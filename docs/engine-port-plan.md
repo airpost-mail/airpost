@@ -2,9 +2,10 @@
 
 This is the brief for the port. It records the decisions already made, the contract with the
 client, the architecture, and a work breakdown sized for a multi-agent workflow. A session
-starting from scratch should be able to execute from this file plus the C++ source. The repo
-`CLAUDE.md` describes the C++ engine's design and invariants, especially "Message Identity and
-Placements"; read it first.
+starting from scratch should be able to execute from this file plus the C++ source. `legacy/mailsync-cpp/CLAUDE.md` describes the C++ engine's design and invariants, especially
+"Message Identity and Placements"; read it first. C++ paths in this doc (`MailSync/…`,
+`Vendor/…`, `test/…`) are relative to `legacy/mailsync-cpp/`. Rust paths are relative to the
+repo root (section 12).
 
 ## 0. Decisions
 
@@ -20,7 +21,8 @@ Placements"; read it first.
 | D8 | No feature cuts beyond ones that would pull C dependencies back in (section 2). |
 | D9 | Provider-specific behaviour lives in provider profiles, one file per provider, not as scattered host checks (section 4). |
 | D10 | One monorepo holds the engine, the desktop client, the future backend and shared libs. Name: Tern (GitHub org `ternmail`); see section 12. |
-| D11 | Everything ships under GPL-3.0-or-later, with the product rebranded away from "Mailspring" (section 12). |
+| D11 | Everything ships under GPL-3.0, the upstream licence (not "or later": that needs the upstream copyright holders' consent). The product is rebranded away from "Mailspring" (section 12). |
+| D12 | One Cargo workspace at the repo root covers the engine, the backend and every Rust library, so the backend (Rust) reuses engine crates such as ids and metadata models. |
 
 ## 1. Size and expectations
 
@@ -174,8 +176,9 @@ Shared state is limited to:
 
 ### 4.2 Workspace layout
 
-A Cargo workspace at `engine/` in the monorepo (section 12). The Python harness moves to
-`engine/test/`. Paths elsewhere in this doc that say `rust/` mean `engine/`.
+The `mailsync` bin crate lives at `apps/engine/` and the `ms-*` library crates at
+`crates/ms-*/`, all members of the root Cargo workspace (D12, section 12). P1-H moves the
+Python harness from `legacy/mailsync-cpp/test/` to `apps/engine/test/`.
 
 | Crate | Replaces | Key deps |
 |---|---|---|
@@ -468,7 +471,7 @@ should start by reading the cited code.
 
 ## 7. Test strategy
 
-- **Primary gate:** `MAILSYNC_BIN=rust/target/release/mailsync python3 -m pytest test` (see
+- **Primary gate:** `MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test` (see
   `test/README.md`).
   - The harness is black-box and runs against the fake IMAP/SMTP server, Dovecot and Cyrus (Docker).
   - `invariants.py` runs after every scenario.
@@ -495,7 +498,7 @@ their gates.
 
 **P0 Foundation (serial, one agent).**
 - Workspace and CI (`cargo fmt`, `clippy -D warnings`, `cargo test`).
-- `rust/CLAUDE.md` carrying over the comment and logging conventions from the repo CLAUDE.md.
+- Root `Cargo.toml` workspace (`apps/engine`, `apps/backend` once it exists, `crates/*`), `cargo deny` licence allowlist, and `apps/engine/CLAUDE.md` carrying over the comment and logging conventions from `legacy/mailsync-cpp/CLAUDE.md`.
 - All of the 4.3 interfaces, with stub implementations.
 - `ms-core`: SyncError, id functions with the golden file, base58, constants, log sink and line format, Clock.
 - `mailsync` bin: CLI parsing, the account/identity handshake, `migrate` creating the fresh V12 schema (section 9), and the stdin loop with no-op handlers.
@@ -600,22 +603,30 @@ The current C++ Windows build is 32-bit (`Win32`); the Rust one targets x86_64 a
 
 ### Layout
 
+Local checkout: `~/Developer/OpenSource/Ternmail/ternmail`, which maps to GitHub `ternmail/ternmail`.
+
 ```
 ternmail/
+  Cargo.toml          workspace: apps/engine, apps/backend, crates/* (D12)
   apps/
-    desktop/        Electron client (imported from Mailspring with history)
-    backend/        future self-hostable metadata/tracking/sharing service (D3)
-  engine/           Cargo workspace: mailsync bin + ms-* crates (section 4.2), harness in engine/test/
-  libs/             code shared across apps, e.g. TS types generated from the engine's
-                    delta/task structs so the client and engine can't drift
+    desktop/          Electron client (TS), imported from Mailspring with history
+    engine/           mailsync bin crate: CLI, modes, stdin loop, thread startup; harness in test/
+    backend/          self-hostable metadata/tracking/sharing server, Rust (D3), not started
+  crates/             Rust libraries (ms-core, ms-store, ms-imap, ...) shared by engine and backend
+  packages/           TS libraries, e.g. protocol types generated from the engine's delta/task
+                      structs so the client and engine can't drift
   legacy/
-    mailsync-cpp/   the C++ engine, the reference and A/B baseline until parity, then deleted
-  LICENSE           GPL-3.0 text
-  NOTICE / AUTHORS  upstream attribution (below)
+    mailsync-cpp/     the C++ engine, imported with history; reference and A/B baseline until
+                      parity, then deleted
+  docs/
+  LICENSE.md          GPL-3.0 text
+  NOTICE.md           upstream attribution (below)
 ```
 
-Import both upstream repos with history (`git subtree add` or `git filter-repo --to-subdirectory-filter`).
-That keeps authorship and copyright lines intact.
+The libraries are split by language so each tool globs its own folder: Cargo uses `crates/*`
+and npm uses `packages/*`. Deployables live in `apps/`. Both upstream repos were imported with
+`git subtree add`, so authorship and copyright lines are intact. Mailspring's `mailsync` git
+submodule was removed after the import.
 
 ### GPL-3.0 obligations
 
@@ -636,7 +647,7 @@ derivative work too. Treat the whole monorepo as GPL-3.0. This is not legal advi
 - **`apps/backend`:** a separate program that talks over HTTP is not a derivative of the client.
   It could carry another licence if it is written from scratch. AGPL-3.0 is worth considering
   so hosted forks have to share changes. Default: GPL-3.0 like the rest, revisit when it exists.
-- **Crates published from `libs/`:** these can carry a permissive licence only if they contain
+- **Crates or packages published from `crates/` or `packages/`:** these can carry a permissive licence only if they contain
   no code derived from the GPL sources.
 
 ### Trademark and naming

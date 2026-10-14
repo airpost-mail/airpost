@@ -5,9 +5,10 @@ A desktop email client with a sync engine written in Rust, forked from Mailsprin
 | Path | Contents |
 |---|---|
 | `apps/desktop/` | Electron client |
-| `apps/backend/` | Self-hostable backend for metadata sync, tracking and sharing (not started) |
-| `engine/` | Rust sync engine (`mailsync`), not started; see `docs/engine-port-plan.md` |
-| `libs/` | Code shared across apps |
-| `legacy/mailsync-cpp/` | The C++ sync engine, the reference and A/B baseline until the Rust engine reaches parity |
+| `apps/engine/` | Rust sync engine binary (`mailsync`), not started; see `docs/engine-port-plan.md` |
+| `apps/backend/` | Self-hostable backend for metadata sync, tracking and sharing, not started |
+| `crates/` | Rust libraries shared by the engine and backend |
+| `packages/` | TS libraries shared across apps |
+| `legacy/mailsync-cpp/` | The C++ sync engine: the reference and A/B baseline until the Rust engine reaches parity |
 
 Licensed under GPL-3.0; see LICENSE.md and NOTICE.md.

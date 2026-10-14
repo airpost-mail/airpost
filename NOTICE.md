@@ -7,7 +7,7 @@ distributed under the GNU General Public License v3.0 (see LICENSE.md).
   at upstream commit `1b52a4b19`) and has been modified since.
 - `legacy/mailsync-cpp/` is https://github.com/Foundry376/Mailspring-Sync (imported with history
   at upstream commit `f7b0239`). It is kept as the reference for the Rust engine.
-- `engine/` is a Rust translation of Mailspring-Sync and is a derivative work of it.
+- `apps/engine/` and `crates/` are a Rust translation of Mailspring-Sync and is a derivative work of it.
 
 Each file keeps its upstream copyright notices. Changes since the import are recorded in the git
 history of this repository.
