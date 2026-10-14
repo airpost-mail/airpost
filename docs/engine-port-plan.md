@@ -479,6 +479,25 @@ should start by reading the cited code.
   - Make IMAP tag regexes tag-agnostic, e.g. `^\d+ IDLE$` → `^\S+ IDLE$`, and the `sent`/`recv` hook patterns.
   - Replace the `migration-*` scenarios (C++ schema upgrades) with `fresh-db-replaces-legacy` and `import-legacy-carries-metadata`.
   - Add scenarios for local metadata expiration, Google People (against a fake People API), and DAV (against Radicale and Baikal in Docker, under `test/servers/`).
+- **What the harness relies on** (`test/harness/mailsync.py`, `test/README.md`):
+  - **Launch:**
+    - The binary comes from `MAILSYNC_BIN`, else `--mailsync`. It is symlinked as `<work>/mailspring-bin/mailsync` to pass the argv[0] check.
+    - Env: `CONFIG_DIR_PATH`, `IDENTITY_SERVER=http://127.0.0.1:9/unreachable`, plus the scenario's `env:`.
+    - It always runs `--mode migrate` first and requires exit 0 and `"error":null`.
+    - Then `--mode sync --verbose --identity null --account <json>`, with the account passed as an argument rather than on stdin.
+    - Account id `c0ffee-harness` must give `startDelay` 0 (`Account.cpp:32-39`).
+    - Stop sequence: close stdin, SIGTERM, then SIGKILL after 5 s.
+  - **Logs:** it tails the log file every 0.1 s, including across `.log.1` rotation, matching `^(\d+) \[ts\] \[thread\] \[level\] msg`. Stdout lines without `modelClass` are recorded as noise.
+  - **Quiescence**, all of which must hold:
+    - every Folder has `localStatus.busy == false` and `syncedMinUID <= 1` (read from the DB);
+    - the last `background` line is exactly `Sync loop complete.` and is at least 2 s old;
+    - the last `foreground` `sent` line is an IDLE command, or its last line is `Connection does not support idling…` (`Idling on folder` when not verbose);
+    - no delta has arrived for 2 s.
+  - **`sync: pass` step:** sends `wake-workers` and waits for ``Marking all folders as `busy` ``.
+  - **`force_scans`:** writes `localStatus.lastDeep/lastShallow/lastCleanup = 0` into the live DB, so the engine must re-read Folder `localStatus` on every pass.
+  - **Task completion:** detected through the `Task.status` column (`complete` / `cancelled`).
+  - **Hook regexes** match the command text the engine sends: `^UID FETCH 1:\*`, `BODY\.PEEK\[\]$`, `^UID STORE .*Deleted`, `^STATUS "`, `^UID (MOVE|COPY)`, `^UID EXPUNGE`, `^LIST`. Matching mailcore's command shapes keeps the fake server on the parsing paths that have been checked against Dovecot.
+  - **Running:** `pip install -r test/requirements.txt`, then `python3 -m pytest test` (16 in parallel, ~6 min), narrowed with `-k`, `--servers fake` or `-n 0`. `python3 test/run.py <yaml> --server kind:profile --keep` runs one scenario. Artifacts go to `test/runs/session-<pid>/`.
 - **A/B:** `test/tools/ab.py` runs both binaries on the same scenario. Use it to diff deltas and DB
   state (ids will differ by design, so compare by `headerMessageId`).
 - **Unit tests per crate:**
