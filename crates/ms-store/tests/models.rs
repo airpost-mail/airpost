@@ -469,6 +469,10 @@ fn files_and_tasks() {
     let mut file = File::create("f1", &msg, &png);
     assert_eq!(file.filename(), "Unnamed Image.png");
     assert_eq!(file.message_id(), "m1");
+    assert_eq!(
+        file.to_json().get("contentId"),
+        Some(&serde_json::Value::Null)
+    );
     f.store.save(&mut file).unwrap();
     let pdf = FilePart {
         part_id: "2",

@@ -31,9 +31,9 @@ impl File {
         let mut data = base_json(id, message.account_id(), 0);
         data["messageId"] = json!(message.id());
         data["partId"] = json!(part.part_id);
-        if let Some(cid) = part.content_id {
-            data["contentId"] = json!(cid);
-        }
+        // Always present: MailProcessor.cpp reads `contentId()` through a non-const
+        // `_data["contentId"]`, which writes null for a part without one.
+        data["contentId"] = part.content_id.map_or(Value::Null, |cid| json!(cid));
         if let Some(ct) = part.content_type {
             data["contentType"] = json!(ct);
         }

@@ -32,14 +32,19 @@ pub fn run(ctx: WorkerContext) -> i32 {
     let fg_wake_queued = Arc::new(AtomicBool::new(false));
     let calendar_running = Arc::new(AtomicBool::new(false));
     let stdin = std::io::stdin();
-    let mut line = String::new();
+    let mut line = Vec::new();
     loop {
         line.clear();
-        match stdin.lock().read_line(&mut line) {
+        // Raw bytes, as getline reads them: a line that is not UTF-8 is dropped like any
+        // other unparseable line, not taken for a closed stdin.
+        match stdin.lock().read_until(b'\n', &mut line) {
             Ok(0) | Err(_) => wait_for_parent_then_exit(),
             Ok(_) => {}
         }
-        let trimmed = line.trim();
+        let Ok(text) = std::str::from_utf8(&line) else {
+            continue;
+        };
+        let trimmed = text.trim();
         if trimmed.is_empty() {
             continue;
         }

@@ -15,6 +15,7 @@ pub mod mailbox_model;
 pub mod metadata_expiration;
 pub mod metadata_worker;
 pub mod tasks;
+mod worker;
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -47,4 +48,36 @@ pub struct WorkerContext {
     pub metadata: Arc<dyn MetadataBackend>,
     /// Builds the task runner the foreground worker uses for remote phases (ms-tasks).
     pub tasks: Arc<dyn TaskRunnerFactory>,
+}
+
+/// A failure no retry can fix (a bug, a non-retryable `SyncError`): log it as critical and
+/// abort, as the worker loops in `main.cpp` did.
+pub(crate) fn abort_worker(e: &ms_core::Error) -> ! {
+    ms_core::critical!("{}", worker_error_text(e));
+    ms_core::log::flush();
+    std::process::abort();
+}
+
+/// The `catch (SyncException &)` arm of the worker loops: aborts on a non-retryable error,
+/// reports a connection error when offline, and logs `--sleeping`. The caller sleeps.
+pub(crate) fn report_worker_error(ctx: &WorkerContext, e: &ms_core::Error) {
+    if !e.is_retryable() {
+        abort_worker(e);
+    }
+    tracing::error!("{}", worker_error_text(e));
+    if e.is_offline() {
+        ctx.deltas.begin_connection_error(ctx.account.id());
+    }
+    tracing::info!("{}", ms_core::logmsg::sleeping());
+}
+
+/// `logCurrentExceptionWithStackTrace`, without the stack.
+fn worker_error_text(e: &ms_core::Error) -> String {
+    match e {
+        ms_core::Error::Sync(s) => format!(
+            "An exception occurred during program execution: {}",
+            s.to_json()
+        ),
+        other => format!("An unexpected error occurred during program execution: {other}"),
+    }
 }

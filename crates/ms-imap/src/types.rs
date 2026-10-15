@@ -146,10 +146,22 @@ pub struct Namespace {
 }
 
 impl Namespace {
-    /// The server path of a folder given by components, e.g. `["Mailspring", "Snoozed"]`.
+    /// The server path of a folder given by components, e.g. `["Mailspring", "Snoozed"]`:
+    /// each component modified UTF-7 encoded, joined by the delimiter, after the prefix
+    /// with the delimiter appended when it lacks one (mailcore's
+    /// `IMAPNamespaceItem::pathForComponents`).
     pub fn path_for_components(&self, components: &[&str]) -> String {
         let delim = self.delimiter.map(String::from).unwrap_or_default();
-        format!("{}{}", self.prefix, components.join(&delim))
+        let encoded: Vec<String> = components
+            .iter()
+            .map(|c| ms_core::utf7::encode(c))
+            .collect();
+        let mut path = self.prefix.clone();
+        if !path.is_empty() && !path.ends_with(&delim) {
+            path.push_str(&delim);
+        }
+        path.push_str(&encoded.join(&delim));
+        path
     }
 }
 
@@ -293,5 +305,42 @@ impl std::fmt::Debug for IdleInterrupt {
         f.debug_struct("IdleInterrupt")
             .field("pending", &self.inner.pending.load(Ordering::SeqCst))
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Namespace;
+
+    fn ns(prefix: &str, delimiter: Option<char>) -> Namespace {
+        Namespace {
+            prefix: prefix.to_owned(),
+            delimiter,
+        }
+    }
+
+    #[test]
+    fn path_for_components_encodes_and_completes_the_prefix() {
+        let parts = ["Mailspring", "Snoozed"];
+        assert_eq!(
+            ns("", Some('/')).path_for_components(&parts),
+            "Mailspring/Snoozed"
+        );
+        assert_eq!(
+            ns("INBOX.", Some('.')).path_for_components(&parts),
+            "INBOX.Mailspring.Snoozed"
+        );
+        assert_eq!(
+            ns("INBOX", Some('.')).path_for_components(&parts),
+            "INBOX.Mailspring.Snoozed"
+        );
+        assert_eq!(
+            ns("", None).path_for_components(&parts),
+            "MailspringSnoozed"
+        );
+        assert_eq!(
+            ns("", Some('/')).path_for_components(&["Entwürfe", "A&B"]),
+            "Entw&APw-rfe/A&-B"
+        );
     }
 }

@@ -1526,6 +1526,7 @@ dependencies = [
 name = "ms-sync"
 version = "0.1.0"
 dependencies = [
+ "hostname",
  "ms-core",
  "ms-dav",
  "ms-imap",
@@ -1533,8 +1534,11 @@ dependencies = [
  "ms-net",
  "ms-providers",
  "ms-store",
+ "rusqlite",
  "serde_json",
+ "tempfile",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1550,7 +1554,9 @@ dependencies = [
  "ms-smtp",
  "ms-store",
  "ms-sync",
+ "rusqlite",
  "serde_json",
+ "tempfile",
  "tracing",
 ]
 

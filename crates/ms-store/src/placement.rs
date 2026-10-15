@@ -540,6 +540,7 @@ impl Store {
     /// Deletes the placements at `uids` in `folder`; returns the affected message ids.
     pub fn delete_vanished_placements(&self, folder: &Folder, uids: &[u32]) -> Result<Vec<String>> {
         let mut affected: Vec<String> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
         for chunk in uids.chunks(BULK_CHUNK) {
             let sql = format!(
                 "DELETE FROM MessageFolder WHERE accountId = ? AND folderId = ? AND remoteUID > 0 \
@@ -553,7 +554,7 @@ impl Store {
             binds.extend(chunk.iter().map(|u| SqlValue::Integer(*u as i64)));
             let mut stmt = self.conn().prepare(&sql)?;
             for id in collect_ids(stmt.query(params_from_iter(binds))?)? {
-                if !affected.contains(&id) {
+                if seen.insert(id.clone()) {
                     affected.push(id);
                 }
             }
@@ -570,6 +571,9 @@ impl Store {
         uids: &UidSet,
     ) -> Result<Vec<String>> {
         let mut affected: Vec<String> = Vec::new();
+        // A wide VANISHED (`1:N` for a folder emptied elsewhere) returns many ids, and this
+        // runs under the write lock.
+        let mut seen: HashSet<String> = HashSet::new();
         let mut stmt = self.conn().prepare_cached(
             "DELETE FROM MessageFolder WHERE accountId = ? AND folderId = ? AND remoteUID > 0 \
              AND remoteUID >= ? AND remoteUID <= ? RETURNING messageId",
@@ -578,7 +582,7 @@ impl Store {
             let end = r.end.map_or(i64::MAX, i64::from);
             let rows = stmt.query(params![folder.account_id(), folder.id(), r.start, end])?;
             for id in collect_ids(rows)? {
-                if !affected.contains(&id) {
+                if seen.insert(id.clone()) {
                     affected.push(id);
                 }
             }

@@ -17,4 +17,10 @@ ms-mime.workspace = true
 ms-net.workspace = true
 ms-dav.workspace = true
 serde_json.workspace = true
+rusqlite.workspace = true
+uuid.workspace = true
+hostname.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
