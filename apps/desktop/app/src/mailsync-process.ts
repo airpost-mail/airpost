@@ -164,6 +164,19 @@ export function resolveSyncEngine(configDirPath: string, resourcePath: string): 
     );
     return 'cpp';
   }
+  // Source checkouts of the monorepo carry no C++ binary, only the Rust one the engine build
+  // installs.
+  if (
+    engine === 'cpp' &&
+    !fs.existsSync(syncEngineBinaryPath(resourcePath, 'cpp')) &&
+    fs.existsSync(syncEngineBinaryPath(resourcePath, 'rust'))
+  ) {
+    console.warn(
+      `The C++ sync engine is selected but ${SYNC_ENGINE_BINARIES.cpp} is not in this ` +
+        `build; running the Rust engine`
+    );
+    return 'rust';
+  }
   return engine;
 }
 

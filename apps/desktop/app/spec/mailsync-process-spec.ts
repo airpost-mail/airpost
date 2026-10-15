@@ -50,7 +50,7 @@ describe('accumulating mailsync stdout', function () {
   const chunks = [bytes.subarray(0, splitAt), bytes.subarray(splitAt)];
 
   it('mangles a character split across chunks when each chunk is decoded alone', function () {
-    const perChunk = chunks.map(c => c.toString('utf-8')).join('');
+    const perChunk = chunks.map((c) => c.toString('utf-8')).join('');
     expect(perChunk).not.toEqual(payload);
     expect(perChunk).toContain('�');
     expect(lastJSONResponse(perChunk).error).not.toEqual('Café serveur');
@@ -132,11 +132,13 @@ describe('migrating for the Rust engine', function () {
       child.stderr = new EventEmitter();
       (proc as any)._proc = child;
       const ok = mode === 'migrate';
-      setTimeout(() => {
+      // A microtask, not setTimeout: the spec helper fakes timers, and the listeners are
+      // attached right after _spawnProcess returns.
+      Promise.resolve().then(() => {
         const result = ok ? '\n{"error":null}' : '\n{"error":"no Message table"}';
         child.stdout.emit('data', Buffer.from(result, 'utf-8'));
         child.emit('close', ok ? 0 : 1, null);
-      }, 0);
+      });
     });
     spyOn(console, 'error');
 
