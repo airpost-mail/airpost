@@ -33,7 +33,7 @@ import { developerToolsAvailable } from '../developer-tools';
 import MailspringProtocolHandler from './mailspring-protocol-handler';
 import ConfigPersistenceManager from './config-persistence-manager';
 import moveToApplications from './move-to-applications';
-import { MailsyncProcess } from '../mailsync-process';
+import { MailsyncProcess, resolveSyncEngine, SyncEngine } from '../mailsync-process';
 import Config from '../config';
 import { registerQuickpreviewIPCHandlers } from './quickpreview-ipc';
 import { guardAuxiliaryWindowNavigation } from './auxiliary-window-guard';
@@ -50,6 +50,7 @@ import { resetThemeForRecovery } from './theme-recovery';
 export default class Application extends EventEmitter {
   resourcePath: string;
   configDirPath: string;
+  syncEngine: SyncEngine;
   config: Config;
   version: string;
   devMode: boolean;
@@ -94,8 +95,10 @@ export default class Application extends EventEmitter {
       safeMode,
     });
 
+    this.syncEngine = resolveSyncEngine(configDirPath, resourcePath);
+
     try {
-      const mailsync = new MailsyncProcess(options);
+      const mailsync = new MailsyncProcess({ ...options, syncEngine: this.syncEngine });
       await mailsync.migrate();
     } catch (err) {
       let message = null;

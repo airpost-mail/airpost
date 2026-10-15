@@ -3,16 +3,16 @@ from pathlib import Path
 
 import pytest
 
-from harness.scenario import (ScenarioRun, ScenarioSkipped, ServerSpec, available_server_kinds,
-                              discover, load_scenario)
+from harness.scenario import (DOCKER_KINDS, ScenarioRun, ScenarioSkipped, ServerSpec, discover, load_scenario,
+                              scenario_slow)
 
 SCENARIOS = Path(__file__).parent / "scenarios"
 
 
 def _cases(config):
-    kinds = available_server_kinds()
-    if config.getoption("--servers"):
-        kinds = set(config.getoption("--servers").split(","))
+    """Every (scenario, server) pair, marked for conftest's tier and server selection: `slow`
+    when the scenario says so for that server or the server runs in Docker, `docker(kind)`
+    for the Docker kinds."""
     only = config.getoption("--scenario")
     cases = []
     for path in discover(SCENARIOS):
@@ -21,7 +21,11 @@ def _cases(config):
             continue
         for entry in sc["servers"]:
             spec = ServerSpec.parse(entry)
-            marks = [] if spec.kind in kinds else [pytest.mark.skip(reason=f"server kind {spec.kind} not available")]
+            marks = []
+            if spec.kind in DOCKER_KINDS:
+                marks.append(pytest.mark.docker(spec.kind))
+            if spec.kind in DOCKER_KINDS or scenario_slow(sc, spec):
+                marks.append(pytest.mark.slow)
             cases.append(pytest.param(path, spec, id=f"{sc['name']}[{spec.id}]", marks=marks))
     return cases
 

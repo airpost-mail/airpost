@@ -31,6 +31,7 @@ steps:
         fwdMsgId: ""
     as: save
   - wait: {task: save, timeout: 60}
+  - mark: scheduled
   - client.task:
       __cls: SyncbackMetadataTask
       model: {messages: {header_message_ids: ["send-later-1@example.test"]}}
@@ -53,8 +54,10 @@ steps:
   - restart:
       wait: false
       before:
-        - wait: {seconds: 25}
+        # Relaunch once the send-later time has passed (a second after it).
+        - wait: {until: scheduled, plus: 21}
   - wait: {delta: {class: Message, type: metadata-expiration, count: 1}, timeout: 90}
+  - mark: expired
   - client.task:
       __cls: SyncbackMetadataTask
       model: {messages: {header_message_ids: ["send-later-1@example.test"]}}
@@ -63,7 +66,9 @@ steps:
     as: sent
   - wait: {task: sent, timeout: 30}
   - mark: cleared
-  - wait: {seconds: 25}
+  # Nothing may arrive after the clear. The earliest scan after one that sent something is
+  # 16 s later (15 s minimum, then 1 s), and its deltas reach stdout 500 ms after it.
+  - wait: {until: expired, plus: 18}
 expect:
   metadata_expiration:
     - {messages: {header_message_ids: ["send-later-1@example.test"]}, plugin: send-later, count: {min: 1}}

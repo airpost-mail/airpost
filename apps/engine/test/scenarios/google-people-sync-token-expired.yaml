@@ -29,8 +29,8 @@ steps:
       people_requests:
         - {method: GET, path: "^/v1/people/me/connections$", query: {syncToken: true}, status: 400, min: 1}
       timeout: 120
-  # The engine clears the stored token after the response arrives; let it land before SIGTERM.
-  - wait: {seconds: 5}
+  # The engine clears the stored token before the pass fails; SIGTERM only after that.
+  - wait: {log: "^-X Calendar sync pass 1 failed\\.$", timeout: 60}
   - restart: {wait: false}
   - wait: {models: {Contact: {where: {s: gpeople}, match: [{email: dan@example.org}, {email: erin@example.org, name: "Erin Elm-Oak"}]}}, timeout: 120}
   - wait: {quiescent: true}

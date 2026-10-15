@@ -59,6 +59,12 @@ pub fn migrate(
         save_key_value(&conn, STATE_ENGINE_KEY, STATE_ENGINE_RUST)?;
         save_key_value(&conn, VACUUM_TIME_KEY, &clock.now().to_string())?;
         outcome.created = true;
+        if outcome.moved_legacy {
+            // Local drafts' attachments exist nowhere else; import-legacy copies them back.
+            if let Err(e) = crate::legacy_import::set_aside_draft_files(config_dir) {
+                write_progress(out, &format!("\nCould not keep draft attachments: {e}"))?;
+            }
+        }
         // Bodies and attachments of the old database are re-downloaded under new ids.
         clear_dir_contents(&config_dir.join(FILES_DIR))?;
     } else if version < SCHEMA_VERSION {

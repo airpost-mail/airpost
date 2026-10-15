@@ -321,13 +321,13 @@ export default class MailsyncBridge {
   // Private
 
   _getClientConfiguration() {
-    const { configDirPath, resourcePath } = AppEnv.getLoadSettings();
+    const { configDirPath, resourcePath, syncEngine } = AppEnv.getLoadSettings();
     const verboseUntil = AppEnv.config.get(VERBOSE_UNTIL_KEY) || 0;
     const verbose = verboseUntil && verboseUntil / 1 > Date.now();
     if (verbose) {
       console.warn(`Verbose mailsync logging is enabled until ${new Date(verboseUntil)}`);
     }
-    return { configDirPath, resourcePath, verbose };
+    return { configDirPath, resourcePath, verbose, syncEngine };
   }
 
   async _launchClient(

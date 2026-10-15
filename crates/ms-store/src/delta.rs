@@ -205,20 +205,8 @@ impl DeltaStream {
     /// thread runs). A later emit with an earlier deadline than the scheduled one flushes
     /// immediately.
     pub fn emit(&self, items: Vec<DeltaItem>, max_delay_ms: u64) {
-        let desired = Instant::now() + Duration::from_millis(max_delay_ms);
         let mut buf = self.lock();
-        for item in items {
-            let list = buf.items.entry(item.model_class.clone()).or_default();
-            let merged = list.last_mut().is_some_and(|last| last.concatenate(&item));
-            if !merged {
-                list.push(item);
-            }
-        }
-        match buf.deadline {
-            None => buf.deadline = Some(desired),
-            Some(scheduled) if desired < scheduled => buf.deadline = Some(Instant::now()),
-            Some(_) => {}
-        }
+        queue_locked(&mut buf, items, max_delay_ms);
         drop(buf);
         self.cv.notify_all();
     }
@@ -277,28 +265,46 @@ impl DeltaStream {
 
     /// `ProcessState {accountId, id, connectionError: true}`, sent on every call.
     pub fn begin_connection_error(&self, account_id: &str) {
-        self.lock().connection_error = true;
-        self.emit_process_state(account_id, true);
+        let mut buf = self.lock();
+        buf.connection_error = true;
+        queue_locked(&mut buf, vec![process_state(account_id, true)], 0);
+        drop(buf);
+        self.cv.notify_all();
     }
 
     /// `ProcessState {…, connectionError: false}`, sent only after a begin.
     pub fn end_connection_error(&self, account_id: &str) {
-        let was = std::mem::replace(&mut self.lock().connection_error, false);
-        if was {
-            self.emit_process_state(account_id, false);
+        let mut buf = self.lock();
+        if std::mem::replace(&mut buf.connection_error, false) {
+            queue_locked(&mut buf, vec![process_state(account_id, false)], 0);
+        }
+        drop(buf);
+        self.cv.notify_all();
+    }
+}
+
+/// The flag and its delta change under one lock: with the C++'s separate steps, a begin and
+/// an end on two workers could interleave so the queued state was `true` while the flag
+/// was already `false`, and no later end ever cleared it.
+fn process_state(account_id: &str, connection_error: bool) -> DeltaItem {
+    let state =
+        json!({ "accountId": account_id, "id": account_id, "connectionError": connection_error });
+    DeltaItem::new(DELTA_TYPE_PERSIST, "ProcessState", vec![state])
+}
+
+fn queue_locked(buf: &mut Buffer, items: Vec<DeltaItem>, max_delay_ms: u64) {
+    let desired = Instant::now() + Duration::from_millis(max_delay_ms);
+    for item in items {
+        let list = buf.items.entry(item.model_class.clone()).or_default();
+        let merged = list.last_mut().is_some_and(|last| last.concatenate(&item));
+        if !merged {
+            list.push(item);
         }
     }
-
-    fn emit_process_state(&self, account_id: &str, connection_error: bool) {
-        let state = json!({ "accountId": account_id, "id": account_id, "connectionError": connection_error });
-        self.emit(
-            vec![DeltaItem::new(
-                DELTA_TYPE_PERSIST,
-                "ProcessState",
-                vec![state],
-            )],
-            0,
-        );
+    match buf.deadline {
+        None => buf.deadline = Some(desired),
+        Some(scheduled) if desired < scheduled => buf.deadline = Some(Instant::now()),
+        Some(_) => {}
     }
 }
 

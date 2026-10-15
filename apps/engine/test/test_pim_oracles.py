@@ -13,7 +13,6 @@ import pytest
 
 from harness import davgen, invariants, legacy, pim
 from harness.servers import dav as davmod
-from harness.servers.dovecot import docker_available
 from harness.servers.people import PeopleState
 
 AID = "c0ffee-harness"
@@ -240,10 +239,9 @@ def dav_db(truth: dict) -> sqlite3.Connection:
     return conn
 
 
-@pytest.fixture(scope="module", params=sorted(davmod.KINDS))
+@pytest.fixture(scope="module", params=[pytest.param(k, marks=[pytest.mark.slow, pytest.mark.docker(k)])
+                                        for k in sorted(davmod.KINDS)])
 def seeded_dav(request, tmp_path_factory):
-    if not docker_available():
-        pytest.skip("Radicale and Baikal run in Docker")
     server = davmod.DavServer(request.param, log_path=str(tmp_path_factory.mktemp(request.param) / "server.log"))
     server.start()
     try:

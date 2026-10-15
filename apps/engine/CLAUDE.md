@@ -39,9 +39,18 @@ cargo test -p mailsync -- --ignored            # the 30 s stdin-closed exit test
 cargo deny check
 python3 apps/engine/tools/schema_check.py check <edgehill.db>  # compare against the C++ V12 replay
 MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test -n 0 -k <scenario>
+python3 -m pytest apps/engine/test             # quick tier: fake server, no Docker, ~3 min
+python3 -m pytest apps/engine/test --all       # both tiers, every server kind, ~12 min
 ```
 
-Release builds exit 2 unless the lowercased argv[0] contains `tern`; the harness symlinks
+Which harness tier when (apps/engine/test/README.md "Tiers"): while iterating, a narrow
+`-k` selection, then the quick tier before calling a change done. Run `--all` (or
+`--servers <kind>` for the kind you touched) once per phase or step that changes IMAP,
+DAV or Docker-server behaviour, and before a commit that ends a phase. A new fake-server
+scenario that takes over ~20 s on its own gets `slow: true`.
+
+Release builds exit 2 unless the lowercased argv[0] contains `tern` or `mailspring` (the
+latter until the desktop rebrand; the app still ships as Mailspring.app); the harness symlinks
 the binary as `<work>/tern-mailspring-bin/mailsync`. Debug builds skip the check.
 
 ## Working in a shared tree

@@ -1,13 +1,14 @@
 """The fake server must answer like Dovecot for every exchange mailsync performs.
-Needs Docker (or a local dovecot); skipped otherwise."""
+Needs Docker (or HARNESS_SERVERS naming dovecot with a local dovecot); skipped otherwise.
+Slow tier: conftest skips the `docker` marker's kinds when they are not available."""
 import pytest
 
-from harness.scenario import available_server_kinds
 from conformance.compare import compare_all
 from conformance.probes import PROBES
 
+pytestmark = [pytest.mark.slow, pytest.mark.docker("dovecot")]
 
-@pytest.mark.skipif("dovecot" not in available_server_kinds(), reason="no Dovecot available")
+
 @pytest.mark.parametrize("probe", PROBES, ids=lambda p: p.__name__)
 def test_fake_matches_dovecot(probe):
     results = compare_all(probes=[probe])

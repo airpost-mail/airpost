@@ -80,10 +80,9 @@ steps:
   - wait: {task: destroy_group, timeout: 60}
   # A later pass must leave the server and the database as the tasks did. Contacts are only
   # re-read on a full pass, 15 s after launch, and quiescence covers mail only, so wait for
-  # the restarted engine's first pass to start and give it time to finish.
+  # the restarted engine's first pass to finish (the second such line in the log).
   - restart: {wait: false}
-  - wait: {log: "^Calendar sync pass 1, with contacts$", count: 2, timeout: 90}
-  - wait: {seconds: 20}
+  - wait: {log: "^Calendar sync pass 1 complete\\.$", count: 2, timeout: 120}
   - wait: {quiescent: true}
 expect:
   tasks:

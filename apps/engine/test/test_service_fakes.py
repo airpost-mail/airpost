@@ -16,7 +16,6 @@ import pytest
 
 from harness import davgen
 from harness.servers import dav as davmod
-from harness.servers.dovecot import docker_available
 from harness.servers.people import CLIENT_ID, EXPIRED_TOKEN_MESSAGE, REFRESH_TOKEN, FakePeopleServer
 
 # GoogleContactsWorker.cpp PERSON_FIELDS.
@@ -193,14 +192,12 @@ def test_people_writes(people):
 
 # -- DAV servers ----------------------------------------------------------------------------------------
 
-dav_kinds = pytest.mark.skipif(not docker_available(), reason="Radicale and Baikal run in Docker")
 NS = davmod.NS
 
 
-@pytest.fixture(scope="module", params=sorted(davmod.KINDS))
+@pytest.fixture(scope="module", params=[pytest.param(k, marks=[pytest.mark.slow, pytest.mark.docker(k)])
+                                        for k in sorted(davmod.KINDS)])
 def dav_server(request, tmp_path_factory):
-    if not docker_available():
-        pytest.skip("Radicale and Baikal run in Docker")
     log = tmp_path_factory.mktemp(request.param) / "server.log"
     server = davmod.DavServer(request.param, log_path=str(log))
     server.start()
@@ -230,7 +227,6 @@ def raw(server, method, path, body=None, headers=None, auth=True):
     return server.dav.request(method, path, body, headers, auth=auth, expect=())
 
 
-@dav_kinds
 def test_dav_discovery_as_davworker(dav_server):
     """resolveAddressBook / resolveCalendarHomeURL, request by request."""
     s = dav_server
@@ -283,7 +279,6 @@ def _sync_collection(s, collection, token, props):
     return responses(doc), doc.findtext("d:sync-token", "", NS)
 
 
-@dav_kinds
 def test_caldav_sync_and_writes(dav_server):
     s = dav_server
     col = s.cfg["calendar"]
@@ -346,7 +341,6 @@ def bare_etag(e: str) -> str:
     return (e or "").strip().removeprefix("W/").strip('"')
 
 
-@dav_kinds
 def test_carddav_sync_groups_and_writes(dav_server):
     s = dav_server
     col = s.cfg["addressbook"]

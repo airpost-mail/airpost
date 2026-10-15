@@ -10,6 +10,7 @@
 
 pub mod delta;
 pub mod invariants;
+pub mod legacy_import;
 pub mod migrate;
 pub mod model;
 pub mod models;

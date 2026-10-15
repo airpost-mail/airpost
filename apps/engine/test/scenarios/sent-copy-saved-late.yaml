@@ -30,7 +30,7 @@ steps:
       perRecipientBodies: null
     as: send1
   - wait: {task: send1, timeout: 90}
-  - wait: {seconds: 8}
+  - wait: {smtp_sent_copies: 1, timeout: 30}
   - sync: pass
   - assert: {server_counts: {Sent Items: 1}, counts: {Sent Items: 1}}
   - client.task:
@@ -51,7 +51,7 @@ steps:
       perRecipientBodies: null
     as: send2
   - wait: {task: send2, timeout: 90}
-  - wait: {seconds: 8}
+  - wait: {smtp_sent_copies: 2, timeout: 30}
   - wait: {quiescent: true}
   - sync: pass
 expect:

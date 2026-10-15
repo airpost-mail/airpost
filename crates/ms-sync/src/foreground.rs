@@ -83,6 +83,11 @@ pub fn run_foreground(ctx: WorkerContext) {
     loop {
         let result = fg.w.configure().and_then(|()| fg.idle_cycle_iteration());
         match result {
+            // Note: an iteration whose IDLE died on a dropped connection proves nothing about
+            // the network, so it leaves a connection error the background worker just raised
+            // in place (the C++ cleared it here, hiding the error from the client when every
+            // socket went stale at once). The next clean iteration or background pass clears it.
+            Ok(()) if fg.idle_exited_with_error => {}
             Ok(()) => ctx.deltas.end_connection_error(ctx.account.id()),
             Err(e) => {
                 crate::report_worker_error(&ctx, &e);

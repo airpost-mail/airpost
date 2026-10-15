@@ -32,6 +32,7 @@ UID-space manipulation use the `cyrus` admin over IMAP and Cyrus's tools in the 
 The server transcript is Cyrus's per-user telemetry log (/var/lib/cyrus/log/<user>/),
 collected into the run's server.log on stop; it includes the harness's own sessions.
 """
+import functools
 import hashlib
 import imaplib
 import os
@@ -41,6 +42,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from . import images
 from .base import truth_via_imap
 from .imap_client import ImapClientServer, uid_set
 
@@ -60,6 +62,7 @@ PROFILES = {
 }
 
 
+@functools.lru_cache(maxsize=None)
 def image_tag() -> str:
     """Tagged by the build context's content so a config change rebuilds the image."""
     if os.environ.get("HARNESS_CYRUS_IMAGE"):
@@ -71,10 +74,7 @@ def image_tag() -> str:
 
 
 def ensure_image() -> str:
-    tag = image_tag()
-    if subprocess.run(["docker", "image", "inspect", tag], capture_output=True).returncode != 0:
-        subprocess.run(["docker", "build", "-q", "-t", tag, str(DOCKERFILE_DIR)], check=True, capture_output=True)
-    return tag
+    return images.ensure(image_tag(), DOCKERFILE_DIR)
 
 
 def _free_port() -> int:

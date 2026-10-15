@@ -220,13 +220,27 @@ pub fn waking_all_workers() -> &'static str {
     "Waking all workers..."
 }
 
-/// `main.cpp:253`. The scenarios dav-initial-sync, google-people-initial-sync and
-/// dav-create-update-delete (anchored, `^…$`) wait for `Calendar sync pass 1, with contacts`.
+/// `main.cpp:253`. The scenarios dav-initial-sync and google-people-initial-sync wait for
+/// `Calendar sync pass 1, with contacts`.
 pub fn calendar_sync_pass(pass: u64, with_contacts: bool) -> String {
     format!(
         "Calendar sync pass {pass}{}",
         if with_contacts { ", with contacts" } else { "" }
     )
+}
+
+/// The end of a calContacts pass whose workers all finished; every store write of the pass
+/// is committed (its deltas may still be up to 500 ms behind). dav-create-update-delete
+/// waits for `^Calendar sync pass 1 complete\.$` (anchored). Not logged by the C++ engine.
+pub fn calendar_sync_pass_complete(pass: u64) -> String {
+    format!("Calendar sync pass {pass} complete.")
+}
+
+/// The end of a calContacts pass that failed, after its error line and before any
+/// suspension. google-people-sync-token-expired waits for `^-X Calendar sync pass 1 failed\.$`
+/// (anchored): the expired sync token is cleared by then. Not logged by the C++ engine.
+pub fn calendar_sync_pass_failed(pass: u64) -> String {
+    format!("-X Calendar sync pass {pass} failed.")
 }
 
 /// A message with neither a Date header nor INTERNALDATE gets a location-based id

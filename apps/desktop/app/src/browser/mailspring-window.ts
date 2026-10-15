@@ -188,6 +188,7 @@ export default class MailspringWindow extends EventEmitter {
 
     const loadSettings = Object.assign({}, settings);
     loadSettings.appVersion = global.application.version;
+    loadSettings.syncEngine = global.application.syncEngine;
     loadSettings.resourcePath = this.resourcePath;
     if (loadSettings.devMode == null) {
       loadSettings.devMode = false;

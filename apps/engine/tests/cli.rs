@@ -72,6 +72,45 @@ fn migrate_creates_v12() {
     assert_eq!(engine, "rust");
 }
 
+/// One-shot contract: no account is read, success is `{"error":null}` after `info:` lines,
+/// a failure is `{"error": what}` with exit 1, and stderr stays empty either way.
+#[test]
+fn import_legacy_one_shot_output() {
+    let dir = tempfile::tempdir().unwrap();
+    let run = |dir: &Path| {
+        let out = mailsync(dir)
+            .args(["--mode", "import-legacy"])
+            .output()
+            .unwrap();
+        assert!(out.stderr.is_empty(), "{:?}", out.stderr);
+        (out.status.code(), String::from_utf8(out.stdout).unwrap())
+    };
+
+    // Before migrate, with a legacy database: the new database must exist first.
+    std::fs::write(dir.path().join("edgehill.legacy.db"), "").unwrap();
+    let (code, stdout) = run(dir.path());
+    assert_eq!(code, Some(1));
+    assert!(
+        stdout.ends_with(
+            "\n{\"error\":\"edgehill.db does not exist; run --mode migrate before --mode import-legacy\"}"
+        ),
+        "{stdout:?}"
+    );
+    std::fs::remove_file(dir.path().join("edgehill.legacy.db")).unwrap();
+
+    let migrated = mailsync(dir.path())
+        .args(["--mode", "migrate"])
+        .output()
+        .unwrap();
+    assert!(migrated.status.success());
+    let (code, stdout) = run(dir.path());
+    assert_eq!(code, Some(0));
+    assert_eq!(
+        stdout,
+        "info: No legacy database to import.\n\n{\"error\":null}"
+    );
+}
+
 #[test]
 fn usage_and_config_dir() {
     let out = Command::new(env!("CARGO_BIN_EXE_mailsync"))

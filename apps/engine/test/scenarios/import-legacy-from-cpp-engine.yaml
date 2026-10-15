@@ -1,0 +1,105 @@
+name: import-legacy-from-cpp-engine
+description: >
+  A user switches engines with work only the C++ engine's database holds. The C++ engine
+  syncs, then the client snoozes a thread, sets a reminder on a message, saves a local draft
+  with an attachment and schedules it with send-later. The app relaunches on the Rust
+  engine: migrate moves edgehill.db aside (setting the draft's attachment aside before it
+  empties files/), `--mode import-legacy` carries the draft, its body, its file and its
+  metadata over and leaves the metadata of synced mail pending under its Message-ID, and
+  sync attaches it to the messages and threads it ingests under their new ids. The imported
+  snooze and send-later still fire: the Rust engine streams both as `metadata-expiration`
+  once their time passes. Contacts' sync tokens are not carried over, the metadata cursor
+  is, and the legacy database is left as the C++ engine wrote it, renamed to
+  edgehill.legacy-imported.db so a later new database never imports it again.
+source: "docs/engine-port-plan.md section 9 (import-legacy); TaskProcessor.cpp performLocalSaveDraft / performLocalSyncbackMetadata"
+binary: cpp
+slow: true
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {special_use: "\\Drafts"}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 35}, snoozeCategoryId: null}
+    as: snooze
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {mailbox: INBOX, uids: [2]}}
+      pluginId: send-reminders
+      value: {expiration: 1900000100, lastReplyTimestamp: 1700000000}
+    as: reminder
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "cpp-draft-1@example.test"
+        subject: "Unsent plans"
+        body: "<p>draft body</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Someone", email: "someone@example.org"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: [{id: "cppdraftfile0001", filename: notes.txt, contentType: text/plain, contentId: null, content: "attached to the draft"}]
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: snooze, timeout: 30}
+  - wait: {task: reminder, timeout: 30}
+  - wait: {task: save, timeout: 60}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["cpp-draft-1@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 35}}
+    as: schedule
+  - wait: {task: schedule, timeout: 30}
+  - restart:
+      import_legacy: true
+      before:
+        # The C++ engine with an identity keeps the metadata stream's cursor and the People
+        # sync tokens in _State; with `--identity null` it writes neither.
+        - db.sql:
+            - "REPLACE INTO _State (id, value) VALUES ('cursor-c0ffee-harness', '42')"
+            - "REPLACE INTO _State (id, value) VALUES ('gsynctoken-contacts-c0ffee-harness', 'people-token')"
+  - mark: imported
+  - wait: {delta: {class: Thread, type: metadata-expiration, count: 1, since: imported}, timeout: 120}
+  - wait: {delta: {class: Message, type: metadata-expiration, count: 1, since: imported}, timeout: 60}
+expect:
+  migrate_output: {launch: last, present: ["Running Migration"]}
+  mode_output: {import-legacy: '"error":null'}
+  counts: {INBOX: 3}
+  db_matches_server: {}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+    - {messages: {mailbox: INBOX, uids: [2]}, plugin: send-reminders, value: {expiration: 1900000100}, expiration: true}
+    - {messages: {mailbox: INBOX, uids: [3]}, plugin: send-reminders, absent: true}
+    - {messages: {header_message_ids: ["cpp-draft-1@example.test"]}, plugin: send-later, expiration: true}
+  metadata_expiration:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, since: imported, count: {min: 1}}
+    - {messages: {header_message_ids: ["cpp-draft-1@example.test"]}, plugin: send-later, since: imported, count: {min: 1}}
+    - {threads: {mailbox: INBOX, uids: [2, 3]}, since: imported, count: 0}
+  models:
+    Message:
+      where: {draft: true}
+      count: 1
+      match: [{hMsgId: "cpp-draft-1@example.test", subject: "Unsent plans"}]
+  config_files:
+    present: [edgehill.legacy-imported.db, files/cp/pd/cppdraftfile0001/notes.txt]
+    absent: [edgehill.legacy.db, files.legacy]
+  sql:
+    - {db: main, query: "SELECT value FROM MessageBody b JOIN Message m ON m.id = b.id WHERE m.headerMessageId = 'cpp-draft-1@example.test'", equals: "<p>draft body</p>"}
+    - {db: main, query: "SELECT count(*) FROM MessageFolder p JOIN Message m ON m.id = p.messageId WHERE m.headerMessageId = 'cpp-draft-1@example.test' AND p.remoteUID = 0", equals: 1}
+    - {db: main, query: "SELECT value FROM _State WHERE id = 'cursor-c0ffee-harness'", equals: "42"}
+    - {db: main, query: "SELECT count(*) FROM _State WHERE id LIKE 'gsynctoken-%'", equals: 0}
+    - {db: main, query: "SELECT count(*) FROM DetatchedPluginMetadata", equals: 0}
+    # import-legacy only reads the legacy database.
+    - {db: edgehill.legacy-imported.db, query: "SELECT count(*) FROM Message WHERE draft = 1", equals: 1}
+    - {db: edgehill.legacy-imported.db, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 3}
+  log_absent: ["\\[critical\\]"]
+  running: true

@@ -13,6 +13,7 @@ Profiles select the advertised capabilities and folder layout:
 Population and mutation go over IMAP (imaplib), i.e. exactly what another client would do;
 UID-space manipulation uses doveadm.
 """
+import functools
 import hashlib
 import os
 import shutil
@@ -23,6 +24,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from . import images
 from .base import truth_via_imap
 from .imap_client import ImapClientServer
 
@@ -31,6 +33,7 @@ TEMPLATE = (HERE.parents[1] / "servers" / "dovecot" / "dovecot.conf.tmpl").read_
 DOCKERFILE_DIR = HERE.parents[1] / "servers" / "dovecot"
 
 
+@functools.lru_cache(maxsize=None)
 def image_tag() -> str:
     """Tagged by the build context's content so a change to it rebuilds the image."""
     if os.environ.get("HARNESS_DOVECOT_IMAGE"):
@@ -46,9 +49,7 @@ def ensure_image() -> str:
     tag = image_tag()
     if os.environ.get("HARNESS_DOVECOT_IMAGE"):
         return tag
-    if subprocess.run(["docker", "image", "inspect", tag], capture_output=True).returncode != 0:
-        subprocess.run(["docker", "build", "-q", "-t", tag, str(DOCKERFILE_DIR)], check=True, capture_output=True)
-    return tag
+    return images.ensure(tag, DOCKERFILE_DIR)
 
 
 # Dovecot's full 2.3 capability list minus CONDSTORE/QRESYNC, for the plain profiles. Kept
@@ -196,7 +197,6 @@ class DovecotServer(ImapClientServer):
 
     def stop(self):
         if self.container:
-            subprocess.run(["docker", "logs", self.container], capture_output=True)
             subprocess.run(["docker", "rm", "-f", self.container], capture_output=True)
             self.container = None
         if self.proc:

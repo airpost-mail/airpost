@@ -161,6 +161,7 @@ class FakeSmtpServer:
         self.sent_copy_delay = sent_copy_delay
         self.deliver_delay = deliver_delay
         self.messages: list = []
+        self.sent_copies_filed = 0   # `sent_copy` appends done so far, delayed ones included
         self.held: Optional[list] = None   # self-addressed deliveries waiting for release()
         self.lock = threading.Lock()
         self.transcript: list = []
@@ -171,11 +172,10 @@ class FakeSmtpServer:
 
     def deliver(self, msg: SmtpMessage):
         if self.sent_copy:
-            store, mailbox = self.sent_copy
             if self.sent_copy_delay:
-                threading.Timer(self.sent_copy_delay, store.append, (mailbox, msg.raw, ["\\Seen"])).start()
+                threading.Timer(self.sent_copy_delay, self._file_sent_copy, (msg,)).start()
             else:
-                store.append(mailbox, msg.raw, ["\\Seen"])
+                self._file_sent_copy(msg)
         if not self.deliver_to:
             return
         store, mailbox, address = self.deliver_to
@@ -189,6 +189,12 @@ class FakeSmtpServer:
             threading.Timer(self.deliver_delay, store.append, (mailbox, msg.raw, [])).start()
             return
         store.append(mailbox, msg.raw, [])
+
+    def _file_sent_copy(self, msg: SmtpMessage):
+        store, mailbox = self.sent_copy
+        store.append(mailbox, msg.raw, ["\\Seen"])
+        with self.lock:
+            self.sent_copies_filed += 1
 
     def hold(self):
         """Queue self-addressed deliveries until release(), as a slow MTA delivers the INBOX

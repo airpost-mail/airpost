@@ -28,7 +28,7 @@ steps:
       perRecipientBodies: {self: "<p>Hi</p>", "bob@example.net": "<p>Hi<img src=\"https://t.example/bob@example.net\"></p>", "carol@example.net": "<p>Hi<img src=\"https://t.example/carol@example.net\"></p>", "dave@example.net": "<p>Hi<img src=\"https://t.example/dave@example.net\"></p>"}
     as: send1
   - wait: {task: send1, timeout: 90}
-  - wait: {seconds: 22}
+  - wait: {smtp_sent_copies: 3, timeout: 60}
   - sync: pass
   - wait: {quiescent: true}
   - sync: pass

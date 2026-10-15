@@ -1,8 +1,10 @@
 # Engine port status
 
-State of the Rust port of Mailspring-Sync after P4/P5 (plan section 8), 2026-10-15, checked by
-the P4/P5 final verification run. P2 and P3 finished earlier the same day, P1 on 2026-10-14. The plan is `docs/engine-port-plan.md`; this file records what exists and what the
-next phases need.
+State of the Rust port of Mailspring-Sync after P6 (plan section 8), 2026-10-15. P0-P6 are
+implemented; what is left needs a human (real accounts, signing secrets, desktop checks,
+decisions) and is listed under "Before shipping". P2 to P5 finished earlier the same day, P1
+on 2026-10-14. The plan is `docs/engine-port-plan.md`; this file records what exists and what
+is still open.
 
 ## Workspace gate
 
@@ -12,18 +14,98 @@ All run from the repo root on the integrated tree:
 |---|---|
 | `cargo fmt --all --check` | clean |
 | `cargo clippy --workspace --all-targets -- -D warnings` | clean |
-| `cargo test --workspace` | P4/P5 tree: 469 pass, 0 fail, 42 ignored (41 `ms-imap` session tests and 1 `mailsync` cli test need Docker / 30 s). P3: 433 pass; P2: 397 |
+| `cargo test --workspace` | P6 fix round 1: 481 pass, 0 fail, 42 ignored. P4/P5 tree: 469 pass, 0 fail, 42 ignored (41 `ms-imap` session tests and 1 `mailsync` cli test need Docker / 30 s). P3: 433 pass; P2: 397 |
 | `cargo build --release` | ok |
 | `cargo deny check licenses bans` | ok; one reqwest (0.13, rustls/ring), no aws-lc-rs, OpenSSL or native-tls |
 | P0 gate (migrate + sync through the harness's `tern-mailspring-bin/mailsync` symlink) | migrate prints `{"error":null}`; sync starts `main`, `background`, `foreground`, stays up, stderr empty |
-| `pytest apps/engine/test --collect-only` | 215 tests collected |
+| `pytest apps/engine/test --collect-only` | 218 tests collected (P6; 215 at P4/P5) |
 | Upstream C++ binary, `--servers fake -k "baseline-initial-sync or metadata-expiration"` | 4 passed, 5 skipped (dovecot/cyrus not selected) (P1) |
+| Full harness suite, Rust release binary, all servers (P6 fix round 1, `--all`) | 215 passed, 3 skipped (`rules-ready-pre-upgrade-messages`, baseline binary not built) of 218, 9 min; see "Full-suite tally (P6)" |
+| Harness quick tier (default `pytest apps/engine/test`, fake server, no Docker) | 106 of 218 cases, ~2.5-3 min |
+| A/B, `ab.py batch`, Rust vs C++ 1.26.0, 188 cases | 0 real and 0 unexplained differences; `docs/engine-ab-report.md` |
 | Full harness suite, Rust release binary, all servers (P4/P5 final) | 210 passed, 1 failed (conformance flake, passes on rerun), 3 skipped, 1 xfailed of 215; see "Full-suite tally (P4/P5)". P3: 196 passed, 15 failed |
 
 The background and foreground workers (P2), the mail tasks, send and the `test` /
 `install-check` modes (P3), the `calContacts` thread (Google People, CalDAV, CardDAV), the
 contact, contact-group and event tasks, the metadata expiration worker and the remote metadata
-worker (P4/P5) are implemented. Still missing: `import-legacy` (P6).
+worker (P4/P5) are implemented. P6 added `import-legacy`, the client engine setting, release
+packaging, the harness tiers and the A/B report; see "P6". No phase has run against a real
+account yet.
+
+## Before shipping
+
+Everything below needs a person: credentials, secrets, a running desktop app, or a decision.
+Nothing here blocks further engine work; the fix backlog (`docs/fix-backlog.md`, F1-F4) can
+proceed in parallel.
+
+Desktop checks (not run here: no `node_modules`, npm was installed with `--ignore-scripts`)
+
+- [ ] In `apps/desktop`: `npm ci`, then `npm run typecheck`, `npm run lint:check`, `npm test`.
+  The P6 edits to `app/src/mailsync-process.ts`, `app/src/browser/application.ts`,
+  `app/src/browser/mailspring-window.ts`, `app/src/flux/mailsync-bridge.ts`,
+  `app/src/config-schema.ts` and `app/spec/mailsync-process-spec.ts` were only syntax-checked.
+- [ ] `apps/engine/packaging/build-release.sh macos --install-desktop`, then launch the app on
+  a profile that has used C++ with `core.sync.engine = "rust"` in config.json (or
+  `MAILSYNC_ENGINE=rust`). Check: the engine is `app.asar.unpacked/mailsync-rs`; the log shows
+  `import-legacy` after `migrate`; `edgehill.legacy-imported.db` exists and
+  `_State.legacy-import` is set; local drafts open with their attachments; a reply draft sits
+  in its thread; an existing snooze and a send-later fire at their time; mail, contacts and
+  calendars resync.
+- [ ] Relaunch and confirm `import-legacy` logs nothing to import (it ran once).
+- [ ] Switch back to `cpp`: the database moves to `edgehill.rust.db*`, the console warns with
+  the count of unsent local drafts and pending expiration metadata, C++ resyncs from empty.
+- [ ] A build without `mailsync-rs` and `core.sync.engine = "rust"` runs C++ with a console
+  warning.
+
+Real accounts (each: `--mode test` on both binaries, then a dogfood week with the Rust engine;
+none has run against a real server)
+
+- [ ] Gmail (OAuth): `--mode test` output against C++ (the open P3-A gate item), labels,
+  send and Sent reconciliation, Google People contacts and contact tasks, Google CalDAV.
+- [ ] Microsoft 365 / Outlook.com (OAuth, Outlook SMTP XOAUTH2): `--mode test` against C++,
+  sync, send, late Sent copies (`removeLateSentCopies`).
+- [ ] iCloud: IMAP, CardDAV, CalDAV (only Radicale and Baikal have run; iCloud has profile
+  tests and fixtures only).
+- [ ] Fastmail: IMAP (QRESYNC), CardDAV, CalDAV.
+- [ ] Yahoo: IMAP, CardDAV (webmail root, empty-answer fallback), CalDAV.
+- [ ] Optional: Nextcloud and GMX DAV, a generic IMAP host without IDLE or UIDPLUS.
+- [ ] Body and snippet drift: sync a few thousand real messages with both engines and diff
+  `Message.snippet`, `MessageBody` and `ThreadSearch` by `headerMessageId` (plan section 10).
+
+Signing, CI and packaging
+
+- [ ] Add a Developer ID Application certificate and the secrets to the GitHub repo:
+  `APPLE_CODESIGN_P12`, `APPLE_CODESIGN_KEY_PASSWORD`, `APPLE_SIGNING_IDENTITY`, plus either
+  `APPLE_API_KEY_P8` / `APPLE_API_KEY_ID` / `APPLE_API_ISSUER` or `APPLE_ID` /
+  `APPLE_ID_PASSWORD` / `APPLE_TEAM_ID`. Without them CI signs ad hoc and skips notarization.
+- [ ] Run `.github/workflows/engine-release.yml` once (`workflow_dispatch`, then an
+  `engine-v*` tag). It has only been checked with actionlint and local runs of each step.
+- [ ] Put `mailsync-rs` into the shipped app: no desktop workflow runs
+  `build-release.sh --install-desktop`, so shipped builds silently fall back to C++. The
+  desktop workflows are in `apps/desktop/.github/workflows/` (`build-macos.yaml`,
+  `build-linux.yaml`, `build-linux-arm64.yaml`, `build-windows.yaml`); GitHub only runs
+  workflows under the repo root's `.github/workflows/`, so they need moving or wrapping first.
+  They will need the Rust toolchain and the signing secrets above.
+- [ ] Windows: there is no Rust build; decide whether Windows ships C++ only for now.
+- [ ] Optional: build `apps/engine/test/ab/mailsync-a83cc9a` to un-skip
+  `rules-ready-pre-upgrade-messages` (x3).
+
+Decisions
+
+- [ ] Rust-to-C++ rollback: local-only drafts and send-later/snooze values left in
+  `edgehill.rust.db` are only warned about in the console, and the next switch overwrites that
+  file. Pick one: a dialog before switching, timestamped copies, or an import on the C++ side.
+- [ ] Connection-error reporting (P6 fix round 1): the Rust foreground no longer clears the
+  error after an IDLE that ended in an error, so a drop of every socket at once (DarkWake) now
+  shows as offline until a pass succeeds; C++ hid it (main.cpp:150). Keep or revert.
+- [ ] Gmail DestroyContactGroupTask whose People API delete fails still loses the local group,
+  as in C++ (P4-G open). Keep, or store the group and members in the task to restore it.
+- [ ] Keep the P4/P5 departures from C++ recorded in plan section 6 "DAV" (If-None-Match on
+  event creates, undo of refused SyncbackEvent / DestroyContact / CardDAV DestroyContactGroup).
+- [ ] A settings UI for `core.sync.engine` (there is none; config.json or env only).
+- [ ] After the desktop rebrand, drop `mailspring` from the argv[0] check in
+  `apps/engine/src/main.rs`.
+- [ ] Schedule `docs/fix-backlog.md` F1-F3 (pause after P6) and F4 (after parity, D5).
 
 ## Packages
 
@@ -499,7 +581,104 @@ PIM oracles) pass.
 - **P5**: use `ms_dav::CalendarHome::gmail` (which honours `MAILSYNC_GOOGLE_CALDAV_ROOT`) rather than
   `ServerProfile::caldav_url`, and `DnsResolver` (which honours the host overrides) for discovery.
 
-## What P6 needs
+## P6
+
+### import-legacy (`crates/ms-store/src/legacy_import.rs`, `apps/engine/src/modes/import_legacy.rs`)
+
+- Implemented as plan section 9 describes: metadata re-keyed by Message-ID into pending
+  `DetatchedPluginMetadata` rows, local drafts with body, File rows, files and metadata,
+  `cursor-*`. `import-legacy-carries-metadata` is no longer xfail; `import-legacy-from-cpp-engine`
+  and `import-legacy-twice` (both `binary: cpp`, slow) and `import-legacy-without-legacy-db`
+  are new. Tests: `crates/ms-store/tests/legacy_import.rs` (11).
+- After the commit the legacy database is renamed to `edgehill.legacy-imported.db*`, so a new
+  `edgehill.db` created later without a new legacy move (the user deleted `edgehill.db*`)
+  imports nothing.
+- Reply and forward drafts join the thread of the message their `rthMsgId` / `fwdMsgId`
+  names, at import if it is synced, otherwise through a `DraftThread` pending row when that
+  message is first saved.
+
+### Client engine setting (`apps/desktop/app/src/mailsync-process.ts`)
+
+- `core.sync.engine` (`cpp` default, `rust`) in config.json, overridden by `MAILSYNC_ENGINE`,
+  picks the binary: `mailsync` (C++) or `mailsync-rs` (Rust), side by side in
+  `app.asar.unpacked`. The main process resolves it once before `migrate`
+  (`Application.syncEngine`) and passes it to windows in `loadSettings.syncEngine`. A build
+  without `mailsync-rs` runs C++ with a console warning.
+- With the Rust engine, `MailsyncProcess.migrate` runs `--mode import-legacy` after `migrate`
+  on every launch; a failure is logged and the launch continues.
+- Switching back to C++: before C++ migrates, a database with `_State.engine = rust` is moved
+  to `edgehill.rust.db*` (an older copy is replaced) and C++ resyncs from an empty database.
+  Nothing imports from `edgehill.rust.db`; the client logs a warning with the number of
+  unsent local drafts and pending expiration metadata left there.
+
+### Packaging
+
+- `apps/engine/packaging/build-release.sh` (macOS arm64/x86_64/universal, Linux x86_64/arm64;
+  `--install-desktop` copies the binary into the desktop app as `mailsync-rs`),
+  `apps/engine/packaging/macos/{sign.sh,notarize.sh,entitlements.plist}` (hardened runtime,
+  notarytool) and `.github/workflows/engine-release.yml` (tag `engine-v*` publishes a release;
+  read-only token by default, third-party actions pinned to commits). No desktop workflow puts
+  `mailsync-rs` into the app yet.
+- Release builds accept an argv[0] containing `tern` or `mailspring`, because the app still
+  ships as Mailspring.app.
+
+### P6 fix round 1 (2026-10-15)
+
+- `connection-dropped-during-command[fake:dovecot]` was flaky in two ways, both races between
+  the background's `begin_connection_error` and the foreground's `end_connection_error` when
+  one drop kills both connections: an end queued before the flush coalesced the `true` away
+  (`[False]`), and an end interleaved inside a begin left the flag `false` with `true` queued,
+  so the retry never cleared it (`[True]`). The foreground no longer clears the error after an
+  iteration whose IDLE ended in an error (a departure from main.cpp:150, which hid the error
+  from the client when every socket went stale at once), and begin/end set the flag and queue
+  the delta under one lock.
+- Desktop: `import-legacy` is run after `migrate` (above); `resolveSyncEngine` falls back to
+  C++ when `mailsync-rs` is missing; the C++ switch-back warns about local-only rows.
+- `import-legacy`: legacy database renamed after import; reply-draft threads (above).
+
+### Harness tiers and timings
+
+- `pytest apps/engine/test` runs the quick tier: 106 of 218 cases, fake server only, no
+  Docker, ~2.5-3 min with 16 workers. `--slow` runs the other 112 (every Docker server kind,
+  conformance probes, DAV self-tests, and scenarios marked `slow:`, today
+  `import-legacy-from-cpp-engine` and `import-legacy-twice`); `--all` runs both, 9 min in fix
+  round 1 (11 min 43 s for the whole suite before the tiers and the longest-first ordering).
+  `--servers <kind>` runs that kind's cases in any tier. Rules: `apps/engine/test/README.md`
+  "Tiers"; per-case durations in `apps/engine/test/durations.json`
+  (`--record-durations`).
+
+### A/B against the C++ binary
+
+`python3 apps/engine/test/tools/ab.py batch` (2026-10-15, 17 min) ran 188 cases on the Rust
+release binary and the C++ 1.26.0 binary and wrote `docs/engine-ab-report.md`: **0 real
+behaviour differences, 0 unexplained**, 2863 deliberate (mostly `_State.engine = rust`, the DAV
+and People cases the C++ binary can't reach because it ignores the endpoint overrides,
+`fresh-db-replaces-legacy` and the Rust-only `import-legacy` mode) and 6 timing (thread search
+body order when both workers fetch bodies). Classification rules are in
+`apps/engine/test/tools/ab_known.py`. `--mode test` / `install-check` are compared separately
+by `apps/engine/tools/test_mode_ab.py` (P3-A table).
+
+### P6 final verification (2026-10-15)
+
+- No code changes and no suite rerun (fix round 1 ran `--all`). One leftover
+  `harness-cyrus-*` container removed; `target/p6-desktop`, `target/p6-legacy` and the old
+  `apps/engine/test/runs/` dirs (`p45-final`, `p6-desktop`, `speed-before`) removed. Fix round
+  1 kept no artifacts because every case passed (only failed and xfailed runs are kept).
+
+## Full-suite tally (P6, 2026-10-15)
+
+`MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test --all`, all servers
+(fake, dovecot, cyrus, radicale, baikal), 16 workers, 9 min: **215 passed, 0 failed, 3
+skipped, 0 xfailed** of 218. No case needed a rerun. `cargo test --workspace` 481 passed, 0
+failed, 42 ignored; fmt and clippy (`-D warnings`) clean.
+
+| Category | Count | Cases |
+|---|---|---|
+| Failed | 0 | |
+| Skipped | 3 | `rules-ready-pre-upgrade-messages` (fake:dovecot, dovecot:qresync, cyrus:fastmail): baseline binary `ab/mailsync-a83cc9a` not built |
+| Xfail | 0 | `import-legacy-carries-metadata` passes since P6 |
+
+## What P6 needs (P4/P5 handoff, kept for reference)
 
 - **`import-legacy`** (plan section 9) is the only missing mode; `import-legacy-carries-metadata`
   is xfail and becomes its gate. It reads `edgehill.legacy.db` (left by `migrate`) and imports

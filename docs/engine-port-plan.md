@@ -598,12 +598,34 @@ their gates.
   - If `edgehill.db` exists and `_State.engine` is not `rust`, move `edgehill.db`, `-wal` and `-shm` to `edgehill.legacy.db*`. Print `Running Migration` so the client shows its progress window.
   - Then create the V12 schema directly (one DDL set, not a V1→V12 replay), set `user_version = 12` and `_State.engine = rust`.
   - Delete `$CONFIG_DIR_PATH/files/` contents only after the new DB is created: bodies and attachments are re-downloaded.
-- `import-legacy` mode (P6, optional per run) reads `edgehill.legacy.db` and imports:
+    Local drafts' files exist nowhere else, so before emptying `files/` migrate moves their
+    directories to `files.legacy/` (`ms_store::legacy_import::set_aside_draft_files`);
+    import-legacy, a later process, copies them back and removes `files.legacy/`.
+- `import-legacy` mode (P6) reads `edgehill.legacy.db` read-only and imports:
   - `ModelPluginMetadata` for messages and threads, re-keyed by `headerMessageId` into
-    `DetatchedPluginMetadata`-style pending rows that attach when the message is ingested (this keeps snoozes, reminders and send-later);
-  - local drafts (Message rows with a UID-0 drafts placement, plus `MessageBody`) and their files;
-  - `cursor-*` and other `_State` keys that still mean something.
+    `DetatchedPluginMetadata` pending rows (`objectId` `<hMsgId>` for a message,
+    `t:<hMsgId>` + U+001F + legacy thread id for each message of a thread) that attach on
+    the message's first save, or at once to messages already synced (this keeps snoozes,
+    reminders and send-later);
+  - local drafts (Message rows with a UID-0 placement and none on the server, or before V10
+    `remoteUID = 0`), under their legacy ids, plus `MessageBody`, their File rows, files and
+    metadata; the placement's folder is created by path if sync has not listed it yet. The
+    legacy `threadId` names nothing in the new database (D4): a reply or forward draft joins
+    the thread of the message its `rthMsgId` (else `fwdMsgId`) names, at once if that
+    message is synced, otherwise through a pending `DraftThread` row (`t:<hMsgId>` + U+001F +
+    draft id) when it is first saved; other drafts get no thread;
+  - `cursor-*`. Other `_State` keys are not carried: `gsynctoken-*` would make the first
+    People pass incremental over contacts that were not imported.
   - Contacts, events and mail are not imported; they resync from the server.
+  - Trigger: the client runs it after `migrate` on every launch, before any account
+    process, with no `--account`. It is a no-op without a legacy DB or once `_State`
+    `legacy-import` is set (written in the import's transaction), so a draft the user
+    deleted or sent is never imported twice. After the commit `edgehill.legacy.db*` is
+    renamed to `edgehill.legacy-imported.db*` (an older copy is replaced), so a new database
+    created without a new legacy move (the user deleted `edgehill.db*` to resync) imports
+    nothing. Output is the one-shot `{"error":…}`; a failure exits 1 and the client launches
+    anyway (`MailsyncProcess.migrate` in apps/desktop/app/src/mailsync-process.ts runs it
+    when the Rust engine is selected).
 - Future schema changes are Rust-owned migrations starting from this V12 baseline.
 
 ## 10. Risks and spikes
@@ -674,8 +696,9 @@ derivative work too. Treat the whole monorepo as GPL-3.0. This is not legal advi
 - Dependencies must be GPLv3-compatible. MIT, Apache-2.0, ISC, BSD and MPL-2.0 all are. Add
   `cargo deny` with an allowlist to CI in P0, and the JS equivalent for `apps/desktop`.
 - **`apps/backend`:** a separate program that talks over HTTP is not a derivative of the client.
-  It could carry another licence if it is written from scratch. AGPL-3.0 is worth considering
-  so hosted forks have to share changes. Default: GPL-3.0 like the rest, revisit when it exists.
+  It is written from scratch and licensed MIT (decided 2026-10-15). It must not depend on any
+  GPL-derived crate (`ms-core`, `ms-store`, ...); shared protocol types live in the MIT
+  `crates/ms-wire`, which the GPL engine may use.
 - **Crates or packages published from `crates/` or `packages/`:** these can carry a permissive licence only if they contain
   no code derived from the GPL sources.
 

@@ -19,11 +19,13 @@ fn main() -> ExitCode {
         .map(|a| a.to_string_lossy().into_owned())
         .collect();
 
-    // Release builds only run under a path naming the product, so the harness and the
-    // client launch it through a path containing "tern" (the C++ checked "mailspring").
+    // Release builds only run under a path naming the product (the C++ checked
+    // "mailspring"). The desktop app still ships as Mailspring.app and launches the engine
+    // from `Mailspring.app/.../app.asar.unpacked/`, so "mailspring" is accepted alongside
+    // "tern" until the desktop rebrand lands; then drop it.
     if !cfg!(debug_assertions) {
         let exe = args.first().map(|a| a.to_lowercase()).unwrap_or_default();
-        if !exe.contains("tern") {
+        if !exe.contains("tern") && !exe.contains("mailspring") {
             return code(EXIT_PATH_CHECK);
         }
     }

@@ -47,11 +47,16 @@ pub fn run_cal_contacts(ctx: WorkerContext) {
         } else {
             workers.run_calendars()
         };
-        if let Err(e) = result {
-            match PassFailure::of(&e) {
-                PassFailure::Stop => return,
-                PassFailure::Suspend(d) => std::thread::sleep(d),
-                PassFailure::Retry => {}
+        match result {
+            Ok(()) => info!("{}", logmsg::calendar_sync_pass_complete(pass)),
+            Err(e) => {
+                let failure = PassFailure::of(&e);
+                info!("{}", logmsg::calendar_sync_pass_failed(pass));
+                match failure {
+                    PassFailure::Stop => return,
+                    PassFailure::Suspend(d) => std::thread::sleep(d),
+                    PassFailure::Retry => {}
+                }
             }
         }
         std::thread::sleep(Duration::from_secs(CALENDAR_SYNC_INTERVAL));

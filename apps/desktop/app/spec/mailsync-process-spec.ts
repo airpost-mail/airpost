@@ -116,3 +116,32 @@ describe('interpreting a mailsync exit', function () {
     expect(err.isNetworkError).toBe(undefined);
   });
 });
+
+describe('migrating for the Rust engine', function () {
+  it('runs import-legacy after migrate and launches anyway when it fails', async function () {
+    const proc = new MailsyncProcess({
+      configDirPath: '/tmp',
+      resourcePath: '/tmp',
+      syncEngine: 'rust',
+    });
+    const modes: string[] = [];
+    spyOn(proc as any, '_spawnProcess').andCallFake((mode: string) => {
+      modes.push(mode);
+      const child: any = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      (proc as any)._proc = child;
+      const ok = mode === 'migrate';
+      setTimeout(() => {
+        const result = ok ? '\n{"error":null}' : '\n{"error":"no Message table"}';
+        child.stdout.emit('data', Buffer.from(result, 'utf-8'));
+        child.emit('close', ok ? 0 : 1, null);
+      }, 0);
+    });
+    spyOn(console, 'error');
+
+    await proc.migrate();
+    expect(modes).toEqual(['migrate', 'import-legacy']);
+    expect(console.error).toHaveBeenCalled();
+  });
+});

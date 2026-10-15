@@ -14,12 +14,14 @@ test/
                   CalDAV/CardDAV servers Radicale 3.8 and Baikal 0.10 (sabre/dav 4)
   scenarios/      one YAML file per scenario
   conformance/    proves the fake answers like Dovecot for everything mailsync sends
-  tools/          ab.py (before/after regression comparison), record_personality.py,
+  tools/          ab.py (before/after outcome comparison, and `ab.py batch`: every case on
+                  the Rust and C++ binaries with DB/delta diffs by headerMessageId, written
+                  to docs/engine-ab-report.md; rules in ab_known.py), record_personality.py,
                   cyrus_server.py (a standalone Cyrus for the Mailspring client)
   docs/           adding-scenarios.md (workflow + gotchas), handoff-refactor-regression.md;
                   tasks/ holds write-ups of engine bugs the suite finds until they are fixed
   runs/           per-run artifacts (gitignored): engine log, DB, server transcript
-  ab/             gitignored: baseline binaries and ab.py recordings
+  ab/             gitignored: baseline binaries and ab.py recordings (`ab/batch/` for `batch`)
 ```
 
 Start with `docs/adding-scenarios.md` if you are here to add a test, and
@@ -29,7 +31,9 @@ Start with `docs/adding-scenarios.md` if you are here to add a test, and
 
 ```bash
 pip install -r test/requirements.txt   # pytest, pytest-xdist, pyyaml
-python3 -m pytest test                 # everything, 16 cases at a time: ~6 min
+python3 -m pytest test                 # quick tier: fake server only, no Docker, ~3 min
+python3 -m pytest test --all           # both tiers, every server kind: ~12 min
+python3 -m pytest test --slow          # slow tier only
 python3 -m pytest test --servers fake -k qresync       # narrow by server kind / name
 python3 -m pytest test -n 0 -k baseline-initial-sync   # serially, for debugging
 python3 test/run.py test/scenarios/qresync-bulk-expunge-during-idle.yaml --server dovecot:qresync --keep
@@ -38,8 +42,8 @@ python3 -m pytest test/test_service_fakes.py test/test_pim_oracles.py -n 0   # h
 ```
 
 Server kinds are `fake` (in-process) and, with Docker, `dovecot`, `cyrus`, `radicale` and
-`baikal`; their images are built once at session start and re-tagged whenever
-`servers/<kind>/` changes. The log
+`baikal`; an image is built the first time a case needs it (a lock file serialises the
+build across workers) and re-tagged whenever `servers/<kind>/` changes. The log
 prints a line when a case starts and `[gwN] [ 42%] PASSED|FAILED <case>` when it ends; a run
 is stuck only if no line appears for ~3 min (the slowest case takes ~140 s). The run ends
 with a "scenarios needing attention" section: every FAILED / XFAIL / XPASS case, its reason
@@ -58,6 +62,23 @@ Artifacts go to `test/runs/session-<pid>/<scenario>-<server>/` (one pid per xdis
 happened, when), `config/mailsync-*.log` (engine log with every IMAP line, per thread),
 `config/edgehill.db`, `server.log` (server transcript). `--keep` / `HARNESS_KEEP=1` keeps
 passing runs too. `run.py --server kind:profile` uses the scenario's own entry for it.
+
+### Tiers
+
+The default run is the quick tier; `--slow` runs only the slow tier and `--all` both. A case
+is in the slow tier (pytest marker `slow`) when it
+
+- needs a Docker server kind (`dovecot`, `cyrus`, `radicale`, `baikal`, including the
+  conformance probes and the DAV self-tests): these always carry `slow` and `docker(kind)`,
+  and are skipped when Docker is missing;
+- or its scenario says `slow: true` (or a reason), or `slow: {"fake:plain": true}` for one
+  server. Use this for a fake-server case that seeds heavily or waits on engine timers and
+  takes over ~20 s on its own, not only under a loaded parallel run.
+
+`--servers dovecot` (any Docker kind) runs that kind's cases whatever the tier. The run ends
+with a list of quick-tier cases over 20 s, the candidates for `slow: true`. Cases run longest
+first, using `durations.json` (refresh it with `--record-durations`; a case missing from it
+counts as 30 s), so one long case does not start last.
 
 ## How a scenario works
 
@@ -91,8 +112,9 @@ The other services are populated the same way, before mailsync starts:
 | `people: {groups: [{name}], contacts: [{name, email, groups} \| {count: n}]}` | contacts and user groups in the fake People API (needs `people: true` on a `fake` entry) |
 | `calendars: {name: {create, display_name, components, events: [spec \| {count: n}]}}` | CalDAV collections and events (`default` is the seeded calendar; others are created with MKCALENDAR when `create: true`); event specs are `harness/davgen.py`'s: uid, summary, start (`"+2d"`, ISO), minutes, all_day, rrule, overrides, attendees |
 | `addressbooks: {default: {contacts: [spec \| {count: n}], groups: [{uid, name, members: [emails or uids], version}]}}` | CardDAV cards; contact specs: uid, name, email(s), phone, org, version `"3.0"`/`"4.0"`; group cards are vCard 3 `X-ADDRESSBOOKSERVER-KIND:group` or vCard 4 `KIND:group` |
-| `legacy_db: {wal, folders, messages, metadata, state, files, sql}` | an `edgehill.db` as the C++ engine leaves it, written before the first `--mode migrate` (`harness/legacy.py`); `wal: true` leaves the writes in the `-wal` file |
-| `import_legacy: true` | run `--mode import-legacy` between migrate and sync, as the client does after the first Rust launch (also `restart: {import_legacy: true}`) |
+| `legacy_db: {wal, folders, messages, metadata, state, files, sql}` | an `edgehill.db` as the C++ engine leaves it, written before the first `--mode migrate` (`harness/legacy.py`); `wal: true` leaves the writes in the `-wal` file; a draft's `reply_to: <message key>` makes it a reply saved in that message's thread |
+| `import_legacy: true` | run `--mode import-legacy` between migrate and sync, as the client does on every launch (also `restart: {import_legacy: true}`) |
+| `slow: true` / `slow: {kind[:profile]: true}` | the case is in the slow tier (see "Tiers") |
 | `xfail: reason` / `skip: reason` | the whole scenario waits on an engine feature: failures are reported as XFAIL (a pass as XPASS), or the case is skipped |
 
 Steps:
@@ -101,7 +123,9 @@ Steps:
 |---|---|
 | `wait: quiescent` / `wait: {quiescent: true, timeout: s}` | until the engine has nothing to do (see below) |
 | `wait: {seconds: n}`, `wait: {log: regex}`, `wait: {task: label}` | |
-| `wait: {log: regex, count: n}` | until the log holds n matching lines, counting earlier processes (the log file survives `restart`) |
+| `wait: {log: regex, count: n, since: mark}` | until the log holds n matching lines, counting earlier processes (the log file survives `restart`); with `since`, only lines timestamped at or after the mark |
+| `wait: {until: mark, plus: s}` | sleep until s seconds after the mark (wall time as the condition, e.g. an expiration passing) |
+| `wait: {smtp_sent_copies: n, timeout: s}` | until a `smtp_sent_copy_delay` server has filed n sent copies |
 | `wait: {counts: {mailbox: n}, timeout: s}` | until the local placement counts match, as `expect: counts`; the outcome, where a log line can arrive as an unparsed continuation |
 | `sync: pass` | `wake-workers` on stdin, then wait for that pass to finish |
 | `server.expunge / flags / move / copy / duplicate / append / create_mailbox / delete_mailbox / set_uidvalidity / set_uidnext / drop_connections / pause` | what another client does to the mailbox (`pause` changes nothing: with `at` and `delay` it holds one reply, as in `undo-before-remote-phase`); `at: before_fetch_body|idle_start|idle_tick|before_command` defers it to that protocol moment (fake only) |
@@ -110,6 +134,7 @@ Steps:
 | `at: {..., every: true}` | keep the hook armed instead of firing once, e.g. a folder whose STATUS fails on every pass (`orphan-sweep-with-unreadable-folder`) |
 | `server.flags: {..., per_message: true}` | one STORE per UID, so HIGHESTMODSEQ advances once per message - how a modseq gap larger than one grows on a real server (used by `modseq-truncation`) |
 | `client.task: {__cls: ChangeFolderTask, messages: {mailbox, uids}, folder: Archive}` | `Actions.queueTask` on stdin; `messages` resolve to engine ids (`{mailbox, uids}`, or `{header_message_ids: [...]}` for rows without a server placement such as a local draft), `threads: {mailbox, uids}` to their `threadIds`, `folder`/`labelsTo*` to Folder JSON, `sourceFolders: [paths]` to `sourceFolderIds` |
+| `client.task` drafts | in `SyncbackDraftTask` / `SendDraftTask`, a `draft.files` entry with `content` is written where the client keeps draft attachments (`files/<id[0:2]>/<id[2:4]>/<id>/<filename>`, id lowercased) and `content` is dropped; `draft: {stored: <Message-ID>}` sends the draft the engine stores, with its body, as the client does for a saved draft |
 | `client.undo_task: {of: label}` | queue the undo of a completed task from its stored data, as `UndoRedoStore` does: for a `ChangeFolderTask` the engine-written `undoPlacements` become `restorePlacements` and the original destination its `sourceFolderIds` |
 | `client.need_bodies`, `client.wake` | the other stdin commands |
 | `client.sync_calendar` | `{"type": "sync-calendar"}`: one calendars-only DAV pass on the `calendar` thread. Contacts sync once per process start (then every 75 min), so contact changes need a `restart` |
@@ -132,8 +157,11 @@ A scenario may also start on another build with a top-level `binary: ab/mailsync
 `--mailsync` still sets the build under test that a `restart` with no `binary:` lands on. The
 harness runs `--mode migrate` on every launch, as the client does. The Rust engine never
 upgrades a C++ database: it moves it to `edgehill.legacy.db*` and starts fresh
-(`fresh-db-replaces-legacy`), so a C++ database is handed to it with `legacy_db:` rather
-than by starting on a C++ build.
+(`fresh-db-replaces-legacy`), so a C++ database is handed to it with `legacy_db:`, or by
+starting on the C++ engine with `binary: cpp` and restarting onto the build under test
+(`import-legacy-from-cpp-engine`). `cpp` is `MAILSYNC_CPP_BIN`, else the engine an
+installed desktop app ships (`/Applications/Mailspring.app/.../app.asar.unpacked/mailsync`),
+else `legacy/mailsync-cpp/mailsync`; the scenario is skipped when none exists.
 
 A top-level `env: {NAME: value}` is added to the engine's environment on every launch, for
 the knobs the engine reads from it: `ORPHAN_SWEEP_MAX_WAIT` (seconds; default one day) is how
@@ -154,6 +182,8 @@ mailboxes that delta must list, `fetched` whether it is the delta that fetched t
 (the ProcessState stream behind the client's offline state), `migrate_output: regex` (the
 last `--mode migrate` stdout) or `{launch: first|last|n, present: [regexes], absent:
 [regexes]}`, `mode_output: {mode: regex}` (a one-shot mode run before sync),
+`smtp: {count, messages: [{recipients, headers: {name: value}, attachments: {filename:
+content}}]}` (what the SMTP sink received, in order),
 `unchanged_since: snapshot`, `running`, `exit`. Any expectation given as a mapping may carry
 `xfail: reason` for a known engine bug: it is recorded, not failed, and reported as XPASS
 once it starts passing.
@@ -171,7 +201,7 @@ Expectations for contacts, calendars, metadata and whole-database state (`harnes
 | `metadata: [{threads\|messages: selector, plugin, value: {subset}, expiration: bool, absent: bool}]` | the model's metadata entry and its ModelPluginMetadata row |
 | `metadata_expiration: [{threads\|messages: selector, plugin, count, since: mark}]` | how many `metadata-expiration` deltas carried the model; none may arrive before the expiration it names |
 | `changed_since: {mark, Table: {key, where, persist: [keys], unpersist: [keys]}}` | exactly which models were streamed after a `mark`, by `key` (default `id`): what proves a pass was incremental |
-| `sql: [{db: main\|legacy, query, equals}]` | a query against the engine's database or `edgehill.legacy.db` (read from a copy, so the check never checkpoints its WAL) |
+| `sql: [{db: main\|legacy\|<file>, query, equals}]` | a query against the engine's database, `edgehill.legacy.db`, or another database file in the config dir such as `edgehill.legacy-imported.db` (read from a copy, so the check never checkpoints its WAL) |
 | `config_files: {present, absent, empty}` | paths under `CONFIG_DIR_PATH`; `empty` directories may also be missing |
 
 **Invariants** run after every scenario's expectations, on every server, without being
@@ -416,7 +446,10 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | status-uidnext-zero-new-mail | STATUS UIDNEXT 0 (hMailServer): new mail found from the message count on the next pass | fake |
 | list-refused-transiently | O365 `NO Server Unavailable` to LIST: offline and retried, not a crash | fake |
 | fresh-db-replaces-legacy | a C++ database (writes still in its WAL) is moved to `edgehill.legacy.db*`, a fresh V12 is created, `files/` emptied, "Running Migration" printed; nothing imported; no migration on the next launch | fake |
-| import-legacy-carries-metadata | `--mode import-legacy` carries snooze/reminder metadata (re-keyed by headerMessageId), a local draft with body and file, and `_State` cursors (xfail until P6) | fake |
+| import-legacy-carries-metadata | `--mode import-legacy` carries snooze/reminder metadata (re-keyed by headerMessageId), a local draft with body and file, and `_State` cursors | fake |
+| import-legacy-from-cpp-engine | the same from a database the C++ engine wrote (`binary: cpp`): the draft's attachment survives migrate, metadata attaches as sync ingests mail, the imported snooze and send-later fire as `metadata-expiration`; People sync tokens are not carried | fake (slow) |
+| import-legacy-twice | the imported draft sends with its attachment; later launches' imports change nothing (the sent draft stays sent, no metadata row duplicated) | fake +smtp (slow) |
+| import-legacy-without-legacy-db | no legacy database: success, nothing written | fake |
 | metadata-expiration-snooze | `thread-snooze` expiration streams the Thread as `metadata-expiration` once due, never early, never for other threads, never after the client clears it | fake |
 | metadata-expiration-send-later | `send-later` on a local draft expires while the engine is stopped and is streamed after relaunch; metadata without an expiration never is | fake |
 | google-people-initial-sync | OAuth-only Gmail account: refresh-token rotation reaches the client, 432 contacts in pages of 400, user groups with members, system groups skipped | fake (people) |

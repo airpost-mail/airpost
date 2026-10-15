@@ -18,6 +18,7 @@ by design (D4), so anything carried over has to be re-keyed by headerMessageId.
         m1: {mailbox: INBOX, uid: 2, thread: t1}           # a message the server also has
         d1: {folder: Drafts, draft: {hMsgId: local-1@example.test, subject: Plans,
              body: "<p>draft</p>"}, files: [{filename: notes.txt, content: "..."}]}
+        d2: {draft: {hMsgId: reply-1@example.test, reply_to: m1}}  # a reply in m1's thread
       metadata:
         - {model: t1, plugin: thread-snooze, value: {expiration: 1900000000}}
       state: {cursor-c0ffee-harness: "42"}
@@ -76,6 +77,7 @@ class _Writer:
         self.folder_ids: dict = {}      # path -> id
         self.message_ids: dict = {}     # scenario key -> id
         self.thread_ids: dict = {}      # scenario key -> id
+        self.message_threads: dict = {} # message key -> thread key
         self.messages: dict = {}        # id -> data
         self.threads: dict = {}         # id -> data
 
@@ -105,7 +107,10 @@ class _Writer:
             folder_path, uid = spec["mailbox"], int(spec["uid"])
         mid = spec.get("id") or _hash_id("cpp", self.aid, hmid)
         fid = self.folder(folder_path, spec.get("role", ""))
-        tkey = spec.get("thread", f"thread-of-{key}")
+        # The client saves a reply draft in the thread of the message it answers.
+        reply_to = draft.get("reply_to") if draft else None
+        tkey = spec.get("thread", self.message_threads[reply_to] if reply_to else f"thread-of-{key}")
+        self.message_threads[key] = tkey
         tid = self.thread_ids.setdefault(tkey, "t:" + mid)
         unread = bool(spec.get("unread", False))
         bits = (1 if unread else 0) | (4 if draft else 0)
@@ -117,6 +122,8 @@ class _Writer:
             "to": draft.get("to", []) if draft else [], "cc": [], "bcc": [], "replyTo": [],
             "snippet": "", "plaintext": bool(draft.get("plaintext", False)) if draft else False,
         }
+        if reply_to:
+            data["rthMsgId"] = self.messages[self.message_ids[reply_to]]["hMsgId"]
         for f in spec.get("files") or []:
             data["files"].append(self.file(mid, f))
         self.c.execute(

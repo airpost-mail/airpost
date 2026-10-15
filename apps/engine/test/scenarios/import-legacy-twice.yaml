@@ -1,0 +1,95 @@
+name: import-legacy-twice
+description: >
+  The client runs `--mode import-legacy` on every launch. The first run after switching
+  from the C++ engine imports a local draft with its attachment and the metadata of a
+  snoozed thread and a reminded message; the user then sends the imported draft, which
+  goes out with its attachment (the file came back to where the client keeps it). Later
+  launches import nothing again: the sent draft does not come back as a draft, no metadata
+  row is duplicated, and nothing is left pending.
+source: "docs/engine-port-plan.md section 9 (import-legacy); TaskProcessor.cpp performRemoteSendDraft"
+binary: cpp
+slow: true
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 2}
+  Drafts: {special_use: "\\Drafts"}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: 1900000000, snoozeCategoryId: null}
+    as: snooze
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {mailbox: INBOX, uids: [2]}}
+      pluginId: send-reminders
+      value: {expiration: 1900000100}
+    as: reminder
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "cpp-draft-2@example.test"
+        subject: "Plans with notes"
+        body: "<p>see the notes</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: [{id: "cppdraftfile0002", filename: notes.txt, contentType: text/plain, contentId: null, content: "attached to the draft"}]
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: snooze, timeout: 30}
+  - wait: {task: reminder, timeout: 30}
+  - wait: {task: save, timeout: 60}
+  - restart: {import_legacy: true}
+  - assert:
+      models:
+        Message:
+          where: {draft: true}
+          count: 1
+          match: [{hMsgId: "cpp-draft-2@example.test"}]
+      metadata:
+        - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+        - {messages: {mailbox: INBOX, uids: [2]}, plugin: send-reminders, expiration: true}
+  - client.task:
+      __cls: SendDraftTask
+      draft: {stored: "cpp-draft-2@example.test"}
+      perRecipientBodies: null
+    as: send
+  - wait: {task: send, timeout: 60}
+  - wait: {counts: {Sent: 1}}
+  - restart: {import_legacy: true}
+  - restart: {import_legacy: true}
+expect:
+  mode_output: {import-legacy: '"error":null'}
+  smtp:
+    count: 1
+    messages:
+      - recipients: ["bob@example.net"]
+        headers: {Subject: "Plans with notes", Message-ID: "<cpp-draft-2@example.test>"}
+        attachments: {notes.txt: "attached to the draft"}
+  counts: {INBOX: 2, Sent: 1}
+  db_matches_server: {}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+    - {messages: {mailbox: INBOX, uids: [2]}, plugin: send-reminders, expiration: true}
+  models:
+    Message:
+      where: {draft: true}
+      count: 0
+  config_files:
+    present: [edgehill.legacy-imported.db]
+    absent: [edgehill.legacy.db, files.legacy]
+  sql:
+    - {db: main, query: "SELECT count(*) FROM Message WHERE headerMessageId = 'cpp-draft-2@example.test'", equals: 1}
+    - {db: main, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 2}
+    - {db: main, query: "SELECT count(*) FROM DetatchedPluginMetadata", equals: 0}
+    - {db: main, query: "SELECT count(*) FROM _State WHERE id = 'legacy-import'", equals: 1}
+  log_absent: ["\\[critical\\]"]
+  running: true

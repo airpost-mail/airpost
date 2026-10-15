@@ -141,7 +141,7 @@ fn foreground_and_tasks() {
 
 #[test]
 fn calendar_contacts_pass() {
-    // dav-initial-sync, google-people-initial-sync, dav-create-update-delete (anchored).
+    // dav-initial-sync, google-people-initial-sync; anchored as a scenario would anchor it.
     assert_matches(
         r"Calendar sync pass 1, with contacts",
         &calendar_sync_pass(1, true),
@@ -153,6 +153,18 @@ fn calendar_contacts_pass() {
     assert!(!Regex::new(r"^Calendar sync pass 1, with contacts$")
         .unwrap()
         .is_match(&calendar_sync_pass(1, false)));
+    // dav-create-update-delete, google-people-sync-token-expired (anchored).
+    assert_matches(
+        r"^Calendar sync pass 1 complete\.$",
+        &calendar_sync_pass_complete(1),
+    );
+    assert_matches(
+        r"^-X Calendar sync pass 1 failed\.$",
+        &calendar_sync_pass_failed(1),
+    );
+    assert!(!Regex::new(r"^Calendar sync pass 1, with contacts$")
+        .unwrap()
+        .is_match(&calendar_sync_pass_complete(1)));
 }
 
 #[test]
@@ -169,6 +181,8 @@ fn nothing_matches_the_absent_only_patterns() {
         starting_sync("me@example.com"),
         waking_all_workers().to_owned(),
         calendar_sync_pass(1, true),
+        calendar_sync_pass_complete(1),
+        calendar_sync_pass_failed(1),
         message_without_date("INBOX", 3),
         orphan_sweep_skipped().to_owned(),
     ];

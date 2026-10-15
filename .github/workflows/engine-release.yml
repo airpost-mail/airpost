@@ -1,0 +1,170 @@
+name: engine-release
+
+# Builds the release engine for macOS (arm64, x86_64, universal; signed with the hardened
+# runtime and notarized when the APPLE_* secrets are set) and Linux (x86_64, arm64), using
+# apps/engine/packaging/. A tag `engine-v*` also publishes the archives as a GitHub release.
+#
+# Secrets (all optional; without them the macOS binaries are signed ad hoc and not notarized):
+#   APPLE_CODESIGN_P12, APPLE_CODESIGN_KEY_PASSWORD  Developer ID Application certificate
+#   APPLE_SIGNING_IDENTITY                           its name or SHA-1
+#   APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER   notarytool API key, or
+#   APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID             notarytool Apple ID
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["engine-v*"]
+
+# Jobs get a read-only token unless they ask for more (only `release` does). Third-party
+# actions are pinned to commits: the macOS job holds the Developer ID key in its keychain
+# from the import step on, including during later steps' post-run hooks.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos:
+    runs-on: macos-14
+    env:
+      HAVE_CERT: ${{ secrets.APPLE_CODESIGN_P12 != '' }}
+      HAVE_NOTARY: ${{ secrets.APPLE_API_KEY_P8 != '' || secrets.APPLE_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Build
+        run: apps/engine/packaging/build-release.sh macos
+        env:
+          OUT_DIR: ${{ runner.temp }}/engine-dist
+
+      - name: Import signing certificate
+        if: env.HAVE_CERT == 'true'
+        uses: apple-actions/import-codesign-certs@77ba2a2a8f5cfc8c405ebf3159f767c323e238f9 # v7.1.0
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CODESIGN_P12 }}
+          p12-password: ${{ secrets.APPLE_CODESIGN_KEY_PASSWORD }}
+
+      - name: Sign
+        run: |
+          [ "$HAVE_CERT" = true ] || export APPLE_SIGNING_IDENTITY=-
+          apps/engine/packaging/macos/sign.sh "$DIST"/*-apple-darwin/mailsync
+        env:
+          DIST: ${{ runner.temp }}/engine-dist
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+      - name: Notarize
+        if: env.HAVE_CERT == 'true' && env.HAVE_NOTARY == 'true'
+        run: |
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            export APPLE_API_KEY_PATH="$RUNNER_TEMP/notary-key.p8"
+            printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY_PATH"
+          fi
+          apps/engine/packaging/macos/notarize.sh "$DIST"/*-apple-darwin/mailsync
+        env:
+          DIST: ${{ runner.temp }}/engine-dist
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Smoke test
+        # Release builds only start from a path naming the product.
+        run: |
+          mkdir -p "$RUNNER_TEMP/tern" "$RUNNER_TEMP/config"
+          for t in aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin; do
+            cp "$DIST/$t/mailsync" "$RUNNER_TEMP/tern/mailsync"
+            "$RUNNER_TEMP/tern/mailsync" --help > /dev/null
+            CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/mailsync" --mode migrate
+          done
+        env:
+          DIST: ${{ runner.temp }}/engine-dist
+
+      - name: Archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/archives"
+          for t in aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin; do
+            tar -czf "$RUNNER_TEMP/archives/mailsync-$t.tar.gz" -C "$DIST/$t" mailsync
+          done
+        env:
+          DIST: ${{ runner.temp }}/engine-dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-macos
+          path: ${{ runner.temp }}/archives/*.tar.gz
+
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04 is the oldest distro the desktop's Linux packages are tested on.
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Build
+        # On a native runner the script builds the runner's arch and skips the other.
+        run: apps/engine/packaging/build-release.sh linux
+        env:
+          OUT_DIR: ${{ runner.temp }}/engine-dist
+
+      - name: Smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/tern" "$RUNNER_TEMP/config"
+          cp "$DIST/${{ matrix.target }}/mailsync" "$RUNNER_TEMP/tern/mailsync"
+          ldd "$RUNNER_TEMP/tern/mailsync"
+          "$RUNNER_TEMP/tern/mailsync" --help > /dev/null
+          CONFIG_DIR_PATH="$RUNNER_TEMP/config" "$RUNNER_TEMP/tern/mailsync" --mode migrate
+        env:
+          DIST: ${{ runner.temp }}/engine-dist
+
+      - name: Archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/archives"
+          tar -czf "$RUNNER_TEMP/archives/mailsync-${{ matrix.target }}.tar.gz" \
+            -C "$DIST/${{ matrix.target }}" mailsync
+          tar -czf "$RUNNER_TEMP/archives/mailsync-${{ matrix.target }}-debug.tar.gz" \
+            -C "$DIST/${{ matrix.target }}" mailsync.debug
+        env:
+          DIST: ${{ runner.temp }}/engine-dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-${{ matrix.target }}
+          path: ${{ runner.temp }}/archives/*.tar.gz
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/engine-v')
+    needs: [macos, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: archives
+          merge-multiple: true
+      - name: Publish
+        run: |
+          cd archives
+          sha256sum ./*.tar.gz > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "Engine ${GITHUB_REF_NAME#engine-v}" --generate-notes ./*
+        env:
+          GH_TOKEN: ${{ github.token }}

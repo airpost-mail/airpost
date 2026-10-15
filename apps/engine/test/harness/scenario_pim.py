@@ -393,7 +393,7 @@ class PimMixin:
                 return not self.wait_detail
             self.wait_detail = []
             try:
-                self.ms.wait_for(ok, timeout, f"models {json.dumps(arg['models'])}", poll=0.5)
+                self.ms.wait_for(ok, timeout, f"models {json.dumps(arg['models'])}", poll=0.25)
             except TimeoutError as e:
                 raise TimeoutError(f"{e}\nstill: {'; '.join(self.wait_detail[:4])}")
         if "delta" in arg:
@@ -407,11 +407,11 @@ class PimMixin:
                         continue
                     n += sum(1 for m in d.models if pim.row_matches({"data": m}, want.get("where")))
                 return n >= int(want.get("count", 1))
-            self.ms.wait_for(seen, timeout, f"delta {json.dumps(want)}", poll=0.5)
+            self.ms.wait_for(seen, timeout, f"delta {json.dumps(want)}", poll=0.25)
         if "people_requests" in arg:
             # Same selectors as the `people_requests` expectation, polled.
             self.ms.wait_for(lambda: not self.expect_people_requests(arg["people_requests"]), timeout,
-                             f"People API requests {json.dumps(arg['people_requests'])}", poll=0.5)
+                             f"People API requests {json.dumps(arg['people_requests'])}", poll=0.25)
 
     def all_deltas(self) -> list:
         return self.earlier_deltas + (self.ms.deltas() if self.ms else [])

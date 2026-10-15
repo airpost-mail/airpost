@@ -1,6 +1,7 @@
 //! Mode dispatch, in `main.cpp`'s order: `migrate` and `install-check` before the account
 //! is read, `reset` before the identity, then logging setup, then `test` or `sync`.
 
+mod import_legacy;
 mod install_check;
 mod test_auth;
 
@@ -20,10 +21,7 @@ pub fn run(opts: Options) -> i32 {
     match opts.mode {
         Mode::Migrate => return migrate(&opts),
         Mode::InstallCheck => return install_check::run(),
-        Mode::ImportLegacy => {
-            one_shot_error("import-legacy is not implemented in this build");
-            return EXIT_FAILURE;
-        }
+        Mode::ImportLegacy => return import_legacy::run(&opts),
         _ => {}
     }
 

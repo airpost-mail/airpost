@@ -209,6 +209,12 @@ impl Message {
         self.last_snapshot = self.snapshot();
     }
 
+    /// Treats the message as not yet counted in its thread, for a message moving into a
+    /// thread it was never part of.
+    pub(crate) fn reset_snapshot(&mut self) {
+        self.last_snapshot = MessageSnapshot::empty();
+    }
+
     pub fn last_snapshot(&self) -> &MessageSnapshot {
         &self.last_snapshot
     }
@@ -620,6 +626,7 @@ impl Model for Message {
     /// against the last snapshot, so both see the rebuilt `folders`.
     fn before_save(&mut self, store: &Store) -> Result<()> {
         metadata_before_save(self, store)?;
+        crate::legacy_import::attach_pending_message_metadata(self, store)?;
         if self.placements_changed {
             store.refresh_message_from_placements(self)?;
         }
@@ -629,10 +636,10 @@ impl Model for Message {
     fn after_save(&mut self, store: &Store) -> Result<()> {
         metadata_after_save(self, &self.initial_metadata, store)?;
         self.initial_metadata = metadata_versions(&self.data);
-        if self.skip_thread_updates_after_save {
-            return Ok(());
+        if !self.skip_thread_updates_after_save {
+            self.update_thread(store, false)?;
         }
-        self.update_thread(store, false)
+        crate::legacy_import::attach_pending_thread_metadata(self, store)
     }
 
     fn after_remove(&mut self, store: &Store) -> Result<()> {

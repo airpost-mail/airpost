@@ -27,6 +27,7 @@ DavClient, exactly what a phone or webmail would send:
             calendar home without a VEVENT component set)
 """
 import base64
+import functools
 import hashlib
 import http.client
 import os
@@ -39,6 +40,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional
 
+from . import images
 from .fake import FakeServer
 
 HERE = Path(__file__).resolve().parent
@@ -57,6 +59,7 @@ KINDS = {
 PROFILES = {"default": {}}
 
 
+@functools.lru_cache(maxsize=None)
 def image_tag(kind: str) -> str:
     """Tagged by the build context's content (seed files included) so a change rebuilds it."""
     env = os.environ.get(f"HARNESS_{kind.upper()}_IMAGE")
@@ -73,12 +76,7 @@ def ensure_image(kind: str) -> str:
     tag = image_tag(kind)
     if os.environ.get(f"HARNESS_{kind.upper()}_IMAGE"):
         return tag
-    if subprocess.run(["docker", "image", "inspect", tag], capture_output=True).returncode != 0:
-        r = subprocess.run(["docker", "build", "-q", "-t", tag, str(SERVERS_DIR / KINDS[kind]["dir"])],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f"docker build of {kind} failed: {r.stderr[-2000:]}")
-    return tag
+    return images.ensure(tag, SERVERS_DIR / KINDS[kind]["dir"])
 
 
 def _free_port() -> int:

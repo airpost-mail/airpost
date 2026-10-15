@@ -15,6 +15,8 @@ runs against it, and what must be true afterwards. See test/README.md for the vo
       db_matches_server: {}
       stable: {passes: 1}
 """
+import email
+import email.policy
 import json
 import os
 import re
@@ -46,8 +48,29 @@ class ScenarioSkipped(Exception):
     pass
 
 
+# Where `binary: cpp` looks for the C++ engine, in order: MAILSYNC_CPP_BIN, the binary an
+# installed desktop app ships (macOS), the C++ tree's cmake output (Linux).
+CPP_BINARY_CANDIDATES = (
+    Path("/Applications/Mailspring.app/Contents/Resources/app.asar.unpacked/mailsync"),
+    TEST_DIR.parents[2] / "legacy" / "mailsync-cpp" / "mailsync",
+)
+
+
+def cpp_binary() -> Path:
+    """The C++ engine, for scenarios that need a database it wrote (`binary: cpp`). A path
+    that does not exist makes the scenario skip."""
+    if os.environ.get("MAILSYNC_CPP_BIN"):
+        return Path(os.environ["MAILSYNC_CPP_BIN"]).expanduser()
+    for c in CPP_BINARY_CANDIDATES:
+        if c.is_file():
+            return c
+    return CPP_BINARY_CANDIDATES[0]
+
+
 SERVER_KINDS = ("fake", "dovecot", "cyrus", "radicale", "baikal")
 DAV_KINDS = ("radicale", "baikal")
+# Server kinds that run in Docker; their cases are always in the slow tier.
+DOCKER_KINDS = {"dovecot", "cyrus", *DAV_KINDS}
 
 
 @dataclass
@@ -77,6 +100,23 @@ def load_scenario(path: Path) -> dict:
     sc["_path"] = str(path)
     sc.setdefault("servers", [{"fake": "dovecot"}])
     return sc
+
+
+def per_server(value, spec: "ServerSpec"):
+    """A scenario key that is either one value for every server or a map from server kind or
+    kind:profile to the value (`xfail`, `slow`)."""
+    if not isinstance(value, dict):
+        return value
+    for key in (spec.id, spec.kind):
+        if key in value:
+            return value[key]
+    return None
+
+
+def scenario_slow(sc: dict, spec: "ServerSpec") -> bool:
+    """`slow: true` (or a reason) puts the scenario in the slow tier; `slow: {fake:plain: true}`
+    only that server's case. Docker server kinds are slow regardless (README "Tiers")."""
+    return bool(per_server(sc.get("slow"), spec))
 
 
 def make_server(spec: ServerSpec, log_path: Optional[str]) -> Server:
@@ -199,6 +239,8 @@ class ScenarioRun(PimMixin):
 
     @staticmethod
     def _binary_path(value: str) -> Path:
+        if value == "cpp":
+            return cpp_binary()
         path = Path(value).expanduser()
         return path if path.is_absolute() else TEST_DIR / path
 
@@ -391,17 +433,30 @@ class ScenarioRun(PimMixin):
             return
         if "seconds" in arg:
             time.sleep(float(arg["seconds"]))
+        if "until" in arg:
+            # Wall time itself is the condition (an expiration passing while the engine is
+            # stopped): until `plus` seconds after a mark, not a padded fixed sleep.
+            time.sleep(max(0.0, self.marks[arg["until"]] + float(arg.get("plus", 0)) - time.time()))
         if "quiescent" in arg:
             self.ms.wait_quiescent(timeout=float(arg.get("timeout", 180)), settle=float(arg.get("settle", 2.0)),
                                    ignore_busy=self.ignore_busy)
         if "log" in arg:
-            if "count" in arg:
-                # The log file outlives a restart, so "the next pass" is "one more match".
-                n = int(arg["count"])
-                self.ms.wait_for(lambda: len(self.ms.grep(arg["log"])) >= n, float(arg.get("timeout", 60)),
-                                 f"{n} log lines /{arg['log']}/")
-            else:
-                self.ms.wait_for_log(arg["log"], timeout=float(arg.get("timeout", 60)))
+            # The log file outlives a restart, so "the next pass" is "one more match", or the
+            # first match `since` a mark (by the line's own timestamp).
+            n = int(arg.get("count", 1))
+            after = self.marks[arg["since"]] if "since" in arg else None
+            rx = re.compile(arg["log"])
+
+            def matches():
+                return sum(1 for l in self.ms.log() if rx.search(l.msg) and (after is None or l.wall >= after))
+            self.ms.wait_for(lambda: matches() >= n, float(arg.get("timeout", 60)),
+                             f"{n} log lines /{arg['log']}/" + (f" since {arg['since']}" if after else ""))
+        if "smtp_sent_copies" in arg:
+            # The copies a `smtp_sent_copy_delay` server files late, as Exchange does: wait
+            # for the server to have filed them rather than for a padded delay.
+            n = int(arg["smtp_sent_copies"])
+            self.ms.wait_for(lambda: self._smtp().sent_copies_filed >= n, float(arg.get("timeout", 60)),
+                             f"{n} sent copies filed by the SMTP server")
         if "counts" in arg:
             self.ms.wait_for(lambda: not self.expect_counts(arg["counts"]), float(arg.get("timeout", 60)),
                              f"placement counts {arg['counts']}")
@@ -629,6 +684,8 @@ class ScenarioRun(PimMixin):
             for key in ("labelsToAdd", "labelsToRemove"):
                 if key in task:
                     task[key] = [self._folder_json(l) if isinstance(l, str) else l for l in task[key]]
+            if isinstance(task.get("draft"), dict) and "stored" in task["draft"]:
+                task["draft"] = self._stored_draft(task["draft"]["stored"])
             if isinstance(task.get("draft"), dict):
                 # the client serializes these on every Message; the engine reads them unguarded
                 draft = task["draft"]
@@ -636,6 +693,7 @@ class ScenarioRun(PimMixin):
                 draft.setdefault("v", 0)
                 draft.setdefault("date", int(time.time()))
                 draft.setdefault("__cls", "Message")
+                self._write_draft_attachments(draft)
             task_id = self.ms.queue_task(task)
             self._note(f"queued {task['__cls']} as {task_id}")
             return task_id
@@ -645,6 +703,34 @@ class ScenarioRun(PimMixin):
             self.ms.need_bodies(self._resolve_messages(arg["messages"]))
             return
         raise ScenarioFailure(f"unknown client op {op!r}")
+
+    def _stored_draft(self, header_message_id: str) -> dict:
+        """{stored: <Message-ID>}: the draft as the engine stores it, with its body, which is
+        what the client sends when the user opens a saved draft and sends it."""
+        with self.ms.db() as c:
+            row = c.execute("SELECT m.data, b.value FROM Message m LEFT JOIN MessageBody b ON b.id = m.id "
+                            "WHERE m.headerMessageId = ? AND m.draft = 1", (header_message_id.strip("<>"),)).fetchone()
+        if row is None:
+            raise ScenarioFailure(f"no draft with Message-ID {header_message_id} in the engine's database")
+        draft = json.loads(row[0])
+        draft["body"] = row[1] or ""
+        return draft
+
+    def _write_draft_attachments(self, draft: dict):
+        """A draft file with `content` is written where the client keeps attachments it adds
+        to a draft (AttachmentStore.pathForFile: files/<id[0:2]>/<id[2:4]>/<id>/<name>, id
+        lowercased), and `content` is dropped from the task, as the client never sends it."""
+        for f in draft.get("files") or []:
+            if "content" not in f:
+                continue
+            content = f.pop("content")
+            f.setdefault("aid", self.ms.account["id"])
+            f.setdefault("__cls", "File")
+            f.setdefault("size", len(content.encode()))
+            lower = f["id"].lower()
+            target = self.ms.config_dir / "files" / lower[0:2] / lower[2:4] / lower / f["filename"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content)
 
     def _undo_task(self, arg: dict):
         """{of: label}: queue the undo of a completed task the way UndoRedoStore does
@@ -726,12 +812,7 @@ class ScenarioRun(PimMixin):
     def _xfail_reason(self, xfail):
         """`xfail: reason` applies to every server; `xfail: {dovecot: reason, "fake:plain": reason}`
         only to the matching server kind or kind:profile."""
-        if not xfail or isinstance(xfail, str):
-            return xfail
-        for key in (self.spec.id, self.spec.kind):
-            if key in xfail:
-                return xfail[key]
-        return None
+        return per_server(xfail, self.spec) or None
 
     def expect_db_matches_server(self, arg: dict) -> list:
         with self.ms.db() as c:
@@ -932,6 +1013,13 @@ class ScenarioRun(PimMixin):
             for h, v in (want.get("headers") or {}).items():
                 if m.header(h) != v:
                     out.append(f"SMTP message {i} header {h} = {m.header(h)!r}, expected {v!r}")
+            if "attachments" in want:
+                # {filename: content}: the parts with that filename and their decoded bytes.
+                parsed = email.message_from_bytes(m.raw, policy=email.policy.default)
+                got = {p.get_filename(): p.get_content() for p in parsed.walk() if p.get_filename()}
+                got = {k: (v.decode() if isinstance(v, bytes) else v) for k, v in got.items()}
+                if got != want["attachments"]:
+                    out.append(f"SMTP message {i} attachments {got!r}, expected {want['attachments']!r}")
         return out
 
     def expect_rules_ready(self, arg: dict) -> list:

@@ -114,6 +114,127 @@ export function lastJSONResponse(stdout: string): any | null {
   return null;
 }
 
+/*
+Which sync engine to run: the C++ `mailsync` or the Rust `mailsync-rs`, shipped side by side
+in app.asar.unpacked. `core.sync.engine` in config.json picks one, `MAILSYNC_ENGINE` overrides
+it, and C++ stays the default until the Rust engine has been dogfooded.
+
+The main process resolves this once at startup, before `migrate`, and hands the result to
+every window in its load settings, so all processes of one launch run the engine that
+migrated the database. A changed setting takes effect on the next launch.
+*/
+export type SyncEngine = 'cpp' | 'rust';
+
+const SYNC_ENGINE_BINARIES: { [engine in SyncEngine]: string } = {
+  cpp: 'mailsync',
+  rust: 'mailsync-rs',
+};
+
+function syncEngineBinaryPath(resourcePath: string, engine: SyncEngine) {
+  return path
+    .join(resourcePath, SYNC_ENGINE_BINARIES[engine])
+    .replace('app.asar', 'app.asar.unpacked');
+}
+
+function configuredSyncEngine(configDirPath: string): SyncEngine {
+  const fromEnv = process.env.MAILSYNC_ENGINE;
+  if (fromEnv === 'cpp' || fromEnv === 'rust') {
+    return fromEnv;
+  }
+  // Read config.json directly, as intl.ts does: this runs before Config is loaded.
+  try {
+    const config = JSON.parse(fs.readFileSync(path.join(configDirPath, 'config.json')).toString());
+    if (config['*'].core.sync.engine === 'rust') {
+      return 'rust';
+    }
+  } catch (err) {
+    // first run, or no engine setting
+  }
+  return 'cpp';
+}
+
+// A build without mailsync-rs (no packaging step put it there, or Windows) runs the C++
+// engine rather than failing to launch on a setting the user can only undo in config.json.
+export function resolveSyncEngine(configDirPath: string, resourcePath: string): SyncEngine {
+  const engine = configuredSyncEngine(configDirPath);
+  if (engine === 'rust' && !fs.existsSync(syncEngineBinaryPath(resourcePath, 'rust'))) {
+    console.warn(
+      `The Rust sync engine is selected but ${SYNC_ENGINE_BINARIES.rust} is not in this ` +
+        `build; running the C++ engine`
+    );
+    return 'cpp';
+  }
+  return engine;
+}
+
+/*
+The Rust engine's `migrate` moves a C++ database aside itself. The C++ engine opens a
+`user_version = 12` database without migrating it (MailStore.cpp), so on a database the Rust
+engine wrote it would run on Rust-generated ids. Before C++ migrates, move such a database to
+edgehill.rust.db* so C++ starts from an empty one and resyncs.
+*/
+function moveAsideRustDatabase(configDirPath: string) {
+  const dbPath = path.join(configDirPath, 'edgehill.db');
+  if (!fs.existsSync(dbPath)) return;
+
+  let engine = null;
+  let localOnly = null;
+  try {
+    const Sqlite3 = require('better-sqlite3');
+    const db = new Sqlite3(dbPath, { fileMustExist: true });
+    try {
+      const row = db.prepare('SELECT value FROM `_State` WHERE id = ?').get('engine');
+      engine = row ? row.value : null;
+      if (engine === 'rust') {
+        localOnly = countLocalOnlyRows(db);
+      }
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    // Unreadable or not one of ours; let mailsync's own migration decide.
+    return;
+  }
+  if (engine !== 'rust') return;
+
+  console.log('Moving the Rust engine database aside before the C++ engine migrates');
+  // Nothing imports from edgehill.rust.db, and the next switch back replaces it.
+  if (localOnly && (localOnly.drafts > 0 || localOnly.scheduled > 0)) {
+    console.warn(
+      `Switching to the C++ engine resyncs from the server. ${localOnly.drafts} unsent local ` +
+        `draft(s) and ${localOnly.scheduled} pending snooze/send-later/reminder value(s) stay ` +
+        `only in edgehill.rust.db, which the next switch from Rust to C++ replaces.`
+    );
+  }
+  for (const suffix of ['', '-wal', '-shm']) {
+    const from = `${dbPath}${suffix}`;
+    const to = path.join(configDirPath, `edgehill.rust.db${suffix}`);
+    if (fs.existsSync(to)) fs.unlinkSync(to);
+    if (fs.existsSync(from)) fs.renameSync(from, to);
+  }
+}
+
+/* Drafts never uploaded (a UID-0 placement only) and metadata waiting on an expiration:
+what a resync from the server does not bring back to an account without a metadata identity. */
+function countLocalOnlyRows(db: any): { drafts: number; scheduled: number } | null {
+  try {
+    const drafts = db
+      .prepare(
+        'SELECT count(*) AS n FROM Message m WHERE m.draft = 1 AND EXISTS ' +
+          '(SELECT 1 FROM MessageFolder p WHERE p.messageId = m.id AND p.remoteUID = 0) ' +
+          'AND NOT EXISTS ' +
+          '(SELECT 1 FROM MessageFolder p WHERE p.messageId = m.id AND p.remoteUID > 0)'
+      )
+      .get().n;
+    const scheduled = db
+      .prepare('SELECT count(*) AS n FROM ModelPluginMetadata WHERE expiration > ?')
+      .get(Math.floor(Date.now() / 1000)).n;
+    return { drafts, scheduled };
+  } catch (err) {
+    return null;
+  }
+}
+
 export class MailsyncProcess extends EventEmitter {
   _proc: ChildProcess = null;
   _win = null;
@@ -125,14 +246,26 @@ export class MailsyncProcess extends EventEmitter {
   verbose: boolean;
   resourcePath: string;
   configDirPath: string;
+  syncEngine: SyncEngine;
   binaryPath: string;
 
-  constructor({ configDirPath, resourcePath, verbose }) {
+  constructor({
+    configDirPath,
+    resourcePath,
+    verbose,
+    syncEngine,
+  }: {
+    configDirPath: string;
+    resourcePath: string;
+    verbose?: boolean;
+    syncEngine?: SyncEngine;
+  }) {
     super();
     this.verbose = verbose;
     this.resourcePath = resourcePath;
     this.configDirPath = configDirPath;
-    this.binaryPath = path.join(resourcePath, 'mailsync').replace('app.asar', 'app.asar.unpacked');
+    this.syncEngine = syncEngine || resolveSyncEngine(configDirPath, resourcePath);
+    this.binaryPath = syncEngineBinaryPath(resourcePath, this.syncEngine);
   }
 
   _showStatusWindow(mode) {
@@ -499,8 +632,11 @@ export class MailsyncProcess extends EventEmitter {
   }
 
   async migrate() {
+    if (this.syncEngine === 'cpp') {
+      moveAsideRustDatabase(this.configDirPath);
+    }
     try {
-      console.log('Running database migrations');
+      console.log(`Running database migrations (${this.syncEngine} engine)`);
       const { buffer } = await this._spawnAndWait('migrate', {
         onData: (data) => {
           const str = data.toString().toLowerCase();
@@ -513,6 +649,22 @@ export class MailsyncProcess extends EventEmitter {
     } catch (err) {
       this._closeStatusWindow();
       throw err;
+    }
+    if (this.syncEngine === 'rust') {
+      await this._importLegacy();
+    }
+  }
+
+  // Carries local drafts, snoozes, reminders and send-later over from the C++ database that
+  // the Rust engine's migrate moved aside (docs/engine-port-plan.md section 9). A no-op
+  // without one or once imported, so it runs on every launch; a failure is logged and the
+  // launch continues, since the account processes do not depend on it.
+  async _importLegacy() {
+    try {
+      const { buffer } = await this._spawnAndWait('import-legacy');
+      console.log(this._stripSecrets(buffer.toString()));
+    } catch (err) {
+      console.error(`mailsync --mode import-legacy failed: ${err}`);
     }
   }
 

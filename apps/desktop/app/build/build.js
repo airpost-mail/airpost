@@ -222,6 +222,9 @@ function buildPackagerOptions() {
         [
           'mailsync',
           'mailsync.exe',
+          // The Rust engine, placed by apps/engine/packaging/build-release.sh.
+          'mailsync-rs',
+          'mailsync-rs.exe',
           'mailsync.bin',
           '*.so',
           '*.so.*',

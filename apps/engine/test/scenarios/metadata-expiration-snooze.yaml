@@ -26,6 +26,7 @@ steps:
       metadata_expiration:
         - {threads: {mailbox: INBOX, uids: [1]}, count: 0}
   - wait: {delta: {class: Thread, type: metadata-expiration, count: 1}, timeout: 90}
+  - mark: expired
   # What the client does on that delta: drop the snooze.
   - client.task:
       __cls: SyncbackMetadataTask
@@ -35,7 +36,9 @@ steps:
     as: unsnooze
   - wait: {task: unsnooze, timeout: 30}
   - mark: cleared
-  - wait: {seconds: 25}
+  # Nothing may arrive after the clear. The earliest scan after one that sent something is
+  # 16 s later (15 s minimum, then 1 s), and its deltas reach stdout 500 ms after it.
+  - wait: {until: expired, plus: 18}
 expect:
   metadata_expiration:
     - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, count: {min: 1}}

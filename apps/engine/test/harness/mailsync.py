@@ -16,6 +16,7 @@ considered quiescent when all of these hold at once:
   - no delta has arrived within the settle window
 """
 import contextlib
+import itertools
 import json
 import os
 import re
@@ -50,6 +51,25 @@ LOG_LINE = re.compile(
 IMAP_LINE = re.compile(r"^(?P<dir>sent|recv|sent-private|error-parse|error-received) (?P<line>.*)$")
 # The command line of an IDLE, whatever the tag looks like.
 IDLE_COMMAND = re.compile(r"^\S+ IDLE$")
+
+
+_minute_epochs: dict = {}
+
+
+def _log_epoch(ts: str) -> float:
+    """`2026-10-15 15:37:28.943` (local time, both engines' log format) as epoch seconds.
+    The minute prefix is converted once; a log holds tens of thousands of lines."""
+    try:
+        minute, seconds = ts[:16], float(ts[17:])
+        base = _minute_epochs.get(minute)
+        if base is None:
+            base = _minute_epochs[minute] = time.mktime(time.strptime(minute, "%Y-%m-%d %H:%M"))
+        return base + seconds
+    except ValueError:
+        return 0.0
+
+
+_task_seq = itertools.count(1)
 
 
 class MailsyncError(RuntimeError):
@@ -149,6 +169,12 @@ class Delta:
 
 # The background worker's sleep between passes (`WORKER_SLEEP`, SyncWorker.cpp).
 WORKER_SLEEP_SECONDS = 120.0
+# How long the background worker's `Sync loop complete.` and the last delta must be old for
+# quiescence. The worker loops into its next pass within milliseconds when it has more to
+# do; the bound is the workers' delta stream delay (500 ms, `STREAM_DELAY_WORKER_MS`), so
+# a change written just before the line still reaches stdout inside the window, with as
+# much again for scheduling under a full parallel run.
+QUIESCENCE_SETTLE = 1.0
 
 
 @dataclass
@@ -159,6 +185,7 @@ class LogLine:
     msg: str
     imap_dir: Optional[str] = None   # sent / recv / sent-private when the line is IMAP traffic
     imap_line: Optional[str] = None
+    wall: float = 0.0  # epoch seconds from the line's own timestamp; comparable with `mark` and across processes
 
 
 @dataclass
@@ -250,7 +277,7 @@ class MailsyncProcess:
         if r.returncode < 0:
             raise MailsyncError(f"migrate {describe_exit(r.returncode)}: {r.stdout[-500:]} {r.stderr[-500:]}")
         if r.returncode != 0 or '"error":null' not in r.stdout.replace(" ", ""):
-            hint = " (exit 2 with no output is the executable-path check: argv[0] must contain 'tern' (Rust) or 'mailspring' (C++))" if r.returncode == 2 else ""
+            hint = " (exit 2 with no output is the executable-path check: argv[0] must contain 'tern' or 'mailspring' (the Rust engine accepts either; the C++ engine needs 'mailspring'))" if r.returncode == 2 else ""
             raise MailsyncError(f"migrate failed ({r.returncode}){hint}: {r.stdout[-500:]} {r.stderr[-500:]}")
 
     def run_one_shot(self, mode: str, timeout: float = 120) -> str:
@@ -357,7 +384,8 @@ class MailsyncProcess:
         """Queue a task the way Actions.queueTask does. `task` needs __cls and the fields
         that class's performLocal/performRemote read; id/accountId/status are filled in."""
         task = dict(task)
-        task.setdefault("id", f"task-{int(time.time() * 1000)}-{len(self.state.deltas)}")
+        # The sequence number keeps tasks queued within one millisecond apart.
+        task.setdefault("id", f"task-{int(time.time() * 1000)}-{len(self.state.deltas)}-{next(_task_seq)}")
         task.setdefault("aid", self.account["id"])   # MailModel's JSON key for accountId
         task.setdefault("status", "local")
         task.setdefault("v", 0)
@@ -445,7 +473,7 @@ class MailsyncProcess:
             m = LOG_LINE.match(raw.rstrip("\r"))
             if not m:
                 continue  # continuation lines of multi-line IMAP literals
-            ll = LogLine(t, m["thread"], m["level"], m["msg"])
+            ll = LogLine(t, m["thread"], m["level"], m["msg"], wall=_log_epoch(m["ts"]))
             im = IMAP_LINE.match(ll.msg)
             if im:
                 ll.imap_dir, ll.imap_line = im["dir"], im["line"]
@@ -506,7 +534,7 @@ class MailsyncProcess:
     # -- waiting --------------------------------------------------------------------------
 
     def wait_for(self, predicate: Callable[[], bool], timeout: float, what: str = "condition",
-                 poll: float = 0.25) -> None:
+                 poll: float = 0.1) -> None:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if not self.running:
@@ -566,7 +594,7 @@ class MailsyncProcess:
         engine = [l for l in fg if l.imap_dir is None]
         return bool(engine) and engine[-1].msg.startswith("Idling on folder")
 
-    def wait_quiescent(self, timeout: float = 120, settle: float = 2.0, require_idle: bool = True,
+    def wait_quiescent(self, timeout: float = 120, settle: float = QUIESCENCE_SETTLE, require_idle: bool = True,
                        ignore_busy: Iterable[str] = ()) -> None:
         """Block until the engine has nothing left to do. See the module docstring.
         ignore_busy: folder paths whose busy flag is known never to clear (the skipped \\All
@@ -591,9 +619,9 @@ class MailsyncProcess:
             self.wait_reason = ""
             return True
 
-        self.wait_for(check, timeout, "quiescence", poll=0.5)
+        self.wait_for(check, timeout, "quiescence", poll=0.2)
 
-    def sync_pass(self, timeout: float = 120, settle: float = 2.0, ignore_busy: Iterable[str] = ()) -> float:
+    def sync_pass(self, timeout: float = 120, settle: float = QUIESCENCE_SETTLE, ignore_busy: Iterable[str] = ()) -> float:
         """wake-workers, then wait for the resulting background pass to finish. Returns the
         timestamp of the wake so callers can scope delta/log queries to this pass."""
         t = self.elapsed()
