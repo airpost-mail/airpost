@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/calendar",
+      "countsAsAttachment": true,
+      "filename": "Event.ics",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Event.ics",
+      "sha256": "a43a92381acda416d449b12f69377efcac983bda6fe8835459c6cc71238b0fe3",
+      "size": 310,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "d527b46e92ea@example.org",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Calendar only"
+}

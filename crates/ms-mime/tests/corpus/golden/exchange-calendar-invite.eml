@@ -1,0 +1,50 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Budget review
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <a5801a554227@example.org>
+MIME-Version: 1.0
+Thread-Topic: Budget review
+X-MS-Has-Attach: yes
+X-MS-TNEF-Correlator: 
+Content-Type: multipart/mixed; boundary="mix5"
+
+--mix5
+Content-Type: multipart/alternative; boundary="alt5"
+
+--alt5
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+When: Saturday 10 January 2026 15:00-16:00 (UTC)
+
+--alt5
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<html><body><p>When: Saturday 10 January 2026</p><p>Budget review</p></body></html>
+
+--alt5
+Content-Type: text/calendar; charset=utf-8; method=REQUEST
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpWRVJTSU9OOjIuMA0KUFJPRElEOi0vL01pY3Jvc29mdCBDb3Jwb3Jh
+dGlvbi8vT3V0bG9vayAxNi4wIE1JTUVESVIvL0VODQpNRVRIT0Q6UkVRVUVTVA0KQkVHSU46VkVW
+RU5UDQpVSUQ6MDQwMDAwMDA4MjAwRTAwMDc0QzVCNzEwMUE4MkUwMDgwMDAwMDAwMDENCkRUU1RB
+UlQ6MjAyNjAxMTBUMTUwMDAwWg0KRFRFTkQ6MjAyNjAxMTBUMTYwMDAwWg0KU1VNTUFSWTpCdWRn
+ZXQgcmV2aWV3DQpPUkdBTklaRVI7Q049QWxpY2U6bWFpbHRvOmFsaWNlQGV4YW1wbGUub3JnDQpF
+TkQ6VkVWRU5UDQpFTkQ6VkNBTEVOREFSDQo=
+--alt5--
+
+--mix5
+Content-Type: application/ics; name="invite.ics"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="invite.ics"
+
+QkVHSU46VkNBTEVOREFSDQpWRVJTSU9OOjIuMA0KUFJPRElEOi0vL01pY3Jvc29mdCBDb3Jwb3Jh
+dGlvbi8vT3V0bG9vayAxNi4wIE1JTUVESVIvL0VODQpNRVRIT0Q6UkVRVUVTVA0KQkVHSU46VkVW
+RU5UDQpVSUQ6MDQwMDAwMDA4MjAwRTAwMDc0QzVCNzEwMUE4MkUwMDgwMDAwMDAwMDENCkRUU1RB
+UlQ6MjAyNjAxMTBUMTUwMDAwWg0KRFRFTkQ6MjAyNjAxMTBUMTYwMDAwWg0KU1VNTUFSWTpCdWRn
+ZXQgcmV2aWV3DQpPUkdBTklaRVI7Q049QWxpY2U6bWFpbHRvOmFsaWNlQGV4YW1wbGUub3JnDQpF
+TkQ6VkVWRU5UDQpFTkQ6VkNBTEVOREFSDQo=
+--mix5--

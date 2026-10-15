@@ -1,0 +1,10 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Unknown charset label
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <440303e6c4f4@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=x-user-defined-garbage
+Content-Transfer-Encoding: 8bit
+
+ѕривет, как дела? Ёто тестовое сообщение в кодировке windows-1251.

@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "5a6185b45046@example.org",
+  "plaintext": true,
+  "searchTextLength": 19,
+  "snippet": "Inner single body\r\n",
+  "subject": "Message part with a single body"
+}

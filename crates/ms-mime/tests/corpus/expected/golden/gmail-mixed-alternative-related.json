@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pdf",
+      "countsAsAttachment": true,
+      "filename": "terms.pdf",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "terms.pdf",
+      "sha256": "17638a2c28f405d502f92d79398bc7fcbd9172f8b563fb271af64eed6e84647e",
+      "size": 10,
+      "uniqueId": "0"
+    },
+    {
+      "contentId": "pic@example.org",
+      "contentType": "image/png",
+      "countsAsAttachment": false,
+      "filename": "pic.png",
+      "inline": true,
+      "partId": "1.2.2",
+      "safeFilename": "pic.png",
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size": 70,
+      "uniqueId": "3"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "1f64a35c86a8@example.org",
+  "plaintext": false,
+  "searchTextLength": 4,
+  "snippet": "Rich",
+  "subject": "Gmail structure"
+}

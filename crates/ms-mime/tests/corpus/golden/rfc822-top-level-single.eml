@@ -1,0 +1,12 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Message part with a single body
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <5a6185b45046@example.org>
+MIME-Version: 1.0
+Content-Type: message/rfc822
+
+Subject: Single inner
+From: dave@dev.example
+
+Inner single body

@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "2b47b955185139069f95b4cc46da71745e570e30bacda342224de49196c9b0a6",
+      "size": 1420,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Charles Halle",
+      "ross@iclc.net"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3njncv$1kh@castle.iclc.net",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "I  DID  IT - I'm a New Entrepreneur  -"
+}

@@ -1,0 +1,47 @@
+Hi everyone.  I'm a consultant working with Nortel on their S/MIME products.
+I've already completed basic interop testing against Deming's Secure
+Messenger and at Blake's suggestion I am about to post a signed message to
+this list for others to use in interop testing.  If you have questions about
+Entrust in general, please visit their web site <http://www.entrust.com>.  If
+you have questions about the forthcoming S/MIME toolkit for Entrust please
+email Michel Ranger <mailto:rangerm@entrust.com> or Ron Vandergeest
+<mailto:rvander@entrust.com>.  E-mail any technical interop-related questions
+directly to me <mailto:rosenqui@strataware.com>.
+
+One big thing you should be aware of with Entrust is that it uses separate
+key pairs for signing and encryption, so you must be careful to distinguish
+between my verification certificate and my signature certificate.  You
+should import *this* certificate into your local database if you want to be
+able to encrypt for me.  For now, signed S/MIME messages created with the
+Entrust toolkit will include both certificates for the originator as well
+as the originator's CA certificate.  Eventually this will be under the
+programmatic control of whatever app is using the toolkit, so it's
+important that you look at the certificate you're importing to make sure
+it's the one you want.  You can tell which one you've got by looking at the
+keyUsage V3 cert extension (object identifier 2.5.29.15).  The encryption
+certificate has the keyEncipherment bit set (bit number 2 or 0x20) and the
+verification certificate has the digitalSignature bit set (bit number 0 or
+0x80).
+
+One other thing that some of you may not have encountered before is that my
+CA is not Verisign.  Included in the P7C (as well as my signed S/MIME
+messages) is my CA's certificate - a self-signed certificate.  You can
+distinguish this form of certificate (a self-signed CA) from a self-signed
+user certificate by looking for the keyCertSign (bit 5) or cRLSign (bit 6)
+bits in the keyUsage extension.  Failing that, you can look for the
+basicConstraints extension to see if the 'cA' BOOLEAN field is present and
+TRUE.
+
+Without further ado, here is my encryption certificate and my CA's
+signature verification certificate.  I'm away all of next week, so if you
+have questions or discover any problems please e-mail me ASAP.  If you
+don't get a reply by the end of Friday I'll try to get back to you as soon
+as possible after Dec. 2nd.
+
+Eric
+---------------------------------------------------------------------
+Eric Rosenquist, Strata Software Limited   http://www.strataware.com/
+mailto:rosenqui@strataware.com   Tel: 613-591-1922  Fax: 613-591-3485
+Quote: I discovered a meal between breakfast and brunch!
+         -- Homer Simpson
+---------------------------------------------------------------------

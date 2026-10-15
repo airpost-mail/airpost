@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 0,
+  "files": [
+    {
+      "contentId": "photo-1@apple.example",
+      "contentType": "image/png",
+      "countsAsAttachment": false,
+      "filename": "photo.png",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "photo.png",
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size": 70,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "4bf90f03300a@example.org",
+  "plaintext": false,
+  "searchTextLength": 26,
+  "snippet": "Look at this: Nice, right?",
+  "subject": "Apple Mail inline image"
+}

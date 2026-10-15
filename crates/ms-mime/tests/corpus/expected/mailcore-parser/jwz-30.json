@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Jamie Zawinski",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3nl1gc$lkb@flop.mcom.com",
+  "plaintext": false,
+  "searchTextLength": 332,
+  "snippet": "Here comes an attachment of type message/rfc822: http://islay.mcom.com:8008/regression/test1.1b3/bug4498/ -- Sharon Iimura Netscape Communications Corporation Not Found The requested object does not exist on this server. The link you followed is either outdated, inaccurate, or the server has been instructed not to let you have it.",
+  "subject": "Re: attach this, spanky"
+}

@@ -1,0 +1,67 @@
+{
+  "attachmentCount": 4,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "68f20529a3710b7f254200f7df95c8663ece3bce6243408155bbe5307cfb38ba",
+      "size": 489,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "quartet.au",
+      "inline": false,
+      "partId": "2.2",
+      "safeFilename": "quartet.au",
+      "sha256": "4eb01d1f584fedb0798316dda147fd2643a82c46fb87f25149172ffe62a3f454",
+      "size": 29,
+      "uniqueId": "2"
+    },
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "quartet.gif",
+      "inline": false,
+      "partId": "2.4",
+      "safeFilename": "quartet.gif",
+      "sha256": "59bf46275390714ea1ea10c2d5f3bc141759a7c6fdc4481f156f937dc99c4d32",
+      "size": 27,
+      "uniqueId": "4"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.5",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "511b5293d59fa2e6b90362ebbf724872ae73fd4039ad9577ffce3c78f446ff65",
+      "size": 222,
+      "uniqueId": "5"
+    }
+  ],
+  "from": [
+    [
+      "Nathaniel Borenstein",
+      "nsb"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "Edjbh9O0M2YtQL5uct@thumper.bellcore.com",
+  "plaintext": true,
+  "searchTextLength": 1,
+  "snippet": "\n",
+  "subject": "Barbershop MIME"
+}

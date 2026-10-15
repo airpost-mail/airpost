@@ -1,0 +1,70 @@
+name: dav-initial-sync
+description: >
+  An IMAP account whose provider also serves CalDAV and CardDAV. On the first calContacts
+  pass the engine discovers both services the RFC 6764 way (.well-known redirect, then
+  current-user-principal, then the home sets), lists the calendar collections that hold
+  VEVENTs (a VTODO-only list is skipped), and stores one Event per VEVENT inside the sync
+  window - 12 months back to 18 months ahead - with a recurring series as its master plus
+  its RECURRENCE-ID override, and one Contact per card: a vCard 3.0 or 4.0 contact keyed by
+  its UID, and each group card (X-ADDRESSBOOKSERVER-KIND or KIND:group) as a hidden contact
+  plus a ContactGroup with its members.
+source: "DAVWorker::run / runContacts / runCalendars / resolveAddressBook / resolveCalendarHomeURL / ingestAddressDataNode / ingestCalendarDataNode; DAVUtils::isGroupCard"
+servers:
+  - {radicale: default}
+  - {baikal: default}
+mailboxes:
+  INBOX: {messages: 2}
+calendars:
+  default:
+    events:
+      - {count: 5}
+      - {uid: weekly@example.test, summary: "Weekly sync", start: "+1d", rrule: "FREQ=WEEKLY;COUNT=10", overrides: [{summary: "Weekly sync (moved)"}]}
+      - {uid: allhands@example.test, summary: "All hands", all_day: true, start: "+3d"}
+      - {uid: long-ago@example.test, summary: "Long ago", start: "-800d"}
+      - {uid: far-ahead@example.test, summary: "Far ahead", start: "+700d"}
+  work:
+    create: true
+    display_name: Work
+    events: [{count: 2}]
+  todo:
+    create: true
+    display_name: Todo
+    components: [VTODO]
+addressbooks:
+  default:
+    contacts:
+      - {count: 25}
+      - {uid: alice-uid, name: "Alice Archer", email: alice@example.org}
+      - {uid: bob-uid, name: "Bob Baker", emails: [bob@example.org, bob@work.example], version: "4.0"}
+    groups:
+      - {name: Climbing, members: [alice@example.org, bob@example.org]}
+      - {name: Family, version: "4.0", members: [alice@example.org]}
+steps:
+  - wait: quiescent
+  - wait: {log: "Calendar sync pass 1, with contacts", timeout: 60}
+  - wait: {models: {Event: {count: 10}, Contact: {where: {s: carddav}, count: 29}, ContactGroup: {count: 2}}, timeout: 120}
+  - wait: {quiescent: true}
+expect:
+  dav_matches_db: {}
+  models:
+    Calendar:
+      count: 2
+      absent: [{name: Todo}]
+    ContactBook: {count: 1, match: [{source: carddav}]}
+    Event:
+      match:
+        - {icsuid: weekly@example.test, rid: {in: ["", null]}}
+        - {icsuid: weekly@example.test, rid: {re: "\\S"}}
+        - {icsuid: allhands@example.test}
+      absent: [{icsuid: long-ago@example.test}, {icsuid: far-ahead@example.test}]
+    Contact:
+      where: {s: carddav}
+      match:
+        - {id: alice-uid, email: alice@example.org, name: "Alice Archer", h: {not: true}}
+        - {id: bob-uid, email: bob@example.org}
+        - {name: Climbing, h: true}
+    ContactGroup:
+      match: [{name: Climbing}, {name: Family}]
+  db_matches_server: {}
+  log_absent: ["\\[critical\\]"]
+  running: true

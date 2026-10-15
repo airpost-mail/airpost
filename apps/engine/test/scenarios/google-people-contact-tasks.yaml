@@ -1,0 +1,79 @@
+name: google-people-contact-tasks
+description: >
+  The user edits Google contacts in the client. Each task applies locally and then writes
+  through the People API: createContact for a new contact (the Contact row keeps its id and
+  gains the resourceName), updateContact with the stored etag and an updatePersonFields
+  mask, deleteContact, a new contact group, a group rename, adding and removing members
+  (members:modify), and deleting the group. Afterwards the API holds what the user did and
+  the database agrees with it.
+source: "TaskProcessor performLocal/RemoteSyncbackContact, DestroyContact, SyncbackContactGroup, ChangeContactGroupMembership, DestroyContactGroup; GoogleContactsWorker::upsertContact / deleteContacts / upsertContactGroup / updateContactGroupMembership / deleteContactGroup"
+servers:
+  - {fake: gmail, people: true}
+mailboxes:
+  INBOX: {messages: 2}
+people:
+  groups: [{name: Climbing}]
+  contacts:
+    - {name: "Alice Archer", email: alice@example.org, groups: [Climbing]}
+    - {name: "Bob Baker", email: bob@example.org}
+    - {name: "Carol Cook", email: carol@example.org}
+steps:
+  - wait: quiescent
+  - wait: {models: {Contact: {where: {s: gpeople}, count: 3}, ContactGroup: {count: 1}}, timeout: 120}
+  - wait: {quiescent: true}
+  - client.task: {__cls: SyncbackContactTask, contact: {new: {name: "Dan Diver", email: dan@example.org}}}
+    as: create
+  - wait: {task: create, timeout: 60}
+  - client.task: {__cls: SyncbackContactTask, contact: {email: bob@example.org, changes: {name: "Robert Baker"}}}
+    as: update
+  - wait: {task: update, timeout: 60}
+  - client.task: {__cls: DestroyContactTask, contacts: [{email: carol@example.org}]}
+    as: destroy
+  - wait: {task: destroy, timeout: 60}
+  - client.task: {__cls: SyncbackContactGroupTask, group: {new: true, name: "Book Club"}}
+    as: new_group
+  - wait: {task: new_group, timeout: 60}
+  - client.task: {__cls: ChangeContactGroupMembershipTask, direction: add, contacts: [{email: bob@example.org}, {email: dan@example.org}], group: {name: "Book Club"}}
+    as: add_members
+  - wait: {task: add_members, timeout: 60}
+  - client.task: {__cls: ChangeContactGroupMembershipTask, direction: remove, contacts: [{email: alice@example.org}], group: {name: Climbing}}
+    as: remove_member
+  - wait: {task: remove_member, timeout: 60}
+  - client.task: {__cls: SyncbackContactGroupTask, group: {name: Climbing, rename: Bouldering}}
+    as: rename_group
+  - wait: {task: rename_group, timeout: 60}
+  - wait: {quiescent: true}
+  - assert:
+      tasks:
+        create: {status: complete, error: null}
+        update: {status: complete, error: null}
+        destroy: {status: complete, error: null}
+        new_group: {status: complete, error: null}
+        add_members: {status: complete, error: null}
+        remove_member: {status: complete, error: null}
+        rename_group: {status: complete, error: null}
+      people_has:
+        contacts: [{email: dan@example.org, name: "Dan Diver"}, {email: bob@example.org, name: "Robert Baker"}]
+        no_contacts: [carol@example.org]
+        groups: {"Book Club": [bob@example.org, dan@example.org], Bouldering: []}
+      people_matches_db: {}
+      models:
+        Contact: {where: {email: dan@example.org}, count: 1, match: [{grn: {re: "^people/"}, s: gpeople}]}
+  - client.task: {__cls: DestroyContactGroupTask, group: {name: Bouldering}}
+    as: destroy_group
+  - wait: {task: destroy_group, timeout: 60}
+  - wait: {quiescent: true}
+expect:
+  tasks:
+    destroy_group: {status: complete, error: null}
+  people_has:
+    no_groups: [Bouldering]
+  people_matches_db: {}
+  people_requests:
+    - {method: POST, path: "^/v1/people:createContact$", count: 1, status: 200}
+    - {method: PATCH, path: "^/v1/people/[^/]+:updateContact$", query: {updatePersonFields: true}, min: 1, status: 200}
+    - {method: DELETE, path: "^/v1/people/[^/]+:deleteContact$", count: 1, status: 200}
+    - {method: POST, path: "^/v1/contactGroups/[^/]+/members:modify$", min: 2, status: 200}
+    - {method: DELETE, path: "^/v1/contactGroups/[^/]+$", count: 1, status: 200}
+    - {status: 400, count: 0}
+  running: true

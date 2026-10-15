@@ -1,0 +1,25 @@
+
+Dear sasl ers
+
+I got ERROR WRITING THE HOST SORT FILE, POSSIBLY OUT OF DISK SPACE
+
+wner running a large data crunching job in batch mode, it goes automatically
+ every morning and retrieves data fron RDB on 6.08 under VMS VAX.
+
+I did check the disk space and actually the disk is full. So hat, well, it's an
+ industrial plan vax and noone can touch the disk, if it's almost full, qwell,
+ so be it. Then the question is :
+
+is there a way to submit a sas job under vms from the system startup (located on
+ the system disk) but redirecting ALL working areas on another disk ?
+
+I tried all trivial solutions available under the system options of SAS, but it
+ seems that SAS will always use some disk space on the system disk nevertheless.
+
+Is there a safe way to run SAS on a vax with the system disk full ?
+
+Thank you in advance.
+
+Stefano Gazziano
+
+SAS consultant in Rome Italy.

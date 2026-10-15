@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-first",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "cdbe2f91977a7ed7200542a41072651f70af2673cea4e9a9f68692284c073ed7",
+      "size": 7,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "4586a485c64d@example.org",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Alternative without text"
+}

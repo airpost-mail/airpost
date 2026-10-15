@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:caldav="urn:ietf:params:xml:ns:caldav">
+<D:response><D:href>/caldav/v2/alice%40gmail.com/events/0f4ab1qv3kgh6bvn3k9j1b2c3d%40google.com.ics</D:href><D:propstat><D:status>HTTP/1.1 200 OK</D:status><D:prop><D:getetag>"63860000001"</D:getetag></D:prop></D:propstat><D:propstat><D:status>HTTP/1.1 404 Not Found</D:status><D:prop><caldav:calendar-data/></D:prop></D:propstat></D:response>
+<D:response><D:href>/caldav/v2/alice%40gmail.com/events/7h2k9vq0p4l5m6n7o8p9q0r1s2%40google.com.ics</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>
+<D:sync-token>https://www.google.com/calendar/dav/alice%40gmail.com/events/sync/CPjM9Lj5z4cDEAAYASDCzKzFAijCzKzFAg==</D:sync-token>
+</D:multistatus>

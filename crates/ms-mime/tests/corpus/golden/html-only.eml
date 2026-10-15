@@ -1,0 +1,12 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: HTML only
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <479086e8b477@example.org>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<html><head><style>p{color:red}</style><title>Ignored title</title></head><=
+body><p>Caf=C3=A9 menu for <b>today</b>:</p><ul><li>Soup</li><li>Bread &amp=
+; butter</li></ul><p>See&nbsp;you</p></body></html>

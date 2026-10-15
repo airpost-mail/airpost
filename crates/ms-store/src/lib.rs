@@ -1,0 +1,30 @@
+//! The engine's SQLite store.
+//!
+//! Derived from Mailspring-Sync (`MailSync/MailStore.*`, `MailStoreTransaction.*`,
+//! `Query.*`, `DeltaStream.*`, `Placement.*`, `Models/*`, `constants.h`), Copyright © 2017
+//! Foundry 376, GPL-3.0. See NOTICE.md.
+//!
+//! One [`Store`] per thread, each with its own connection; `Store` is `!Send` so the
+//! compiler enforces what `MailStore::assertCorrectThread` checked at runtime. Deltas go to
+//! the process-wide [`DeltaStream`], which every store shares.
+
+pub mod delta;
+pub mod invariants;
+pub mod migrate;
+pub mod model;
+pub mod models;
+pub mod placement;
+pub mod query;
+pub mod schema;
+pub mod search;
+pub mod store;
+
+pub use delta::{DeltaItem, DeltaStream};
+pub use model::Model;
+pub use models::{
+    Calendar, Contact, ContactBook, ContactGroup, Event, File, FilePart, Folder, GenericModel,
+    IcsEventFields, IncomingMessage, Label, Message, MessageSnapshot, Task, Thread,
+};
+pub use placement::{FetchableCopy, MessageAttributes, Placement};
+pub use query::Query;
+pub use store::Store;

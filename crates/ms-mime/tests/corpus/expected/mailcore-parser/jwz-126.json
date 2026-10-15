@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "440e83c49489895f834081cb211e1feee2fd3ee21a902b0bc5ed26d95cccfa87",
+      "size": 2004,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "John T. Gildred",
+      "jgildred@opensoft.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9606101835.AA29051@www",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Signed Confirmation"
+}

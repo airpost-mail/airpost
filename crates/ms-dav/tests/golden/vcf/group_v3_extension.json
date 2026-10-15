@@ -1,0 +1,13 @@
+{
+  "after_edit": "BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//Apple Inc.//AddressBook 14.0//EN\r\nUID:grp-v3\r\nN:Renamed\r\nFN:Renamed\r\nX-ADDRESSBOOKSERVER-KIND:group\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:f-1\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:added-1\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:m-1\r\nEND:VCARD\r\n",
+  "email": "",
+  "emails": [],
+  "is_group": true,
+  "member_ids": [
+    "f-1"
+  ],
+  "name": "Family",
+  "serialized": "BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//Apple Inc.//AddressBook 14.0//EN\r\nUID:grp-v3\r\nN:Family\r\nFN:Family\r\nX-ADDRESSBOOKSERVER-KIND:group\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:f-1\r\nEND:VCARD\r\n",
+  "uid": "grp-v3",
+  "version": "3.0"
+}

@@ -1,0 +1,9 @@
+BEGIN:VCARD
+VERSION:4.0
+UID:grp-v4
+KIND:group
+FN:Book club
+N:Book club;;;;
+MEMBER:urn:uuid:m-1
+MEMBER:urn:uuid:m-2
+END:VCARD

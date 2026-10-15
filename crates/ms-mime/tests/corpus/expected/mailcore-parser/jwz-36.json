@@ -1,0 +1,79 @@
+{
+  "attachmentCount": 5,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "f28ef0ec72788cc5f8a80fd0e8ef25a30b6d3912b4a56877e3820da94973a1c7",
+      "size": 144,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "draft-smith-ipatm-bcast-00.txt",
+      "inline": false,
+      "partId": "2.2",
+      "safeFilename": "draft-smith-ipatm-bcast-00.txt",
+      "sha256": "02558e0fc78981c8b1499644f169ae1d6f0a4286314da8866a8445098c3bc1b3",
+      "size": 76,
+      "uniqueId": "2"
+    },
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.3",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "93e0866ca61ef7e2a26662f627be64c3876c705eddae28960ae3786819e0fb54",
+      "size": 67,
+      "uniqueId": "3"
+    },
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "/some/directory/loser.gif",
+      "inline": false,
+      "partId": "2.4",
+      "safeFilename": "-some-directory-loser.gif",
+      "sha256": "0f027ab4f60566081cc0eb767a83a37af3a87884e861709b450ba1ebd527fc51",
+      "size": 68,
+      "uniqueId": "4"
+    },
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "/afs/directory/loser.gif",
+      "inline": false,
+      "partId": "2.5",
+      "safeFilename": "-afs-directory-loser.gif",
+      "sha256": "3f740b429fbbbcabfda833c04660628d335b586ec8684e0543ecaa54ba8ed955",
+      "size": 68,
+      "uniqueId": "5"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "Internet-Drafts@CNRI.Reston.VA.US"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9504251109.aa04587@IETF.CNRI.Reston.VA.US",
+  "plaintext": true,
+  "searchTextLength": 38,
+  "snippet": "here are a couple of external bodies:\n",
+  "subject": "I-D ACTION:draft-smith-ipatm-bcast-00.txt"
+}

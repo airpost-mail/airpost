@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "768ec9fc0e53@example.org",
+  "plaintext": true,
+  "searchTextLength": 28,
+  "snippet": "The From_ line is skipped.\r\n",
+  "subject": "With an mbox From line"
+}

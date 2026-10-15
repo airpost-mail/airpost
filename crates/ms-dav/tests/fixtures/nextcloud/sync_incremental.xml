@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns" xmlns:x1="http://apple.com/ns/ical/" xmlns:card="urn:ietf:params:xml:ns:carddav"><d:response><d:href>/remote.php/dav/calendars/alice/personal/DEADBEEF-1.ics</d:href><d:status>HTTP/1.1 404 Not Found</d:status></d:response><d:response><d:href>/remote.php/dav/calendars/alice/personal/F00D-2.ics</d:href><d:propstat><d:prop><d:getetag>&quot;5c7e0e1f2ab3&quot;</d:getetag><cal:calendar-data>BEGIN:VCALENDAR
+PRODID:-//Nextcloud calendar v4.7.6
+VERSION:2.0
+BEGIN:VEVENT
+CREATED:20240601T100000Z
+DTSTAMP:20240601T100000Z
+LAST-MODIFIED:20240601T100000Z
+UID:F00D-2
+DTSTART;TZID=Europe/Berlin:20241027T023000
+DURATION:PT1H
+SUMMARY:Night shift
+END:VEVENT
+BEGIN:VTIMEZONE
+TZID:Europe/Berlin
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+TZNAME:CEST
+DTSTART:19700329T020000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+TZNAME:CET
+DTSTART:19701025T030000
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+END:STANDARD
+END:VTIMEZONE
+END:VCALENDAR
+</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:sync-token>http://sabre.io/ns/sync/43</d:sync-token></d:multistatus>

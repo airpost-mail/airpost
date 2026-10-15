@@ -1,0 +1,22 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: cid by filename
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <7ac6b1ecced5@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix4"
+
+--mix4
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<p>Outlook signature <img src="cid:image001.png@01D3A1B2.C3D4E5F0"></p>
+
+--mix4
+Content-Type: image/png; name="image001.png"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="image001.png"
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmM
+IQAAAABJRU5ErkJggg==
+--mix4--

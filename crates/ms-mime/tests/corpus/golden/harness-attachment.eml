@@ -1,0 +1,32 @@
+Return-Path: <dave@dev.example>
+Delivered-To: test@example.test
+Message-ID: <harness-3-e480dd9e@example.test>
+Date: Mon, 12 Oct 2026 01:18:23 +0000
+From: Dave Dev <dave@dev.example>
+To: Harness Test <test@example.test>
+Subject: Message 3
+MIME-Version: 1.0
+In-Reply-To: <harness-1-x@example.test>
+References: <harness-1-x@example.test>
+Content-Type: multipart/mixed; boundary="=_harness_5b3bedf4ad6d"
+
+--=_harness_5b3bedf4ad6d
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+This is the body of message 3.
+
+-- 
+Dave Dev
+
+--=_harness_5b3bedf4ad6d
+Content-Type: application/octet-stream; name="report.pdf"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="report.pdf"
+
+JVBERi0xLjQgZmFrZSVQREYtMS40IGZha2UlUERGLTEuNCBmYWtlJVBERi0xLjQgZmFrZSVQREYt
+MS40IGZha2UlUERGLTEuNCBmYWtlJVBERi0xLjQgZmFrZSVQREYtMS40IGZha2UlUERGLTEuNCBm
+YWtlJVBERi0xLjQgZmFrZSVQREYtMS40IGZha2UlUERGLTEuNCBmYWtlJVBERi0xLjQgZmFrZSVQ
+REYtMS40IGZha2UlUERGLTEuNCBmYWtlJVBERi0xLjQgZmFrZSVQREYtMS40IGZha2UlUERGLTEu
+NCBmYWtlJVBERi0xLjQgZmFrZSVQREYtMS40IGZha2U=
+--=_harness_5b3bedf4ad6d--

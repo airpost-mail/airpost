@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/png",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.png",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Image.png",
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size": 70,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "de340f6b1871@example.org",
+  "plaintext": true,
+  "searchTextLength": 32,
+  "snippet": "Plain text as the related root\r\n",
+  "subject": "Related with a plain root"
+}

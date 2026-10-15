@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "测试费 1009.xls",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "测试费 1009.xls",
+      "sha256": "afc54b1f8b23ee8852558eee2259534b211572fcf5452f456b542c390e93760d",
+      "size": 46592,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Naiqi Xiao",
+      "naiqi.xiao@utoronto.ca"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "EADB9D745B3C49DFB1F2BE5209B42282@gmail.com",
+  "plaintext": false,
+  "searchTextLength": 154,
+  "snippet": "见附件。 谢了！ 肖乃奇 ---------------------------------- Dr. Eric Jackman Institute of Child Study Ontario Institute for Studies in Education University of Toronto",
+  "subject": "测试费表格"
+}

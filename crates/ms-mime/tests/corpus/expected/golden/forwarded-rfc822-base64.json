@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "message/rfc822",
+      "countsAsAttachment": true,
+      "filename": "Original message.eml",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Original message.eml",
+      "sha256": "5c80d7e3276c77a456c5f6234a15220491276248d80e0e3746a78bb2632299a3",
+      "size": 384,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "5043e8628b0e@example.org",
+  "plaintext": true,
+  "searchTextLength": 21,
+  "snippet": "Attached as a file.\r\n",
+  "subject": "Fwd: base64 message"
+}

@@ -1,0 +1,20 @@
+Dear S/MIME developers,
+
+   I believe that this is a valid S/MIME multipart/signed message. The
+implementation is still quite experimental, so as yet I have no way of
+verifying that it is, in fact valid. The code is quite similar to my
+PGP/MIME and MOSS multipart/signed implementations, so there's reason
+to believe it works, but, then again, a lot can go wrong.
+
+   If anyone can verify this message or tell me where I went wrong, it
+would be much appreciated.
+
+   By the way, there's a minor nit to pick in the S/MIME message
+format document. After clearly (and correctly) calling out the fact
+that MIME parameters including slashes need to be quoted, the example
+of the multipart/signed at the end of the document is lacking quotes.
+
+   Also, when the spec is finalized, it would be nice if the examples
+had valid PKCS data :-)
+
+Raph (who really needs to get some sleep after staying up past 4am)

@@ -1,0 +1,55 @@
+{
+  "attachmentCount": 3,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/x-xbitmap",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "470fc6eea06599ac5ae555c73868c182a62ad2409fd8fe645cd9d2771953f529",
+      "size": 884,
+      "uniqueId": "2"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/x-xbitmap",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.4",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "a94f29429e871bb8f1c91e91f919fbf6806add4722f6d5ff5b4713323c206a00",
+      "size": 890,
+      "uniqueId": "4"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.5",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "198112581869b5958957a4f8802711c9649ee5b3ce0006a17e02dd3df0e570a2",
+      "size": 546,
+      "uniqueId": "5"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "rhys@cs.uq.oz.au"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9202070333.AA25077@client",
+  "plaintext": true,
+  "searchTextLength": 205,
+  "snippet": "Hi there!  Here's my first test message to you using my own version\nof metasend.\n\nFirst some piccys!!\n\nHere's the icon for my newsreader:... and how about this little devil to announce the arrival of mail:",
+  "subject": "Test MIME message"
+}

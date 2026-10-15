@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Nathaniel Borenstein",
+      "nsb"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": null,
+  "plaintext": true,
+  "searchTextLength": 170,
+  "snippet": "This is an ordinary text message in which my name (םולש ןב ילטפנ) \nis in Hebrew (תירבע).  \n\nThere is Hebrew in the Subject and Reply-to headers, if viewed with metamail.\n",
+  "subject": "test of תירבע in mail headers"
+}

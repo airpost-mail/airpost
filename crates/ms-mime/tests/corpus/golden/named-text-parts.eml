@@ -1,0 +1,41 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Named text parts
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <0a9f6409ac39@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix7"
+
+--mix7
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Body text.
+
+--mix7
+Content-Type: text/plain; charset=utf-8; name="notes.txt"
+Content-Transfer-Encoding: 7bit
+
+These are notes.
+
+--mix7
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="explicit.txt"
+
+Explicit attachment.
+
+--mix7
+Content-Type: text/plain; charset=utf-8; name="inline.txt"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline; filename="inline.txt"
+
+Named but inline.
+
+--mix7
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Unnamed trailer.
+
+--mix7--

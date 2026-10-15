@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "f2f4049e74d3@example.org",
+  "plaintext": true,
+  "searchTextLength": 34,
+  "snippet": "Grüße aus München — schönen Tag!\r\n",
+  "subject": "Mislabelled UTF-8"
+}

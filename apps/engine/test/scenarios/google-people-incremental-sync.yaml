@@ -1,0 +1,56 @@
+name: google-people-incremental-sync
+description: >
+  After a first contact pass, contacts.google.com adds a contact, renames one, deletes one,
+  renames a group and moves a member between groups. Contacts sync once per process start
+  (then every 75 minutes), so the engine is relaunched: the second pass must send the
+  stored sync tokens and apply exactly what changed - the People API reports a deletion as
+  a person with `metadata.deleted: true` - without re-sending unchanged contacts to the
+  client. The last check proves the pass was incremental: only the changed models are
+  streamed after the mark.
+source: "GoogleContactsWorker::run (gsynctoken-contacts-<aid>, gsynctoken-groups-<aid>); People API connections.list syncToken semantics"
+servers:
+  - {fake: gmail, people: true}
+mailboxes:
+  INBOX: {messages: 2}
+people:
+  groups: [{name: Climbing}, {name: Book Club}]
+  contacts:
+    - {count: 40}
+    - {name: "Alice Archer", email: alice@example.org, groups: [Climbing]}
+    - {name: "Bob Baker", email: bob@example.org, groups: [Climbing]}
+    - {name: "Carol Cook", email: carol@example.org, groups: [Book Club]}
+steps:
+  - wait: quiescent
+  - wait: {models: {Contact: {where: {s: gpeople}, count: 43}, ContactGroup: {count: 2}}, timeout: 120}
+  - wait: {quiescent: true}
+  - assert:
+      people_matches_db: {}
+  - mark: changed
+  - people.add_contact: {name: "Dan Diver", email: dan@example.org, groups: [Book Club]}
+  - people.update_contact: {email: alice@example.org, name: "Alice Archer-Smith"}
+  - people.delete_contact: {email: carol@example.org}
+  - people.rename_group: {name: Climbing, to: Bouldering}
+  - people.group_members: {group: Bouldering, remove: [bob@example.org]}
+  - people.group_members: {group: Book Club, add: [bob@example.org]}
+  - restart: {wait: false}
+  - wait: {models: {Contact: {where: {s: gpeople}, count: 43, match: [{email: dan@example.org}, {name: "Alice Archer-Smith"}]}, ContactGroup: {match: [{name: Bouldering}]}}, timeout: 120}
+  - wait: {quiescent: true}
+expect:
+  people_matches_db: {}
+  models:
+    Contact:
+      where: {s: gpeople}
+      absent: [{email: carol@example.org}]
+  changed_since:
+    mark: changed
+    Contact:
+      key: email
+      where: {s: gpeople}
+      persist: [dan@example.org, alice@example.org, bob@example.org]
+      unpersist: [carol@example.org]
+  people_requests:
+    - {method: GET, path: "^/v1/people/me/connections$", query: {syncToken: false}, count: 1}
+    - {method: GET, path: "^/v1/people/me/connections$", query: {syncToken: true}, count: 1, status: 200}
+    - {method: GET, path: "^/v1/contactGroups$", query: {syncToken: true}, min: 1, status: 200}
+    - {status: 400, count: 0}
+  running: true

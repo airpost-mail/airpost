@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "message/delivery-status",
+      "countsAsAttachment": true,
+      "filename": "Delivery Status.txt",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Delivery Status.txt",
+      "sha256": "ee93c407fc2859c224ae65b32ed73fac3f7444d0e2db1963a8b614b992b734d8",
+      "size": 114,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Mail Delivery System",
+      "MAILER-DAEMON@mx.example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "d9a9a86e9a82@example.org",
+  "plaintext": true,
+  "searchTextLength": 242,
+  "snippet": "This is the mail system at host mx.example.org.\r\n\r\nI'm sorry to have to inform you that your message could not\r\nbe delivered to one or more recipients.\r\n\r\n<nobody@example.net>: host mx.example.net said: 550 5.1.1 User unknown\r\nOriginal body\r\n",
+  "subject": "Undelivered Mail Returned to Sender"
+}

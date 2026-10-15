@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Lasse Hillerøe Petersen",
+      "lassehp@imv.aau.dk"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "lassehp-0705951521330001@ratatosk.imv.aau.dk",
+  "plaintext": true,
+  "searchTextLength": 1872,
+  "snippet": "In mail, \"Kari E. Hurtta\" <Kari.Hurtta@fmi.fi> wrote:\n>lassehp@imv.aau.dk (Lasse Hillerøe Petersen) writes in \n>comp.mail.{mime.sendmail}:\n>\n>[ Hmm. Why kermit refuses to show 'ø' -- instead it shows 'o' :-) ]\n\nOh! (or Øh!) :-)\n\n>Are you sure that problem _isn't_ local -mailer (ie.\n>the mailer that is called in sendmail.cf's Mlocal -line -- It is usually\n>/bin/mail) ?\n\nNo. I wasn't even aware that",
+  "subject": "SOLVED: MIME linewrap => A/UX Sendmail 8.6.9 discarding after CRLF.CRLF"
+}

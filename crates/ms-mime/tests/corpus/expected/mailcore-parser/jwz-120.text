@@ -1,0 +1,17 @@
+Jamie -
+
+I tried to sign and encrypt this message, but when I did I received the
+following error:
+
+The certificate issuer for this server is not recognized by Netscape.  
+The security certificate may or may not be valid.  Netscape refuses to
+connect to this server.
+
+I also got this error when I tried only to encrypt the message.  However
+with digital signing it seems to work ok.  From the error message, I
+don't know whether the server in error is my mail server, certificate
+server, or a server on your end.  Our mail server is Netscape mail
+server v1.1 and Certificate Server 1.0.
+
+Thanks for the help,
+Dan

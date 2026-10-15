@@ -1,0 +1,10 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Low priority
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <ab75f3574713@example.org>
+MIME-Version: 1.0
+X-Priority: 5 (Lowest)
+Content-Type: text/plain
+
+Whenever.

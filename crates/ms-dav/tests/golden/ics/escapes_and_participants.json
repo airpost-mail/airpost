@@ -1,0 +1,24 @@
+[
+  {
+    "all_day": false,
+    "attendees": [
+      "Bob <bob@example.com>",
+      "carol@example.com",
+      "Room 1 <room1@example.com>"
+    ],
+    "description": "Line one\nLine two with a long tail that the producer folded across two lines",
+    "has_dtstamp": true,
+    "is_recurring": false,
+    "location": "Room \"A\"",
+    "organizer": "Doe, Jane <jane@example.com>",
+    "re": 1725206400,
+    "recurrence_id": "",
+    "rs": 1725202800,
+    "search_participants": "Bob <bob@example.com> carol@example.com Room 1 <room1@example.com>",
+    "start": 1725202800,
+    "status": "TENTATIVE",
+    "status_or_default": "TENTATIVE",
+    "summary": "Review, part 2; final",
+    "uid": "people@example.com"
+  }
+]

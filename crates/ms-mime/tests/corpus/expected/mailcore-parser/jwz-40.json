@@ -1,0 +1,103 @@
+{
+  "attachmentCount": 7,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "efd258d59143e00ef6b8ab507883f7cfd9ff3ef61b80f97bccea8200a4a0c318",
+      "size": 416,
+      "uniqueId": "0"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/enriched",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "64e17da27024e551ba0518b38adb2200b9ec090ecf140b58e9fc65acd6f114b6",
+      "size": 629,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/unknown",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "5.2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "2bb580f1746227b16ddc413fa31c780df29350403f1f3780f412d965c9ad9322",
+      "size": 38,
+      "uniqueId": "10"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/x-xbitmap",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "6",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "cbac990873c1c7a6a5efb6ecfa9ccf8c5264c4e3afeacfa7fff4b2d7ea169b11",
+      "size": 9431,
+      "uniqueId": "4"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/unknown",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "7",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "a85dc574be223925da27b6b8e2997ad148f44accd7c5bffda23a90a4510b7f02",
+      "size": 38,
+      "uniqueId": "5"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/x-xbitmap",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "8",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "bea9765aab875531a2996bd66d4149de89944a4af1eb02c1046e6adcb031b95c",
+      "size": 7559,
+      "uniqueId": "6"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "9.5",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "9b62e2f692dadd4700922bef6b098d2438e7d0409b2f75eca4493158688e5b45",
+      "size": 49,
+      "uniqueId": "8"
+    }
+  ],
+  "from": [
+    [
+      "Jamie Zawinski, with suffix & ampersand",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3ltdfq$j50@secnews.netscape.com",
+  "plaintext": false,
+  "searchTextLength": 141,
+  "snippet": "This is plain text So is this. Here's some HTMLmsg 1 msg 2 msg 3 We now interrupt this digest to say BITE ME. Thank you, and good night.msg 6",
+  "subject": "posting HTML (was Re: Public News Server)"
+}

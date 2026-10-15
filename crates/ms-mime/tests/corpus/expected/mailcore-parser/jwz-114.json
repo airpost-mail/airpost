@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "smime.p7m",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "smime.p7m",
+      "sha256": "38171e413884a5637ef885f34f6be98cfbb465beda8e32d58da5de4f8ff4d1bf",
+      "size": 487,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Lisa Repka",
+      "repka@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "32B97DAA.167E@netscape.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "very cool"
+}

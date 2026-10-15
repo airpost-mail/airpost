@@ -1,0 +1,38 @@
+[
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": true,
+    "is_recurring": true,
+    "location": "",
+    "organizer": "",
+    "re": 1727681400,
+    "recurrence_id": "",
+    "rs": 1717399800,
+    "search_participants": "",
+    "start": 1717399800,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Weekly sync",
+    "uid": "series-1@example.com"
+  },
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": true,
+    "is_recurring": false,
+    "location": "",
+    "organizer": "",
+    "re": 1718615700,
+    "recurrence_id": "20240617T093000",
+    "rs": 1718614800,
+    "search_participants": "",
+    "start": 1718614800,
+    "status": "CANCELLED",
+    "status_or_default": "CANCELLED",
+    "summary": "Weekly sync",
+    "uid": "series-1@example.com"
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "d798af4d613eb20940729e18cc3d2a40b7aafe0f13d81dbeafa943c92c8ac26b",
+      "size": 2578,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Arjun J Taneja",
+      "arjun@connectsoft.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "199604230119.SAA12999@connectsoft.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Ready for interoperability testing."
+}

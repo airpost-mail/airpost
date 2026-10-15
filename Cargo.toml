@@ -1,0 +1,82 @@
+[workspace]
+resolver = "2"
+# apps/backend joins once it exists (docs/engine-port-plan.md section 12).
+members = ["apps/engine", "crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+license = "GPL-3.0-only"
+repository = "https://github.com/ternmail/ternmail"
+publish = false
+
+[workspace.dependencies]
+# Engine crates
+ms-core = { path = "crates/ms-core" }
+ms-store = { path = "crates/ms-store" }
+ms-providers = { path = "crates/ms-providers" }
+ms-imap = { path = "crates/ms-imap" }
+ms-mime = { path = "crates/ms-mime" }
+ms-smtp = { path = "crates/ms-smtp" }
+ms-net = { path = "crates/ms-net" }
+ms-dav = { path = "crates/ms-dav" }
+ms-sync = { path = "crates/ms-sync" }
+ms-tasks = { path = "crates/ms-tasks" }
+
+# IMAP. ms-imap has its own parser and command layer (docs/spikes/imap.md); async-imap and
+# imap-proto are dev-dependencies of its spike example only.
+async-imap = { version = "0.12", default-features = false, features = ["runtime-tokio"] }
+imap-proto = "0.17"
+tokio = { version = "1.53", features = ["rt", "net", "io-util", "time", "sync", "macros"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+rustls-platform-verifier = "0.7"
+async-compression = { version = "0.4", features = ["tokio", "deflate"] }
+futures = "0.3"
+
+# MIME, SMTP, calendars and contacts
+mail-parser = "0.11"
+mail-builder = "1.0"
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "hostname", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier"] }
+calcard = "0.3"
+encoding_rs = "0.8"
+chardetng = "1.0"
+html5ever = "0.40"
+roxmltree = "0.21"
+hickory-resolver = { version = "0.26", default-features = false, features = ["tokio", "system-config"] }
+
+# Storage and networking
+rusqlite = { version = "0.40", features = ["bundled"] }
+# rustls-no-provider: the bin installs ring as the process CryptoProvider. reqwest's "rustls"
+# feature pulls aws-lc-rs, whose OpenSSL-licensed code is not GPL-compatible.
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls-no-provider", "form", "http2", "charset"] }
+
+# Ids, encodings, time
+sha2 = "0.11"
+bs58 = "0.5"
+base64 = "0.23"
+md-5 = "0.11"
+hmac = "0.13"
+uuid = { version = "1.28", features = ["v4"] }
+unicode-normalization = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+rand = "0.10"
+hostname = "0.4"
+
+# Logging, errors, serialization
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "registry"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+bitflags = "2.13"
+libc = "0.2"
+
+# Tests
+regex = "1.13"
+tempfile = "3.27"
+
+[profile.release]
+debug = 1

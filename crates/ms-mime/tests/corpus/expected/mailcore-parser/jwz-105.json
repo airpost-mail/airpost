@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "smime.p7m",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "smime.p7m",
+      "sha256": "c82c8b760a664355c7166b949e7a7bb02afa5cd9a0850b1603705ec953c11811",
+      "size": 3101,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "blaker@craswell.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": null,
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "enrypted"
+}

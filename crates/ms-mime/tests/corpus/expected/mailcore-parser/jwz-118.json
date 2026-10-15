@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "smime.p7s",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "smime.p7s",
+      "sha256": "3e57984f5d25f87b7b33ce1f4ddebf39c34a58c06ea468148780e2df284bda7c",
+      "size": 4108,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Dan Hugo",
+      "dhugo@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "332DED2F.F5365D61@netscape.com",
+  "plaintext": true,
+  "searchTextLength": 41,
+  "snippet": "I signed this.  It is signed by me.  \n-dh",
+  "subject": "This is signed"
+}

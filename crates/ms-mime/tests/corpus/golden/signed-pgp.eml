@@ -1,0 +1,28 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: PGP signed
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <c7ba4abdc80b@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/signed; boundary="pgp1"; micalg=pgp-sha256;
+ protocol="application/pgp-signature"
+
+--pgp1
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Signed text.
+
+--pgp1
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Transfer-Encoding: 7bit
+Content-Description: OpenPGP digital signature
+Content-Disposition: attachment; filename="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCAAdFiEE
+=abcd
+-----END PGP SIGNATURE-----
+
+--pgp1--

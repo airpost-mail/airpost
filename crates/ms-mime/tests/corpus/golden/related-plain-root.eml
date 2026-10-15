@@ -1,0 +1,22 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Related with a plain root
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <de340f6b1871@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/related; boundary="relx"
+
+--relx
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Plain text as the related root
+
+--relx
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: <unused@example.org>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmM
+IQAAAABJRU5ErkJggg==
+--relx--

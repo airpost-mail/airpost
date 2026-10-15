@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/calendar",
+      "countsAsAttachment": true,
+      "filename": "Event.ics",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Event.ics",
+      "sha256": "c8120b43ed23877583b7247b3139df09d9829e9686bc76b892ea89c3261e3a22",
+      "size": 286,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "harness-4-b1d785c9@example.test",
+  "plaintext": true,
+  "searchTextLength": 54,
+  "snippet": "This is the body of message 4.\r\n\r\n-- \r\nAlice Example\r\n",
+  "subject": "Invitation: Standup"
+}

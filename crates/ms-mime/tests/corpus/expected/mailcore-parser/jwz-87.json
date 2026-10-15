@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pgp-signature",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "5163c48b9e518851801b874b1403c67ac1242284b2b9464b2ae6496458b3d2a3",
+      "size": 284,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Mark M.",
+      "markm@voicenet.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "Pine.LNX.3.93.960527203358.1163A-100000@gak",
+  "plaintext": true,
+  "searchTextLength": 996,
+  "snippet": "On Fri, 24 May 1996, E. ALLEN SMITH wrote:\n\n> \tHmm.... what were the normal key-length recommendations again? This\n> appears to imply that the NSA can break at least 64-bit, and probably 80-bit,\n> encryption. How does this translate into public key lengths? E.g., how many\n> normal bits is a 1024-bit PGP key equivalent to?\n> \t-Allen\n\nThe normal key-length recommendation was 96 bits.  64 bits and 80",
+  "subject": "Re: Layman's explanation for limits on escrowed encryption ..."
+}

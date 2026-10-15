@@ -1,0 +1,20 @@
+[
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "Eggs",
+    "has_dtstamp": true,
+    "is_recurring": false,
+    "location": "Kitchen",
+    "organizer": "",
+    "re": 1718006400,
+    "recurrence_id": "",
+    "rs": 1718002800,
+    "search_participants": "",
+    "start": 1718002800,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Breakfast",
+    "uid": "simple-1@example.com"
+  }
+]

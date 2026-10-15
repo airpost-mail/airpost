@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 2,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/html",
+      "countsAsAttachment": true,
+      "filename": "Page1.htm",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Page1.htm",
+      "sha256": "271f50047d90b1f3595ae295523a24b48fe16f90079952ff3c6f4f3dfd5aea18",
+      "size": 811,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "Page1.p7s",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "Page1.p7s",
+      "sha256": "ce94ddfc3c2b2294b6373a70b95ea6ae30f3cb52459c82d796e5f0b27ccdf163",
+      "size": 887,
+      "uniqueId": "2"
+    }
+  ],
+  "from": [
+    [
+      "Peter Williams",
+      "peter@verisign.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "01BB9E4D.CA27D8A0@Peter.verisign.com",
+  "plaintext": false,
+  "searchTextLength": 442,
+  "snippet": "The first two bodypart sent above should be part of a MIME object. One should be type text/html, the second application/octet-stream. Can anyone who cares send me back the MIME object for this message actually delivered to their UA? Im finding Deming' s excellent tool to be be very useful for signing attachements of any type, and being able to reverify the bodypart content even once the attachemen",
+  "subject": "plase help by returning what gets delivered..."
+}

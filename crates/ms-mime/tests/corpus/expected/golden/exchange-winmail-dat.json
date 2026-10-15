@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/ms-tnef",
+      "countsAsAttachment": true,
+      "filename": "winmail.dat",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "winmail.dat",
+      "sha256": "04ba33cba87444184dc06be7d656d4efbfa12769548f26c33d4688b2629a35be",
+      "size": 52,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "1040c664f911@example.org",
+  "plaintext": true,
+  "searchTextLength": 31,
+  "snippet": "Please see the attached file.\r\n",
+  "subject": "TNEF from Exchange"
+}

@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 2,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/x-vcard",
+      "countsAsAttachment": true,
+      "filename": "vcard.vcf",
+      "inline": false,
+      "partId": "2.3",
+      "safeFilename": "vcard.vcf",
+      "sha256": "8ed43b43030fd5c7595a9e68f74e4f218a8bb7b2fe2986c9bcd457b005bec85b",
+      "size": 479,
+      "uniqueId": "3"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "smime.p7s",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "smime.p7s",
+      "sha256": "7446882d1b616003a8c47ac86709fe9d35ebaf5d5ad799bef7c04da26dbbf69d",
+      "size": 3863,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Jason Lawrence Weisberger",
+      "jweis@why.bother.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "Pine.LNX.3.95.970512224621.25674T-311000@why.bother.com",
+  "plaintext": true,
+  "searchTextLength": 397,
+  "snippet": "\nEmacs? You fiend.  My mua is pine.\n\nJason L. Weisberger\nChief of Network Operations\nSoftAware, Inc.\nHere is another option.  If you want the exact emacs binding, feel free\nto ask Noah.\n\n-Bob\nI read my mime mail in emacs, of course, which does everything other than\nS/MIME signature/encryption/decryption at the moment (but you can do things\nwith PGP).\n\nHooray for competing encryption standards.\n",
+  "subject": "Re: [Fwd: the one true mail client?]"
+}

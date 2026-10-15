@@ -1,0 +1,13 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Plain text with markup characters
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <569e21503f4d@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+<script>alert(1)</script> & "quotes"
+> quoted
+
+
+after blank lines

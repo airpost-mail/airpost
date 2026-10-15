@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Stefano Gazziano",
+      "GAZZIANO_S@CASACCIA.ENEA.IT"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "01HPSYRPA1IAERWENE@ECA401.CASACCIA.ENEA.IT",
+  "plaintext": true,
+  "searchTextLength": 876,
+  "snippet": "\nDear sasl ers\n\nI got ERROR WRITING THE HOST SORT FILE, POSSIBLY OUT OF DISK SPACE\n\nwner running a large data crunching job in batch mode, it goes automatically\n every morning and retrieves data fron RDB on 6.08 under VMS VAX.\n\nI did check the disk space and actually the disk is full. So hat, well, it's an\n industrial plan vax and noone can touch the disk, if it's almost full, qwell,\n so be it. Th",
+  "subject": "work space"
+}

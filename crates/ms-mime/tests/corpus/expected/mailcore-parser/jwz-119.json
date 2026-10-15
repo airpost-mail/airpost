@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "smime.p7m",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "smime.p7m",
+      "sha256": "542fe27279faf559f354b058f6c1508688a3df253a8c8a9d1d75edc517f9ff91",
+      "size": 7571,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Lisa Repka",
+      "repka@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3336293C.1A98A9A9@netscape.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "testing out some new stuff"
+}

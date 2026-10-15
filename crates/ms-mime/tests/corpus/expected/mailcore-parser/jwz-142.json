@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/vcard",
+      "countsAsAttachment": true,
+      "filename": "MJOSEPH.VCF",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "MJOSEPH.VCF",
+      "sha256": "18c0ecfac0039239b5aed6b6a7f19a65cd36864a646563adbc77469e71e6df70",
+      "size": 3641,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Dr. Mark K. Joseph",
+      "izzy@nugget.scr.atm.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "19960927163654.izzy@scr.atm.com",
+  "plaintext": true,
+  "searchTextLength": 863,
+  "snippet": "On Thu, 26 Sep 1996 18:30:27 -0700\n\"Lewis Geer (Exchange)\" <lewisg@Exchange.Microsoft.com> wrote:\n\n>Section 7:\n>New Text:\n>When the sending MUA sends objects that reference each other within an\n>email message, the sending MUA SHOULD attempt to use the Content-ID\n>method (as defined in section 8.3).  This will avoid problems the\n>receiving MUA will have in parsing non-typed fields (such as PARAM\n>f",
+  "subject": "RE: problem with relative urls and applets"
+}

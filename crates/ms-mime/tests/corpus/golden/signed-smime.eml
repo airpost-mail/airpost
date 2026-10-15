@@ -1,0 +1,32 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: S/MIME signed
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <af6dd7980097@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/signed; boundary="smime1"; protocol="application/pkcs7-signature"; micalg=sha-256
+
+--smime1
+Content-Type: multipart/alternative; boundary="smalt"
+
+--smalt
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+S/MIME plain
+
+--smalt
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<p>S/MIME <u>html</u></p>
+
+--smalt--
+--smime1
+Content-Type: application/pkcs7-signature; name="smime.p7s"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="smime.p7s"
+Content-Description: S/MIME Cryptographic Signature
+
+MIIFZmFrZS1zaWduYXR1cmU=
+--smime1--

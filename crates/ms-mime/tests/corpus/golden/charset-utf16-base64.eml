@@ -1,0 +1,10 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: UTF-16 body
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <bff14fa13c26@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-16
+Content-Transfer-Encoding: base64
+
+//7lZSxnnopuMMYwrTC5MMgwDQAKAA==

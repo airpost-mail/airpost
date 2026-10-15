@@ -1,0 +1,12 @@
+{
+  "email": "ada@example.org",
+  "emails": [
+    "ada@example.org"
+  ],
+  "is_group": false,
+  "member_ids": [],
+  "name": "Countess Ada King Lovelace of Lovelace",
+  "serialized": "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:n-only\r\nN:Lovelace;Ada;King;Countess;of Lovelace\r\nEMAIL:ada@example.org\r\nEND:VCARD\r\n",
+  "uid": "n-only",
+  "version": "3.0"
+}

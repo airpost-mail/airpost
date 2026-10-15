@@ -1,0 +1,28 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: cid referenced
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <054a6003738e@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix3"
+
+--mix3
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<p>Inline <img src="cid:sig@example.org"> without disposition</p>
+
+--mix3
+Content-Type: image/gif; name="sig.gif"
+Content-Transfer-Encoding: base64
+Content-ID: <sig@example.org>
+Content-Disposition: attachment; filename="sig.gif"
+
+R0lGODlhAQABAAAAADs=
+--mix3
+Content-Type: image/gif; name="unref.gif"
+Content-Transfer-Encoding: base64
+Content-ID: <unreferenced@example.org>
+
+R0lGODlhAQABAAAAADs=
+--mix3--

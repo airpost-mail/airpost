@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "d29ef099ef501b64b6b0a41b5e1585a18c4e21cc6c1686a1b35108c51c6181e8",
+      "size": 551,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Raph Levien",
+      "raph@callisto.hip.berkeley.edu"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "199604251026.DAA00979@callisto.hip.berkeley.edu",
+  "plaintext": true,
+  "searchTextLength": 901,
+  "snippet": "Dear S/MIME developers,\n\n   I believe that this is a valid S/MIME multipart/signed message. The\nimplementation is still quite experimental, so as yet I have no way of\nverifying that it is, in fact valid. The code is quite similar to my\nPGP/MIME and MOSS multipart/signed implementations, so there's reason\nto believe it works, but, then again, a lot can go wrong.\n\n   If anyone can verify this messag",
+  "subject": "Multipart/signed message format"
+}

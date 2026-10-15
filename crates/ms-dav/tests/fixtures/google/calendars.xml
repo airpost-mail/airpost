@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:caldav="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:ical="http://apple.com/ns/ical/">
+<D:response xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:CS="http://calendarserver.org/ns/">
+<D:href>/caldav/v2/alice%40gmail.com/user/</D:href>
+<D:propstat><D:status>HTTP/1.1 200 OK</D:status><D:prop><D:resourcetype><D:principal/></D:resourcetype><D:displayname>Alice Example</D:displayname></D:prop></D:propstat>
+<D:propstat><D:status>HTTP/1.1 404 Not Found</D:status><D:prop><cs:getctag/><caldav:supported-calendar-component-set/><ical:calendar-color/><caldav:calendar-description/><D:current-user-privilege-set/><D:owner/><ical:calendar-order/></D:prop></D:propstat>
+</D:response>
+<D:response xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:CS="http://calendarserver.org/ns/">
+<D:href>/caldav/v2/alice%40gmail.com/events/</D:href>
+<D:propstat><D:status>HTTP/1.1 200 OK</D:status><D:prop><D:resourcetype><D:collection/><caldav:calendar/></D:resourcetype><D:displayname>alice@gmail.com</D:displayname><cs:getctag>63860000000</cs:getctag><caldav:supported-calendar-component-set><caldav:comp name="VEVENT"/></caldav:supported-calendar-component-set><ical:calendar-color>#9fe1e7</ical:calendar-color><D:current-user-privilege-set><D:privilege><D:read/></D:privilege><D:privilege><caldav:read-free-busy/></D:privilege><D:privilege><D:write/></D:privilege></D:current-user-privilege-set><D:owner><D:href>/caldav/v2/alice%40gmail.com/user</D:href></D:owner></D:prop></D:propstat>
+<D:propstat><D:status>HTTP/1.1 404 Not Found</D:status><D:prop><caldav:calendar-description/><ical:calendar-order/></D:prop></D:propstat>
+</D:response>
+</D:multistatus>

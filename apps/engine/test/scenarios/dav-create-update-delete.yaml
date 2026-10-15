@@ -1,0 +1,97 @@
+name: dav-create-update-delete
+description: >
+  The user edits calendars and contacts in the client. Each task applies locally and then
+  writes to the server: a new event is PUT with If-None-Match into the chosen calendar and
+  read back for its etag; an edit is PUT with the stored etag and keeps the UID; a delete
+  is a DELETE with If-Match. A new contact is a new card whose UID is the contact's id, an
+  edit rewrites only what changed in the stored vCard, a group is a group card whose
+  member list follows membership changes, and deleting a group deletes its card. After
+  each step the database agrees with the server, etags included, so the next edit does
+  not conflict with the engine's own write.
+source: "TaskProcessor performLocal/RemoteSyncbackEvent, DestroyEvent, SyncbackContact, DestroyContact, SyncbackContactGroup, ChangeContactGroupMembership, DestroyContactGroup; DAVWorker::writeAndResyncEvent / deleteEvent / writeAndResyncContact / deleteContact"
+servers:
+  - {radicale: default}
+  - {baikal: default}
+mailboxes:
+  INBOX: {messages: 2}
+calendars:
+  default:
+    events:
+      - {uid: review@example.test, summary: "Design review", start: "+2d"}
+      - {uid: retro@example.test, summary: "Retro", start: "+3d"}
+addressbooks:
+  default:
+    contacts:
+      - {uid: alice-uid, name: "Alice Archer", email: alice@example.org}
+      - {uid: bob-uid, name: "Bob Baker", email: bob@example.org}
+      - {uid: carol-uid, name: "Carol Cook", email: carol@example.org}
+steps:
+  - wait: quiescent
+  - wait: {models: {Event: {count: 2}, Contact: {where: {s: carddav}, count: 3}}, timeout: 120}
+  - wait: {quiescent: true}
+  - client.task: {__cls: SyncbackEventTask, calendar: default, event: {ics: {uid: lunch@example.test, summary: Lunch, start: "+5d"}}}
+    as: create_event
+  - wait: {task: create_event, timeout: 60}
+  - client.task: {__cls: SyncbackEventTask, event: {uid: review@example.test, changes: {SUMMARY: "Design review (v2)"}}}
+    as: update_event
+  - wait: {task: update_event, timeout: 60}
+  - client.task: {__cls: SyncbackEventTask, event: {uid: review@example.test, changes: {LOCATION: "Room 4"}}}
+    as: update_event_again
+  - wait: {task: update_event_again, timeout: 60}
+  - client.task: {__cls: DestroyEventTask, events: [{uid: retro@example.test}]}
+    as: destroy_event
+  - wait: {task: destroy_event, timeout: 60}
+  - client.task: {__cls: SyncbackContactTask, contact: {new: {name: "Dan Diver", email: dan@example.org}}}
+    as: create_contact
+  - wait: {task: create_contact, timeout: 60}
+  - client.task: {__cls: SyncbackContactTask, contact: {uid: bob-uid, changes: {name: "Robert Baker"}}}
+    as: update_contact
+  - wait: {task: update_contact, timeout: 60}
+  - client.task: {__cls: DestroyContactTask, contacts: [{uid: carol-uid}]}
+    as: destroy_contact
+  - wait: {task: destroy_contact, timeout: 60}
+  - client.task: {__cls: SyncbackContactGroupTask, group: {new: true, name: "Book Club"}}
+    as: create_group
+  - wait: {task: create_group, timeout: 60}
+  - client.task: {__cls: ChangeContactGroupMembershipTask, direction: add, contacts: [{uid: alice-uid}, {uid: bob-uid}], group: {name: "Book Club"}}
+    as: add_members
+  - wait: {task: add_members, timeout: 60}
+  - wait: {quiescent: true}
+  - assert:
+      tasks:
+        create_event: {status: complete, error: null}
+        update_event: {status: complete, error: null}
+        update_event_again: {status: complete, error: null}
+        destroy_event: {status: complete, error: null}
+        create_contact: {status: complete, error: null}
+        update_contact: {status: complete, error: null}
+        destroy_contact: {status: complete, error: null}
+        create_group: {status: complete, error: null}
+        add_members: {status: complete, error: null}
+      dav_has:
+        events: [{uid: lunch@example.test, summary: Lunch}, {uid: review@example.test, summary: "Design review (v2)"}]
+        no_events: [retro@example.test]
+        contacts: [{email: dan@example.org, name: "Dan Diver"}, {uid: bob-uid, name: "Robert Baker"}]
+        no_contacts: [carol-uid]
+        groups: {"Book Club": [alice@example.org, bob@example.org]}
+      dav_matches_db: {}
+  - client.task: {__cls: DestroyContactGroupTask, group: {name: "Book Club"}}
+    as: destroy_group
+  - wait: {task: destroy_group, timeout: 60}
+  # A later pass must leave the server and the database as the tasks did. Contacts are only
+  # re-read on a full pass, 15 s after launch, and quiescence covers mail only, so wait for
+  # the restarted engine's first pass to start and give it time to finish.
+  - restart: {wait: false}
+  - wait: {log: "^Calendar sync pass 1, with contacts$", count: 2, timeout: 90}
+  - wait: {seconds: 20}
+  - wait: {quiescent: true}
+expect:
+  tasks:
+    destroy_group: {status: complete, error: null}
+  dav_has:
+    no_contacts: [{name: "Book Club"}]
+  dav_matches_db: {}
+  models:
+    ContactGroup: {count: 0}
+    Event: {count: 2}
+  running: true

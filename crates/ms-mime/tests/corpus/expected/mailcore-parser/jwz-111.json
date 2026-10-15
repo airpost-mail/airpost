@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "smime.p7m",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "smime.p7m",
+      "sha256": "5107e080c422340ddda98269e9200489ebccadf1fd1914dc266b418fbc82608d",
+      "size": 1059,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Blake Ramsdell",
+      "blaker@craswell.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3.0.32.19961213150855.009172e0@mail.craswell.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Re: can you send me an encrypted message?"
+}

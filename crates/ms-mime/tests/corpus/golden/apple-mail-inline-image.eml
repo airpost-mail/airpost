@@ -1,0 +1,28 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Apple Mail inline image
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <4bf90f03300a@example.org>
+MIME-Version: 1.0
+X-Mailer: Apple Mail (2.3445)
+Content-Type: multipart/mixed; boundary="apple"
+
+--apple
+Content-Type: text/html; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+<html><body><div>Look at this:</div></body></html>
+--apple
+Content-Type: image/png; name="photo.png"
+Content-Transfer-Encoding: base64
+Content-Disposition: inline; filename="photo.png"
+Content-Id: <photo-1@apple.example>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmM
+IQAAAABJRU5ErkJggg==
+--apple
+Content-Type: text/html; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+<html><body><div>Nice, right?</div></body></html>
+--apple--

@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "multipart/mixed",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "d999e9d47477a480dd832c28b3c91c963b8578e219b6e594e5ade6afb9921221",
+      "size": 28,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "15dece2cc2a3@example.org",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Multipart without boundary"
+}

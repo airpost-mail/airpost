@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "569e21503f4d@example.org",
+  "plaintext": true,
+  "searchTextLength": 71,
+  "snippet": "<script>alert(1)</script> & \"quotes\"\r\n> quoted\r\n\r\n\r\nafter blank lines\r\n",
+  "subject": "Plain text with markup characters"
+}

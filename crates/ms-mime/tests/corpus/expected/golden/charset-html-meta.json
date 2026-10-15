@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "b1cb8eb0525a@example.org",
+  "plaintext": false,
+  "searchTextLength": 12,
+  "snippet": "Привет, мир!",
+  "subject": "HTML with meta charset"
+}

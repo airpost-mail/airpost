@@ -1,0 +1,29 @@
+[package]
+name = "ms-core"
+description = "Errors, ids, constants, logging and other foundations shared by every engine crate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+bitflags.workspace = true
+bs58.workspace = true
+chrono.workspace = true
+encoding_rs.workspace = true
+rand.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+unicode-normalization.workspace = true
+
+[dev-dependencies]
+regex.workspace = true
+tempfile.workspace = true
+base64.workspace = true

@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "eric.p7c",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "eric.p7c",
+      "sha256": "966eff8b01fd895eaec114ab4c855043a26345d675b5231d32bdcd3c526b1ce4",
+      "size": 1638,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Eric Rosenquist",
+      "rosenqui@strataware.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "199611081945.OAA29470@krusty.strataware.com",
+  "plaintext": true,
+  "searchTextLength": 741,
+  "snippet": "Netscape: here's my encryption certificate for S/MIME testing\npurposes.  Beware that this is an Entrust certificate rather than\nVerisign.  Among other things, this means that I have a separate\nkey pair for signing and encryption, so you'll have to use this\none to encrypt for me and use the certif included with signed\nmessages (rather than this one) to verify signatures.\n\nEric\n---------------------",
+  "subject": "My encryption certificate for S/MIME testing"
+}

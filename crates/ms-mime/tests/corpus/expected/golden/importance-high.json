@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": "high",
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "270856508332@example.org",
+  "plaintext": true,
+  "searchTextLength": 17,
+  "snippet": "Please respond.\r\n",
+  "subject": "Urgent"
+}

@@ -1,0 +1,27 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Alternative without HTML
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <19e54b387d3c@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="alt3"
+
+--alt3
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+First plain
+
+--alt3
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Second plain wins
+
+--alt3
+Content-Type: text/enriched
+Content-Transfer-Encoding: 7bit
+
+<bold>enriched</bold>
+
+--alt3--

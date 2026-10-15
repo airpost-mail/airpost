@@ -1,0 +1,23 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: List digest
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <a067ec9b64a5@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/digest; boundary="dig"
+
+--dig
+
+From: a@example.org
+Subject: first
+
+First digest entry
+--dig
+Content-Type: message/rfc822
+
+From: b@example.org
+Subject: second
+Content-Type: text/html
+
+<p>Second entry</p>
+--dig--

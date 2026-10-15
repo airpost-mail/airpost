@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 2,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/jpeg",
+      "countsAsAttachment": true,
+      "filename": "bad-frog.jpg",
+      "inline": true,
+      "partId": "1",
+      "safeFilename": "bad-frog.jpg",
+      "sha256": "3c3132440912f1f1cfd8e795587852aaaddea31c9b0e3d6949c1d8c35c7f9096",
+      "size": 7930,
+      "uniqueId": "0"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "smime.p7s",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "smime.p7s",
+      "sha256": "8f1892437154cabbd4ee51f9567cb2981caf01156f18c666895a33a93cc89818",
+      "size": 3409,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Jamie Zawinski",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "32AF6884.41C6@netscape.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "signed frog"
+}

@@ -1,0 +1,13 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Weekly newsletter
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <b8f2d4d6fa63@example.org>
+MIME-Version: 1.0
+List-Unsubscribe: <mailto:unsub@lists.example.org?subject=unsubscribe>,
+ <https://lists.example.org/u/abc123>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+List-Id: Example News <news.lists.example.org>
+Content-Type: text/html; charset=utf-8
+
+<p>This week: <a href="https://example.org/a">an article</a> and <a href="mailto:x@example.org">a contact</a>.</p><p><a href="https://lists.example.org/u/abc123">Unsubscribe</a></p>

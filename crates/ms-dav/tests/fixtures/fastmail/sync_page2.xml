@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:CS="http://calendarserver.org/ns/"><D:response><D:href>/dav/addressbooks/user/alice@fastmail.com/Default/group-friends.vcf</D:href><D:propstat><D:prop><D:getetag>"g7h8"</D:getetag></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response><D:sync-token>https://www.fastmail.com/ns/sync/1002</D:sync-token></D:multistatus>

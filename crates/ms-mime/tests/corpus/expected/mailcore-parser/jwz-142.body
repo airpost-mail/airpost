@@ -1,0 +1,18 @@
+On Thu, 26 Sep 1996 18:30:27 -0700
+"Lewis Geer (Exchange)" <lewisg@Exchange.Microsoft.com> wrote:
+
+>Section 7:
+>New Text:
+>When the sending MUA sends objects that reference each other within an
+>email message, the sending MUA SHOULD attempt to use the Content-ID
+>method (as defined in section 8.3).  This will avoid problems the
+>receiving MUA will have in parsing non-typed fields (such as PARAM
+>fields in OBJECT tags) that are contained in the html.  In the case
+>where the email message contains MICs, it may be necessary for the
+>sending MUA to use the Content-Location method (as defined in section
+>8.2) in order for the receiving MUA to be able to verify the MICS, as
+>well as to verify the message against its WWW counterpoint.
+>
+
+I for one agree with this change.  MICs aside the "cid:" approach
+is much easier to implement (speaking from experience).

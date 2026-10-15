@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/postscript",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "13e1e73e25d621ed85199d00e6be4cc8abceb2c06eea65b40a593a57996889d1",
+      "size": 659,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Peter Urka",
+      "pcu@umich.edu"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "07May1621030321@urkabox.chem.lsa.umich.edu",
+  "plaintext": true,
+  "searchTextLength": 180,
+  "snippet": "In article: <3ohapq$h3b@gandalf.rutgers.edu> John Kheit \n<kheit@gandalf.rutgers.edu > writes\n\n> NeXTSTEP, NeXTSTEP, NeXTSTEP...\n\nDon't you mean: \"NeXTstep, NeXTSTEP, NEXTSTEP...\"?\n",
+  "subject": "Re: The Once and Future OS"
+}

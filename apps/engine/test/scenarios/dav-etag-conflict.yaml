@@ -1,0 +1,63 @@
+name: dav-etag-conflict
+description: >
+  Another client edits an event and a card after the engine synced them, so the etags the
+  engine holds are stale. The user then edits the same event and card, and deletes another
+  event that was also changed elsewhere. Every write carries If-Match with the stored etag;
+  the server answers 412 Precondition Failed, and the engine must fail the task with
+  `etag-conflict` instead of overwriting the other client's change, then converge on the
+  server's version at the next pass.
+source: "DAVWorker::writeAndResyncEvent (412 -> etag-conflict), deleteEvent, writeAndResyncContact; docs/engine-port-plan.md section 6 (PUT/DELETE with If-Match; a 412 becomes etag-conflict)"
+servers:
+  - {radicale: default}
+  - {baikal: default}
+mailboxes:
+  INBOX: {messages: 2}
+calendars:
+  default:
+    events:
+      - {uid: review@example.test, summary: "Design review", start: "+2d"}
+      - {uid: retro@example.test, summary: "Retro", start: "+3d"}
+addressbooks:
+  default:
+    contacts:
+      - {uid: alice-uid, name: "Alice Archer", email: alice@example.org}
+steps:
+  - wait: quiescent
+  - wait: {models: {Event: {count: 2}, Contact: {where: {s: carddav}, count: 1}}, timeout: 120}
+  - wait: {quiescent: true}
+  - dav.update_event: {uid: review@example.test, changes: {SUMMARY: "Design review (phone)"}}
+  - dav.update_event: {uid: retro@example.test, changes: {LOCATION: "Room 9"}}
+  - dav.update_contact: {uid: alice-uid, changes: {FN: "Alice from the phone"}}
+  - client.task: {__cls: SyncbackEventTask, event: {uid: review@example.test, changes: {SUMMARY: "Design review (desktop)"}}}
+    as: update_event
+  - wait: {task: update_event, timeout: 60}
+  - client.task: {__cls: DestroyEventTask, events: [{uid: retro@example.test}]}
+    as: destroy_event
+  - wait: {task: destroy_event, timeout: 60}
+  - client.task: {__cls: SyncbackContactTask, contact: {uid: alice-uid, changes: {name: "Alice from the desktop"}}}
+    as: update_contact
+  - wait: {task: update_contact, timeout: 60}
+  - assert:
+      tasks:
+        update_event: {status: complete, error: "etag-conflict"}
+        destroy_event: {status: complete, error: "etag-conflict"}
+        update_contact: {status: complete, error: "etag-conflict"}
+      dav_has:
+        events: [{uid: review@example.test, summary: "Design review (phone)"}, {uid: retro@example.test}]
+        contacts: [{uid: alice-uid, name: "Alice from the phone"}]
+  # The local rows still hold the desktop edits (the local syncback saved them before the
+  # remote phase). Contacts are only re-read on a full pass, which runs 15 s after launch, so
+  # restart and poll for it; `restart: {}` would wait for mail only and `expect` does not poll.
+  - restart: {wait: false}
+  - wait:
+      models:
+        Event: {match: [{icsuid: review@example.test, ics: {re: "SUMMARY:Design review \\(phone\\)"}}]}
+        Contact: {match: [{id: alice-uid, name: "Alice from the phone"}]}
+      timeout: 120
+  - wait: {quiescent: true}
+expect:
+  dav_matches_db: {}
+  models:
+    Event: {match: [{icsuid: review@example.test, ics: {re: "SUMMARY:Design review \\(phone\\)"}}]}
+    Contact: {match: [{id: alice-uid, name: "Alice from the phone"}]}
+  running: true

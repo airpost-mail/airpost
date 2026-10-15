@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "smime.p7s",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "smime.p7s",
+      "sha256": "01774b6b5ec29414de22ca89ae67ee3962beaecff359ac8b6c51a810ba92d99d",
+      "size": 2908,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Blake Ramsdell",
+      "blaker@craswell.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3.0.32.19961213151017.0091ed80@mail.craswell.com",
+  "plaintext": true,
+  "searchTextLength": 107,
+  "snippet": "I sent you an encrypted message that was triple-DES.  Let me know if you\nhad any problems with it...\n\nBlake",
+  "subject": "Encrypted message"
+}

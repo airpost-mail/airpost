@@ -1,0 +1,10 @@
+Actually, I can show you precisely what it looked like, if you can display the 
+image:
+
+
+
+
+Note that the implementation currently warns you what character set it is 
+using, since it can't really tell if that corresponds to the character set 
+expected by your terminal or terminal window....
+

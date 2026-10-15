@@ -1,0 +1,21 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Calendar only
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <d527b46e92ea@example.org>
+MIME-Version: 1.0
+Content-Type: text/calendar; charset=utf-8; method=CANCEL
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Microsoft Corporation//Outlook 16.0 MIMEDIR//EN
+METHOD:CANCEL
+BEGIN:VEVENT
+UID:040000008200E00074C5B7101A82E008000000001
+DTSTART:20260110T150000Z
+DTEND:20260110T160000Z
+SUMMARY:Budget review
+ORGANIZER;CN=Alice:mailto:alice@example.org
+END:VEVENT
+END:VCALENDAR

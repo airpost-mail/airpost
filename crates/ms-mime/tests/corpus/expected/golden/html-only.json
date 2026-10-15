@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "479086e8b477@example.org",
+  "plaintext": false,
+  "searchTextLength": 48,
+  "snippet": "Café menu for today: Soup Bread & butter See you",
+  "subject": "HTML only"
+}

@@ -1,0 +1,307 @@
+[
+  {
+    "name": "plain ascii",
+    "account_id": "c0ffee-harness",
+    "date": "Mon, 7 Feb 1994 21:52:25 -0800",
+    "subject": "Hello world",
+    "to": [
+      "alice@example.com"
+    ],
+    "cc": [],
+    "bcc": [],
+    "message_id": "<abc123@example.com>",
+    "folder_path": "INBOX",
+    "uid": 1,
+    "source": "c0ffee-harness-760686745Hello world-alice@example.com-abc123@example.com",
+    "id": "pNdGjFNL49BeS5ZCHNSt31XmrBEWWgdy8ze2wGfP"
+  },
+  {
+    "name": "recipients sorted and lowercased",
+    "account_id": "acc1",
+    "date": "Tue, 1 Jul 2003 10:52:37 +0200",
+    "subject": "Team sync",
+    "to": [
+      "Zed@Example.com",
+      "bob@example.com"
+    ],
+    "cc": [
+      "Carol@EXAMPLE.org"
+    ],
+    "bcc": [
+      "alice@example.net"
+    ],
+    "message_id": "<m1@host>",
+    "folder_path": "INBOX",
+    "uid": 7,
+    "source": "acc1-1057049557Team sync-alice@example.netbob@example.comcarol@example.orgzed@example.com-m1@host",
+    "id": "MVgQFQJfpX4iNu9nzPyfYH5xp35s9yZu8k6aohFg7"
+  },
+  {
+    "name": "message id without brackets",
+    "account_id": "acc1",
+    "date": "Tue, 1 Jul 2003 10:52:37 +0200",
+    "subject": "Team sync",
+    "to": [
+      "Zed@Example.com",
+      "bob@example.com"
+    ],
+    "cc": [
+      "Carol@EXAMPLE.org"
+    ],
+    "bcc": [
+      "alice@example.net"
+    ],
+    "message_id": "m1@host",
+    "folder_path": "Archive",
+    "uid": 99,
+    "source": "acc1-1057049557Team sync-alice@example.netbob@example.comcarol@example.orgzed@example.com-m1@host",
+    "id": "MVgQFQJfpX4iNu9nzPyfYH5xp35s9yZu8k6aohFg7"
+  },
+  {
+    "name": "no message id",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "Receipt",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": null,
+    "folder_path": "INBOX",
+    "uid": 3,
+    "source": "acc1-1727856000Receipt-me@example.com-",
+    "id": "9ugLpvhnqM1dKjSL65Sb6JzXxQnWavN358vDRMsmr"
+  },
+  {
+    "name": "rfc2047 B utf-8",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "=?UTF-8?B?Q2Fmw6kgbWVudQ==?=",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<b@x>",
+    "folder_path": "INBOX",
+    "uid": 4,
+    "source": "acc1-1727856000Café menu-me@example.com-b@x",
+    "id": "HX6UoJWQnMQG4NU9oyrxNKm3pUr6Bfa3hdEwrjsW2"
+  },
+  {
+    "name": "rfc2047 Q latin-1 with prefix",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "Re: =?iso-8859-1?q?caf=E9_cr=E8me?=",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<q@x>",
+    "folder_path": "INBOX",
+    "uid": 5,
+    "source": "acc1-1727856000Re: café crème-me@example.com-q@x",
+    "id": "NZvHB6Z3aC8mrCQ9zwy6Z72GcA8K1DrCr9nPeSBTU"
+  },
+  {
+    "name": "adjacent encoded words split a character",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "=?UTF-8?Q?Gr=C3?= =?UTF-8?Q?=BC=C3=9Fe?=",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<split@x>",
+    "folder_path": "INBOX",
+    "uid": 6,
+    "source": "acc1-1727856000Grüße-me@example.com-split@x",
+    "id": "93SKCSWV67UZcKjeWJ8eVQbiDb13ybKMjYLHz9F9F"
+  },
+  {
+    "name": "raw 8-bit latin-1 subject",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject_base64": "Y2Fm6SBhdSBsYWl0",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<raw@x>",
+    "folder_path": "INBOX",
+    "uid": 7,
+    "source": "acc1-1727856000café au lait-me@example.com-raw@x",
+    "id": "q26KhERKAEFAwBnh6pEvZ17Y8n2zgrwXkNiC5McqK"
+  },
+  {
+    "name": "raw utf-8 subject",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "日本語の件名",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<ja@x>",
+    "folder_path": "INBOX",
+    "uid": 8,
+    "source": "acc1-1727856000日本語の件名-me@example.com-ja@x",
+    "id": "TA6cttH8Nvfr2VUee6rji4fHjk8iTajB7YjX5AVg9"
+  },
+  {
+    "name": "NFD subject normalised to NFC",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "Café",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<nfd@x>",
+    "folder_path": "INBOX",
+    "uid": 9,
+    "source": "acc1-1727856000Café-me@example.com-nfd@x",
+    "id": "43Vgommrvp2HWAJxbWfaDg6Vits2HabsSbmfBAm2R"
+  },
+  {
+    "name": "NFC twin of the NFD subject",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "Café",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<nfd@x>",
+    "folder_path": "Sent",
+    "uid": 10,
+    "source": "acc1-1727856000Café-me@example.com-nfd@x",
+    "id": "43Vgommrvp2HWAJxbWfaDg6Vits2HabsSbmfBAm2R"
+  },
+  {
+    "name": "subject whitespace trimmed",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "  padded  ",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<pad@x>",
+    "folder_path": "INBOX",
+    "uid": 11,
+    "source": "acc1-1727856000padded-me@example.com-pad@x",
+    "id": "mLeaCyuDktnk7xh5y2uc29FCMzymdqnZfrzzxXXKo"
+  },
+  {
+    "name": "no subject header",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<nosubj@x>",
+    "folder_path": "INBOX",
+    "uid": 12,
+    "source": "acc1-1727856000-me@example.com-nosubj@x",
+    "id": "m9o7FQDcgv8wVWoqw7nqDg6NSPE5EuxA7vQnPTQYi"
+  },
+  {
+    "name": "empty subject",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<emptysubj@x>",
+    "folder_path": "INBOX",
+    "uid": 13,
+    "source": "acc1-1727856000-me@example.com-emptysubj@x",
+    "id": "AhefH2kyssWxJz4PhJ6QR9eJUKn2g7NuAYNf3xAWN"
+  },
+  {
+    "name": "no Date header falls back to INTERNALDATE",
+    "account_id": "acc1",
+    "internal_date": 1700000000,
+    "subject": "No date",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<nodate@x>",
+    "folder_path": "INBOX",
+    "uid": 14,
+    "source": "acc1-1700000000No date-me@example.com-nodate@x",
+    "id": "jmAyfF3S1tUq7fVNmgaeNreNrA4pEc4RxK2LamkDY"
+  },
+  {
+    "name": "unparseable Date falls back to INTERNALDATE",
+    "account_id": "acc1",
+    "date": "sometime last week",
+    "internal_date": 1700000000,
+    "subject": "No date",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<nodate@x>",
+    "folder_path": "INBOX",
+    "uid": 15,
+    "source": "acc1-1700000000No date-me@example.com-nodate@x",
+    "id": "jmAyfF3S1tUq7fVNmgaeNreNrA4pEc4RxK2LamkDY"
+  },
+  {
+    "name": "no date at all uses folder and uid",
+    "account_id": "acc1",
+    "subject": "Undated",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<undated@x>",
+    "folder_path": "INBOX",
+    "uid": 16,
+    "source": "acc1-INBOX:16Undated-me@example.com-undated@x",
+    "id": "ToeFfN5VNGhZcfPwFMEPQJ2NTrRDUgGjFQ5qWatfm"
+  },
+  {
+    "name": "named zone and comment",
+    "account_id": "acc1",
+    "date": "Mon, 7 Feb 1994 21:52:25 PST (Pacific)",
+    "subject": "Zones",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<zone@x>",
+    "folder_path": "INBOX",
+    "uid": 17,
+    "source": "acc1-760686745Zones-me@example.com-zone@x",
+    "id": "Bs5Yy4KUWvHSnJgYftQX5o3FBhjc7GtmF3qUtH3Hy"
+  },
+  {
+    "name": "two digit year",
+    "account_id": "acc1",
+    "date": "Mon, 7 Feb 94 21:52:25 -0800",
+    "subject": "Zones",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<zone@x>",
+    "folder_path": "INBOX",
+    "uid": 18,
+    "source": "acc1-760686745Zones-me@example.com-zone@x",
+    "id": "Bs5Yy4KUWvHSnJgYftQX5o3FBhjc7GtmF3qUtH3Hy"
+  },
+  {
+    "name": "no recipients",
+    "account_id": "acc1",
+    "date": "Wed, 02 Oct 2024 08:00:00 +0000",
+    "subject": "Note to self",
+    "message_id": "<norcpt@x>",
+    "folder_path": "Drafts",
+    "uid": 19,
+    "source": "acc1-1727856000Note to self--norcpt@x",
+    "id": "Xu61Pv65ZNz4Kd6sAa9L5npLgSXnge8nVxWthkH2H"
+  },
+  {
+    "name": "modified utf-7 folder path in fallback",
+    "account_id": "acc1",
+    "subject": "Undated",
+    "to": [
+      "me@example.com"
+    ],
+    "message_id": "<undated@x>",
+    "folder_path": "Entw&APw-rfe",
+    "uid": 20,
+    "source": "acc1-Entw&APw-rfe:20Undated-me@example.com-undated@x",
+    "id": "NXzNyaEBZ9NvYrdCnuR7zAfwwGGLzMXzEeVj9tSMU"
+  }
+]

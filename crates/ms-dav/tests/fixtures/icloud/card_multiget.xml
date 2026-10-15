@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?><multistatus xmlns='DAV:'><response><href>/123456789/carddavhome/card/6a5c4f29.vcf</href><propstat><prop><getetag>"l6za1q3e"</getetag><address-data xmlns='urn:ietf:params:xml:ns:carddav'><![CDATA[BEGIN:VCARD
+VERSION:3.0
+PRODID:-//Apple Inc.//iOS 17.0//EN
+N:Appleseed;Katie;;;
+FN:Katie Appleseed
+item1.EMAIL;type=INTERNET;type=pref:katie@example.com
+item1.X-ABLabel:_$!<Other>!$_
+REV:2019-10-11T20:03:16Z
+UID:6a5c4f29-1a0e-4e43-a4b5-0f1e5ad0f5e1
+END:VCARD
+]]></address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/123456789/carddavhome/card/group-1.vcf</href><propstat><prop><getetag>"l6za1q3f"</getetag><address-data xmlns='urn:ietf:params:xml:ns:carddav'><![CDATA[BEGIN:VCARD
+VERSION:3.0
+PRODID:-//Apple Inc.//iOS 17.0//EN
+N:Running Group
+FN:Running Group
+X-ADDRESSBOOKSERVER-KIND:group
+X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:6a5c4f29-1a0e-4e43-a4b5-0f1e5ad0f5e1
+REV:2019-10-11T20:03:16Z
+UID:group-1
+END:VCARD
+]]></address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>

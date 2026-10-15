@@ -1,0 +1,74 @@
+name: dav-incremental-sync
+description: >
+  After the first pass, another client (a phone) adds, edits and deletes events and cards
+  and changes a group's members. The client's calendar refresh (`sync-calendar` on stdin)
+  runs a calendars-only pass: the changed calendar's ctag / sync token differs, so the
+  engine asks for what changed (sync-collection REPORT, or an etag listing where that is
+  unsupported) and applies exactly that; an unchanged calendar costs one PROPFIND and
+  produces no deltas. Contacts sync once per process start, so the contact changes arrive
+  after a relaunch, again as only the changed cards.
+source: "DAVWorker::runCalendars (ctag check, syncCalendarWithToken / syncCalendarWithEtags), runContacts; main.cpp sync-calendar"
+servers:
+  - {radicale: default}
+  - {baikal: default}
+mailboxes:
+  INBOX: {messages: 2}
+calendars:
+  default:
+    events:
+      - {count: 6}
+  work:
+    create: true
+    display_name: Work
+    events: [{uid: standup@example.test, summary: Standup, start: "+2d"}]
+addressbooks:
+  default:
+    contacts:
+      - {count: 10}
+      - {uid: alice-uid, name: "Alice Archer", email: alice@example.org}
+      - {uid: bob-uid, name: "Bob Baker", email: bob@example.org}
+    groups:
+      - {uid: climbing-uid, name: Climbing, members: [alice@example.org]}
+steps:
+  - wait: quiescent
+  - wait: {models: {Event: {count: 7}, Contact: {where: {s: carddav}, count: 13}}, timeout: 120}
+  - wait: {quiescent: true}
+  - assert:
+      dav_matches_db: {}
+  - mark: calendars
+  - dav.add_event: {calendar: default, event: {uid: added@example.test, summary: "Dentist", start: "+4d"}}
+  - dav.update_event: {uid: harness-event-1@example.test, changes: {SUMMARY: "Moved meeting"}}
+  - dav.delete_event: {uid: harness-event-2@example.test}
+  - client.sync_calendar: {}
+  - wait: {models: {Event: {count: 7, match: [{icsuid: added@example.test}], absent: [{icsuid: harness-event-2@example.test}]}}, timeout: 60}
+  - wait: {quiescent: true}
+  - assert:
+      dav_matches_db: {}
+      changed_since:
+        mark: calendars
+        Event:
+          key: icsuid
+          persist: [added@example.test, harness-event-1@example.test]
+          unpersist: [harness-event-2@example.test]
+        Calendar:
+          where: {name: Work}
+          persist: []
+  - mark: contacts
+  - dav.add_contact: {contact: {uid: dan-uid, name: "Dan Diver", email: dan@example.org}}
+  - dav.update_contact: {uid: alice-uid, changes: {FN: "Alice Archer-Smith"}}
+  - dav.delete_contact: {uid: harness-contact-1}
+  - dav.set_group_members: {uid: climbing-uid, members: [alice@example.org, bob@example.org]}
+  - restart: {wait: false}
+  - wait: {models: {Contact: {where: {s: carddav}, match: [{id: dan-uid}, {name: "Alice Archer-Smith"}], absent: [{id: harness-contact-1}]}}, timeout: 120}
+  - wait: {quiescent: true}
+expect:
+  dav_matches_db: {}
+  changed_since:
+    mark: contacts
+    Contact:
+      where: {s: carddav}
+      persist: [dan-uid, alice-uid, bob-uid, climbing-uid]
+      unpersist: [harness-contact-1]
+    Event:
+      persist: []
+  running: true

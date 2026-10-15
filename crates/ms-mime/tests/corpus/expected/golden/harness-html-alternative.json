@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Carol Notifications",
+      "noreply@service.example"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "harness-2-bc278401@example.test",
+  "plaintext": false,
+  "searchTextLength": 53,
+  "snippet": "This is the body of message 2. -- Carol Notifications",
+  "subject": "Quarterly report"
+}

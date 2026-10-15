@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 0,
+  "files": [
+    {
+      "contentId": "0.19960603164233.izzy@scr.atm.com",
+      "contentType": "image/gif",
+      "countsAsAttachment": false,
+      "filename": "SIG.GIF",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "SIG.GIF",
+      "sha256": "8cbc330cb2fec6618cd12739be183ce8ad4263bb083ce13858055fbe23bef540",
+      "size": 685,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "izzy@nugget.scr.atm.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "19960603164232.izzy@scr.atm.com",
+  "plaintext": false,
+  "searchTextLength": 3027,
+  "snippet": ">> >2: your fixed-width text is *larger* than the default size for fixed- >> > width text, and since the default size of my window is 80 fixed- >> > width columns wide, I actually lose 2-3 columns off the end of each >> > of your lines. >> > >> This is really the receivers problem not the senders. > >Total nonsense. > I do not appreciate your response here! If you continue with this type of respon",
+  "subject": "RE[4]: your generated HTML"
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": true,
+    "is_recurring": false,
+    "location": "",
+    "organizer": "",
+    "re": 1705341600,
+    "recurrence_id": "",
+    "rs": 1705338000,
+    "search_participants": "",
+    "start": 1705338000,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Winter (PST)",
+    "uid": "040000008200E00074C5B7101A82E00800000000"
+  },
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": true,
+    "is_recurring": false,
+    "location": "",
+    "organizer": "",
+    "re": 1721062800,
+    "recurrence_id": "",
+    "rs": 1721059200,
+    "search_participants": "",
+    "start": 1721059200,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Summer (PDT)",
+    "uid": "040000008200E00074C5B7101A82E00800000001"
+  }
+]

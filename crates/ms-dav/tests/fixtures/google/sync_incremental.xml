@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:caldav="urn:ietf:params:xml:ns:caldav">
+<D:response><D:href>/caldav/v2/alice%40gmail.com/events/0f4ab1qv3kgh6bvn3k9j1b2c3d%40google.com.ics</D:href><D:propstat><D:status>HTTP/1.1 200 OK</D:status><D:prop><D:getetag>"63860000002"</D:getetag><caldav:calendar-data>BEGIN:VCALENDAR&#13;
+PRODID:-//Google Inc//Google Calendar 70.9054//EN&#13;
+VERSION:2.0&#13;
+CALSCALE:GREGORIAN&#13;
+BEGIN:VEVENT&#13;
+DTSTART:20240612T150000Z&#13;
+DTEND:20240612T160000Z&#13;
+DTSTAMP:20240611T120000Z&#13;
+ORGANIZER;CN=alice@gmail.com:mailto:alice@gmail.com&#13;
+UID:0f4ab1qv3kgh6bvn3k9j1b2c3d@google.com&#13;
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=alice@g&#13;
+ mail.com;X-NUM-GUESTS=0:mailto:alice@gmail.com&#13;
+CREATED:20240611T120000Z&#13;
+DESCRIPTION:Agenda:\n1. Budget\n2. Hiring&#13;
+LAST-MODIFIED:20240611T120000Z&#13;
+SEQUENCE:1&#13;
+STATUS:CONFIRMED&#13;
+SUMMARY:Quarterly review&#13;
+TRANSP:OPAQUE&#13;
+END:VEVENT&#13;
+END:VCALENDAR&#13;
+</caldav:calendar-data></D:prop></D:propstat></D:response>
+<D:sync-token>https://www.google.com/calendar/dav/alice%40gmail.com/events/sync/CPjM9Lj5z4cDEAAYASDCzKzFAijCzKzFAh==</D:sync-token>
+</D:multistatus>

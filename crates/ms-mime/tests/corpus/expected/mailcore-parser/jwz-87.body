@@ -1,0 +1,22 @@
+On Fri, 24 May 1996, E. ALLEN SMITH wrote:
+
+> 	Hmm.... what were the normal key-length recommendations again? This
+> appears to imply that the NSA can break at least 64-bit, and probably 80-bit,
+> encryption. How does this translate into public key lengths? E.g., how many
+> normal bits is a 1024-bit PGP key equivalent to?
+> 	-Allen
+
+The normal key-length recommendation was 96 bits.  64 bits and 80 bits are
+equivalent to 512 bits and 768 bits respectively.  I would guess that a
+1024-bit key is about as strong as an 96-bit key.  The first two numbers are
+from _Applied Cryptography_; my estimate is an extrapolation from the data in
+AC.
+
+-- Mark
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+markm@voicenet.com              | finger -l for PGP key 0xe3bf2169
+http://www.voicenet.com/‾markm/ | d61734f2800486ae6f79bfeb70f95348
+((2b) || !(2b))                 | Old key now used only for signatures
+"The concept of normalcy is just a conspiracy of the majority" -me
+

@@ -1,0 +1,10 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: HTML with meta charset
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <b1cb8eb0525a@example.org>
+MIME-Version: 1.0
+Content-Type: text/html
+Content-Transfer-Encoding: 8bit
+
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=koi8-r"></head><body><p>Привет, мир!</p></body></html>

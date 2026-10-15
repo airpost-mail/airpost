@@ -1,0 +1,21 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Alternative without text
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <4586a485c64d@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="alt4"
+
+--alt4
+Content-Type: application/x-first
+Content-Transfer-Encoding: 7bit
+
+first
+
+--alt4
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmM
+IQAAAABJRU5ErkJggg==
+--alt4--

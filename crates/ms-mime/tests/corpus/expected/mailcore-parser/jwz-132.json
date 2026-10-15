@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "multipart/report",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "d41f929664924b8c89789f48823d44aaa828c2658b5adc6cde02b1bde7287eb3",
+      "size": 1264,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "The Post Office",
+      "postmaster@mm1.sprynet.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "96Jul29.022158-0700pdt.148226-12799+708@mm1.sprynet.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "email delivery error"
+}

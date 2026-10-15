@@ -1,0 +1,10 @@
+From alice@example.org Tue Jan  6 10:00:00 2026
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: With an mbox From line
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <768ec9fc0e53@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain
+
+The From_ line is skipped.

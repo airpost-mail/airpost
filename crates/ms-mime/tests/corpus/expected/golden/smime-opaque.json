@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "smime.p7m",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "smime.p7m",
+      "sha256": "0c4454862e85c53e1b13f7dc0ad9dd6a574fcd3525728e398f79126a5fc0768a",
+      "size": 17,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "a05ee95f22d8@example.org",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "S/MIME encrypted"
+}

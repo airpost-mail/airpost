@@ -1,0 +1,56 @@
+name: import-legacy-carries-metadata
+description: >
+  After migrate has moved a C++ database aside, `--mode import-legacy` (run by the client
+  between migrate and sync) carries over what only existed locally: plugin metadata on
+  messages and threads (a snooze on a thread, a reminder on a message), re-keyed by
+  headerMessageId into pending rows that attach when sync ingests the message under its
+  new id; a draft that was never uploaded (a UID-0 Drafts placement) with its body and its
+  attachment; and `_State` cursors. Contacts, events and mail are not imported; mail comes
+  from the server. Planned for P6; until then the mode reports "not implemented" and the
+  scenario is an expected failure.
+source: "docs/engine-port-plan.md section 9 (import-legacy); MailStore::findAndDeleteDetachedPluginMetadata"
+xfail: "P6: --mode import-legacy is not implemented yet"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {special_use: "\\Drafts"}
+import_legacy: true
+legacy_db:
+  wal: true
+  folders: {INBOX: inbox, Drafts: drafts}
+  messages:
+    m1: {mailbox: INBOX, uid: 1, thread: t1}
+    m2: {mailbox: INBOX, uid: 2}
+    d1:
+      folder: Drafts
+      draft: {hMsgId: "local-draft-1@example.test", subject: "Unsent plans", body: "<p>draft body</p>"}
+      files: [{filename: notes.txt, content: "attached to the draft"}]
+  metadata:
+    - {model: t1, plugin: thread-snooze, value: {expiration: 1900000000, snoozeCategoryId: "cpp-snoozed"}}
+    - {model: m2, plugin: send-reminders, value: {expiration: 1900000100, lastReplyTimestamp: 1700000000}}
+  state: {cursor-c0ffee-harness: "42"}
+steps:
+  - wait: quiescent
+expect:
+  mode_output: {import-legacy: '"error":null'}
+  counts: {INBOX: 3}
+  db_matches_server: {}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, value: {expiration: 1900000000}, expiration: true}
+    - {messages: {mailbox: INBOX, uids: [2]}, plugin: send-reminders, value: {expiration: 1900000100}, expiration: true}
+    - {messages: {mailbox: INBOX, uids: [3]}, plugin: send-reminders, absent: true}
+  models:
+    Message:
+      where: {draft: true}
+      count: 1
+      match: [{hMsgId: "local-draft-1@example.test", subject: "Unsent plans"}]
+    File:
+      count: 1
+      match: [{filename: notes.txt}]
+  sql:
+    - {db: main, query: "SELECT count(*) FROM MessageBody b JOIN Message m ON m.id = b.id WHERE m.headerMessageId = 'local-draft-1@example.test'", equals: 1}
+    - {db: main, query: "SELECT value FROM _State WHERE id = 'cursor-c0ffee-harness'", equals: "42"}
+    # Every pending row attached to an ingested message.
+    - {db: main, query: "SELECT count(*) FROM DetatchedPluginMetadata", equals: 0}
+  running: true

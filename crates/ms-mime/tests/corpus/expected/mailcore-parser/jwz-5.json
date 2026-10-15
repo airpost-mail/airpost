@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 2,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "eb8f222673dbaae4f2b1d51f11d32d9dbc32a40158786f054344140d245ca743",
+      "size": 416,
+      "uniqueId": "0"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "1f69ace44c58df538c7ae115fe7ad9752f9ef1265b9c4642db358e70aab84ab4",
+      "size": 103,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "beatty@COSMOS.VLSI.CS.CMU.EDU"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9208281913.AA24840@flash.bellcore.com",
+  "plaintext": true,
+  "searchTextLength": 5000,
+  "snippet": "26-Aug-92 22:15:02-LCL,22076;000000000000\nReceived: from po3.andrew.cmu.edu by COSMOS.VLSI.CS.CMU.EDU id aa13358;\n          26 Aug 92 22:14:26 EDT\nReceived: from sqhilton.pc.cs.cmu.edu by po3.andrew.cmu.edu (5.54/3.15) id <AA21478> for beatty@cosmos.vlsi.cs.cmu.edu; Wed, 26 Aug 92 22:14:07 EDT\nReceived: by sqhilton.pc.cs.cmu.edu (NeXT-1.0 (From Sendmail 5.52)/NeXT-2.0)\n\tid AA21178; Wed, 26 Aug 92 ",
+  "subject": "mew-law encoding?"
+}

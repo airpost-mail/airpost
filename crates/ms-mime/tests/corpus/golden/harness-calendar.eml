@@ -1,0 +1,37 @@
+Return-Path: <alice@example.org>
+Delivered-To: test@example.test
+Message-ID: <harness-4-b1d785c9@example.test>
+Date: Mon, 12 Oct 2026 01:21:23 +0000
+From: Alice Example <alice@example.org>
+To: Harness Test <test@example.test>
+Subject: Invitation: Standup
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="=_harness_a3379de1a272"
+
+--=_harness_a3379de1a272
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+This is the body of message 4.
+
+-- 
+Alice Example
+
+--=_harness_a3379de1a272
+Content-Type: text/calendar; charset="utf-8"; method=REQUEST
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//harness//EN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:harness-4-b1d785c9@example.test
+DTSTAMP:20260105T090000Z
+DTSTART:20260106T150000Z
+DTEND:20260106T160000Z
+SUMMARY:Invitation: Standup
+ORGANIZER:mailto:alice@example.org
+END:VEVENT
+END:VCALENDAR
+--=_harness_a3379de1a272--

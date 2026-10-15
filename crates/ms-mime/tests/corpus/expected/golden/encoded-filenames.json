@@ -1,0 +1,79 @@
+{
+  "attachmentCount": 5,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pdf",
+      "countsAsAttachment": true,
+      "filename": "€ rates 2026.pdf",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "€ rates 2026.pdf",
+      "sha256": "17f6d56c44f86dce0de32d6c3ed26f3ed309b03d1359f33826071e79e537c5d0",
+      "size": 9,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/pdf",
+      "countsAsAttachment": true,
+      "filename": "Über die Grenze.pdf",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "Über die Grenze.pdf",
+      "sha256": "809a4c9886c75a767157a59673af958fbd561a6e5a3bae73a1429f13985dae72",
+      "size": 9,
+      "uniqueId": "2"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "countsAsAttachment": true,
+      "filename": "Отчёт.docx",
+      "inline": false,
+      "partId": "4",
+      "safeFilename": "Отчёт.docx",
+      "sha256": "8293e7f791dd6b5c34c45d6b887f0b892db8d3fe7368e81d12e819492a1a1a05",
+      "size": 8,
+      "uniqueId": "3"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/zip",
+      "countsAsAttachment": true,
+      "filename": "résumé.zip",
+      "inline": false,
+      "partId": "5",
+      "safeFilename": "résumé.zip",
+      "sha256": "1171d55c61a4107d133a28904611ae09f32c15bc1cfb951caa9388bbc9ae16e9",
+      "size": 7,
+      "uniqueId": "4"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "a/b\\c:d*e?.txt",
+      "inline": false,
+      "partId": "6",
+      "safeFilename": "a-b-c-d-e-.txt",
+      "sha256": "4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2",
+      "size": 4,
+      "uniqueId": "5"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "b47e37b08e2f@example.org",
+  "plaintext": true,
+  "searchTextLength": 16,
+  "snippet": "Encoded names.\r\n",
+  "subject": "Encoded file names"
+}

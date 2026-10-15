@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "0fe9d8c853e81fd52d371aa1a579cf14242bf2124018a84b0f56de7522992efb",
+      "size": 2745,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "John T. Gildred",
+      "jgildred@opensoft.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "MSG961029151201#15@server1.opensoft.com",
+  "plaintext": true,
+  "searchTextLength": 74,
+  "snippet": "Fellow testers:\n\nPlease let me know if this sig poses any problems.\n\n-John",
+  "subject": "Signed SHA1 with VeriSign certification"
+}

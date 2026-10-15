@@ -1,0 +1,20 @@
+[
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": true,
+    "is_recurring": false,
+    "location": "",
+    "organizer": "",
+    "re": 1710057600,
+    "recurrence_id": "",
+    "rs": 1710055800,
+    "search_participants": "",
+    "start": 1710055800,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Does not exist",
+    "uid": "gap@example.com"
+  }
+]

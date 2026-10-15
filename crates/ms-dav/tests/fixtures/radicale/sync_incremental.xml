@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><response><href>/alice/7f3c4a52-36a9-4e0c-a3a5-7a0b9c1d2e3f/meeting.ics</href><status>HTTP/1.1 404 Not Found</status></response><response><href>/alice/7f3c4a52-36a9-4e0c-a3a5-7a0b9c1d2e3f/new.ics</href><propstat><prop><getetag>"e3a"</getetag><C:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//t//t//EN
+BEGIN:VEVENT
+UID:new@radicale
+DTSTAMP:20240601T080000Z
+DTSTART;VALUE=DATE:20240704
+DTEND;VALUE=DATE:20240705
+SUMMARY:Holiday
+END:VEVENT
+END:VCALENDAR
+</C:calendar-data></prop><status>HTTP/1.1 200 OK</status></propstat></response><sync-token>http://radicale.org/ns/sync/9e8d7c6b5a49</sync-token></multistatus>

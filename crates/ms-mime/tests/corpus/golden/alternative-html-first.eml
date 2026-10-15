@@ -1,0 +1,21 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Alternative, HTML first
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <9cb452b06d7d@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="alt2"
+
+--alt2
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<p>HTML first</p>
+
+--alt2
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Plain last
+
+--alt2--

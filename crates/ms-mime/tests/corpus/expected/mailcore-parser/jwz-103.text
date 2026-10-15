@@ -1,0 +1,14 @@
+Netscape: here's my encryption certificate for S/MIME testing
+purposes.  Beware that this is an Entrust certificate rather than
+Verisign.  Among other things, this means that I have a separate
+key pair for signing and encryption, so you'll have to use this
+one to encrypt for me and use the certif included with signed
+messages (rather than this one) to verify signatures.
+
+Eric
+---------------------------------------------------------------------
+Eric Rosenquist, Strata Software Limited   http://www.strataware.com/
+mailto:rosenqui@strataware.com   Tel: 613-591-1922  Fax: 613-591-3485
+Quote: I discovered a meal between breakfast and brunch!
+         -- Homer Simpson
+---------------------------------------------------------------------

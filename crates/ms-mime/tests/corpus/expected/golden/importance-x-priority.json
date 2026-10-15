@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": "low",
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "ab75f3574713@example.org",
+  "plaintext": true,
+  "searchTextLength": 11,
+  "snippet": "Whenever.\r\n",
+  "subject": "Low priority"
+}

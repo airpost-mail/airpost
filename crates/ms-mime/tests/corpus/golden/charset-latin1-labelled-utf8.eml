@@ -1,0 +1,10 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Mislabelled latin-1
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <8cbcd2e6ffdc@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+Il était une fois une forêt où vivait un garçon très naïf.

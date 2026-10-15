@@ -1,0 +1,24 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: TNEF from Exchange
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <1040c664f911@example.org>
+MIME-Version: 1.0
+X-MS-Has-Attach: yes
+X-MS-TNEF-Correlator: <00000000@example.org>
+Thread-Index: AQHUabcd
+Content-Type: multipart/mixed; boundary="tnef"
+
+--tnef
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Please see the attached file.
+
+--tnef
+Content-Type: application/ms-tnef; name="winmail.dat"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="winmail.dat"
+
+eJ8+ImZha2UtdG5lZnifPiJmYWtlLXRuZWZ4nz4iZmFrZS10bmVmeJ8+ImZha2UtdG5lZg==
+--tnef--

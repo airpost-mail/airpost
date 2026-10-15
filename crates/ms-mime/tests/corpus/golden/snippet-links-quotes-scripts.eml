@@ -1,0 +1,16 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Re: Snippet rules
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <8fee9a4ac852@example.org>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><script>var hidden = 1;</script><style>.x{display:none}</style></head><body>
+<div>Thanks   for the
+
+   <a href="https://example.org/doc">document</a>!</div>
+<div>Same link text: <a href="https://example.org/same">https://example.org/same</a></div>
+<blockquote type="cite"><div>On Monday Bob wrote:</div><div>quoted text that the snippet keeps</div></blockquote>
+<blockquote><div>A plain blockquote stays</div></blockquote>
+<p>Tab	and&nbsp;&nbsp;nbsp &amp; entities &lt;ok&gt;</p><img src="https://example.org/i.png" alt="pic"></body></html>

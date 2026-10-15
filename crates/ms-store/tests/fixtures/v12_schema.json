@@ -1,0 +1,548 @@
+[
+ {
+  "type": "index",
+  "name": "ContactAccountEmailIndex",
+  "tbl_name": "Contact",
+  "sql": "CREATE INDEX ContactAccountEmailIndex ON Contact(accountId, email)"
+ },
+ {
+  "type": "index",
+  "name": "ContactBrowseIndex",
+  "tbl_name": "Contact",
+  "sql": "CREATE INDEX ContactBrowseIndex ON Contact(hidden,refs,accountId)"
+ },
+ {
+  "type": "index",
+  "name": "ContactEmailIndex",
+  "tbl_name": "Contact",
+  "sql": "CREATE INDEX ContactEmailIndex ON Contact(email)"
+ },
+ {
+  "type": "index",
+  "name": "EventETag",
+  "tbl_name": "Event",
+  "sql": "CREATE INDEX EventETag ON Event(calendarId, etag)"
+ },
+ {
+  "type": "index",
+  "name": "EventRecurrenceId",
+  "tbl_name": "Event",
+  "sql": "CREATE INDEX EventRecurrenceId ON Event(calendarId, icsuid, recurrenceId)"
+ },
+ {
+  "type": "index",
+  "name": "EventUID",
+  "tbl_name": "Event",
+  "sql": "CREATE INDEX EventUID ON Event(accountId, icsuid)"
+ },
+ {
+  "type": "index",
+  "name": "MessageBodyIndex",
+  "tbl_name": "MessageBody",
+  "sql": "CREATE UNIQUE INDEX MessageBodyIndex ON MessageBody(id)"
+ },
+ {
+  "type": "index",
+  "name": "MessageFolderMessageIndex",
+  "tbl_name": "MessageFolder",
+  "sql": "CREATE INDEX MessageFolderMessageIndex ON MessageFolder (messageId)"
+ },
+ {
+  "type": "index",
+  "name": "MessageFolderUIDIndex",
+  "tbl_name": "MessageFolder",
+  "sql": "CREATE UNIQUE INDEX MessageFolderUIDIndex ON MessageFolder (accountId, folderId, remoteUID) WHERE remoteUID > 0"
+ },
+ {
+  "type": "index",
+  "name": "MessageListDateIndex",
+  "tbl_name": "Message",
+  "sql": "CREATE INDEX MessageListDateIndex ON Message (accountId, date DESC)"
+ },
+ {
+  "type": "index",
+  "name": "MessageListDraftIndex",
+  "tbl_name": "Message",
+  "sql": "CREATE INDEX MessageListDraftIndex ON Message(accountId, date DESC) WHERE draft = 1"
+ },
+ {
+  "type": "index",
+  "name": "MessageListHeaderMsgIdIndex",
+  "tbl_name": "Message",
+  "sql": "CREATE INDEX MessageListHeaderMsgIdIndex ON Message(headerMessageId)"
+ },
+ {
+  "type": "index",
+  "name": "MessageListThreadIndex",
+  "tbl_name": "Message",
+  "sql": "CREATE INDEX MessageListThreadIndex ON Message(threadId, date ASC)"
+ },
+ {
+  "type": "index",
+  "name": "MessageListUnifiedDraftIndex",
+  "tbl_name": "Message",
+  "sql": "CREATE INDEX MessageListUnifiedDraftIndex ON Message(date DESC) WHERE draft = 1"
+ },
+ {
+  "type": "index",
+  "name": "MessageOrphanSinceIndex",
+  "tbl_name": "MessageOrphan",
+  "sql": "CREATE INDEX MessageOrphanSinceIndex ON MessageOrphan (accountId, since)"
+ },
+ {
+  "type": "index",
+  "name": "ModelPluginMetadata_expiration",
+  "tbl_name": "ModelPluginMetadata",
+  "sql": "CREATE INDEX `ModelPluginMetadata_expiration` ON `ModelPluginMetadata` (`expiration` ASC) WHERE expiration IS NOT NULL"
+ },
+ {
+  "type": "index",
+  "name": "ModelPluginMetadata_id",
+  "tbl_name": "ModelPluginMetadata",
+  "sql": "CREATE INDEX `ModelPluginMetadata_id` ON `ModelPluginMetadata` (`id` ASC)"
+ },
+ {
+  "type": "index",
+  "name": "TaskByStatus",
+  "tbl_name": "Task",
+  "sql": "CREATE INDEX TaskByStatus ON Task(accountId, status)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadCategory_id",
+  "tbl_name": "ThreadCategory",
+  "sql": "CREATE INDEX `ThreadCategory_id` ON `ThreadCategory` (`id` ASC)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadCategory_val_id",
+  "tbl_name": "ThreadCategory",
+  "sql": "CREATE UNIQUE INDEX `ThreadCategory_val_id` ON `ThreadCategory` (`value` ASC, `id` ASC)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadDateIndex",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadDateIndex ON `Thread` (lastMessageReceivedTimestamp DESC)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadGmailLookup",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadGmailLookup ON `Thread` (gThrId) WHERE gThrId IS NOT NULL"
+ },
+ {
+  "type": "index",
+  "name": "ThreadIsSearchIndexedIndex",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadIsSearchIndexedIndex ON `Thread` (isSearchIndexed, id)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadIsSearchIndexedLastMessageReceivedIndex",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadIsSearchIndexedLastMessageReceivedIndex ON `Thread` (isSearchIndexed, lastMessageReceivedTimestamp)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadListCategoryIndex",
+  "tbl_name": "ThreadCategory",
+  "sql": "CREATE INDEX ThreadListCategoryIndex ON `ThreadCategory` (lastMessageReceivedTimestamp DESC, value, inAllMail, unread, id)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadListCategorySentIndex",
+  "tbl_name": "ThreadCategory",
+  "sql": "CREATE INDEX ThreadListCategorySentIndex ON `ThreadCategory` (lastMessageSentTimestamp DESC, value, inAllMail, unread, id)"
+ },
+ {
+  "type": "index",
+  "name": "ThreadStarredIndex",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadStarredIndex ON `Thread` (accountId, lastMessageReceivedTimestamp DESC) WHERE starred = 1 AND inAllMail = 1"
+ },
+ {
+  "type": "index",
+  "name": "ThreadUnifiedStarredIndex",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadUnifiedStarredIndex ON `Thread` (lastMessageReceivedTimestamp DESC) WHERE starred = 1 AND inAllMail = 1"
+ },
+ {
+  "type": "index",
+  "name": "ThreadUnifiedUnreadIndex",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadUnifiedUnreadIndex ON `Thread` (lastMessageReceivedTimestamp DESC) WHERE unread = 1 AND inAllMail = 1"
+ },
+ {
+  "type": "index",
+  "name": "ThreadUnreadIndex",
+  "tbl_name": "Thread",
+  "sql": "CREATE INDEX ThreadUnreadIndex ON `Thread` (accountId, lastMessageReceivedTimestamp DESC) WHERE unread = 1 AND inAllMail = 1"
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Account_1",
+  "tbl_name": "Account",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Calendar_1",
+  "tbl_name": "Calendar",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_ContactBook_1",
+  "tbl_name": "ContactBook",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_ContactContactGroup_1",
+  "tbl_name": "ContactContactGroup",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_ContactGroup_1",
+  "tbl_name": "ContactGroup",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Contact_1",
+  "tbl_name": "Contact",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_DetatchedPluginMetadata_1",
+  "tbl_name": "DetatchedPluginMetadata",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Event_1",
+  "tbl_name": "Event",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_File_1",
+  "tbl_name": "File",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Folder_1",
+  "tbl_name": "Folder",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Label_1",
+  "tbl_name": "Label",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_MessageBody_1",
+  "tbl_name": "MessageBody",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_MessageOrphan_1",
+  "tbl_name": "MessageOrphan",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Message_1",
+  "tbl_name": "Message",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_ModelPluginMetadata_1",
+  "tbl_name": "ModelPluginMetadata",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Task_1",
+  "tbl_name": "Task",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_ThreadCategory_1",
+  "tbl_name": "ThreadCategory",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_ThreadCounts_1",
+  "tbl_name": "ThreadCounts",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_ThreadReference_1",
+  "tbl_name": "ThreadReference",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex_Thread_1",
+  "tbl_name": "Thread",
+  "sql": null
+ },
+ {
+  "type": "index",
+  "name": "sqlite_autoindex__State_1",
+  "tbl_name": "_State",
+  "sql": null
+ },
+ {
+  "type": "table",
+  "name": "Account",
+  "tbl_name": "Account",
+  "sql": "CREATE TABLE `Account` (id VARCHAR(40) PRIMARY KEY, data BLOB, accountId VARCHAR(8), email_address TEXT)"
+ },
+ {
+  "type": "table",
+  "name": "Calendar",
+  "tbl_name": "Calendar",
+  "sql": "CREATE TABLE `Calendar` (id VARCHAR(40) PRIMARY KEY, data BLOB, accountId VARCHAR(8))"
+ },
+ {
+  "type": "table",
+  "name": "Contact",
+  "tbl_name": "Contact",
+  "sql": "CREATE TABLE `Contact` (id VARCHAR(40) PRIMARY KEY, data BLOB, accountId VARCHAR(8), email TEXT, version INTEGER, refs INTEGER DEFAULT 0, hidden TINYINT(1) DEFAULT 0, source VARCHAR(10) DEFAULT 'mail', bookId VARCHAR(40), etag VARCHAR(40))"
+ },
+ {
+  "type": "table",
+  "name": "ContactBook",
+  "tbl_name": "ContactBook",
+  "sql": "CREATE TABLE `ContactBook` (`id` varchar(40),`accountId` varchar(40), `data` BLOB, `version` INTEGER, PRIMARY KEY (id))"
+ },
+ {
+  "type": "table",
+  "name": "ContactContactGroup",
+  "tbl_name": "ContactContactGroup",
+  "sql": "CREATE TABLE `ContactContactGroup` (`id` varchar(40),`value` varchar(40), PRIMARY KEY (id, value))"
+ },
+ {
+  "type": "table",
+  "name": "ContactGroup",
+  "tbl_name": "ContactGroup",
+  "sql": "CREATE TABLE `ContactGroup` (`id` varchar(40),`accountId` varchar(40),`bookId` varchar(40), `data` BLOB, `version` INTEGER, `name` varchar(300), PRIMARY KEY (id))"
+ },
+ {
+  "type": "table",
+  "name": "ContactSearch",
+  "tbl_name": "ContactSearch",
+  "sql": "CREATE VIRTUAL TABLE `ContactSearch` USING fts5(tokenize = 'porter unicode61', content_id UNINDEXED, content)"
+ },
+ {
+  "type": "table",
+  "name": "ContactSearch_config",
+  "tbl_name": "ContactSearch_config",
+  "sql": "CREATE TABLE 'ContactSearch_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+ },
+ {
+  "type": "table",
+  "name": "ContactSearch_content",
+  "tbl_name": "ContactSearch_content",
+  "sql": "CREATE TABLE 'ContactSearch_content'(id INTEGER PRIMARY KEY, c0, c1)"
+ },
+ {
+  "type": "table",
+  "name": "ContactSearch_data",
+  "tbl_name": "ContactSearch_data",
+  "sql": "CREATE TABLE 'ContactSearch_data'(id INTEGER PRIMARY KEY, block BLOB)"
+ },
+ {
+  "type": "table",
+  "name": "ContactSearch_docsize",
+  "tbl_name": "ContactSearch_docsize",
+  "sql": "CREATE TABLE 'ContactSearch_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+ },
+ {
+  "type": "table",
+  "name": "ContactSearch_idx",
+  "tbl_name": "ContactSearch_idx",
+  "sql": "CREATE TABLE 'ContactSearch_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+ },
+ {
+  "type": "table",
+  "name": "DetatchedPluginMetadata",
+  "tbl_name": "DetatchedPluginMetadata",
+  "sql": "CREATE TABLE `DetatchedPluginMetadata` (objectId VARCHAR(40), objectType VARCHAR(15), accountId VARCHAR(8), pluginId VARCHAR(40), value BLOB, version INTEGER, PRIMARY KEY (`objectId`, `accountId`, `pluginId`))"
+ },
+ {
+  "type": "table",
+  "name": "Event",
+  "tbl_name": "Event",
+  "sql": "CREATE TABLE `Event` (id VARCHAR(40) PRIMARY KEY, data BLOB, accountId VARCHAR(8), etag VARCHAR(40), calendarId VARCHAR(40), recurrenceStart INTEGER, recurrenceEnd INTEGER, icsuid VARCHAR(150), recurrenceId VARCHAR(50) DEFAULT '')"
+ },
+ {
+  "type": "table",
+  "name": "EventSearch",
+  "tbl_name": "EventSearch",
+  "sql": "CREATE VIRTUAL TABLE `EventSearch` USING fts5(tokenize = 'porter unicode61', content_id UNINDEXED, title, description, location, participants)"
+ },
+ {
+  "type": "table",
+  "name": "EventSearch_config",
+  "tbl_name": "EventSearch_config",
+  "sql": "CREATE TABLE 'EventSearch_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+ },
+ {
+  "type": "table",
+  "name": "EventSearch_content",
+  "tbl_name": "EventSearch_content",
+  "sql": "CREATE TABLE 'EventSearch_content'(id INTEGER PRIMARY KEY, c0, c1, c2, c3, c4)"
+ },
+ {
+  "type": "table",
+  "name": "EventSearch_data",
+  "tbl_name": "EventSearch_data",
+  "sql": "CREATE TABLE 'EventSearch_data'(id INTEGER PRIMARY KEY, block BLOB)"
+ },
+ {
+  "type": "table",
+  "name": "EventSearch_docsize",
+  "tbl_name": "EventSearch_docsize",
+  "sql": "CREATE TABLE 'EventSearch_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+ },
+ {
+  "type": "table",
+  "name": "EventSearch_idx",
+  "tbl_name": "EventSearch_idx",
+  "sql": "CREATE TABLE 'EventSearch_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+ },
+ {
+  "type": "table",
+  "name": "File",
+  "tbl_name": "File",
+  "sql": "CREATE TABLE `File` (id VARCHAR(40) PRIMARY KEY, version INTEGER, data BLOB, accountId VARCHAR(8), filename TEXT)"
+ },
+ {
+  "type": "table",
+  "name": "Folder",
+  "tbl_name": "Folder",
+  "sql": "CREATE TABLE Folder (id VARCHAR(40) PRIMARY KEY,accountId VARCHAR(8),version INTEGER,data TEXT,path VARCHAR(255),role VARCHAR(255),createdAt DATETIME,updatedAt DATETIME)"
+ },
+ {
+  "type": "table",
+  "name": "Label",
+  "tbl_name": "Label",
+  "sql": "CREATE TABLE Label (id VARCHAR(40) PRIMARY KEY,accountId VARCHAR(8),version INTEGER,data TEXT,path VARCHAR(255),role VARCHAR(255),createdAt DATETIME,updatedAt DATETIME)"
+ },
+ {
+  "type": "table",
+  "name": "Message",
+  "tbl_name": "Message",
+  "sql": "CREATE TABLE Message (id VARCHAR(40) PRIMARY KEY,accountId VARCHAR(8),version INTEGER,data TEXT,headerMessageId VARCHAR(255),gMsgId VARCHAR(255),gThrId VARCHAR(255),subject VARCHAR(500),date DATETIME,draft TINYINT(1),unread TINYINT(1),starred TINYINT(1),replyToHeaderMessageId VARCHAR(255),threadId VARCHAR(40))"
+ },
+ {
+  "type": "table",
+  "name": "MessageBody",
+  "tbl_name": "MessageBody",
+  "sql": "CREATE TABLE `MessageBody` (id VARCHAR(40) PRIMARY KEY, `value` TEXT, fetchedAt DATETIME)"
+ },
+ {
+  "type": "table",
+  "name": "MessageFolder",
+  "tbl_name": "MessageFolder",
+  "sql": "CREATE TABLE MessageFolder (rowid INTEGER PRIMARY KEY,accountId VARCHAR(8) NOT NULL,messageId VARCHAR(40) NOT NULL,folderId VARCHAR(40) NOT NULL,remoteUID INTEGER NOT NULL,unread TINYINT(1) NOT NULL DEFAULT 0,starred TINYINT(1) NOT NULL DEFAULT 0,draft TINYINT(1) NOT NULL DEFAULT 0,remoteXGMLabels TEXT NOT NULL DEFAULT '[]',pendingFolderId VARCHAR(40) NULL)"
+ },
+ {
+  "type": "table",
+  "name": "MessageOrphan",
+  "tbl_name": "MessageOrphan",
+  "sql": "CREATE TABLE MessageOrphan (messageId VARCHAR(40) PRIMARY KEY,accountId VARCHAR(8) NOT NULL,since INTEGER NOT NULL)"
+ },
+ {
+  "type": "table",
+  "name": "ModelPluginMetadata",
+  "tbl_name": "ModelPluginMetadata",
+  "sql": "CREATE TABLE `ModelPluginMetadata` (id VARCHAR(40), `accountId` VARCHAR(8), `objectType` VARCHAR(15), `value` TEXT, `expiration` DATETIME, PRIMARY KEY (`value`, `id`))"
+ },
+ {
+  "type": "table",
+  "name": "Task",
+  "tbl_name": "Task",
+  "sql": "CREATE TABLE `Task` (id VARCHAR(40) PRIMARY KEY, version INTEGER, data BLOB, accountId VARCHAR(8), status VARCHAR(255))"
+ },
+ {
+  "type": "table",
+  "name": "Thread",
+  "tbl_name": "Thread",
+  "sql": "CREATE TABLE Thread (id VARCHAR(42) PRIMARY KEY,accountId VARCHAR(8),version INTEGER,data TEXT,gThrId VARCHAR(20),subject VARCHAR(500),snippet VARCHAR(255),unread INTEGER,starred INTEGER,firstMessageTimestamp DATETIME,lastMessageTimestamp DATETIME,lastMessageReceivedTimestamp DATETIME,lastMessageSentTimestamp DATETIME,inAllMail TINYINT(1),isSearchIndexed TINYINT(1),participants TEXT,hasAttachments INTEGER)"
+ },
+ {
+  "type": "table",
+  "name": "ThreadCategory",
+  "tbl_name": "ThreadCategory",
+  "sql": "CREATE TABLE ThreadCategory (id VARCHAR(40),value VARCHAR(40),inAllMail TINYINT(1),unread TINYINT(1),lastMessageReceivedTimestamp DATETIME,lastMessageSentTimestamp DATETIME,PRIMARY KEY (id, value))"
+ },
+ {
+  "type": "table",
+  "name": "ThreadCounts",
+  "tbl_name": "ThreadCounts",
+  "sql": "CREATE TABLE `ThreadCounts` (`categoryId` TEXT PRIMARY KEY, `unread` INTEGER, `total` INTEGER)"
+ },
+ {
+  "type": "table",
+  "name": "ThreadReference",
+  "tbl_name": "ThreadReference",
+  "sql": "CREATE TABLE ThreadReference (threadId VARCHAR(42),accountId VARCHAR(8),headerMessageId VARCHAR(255),PRIMARY KEY (threadId, accountId, headerMessageId))"
+ },
+ {
+  "type": "table",
+  "name": "ThreadSearch",
+  "tbl_name": "ThreadSearch",
+  "sql": "CREATE VIRTUAL TABLE `ThreadSearch` USING fts5(tokenize = 'porter unicode61', content_id UNINDEXED, subject, to_, from_, categories, body)"
+ },
+ {
+  "type": "table",
+  "name": "ThreadSearch_config",
+  "tbl_name": "ThreadSearch_config",
+  "sql": "CREATE TABLE 'ThreadSearch_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+ },
+ {
+  "type": "table",
+  "name": "ThreadSearch_content",
+  "tbl_name": "ThreadSearch_content",
+  "sql": "CREATE TABLE 'ThreadSearch_content'(id INTEGER PRIMARY KEY, c0, c1, c2, c3, c4, c5)"
+ },
+ {
+  "type": "table",
+  "name": "ThreadSearch_data",
+  "tbl_name": "ThreadSearch_data",
+  "sql": "CREATE TABLE 'ThreadSearch_data'(id INTEGER PRIMARY KEY, block BLOB)"
+ },
+ {
+  "type": "table",
+  "name": "ThreadSearch_docsize",
+  "tbl_name": "ThreadSearch_docsize",
+  "sql": "CREATE TABLE 'ThreadSearch_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+ },
+ {
+  "type": "table",
+  "name": "ThreadSearch_idx",
+  "tbl_name": "ThreadSearch_idx",
+  "sql": "CREATE TABLE 'ThreadSearch_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+ },
+ {
+  "type": "table",
+  "name": "_State",
+  "tbl_name": "_State",
+  "sql": "CREATE TABLE `_State` (id VARCHAR(40) PRIMARY KEY, value TEXT)"
+ }
+]

@@ -1,0 +1,14 @@
+{
+  "after_edit": "BEGIN:VCARD\r\nVERSION:4.0\r\nUID:grp-v4\r\nKIND:group\r\nFN:Renamed\r\nN:Renamed\r\nMEMBER:urn:uuid:m-1\r\nMEMBER:urn:uuid:added-1\r\nMEMBER:urn:uuid:f-1\r\nEND:VCARD\r\n",
+  "email": "",
+  "emails": [],
+  "is_group": true,
+  "member_ids": [
+    "m-1",
+    "m-2"
+  ],
+  "name": "Book club",
+  "serialized": "BEGIN:VCARD\r\nVERSION:4.0\r\nUID:grp-v4\r\nKIND:group\r\nFN:Book club\r\nN:Book club;;;;\r\nMEMBER:urn:uuid:m-1\r\nMEMBER:urn:uuid:m-2\r\nEND:VCARD\r\n",
+  "uid": "grp-v4",
+  "version": "4.0"
+}

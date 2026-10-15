@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.gif",
+      "inline": false,
+      "partId": "2.2",
+      "safeFilename": "Unnamed Image.gif",
+      "sha256": "c00f7c880d74091b4c048c571d45d6ab58f06a12555c6e8b693e8299c9fd1fa4",
+      "size": 4185,
+      "uniqueId": "2"
+    }
+  ],
+  "from": [
+    [
+      "Nathaniel Borenstein",
+      "nsb"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "EdV2eZy0M2Yt5gpZkI@thumper.bellcore.com",
+  "plaintext": true,
+  "searchTextLength": 292,
+  "snippet": "Actually, I can show you precisely what it looked like, if you can display the \nimage:\n\n\n\n\nNote that the implementation currently warns you what character set it is \nusing, since it can't really tell if that corresponds to the character set \nexpected by your terminal or terminal window....\n\n",
+  "subject": "PS -- Re: RFC-HDR care and feeding"
+}

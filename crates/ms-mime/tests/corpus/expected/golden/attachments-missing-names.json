@@ -1,0 +1,79 @@
+{
+  "attachmentCount": 5,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pdf",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "ef381f48344a471dcadc1393a10d82e85dcfaca7c500a6e17f48f358b701c1f4",
+      "size": 15,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/jpeg",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.jpg",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "Unnamed Image.jpg",
+      "sha256": "b9f567aa37541344f8b402eb861816d709bac4ae831943725b1f02a2222fe05e",
+      "size": 12,
+      "uniqueId": "2"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/calendar",
+      "countsAsAttachment": true,
+      "filename": "Event.ics",
+      "inline": false,
+      "partId": "4",
+      "safeFilename": "Event.ics",
+      "sha256": "cc71a4dcb22652479976c87db59996eacdc13c236288f9ea2067a062c79b46f3",
+      "size": 311,
+      "uniqueId": "3"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "5",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "ae4b3280e56e2faf83f414a6e3dabe9d5fbe18976544c05fed121accb85b53fc",
+      "size": 3,
+      "uniqueId": "4"
+    },
+    {
+      "contentId": null,
+      "contentType": "message/rfc822",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "6",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "049f3c50a217654e9dbc90b12850e982a27e12d1b82fb58541afce05663f9ff4",
+      "size": 24,
+      "uniqueId": "5"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "384e9809c0f7@example.org",
+  "plaintext": true,
+  "searchTextLength": 18,
+  "snippet": "See attachments.\r\n",
+  "subject": "Unnamed attachments"
+}

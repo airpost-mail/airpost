@@ -1,0 +1,6 @@
+BEGIN:VCARD
+VERSION:3.0
+UID:n-only
+N:Lovelace;Ada;King;Countess;of Lovelace
+EMAIL:ada@example.org
+END:VCARD

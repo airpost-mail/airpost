@@ -1,1 +1,5 @@
-mailsync bin crate (CLI, modes, stdin loop, threads). Created in phase P0 of docs/engine-port-plan.md.
+# mailsync
+
+The Tern mail sync engine, a Rust port of Mailspring-Sync. One process per account, driven
+by the desktop client over stdin/stdout. See `docs/engine-port-plan.md` for the plan and
+`CLAUDE.md` here for conventions and commands. The black-box test harness is in `test/`.

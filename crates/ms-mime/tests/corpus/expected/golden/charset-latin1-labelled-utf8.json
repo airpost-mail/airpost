@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "8cbcd2e6ffdc@example.org",
+  "plaintext": true,
+  "searchTextLength": 60,
+  "snippet": "Il était une fois une forêt où vivait un garçon très naïf.\r\n",
+  "subject": "Mislabelled latin-1"
+}

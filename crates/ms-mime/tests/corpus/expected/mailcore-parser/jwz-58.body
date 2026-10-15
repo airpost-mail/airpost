@@ -1,0 +1,35 @@
+On 11 Jul 1996, Shlomi Fish wrote:
+
+> I'm trying to write a CGI script (or any other program for that matter) that
+> sends a Hebrew message by calling sendmail. Sendmail refuses to send it once
+> I finished piping it to it. Here's the header of the message (think that I
+> write it on the keyboard after running sendmail):
+> 
+> From: nobody@medusa.cortext.co.il
+> To: shlomi@medusa
+> Subject: My Subject
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=ISO-8859-8
+> Content-Transfer-Encoding: Base64
+> 
+> < The message's body encoded in Base64 >
+
+Message seems to look good. What parameters do you use on sendmail's
+command line? -t for taking the addresses of recepients from the headers
+of the message? And what is the error message? Also, have you tried -v
+flag to turn sendmail into verbose mode to tell you more (and running it
+interactively)?
+
+I hope some of these suggestions may help.
+
+V. S.
+
+P. S.  If you have an 8BITMIME sendmail (Berkeley 8.7.*), you may try it
+in that mode and use Content-Transfer-Encoding: 8bit and put Hebrew in
+8-bit. Sendmail itself encode the data if the recepient is not able to
+protect them from corruption.
+
+Vladimír Solnický, ÚTIA AV ČR, Pod vodárenskou věží 4,
+182 08 Praha 8-Libeň, +42 2 6605/2364, telefax: +42 2 6884677,
+vs@utia.cas.cz, http://www.utia.cas.cz/user_data/vs/vs-home-cz.html
+

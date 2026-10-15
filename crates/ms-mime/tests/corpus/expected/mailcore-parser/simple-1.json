@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      null,
+      "fejj@gnome.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": null,
+  "plaintext": true,
+  "searchTextLength": 175,
+  "snippet": "Hello world.\n\nmultipart/mixed; boundary=\"x\"\n  multipart/mixed; boundary=\"xy\"\n     multipart/mixed; boundary=\"xyz\"\n        text/plain                         <-- You are here.\n",
+  "subject": "this'll probably break a lot of mime parsers"
+}

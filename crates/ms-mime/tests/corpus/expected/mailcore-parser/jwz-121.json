@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "smime.p7m",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "smime.p7m",
+      "sha256": "871a885b7c07a2809c0c5ab8e66ad00625529dd5303ca9516cd3d4416ba6faf8",
+      "size": 385,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Jamie Zawinski",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "33556759.E69CC032@netscape.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "encrypted"
+}

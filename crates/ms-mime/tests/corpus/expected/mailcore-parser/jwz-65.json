@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Patrik F¥dltstr¥vm",
+      "paf@nada.kth.se"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "Pine.3.80.9211151559.B2317-e100000@joker.nada.kth.se",
+  "plaintext": true,
+  "searchTextLength": 5000,
+  "snippet": "At last I think I have got pine working correctly again, so I'll\nmake a new attemt to send the complete character set ISO-8859-1\nin a MIME letter in Quoted-Printable.\n\nI'm sorry for the delay...\n\nN.B. Because of a bug in Pine, which is in the part that parses headers,\n     the From: and Reply-To: header fields can contain strange combinations\n     of Â¥ and | because I have some eight bit characte",
+  "subject": "MIME letter with ISO-8859-1"
+}

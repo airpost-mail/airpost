@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav" xmlns:CS="http://calendarserver.org/ns/"><D:response><D:href>/dav/addressbooks/user/alice@fastmail.com/Default/0b5c2f2a-1.vcf</D:href><D:propstat><D:prop><D:getetag>"a1b2c3"</D:getetag><C:address-data>BEGIN:VCARD
+VERSION:3.0
+UID:0b5c2f2a-1
+N:O'Brien;Seán;;;
+FN:Seán O'Brien
+EMAIL;TYPE=WORK:sean@example.ie
+EMAIL;TYPE=HOME:sean.home@example.ie
+ORG:Example\, Ltd.
+NOTE:Met at the conference\nBring the slides
+PRODID:-//Fastmail//Contacts//EN
+END:VCARD
+</C:address-data></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response><D:response><D:href>/dav/addressbooks/user/alice@fastmail.com/Default/0b5c2f2a-2.vcf</D:href><D:propstat><D:prop><D:getetag>"d4e5f6"</D:getetag><C:address-data>BEGIN:VCARD
+VERSION:3.0
+UID:0b5c2f2a-2
+N:;;;;
+FN:
+EMAIL:nobody@example.org
+END:VCARD
+</C:address-data></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response><D:response><D:href>/dav/addressbooks/user/alice@fastmail.com/Default/group-friends.vcf</D:href><D:propstat><D:prop><D:getetag>"g7h8"</D:getetag><C:address-data>BEGIN:VCARD
+VERSION:3.0
+UID:group-friends
+N:Friends
+FN:Friends
+X-ADDRESSBOOKSERVER-KIND:group
+X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:0b5c2f2a-1
+X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:0b5c2f2a-2
+END:VCARD
+</C:address-data></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response></D:multistatus>

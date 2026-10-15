@@ -1,0 +1,75 @@
+name: metadata-expiration-send-later
+description: >
+  The client schedules a local draft with `send-later` metadata on the Message. The engine
+  is quit before the time comes and relaunched after it has passed: the expiration lives in
+  ModelPluginMetadata, so the new process streams the draft as a `metadata-expiration`
+  delta (after its 15 s start delay, never before the scheduled time), which is what makes
+  the client send it. It keeps re-sending until the client clears the metadata; a message
+  with metadata but no expiration is never sent.
+source: "MetadataExpirationWorker.cpp; MailModel::afterSave; client send-later plugin"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 2}
+  Drafts: {special_use: "\\Drafts"}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "send-later-1@example.test"
+        subject: "Scheduled"
+        body: "<p>later</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Someone", email: "someone@example.org"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["send-later-1@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 20}}
+    as: schedule
+  - wait: {task: schedule, timeout: 30}
+  # Metadata without an expiration (a read receipt) is stored but never expires.
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {mailbox: INBOX, uids: [1]}}
+      pluginId: open-tracking
+      value: {uid: "tracking-1", open_count: 0}
+    as: tracking
+  - wait: {task: tracking, timeout: 30}
+  - assert:
+      metadata:
+        - {messages: {header_message_ids: ["send-later-1@example.test"]}, plugin: send-later, expiration: true}
+        - {messages: {mailbox: INBOX, uids: [1]}, plugin: open-tracking, expiration: false}
+  - restart:
+      wait: false
+      before:
+        - wait: {seconds: 25}
+  - wait: {delta: {class: Message, type: metadata-expiration, count: 1}, timeout: 90}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["send-later-1@example.test"]}}
+      pluginId: send-later
+      value: {expiration: null}
+    as: sent
+  - wait: {task: sent, timeout: 30}
+  - mark: cleared
+  - wait: {seconds: 25}
+expect:
+  metadata_expiration:
+    - {messages: {header_message_ids: ["send-later-1@example.test"]}, plugin: send-later, count: {min: 1}}
+    - {messages: {mailbox: INBOX, uids: [1, 2]}, count: 0}
+    - {messages: {header_message_ids: ["send-later-1@example.test"]}, since: cleared, count: 0}
+  metadata:
+    - {messages: {header_message_ids: ["send-later-1@example.test"]}, plugin: send-later, expiration: false}
+    - {messages: {mailbox: INBOX, uids: [1]}, plugin: open-tracking, expiration: false}
+  running: true

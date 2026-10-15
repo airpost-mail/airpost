@@ -1,0 +1,15 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Plain text
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <f39a0720a929@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Hello Bob,
+
+The meeting moved to   Thursday.
+
+-- 
+Alice

@@ -1,0 +1,1 @@
+MHTML test > This is a test of multipart/related using only Content-ID headers, and the cid: URL type. A picture of a frog in a cage should appear below: (Not a picture of jwz.) Nothing should appear after this line.

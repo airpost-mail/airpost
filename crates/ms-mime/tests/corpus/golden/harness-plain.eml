@@ -1,0 +1,15 @@
+Return-Path: <bob@example.net>
+Delivered-To: test@example.test
+Message-ID: <harness-1-ca3b8317@example.test>
+Date: Mon, 12 Oct 2026 01:12:23 +0000
+From: Bob Builder <bob@example.net>
+To: Harness Test <test@example.test>
+Subject: Message 1
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+This is the body of message 1.
+
+-- 
+Bob Builder

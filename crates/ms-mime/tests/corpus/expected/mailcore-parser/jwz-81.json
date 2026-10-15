@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/jpeg",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.jpg",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Image.jpg",
+      "sha256": "3c3132440912f1f1cfd8e795587852aaaddea31c9b0e3d6949c1d8c35c7f9096",
+      "size": 7930,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Jamie Zawinski",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3341AE7C.665F552F.8@netscape.com",
+  "plaintext": false,
+  "searchTextLength": 315,
+  "snippet": "MHTML test > This is a test of multipart/related using Content-Location headers: the IMG reference is to an absolute URL, but it should come out of the message (the frog) rather than off the net (jwz.) A picture of a frog in a cage should appear below: (Not a picture of jwz.) Nothing should appear after this line.",
+  "subject": "multipart/related MHTML test case"
+}

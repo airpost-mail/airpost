@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": "sig@example.org",
+      "contentType": "image/gif",
+      "countsAsAttachment": false,
+      "filename": "sig.gif",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "sig.gif",
+      "sha256": "1f19970f056cd116a5fe3c02422c1ee1ac827136df470b5c89af492620512aa4",
+      "size": 14,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "unref.gif",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "unref.gif",
+      "sha256": "1f19970f056cd116a5fe3c02422c1ee1ac827136df470b5c89af492620512aa4",
+      "size": 14,
+      "uniqueId": "2"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "054a6003738e@example.org",
+  "plaintext": false,
+  "searchTextLength": 26,
+  "snippet": "Inline without disposition",
+  "subject": "cid referenced"
+}

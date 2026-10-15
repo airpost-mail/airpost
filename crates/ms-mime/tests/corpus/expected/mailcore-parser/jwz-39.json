@@ -1,0 +1,79 @@
+{
+  "attachmentCount": 5,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "one.gif",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "one.gif",
+      "sha256": "116fc8991dd3111416f73d80d6fe140adb9a0ebca84b400efd57d13e79cda283",
+      "size": 339,
+      "uniqueId": "0"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "two.gif",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "two.gif",
+      "sha256": "b3073c1054e9cb75ca05e2f2ccc22e42a4f4d35d5e733c3ac9808000761558db",
+      "size": 358,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "three.gif",
+      "inline": false,
+      "partId": "4",
+      "safeFilename": "three.gif",
+      "sha256": "69ca9a24ff3d11ebd27a5d086c4574ea2cbf8959330dcc357ee4687036d204ef",
+      "size": 390,
+      "uniqueId": "2"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "four.gif",
+      "inline": false,
+      "partId": "5",
+      "safeFilename": "four.gif",
+      "sha256": "0dc1176b085e176abf6e1af1343ab5e3b877e85724c95ba56133de4a777ee7b2",
+      "size": 369,
+      "uniqueId": "3"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/html",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "8",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "12c18bfbfeac919209e903d736da94e3a8acca06f3c17c3cc60bd4898133abc3",
+      "size": 52,
+      "uniqueId": "4"
+    }
+  ],
+  "from": [
+    [
+      "Jamie Zawinski",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "31C105ED.41C6@netscape.com",
+  "plaintext": false,
+  "searchTextLength": 77,
+  "snippet": "This is the first attached message. This is the second attached message. Foo!",
+  "subject": "attached image cache test (test 1: attachment disposition)"
+}

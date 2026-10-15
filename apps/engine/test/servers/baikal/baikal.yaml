@@ -1,0 +1,25 @@
+# Baikal configuration for the mailsync integration harness. Basic auth because the engine
+# authenticates DAV with the account's IMAP credentials (DAVWorker getAuthorizationHeader).
+system:
+    configured_version: '0.10.1'
+    timezone: 'UTC'
+    card_enabled: true
+    cal_enabled: true
+    invite_from: ''
+    dav_auth_type: 'Basic'
+    admin_passwordhash: '142ff212f9ed2f8f8b5e7b96f6929f78'   # admin / admin
+    failed_access_message: 'user %u authentication failure for Baikal'
+    auth_realm: BaikalDAV
+    base_uri: ''
+database:
+    sqlite_file: '/var/www/baikal/Specific/db/db.sqlite'
+    backend: 'sqlite'
+    mysql_host: ''
+    mysql_dbname: ''
+    mysql_username: ''
+    mysql_password: ''
+    encryption_key: 'harness-not-a-secret'
+    pgsql_host: ''
+    pgsql_dbname: ''
+    pgsql_username: ''
+    pgsql_password: ''

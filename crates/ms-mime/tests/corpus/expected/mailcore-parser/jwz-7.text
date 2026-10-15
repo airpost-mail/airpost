@@ -1,0 +1,40 @@
+Hi.  I received a message from a member of i-headers mainling list,
+as follows:
+
+In message <9206120510.AA06898@atrai.sala.sony.co.jp> on 06/12/92(14:07:02)
+you taka@fxis.fujixerox.co.jp wrote:
+ |FXISの神戸です。MIMEとヘッダのエンコードに関するRFCが出ました。
+ |RFC1343は、ほとんどmetamailみたい...。
+ |
+ |RFC1341(.txt/.ps)
+ |
+ |	MIME (Multipurpose Internet Mail Extensions):
+ |	Mechanisms for Specifying and Describing the Format of
+ |	Internet Message Bodies
+ |
+ |RFC1342(.txt)
+ |
+ |	Representation of Non-ASCII Text in Internet Message Headers
+ |
+ |RFC1343(.txt/.ps)
+ |
+ |	A User Agent Configuration Mechanism
+ |		For Multimedia Mail Format Information
+ |
+ |RFC1344(.txt/.ps)
+ |
+ |	Implications of MIME for Internet Mail Gateways
+ |
+ |--
+ |神戸　隆博（かんべ　たかひろ）		FXIS / Network Team.
+ |					taka@fxis.fujixerox.co.jp
+
+He says that MIME has got RFC numbers and RFC1343 is almost about
+Metamail.  Where can I get these official RFCs?
+
+--
+Yutaka Sato <ysato@etl.go.jp>
+Information Base Section
+ELECTROTECHNICAL LABORATORY
+1-1-4 Umezono, Tsukuba, Ibaraki, 305 Japan
+

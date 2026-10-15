@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "3effb0003a0042974738bd0dc8cffa45b9833c94bb2908463f61c1eafa39feef",
+      "size": 1569,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "Ray2@FrontierTech.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "31AB36CC-00000001@rock106.FrontierTech.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Frontier Technologies testing, here's my cert"
+}

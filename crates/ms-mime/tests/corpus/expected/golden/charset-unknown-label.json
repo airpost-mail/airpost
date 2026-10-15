@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "440303e6c4f4@example.org",
+  "plaintext": true,
+  "searchTextLength": 68,
+  "snippet": "Привет, как дела? Это тестовое сообщение в кодировке windows-1251.\r\n",
+  "subject": "Unknown charset label"
+}

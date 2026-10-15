@@ -1,0 +1,49 @@
+name: metadata-expiration-snooze
+description: >
+  The client snoozes a thread by saving `thread-snooze` metadata whose value carries an
+  `expiration` (SyncbackMetadataTask). The engine stores it on the Thread and indexes the
+  expiration in ModelPluginMetadata; once that time passes, the metadataExpiration thread
+  streams the Thread as a `metadata-expiration` delta, which is what makes the client
+  unsnooze it. Nothing is sent early, other threads are never sent, and once the client
+  clears the metadata (value {}) no further expiration deltas arrive.
+source: "MetadataExpirationWorker.cpp (15 s start delay, expiration <= now, re-emit until cleared); MailModel::afterSave (ModelPluginMetadata); client thread-snooze plugin"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 25}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - assert:
+      metadata:
+        - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+      metadata_expiration:
+        - {threads: {mailbox: INBOX, uids: [1]}, count: 0}
+  - wait: {delta: {class: Thread, type: metadata-expiration, count: 1}, timeout: 90}
+  # What the client does on that delta: drop the snooze.
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {}
+    as: unsnooze
+  - wait: {task: unsnooze, timeout: 30}
+  - mark: cleared
+  - wait: {seconds: 25}
+expect:
+  metadata_expiration:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, count: {min: 1}}
+    - {threads: {mailbox: INBOX, uids: [2, 3]}, count: 0}
+    - {threads: {mailbox: INBOX, uids: [1]}, since: cleared, count: 0}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, absent: true}
+  sql:
+    - {db: main, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 0}
+  db_matches_server: {}
+  running: true

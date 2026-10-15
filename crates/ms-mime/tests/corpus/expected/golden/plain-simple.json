@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "f39a0720a929@example.org",
+  "plaintext": true,
+  "searchTextLength": 62,
+  "snippet": "Hello Bob,\r\n\r\nThe meeting moved to   Thursday.\r\n\r\n-- \r\nAlice\r\n",
+  "subject": "Plain text"
+}

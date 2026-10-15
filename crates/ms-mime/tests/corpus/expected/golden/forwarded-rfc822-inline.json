@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "eec4f3257a0b@example.org",
+  "plaintext": false,
+  "searchTextLength": 27,
+  "snippet": "Forwarding this. Inner HTML",
+  "subject": "Fwd: Original message"
+}

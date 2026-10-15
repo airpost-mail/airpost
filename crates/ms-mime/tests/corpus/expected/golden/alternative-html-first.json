@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9cb452b06d7d@example.org",
+  "plaintext": false,
+  "searchTextLength": 10,
+  "snippet": "HTML first",
+  "subject": "Alternative, HTML first"
+}

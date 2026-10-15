@@ -1,0 +1,20 @@
+[package]
+name = "ms-sync"
+description = "The mail sync workers: background scans, foreground IDLE, mail processing, metadata and calendar/contact threads"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+ms-core.workspace = true
+ms-store.workspace = true
+ms-providers.workspace = true
+ms-imap.workspace = true
+ms-mime.workspace = true
+ms-net.workspace = true
+ms-dav.workspace = true
+serde_json.workspace = true
+tracing.workspace = true

@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "746416d85a5d@example.org",
+  "plaintext": true,
+  "searchTextLength": 15,
+  "snippet": "こんにちは、世界\r\n2行目\r\n",
+  "subject": "こんにちは"
+}

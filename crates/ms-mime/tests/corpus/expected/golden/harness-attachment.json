@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "report.pdf",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "report.pdf",
+      "sha256": "b0ee89e82e8c8fcdc6036ecb51177746d7fa383cf152c04f837df8b45ac22c5c",
+      "size": 260,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Dave Dev",
+      "dave@dev.example"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "harness-3-e480dd9e@example.test",
+  "plaintext": true,
+  "searchTextLength": 49,
+  "snippet": "This is the body of message 3.\r\n\r\n-- \r\nDave Dev\r\n",
+  "subject": "Message 3"
+}

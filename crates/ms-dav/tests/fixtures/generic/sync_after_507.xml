@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<multistatus xmlns="DAV:"><response><href>/cal/b.ics</href><propstat><prop><getetag>"2"</getetag></prop><status>HTTP/1.1 200 OK</status></propstat></response><sync-token>tok-2</sync-token></multistatus>

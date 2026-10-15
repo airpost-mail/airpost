@@ -1,0 +1,11 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: S/MIME encrypted
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <a05ee95f22d8@example.org>
+MIME-Version: 1.0
+Content-Type: application/pkcs7-mime; smime-type=enveloped-data; name="smime.p7m"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="smime.p7m"
+
+MIAGCSqGSIb3DQEHA2Zha2U=

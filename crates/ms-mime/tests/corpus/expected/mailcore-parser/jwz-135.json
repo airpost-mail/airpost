@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "x-sun-attachment/unknown",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "52c8870d158f6bae4fe16bef66caa732b2d1fe09ad6a5a3900f0ee09329894d9",
+      "size": 1401,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Jean-Philippe Favreau",
+      "favreau@APM2.NCSL.NIST.GOV"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9504261902.AA20642@apm2.ncsl.nist.gov",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Federal EDI - 836 IC open for comments"
+}

@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Mail Delivery Subsystem",
+      "MAILER-DAEMON@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "199504270008.RAA17252@neon.netscape.com",
+  "plaintext": true,
+  "searchTextLength": 3737,
+  "snippet": "The original message was received at Wed, 26 Apr 1995 17:08:30 -0700\nfrom cronos.mcom.com [198.93.94.116]\n\n   ----- The following addresses had delivery problems -----\n<drwebb@maine.link.net>  (unrecoverable error)\n\n   ----- Transcript of session follows -----\n550 <drwebb@maine.link.net>... Host unknown (Name server: maine.link.net: host not found)\n\n   ----- Original message follows -----\n>drwebb@",
+  "subject": "Returned mail: Host unknown (Name server: maine.link.net: host not found)"
+}

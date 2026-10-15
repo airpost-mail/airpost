@@ -1,0 +1,11 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: MSMail priority
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <a2ad838dc8a9@example.org>
+MIME-Version: 1.0
+X-Priority: urgent
+X-MSMail-Priority: High
+Content-Type: text/plain
+
+Fallback to X-MSMail-Priority.

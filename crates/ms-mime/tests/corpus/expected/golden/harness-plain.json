@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Bob Builder",
+      "bob@example.net"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "harness-1-ca3b8317@example.test",
+  "plaintext": true,
+  "searchTextLength": 52,
+  "snippet": "This is the body of message 1.\r\n\r\n-- \r\nBob Builder\r\n",
+  "subject": "Message 1"
+}

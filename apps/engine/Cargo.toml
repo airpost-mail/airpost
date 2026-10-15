@@ -1,0 +1,36 @@
+[package]
+name = "mailsync"
+description = "The Tern mail sync engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "mailsync"
+path = "src/main.rs"
+
+[dependencies]
+ms-core.workspace = true
+ms-store.workspace = true
+ms-providers.workspace = true
+ms-imap.workspace = true
+ms-mime.workspace = true
+ms-smtp.workspace = true
+ms-net.workspace = true
+ms-dav.workspace = true
+ms-sync.workspace = true
+ms-tasks.workspace = true
+rustls.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+regex.workspace = true
+tempfile.workspace = true
+rusqlite.workspace = true

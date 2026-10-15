@@ -1,0 +1,25 @@
+# Radicale configuration for the mailsync integration harness.
+[server]
+hosts = 0.0.0.0:5232
+
+[auth]
+# The engine authenticates DAV with the account's IMAP credentials (DAVWorker
+# getAuthorizationHeader: Basic imap_username:imap_password), so the user is the harness's
+# IMAP user.
+type = htpasswd
+htpasswd_filename = /etc/radicale/users
+htpasswd_encryption = plain
+delay = 0
+
+[rights]
+type = owner_only
+
+[storage]
+filesystem_folder = /data/collections
+
+[web]
+type = none
+
+[logging]
+level = info
+mask_passwords = True

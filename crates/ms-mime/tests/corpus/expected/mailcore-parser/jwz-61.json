@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Keith Moore",
+      "moore@cs.utk.edu"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "199508140639.CAA17658@wilma.cs.utk.edu",
+  "plaintext": true,
+  "searchTextLength": 1456,
+  "snippet": "> Thanks for the pointers to mpack/munpack - but we are left with a\n> mystery. We were emailed a quoted printable message containing an MD5\n> signature by Yanling Qi using \"CDE dtmail\". However, although our MD5\n> calculations agree with mpack/munpack, I can't get either to agree with\n> the Content-MD5 header on that message. (However, munpack won't directly\n> decode the message so I have to decod",
+  "subject": "Re: MIME Content-MD5 header"
+}

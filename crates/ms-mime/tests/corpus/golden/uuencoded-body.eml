@@ -1,0 +1,13 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: uuencoded text
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <9a409b207b68@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain
+Content-Transfer-Encoding: x-uuencode
+
+begin 644 hello.txt
++2&5L;&\@=V]R;&0*
+`
+end

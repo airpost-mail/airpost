@@ -1,0 +1,26 @@
+> Thanks for the pointers to mpack/munpack - but we are left with a
+> mystery. We were emailed a quoted printable message containing an MD5
+> signature by Yanling Qi using "CDE dtmail". However, although our MD5
+> calculations agree with mpack/munpack, I can't get either to agree with
+> the Content-MD5 header on that message. (However, munpack won't directly
+> decode the message so I have to decode it first and see what MD5 mpack
+> puts on it when its re-encoded!).
+>
+> We are uncertain where the problem lies, so we would be grateful for
+> some more examples of quoted printable text with Content-MD5 headers.
+
+My guess would be that one of the implementations is not using the
+canonical form for end-of-line in text/plain.  The newlines in a
+quoted-printable should be interpreted as 0D 0A for the purpose of
+computing MD5 (as for all other purposes).  I'll bet one or more of
+the implementations is treating it as either just 0D or just 0A, so
+you get a different MD5 value.
+
+Here is the same file encoded twice: one in quoted-printable, another
+in base64.  They have the same canonical form and thus the same MD5.
+See whether they get the same MD5 on your system:
+From moore@cs.utk.edu Mon Aug 14 01:49:07 1995
+From moore@cs.utk.edu Mon Aug 14 01:51:53 1995
+From moore@cs.utk.edu Mon Aug 14 02:17:26 1995From moore@cs.utk.edu Mon Aug 14 01:49:07 1995
+From moore@cs.utk.edu Mon Aug 14 01:51:53 1995
+From moore@cs.utk.edu Mon Aug 14 02:17:26 1995

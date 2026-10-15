@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "f91d5aa7378698429e20d0eb592454c1eeddffcb1f10d7578820213cd5b2f5fa",
+      "size": 2530,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "develop!nextmime@ebony@sblab.att.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9209252113.AA00975@ ebony",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "More richtext questions/comments"
+}

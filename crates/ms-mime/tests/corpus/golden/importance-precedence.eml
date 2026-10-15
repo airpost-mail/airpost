@@ -1,0 +1,12 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Importance wins
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <5a4e0184469d@example.org>
+MIME-Version: 1.0
+Importance: normal
+X-Priority: 1 (Highest)
+X-MSMail-Priority: High
+Content-Type: text/plain
+
+Importance is authoritative.

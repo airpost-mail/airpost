@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "ca79890081cf371de3946dac44569dd5b158f39a17813e3578ca42658d11d670",
+      "size": 3028,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Ron Craswell",
+      "ronc@deming.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "19960923092443.03af0217.in@peapod.deming.com",
+  "plaintext": true,
+  "searchTextLength": 152,
+  "snippet": "Here's a test multipart/signed message. Anyone who can read\nthis and verify the signature, please respond to me.\n\nThanks,\nRon Craswell\nDeming Software\n\n",
+  "subject": "multipart/signed test"
+}

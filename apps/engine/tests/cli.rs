@@ -1,0 +1,212 @@
+//! Black-box checks of the process contract (docs/engine-port-plan.md section 3) on the
+//! debug binary, which skips the argv[0] check.
+
+use std::io::{Read, Write};
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
+
+const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
+
+fn mailsync(config: &Path) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+    c.env("CONFIG_DIR_PATH", config)
+        .env("IDENTITY_SERVER", "http://127.0.0.1:9/unreachable")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    c
+}
+
+fn wait_with_timeout(child: &mut Child, timeout: Duration) -> Option<std::process::ExitStatus> {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
+        if let Some(status) = child.try_wait().unwrap() {
+            return Some(status);
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    None
+}
+
+fn wait_for_log(path: &Path, pattern: &regex::Regex, timeout: Duration) -> String {
+    let start = Instant::now();
+    loop {
+        let text = std::fs::read_to_string(path).unwrap_or_default();
+        if pattern.is_match(&text) {
+            return text;
+        }
+        assert!(start.elapsed() < timeout, "{pattern} not in log:\n{text}");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+#[test]
+fn migrate_creates_v12() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = mailsync(dir.path())
+        .args([
+            "--mode",
+            "migrate",
+            "--identity",
+            "null",
+            "--account",
+            ACCOUNT,
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.ends_with("\n{\"error\":null}"), "{stdout:?}");
+    assert!(out.stderr.is_empty());
+    let conn = rusqlite::Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let v: i32 = conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .unwrap();
+    assert_eq!(v, 12);
+    let engine: String = conn
+        .query_row("SELECT value FROM _State WHERE id = 'engine'", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(engine, "rust");
+}
+
+#[test]
+fn usage_and_config_dir() {
+    let out = Command::new(env!("CARGO_BIN_EXE_mailsync"))
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert!(String::from_utf8_lossy(&out.stdout).starts_with("USAGE:"));
+
+    let out = Command::new(env!("CARGO_BIN_EXE_mailsync"))
+        .env_remove("CONFIG_DIR_PATH")
+        .args(["--mode", "migrate"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+}
+
+#[test]
+fn account_handshake_and_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut child = mailsync(dir.path())
+        .args(["--mode", "sync", "--info", "me@example.com"])
+        .spawn()
+        .unwrap();
+    let mut stdout = child.stdout.take().unwrap();
+    let mut prompt = [0u8; 27];
+    stdout.read_exact(&mut prompt).unwrap();
+    assert_eq!(&prompt, b"\nWaiting for Account JSON:\n");
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"not json\n")
+        .unwrap();
+    let mut rest = String::new();
+    stdout.read_to_string(&mut rest).unwrap();
+    assert_eq!(child.wait().unwrap().code(), Some(1));
+    assert!(
+        rest.starts_with("\n{\"error\":\"Invalid Account JSON: "),
+        "{rest:?}"
+    );
+
+    let out = mailsync(dir.path())
+        .args(["--mode", "sync", "--account", r#"{"id":"x"}"#])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "\n{\"error\":\"Account is missing required fields:id or settings\"}"
+    );
+
+    let out = mailsync(dir.path())
+        .args(["--mode", "sync", "--account", ACCOUNT, "--identity", "{}"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "\n{\"error\":\"ErrorIdentityMissingFields\"}"
+    );
+}
+
+#[test]
+fn sync_starts_logs_and_takes_commands() {
+    let dir = tempfile::tempdir().unwrap();
+    let status = mailsync(dir.path())
+        .args(["--mode", "migrate"])
+        .output()
+        .unwrap()
+        .status;
+    assert!(status.success());
+
+    let mut child = mailsync(dir.path())
+        .args([
+            "--mode",
+            "sync",
+            "--verbose",
+            "--identity",
+            "null",
+            "--account",
+            ACCOUNT,
+        ])
+        .spawn()
+        .unwrap();
+    let log = dir.path().join("mailsync-c0ffee-harness.log");
+    let line = regex::Regex::new(
+        r"(?m)^\d+ \[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3}\] \[main\] \[info\] ------------- Starting Sync \(me@example.com\) ---------------\r?$",
+    )
+    .unwrap();
+    wait_for_log(&log, &line, Duration::from_secs(10));
+
+    let mut stdin = child.stdin.take().unwrap();
+    stdin
+        .write_all(b"garbage\n\n{\"type\":\"wake-workers\"}\n{\"type\":\"queue-task\",\"task\":{\"id\":\"t1\"}}\n{\"type\":\"need-bodies\",\"ids\":[\"m1\"]}\n")
+        .unwrap();
+    stdin.flush().unwrap();
+    let woke = regex::Regex::new(r"(?m)\[main\] \[info\] Waking all workers\.\.\.\r?$").unwrap();
+    wait_for_log(&log, &woke, Duration::from_secs(10));
+
+    assert!(child.try_wait().unwrap().is_none(), "exited early");
+    child.kill().unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+/// Takes 30 s: `cargo test -p mailsync -- --ignored`.
+#[test]
+#[ignore]
+fn exits_141_after_stdin_closes() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(mailsync(dir.path())
+        .args(["--mode", "migrate"])
+        .output()
+        .unwrap()
+        .status
+        .success());
+    let mut child = mailsync(dir.path())
+        .args(["--mode", "sync", "--identity", "null", "--account", ACCOUNT])
+        .spawn()
+        .unwrap();
+    drop(child.stdin.take());
+    let start = Instant::now();
+    let status = wait_with_timeout(&mut child, Duration::from_secs(45)).expect("did not exit");
+    assert_eq!(status.code(), Some(141));
+    assert!(start.elapsed() >= Duration::from_secs(30));
+    let mut stderr = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr)
+        .unwrap();
+    assert!(stderr.is_empty(), "{stderr}");
+}

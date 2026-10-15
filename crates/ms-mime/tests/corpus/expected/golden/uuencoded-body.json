@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9a409b207b68@example.org",
+  "plaintext": true,
+  "searchTextLength": 11,
+  "snippet": "Hello world",
+  "subject": "uuencoded text"
+}

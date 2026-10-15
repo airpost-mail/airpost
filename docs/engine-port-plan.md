@@ -185,11 +185,11 @@ Python harness from `legacy/mailsync-cpp/test/` to `apps/engine/test/`.
 | `ms-core` | `SyncException`, `constants.h` tunables, ids, base58, logging sink, thread names, `Clock` | sha2, bs58, tracing |
 | `ms-store` | `MailStore`, `MailStoreTransaction`, `Query`, `DeltaStream`, models, `Placement`, DDL | rusqlite, serde_json |
 | `ms-providers` | Every host/greeting/capability quirk check, folder-role tables (`COMMON_FOLDER_NAMES`), OAuth endpoints | none |
-| `ms-imap` | `IMAPSession` + libetpan IMAP | async-imap, imap-proto, tokio, rustls, rustls-platform-verifier |
+| `ms-imap` | `IMAPSession` + libetpan IMAP | own parser and command layer (`docs/spikes/imap.md`), tokio, rustls, rustls-platform-verifier, async-compression |
 | `ms-mime` | `MessageParser`, `HTMLRenderer`, header decoding, `Attachment`, `MessageBuilder`, `flattenHTML` | mail-parser, mail-builder, encoding_rs, chardetng, html5ever |
 | `ms-smtp` | `SMTPSession` | lettre |
 | `ms-net` | `NetworkRequestUtils`, `XOAuth2TokenManager`, Google People client, `MetadataBackend` | reqwest |
-| `ms-dav` | `DAVWorker` protocol side, `DavXML`, `DAVUtils`, `VCard`, icalendarlib | reqwest, roxmltree or quick-xml, calcard, hickory-resolver |
+| `ms-dav` | `DAVWorker` protocol side, `DavXML`, `DAVUtils`, `VCard`, icalendarlib | reqwest, roxmltree, calcard, hickory-resolver |
 | `ms-sync` | `SyncWorker`, `MailProcessor`, `MailboxModel` impls, `MetadataExpirationWorker` | the crates above |
 | `ms-tasks` | `TaskProcessor` | the crates above |
 | `mailsync` (bin) | `main.cpp`: CLI, modes, stdin loop, thread startup, `test`, `install-check`, `import-legacy` | everything |
@@ -265,16 +265,16 @@ a fake-server personality in `test/fakeimap/personalities.py` that exercises it.
 | Provider / server | Profile content | C++ evidence |
 |---|---|---|
 | Gmail (detected by `X-GM-EXT-1`) | `mailbox_model = GmailLabels`; XLIST off; LITERAL+ search; login-error text mapping; OAuth (Google); People API contacts; fixed CalDAV URL `apidata.googleusercontent.com/caldav/v2/<email>` | `SyncWorker.cpp:961-964`, `MailProcessor.cpp:299-304`, `MCIMAPSession.cpp:1074-1103, 4500-4515`, `DAVWorker.cpp:445-460` |
-| O365 / Exchange | OAuth (Microsoft, `IMAP.AccessAsUser.All` + `SMTP.Send`); `SMTPUsername` for shared mailboxes; `createHelperFolders=false` for shared mailboxes; LIST NO treated as connection error; `late_sent_copies`; Outlook XOAUTH2 variant for `smtp-mail.outlook.com` | `SyncWorker.cpp:860-864, 765-769`, `MailUtils.cpp:894-897`, `MCSMTPSession.cpp:91, 638-642`, `NetworkRequestUtils.cpp:58-100` |
+| O365 / Exchange | OAuth (Microsoft, `IMAP.AccessAsUser.All` + `SMTP.Send`); `SMTPUsername` for shared mailboxes; `createHelperFolders=false` for shared mailboxes; LIST NO treated as connection error; `late_sent_copies`; Outlook XOAUTH2 variant for `smtp-mail.outlook.com`, decided by the SMTP host (`smtp_uses_outlook_xoauth2`), not the IMAP profile | `SyncWorker.cpp:860-864, 765-769`, `MailUtils.cpp:894-897`, `MCSMTPSession.cpp:91, 638-642`, `NetworkRequestUtils.cpp:58-100` |
 | iCloud (`imap.mail.me.com`) | `disable_qresync` | `MailUtils.cpp:882`, `SyncWorker.cpp:402`, `Account.cpp:125` |
-| Yahoo | `trust_copyuid_pairing = false`; honour MESSAGELIMIT (RFC 9738); XYMHIGHESTMODSEQ; SEARCH charset NULL | `TaskProcessor.cpp:129-216`, `SyncWorker.cpp:1212-1224, 1294-1298`, `MCIMAPSession.cpp:3705` |
+| Yahoo | honour MESSAGELIMIT (RFC 9738); XYMHIGHESTMODSEQ; SEARCH charset NULL. The multi-message COPYUID distrust that Yahoo motivated applies to every server (`trust_copyuid_pairing` defaults to false) | `TaskProcessor.cpp:129-216`, `SyncWorker.cpp:1212-1224, 1294-1298`, `MCIMAPSession.cpp:3705` |
 | ProtonMail Bridge | `skip_all_mail_folder`; `merge_duplicate_list_entries` | `SyncWorker.cpp:498-507, 811-834` |
 | Dovecot | `noop_before_selected_status`; BYE on UIDVALIDITY change | `SyncWorker.cpp:1184-1194, 1348-1361`, `MCIMAPSession.cpp:1467` |
 | Cyrus / Fastmail | `vanished_upper_bound_uidnext` (cyrus-imapd #6071) | `SyncWorker.cpp:1394-1400` |
-| Courier | force IDLE and NAMESPACE on; `reselect_after_append` | `MCIMAPSession.cpp:862-867`, `TaskProcessor.cpp` send path |
+| Courier | force IDLE and NAMESPACE on. `reselect_after_append` is on for every server, as in C++ (`TaskProcessor.cpp:2438-2441`) | `MCIMAPSession.cpp:862-867`, `TaskProcessor.cpp` send path |
 | Coremail / NetEase | ID before SELECT; `C`-prefixed tags (detected from the greeting); `status_uidnext_unreliable` | `MailUtils.cpp:849-856`, `MCIMAPSession.cpp:857-861, 4819`, libetpan `mailimap.c:2461, 2550` |
 | hMailServer, home.pl | `status_uidnext_unreliable`; XLIST off for IdeaImapServer | `SyncWorker.cpp:447-460`, `MCIMAPSession.cpp:4504` |
-| Yandex | XLIST off; tolerate abrupt IDLE disconnects | `MCIMAPSession.cpp:4505`, `SyncWorker.cpp:310-313` |
+| Yandex | XLIST off. `tolerate_idle_disconnect` is on for every server, as in C++ (`SyncWorker.cpp:302-313`) | `MCIMAPSession.cpp:4505`, `SyncWorker.cpp:310-313` |
 | Hermes | ignore the NAMESPACE capability | `MCIMAPSession.cpp:4547` |
 | DavMail, Zoho | `merge_duplicate_list_entries` | `SyncWorker.cpp:811-834` |
 | DAV servers (Yahoo, Fastmail, iCloud, Nextcloud, SOGo, Zimbra, Posteo, Synology, DAViCal, Bedework, Radicale, GMX, Baikal, Xandikos) | `DavProfile` flags, taken from the comments at `DAVWorker.cpp:650, 835, 1020-1023, 1360, 1782-1801, 2112, 2335` | |
@@ -290,12 +290,12 @@ all compatible with the GPLv3 output.
 
 | Concern | Crate | Notes |
 |---|---|---|
-| IMAP | `async-imap` 0.12, over `imap-proto` 0.17 | Production-proven in Delta Chat (`chatmail/core`). imap-proto already parses VANISHED, MODSEQ, X-GM-LABELS/MSGID/THRID and COPYUID. `imap-codec` 1.0 is stricter but has no X-GM-*. |
+| IMAP | own parser and command layer on tokio + rustls | The section 10 spike ruled out `async-imap` 0.12 / `imap-proto` 0.17 (no VANISHED in command results, no MESSAGELIMIT code, strict ENVELOPE, fixed tag prefix; `docs/spikes/imap.md`). They remain dev-dependencies for the spike example only. |
 | MIME parse | `mail-parser` 0.11 (Stalwart) | Lenient. Exposes the part tree needed for partID/uniqueID numbering. `mailparse` (used by Delta Chat) is the fallback. |
 | MIME build | `mail-builder` 1.0 (Stalwart) | |
 | SMTP | `lettre` 0.11 | rustls; raw-envelope send for per-recipient sends; XOAUTH2/PLAIN/LOGIN |
 | iCal + vCard | `calcard` 0.3 (Stalwart) | Parse and build both formats |
-| CalDAV/CardDAV client | `libdav` 0.11 | Evaluate in the DAV phase. The DAVWorker quirks get ported on top either way. |
+| CalDAV/CardDAV client | own client on `reqwest` + `roxmltree` | `libdav` 0.11 was evaluated and not adopted (`docs/spikes/dav.md`). |
 | SQLite | `rusqlite` 0.40 with `bundled` | |
 | HTTP | `reqwest` 0.13 | |
 | TLS | `rustls` + `rustls-platform-verifier` | OS trust store |
@@ -388,7 +388,7 @@ should start by reading the cited code.
   - When a file has no contentId and the body contains `cid:<filename>`, contentId is set to the filename.
   - Unnamed parts get default names (`File.cpp:40-65`).
   - Thread `attachmentCount` counts files with no contentId or larger than 12 KB.
-- **Snippet:** the flattened HTML (links get ` (url)`, `<blockquote type=cite>` is dropped), whitespace collapsed, cut to 400 UTF-16 units. Search text is cut to 5000.
+- **Snippet:** the flattened HTML (links get ` (url)`; cited blockquotes are kept with `> ` prefixes, because `flattenHTML()` is `flattenHTMLAndShowBlockquote(true)`, `MCString.cpp:2162`), whitespace collapsed, cut to 400 UTF-16 units. Search text is cut to 5000.
 - **Also extracted:** `List-Unsubscribe`, `List-Unsubscribe-Post`, and importance (Importance → X-Priority → X-MSMail-Priority).
 - **Mail-sourced contacts** (`MailProcessor.cpp:823-890`, `contactKeyForEmail` at `MailUtils.cpp:238-266`):
   - Created from participants, and they power composer autocomplete.
@@ -459,9 +459,12 @@ should start by reading the cited code.
   - RFC 6585 429 / Retry-After backoff.
 - **Auth:** OAuth Bearer when a refresh token exists, otherwise Basic with the IMAP credentials.
 - **Writes:**
-  - PUT/DELETE with If-Match; a 412 becomes `etag-conflict`.
+  - PUT/DELETE with If-Match; a 412 becomes `etag-conflict`. This covers contact PUT and event DELETE as well as event PUT; C++ maps 412 only for event PUT (`DAVWorker.cpp:2469`), and `dav-etag-conflict` expects all three. A 412 on DELETE is re-checked with a getetag PROPFIND, and a 404/410 there counts as already gone.
+  - A new CardDAV contact or group card is PUT to `<addressbook>/<uid>.vcf`, and the card's UID equals the Contact id. C++ POSTs to the collection (`DAVWorker::writeAndResyncContact`) and gives a new group a random UID (`performLocalSyncbackContactGroup`).
   - Create re-checks with a REPORT read-back.
   - 404/410 on delete counts as success.
+- **Google People:** a connection with `metadata.deleted == true` is a tombstone and removes the local contact. C++ checks a top-level `deleted` the API never sends, so it saves a blank contact (`GoogleContactsWorker::run`). An expired sync token clears the token and fails the pass; the full re-list runs on the next contacts pass, as in C++.
+- **Contact groups:** removing a group leaves `gis` on its members and removing a contact leaves its join rows, as in C++ (`ContactGroup::afterRemove`, `Contact::afterRemove`). The `contacts` invariant accepts these leftovers.
 - **Schedule:** calendars every 15 min, contacts every 75 min, the first run 15 s after start. `sync-calendar` runs calendars only, never two at once.
 - **Event fields:**
   - The raw ICS is stored in `_data.ics`, plus UID, RECURRENCE-ID, STATUS, DTSTART and the search fields.
@@ -496,6 +499,10 @@ should start by reading the cited code.
   - **`sync: pass` step:** sends `wake-workers` and waits for ``Marking all folders as `busy` ``.
   - **`force_scans`:** writes `localStatus.lastDeep/lastShallow/lastCleanup = 0` into the live DB, so the engine must re-read Folder `localStatus` on every pass.
   - **Task completion:** detected through the `Task.status` column (`complete` / `cancelled`).
+  - **Endpoint overrides** the engine reads in place of its compiled-in hosts (`test/README.md`):
+    - `MAILSYNC_GOOGLE_TOKEN_URL` (and `MAILSYNC_MICROSOFT_TOKEN_URL`) replace the OAuth token endpoints; `MAILSYNC_GOOGLE_PEOPLE_ROOT` replaces `https://people.googleapis.com/v1/` (ms-net `Endpoints::from_env`).
+    - `MAILSYNC_GOOGLE_CALDAV_ROOT` replaces the Gmail calendar host `apidata.googleusercontent.com` (ms-dav `gmail_caldav_host`).
+    - `MAILSYNC_CALDAV_HOST` / `MAILSYNC_CARDDAV_HOST` (`host[:port]`) replace the DNS SRV lookup; discovery then runs from `.well-known` (ms-dav `env_host_override`).
   - **Hook regexes** match the command text the engine sends: `^UID FETCH 1:\*`, `BODY\.PEEK\[\]$`, `^UID STORE .*Deleted`, `^STATUS "`, `^UID (MOVE|COPY)`, `^UID EXPUNGE`, `^LIST`. Matching mailcore's command shapes keeps the fake server on the parsing paths that have been checked against Dovecot.
   - **Running:** `pip install -r test/requirements.txt`, then `python3 -m pytest test` (16 in parallel, ~6 min), narrowed with `-k`, `--servers fake` or `-n 0`. `python3 test/run.py <yaml> --server kind:profile --keep` runs one scenario. Artifacts go to `test/runs/session-<pid>/`.
 - **A/B:** `test/tools/ab.py` runs both binaries on the same scenario. Use it to diff deltas and DB

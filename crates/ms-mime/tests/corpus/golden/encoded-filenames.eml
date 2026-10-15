@@ -1,0 +1,46 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Encoded file names
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <b47e37b08e2f@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix8"
+
+--mix8
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Encoded names.
+
+--mix8
+Content-Type: application/pdf
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename*=UTF-8''%E2%82%AC%20rates%202026.pdf
+
+JVBERiBldXJv
+--mix8
+Content-Type: application/pdf
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment;
+ filename*0*=UTF-8''%C3%9Cber%20die%20;
+ filename*1="Grenze.pdf"
+
+JVBERiBjb250
+--mix8
+Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document; name="=?UTF-8?B?0J7RgtGH0ZHRgi5kb2N4?="
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="=?UTF-8?B?0J7RgtGH0ZHRgi5kb2N4?="
+
+UEsDBGRvY3g=
+--mix8
+Content-Type: application/zip; name="=?iso-8859-1?Q?r=E9sum=E9.zip?="
+Content-Transfer-Encoding: base64
+
+UEsDBHppcA==
+--mix8
+Content-Type: application/octet-stream; name="../../etc/passwd"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="a/b\\c:d*e?.txt"
+
+cm9vdA==
+--mix8--

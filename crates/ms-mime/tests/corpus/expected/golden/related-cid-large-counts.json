@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": "chart@example.org",
+      "contentType": "image/png",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.png",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "Unnamed Image.png",
+      "sha256": "c84c1bb40bb2828701d52b2f3641b5fc53e7d880255b4ad3fbd779757d80f5e5",
+      "size": 15430,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "c06da78de334@example.org",
+  "plaintext": false,
+  "searchTextLength": 10,
+  "snippet": "Big chart:",
+  "subject": "Related with a large image"
+}

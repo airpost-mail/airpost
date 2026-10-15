@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pgp-signature",
+      "countsAsAttachment": true,
+      "filename": "signature.asc",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "signature.asc",
+      "sha256": "3ea7ae7869f4ea2ab2ea83e85df369fa8e2336187153d2d0a212602fb3f59d26",
+      "size": 87,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "c7ba4abdc80b@example.org",
+  "plaintext": true,
+  "searchTextLength": 14,
+  "snippet": "Signed text.\r\n",
+  "subject": "PGP signed"
+}

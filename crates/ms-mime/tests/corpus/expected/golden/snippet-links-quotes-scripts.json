@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "8fee9a4ac852@example.org",
+  "plaintext": false,
+  "searchTextLength": 207,
+  "snippet": "Thanks for the document (https://example.org/doc)! Same link text: https://example.org/same > On Monday Bob wrote: > quoted text that the snippet keeps > A plain blockquote stays Tab and nbsp & entities <ok>",
+  "subject": "Re: Snippet rules"
+}

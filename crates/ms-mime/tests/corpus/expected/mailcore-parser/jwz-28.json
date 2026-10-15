@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.gif",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Image.gif",
+      "sha256": "be3e41df8e8242332200f555ded7f0e2578fb44a89e7a6802afd3229807393a9",
+      "size": 4600,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Yutaka Sato \u001b$@:4F#K-\u001b(J",
+      "ysato@etl.go.jp"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "gCvvx.ysato@etl.go.jp",
+  "plaintext": true,
+  "searchTextLength": 1922,
+  "snippet": "In message <keAshCG0M2Yt5A32xi@thumper.bellcore.com> on 06/09/92(01:31:10)\nyou Nathaniel Borenstein <nsb@thumper.bellcore.com> wrote:\n |This is using vanilla metamail, with MM_CHARSET set to iso-2022-jp.  Any\n |idea what's wrong?  I'd love to actually see your name properly...  --\n |Nathaniel\n\nISO-2022-JP does not correspond to any single character set in X,\nbut is a sum of US-ASCII and Japanese J",
+  "subject": "Re: How to see Japanese characters (Re: malformed message)"
+}

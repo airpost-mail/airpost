@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "message/partial",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "6eab3a67ff57e10cec2d8b10ff678c616cf5ec0e6c9a28ee8a7cd6e0a6404802",
+      "size": 4804,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "nsb@thumper.bellcore.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": null,
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "GIF image (1/3)"
+}

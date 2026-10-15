@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "plain/text",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Вестник Чиптрипа® :)",
+      "cheaptripinsider@moitrip.ru"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "54AD68C9E3B0184CAC6041320424FD1B5B81E74D@localhost.localdomain",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "test of empty multipart/alternative"
+}

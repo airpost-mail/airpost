@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "deming.p7m",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "deming.p7m",
+      "sha256": "4fbb4b62b534fcb7db66c1302216b7883d7d4dd1584eeb8cf52aeda181a0b5c4",
+      "size": 2132,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Blake Ramsdell",
+      "BlakeR@deming.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "c=US%a=_%p=Deming_Software%l=PAIN-960427080858Z-10@pain.deming.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Deming Software -- ready to go!"
+}

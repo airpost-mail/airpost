@@ -1,0 +1,55 @@
+{
+  "attachmentCount": 3,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "4ed38d3c20bc5d1b655c363c0956724d6aca070a3563d14dc8a11b1be428cf05",
+      "size": 33,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "3.2",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "aabf2329be72dcc9234631e47af8cf5e994937e3c69da3ba6a19182a05b27c5b",
+      "size": 35,
+      "uniqueId": "4"
+    },
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.gif",
+      "inline": false,
+      "partId": "4.1",
+      "safeFilename": "Unnamed Image.gif",
+      "sha256": "4384318f5510d32778ce2d970401d978ee75a557df0af6bbbeaf36df89ab1584",
+      "size": 35,
+      "uniqueId": "2"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "me@myself.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": null,
+  "plaintext": true,
+  "searchTextLength": 144,
+  "snippet": "This part specifier should be: 1\nThis part specifier should be: 3.1\nThis part specifier should be: 4.2.1\nThis part specifier should be: 4.2.2.1\n",
+  "subject": "Sample message structure for IMAP part specifiers"
+}

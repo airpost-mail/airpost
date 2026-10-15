@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Jamie Zawinski",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "331FF31B.ABD@netscape.com",
+  "plaintext": true,
+  "searchTextLength": 2827,
+  "snippet": "blah blah blah\n>From - Fri Dec 13 15:01:21 1996\nReturn-Path: <blaker@craswell.com>\nReceived: from maleman.mcom.com ([198.93.92.3]) by dredd.mcom.com\n          (Netscape Mail Server v2.02) with SMTP id AAA19742\n          for <jwz@dredd.mcom.com>; Fri, 13 Dec 1996 14:59:31 -0800\nReceived: from xwing.netscape.com (xwing.mcom.com [205.218.156.54]) by maleman.mcom.com (8.6.9/8.6.9) with ESMTP id OAA237",
+  "subject": "forwarded encrypted message (mult/mixed)"
+}

@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "3e42a593069fcc65e5549476ed88059abdf66ac8c0b095d61a2c1cebe595ffa8",
+      "size": 537,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Taso N. Devetzis",
+      "devetzis"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9206170033.AA10194@dexter.bellcore.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "greek mail"
+}

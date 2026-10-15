@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/octet-stream",
+      "countsAsAttachment": true,
+      "filename": "verisign.p7m",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "verisign.p7m",
+      "sha256": "d76b0f4694c59cb643632096374d5e9c02ce89ddc409b02202bdca109c363290",
+      "size": 2634,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Kurt Stammberger",
+      "kurt@RSA.COM"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "c=US%a=_%p=RSA_Data_Securit%l=LOBESTER-961018205746Z-5325@LOBESTER.rsa.com",
+  "plaintext": true,
+  "searchTextLength": 72,
+  "snippet": "Hi folks.  Here's my new S/MIME certificate.\n \nKurt Stammberger\nRSADSI\n\n",
+  "subject": "S/MIME Cert"
+}

@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "smime.p7s",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "smime.p7s",
+      "sha256": "43e5fe18a7434527a10c1023118026c43fac8cd95cf63716adf96f1e24c464e2",
+      "size": 17,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "af6dd7980097@example.org",
+  "plaintext": false,
+  "searchTextLength": 11,
+  "snippet": "S/MIME html",
+  "subject": "S/MIME signed"
+}

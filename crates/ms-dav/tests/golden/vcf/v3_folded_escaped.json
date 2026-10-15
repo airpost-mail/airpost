@@ -1,0 +1,12 @@
+{
+  "email": "john.smith@acme.example",
+  "emails": [
+    "john.smith@acme.example"
+  ],
+  "is_group": false,
+  "member_ids": [],
+  "name": "Dr. John Q. Smith, Jr.",
+  "serialized": "BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//Apple Inc.//iOS 17.5//EN\r\nUID:B7C1E2F0-1111-2222-3333-444455556666\r\nN:Smith;John;Q.;Dr.;Jr.\r\nFN:Dr. John Q. Smith\\, Jr.\r\nORG:Acme\\, Inc.;R&D\r\nNOTE:A long note that the producer has folded over more than one line because it is longer than seventy-five octets.\r\nEMAIL;type=INTERNET;type=WORK;type=pref:john.smith@acme.example\r\nEND:VCARD\r\n",
+  "uid": "B7C1E2F0-1111-2222-3333-444455556666",
+  "version": "3.0"
+}

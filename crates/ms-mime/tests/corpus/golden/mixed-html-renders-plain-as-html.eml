@@ -1,0 +1,24 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: HTML and plain mixed
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <335775d1ce99@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix2"
+
+--mix2
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<p>Intro in HTML</p>
+
+--mix2
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Reply line
+> quoted line
+>> deeper
+back & <done>
+
+--mix2--

@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "d0cb4932d76b@example.org",
+  "plaintext": false,
+  "searchTextLength": 142,
+  "snippet": "This is a long line that was wrapped by the quoted-printable encoder with soft breaks, and some “smart quotes” and an em dash — plus a euro €.",
+  "subject": "Quoted-printable HTML"
+}

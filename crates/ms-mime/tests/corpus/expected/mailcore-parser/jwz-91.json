@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/richtext",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "9861f2ec27e13379ec0d575df0c75beb8a91b82f5ba64c13b334d6eac1672c91",
+      "size": 1367,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Daniel A. Glasser",
+      "dag@persoft.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "m0lQjol-00018GC@persoft.persoft.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "First impressions of metamail release 2"
+}

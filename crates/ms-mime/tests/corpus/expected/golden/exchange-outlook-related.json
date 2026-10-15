@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "countsAsAttachment": true,
+      "filename": "Budget Q1.xlsx",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Budget Q1.xlsx",
+      "sha256": "8aa880afd114e2e417aa260ffaf2d5736a7e12bfa1ab726597322e21adfaedad",
+      "size": 80,
+      "uniqueId": "0"
+    },
+    {
+      "contentId": "image001.png@01D3A1B2.C3D4E5F0",
+      "contentType": "image/png",
+      "countsAsAttachment": false,
+      "filename": "image001.png",
+      "inline": true,
+      "partId": "1.2",
+      "safeFilename": "image001.png",
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size": 70,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Doe, Jane",
+      "jane.doe@corp.example"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "7c94f4c73896@example.org",
+  "plaintext": false,
+  "searchTextLength": 8,
+  "snippet": "Hi team,",
+  "subject": "Outlook with image001"
+}

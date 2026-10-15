@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/pgp",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "1d0d454dafa7bacf0a9d29715f507fa06107682675c5ceb7e5c71b7048e2d323",
+      "size": 1384,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Jeffrey A. Stuart",
+      "ncoast!tdi3!tdi4!jstuart@USENET.INS.CWRU.EDU"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "199504252230.SAA26982@tdi3.tridelta.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Re: New Virus Alert! No"
+}

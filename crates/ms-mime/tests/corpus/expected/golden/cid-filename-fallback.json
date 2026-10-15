@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 0,
+  "files": [
+    {
+      "contentId": "image001.png",
+      "contentType": "image/png",
+      "countsAsAttachment": false,
+      "filename": "image001.png",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "image001.png",
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size": 70,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "7ac6b1ecced5@example.org",
+  "plaintext": false,
+  "searchTextLength": 17,
+  "snippet": "Outlook signature",
+  "subject": "cid by filename"
+}

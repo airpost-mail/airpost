@@ -1,0 +1,42 @@
+name: google-people-sync-token-expired
+description: >
+  Google expires sync tokens after about a week. On the next launch the incremental request
+  answers 400 FAILED_PRECONDITION "Sync token is expired. Clear local cache and retry call
+  without the sync token."; the engine must drop the stored token and fail that contact pass.
+  The next contact pass (here: the next launch) lists everything again without a token and
+  picks up what changed meanwhile. As in C++, the re-list comes on the next pass, not straight
+  after the 400, and a full listing only adds and updates: a contact deleted while the token
+  was stale is not reconciled by its absence, so this scenario does not delete one.
+source: "GoogleContactsWorker::paginateGoogleCollection (expired-token text: saveKeyValue(syncTokenKey, \"\"); throw;), GoogleContactsWorker::run, main.cpp runCalContactsSyncWorker (contacts every 75 min)"
+servers:
+  - {fake: gmail, people: true}
+mailboxes:
+  INBOX: {messages: 2}
+people:
+  contacts:
+    - {count: 20}
+    - {name: "Alice Archer", email: alice@example.org}
+    - {name: "Erin Elm", email: erin@example.org}
+steps:
+  - wait: quiescent
+  - wait: {models: {Contact: {where: {s: gpeople}, count: 22}}, timeout: 120}
+  - wait: {quiescent: true}
+  - people.expire_sync_tokens: {}
+  - people.add_contact: {name: "Dan Diver", email: dan@example.org}
+  - people.update_contact: {email: erin@example.org, name: "Erin Elm-Oak"}
+  - restart: {wait: false}
+  - wait:
+      people_requests:
+        - {method: GET, path: "^/v1/people/me/connections$", query: {syncToken: true}, status: 400, min: 1}
+      timeout: 120
+  # The engine clears the stored token after the response arrives; let it land before SIGTERM.
+  - wait: {seconds: 5}
+  - restart: {wait: false}
+  - wait: {models: {Contact: {where: {s: gpeople}, match: [{email: dan@example.org}, {email: erin@example.org, name: "Erin Elm-Oak"}]}}, timeout: 120}
+  - wait: {quiescent: true}
+expect:
+  people_matches_db: {}
+  people_requests:
+    - {method: GET, path: "^/v1/people/me/connections$", query: {syncToken: true}, status: 400, count: 1}
+    - {method: GET, path: "^/v1/people/me/connections$", query: {syncToken: false}, status: 200, count: 2}
+  running: true

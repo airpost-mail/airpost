@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 0,
+  "files": [
+    {
+      "contentId": "3341AE7C.665F552F.6.part2@netscape.com",
+      "contentType": "image/jpeg",
+      "countsAsAttachment": false,
+      "filename": "Unnamed Image.jpg",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "Unnamed Image.jpg",
+      "sha256": "3c3132440912f1f1cfd8e795587852aaaddea31c9b0e3d6949c1d8c35c7f9096",
+      "size": 7930,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Jamie Zawinski",
+      "jwz@netscape.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3341AE7C.665F552F.6@netscape.com",
+  "plaintext": false,
+  "searchTextLength": 258,
+  "snippet": "MHTML test > This is a test of multipart/related using Content-ID headers, and the cid: URL type. However, Content-Location headers are present. A picture of a frog in a cage should appear below: (Not a picture of jwz.) Nothing should appear after this line.",
+  "subject": "multipart/related MHTML test case"
+}

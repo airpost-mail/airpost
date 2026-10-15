@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "smime.p7s",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "smime.p7s",
+      "sha256": "1573bbecce4f9c3d90f80ac92602649cfcaec4f02843ae40d6c718a6f5c06e9f",
+      "size": 1321,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Dan Werbel",
+      "danw@ayce.com"
+    ]
+  ],
+  "importance": "normal",
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "33536F24.BBDEA09D@ayce.com",
+  "plaintext": true,
+  "searchTextLength": 611,
+  "snippet": "Jamie -\n\nI tried to sign and encrypt this message, but when I did I received the\nfollowing error:\n\nThe certificate issuer for this server is not recognized by Netscape.  \nThe security certificate may or may not be valid.  Netscape refuses to\nconnect to this server.\n\nI also got this error when I tried only to encrypt the message.  However\nwith digital signing it seems to work ok.  From the error me",
+  "subject": "Re: Obtaining other people's certificates"
+}

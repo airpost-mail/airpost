@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-signature",
+      "countsAsAttachment": true,
+      "filename": "smime.p7s",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "smime.p7s",
+      "sha256": "cd4979dd2d5cab08ee2e442154aed809e8a19f7fd98ed2b5000b92809b18024b",
+      "size": 2896,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Blake Ramsdell",
+      "blaker@craswell.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "3.0b33.32.19961007212705.0091cdb0@mail.craswell.com",
+  "plaintext": true,
+  "searchTextLength": 155,
+  "snippet": "Here is my cert to start interoperability testing.  Does anyone (Alex?)\nknow when VeriSign is going to have validity periods of more than five days?\n\nBlake",
+  "subject": "A cert from deming software"
+}

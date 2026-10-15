@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='utf-8'?>
+<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:CR="urn:ietf:params:xml:ns:carddav" xmlns:CS="http://calendarserver.org/ns/" xmlns:ICAL="http://apple.com/ns/ical/">
+  <response>
+    <href>/alice/</href>
+    <propstat><prop><resourcetype><principal /><collection /></resourcetype><current-user-privilege-set><privilege><read /></privilege><privilege><all /></privilege></current-user-privilege-set><owner><href>/alice/</href></owner></prop><status>HTTP/1.1 200 OK</status></propstat>
+    <propstat><prop><displayname /><CS:getctag /><C:supported-calendar-component-set /><ICAL:calendar-color /><C:calendar-description /><ICAL:calendar-order /></prop><status>HTTP/1.1 404 Not Found</status></propstat>
+  </response>
+  <response>
+    <href>/alice/7f3c4a52-36a9-4e0c-a3a5-7a0b9c1d2e3f/</href>
+    <propstat><prop><resourcetype><C:calendar /><collection /></resourcetype><displayname>Personal</displayname><CS:getctag>"0d1ee9b9ef3c1bc9b4b4d8f8d6b4a6e1"</CS:getctag><C:supported-calendar-component-set><C:comp name="VEVENT" /><C:comp name="VJOURNAL" /><C:comp name="VTODO" /></C:supported-calendar-component-set><ICAL:calendar-color>#ff0000ff</ICAL:calendar-color><C:calendar-description>Home things</C:calendar-description><current-user-privilege-set><privilege><read /></privilege><privilege><all /></privilege></current-user-privilege-set><owner><href>/alice/</href></owner></prop><status>HTTP/1.1 200 OK</status></propstat>
+    <propstat><prop><ICAL:calendar-order /></prop><status>HTTP/1.1 404 Not Found</status></propstat>
+  </response>
+  <response>
+    <href>/alice/tasks/</href>
+    <propstat><prop><resourcetype><C:calendar /><collection /></resourcetype><displayname>Tasks</displayname><CS:getctag>"a1"</CS:getctag><C:supported-calendar-component-set><C:comp name="VTODO" /></C:supported-calendar-component-set><owner><href>/alice/</href></owner></prop><status>HTTP/1.1 200 OK</status></propstat>
+  </response>
+  <response>
+    <href>/alice/contacts/</href>
+    <propstat><prop><resourcetype><CR:addressbook /><collection /></resourcetype><displayname>Contacts</displayname><CS:getctag>"b2"</CS:getctag><owner><href>/alice/</href></owner></prop><status>HTTP/1.1 200 OK</status></propstat>
+    <propstat><prop><C:supported-calendar-component-set /></prop><status>HTTP/1.1 404 Not Found</status></propstat>
+  </response>
+</multistatus>

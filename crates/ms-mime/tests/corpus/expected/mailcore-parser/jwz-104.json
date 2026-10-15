@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs7-mime",
+      "countsAsAttachment": true,
+      "filename": "eric.p7c",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "eric.p7c",
+      "sha256": "c0a6bbb681b54fbcce81c53c22c2f635c8b3777776c5dcf162c4efa50fe337c9",
+      "size": 1882,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      "Eric Rosenquist",
+      "rosenqui@strataware.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "199611212110.QAA14653@krusty.strataware.com",
+  "plaintext": true,
+  "searchTextLength": 2812,
+  "snippet": "Hi everyone.  I'm a consultant working with Nortel on their S/MIME products.\nI've already completed basic interop testing against Deming's Secure\nMessenger and at Blake's suggestion I am about to post a signed message to\nthis list for others to use in interop testing.  If you have questions about\nEntrust in general, please visit their web site <http://www.entrust.com>.  If\nyou have questions about",
+  "subject": "My encryption certificate for S/MIME testing"
+}

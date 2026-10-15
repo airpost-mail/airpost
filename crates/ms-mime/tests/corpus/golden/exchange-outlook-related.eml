@@ -1,0 +1,55 @@
+From: "Doe, Jane" <jane.doe@corp.example>
+To: Bob Example <bob@example.net>
+Subject: Outlook with image001
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <7c94f4c73896@example.org>
+MIME-Version: 1.0
+Thread-Topic: Outlook
+X-MS-Has-Attach: yes
+Content-Language: en-US
+Content-Type: multipart/mixed; boundary="_005_mix_"
+
+--_005_mix_
+Content-Type: multipart/related; boundary="_004_rel_";
+	type="multipart/alternative"
+
+--_004_rel_
+Content-Type: multipart/alternative; boundary="_000_alt_"
+
+--_000_alt_
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+Hi team,
+
+[cid:image001.png@01D3A1B2.C3D4E5F0]
+
+--_000_alt_
+Content-Type: text/html; charset="us-ascii"
+Content-Transfer-Encoding: quoted-printable
+
+<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dus-ascii"><style><!--
+/* Font Definitions */
+p.MsoNormal{margin:0cm;}
+--></style></head><body lang=3D"EN-US"><div class=3D"WordSection1"><p class=3D"MsoNormal">Hi team,<o:p></o:p></p><p class=3D"MsoNormal"><img width=3D"120" height=3D"40" id=3D"Picture_x0020_1" src=3D"cid:image001.png@01D3A1B2.C3D4E5F0" alt=3D"Logo"><o:p></o:p></p></div></body></html>
+--_000_alt_--
+--_004_rel_
+Content-Type: image/png; name="image001.png"
+Content-Transfer-Encoding: base64
+Content-Description: image001.png
+Content-Disposition: inline; filename="image001.png"; size=67;
+	creation-date="Tue, 06 Jan 2026 10:00:00 GMT"
+Content-ID: <image001.png@01D3A1B2.C3D4E5F0>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmM
+IQAAAABJRU5ErkJggg==
+--_004_rel_--
+--_005_mix_
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="Budget Q1.xlsx"
+Content-Transfer-Encoding: base64
+Content-Description: Budget Q1.xlsx
+Content-Disposition: attachment; filename="Budget Q1.xlsx"; size=80
+
+UEsDBHhsc3hQSwMEeGxzeFBLAwR4bHN4UEsDBHhsc3hQSwMEeGxzeFBLAwR4bHN4UEsDBHhsc3hQ
+SwMEeGxzeFBLAwR4bHN4UEsDBHhsc3g=
+--_005_mix_--

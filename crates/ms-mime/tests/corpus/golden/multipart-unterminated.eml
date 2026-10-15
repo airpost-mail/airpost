@@ -1,0 +1,17 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Unterminated multipart
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <93cb9cfb28ae@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="cut"
+
+Preamble text
+--cut
+Content-Type: text/plain
+
+Plain
+--cut
+Content-Type: text/html
+
+<p>The HTML part runs to the end

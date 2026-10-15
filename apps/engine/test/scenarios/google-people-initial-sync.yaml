@@ -1,0 +1,50 @@
+name: google-people-initial-sync
+description: >
+  A Gmail account with 432 Google contacts in two user groups. The engine authenticates
+  with OAuth only (refresh token, no password): the fake token endpoint rotates the refresh
+  token on the first grant, which the engine must hand to the client as a
+  ProcessAccountSecretsUpdated delta or the account breaks at the next launch. The
+  calContacts thread then lists connections in pages of 400 asking for a sync token, lists
+  the contact groups, and fetches each user group's members. Every person becomes one
+  `gpeople` Contact keyed by its resourceName, system groups are skipped, user groups
+  become ContactGroups with their members, and one ContactBook tells the client contact
+  sync is on.
+source: "GoogleContactsWorker::run / paginateGoogleCollection; XOAuth2TokenManager (refresh_token rotation -> DeltaStream::sendUpdatedSecrets); main.cpp runCalContactsSyncWorker"
+servers:
+  - {fake: gmail, people: true, people_options: {rotate_refresh_token: true}}
+mailboxes:
+  INBOX: {messages: 3}
+people:
+  groups: [{name: Climbing}, {name: Book Club}]
+  contacts:
+    - {count: 430}
+    - {name: "Alice Archer", email: alice@example.org, groups: [Climbing]}
+    - {name: "Bob Baker", email: bob@example.org, groups: [Climbing, Book Club]}
+steps:
+  - wait: {delta: {class: ProcessAccountSecretsUpdated, where: {settings.refresh_token: {re: "rotated"}}}, timeout: 60}
+  - wait: quiescent
+  - wait: {log: "Calendar sync pass 1, with contacts", timeout: 60}
+  - wait: {models: {Contact: {where: {s: gpeople}, count: 432}, ContactGroup: {count: 2}}, timeout: 120}
+  - wait: {quiescent: true}
+expect:
+  people_matches_db: {}
+  models:
+    ContactBook: {count: 1, match: [{source: gpeople}]}
+    Contact:
+      where: {s: gpeople}
+      match:
+        - {email: alice@example.org, name: "Alice Archer", grn: {re: "^people/c\\d+$"}, h: {not: true}}
+    ContactGroup:
+      match: [{name: Climbing, grn: {re: "^contactGroups/"}}, {name: Book Club}]
+      absent: [{name: My Contacts}, {name: Starred}]
+  people_requests:
+    - {method: POST, path: "^/token$", min: 1}
+    - {method: GET, path: "^/v1/people/me/connections$", query: {requestSyncToken: "true", personFields: true, pageToken: false, syncToken: false}, count: 1}
+    - {method: GET, path: "^/v1/people/me/connections$", query: {pageToken: true}, count: 1, status: 200}
+    - {method: GET, path: "^/v1/contactGroups$", min: 1, status: 200}
+    - {method: GET, path: "^/v1/contactGroups/[^/]+$", query: {maxMembers: true}, min: 2}
+    - {status: 401, count: 0}
+    - {status: 400, count: 0}
+  db_matches_server: {}
+  log_absent: ["\\[critical\\]"]
+  running: true

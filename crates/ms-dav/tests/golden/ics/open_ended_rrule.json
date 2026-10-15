@@ -1,0 +1,20 @@
+[
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": true,
+    "is_recurring": true,
+    "location": "",
+    "organizer": "",
+    "re": 2114294400,
+    "recurrence_id": "",
+    "rs": 1704474000,
+    "search_participants": "",
+    "start": 1704474000,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Rent",
+    "uid": "forever@example.com"
+  }
+]

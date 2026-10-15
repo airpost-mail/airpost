@@ -1,0 +1,12 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Quoted-printable HTML
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <d0cb4932d76b@example.org>
+MIME-Version: 1.0
+Content-Type: text/html; charset=windows-1252
+Content-Transfer-Encoding: quoted-printable
+
+<p>This is a long line that was wrapped by the quoted-printable encoder with s=
+oft breaks, and some =93smart quotes=94 and an em dash =97 plus a euro =80.</p>=
+

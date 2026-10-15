@@ -1,0 +1,11 @@
+BEGIN:VCARD
+VERSION:3.0
+PRODID:-//Apple Inc.//iOS 17.5//EN
+UID:B7C1E2F0-1111-2222-3333-444455556666
+N:Smith;John;Q.;Dr.;Jr.
+FN:Dr. John Q. Smith\, Jr.
+ORG:Acme\, Inc.;R&D
+NOTE:A long note that the producer has folded over more than one line be
+ cause it is longer than seventy-five octets.
+EMAIL;type=INTERNET;type=WORK;type=pref:john.smith@acme.example
+END:VCARD

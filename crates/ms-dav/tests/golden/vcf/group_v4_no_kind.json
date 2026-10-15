@@ -1,0 +1,11 @@
+{
+  "after_edit": "BEGIN:VCARD\r\nVERSION:4.0\r\nUID:grp-v4-ext\r\nFN:Renamed\r\nX-ADDRESSBOOKSERVER-KIND:group\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:added-1\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:m-1\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:f-1\r\nN:Renamed\r\nEND:VCARD\r\n",
+  "email": "",
+  "emails": [],
+  "is_group": true,
+  "member_ids": [],
+  "name": "Neighbours",
+  "serialized": "BEGIN:VCARD\r\nVERSION:4.0\r\nUID:grp-v4-ext\r\nFN:Neighbours\r\nX-ADDRESSBOOKSERVER-KIND:group\r\nEND:VCARD\r\n",
+  "uid": "grp-v4-ext",
+  "version": "4.0"
+}

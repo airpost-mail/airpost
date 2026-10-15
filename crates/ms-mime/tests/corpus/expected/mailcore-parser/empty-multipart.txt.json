@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      null,
+      "mimekit@example.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "54AD68C9E3B0184CAC6041320424FD1B5B81E74D@localhost.localdomain",
+  "plaintext": true,
+  "searchTextLength": 84,
+  "snippet": "This part should be on the same level as the multipart/alternative and not a child.\n",
+  "subject": "test of empty multipart/alternative"
+}

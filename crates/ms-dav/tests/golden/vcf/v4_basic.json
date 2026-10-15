@@ -1,0 +1,13 @@
+{
+  "email": "jane@example.com",
+  "emails": [
+    "jane@example.com",
+    "jane.home@example.org"
+  ],
+  "is_group": false,
+  "member_ids": [],
+  "name": "Jane Doe",
+  "serialized": "BEGIN:VCARD\r\nVERSION:4.0\r\nUID:urn:uuid:4fbe8971-0bc3-424c-9c26-36c3e1eff6b1\r\nFN:Jane Doe\r\nN:Doe;Jane;;;\r\nEMAIL;TYPE=work:jane@example.com\r\nEMAIL;TYPE=home;PREF=1:jane.home@example.org\r\nTEL;VALUE=uri;TYPE=cell:tel:+1-555-555-0100\r\nEND:VCARD\r\n",
+  "uid": "urn:uuid:4fbe8971-0bc3-424c-9c26-36c3e1eff6b1",
+  "version": "4.0"
+}

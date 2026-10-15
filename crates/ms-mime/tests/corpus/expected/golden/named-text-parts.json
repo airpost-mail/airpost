@@ -1,0 +1,43 @@
+{
+  "attachmentCount": 2,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "text/plain",
+      "countsAsAttachment": true,
+      "filename": "notes.txt",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "notes.txt",
+      "sha256": "f659ccee5378523b7d7fd48bbb9a811d2fa30410f97b0ed24c906982c093a326",
+      "size": 18,
+      "uniqueId": "1"
+    },
+    {
+      "contentId": null,
+      "contentType": "text/plain",
+      "countsAsAttachment": true,
+      "filename": "explicit.txt",
+      "inline": false,
+      "partId": "3",
+      "safeFilename": "explicit.txt",
+      "sha256": "f27d1d5c4fbf9bf1cf502201c6458ad60dbfd1863b79572833873ba7e6908f4f",
+      "size": 22,
+      "uniqueId": "2"
+    }
+  ],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "0a9f6409ac39@example.org",
+  "plaintext": true,
+  "searchTextLength": 49,
+  "snippet": "Body text.\r\nNamed but inline.\r\nUnnamed trailer.\r\n",
+  "subject": "Named text parts"
+}

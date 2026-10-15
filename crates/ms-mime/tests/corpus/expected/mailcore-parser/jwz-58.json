@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Vladimír Solnický",
+      "vs@utia.cas.cz"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "Pine.HPP.3.94.1.960713165148.28138A-100000@visla.utia.cas.cz",
+  "plaintext": true,
+  "searchTextLength": 1341,
+  "snippet": "On 11 Jul 1996, Shlomi Fish wrote:\n\n> I'm trying to write a CGI script (or any other program for that matter) that\n> sends a Hebrew message by calling sendmail. Sendmail refuses to send it once\n> I finished piping it to it. Here's the header of the message (think that I\n> write it on the keyboard after running sendmail):\n> \n> From: nobody@medusa.cortext.co.il\n> To: shlomi@medusa\n> Subject: My Subj",
+  "subject": "Re: Sending a Hebrew message with sendmail"
+}

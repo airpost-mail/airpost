@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "application/x-pkcs",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "1fb1d81e170448a8c6ee18162d7c295439e663f0ade4a12b0e98cc24a659241a",
+      "size": 1281,
+      "uniqueId": "0"
+    }
+  ],
+  "from": [
+    [
+      "Don Major",
+      "dwm@ctt.bellcore.com"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9302260530.AA25246@shadow.secure.bellcore.com",
+  "plaintext": true,
+  "searchTextLength": 0,
+  "snippet": "",
+  "subject": "Signed PKCS/MIME Message"
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": false,
+    "is_recurring": false,
+    "location": "",
+    "organizer": "",
+    "re": 1722506400,
+    "recurrence_id": "",
+    "rs": 1722502800,
+    "search_participants": "",
+    "start": 1722502800,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Wherever you are",
+    "uid": "floating@example.com"
+  }
+]

@@ -1,0 +1,63 @@
+name: fresh-db-replaces-legacy
+description: >
+  A user switches from the C++ engine. Its edgehill.db (V12, no `_State.engine` key) was left
+  with its last writes still in edgehill.db-wal, as an engine killed mid-run leaves it, and
+  files/ holds a draft's attachment and a stray file. `--mode migrate` must not upgrade
+  that database: it prints "Running Migration" (the client opens its progress window on
+  it), moves edgehill.db with its -wal and -shm to edgehill.legacy.db* without losing a
+  committed row, creates a fresh V12 database marked `engine = rust`, and empties files/.
+  Sync then rebuilds
+  everything from the server, and nothing from the old database - its local draft and its
+  snooze metadata - reaches the new one without `--mode import-legacy`. A second launch sees
+  its own database and runs no migration.
+source: "docs/engine-port-plan.md section 9; crates/ms-store/src/migrate.rs"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {special_use: "\\Drafts"}
+legacy_db:
+  wal: true
+  folders: {INBOX: inbox, Drafts: drafts}
+  messages:
+    m1: {mailbox: INBOX, uid: 1, thread: t1}
+    m2: {mailbox: INBOX, uid: 2}
+    d1:
+      folder: Drafts
+      draft: {hMsgId: "local-draft-1@example.test", subject: "Unsent plans", body: "<p>draft</p>"}
+      files: [{filename: notes.txt, content: "attached to the draft"}]
+  metadata:
+    - {model: t1, plugin: thread-snooze, value: {expiration: 1900000000}}
+  state: {cursor-c0ffee-harness: "42"}
+  files: {"zz/zz/zzstray/stray.bin": "left over"}
+steps:
+  - assert:
+      migrate_output: {launch: first, present: ["Running Migration"], absent: ["Running Setup"]}
+      config_files:
+        present: [edgehill.db, edgehill.legacy.db]
+        empty: [files]
+      sql:
+        - {db: main, query: "PRAGMA user_version", equals: 12}
+        - {db: main, query: "SELECT value FROM _State WHERE id = 'engine'", equals: rust}
+        # Every row the C++ engine committed survives the move, including those that were
+        # only in its WAL (moved alongside, or checkpointed first).
+        - {db: legacy, query: "SELECT count(*) FROM Message", equals: 3}
+        - {db: legacy, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 1}
+        - {db: legacy, query: "SELECT value FROM _State WHERE id = 'cursor-c0ffee-harness'", equals: "42"}
+  - wait: quiescent
+  - restart: {}
+expect:
+  migrate_output: {launch: last, absent: ["Running Migration", "Running Setup"]}
+  counts: {INBOX: 3, total: 3}
+  db_matches_server: {}
+  config_files:
+    present: [edgehill.legacy.db]
+    empty: [files]
+  sql:
+    - {db: main, query: "SELECT count(*) FROM Message WHERE headerMessageId = 'local-draft-1@example.test'", equals: 0}
+    - {db: main, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 0}
+    - {db: main, query: "SELECT count(*) FROM File", equals: 0}
+    - {db: main, query: "SELECT count(*) FROM _State WHERE id = 'cursor-c0ffee-harness'", equals: 0}
+    - {db: legacy, query: "SELECT count(*) FROM Message", equals: 3}
+  log_absent: ["\\[critical\\]"]
+  running: true

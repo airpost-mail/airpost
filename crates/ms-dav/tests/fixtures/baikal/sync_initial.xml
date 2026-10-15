@@ -1,0 +1,2 @@
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:card="urn:ietf:params:xml:ns:carddav"><d:response><d:href>/dav.php/calendars/alice/default/0a1b2c3d.ics</d:href><d:propstat><d:prop><d:getetag>&quot;8f54bd5a9e4d1bb1d4a1e6c0f8a72e3d&quot;</d:getetag></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response><d:sync-token>http://sabre.io/ns/sync/12</d:sync-token></d:multistatus>

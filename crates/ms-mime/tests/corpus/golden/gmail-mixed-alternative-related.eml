@@ -1,0 +1,41 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Gmail structure
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <1f64a35c86a8@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mixalt"
+
+--mixalt
+Content-Type: multipart/alternative; boundary="altrel"
+
+--altrel
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Plain version
+
+--altrel
+Content-Type: multipart/related; boundary="relin"
+
+--relin
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+<p>Rich <img src="cid:pic@example.org"></p>
+--relin
+Content-Type: image/png; name="pic.png"
+Content-Transfer-Encoding: base64
+Content-ID: <pic@example.org>
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmM
+IQAAAABJRU5ErkJggg==
+--relin--
+--altrel--
+--mixalt
+Content-Type: application/pdf; name="terms.pdf"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="terms.pdf"
+
+JVBERiB0ZXJtcw==
+--mixalt--

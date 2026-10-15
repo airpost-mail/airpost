@@ -1,0 +1,12 @@
+{
+  "email": "grace@navy.example",
+  "emails": [
+    "grace@navy.example"
+  ],
+  "is_group": false,
+  "member_ids": [],
+  "name": "Grace Hopper",
+  "serialized": "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:grouped-1\r\nFN:Grace Hopper\r\nitem1.EMAIL;type=INTERNET:grace@navy.example\r\nitem1.X-ABLABEL:_$!<Work>!$_\r\nitem2.URL;X-NOTE=\"see: profile\":https://example.org/grace\r\nEND:VCARD\r\n",
+  "uid": "grouped-1",
+  "version": "3.0"
+}

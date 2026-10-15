@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "8583015b9e36@example.org",
+  "plaintext": true,
+  "searchTextLength": 5000,
+  "snippet": "Line 0000 of a long message body.\r\nLine 0001 of a long message body.\r\nLine 0002 of a long message body.\r\nLine 0003 of a long message body.\r\nLine 0004 of a long message body.\r\nLine 0005 of a long message body.\r\nLine 0006 of a long message body.\r\nLine 0007 of a long message body.\r\nLine 0008 of a long message body.\r\nLine 0009 of a long message body.\r\nLine 0010 of a long message body.\r\nLine 0011 of a ",
+  "subject": "Long search text"
+}

@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": "normal",
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "5a4e0184469d@example.org",
+  "plaintext": true,
+  "searchTextLength": 30,
+  "snippet": "Importance is authoritative.\r\n",
+  "subject": "Importance wins"
+}

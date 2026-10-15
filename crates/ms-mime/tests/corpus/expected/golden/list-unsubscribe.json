@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": "<mailto:unsub@lists.example.org?subject=unsubscribe>, <https://lists.example.org/u/abc123>",
+  "listUnsubscribePost": "List-Unsubscribe=One-Click",
+  "messageId": "b8f2d4d6fa63@example.org",
+  "plaintext": false,
+  "searchTextLength": 132,
+  "snippet": "This week: an article (https://example.org/a) and a contact (mailto:x@example.org). Unsubscribe (https://lists.example.org/u/abc123)",
+  "subject": "Weekly newsletter"
+}

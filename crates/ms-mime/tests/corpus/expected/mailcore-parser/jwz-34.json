@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "image/gif",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Image.gif",
+      "inline": false,
+      "partId": "2",
+      "safeFilename": "Unnamed Image.gif",
+      "sha256": "592d5c26c3be832c50c297cb0d69441e022f43753a0e481126b7f834fb75280b",
+      "size": 3819,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "bob@sarad.cs.su.oz.au"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9302042227.AA17392@thumper.bellcore.com",
+  "plaintext": true,
+  "searchTextLength": 78,
+  "snippet": "\nThis sums up my feeling about using (non-MIME) email to carry files!\n\nBob.\n\n\n",
+  "subject": "sending files via email"
+}

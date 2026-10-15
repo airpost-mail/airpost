@@ -1,0 +1,20 @@
+[
+  {
+    "all_day": false,
+    "attendees": [],
+    "description": "",
+    "has_dtstamp": false,
+    "is_recurring": false,
+    "location": "",
+    "organizer": "",
+    "re": 1730700000,
+    "recurrence_id": "",
+    "rs": 1730602800,
+    "search_participants": "",
+    "start": 1730602800,
+    "status": "",
+    "status_or_default": "CONFIRMED",
+    "summary": "Overnight across DST end",
+    "uid": "duration@example.com"
+  }
+]

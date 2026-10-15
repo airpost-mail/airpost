@@ -1,0 +1,32 @@
+Return-Path: <noreply@service.example>
+Delivered-To: test@example.test
+Message-ID: <harness-2-bc278401@example.test>
+Date: Mon, 12 Oct 2026 01:15:23 +0000
+From: Carol Notifications <noreply@service.example>
+To: Harness Test <test@example.test>
+Subject: Quarterly report
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="=_harness_4282773f1ec7"
+
+--=_harness_4282773f1ec7
+Content-Type: multipart/alternative; boundary="=_alt_1bc36bc3"
+
+--=_alt_1bc36bc3
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+This is the body of message 2.
+
+-- 
+Carol Notifications
+
+--=_alt_1bc36bc3
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+<html><body><p>This is the body of message 2.
+
+-- 
+Carol Notifications</p></body></html>
+--=_alt_1bc36bc3--
+--=_harness_4282773f1ec7--

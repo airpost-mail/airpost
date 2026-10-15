@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "message/external-body",
+      "countsAsAttachment": true,
+      "filename": "Unnamed Attachment",
+      "inline": false,
+      "partId": "2.1",
+      "safeFilename": "Unnamed Attachment",
+      "sha256": "f28ef0ec72788cc5f8a80fd0e8ef25a30b6d3912b4a56877e3820da94973a1c7",
+      "size": 144,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "Internet-Drafts@CNRI.Reston.VA.US"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "9504251109.aa04587@IETF.CNRI.Reston.VA.US",
+  "plaintext": true,
+  "searchTextLength": 3204,
+  "snippet": "A New Internet-Draft is available from the on-line Internet-Drafts \ndirectories.                                                               \n\n       Title     : IP Broadcast over ATM Networks.                         \n       Author(s) : T. Smith, G. Armitage\n       Filename  : draft-smith-ipatm-bcast-00.txt\n       Pages     : 7\n       Date      : 04/24/1995\n\nThis memo describes how the IP multi",
+  "subject": "I-D ACTION:draft-smith-ipatm-bcast-00.txt"
+}

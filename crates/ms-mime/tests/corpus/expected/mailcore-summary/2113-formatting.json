@@ -1,0 +1,31 @@
+{
+  "attachmentCount": 1,
+  "files": [
+    {
+      "contentId": null,
+      "contentType": "message/feedback-report",
+      "countsAsAttachment": true,
+      "filename": "Feedback Report.txt",
+      "inline": true,
+      "partId": "2",
+      "safeFilename": "Feedback Report.txt",
+      "sha256": "3db39961450c7d9f6acfb29bff96a3c76c06bc5b88e2f1b56f614990eb1ded13",
+      "size": 236,
+      "uniqueId": "1"
+    }
+  ],
+  "from": [
+    [
+      null,
+      "scomp@aol.net"
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "201102071046.7d794d5013bd19a@omr-d24.mx.aol.com",
+  "plaintext": false,
+  "searchTextLength": 1299,
+  "snippet": "This is an email abuse report for an email message with the message-id of received from IP address 76.12.18.82 on Mon, 7 Feb 2011 09:28:58 -0500 (EST) For information, please review the top portion of the following page: http://postmaster.aol.com/tools/fbl.html For information about AOL E-mail guidelines, please see http://postmaster.aol.com/guidelines/ If you would like to cancel or change the co",
+  "subject": "Email Feedback Report for IP 76.12.18.82"
+}

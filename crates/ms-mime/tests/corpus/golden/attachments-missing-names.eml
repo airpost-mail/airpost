@@ -1,0 +1,54 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Unnamed attachments
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <384e9809c0f7@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix6"
+
+--mix6
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+See attachments.
+
+--mix6
+Content-Type: application/pdf
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJWZha2UK
+--mix6
+Content-Type: image/jpeg
+Content-Transfer-Encoding: base64
+
+/9j/4GZha2VqcGVn
+--mix6
+Content-Type: text/calendar
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment
+
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Microsoft Corporation//Outlook 16.0 MIMEDIR//EN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:040000008200E00074C5B7101A82E008000000001
+DTSTART:20260110T150000Z
+DTEND:20260110T160000Z
+SUMMARY:Budget review
+ORGANIZER;CN=Alice:mailto:alice@example.org
+END:VEVENT
+END:VCALENDAR
+
+--mix6
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment
+
+AAEC
+--mix6
+Content-Type: message/rfc822
+Content-Transfer-Encoding: base64
+
+U3ViamVjdDogaW5uZXINCg0KYm9keQ0K
+--mix6--

@@ -1,0 +1,12 @@
+{
+  "email": "anon@example.net",
+  "emails": [
+    "anon@example.net"
+  ],
+  "is_group": false,
+  "member_ids": [],
+  "name": "",
+  "serialized": "BEGIN:VCARD\r\nVERSION:4.0\r\nEMAIL:anon@example.net\r\nEND:VCARD\r\n",
+  "uid": "",
+  "version": "4.0"
+}

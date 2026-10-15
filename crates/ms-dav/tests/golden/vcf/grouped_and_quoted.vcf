@@ -1,0 +1,8 @@
+BEGIN:VCARD
+VERSION:3.0
+UID:grouped-1
+FN:Grace Hopper
+item1.EMAIL;type=INTERNET:grace@navy.example
+item1.X-ABLabel:_$!<Work>!$_
+item2.URL;X-NOTE="see: profile":https://example.org/grace
+END:VCARD

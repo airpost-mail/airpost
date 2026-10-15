@@ -1,0 +1,27 @@
+From: Alice Example <alice@example.org>
+To: Bob Example <bob@example.net>
+Subject: Fwd: base64 message
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <5043e8628b0e@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="fwd2"
+
+--fwd2
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Attached as a file.
+
+--fwd2
+Content-Type: message/rfc822; name="Original message.eml"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="Original message.eml"
+
+RnJvbTogQ2Fyb2wgPGNhcm9sQGV4YW1wbGUuY29tPg0KVG86IEFsaWNlIDxhbGljZUBleGFtcGxl
+Lm9yZz4NClN1YmplY3Q6IE9yaWdpbmFsIG1lc3NhZ2UNCkRhdGU6IE1vbiwgMDUgSmFuIDIwMjYg
+MDk6MDA6MDAgKzAwMDANCk1lc3NhZ2UtSUQ6IDxpbm5lci0xQGV4YW1wbGUuY29tPg0KTUlNRS1W
+ZXJzaW9uOiAxLjANCkNvbnRlbnQtVHlwZTogbXVsdGlwYXJ0L2FsdGVybmF0aXZlOyBib3VuZGFy
+eT0iaW5uZXItYWx0Ig0KDQotLWlubmVyLWFsdA0KQ29udGVudC1UeXBlOiB0ZXh0L3BsYWluDQoN
+CklubmVyIHBsYWluDQoNCi0taW5uZXItYWx0DQpDb250ZW50LVR5cGU6IHRleHQvaHRtbA0KDQo8
+cD5Jbm5lciA8Yj5IVE1MPC9iPjwvcD4NCg0KLS1pbm5lci1hbHQtLQ0K
+--fwd2--

@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "jwz",
+      ""
+    ]
+  ],
+  "importance": null,
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": null,
+  "plaintext": true,
+  "searchTextLength": 1209,
+  "snippet": "We search through text/plain messages for URLs and make them clickable.\nHere are some examples.\n\nThese should all have links over them:\n\n\thttp://home.netscape.com and http://home.netscape.com/, (and the\n\tcomma shouldn't be in the URL) \"http://home.netscape.com:80/\" \n\tand <https://home.netscape.com> and mailto:jwz as well as\n\tmailto:jwz%2Cterry, and mailto:jwz,terry, but note that the final\n\tcommas",
+  "subject": "test of URLs in text/plain messages"
+}

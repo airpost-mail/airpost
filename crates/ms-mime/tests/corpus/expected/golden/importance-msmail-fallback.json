@@ -1,0 +1,18 @@
+{
+  "attachmentCount": 0,
+  "files": [],
+  "from": [
+    [
+      "Alice Example",
+      "alice@example.org"
+    ]
+  ],
+  "importance": "high",
+  "listUnsubscribe": null,
+  "listUnsubscribePost": null,
+  "messageId": "a2ad838dc8a9@example.org",
+  "plaintext": true,
+  "searchTextLength": 32,
+  "snippet": "Fallback to X-MSMail-Priority.\r\n",
+  "subject": "MSMail priority"
+}

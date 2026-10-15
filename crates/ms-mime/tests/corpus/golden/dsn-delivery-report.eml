@@ -1,0 +1,42 @@
+From: MAILER-DAEMON@mx.example.org (Mail Delivery System)
+To: Bob Example <bob@example.net>
+Subject: Undelivered Mail Returned to Sender
+Date: Tue, 06 Jan 2026 10:00:00 +0000
+Message-ID: <d9a9a86e9a82@example.org>
+MIME-Version: 1.0
+Auto-Submitted: auto-replied
+Content-Type: multipart/report; boundary="dsn1"; report-type=delivery-status
+
+--dsn1
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Content-Description: Notification
+
+This is the mail system at host mx.example.org.
+
+I'm sorry to have to inform you that your message could not
+be delivered to one or more recipients.
+
+<nobody@example.net>: host mx.example.net said: 550 5.1.1 User unknown
+
+--dsn1
+Content-Type: message/delivery-status
+Content-Description: Delivery report
+
+Reporting-MTA: dns; mx.example.org
+
+Final-Recipient: rfc822; nobody@example.net
+Action: failed
+Status: 5.1.1
+
+--dsn1
+Content-Type: message/rfc822
+Content-Description: Undelivered Message
+
+From: Alice <alice@example.org>
+To: nobody@example.net
+Subject: Hello
+
+Original body
+
+--dsn1--
