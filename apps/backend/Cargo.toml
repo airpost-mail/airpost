@@ -1,0 +1,57 @@
+[workspace]
+# Own workspace until B1-E joins it to the root one (docs/backend-plan.md 3.1). Versions shared
+# with the root workspace are pinned by hand to match it.
+
+[package]
+name = "tern-backend"
+description = "Self-hostable Tern server: identity, metadata sync, tracking"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+license = "MIT"
+repository = "https://github.com/ternmail/ternmail"
+publish = false
+
+[[bin]]
+name = "tern-backend"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "form", "tokio", "tower-log", "original-uri", "matched-path"] }
+tokio = { version = "1.53", features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time"] }
+tower = { version = "0.5", default-features = false }
+tower-http = { version = "0.7", features = ["cors", "trace", "limit"] }
+http-body = "1.1"
+rusqlite = { version = "0.40", features = ["bundled"] }
+argon2 = "0.6"
+rand = "0.10"
+sha2 = "0.11"
+base64 = "0.23"
+governor = "0.10"
+# Already in the tree through tokio; for TCP keepalive and TCP_USER_TIMEOUT on accepted sockets.
+socket2 = { version = "0.6", features = ["all"] }
+maud = "0.27"
+clap = { version = "4.6", features = ["derive", "env"] }
+toml = { version = "1.1", default-features = false, features = ["parse", "serde", "std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "ansi", "env-filter"] }
+
+[dev-dependencies]
+tokio = { version = "1.53", features = ["test-util", "io-util"] }
+hyper = { version = "1", features = ["client", "server", "http1"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "http1", "tokio", "service"] }
+http-body-util = "0.1"
+tempfile = "3.27"
+
+[profile.release]
+debug = 1
+
+# argon2 at default cost takes seconds unoptimized; tests hash and verify passwords.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3

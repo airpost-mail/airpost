@@ -1,0 +1,52 @@
+# cargo deny check — docs/backend-plan.md 3.1. Same licence policy as the root deny.toml
+# (docs/engine-port-plan.md section 12): permissive licences only, since tern-backend is MIT.
+
+[graph]
+all-features = false
+# Dev-dependencies never ship. B1-E dev-depends on ms-net, which brings reqwest and rustls.
+exclude-dev = true
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "MPL-2.0",
+    "Zlib",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+]
+unused-allowed-license = "allow"
+
+[licenses.private]
+# tern-backend itself is MIT (backend-plan O6) and unpublished.
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+# No TLS stack or HTTP client in the server (3.1, O5). aws-lc's OpenSSL-licensed code is not
+# GPL-compatible.
+deny = [
+    { crate = "aws-lc-rs" },
+    { crate = "aws-lc-sys" },
+    { crate = "openssl-sys" },
+    { crate = "openssl" },
+    { crate = "native-tls" },
+    { crate = "rustls" },
+    { crate = "reqwest" },
+]
+
+[advisories]
+version = 2
+yanked = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
