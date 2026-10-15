@@ -944,17 +944,8 @@ fn local_failures_end_the_task_with_error_json() {
 }
 
 #[test]
-fn tasks_of_later_packages_fail_and_unknown_tasks_complete() {
+fn unknown_tasks_complete() {
     let mut e = env(&[]);
-    let mut contact = e.queue("SyncbackContactTask", json!({}));
-    assert_eq!(contact.status(), "remote");
-    e.remote(&mut contact);
-    assert_eq!(contact.status(), "complete");
-    assert_eq!(
-        contact.data["error"]["what"],
-        "Unsure of how to process this task type SyncbackContactTask"
-    );
-
     let mut unknown = e.queue("MadeUpTask", json!({}));
     e.remote(&mut unknown);
     assert_eq!(unknown.status(), "complete");

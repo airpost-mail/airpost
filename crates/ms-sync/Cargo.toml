@@ -24,3 +24,5 @@ tracing.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+# The ms-net tests' MockServer, which the People API tests share.
+reqwest.workspace = true

@@ -230,8 +230,8 @@ pub fn metadata_before_save<M: Model>(model: &mut M, store: &Store) -> Result<()
 }
 
 /// `MailModel::afterSave` for metadata models: rewrites the model's `ModelPluginMetadata`
-/// rows when any plugin's version changed since `initial`, and pulls the expiration
-/// worker's wake time in when a value carries an `expiration`. Metadata with an empty value
+/// rows when any plugin's version changed since `initial`, and wakes the expiration worker
+/// when the earliest `expiration` among the values is before the time it sleeps until. Metadata with an empty value
 /// has no row, which is how a plugin "removes" metadata while its version keeps counting.
 pub fn metadata_after_save<M: Model>(
     model: &M,

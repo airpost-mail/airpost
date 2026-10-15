@@ -106,20 +106,29 @@ pub fn parse_events_in(ics: &str, floating: FloatingZone) -> Vec<EventFields> {
         cal: &cal,
         floating,
     };
-    let mut uidless = 0;
+    let mut uidless: u8 = 0;
     cal.components
         .iter()
         .filter(|c| c.component_type == ICalendarComponentType::VEvent)
         .map(|c| {
             let mut ev = event_fields(c, &ctx);
-            // icalendarlib numbered UID-less events from 0 within the file.
+            // icalendarlib gives UID-less events a one-character UID counting from "\0"
+            // within the file (`UID = NoUID++` assigns an unsigned to a string,
+            // icalendar.cpp:77-78); see `is_placeholder_uid`.
             if ev.uid.is_empty() {
-                ev.uid = uidless.to_string();
-                uidless += 1;
+                ev.uid = char::from(uidless).to_string();
+                uidless = uidless.wrapping_add(1);
             }
             ev
         })
         .collect()
+}
+
+/// Whether `uid` is the placeholder [`parse_events`] gives a VEVENT without one: a single
+/// control character (`performLocalSyncbackEvent` refuses such events).
+pub fn is_placeholder_uid(uid: &str) -> bool {
+    let mut chars = uid.chars();
+    matches!((chars.next(), chars.next()), (Some(c), None) if (c as u32) < 0x20)
 }
 
 /// The VEVENT a row with `recurrence_id` stands for, else the first one: the server may

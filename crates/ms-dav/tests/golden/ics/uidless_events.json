@@ -15,7 +15,7 @@
     "status": "",
     "status_or_default": "CONFIRMED",
     "summary": "First",
-    "uid": "0"
+    "uid": "\u0000"
   },
   {
     "all_day": false,
@@ -33,7 +33,7 @@
     "status": "",
     "status_or_default": "CONFIRMED",
     "summary": "Second",
-    "uid": "1"
+    "uid": "\u0001"
   },
   {
     "all_day": false,

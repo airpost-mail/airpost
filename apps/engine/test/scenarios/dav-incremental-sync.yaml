@@ -32,6 +32,10 @@ addressbooks:
 steps:
   - wait: quiescent
   - wait: {models: {Event: {count: 7}, Contact: {where: {s: carddav}, count: 13}}, timeout: 120}
+  # The rows are in the database up to 500 ms before their deltas reach stdout (a DAVWorker
+  # store streams with a 500 ms delay, MailStore.cpp:95-96), and quiescence only sees deltas
+  # that arrived. Each calendar's last write is its ctag, so wait for both before the mark.
+  - wait: {delta: {class: Calendar, type: persist, where: {ctag: {re: "."}}, count: 2}, timeout: 30}
   - wait: {quiescent: true}
   - assert:
       dav_matches_db: {}
@@ -41,6 +45,8 @@ steps:
   - dav.delete_event: {uid: harness-event-2@example.test}
   - client.sync_calendar: {}
   - wait: {models: {Event: {count: 7, match: [{icsuid: added@example.test}], absent: [{icsuid: harness-event-2@example.test}]}}, timeout: 60}
+  # As above: the changed calendar's new ctag is the pass's last write.
+  - wait: {delta: {since: calendars, class: Calendar, type: persist, where: {ctag: {re: "."}}}, timeout: 30}
   - wait: {quiescent: true}
   - assert:
       dav_matches_db: {}
@@ -60,6 +66,9 @@ steps:
   - dav.set_group_members: {uid: climbing-uid, members: [alice@example.org, bob@example.org]}
   - restart: {wait: false}
   - wait: {models: {Contact: {where: {s: carddav}, match: [{id: dan-uid}, {name: "Alice Archer-Smith"}], absent: [{id: harness-contact-1}]}}, timeout: 120}
+  # As above: group cards are applied after the other cards, so their ContactGroup delta
+  # comes from the tail of the pass.
+  - wait: {delta: {since: contacts, class: ContactGroup, type: persist}, timeout: 30}
   - wait: {quiescent: true}
 expect:
   dav_matches_db: {}

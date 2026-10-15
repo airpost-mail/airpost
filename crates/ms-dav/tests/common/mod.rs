@@ -90,6 +90,19 @@ impl Fake {
         self
     }
 
+    /// A route that answers every request whose body contains `body_has`.
+    pub fn on_body(
+        &self,
+        method: &str,
+        url: &str,
+        body_has: &str,
+        status: u16,
+        body: &str,
+    ) -> &Self {
+        self.add(method, url, Some(body_has), false, status, &[], body);
+        self
+    }
+
     /// A route that answers once, matching a body fragment when given.
     pub fn once(
         &self,
@@ -106,6 +119,12 @@ impl Fake {
 
     pub fn redirect(&self, url: &str, location: &str) -> &Self {
         self.add("GET", url, None, false, 301, &[("Location", location)], "");
+        self
+    }
+
+    /// Drops every route, keeping the request log: the next server state starts here.
+    pub fn reset(&self) -> &Self {
+        self.state.lock().unwrap().routes.clear();
         self
     }
 

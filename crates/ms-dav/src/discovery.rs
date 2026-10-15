@@ -395,7 +395,7 @@ impl DavClient {
         host: &DavHost,
     ) -> Result<Option<Vec<AddressBookInfo>>> {
         let root = self.service_root(DavService::CardDav, host);
-        if root == "https://mail.yahoo.com/" {
+        if self.profile_for(&root).carddav_webmail_root == Some(root.as_str()) {
             return Ok(None);
         }
         // An empty principal resolves to the root, as the C++ did: some servers answer the

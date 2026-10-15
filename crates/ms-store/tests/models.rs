@@ -26,7 +26,26 @@ fn metadata_rows_follow_versions_and_wake_the_expiration_worker() {
         Some(1)
     );
     assert_eq!(m.upsert_metadata("empty", &json!({}), None), Some(1));
+    // The expiration worker sleeps until later than this expiration, so the save wakes it.
+    // Other tests save metadata for the same account and may wake it first; start over then.
+    let signal = ms_core::wake::expiration_signal(ACCOUNT);
+    let worker = loop {
+        let worker = {
+            let signal = signal.clone();
+            std::thread::spawn(move || signal.wait_until(1_900_000_000, &|| 1_700_000_000))
+        };
+        while !signal.is_waiting() && !worker.is_finished() {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        if !worker.is_finished() {
+            break worker;
+        }
+    };
     f.store.save(&mut m).unwrap();
+    assert!(
+        worker.join().unwrap(),
+        "the save woke the expiration worker"
+    );
     let (object_type, expiration): (String, i64) = f
         .store
         .conn()
@@ -46,10 +65,6 @@ fn metadata_rows_follow_versions_and_wake_the_expiration_worker() {
         "empty values have no row"
     );
     f.assert_invariants();
-    let deadline = ms_core::wake::expiration_signal(ACCOUNT)
-        .deadline()
-        .unwrap();
-    assert!(deadline <= 1_800_000_000);
 
     // A stale version is refused.
     let mut m = f.load(msg.id());

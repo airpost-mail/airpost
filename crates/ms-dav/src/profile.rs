@@ -1,12 +1,14 @@
 //! DAV server quirks as named flags, the DAV counterpart of `ms_providers::ServerProfile`.
-//! Taken from the comments in Mailspring-Sync `MailSync/DAVWorker.cpp` (lines 446, 650,
-//! 835, 1020-1023, 1360, 1782-1801, 1968, 2112, 2335; Copyright © 2017 Foundry 376,
-//! GPL-3.0, see NOTICE.md), most of which cite python-caldav's server compatibility notes.
+//! Taken from the comments in Mailspring-Sync `MailSync/DAVWorker.cpp` (lines 196-214,
+//! 446, 650, 835, 1020-1023, 1360, 1782-1801, 1968, 2112, 2335; Copyright © 2017 Foundry
+//! 376, GPL-3.0, see NOTICE.md), most of which cite python-caldav's server compatibility
+//! notes.
 //!
-//! [`DavClient`](crate::DavClient) acts on `http1_only` and `no_sync_collection`. The
-//! other quirks are handled for every server by the generic code paths (the etag fallback,
-//! the client-side range check, bounded time ranges, the comp-filter), so their flags
-//! document where each behaviour comes from and let the workers log it.
+//! [`DavClient`](crate::DavClient) acts on `http1_only`, `no_sync_collection` and
+//! `carddav_webmail_root`. The other quirks are handled for every server by the generic
+//! code paths (the etag fallback, the client-side range check, bounded time ranges, the
+//! comp-filter, href normalisation, case-insensitive group kinds), so their flags document
+//! where each behaviour comes from and let the workers log it.
 
 use crate::href::{host_of, path_of};
 
@@ -25,6 +27,9 @@ pub fn gmail_caldav_host() -> String {
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| GMAIL_CALDAV_HOST.to_string())
 }
+
+/// Where Yahoo's CardDAV `.well-known` redirects end when the account has no CardDAV.
+pub const YAHOO_WEBMAIL_ROOT: &str = "https://mail.yahoo.com/";
 
 /// Server families with a known quirk.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -47,6 +52,8 @@ pub enum DavServer {
     Gmx,
     Xandikos,
     Robur,
+    Cyrus,
+    Confluence,
 }
 
 /// What the server said about itself, from the `Server` and `DAV` response headers.
@@ -63,9 +70,9 @@ pub struct DavProfile {
     pub fixed_caldav_host: Option<&'static str>,
     /// Contacts sync through the People API, not CardDAV (Google).
     pub contacts_via_people_api: bool,
-    /// The CardDAV `.well-known` chain ends on the webmail (`https://mail.yahoo.com/`),
-    /// which means no CardDAV (Yahoo, `DAVWorker.cpp:650`).
-    pub carddav_redirects_to_webmail: bool,
+    /// The CardDAV `.well-known` chain can end on this webmail page, which means no CardDAV
+    /// (Yahoo: `https://mail.yahoo.com/`, `DAVWorker.cpp:650`).
+    pub carddav_webmail_root: Option<&'static str>,
     /// The server may give a written card a new UID and href, so the stored contact is
     /// replaced rather than updated (Fastmail, `DAVWorker.cpp:835`).
     pub reassigns_contact_uid: bool,
@@ -100,6 +107,13 @@ pub struct DavProfile {
     /// DURATION is ignored, so such events look zero-length to time ranges (Xandikos,
     /// `DAVWorker.cpp:1798`).
     pub ignores_duration: bool,
+    /// Hrefs come back percent-encoded twice (`@` as `%2540`; Confluence,
+    /// `DAVWorker.cpp:196-214`); `normalize_href` decodes until stable for every server.
+    pub double_encoded_hrefs: bool,
+    /// A stored vCard 4 group is served to vCard 3 clients as
+    /// `X-ADDRESSBOOKSERVER-KIND:GROUP` (sabre/vobject: Baikal, Nextcloud); `VCard::is_group`
+    /// ignores the value's case for every server.
+    pub uppercase_group_kind: bool,
     /// Authentication fails under HTTP/2 multiplexing with 401s despite correct
     /// credentials (Baikal's nginx image, `DAVWorker.cpp:2335`); requests use HTTP/1.1.
     pub http1_only: bool,
@@ -125,15 +139,21 @@ impl DavProfile {
             }
             ICloud => p.vcard3_contact_groups = true,
             Yahoo => {
-                p.carddav_redirects_to_webmail = true;
+                p.carddav_webmail_root = Some(YAHOO_WEBMAIL_ROOT);
                 p.sync_collection_omits_token = true;
             }
             Fastmail => {
                 p.reassigns_contact_uid = true;
                 p.vcard3_contact_groups = true;
             }
-            Nextcloud => p.unreliable_sync_token = true,
-            Baikal => p.http1_only = true,
+            Nextcloud => {
+                p.unreliable_sync_token = true;
+                p.uppercase_group_kind = true;
+            }
+            Baikal => {
+                p.http1_only = true;
+                p.uppercase_group_kind = true;
+            }
             Radicale => p.requires_bounded_time_range = true,
             Sogo => {
                 p.second_precision_sync_token = true;
@@ -151,7 +171,10 @@ impl DavProfile {
             }
             Xandikos => p.ignores_duration = true,
             Robur => p.no_sync_collection = true,
-            Generic => {}
+            Confluence => p.double_encoded_hrefs = true,
+            // Cyrus fails calendar-query without a VEVENT comp-filter (`DAVWorker.cpp:1783`),
+            // which every server gets.
+            Cyrus | Generic => {}
         }
         p
     }
@@ -195,6 +218,8 @@ fn classify(url: &str, hints: &ServerHints) -> DavServer {
         ("robur", Robur),
         ("baikal", Baikal),
         ("nextcloud", Nextcloud),
+        ("cyrus", Cyrus),
+        ("confluence", Confluence),
     ];
     if let Some((_, s)) = by_header
         .iter()
@@ -269,7 +294,11 @@ mod tests {
     fn flags() {
         assert!(DavProfile::for_server(DavServer::Baikal).http1_only);
         assert!(DavProfile::for_server(DavServer::Gmx).no_sync_collection);
-        assert!(DavProfile::for_server(DavServer::Yahoo).carddav_redirects_to_webmail);
+        assert_eq!(
+            DavProfile::for_server(DavServer::Yahoo).carddav_webmail_root,
+            Some("https://mail.yahoo.com/")
+        );
+        assert!(DavProfile::for_server(DavServer::Baikal).uppercase_group_kind);
         assert!(DavProfile::for_server(DavServer::Generic).requires_comp_filter);
         assert!(!DavProfile::for_server(DavServer::Generic).no_sync_collection);
         assert_eq!(

@@ -194,9 +194,16 @@ impl VCard {
         self.value("VERSION")
     }
 
-    /// `DAVUtils::isGroupCard`: vCard 4 `KIND:group`, or the vCard 3 extension.
+    /// `DAVUtils::isGroupCard`: vCard 4 `KIND:group`, or the vCard 3 extension. The value
+    /// is compared ignoring case (RFC 6350 §6.1.4 defines it in ABNF, where literals are
+    /// case-insensitive): sabre/dav (Baikal, Nextcloud) serves a stored vCard 4 group to a
+    /// vCard 3 client as `X-ADDRESSBOOKSERVER-KIND:GROUP`, which C++ compared exactly and
+    /// missed.
     pub fn is_group(&self) -> bool {
-        self.value("KIND") == "group" || self.named(X_VCARD3_KIND).any(|p| p.value == "group")
+        self.value("KIND").eq_ignore_ascii_case("group")
+            || self
+                .named(X_VCARD3_KIND)
+                .any(|p| p.value.eq_ignore_ascii_case("group"))
     }
 
     /// Groups whose members are written as `MEMBER`: vCard 4.0 cards that state a KIND.
@@ -496,5 +503,18 @@ mod tests {
         let f = ContactFields::from_vcard(&v4.serialize());
         assert!(f.is_group);
         assert_eq!(f.member_ids, vec!["c"]);
+    }
+
+    #[test]
+    fn group_kind_ignores_case() {
+        // A vCard 4 group as sabre/dav serves it to a vCard 3 client.
+        let sabre = VCard::parse(
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Family\r\nX-ADDRESSBOOKSERVER-KIND:GROUP\r\nEND:VCARD\r\n",
+        );
+        assert!(sabre.is_group());
+        assert!(
+            VCard::parse("BEGIN:VCARD\r\nVERSION:4.0\r\nKIND:Group\r\nEND:VCARD\r\n").is_group()
+        );
+        assert!(!VCard::parse("BEGIN:VCARD\r\nKIND:individual\r\nEND:VCARD\r\n").is_group());
     }
 }

@@ -37,7 +37,12 @@ pub struct MetadataPush {
 /// What a pull delivers.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MetadataDelta {
+    /// One plugin's metadata on one model. The worker applies it if it is newer than what
+    /// the model holds, or keeps it in `DetatchedPluginMetadata` until the model arrives.
     Metadata(Metadata),
+    /// Everything before this point has been delivered: the worker stores the cursor and
+    /// resumes from it after a restart (`setDeltaCursor` after each streamed delta).
+    Cursor(String),
     /// The backend rejected the identity; the client must refresh it
     /// (`ProcessIdentityRefreshNeeded`).
     IdentityRefreshNeeded,
@@ -48,7 +53,11 @@ pub trait MetadataBackend: Send + Sync {
     fn push(&self, push: &MetadataPush) -> Result<()>;
 
     /// Streams deltas since `cursor` into `sink` until the backend closes the stream, and
-    /// returns the cursor to resume from.
+    /// returns the cursor to resume from. Without a cursor (first run, or after a reset)
+    /// it delivers the head cursor and then every existing record (`fetchDeltaCursor` and
+    /// the `/metadata` pages). The `metadata` thread calls it again as soon as it returns,
+    /// so it should block while the backend has nothing new. A retryable `SyncError`
+    /// backs off (3 s up to 300 s); any other error ends the process.
     fn pull(&self, cursor: Option<&str>, sink: &mut dyn FnMut(MetadataDelta)) -> Result<String>;
 
     /// A client feature was used (`SendFeatureUsageEventTask`). Usage counts fed

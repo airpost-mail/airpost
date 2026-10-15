@@ -14,14 +14,16 @@ use std::sync::Arc;
 use ms_core::constants::{ls, SENT_COPY_CLEANUP_WINDOW};
 use ms_core::{logmsg, Account, Error, Result, SyncError, UidSet};
 use ms_imap::ImapSession;
-use ms_net::{LocalOnly, MetadataBackend, MetadataPush};
+use ms_net::{LocalOnly, MetadataBackend, MetadataPush, TokenManager};
 use ms_store::model::{json_i64, json_str};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
 use ms_sync::{RemoteTaskRunner, TaskRunnerFactory, WorkerContext};
 use serde_json::Value;
 use tracing::{error, info};
 
+mod contacts;
 mod drafts;
+mod events;
 mod export;
 mod folders;
 mod imap_ops;
@@ -41,19 +43,8 @@ const KEPT_FINISHED_TASKS: i64 = 100;
 /// ...and runs only once more than this many beyond them have accumulated.
 const FINISHED_TASKS_SLOP: i64 = 10;
 
-/// Task classes TaskProcessor.cpp handles that later packages port: the contact and
-/// contact-group tasks (P4-G / P5) and the event tasks (P5). Their local phase does
-/// nothing and their remote phase fails, so the client sees an error instead of an edit
-/// that silently did not happen.
-pub const NOT_YET_PORTED: [&str; 7] = [
-    "DestroyContactTask",
-    "SyncbackContactTask",
-    "ChangeContactGroupMembershipTask",
-    "SyncbackContactGroupTask",
-    "DestroyContactGroupTask",
-    "SyncbackEventTask",
-    "DestroyEventTask",
-];
+pub use contacts::CONTACT_TASKS;
+pub use events::EVENT_TASKS;
 
 fn unsure_how_to_process(class: &str) -> String {
     format!("Unsure of how to process this task type {class}")
@@ -63,23 +54,37 @@ pub struct TaskProcessor<'a> {
     pub account: Arc<Account>,
     pub store: &'a Store,
     metadata: Arc<dyn MetadataBackend>,
+    /// OAuth access tokens for the People API and CalDAV/CardDAV (contact and event tasks).
+    tokens: Arc<TokenManager>,
+    /// `--verbose`: DAV writes log the vCard or ICS they send.
+    verbose: bool,
     /// `$CONFIG_DIR_PATH`: attachments are read from and written to `files/` under it.
     config_dir: Option<PathBuf>,
     mailer: MailerFactory,
     sleep: Sleeper,
+    /// Replaces the DAV transport and host lookup of the contact and event tasks (tests).
+    dav_connector: Option<DavConnector>,
 }
+
+/// Builds the DAV client and host resolver a contact or event task's DavWorker uses.
+pub type DavConnector =
+    Arc<dyn Fn() -> (ms_dav::DavClient, Box<dyn ms_dav::HostResolver>) + Send + Sync>;
 
 impl<'a> TaskProcessor<'a> {
     /// A processor with the local-only metadata backend, SMTP with the account's password
     /// or a token refreshed for this processor, and no config dir.
     pub fn new(account: Arc<Account>, store: &'a Store) -> Self {
+        let tokens = Arc::new(TokenManager::new(None));
         TaskProcessor {
             account,
             store,
             metadata: Arc::new(LocalOnly),
+            tokens: tokens.clone(),
+            verbose: false,
             config_dir: None,
-            mailer: smtp_mailer(Arc::new(ms_net::TokenManager::new(None)), false),
+            mailer: smtp_mailer(tokens, false),
             sleep: thread_sleeper(),
+            dav_connector: None,
         }
     }
 
@@ -89,14 +94,29 @@ impl<'a> TaskProcessor<'a> {
             account: ctx.account.clone(),
             store,
             metadata: ctx.metadata.clone(),
+            tokens: ctx.tokens.clone(),
+            verbose: ctx.verbose,
             config_dir: Some(ctx.config_dir.clone()),
             mailer: smtp_mailer(ctx.tokens.clone(), ctx.verbose),
             sleep: thread_sleeper(),
+            dav_connector: None,
         }
     }
 
     pub fn with_config_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.config_dir = Some(dir.into());
+        self
+    }
+
+    /// Replaces the OAuth token source of the People API calls (tests).
+    pub fn with_tokens(mut self, tokens: Arc<TokenManager>) -> Self {
+        self.tokens = tokens;
+        self
+    }
+
+    /// Replaces the DAV transport and host lookup (tests).
+    pub fn with_dav(mut self, connector: DavConnector) -> Self {
+        self.dav_connector = Some(connector);
         self
     }
 
@@ -195,6 +215,8 @@ impl<'a> TaskProcessor<'a> {
             "ChangeLabelsTask" => {
                 self.perform_local_change_on_messages(data, messages::apply_labels)
             }
+            c if CONTACT_TASKS.contains(&c) => self.perform_local_contact_task(c, data),
+            c if EVENT_TASKS.contains(&c) => self.perform_local_event_task(c, data),
             "SyncbackDraftTask" => self.perform_local_save_draft(data),
             "DestroyDraftTask" => self.perform_local_destroy_draft(data),
             "SyncbackMetadataTask" => self.perform_local_syncback_metadata(&account_id, data),
@@ -315,10 +337,8 @@ impl<'a> TaskProcessor<'a> {
             "GetManyRFC2822Task" => self.perform_remote_get_many_rfc2822(task, session),
             "SendDraftTask" => self.perform_remote_send_draft(task, session),
             "EventRSVPTask" => self.perform_remote_send_rsvp(&task.data),
-            other if NOT_YET_PORTED.contains(&other) => {
-                error!("{}", unsure_how_to_process(other));
-                Err(Error::other(unsure_how_to_process(other)))
-            }
+            c if CONTACT_TASKS.contains(&c) => self.perform_remote_contact_task(c, &task.data),
+            c if EVENT_TASKS.contains(&c) => self.perform_remote_event_task(c, &task.data),
             other => {
                 error!("{}", unsure_how_to_process(other));
                 Ok(())

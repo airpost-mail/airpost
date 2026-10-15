@@ -551,6 +551,14 @@ impl DavClient {
         self.put(ResourceKind::ICalendar, url, ics, etag, false)
     }
 
+    /// PUTs a new event resource with `If-None-Match: *`, so a resource the engine has not
+    /// synced yet (an invitation the server's scheduling delivered) is never overwritten
+    /// (RFC 4791 §5.3.2). A 412 is an `etag-conflict` error. The C++ engine sent no
+    /// precondition on creates.
+    pub fn create_ics(&mut self, url: &str, ics: &str) -> Result<WriteResult> {
+        self.put(ResourceKind::ICalendar, url, ics, "", true)
+    }
+
     /// PUTs an existing card, with `If-Match` when `etag` is set. A 412 is an
     /// `etag-conflict` error.
     pub fn put_vcard(&mut self, url: &str, vcf: &str, etag: &str) -> Result<WriteResult> {

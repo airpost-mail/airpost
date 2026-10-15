@@ -64,8 +64,13 @@ pub fn wake_all_workers() {
     }
 }
 
-/// The metadata expiration worker's timer: it sleeps until the earliest known expiration,
-/// and saving metadata with an earlier one pulls the deadline in.
+/// The metadata expiration worker's wake handle (`MetadataExpirationWorker::_wakeTime`,
+/// `_wakeCv`). The worker publishes the time it sleeps until; saving metadata that expires
+/// earlier ends that sleep so the worker re-scans and picks the new, earlier time.
+///
+/// Like the C++ condition variable, a wake reaches only a worker that is waiting: one that
+/// is scanning reads the new expiration from the database itself. Before the first scan the
+/// wake time is the epoch, so nothing wakes the worker during its start delay.
 #[derive(Default)]
 pub struct DeadlineSignal {
     state: Mutex<DeadlineState>,
@@ -74,73 +79,78 @@ pub struct DeadlineSignal {
 
 #[derive(Default)]
 struct DeadlineState {
-    /// Epoch seconds of the next wake, if any.
-    deadline: Option<i64>,
-    woken: bool,
+    /// Epoch seconds the worker sleeps until.
+    wake_time: i64,
+    waiting: bool,
+    /// Bumped by each wake that reaches a waiting worker.
+    generation: u64,
 }
 
 impl DeadlineSignal {
-    /// `isSavingMetadataWithExpiration`: wake at `expiration` unless already due earlier.
+    fn lock(&self) -> std::sync::MutexGuard<'_, DeadlineState> {
+        self.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// `isSavingMetadataWithExpiration`: wakes the worker if `expiration` (epoch seconds) is
+    /// before the time it sleeps until.
     pub fn schedule(&self, expiration: i64) {
-        let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        if s.deadline.is_none_or(|d| expiration < d) {
-            s.deadline = Some(expiration);
-            self.cv.notify_all();
+        let mut s = self.lock();
+        if expiration < s.wake_time {
+            if s.waiting {
+                s.generation = s.generation.wrapping_add(1);
+                self.cv.notify_all();
+            }
+        } else {
+            tracing::info!(
+                "Metadata expiration {expiration} is further in future than wake time {}",
+                s.wake_time
+            );
         }
     }
 
+    /// `WakeAllMetadataExpirationWorkers`: re-check for metadata that expired while the
+    /// machine slept.
     pub fn wake(&self) {
-        let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        s.woken = true;
-        self.cv.notify_all();
+        self.schedule(0);
     }
 
-    pub fn deadline(&self) -> Option<i64> {
-        self.state
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .deadline
+    /// The time the worker last slept or sleeps until, in epoch seconds.
+    pub fn wake_time(&self) -> i64 {
+        self.lock().wake_time
     }
 
-    /// Replaces the deadline (the worker computes it from the database after each run).
-    pub fn set_deadline(&self, deadline: Option<i64>) {
-        self.state
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .deadline = deadline;
+    /// Whether the worker is waiting in [`DeadlineSignal::wait_until`].
+    pub fn is_waiting(&self) -> bool {
+        self.lock().waiting
     }
 
-    /// Waits until the deadline (measured with `now`, epoch seconds), a wake, or `max`.
-    /// Clears the wake flag.
-    pub fn wait(&self, now: &dyn Fn() -> i64, max: Duration) {
-        let limit = Instant::now() + max;
-        let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        loop {
-            if s.woken {
-                s.woken = false;
-                return;
+    /// Publishes `wake_time` and sleeps until `now()` (epoch seconds) reaches it or a
+    /// [`DeadlineSignal::schedule`] with an earlier time. Returns true if woken early.
+    pub fn wait_until(&self, wake_time: i64, now: &dyn Fn() -> i64) -> bool {
+        // Re-read the clock at least this often, so a wall-clock jump (the machine slept)
+        // does not stretch the sleep.
+        const MAX_SLICE: Duration = Duration::from_secs(30);
+        let mut s = self.lock();
+        s.wake_time = wake_time;
+        s.waiting = true;
+        let start = s.generation;
+        let woken = loop {
+            if s.generation != start {
+                break true;
             }
-            let remaining_max = limit.saturating_duration_since(Instant::now());
-            let until_deadline = match s.deadline {
-                Some(d) => {
-                    let secs = d - now();
-                    if secs <= 0 {
-                        return;
-                    }
-                    Duration::from_secs(secs as u64)
-                }
-                None => remaining_max,
-            };
-            let wait = until_deadline.min(remaining_max);
-            if wait.is_zero() {
-                return;
+            let secs = wake_time - now();
+            if secs <= 0 {
+                break false;
             }
+            let wait = Duration::from_secs(secs as u64).min(MAX_SLICE);
             s = self
                 .cv
                 .wait_timeout(s, wait)
                 .unwrap_or_else(|e| e.into_inner())
                 .0;
-        }
+        };
+        s.waiting = false;
+        woken
     }
 }
 
@@ -149,9 +159,9 @@ fn registry() -> &'static Mutex<HashMap<String, Arc<DeadlineSignal>>> {
     REG.get_or_init(Default::default)
 }
 
-/// The expiration signal of an account, created on first use. The store calls
-/// [`DeadlineSignal::schedule`] when it saves metadata with an expiration; the worker waits
-/// on it.
+/// The expiration signal of an account (`MetadataExpirationWorkerForAccountId`), created
+/// on first use. The store calls [`DeadlineSignal::schedule`] when it saves metadata with an
+/// expiration; the worker waits on it.
 pub fn expiration_signal(account_id: &str) -> Arc<DeadlineSignal> {
     registry()
         .lock()
@@ -187,17 +197,40 @@ mod tests {
     }
 
     #[test]
-    fn deadline_schedule_keeps_earliest() {
-        let d = DeadlineSignal::default();
-        d.schedule(100);
-        d.schedule(200);
-        assert_eq!(d.deadline(), Some(100));
-        d.schedule(50);
-        assert_eq!(d.deadline(), Some(50));
-        // already due
-        d.wait(&|| 60, Duration::from_secs(5));
-        d.wake();
-        d.set_deadline(None);
-        d.wait(&|| 0, Duration::from_secs(5));
+    fn schedule_wakes_only_a_waiting_worker_for_an_earlier_time() {
+        let now = || 1_000;
+        let d = Arc::new(DeadlineSignal::default());
+        // Nothing is waiting: the wake is lost, as with a condvar.
+        d.schedule(-1);
+        assert!(!d.wait_until(999, &now), "already due");
+        assert_eq!(d.wake_time(), 999);
+
+        let waiter = {
+            let d = d.clone();
+            thread::spawn(move || d.wait_until(1_000_000, &|| 1_000))
+        };
+        while !d.is_waiting() {
+            thread::sleep(Duration::from_millis(5));
+        }
+        d.schedule(2_000_000);
+        thread::sleep(Duration::from_millis(50));
+        assert!(!waiter.is_finished(), "a later expiration does not wake");
+        d.schedule(5_000);
+        assert!(waiter.join().unwrap());
+        assert!(!d.is_waiting());
+    }
+
+    #[test]
+    fn wake_all_workers_wakes_registered_expiration_workers() {
+        let d = expiration_signal("wake-all-test");
+        let waiter = {
+            let d = d.clone();
+            thread::spawn(move || d.wait_until(1_000_000, &|| 1_000))
+        };
+        while !d.is_waiting() {
+            thread::sleep(Duration::from_millis(5));
+        }
+        wake_all_workers();
+        assert!(waiter.join().unwrap());
     }
 }

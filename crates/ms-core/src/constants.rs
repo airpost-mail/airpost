@@ -145,6 +145,18 @@ pub const DELTA_TYPE_PERSIST: &str = "persist";
 pub const DELTA_TYPE_UNPERSIST: &str = "unpersist";
 pub const DELTA_TYPE_METADATA_EXPIRATION: &str = "metadata-expiration";
 
+/// `MetadataExpirationWorker::run`, which names none of these: seconds before the first
+/// scan (plugins load after the main window), the wake with nothing scheduled, the
+/// shortest sleep after a scan that emitted (the client needs time to clear what it was
+/// sent) and after one that did not (the undo-send window), models per lookup, and the
+/// delta delivery delay in milliseconds.
+pub const METADATA_EXPIRATION_START_DELAY: u64 = 15;
+pub const METADATA_EXPIRATION_IDLE: i64 = 2 * 60 * 60;
+pub const METADATA_EXPIRATION_MIN_DELAY_AFTER_EMIT: i64 = 15;
+pub const METADATA_EXPIRATION_MIN_DELAY_IDLE: i64 = 5;
+pub const METADATA_EXPIRATION_CHUNK: usize = 100;
+pub const METADATA_EXPIRATION_EMIT_DELAY_MS: u64 = 500;
+
 /// Finished tasks kept, and how far past it pruning waits (`cleanupOldTasksAtRuntime`).
 pub const TASK_KEEP_FINISHED: usize = 100;
 pub const TASK_PRUNE_SLOP: usize = 10;

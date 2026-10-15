@@ -9,7 +9,9 @@
 
 pub mod background;
 pub mod cal_contacts;
+pub mod dav;
 pub mod foreground;
+pub mod google_contacts;
 pub mod mail_processor;
 pub mod mailbox_model;
 pub mod metadata_expiration;

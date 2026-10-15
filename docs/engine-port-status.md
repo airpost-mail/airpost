@@ -1,7 +1,7 @@
 # Engine port status
 
-State of the Rust port of Mailspring-Sync after P3 (plan section 8), 2026-10-15. P2 finished
-earlier the same day, P1 on 2026-10-14. The plan is `docs/engine-port-plan.md`; this file records what exists and what the
+State of the Rust port of Mailspring-Sync after P4/P5 (plan section 8), 2026-10-15, checked by
+the P4/P5 final verification run. P2 and P3 finished earlier the same day, P1 on 2026-10-14. The plan is `docs/engine-port-plan.md`; this file records what exists and what the
 next phases need.
 
 ## Workspace gate
@@ -12,18 +12,18 @@ All run from the repo root on the integrated tree:
 |---|---|
 | `cargo fmt --all --check` | clean |
 | `cargo clippy --workspace --all-targets -- -D warnings` | clean |
-| `cargo test --workspace` | P3 tree: 433 pass, 0 fail, 42 ignored (41 `ms-imap` session tests and 1 `mailsync` cli test need Docker / 30 s). P2 tree: 397 pass |
+| `cargo test --workspace` | P4/P5 tree: 469 pass, 0 fail, 42 ignored (41 `ms-imap` session tests and 1 `mailsync` cli test need Docker / 30 s). P3: 433 pass; P2: 397 |
 | `cargo build --release` | ok |
 | `cargo deny check licenses bans` | ok; one reqwest (0.13, rustls/ring), no aws-lc-rs, OpenSSL or native-tls |
 | P0 gate (migrate + sync through the harness's `tern-mailspring-bin/mailsync` symlink) | migrate prints `{"error":null}`; sync starts `main`, `background`, `foreground`, stays up, stderr empty |
 | `pytest apps/engine/test --collect-only` | 215 tests collected |
 | Upstream C++ binary, `--servers fake -k "baseline-initial-sync or metadata-expiration"` | 4 passed, 5 skipped (dovecot/cyrus not selected) (P1) |
-| Full harness suite, Rust release binary, all servers (P3) | 196 passed, 15 failed, 3 skipped, 1 xfailed; no P3 bugs (see "Full-suite tally (P3)"). P2: 121 passed, 90 failed |
+| Full harness suite, Rust release binary, all servers (P4/P5 final) | 210 passed, 1 failed (conformance flake, passes on rerun), 3 skipped, 1 xfailed of 215; see "Full-suite tally (P4/P5)". P3: 196 passed, 15 failed |
 
 The background and foreground workers (P2), the mail tasks, send and the `test` /
-`install-check` modes (P3) are implemented. Still missing: the `calContacts` thread (Google
-People, CalDAV, CardDAV), contact/contact-group/event tasks, the metadata expiration worker and
-the remote metadata worker (P4/P5), and `import-legacy` (P6).
+`install-check` modes (P3), the `calContacts` thread (Google People, CalDAV, CardDAV), the
+contact, contact-group and event tasks, the metadata expiration worker and the remote metadata
+worker (P4/P5) are implemented. Still missing: `import-legacy` (P6).
 
 ## Packages
 
@@ -77,9 +77,9 @@ the remote metadata worker (P4/P5), and `import-legacy` (P6).
 - Endpoint overrides read the harness names: `MAILSYNC_GOOGLE_TOKEN_URL`,
   `MAILSYNC_MICROSOFT_TOKEN_URL`, `MAILSYNC_GOOGLE_PEOPLE_ROOT` (`Endpoints::from_env`).
 - Tests: unit 7, http 9, oauth 12, people 8.
-- `SyncWorker::configure` calls `token_for` before every worker iteration of an OAuth account;
-  `google-people-initial-sync` gets through its `ProcessAccountSecretsUpdated` (rotated refresh
-  token) step on the Rust binary. The People client is not called by any worker yet (P4-G).
+- `SyncWorker::configure` calls `token_for` before every worker iteration of an OAuth account.
+  The People client is used by `GoogleContactsWorker` and the Gmail contact tasks (P4-G), the
+  `MetadataBackend` trait by `MetadataWorker` and SyncbackMetadata (P4-M).
 
 ### P1-T SMTP (`crates/ms-smtp`): gate passed
 
@@ -112,10 +112,11 @@ the remote metadata worker (P4/P5), and `import-legacy` (P6).
   DAV (Radicale/Baikal in Docker) scenarios, new `wait: {log, count}` and `wait: {people_requests}`
   forms, the endpoint override table in `test/README.md`.
 - The C++ binary still passes the unchanged scenarios it was run on.
-- Open: DAV and People scenarios cannot be validated end to end until P4-G/P5 exist (the C++
-  binary does not read the overrides). Fixed waits in `dav-create-update-delete` (20 s after the
-  pass starts) and `google-people-sync-token-expired` (5 s settle) may need tuning; a log line for
-  the end of a contacts pass would make the first exact.
+- Open: the DAV and People scenarios have only ever run on the Rust engine (the C++ binary
+  does not read the overrides), so they check the Rust engine against the C++ source, not
+  against the C++ binary. The fixed waits in `dav-create-update-delete` (20 s after the pass
+  starts) and `google-people-sync-token-expired` (5 s settle) are still there and passed in
+  every P4/P5 run; a log line for the end of a contacts pass would make the first exact.
 
 ### P2-B background and P2-F foreground (`crates/ms-sync`): gate passed apart from task-blocked scenarios and one environment failure
 
@@ -214,9 +215,8 @@ the remote metadata worker (P4/P5), and `import-legacy` (P6).
   - `json.rs`: task field reads that fail with nlohmann's `what` text, so a malformed task ends
     as `unhandled-exception` on the task, as C++.
 - Error policy: a task failure is saved on the task (`complete` + error JSON) and
-  `perform_remote` returns `Ok`; only a SQLite error leaves the task as it was. Task classes of
-  later packages (`NOT_YET_PORTED` in lib.rs: contact, contact-group and event tasks) do nothing
-  locally and complete with an error remotely; unknown classes complete, as C++.
+  `perform_remote` returns `Ok`; only a SQLite error leaves the task as it was. Unknown
+  classes complete, as C++. (The contact, contact-group and event tasks came in P4-G / P5.)
 - Differences from C++: an unreadable draft attachment fails the send with `send-failed` (C++
   sent an empty part; plan section 6 "Send"). Attachments are read from the client's
   `files/xx/yy/<id>/<safeDisplayName>` path first (`File::client_path_in`), then the C++
@@ -295,6 +295,130 @@ The earlier P3-A run had 43 cases without fake:gmail (41 match, 2 known divergen
   mismatches; table above).
 - Per-agent `target/p3-*` build dirs and old `apps/engine/test/runs/` session dirs removed;
   this run's artifacts are in `apps/engine/test/runs/p3-final/`.
+
+### P4-G Google People (`crates/ms-sync/src/google_contacts.rs`, `crates/ms-tasks/src/contacts.rs`): gate passed
+
+- What exists: `ms_sync::google_contacts::GoogleContactsWorker` (`GoogleContactsWorker.cpp`):
+  `new(account, &Store, Arc<TokenManager>)`, `with_page_delay`, `run` (people and groups
+  listings with `gsynctoken-contacts-<aid>` / `gsynctoken-groups-<aid>`, from
+  `contacts_sync_token_key` / `groups_sync_token_key`), and the task writes `upsert_contact`,
+  `delete_contact`, `upsert_contact_group`, `delete_contact_group`,
+  `update_contact_group_membership`. `find_or_create_book` creates the `gpeople` ContactBook
+  with the id the contacts pass uses, so a task queued before the first pass finds it.
+- Tasks: `ms_tasks::CONTACT_TASKS` (DestroyContact, SyncbackContact,
+  ChangeContactGroupMembership, SyncbackContactGroup, DestroyContactGroup) dispatch in
+  `perform_local` / `perform_remote` to `contacts.rs`; Gmail goes to the People API, every
+  other account to the CardDAV branch P5 added there (`DavWorker`). `TaskProcessor` carries
+  `tokens` (from `ctx.tokens`; `new()` shares one TokenManager with the mailer) and `verbose`;
+  `with_tokens` and `with_dav` (a `DavConnector` building the client and host resolver)
+  replace them in tests.
+- calContacts hooks: `cal_contacts.rs` holds `CalContactsWorkers { google, dav }`; a pass
+  with contacts runs Google People, then `DavWorker::run` (`run_contacts`, the CardDAV half,
+  skipped for Gmail; then `run_calendars`); a calendars-only pass and `sync-calendar`
+  run `run_calendars`. Contacts every 75 min by elapsed time, calendars every 15 min, the
+  failure policy of `runCalContactsSyncWorker` (`PassFailure`).
+- Tests: ms-sync `google_contacts` 3, ms-tasks `contacts` 5, cal_contacts unit 2.
+- Gate: `google-people-initial-sync`, `-incremental-sync`, `-sync-token-expired`,
+  `-contact-tasks` pass on fake:gmail. No People scenario was changed.
+- Open:
+  - A Gmail DestroyContactGroupTask whose People API delete fails still loses the local
+    ContactGroup, as in C++. Restoring it means saving the group and its members in the task
+    data during the local phase (the join rows go on remove); needs a decision.
+  - Only the fake People API has been exercised; no real Google account has synced.
+
+### P4-M metadata (`crates/ms-sync/src/metadata_expiration.rs`, `metadata_worker.rs`): gate passed
+
+- What exists: `MetadataExpirationWorker` (`new`, `with_chunk_pause`, `scan`) behind
+  `run_metadata_expiration`, with the `METADATA_EXPIRATION_*` constants in ms-core;
+  `ms_core::wake::DeadlineSignal` follows `isSavingMetadataWithExpiration` (`schedule`,
+  `wake`, `wait_until`, `wake_time`, `is_waiting`). `MetadataWorker` (`new`, `cursor`,
+  `pull_once`) and `apply_metadata` behind `run_metadata_worker`, which is not started for
+  `LocalOnly`; `MetadataDelta::Cursor` lets a backend save a resume point mid-stream.
+- Tests: ms-sync `metadata` 4, `apps/engine/tests/metadata_backend.rs` 3, wake unit 3.
+- Gate: `metadata-expiration-snooze`, `-send-later` pass on fake:dovecot; the C++ binary
+  passes them too and was the oracle. No metadata scenario was changed.
+- Open: `MetadataWorker` is exercised only through test backends
+  (`apps/engine/tests/metadata_backend.rs`); the shipped engine uses `LocalOnly`, so the worker
+  never starts in production until a real backend exists.
+
+### P5 DAV (`crates/ms-sync/src/dav.rs`, `crates/ms-tasks/src/events.rs`): gate passed
+
+- What exists: `ms_sync::dav::DavWorker` (`DAVWorker.cpp`): CardDAV discovery with
+  validation and rediscovery, sync-collection with the etag-listing fallback for address
+  books and calendars, the Yahoo empty-answer fallback, 507 paging (in ms-dav), the
+  empty-multiget token hold, the sync window for new events on the sync-token path, the
+  deleted-master cascade, calendar metadata and pruning (only when the listing names a held
+  calendar), `write_and_resync_contact`, `delete_contact`, `write_and_resync_event`,
+  `restore_event_from_server`, `delete_event`; `rebuild_contact_group` and
+  `ics_event_fields`. `ms_tasks::EVENT_TASKS` (SyncbackEvent, DestroyEvent) in `events.rs`.
+- ms-dav changes: `DavProfile.carddav_webmail_root` (replaces the Yahoo bool),
+  `double_encoded_hrefs`, `uppercase_group_kind`, `DavServer::Cyrus` / `Confluence`;
+  UID-less VEVENTs get icalendarlib's placeholder UIDs (`is_placeholder_uid`); `VCard::is_group`
+  compares the kind case-insensitively; `DavClient::create_ics`.
+- Tests: ms-sync `dav` 12 (scripted transport: etag listings, sync-token edge cases, prune
+  guard, event creates and restore), ms-tasks `dav_tasks` 5.
+- Gate: `dav-initial-sync`, `dav-incremental-sync`, `dav-create-update-delete`,
+  `dav-etag-conflict` pass on radicale and baikal.
+- Scenario changes: one. `dav-incremental-sync` gained three `wait: {delta: …}` steps before
+  its quiescence marks (each calendar's ctag persist, the changed calendar's ctag, the
+  ContactGroup persist after the restart). Justification: every DAVWorker store streams its
+  deltas with a 500 ms delay (`_streamMaxDelay(500)`, MailStore.cpp:95-96; only SyncWorker
+  and main call `setStreamDelay`), so rows are in the database before their deltas reach
+  stdout, and quiescence only sees deltas that have arrived. The assertions are unchanged.
+- Open:
+  - Items 18-20 of the review (If-None-Match on event creates; undoing a refused
+    SyncbackEvent, DestroyContact or CardDAV DestroyContactGroup) depart from C++, which has
+    the same gaps. Plan section 6 "DAV" records them; whether the plan keeps them needs
+    confirming.
+  - Only Radicale and Baikal have been run end to end. The other `DavProfile` servers
+    (iCloud, Yahoo, Fastmail, Google, Nextcloud, GMX) have profile unit tests and recorded
+    fixtures in ms-dav, not a real-server run.
+
+### P4/P5 fix round 1 (2026-10-15)
+
+- A new CardDAV group card gets no bookId until its read-back, as in C++
+  (TaskProcessor.cpp:1528-1545): with one, an etag-listing pass between the local and remote
+  phases deleted the card (empty etag, never listed) and its ContactGroup.
+- A new event is PUT with `If-None-Match: *` (`DavClient::create_ics`); C++ sent no
+  precondition.
+- A refused remote phase no longer leaves the local edit behind (C++ did): SyncbackEvent
+  re-reads the stored resource, or removes an event that was never written; DestroyContact
+  unhides the contacts it did not delete (group cards stay hidden); a CardDAV
+  DestroyContactGroup rebuilds the group from its card. A Gmail DestroyContactGroup that
+  fails still loses the local group, as in C++. Plan section 6 "DAV" records these.
+- DavWorker tests on ms-dav's scripted transport (`crates/ms-sync/tests/dav.rs`, helpers in
+  `tests/support/dav_server.rs`, shared with ms-tasks); `Fake` gained `reset` and `on_body`.
+- Full suite, Rust release binary, all servers (fake, dovecot, cyrus, radicale, baikal),
+  without `import-legacy-carries-metadata` (P6) and `rules-ready-pre-upgrade-messages`
+  (baseline not built): **211 passed, 0 failed** (12 min). `cargo fmt --all --check` and
+  `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo test --workspace`
+  469 passed, 0 failed, 42 ignored.
+
+### P4/P5 final verification (2026-10-15)
+
+- No code changes. Release binary up to date; full suite on all servers (tally below).
+  `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` clean;
+  `cargo test --workspace` 469 passed, 0 failed, 42 ignored.
+- One leftover `harness-dovecot-*` container removed. Per-agent `target/p4-*`, `target/p5`,
+  `target/p45-*` build dirs and the old `apps/engine/test/runs/` dirs (`p3-final`, `p4-*`,
+  `p45-review-*`) removed; this run's artifacts are in `apps/engine/test/runs/p45-final/`.
+
+## Full-suite tally (P4/P5, 2026-10-15)
+
+`MAILSYNC_BIN=target/release/mailsync HARNESS_RUNS_DIR=apps/engine/test/runs/p45-final python3 -m pytest apps/engine/test`,
+all servers (fake, dovecot, cyrus, radicale, baikal), 16 workers, 12 min: **210 passed, 1
+failed, 3 skipped, 1 xfailed** of 215. Every P3 failure except the flake now passes.
+
+| Category | Count | Cases |
+|---|---|---|
+| Harness flake, no engine involved | 1 | `conformance::test_fake_matches_dovecot[probe_idle]` (Dovecot's untagged `* OK` during IDLE missing under load, as in the P3 run); passed twice on rerun |
+| P6 | 0 failed | `import-legacy-carries-metadata` is xfail |
+| Fails on C++ too | 0 | |
+| P4/P5 bug | 0 | |
+
+Skipped: `rules-ready-pre-upgrade-messages` x3 (baseline binary `ab/mailsync-a83cc9a` not built).
+Xfail: `import-legacy-carries-metadata` (P6). No case needed a C++ cross-check: the only
+C++-oracle scenarios here (`metadata-expiration-*`) pass.
 
 ## Full-suite tally (P3, 2026-10-15)
 
@@ -375,32 +499,35 @@ PIM oracles) pass.
 - **P5**: use `ms_dav::CalendarHome::gmail` (which honours `MAILSYNC_GOOGLE_CALDAV_ROOT`) rather than
   `ServerProfile::caldav_url`, and `DnsResolver` (which honours the host overrides) for discovery.
 
-## What P4 and P5 need to know
+## What P6 needs
 
-- **calContacts thread.** `ms_sync::cal_contacts::run_cal_contacts` sleeps
-  `CAL_CONTACTS_INITIAL_DELAY` plus the account's start delay and parks; `run_calendar_pass`
-  (`sync-calendar`) does nothing. P4-G puts the Google People pass there, P5 the CalDAV/CardDAV
-  passes; the scenarios wait for `Calendar sync pass 1, with contacts` (`ms-core::logmsg`), and
-  `dav-create-update-delete` has a fixed 20 s wait after the pass starts. It needs its own
-  `Store` (one per thread). Use `ms_dav::CalendarHome::gmail` and `DnsResolver` (they honour the
-  harness overrides) and a caching `TokenProvider`.
-- **Contact, group and event task hooks.** `ms_tasks::NOT_YET_PORTED` lists DestroyContact,
-  SyncbackContact, ChangeContactGroupMembership, SyncbackContactGroup, DestroyContactGroup,
-  SyncbackEvent and DestroyEvent. Today their local phase is a no-op and the remote phase saves
-  an error on the task. Port each by adding a `perform_local` / `perform_remote` arm in
-  `crates/ms-tasks/src/lib.rs` and removing it from the list; keep the error-on-task policy
-  (return `Ok` for task failures). In C++ these tasks' remote phase talks to DAV/People, not
-  IMAP, so it needs the DAV client or People client reachable from the foreground's
-  `perform_remote` (or a hand-off to calContacts); `Contact::mutate_vcf_in_info` is the store
-  half of `mutateCardInInfo`.
-- **Metadata expiration (P4-M).** Saving metadata with an `expiration` already calls
-  `ms_core::wake::expiration_signal(account).schedule(e)` (`ms-store` `model.rs`), and
-  `DELTA_TYPE_METADATA_EXPIRATION` and `DeltaItem::for_model` exist. The worker
-  (`ms_sync::metadata_expiration::run_metadata_expiration`) only waits on the signal; it needs
-  the `MetadataExpirationWorker` body (query due `ModelPluginMetadata` rows, emit
-  `metadata-expiration` deltas, reschedule). `run_metadata_worker` (remote pull) idles and is not
-  started for `LocalOnly`. SyncbackMetadataTask's remote phase already calls
-  `MetadataBackend::push` for a non-local backend.
+- **`import-legacy`** (plan section 9) is the only missing mode; `import-legacy-carries-metadata`
+  is xfail and becomes its gate. It reads `edgehill.legacy.db` (left by `migrate`) and imports
+  `ModelPluginMetadata` for messages and threads as `DetatchedPluginMetadata`-style rows keyed
+  by `headerMessageId`, local drafts (UID-0 drafts placements with `MessageBody` and files) and
+  the `_State` keys that still apply. Snoozes and send-later must survive: the expiration
+  worker (P4-M) only sees metadata that is attached to a row, so check an imported snooze
+  wakes. Contacts, events and mail are not imported; the calContacts and mail workers resync
+  them.
+- **Packaging:** macOS signing and notarization of `target/release/mailsync`, and Linux
+  packages. The client finds the binary at `<resources>/mailsync` under `app.asar.unpacked`
+  (`apps/desktop/app/src/mailsync-process.ts:135`). `cargo deny` is clean today; keep the
+  reqwest/rustls (ring) stack free of OpenSSL and aws-lc-rs.
+- **Client engine setting:** a setting that picks the C++ or Rust binary. `migrate` already
+  moves a C++ `edgehill.db` aside when `_State.engine` is not `rust`. C++ opens a
+  `user_version = 12` DB without migrating (MailStore.cpp:116, 212-257), so switching back runs
+  C++ on the Rust-written DB; decide whether that is allowed or the switch forces a resync.
+- **`ab.py` over the full suite:** `apps/engine/test/tools/ab.py run` on the C++ binary and the
+  Rust one, then `compare`. Expect the DAV and People scenarios to differ (the C++ binary does
+  not read the endpoint overrides) and the two `dovecot:tls` test-mode divergences; anything
+  else is a regression. Building `ab/mailsync-a83cc9a` would also un-skip
+  `rules-ready-pre-upgrade-messages`.
+- **Dogfooding on real accounts**, which no phase has done yet: Gmail and O365 `--mode test`
+  against C++ (the P3-A gate item), Gmail People and Google CalDAV, iCloud/Fastmail/Yahoo
+  CardDAV and CalDAV, and a few thousand real messages diffed for snippet and body drift
+  (plan section 10).
+- **Decisions pending from P4/P5:** the Gmail DestroyContactGroup restore (P4-G open) and
+  whether the plan keeps the P4/P5 departures from C++ in section 6 "DAV" (P5 open).
 
 ## What P3 needed to know (P2 handoff, kept for reference)
 
