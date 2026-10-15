@@ -1545,6 +1545,7 @@ dependencies = [
 name = "ms-tasks"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "ms-core",
  "ms-dav",
  "ms-imap",

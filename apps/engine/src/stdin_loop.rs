@@ -15,7 +15,9 @@ use ms_core::SyncError;
 use serde_json::Value;
 
 use crate::platform;
+use ms_store::{Model, Task};
 use ms_sync::WorkerContext;
+use ms_tasks::TaskProcessor;
 
 pub fn run(ctx: WorkerContext) -> i32 {
     let store = match ms_store::Store::open(&ctx.config_dir, ctx.deltas.clone()) {
@@ -27,7 +29,10 @@ pub fn run(ctx: WorkerContext) -> i32 {
         }
     };
     store.set_stream_delay(STREAM_DELAY_MAIN_MS);
-    // TODO(P3-T): TaskProcessor::cleanup_tasks_after_launch on this store.
+    let tasks = TaskProcessor::for_context(&ctx, &store);
+    if let Err(e) = tasks.cleanup_tasks_after_launch() {
+        abort_on_task_error(&e);
+    }
 
     let fg_wake_queued = Arc::new(AtomicBool::new(false));
     let calendar_running = Arc::new(AtomicBool::new(false));
@@ -51,7 +56,7 @@ pub fn run(ctx: WorkerContext) -> i32 {
         let Ok(packet) = serde_json::from_str::<Value>(trimmed) else {
             continue;
         };
-        handle(&ctx, &packet, &fg_wake_queued, &calendar_running);
+        handle(&ctx, &tasks, &packet, &fg_wake_queued, &calendar_running);
     }
 }
 
@@ -66,20 +71,32 @@ fn wait_for_parent_then_exit() -> ! {
     platform::exit_now(EXIT_STDIN_CLOSED)
 }
 
+/// A database error from a task's local phase or a cancel leaves the task as it was; the
+/// C++ main loop let it escape and aborted.
+fn abort_on_task_error(e: &ms_core::Error) -> ! {
+    ms_core::critical!("An unexpected error occurred during program execution: {e}");
+    ms_core::log::flush();
+    std::process::abort();
+}
+
 fn handle(
     ctx: &WorkerContext,
+    tasks: &TaskProcessor<'_>,
     packet: &Value,
     fg_wake_queued: &Arc<AtomicBool>,
     calendar_running: &Arc<AtomicBool>,
 ) {
     match packet["type"].as_str().unwrap_or("") {
         "queue-task" => {
-            let mut task = packet["task"].clone();
-            if task.is_object() {
-                task["v"] = Value::from(0);
+            let mut json = packet["task"].clone();
+            if let Some(obj) = json.as_object_mut() {
+                obj.insert("v".into(), Value::from(0));
+                if let Ok(mut task) = Task::from_json(json) {
+                    if let Err(e) = tasks.perform_local(&mut task) {
+                        abort_on_task_error(&e);
+                    }
+                }
             }
-            // TODO(P3-T): TaskProcessor::perform_local(task) on the main store.
-            let _ = task;
 
             // Interrupt the foreground IDLE so it runs the remote phase, after a short
             // wait so tasks queued back to back go together instead of fighting the
@@ -98,7 +115,13 @@ fn handle(
             }
         }
         "cancel-task" => {
-            // TODO(P3-T): TaskProcessor::cancel(packet["taskId"]).
+            // A task that has started (or finished) cannot always be dequeued, but a
+            // deleted draft's pending saves can.
+            if let Some(id) = packet["taskId"].as_str() {
+                if let Err(e) = tasks.cancel(id) {
+                    abort_on_task_error(&e);
+                }
+            }
         }
         "wake-workers" => {
             tracing::info!("{}", ms_core::logmsg::waking_all_workers());

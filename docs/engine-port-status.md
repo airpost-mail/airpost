@@ -1,7 +1,7 @@
 # Engine port status
 
-State of the Rust port of Mailspring-Sync after P2 (plan section 8), 2026-10-15. P1 finished
-2026-10-14. The plan is `docs/engine-port-plan.md`; this file records what exists and what the
+State of the Rust port of Mailspring-Sync after P3 (plan section 8), 2026-10-15. P2 finished
+earlier the same day, P1 on 2026-10-14. The plan is `docs/engine-port-plan.md`; this file records what exists and what the
 next phases need.
 
 ## Workspace gate
@@ -12,16 +12,18 @@ All run from the repo root on the integrated tree:
 |---|---|
 | `cargo fmt --all --check` | clean |
 | `cargo clippy --workspace --all-targets -- -D warnings` | clean |
-| `cargo test --workspace` | P2 tree: 397 pass, 0 fail; 41 `ms-imap` session tests and 1 `mailsync` cli test are `#[ignore]` (need Docker / 30 s) |
+| `cargo test --workspace` | P3 tree: 433 pass, 0 fail, 42 ignored (41 `ms-imap` session tests and 1 `mailsync` cli test need Docker / 30 s). P2 tree: 397 pass |
 | `cargo build --release` | ok |
 | `cargo deny check licenses bans` | ok; one reqwest (0.13, rustls/ring), no aws-lc-rs, OpenSSL or native-tls |
 | P0 gate (migrate + sync through the harness's `tern-mailspring-bin/mailsync` symlink) | migrate prints `{"error":null}`; sync starts `main`, `background`, `foreground`, stays up, stderr empty |
 | `pytest apps/engine/test --collect-only` | 215 tests collected |
 | Upstream C++ binary, `--servers fake -k "baseline-initial-sync or metadata-expiration"` | 4 passed, 5 skipped (dovecot/cyrus not selected) (P1) |
-| Full harness suite, Rust release binary, all servers (P2) | 121 passed, 90 failed, 3 skipped, 1 xfailed; no P2 regressions (see "Full-suite tally") |
+| Full harness suite, Rust release binary, all servers (P3) | 196 passed, 15 failed, 3 skipped, 1 xfailed; no P3 bugs (see "Full-suite tally (P3)"). P2: 121 passed, 90 failed |
 
-The background and foreground workers are implemented (P2). Tasks are not: `queue-task` is
-accepted and dropped, so every scenario that waits on a task times out.
+The background and foreground workers (P2), the mail tasks, send and the `test` /
+`install-check` modes (P3) are implemented. Still missing: the `calContacts` thread (Google
+People, CalDAV, CardDAV), contact/contact-group/event tasks, the metadata expiration worker and
+the remote metadata worker (P4/P5), and `import-legacy` (P6).
 
 ## Packages
 
@@ -166,21 +168,21 @@ accepted and dropped, so every scenario that waits on a task times out.
 | `orphan-sweep-waits-for-initial-walk`, `orphan-sweep-with-unreadable-folder` | fake:dovecot | pass |
 | `remote-flag-changes`, `remote-move-destination-scanned-first` | fake:dovecot, fake:plain, dovecot:qresync, cyrus:fastmail | pass |
 | `remote-move-to-archive` | fake:dovecot, fake:plain, dovecot:qresync, cyrus:fastmail, cyrus:default-ns | pass |
-| `remote-move-while-task-in-flight` | fake:dovecot, fake:plain, dovecot:qresync, cyrus:fastmail | fail: ChangeStarredTask times out (P3-T); passes on C++ |
+| `remote-move-while-task-in-flight` | fake:dovecot, fake:plain, dovecot:qresync, cyrus:fastmail | P2: fail, ChangeStarredTask times out (P3-T); passes since P3 |
 | `self-addressed-inbox-and-sent` | fake:dovecot, fake:plain, dovecot:qresync, cyrus:fastmail, cyrus:default-ns | pass |
 | `plain-expunge-found-by-deep-scan` | fake:plain, dovecot:plain, cyrus:plain | pass |
 | `proton-all-mail-duplicates` | fake:proton-bridge, dovecot:proton-like | pass |
-| `gmail-labels` | fake:gmail | fail: trash ChangeFolderTask times out (P3-T); passes on C++ |
+| `gmail-labels` | fake:gmail | P2: fail, trash ChangeFolderTask times out (P3-T); passes since P3 |
 | `folder-roles-by-localized-name`, `gateway-duplicate-list-entries`, `list-refused-transiently`, `messagelimit-partial-fetch`, `netease-coremail-id-before-select`, `status-uidnext-zero-new-mail` | their personality | pass |
 | `new-mail-during-idle` | fake:dovecot, fake:plain, dovecot:qresync, cyrus:fastmail | pass |
 | `connection-dropped-during-command`, `connection-dropped-during-idle` | fake:dovecot, dovecot:qresync, cyrus:fastmail | pass |
 | `mid-pass-foreground-tombstone` | fake:dovecot, fake:plain | pass |
-| `heavy-fetch-truncation-backlog` | fake:plain, dovecot:plain pass; cyrus:plain fails | cyrus:plain fails the same way on C++ (see open issues) |
-| `rules-ready-incoming`, `-across-restart`, `-self-addressed-send`, `-gmail`, `-inbox-copy-first` | their servers | fail: SendDraftTask / ChangeFolderTask time out, or wait for `Syncing sent message` (P3-T/P3-S); all pass on C++ |
+| `heavy-fetch-truncation-backlog` | fake:plain, dovecot:plain pass; cyrus:plain fails | P2: cyrus:plain failed the same way on C++ (see open issues); passes since P3 fix round 1 (`hold_engine`) |
+| `rules-ready-incoming`, `-across-restart`, `-self-addressed-send`, `-gmail`, `-inbox-copy-first` | their servers | P2: fail, SendDraftTask / ChangeFolderTask time out, or wait for `Syncing sent message` (P3-T/P3-S); pass since P3 |
 | `rules-ready-pre-upgrade-messages` | fake:dovecot, dovecot:qresync, cyrus:fastmail | skipped: `ab/mailsync-a83cc9a` baseline is not built |
 
 - Open:
-  - `heavy-fetch-truncation-backlog@cyrus:plain` fails on both binaries in this environment:
+  - (Fixed in P3 round 1 by `hold_engine`.) `heavy-fetch-truncation-backlog@cyrus:plain` failed on both binaries in this environment:
     the harness's 2300-message APPEND to Cyrus took ~220 s, so the engine's pass after its
     120 s sleep found ~1230 new messages instead of 2300 and truncated once (the scenario
     expects 2 or 3 truncations). It passed in the previous round on the Rust binary. The
@@ -190,8 +192,125 @@ accepted and dropped, so every scenario that waits on a task times out.
     error, as C++ does. It passes.
   - The foreground's CONDSTORE path does not compare UIDVALIDITY; only the background pass
     resets it. Same as C++ (SyncWorker.cpp:509 is in `syncNow` only).
-  - TLS failure advice (`tlsFailureAdvice`) on connect is not ported; it comes with `test`
-    mode (`TODO(P2-T)` in foreground.rs).
+  - (Fixed in P3.) TLS failure advice (`tlsFailureAdvice`) on connect: the foreground worker
+    logs it and uses it as debuginfo (see P3-A).
+
+### P3-T tasks and P3-S send (`crates/ms-tasks`): gate passed
+
+- What exists: `TaskProcessor` (TaskProcessor.cpp) wired into the stdin loop
+  (`cleanup_tasks_after_launch` at startup, `perform_local` on `queue-task`, `cancel` on
+  `cancel-task`) and into the foreground worker through `ms_tasks::Tasks` (`perform_remote`).
+  One module per task family, each naming its C++ source:
+  - `messages.rs`: ChangeUnread, ChangeStarred, ChangeFolder (with undo through
+    `undoPlacements` / `restorePlacements`), ChangeLabels; `imap_ops.rs`: `_resolveNewUIDs`,
+    `_moveMessagesResilient`, `_removeMessagesResilient`, `_expungeMovedCopies`.
+  - `drafts.rs`: SyncbackDraft (local only), DestroyDraft. `folders.rs`: SyncbackCategory,
+    DestroyCategory, ChangeRoleMapping, ExpungeAllInFolder. `export.rs`: GetMessageRFC2822,
+    GetManyRFC2822. SyncbackMetadata (local upsert; remote push only for a non-local backend),
+    SendFeatureUsageEvent (no-op through `MetadataBackend::record_feature_usage`).
+  - `send.rs`: SendDraft (single and multisend), Sent reconciliation, Gmail All Mail placement,
+    `_removeSentCopies` (late-copy cleanup from the background worker); `rsvp.rs`: EventRSVPTask;
+    `mailer.rs`: the SMTP factory (User-Agent "Tern").
+  - `json.rs`: task field reads that fail with nlohmann's `what` text, so a malformed task ends
+    as `unhandled-exception` on the task, as C++.
+- Error policy: a task failure is saved on the task (`complete` + error JSON) and
+  `perform_remote` returns `Ok`; only a SQLite error leaves the task as it was. Task classes of
+  later packages (`NOT_YET_PORTED` in lib.rs: contact, contact-group and event tasks) do nothing
+  locally and complete with an error remotely; unknown classes complete, as C++.
+- Differences from C++: an unreadable draft attachment fails the send with `send-failed` (C++
+  sent an empty part; plan section 6 "Send"). Attachments are read from the client's
+  `files/xx/yy/<id>/<safeDisplayName>` path first (`File::client_path_in`), then the C++
+  `safeFilename` path, then the only file in that directory.
+- Tests: ms-tasks `tests/tasks.rs` 22 (moves with permuted COPYUID, MOVE-less moves, rejected
+  move/star, undo before the remote phase, mark-read fan-out, draft destroy, category tasks,
+  expunge-all, cancel and cleanup, send/multisend/SMTP failures, late copies, RSVP,
+  attachments), unit 4; ms-store models +`safe_display_name_matches_the_client`.
+
+### P3-A modes (`apps/engine/src/modes/`): gate passed for the harness accounts
+
+- What exists: `--mode test` (`modes/test_auth.rs`, `runTestAuth`): IMAP connect, login and
+  folder listing with the `inbox` (or Gmail `all`) role check, then SMTP login only when
+  `settings.smtp_verification == "login"`, otherwise MAIL FROM / RCPT TO self and the test
+  email; OAuth refresh first, with a rotated refresh token sent as `ProcessAccountSecretsUpdated`
+  before the result. Output `{account, error, error_service, log}`, plus `error_advice` after a
+  TLS failure and `error_offline` for failures outside the sessions; exit 0/1. `--mode
+  install-check` (`modes/install_check.rs`). `ms_core::tls_failure_advice`
+  (`MailUtils::tlsFailureAdvice`), also used by the foreground worker on a failed
+  `connectIfNeeded` (`connectIfNeeded: <advice>` debuginfo, as SyncWorker.cpp:162-169).
+- install-check targets: HTTP GET of the Google OAuth token endpoint (`MAILSYNC_GOOGLE_TOKEN_URL`
+  overrides it; C++ pinged `$IDENTITY_SERVER/ping`), a TLS IMAP connect to imap.gmail.com:993
+  with CAPABILITY, a TLS SMTP connect to smtp.gmail.com:465 with EHLO/QUIT. `tidy_check` and
+  `legacy_tls_check` always succeed (no libtidy, no TLS below 1.2).
+- Tests: `apps/engine/tests/test_mode.rs` (6: success, login-only SMTP, IMAP failures, SMTP
+  failure, OAuth rotation, OAuth refusal); `apps/engine/tools/test_mode_ab.py` diffs both binaries.
+
+| `test_mode_ab.py` (2026-10-15, P3 final run) | Result |
+|---|---|
+| fake:dovecot, fake:gmail, dovecot:qresync, cyrus:fastmail (12 cases each), dovecot:tls (6) | 52 match, 2 known divergences (both `dovecot:tls`), 0 mismatches |
+| install-check | shape and outcomes match (both exit 0) |
+
+The earlier P3-A run had 43 cases without fake:gmail (41 match, 2 known divergences).
+
+- Known differences against the C++ binary:
+  - `dovecot:tls` `good` and `self-signed-allow-insecure`: the shipped C++ build skips
+    certificate validation when `imap_allow_insecure_ssl` is set and gives no advice for a
+    certificate error; the Rust engine always validates and gives the certificate advice (as the
+    C++ source does).
+  - The advice never suggests "Allow insecure SSL" (`smtp_allow_insecure_ssl` /
+    `imap_allow_insecure_ssl` are carried but have no effect); it says "Tern" where C++ said
+    "Mailspring".
+  - `log` transcripts differ in tag shapes, capability text and TLS notes; not compared.
+- Not done: the manual Gmail/O365 `test` run against C++ (plan section 8 P3-A gate).
+
+### P3 fix round 1 (2026-10-15)
+
+- Attachments: `File::safe_display_name` / `client_path_in` port the client's
+  `safeDisplayName` and `AttachmentStore.pathForFile`. SendDraftTask reads a draft file there,
+  then at the C++ `safeFilename` path, then the only file in its directory; an unreadable file
+  still fails the send with `send-failed` (plan section 6 "Send" records the change from C++,
+  which sent an empty part). Inline parts downloaded with a body are written to the client path.
+- Harness: `hold_engine: true` on a `server.*` step SIGSTOPs the engine while the step runs
+  (`MailsyncProcess.held`); if the worker's 120 s sleep ran out meanwhile, it waits for the pass
+  that starts on resume, because a `wake-workers` sent during that pass is not seen until the
+  next sleep ends (both binaries). `heavy-fetch-truncation-backlog` holds the engine during its
+  2300-message APPEND; its assertions are unchanged. It passes on cyrus:plain on the C++ and
+  Rust binaries (append ~130 s).
+- Full in-scope suite (fake, dovecot, cyrus; without `dav-*`, `google-people-*`,
+  `metadata-expiration-*`, `import-legacy-carries-metadata`, `rules-ready-pre-upgrade-messages`),
+  Rust release binary: **167 passed, 0 failed**; the 30 non-scenario tests pass.
+
+### P3 fix round 2 (2026-10-15)
+
+- No code changes. The manual Gmail/O365 `test` run against C++ (P3-A gate) is still not done:
+  it needs real accounts, which this environment does not have.
+- Full in-scope suite (same exclusions as round 1), Rust release binary: **197 passed, 0 failed**
+  (167 scenario cases and 30 non-scenario tests, 11 min). `cargo fmt --all --check` and
+  `cargo clippy --workspace --all-targets -- -D warnings` are clean; `cargo test --workspace`
+  433 passed, 0 failed, 42 ignored.
+
+### P3 final verification (2026-10-15)
+
+- No code changes. Release binary rebuilt (up to date), full suite on all servers (below),
+  `test_mode_ab.py --install-check` against C++ (53 of 55 match, 2 known divergences, 0
+  mismatches; table above).
+- Per-agent `target/p3-*` build dirs and old `apps/engine/test/runs/` session dirs removed;
+  this run's artifacts are in `apps/engine/test/runs/p3-final/`.
+
+## Full-suite tally (P3, 2026-10-15)
+
+`MAILSYNC_BIN=target/release/mailsync HARNESS_RUNS_DIR=apps/engine/test/runs/p3-final python3 -m pytest apps/engine/test`,
+all servers (fake, dovecot, cyrus, radicale, baikal), 16 workers, 12 min: **196 passed, 15
+failed, 3 skipped, 1 xfailed** of 215. Every P2 task/send failure now passes.
+
+| Category | Count | Cases |
+|---|---|---|
+| P4-M not done (the expiration worker idles; the SyncbackMetadataTask before it completes) | 2 | `metadata-expiration-snooze`, `metadata-expiration-send-later` (fake:dovecot). Pass on C++ (rerun). |
+| P4-G / P5 not done; fail on C++ too (it does not read the endpoint overrides) | 12 | `dav-initial-sync`, `dav-incremental-sync`, `dav-create-update-delete`, `dav-etag-conflict` (radicale, baikal each); `google-people-initial-sync`, `-incremental-sync`, `-sync-token-expired`, `-contact-tasks` (fake:gmail) |
+| Harness flake, no engine involved | 1 | `conformance::test_fake_matches_dovecot[probe_idle]` (fake vs Dovecot untagged `* OK` text under load); passes on rerun |
+| P3 bug | 0 | |
+
+Skipped: `rules-ready-pre-upgrade-messages` x3 (baseline binary `ab/mailsync-a83cc9a` not built).
+Xfail: `import-legacy-carries-metadata` (P6).
 
 ## Full-suite tally (P2, 2026-10-15)
 
@@ -256,7 +375,34 @@ PIM oracles) pass.
 - **P5**: use `ms_dav::CalendarHome::gmail` (which honours `MAILSYNC_GOOGLE_CALDAV_ROOT`) rather than
   `ServerProfile::caldav_url`, and `DnsResolver` (which honours the host overrides) for discovery.
 
-## What P3 needs to know
+## What P4 and P5 need to know
+
+- **calContacts thread.** `ms_sync::cal_contacts::run_cal_contacts` sleeps
+  `CAL_CONTACTS_INITIAL_DELAY` plus the account's start delay and parks; `run_calendar_pass`
+  (`sync-calendar`) does nothing. P4-G puts the Google People pass there, P5 the CalDAV/CardDAV
+  passes; the scenarios wait for `Calendar sync pass 1, with contacts` (`ms-core::logmsg`), and
+  `dav-create-update-delete` has a fixed 20 s wait after the pass starts. It needs its own
+  `Store` (one per thread). Use `ms_dav::CalendarHome::gmail` and `DnsResolver` (they honour the
+  harness overrides) and a caching `TokenProvider`.
+- **Contact, group and event task hooks.** `ms_tasks::NOT_YET_PORTED` lists DestroyContact,
+  SyncbackContact, ChangeContactGroupMembership, SyncbackContactGroup, DestroyContactGroup,
+  SyncbackEvent and DestroyEvent. Today their local phase is a no-op and the remote phase saves
+  an error on the task. Port each by adding a `perform_local` / `perform_remote` arm in
+  `crates/ms-tasks/src/lib.rs` and removing it from the list; keep the error-on-task policy
+  (return `Ok` for task failures). In C++ these tasks' remote phase talks to DAV/People, not
+  IMAP, so it needs the DAV client or People client reachable from the foreground's
+  `perform_remote` (or a hand-off to calContacts); `Contact::mutate_vcf_in_info` is the store
+  half of `mutateCardInInfo`.
+- **Metadata expiration (P4-M).** Saving metadata with an `expiration` already calls
+  `ms_core::wake::expiration_signal(account).schedule(e)` (`ms-store` `model.rs`), and
+  `DELTA_TYPE_METADATA_EXPIRATION` and `DeltaItem::for_model` exist. The worker
+  (`ms_sync::metadata_expiration::run_metadata_expiration`) only waits on the signal; it needs
+  the `MetadataExpirationWorker` body (query due `ModelPluginMetadata` rows, emit
+  `metadata-expiration` deltas, reschedule). `run_metadata_worker` (remote pull) idles and is not
+  started for `LocalOnly`. SyncbackMetadataTask's remote phase already calls
+  `MetadataBackend::push` for a non-local backend.
+
+## What P3 needed to know (P2 handoff, kept for reference)
 
 - **Where tasks enter.** `apps/engine/src/stdin_loop.rs` has three `TODO(P3-T)`s on the main
   thread's store: `cleanup_tasks_after_launch` at startup, `perform_local` in `queue-task` (the

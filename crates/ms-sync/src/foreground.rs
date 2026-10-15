@@ -178,11 +178,17 @@ impl Foreground {
             return Ok(());
         }
 
-        // TODO(P2-T): the TLS advice of `tlsFailureAdvice` comes with test mode.
-        self.w
-            .session
-            .connect_if_needed()
-            .map_err(|e| e.into_sync("connectIfNeeded"))?;
+        if let Err(e) = self.w.session.connect_if_needed() {
+            let advice = ms_core::tls_failure_advice(e.code, self.w.session.last_tls_error());
+            return Err(match advice {
+                Some(advice) => {
+                    error!("{advice}");
+                    e.into_sync(&format!("connectIfNeeded: {advice}"))
+                }
+                None => e.into_sync("connectIfNeeded"),
+            }
+            .into());
+        }
         if self.should_reloop() {
             return Ok(());
         }

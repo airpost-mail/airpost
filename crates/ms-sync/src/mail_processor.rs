@@ -703,18 +703,17 @@ impl<'a> MailProcessor<'a> {
         })
     }
 
-    /// `retrievedFileData`: `files/<id[0:2]>/<id[2:4]>/<id>/<safeFilename>`, id lowercased.
+    /// `retrievedFileData`. The file goes where the client looks for it
+    /// (`File::client_path_in`); C++ wrote `safeFilename`, which the client could not find
+    /// for names its `safeDisplayName` changes further (trailing dots, control characters).
     fn write_file_data(&self, file: &File, data: &[u8]) -> std::io::Result<()> {
         let Some(config_dir) = &self.config_dir else {
             return Ok(());
         };
-        let id = file.id().to_lowercase();
-        let dir = config_dir
-            .join(FILES_DIR)
-            .join(id.get(0..2).unwrap_or(&id))
-            .join(id.get(2..4).unwrap_or(""))
-            .join(&id);
-        std::fs::create_dir_all(&dir)?;
-        std::fs::write(dir.join(file.safe_filename()), data)
+        let path = file.client_path_in(&config_dir.join(FILES_DIR));
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(path, data)
     }
 }

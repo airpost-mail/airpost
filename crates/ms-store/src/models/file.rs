@@ -1,6 +1,8 @@
 //! `File`: an attachment or inline part of a message. Derived from Mailspring-Sync
 //! `MailSync/Models/File.*`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
+use std::path::{Path, PathBuf};
+
 use ms_core::Result;
 use rusqlite::Statement;
 use serde_json::{json, Value};
@@ -70,6 +72,75 @@ impl File {
             .chars()
             .map(|c| if "\\/:|?*><\"#".contains(c) { '-' } else { c })
             .collect()
+    }
+
+    /// The client's `File.displayName()`: the filename, or a default by MIME type. The
+    /// client localises "Unnamed Attachment"; the engine names every part it creates, so
+    /// only rows written by older clients reach that fallback.
+    pub fn display_name(&self) -> &str {
+        if !self.filename().is_empty() {
+            return self.filename();
+        }
+        match self.content_type() {
+            "text/calendar" => "Event.ics",
+            "image/png" => "Unnamed Image.png",
+            "image/jpg" | "image/jpeg" => "Unnamed Image.jpg",
+            _ => "Unnamed Attachment",
+        }
+    }
+
+    /// The client's `File.safeDisplayName()`, the name the client gives the file on disk
+    /// (`attachment-store.ts` `pathForFile`): C0/C1 controls and bidi controls removed,
+    /// the [`safe_filename`](Self::safe_filename) characters replaced, trailing dots and
+    /// spaces trimmed, reserved Windows names prefixed with `_`, and `-` for an empty name.
+    pub fn safe_display_name(&self) -> String {
+        let mut name: String = self
+            .display_name()
+            .chars()
+            .filter(|&c| {
+                !matches!(c, '\u{00}'..='\u{1F}' | '\u{7F}'..='\u{9F}')
+                    && !matches!(
+                        c,
+                        '\u{061C}'
+                            | '\u{200E}'
+                            | '\u{200F}'
+                            | '\u{202A}'..='\u{202E}'
+                            | '\u{2066}'..='\u{2069}'
+                    )
+            })
+            .map(|c| if "\\/:|?*><\"#".contains(c) { '-' } else { c })
+            .collect();
+        name.truncate(name.trim_end_matches(['.', ' ']).len());
+        let stem = name.split('.').next().unwrap_or("").to_ascii_uppercase();
+        let reserved = matches!(
+            stem.as_str(),
+            "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+        ) || ((stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem[3..].chars().count() == 1
+            && stem[3..]
+                .chars()
+                .all(|c| c.is_ascii_digit() || matches!(c, '¹' | '²' | '³')));
+        if reserved {
+            name.insert(0, '_');
+        }
+        if name.is_empty() {
+            name.push('-');
+        }
+        name
+    }
+
+    /// `files/<id[0:2]>/<id[2:4]>/<id>` under `files_root`, id lowercased.
+    pub fn dir_in(&self, files_root: &Path) -> PathBuf {
+        let id = self.id().to_lowercase();
+        files_root
+            .join(id.get(0..2).unwrap_or(&id))
+            .join(id.get(2..4).unwrap_or(""))
+            .join(&id)
+    }
+
+    /// Where the client reads and writes this file (`AttachmentStore.pathForFile`).
+    pub fn client_path_in(&self, files_root: &Path) -> PathBuf {
+        self.dir_in(files_root).join(self.safe_display_name())
     }
 
     pub fn part_id(&self) -> &str {

@@ -21,6 +21,7 @@ ms-sync.workspace = true
 serde_json.workspace = true
 rusqlite.workspace = true
 tracing.workspace = true
+chrono.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

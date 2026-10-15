@@ -1,6 +1,9 @@
 //! Mode dispatch, in `main.cpp`'s order: `migrate` and `install-check` before the account
 //! is read, `reset` before the identity, then logging setup, then `test` or `sync`.
 
+mod install_check;
+mod test_auth;
+
 use std::io::BufRead;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -16,10 +19,7 @@ use crate::stdin_loop;
 pub fn run(opts: Options) -> i32 {
     match opts.mode {
         Mode::Migrate => return migrate(&opts),
-        Mode::InstallCheck => {
-            one_shot_error("install-check is not implemented in this build");
-            return EXIT_FAILURE;
-        }
+        Mode::InstallCheck => return install_check::run(),
         Mode::ImportLegacy => {
             one_shot_error("import-legacy is not implemented in this build");
             return EXIT_FAILURE;
@@ -57,15 +57,7 @@ pub fn run(opts: Options) -> i32 {
     install_panic_hook();
 
     match opts.mode {
-        Mode::Test => {
-            one_shot(&json!({
-                "error": "test mode is not implemented in this build",
-                "error_service": "imap",
-                "log": "",
-                "account": null,
-            }));
-            EXIT_FAILURE
-        }
+        Mode::Test => test_auth::run(&account),
         Mode::Sync => sync(&opts, account, identity),
         Mode::Migrate | Mode::InstallCheck | Mode::ImportLegacy | Mode::Reset => unreachable!(),
     }

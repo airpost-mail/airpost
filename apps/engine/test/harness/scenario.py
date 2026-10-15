@@ -331,9 +331,24 @@ class ScenarioRun(PimMixin):
     def run_step(self, step, allow_client: bool = True):
         if isinstance(step, str):
             step = {step: {}}
-        (verb, arg), = [(k, v) for k, v in step.items() if k not in ("as", "note")]
+        (verb, arg), = [(k, v) for k, v in step.items() if k not in ("as", "note", "hold_engine")]
         label = step.get("as")
         self._note(f"step {verb} {json.dumps(arg) if not isinstance(arg, str) else arg}")
+        if step.get("hold_engine"):
+            # Server steps only: anything that waits on the engine would wait forever.
+            if not verb.startswith("server."):
+                raise ScenarioFailure(f"hold_engine applies to server steps, not {verb}")
+            started = time.monotonic()
+            with self.ms.held():
+                result = self._run_step_verb(verb, arg, allow_client)
+            self._note(f"engine held {time.monotonic() - started:.1f}s for {verb}")
+        else:
+            result = self._run_step_verb(verb, arg, allow_client)
+        if label:
+            self.labels[label] = result
+        return result
+
+    def _run_step_verb(self, verb, arg, allow_client: bool):
         result = None
         if verb == "wait":
             result = self._wait(arg)
@@ -365,8 +380,6 @@ class ScenarioRun(PimMixin):
             result = self._client_step(verb[len("client."):], arg or {})
         else:
             raise ScenarioFailure(f"unknown step {verb!r}")
-        if label:
-            self.labels[label] = result
         return result
 
     def _wait(self, arg):

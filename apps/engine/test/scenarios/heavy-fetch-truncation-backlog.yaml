@@ -17,7 +17,10 @@ mailboxes:
   Archive: {messages: {count: 200, age_days: 30}}
 steps:
   - wait: quiescent
+  # The scenario needs all 2300 on the server before the engine looks; the APPEND took
+  # ~220 s on Cyrus under load, longer than the worker's 120 s sleep.
   - server.append: {mailbox: Archive, messages: {count: 2300, age_days: 30}}
+    hold_engine: true
   - force_scans: {timeout: 300}
 expect:
   log_present: ["Fetching full headers for 1024 \\(of \\d+ needed\\)"]

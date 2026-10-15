@@ -691,3 +691,32 @@ fn reset_for_account_clears_every_table() {
     assert!(f.thread(msg.thread_id()).is_none());
     let _ = Thread::TABLE;
 }
+
+#[test]
+fn safe_display_name_matches_the_client() {
+    let named = |name: &str, ct: &str| File {
+        data: serde_json::json!({"id": "AbCdEf12", "filename": name, "contentType": ct}),
+    };
+    for (name, ct, want) in [
+        ("report.pdf ", "", "report.pdf"),
+        ("evil.exe. . ", "", "evil.exe"),
+        ("report\u{202E}gpj.exe", "", "reportgpj.exe"),
+        ("a\u{0007}b\u{0085}c.txt", "", "abc.txt"),
+        ("a/b:c?.pdf", "", "a-b-c-.pdf"),
+        ("con.txt", "", "_con.txt"),
+        ("COM1", "", "_COM1"),
+        ("lpt\u{00B2}.log", "", "_lpt\u{00B2}.log"),
+        ("console.txt", "", "console.txt"),
+        ("CONIN$.dat", "", "_CONIN$.dat"),
+        ("", "image/png", "Unnamed Image.png"),
+        ("", "image/gif", "Unnamed Attachment"),
+        ("...", "", "-"),
+    ] {
+        assert_eq!(named(name, ct).safe_display_name(), want, "{name:?}");
+    }
+    let root = std::path::Path::new("/cfg/files");
+    assert_eq!(
+        named("x.pdf ", "").client_path_in(root),
+        root.join("ab").join("cd").join("abcdef12").join("x.pdf")
+    );
+}

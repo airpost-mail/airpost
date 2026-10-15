@@ -147,6 +147,10 @@ class Delta:
         return [m.get("id") for m in self.models]
 
 
+# The background worker's sleep between passes (`WORKER_SLEEP`, SyncWorker.cpp).
+WORKER_SLEEP_SECONDS = 120.0
+
+
 @dataclass
 class LogLine:
     t: float           # seconds since process start (from our clock, not the engine's)
@@ -299,6 +303,31 @@ class MailsyncProcess:
             t.join(timeout=2)
         self._drain_log()
         return self.proc.returncode
+
+    @contextlib.contextmanager
+    def held(self):
+        """SIGSTOP the engine for the duration, SIGCONT after: the server changes made inside
+        land as one batch however long they take, instead of being split by a worker pass
+        that wakes from its 120 s sleep halfway through. Its sockets stay open; anything the
+        server sends meanwhile is read on resume. POSIX only.
+
+        If the background worker's sleep ran out while held, its pass starts on resume; a
+        `wake-workers` sent during that pass is not seen until the next sleep ends, so this
+        waits for the pass to finish before returning."""
+        if not self.running:
+            raise MailsyncError(f"mailsync is not running ({describe_exit(self.exit_code)})")
+        done = [l for l in self.log("background", engine_only=True) if l.msg == "Sync loop complete."]
+        asleep_since = done[-1].t if done else None
+        self.proc.send_signal(signal.SIGSTOP)
+        try:
+            yield
+        finally:
+            resumed = self.elapsed()
+            if self.proc.poll() is None:
+                self.proc.send_signal(signal.SIGCONT)
+        if asleep_since is not None and resumed - asleep_since >= WORKER_SLEEP_SECONDS - 5:
+            self.wait_for_log(r"^Syncing folder list", timeout=30, since=asleep_since + 0.001)
+            self.wait_quiescent(timeout=600)
 
     @property
     def exit_code(self) -> Optional[int]:

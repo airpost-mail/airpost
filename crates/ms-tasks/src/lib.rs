@@ -8,55 +8,129 @@
 //! which reaches this crate through [`ms_sync::TaskRunnerFactory`]. No automatic retries:
 //! a failure ends as `complete` with `error` set.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use ms_core::constants::{ls, SENT_COPY_CLEANUP_WINDOW};
-use ms_core::{logmsg, Account, Result, UidSet};
+use ms_core::{logmsg, Account, Error, Result, SyncError, UidSet};
 use ms_imap::ImapSession;
+use ms_net::{LocalOnly, MetadataBackend, MetadataPush};
 use ms_store::model::{json_i64, json_str};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
 use ms_sync::{RemoteTaskRunner, TaskRunnerFactory, WorkerContext};
 use serde_json::Value;
-use tracing::info;
+use tracing::{error, info};
+
+mod drafts;
+mod export;
+mod folders;
+mod imap_ops;
+mod json;
+mod mailer;
+mod messages;
+mod rsvp;
+mod send;
+
+pub use export::sanitize_eml_filename;
+pub use mailer::{smtp_mailer, thread_sleeper, Mailer, MailerFactory, Sleeper};
+
+use json::{at, get_str};
 
 /// `cleanupOldTasksAtRuntime` keeps this many complete / cancelled tasks...
 const KEPT_FINISHED_TASKS: i64 = 100;
 /// ...and runs only once more than this many beyond them have accumulated.
 const FINISHED_TASKS_SLOP: i64 = 10;
 
+/// Task classes TaskProcessor.cpp handles that later packages port: the contact and
+/// contact-group tasks (P4-G / P5) and the event tasks (P5). Their local phase does
+/// nothing and their remote phase fails, so the client sees an error instead of an edit
+/// that silently did not happen.
+pub const NOT_YET_PORTED: [&str; 7] = [
+    "DestroyContactTask",
+    "SyncbackContactTask",
+    "ChangeContactGroupMembershipTask",
+    "SyncbackContactGroupTask",
+    "DestroyContactGroupTask",
+    "SyncbackEventTask",
+    "DestroyEventTask",
+];
+
+fn unsure_how_to_process(class: &str) -> String {
+    format!("Unsure of how to process this task type {class}")
+}
+
 pub struct TaskProcessor<'a> {
     pub account: Arc<Account>,
     pub store: &'a Store,
+    metadata: Arc<dyn MetadataBackend>,
+    /// `$CONFIG_DIR_PATH`: attachments are read from and written to `files/` under it.
+    config_dir: Option<PathBuf>,
+    mailer: MailerFactory,
+    sleep: Sleeper,
 }
 
 impl<'a> TaskProcessor<'a> {
+    /// A processor with the local-only metadata backend, SMTP with the account's password
+    /// or a token refreshed for this processor, and no config dir.
     pub fn new(account: Arc<Account>, store: &'a Store) -> Self {
-        TaskProcessor { account, store }
+        TaskProcessor {
+            account,
+            store,
+            metadata: Arc::new(LocalOnly),
+            config_dir: None,
+            mailer: smtp_mailer(Arc::new(ms_net::TokenManager::new(None)), false),
+            sleep: thread_sleeper(),
+        }
     }
 
-    /// On launch: deletes tasks still in `local` (`cleanupTasksAfterLaunch`).
+    /// The processor a thread of the sync process uses, on that thread's store.
+    pub fn for_context(ctx: &WorkerContext, store: &'a Store) -> Self {
+        TaskProcessor {
+            account: ctx.account.clone(),
+            store,
+            metadata: ctx.metadata.clone(),
+            config_dir: Some(ctx.config_dir.clone()),
+            mailer: smtp_mailer(ctx.tokens.clone(), ctx.verbose),
+            sleep: thread_sleeper(),
+        }
+    }
+
+    pub fn with_config_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.config_dir = Some(dir.into());
+        self
+    }
+
+    /// Replaces SMTP (tests).
+    pub fn with_mailer(mut self, mailer: MailerFactory) -> Self {
+        self.mailer = mailer;
+        self
+    }
+
+    /// Replaces the waits between polls of the Sent folder (tests).
+    pub fn with_sleeper(mut self, sleep: Sleeper) -> Self {
+        self.sleep = sleep;
+        self
+    }
+
+    /// On launch: deletes tasks still in `local`. They are saved right before their local
+    /// phase runs, so the app most likely crashed running them; deleting them keeps it
+    /// from crashing again (`cleanupTasksAfterLaunch`).
     pub fn cleanup_tasks_after_launch(&self) -> Result<()> {
-        todo!("P3-T: TaskProcessor::cleanupTasksAfterLaunch")
+        let stuck = self.store.find_all::<Task>(
+            &Query::new()
+                .equal("accountId", self.account.id())
+                .equal("status", "local"),
+        )?;
+        for mut t in stuck {
+            self.store.remove(&mut t)?;
+        }
+        self.cleanup_old_tasks()
     }
 
-    /// `queue-task`: saves the task and applies its local change (`performLocal`).
-    pub fn perform_local(&self, task: &mut Task) -> Result<()> {
-        let _ = task;
-        todo!("P3-T: TaskProcessor::performLocal")
-    }
-
-    /// `cancel-task`: cancels the task if its remote phase has not started.
-    pub fn cancel(&self, task_id: &str) -> Result<()> {
-        let _ = task_id;
-        todo!("P3-T: TaskProcessor::cancel")
-    }
-}
-
-impl RemoteTaskRunner for TaskProcessor<'_> {
     /// Keeps the last 100 finished tasks, once more than 10 beyond that have piled up. They
     /// are removed one by one rather than with a DELETE, because the client observes the
     /// Task table and releases only rows it gets an `unpersist` for.
-    fn cleanup_old_tasks_at_runtime(&mut self) -> Result<()> {
+    fn cleanup_old_tasks(&self) -> Result<()> {
         let finished = || {
             Query::new()
                 .equal("accountId", self.account.id())
@@ -77,9 +151,265 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
         })
     }
 
+    /// `queue-task` on the main thread: saves the task, applies its local change and moves
+    /// it to `remote`. A failure ends the task as `complete` with `error`; there are no
+    /// retries. A database error leaves the task as it was and is returned (the caller
+    /// aborts, as the C++ main loop did): it says nothing about whether the task can run.
+    pub fn perform_local(&self, task: &mut Task) -> Result<()> {
+        let class = task.class().to_owned();
+        let id = task.id().to_owned();
+        info!("[{id}] Running {class} performLocal:");
+
+        if let Err(e) = self.store.save(task) {
+            error!("[{id}] -- Exception: Task could not be saved to the database. {e}");
+            return Ok(());
+        }
+
+        match self.perform_local_by_class(&class, task) {
+            Ok(()) => {
+                info!("[{id}] -- Succeeded. Changing status to `remote`");
+                task.set_status("remote");
+            }
+            Err(e) => self.fail(task, e)?,
+        }
+        self.store.save(task)
+    }
+
+    fn perform_local_by_class(&self, class: &str, task: &mut Task) -> Result<()> {
+        let account_id = task.account_id().to_owned();
+        if account_id != self.account.id() {
+            return Err(SyncError::fatal("generic", "You must provide an account id.").into());
+        }
+        let data = &mut task.data;
+        match class {
+            "ChangeUnreadTask" => {
+                self.perform_local_change_on_messages(data, messages::apply_unread)
+            }
+            "ChangeStarredTask" => {
+                self.perform_local_change_on_messages(data, messages::apply_starred)
+            }
+            "ChangeFolderTask" => {
+                data["undoPlacements"] = Value::Object(Default::default());
+                self.perform_local_change_on_messages(data, messages::apply_folder)
+            }
+            "ChangeLabelsTask" => {
+                self.perform_local_change_on_messages(data, messages::apply_labels)
+            }
+            "SyncbackDraftTask" => self.perform_local_save_draft(data),
+            "DestroyDraftTask" => self.perform_local_destroy_draft(data),
+            "SyncbackMetadataTask" => self.perform_local_syncback_metadata(&account_id, data),
+            "ChangeRoleMappingTask" => self.perform_local_change_role_mapping(&account_id, data),
+            "SyncbackCategoryTask"
+            | "DestroyCategoryTask"
+            | "SendDraftTask"
+            | "SendFeatureUsageEventTask"
+            | "ExpungeAllInFolderTask"
+            | "GetMessageRFC2822Task"
+            | "GetManyRFC2822Task"
+            | "EventRSVPTask" => Ok(()),
+            other => {
+                error!("{}", unsure_how_to_process(other));
+                Ok(())
+            }
+        }
+    }
+
+    /// `cancel-task`: flags the task; its remote phase ends it as `cancelled` if it has not
+    /// started, and a long export stops at its next chunk.
+    pub fn cancel(&self, task_id: &str) -> Result<()> {
+        self.store.transaction("cancel", |s| {
+            let task = s.find::<Task>(
+                &Query::new()
+                    .equal("id", task_id)
+                    .equal("accountId", self.account.id()),
+            )?;
+            if let Some(mut task) = task {
+                task.set_should_cancel();
+                s.save(&mut task)?;
+            }
+            Ok(())
+        })
+    }
+
+    /// The remote phase. Saves the task's final status itself; only a database error is
+    /// returned, leaving the task in `remote` for the next pass or launch.
+    fn perform_remote_task(&self, task: &mut Task, session: &mut dyn ImapSession) -> Result<()> {
+        let class = task.class().to_owned();
+        let id = task.id().to_owned();
+        info!("[{id}] Running {class} performRemote:");
+
+        let result = (|| -> Result<()> {
+            if task.account_id() != self.account.id() {
+                return Err(SyncError::fatal("generic", "You must provide an account id.").into());
+            }
+            if task.should_cancel() {
+                task.set_status("cancelled");
+                return Ok(());
+            }
+            self.perform_remote_by_class(&class, task, session)?;
+            // A long-running task (GetManyRFC2822Task) can see a cancel request while it
+            // runs and stop early; the check above only covers cancels before it starts.
+            if task.should_cancel() {
+                info!("[{id}] -- Cancelled. Changing status to `cancelled`");
+                task.set_status("cancelled");
+            } else {
+                info!("[{id}] -- Succeeded. Changing status to `complete`");
+                task.set_status("complete");
+            }
+            Ok(())
+        })();
+        if let Err(e) = result {
+            self.fail(task, e)?;
+        }
+        self.store.save(task)
+    }
+
+    fn perform_remote_by_class(
+        &self,
+        class: &str,
+        task: &mut Task,
+        session: &mut dyn ImapSession,
+    ) -> Result<()> {
+        let account_id = task.account_id().to_owned();
+        match class {
+            "ChangeUnreadTask" => self.perform_remote_change_on_messages(
+                &task.data,
+                session,
+                false,
+                messages::apply_unread_in_imap_folder,
+            ),
+            "ChangeStarredTask" => self.perform_remote_change_on_messages(
+                &task.data,
+                session,
+                false,
+                messages::apply_starred_in_imap_folder,
+            ),
+            "ChangeFolderTask" => self.perform_remote_change_on_messages(
+                &task.data,
+                session,
+                true,
+                messages::apply_folder_move_in_imap_folder,
+            ),
+            "ChangeLabelsTask" => self.perform_remote_change_on_messages(
+                &task.data,
+                session,
+                false,
+                messages::apply_label_change_in_imap_folder,
+            ),
+            // Drafts are not synced back to the server.
+            "SyncbackDraftTask" | "ChangeRoleMappingTask" => Ok(()),
+            "DestroyDraftTask" => self.perform_remote_destroy_draft(&task.data, session),
+            "SyncbackCategoryTask" => {
+                self.perform_remote_syncback_category(&account_id, &mut task.data, session)
+            }
+            "DestroyCategoryTask" => self.perform_remote_destroy_category(&task.data, session),
+            "SyncbackMetadataTask" => self.perform_remote_syncback_metadata(&task.data),
+            "SendFeatureUsageEventTask" => {
+                let feature = json_str(&task.data, "feature").to_owned();
+                self.metadata.record_feature_usage(&feature)
+            }
+            "ExpungeAllInFolderTask" => {
+                self.perform_remote_expunge_all_in_folder(&task.data, session)
+            }
+            "GetMessageRFC2822Task" => self.perform_remote_get_message_rfc2822(&task.data, session),
+            "GetManyRFC2822Task" => self.perform_remote_get_many_rfc2822(task, session),
+            "SendDraftTask" => self.perform_remote_send_draft(task, session),
+            "EventRSVPTask" => self.perform_remote_send_rsvp(&task.data),
+            other if NOT_YET_PORTED.contains(&other) => {
+                error!("{}", unsure_how_to_process(other));
+                Err(Error::other(unsure_how_to_process(other)))
+            }
+            other => {
+                error!("{}", unsure_how_to_process(other));
+                Ok(())
+            }
+        }
+    }
+
+    /// Ends a task that failed as `complete` with its error JSON. A database error is not
+    /// the task's fault: it is logged and returned, and the task left as it was.
+    fn fail(&self, task: &mut Task, e: Error) -> Result<()> {
+        let id = task.id().to_owned();
+        match e {
+            Error::Database(_) => {
+                error!("[{id}] -- Database error, not marking the task complete: {e}");
+                ms_core::log::flush();
+                return Err(e);
+            }
+            Error::Sync(ref s) => {
+                error!(
+                    "[{id}] -- Failed ({}). Changing status to `complete`",
+                    s.to_json()
+                );
+            }
+            ref other => {
+                error!(
+                    "[{id}] -- Failed with an unexpected exception ({other}). Changing status to `complete`"
+                );
+            }
+        }
+        ms_core::log::flush();
+        task.set_error(e.to_json());
+        task.set_status("complete");
+        Ok(())
+    }
+
+    /// `upsertMetadata` on the model the task names, any class `findGeneric` knows, and
+    /// the new version recorded as `modelMetadataNewVersion` for the remote phase.
+    fn perform_local_syncback_metadata(&self, account_id: &str, data: &mut Value) -> Result<()> {
+        let id = get_str(at(data, "modelId"))?;
+        let class = get_str(at(data, "modelClassName"))?;
+        let plugin_id = get_str(at(data, "pluginId"))?;
+        let value = at(data, "value").clone();
+        let version = self.store.transaction("performLocalSyncbackMetadata", |s| {
+            let query = Query::new().equal("id", &id).equal("accountId", account_id);
+            let Some(mut model) = s.find_generic(&class, &query)? else {
+                info!(
+                    "cannot apply metadata locally because no model matching type:{class} id:{id}, aid:{account_id} could be found."
+                );
+                return Ok(None);
+            };
+            let version = model.upsert_metadata(&plugin_id, &value, None);
+            model.save(s)?;
+            Ok(version)
+        })?;
+        if let Some(v) = version {
+            data["modelMetadataNewVersion"] = Value::from(v);
+        }
+        Ok(())
+    }
+
+    /// Hands the change to the metadata backend. With the local-only backend there is
+    /// nothing remote, as when the C++ ran without an identity (plan D3).
+    fn perform_remote_syncback_metadata(&self, data: &Value) -> Result<()> {
+        if self.metadata.is_local_only() {
+            return Ok(());
+        }
+        let push = MetadataPush {
+            account_id: self.account.id().to_owned(),
+            model_id: get_str(at(data, "modelId"))?,
+            model_class: json_str(data, "modelClassName").to_owned(),
+            plugin_id: get_str(at(data, "pluginId"))?,
+            value: at(data, "value").clone(),
+            version: json_i64(at(data, "modelMetadataNewVersion")),
+            header_message_id: at(data, "modelHeaderMessageId").as_str().map(str::to_owned),
+        };
+        self.metadata.push(&push)?;
+        info!(
+            "Syncback of metadata {}:{} = {} succeeded.",
+            push.model_id, push.plugin_id, push.value
+        );
+        Ok(())
+    }
+}
+
+impl RemoteTaskRunner for TaskProcessor<'_> {
+    fn cleanup_old_tasks_at_runtime(&mut self) -> Result<()> {
+        self.cleanup_old_tasks()
+    }
+
     fn perform_remote(&mut self, task: &mut Task, session: &mut dyn ImapSession) -> Result<()> {
-        let _ = (task, session);
-        todo!("P3-T: TaskProcessor::performRemote")
+        self.perform_remote_task(task, session)
     }
 
     /// A sent message appended to Sent because the server's own copy had not appeared yet
@@ -154,9 +484,8 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
                     keep_uid
                 )
             );
-            let _ = &session;
-            // Only a message the send path stamped with `_asc` gets here.
-            todo!("P3-S: _removeSentCopies / _removeMessagesResilient")
+            let late: Vec<u32> = late.iter().collect();
+            self.remove_sent_copies(session, sent, &late)?;
         }
         Ok(())
     }
@@ -172,7 +501,7 @@ impl TaskRunnerFactory for Tasks {
         store: &'a Store,
         ctx: &WorkerContext,
     ) -> Box<dyn RemoteTaskRunner + 'a> {
-        Box::new(TaskProcessor::new(ctx.account.clone(), store))
+        Box::new(TaskProcessor::for_context(ctx, store))
     }
 }
 
