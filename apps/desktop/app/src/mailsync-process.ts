@@ -645,13 +645,16 @@ export class MailsyncProcess extends EventEmitter {
         },
       });
       console.log(this._stripSecrets(buffer.toString()));
+      // Import while the status window is still up: closing it must be the last step before
+      // the main window opens, or the main process stalls with no window (see
+      // _closeStatusWindow).
+      if (this.syncEngine === 'rust') {
+        await this._importLegacy();
+      }
       this._closeStatusWindow();
     } catch (err) {
       this._closeStatusWindow();
       throw err;
-    }
-    if (this.syncEngine === 'rust') {
-      await this._importLegacy();
     }
   }
 
