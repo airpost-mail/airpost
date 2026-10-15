@@ -93,8 +93,13 @@ class MailImportantIcon extends React.Component<MailImportantIconProps, MailImpo
     }
   }
 
+  // A new thread prop must get through so componentDidUpdate can derive state from it.
   shouldComponentUpdate(nextProps: MailImportantIconProps, nextState: MailImportantIconState) {
-    return !_.isEqual(nextState, this.state);
+    return (
+      nextProps.thread !== this.props.thread ||
+      nextProps.showIfAvailableForAnyAccount !== this.props.showIfAvailableForAnyAccount ||
+      !_.isEqual(nextState, this.state)
+    );
   }
 
   render() {
