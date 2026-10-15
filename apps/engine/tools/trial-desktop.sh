@@ -2,11 +2,12 @@
 # Run the desktop client from source on the Rust engine, against a copy of an existing
 # Mailspring profile, so the real profile and the running Mailspring.app are never touched.
 #
-#   apps/engine/tools/trial-desktop.sh [--fresh] [--from DIR] [--to DIR]
+#   apps/engine/tools/trial-desktop.sh [--accounts EMAIL,...] [--fresh] [--from DIR] [--to DIR]
 #
-# --from  profile to copy (default: ~/Library/Application Support/Mailspring)
-# --to    trial profile (default: ~/tern-trial); reused on later runs unless --fresh
-# --fresh delete the trial profile and copy it again
+# --accounts keep only these accounts in the copy (config.json and database); default: all
+# --from     profile to copy (default: ~/Library/Application Support/Mailspring)
+# --to       trial profile (default: ~/tern-trial); reused on later runs unless --fresh
+# --fresh    delete the trial profile and copy it again
 #
 # The Rust engine's migrate moves the copied edgehill.db aside and resyncs every account from
 # scratch; import-legacy then carries over local drafts, snooze/send-later/reminder metadata and
@@ -18,9 +19,11 @@ repo="$(cd "$(dirname "$0")/../../.." && pwd)"
 from="$HOME/Library/Application Support/Mailspring"
 to="$HOME/tern-trial"
 fresh=0
+accounts=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --fresh) fresh=1 ;;
+    --accounts) accounts="$2"; shift ;;
     --from) from="$2"; shift ;;
     --to) to="$2"; shift ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
@@ -53,7 +56,41 @@ if [ ! -f "$to/config.json" ]; then
   # consistent copy without stopping it.
   log "copying edgehill.db (online backup)"
   sqlite3 "$from/edgehill.db" ".backup '$to/edgehill.db'"
+  if [ -n "$accounts" ]; then
+    log "keeping only: $accounts"
+    python3 -I - "$to" "$accounts" <<'PY'
+import json, sqlite3, sys
+to, wanted = sys.argv[1], [e.strip().lower() for e in sys.argv[2].split(",") if e.strip()]
+cfg_path = f"{to}/config.json"
+cfg = json.load(open(cfg_path))
+accts = cfg["*"].get("accounts") or []
+keep = [a for a in accts if a.get("emailAddress", "").lower() in wanted]
+missing = set(wanted) - {a["emailAddress"].lower() for a in keep}
+if missing:
+    sys.exit(f"not in the profile: {', '.join(sorted(missing))}")
+cfg["*"]["accounts"] = keep
+json.dump(cfg, open(cfg_path, "w"), indent=2)
+ids = [a["id"] for a in keep]
+db = sqlite3.connect(f"{to}/edgehill.db")
+marks = ",".join("?" * len(ids))
+tables = [n for (n,) in db.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+for t in tables:
+    if "accountId" in [r[1] for r in db.execute(f'PRAGMA table_info("{t}")')]:
+        db.execute(f'DELETE FROM "{t}" WHERE accountId NOT IN ({marks})', ids)
+for (key,) in db.execute("SELECT key FROM _State WHERE key LIKE 'cursor-%'").fetchall():
+    if not any(key.endswith(i) for i in ids):
+        db.execute("DELETE FROM _State WHERE key = ?", (key,))
+db.commit()
+db.execute("VACUUM")
+print(f"kept {len(keep)} of {len(accts)} accounts", file=sys.stderr)
+PY
+  fi
+  printf '%s\n' "${accounts:-all}" > "$to/.tern-trial-accounts"
 else
+  if [ -n "$accounts" ] && [ "$(cat "$to/.tern-trial-accounts" 2>/dev/null)" != "$accounts" ]; then
+    echo "$to was made with different accounts; pass --fresh to recopy" >&2
+    exit 1
+  fi
   log "reusing $to (pass --fresh to copy again)"
 fi
 
