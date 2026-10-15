@@ -77,9 +77,9 @@ tables = [n for (n,) in db.execute("SELECT name FROM sqlite_master WHERE type='t
 for t in tables:
     if "accountId" in [r[1] for r in db.execute(f'PRAGMA table_info("{t}")')]:
         db.execute(f'DELETE FROM "{t}" WHERE accountId NOT IN ({marks})', ids)
-for (key,) in db.execute("SELECT key FROM _State WHERE key LIKE 'cursor-%'").fetchall():
+for (key,) in db.execute("SELECT id FROM _State WHERE id LIKE 'cursor-%'").fetchall():
     if not any(key.endswith(i) for i in ids):
-        db.execute("DELETE FROM _State WHERE key = ?", (key,))
+        db.execute("DELETE FROM _State WHERE id = ?", (key,))
 db.commit()
 db.execute("VACUUM")
 print(f"kept {len(keep)} of {len(accts)} accounts", file=sys.stderr)
