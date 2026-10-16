@@ -500,15 +500,16 @@ real accounts.
 
 | Service | Profile | Notes |
 |---|---|---|
-| `mail` | all | The harness's fake IMAP and SMTP behind a new standalone entry point (`python3 -m harness.servers.dev --imap 1143 --smtp 1025 --seed <corpus>`), or the existing Dovecot test image plus the SMTP sink from `test/tools/cyrus_server.py`. Two seeded users |
-| `oauth` | all | `harness/servers/people.py` for a fake Google OAuth and People API, for OAuth onboarding without Google |
-| `backend` | `backend`, `web`, `hosted` | Built from the tree; `signup=open` in `hosted` |
+| `mail` | all | `apps/engine/test/tools/dev_mail.py` (done): the harness's fake IMAP and SMTP for alice and bob `@tern.test`, password `ternpass`, IMAP 1143-1144, SMTP 1025-1026, mail routed between them. Also `make mail` without Docker |
+| `backend` | `backend` (done), `web`, `hosted` | Built from the tree, plain http on `127.0.0.1:5101` (clients accept http for loopback), user alice seeded by `make stack`; `signup=open` in `hosted` |
+| `oauth` | later | `harness/servers/people.py` for a fake Google OAuth and People API, once onboarding goes through the engine (stage 12) |
 | `engine`, `gateway` | `web`, `hosted` | Once they can run headless; two engine instances in `hosted` to stand in for two tenants |
-| `caddy` | all | `tls internal` on `*.tern.localhost` so TLS paths are exercised |
-| seed job | all | Creates backend users and tokens, prints a desktop config pointing at the stack |
 
-Scenario 1 needs no stack: `make desktop` with an account on the `mail` service. Desktop
-against the stack: `make desktop SERVER=https://tern.tern.localhost`.
+No TLS proxy in the dev stack: Electron and the engine would not trust a local CA, and
+`deploy/backend`'s CI smoke test covers the TLS path.
+
+Scenario 1 needs no stack: `make desktop` (sandbox profile in `.dev/profile`) with an account
+on the `mail` service.
 
 The harness keeps starting its own servers per scenario; the dev stack reuses its code but
 doesn't replace it.

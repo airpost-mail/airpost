@@ -1,0 +1,49 @@
+# Local stack for development (docs/deployment-plan.md 8.2). Fake mail only, never real
+# accounts. Run it through the Makefile at the repo root:
+#   make stack                 # fake mail accounts
+#   make stack PROFILE=backend # plus tern-backend on http://127.0.0.1:5101, user alice@tern.test
+#   make stack-down / make stack-reset
+# Ports are published on loopback only. The backend uses plain http, which the backend and
+# the clients accept for loopback addresses; deploy/backend has the TLS setup and CI tests it.
+# Headless engine and gateway services (profiles `web` and `hosted`) come once they can run
+# headless.
+name: tern-dev
+
+services:
+  mail:
+    image: python:3.12-slim
+    working_dir: /test
+    command: ["python3", "-I", "tools/dev_mail.py", "--host", "0.0.0.0"]
+    volumes:
+      - ../../apps/engine/test:/test:ro
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "127.0.0.1:1143-1144:1143-1144"
+      - "127.0.0.1:1025-1026:1025-1026"
+    stop_signal: SIGTERM
+
+  backend:
+    profiles: [backend]
+    image: tern-backend:dev
+    build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
+    environment:
+      TERN_PUBLIC_URL: http://127.0.0.1:5101
+      # Peers arrive through Docker's port forwarding, from the compose network's gateway.
+      TERN_TRUSTED_PROXIES: ""
+      RUST_LOG: info,tower_http=debug
+    volumes:
+      - backend-data:/data
+    ports:
+      - "127.0.0.1:5101:5101"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/tern-backend", "healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  backend-data:

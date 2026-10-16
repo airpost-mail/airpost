@@ -1,0 +1,106 @@
+# Developer entry points (docs/deployment-plan.md 8.1). Thin wrappers around cargo, npm,
+# pytest and docker compose; `make help` lists them. Nothing here touches a real profile:
+# the desktop and the CLI run on .dev/profile, and mail comes from fake servers.
+
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
+
+export CARGO_PROFILE_DEV_DEBUG ?= 0
+
+PROFILE_DIR := $(CURDIR)/.dev/profile
+VENV := $(CURDIR)/.venv
+PY := $(VENV)/bin/python
+STACK := docker compose -f deploy/dev/compose.yaml
+# `make stack PROFILE=backend` adds the backend to the fake mail servers.
+PROFILE ?=
+STACK_PROFILE := $(if $(PROFILE),--profile $(PROFILE))
+RELEASE_BINS := MAILSYNC_BIN=target/release/mailsync TERN_BIN=target/release/tern TERN_MCP_BIN=target/release/tern-mcp
+
+.PHONY: help
+help: ## List the targets
+	@grep -hE '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
+
+.PHONY: setup
+setup: check-tools $(VENV) ## Install JS and Python dependencies and build the Rust binaries
+	cd apps/desktop && npm ci
+	cd apps/web && npm ci
+	$(MAKE) build
+
+.PHONY: check-tools
+check-tools:
+	@command -v cargo >/dev/null || { echo "Rust is missing: https://rustup.rs (rust-toolchain.toml pins the version)"; exit 1; }
+	@command -v node >/dev/null || { echo "Node is missing: install the version in .node-version"; exit 1; }
+	@node -e 'const want=require("fs").readFileSync(".node-version","utf8").trim(); const have=process.versions.node.split(".")[0]; if (have!==want) { console.error(`Node $${have} found, .node-version wants $${want}`); process.exit(1) }'
+	@command -v python3 >/dev/null || { echo "python3 is missing"; exit 1; }
+	@command -v docker >/dev/null || echo "docker not found: make stack and the Docker harness tier won't work"
+
+$(VENV): apps/engine/test/requirements.txt
+	python3 -m venv $(VENV)
+	$(VENV)/bin/pip install -q -r apps/engine/test/requirements.txt
+	@touch $(VENV)
+
+.PHONY: build
+build: ## Debug builds of mailsync, tern, tern-mcp and tern-backend
+	cargo build -p mailsync -p tern -p tern-mcp -p tern-backend
+
+.PHONY: release
+release: ## Release builds of the same
+	cargo build --release --locked -p mailsync -p tern -p tern-mcp -p tern-backend
+
+.PHONY: desktop
+desktop: build ## Run the desktop on .dev/profile with the debug engine
+	ln -sf ../../../target/debug/mailsync apps/desktop/app/mailsync-rs
+	mkdir -p $(PROFILE_DIR)
+	cd apps/desktop && MAILSYNC_ENGINE=rust npm start -- --config-dir-path="$(PROFILE_DIR)"
+
+.PHONY: tern
+tern: ## Run the CLI against the dev desktop's engine: make tern ARGS="status"
+	TERN_CONFIG_DIR="$(PROFILE_DIR)" target/debug/tern $(ARGS)
+
+.PHONY: web
+web: ## Vite dev server for apps/web on the mock engine
+	cd apps/web && npm run dev
+
+.PHONY: mail
+mail: ## Fake mail accounts without Docker (alice and bob @tern.test, password ternpass)
+	python3 -I apps/engine/test/tools/dev_mail.py
+
+.PHONY: stack
+stack: ## Local stack in Docker: fake mail, and the backend with PROFILE=backend
+	$(STACK) $(STACK_PROFILE) up -d --build --wait
+	@if [ "$(PROFILE)" = backend ] && ! $(STACK) exec -T backend tern-backend user list | grep -q alice@tern.test; then \
+	  echo ternpass | $(STACK) exec -T backend tern-backend user add alice@tern.test --first-name Alice --password-stdin; \
+	fi
+	@$(STACK) $(STACK_PROFILE) logs mail | grep -E 'IMAP .* SMTP' | sed 's/^.*| //'
+	@if [ "$(PROFILE)" = backend ]; then echo "backend: http://127.0.0.1:5101, user alice@tern.test, password ternpass"; fi
+
+.PHONY: stack-down
+stack-down: ## Stop the local stack, keeping its data
+	$(STACK) --profile backend down
+
+.PHONY: stack-reset
+stack-reset: ## Stop the local stack and delete its data
+	$(STACK) --profile backend down -v
+
+.PHONY: test
+test: $(VENV) ## Workspace tests and the harness quick tier (debug engine)
+	cargo test --workspace
+	cargo build -p mailsync -p tern -p tern-mcp
+	MAILSYNC_BIN=target/debug/mailsync TERN_BIN=target/debug/tern TERN_MCP_BIN=target/debug/tern-mcp $(PY) -m pytest apps/engine/test -q
+
+.PHONY: lint
+lint: ## fmt, clippy, cargo deny, and the JS linters
+	cargo fmt --all --check
+	cargo clippy --workspace --all-targets --locked -- -D warnings
+	cargo deny check
+	cd apps/desktop && npm run lint:check
+	cd apps/web && npm run lint && npm run typecheck
+
+.PHONY: gate
+gate: $(VENV) ## The merge gate: lint, tests, release builds, harness quick tier on serve
+	cargo fmt --all --check
+	cargo clippy --workspace --all-targets --locked -- -D warnings
+	cargo test --workspace --locked
+	cargo deny check
+	$(MAKE) release
+	MAILSYNC_TRANSPORT=serve REQUIRE_TERN=1 $(RELEASE_BINS) $(PY) -m pytest apps/engine/test -q
