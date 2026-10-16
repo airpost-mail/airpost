@@ -183,6 +183,8 @@ describe('syncing over the engine socket', function () {
   let child: any = null;
   let spawnArgs: string[] = null;
   let savedTransport: string = undefined;
+  // What the fake engine's hello lists; undefined answers as an engine without features.
+  let helloFeatures: string[] = undefined;
 
   // Resolves once the fake engine has read `n` request lines in total.
   const requests = (n: number) =>
@@ -213,7 +215,17 @@ describe('syncing over the engine socket', function () {
           for (const line of lines) {
             const req = JSON.parse(line);
             received.push(req);
-            const result = req.method === 'calendar.sync' ? { started: true } : {};
+            if (req.method === 'tasks.list') {
+              const error = { code: -32601, message: 'unknown method tasks.list' };
+              socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, error })}\n`);
+              continue;
+            }
+            const result =
+              req.method === 'calendar.sync'
+                ? { started: true }
+                : req.method === 'hello' && helloFeatures
+                  ? { protocol: 1, engine: '0.1.0', pid: 1, accounts: [], features: helloFeatures }
+                  : {};
             socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, result })}\n`);
           }
           if (onReceived) onReceived();
@@ -235,6 +247,7 @@ describe('syncing over the engine socket', function () {
     socketPath = path.join(dir, 'run', `${ACCOUNT_ID}.sock`);
     received = [];
     conn = null;
+    helloFeatures = undefined;
 
     proc = new MailsyncProcess({ configDirPath: dir, resourcePath: dir, syncEngine: 'rust' });
     proc.account = { id: ACCOUNT_ID, emailAddress: 'me@example.com' } as any;
@@ -278,6 +291,39 @@ describe('syncing over the engine socket', function () {
     expect(wake.method).toEqual('sync.wake');
     expect(wake.params).toEqual({ accountId: ACCOUNT_ID });
     expect(child.stdin.write).not.toHaveBeenCalled();
+  });
+
+  it('keeps hello.features, answers request() and emits mail.new', async function () {
+    helloFeatures = ['counts', 'mail-new'];
+    proc.sync();
+    const hello = nextEvent(proc, 'hello');
+    listening();
+    expect((await hello).features).toEqual(['counts', 'mail-new']);
+    expect(proc.features).toEqual(['counts', 'mail-new']);
+
+    expect(await proc.request('counts.get', {})).toEqual({});
+    let refused: any = null;
+    await proc.request('tasks.list', {}).catch((e) => (refused = e));
+    expect([refused.code, refused.message]).toEqual([-32601, 'unknown method tasks.list']);
+
+    const mailNew = nextEvent(proc, 'mail-new');
+    const params = { accountId: ACCOUNT_ID, threadId: 't1', messageId: 'm1' };
+    conn.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'mail.new', params })}\n`);
+    expect(await mailNew).toEqual(params);
+
+    // A request still out when the connection ends is rejected.
+    const pending: Promise<any> = proc.request('counts.get', {}).catch((e) => e);
+    (proc as any)._closeSocket();
+    expect((await pending).engineExited).toBe(true);
+  });
+
+  it('reads an engine without hello.features as having none', async function () {
+    proc.sync();
+    expect(proc.features).toBe(null);
+    const hello = nextEvent(proc, 'hello');
+    listening();
+    await hello;
+    expect(proc.features).toEqual([]);
   });
 
   it('emits socket deltas and the stdout lines other than the listening one', async function () {

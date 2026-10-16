@@ -20,6 +20,8 @@ import {
   AccountStateParams,
   ErrorCode,
   EXIT_SOCKET_IN_USE,
+  HelloResult,
+  MailNewParams,
   serveSocketPath,
   SyncErrorJSON,
 } from './engine-protocol';
@@ -153,6 +155,11 @@ export interface EngineClientHost {
   onAccountLaunched(json: AccountJSON): void;
   // The account (or, after an engine cutoff, every account) is not relaunched any more.
   onTooManyFailures(accountId: string, exit: MailsyncProcessExit, authFailure: boolean): void;
+  // The engine answered hello on its socket (again, after each respawn).
+  onHello?(result: HelloResult): void;
+  // The engine is gone; its features and requests with it, until the next hello.
+  onEngineGone?(): void;
+  onMailNew?(params: MailNewParams): void;
 }
 
 interface Entry {
@@ -274,6 +281,17 @@ export class EngineClient {
     if (this.engine) this.engine.wakeAll();
   }
 
+  // `hello.features` of the running engine; null before its hello and without an engine.
+  features(): string[] | null {
+    return this.engine ? this.engine.features : null;
+  }
+
+  // A socket request to the running engine, for the reads the bridge doesn't route.
+  request<R = unknown>(method: string, params: unknown): Promise<R> {
+    if (!this.engine) return Promise.reject(new Error('The sync engine is not running'));
+    return this.engine.request<R>(method, params);
+  }
+
   syncCalendar(accountId?: string) {
     const ids = accountId ? [accountId] : [...this.entries.keys()];
     for (const id of ids) {
@@ -288,6 +306,7 @@ export class EngineClient {
     const engine = this.engine;
     this.engine = null;
     this.entries.clear();
+    if (engine && this.host.onEngineGone) this.host.onEngineGone();
     return engine ? engine.shutdown() : Promise.resolve();
   }
 
@@ -316,6 +335,12 @@ export class EngineClient {
     });
     engine.on('ready', () => {
       if (this.engine === engine) this.inUseExits = 0;
+    });
+    engine.on('hello', (result: HelloResult) => {
+      if (this.engine === engine && this.host.onHello) this.host.onHello(result);
+    });
+    engine.on('mail-new', (params: MailNewParams) => {
+      if (this.engine === engine && this.host.onMailNew) this.host.onMailNew(params);
     });
     engine.on('close', (exit: MailsyncProcessExit) => this._onEngineClose(engine, exit));
     try {
@@ -463,6 +488,7 @@ export class EngineClient {
   _onEngineClose(engine: EngineServeProcess, exit: MailsyncProcessExit) {
     if (this.engine !== engine) return;
     this.engine = null;
+    if (this.host.onEngineGone) this.host.onEngineGone();
     const ids = [...this.entries.keys()];
     this.entries.clear();
     for (const id of ids) {

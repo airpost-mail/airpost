@@ -55,6 +55,10 @@ export const Method = {
   BodiesFetch: 'bodies.fetch',
   CalendarSync: 'calendar.sync',
   EngineStatus: 'engine.status',
+  // Reads; an engine has them when `hello.features` lists their Feature.
+  CountsGet: 'counts.get',
+  TasksList: 'tasks.list',
+  MetadataList: 'metadata.list',
   AccountList: 'account.list',
   // `serve` mode's stdin only: the account JSON carries credentials.
   AccountAdd: 'account.add',
@@ -67,6 +71,17 @@ export const Method = {
   Delta: 'delta',
   Disconnect: 'disconnect',
   AccountState: 'account.state',
+  MailNew: 'mail.new',
+} as const;
+
+// What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
+// an engine without `features` (the C++ engine's path, an older Rust engine) has none.
+export const Feature = {
+  Counts: 'counts',
+  TasksList: 'tasks-list',
+  MetadataList: 'metadata-list',
+  MessageHidden: 'message-hidden',
+  MailNew: 'mail-new',
 } as const;
 
 export const ErrorCode = {
@@ -127,6 +142,40 @@ export interface HelloResult {
   engine: string;
   pid: number;
   accounts: AccountInfo[];
+  features?: string[];
+}
+
+export interface CategoryCounts {
+  unread: number;
+  total: number;
+}
+
+// `accounts` null (or absent) means every account the engine holds.
+export interface CountsGetParams {
+  accounts?: string[] | null;
+}
+
+// Keyed by category id. The same rows arrive as ThreadCounts deltas after it.
+export interface CountsGetResult {
+  counts: { [categoryId: string]: CategoryCounts };
+}
+
+// A ThreadCounts delta's model: `persist` when a count changes or a category is added,
+// `unpersist` (no counts) when the category is removed.
+export interface ThreadCountsRow {
+  id: string;
+  categoryId: string;
+  unread?: number;
+  total?: number;
+}
+
+export const THREAD_COUNTS_CLASS = 'ThreadCounts';
+
+// Once per message that lands unread in the inbox after the first headers sync.
+export interface MailNewParams {
+  accountId: string;
+  threadId: string;
+  messageId: string;
 }
 
 // null means every account, or every model class.

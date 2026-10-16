@@ -10,9 +10,16 @@ import {
   DatabaseChangeRecord,
   TaskFactory,
 } from 'mailspring-exports';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../../src/engine-events';
+import { Feature, MailNewParams } from '../../../src/engine-protocol';
 
 const WAIT_FOR_CHANGES_DELAY = 400;
 const NEW_MAIL_SOUND_QUIET_PERIOD = 5000;
+// mail.new arrives once per message; the ones this close together are handled as one batch,
+// as the messages of one delta were.
+const MAIL_NEW_BATCH_DELAY = 100;
+// How many notified message ids are remembered to drop a repeated mail.new.
+const MAIL_NEW_SEEN_LIMIT = 2000;
 
 export class Notifier {
   activationTime = Date.now();
@@ -21,9 +28,19 @@ export class Notifier {
   lastNewMailSoundRequest = 0;
   unlisteners: Array<() => void>;
   activeNotifications = {};
+  engine: EngineEventsType;
+  mailNewBatch: MailNewParams[] = [];
+  mailNewTimer = null;
+  mailNewSeen = new Set<string>();
 
-  constructor() {
-    this.unlisteners = [DatabaseStore.listen(this._onDatabaseChanged, this)];
+  constructor(engine: EngineEventsType = EngineEvents) {
+    this.engine = engine;
+    engine.on('mail-new', this._onMailNew);
+    this.unlisteners = [
+      DatabaseStore.listen(this._onDatabaseChanged, this),
+      () => engine.removeListener('mail-new', this._onMailNew),
+      () => clearTimeout(this.mailNewTimer),
+    ];
   }
 
   unlisten() {
@@ -42,7 +59,8 @@ export class Notifier {
       this._onThreadsChanged(objects);
     }
 
-    if (objectClass === Message.name) {
+    // An engine with mail.new decides what is new mail; see _onMailNew.
+    if (objectClass === Message.name && !this.engine.has(Feature.MailNew)) {
       const newIds = new Set<string>();
       for (const json of objectsRawJSON) {
         if (json.headersSyncComplete) newIds.add(json.id);
@@ -50,6 +68,33 @@ export class Notifier {
       if (!newIds.size) return;
       this._onMessagesChanged(objects, newIds);
     }
+  }
+
+  _onMailNew = (params: MailNewParams) => {
+    if (!params || !params.messageId || this.mailNewSeen.has(params.messageId)) return;
+    if (this.mailNewSeen.size >= MAIL_NEW_SEEN_LIMIT) this.mailNewSeen.clear();
+    this.mailNewSeen.add(params.messageId);
+    this.mailNewBatch.push(params);
+    if (!this.mailNewTimer) {
+      this.mailNewTimer = setTimeout(() => {
+        this.mailNewTimer = null;
+        this._onMailNewBatch();
+      }, MAIL_NEW_BATCH_DELAY);
+    }
+  };
+
+  // async for testing. The engine checked unread, inbox, the first headers sync and the
+  // sender; the launch time and the 400 ms wait for later changes still apply here.
+  async _onMailNewBatch() {
+    const batch = this.mailNewBatch;
+    this.mailNewBatch = [];
+    if (!batch.length || AppEnv.config.get('core.notifications.enabled') === false) {
+      return;
+    }
+    const ids = batch.map((p) => p.messageId);
+    const msgs = await DatabaseStore.findAll<Message>(Message, Message.attributes.id.in(ids));
+    if (!msgs.length) return;
+    await this._onMessagesChanged(msgs, new Set(ids));
   }
 
   // async for testing

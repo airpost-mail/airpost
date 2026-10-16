@@ -20,6 +20,8 @@ import {
   resolveSyncEngine,
 } from '../mailsync-process';
 import { CrashTracker, EngineClient, isAuthFailure, serveEngineSelected } from '../engine-client';
+import EngineEvents from '../engine-events';
+import { THREAD_COUNTS_CLASS } from '../engine-protocol';
 import KeyManager from '../key-manager';
 import * as Actions from './actions';
 import * as Utils from './models/utils';
@@ -325,6 +327,12 @@ export default class MailsyncBridge {
           syncError: exit,
         });
       },
+      onHello: (result) =>
+        EngineEvents.connected(result.features || [], (method, params) =>
+          this._engine.request(method, params)
+        ),
+      onEngineGone: () => EngineEvents.gone(),
+      onMailNew: (params) => EngineEvents.mailNew(params),
     });
   }
 
@@ -473,6 +481,11 @@ export default class MailsyncBridge {
       }
       if (modelClass === 'ProcessAccountSecretsUpdated' && modelJSONs.length) {
         KeyManager.extractAndStoreAccountSecrets(new Account(modelJSONs[0]));
+        continue;
+      }
+      // Not a model either: ThreadCountsStore applies them in this window.
+      if (modelClass === THREAD_COUNTS_CLASS) {
+        EngineEvents.threadCounts({ type, rows: modelJSONs });
         continue;
       }
 

@@ -21,6 +21,8 @@ import {
   DisconnectParams,
   engineSocketPath,
   HelloParams,
+  HelloResult,
+  MailNewParams,
   MAX_LINE_BYTES,
   Method,
   parseListeningLine,
@@ -294,6 +296,13 @@ export class MailsyncProcess extends EventEmitter {
   _socket: net.Socket = null;
   _socketQueue: string[] = null;
   _socketRequests = new Map<RequestId, string>();
+  // Socket requests whose answer someone awaits (request()), by id.
+  _socketCalls = new Map<
+    RequestId,
+    { resolve: (result: any) => void; reject: (error: Error) => void }
+  >();
+  // `hello.features` of the engine on the socket; null until hello answers.
+  features: string[] = null;
   _nextRequestId = 1;
   _killed = false;
 
@@ -604,7 +613,8 @@ export class MailsyncProcess extends EventEmitter {
     return `tern-desktop/${version}`;
   }
 
-  _sendRequest(method: string, params: unknown) {
+  // Sends a request over the socket. Returns its id, or null when it was dropped.
+  _sendRequest(method: string, params: unknown): RequestId | null {
     const id = this._nextRequestId++;
     const line = `${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`;
     if (this._socket && !this._socket.destroyed) {
@@ -615,12 +625,31 @@ export class MailsyncProcess extends EventEmitter {
       this._socketQueue.push(line);
     } else {
       console.warn(`Not connected to the sync engine; dropped ${method}`);
+      return null;
     }
+    return id;
+  }
+
+  // A socket request whose result the caller needs. Rejects with an EngineRequestError when
+  // the engine refuses it, or with `engineExited` when the connection ends first.
+  request<R = unknown>(method: string, params: unknown): Promise<R> {
+    const id = this._sendRequest(method, params);
+    if (id === null) {
+      return Promise.reject(
+        new EngineRequestError('Not connected to the sync engine', { engineExited: true })
+      );
+    }
+    return new Promise<R>((resolve, reject) => this._socketCalls.set(id, { resolve, reject }));
   }
 
   _closeSocket() {
     this._socketQueue = null;
     this._socketRequests.clear();
+    const calls = [...this._socketCalls.values()];
+    this._socketCalls.clear();
+    for (const { reject } of calls) {
+      reject(new EngineRequestError('The sync engine connection ended', { engineExited: true }));
+    }
     if (this._socket) {
       // A close we asked for is not a failure.
       this._socket.removeAllListeners();
@@ -705,6 +734,10 @@ export class MailsyncProcess extends EventEmitter {
       this.emit('account-state', msg.params as AccountStateParams);
       return null;
     }
+    if (msg.method === Method.MailNew) {
+      this.emit('mail-new', msg.params as MailNewParams);
+      return null;
+    }
     if (msg.method === Method.Disconnect) {
       const { reason } = (msg.params || {}) as DisconnectParams;
       console.warn(`Sync engine dropped the connection: ${reason}`);
@@ -714,8 +747,14 @@ export class MailsyncProcess extends EventEmitter {
       const response = msg as RpcResponse;
       const method = this._socketRequests.get(response.id);
       this._socketRequests.delete(response.id);
+      const call = this._socketCalls.get(response.id);
+      this._socketCalls.delete(response.id);
       if (response.error) {
         const { code, message, data } = response.error;
+        if (call) {
+          call.reject(new EngineRequestError(message, { code, data }));
+          return null;
+        }
         console.warn(
           `Sync engine refused ${method || `request ${response.id}`}: ${message} (${code})`,
           data
@@ -723,6 +762,14 @@ export class MailsyncProcess extends EventEmitter {
         if (method === Method.Hello) {
           return new Error(`The sync engine refused hello: ${message}`);
         }
+        return null;
+      }
+      if (call) {
+        call.resolve(response.result);
+      } else if (method === Method.Hello) {
+        const hello = (response.result || {}) as HelloResult;
+        this.features = Array.isArray(hello.features) ? hello.features : [];
+        this.emit('hello', hello);
       }
     }
     return null;
@@ -1004,9 +1051,10 @@ account.remove and engine.shutdown, their responses, and the accounts'
 ProcessAccountSecretsUpdated deltas, so credentials never touch the socket. Everything else
 goes over the socket, connected once the first stdin response shows the engine has bound it.
 
-Emits 'ready' once the engine has bound its socket, 'deltas' (delta params as JSON text, the
-shape the bridge reads), 'account-state' (AccountStateParams), and 'close'
-(MailsyncProcessExit) once, when the engine exits or its socket fails.
+Emits 'ready' once the engine has bound its socket, 'hello' (HelloResult) once the socket is
+greeted, 'deltas' (delta params as JSON text, the shape the bridge reads), 'account-state'
+(AccountStateParams), 'mail-new' (MailNewParams), and 'close' (MailsyncProcessExit) once, when
+the engine exits or its socket fails.
 */
 export class EngineServeProcess extends MailsyncProcess {
   _parentRequests = new Map<
