@@ -4,6 +4,11 @@ command line, newline-delimited JSON commands on stdin, the delta stream on stdo
 the engine log in CONFIG_DIR_PATH. Nothing here touches the engine's source; every signal
 the harness relies on is one the client already depends on or one that is logged today.
 
+MAILSYNC_TRANSPORT=socket runs the Rust engine with `--socket` instead
+(docs/engine-protocol-plan.md section 2): commands become JSON-RPC requests on a Unix
+socket and deltas arrive as `delta` notifications, recorded exactly as the stdout ones are.
+stdin stays open as the lifeline and still carries test-crash and test-segfault.
+
 Quiescence is inferred, not signalled. The engine has no "done" event, so a process is
 considered quiescent when all of these hold at once:
 
@@ -20,9 +25,12 @@ import itertools
 import json
 import os
 import re
+import shutil
 import signal
+import socket
 import sqlite3
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
@@ -70,6 +78,31 @@ def _log_epoch(ts: str) -> float:
 
 
 _task_seq = itertools.count(1)
+
+TRANSPORTS = ("stdio", "socket")
+# The protocol version the socket transport speaks (ms-ipc PROTOCOL_VERSION).
+SOCKET_PROTOCOL = 1
+# The engine's TASK_REJECTED: the task's local phase failed. The Task delta carries the same
+# error, as on stdio, so it is an outcome rather than a transport problem.
+RPC_TASK_REJECTED = -32002
+# The stdin commands the socket transport sends as requests; anything else goes over stdin.
+STDIN_TO_METHOD = {
+    "wake-workers": "sync.wake",
+    "queue-task": "task.queue",
+    "cancel-task": "task.cancel",
+    "need-bodies": "bodies.fetch",
+    "sync-calendar": "calendar.sync",
+}
+# The one delta that stays on stdout in socket mode (plan section 2): the account JSON after
+# an OAuth refresh, which must not reach socket subscribers.
+STDOUT_ONLY_DELTA = "ProcessAccountSecretsUpdated"
+
+
+def default_transport() -> str:
+    t = os.environ.get("MAILSYNC_TRANSPORT") or "stdio"
+    if t not in TRANSPORTS:
+        raise MailsyncError(f"MAILSYNC_TRANSPORT={t!r}: expected one of {', '.join(TRANSPORTS)}")
+    return t
 
 
 class MailsyncError(RuntimeError):
@@ -193,6 +226,7 @@ class ProcessState:
     deltas: list = field(default_factory=list)
     log: list = field(default_factory=list)
     stdout_noise: list = field(default_factory=list)   # non-JSON stdout, e.g. {"error": ...}
+    rpc_errors: list = field(default_factory=list)     # socket: (t, method, error object) of failed requests
     folder_status: dict = field(default_factory=dict)  # folder id -> latest localStatus
     folder_paths: dict = field(default_factory=dict)   # folder id -> path
     last_delta_t: float = 0.0
@@ -208,6 +242,7 @@ class MailsyncProcess:
         identity: Optional[dict] = None,
         env: Optional[dict] = None,
         pre_sync_modes: Iterable[str] = (),
+        transport: Optional[str] = None,
     ):
         self.account = account
         self.work_dir = Path(work_dir)
@@ -232,6 +267,22 @@ class MailsyncProcess:
         self.pre_sync_modes = list(pre_sync_modes)
         self.mode_outputs: dict = {}
         self.stderr_path = self.work_dir / "stderr.log"
+        self.transport = transport or default_transport()
+        if self.transport not in TRANSPORTS:
+            raise MailsyncError(f"unknown transport {self.transport!r}")
+        # Socket transport state. Problems on the socket fail the next send or wait, and the
+        # scenario's expectations (transport_errors).
+        self.transport_errors: list = []
+        self._sock: Optional[socket.socket] = None
+        self._sock_dir: Optional[Path] = None
+        self._sock_lock = threading.Lock()
+        self._rpc_seq = itertools.count(1)
+        self._rpc_methods: dict = {}       # id -> method, for requests not yet answered
+        self._rpc_replies: dict = {}       # id -> response, for requests start() waits on
+        self._rpc_cond = threading.Condition()
+        self._listening: Optional[str] = None
+        self._listening_event = threading.Event()
+        self._closing = False
 
     # -- lifecycle ----------------------------------------------------------------------
 
@@ -301,6 +352,11 @@ class MailsyncProcess:
         if self.verbose:
             args.append("--verbose")
         args += ["--identity", self._identity_arg(), "--account", json.dumps(self.account)]
+        if self.transport == "socket":
+            # macOS caps socket paths at 104 bytes and pytest's work dirs under /var/folders
+            # are longer, so the socket lives in a fresh short dir (0700 from mkdtemp).
+            self._sock_dir = Path(tempfile.mkdtemp(prefix="ms-", dir="/tmp"))
+            args += ["--socket", str(self._sock_dir / "s")]
         self._t0 = time.monotonic()
         self.proc = subprocess.Popen(
             args, env=self._env(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -310,10 +366,128 @@ class MailsyncProcess:
             t = threading.Thread(target=target, daemon=True)
             t.start()
             self._threads.append(t)
+        if self.transport == "socket":
+            self._connect()
+
+    # -- socket transport -----------------------------------------------------------------
+
+    def _connect(self, timeout: float = 30.0):
+        """Waits for `{"listening": path}`, connects, and sends hello and subscribe. Returns
+        once subscribed, so no delta is missed (the engine also holds the deltas it flushed
+        before the first subscribe and replays them)."""
+        deadline = time.monotonic() + timeout
+        while not self._listening_event.wait(0.1):
+            if self.proc.poll() is not None or time.monotonic() > deadline:
+                what = describe_exit(self.exit_code) if self.proc.poll() is not None else f"nothing after {timeout}s"
+                raise MailsyncError(f"no listening line from mailsync --socket ({what})"
+                                    f"\n--- stderr ---\n{self.stderr_tail()}")
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(self._listening)
+        self._sock = sock
+        t = threading.Thread(target=self._read_socket, args=(sock,), daemon=True)
+        t.start()
+        self._threads.append(t)
+        hello = self._call("hello", {"protocol": SOCKET_PROTOCOL, "client": "tern-harness"}, deadline)
+        ids = [a.get("accountId") for a in hello.get("accounts", [])]
+        if hello.get("protocol") != SOCKET_PROTOCOL or self.account["id"] not in ids:
+            raise MailsyncError(f"unexpected hello result: {hello}")
+        self._call("subscribe", {"accounts": None, "classes": None}, deadline)
+
+    def _request(self, method: str, params: dict, keep_reply: bool = False) -> int:
+        rid = next(self._rpc_seq)
+        line = json.dumps({"jsonrpc": "2.0", "id": rid, "method": method, "params": params}) + "\n"
+        with self._rpc_cond:
+            self._rpc_methods[rid] = method
+            if keep_reply:
+                self._rpc_replies[rid] = None
+        with self._sock_lock:
+            try:
+                self._sock.sendall(line.encode())
+            except OSError as e:
+                raise MailsyncError(f"{method}: socket write failed ({e}); mailsync {describe_exit(self.exit_code)}")
+        return rid
+
+    def _call(self, method: str, params: dict, deadline: float):
+        rid = self._request(method, params, keep_reply=True)
+        with self._rpc_cond:
+            while self._rpc_replies.get(rid) is None:
+                left = deadline - time.monotonic()
+                if left <= 0 or self.proc.poll() is not None or self.transport_errors:
+                    raise MailsyncError(f"no answer to {method} ({describe_exit(self.exit_code)}); "
+                                        f"transport errors: {self.transport_errors}")
+                self._rpc_cond.wait(min(left, 0.1))
+            reply = self._rpc_replies.pop(rid)
+        if "error" in reply:
+            raise MailsyncError(f"{method} failed: {reply['error']}")
+        return reply.get("result")
+
+    def _transport_error(self, msg: str):
+        with self._lock:
+            self.transport_errors.append(f"[{self.elapsed():.1f}s] {msg}")
+
+    def _read_socket(self, sock: socket.socket):
+        f = sock.makefile("rb")
+        try:
+            for raw in f:
+                line = raw.strip()
+                if line:
+                    self._on_socket_line(line)
+        except OSError:
+            pass   # stop() closed it
+        if self._closing:
+            return
+        # The engine closes the socket when it exits; give an exit in progress a moment.
+        try:
+            self.proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            if not self._closing:
+                self._transport_error("the engine closed the socket while still running")
+
+    def _on_socket_line(self, line: bytes):
+        t = self.elapsed()
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            self._transport_error(f"unparseable socket line: {line[:200]!r}")
+            return
+        method = msg.get("method")
+        if method == "delta":
+            params = dict(msg.get("params") or {})
+            account_id = params.pop("accountId", None)
+            if account_id != self.account["id"] or "modelClass" not in params:
+                self._transport_error(f"delta for account {account_id!r}: {line[:200]!r}")
+                return
+            self._record_delta(t, params)
+        elif method == "disconnect":
+            self._transport_error(f"engine sent disconnect: {msg.get('params')}")
+        elif "id" in msg:
+            with self._rpc_cond:
+                name = self._rpc_methods.pop(msg["id"], "?")
+                if msg["id"] in self._rpc_replies:
+                    self._rpc_replies[msg["id"]] = msg
+                    self._rpc_cond.notify_all()
+                    return
+            err = msg.get("error")
+            if err:
+                with self._lock:
+                    self.state.rpc_errors.append((t, name, err))
+                if err.get("code") != RPC_TASK_REJECTED:
+                    self._transport_error(f"{name} failed: {err}")
+        else:
+            self._transport_error(f"unexpected socket message: {line[:200]!r}")
+
+    def _close_socket(self):
+        self._closing = True
+        if self._sock is not None:
+            with contextlib.suppress(OSError):
+                self._sock.shutdown(socket.SHUT_RDWR)
+            with contextlib.suppress(OSError):
+                self._sock.close()
 
     def stop(self, timeout: float = 5.0) -> Optional[int]:
         if not self.proc:
             return None
+        self._close_socket()
         if self.proc.poll() is None:
             try:
                 self.proc.stdin.close()
@@ -329,6 +503,8 @@ class MailsyncProcess:
         for t in self._threads:
             t.join(timeout=2)
         self._drain_log()
+        if self._sock_dir is not None:
+            shutil.rmtree(self._sock_dir, ignore_errors=True)
         return self.proc.returncode
 
     @contextlib.contextmanager
@@ -370,10 +546,26 @@ class MailsyncProcess:
     # -- stdin commands -------------------------------------------------------------------
 
     def send(self, packet: dict):
+        """A stdin command. On the socket transport the ones with a method become requests;
+        their answers are read asynchronously, as stdin has none."""
         if not self.running:
             raise MailsyncError(f"mailsync is not running ({describe_exit(self.exit_code)})")
-        self.proc.stdin.write(json.dumps(packet) + "\n")
-        self.proc.stdin.flush()
+        if self.transport_errors:
+            raise MailsyncError("socket transport failed: " + "; ".join(self.transport_errors))
+        method = STDIN_TO_METHOD.get(packet.get("type")) if self.transport == "socket" else None
+        if method is None:
+            self.proc.stdin.write(json.dumps(packet) + "\n")
+            self.proc.stdin.flush()
+            return
+        aid = self.account["id"]
+        params = {
+            "sync.wake": lambda: {"accountId": aid},
+            "task.queue": lambda: {"accountId": aid, "task": packet["task"]},
+            "task.cancel": lambda: {"accountId": aid, "taskId": packet["taskId"]},
+            "bodies.fetch": lambda: {"accountId": aid, "ids": packet["ids"]},
+            "calendar.sync": lambda: {"accountId": aid},
+        }[method]()
+        self._request(method, params)
 
     def wake(self):
         """Ends the background worker's 120s sleep and re-marks folders busy, exactly as the
@@ -404,6 +596,7 @@ class MailsyncProcess:
     # -- observation ----------------------------------------------------------------------
 
     def _read_stdout(self):
+        socket_mode = self.transport == "socket"
         for line in self.proc.stdout:
             line = line.strip()
             if not line:
@@ -412,24 +605,32 @@ class MailsyncProcess:
             try:
                 d = json.loads(line)
             except json.JSONDecodeError:
+                d = None
+            if socket_mode and isinstance(d, dict) and "listening" in d and not self._listening_event.is_set():
+                self._listening = d["listening"]
+                self._listening_event.set()
+                continue
+            if not isinstance(d, dict) or "modelClass" not in d:
                 with self._lock:
                     self.state.stdout_noise.append((t, line))
                 continue
-            if "modelClass" not in d:
-                with self._lock:
-                    self.state.stdout_noise.append((t, line))
+            if socket_mode and d["modelClass"] != STDOUT_ONLY_DELTA:
+                self._transport_error(f"delta on stdout in socket mode: {line[:200]}")
                 continue
-            delta = Delta(t, d.get("type", ""), d["modelClass"], d.get("modelJSONs", []), d, wall=time.time())
-            with self._lock:
-                self.state.deltas.append(delta)
-                self.state.last_delta_t = t
-                if delta.model_class == "Folder":
-                    for m in delta.models:
-                        if delta.type == "persist":
-                            self.state.folder_status[m["id"]] = m.get("localStatus", {})
-                            self.state.folder_paths[m["id"]] = m.get("path")
-                        else:
-                            self.state.folder_status.pop(m["id"], None)
+            self._record_delta(t, d)
+
+    def _record_delta(self, t: float, d: dict):
+        delta = Delta(t, d.get("type", ""), d["modelClass"], d.get("modelJSONs", []), d, wall=time.time())
+        with self._lock:
+            self.state.deltas.append(delta)
+            self.state.last_delta_t = t
+            if delta.model_class == "Folder":
+                for m in delta.models:
+                    if delta.type == "persist":
+                        self.state.folder_status[m["id"]] = m.get("localStatus", {})
+                        self.state.folder_paths[m["id"]] = m.get("path")
+                    else:
+                        self.state.folder_status.pop(m["id"], None)
 
     @property
     def log_path(self) -> Path:
@@ -540,6 +741,9 @@ class MailsyncProcess:
             if not self.running:
                 raise MailsyncError(f"mailsync stopped ({describe_exit(self.exit_code)}) while waiting for {what}"
                                     f"\n--- stderr ---\n{self.stderr_tail()}")
+            if self.transport_errors:
+                raise MailsyncError(f"socket transport failed while waiting for {what}: "
+                                    + "; ".join(self.transport_errors))
             if predicate():
                 return
             time.sleep(poll)
@@ -649,6 +853,7 @@ class MailsyncProcess:
             f"bg tail: {[l.msg[:100] for l in bg]}\nfg tail: {[l.msg[:100] for l in fg]}\n"
             f"fg idling={self._foreground_idling()} waiting because: {self.wait_reason!r} "
             f"stdout noise={self.state.stdout_noise[-3:]}"
+            + (f" transport={self.transport} errors={self.transport_errors[-3:]}" if self.transport == "socket" else "")
         )
 
     def __enter__(self):

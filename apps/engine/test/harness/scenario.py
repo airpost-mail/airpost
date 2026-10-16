@@ -238,6 +238,11 @@ class ScenarioRun(PimMixin, BackendMixin):
             )
         return path
 
+    def _transport_for(self, binary: Optional[Path]) -> Optional[str]:
+        """A build the scenario pins (`binary:`, the C++ engine or an older Rust one) may not
+        have `--socket`, so it runs on stdio; the build under test follows MAILSYNC_TRANSPORT."""
+        return None if binary == self.binary else "stdio"
+
     @staticmethod
     def _binary_path(value: str) -> Path:
         if value == "cpp":
@@ -279,8 +284,10 @@ class ScenarioRun(PimMixin, BackendMixin):
         # `import_legacy: true` runs `--mode import-legacy` between migrate and sync, as the
         # client does once after the first Rust launch (docs/engine-port-plan.md section 9).
         modes = ["import-legacy"] if self.sc.get("import_legacy") else []
-        self.ms = MailsyncProcess(account, self.work, binary=self._initial_binary(), verbose=True,
-                                  env=self._engine_env(), pre_sync_modes=modes)
+        binary = self._initial_binary()
+        self.ms = MailsyncProcess(account, self.work, binary=binary, verbose=True,
+                                  env=self._engine_env(), pre_sync_modes=modes,
+                                  transport=self._transport_for(binary))
         self._attach_backend(self.ms)
         self._write_legacy_db()
 
@@ -513,7 +520,7 @@ class ScenarioRun(PimMixin, BackendMixin):
         binary = self._binary_path(arg["binary"]) if arg.get("binary") else self.binary
         modes = ["import-legacy"] if arg.get("import_legacy") else []
         self.ms = MailsyncProcess(account, self.work, binary=binary, verbose=True, env=self._engine_env(),
-                                  pre_sync_modes=modes)
+                                  pre_sync_modes=modes, transport=self._transport_for(binary))
         self._attach_backend(self.ms)
         try:
             self.ms.start()
@@ -813,6 +820,8 @@ class ScenarioRun(PimMixin, BackendMixin):
                     self._note(f"XPASS {key} - passes now, remove xfail: {xfail}")
                 continue
             problems += found
+        if self.ms and self.ms.transport_errors:
+            problems.append("socket transport: " + "; ".join(self.ms.transport_errors))
         if self.ms and self.ms.exit_code is not None and not expect.get("exit") and not crash_expected:
             problems.append(f"mailsync stopped ({describe_exit(self.ms.exit_code)})\n{self.ms.stderr_tail()}")
         for p in problems:

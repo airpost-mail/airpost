@@ -81,6 +81,26 @@ with a list of quick-tier cases over 20 s, the candidates for `slow: true`. Case
 first, using `durations.json` (refresh it with `--record-durations`; a case missing from it
 counts as 30 s), so one long case does not start last.
 
+### Transports
+
+`MAILSYNC_TRANSPORT=socket` runs the engine with `--socket` (docs/engine-protocol-plan.md
+section 2) instead of the default `stdio`. The harness waits for `{"listening": …}` on
+stdout, connects, sends `hello` and `subscribe`, and records each `delta` notification as
+the same `Delta` the stdout reader makes; `wake`, `queue_task`, `need_bodies` and
+`sync_calendar` become `sync.wake`, `task.queue`, `bodies.fetch` and `calendar.sync`
+requests. The account still goes on `--account` and stdin stays open as the lifeline
+(test-crash and test-segfault still go there). The socket lives in a fresh `/tmp/ms-*` dir,
+since macOS caps socket paths at 104 bytes. A delta on stdout other than
+`ProcessAccountSecretsUpdated`, a `disconnect`, a failed request (except a task whose local
+phase failed) or the engine closing the socket while running fails the case. A scenario
+that pins `binary:` (the C++ engine, an older build) runs that engine on stdio. The quick
+tier runs in both transports; the phase gate runs `--all` on the socket.
+
+```bash
+MAILSYNC_TRANSPORT=socket python3 -m pytest test          # quick tier over the socket
+MAILSYNC_TRANSPORT=socket python3 -m pytest test --all
+```
+
 ## How a scenario works
 
 ```yaml
