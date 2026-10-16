@@ -1,11 +1,5 @@
 import { LRUCache } from 'lru-cache';
-import {
-  QuotedHTMLTransformer,
-  localized,
-  Actions,
-  MailspringAPIRequest,
-  RegExpUtils,
-} from 'mailspring-exports';
+import { QuotedHTMLTransformer, localized, Actions, RegExpUtils } from 'mailspring-exports';
 
 export const TranslatePopupOptions = {
   English: 'en',
@@ -179,6 +173,20 @@ function forEachTranslatableText(doc: Document, callback: (el: Node, text: strin
 const translatedSnippetCache = new LRUCache<string, string>({ max: 1000 });
 let translatedSnippetLang = '';
 
+export const TRANSLATION_UNAVAILABLE = localized(
+  'Translation needs a translation server, and none is configured.'
+);
+
+// There is no translation server yet, so the composer button is disabled and messages in
+// other languages get no translation banner.
+export function isTranslationAvailable() {
+  return false;
+}
+
+async function requestTranslation(html: string, targetLang: string): Promise<string> {
+  throw new Error(TRANSLATION_UNAVAILABLE);
+}
+
 export async function translateMessageBody(
   html: string,
   targetLang?: string,
@@ -225,16 +233,9 @@ export async function translateMessageBody(
   if (translationDoc.childElementCount > 0) {
     const translationHTML = translationDoc.innerHTML.replace(/&nbsp;/g, ' '); // nbsp char
 
-    let response = null;
+    let translatedHTML: string;
     try {
-      response = await MailspringAPIRequest.makeRequest({
-        server: 'identity',
-        method: 'POST',
-        path: `/api/translate`,
-        json: true,
-        body: { lang: targetLang, text: translationHTML, format: 'html' },
-        timeout: 5000,
-      });
+      translatedHTML = await requestTranslation(translationHTML, targetLang);
     } catch (error) {
       Actions.closePopover();
       if (!silent) {
@@ -246,7 +247,7 @@ export async function translateMessageBody(
       return false;
     }
 
-    const resultDoc = domParser.parseFromString(response.result, 'text/html');
+    const resultDoc = domParser.parseFromString(translatedHTML, 'text/html');
     resultElements = Array.from(resultDoc.querySelectorAll('b'));
   }
 

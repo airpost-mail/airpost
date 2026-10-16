@@ -6,7 +6,6 @@ import _ from 'underscore';
 
 import { Task } from './tasks/task';
 import TaskQueue from './stores/task-queue';
-import { IdentityStore } from './stores/identity-store';
 
 import { Account } from './models/account';
 import { AccountStore } from './stores/account-store';
@@ -266,7 +265,6 @@ export default class MailsyncBridge {
     // create a new client that will perform the reset
     const resetClient = new MailsyncProcess(this._getClientConfiguration());
     resetClient.account = (await KeyManager.insertAccountSecrets(account)).toJSON();
-    resetClient.identity = IdentityStore.identity();
 
     // no-op - do not allow us to kill this client - we may be reseting the cache of an
     // account which does not exist anymore, but we don't want to interrupt this process
@@ -348,7 +346,6 @@ export default class MailsyncBridge {
     }
 
     client.account = fullAccountJSON;
-    client.identity = IdentityStore.identity();
     client.sync();
     client.on('deltas', this._onIncomingMessages);
     client.on('close', ({ code, error, signal }: MailsyncProcessExit) => {
@@ -470,11 +467,6 @@ export default class MailsyncBridge {
       }
       if (modelClass === 'ProcessAccountSecretsUpdated' && modelJSONs.length) {
         KeyManager.extractAndStoreAccountSecrets(new Account(modelJSONs[0]));
-        continue;
-      }
-
-      if (modelClass === 'ProcessIdentityRefreshNeeded') {
-        IdentityStore.fetchIdentitySoon();
         continue;
       }
 

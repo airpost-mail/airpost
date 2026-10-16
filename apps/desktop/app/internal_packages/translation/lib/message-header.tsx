@@ -9,7 +9,7 @@ import {
   MessageBodyProcessor,
 } from 'mailspring-exports';
 
-import { translateMessageBody, AllLanguages } from './service';
+import { translateMessageBody, isTranslationAvailable, AllLanguages } from './service';
 import { Menu, ButtonDropdown, RetinaImg } from 'mailspring-component-kit';
 
 interface TranslateMessageHeaderProps {
@@ -121,6 +121,8 @@ export class TranslateMessageHeader extends React.Component<
       this.setState({ detected: result.fromLang });
       return;
     }
+
+    if (!isTranslationAvailable()) return;
 
     // add a delay to avoid this work if the user is rapidly flipping through messages
     await Promise.delay(1000);

@@ -1,4 +1,4 @@
-import { localized, AccountStore, Account, IdentityStore } from 'mailspring-exports';
+import { localized, AccountStore, Account } from 'mailspring-exports';
 import { ipcRenderer } from 'electron';
 import MailspringStore from 'mailspring-store';
 
@@ -20,13 +20,8 @@ class OnboardingStore extends MailspringStore {
     const { existingAccountJSON, addingAccount } = AppEnv.getWindowProps();
 
     const hasAccounts = AccountStore.accounts().length > 0;
-    const identity = IdentityStore.identity();
 
-    this._account = new Account({
-      name: identity ? `${identity.firstName || ''} ${identity.lastName || ''}` : '',
-      emailAddress: identity ? identity.emailAddress : '',
-      settings: {},
-    });
+    this._account = new Account({ name: '', emailAddress: '', settings: {} });
 
     if (existingAccountJSON) {
       // Used when re-adding an account after re-connecting, take the user back

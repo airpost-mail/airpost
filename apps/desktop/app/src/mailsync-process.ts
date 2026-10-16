@@ -11,7 +11,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import { localized } from './intl';
 import { developerToolsAvailable } from './developer-tools';
-import { IIdentity, Account } from 'mailspring-exports';
+import { Account } from 'mailspring-exports';
 
 import {
   GMAIL_CLIENT_ID,
@@ -77,18 +77,14 @@ export const LocalizedErrorStrings = {
   ErrorNoImplementedAuthMethods: localized(
     'Sorry, your SMTP server does not support basic username / password authentication.'
   ),
-  ErrorIdentityMissingFields: localized(
-    'Your Mailspring ID is missing required fields - you may need to reset Mailspring. %@',
-    'https://getmailspring.com/docs/your-mailspring-id-is-missing-required-fields'
-  ),
 };
 
 // LocalizedErrorStrings codes that, despite being "classified" by mailsync,
 // can also indicate a genuine Mailspring defect rather than a server/user
-// condition - a malformed-response parser regression, or corrupted local
-// identity state. These should keep reaching error reporting instead of
-// being treated as expected, user-actionable failures.
-const AMBIGUOUS_MAILSYNC_ERRORS = new Set(['ErrorParse', 'ErrorIdentityMissingFields']);
+// condition - a malformed-response parser regression. These should keep
+// reaching error reporting instead of being treated as expected,
+// user-actionable failures.
+const AMBIGUOUS_MAILSYNC_ERRORS = new Set(['ErrorParse']);
 
 /*
 Extracts mailsync's JSON result from what it wrote to stdout.
@@ -254,7 +250,6 @@ export class MailsyncProcess extends EventEmitter {
 
   // these must be set before you use the process
   account: Account = null;
-  identity: IIdentity = null;
 
   verbose: boolean;
   resourcePath: string;
@@ -338,11 +333,11 @@ export class MailsyncProcess extends EventEmitter {
       CONFIG_DIR_PATH: this.configDirPath,
       GMAIL_CLIENT_ID: GMAIL_CLIENT_ID,
       GMAIL_CLIENT_SECRET: GMAIL_CLIENT_SECRET,
-      IDENTITY_SERVER: 'unknown',
     });
-    if (process.type === 'renderer') {
-      const rootURLForServer = require('./flux/mailspring-api-request').rootURLForServer;
-      env.IDENTITY_SERVER = rootURLForServer('identity');
+    // The C++ engine prints its usage and exits when this is empty. Without an identity it
+    // only reads it in install-check mode, which the app doesn't run.
+    if (this.syncEngine === 'cpp') {
+      env.IDENTITY_SERVER = 'unknown';
     }
 
     const args = [`--mode`, mode];
@@ -368,7 +363,8 @@ export class MailsyncProcess extends EventEmitter {
     if (this.account && this._proc.stdout) {
       this._proc.stdout.once('data', () => {
         const rs = new Readable();
-        rs.push(`${JSON.stringify(this.account)}\n${JSON.stringify(this.identity)}\n`);
+        // Both engines read an identity line after the account; `null` means none.
+        rs.push(`${JSON.stringify(this.account)}\nnull\n`);
         rs.push(null);
         rs.pipe(this._proc.stdin, { end: false });
       });

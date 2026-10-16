@@ -214,7 +214,6 @@ class SignatureEditor extends React.Component<SignatureEditorProps, SignatureEdi
                   </div>
                 ))}
                 <SignaturePhotoPicker
-                  id={signature.id}
                   data={data}
                   resolvedURL={resolvedData.photoURL}
                   onChange={this._onDataFieldChange}

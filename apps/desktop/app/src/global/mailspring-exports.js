@@ -56,8 +56,7 @@ lazyLoadWithGetter(`isRTL`, () => require('../intl').isRTL);
 // Actions
 lazyLoad(`Actions`, 'flux/actions');
 
-// API Endpoints
-lazyLoad(`MailspringAPIRequest`, 'flux/mailspring-api-request');
+// Sync engine
 lazyLoad(`MailsyncProcess`, 'mailsync-process');
 // The Database
 lazyLoad(`Matcher`, 'flux/attributes/matcher');
@@ -139,7 +138,6 @@ load(`AccountStore`, 'flux/stores/account-store');
 load(`SignatureStore`, 'flux/stores/signature-store');
 load(`MessageStore`, 'flux/stores/message-store');
 load(`ContactStore`, 'flux/stores/contact-store');
-load(`IdentityStore`, 'flux/stores/identity-store');
 load(`CategoryStore`, 'flux/stores/category-store');
 load(`UndoRedoStore`, 'flux/stores/undo-redo-store');
 load(`WorkspaceStore`, 'flux/stores/workspace-store');

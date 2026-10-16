@@ -605,7 +605,6 @@ export default class ActivityReports extends React.Component<RootProps, RootStat
       firstOpenBuckets,
       openRateByHour,
       openRateByWeekday,
-      version,
       loading,
     } = this.state;
     const { timespan } = this.props;
@@ -802,7 +801,7 @@ export default class ActivityReports extends React.Component<RootProps, RootStat
           <div className="btn" onClick={this._onExport}>
             {localized('Export Raw Data')}
           </div>
-          <ShareButton key={version} />
+          <ShareButton />
         </div>
       </div>
     );

@@ -1,6 +1,5 @@
 import MailspringStore from 'mailspring-store';
-import { IdentityStore } from 'mailspring-exports';
-import { GrammarError, LanguageToolBackend, UsageExceededError } from './grammar-check-service';
+import { GrammarError, LanguageToolBackend } from './grammar-check-service';
 
 interface BlockCheckResult {
   text: string;
@@ -66,6 +65,10 @@ class _GrammarCheckStore extends MailspringStore {
     return this._enabled;
   }
 
+  isAvailable(): boolean {
+    return !!this._backend && this._backend.isAvailable();
+  }
+
   isChecking(draftId?: string): boolean {
     if (!draftId) {
       for (const val of this._checking.values()) {
@@ -91,8 +94,7 @@ class _GrammarCheckStore extends MailspringStore {
   }
 
   markDirty(draftId: string, blockKey: string, blockText: string) {
-    // The checker is proxied through the Mailspring ID server, so it needs a signed-in identity.
-    if (!this._enabled || !IdentityStore.identity()) {
+    if (!this._enabled || !this.isAvailable()) {
       return;
     }
     let draftDirty = this._dirtyBlocks.get(draftId);
@@ -147,7 +149,7 @@ class _GrammarCheckStore extends MailspringStore {
   // newer check. Callers should skip applying decorations when false is returned,
   // because a newer check is already in-flight and will apply its own results.
   async checkDirtyBlocks(draftId: string): Promise<boolean> {
-    if (!this._enabled || !IdentityStore.identity()) {
+    if (!this._enabled || !this.isAvailable()) {
       return false;
     }
 
@@ -207,10 +209,6 @@ class _GrammarCheckStore extends MailspringStore {
 
           draftErrors.set(blockKey, { text: blockText, errors: filteredErrors });
         } catch (err) {
-          if (err instanceof UsageExceededError) {
-            this._dirtyBlocks.clear();
-            break;
-          }
           console.warn(`Grammar check failed for block ${blockKey}:`, err);
         }
       }

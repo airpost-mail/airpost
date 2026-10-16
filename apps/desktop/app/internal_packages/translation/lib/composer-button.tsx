@@ -2,7 +2,12 @@ import React, { useRef } from 'react';
 import { localized, Actions, Message, DraftEditingSession } from 'mailspring-exports';
 
 import { Menu, RetinaImg } from 'mailspring-component-kit';
-import { TranslatePopupOptions, translateMessageBody } from './service';
+import {
+  TranslatePopupOptions,
+  translateMessageBody,
+  isTranslationAvailable,
+  TRANSLATION_UNAVAILABLE,
+} from './service';
 
 type Props = { draft: Message; session: DraftEditingSession };
 
@@ -39,13 +44,17 @@ const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
   if (draft.plaintext) {
     return <span />;
   }
+  const available = isTranslationAvailable();
+  const title = available ? localized('Translate email body…') : TRANSLATION_UNAVAILABLE;
   return (
     <button
       ref={buttonRef}
       tabIndex={-1}
       className="btn btn-toolbar btn-translate pull-right"
       onClick={onClickTranslateButton}
-      title={localized('Translate email body…')}
+      disabled={!available}
+      title={title}
+      aria-label={title}
     >
       <RetinaImg
         mode={RetinaImg.Mode.ContentIsMask}

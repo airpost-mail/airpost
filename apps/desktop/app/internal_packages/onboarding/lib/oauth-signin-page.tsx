@@ -52,6 +52,17 @@ export function oauthStateIsValid(
   return crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
 }
 
+// Shown in the browser tab the provider redirected to, once the code has reached the app.
+function oauthFinishedPage() {
+  const title = localized('Signed in');
+  const message = localized('You can close this window and return to the app.');
+  return (
+    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head>` +
+    `<body style="font-family: sans-serif; text-align: center; margin-top: 80px;">` +
+    `${message}</body></html>`
+  );
+}
+
 interface OAuthSignInPageProps {
   providerAuthPageUrl: string;
   buildAccountFromAuthResponse: (rep: any) => Account | Promise<Account>;
@@ -113,8 +124,8 @@ export default class OAuthSignInPage extends React.Component<
         return;
       }
       this._onReceivedCode(code);
-      response.writeHead(302, { Location: 'https://id.getmailspring.com/oauth/finished' });
-      response.end();
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      response.end(oauthFinishedPage());
     });
     this._server.once('error', (err) => {
       AppEnv.showErrorDialog({

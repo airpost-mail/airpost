@@ -5,11 +5,11 @@ import classnames from 'classnames';
 import networkErrors from 'chromium-net-errors';
 import { localized } from 'mailspring-exports';
 
-import { rootURLForServer } from '../flux/mailspring-api-request';
 import { RetinaImg } from './retina-img';
 import { Disposable } from 'event-kit';
 
 type InitialLoadingCoverProps = {
+  src?: string;
   ready?: boolean;
   error?: string;
   onTryAgain?: (...args: any[]) => any;
@@ -54,7 +54,7 @@ class InitialLoadingCover extends React.Component<
     if (this.props.error) {
       message = this.props.error;
     } else if (this.state.slow) {
-      message = localized(`Still trying to reach %@…`, rootURLForServer('identity'));
+      message = localized(`Still trying to reach %@…`, this.props.src);
     } else {
       message = '&nbsp;';
     }
@@ -177,11 +177,7 @@ export default class Webview extends React.Component<WebviewProps, WebviewState>
     if (!isMainFrame) return;
 
     if (httpResponseCode >= 400) {
-      const error = localized(
-        `Could not reach Mailspring. Please try again or contact support@getmailspring.com if the issue persists. (%@: %@)`,
-        navigatedUrl,
-        httpResponseCode
-      );
+      const error = localized(`Could not reach %@. %@`, navigatedUrl, httpResponseCode);
       this.setState({ ready: false, error: error, webviewLoading: false });
     }
     this.setState({ ready: true, webviewLoading: false });
@@ -230,6 +226,7 @@ export default class Webview extends React.Component<WebviewProps, WebviewState>
           />
         </div>
         <InitialLoadingCover
+          src={this.props.src}
           ready={this.state.ready}
           error={this.state.error}
           onTryAgain={this._onTryAgain}

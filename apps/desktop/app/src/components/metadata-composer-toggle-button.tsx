@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  MailspringAPIRequest,
-  APIError,
-  localized,
-  Message,
-  DraftEditingSession,
-} from 'mailspring-exports';
+import { localized, Message, DraftEditingSession } from 'mailspring-exports';
 import { RetinaImg } from 'mailspring-component-kit';
 import classnames from 'classnames';
 import _ from 'underscore';
@@ -66,20 +60,12 @@ export default class MetadataComposerToggleButton extends React.Component<
     try {
       session.changes.addPluginMetadata(pluginId, metadataValue);
     } catch (error) {
-      const { errorMessage } = this.props;
-
       AppEnv.config.set(this._configKey(), false);
-
-      let title = localized('Error');
-      if (!(error instanceof APIError)) {
-        AppEnv.reportError(error);
-      } else if (error.statusCode === 400) {
-        AppEnv.reportError(error);
-      } else if (MailspringAPIRequest.TimeoutErrorCodes.includes(error.statusCode)) {
-        title = localized('Offline');
-      }
-
-      AppEnv.showErrorDialog({ title, message: errorMessage(error) });
+      AppEnv.reportError(error);
+      AppEnv.showErrorDialog({
+        title: localized('Error'),
+        message: this.props.errorMessage(error),
+      });
     }
 
     this.setState({ pending: false });

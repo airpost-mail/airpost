@@ -1,5 +1,4 @@
-import { MailspringAPIRequest, Utils } from 'mailspring-exports';
-const { makeRequest } = MailspringAPIRequest;
+import { Utils } from 'mailspring-exports';
 
 const CACHE_SIZE = 200;
 const CACHE_INDEX_KEY = 'pp-cache-v3-keys';
@@ -17,39 +16,15 @@ class ParticipantProfileDataSource {
   }
 
   async find(contact: { email: string; name: string }) {
-    const { email, name } = contact;
+    const { email } = contact;
 
     if (!email || Utils.likelyNonHumanEmail(email)) {
       return {};
     }
 
-    const data = this.getCache(email);
-    if (data) {
-      return data;
-    }
-
-    let body = null;
-
-    try {
-      body = await makeRequest({
-        server: 'identity',
-        method: 'GET',
-        path: `/api/info-for-email-v2/${email}?phrase=${encodeURIComponent(name)}`,
-      });
-    } catch (err) {
-      // we don't care about errors
-      return {};
-    }
-
-    if (!body.person) {
-      body.person = { email };
-    }
-    if (!body.company) {
-      body.company = {};
-    }
-
-    this.setCache(email, body);
-    return body;
+    // Profiles are only read from the cache: there is no enrichment server, so nothing new is
+    // fetched and the sidebar shows the local contact and message history.
+    return this.getCache(email) || {};
   }
 
   // LocalStorage Retrieval / Saving

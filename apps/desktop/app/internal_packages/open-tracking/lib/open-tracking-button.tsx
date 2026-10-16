@@ -1,25 +1,11 @@
 import React from 'react';
-import {
-  Message,
-  DraftEditingSession,
-  localized,
-  APIError,
-  MailspringAPIRequest,
-} from 'mailspring-exports';
+import { Message, DraftEditingSession, localized } from 'mailspring-exports';
 import { MetadataComposerToggleButton } from 'mailspring-component-kit';
 import { PLUGIN_ID, PLUGIN_NAME, isTrackingServerAvailable } from './open-tracking-constants';
 
 type Props = { draft: Message; session: DraftEditingSession };
 
 function errorMessage(error: Error) {
-  if (
-    error instanceof APIError &&
-    MailspringAPIRequest.TimeoutErrorCodes.includes(error.statusCode)
-  ) {
-    return localized(
-      `Open tracking does not work offline. Please re-enable when you come back online.`
-    );
-  }
   return localized(
     `Unfortunately, open tracking is currently not available. Please try again later. Error: %@`,
     error.message

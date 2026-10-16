@@ -95,7 +95,6 @@ my-plugin/
   "isOptional": true,
   "isDefault": true,
   "syncInit": false,
-  "isIdentityRequired": false,
   "isHiddenOnPluginsPage": false,
 
   "theme": false
@@ -116,7 +115,6 @@ my-plugin/
 | `isOptional` | No | If true, can be disabled by user |
 | `isDefault` | No | If true, enabled by default |
 | `syncInit` | No | If true, loads immediately during startup |
-| `isIdentityRequired` | No | If true, requires Mailspring account to activate |
 | `theme` | No | Set to `"ui"` for theme plugins |
 
 ### Window Types
@@ -217,7 +215,6 @@ activatePackage(pkg)
     ├── Skip if already active
     ├── Skip if theme (handled separately)
     ├── Skip if optional and disabled in config
-    ├── Skip if identity required but not present
     ├── Verify engines.mailspring is set
     │
     ├── Mark as active

@@ -28,6 +28,29 @@ export class GrammarCheckToggle extends React.Component<{
   };
 
   render() {
+    if (!GrammarCheckStore.isAvailable()) {
+      const reason = localized(
+        'Grammar check needs a LanguageTool server, and none is configured.'
+      );
+      return (
+        <button
+          tabIndex={-1}
+          className="btn btn-toolbar btn-grammar-check"
+          disabled
+          title={reason}
+          aria-label={reason}
+        >
+          <span className="grammar-check-icon-wrap">
+            <RetinaImg
+              url="mailspring://composer-grammar-check/assets/icon-composer-grammar@2x.png"
+              mode={RetinaImg.Mode.ContentIsMask}
+              aria-hidden="true"
+            />
+          </span>
+        </button>
+      );
+    }
+
     const enabled = GrammarCheckStore.isEnabled();
     const checking = GrammarCheckStore.isChecking(this.props.draft.headerMessageId);
     const errorCount = GrammarCheckStore.errorCount(this.props.draft.headerMessageId);

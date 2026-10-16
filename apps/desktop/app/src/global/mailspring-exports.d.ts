@@ -13,9 +13,7 @@ export const isRTL: isRTL;
 export type Actions = typeof import('../flux/actions');
 export const Actions: Actions;
 
-// API Endpoints
-export type MailspringAPIRequest = typeof import('../flux/mailspring-api-request').default;
-export const MailspringAPIRequest: MailspringAPIRequest;
+// Sync engine
 export * from '../mailsync-process';
 
 // The Database
@@ -113,7 +111,6 @@ export * from '../flux/stores/signature-store';
 export * from '../flux/stores/message-store';
 export type ContactStore = typeof import('../flux/stores/contact-store').default;
 export const ContactStore: ContactStore;
-export * from '../flux/stores/identity-store';
 export type CategoryStore = typeof import('../flux/stores/category-store').default;
 export const CategoryStore: CategoryStore;
 export type UndoRedoStore = typeof import('../flux/stores/undo-redo-store').default;

@@ -1,6 +1,6 @@
 # Pro features and the backend
 
-The desktop has no plans, quotas or upgrade prompts, and no Pro plugin needs a Mailspring ID to load. The features below that need a server still show in the UI. Without an identity they stay inert, because `makeRequest` (`apps/desktop/app/src/flux/mailspring-api-request.ts`) refuses to send a request when no identity is set, so they make no calls to `*.getmailspring.com`. Users who signed in to a Mailspring ID before this change keep their identity, and these features still reach Mailspring's servers for them. Desktop paths below are relative to `apps/desktop/app/`. `docs/backend-plan.md` has the full treatment of each one.
+The desktop has no plans, quotas or upgrade prompts, and no Mailspring ID: there is no sign-in, no identity store and no client for Mailspring's API. A Mailspring ID carried over in config.json (`identity`) and its keyset token are ignored and left in place, because the profile may still be shared with Mailspring.app. Sync engines are spawned with a `null` identity, so the engine uses its `LocalOnly` metadata backend. The features below that need a server still show in the UI, disabled with a tooltip, and make no network calls until `apps/backend` provides them. Desktop paths below are relative to `apps/desktop/app/`. `docs/backend-plan.md` has the full treatment of each one.
 
 | Feature | Works locally today | Mailspring endpoint it used | What `apps/backend` must provide |
 |---|---|---|---|
@@ -20,10 +20,10 @@ The desktop has no plans, quotas or upgrade prompts, and no Pro plugin needs a M
 
 - Snooze and reminders fire from `metadata-expiration` deltas, which the engine emits from its local database. The `LocalOnly` metadata backend (`crates/ms-net/src/metadata.rs`) is enough for a single device.
 - Send later fires from the draft's own metadata on the same device.
-- Open and link tracking: the composer leaves outgoing mail untouched when no identity is set, and the toolbar toggle is disabled with a tooltip (`internal_packages/{open,link}-tracking/lib/*-constants.ts`). Mailspring's tracking URLs can never reach a Tern server, so the backend needs its own URL format.
-- Activity: the dashboard reads local tracking metadata. Only the share button needs a server.
-- Thread sharing: the toggle shows an error dialog when no identity is set. Share URLs are hard-coded to `shared.getmailspring.com` in `internal_packages/thread-sharing/lib/main.tsx`.
-- Translation: manual translation shows an error, and automatic translation fails silently. The client needs a configurable translation URL, with the adapter in `internal_packages/translation/lib/service.ts`.
-- Contact and company profiles: the sidebar shows the local contact and message history, with no enrichment.
-- Grammar check: the store skips checks when no identity is set (`internal_packages/composer-grammar-check/lib/grammar-check-store.ts`). The client needs a configurable LanguageTool URL.
-- Signature photo upload: the upload option is hidden when no identity is set. The company-logo option still builds `logo.getmailspring.com` URLs (`internal_packages/composer-signature/lib/constants.ts`), which predates this change.
+- Open and link tracking: `PLUGIN_URL` is `null` in `internal_packages/{open,link}-tracking/lib/*-constants.ts`, so the composer leaves outgoing mail untouched and the toolbar toggle is disabled with a tooltip. Setting it to the backend's URL turns both on; the backend needs its own URL format, since Mailspring's tracking URLs can never reach a Tern server.
+- Activity: the dashboard reads local tracking metadata. Only the share button needs a server; it is disabled with a tooltip (`internal_packages/activity/lib/dashboard/share-button.tsx`).
+- Thread sharing: the toolbar button is disabled with a tooltip, and the Share this thread menu item shows the same message (`internal_packages/thread-sharing/lib/thread-sharing-button.tsx`). The upload, the share popover and the viewer URL need writing against the backend.
+- Translation: `isTranslationAvailable()` is `false`, so the composer button is disabled with a tooltip and messages get no translation banner. `requestTranslation` in `internal_packages/translation/lib/service.ts` is where a configurable LibreTranslate URL plugs in.
+- Contact and company profiles: the sidebar shows the local contact and message history, plus any profile Mailspring cached in localStorage, with no new lookups (`internal_packages/participant-profile/lib/participant-profile-data-source.ts`).
+- Grammar check: `LanguageToolBackend.isAvailable()` is `false`, so the store skips checks and the toolbar toggle is disabled with a tooltip. `_request` in `internal_packages/composer-grammar-check/lib/grammar-check-service.ts` is where a configurable LanguageTool URL plugs in.
+- Signature photo upload: the picker has no upload, only a URL for a custom image (`internal_packages/composer-signature/lib/signature-photo-picker.tsx`). The company-logo option still builds `logo.getmailspring.com` URLs (`internal_packages/composer-signature/lib/constants.ts`).

@@ -1,5 +1,3 @@
-import { MailspringAPIRequest } from 'mailspring-exports';
-
 export interface GrammarError {
   offset: number;
   length: number;
@@ -63,13 +61,6 @@ export interface LanguageToolResponse {
   matches: LanguageToolMatch[];
 }
 
-export class UsageExceededError extends Error {
-  constructor(message?: string) {
-    super(message || 'Grammar check usage limit exceeded');
-    this.name = 'UsageExceededError';
-  }
-}
-
 export interface GrammarCheckBackend {
   check(text: string, messageId: string, language?: string): Promise<GrammarError[]>;
   isAvailable(): boolean;
@@ -109,41 +100,15 @@ export class LanguageToolBackend implements GrammarCheckBackend {
     }
   }
 
+  // There is no LanguageTool server yet, so the store never checks and the toolbar toggle
+  // is disabled.
   isAvailable(): boolean {
-    return true;
+    return false;
   }
 
   async check(text: string, messageId: string, language?: string): Promise<GrammarError[]> {
     this._readConfig();
-
-    let data: LanguageToolResponse;
-    try {
-      data = await MailspringAPIRequest.makeRequest({
-        server: 'identity',
-        method: 'POST',
-        path: '/api/grammar/check',
-        json: true,
-        body: {
-          messageId,
-          text,
-          language: language || this.language,
-        },
-      });
-    } catch (err) {
-      // 400 = quota reached ("Quota Reached")
-      if (err.statusCode === 400) {
-        throw new UsageExceededError();
-      }
-      // 429 = rate limited — surface as a transient error, caller will retry on next dirty check
-      if (err.statusCode === 429) {
-        throw new Error('Grammar check rate limit reached, please try again shortly.');
-      }
-      // 502 = LanguageTool backend unavailable
-      if (err.statusCode === 502) {
-        throw new Error('Grammar check service is temporarily unavailable.');
-      }
-      throw err;
-    }
+    const data = await this._request(text, language || this.language);
 
     const filtered = data.matches.filter((match) => match.rule.issueType !== 'misspelling');
 
@@ -163,5 +128,9 @@ export class LanguageToolBackend implements GrammarCheckBackend {
       contextOffset: match.context.offset,
       contextLength: match.context.length,
     }));
+  }
+
+  private async _request(text: string, language: string): Promise<LanguageToolResponse> {
+    throw new Error('No grammar check server is configured.');
   }
 }
