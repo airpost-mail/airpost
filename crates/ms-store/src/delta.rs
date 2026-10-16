@@ -195,6 +195,8 @@ struct Buffer {
     /// When the scheduled flush is due, if one is scheduled.
     deadline: Option<Instant>,
     connection_error: bool,
+    /// [`DeltaStream::close`] was called: later items are dropped.
+    closed: bool,
 }
 
 pub struct DeltaStream {
@@ -249,6 +251,15 @@ impl DeltaStream {
     pub fn flush(&self) {
         let mut buf = self.lock();
         self.write_buffer(&mut buf);
+    }
+
+    /// Flushes and drops everything emitted from now on. `serve` closes an account's stream
+    /// once its threads stopped, so a thread left running from that run cannot publish under
+    /// the account's id after it was stopped, removed or added again.
+    pub fn close(&self) {
+        let mut buf = self.lock();
+        self.write_buffer(&mut buf);
+        buf.closed = true;
     }
 
     /// Writes while holding the buffer lock, as the C++ did, so lines from two flushes
@@ -326,6 +337,9 @@ fn process_state(account_id: &str, connection_error: bool) -> DeltaItem {
 }
 
 fn queue_locked(buf: &mut Buffer, items: Vec<DeltaItem>, max_delay_ms: u64) {
+    if buf.closed {
+        return;
+    }
     let desired = Instant::now() + Duration::from_millis(max_delay_ms);
     for item in items {
         let list = buf.items.entry(item.model_class.clone()).or_default();

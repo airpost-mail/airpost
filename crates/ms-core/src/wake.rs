@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Process-wide sleep/wake signals: the worker sleep condvar (`MailUtils::sleepWorkerUntil
-//! WakeOrSec` / `wakeAllWorkers`) and the metadata expiration workers' wake handles
-//! (`MetadataExpirationWorkerForAccountId`, `WakeAllMetadataExpirationWorkers`).
+//! Sleep/wake signals: the worker sleep condvar (`MailUtils::sleepWorkerUntilWakeOrSec` /
+//! `wakeAllWorkers`), which each account holds in its `WorkerContext`, and the metadata
+//! expiration workers' wake handles (`MetadataExpirationWorkerForAccountId`,
+//! `WakeAllMetadataExpirationWorkers`), kept here by account id because the store's save
+//! path reaches them without a context.
 //!
 //! Derived from Mailspring-Sync `MailSync/MailUtils.cpp` and
 //! `MailSync/MetadataExpirationWorker.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See
@@ -13,11 +15,18 @@ use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// A wake-up that reaches only threads already waiting, like a condvar `notify_all`.
+/// A wake-up that reaches only threads already waiting, like a condvar `notify_all`. Once
+/// closed, every sleep returns at once.
 #[derive(Default)]
 pub struct WakeSignal {
-    generation: Mutex<u64>,
+    state: Mutex<WakeState>,
     cv: Condvar,
+}
+
+#[derive(Default)]
+struct WakeState {
+    generation: u64,
+    closed: bool,
 }
 
 impl WakeSignal {
@@ -25,20 +34,20 @@ impl WakeSignal {
         WakeSignal::default()
     }
 
-    /// Sleeps until `timeout` passes or [`WakeSignal::wake_all`] is called. Returns true if
-    /// woken early.
+    /// Sleeps until `timeout` passes, [`WakeSignal::wake_all`] is called or the signal is
+    /// closed. Returns true if woken early or closed.
     pub fn sleep(&self, timeout: Duration) -> bool {
         let deadline = Instant::now() + timeout;
-        let mut gen = self.generation.lock().unwrap_or_else(|e| e.into_inner());
-        let start = *gen;
-        while *gen == start {
+        let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let start = s.generation;
+        while s.generation == start && !s.closed {
             let now = Instant::now();
             if now >= deadline {
                 return false;
             }
-            gen = self
+            s = self
                 .cv
-                .wait_timeout(gen, deadline - now)
+                .wait_timeout(s, deadline - now)
                 .unwrap_or_else(|e| e.into_inner())
                 .0;
         }
@@ -46,28 +55,20 @@ impl WakeSignal {
     }
 
     pub fn wake_all(&self) {
-        let mut gen = self.generation.lock().unwrap_or_else(|e| e.into_inner());
-        *gen = gen.wrapping_add(1);
+        let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        s.generation = s.generation.wrapping_add(1);
         self.cv.notify_all();
     }
-}
 
-fn worker_signal() -> &'static WakeSignal {
-    static SIGNAL: OnceLock<WakeSignal> = OnceLock::new();
-    SIGNAL.get_or_init(WakeSignal::new)
-}
+    /// Ends every sleep, now and later.
+    pub fn close(&self) {
+        let mut s = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        s.closed = true;
+        self.cv.notify_all();
+    }
 
-/// Sleeps a sync worker for `secs`, or until `wake-workers`.
-pub fn sleep_worker_until_wake_or(secs: u64) -> bool {
-    worker_signal().sleep(Duration::from_secs(secs))
-}
-
-/// `wake-workers`: ends every worker sleep and wakes every metadata expiration worker so
-/// it re-checks for metadata that expired while the machine slept.
-pub fn wake_all_workers() {
-    worker_signal().wake_all();
-    for signal in expiration_signals() {
-        signal.wake();
+    pub fn is_closed(&self) -> bool {
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).closed
     }
 }
 
@@ -91,6 +92,7 @@ struct DeadlineState {
     waiting: bool,
     /// Bumped by each wake that reaches a waiting worker.
     generation: u64,
+    closed: bool,
 }
 
 impl DeadlineSignal {
@@ -121,6 +123,13 @@ impl DeadlineSignal {
         self.schedule(0);
     }
 
+    /// Ends the worker's wait, now and later: its account is stopping.
+    pub fn close(&self) {
+        let mut s = self.lock();
+        s.closed = true;
+        self.cv.notify_all();
+    }
+
     /// The time the worker last slept or sleeps until, in epoch seconds.
     pub fn wake_time(&self) -> i64 {
         self.lock().wake_time
@@ -132,7 +141,8 @@ impl DeadlineSignal {
     }
 
     /// Publishes `wake_time` and sleeps until `now()` (epoch seconds) reaches it or a
-    /// [`DeadlineSignal::schedule`] with an earlier time. Returns true if woken early.
+    /// [`DeadlineSignal::schedule`] with an earlier time. Returns true if woken early or
+    /// closed.
     pub fn wait_until(&self, wake_time: i64, now: &dyn Fn() -> i64) -> bool {
         // Re-read the clock at least this often, so a wall-clock jump (the machine slept)
         // does not stretch the sleep.
@@ -142,7 +152,7 @@ impl DeadlineSignal {
         s.waiting = true;
         let start = s.generation;
         let woken = loop {
-            if s.generation != start {
+            if s.generation != start || s.closed {
                 break true;
             }
             let secs = wake_time - now();
@@ -178,13 +188,13 @@ pub fn expiration_signal(account_id: &str) -> Arc<DeadlineSignal> {
         .clone()
 }
 
-fn expiration_signals() -> Vec<Arc<DeadlineSignal>> {
-    registry()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .values()
-        .cloned()
-        .collect()
+/// Drops the account's expiration signal if it is still `signal`, so an account added again
+/// gets a fresh one and a stop of an earlier run never drops a later run's.
+pub fn remove_expiration_signal(account_id: &str, signal: &Arc<DeadlineSignal>) {
+    let mut reg = registry().lock().unwrap_or_else(|e| e.into_inner());
+    if reg.get(account_id).is_some_and(|s| Arc::ptr_eq(s, signal)) {
+        reg.remove(account_id);
+    }
 }
 
 #[cfg(test)]
@@ -228,8 +238,16 @@ mod tests {
     }
 
     #[test]
-    fn wake_all_workers_wakes_registered_expiration_workers() {
-        let d = expiration_signal("wake-all-test");
+    fn close_ends_sleeps_now_and_later() {
+        let s = Arc::new(WakeSignal::new());
+        let s2 = s.clone();
+        let t = thread::spawn(move || s2.sleep(Duration::from_secs(10)));
+        thread::sleep(Duration::from_millis(50));
+        s.close();
+        assert!(t.join().unwrap());
+        assert!(s.sleep(Duration::from_secs(10)));
+
+        let d = Arc::new(DeadlineSignal::default());
         let waiter = {
             let d = d.clone();
             thread::spawn(move || d.wait_until(1_000_000, &|| 1_000))
@@ -237,7 +255,19 @@ mod tests {
         while !d.is_waiting() {
             thread::sleep(Duration::from_millis(5));
         }
-        wake_all_workers();
+        d.close();
         assert!(waiter.join().unwrap());
+        assert!(d.wait_until(1_000_000, &|| 1_000));
+    }
+
+    #[test]
+    fn removed_expiration_signal_is_replaced() {
+        let a = expiration_signal("remove-test");
+        remove_expiration_signal("remove-test", &a);
+        let b = expiration_signal("remove-test");
+        assert!(!Arc::ptr_eq(&a, &b));
+        // A late remove for the first signal leaves the second registered.
+        remove_expiration_signal("remove-test", &a);
+        assert!(Arc::ptr_eq(&b, &expiration_signal("remove-test")));
     }
 }

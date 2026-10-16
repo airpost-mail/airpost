@@ -597,3 +597,32 @@ fn custom_sink_gets_class_and_stdout_line() {
     let expected: String = got.iter().map(|(_, l)| format!("{l}\n")).collect();
     assert_eq!(sink.text(), expected);
 }
+
+/// `close` delivers what is buffered and drops what comes after, a connection error
+/// included.
+#[test]
+fn close_flushes_then_drops_later_items() {
+    let (sink, s) = stream();
+    s.emit(
+        vec![item(
+            DELTA_TYPE_PERSIST,
+            "Thread",
+            vec![json!({"id": "t1"})],
+        )],
+        500,
+    );
+    s.close();
+    assert_eq!(sink.lines().len(), 1);
+    s.emit(
+        vec![item(
+            DELTA_TYPE_PERSIST,
+            "Thread",
+            vec![json!({"id": "t2"})],
+        )],
+        0,
+    );
+    s.begin_connection_error(ACCOUNT);
+    s.flush();
+    sleep(Duration::from_millis(50));
+    assert_eq!(sink.lines().len(), 1);
+}

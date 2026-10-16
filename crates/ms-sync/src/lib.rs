@@ -7,8 +7,8 @@
 //! `MetadataExpirationWorker.*`, `DAVWorker.*`, `GoogleContactsWorker.*` and the worker
 //! loops in `main.cpp`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! Each `run_*` function is the body of one named thread (plan 4.1) and never returns
-//! while the process lives. Each opens its own [`ms_store::Store`] on its thread.
+//! Each `run_*` function is the body of one named thread (plan 4.1) and returns only when
+//! its account stops ([`runtime`]). Each opens its own [`ms_store::Store`] on its thread.
 
 pub mod background;
 pub mod cal_contacts;
@@ -19,6 +19,7 @@ pub mod mail_processor;
 pub mod mailbox_model;
 pub mod metadata_expiration;
 pub mod metadata_worker;
+pub mod runtime;
 pub mod tasks;
 mod worker;
 
@@ -26,12 +27,14 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
+use ms_core::wake::WakeSignal;
 use ms_core::{Account, Clock};
 use ms_net::{MetadataBackend, TokenManager};
 use ms_store::DeltaStream;
 
 pub use foreground::ForegroundControl;
 pub use mailbox_model::MailboxModel;
+pub use runtime::{AccountFailure, AccountRuntime, FailureHandler};
 pub use tasks::{RemoteTaskRunner, TaskRunnerFactory};
 
 /// What every worker thread is given. Cheap to clone; everything shared is behind an `Arc`.
@@ -52,27 +55,57 @@ pub struct WorkerContext {
     pub metadata: Arc<dyn MetadataBackend>,
     /// Builds the task runner the foreground worker uses for remote phases (ms-tasks).
     pub tasks: Arc<dyn TaskRunnerFactory>,
+    /// The account's worker sleeps; `wake-workers` ends them.
+    pub wake: Arc<WakeSignal>,
+    /// The account's stop flag, failure handler and threads ([`runtime`]).
+    pub control: Arc<runtime::AccountControl>,
 }
 
-/// A failure no retry can fix (a bug, a non-retryable `SyncError`): log it as critical and
-/// abort, as the worker loops in `main.cpp` did.
-pub(crate) fn abort_worker(e: &ms_core::Error) -> ! {
-    ms_core::critical!("{}", worker_error_text(e));
-    ms_core::log::flush();
-    std::process::abort();
+impl WorkerContext {
+    /// A context with the system clock, quiet protocol logs and fresh per-account state.
+    pub fn new(
+        account: Arc<Account>,
+        config_dir: PathBuf,
+        deltas: Arc<DeltaStream>,
+        tokens: Arc<TokenManager>,
+        metadata: Arc<dyn MetadataBackend>,
+        tasks: Arc<dyn TaskRunnerFactory>,
+        on_failure: FailureHandler,
+    ) -> Self {
+        let control = Arc::new(runtime::AccountControl::new(account.id(), on_failure));
+        WorkerContext {
+            account,
+            config_dir,
+            deltas,
+            clock: ms_core::clock::system(),
+            verbose: false,
+            foreground: Arc::new(ForegroundControl::new()),
+            background_mark_all: Arc::new(AtomicBool::new(false)),
+            tokens,
+            metadata,
+            tasks,
+            wake: Arc::new(WakeSignal::new()),
+            control,
+        }
+    }
 }
 
-/// The `catch (SyncException &)` arm of the worker loops: aborts on a non-retryable error,
-/// reports a connection error when offline, and logs `--sleeping`. The caller sleeps.
-pub(crate) fn report_worker_error(ctx: &WorkerContext, e: &ms_core::Error) {
+/// The `catch (SyncException &)` arm of the worker loops: a non-retryable error stops the
+/// account and returns false; otherwise it reports a connection error when offline, logs
+/// `--sleeping` and returns true, and the caller sleeps.
+pub(crate) fn report_worker_error(ctx: &WorkerContext, e: &ms_core::Error) -> bool {
     if !e.is_retryable() {
-        abort_worker(e);
+        ctx.fail_with(e);
+        return false;
     }
     tracing::error!("{}", worker_error_text(e));
-    if e.is_offline() {
+    // A thread finishing a call after its account stopped must not report the account
+    // offline: a later run of it would never clear that.
+    if e.is_offline() && !ctx.is_stopping() {
         ctx.deltas.begin_connection_error(ctx.account.id());
     }
     tracing::info!("{}", ms_core::logmsg::sleeping());
+    true
 }
 
 /// `logCurrentExceptionWithStackTrace`, without the stack.

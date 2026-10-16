@@ -378,3 +378,50 @@ fn concurrent_callers_share_one_refresh() {
     }
     assert_eq!(f.server.count(), 1);
 }
+
+#[test]
+fn one_accounts_slow_refresh_does_not_hold_up_another() {
+    let server = MockServer::start(|r| {
+        if r.form_value("refresh_token").as_deref() == Some("slow") {
+            token("slow-token", json!(3600)).delayed(Duration::from_secs(2))
+        } else {
+            token("fast-token", json!(3600))
+        }
+    });
+    let tokens = Arc::new(
+        TokenManager::new(None)
+            .with_clock(Arc::new(ManualClock::new(1_000_000)))
+            .with_endpoints(Endpoints::all_at(&server.url()))
+            .with_gmail_client(None),
+    );
+    let with_refresh_token = |id: &str, refresh: &str| {
+        Account::from_json(json!({
+            "id": id, "provider": "gmail", "emailAddress": "me@example.test",
+            "settings": {
+                "imap_username": "me@example.test", "refresh_token": refresh,
+                "refresh_client_id": "cid",
+            }
+        }))
+        .unwrap()
+    };
+    let slow = with_refresh_token("slow-acct", "slow");
+    let fast = with_refresh_token("fast-acct", "fast");
+
+    let t = tokens.clone();
+    let slow_refresh =
+        std::thread::spawn(move || t.token_for(&HttpClient::new().unwrap(), &slow).unwrap());
+    while server.count() == 0 {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let started = std::time::Instant::now();
+    let got = tokens
+        .token_for(&HttpClient::new().unwrap(), &fast)
+        .unwrap();
+    assert_eq!(got.access_token, "fast-token");
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "waited {:?} for the other account's refresh",
+        started.elapsed()
+    );
+    assert_eq!(slow_refresh.join().unwrap().access_token, "slow-token");
+}

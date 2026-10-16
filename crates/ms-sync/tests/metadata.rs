@@ -314,7 +314,12 @@ impl MetadataBackend for FakeBackend {
         Ok(())
     }
 
-    fn pull(&self, cursor: Option<&str>, sink: &mut dyn FnMut(MetadataDelta)) -> Result<String> {
+    fn pull(
+        &self,
+        cursor: Option<&str>,
+        _stop: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(MetadataDelta),
+    ) -> Result<String> {
         self.cursors_seen
             .lock()
             .unwrap()
@@ -413,7 +418,12 @@ impl MetadataBackend for BoundBackend {
         Ok(())
     }
 
-    fn pull(&self, cursor: Option<&str>, _sink: &mut dyn FnMut(MetadataDelta)) -> Result<String> {
+    fn pull(
+        &self,
+        cursor: Option<&str>,
+        _stop: &dyn Fn() -> bool,
+        _sink: &mut dyn FnMut(MetadataDelta),
+    ) -> Result<String> {
         self.cursors_seen
             .lock()
             .unwrap()

@@ -21,11 +21,13 @@
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use ms_core::constants::{thread, ACCOUNT_STOP_POLL_MS};
 use ms_core::{Error, Metadata, Result, SyncError};
 use ms_wire::{
     BackendEvent, BackfillRecord, BackfillResponse, Me, MetadataRecord, ObjectType, StreamLine,
@@ -403,7 +405,12 @@ impl MetadataBackend for HttpMetadataBackend {
         }
     }
 
-    fn pull(&self, cursor: Option<&str>, sink: &mut dyn FnMut(MetadataDelta)) -> Result<String> {
+    fn pull(
+        &self,
+        cursor: Option<&str>,
+        stop: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(MetadataDelta),
+    ) -> Result<String> {
         if self.is_dormant() {
             return Err(self.dormant_error());
         }
@@ -432,21 +439,24 @@ impl MetadataBackend for HttpMetadataBackend {
         }
         info!("Metadata stream open from cursor {from}.");
         let mut last = from.to_owned();
-        let mut reader = BufReader::new(resp);
-        let mut line = Vec::new();
+        let lines = read_lines_on_a_thread(resp)?;
         loop {
-            line.clear();
-            match reader.read_until(b'\n', &mut line) {
-                Ok(0) => break,
-                Ok(_) => {}
-                Err(e) => {
+            if stop() {
+                info!("Metadata stream closed at cursor {last}: the account is stopping.");
+                return Ok(last);
+            }
+            let line = match lines.recv_timeout(Duration::from_millis(ACCOUNT_STOP_POLL_MS)) {
+                Ok(Ok(line)) => line,
+                Ok(Err(e)) => {
                     return Err(SyncError::offline(
                         "Metadata stream interrupted",
                         format!("{url}: {e}"),
                     )
                     .into())
                 }
-            }
+                Err(RecvTimeoutError::Timeout) => continue,
+                Err(RecvTimeoutError::Disconnected) => break,
+            };
             let text = line.trim_ascii();
             if text.len() <= 1 {
                 continue;
@@ -468,8 +478,54 @@ impl MetadataBackend for HttpMetadataBackend {
     }
 }
 
-/// The metadata thread aborts the process on a non-retryable error; nothing the server
-/// answers should do that.
+/// Reads the stream's lines, heartbeats included, on a `metadataStream` thread, so the pull
+/// can return when the account stops while a read is blocked: the server only closes a
+/// stream after an hour. The thread ends at the stream's end, on a read error, or at the
+/// first line after the pull returned (a heartbeat comes every few seconds), closing the
+/// connection.
+fn read_lines_on_a_thread(
+    resp: reqwest::blocking::Response,
+) -> Result<Receiver<std::io::Result<Vec<u8>>>> {
+    // Bounded so a fast stream cannot run ahead of the database.
+    let (tx, rx) = mpsc::sync_channel(STREAM_LINES_AHEAD);
+    ms_core::log::spawn_account_thread(
+        ms_core::log::thread_account(),
+        thread::METADATA_STREAM,
+        move || {
+            let mut reader = BufReader::new(resp);
+            loop {
+                let mut line = Vec::new();
+                match reader.read_until(b'\n', &mut line) {
+                    Ok(0) => return,
+                    Ok(_) => {
+                        if tx.send(Ok(line)).is_err() {
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e));
+                        return;
+                    }
+                }
+            }
+        },
+    )
+    .map_err(|e| {
+        SyncError::new(
+            "Could not start the metadata stream reader",
+            e.to_string(),
+            true,
+            false,
+        )
+    })?;
+    Ok(rx)
+}
+
+/// How many stream lines the reader thread may read ahead of the pull.
+const STREAM_LINES_AHEAD: usize = 256;
+
+/// A non-retryable error stops the account (aborts the process in `sync` mode); nothing the
+/// server answers should do that.
 fn as_retryable(e: Error) -> Error {
     match e {
         Error::Sync(mut s) => {

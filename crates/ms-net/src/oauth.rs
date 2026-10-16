@@ -47,15 +47,17 @@ const ERROR_KEY: &str = "invalid-xoauth2-resp";
 const SENSITIVE_KEYS: [&str; 3] = ["access_token", "refresh_token", "id_token"];
 const LOG_BODY_LIMIT: usize = 512;
 
+/// One account's cached token and the refresh token it rotated to, if it did.
 #[derive(Default)]
-struct State {
-    cache: HashMap<String, AccessToken>,
-    rotated_refresh_tokens: HashMap<String, String>,
+struct AccountTokens {
+    cached: Option<AccessToken>,
+    rotated_refresh_token: Option<String>,
 }
 
-/// Shared by every thread of the process (`SharedXOAuth2TokenManager`).
+/// Shared by every thread of the process (`SharedXOAuth2TokenManager`). Each account has its
+/// own lock, so one account's refresh never waits for another's.
 pub struct TokenManager {
-    state: Mutex<State>,
+    accounts: Mutex<HashMap<String, Arc<Mutex<AccountTokens>>>>,
     on_rotate: Option<RotateCallback>,
     clock: Arc<dyn Clock>,
     endpoints: Endpoints,
@@ -69,7 +71,7 @@ impl TokenManager {
         let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
         let gmail_client = env(ENV_GMAIL_CLIENT_ID).zip(env(ENV_GMAIL_CLIENT_SECRET));
         TokenManager {
-            state: Mutex::new(State::default()),
+            accounts: Mutex::new(HashMap::new()),
             on_rotate,
             clock: ms_core::clock::system(),
             endpoints: Endpoints::from_env(),
@@ -101,21 +103,30 @@ impl TokenManager {
     /// echoes the account back to the client (`test` mode).
     pub fn account_with_current_secrets(&self, account: &Account) -> Account {
         let mut updated = account.clone();
-        if let Some(t) = self.lock().rotated_refresh_tokens.get(account.id()) {
+        let entry = self.entry(account.id());
+        if let Some(t) = &lock(&entry).rotated_refresh_token {
             updated.set_refresh_token(t);
         }
         updated
     }
 
+    /// Drops what is cached for the account: it was removed from the process.
+    pub fn forget(&self, account_id: &str) {
+        self.accounts
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(account_id);
+    }
+
     /// A valid access token for `account`, refreshing it if needed (`partsForAccount`).
     ///
-    /// The lock is held across the refresh, so concurrent callers for the same account wait
-    /// for one request instead of each making their own.
+    /// The account's lock is held across the refresh, so concurrent callers for the same
+    /// account wait for one request instead of each making their own.
     pub fn token_for(&self, http: &HttpClient, account: &Account) -> Result<AccessToken> {
-        let key = account.id().to_owned();
-        let mut state = self.lock();
+        let entry = self.entry(account.id());
+        let mut state = lock(&entry);
 
-        if let Some(cached) = state.cache.get(&key) {
+        if let Some(cached) = &state.cached {
             // Margin: the token has to stay valid while the caller uses it.
             if cached.expires_at > self.clock.now() + OAUTH_EXPIRY_MARGIN {
                 return Ok(cached.clone());
@@ -132,9 +143,8 @@ impl TokenManager {
         }
 
         let refresh_token = state
-            .rotated_refresh_tokens
-            .get(&key)
-            .cloned()
+            .rotated_refresh_token
+            .clone()
             .unwrap_or_else(|| account.refresh_token().to_owned());
 
         info!(
@@ -166,9 +176,7 @@ impl TokenManager {
                     account.provider(),
                     account.id()
                 );
-                state
-                    .rotated_refresh_tokens
-                    .insert(key.clone(), updated.to_owned());
+                state.rotated_refresh_token = Some(updated.to_owned());
                 let mut rotated = account.clone();
                 rotated.set_refresh_token(updated);
                 if let Some(cb) = &self.on_rotate {
@@ -184,7 +192,7 @@ impl TokenManager {
             access_token,
             expires_at: self.clock.now() + expires_in_of(&resp),
         };
-        state.cache.insert(key, token.clone());
+        state.cached = Some(token.clone());
         Ok(token)
     }
 
@@ -225,11 +233,20 @@ impl TokenManager {
         http.post_form(self.endpoints.token_url(oauth), &form)
     }
 
-    fn lock(&self) -> MutexGuard<'_, State> {
-        // A panic while holding the lock aborts the process (panic hook), so poisoning
-        // never leaves a half-written cache behind.
-        self.state.lock().unwrap_or_else(|p| p.into_inner())
+    fn entry(&self, account_id: &str) -> Arc<Mutex<AccountTokens>> {
+        self.accounts
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .entry(account_id.to_owned())
+            .or_default()
+            .clone()
     }
+}
+
+/// Each field is replaced whole, so a panic while the lock is held (which stops only that
+/// account) leaves nothing half-written for a poisoned lock to expose.
+fn lock(entry: &Mutex<AccountTokens>) -> MutexGuard<'_, AccountTokens> {
+    entry.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 /// `expiresInOf`: a number, or a string that starts with one (as `stoi` reads it), else

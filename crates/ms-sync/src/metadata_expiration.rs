@@ -21,21 +21,22 @@ use ms_core::constants::{
     METADATA_EXPIRATION_IDLE, METADATA_EXPIRATION_MIN_DELAY_AFTER_EMIT,
     METADATA_EXPIRATION_MIN_DELAY_IDLE, METADATA_EXPIRATION_START_DELAY,
 };
-use ms_core::wake::expiration_signal;
 use ms_core::{Clock, Result};
 use ms_store::{DeltaItem, DeltaStream, Query, Store};
 use tracing::{error, info};
 
 use crate::WorkerContext;
 
-/// The thread body (`MetadataExpirationWorker::run`). Never returns.
+/// The thread body (`MetadataExpirationWorker::run`). Returns when the account stops.
 pub fn run_metadata_expiration(ctx: WorkerContext) {
-    let signal = expiration_signal(ctx.account.id());
+    let signal = ctx.expiration_signal().clone();
     // Plugins may take longer than the main application to load.
-    std::thread::sleep(Duration::from_secs(METADATA_EXPIRATION_START_DELAY));
+    if ctx.pause(Duration::from_secs(METADATA_EXPIRATION_START_DELAY)) {
+        return;
+    }
     let store = match Store::open(&ctx.config_dir, ctx.deltas.clone()) {
         Ok(s) => s,
-        Err(e) => crate::abort_worker(&e),
+        Err(e) => return ctx.fail_with(&e),
     };
     let worker = MetadataExpirationWorker::new(
         ctx.account.id(),
@@ -43,17 +44,19 @@ pub fn run_metadata_expiration(ctx: WorkerContext) {
         ctx.deltas.clone(),
         ctx.clock.clone(),
     );
-    loop {
+    while !ctx.is_stopping() {
         let next = match worker.scan() {
             Ok(next) => next,
-            Err(e) => crate::abort_worker(&e),
+            Err(e) => return ctx.fail_with(&e),
         };
         let clock = ctx.clock.clone();
         signal.wait_until(next, &|| clock.now());
         // Not at exactly the requested time, in case the client's clock differs slightly;
         // and a wake comes from inside the saving transaction, which has to commit before
         // the scan can see the new expiration.
-        std::thread::sleep(Duration::from_secs(1));
+        if ctx.pause(Duration::from_secs(1)) {
+            return;
+        }
     }
 }
 

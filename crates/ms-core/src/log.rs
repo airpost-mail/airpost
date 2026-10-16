@@ -11,6 +11,12 @@
 //!   5 MB the file rotates to `.log.1`, `.log.1` to `.log.2`, up to `.log.3`. Lines are
 //!   buffered and flushed about 1 s after activity; the client reads the last 3000 bytes
 //!   for crash reports and the harness tails the file every 0.1 s.
+//! - With several accounts in one process, each account's lines go to its own file in that
+//!   format: a thread carries the id of the account it works for ([`set_thread_account`],
+//!   [`spawn_account_thread`]), and an event goes to the file [`open_account_log`] opened for
+//!   that id. Lines from threads without an account, or whose account has no file open, go
+//!   to the file [`init_file`] opened (`engine.log`). `sync` mode opens no account file, so
+//!   every line lands in the one file it passes to [`init_file`], its account's log.
 //! - Every other mode logs `<level>: <message>` to stdout.
 //! - `critical` lines also go to stderr, which the client turns into the process error,
 //!   and flush the file at once.
@@ -23,10 +29,12 @@
 //! Only events from the engine's own crates (targets `ms_*` and `mailsync`) at INFO and
 //! above are recorded; dependencies' tracing output is dropped.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock, RwLock};
 use std::thread;
 use std::time::Duration;
 
@@ -134,6 +142,29 @@ struct FlushState {
 }
 
 impl FileSink {
+    /// Opens `path` and starts the sink's flush thread.
+    fn open(path: &Path) -> io::Result<Arc<Self>> {
+        let file = RotatingFile::open(path, LOG_MAX_BYTES, LOG_MAX_FILES)?;
+        let sink = Arc::new(FileSink {
+            file: Mutex::new(file),
+            pending: Mutex::new(FlushState::default()),
+            cv: Condvar::new(),
+        });
+        let flusher = sink.clone();
+        thread::Builder::new()
+            .name("logFlush".into())
+            .spawn(move || flusher.run_flusher())?;
+        Ok(sink)
+    }
+
+    /// Flushes and ends the flush thread. Lines written later are flushed only by
+    /// [`flush`].
+    fn close(&self) {
+        let mut p = self.pending.lock().unwrap_or_else(|e| e.into_inner());
+        p.exit = true;
+        self.cv.notify_one();
+    }
+
     fn write(&self, line: &str) {
         if let Ok(mut f) = self.file.lock() {
             // A full disk must not take the engine down; the line is lost.
@@ -179,9 +210,77 @@ impl FileSink {
     }
 }
 
+/// The engine-wide file and the account files, chosen per event by the thread's account.
+struct Router {
+    engine: Arc<FileSink>,
+    accounts: RwLock<HashMap<String, Arc<FileSink>>>,
+}
+
+impl Router {
+    fn sink_for_current_thread(&self) -> Arc<FileSink> {
+        let account = THREAD_ACCOUNT.with(|a| a.borrow().clone());
+        account
+            .and_then(|id| {
+                self.accounts
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(&*id)
+                    .cloned()
+            })
+            .unwrap_or_else(|| self.engine.clone())
+    }
+
+    fn all(&self) -> Vec<Arc<FileSink>> {
+        let accounts = self.accounts.read().unwrap_or_else(|e| e.into_inner());
+        std::iter::once(self.engine.clone())
+            .chain(accounts.values().cloned())
+            .collect()
+    }
+}
+
 enum Output {
-    File(Arc<FileSink>),
+    File(Arc<Router>),
     Stdout,
+}
+
+thread_local! {
+    static THREAD_ACCOUNT: RefCell<Option<Arc<str>>> = const { RefCell::new(None) };
+}
+
+/// Marks the calling thread as working for `account_id` (or for none), which picks the log
+/// file its lines go to.
+pub fn set_thread_account(account_id: Option<Arc<str>>) {
+    THREAD_ACCOUNT.with(|a| *a.borrow_mut() = account_id);
+}
+
+/// The account the calling thread works for, if any.
+pub fn thread_account() -> Option<Arc<str>> {
+    THREAD_ACCOUNT.with(|a| a.borrow().clone())
+}
+
+/// Spawns a thread named `name` that works for `account_id` (see [`set_thread_account`]).
+pub fn spawn_account_thread<F, T>(
+    account_id: Option<Arc<str>>,
+    name: &str,
+    f: F,
+) -> io::Result<thread::JoinHandle<T>>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    thread::Builder::new().name(name.into()).spawn(move || {
+        set_thread_account(account_id);
+        f()
+    })
+}
+
+/// Spawns a thread named `name` that works for the calling thread's account.
+pub fn spawn_inheriting<F, T>(name: &str, f: F) -> io::Result<thread::JoinHandle<T>>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    spawn_account_thread(thread_account(), name, f)
 }
 
 struct EngineLayer {
@@ -271,7 +370,8 @@ impl<S: Subscriber> Layer<S> for EngineLayer {
         let level = level_name(meta.level(), v.critical);
 
         match &self.output {
-            Output::File(sink) => {
+            Output::File(router) => {
+                let sink = router.sink_for_current_thread();
                 let current = thread::current();
                 let line = format_file_line(
                     self.pid,
@@ -297,22 +397,49 @@ impl<S: Subscriber> Layer<S> for EngineLayer {
     }
 }
 
-static FILE_SINK: OnceLock<Arc<FileSink>> = OnceLock::new();
+static ROUTER: OnceLock<Arc<Router>> = OnceLock::new();
 
-/// Installs the rotating file logger as the global subscriber. Call once, from `main`.
+/// Installs the rotating file logger as the global subscriber, with `path` as the file for
+/// lines that belong to no open account log. Call once, from `main`.
 pub fn init_file(path: &Path) -> io::Result<()> {
-    let file = RotatingFile::open(path, LOG_MAX_BYTES, LOG_MAX_FILES)?;
-    let sink = Arc::new(FileSink {
-        file: Mutex::new(file),
-        pending: Mutex::new(FlushState::default()),
-        cv: Condvar::new(),
+    let router = Arc::new(Router {
+        engine: FileSink::open(path)?,
+        accounts: RwLock::new(HashMap::new()),
     });
-    let flusher = sink.clone();
-    thread::Builder::new()
-        .name("logFlush".into())
-        .spawn(move || flusher.run_flusher())?;
-    let _ = FILE_SINK.set(sink.clone());
-    install(Output::File(sink))
+    let _ = ROUTER.set(router.clone());
+    install(Output::File(router))
+}
+
+/// Opens `$CONFIG_DIR_PATH/mailsync-<accountId>.log` for the lines of threads working for
+/// `account_id`. Does nothing unless [`init_file`] installed the file logger, or if the
+/// account's file is already open.
+pub fn open_account_log(config_dir: &Path, account_id: &str) -> io::Result<()> {
+    let Some(router) = ROUTER.get() else {
+        return Ok(());
+    };
+    let mut accounts = router.accounts.write().unwrap_or_else(|e| e.into_inner());
+    if !accounts.contains_key(account_id) {
+        let sink = FileSink::open(&log_path(config_dir, account_id))?;
+        accounts.insert(account_id.to_owned(), sink);
+    }
+    Ok(())
+}
+
+/// Flushes and closes the account's file; its threads' later lines go to the engine-wide
+/// file.
+pub fn close_account_log(account_id: &str) {
+    let Some(router) = ROUTER.get() else {
+        return;
+    };
+    let removed = router
+        .accounts
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .remove(account_id);
+    if let Some(sink) = removed {
+        sink.close();
+        sink.flush();
+    }
 }
 
 /// Installs the `<level>: <message>` stdout logger as the global subscriber.
@@ -331,8 +458,10 @@ fn install(output: Output) -> io::Result<()> {
 
 /// Writes buffered lines now. Call before `abort` / `exit`, which skip destructors.
 pub fn flush() {
-    if let Some(sink) = FILE_SINK.get() {
-        sink.flush();
+    if let Some(router) = ROUTER.get() {
+        for sink in router.all() {
+            sink.flush();
+        }
     }
     let _ = io::stdout().flush();
 }
@@ -353,6 +482,49 @@ mod tests {
             line,
             format!("4242 [2026-10-14 09:05:07.042] [background] [info] Sync loop complete.{EOL}")
         );
+    }
+
+    #[test]
+    fn routes_by_thread_account() {
+        let dir = tempfile::tempdir().unwrap();
+        let open = |name: &str| FileSink::open(&dir.path().join(name)).unwrap();
+        let router = Arc::new(Router {
+            engine: open("engine.log"),
+            accounts: RwLock::new(HashMap::from([("a1".to_owned(), open("a1.log"))])),
+        });
+        let a1 = router.accounts.read().unwrap()["a1"].clone();
+        assert!(Arc::ptr_eq(
+            &router.sink_for_current_thread(),
+            &router.engine
+        ));
+
+        let r = router.clone();
+        let picked = spawn_account_thread(Some("a1".into()), "background", move || {
+            let inherited = spawn_inheriting("foreground", {
+                let r = r.clone();
+                move || (thread_account(), r.sink_for_current_thread())
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+            (r.sink_for_current_thread(), inherited)
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+        assert!(Arc::ptr_eq(&picked.0, &a1));
+        assert_eq!(picked.1 .0.as_deref(), Some("a1"));
+        assert!(Arc::ptr_eq(&picked.1 .1, &a1));
+
+        // An account without an open file logs to the engine-wide one.
+        let r = router.clone();
+        let other = spawn_account_thread(Some("a2".into()), "background", move || {
+            r.sink_for_current_thread()
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+        assert!(Arc::ptr_eq(&other, &router.engine));
     }
 
     #[test]

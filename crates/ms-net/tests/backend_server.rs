@@ -11,7 +11,7 @@
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
@@ -166,11 +166,27 @@ fn pull_in_background(
     mpsc::Receiver<MetadataDelta>,
     std::thread::JoinHandle<ms_core::Result<String>>,
 ) {
+    pull_until(backend, cursor, Arc::new(AtomicBool::new(false)))
+}
+
+/// [`pull_in_background`] that also ends once `stop` is set.
+fn pull_until(
+    backend: Arc<HttpMetadataBackend>,
+    cursor: Option<String>,
+    stop: Arc<AtomicBool>,
+) -> (
+    mpsc::Receiver<MetadataDelta>,
+    std::thread::JoinHandle<ms_core::Result<String>>,
+) {
     let (tx, rx) = mpsc::channel();
     let handle = std::thread::spawn(move || {
-        backend.pull(cursor.as_deref(), &mut |d| {
-            let _ = tx.send(d);
-        })
+        backend.pull(
+            cursor.as_deref(),
+            &|| stop.load(Ordering::SeqCst),
+            &mut |d| {
+                let _ = tx.send(d);
+            },
+        )
     });
     (rx, handle)
 }
@@ -266,6 +282,42 @@ fn push_then_stream_from_zero_with_the_thread_anchor() {
     assert_eq!(pull.join().unwrap().unwrap(), newest);
 }
 
+/// A stopping account ends its open stream promptly: the server would keep it open for an
+/// hour and only sends heartbeats meanwhile.
+#[test]
+fn stop_ends_an_open_stream() {
+    let dir = tempfile::tempdir().unwrap();
+    let b = Backend::start(dir.path(), "127.0.0.1:0".parse().unwrap());
+    let user = b.user("ada@example.com");
+    let laptop = device(b.server_object(&user, &b.token(&user)));
+    let phone = device(b.server_object(&user, &b.token(&user)));
+    laptop
+        .backend
+        .push(&push("Message", "m1", "open-tracking", json!({}), 1))
+        .unwrap();
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let (rx, pull) = pull_until(phone.backend.clone(), None, stop.clone());
+    recv(&rx);
+    let MetadataDelta::Cursor(cursor) = recv(&rx) else {
+        panic!("cursor after the record")
+    };
+    // Past the server's first heartbeat, so the pull is waiting on an idle stream.
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(!pull.is_finished());
+
+    let started = std::time::Instant::now();
+    stop.store(true, Ordering::SeqCst);
+    while !pull.is_finished() {
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "the pull did not end"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(pull.join().unwrap().unwrap(), cursor);
+}
+
 #[test]
 fn pushes_during_an_outage_wait_in_the_outbox() {
     let dir = tempfile::tempdir().unwrap();
@@ -302,7 +354,7 @@ fn pushes_during_an_outage_wait_in_the_outbox() {
     assert!(laptop.backend.drain_outbox().unwrap_err().is_retryable());
     assert!(laptop
         .backend
-        .pull(None, &mut |_| {})
+        .pull(None, &|| false, &mut |_| {})
         .unwrap_err()
         .is_retryable());
 
@@ -480,7 +532,10 @@ fn a_revoked_token_makes_the_backend_dormant() {
     for e in [
         laptop.backend.binding().unwrap_err(),
         laptop.backend.drain_outbox().unwrap_err(),
-        laptop.backend.pull(Some("5"), &mut |_| {}).unwrap_err(),
+        laptop
+            .backend
+            .pull(Some("5"), &|| false, &mut |_| {})
+            .unwrap_err(),
     ] {
         assert!(e.is_retryable(), "{e}");
         assert!(e.to_string().contains("rejected"), "{e}");
@@ -505,7 +560,7 @@ fn a_server_under_a_path_prefix_is_unsupported_but_harmless() {
     assert!(e.is_retryable(), "{e}");
     assert!(laptop
         .backend
-        .pull(None, &mut |_| {})
+        .pull(None, &|| false, &mut |_| {})
         .unwrap_err()
         .is_retryable());
     assert!(!laptop.backend.is_dormant());

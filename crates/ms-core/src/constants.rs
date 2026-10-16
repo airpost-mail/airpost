@@ -217,7 +217,20 @@ pub const STDIN_ORPHAN_TIMEOUT: u64 = 30;
 pub const EXIT_OK: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
 pub const EXIT_PATH_CHECK: i32 = 2;
+/// `serve` found another engine listening on its socket, typically the previous one still
+/// shutting down. The client retries it rather than counting a crash.
+pub const EXIT_SOCKET_IN_USE: i32 = 3;
 pub const EXIT_STDIN_CLOSED: i32 = 141;
+/// How long stopping an account waits for its threads to exit before leaving the rest to
+/// finish on their own (a blocking network call ends only at its own timeout).
+pub const ACCOUNT_STOP_TIMEOUT_MS: u64 = 5_000;
+/// How often an account's `main` thread checks for a stop between commands.
+pub const ACCOUNT_STOP_POLL_MS: u64 = 200;
+/// `serve`: how long `account.add` waits for the account's `main` thread to open the
+/// database before answering with `starting`.
+pub const ACCOUNT_START_WAIT_MS: u64 = 10_000;
+/// `serve`: `$CONFIG_DIR_PATH/<this>` takes the lines of threads that work for no account.
+pub const ENGINE_LOG_FILE: &str = "engine.log";
 /// `--socket`: a connection whose unsent responses and deltas pass this many bytes is sent
 /// a `disconnect` notification and closed (docs/engine-protocol-plan.md 1.4).
 pub const SOCKET_QUEUE_BYTES: usize = 64 * 1024 * 1024;
@@ -238,8 +251,13 @@ pub mod thread {
     pub const CAL_CONTACTS: &str = "calContacts";
     pub const METADATA: &str = "metadata";
     pub const METADATA_EXPIRATION: &str = "metadataExpiration";
+    /// Reads the metadata stream's lines for the `metadata` thread, which can then stop
+    /// while a read is blocked. Logs nothing.
+    pub const METADATA_STREAM: &str = "metadataStream";
     /// The one-off thread a `sync-calendar` command starts.
     pub const CALENDAR: &str = "calendar";
+    /// The short-lived thread that interrupts IDLE after `queue-task`'s debounce.
+    pub const QUEUE_TASK_DEBOUNCE: &str = "queueTaskDebounce";
     pub const DELTA_STREAM_FLUSH: &str = "DeltaStreamFlush";
     /// Reads stdin commands for the main thread and watches for the parent going away.
     pub const STDIN: &str = "stdin";
@@ -251,4 +269,6 @@ pub mod thread {
     pub const SOCKET_WRITER: &str = "socketWriter";
     /// `--socket`: removes the socket files on SIGTERM / SIGINT.
     pub const SIGNALS: &str = "signals";
+    /// `serve`: joins a failed account's threads and reports it stopped.
+    pub const ACCOUNT_STOP: &str = "accountStop";
 }

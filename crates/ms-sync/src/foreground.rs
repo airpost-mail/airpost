@@ -10,7 +10,6 @@
 use std::sync::{Condvar, Mutex};
 
 use ms_core::constants::{ls, WORKER_SLEEP};
-use ms_core::wake::sleep_worker_until_wake_or;
 use ms_core::{logmsg, ErrorCode, Result, SyncError};
 use ms_imap::{IdleInterrupt, ImapSession};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
@@ -77,13 +76,13 @@ impl ForegroundControl {
     }
 }
 
-/// The thread body (`runForegroundSyncWorker`).
+/// The thread body (`runForegroundSyncWorker`). Returns when the account stops.
 pub fn run_foreground(ctx: WorkerContext) {
     let mut fg = match Foreground::new(ctx.clone()) {
         Ok(f) => f,
-        Err(e) => crate::abort_worker(&e),
+        Err(e) => return ctx.fail_with(&e),
     };
-    loop {
+    while !ctx.is_stopping() {
         let result = fg.w.configure().and_then(|()| fg.idle_cycle_iteration());
         match result {
             // Note: an iteration whose IDLE died on a dropped connection proves nothing about
@@ -93,8 +92,10 @@ pub fn run_foreground(ctx: WorkerContext) {
             Ok(()) if fg.idle_exited_with_error => {}
             Ok(()) => ctx.deltas.end_connection_error(ctx.account.id()),
             Err(e) => {
-                crate::report_worker_error(&ctx, &e);
-                sleep_worker_until_wake_or(WORKER_SLEEP);
+                if !crate::report_worker_error(&ctx, &e) {
+                    return;
+                }
+                ctx.sleep_until_wake_or(WORKER_SLEEP);
             }
         }
     }

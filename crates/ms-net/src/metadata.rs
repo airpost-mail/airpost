@@ -67,8 +67,17 @@ pub trait MetadataBackend: Send + Sync {
     /// it delivers the head cursor and then every existing record (`fetchDeltaCursor` and
     /// the `/metadata` pages). The `metadata` thread calls it again as soon as it returns,
     /// so it should block while the backend has nothing new. A retryable `SyncError`
-    /// backs off (3 s up to 300 s); any other error ends the process.
-    fn pull(&self, cursor: Option<&str>, sink: &mut dyn FnMut(MetadataDelta)) -> Result<String>;
+    /// backs off (3 s up to 300 s); any other error stops the account.
+    ///
+    /// `stop` turns true when the account stops: the pull must then return soon (within
+    /// [`ms_core::constants::ACCOUNT_STOP_POLL_MS`] or so), with the cursor of what it
+    /// delivered, however long the stream would have stayed open.
+    fn pull(
+        &self,
+        cursor: Option<&str>,
+        stop: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(MetadataDelta),
+    ) -> Result<String>;
 
     /// Called by the `metadata` thread before each pull: the `"<serverId>:<userId>"` the
     /// stored cursor must belong to, or `None` for a backend without one. When it differs
@@ -109,7 +118,12 @@ impl MetadataBackend for LocalOnly {
         Ok(())
     }
 
-    fn pull(&self, cursor: Option<&str>, _sink: &mut dyn FnMut(MetadataDelta)) -> Result<String> {
+    fn pull(
+        &self,
+        cursor: Option<&str>,
+        _stop: &dyn Fn() -> bool,
+        _sink: &mut dyn FnMut(MetadataDelta),
+    ) -> Result<String> {
         Ok(cursor.unwrap_or("0").to_owned())
     }
 
@@ -140,8 +154,10 @@ mod tests {
         assert!(backend.record_feature_usage("snooze").is_ok());
 
         let mut delivered = 0;
-        let cursor = backend.pull(Some("42"), &mut |_| delivered += 1).unwrap();
+        let cursor = backend
+            .pull(Some("42"), &|| false, &mut |_| delivered += 1)
+            .unwrap();
         assert_eq!((cursor.as_str(), delivered), ("42", 0));
-        assert_eq!(backend.pull(None, &mut |_| {}).unwrap(), "0");
+        assert_eq!(backend.pull(None, &|| false, &mut |_| {}).unwrap(), "0");
     }
 }

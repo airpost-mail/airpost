@@ -26,12 +26,14 @@ use crate::dav::DavWorker;
 use crate::google_contacts::GoogleContactsWorker;
 use crate::WorkerContext;
 
-/// The thread body. Never returns while the account can authenticate.
+/// The thread body. Returns when the account stops or can no longer authenticate.
 pub fn run_cal_contacts(ctx: WorkerContext) {
     // Gives the mail workers a head start, so they don't all open the database at once.
-    std::thread::sleep(Duration::from_secs(
+    if ctx.pause(Duration::from_secs(
         CAL_CONTACTS_INITIAL_DELAY + ctx.account.start_delay(),
-    ));
+    )) {
+        return;
+    }
     let store = match open_store(&ctx) {
         Ok(s) => s,
         Err(e) => return stop_unexpected(&e),
@@ -57,12 +59,18 @@ pub fn run_cal_contacts(ctx: WorkerContext) {
                 info!("{}", logmsg::calendar_sync_pass_failed(pass));
                 match failure {
                     PassFailure::Stop => return,
-                    PassFailure::Suspend(d) => std::thread::sleep(d),
+                    PassFailure::Suspend(d) => {
+                        if ctx.pause(d) {
+                            return;
+                        }
+                    }
                     PassFailure::Retry => {}
                 }
             }
         }
-        std::thread::sleep(Duration::from_secs(CALENDAR_SYNC_INTERVAL));
+        if ctx.pause(Duration::from_secs(CALENDAR_SYNC_INTERVAL)) {
+            return;
+        }
     }
 }
 

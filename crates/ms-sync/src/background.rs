@@ -18,7 +18,6 @@ use ms_core::constants::{
     MAX_FULL_HEADERS_REQUEST_SIZE, MAX_SINGLE_RANGE_SWEEP_SIZE, NEW_MAIL_BODY_FETCH_LIMIT,
     SHALLOW_SCAN_DEPTH, SHALLOW_SCAN_INTERVAL, WORKER_SLEEP,
 };
-use ms_core::wake::sleep_worker_until_wake_or;
 use ms_core::{logmsg, Error, ErrorCode, FolderFlags, Result, SyncError};
 use ms_imap::{FolderStatus, ImapSession, ListedFolder, Namespace};
 use ms_providers::roles::{role_for_folder, role_for_folder_flags, role_for_folder_path, ROLES};
@@ -34,21 +33,29 @@ use crate::WorkerContext;
 
 /// The thread body: waits out the account's start delay, then lists folders, starts the
 /// foreground thread and runs passes until there is nothing left to do, sleeping between
-/// rounds until the interval passes or `wake-workers` arrives.
+/// rounds until the interval passes or `wake-workers` arrives. Returns when the account
+/// stops.
 pub fn run_background(ctx: WorkerContext) {
     // Staggers many accounts' first database opens.
-    sleep_worker_until_wake_or(ctx.account.start_delay());
+    ctx.sleep_until_wake_or(ctx.account.start_delay());
+    if ctx.is_stopping() {
+        return;
+    }
     let mut bg = match Background::new(ctx.clone()) {
         Ok(b) => b,
-        Err(e) => crate::abort_worker(&e),
+        Err(e) => return ctx.fail_with(&e),
     };
     let mut started = false;
-    loop {
-        match bg.run_once(&mut started) {
-            Ok(()) => {}
-            Err(e) => crate::report_worker_error(&ctx, &e),
+    while !ctx.is_stopping() {
+        if let Err(e) = bg.run_once(&mut started) {
+            if !crate::report_worker_error(&ctx, &e) {
+                return;
+            }
         }
-        sleep_worker_until_wake_or(WORKER_SLEEP);
+        if ctx.is_stopping() {
+            return;
+        }
+        ctx.sleep_until_wake_or(WORKER_SLEEP);
     }
 }
 
@@ -159,9 +166,9 @@ impl Background {
             return;
         }
         let ctx = self.ctx().clone();
-        if let Err(e) = std::thread::Builder::new()
-            .name(thread::FOREGROUND.into())
-            .spawn(move || run_foreground(ctx))
+        if let Err(e) = self
+            .ctx()
+            .spawn(thread::FOREGROUND, move || run_foreground(ctx))
         {
             ms_core::critical!("Could not start the foreground thread: {e}");
             ms_core::log::flush();
@@ -296,6 +303,10 @@ impl Background {
 
         let container = self.ctx().account.container_folder().to_owned();
         for folder in folders.iter_mut() {
+            // An unfinished pass must not reach the orphan sweep below.
+            if self.ctx().is_stopping() {
+                return Ok(false);
+            }
             let path = folder.path().to_owned();
             let remote = match self.w.session.status(&path) {
                 Ok(s) => s,

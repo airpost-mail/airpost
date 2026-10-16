@@ -23,27 +23,27 @@ use crate::WorkerContext;
 const BACKOFF_SECONDS: [u64; 10] = [3, 3, 5, 10, 20, 30, 60, 120, 300, 300];
 
 /// The thread body (`MetadataWorker::run`). Returns at once for a local-only backend;
-/// otherwise never returns.
+/// otherwise when the account stops.
 pub fn run_metadata_worker(ctx: WorkerContext) {
     if ctx.metadata.is_local_only() {
         return;
     }
     let store = match Store::open(&ctx.config_dir, ctx.deltas.clone()) {
         Ok(s) => s,
-        Err(e) => crate::abort_worker(&e),
+        Err(e) => return ctx.fail_with(&e),
     };
     let worker = MetadataWorker::new(ctx.account.id(), &store, ctx.metadata.clone());
     let mut backoff_step = 0;
-    loop {
-        match worker.pull_once() {
+    while !ctx.is_stopping() {
+        match worker.pull_until(&|| ctx.is_stopping()) {
             Ok(()) => backoff_step = 0,
             Err(e) if e.is_retryable() => {
                 let secs = BACKOFF_SECONDS[backoff_step];
                 info!("Will retry in {secs} sec.");
-                ms_core::wake::sleep_worker_until_wake_or(secs);
+                ctx.sleep_until_wake_or(secs);
                 backoff_step = (backoff_step + 1).min(BACKOFF_SECONDS.len() - 1);
             }
-            Err(e) => crate::abort_worker(&e),
+            Err(e) => return ctx.fail_with(&e),
         }
     }
 }
@@ -90,10 +90,15 @@ impl<'a> MetadataWorker<'a> {
     /// backend closes the stream, applying each delta as it arrives and saving the cursor
     /// the backend hands back.
     pub fn pull_once(&self) -> Result<()> {
+        self.pull_until(&|| false)
+    }
+
+    /// [`MetadataWorker::pull_once`], ending the stream early once `stop` is true.
+    pub fn pull_until(&self, stop: &dyn Fn() -> bool) -> Result<()> {
         self.check_binding()?;
         let cursor = self.cursor()?;
         let mut failed = None;
-        let resume = self.backend.pull(cursor.as_deref(), &mut |delta| {
+        let resume = self.backend.pull(cursor.as_deref(), stop, &mut |delta| {
             if failed.is_some() {
                 return;
             }
