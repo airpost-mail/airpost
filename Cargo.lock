@@ -3026,6 +3026,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tern-client",
 ]
 
 [[package]]
@@ -3061,6 +3062,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tern-client"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "ms-ipc",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "uuid",
+]
+
+[[package]]
 name = "tern-mcp"
 version = "0.1.0"
 dependencies = [
@@ -3072,13 +3085,13 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
- "libc",
  "ms-ipc",
  "rmcp",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
+ "tern-client",
  "tokio",
  "toml",
  "uuid",
