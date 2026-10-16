@@ -79,6 +79,12 @@ pub const COMMON_FOLDER_NAMES: &[(&str, &str)] = &[
     ("черновики", "drafts"),
     ("draftbox", "drafts"),
     ("robocze", "drafts"),
+    // Not in the C++ table: Gmail can list Important and Starred without their special-use
+    // flag (forum topic 227), and then nothing gave them a role.
+    ("[gmail]/important", "important"),
+    ("[google mail]/important", "important"),
+    ("[gmail]/starred", "starred"),
+    ("[google mail]/starred", "starred"),
     // Note: the C++ table keys these two with capitals and looks names up lowercased, so
     // they never match; `[Mailspring]/X` and `Mailspring/X` are handled by prefix instead.
     ("Mailspring/Snoozed", "snoozed"),
@@ -205,6 +211,11 @@ mod tests {
         assert_eq!(path_role("[Gmail]/Sent Mail"), Some("sent"));
         assert_eq!(path_role("Junk E-mail"), Some("spam"));
         assert_eq!(path_role("Work"), None);
+        assert_eq!(path_role("[Gmail]/Important"), Some("important"));
+        assert_eq!(path_role("[Google Mail]/Important"), Some("important"));
+        assert_eq!(path_role("[Gmail]/Starred"), Some("starred"));
+        // A user label named Important is not the system one.
+        assert_eq!(path_role("Important"), None);
         // Modified UTF-7 names (folder-roles-by-localized-name).
         assert_eq!(path_role("Ko&AWE-"), Some("trash"));
         assert_eq!(path_role("&BBoEPgRABDcEOAQ9BDA-"), Some("trash"));

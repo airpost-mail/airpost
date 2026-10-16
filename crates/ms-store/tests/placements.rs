@@ -621,6 +621,129 @@ fn gmail_labels_and_single_placement() {
     assert_eq!(f.load(msg.id()).labels(), &json!(["Work"]));
 }
 
+fn thread_label_paths(f: &common::Fixture, thread_id: &str) -> Vec<String> {
+    let mut paths: Vec<String> = f
+        .thread(thread_id)
+        .unwrap()
+        .labels()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["path"].as_str().unwrap().to_owned())
+        .collect();
+    paths.sort();
+    paths
+}
+
+#[test]
+fn gmail_system_labels_match_by_role_then_gmail_path() {
+    use ms_store::models::label_for_xgm_label_name;
+    let label = |path: &str, role: &str| {
+        let mut l = ms_store::Label::new(&ms_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        l.set_path(path);
+        l.set_role(role);
+        l
+    };
+    let found = |name: &str, labels: &[ms_store::Label]| {
+        label_for_xgm_label_name(name, labels).map(|l| l.path().to_owned())
+    };
+    // A user label named Important, listed before the system one.
+    let both = [
+        label("Important", ""),
+        label("[Gmail]/Important", "important"),
+    ];
+    assert_eq!(
+        found("\\Important", &both).as_deref(),
+        Some("[Gmail]/Important")
+    );
+    assert_eq!(found("Important", &both).as_deref(), Some("Important"));
+    // Important hidden from IMAP: the user label must not stand in for it.
+    let user_only = [label("Important", "")];
+    assert_eq!(found("\\Important", &user_only), None);
+    // Listed without \Important (no role): the [Gmail]/ path still names it.
+    let no_role = [
+        label("[Google Mail]/Important", ""),
+        label("[Gmail]/Drafts", ""),
+    ];
+    assert_eq!(
+        found("\\Important", &no_role).as_deref(),
+        Some("[Google Mail]/Important")
+    );
+    assert_eq!(
+        found("\\Draft", &no_role).as_deref(),
+        Some("[Gmail]/Drafts")
+    );
+    assert_eq!(
+        found("\\Inbox", &[label("INBOX", "inbox")]).as_deref(),
+        Some("INBOX")
+    );
+}
+
+#[test]
+fn threads_recount_when_a_label_appears_or_gains_a_role() {
+    let f = fixture();
+    let all = f.folder("[Gmail]/All Mail", "all");
+    f.label("INBOX", "inbox");
+    let user_important = f.label("Important", "");
+    let gattrs = |uid: u32| MessageAttributes {
+        uid,
+        unread: true,
+        labels: vec!["\\Important".into(), "\\Inbox".into()],
+        ..Default::default()
+    };
+    let msg = f.insert("i@x", &all, 1, gattrs(1), None);
+    // Important hidden from IMAP: no label for \Important, and not the user label.
+    assert_eq!(thread_label_paths(&f, msg.thread_id()), ["INBOX"]);
+    f.assert_invariants();
+
+    // Shown again, without the flag at first: the label appears without a role.
+    let before = f.store.all_labels_cache(ACCOUNT).unwrap();
+    let mut important = f.label("[Gmail]/Important", "");
+    let after = f.store.all_labels_cache(ACCOUNT).unwrap();
+    let ids = Thread::ids_affected_by_label_change(&f.store, ACCOUNT, &before, &after).unwrap();
+    assert_eq!(ids, [msg.thread_id().to_owned()]);
+    f.store
+        .transaction("recount", |s| Thread::recount_from_messages(s, &ids))
+        .unwrap();
+    assert_eq!(
+        thread_label_paths(&f, msg.thread_id()),
+        ["INBOX", "[Gmail]/Important"]
+    );
+    assert_eq!(f.thread_counts(important.id()), (1, 1));
+    assert_eq!(f.thread_counts(user_important.id()), (0, 0));
+    f.assert_invariants();
+
+    // Gaining the role changes no resolution but the role the thread embeds.
+    let before = f.store.all_labels_cache(ACCOUNT).unwrap();
+    important.set_role("important");
+    f.store.save(&mut important).unwrap();
+    let after = f.store.all_labels_cache(ACCOUNT).unwrap();
+    let ids = Thread::ids_affected_by_label_change(&f.store, ACCOUNT, &before, &after).unwrap();
+    assert_eq!(ids, [msg.thread_id().to_owned()]);
+    f.store
+        .transaction("recount", |s| Thread::recount_from_messages(s, &ids))
+        .unwrap();
+    let t = f.thread(msg.thread_id()).unwrap();
+    let embedded = t
+        .labels()
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["id"] == important.id())
+        .unwrap()
+        .clone();
+    assert_eq!(embedded["role"], "important");
+    f.assert_invariants();
+
+    // Nothing changed: nothing to recount.
+    let same = f.store.all_labels_cache(ACCOUNT).unwrap();
+    assert!(
+        Thread::ids_affected_by_label_change(&f.store, ACCOUNT, &same, &same)
+            .unwrap()
+            .is_empty()
+    );
+}
+
 #[test]
 fn fetchable_copies_are_ranked() {
     let f = fixture();

@@ -1,0 +1,83 @@
+name: gmail-important
+description: >
+  Gmail's Important marker in the three setups that break it in the C++ engine. Important
+  hidden from IMAP, with a user label literally named "Important": the user label must not
+  stand in for \Important. Important shown again: the threads already synced pick up the
+  marker without Rebuild Cache. [Gmail]/Important listed without the \Important flag: the
+  path gives it the role, so it is the marker and not a chip. Then ChangeLabelsTask adds and
+  removes the marker as \Important on the server and the user label by its name.
+source: "docs/fix-backlog.md F2; Mailspring #443; forum topic 227; MailUtils.cpp:447-461 labelForXGMLabelName"
+servers:
+  - {fake: gmail}
+mailboxes:
+  INBOX: {messages: 6}
+  Important: {}
+setup:
+  - server.delete_mailbox: {name: "[Gmail]/Important"}
+  - server.labels: {mailbox: INBOX, uids: "1:3", add: ["\\Important"]}
+  - server.labels: {mailbox: INBOX, uids: [4], add: ["Important"]}
+steps:
+  # 1 + 2: hidden, and a user label named Important.
+  - wait: quiescent
+  - assert:
+      db_matches_server: {labels: true}
+      thread_labels:
+        roles: {Important: "", "[Gmail]/Important": null}
+        threads:
+          - {mailbox: "[Gmail]/All Mail", uids: "1:3", lacks: [Important]}
+          - {mailbox: "[Gmail]/All Mail", uids: [4], has: [Important]}
+      invariants: {}
+  # Shown in IMAP again, with its flag: the synced threads are recounted.
+  - server.create_mailbox: {name: "[Gmail]/Important", special_use: "\\Important"}
+  - sync: pass
+  - assert:
+      thread_labels:
+        roles: {Important: "", "[Gmail]/Important": important}
+        threads:
+          - {mailbox: "[Gmail]/All Mail", uids: "1:3", has: ["[Gmail]/Important"], lacks: [Important]}
+          - {mailbox: "[Gmail]/All Mail", uids: [4], has: [Important], lacks: ["[Gmail]/Important"]}
+      invariants: {}
+  # Hidden again: the label goes and the threads drop it.
+  - server.delete_mailbox: {name: "[Gmail]/Important"}
+  - sync: pass
+  - assert:
+      thread_labels:
+        roles: {"[Gmail]/Important": null}
+        threads:
+          - {mailbox: "[Gmail]/All Mail", uids: "1:3", lacks: ["[Gmail]/Important", Important]}
+      invariants: {}
+  # 3: listed without \Important.
+  - server.create_mailbox: {name: "[Gmail]/Important"}
+  - sync: pass
+  - assert:
+      thread_labels:
+        roles: {Important: "", "[Gmail]/Important": important}
+        threads:
+          - {mailbox: "[Gmail]/All Mail", uids: "1:3", has: ["[Gmail]/Important"], lacks: [Important]}
+      invariants: {}
+  - client.task: {__cls: ChangeLabelsTask, messages: {mailbox: "[Gmail]/All Mail", uids: [1]}, labelsToAdd: [], labelsToRemove: ["[Gmail]/Important"]}
+    as: unmark
+  - wait: {task: unmark, timeout: 60}
+  - client.task: {__cls: ChangeLabelsTask, messages: {mailbox: "[Gmail]/All Mail", uids: [5]}, labelsToAdd: ["[Gmail]/Important"], labelsToRemove: []}
+    as: mark
+  - wait: {task: mark, timeout: 60}
+  - client.task: {__cls: ChangeLabelsTask, messages: {mailbox: "[Gmail]/All Mail", uids: [4]}, labelsToAdd: [], labelsToRemove: [Important]}
+    as: unlabel
+  - wait: {task: unlabel, timeout: 60}
+  - client.task: {__cls: ChangeLabelsTask, messages: {mailbox: "[Gmail]/All Mail", uids: [2]}, labelsToAdd: [Important], labelsToRemove: []}
+    as: label
+  - wait: {task: label, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  db_matches_server: {labels: true}
+  thread_labels:
+    roles: {Important: "", "[Gmail]/Important": important}
+    threads:
+      - {mailbox: "[Gmail]/All Mail", uids: [1], lacks: ["[Gmail]/Important", Important], server_lacks: ["\\Important", "[Gmail]/Important"]}
+      - {mailbox: "[Gmail]/All Mail", uids: [2], has: ["[Gmail]/Important", Important], server_has: ["\\Important", Important]}
+      - {mailbox: "[Gmail]/All Mail", uids: [3], has: ["[Gmail]/Important"], lacks: [Important], server_has: ["\\Important"]}
+      - {mailbox: "[Gmail]/All Mail", uids: [4], lacks: ["[Gmail]/Important", Important], server_lacks: ["\\Important", Important]}
+      - {mailbox: "[Gmail]/All Mail", uids: [5], has: ["[Gmail]/Important"], server_has: ["\\Important"], server_lacks: ["[Gmail]/Important"]}
+  stable: {passes: 2}
+  running: true

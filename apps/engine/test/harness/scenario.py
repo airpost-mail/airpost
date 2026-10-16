@@ -958,6 +958,49 @@ class ScenarioRun(PimMixin):
         return [f"folder {path} has role {folders.get(path, {}).get('role')!r}, expected {role!r}"
                 for path, role in arg.items() if folders.get(path, {}).get("role") != role]
 
+    def expect_thread_labels(self, arg: dict) -> list:
+        """Gmail labels as the client shows them. `roles: {path: role}` checks Label rows;
+        each `threads` entry `{mailbox, uids, has, lacks}` checks by path the labels listed
+        on the thread of each of those messages, and that every listed label carries its
+        Label row's current role (the client tells the Important marker from a chip by it).
+        `server_has` / `server_lacks` check those messages' X-GM-LABELS on the server, which
+        proves a ChangeLabelsTask stored the label the server knows."""
+        with self.ms.db() as c:
+            rows = {r["id"]: (r["path"], r["role"] or "") for r in c.execute("SELECT id, path, role FROM Label")}
+        roles = dict(rows.values())
+        out = [f"label {path} has role {roles.get(path)!r}, expected {role!r}"
+               for path, role in (arg.get("roles") or {}).items() if roles.get(path) != role]
+        truth = self.server.truth()
+        for sel in arg.get("threads") or []:
+            held = truth.get(sel["mailbox"], {})
+            for uid in parse_uids(sel["uids"]):
+                server_labels = set(held.get(uid, {}).get("labels", ()))
+                where = f"server {sel['mailbox']} UID {uid}"
+                out += [f"{where} lacks label {l}, has {sorted(server_labels)}"
+                        for l in sel.get("server_has", []) if l not in server_labels]
+                out += [f"{where} has label {l}" for l in sel.get("server_lacks", []) if l in server_labels]
+        for sel in arg.get("threads") or []:
+            for mid in self._resolve_messages({"mailbox": sel["mailbox"], "uids": sel["uids"]}):
+                with self.ms.db() as c:
+                    t = c.execute("SELECT t.data FROM Thread t JOIN Message m ON m.threadId = t.id WHERE m.id = ?",
+                                  (mid,)).fetchone()
+                where = f"thread of {sel['mailbox']} message {mid}"
+                if t is None:
+                    out.append(f"{where}: no thread")
+                    continue
+                labels = json.loads(t[0]).get("labels") or []
+                paths = sorted(l.get("path") for l in labels)
+                out += [f"{where} lacks label {p}, has {paths}" for p in sel.get("has", []) if p not in paths]
+                out += [f"{where} lists label {p}" for p in sel.get("lacks", []) if p in paths]
+                for l in labels:
+                    current = rows.get(l.get("id"))
+                    if current is None:
+                        out.append(f"{where} lists label {l.get('path')}, which has no Label row")
+                    elif (l.get("role") or "") != current[1]:
+                        out.append(f"{where} lists label {l.get('path')} with role {l.get('role')!r}, "
+                                   f"its Label row has {current[1]!r}")
+        return out
+
     def expect_server_counts(self, arg: dict) -> list:
         truth = self.server.truth()
         return [f"server has {len(truth.get(mb, {}))} in {mb}, expected {n}" for mb, n in arg.items()

@@ -19,7 +19,7 @@ use ms_core::wake::sleep_worker_until_wake_or;
 use ms_core::{logmsg, Error, ErrorCode, FolderFlags, Result, SyncError};
 use ms_imap::{FolderStatus, ImapSession, ListedFolder, Namespace};
 use ms_providers::roles::{role_for_folder, role_for_folder_flags, role_for_folder_path, ROLES};
-use ms_store::{Folder, Label, Message, Model, Query};
+use ms_store::{Folder, Label, Message, Model, Query, Thread};
 use serde_json::Value;
 use tracing::{error, info, warn};
 
@@ -793,6 +793,7 @@ impl Background {
         let q = Query::new().equal("accountId", &account_id);
         let mut unused_folders = self.w.store.find_all_map::<Folder>(&q, "id")?;
         let mut unused_labels = self.w.store.find_all_map::<Label>(&q, "id")?;
+        let labels_before = self.w.store.all_labels_cache(&account_id)?;
         let model = mailbox_model::for_profile(self.w.session.profile().mailbox_model, &account_id);
         let (_, labels) = model.classify_folders(&remote);
         let label_ids: HashSet<String> = labels.iter().map(|l| l.id().to_owned()).collect();
@@ -921,6 +922,15 @@ impl Background {
             "syncFoldersAndLabels",
         )?;
 
+        let labels_changed = !unused_labels.is_empty()
+            || created
+                .iter()
+                .any(|&i| matches!(categories[i], Category::Label(_)))
+            || role_updates.iter().any(|(id, _)| label_ids.contains(id));
+        if labels_changed {
+            self.recount_relabelled_threads(&account_id, &labels_before)?;
+        }
+
         Ok(categories
             .into_iter()
             .filter_map(|c| match c {
@@ -928,5 +938,25 @@ impl Background {
                 Category::Label(_) => None,
             })
             .collect())
+    }
+
+    /// Threads count their labels by resolving each message's X-GM-LABELS against the
+    /// labels at the time, so a label that appears (Important shown in IMAP again), gains a
+    /// role or goes away leaves them counted against the old set until Rebuild Cache. This
+    /// recounts the threads whose messages carry a name that now resolves differently.
+    /// Not in C++ (docs/fix-backlog.md F2).
+    fn recount_relabelled_threads(&self, account_id: &str, before: &[Label]) -> Result<()> {
+        let after = self.w.store.all_labels_cache(account_id)?;
+        let ids = Thread::ids_affected_by_label_change(&self.w.store, account_id, before, &after)?;
+        if ids.is_empty() {
+            return Ok(());
+        }
+        info!("Recounting {} threads after a label change.", ids.len());
+        for chunk in ids.chunks(100) {
+            self.w.store.transaction("recountRelabelledThreads", |s| {
+                Thread::recount_from_messages(s, chunk)
+            })?;
+        }
+        Ok(())
     }
 }

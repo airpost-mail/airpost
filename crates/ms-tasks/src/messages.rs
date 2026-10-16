@@ -166,12 +166,17 @@ pub(crate) fn apply_starred_in_imap_folder(
 }
 
 /// The X-GM-LABELS value of a Label JSON: the system labels by role, others by path.
+/// `[Gmail]/Important` is `\Important` even without the role, which is how the messages
+/// carry it; C++ sent the path and the removal failed with ErrorStore (forum topic 227).
 pub(crate) fn xgm_key_for_label(label: &Value) -> Result<String> {
     let role = get_str(at(label, "role"))?;
     let path = get_str(at(label, "path"))?;
+    let lower = path.to_ascii_lowercase();
+    let important_path = ["[gmail]/important", "[google mail]/important"].contains(&lower.as_str());
     Ok(match role.as_str() {
         "inbox" => "\\Inbox".to_owned(),
         "important" => "\\Important".to_owned(),
+        _ if important_path => "\\Important".to_owned(),
         _ => path,
     })
 }

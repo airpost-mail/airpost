@@ -94,21 +94,21 @@ class _Snapshot:
         return any(self.roles.get(fid, "") not in ("spam", "trash") for fid in folder_ids)
 
     def label_for_xgm_name(self, account_id: str, name: str):
-        """MailUtils::labelForXGMLabelName over the account's labels: exact path, then
-        `\\Name` against the path without `[Gmail]/` or the role (singular or plural),
-        case-insensitively."""
+        """labelForXGMLabelName as the Rust engine has it (ms_store label_for_xgm_label_name):
+        a user label by exact path; `\\Name` by role (singular or plural), then by a
+        `[Gmail]/` or `[Google Mail]/` path naming it, case-insensitively."""
         labels = self.labels.get(account_id, ())
+        if not name.startswith("\\"):
+            return next((l for l in labels if l["path"] == name), None)
+        needle = name[1:].lower()
+        names = (needle, needle + "s")
         for label in labels:
-            if label["path"] == name:
+            if (label["role"] or "") in names:
                 return label
-        if name.startswith("\\"):
-            needle = name[1:].lower()
-            for label in labels:
-                path = (label["path"] or "").lower()
-                if path.startswith("[gmail]/"):
-                    path = path[len("[gmail]/"):]
-                role = label["role"] or ""
-                if path == needle or role == needle or role == needle + "s":
+        for label in labels:
+            path = (label["path"] or "").lower()
+            for prefix in ("[gmail]/", "[google mail]/"):
+                if path.startswith(prefix) and path[len(prefix):] in names:
                     return label
         return None
 

@@ -199,6 +199,80 @@ impl Thread {
         self.data["labels"] = json!([]);
     }
 
+    /// The account's threads holding a copy whose stored X-GM-LABELS include a name that
+    /// resolves differently under `after` than under `before`: to another label, to none, or
+    /// to a label whose path or role changed. Their label refs were counted against
+    /// `before` and the label JSON they embed may be stale.
+    pub fn ids_affected_by_label_change(
+        store: &Store,
+        account_id: &str,
+        before: &[Label],
+        after: &[Label],
+    ) -> Result<Vec<String>> {
+        let names: Vec<String> = store
+            .conn()
+            .prepare(
+                "SELECT DISTINCT j.value FROM MessageFolder mf, json_each(mf.remoteXGMLabels) j \
+                 WHERE mf.accountId = ? AND j.type = 'text'",
+            )?
+            .query_map([account_id], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        let key = |l: Option<&Label>| {
+            l.map(|l| (l.id().to_owned(), l.path().to_owned(), l.role().to_owned()))
+        };
+        let changed: Vec<&String> = names
+            .iter()
+            .filter(|n| {
+                key(label_for_xgm_label_name_quiet(n, before))
+                    != key(label_for_xgm_label_name_quiet(n, after))
+            })
+            .collect();
+        if changed.is_empty() {
+            return Ok(Vec::new());
+        }
+        let ids = store
+            .conn()
+            .prepare(
+                "SELECT DISTINCT m.threadId FROM Message m \
+                 JOIN MessageFolder mf ON mf.messageId = m.id, json_each(mf.remoteXGMLabels) j \
+                 WHERE mf.accountId = ?1 AND j.value IN (SELECT value FROM json_each(?2)) \
+                 AND m.threadId IS NOT NULL AND m.threadId != ''",
+            )?
+            .query_map(
+                rusqlite::params![account_id, json!(changed).to_string()],
+                |r| r.get(0),
+            )?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(ids)
+    }
+
+    /// Recounts the threads from all of their messages, against the current labels, and
+    /// saves them. The caller owns the transaction.
+    pub fn recount_from_messages(store: &Store, thread_ids: &[String]) -> Result<()> {
+        if thread_ids.is_empty() {
+            return Ok(());
+        }
+        let mut threads: BTreeMap<String, Thread> = store
+            .find_all::<Thread>(&crate::Query::new().equal_any("id", thread_ids.iter()))?
+            .into_iter()
+            .map(|t| (t.id().to_owned(), t))
+            .collect();
+        for t in threads.values_mut() {
+            t.reset_counted_attributes();
+        }
+        let messages = store
+            .find_all::<Message>(&crate::Query::new().equal_any("threadId", thread_ids.iter()))?;
+        for msg in &messages {
+            if let Some(t) = threads.get_mut(msg.thread_id()) {
+                t.apply_message_attribute_changes(&MessageSnapshot::empty(), Some(msg), store)?;
+            }
+        }
+        for t in threads.values_mut() {
+            store.save(t)?;
+        }
+        Ok(())
+    }
+
     /// Updates the counters and category sets from a before and after view of one message:
     /// `old` is the message as it was last counted (the empty snapshot for a new message),
     /// `next` its current state, or `None` when it is being removed.
@@ -558,25 +632,41 @@ impl Model for Thread {
     }
 }
 
-/// The label an X-GM-LABELS name refers to (`MailUtils::labelForXGMLabelName`): the label
-/// with that exact path, else for a system name like `\Inbox` the label whose path
-/// (without `[Gmail]/`) or role matches it case-insensitively, the role also in its plural
-/// (`\Draft` → `drafts`).
+/// The label an X-GM-LABELS name refers to (`MailUtils::labelForXGMLabelName`). A user
+/// label name is matched by exact path. A system name like `\Important` is matched by role
+/// (also in its plural, `\Draft` → `drafts`), then by a `[Gmail]/` or `[Google Mail]/`
+/// path naming it, case-insensitively.
+///
+/// Note: C++ tried every label's exact path first and then matched `\Name` against paths
+/// without `[Gmail]/` and roles in one pass, first hit wins. A user label named
+/// "Important" then took `\Important`, and an Important label listed without the
+/// `\Important` flag became a user chip (docs/fix-backlog.md F2).
 pub fn label_for_xgm_label_name<'a>(name: &str, all_labels: &'a [Label]) -> Option<&'a Label> {
-    if let Some(l) = all_labels.iter().find(|l| l.path() == name) {
+    let found = label_for_xgm_label_name_quiet(name, all_labels);
+    if found.is_none() {
+        tracing::warn!("Label not found: {name}");
+    }
+    found
+}
+
+fn label_for_xgm_label_name_quiet<'a>(name: &str, all_labels: &'a [Label]) -> Option<&'a Label> {
+    match name.strip_prefix('\\') {
+        Some(system) => system_label(system, all_labels),
+        None => all_labels.iter().find(|l| l.path() == name),
+    }
+}
+
+fn system_label<'a>(name: &str, all_labels: &'a [Label]) -> Option<&'a Label> {
+    let needle = name.to_ascii_lowercase();
+    let plural = format!("{needle}s");
+    let is_system_name = |s: &str| s == needle || s == plural;
+    if let Some(l) = all_labels.iter().find(|l| is_system_name(l.role())) {
         return Some(l);
     }
-    if let Some(stripped) = name.strip_prefix('\\') {
-        let needle = stripped.to_ascii_lowercase();
-        let plural = format!("{needle}s");
-        for label in all_labels {
-            let path = label.path().to_ascii_lowercase();
-            let path = path.strip_prefix("[gmail]/").unwrap_or(&path);
-            if path == needle || label.role() == needle || label.role() == plural {
-                return Some(label);
-            }
-        }
-    }
-    tracing::warn!("Label not found: {name}");
-    None
+    all_labels.iter().find(|l| {
+        let path = l.path().to_ascii_lowercase();
+        ["[gmail]/", "[google mail]/"]
+            .iter()
+            .any(|p| path.strip_prefix(p).is_some_and(is_system_name))
+    })
 }

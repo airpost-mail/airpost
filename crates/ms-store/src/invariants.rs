@@ -297,14 +297,19 @@ impl Snapshot {
 
     fn label_for_xgm_name(&self, account_id: &str, name: &str) -> Option<&LabelRow> {
         let labels = self.labels.get(account_id)?;
-        if let Some(l) = labels.iter().find(|l| l.path == name) {
-            return Some(l);
-        }
-        let needle = name.strip_prefix('\\')?.to_ascii_lowercase();
-        labels.iter().find(|l| {
-            let path = l.path.to_ascii_lowercase();
-            let path = path.strip_prefix("[gmail]/").unwrap_or(&path);
-            path == needle || l.role == needle || l.role == format!("{needle}s")
+        let Some(system) = name.strip_prefix('\\') else {
+            return labels.iter().find(|l| l.path == name);
+        };
+        let needle = system.to_ascii_lowercase();
+        let plural = format!("{needle}s");
+        let is_system_name = |s: &str| s == needle || s == plural;
+        labels.iter().find(|l| is_system_name(&l.role)).or_else(|| {
+            labels.iter().find(|l| {
+                let path = l.path.to_ascii_lowercase();
+                ["[gmail]/", "[google mail]/"]
+                    .iter()
+                    .any(|p| path.strip_prefix(p).is_some_and(is_system_name))
+            })
         })
     }
 }
