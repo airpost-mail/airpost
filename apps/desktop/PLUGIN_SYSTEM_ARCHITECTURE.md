@@ -108,7 +108,7 @@ my-plugin/
 | `name` | Yes | Package identifier (kebab-case) |
 | `version` | Yes | Semantic version |
 | `main` | Yes* | Entry point path (required for non-theme plugins) |
-| `engines.mailspring` | Yes | **Required for validation** - target engine version |
+| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `app/src/plugin-api-version.ts`, 1.26.0). `*` matches any |
 | `displayName` | No | Human-readable name for UI |
 | `description` | No | Plugin description |
 | `windowTypes` | No | Which window types load this plugin |
@@ -191,7 +191,7 @@ export function activateConfig() {
 
 1. **Discovery**: `PackageManager.discoverPackages()` scans configured directories
 2. **Filtering**: Packages filtered by `windowTypes` for current window
-3. **Validation**: Checks for valid `package.json` with `engines.mailspring`
+3. **Validation**: Checks that `engines.mailspring` is a range `PLUGIN_API_VERSION` satisfies
 4. **Sync Loading**: Plugins with `syncInit: true` activate immediately
 5. **Delayed Loading**: Other plugins activate after 2.5 second delay
 6. **Resource Loading**: Keymaps, stylesheets, menus auto-loaded
@@ -215,7 +215,8 @@ activatePackage(pkg)
     ├── Skip if already active
     ├── Skip if theme (handled separately)
     ├── Skip if optional and disabled in config
-    ├── Verify engines.mailspring is set
+    ├── Verify PLUGIN_API_VERSION satisfies engines.mailspring
+    │   (missing or unsatisfied: logged and skipped; later packages still load)
     │
     ├── Mark as active
     └── Call pkg.activate()
@@ -436,7 +437,7 @@ Located in `internal_packages/theme-picker/`:
 | No enable/disable UI | Plugins require config file editing (themes have UI) |
 | No update mechanism | Manual updates only |
 | No sandboxing | Plugins have full API access |
-| Limited version checking | `engines.mailspring: "*"` is common |
+| Limited version checking | `engines.mailspring: "*"` is common; the range is checked against the plugin API version, which only moves with the API |
 
 ### Disabled Plugins Configuration
 

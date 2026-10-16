@@ -10,6 +10,7 @@ import {
   IntegrationSettings,
   ProviderConfig,
 } from 'mailspring-exports';
+import { McpSection } from './mcp/mcp-section';
 
 // Preferences > Integrations (docs/integrations-plan.md, section 2). Settings go to config under
 // core.integrations.<kind>; API keys only to the keyset, and are never shown again once saved.
@@ -437,6 +438,7 @@ export default class PreferencesIntegrations extends React.Component {
         <IntegrationSection kind="translation" />
         <IntegrationSection kind="grammar" />
         <IntegrationSection kind="enrichment" />
+        <McpSection />
       </div>
     );
   }

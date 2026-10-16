@@ -3,6 +3,7 @@ import fs from 'fs';
 import { shell } from 'electron';
 import { localized } from './intl';
 import Package, { isValidPackageName } from './package';
+import { PLUGIN_API_VERSION } from './plugin-api-version';
 
 export default class PackageManager {
   packageDirectories: string[] = [];
@@ -109,19 +110,25 @@ export default class PackageManager {
       return;
     }
 
-    if (!pkg.isEngineSet()) {
-      // don't use AppEnv.reportError, I don't want to know about these.
-      console.error(
-        localized(
-          `This plugin or theme %@ does not list "mailspring" in it's package.json's "engines" field. Ask the developer to test the plugin with Tern and add it, or follow the instructions here: %@`,
-          pkg.name,
-          `https://github.com/ternmail/ternmail/blob/main/apps/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
-        )
-      );
-      return;
-    }
-
     try {
+      if (pkg.engineRange() !== null && !pkg.isEngineSet()) {
+        console.error(
+          `Plugin ${pkg.name} needs plugin API ${pkg.engineRange()} (engines.mailspring), but ` +
+            `this version of Tern has ${PLUGIN_API_VERSION}; it was not activated.`
+        );
+        return;
+      }
+      if (!pkg.isEngineSet()) {
+        // don't use AppEnv.reportError, I don't want to know about these.
+        console.error(
+          localized(
+            `This plugin or theme %@ does not list "mailspring" in it's package.json's "engines" field. Ask the developer to test the plugin with Tern and add it, or follow the instructions here: %@`,
+            pkg.name,
+            `https://github.com/ternmail/ternmail/blob/main/apps/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
+          )
+        );
+        return;
+      }
       this.active[pkg.name] = pkg;
       pkg.activate();
     } catch (err) {

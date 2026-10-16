@@ -1,6 +1,10 @@
 import crypto from 'crypto';
 
 export const LOCAL_SERVER_PORT = 12141;
+// Loopback only: the OAuth redirect comes from this machine's browser, and the `state`
+// check shouldn't be the only thing keeping other hosts from reaching the receiver.
+// Microsoft's redirect names `localhost`, which browsers also try on 127.0.0.1.
+export const LOCAL_SERVER_HOST = '127.0.0.1';
 
 export const GMAIL_CLIENT_ID =
   process.env.MS_GMAIL_CLIENT_ID ||

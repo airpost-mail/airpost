@@ -53,6 +53,9 @@ lazyLoadWithGetter(`getAvailableLanguages`, () => require('../intl').getAvailabl
 lazyLoadWithGetter(`getCurrentLocale`, () => require('../intl').getCurrentLocale);
 lazyLoadWithGetter(`isRTL`, () => require('../intl').isRTL);
 
+// The plugin API version plugins match `engines.mailspring` against
+lazyLoadWithGetter(`apiVersion`, () => require('../plugin-api-version').PLUGIN_API_VERSION);
+
 // Actions
 lazyLoad(`Actions`, 'flux/actions');
 
@@ -60,8 +63,14 @@ lazyLoad(`Actions`, 'flux/actions');
 lazyLoad(`MailsyncProcess`, 'mailsync-process');
 // The Database
 lazyLoad(`Matcher`, 'flux/attributes/matcher');
-lazyLoadWithGetter('AndCompositeMatcher', () => require('../flux/attributes/matcher').AndCompositeMatcher);
-lazyLoadWithGetter('OrCompositeMatcher', () => require('../flux/attributes/matcher').OrCompositeMatcher);
+lazyLoadWithGetter(
+  'AndCompositeMatcher',
+  () => require('../flux/attributes/matcher').AndCompositeMatcher
+);
+lazyLoadWithGetter(
+  'OrCompositeMatcher',
+  () => require('../flux/attributes/matcher').OrCompositeMatcher
+);
 lazyLoad(`DatabaseStore`, 'flux/stores/database-store');
 lazyLoad(`QueryResultSet`, 'flux/models/query-result-set');
 lazyLoad(`QuerySubscription`, 'flux/models/query-subscription');

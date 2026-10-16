@@ -82,7 +82,7 @@ class _SnoozeStore extends MailspringStore {
       // otherwise we'll receive a notification from the sync worker over and
       // over again.
       Actions.queueTasks(
-        threads.map((model) =>
+        unsnooze.map((model) =>
           SyncbackMetadataTask.forSaving({
             model,
             pluginId: PLUGIN_ID,

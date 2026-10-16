@@ -229,13 +229,13 @@ function sourceURLFor(commit) {
 
 /**
  * Writes the licence page into `buildPath/static/all_licenses.html` and puts LICENSE.md,
- * NOTICE.md and the engine's THIRD-PARTY-NOTICES.txt in the resources directory, outside the
- * asar. On macOS it also copies Electron's LICENSE and LICENSES.chromium.html into
- * Contents/Resources, since the zip holds only the .app.
+ * NOTICE.md and the engine's and tern-mcp's THIRD-PARTY-NOTICES in the resources directory,
+ * outside the asar. On macOS it also copies Electron's LICENSE and LICENSES.chromium.html
+ * into Contents/Resources, since the zip holds only the .app.
  *
- * Throws in CI (`CI` set) when the engine is packaged without its crate notices, Electron's
- * licence files cannot be found, or an npm package has no licence text, so a release cannot
- * ship without them.
+ * Throws in CI (`CI` set) when the engine or tern-mcp is packaged without its crate notices,
+ * Electron's licence files cannot be found, or an npm package has no licence text, so a
+ * release cannot ship without them.
  */
 function writeLicenses({ buildPath, platform, commit }) {
   const resourcesDir = path.resolve(buildPath, '..');
@@ -257,6 +257,19 @@ function writeLicenses({ buildPath, platform, commit }) {
     fs.copyFileSync(engineNoticesPath, path.join(resourcesDir, 'THIRD-PARTY-NOTICES-engine.txt'));
   } else if (hasEngine) {
     const msg = `The Rust engine is packaged but ${engineNoticesPath} is missing (run apps/engine/packaging/build-release.sh --install-desktop with cargo-about installed)`;
+    if (inCI) throw new Error(msg);
+    console.warn(`---> ${msg}`);
+  }
+
+  const hasMcp = ['tern-mcp', 'tern-mcp.exe'].some((f) => fs.existsSync(path.join(buildPath, f)));
+  const mcpNoticesPath =
+    process.env.TERN_MCP_NOTICES || path.join(appDir, 'tern-mcp.THIRD-PARTY-NOTICES.txt');
+  let mcpNotices = null;
+  if (fs.existsSync(mcpNoticesPath)) {
+    mcpNotices = read(mcpNoticesPath);
+    fs.copyFileSync(mcpNoticesPath, path.join(resourcesDir, 'THIRD-PARTY-NOTICES-tern-mcp.txt'));
+  } else if (hasMcp) {
+    const msg = `tern-mcp is packaged but ${mcpNoticesPath} is missing (run apps/engine/packaging/build-release.sh --install-desktop with cargo-about installed)`;
     if (inCI) throw new Error(msg);
     console.warn(`---> ${msg}`);
   }
@@ -290,6 +303,9 @@ function writeLicenses({ buildPath, platform, commit }) {
 
   if (engineNotices) {
     parts.push(section('engine', 'Sync engine: Rust crates', pre(engineNotices)));
+  }
+  if (mcpNotices) {
+    parts.push(section('tern-mcp', 'MCP server (tern-mcp): Rust crates', pre(mcpNotices)));
   }
 
   if (electronLicense) {

@@ -257,9 +257,13 @@ function buildPackagerOptions() {
         [
           'mailsync',
           'mailsync.exe',
-          // The Rust engine, placed by apps/engine/packaging/build-release.sh.
+          // The Rust engine and the MCP server, placed by
+          // apps/engine/packaging/build-release.sh --install-desktop. Preferences runs
+          // tern-mcp, and MCP clients run it from here, so it must be a real file.
           'mailsync-rs',
           'mailsync-rs.exe',
+          'tern-mcp',
+          'tern-mcp.exe',
           'mailsync.bin',
           '*.so',
           '*.so.*',
@@ -273,7 +277,6 @@ function buildPackagerOptions() {
           'examples/**',
           '**/src/tasks/**',
           '**/src/quickpreview/**',
-          '**/mcp-stdio-bridge.js',
           '**/static/all_licenses.html',
           '**/static/extensions/**',
           '**/node_modules/spellchecker/**',
@@ -339,7 +342,7 @@ function buildPackagerOptions() {
             // which includes restricted entitlements (keychain-access-groups,
             // com.apple.developer.*) that are validated against the embedded
             // provisioning profile. All helper binaries (Electron helpers,
-            // mailsync, chrome_crashpad_handler, ShipIt, etc.) must be signed
+            // mailsync-rs, tern-mcp, chrome_crashpad_handler, ShipIt, etc.) must be signed
             // with only the basic com.apple.security.* entitlements — amfid
             // will reject any helper that carries restricted entitlements it
             // cannot match to a profile scoped to that binary.

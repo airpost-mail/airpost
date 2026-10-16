@@ -1,9 +1,14 @@
-import {
+import http from 'http';
+import OAuthSignInPage, {
   extractOAuthCodeFromUrl,
   extractOAuthStateFromUrl,
   oauthStateIsValid,
 } from '../lib/oauth-signin-page';
-import { createOAuthState } from '../lib/onboarding-constants';
+import {
+  createOAuthState,
+  LOCAL_SERVER_HOST,
+  LOCAL_SERVER_PORT,
+} from '../lib/onboarding-constants';
 
 describe('extractOAuthCodeFromUrl', function extractOAuthCodeTests() {
   it('extracts a standard Google OAuth code with a slash', () => {
@@ -83,5 +88,27 @@ describe('OAuth state validation', function oauthStateTests() {
     const latest = createOAuthState();
     expect(oauthStateIsValid(earlier)).toBe(false);
     expect(oauthStateIsValid(latest)).toBe(true);
+  });
+});
+
+describe('OAuthSignInPage redirect receiver', function oauthReceiverTests() {
+  it('listens on 127.0.0.1 only', () => {
+    const listen = jasmine.createSpy('listen');
+    const fakeServer = { listen, once: () => fakeServer, close: () => {} };
+    spyOn(http, 'createServer').andReturn(fakeServer as any);
+
+    const page = new OAuthSignInPage({
+      providerAuthPageUrl: 'https://accounts.example.test/auth',
+      buildAccountFromAuthResponse: () => null,
+      onSuccess: () => {},
+      onTryAgain: () => {},
+      providerConfig: null,
+      serviceName: 'Example',
+    });
+    page.componentDidMount();
+    page.componentWillUnmount();
+
+    expect(listen).toHaveBeenCalledWith(LOCAL_SERVER_PORT, '127.0.0.1');
+    expect(LOCAL_SERVER_HOST).toBe('127.0.0.1');
   });
 });

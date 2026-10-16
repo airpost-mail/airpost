@@ -7,6 +7,21 @@ import {
 } from 'mailspring-exports';
 
 import PreferencesRoot from './preferences-root';
+import { migrateCoreMcpConfig } from './tabs/mcp/mcp-policy';
+import { replaceStaleBridgeEntryOnce } from './tabs/mcp/tern-mcp';
+
+/** Moves the old MCP plugin's settings into mcp.json and repoints its Claude Desktop entry at
+ * tern-mcp. Main window of the real app only: both write outside the app's own state. */
+function upgradeMcpSetup() {
+  if (AppEnv.inSpecMode() || !AppEnv.isMainWindow()) return;
+  const dir = AppEnv.getConfigDirPath();
+  try {
+    migrateCoreMcpConfig(dir);
+  } catch (err) {
+    console.warn(`[MCP] Could not move core.mcp to mcp.json: ${err.message}`);
+  }
+  replaceStaleBridgeEntryOnce(dir).catch((err) => console.warn(`[MCP] ${err.message}`));
+}
 
 export function activate() {
   PreferencesUIStore.registerPreferencesTab(
@@ -71,6 +86,8 @@ export function activate() {
   ComponentRegistry.register(PreferencesRoot, {
     location: WorkspaceStore.Location.Preferences,
   });
+
+  setTimeout(upgradeMcpSetup, 5000);
 }
 
 export function deactivate() {}

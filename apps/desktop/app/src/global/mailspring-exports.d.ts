@@ -9,6 +9,9 @@ export const getAvailableLanguages: getAvailableLanguages;
 export type isRTL = typeof import('../intl').isRTL;
 export const isRTL: isRTL;
 
+/** The plugin API version, matched as semver against a plugin's `engines.mailspring`. */
+export const apiVersion: string;
+
 // Actions
 export type Actions = typeof import('../flux/actions');
 export const Actions: Actions;

@@ -1,5 +1,7 @@
 import path from 'path';
 import fs from 'fs';
+import semver from 'semver';
+import { PLUGIN_API_VERSION } from './plugin-api-version';
 
 class NoPackageJSONError extends Error {}
 class InvalidPackageNameError extends Error {}
@@ -100,8 +102,16 @@ export default class Package {
     return !!this.json.isOptional;
   }
 
+  engineRange(): string | null {
+    const range = this.json.engines?.mailspring;
+    return typeof range === 'string' ? range : null;
+  }
+
+  /** Whether `engines.mailspring` is a range the plugin API version satisfies. A missing
+   * `engines` or an invalid range is false, never a throw. */
   isEngineSet() {
-    return !!this.json.engines.mailspring;
+    const range = this.engineRange();
+    return range !== null && semver.satisfies(PLUGIN_API_VERSION, range);
   }
 
   isDefault() {

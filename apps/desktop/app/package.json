@@ -14,7 +14,6 @@
   "dependencies": {
     "@bengotow/slate-edit-list": "github:bengotow/slate-edit-list#b868e108",
     "@electron/remote": "^2.1.2",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@tern/email-dark": "file:../../../packages/email-dark",
     "app-module-path": "^2.2.0",
     "better-sqlite3": "^12.8.0",
@@ -49,6 +48,7 @@
     "reflux": "0.1.13",
     "rtlcss": "^4.3.0",
     "rx-lite": "4.0.8",
+    "semver": "^7.8.5",
     "slate": "github:bengotow/slate#cd6f40e8",
     "slate-auto-replace": "0.12.1",
     "slate-base64-serializer": "0.2.100",

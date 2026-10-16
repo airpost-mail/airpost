@@ -7,7 +7,7 @@ import http from 'http';
 import url from 'url';
 
 import FormErrorMessage from './form-error-message';
-import { LOCAL_SERVER_PORT, getLatestOAuthState } from './onboarding-constants';
+import { LOCAL_SERVER_HOST, LOCAL_SERVER_PORT, getLatestOAuthState } from './onboarding-constants';
 import AccountProviders from './account-providers';
 
 /**
@@ -136,7 +136,7 @@ export default class OAuthSignInPage extends React.Component<
         ),
       });
     });
-    this._server.listen(LOCAL_SERVER_PORT);
+    this._server.listen(LOCAL_SERVER_PORT, LOCAL_SERVER_HOST);
   }
 
   componentWillUnmount() {

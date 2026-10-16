@@ -1,0 +1,86 @@
+@import 'ui-variables';
+
+.container-integrations .integrations-mcp {
+  .mcp-status-row,
+  .mcp-client,
+  .mcp-audit-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .btn {
+      margin: 0;
+    }
+  }
+
+  .mcp-status {
+    color: @text-color-subtle;
+  }
+
+  .mcp-client-name {
+    width: 140px;
+    flex-shrink: 0;
+  }
+
+  .mcp-client-result {
+    font-size: @font-size-smaller;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    &.ok {
+      color: @color-success;
+    }
+    &.failed {
+      color: @color-error;
+    }
+  }
+
+  .mcp-accounts {
+    margin: 6px 0;
+
+    .item .btn {
+      margin-left: 8px;
+    }
+  }
+
+  .mcp-folders {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 16px;
+    margin: 0 0 6px 24px;
+
+    .mcp-folder {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+
+  .mcp-audit {
+    margin-top: 10px;
+  }
+
+  .mcp-audit-empty {
+    color: @text-color-subtle;
+  }
+
+  .mcp-audit-table {
+    width: 100%;
+    font-size: @font-size-smaller;
+    border-collapse: collapse;
+
+    td {
+      padding: 2px 6px 2px 0;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+    td.mcp-audit-params {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      color: @text-color-subtle;
+    }
+    tr.outcome-denied td,
+    tr.outcome-error td {
+      color: @color-error;
+    }
+  }
+}
