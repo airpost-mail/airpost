@@ -52,6 +52,13 @@ Desktop checks (not run here: no `node_modules`, npm was installed with `--ignor
   in its thread; an existing snooze and a send-later fire at their time; mail, contacts and
   calendars resync.
 - [ ] Relaunch and confirm `import-legacy` logs nothing to import (it ran once).
+- [ ] Profile move: the desktop now keeps its data in `Tern` / `Tern-dev` under the app-data
+  dir and, on first launch, copies the `Mailspring` / `Mailspring-dev` profile there (no
+  caches, crash dumps, locks or logs; the database via SQLite online backup; the Mailspring
+  profile is only read). Check on a machine with Mailspring.app running: the first launch
+  imports without a dialog, accounts sign in from the shared `Mailspring Safe Storage`
+  keychain item, `migrate` and `import-legacy` run on the copy, Mailspring.app keeps
+  working, and a second launch does not import again.
 - [ ] Switch back to `cpp`: the database moves to `edgehill.rust.db*`, the console warns with
   the count of unsent local drafts and pending expiration metadata, C++ resyncs from empty.
 - [ ] A build without `mailsync-rs` and `core.sync.engine = "rust"` runs C++ with a console

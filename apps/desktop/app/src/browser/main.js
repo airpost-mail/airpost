@@ -41,30 +41,59 @@ if (typeof process.setFdLimit === 'function') {
   process.setFdLimit(1024);
 }
 
-const setupConfigDir = args => {
-  let dirname = 'Mailspring';
-  if (args.devMode) {
-    dirname = 'Mailspring-dev';
-  }
-  if (args.specMode) {
-    dirname = 'Mailspring-spec';
-  }
+// Tern keeps its own profile so it can run next to Mailspring.app, and imports the Mailspring
+// profile of the same mode on first launch. The app name stays "Mailspring": safeStorage's
+// keychain item ("Mailspring Safe Storage") follows it, and that is what carries saved
+// credentials over.
+const profileDirNames = args => {
+  if (args.specMode) return { tern: 'Tern-spec', mailspring: null };
+  if (args.devMode) return { tern: 'Tern-dev', mailspring: 'Mailspring-dev' };
+  return { tern: 'Tern', mailspring: 'Mailspring' };
+};
 
-  // Check if a custom config dir was provided via --config-dir-path
-  let configDirPath = args.configDirPath || path.join(app.getPath('appData'), dirname);
+// Returns the config dir, and the Mailspring profile to import from when the default dir is used.
+const setupConfigDir = args => {
+  const names = profileDirNames(args);
+  const appData = app.getPath('appData');
+  let configDirPath = args.configDirPath || path.join(appData, names.tern);
+  let importFromPath =
+    !args.configDirPath && names.mailspring ? path.join(appData, names.mailspring) : null;
 
   if (process.platform === 'linux' && process.env.SNAP) {
     // for linux snap, use the sandbox directory that is persisted between snap revisions
     configDirPath = args.configDirPath || process.env.SNAP_USER_COMMON;
+    importFromPath = null;
   }
 
-  // crete the directory
   fs.mkdirSync(configDirPath, { recursive: true });
 
-  // tell Electron to use this folder for local storage, etc. as well
+  // Also moves Electron's local storage and crash dumps here. The default userData follows the
+  // app name, which is Mailspring's profile.
   app.setPath('userData', configDirPath);
 
-  return configDirPath;
+  return { configDirPath, importFromPath };
+};
+
+// Starts the first-launch import. The promise resolves once the profile is ready to use: to
+// null, or to the error if the import failed (with nothing copied left behind).
+const startProfileImport = (configDirPath, importFromPath) => {
+  if (!importFromPath) return Promise.resolve(null);
+  const { importMailspringProfile } = require('./mailspring-profile-import');
+  return importMailspringProfile(importFromPath, configDirPath).then(() => null, error => error);
+};
+
+// Returns whether to start anyway, with an empty profile.
+const confirmStartAfterFailedImport = error => {
+  const { dialog } = require('electron');
+  const choice = dialog.showMessageBoxSync({
+    type: 'error',
+    buttons: ['Quit', 'Start Without Importing'],
+    defaultId: 0,
+    cancelId: 0,
+    message: 'Your Mailspring profile could not be copied.',
+    detail: `${error.message}\n\nNothing in the Mailspring profile was changed. Quit to try again on the next launch, or start with no accounts.`,
+  });
+  return choice === 1;
 };
 
 const setupCompileCache = (configDirPath, devMode) => {
@@ -339,8 +368,9 @@ const start = () => {
   app.commandLine.appendSwitch('js-flags', '--harmony');
 
   const options = parseCommandLine(process.argv);
+  // Before the error logger: it starts the crash reporter, which writes under userData.
+  const { configDirPath, importFromPath } = setupConfigDir(options);
   global.errorLogger = setupErrorLogger(options);
-  const configDirPath = setupConfigDir(options);
   options.configDirPath = configDirPath;
 
   // On macOS, setLoginItemSettings doesn't support passing custom args, so we
@@ -369,6 +399,8 @@ const start = () => {
 
   setupCompileCache(configDirPath, options.devMode);
 
+  const profileImport = startProfileImport(configDirPath, importFromPath);
+
   // Must precede `ready`: disableHardwareAcceleration() has no effect afterward.
   require('./hardware-acceleration-recovery').applyPersistentSoftwareRendering(
     app,
@@ -387,7 +419,13 @@ const start = () => {
 
   app.on('open-url', onOpenUrlBeforeReady);
   app.on('open-file', onOpenFileBeforeReady);
-  app.on('ready', () => {
+  app.on('ready', async () => {
+    const importError = await profileImport;
+    if (importError && !confirmStartAfterFailedImport(importError)) {
+      app.exit(1);
+      return;
+    }
+
     app.removeListener('open-file', onOpenFileBeforeReady);
     app.removeListener('open-url', onOpenUrlBeforeReady);
 

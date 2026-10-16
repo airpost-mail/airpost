@@ -12,7 +12,10 @@ export default class SignaturePhotoPicker extends React.Component<{
     const { data, resolvedURL } = this.props;
 
     let source = data.photoURL || '';
-    if (!['gravatar', 'company', ''].includes(source)) {
+    // 'company' is a removed domain-logo option that saved signature data can still hold.
+    if (source === 'company') {
+      source = '';
+    } else if (!['gravatar', ''].includes(source)) {
       source = 'custom';
     }
 
@@ -33,7 +36,6 @@ export default class SignaturePhotoPicker extends React.Component<{
             >
               <option value="">{localized('None')}</option>
               <option value="gravatar">{localized('Gravatar Profile Photo')}</option>
-              <option value="company">{localized('Company / Domain Logo')}</option>
               <option disabled>──────────</option>
               <option value="custom">{localized('Custom Image…')}</option>
             </select>

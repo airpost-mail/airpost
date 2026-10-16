@@ -3,8 +3,6 @@ import https from 'https';
 import { shell } from 'electron';
 import url from 'url';
 
-const FALLBACK_DOWNLOAD_URL = 'https://getmailspring.com/download';
-
 function safeHttpUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   try {
@@ -113,6 +111,7 @@ export default class AutoupdateImplBase extends EventEmitter {
 
   /* Public: Install the update. */
   quitAndInstall() {
-    shell.openExternal(safeHttpUrl(this.lastRetrievedUpdateURL) ?? FALLBACK_DOWNLOAD_URL);
+    const downloadURL = safeHttpUrl(this.lastRetrievedUpdateURL);
+    if (downloadURL) shell.openExternal(downloadURL);
   }
 }

@@ -17,23 +17,40 @@ const UnsupportedState = 'unsupported';
 const ErrorState = 'error';
 const preferredChannel = 'stable';
 
+// Base URL of the update feed, eg. 'https://updates.example.com'; the manager requests
+// `<base>/check/<platform>/<arch>/<version>/anonymous/<channel>`. Empty disables updates: no
+// requests are made, and the state stays 'unsupported', which hides the update menu items.
+export const UPDATE_FEED_BASE_URL = '';
+
 export default class AutoUpdateManager extends EventEmitter {
   state = IdleState;
   version: string;
   config: import('../config').default;
   specMode: boolean;
   preferredChannel: string;
-  feedURL: string;
+  feedBaseURL: string;
+  feedURL: string | null = null;
   releaseNotes: string;
   releaseVersion: string;
 
-  constructor(version: string, config: import('../config').default, specMode: boolean) {
+  constructor(
+    version: string,
+    config: import('../config').default,
+    specMode: boolean,
+    feedBaseURL: string = UPDATE_FEED_BASE_URL
+  ) {
     super();
 
     this.version = version;
     this.config = config;
     this.specMode = specMode;
     this.preferredChannel = preferredChannel;
+    this.feedBaseURL = feedBaseURL.replace(/\/+$/, '');
+
+    if (!this.feedBaseURL) {
+      this.state = UnsupportedState;
+      return;
+    }
 
     this.updateFeedURL();
 
@@ -58,12 +75,7 @@ export default class AutoUpdateManager extends EventEmitter {
       }
     }
 
-    let host = `updates.getmailspring.com`;
-    if (this.config.get('env') === 'staging') {
-      host = `updates-staging.getmailspring.com`;
-    }
-
-    this.feedURL = `https://${host}/check/${params.platform}/${params.arch}/${params.version}/${params.id}/${params.channel}`;
+    this.feedURL = `${this.feedBaseURL}/check/${params.platform}/${params.arch}/${params.version}/${params.id}/${params.channel}`;
     if (autoUpdater) {
       autoUpdater.setFeedURL(this.feedURL);
     }
@@ -162,6 +174,7 @@ export default class AutoUpdateManager extends EventEmitter {
   }
 
   check({ hidePopups }: { hidePopups?: boolean } = {}) {
+    if (!autoUpdater) return;
     this.updateFeedURL();
     if (!hidePopups) {
       autoUpdater.once('update-not-available', this.onUpdateNotAvailable);
@@ -171,6 +184,7 @@ export default class AutoUpdateManager extends EventEmitter {
   }
 
   install() {
+    if (!autoUpdater) return;
     autoUpdater.quitAndInstall();
   }
 

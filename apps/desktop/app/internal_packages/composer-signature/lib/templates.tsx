@@ -1,70 +1,6 @@
 import React from 'react';
 import querystring from 'querystring';
 
-// Static components
-
-const FB_SHARE = (
-  <img
-    src="https://www.getmailspring.com/signature-assets/fb.gif"
-    width="13"
-    height="13"
-    alt="Facebook"
-  />
-);
-
-const MEDIUM_SHARE = (
-  <img
-    src="https://www.getmailspring.com/signature-assets/medium.gif"
-    width="13"
-    height="13"
-    alt="Medium"
-  />
-);
-
-const GITHUB_SHARE = (
-  <img
-    src="https://www.getmailspring.com/signature-assets/github.gif"
-    width="13"
-    height="13"
-    alt="Github"
-  />
-);
-
-const YOUTUBE_SHARE = (
-  <img
-    src="https://www.getmailspring.com/signature-assets/youtube.gif"
-    width="13"
-    height="13"
-    alt="YouTube"
-  />
-);
-
-const TWITTER_SHARE = (
-  <img
-    src="https://www.getmailspring.com/signature-assets/twitter.gif"
-    width="13"
-    height="13"
-    alt="Twitter"
-  />
-);
-const LINKEDIN_SHARE = (
-  <img
-    src="https://www.getmailspring.com/signature-assets/linkedin.gif"
-    width="13"
-    height="13"
-    alt="LinkedIn"
-  />
-);
-
-const INSTAGRAM_SHARE = (
-  <img
-    src="https://www.getmailspring.com/signature-assets/instagram.gif"
-    width="13"
-    height="13"
-    alt="Instagram"
-  />
-);
-
 function widthAndHeightForPhotoURL(
   photoURL,
   { maxWidth, maxHeight }: { maxWidth?: number; maxHeight?: number } = {}
@@ -87,7 +23,10 @@ function widthAndHeightForPhotoURL(
     height: Math.round(q.msh * scale),
   };
 }
-// Generic components used across templates
+// Generic components used across templates.
+//
+// Social profiles are text links rather than icons: the signature is sent as HTML, so an icon
+// would have to be a remote image that every recipient's client fetches from someone's server.
 
 const PrefixStyles = {
   None: {},
@@ -166,7 +105,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
             title="Facebook"
             style={{ marginRight: 8, color: props.tintColor }}
           >
-            {FB_SHARE}
+            Facebook
           </a>
         )}
         {props.linkedinURL && (
@@ -175,7 +114,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
             title="LinkedIn"
             style={{ marginRight: 8, color: props.tintColor }}
           >
-            {LINKEDIN_SHARE}
+            LinkedIn
           </a>
         )}
         {props.mediumURL && (
@@ -184,7 +123,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
             title="Medium"
             style={{ marginRight: 8, color: props.tintColor }}
           >
-            {MEDIUM_SHARE}
+            Medium
           </a>
         )}
         {props.githubURL && (
@@ -193,7 +132,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
             title="GitHub"
             style={{ marginRight: 8, color: props.tintColor }}
           >
-            {GITHUB_SHARE}
+            GitHub
           </a>
         )}
         {props.youtubeURL && (
@@ -202,7 +141,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
             title="YouTube"
             style={{ marginRight: 8, color: props.tintColor }}
           >
-            {YOUTUBE_SHARE}
+            YouTube
           </a>
         )}
         {props.twitterHandle && (
@@ -211,7 +150,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
             title="Twitter"
             style={{ marginRight: 8, color: props.tintColor }}
           >
-            {TWITTER_SHARE}
+            Twitter
           </a>
         )}
         {props.instagramURL && (
@@ -220,7 +159,7 @@ function GenericInfoBlock(props, prefixStyle: any = PrefixStyles.None) {
             title="Instagram"
             style={{ marginRight: 8, color: props.tintColor }}
           >
-            {INSTAGRAM_SHARE}
+            Instagram
           </a>
         )}
       </div>
@@ -484,7 +423,7 @@ const Templates = [
                       title="Facebook"
                       style={{ marginRight: 8, color: props.tintColor }}
                     >
-                      {FB_SHARE}
+                      Facebook
                     </a>
                   )}
                   {props.mediumURL && (
@@ -493,16 +432,16 @@ const Templates = [
                       title="Medium"
                       style={{ marginRight: 8, color: props.tintColor }}
                     >
-                      {MEDIUM_SHARE}
+                      Medium
                     </a>
                   )}
                   {props.githubURL && (
                     <a
                       href={props.githubURL}
-                      title="Github"
+                      title="GitHub"
                       style={{ marginRight: 8, color: props.tintColor }}
                     >
-                      {GITHUB_SHARE}
+                      GitHub
                     </a>
                   )}
                   {props.youtubeURL && (
@@ -511,7 +450,7 @@ const Templates = [
                       title="YouTube"
                       style={{ marginRight: 8, color: props.tintColor }}
                     >
-                      {YOUTUBE_SHARE}
+                      YouTube
                     </a>
                   )}
                   {props.linkedinURL && (
@@ -520,7 +459,7 @@ const Templates = [
                       title="LinkedIn"
                       style={{ marginRight: 8, color: props.tintColor }}
                     >
-                      {LINKEDIN_SHARE}
+                      LinkedIn
                     </a>
                   )}
                   {props.twitterHandle && (
@@ -529,7 +468,7 @@ const Templates = [
                       title="Twitter"
                       style={{ marginRight: 8, color: props.tintColor }}
                     >
-                      {TWITTER_SHARE}
+                      Twitter
                     </a>
                   )}
                 </div>

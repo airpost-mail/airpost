@@ -159,12 +159,12 @@ module.exports = ErrorLogger = (function () {
     if (process.type === 'renderer') {
       return;
     }
+    // Native crash dumps stay on disk (app.getPath('crashDumps')); there is no endpoint to
+    // upload them to.
     require('electron').crashReporter.start({
       productName: 'Mailspring',
       companyName: 'Mailspring',
-      submitURL: `https://id.getmailspring.com/report-crash?ver=${appVersion}&platform=${process.platform}`,
-      uploadToServer: true,
-      autoSubmit: true,
+      uploadToServer: false,
       extra: {
         ver: appVersion,
         platform: process.platform,

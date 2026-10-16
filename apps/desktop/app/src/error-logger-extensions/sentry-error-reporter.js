@@ -4,7 +4,8 @@ const crypto = require('crypto');
 const https = require('https');
 const { URL } = require('url');
 
-const DSN = 'https://b4e04d8ca1e8f1206aa79db0dee2da16@o70907.ingest.us.sentry.io/4511340571000832';
+// Empty until Tern has its own Sentry project; with no DSN nothing is sent.
+const DSN = '';
 
 function parseDSN(dsn) {
   const u = new URL(dsn);
@@ -126,6 +127,7 @@ function buildEvent({ err, frames, extra, deviceHash, release, tags }) {
 }
 
 function sendEnvelope(event, release) {
+  if (!DSN) return;
   const { publicKey, host, projectId } = parseDSN(DSN);
   const envelopeHeader = JSON.stringify({
     event_id: event.event_id,
