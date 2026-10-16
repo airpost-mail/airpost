@@ -13,15 +13,10 @@ import DatabaseStore from './stores/database-store';
 import OnlineStatusStore from './stores/online-status-store';
 import { DatabaseChangeRecord } from './stores/database-change-record';
 import DatabaseObjectRegistry from '../registries/database-object-registry';
-import {
-  EngineServeProcess,
-  MailsyncProcess,
-  MailsyncProcessExit,
-  resolveSyncEngine,
-} from '../mailsync-process';
-import { CrashTracker, EngineClient, isAuthFailure, serveEngineSelected } from '../engine-client';
-import EngineEvents from '../engine-events';
-import { THREAD_COUNTS_CLASS } from '../engine-protocol';
+import { MailsyncProcess, MailsyncProcessExit, resolveSyncEngine } from '../mailsync-process';
+import { CrashTracker, isAuthFailure, serveEngineSelected } from '../engine-client';
+import { EngineConnection } from '../engine-connection';
+import { AccountEvent, EngineStatus, SupervisorChannel } from '../supervisor-channels';
 import KeyManager from '../key-manager';
 import * as Actions from './actions';
 import * as Utils from './models/utils';
@@ -58,18 +53,123 @@ function convertDeltaModels(modelJSONs: any[], modelClass: string) {
   return { models, rawJSONs };
 }
 
+/*
+Applies one batch of delta lines in a window. Every window triggers DatabaseStore; only the main
+window runs what must happen once: Task onSuccess/onError (send sound, error dialogs, send
+hooks), ProcessState into OnlineStatusStore, and, for the engines the main window runs itself,
+ProcessAccountSecretsUpdated into KeyManager and the rebroadcast to the other windows.
+*/
+export function applyDeltas(
+  msgs: string[],
+  { mainWindow, rebroadcast }: { mainWindow: boolean; rebroadcast: boolean }
+) {
+  for (const msg of msgs) {
+    if (msg.length === 0) {
+      continue;
+    }
+    if (msg[0] !== '{') {
+      if (!msg.startsWith('Waiting for')) {
+        console.log(`Sync worker sent non-JSON formatted message: ${msg}`);
+      }
+      continue;
+    }
+
+    let json = null;
+    try {
+      json = JSON.parse(msg);
+    } catch (err) {
+      console.log(`Sync worker sent non-JSON formatted message: ${msg}. ${err}`);
+      continue;
+    }
+
+    const { type, modelJSONs, modelClass } = json;
+    if (!modelJSONs || !type || !modelClass) {
+      console.log(`Sync worker sent a JSON formatted message with unexpected keys: ${msg}`);
+      continue;
+    }
+
+    // Note: these deltas don't reflect a real model - we just stream in the process
+    // state changes (online / offline) alongside the database changes.
+    if (modelClass === 'ProcessState' && modelJSONs.length) {
+      if (mainWindow) OnlineStatusStore.onSyncProcessStateReceived(modelJSONs[0]);
+      continue;
+    }
+    if (modelClass === 'ProcessAccountSecretsUpdated' && modelJSONs.length) {
+      if (mainWindow) KeyManager.extractAndStoreAccountSecrets(new Account(modelJSONs[0]));
+      continue;
+    }
+
+    if (rebroadcast) {
+      ipcRenderer.send('mailsync-bridge-rebroadcast-to-all', msg);
+    }
+
+    const { models, rawJSONs } = convertDeltaModels(modelJSONs, modelClass);
+    if (models.length === 0) {
+      continue;
+    }
+    const record = new DatabaseChangeRecord({
+      type, // TODO BG move to "model" naming style, finding all uses might be tricky
+      objectClass: modelClass,
+      objects: models,
+      objectsRawJSON: rawJSONs,
+    });
+    DatabaseStore.trigger(record);
+    if (mainWindow) runTaskHandlers(record);
+  }
+}
+
+// Runs task success / error handlers if the task is now complete.
+function runTaskHandlers(record: DatabaseChangeRecord<Model>) {
+  // Note: cannot use `record.objectClass` because of subclass names
+  if (record.type === 'persist' && record.objects[0] instanceof Task) {
+    for (const obj of record.objects) {
+      const task = obj as Task;
+      if (task.status !== 'complete') {
+        continue;
+      }
+      if (task.error != null) {
+        task.onError(task.error);
+      } else {
+        task.onSuccess();
+      }
+    }
+  }
+}
+
+/*
+The windows' side of the sync engine. With the Rust engine's `serve` mode the main process
+supervises the engine (browser/engine-supervisor.ts) and every window reads deltas on its own
+socket connection; the main window also sends its accounts' commands on it and applies the
+supervisor's account events. The C++ engine and the per-account and stdio modes run in the main
+window, which rebroadcasts their deltas to the other windows.
+*/
 export default class MailsyncBridge {
   _crashTracker = new CrashTracker();
   _clients: { [accountId: string]: MailsyncProcess } = {};
-  // The Rust engine's `serve` mode, which replaces `_clients` (engine-client.ts).
-  _engine: EngineClient = null;
+  // The `serve` engine's socket, which replaces `_clients`.
+  _connection: EngineConnection = null;
+  _mainWindow = false;
+  _appliedEvents = new Set<number>();
   _lastWait: number;
 
   constructor() {
-    if (!AppEnv.isMainWindow() || AppEnv.inSpecMode()) {
+    if (AppEnv.inSpecMode()) {
       ipcRenderer.on('mailsync-bridge-message', this._onIncomingRebroadcastMessage);
       return;
     }
+    this._mainWindow = AppEnv.isMainWindow();
+
+    const { configDirPath, resourcePath, syncEngine } = this._getClientConfiguration();
+    const engine = syncEngine || resolveSyncEngine(configDirPath, resourcePath);
+    if (serveEngineSelected(engine, configDirPath)) {
+      this._connection = this._createConnection();
+    } else if (!this._mainWindow) {
+      ipcRenderer.on('mailsync-bridge-message', this._onIncomingRebroadcastMessage);
+      return;
+    }
+
+    AppEnv.onReadyToUnload(this._onReadyToUnload);
+    if (!this._mainWindow) return;
 
     ipcRenderer.on('run-calendar-sync', (_event, accountId?: string) =>
       this.sendSyncCalendarNow(accountId)
@@ -80,20 +180,16 @@ export default class MailsyncBridge {
     Actions.cancelTask.listen(this._onCancelTask, this);
     Actions.fetchBodies.listen(this._onFetchBodies, this);
 
-    const { configDirPath, resourcePath, syncEngine } = this._getClientConfiguration();
-    const engine = syncEngine || resolveSyncEngine(configDirPath, resourcePath);
-    if (serveEngineSelected(engine, configDirPath)) {
-      this._engine = this._createEngineClient();
-    }
-
-    AccountStore.listen(this.ensureClients, this);
-
     AppEnv.onBeforeUnload(this._onBeforeUnload);
-    AppEnv.onReadyToUnload(this._onReadyToUnload);
 
-    process.nextTick(() => {
-      this.ensureClients();
-    });
+    if (this._connection) {
+      this._attachToSupervisor();
+    } else {
+      AccountStore.listen(this.ensureClients, this);
+      process.nextTick(() => {
+        this.ensureClients();
+      });
+    }
   }
 
   // Public
@@ -132,9 +228,10 @@ export default class MailsyncBridge {
     return this._clients;
   }
 
+  // The supervisor follows config.json `accounts` itself for `serve`.
   ensureClients = _.throttle(async () => {
-    if (this._engine) {
-      return this._engine.ensure();
+    if (this._connection) {
+      return;
     }
     const clientsWithoutAccounts = { ...this._clients };
     const keys = await KeyManager._getKeyHash();
@@ -158,8 +255,9 @@ export default class MailsyncBridge {
   }, 100);
 
   async forceRelaunchClient(account: Account) {
-    if (this._engine) {
-      return this._engine.forceRelaunch(account);
+    if (this._connection) {
+      await ipcRenderer.invoke(SupervisorChannel.ForceRelaunch, account.id);
+      return;
     }
     const keys = await KeyManager._getKeyHash();
     this._launchClient(account, keys, { force: true });
@@ -185,8 +283,10 @@ export default class MailsyncBridge {
 
   sendSyncMailNow() {
     console.warn('Sending `wake` to all mailsync workers...');
-    if (this._engine) {
-      this._engine.wakeAll();
+    if (this._connection) {
+      this._connection
+        .request('sync.wake', {})
+        .catch((err) => console.warn(`sync.wake failed: ${err.message}`));
       return;
     }
     for (const client of Object.values(this._clients)) {
@@ -201,8 +301,13 @@ export default class MailsyncBridge {
       ipcRenderer.send('command', 'application:sync-calendar', accountId);
       return;
     }
-    if (this._engine) {
-      this._engine.syncCalendar(accountId);
+    if (this._connection) {
+      const ids = accountId ? [accountId] : this._connection.accountIds();
+      for (const id of ids) {
+        if (this._connection.accountIds().includes(id)) {
+          this._connection.send(id, { type: 'sync-calendar' });
+        }
+      }
       return;
     }
 
@@ -216,7 +321,7 @@ export default class MailsyncBridge {
   }
 
   sendMessageToAccount(accountId: string, json: Record<string, unknown>) {
-    if (this._engine ? !this._engine.send(accountId, json) : !this._clients[accountId]) {
+    if (this._connection ? !this._connection.send(accountId, json) : !this._clients[accountId]) {
       const { emailAddress } = AccountStore.accountForId(accountId) || { emailAddress: undefined };
       return AppEnv.showErrorDialog({
         title: localized(`Tern is unable to sync %@`, emailAddress),
@@ -225,21 +330,32 @@ export default class MailsyncBridge {
         ),
       });
     }
-    if (!this._engine) {
+    if (!this._connection) {
       this._clients[accountId].sendMessage(json);
     }
   }
 
   async resetCacheForAccount(account: Account, { silent }: { silent?: boolean } = {}) {
-    // create a new client that will perform the reset
-    const resetClient = new MailsyncProcess(this._getClientConfiguration());
-    resetClient.account = (await KeyManager.insertAccountSecrets(account)).toJSON();
+    let reset: () => Promise<unknown>;
+    if (this._connection) {
+      // The supervisor drops the account from the engine, resets it and adds it back.
+      const json = account.toJSON();
+      for (const key of ['imap_password', 'smtp_password', 'refresh_token']) {
+        delete json.settings[key];
+      }
+      reset = async () => {
+        const result = await ipcRenderer.invoke(SupervisorChannel.ResetCache, json);
+        if (result && result.error) throw new Error(result.error);
+      };
+    } else {
+      // create a new client that will perform the reset
+      const resetClient = new MailsyncProcess(this._getClientConfiguration());
+      resetClient.account = (await KeyManager.insertAccountSecrets(account)).toJSON();
 
-    // no-op - do not allow us to kill this client - we may be reseting the cache of an
-    // account which does not exist anymore, but we don't want to interrupt this process
-    resetClient.kill = () => {};
+      // no-op - do not allow us to kill this client - we may be reseting the cache of an
+      // account which does not exist anymore, but we don't want to interrupt this process
+      resetClient.kill = () => {};
 
-    if (!this._engine) {
       // grab the existing client, if there is one
       const syncingClient = this._clients[account.id];
       this._clients[account.id] = resetClient;
@@ -249,6 +365,7 @@ export default class MailsyncBridge {
       if (syncingClient) {
         syncingClient.kill();
       }
+      reset = () => resetClient.resetCache();
     }
 
     if (!silent) {
@@ -264,10 +381,7 @@ export default class MailsyncBridge {
     try {
       const start = Date.now();
 
-      // The serve engine drops the account first and adds it back after.
-      await (this._engine
-        ? this._engine.resetCache(account.id, () => resetClient.resetCache())
-        : resetClient.resetCache());
+      await reset();
 
       if (!silent) {
         AppEnv.showErrorDialog({
@@ -285,7 +399,7 @@ export default class MailsyncBridge {
         message: localized(`Tern was unable to reset the local cache. %@`, error),
       });
     } finally {
-      if (!this._engine) {
+      if (!this._connection) {
         delete this._clients[account.id];
         process.nextTick(() => {
           this.ensureClients();
@@ -296,7 +410,11 @@ export default class MailsyncBridge {
 
   // window:attach-to-xcode: the engine, or the last per-account process.
   attachToXcode() {
-    const proc = this._engine ? this._engine.engine : Object.values(this._clients).pop();
+    if (this._connection) {
+      ipcRenderer.send(SupervisorChannel.AttachToXcode);
+      return;
+    }
+    const proc = Object.values(this._clients).pop();
     if (proc) {
       proc.attachToXcode();
     }
@@ -304,36 +422,81 @@ export default class MailsyncBridge {
 
   // Private
 
-  _createEngineClient() {
-    return new EngineClient({
-      createEngine: () => new EngineServeProcess(this._getClientConfiguration()),
-      accounts: () => AccountStore.accounts(),
-      accountJSONs: async (accounts: Account[]) => {
-        const keys = await KeyManager._getKeyHash();
-        return Promise.all(
-          accounts.map(async (a) => (await KeyManager.insertAccountSecrets(a, keys)).toJSON())
-        );
-      },
-      onDeltas: this._onIncomingMessages,
-      onAccountExited: (accountId) => OnlineStatusStore.onSyncProcessExited(accountId),
-      onAccountLaunched: (json) => {
-        if (json.syncState !== Account.SYNC_STATE_OK) {
-          Actions.updateAccount(json.id, { syncState: Account.SYNC_STATE_OK, syncError: null });
-        }
-      },
-      onTooManyFailures: (accountId, exit, authFailure) => {
-        Actions.updateAccount(accountId, {
-          syncState: authFailure ? Account.SYNC_STATE_AUTH_FAILED : Account.SYNC_STATE_ERROR,
-          syncError: exit,
-        });
-      },
-      onHello: (result) =>
-        EngineEvents.connected(result.features || [], (method, params) =>
-          this._engine.request(method, params)
-        ),
-      onEngineGone: () => EngineEvents.gone(),
-      onMailNew: (params) => EngineEvents.mailNew(params),
+  _createConnection() {
+    const connection = new EngineConnection({
+      clientName: `tern-desktop/${AppEnv.getVersion()}`,
+      mainWindow: this._mainWindow,
     });
+    connection.on('deltas', this._onIncomingMessages);
+    let statusSeen = false;
+    ipcRenderer.on(SupervisorChannel.Status, (_event, status: EngineStatus) => {
+      statusSeen = true;
+      connection.setStatus(status);
+    });
+    // A Status that arrives first is newer than this answer.
+    ipcRenderer.invoke(SupervisorChannel.GetStatus).then(
+      (status: EngineStatus | null) => {
+        if (!statusSeen) connection.setStatus(status);
+      },
+      (err) => console.error(`Could not ask the main process for the sync engine: ${err}`)
+    );
+    return connection;
+  }
+
+  // The supervisor's account events: the ones this window's renderer missed, then each as it
+  // happens. A renderer started by a reload may see one both ways, so each applies once.
+  _attachToSupervisor() {
+    ipcRenderer.on(
+      SupervisorChannel.AccountEvent,
+      (_event, accountEvent: AccountEvent & { seq: number }) =>
+        this._applyAccountEvents([accountEvent])
+    );
+    ipcRenderer.invoke(SupervisorChannel.AttachMainWindow).then(
+      (missed: Array<AccountEvent & { seq: number }>) => this._applyAccountEvents(missed),
+      (err) => console.error(`Could not attach to the sync engine supervisor: ${err}`)
+    );
+  }
+
+  _applyAccountEvents(events: Array<AccountEvent & { seq: number }>) {
+    let last = 0;
+    for (const accountEvent of events) {
+      last = Math.max(last, accountEvent.seq);
+      if (this._appliedEvents.has(accountEvent.seq)) continue;
+      this._appliedEvents.add(accountEvent.seq);
+      this._onAccountEvent(accountEvent);
+    }
+    if (last) ipcRenderer.send(SupervisorChannel.AckAccountEvents, last);
+  }
+
+  _onAccountEvent(accountEvent: AccountEvent) {
+    switch (accountEvent.type) {
+      case 'launched':
+        if (accountEvent.syncState !== Account.SYNC_STATE_OK) {
+          Actions.updateAccount(accountEvent.accountId, {
+            syncState: Account.SYNC_STATE_OK,
+            syncError: null,
+          });
+        }
+        return;
+      case 'exited':
+        OnlineStatusStore.onSyncProcessExited(accountEvent.accountId);
+        return;
+      case 'too-many-failures': {
+        const { code, signal, error } = accountEvent.exit;
+        let syncError: Error = null;
+        if (error) {
+          syncError = new Error(error.message);
+          if (error.syncError) (syncError as any).syncError = error.syncError;
+        }
+        Actions.updateAccount(accountEvent.accountId, {
+          syncState: accountEvent.authFailure
+            ? Account.SYNC_STATE_AUTH_FAILED
+            : Account.SYNC_STATE_ERROR,
+          syncError: { code, error: syncError, signal },
+        });
+        return;
+      }
+    }
   }
 
   _getClientConfiguration() {
@@ -448,84 +611,7 @@ export default class MailsyncBridge {
   }
 
   _onIncomingMessages = (msgs: string[]) => {
-    for (const msg of msgs) {
-      if (msg.length === 0) {
-        continue;
-      }
-      if (msg[0] !== '{') {
-        if (!msg.startsWith('Waiting for')) {
-          console.log(`Sync worker sent non-JSON formatted message: ${msg}`);
-        }
-        continue;
-      }
-
-      let json = null;
-      try {
-        json = JSON.parse(msg);
-      } catch (err) {
-        console.log(`Sync worker sent non-JSON formatted message: ${msg}. ${err}`);
-        continue;
-      }
-
-      const { type, modelJSONs, modelClass } = json;
-      if (!modelJSONs || !type || !modelClass) {
-        console.log(`Sync worker sent a JSON formatted message with unexpected keys: ${msg}`);
-        continue;
-      }
-
-      // Note: these deltas don't reflect a real model - we just stream in the process
-      // state changes (online / offline) alongside the database changes.
-      if (modelClass === 'ProcessState' && modelJSONs.length) {
-        OnlineStatusStore.onSyncProcessStateReceived(modelJSONs[0]);
-        continue;
-      }
-      if (modelClass === 'ProcessAccountSecretsUpdated' && modelJSONs.length) {
-        KeyManager.extractAndStoreAccountSecrets(new Account(modelJSONs[0]));
-        continue;
-      }
-      // Not a model either: ThreadCountsStore applies them in this window.
-      if (modelClass === THREAD_COUNTS_CLASS) {
-        EngineEvents.threadCounts({ type, rows: modelJSONs });
-        continue;
-      }
-
-      // dispatch the message to other windows
-      ipcRenderer.send('mailsync-bridge-rebroadcast-to-all', msg);
-
-      const { models, rawJSONs } = convertDeltaModels(modelJSONs, modelClass);
-      if (models.length === 0) {
-        continue;
-      }
-      this._onIncomingChangeRecord(
-        new DatabaseChangeRecord({
-          type, // TODO BG move to "model" naming style, finding all uses might be tricky
-          objectClass: modelClass,
-          objects: models,
-          objectsRawJSON: rawJSONs,
-        })
-      );
-    }
-  };
-
-  _onIncomingChangeRecord = (record: DatabaseChangeRecord<Model>) => {
-    // Allow observers of the database to handle this change
-    DatabaseStore.trigger(record);
-
-    // Run task success / error handlers if the task is now complete
-    // Note: cannot use `record.objectClass` because of subclass names
-    if (record.type === 'persist' && record.objects[0] instanceof Task) {
-      for (const obj of record.objects) {
-        const task = obj as Task;
-        if (task.status !== 'complete') {
-          continue;
-        }
-        if (task.error != null) {
-          task.onError(task.error);
-        } else {
-          task.onSuccess();
-        }
-      }
-    }
+    applyDeltas(msgs, { mainWindow: this._mainWindow, rebroadcast: !this._connection });
   };
 
   _onIncomingRebroadcastMessage = (event: Electron.IpcRendererEvent, msg: string) => {
@@ -572,9 +658,10 @@ export default class MailsyncBridge {
     return false;
   };
 
+  // The `serve` engine outlives the window; the supervisor stops it when the app quits.
   _onReadyToUnload = () => {
-    if (this._engine) {
-      this._engine.shutdown();
+    if (this._connection) {
+      this._connection.close();
     }
     for (const client of Object.values(this._clients)) {
       client.kill();

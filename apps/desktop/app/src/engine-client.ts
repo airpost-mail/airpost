@@ -2,11 +2,12 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The main window's client for the Rust engine's `serve` mode: one engine process for every
-account (docs/engine-protocol-plan.md section 4). MailsyncBridge owns it when
-serveEngineSelected() is true and keeps its per-account processes otherwise.
+The supervisor of the Rust engine's `serve` mode: one engine process for every account
+(docs/engine-protocol-plan.md section 4). The main process's EngineSupervisor owns it when
+serveEngineSelected() is true; the main window's MailsyncBridge keeps its per-account
+processes otherwise.
 
-It keeps the engine's accounts equal to AccountStore's (account.add / account.remove), routes
+It keeps the engine's accounts equal to the host's (account.add / account.remove), routes
 each account's commands to it, and applies the per-process relaunch rules of the per-account
 path to accounts instead: an `account.state` `stopped` counts as that account's crash and adds
 it again, until CrashTracker's cutoff. An engine exit counts as an engine crash and respawns
@@ -20,8 +21,6 @@ import {
   AccountStateParams,
   ErrorCode,
   EXIT_SOCKET_IN_USE,
-  HelloResult,
-  MailNewParams,
   serveSocketPath,
   SyncErrorJSON,
 } from './engine-protocol';
@@ -145,7 +144,7 @@ export interface AccountJSON extends CrashKeyJSON {
 export interface EngineClientHost {
   // A configured engine, not yet started.
   createEngine(): EngineServeProcess;
-  // The accounts that should be syncing (AccountStore).
+  // The accounts that should be syncing (config.json `accounts`).
   accounts(): EngineAccount[];
   accountJSONs(accounts: EngineAccount[]): Promise<AccountJSON[]>;
   onDeltas(msgs: string[]): void;
@@ -155,11 +154,9 @@ export interface EngineClientHost {
   onAccountLaunched(json: AccountJSON): void;
   // The account (or, after an engine cutoff, every account) is not relaunched any more.
   onTooManyFailures(accountId: string, exit: MailsyncProcessExit, authFailure: boolean): void;
-  // The engine answered hello on its socket (again, after each respawn).
-  onHello?(result: HelloResult): void;
-  // The engine is gone; its features and requests with it, until the next hello.
-  onEngineGone?(): void;
-  onMailNew?(params: MailNewParams): void;
+  // `entries` or `held` changed: an account is being added, was added, is being removed or
+  // is gone, or a reset holds it.
+  onAccountsChanged?(): void;
 }
 
 interface Entry {
@@ -199,7 +196,7 @@ export class EngineClient {
     this.host = host;
   }
 
-  // Adds the accounts the engine is missing and removes the ones AccountStore no longer has.
+  // Adds the accounts the engine is missing and removes the ones the host no longer lists.
   ensure(): Promise<void> {
     if (this.shuttingDown || this.engineGaveUp || this.respawnTimer) {
       return Promise.resolve();
@@ -235,7 +232,7 @@ export class EngineClient {
   }
 
   // Takes the account out of the engine, runs `reset` (the one-shot `--mode reset`), then lets
-  // ensure() add it back if AccountStore still has it.
+  // ensure() add it back if the host still lists it.
   async resetCache<T>(accountId: string, reset: () => Promise<T>): Promise<T> {
     this._hold(accountId);
     try {
@@ -281,17 +278,6 @@ export class EngineClient {
     if (this.engine) this.engine.wakeAll();
   }
 
-  // `hello.features` of the running engine; null before its hello and without an engine.
-  features(): string[] | null {
-    return this.engine ? this.engine.features : null;
-  }
-
-  // A socket request to the running engine, for the reads the bridge doesn't route.
-  request<R = unknown>(method: string, params: unknown): Promise<R> {
-    if (!this.engine) return Promise.reject(new Error('The sync engine is not running'));
-    return this.engine.request<R>(method, params);
-  }
-
   syncCalendar(accountId?: string) {
     const ids = accountId ? [accountId] : [...this.entries.keys()];
     for (const id of ids) {
@@ -306,14 +292,19 @@ export class EngineClient {
     const engine = this.engine;
     this.engine = null;
     this.entries.clear();
-    if (engine && this.host.onEngineGone) this.host.onEngineGone();
+    this._changed();
     return engine ? engine.shutdown() : Promise.resolve();
   }
 
   // Private
 
+  _changed() {
+    if (this.host.onAccountsChanged) this.host.onAccountsChanged();
+  }
+
   _hold(accountId: string) {
     this.held.set(accountId, (this.held.get(accountId) || 0) + 1);
+    this._changed();
   }
 
   _release(accountId: string) {
@@ -323,6 +314,7 @@ export class EngineClient {
     } else {
       this.held.delete(accountId);
     }
+    this._changed();
   }
 
   _ensureEngine() {
@@ -335,12 +327,6 @@ export class EngineClient {
     });
     engine.on('ready', () => {
       if (this.engine === engine) this.inUseExits = 0;
-    });
-    engine.on('hello', (result: HelloResult) => {
-      if (this.engine === engine && this.host.onHello) this.host.onHello(result);
-    });
-    engine.on('mail-new', (params: MailNewParams) => {
-      if (this.engine === engine && this.host.onMailNew) this.host.onMailNew(params);
     });
     engine.on('close', (exit: MailsyncProcessExit) => this._onEngineClose(engine, exit));
     try {
@@ -364,6 +350,7 @@ export class EngineClient {
       this.removals.delete(id);
       claimed.set(id, entry);
     }
+    this._changed();
     const current = (id: string, entry: Entry) =>
       this.entries.get(id) === entry && entry.state === 'adding';
 
@@ -374,6 +361,7 @@ export class EngineClient {
       for (const [id, entry] of claimed) {
         if (current(id, entry) && !jsons.some((j) => j.id === id)) this.entries.delete(id);
       }
+      this._changed();
     }
     for (const json of jsons) {
       const entry = claimed.get(json.id);
@@ -391,6 +379,7 @@ export class EngineClient {
       );
       this.host.onAccountLaunched(json);
     }
+    this._changed();
   }
 
   // account.add answered: the commands held for it go out. An account that already stopped
@@ -408,6 +397,7 @@ export class EngineClient {
     for (const json of pending) {
       this.engine.sendToAccount(accountId, json);
     }
+    this._changed();
   }
 
   _addFailed(accountId: string, entry: Entry, err: any) {
@@ -444,6 +434,7 @@ export class EngineClient {
 
   _stopped(accountId: string, entry: Entry, error: Error) {
     this.entries.delete(accountId);
+    this._changed();
     this.host.onAccountExited(accountId);
     if (!entry.json) return;
     const exit: MailsyncProcessExit = { code: null, error, signal: null };
@@ -461,6 +452,7 @@ export class EngineClient {
     if (entry.removal) return entry.removal;
     entry.state = 'removing';
     entry.pending = null;
+    this._changed();
     const engine = this.engine;
     const removed = engine
       ? engine.removeAccount(accountId).then(
@@ -477,6 +469,7 @@ export class EngineClient {
     entry.removal = removed.then((stillRunning) => {
       removal.finishedAt = Date.now();
       if (this.entries.get(accountId) === entry) this.entries.delete(accountId);
+      this._changed();
       this.host.onAccountExited(accountId);
       return stillRunning;
     });
@@ -488,9 +481,9 @@ export class EngineClient {
   _onEngineClose(engine: EngineServeProcess, exit: MailsyncProcessExit) {
     if (this.engine !== engine) return;
     this.engine = null;
-    if (this.host.onEngineGone) this.host.onEngineGone();
     const ids = [...this.entries.keys()];
     this.entries.clear();
+    this._changed();
     for (const id of ids) {
       this.host.onAccountExited(id);
     }

@@ -1,6 +1,11 @@
 import crypto from 'crypto';
-import KeyManager, { secureStorage } from '../src/key-manager';
-import { mailspringKeychain, MigrationError } from '../src/mailspring-keychain-migration';
+import {
+  KeyManager as MainKeyManager,
+  registerKeyManagerIPC,
+  secureStorage,
+} from '../src/browser/key-manager';
+import { KEY_MANAGER_CHANNEL } from '../src/supervisor-channels';
+import { mailspringKeychain, MigrationError } from '../src/browser/mailspring-keychain-migration';
 
 const CREDENTIALS_KEY = 'credentials';
 const KEY_OWNER_KEY = 'credentialsKeyOwner';
@@ -19,17 +24,20 @@ const mailspringBlob = (plaintext: string, secret = OLD_SECRET) => {
 // A stored blob is a JSON-serialized Buffer, which is what config.get() hands back.
 const storedBlob = () => Buffer.from('v10encrypted').toJSON();
 
-describe('KeyManager', function () {
-  beforeEach(function () {
-    // The manager is a singleton, so its once-per-session guards leak between specs.
-    (KeyManager as any)._fatalErrorReported = false;
-    (KeyManager as any)._reEncryptAttempted = false;
-    (KeyManager as any)._migration = null;
+// The main process's KeyManager, on a plain-object config; nothing here reaches safeStorage, the
+// keychain or a real dialog.
+let KeyManager: MainKeyManager = null;
 
+describe('KeyManager in the main process', function () {
+  beforeEach(function () {
     this.config = {};
-    spyOn(AppEnv.config, 'get').andCallFake((key: string) => this.config[key]);
-    spyOn(AppEnv.config, 'set').andCallFake((key: string, val: any) => {
-      this.config[key] = val;
+    KeyManager = new MainKeyManager({
+      config: {
+        get: (key: string) => this.config[key],
+        set: (key: string, val: any) => {
+          this.config[key] = val;
+        },
+      },
     });
     spyOn(secureStorage, 'isAvailable').andCallFake(() => Promise.resolve(true));
     spyOn(secureStorage, 'encrypt').andCallFake((plaintext: string) =>
@@ -401,9 +409,8 @@ describe('KeyManager', function () {
 
   describe('_reportFatalError', function () {
     it('shows one dialog no matter how many failures arrive', function () {
-      const remote = require('@electron/remote');
-      spyOn(remote.dialog, 'showMessageBoxSync').andReturn(1);
-      spyOn(remote.app, 'quit');
+      spyOn(KeyManager, '_showMessageBoxSync').andReturn(1);
+      spyOn(KeyManager, '_quit');
 
       for (let i = 0; i < 3; i++) {
         try {
@@ -412,8 +419,56 @@ describe('KeyManager', function () {
           // always rethrows so callers abort
         }
       }
-      expect((remote.dialog.showMessageBoxSync as jasmine.Spy).calls.length).toBe(1);
-      expect((remote.app.quit as jasmine.Spy).calls.length).toBe(1);
+      expect((KeyManager._showMessageBoxSync as jasmine.Spy).calls.length).toBe(1);
+      expect((KeyManager._quit as jasmine.Spy).calls.length).toBe(1);
+    });
+  });
+
+  describe('for the windows', function () {
+    beforeEach(function () {
+      this.config[CREDENTIALS_KEY] = Buffer.from('{"a-imap":"secret"}').toJSON();
+      this.config[KEY_OWNER_KEY] = 'tern';
+      spyOn(secureStorage, 'decrypt').andCallFake((blob: Buffer) =>
+        Promise.resolve({ result: blob.toString(), shouldReEncrypt: false })
+      );
+      const handlers: { [channel: string]: (...args: any[]) => any } = {};
+      registerKeyManagerIPC(
+        { handle: (channel: string, fn: any) => (handlers[channel] = fn) } as any,
+        KeyManager
+      );
+      this.call = (method: string, ...args: any[]) =>
+        handlers[KEY_MANAGER_CHANNEL]({}, method, ...args);
+    });
+
+    it('answers the facade, and refuses what it does not offer', async function () {
+      expect(await this.call('getPassword', 'a-imap')).toEqual({ value: 'secret' });
+      expect(await this.call('_writeKeyHash', {})).toEqual({
+        error: 'KeyManager has no method _writeKeyHash',
+      });
+    });
+
+    it('stores account secrets without sending them back', async function () {
+      const reply = await this.call('storeAccountSecrets', {
+        emailAddress: 'me@example.com',
+        settings: { imap_password: 'pw', refresh_token: 'rt' },
+      });
+      expect(reply).toEqual({ value: undefined });
+      expect(await this.call('accountSecrets', 'me@example.com')).toEqual({
+        value: { imap_password: 'pw', smtp_password: undefined, refresh_token: 'rt' },
+      });
+    });
+
+    // Windows and the engine's token rotations all write the one keyset.
+    it('keeps every change when several arrive at once', async function () {
+      await Promise.all([
+        this.call('replacePassword', 'b-imap', 'one'),
+        this.call('replacePassword', 'c-imap', 'two'),
+        this.call('deletePassword', 'a-imap'),
+      ]);
+      expect(JSON.parse(this.config[CREDENTIALS_KEY].toString())).toEqual({
+        'b-imap': 'one',
+        'c-imap': 'two',
+      });
     });
   });
 });

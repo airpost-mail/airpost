@@ -305,6 +305,9 @@ export class MailsyncProcess extends EventEmitter {
   features: string[] = null;
   _nextRequestId = 1;
   _killed = false;
+  // What the socket connection subscribes to. The main process's supervisor takes no model
+  // class, which still brings it every account.state (src/browser/engine-supervisor.ts).
+  subscription: SubscribeParams = { accounts: null, classes: null };
 
   // these must be set before you use the process
   account: Account = null;
@@ -678,7 +681,7 @@ export class MailsyncProcess extends EventEmitter {
       protocol: PROTOCOL_VERSION,
       client: this._clientName(),
     } as HelloParams);
-    this._sendRequest(Method.Subscribe, { accounts: null, classes: null } as SubscribeParams);
+    this._sendRequest(Method.Subscribe, this.subscription);
     for (const line of queued) {
       socket.write(line, 'utf-8');
     }

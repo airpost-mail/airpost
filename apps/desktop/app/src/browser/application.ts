@@ -44,6 +44,14 @@ import {
 } from './notification-ipc';
 import WindowsTaskbarManager from './windows-taskbar-manager';
 import { resetThemeForRecovery } from './theme-recovery';
+import { KeyManager, registerKeyManagerIPC } from './key-manager';
+import {
+  EngineSupervisor,
+  QuitGate,
+  registerEngineSupervisorIPC,
+  waitForEarlierEngine,
+} from './engine-supervisor';
+import { serveEngineSelected } from '../engine-client';
 
 // The application's singleton class.
 //
@@ -68,6 +76,9 @@ export default class Application extends EventEmitter {
   systemAccentWatcher: SystemAccentWatcher;
   systemTrayManager: SystemTrayManager;
   windowsTaskbarManager?: WindowsTaskbarManager;
+  keyManager: KeyManager;
+  engineSupervisor: EngineSupervisor | null = null;
+  quitGate = new QuitGate();
 
   _sourceWindows: { [taskId: string]: BrowserWindow } = {};
   _resettingAndRelaunching: boolean;
@@ -103,6 +114,7 @@ export default class Application extends EventEmitter {
     this.syncEngine = resolveSyncEngine(configDirPath, resourcePath);
 
     try {
+      await waitForEarlierEngine(configDirPath);
       const mailsync = new MailsyncProcess({ ...options, syncEngine: this.syncEngine });
       await mailsync.migrate();
     } catch (err) {
@@ -153,6 +165,9 @@ export default class Application extends EventEmitter {
 
     this.configMigrator = new ConfigMigrator(this.config);
     this.configMigrator.migrate();
+
+    // Before any window exists: every window asks for the engine and the keyset at boot.
+    this.startEngineSupervisor();
 
     let initializeInBackground = options.background;
     if (initializeInBackground === undefined) {
@@ -210,6 +225,29 @@ export default class Application extends EventEmitter {
     }
   }
 
+  // The keyset and, for the Rust engine's `serve` mode, the engine live in the main process;
+  // windows reach both over IPC.
+  startEngineSupervisor() {
+    this.keyManager = new KeyManager({ config: this.config });
+    registerKeyManagerIPC(ipcMain, this.keyManager);
+    if (!this.specMode && serveEngineSelected(this.syncEngine, this.configDirPath)) {
+      this.engineSupervisor = new EngineSupervisor({
+        configDirPath: this.configDirPath,
+        resourcePath: this.resourcePath,
+        syncEngine: this.syncEngine,
+        config: this.config,
+        keyManager: this.keyManager,
+        broadcast: (channel, payload) => {
+          for (const win of BrowserWindow.getAllWindows()) {
+            if (!win.isDestroyed()) win.webContents.send(channel, payload);
+          }
+        },
+      });
+    }
+    registerEngineSupervisorIPC(ipcMain, this.engineSupervisor);
+    if (this.engineSupervisor) this.engineSupervisor.start();
+  }
+
   getMainWindow() {
     const win = this.windowManager.get(WindowManager.MAIN_WINDOW);
     return win ? win.browserWindow : null;
@@ -231,6 +269,11 @@ export default class Application extends EventEmitter {
     // process them once initialization is complete.
     if (!this._initialized) {
       this._pendingLaunchOptions.push(options);
+      return;
+    }
+    if (
+      this.quitGate.deferLaunch([...(options.urlsToOpen || []), ...(options.pathsToOpen || [])])
+    ) {
       return;
     }
 
@@ -366,7 +409,8 @@ export default class Application extends EventEmitter {
       app.quit();
     };
     this.windowManager.destroyAllWindows();
-    this._deleteDatabase(done);
+    const stopped = this.engineSupervisor ? this.engineSupervisor.shutdown() : Promise.resolve();
+    stopped.then(() => this._deleteDatabase(done));
   };
 
   _deleteDatabase = (callback) => {
@@ -495,7 +539,9 @@ export default class Application extends EventEmitter {
     this.on('application:install-update', () => {
       this.quitting = true;
       this.windowManager.cleanupBeforeAppQuit();
-      this.autoUpdateManager.install();
+      // Stopped first, so will-quit doesn't hold up the updater's own quit.
+      const stopped = this.engineSupervisor ? this.engineSupervisor.shutdown() : Promise.resolve();
+      stopped.then(() => this.autoUpdateManager.install());
     });
 
     this.on('application:toggle-dev', () => {
@@ -557,6 +603,21 @@ export default class Application extends EventEmitter {
       });
     }
 
+    // The supervised engine stops its accounts before the app exits, so a relaunch finds the
+    // socket and the database free.
+    app.on('will-quit', (event) => {
+      const supervisor = this.engineSupervisor;
+      if (!supervisor || (supervisor.stopped && !this.quitGate.waiting)) return;
+      this.quitGate.hold(
+        event,
+        () => supervisor.shutdown(),
+        (relaunchArgs) => {
+          if (relaunchArgs) app.relaunch({ args: process.argv.slice(1).concat(relaunchArgs) });
+          app.quit();
+        }
+      );
+    });
+
     app.on('window-all-closed', () => {
       this.windowManager.quitWinLinuxIfNoWindows();
     });
@@ -575,6 +636,7 @@ export default class Application extends EventEmitter {
     let pathsTimeout = null;
     app.on('open-file', (event, pathToOpen) => {
       event.preventDefault();
+      if (this.quitGate.deferLaunch([pathToOpen])) return;
 
       // if the user drags many files onto the app, this method is called
       // back-to-back several times. collect all the files and then fire.
@@ -587,8 +649,9 @@ export default class Application extends EventEmitter {
     });
 
     app.on('open-url', (event, urlToOpen) => {
-      this.openUrl(urlToOpen);
       event.preventDefault();
+      if (this.quitGate.deferLaunch([urlToOpen])) return;
+      this.openUrl(urlToOpen);
     });
 
     // System Tray
@@ -707,6 +770,10 @@ export default class Application extends EventEmitter {
     powerMonitor.on('unlock-screen', onSystemResumed);
 
     app.on('activate', (event, hasVisibleWindows) => {
+      if (this.quitGate.deferLaunch()) {
+        event.preventDefault();
+        return;
+      }
       if (!hasVisibleWindows) {
         this.ensureWindowsForTokenState();
       }
