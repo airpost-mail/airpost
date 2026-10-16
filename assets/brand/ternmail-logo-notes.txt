@@ -1,0 +1,11 @@
+Ternmail standalone logo exports
+
+Created with the built-in image generation/editing tool from the supplied Origami Bird App Icon.png.
+
+Dark-background mark prompt: Extract only the blue-and-white origami bird onto true transparency. Remove the navy rounded-square tile and black canvas. Preserve silhouette, orientation, folds, blue-and-white palette; no text, no red beak.
+
+Light-background mark prompt: Isolate the same origami bird onto true transparency. Adapt the body/head/beak to medium and deep navy, retain a cobalt raised wing and pale ice-blue fold highlights so the mark reads on white. Preserve shape, orientation and folds; no text, no red beak.
+
+Final cleanup prompt for each: Clean the alpha edges and remove stray pixels, fringe and roughness outside the silhouette. Preserve bird shape, colors and internal folds. No tile or shadow.
+
+PNG files use RGBA transparency and are exported at 1024, 512 and 256 pixels square.
