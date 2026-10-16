@@ -682,7 +682,17 @@ fn move_without_move_capability_copies_expunges_and_reapplies_flags() {
     let mut e = env(&["UIDPLUS"]);
     let inbox = e.folder("INBOX", "inbox");
     let archive = e.folder("Archive", "archive");
-    let id = e.deliver(&inbox, 1, MessageFlags::SEEN | MessageFlags::FLAGGED);
+    let kept = MessageFlags::ANSWERED | MessageFlags::FORWARDED;
+    let id = e.deliver(&inbox, 1, MessageFlags::SEEN | MessageFlags::FLAGGED | kept);
+    // Another client marks it a draft after the last scan; the local placement wins.
+    e.imap
+        .boxes
+        .get_mut("INBOX")
+        .unwrap()
+        .messages
+        .get_mut(&1)
+        .unwrap()
+        .flags |= MessageFlags::DRAFT;
 
     let mut task = e.queue(
         "ChangeFolderTask",
@@ -701,7 +711,8 @@ fn move_without_move_capability_copies_expunges_and_reapplies_flags() {
     let copies = e.copies(&id);
     assert_eq!(copies, vec![("Archive".to_owned(), 1, None)]);
     let flags = e.imap.boxes["Archive"].messages[&1].flags;
-    assert!(flags.contains(MessageFlags::SEEN | MessageFlags::FLAGGED));
+    assert_eq!(flags, MessageFlags::SEEN | MessageFlags::FLAGGED | kept);
+    assert!(!e.imap.log.iter().any(|l| l.contains(" Set ")));
     e.assert_invariants();
 }
 

@@ -1,0 +1,37 @@
+name: move-without-move-keeps-keywords
+description: >
+  On a server without MOVE the engine moves a copy with COPY, STORE +\Deleted and an
+  expunge, then brings \Seen, \Flagged and \Draft of the new copy in line with local state.
+  COPY carries every flag, so that last STORE must add and remove those three rather than
+  replace the set: a replacing FLAGS STORE drops keywords (Thunderbird tags, future Tern
+  labels), \Answered and $Forwarded. Another client tags two INBOX messages and the user
+  archives them; the Archive copies keep everything, as UID MOVE would.
+source: "RFC 3501 6.4.7 (COPY preserves flags); RFC 6851 3.3 (MOVE preserves flags); docs/labels-plan.md section 1"
+servers:
+  - {fake: dovecot}
+  - {fake: dovecot-without-move}
+  - {dovecot: no-move}
+  - {cyrus: no-move}
+mailboxes:
+  INBOX: {messages: 10}
+  Archive: {messages: 1}
+steps:
+  - wait: quiescent
+  - server.flags: {mailbox: INBOX, uids: [3], add: ["\\Answered", "$Forwarded", "$label1", "work"]}
+  - server.flags: {mailbox: INBOX, uids: [4], add: ["\\Flagged", "clients/acme"], remove: ["\\Seen"]}
+  - wait: {seconds: 1}
+  - sync: pass
+  - client.task: {__cls: ChangeFolderTask, messages: {mailbox: INBOX, uids: [3, 4]}, folder: Archive}
+    as: move
+  - wait: {task: move, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    Archive:
+      - {message_id: "<harness-3-e480dd9e@example.test>", flags: ["\\Seen"], includes: ["\\Answered", "$Forwarded", "$label1", "work"]}
+      - {message_id: "<harness-4-79f05e78@example.test>", flags: ["\\Flagged"], includes: ["clients/acme"]}
+  server_counts: {INBOX: 8, Archive: 3}
+  db_matches_server: {}
+  stable: {passes: 1}
+  running: true

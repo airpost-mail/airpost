@@ -261,7 +261,7 @@ long the orphan sweep waits for a folder that has not been fully scanned.
 Expectations: `db_matches_server` (placements: every (folder, UID) on the server is a
 message locally with the same Message-ID and tracked flags, and nothing local is missing on
 the server), `counts`, `shown` (messages per folder as the client sees them: the
-`Message.folders` snapshot, so a copy in flight counts in its pending destination), `server_counts`, `server_has: {mailbox: [Message-IDs]}` (those messages are in that mailbox on the server, whatever the engine believes; an entry `{message_id, flags: [...]}` also requires a copy there with exactly those tracked flags), `stable: {passes: N}` (N more passes over an
+`Message.folders` snapshot, so a copy in flight counts in its pending destination), `server_counts`, `server_has: {mailbox: [Message-IDs]}` (those messages are in that mailbox on the server, whatever the engine believes; an entry `{message_id, flags: [...]}` also requires a copy there with exactly those tracked flags, and `includes: [...]` one with at least those flags or keywords, case-insensitive), `stable: {passes: N}` (N more passes over an
 unchanged mailbox must not move a single placement - the flapping detector), `folder_status`,
 `log_present` / `log_absent`, `log_count: {regex: n}` or `{regex: {min, max}}` (how many
 log lines match, to bound a loop the engine should take a known number of times),
@@ -562,6 +562,7 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | sent-copy-send-interrupted | engine killed during the Sent poll: on relaunch the draft row goes and nothing is resent | fake (+smtp) |
 | sent-copy-late-after-window | a late copy hours after the send is still removed; without UIDPLUS too | fake (+smtp) |
 | move-without-move-keeps-other-deleted | no-MOVE fallback expunges only the moved UID; another client's `\\Deleted` message survives | fake, dovecot, cyrus |
+| move-without-move-keeps-keywords | no-MOVE fallback keeps keywords, `\\Answered` and `$Forwarded` on the moved copy (add/remove STORE, not a replacing one) | fake, dovecot, cyrus |
 | move-without-move-connection-drop | connection lost after the server ran UID EXPUNGE: no plain EXPUNGE on reconnect | fake |
 | folder-roles-by-localized-name | roles by name without SPECIAL-USE: modified UTF-7 names, Borradores, `\\Archive` | fake |
 | status-uidnext-zero-new-mail | STATUS UIDNEXT 0 (hMailServer): new mail found from the message count on the next pass | fake |

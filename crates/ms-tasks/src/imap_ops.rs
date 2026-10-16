@@ -194,30 +194,43 @@ pub(crate) fn move_messages_resilient(
     }
 
     if must_apply_attributes {
-        for item in items.iter().filter(|i| i.moved) {
-            let p = &item.placement;
-            let mut flags = MessageFlags::empty();
-            if p.starred {
-                flags |= MessageFlags::FLAGGED;
-            }
-            if !p.unread {
-                flags |= MessageFlags::SEEN;
-            }
-            if p.draft {
-                flags |= MessageFlags::DRAFT;
-            }
+        apply_tracked_flags(session, dest, items);
+    }
+    Ok(())
+}
+
+/// Brings `\Seen`, `\Flagged` and `\Draft` of the moved copies in `dest` in line with the
+/// items' placements, with `+FLAGS` / `-FLAGS` grouped by change. COPY already carries every
+/// flag (RFC 3501 6.4.7), so a replacing `FLAGS` STORE would drop keywords, `\Answered` and
+/// `$Forwarded` that MOVE keeps (`move-without-move-keeps-keywords`). Best effort: the
+/// destination's next scan reads whatever the server has.
+fn apply_tracked_flags(session: &mut dyn ImapSession, dest: &Folder, items: &[TaskPlacement]) {
+    let mut changes: BTreeMap<(bool, u32), Vec<u32>> = BTreeMap::new();
+    for item in items.iter().filter(|i| i.moved) {
+        let p = &item.placement;
+        let mut set = MessageFlags::empty();
+        set.set(MessageFlags::SEEN, !p.unread);
+        set.set(MessageFlags::FLAGGED, p.starred);
+        set.set(MessageFlags::DRAFT, p.draft);
+        let tracked = MessageFlags::SEEN | MessageFlags::FLAGGED | MessageFlags::DRAFT;
+        for (add, flags) in [(true, set), (false, tracked - set)] {
             if !flags.is_empty() {
-                // Note: best effort; the destination's next scan reads whatever it has.
-                let _ = session.store_flags(
-                    dest.path(),
-                    &UidSet::single(item.moved_uid),
-                    StoreOp::Set,
-                    flags,
-                );
+                changes
+                    .entry((add, flags.bits()))
+                    .or_default()
+                    .push(item.moved_uid);
             }
         }
     }
-    Ok(())
+    for ((add, bits), uids) in changes {
+        let op = if add { StoreOp::Add } else { StoreOp::Remove };
+        let _ = session.store_flags(
+            dest.path(),
+            &UidSet::from_uids(uids),
+            op,
+            MessageFlags::from_bits_retain(bits),
+        );
+    }
 }
 
 /// Permanently removes `uids` from `path`: flags them `\Deleted`, moves them to Trash when

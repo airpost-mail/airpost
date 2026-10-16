@@ -1233,22 +1233,31 @@ class ScenarioRun(PimMixin, BackendMixin):
                 if sorted(truth.get(mb, {})) != sorted(uids)]
 
     def expect_server_has(self, arg: dict) -> list:
-        """{mailbox: [Message-ID | {message_id, flags}]}: each message is in that mailbox on
-        the server, whatever the engine believes - what proves a task moved the message it was
-        asked to. With `flags`, some copy there carries exactly those tracked flags, which is
-        what tells a message's copies apart when they differ only in unread or starred."""
+        """{mailbox: [Message-ID | {message_id, flags, includes}]}: each message is in that
+        mailbox on the server, whatever the engine believes - what proves a task moved the
+        message it was asked to. With `flags`, some copy there carries exactly those tracked
+        flags, which is what tells a message's copies apart when they differ only in unread or
+        starred. With `includes`, some copy carries at least those flags, any flag or keyword
+        (compared case-insensitively, as Cyrus does), which is what proves a move kept them."""
         truth = self.server.truth()
         problems = []
         for mb, wanted in arg.items():
             held = list(truth.get(mb, {}).values())
             for want in wanted:
                 mid = normalize_message_id(want if isinstance(want, str) else want["message_id"])
+                all_flags = [{f.lower() for f in v["flags"]} for v in held if v["message_id"] == mid]
                 copies = [set(v["flags"]) & TRACKED_FLAGS for v in held if v["message_id"] == mid]
                 if not copies:
                     problems.append(f"server has no {mid} in {mb}")
-                elif isinstance(want, dict) and "flags" in want and set(want["flags"]) not in copies:
+                    continue
+                if not isinstance(want, dict):
+                    continue
+                if "flags" in want and set(want["flags"]) not in copies:
                     problems.append(f"server has {mid} in {mb} with flags {[sorted(c) for c in copies]}, "
                                     f"expected {sorted(want['flags'])}")
+                if "includes" in want and not any({f.lower() for f in want["includes"]} <= c for c in all_flags):
+                    problems.append(f"server has {mid} in {mb} with flags {[sorted(c) for c in all_flags]}, "
+                                    f"expected at least {sorted(want['includes'])}")
         return problems
 
     def expect_unchanged_since(self, arg) -> list:
