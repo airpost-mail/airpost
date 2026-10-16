@@ -3,7 +3,10 @@
 
 //! Finding the running engines (docs/engine-protocol-plan.md 1.5): every engine writes
 //! `<config-dir>/run/<name>.json` with its pid and socket once it listens, and removes it on
-//! a clean exit. Entries whose pid is gone are left behind by a crash and skipped.
+//! a clean exit. A per-account engine (`sync --socket`) writes `run/<accountId>.json`; the
+//! one engine of `serve` mode writes `run/engine.json`, listing its accounts. Either way the
+//! accounts are read from each engine's `hello`. Entries whose pid is gone are left behind by
+//! a crash and skipped.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -72,6 +75,9 @@ pub struct Entry {
     /// Per-account engines (phase A) name their account; a shared engine doesn't.
     #[serde(default)]
     pub account_id: Option<String>,
+    /// A shared engine (`serve`, `run/engine.json`) lists the accounts it holds.
+    #[serde(default)]
+    pub accounts: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default)]
@@ -270,14 +276,23 @@ mod tests {
         child.wait().unwrap();
         let dead = json!({"pid": dead_pid, "socket": "/tmp/b.sock", "protocol": 1});
         write(run, "acc-b.json", &dead.to_string());
+        let shared = json!({"pid": std::process::id(), "socket": "/tmp/engine.sock",
+                            "protocol": 1, "accounts": ["acc-c", "acc-d"]});
+        write(run, "engine.json", &shared.to_string());
         write(run, "garbage.json", "{not json");
         write(run, "wrong-shape.json", r#"{"socket": "/tmp/c.sock"}"#);
         write(run, "acc-a.sock", "");
         write(run, "notes.txt", "{}");
 
         let s = scan(run);
-        assert_eq!(s.live.len(), 1);
+        assert_eq!(s.live.len(), 2);
         assert_eq!(s.live[0].0, run.join("acc-a.json"));
+        assert_eq!(s.live[1].0, run.join("engine.json"));
+        assert_eq!(s.live[1].1.account_id, None);
+        assert_eq!(
+            s.live[1].1.accounts,
+            Some(vec!["acc-c".to_owned(), "acc-d".to_owned()])
+        );
         assert_eq!(
             s.live[0].1,
             Entry {
@@ -285,6 +300,7 @@ mod tests {
                 socket: "/tmp/a.sock".into(),
                 protocol: 1,
                 account_id: Some("acc-a".into()),
+                accounts: None,
             }
         );
         if cfg!(unix) {
@@ -335,6 +351,7 @@ mod tests {
                 socket: PathBuf::from("/tmp/x.sock"),
                 protocol: 1,
                 account_id: None,
+                accounts: None,
             },
             hello: HelloResult {
                 protocol: 1,
@@ -346,6 +363,7 @@ mod tests {
                         account_id: (*id).into(),
                         email: (*email).into(),
                         state: "running".into(),
+                        error: None,
                     })
                     .collect(),
             },
@@ -383,6 +401,7 @@ mod tests {
             account_id: "abc".into(),
             email: "Me@Example.test".into(),
             state: "running".into(),
+            error: None,
         };
         assert!(matches(&a, "abc"));
         assert!(matches(&a, "me@example.test"));

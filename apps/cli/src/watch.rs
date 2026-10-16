@@ -294,6 +294,7 @@ mod tests {
                 socket: "/tmp/x.sock".into(),
                 protocol: 1,
                 account_id: Some(account.into()),
+                accounts: None,
             },
             hello: HelloResult {
                 protocol: 1,
@@ -303,6 +304,7 @@ mod tests {
                     account_id: account.into(),
                     email: format!("{account}@x.test"),
                     state: "running".into(),
+                    error: None,
                 }],
             },
             client: Client::from_streams(

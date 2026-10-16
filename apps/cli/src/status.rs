@@ -3,7 +3,7 @@
 
 //! Engine-level commands: status, accounts, sync, calendar sync, raw rpc.
 
-use ms_ipc::{method, CalendarSyncResult, EngineStatusResult};
+use ms_ipc::{account_state, method, CalendarSyncResult, EngineStatusResult};
 use serde_json::{json, Value};
 
 use crate::app::{call, Ctx};
@@ -45,12 +45,17 @@ pub fn status(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
             continue;
         }
         for a in &accounts {
-            let server = if a.connection_error { "offline" } else { "ok" };
+            let running = a.state == account_state::RUNNING;
+            let server = match (running, a.connection_error) {
+                (false, _) => "-",
+                (true, true) => "offline",
+                (true, false) => "ok",
+            };
             table.row(
                 vec![
                     a.email.clone(),
                     a.account_id.clone(),
-                    a.state.clone(),
+                    state_text(&a.state, a.error.as_ref()),
                     server.to_owned(),
                     s.pid.to_string(),
                     output::uptime(s.uptime_secs),
@@ -58,7 +63,10 @@ pub fn status(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
                 ],
                 false,
             );
-            if a.connection_error {
+            if a.state == account_state::STOPPED {
+                table.alert(2);
+            }
+            if running && a.connection_error {
                 table.alert(3);
             }
         }
@@ -74,6 +82,17 @@ pub fn status(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
     Ok(())
 }
 
+/// An account's `state`, with the error key that stopped it (`stopped: ErrorAuthentication`).
+fn state_text(state: &str, error: Option<&Value>) -> String {
+    let key = error
+        .and_then(|e| e["key"].as_str())
+        .filter(|k| !k.is_empty());
+    match key {
+        Some(k) if state == account_state::STOPPED => format!("{state}: {k}"),
+        _ => state.to_owned(),
+    }
+}
+
 pub fn accounts(ctx: &Ctx, engines: &[Engine]) -> Result<()> {
     let targets = discovery::targets(engines, ctx.account())?;
     if ctx.json {
@@ -81,16 +100,16 @@ pub fn accounts(ctx: &Ctx, engines: &[Engine]) -> Result<()> {
             .iter()
             .map(|t| {
                 let e = &engines[t.engine];
-                let state = e
+                let info = e
                     .hello
                     .accounts
                     .iter()
-                    .find(|a| a.account_id == t.account_id)
-                    .map(|a| a.state.as_str());
+                    .find(|a| a.account_id == t.account_id);
                 json!({
                     "accountId": t.account_id,
                     "email": t.email,
-                    "state": state,
+                    "state": info.map(|a| a.state.as_str()),
+                    "error": info.and_then(|a| a.error.clone()),
                     "pid": e.hello.pid,
                     "socket": e.entry.socket,
                 })
@@ -107,12 +126,12 @@ pub fn accounts(ctx: &Ctx, engines: &[Engine]) -> Result<()> {
             .accounts
             .iter()
             .find(|a| a.account_id == t.account_id)
-            .map_or("", |a| a.state.as_str());
+            .map_or(String::new(), |a| state_text(&a.state, a.error.as_ref()));
         table.row(
             vec![
                 t.email.clone(),
                 t.account_id.clone(),
-                state.to_owned(),
+                state,
                 e.hello.pid.to_string(),
             ],
             false,
@@ -123,7 +142,24 @@ pub fn accounts(ctx: &Ctx, engines: &[Engine]) -> Result<()> {
 }
 
 pub fn sync(ctx: &Ctx, engines: &mut [Engine]) -> Result<()> {
-    let targets = discovery::targets(engines, ctx.account())?;
+    let mut targets = discovery::targets(engines, ctx.account())?;
+    // Without --account, a stopped account (`serve` mode) is skipped rather than failing
+    // the whole command; it has to be added again to sync.
+    if ctx.account.is_none() {
+        targets.retain(|t| {
+            let state = engines[t.engine]
+                .hello
+                .accounts
+                .iter()
+                .find(|a| a.account_id == t.account_id)
+                .map(|a| a.state.as_str());
+            let skip = state == Some(account_state::STOPPED);
+            if skip && !ctx.json {
+                output::line(&format!("Skipping {}: stopped", t.email));
+            }
+            !skip
+        });
+    }
     for t in &targets {
         call::<Value>(
             engines,
@@ -214,4 +250,21 @@ fn parse_params(s: &str) -> Result<Value> {
             "the params aren't JSON ({e}); quote them, e.g. '{{\"accountId\": \"...\"}}'"
         ))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stopped_states_name_their_error() {
+        let e = json!({"key": "ErrorAuthentication", "retryable": false});
+        assert_eq!(state_text("running", None), "running");
+        assert_eq!(
+            state_text("stopped", Some(&e)),
+            "stopped: ErrorAuthentication"
+        );
+        assert_eq!(state_text("stopped", Some(&json!({}))), "stopped");
+        assert_eq!(state_text("starting", Some(&e)), "starting");
+    }
 }
