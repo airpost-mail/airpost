@@ -214,16 +214,20 @@ export default class MessageControls extends React.Component<MessageControlsProp
   };
 
   render() {
-    const items = this._items();
+    // A draft that is sending renders as a message; replying to or forwarding it would quote
+    // a message that hasn't been sent, so it only gets the actions menu.
+    const items = this.props.message.draft ? null : this._items();
     return (
       <div className="message-actions-wrap" onClick={(e) => e.stopPropagation()}>
-        <ButtonDropdown
-          primaryItem={<RetinaImg name={items[0].image} mode={RetinaImg.Mode.ContentIsMask} />}
-          primaryTitle={items[0].name}
-          primaryClick={items[0].select}
-          closeOnMenuClick
-          menu={this._dropdownMenu(items.slice(1))}
-        />
+        {items && (
+          <ButtonDropdown
+            primaryItem={<RetinaImg name={items[0].image} mode={RetinaImg.Mode.ContentIsMask} />}
+            primaryTitle={items[0].name}
+            primaryClick={items[0].select}
+            closeOnMenuClick
+            menu={this._dropdownMenu(items.slice(1))}
+          />
+        )}
         <div
           className="message-actions-ellipsis"
           tabIndex={-1}

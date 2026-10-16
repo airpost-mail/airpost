@@ -323,11 +323,18 @@ class DraftStore extends MailspringStore {
         Message.attributes.body
       );
     } else {
+      // Reply to the newest received/sent message, never to an unsent draft on the thread.
+      // No limit: hidden messages (reminders) must not push the real one out of the window, so
+      // the scan skips bodies and the chosen message's body is loaded on its own.
       queries.message = DatabaseStore.findAll<Message>(Message, { threadId: threadId || thread.id })
+        .where(Message.attributes.draft.equal(false))
         .order(Message.attributes.date.descending())
-        .include(Message.attributes.body)
-        .limit(10)
-        .then((messages) => messages.find((m) => !m.isHidden()));
+        .then((messages) => {
+          const latest = messages.find((m) => !m.isHidden());
+          return latest
+            ? DatabaseStore.find<Message>(Message, latest.id).include(Message.attributes.body)
+            : null;
+        });
     }
 
     return Promise.props(queries);

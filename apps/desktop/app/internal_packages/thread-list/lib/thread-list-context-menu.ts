@@ -128,6 +128,7 @@ export default class ThreadListContextMenu {
     }
 
     return DatabaseStore.findBy<Message>(Message, { threadId: this.threadIds[0] })
+      .where(Message.attributes.draft.equal(false))
       .order(Message.attributes.date.descending())
       .limit(1)
       .then((message) => {

@@ -1005,7 +1005,7 @@ export function registerTools(server: McpServer) {
       const messages = await DatabaseStore.findAll<Message>(Message, { threadId }).order(
         Message.attributes.date.descending()
       );
-      const message = messages.find((m) => !m.isHidden());
+      const message = messages.find((m) => !m.draft && !m.isHidden());
       if (!message) return errorResult('No visible message found in thread');
 
       const draft = await DraftFactory.createDraftForReply({
