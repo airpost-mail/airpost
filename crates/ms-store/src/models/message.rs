@@ -226,8 +226,8 @@ impl Message {
         ms_core::ids::is_deletion_placeholder_id(self.id())
     }
 
-    /// "Ben via Mailspring" reminders and unsnoozes, which do not move the thread's
-    /// last-sent timestamp.
+    /// "Ben via Tern" reminders and unsnoozes ("Ben via Mailspring" before the rename), which
+    /// do not move the thread's last-sent timestamp.
     pub fn is_hidden_reminder(&self) -> bool {
         let from = self.from();
         let Some(arr) = from.as_array() else {
@@ -239,7 +239,9 @@ impl Message {
         let Some(name) = arr[0].get("name").and_then(Value::as_str) else {
             return false;
         };
-        name.len() >= 15 && name.as_bytes().ends_with(b"via Mailspring")
+        [&b"via Tern"[..], &b"via Mailspring"[..]]
+            .iter()
+            .any(|suffix| name.len() > suffix.len() && name.as_bytes().ends_with(suffix))
     }
 
     /// `{ "<folderId>": bits }`: live copies only, keyed by the folder the client sees each

@@ -50,9 +50,9 @@ Which harness tier when (apps/engine/test/README.md "Tiers"): while iterating, a
 DAV or Docker-server behaviour, and before a commit that ends a phase. A new fake-server
 scenario that takes over ~20 s on its own gets `slow: true`.
 
-Release builds exit 2 unless the lowercased argv[0] contains `tern` or `mailspring` (the
-latter until the desktop rebrand; the app still ships as Mailspring.app); the harness symlinks
-the binary as `<work>/tern-mailspring-bin/mailsync`. Debug builds skip the check.
+Release builds exit 2 unless the lowercased argv[0] contains `tern`; the harness symlinks the
+binary as `<work>/tern-mailspring-bin/mailsync` (the name also satisfies the C++ engine's
+`mailspring` check, for A/B runs). Debug builds skip the check.
 
 ## Working in a shared tree
 

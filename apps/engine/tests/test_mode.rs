@@ -280,7 +280,7 @@ fn success_sends_the_test_email_and_echoes_the_account() {
     assert!(log.starts_with("----------IMAP----------\n"), "{log}");
     assert!(log.contains("\n\n----------SMTP----------\n"), "{log}");
     assert!(log.contains("LIST"), "{log}");
-    assert!(log.contains("Subject: Mailspring SMTP Test Email"), "{log}");
+    assert!(log.contains("Subject: Tern SMTP Test Email"), "{log}");
     // The AUTH commands reached the servers but not the transcript.
     assert!(imap.received.lock().unwrap()[0].contains("LOGIN me pass"));
     assert!(smtp

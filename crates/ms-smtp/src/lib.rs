@@ -152,7 +152,7 @@ impl SmtpClient {
         self.block_on(async |s| s.login_if_needed().await)
     }
 
-    /// `checkAccount`: MAIL FROM / RCPT TO `from`, then the "Mailspring SMTP Test Email" to
+    /// `checkAccount`: MAIL FROM / RCPT TO `from`, then the "Tern SMTP Test Email" to
     /// `from` itself. Refusals of MAIL map to `ErrorInvalidAccount`, of RCPT and DATA to
     /// `ErrorInvalidRelaySMTP`.
     pub fn check_account(&mut self, from: &str) -> Result<()> {

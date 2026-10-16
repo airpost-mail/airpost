@@ -190,7 +190,7 @@ bool Message::isDeletionPlaceholder() {
 }
 
 bool Message::isHiddenReminder() {
-    // check for "Ben via Mailspring" reminders / unsnoozes
+    // check for "Ben via Tern" reminders / unsnoozes ("Ben via Mailspring" before the rename)
     if (from().size() != 1) {
         return false;
     }
@@ -198,11 +198,13 @@ bool Message::isHiddenReminder() {
         return false;
     }
     auto fromName = from()[0]["name"].get<string>();
-    if (fromName.length() < 15) {
-        return false;
+    for (const string suffix : {"via Tern", "via Mailspring"}) {
+        if (fromName.length() > suffix.length() &&
+            fromName.compare(fromName.length() - suffix.length(), suffix.length(), suffix) == 0) {
+            return true;
+        }
     }
-    auto fromEnd = fromName.substr(fromName.length() - 14, 14);
-    return (fromEnd == "via Mailspring");
+    return false;
 }
 
 // mutable attributes

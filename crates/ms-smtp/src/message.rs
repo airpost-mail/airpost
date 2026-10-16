@@ -15,7 +15,7 @@ use lettre::message::Mailbox;
 use lettre::Address;
 
 /// The subject of the `test` mode email. The client and support docs refer to it by name.
-pub const TEST_EMAIL_SUBJECT: &str = "Mailspring SMTP Test Email";
+pub const TEST_EMAIL_SUBJECT: &str = "Tern SMTP Test Email";
 const TEST_EMAIL_FROM_NAME: &str = "Tern";
 const TEST_EMAIL_USER_AGENT: &str = "Tern";
 const TEST_EMAIL_BODY: &str = "This is an email sent by Tern while testing your account configuration.\r\n\r\nAs you've received it, everything is working.\r\n";
@@ -254,7 +254,7 @@ mod tests {
     #[test]
     fn test_email_shape() {
         let raw = String::from_utf8(build_test_email("me@example.test").unwrap()).unwrap();
-        assert!(raw.contains("Subject: Mailspring SMTP Test Email\r\n"));
+        assert!(raw.contains("Subject: Tern SMTP Test Email\r\n"));
         assert!(raw.contains("To: me@example.test\r\n"));
         assert!(raw.contains("Reply-To: me@example.test\r\n"));
         assert!(raw.contains("From: Tern <me@example.test>\r\n"));

@@ -638,7 +638,7 @@ class MailsyncProcess:
         if r.returncode < 0:
             raise MailsyncError(f"migrate {describe_exit(r.returncode)}: {r.stdout[-500:]} {r.stderr[-500:]}")
         if r.returncode != 0 or '"error":null' not in r.stdout.replace(" ", ""):
-            hint = " (exit 2 with no output is the executable-path check: argv[0] must contain 'tern' or 'mailspring' (the Rust engine accepts either; the C++ engine needs 'mailspring'))" if r.returncode == 2 else ""
+            hint = " (exit 2 with no output is the executable-path check: argv[0] must contain 'tern' for the Rust engine, 'mailspring' for the C++ one)" if r.returncode == 2 else ""
             raise MailsyncError(f"migrate failed ({r.returncode}){hint}: {r.stdout[-500:]} {r.stderr[-500:]}")
 
     def run_one_shot(self, mode: str, timeout: float = 120) -> str:

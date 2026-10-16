@@ -863,19 +863,44 @@ fn lmrt_falls_back_to_sent_mail() {
 fn hidden_reminders_do_not_move_lmst() {
     let f = fixture();
     let sent = f.folder("Sent", "sent");
-    let r = f.insert_with("r@x", &sent, 1, attrs(1, false), None, |h| {
-        h.from = vec![ms_core::Address::new(
-            Some("Ben via Mailspring"),
-            "me@example.com",
-        )]
-    });
-    assert!(f.load(r.id()).is_hidden_reminder());
-    assert_eq!(
-        f.thread(r.thread_id())
-            .unwrap()
-            .last_message_sent_timestamp(),
-        0
-    );
+    // "via Mailspring": reminders created before the rename.
+    for (i, name) in ["Ben via Tern", "Ben via Mailspring"]
+        .into_iter()
+        .enumerate()
+    {
+        let uid = 1 + i as u32;
+        let r = f.insert_with(
+            &format!("r{uid}@x"),
+            &sent,
+            uid,
+            attrs(uid, false),
+            None,
+            |h| h.from = vec![ms_core::Address::new(Some(name), "me@example.com")],
+        );
+        assert!(f.load(r.id()).is_hidden_reminder(), "{name}");
+        assert_eq!(
+            f.thread(r.thread_id())
+                .unwrap()
+                .last_message_sent_timestamp(),
+            0,
+            "{name}"
+        );
+    }
+    for (i, name) in ["via Tern", "via Mailspring", "Ben via Ternary"]
+        .into_iter()
+        .enumerate()
+    {
+        let uid = 10 + i as u32;
+        let r = f.insert_with(
+            &format!("n{uid}@x"),
+            &sent,
+            uid,
+            attrs(uid, false),
+            None,
+            |h| h.from = vec![ms_core::Address::new(Some(name), "me@example.com")],
+        );
+        assert!(!f.load(r.id()).is_hidden_reminder(), "{name}");
+    }
 }
 
 #[test]
