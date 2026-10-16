@@ -20,18 +20,21 @@ use std::io::{BufReader, ErrorKind, Write};
 use std::net::Shutdown;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use ms_core::constants::{thread, SOCKET_BACKLOG_BYTES, SOCKET_QUEUE_BYTES};
+use ms_core::constants::{
+    thread, SOCKET_BACKLOG_BYTES, SOCKET_MAX_CONNECTIONS, SOCKET_QUEUE_BYTES,
+};
 use ms_core::Account;
 use ms_ipc::{
-    account_state, code, feature, method, AccountInfo, AccountListResult, AccountStateParams,
-    AccountStatus, BodiesFetchParams, CalendarSyncParams, DisconnectParams, EngineStatusResult,
-    ErrorObject, FrameError, HelloParams, HelloResult, MailNewParams, Notification,
-    Request as RpcRequest, Response, SubscribeParams, SyncWakeParams, TaskCancelParams,
-    TaskQueueParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    account_state, code, feature, method, policy, AccountInfo, AccountListResult,
+    AccountStateParams, AccountStatus, BodiesFetchParams, CalendarSyncParams, DisconnectParams,
+    EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, MailNewParams,
+    Notification, RelayDevice, Request as RpcRequest, Response, SubscribeParams, SyncWakeParams,
+    TaskCancelParams, TaskQueueParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
@@ -260,6 +263,8 @@ struct Subscriber {
     /// `None` for every account.
     accounts: Option<HashSet<String>>,
     classes: Option<HashSet<String>>,
+    /// A gateway connection for a remote device.
+    relayed: bool,
 }
 
 impl Subscriber {
@@ -279,11 +284,12 @@ impl Subscriber {
             }
     }
 
-    /// Only a subscriber that wants every account and every class takes the backlog: a CLI
-    /// watching one account or one class leaves it for the desktop, and taking it would
-    /// throw away the other accounts' lines.
+    /// Only a local subscriber that wants every account and every class takes the backlog:
+    /// a CLI watching one account or one class leaves it for the desktop, and taking it
+    /// would throw away the other accounts' lines. A browser tab reconnecting through the
+    /// gateway after an engine restart must not take the desktop's start-up deltas either.
     fn takes_backlog(&self) -> bool {
-        self.classes.is_none() && self.accounts.is_none()
+        self.classes.is_none() && self.accounts.is_none() && !self.relayed
     }
 }
 
@@ -496,6 +502,7 @@ impl Accounts for SingleAccount {
             state: account_state::RUNNING.to_owned(),
             connection_error: self.deltas.connection_error(),
             error: None,
+            account: Some(policy::public_account_json(self.account.as_json())),
         }]
     }
 
@@ -549,7 +556,10 @@ fn accept_loop(listener: &UnixListener, server: &Arc<Server>) {
         };
         next_id += 1;
         match platform::uds::peer_is_same_user(&stream) {
-            Ok(true) => start_connection(next_id, stream, server.clone()),
+            Ok(true) => match OpenConnection::take() {
+                Some(slot) => start_connection(next_id, stream, server.clone(), slot),
+                None => refuse_busy(next_id, stream),
+            },
             Ok(false) => {
                 warn!("-X Refusing socket connection {next_id}: the peer is another user");
                 let _ = stream.shutdown(Shutdown::Both);
@@ -562,7 +572,40 @@ fn accept_loop(listener: &UnixListener, server: &Arc<Server>) {
     }
 }
 
-fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>) {
+static OPEN_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
+
+/// One of the [`SOCKET_MAX_CONNECTIONS`] connection slots, given back when dropped.
+struct OpenConnection;
+
+impl OpenConnection {
+    fn take() -> Option<OpenConnection> {
+        OPEN_CONNECTIONS
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
+                (n < SOCKET_MAX_CONNECTIONS).then_some(n + 1)
+            })
+            .ok()
+            .map(|_| OpenConnection)
+    }
+}
+
+impl Drop for OpenConnection {
+    fn drop(&mut self) {
+        OPEN_CONNECTIONS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+fn refuse_busy(id: u64, mut stream: UnixStream) {
+    warn!("-X Refusing socket connection {id}: {SOCKET_MAX_CONNECTIONS} are open");
+    let e = ErrorObject::new(
+        code::TOO_MANY_CONNECTIONS,
+        format!("the engine already has {SOCKET_MAX_CONNECTIONS} connections open"),
+    );
+    let _ = stream.set_write_timeout(Some(WRITE_POLL));
+    let _ = stream.write_all(&ms_ipc::encode(&Response::err(None, e)));
+    let _ = stream.shutdown(Shutdown::Both);
+}
+
+fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>, slot: OpenConnection) {
     let write_half = match stream.try_clone() {
         Ok(s) => s,
         Err(e) => {
@@ -584,10 +627,14 @@ fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>) {
         session: Session::new(server),
         outbox: outbox.clone(),
         hello: false,
+        relay: None,
     };
     let reader = std::thread::Builder::new()
         .name(thread::SOCKET_READER.into())
-        .spawn(move || conn.read_loop(stream));
+        .spawn(move || {
+            let _slot = slot;
+            conn.read_loop(stream)
+        });
     if let Err(e) = reader {
         warn!("-X Dropping socket connection {id}: {e}");
         outbox.close();
@@ -756,6 +803,7 @@ fn features() -> Vec<String> {
         feature::METADATA_LIST,
         feature::MESSAGE_HIDDEN,
         feature::MAIL_NEW,
+        feature::RELAYED,
     ]
     .map(str::to_owned)
     .to_vec()
@@ -798,6 +846,20 @@ struct Connection {
     session: Session,
     outbox: Arc<Outbox>,
     hello: bool,
+    /// Set by the first successful `hello` that says `relayed`; a later `hello` can't
+    /// change it.
+    relay: Option<Relay>,
+}
+
+struct Relay {
+    scopes: Vec<String>,
+}
+
+fn forbidden_relayed(what: impl std::fmt::Display) -> ErrorObject {
+    ErrorObject::new(
+        code::FORBIDDEN_RELAYED,
+        format!("{what} is not allowed on a relayed connection without the admin scope"),
+    )
 }
 
 impl Connection {
@@ -854,14 +916,9 @@ impl Connection {
         let result = match req.method.as_str() {
             method::HELLO => {
                 let r = self.session.call(&req).unwrap_or(Ok(Value::Null));
-                if r.is_ok() {
+                if r.is_ok() && !self.hello {
                     self.hello = true;
-                    let client = req.params.get("client").and_then(Value::as_str);
-                    info!(
-                        "Socket connection {}: hello from {:?}",
-                        self.id,
-                        client.unwrap_or("")
-                    );
+                    self.on_first_hello(&req);
                 }
                 r
             }
@@ -869,6 +926,7 @@ impl Connection {
                 code::HELLO_REQUIRED,
                 "hello must be the first request",
             )),
+            _ if self.relay_refuses(&req) => Err(forbidden_relayed(&req.method)),
             method::SUBSCRIBE => match self.subscribe(&req) {
                 Ok(()) => return None,
                 Err(e) => Err(e),
@@ -896,6 +954,40 @@ impl Connection {
         })
     }
 
+    fn on_first_hello(&mut self, req: &RpcRequest) {
+        let Ok(p) = req.params_as::<HelloParams>() else {
+            return;
+        };
+        if !p.relayed {
+            info!("Socket connection {}: hello from {:?}", self.id, p.client);
+            return;
+        }
+        let RelayDevice { id, name } = p.device.unwrap_or(RelayDevice {
+            id: String::new(),
+            name: String::new(),
+        });
+        info!(
+            "Socket connection {}: hello from {:?}, relayed for device {id} {name:?} with \
+             scopes {:?}",
+            self.id, p.client, p.scopes
+        );
+        self.relay = Some(Relay { scopes: p.scopes });
+    }
+
+    /// Whether this is a relayed connection that may not make `req` (ms-ipc's `policy`).
+    fn relay_refuses(&self, req: &RpcRequest) -> bool {
+        let Some(relay) = &self.relay else {
+            return false;
+        };
+        if !policy::relayed_method_allowed(&req.method, &relay.scopes) {
+            return true;
+        }
+        req.method == method::TASK_QUEUE
+            && req
+                .params_as::<TaskQueueParams>()
+                .is_ok_and(|p| !policy::relayed_task_allowed(&p.task, &relay.scopes))
+    }
+
     fn subscribe(&self, req: &RpcRequest) -> Result<(), ErrorObject> {
         let p = req.params_as::<SubscribeParams>()?;
         if let Some(list) = &p.accounts {
@@ -913,6 +1005,7 @@ impl Connection {
                 outbox: self.outbox.clone(),
                 accounts: p.accounts.map(|a| a.into_iter().collect()),
                 classes: p.classes.map(|c| c.into_iter().collect()),
+                relayed: self.relay.is_some(),
             },
             response,
         );
@@ -953,6 +1046,7 @@ mod tests {
             outbox: outbox.clone(),
             accounts: accounts.map(set),
             classes: classes.map(set),
+            relayed: false,
         };
         (sub, outbox)
     }

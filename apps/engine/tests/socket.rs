@@ -368,6 +368,171 @@ fn first_subscriber_gets_the_backlog() {
     e.stop();
 }
 
+fn relayed_hello(c: &mut Client, scopes: &[&str]) -> Value {
+    c.call(
+        method::HELLO,
+        json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+                "scopes": scopes, "device": { "id": "d1", "name": "Test browser" } }),
+    )
+    .unwrap()
+}
+
+fn queue(c: &mut Client, task: Value) -> Result<Value, ClientError> {
+    c.call(
+        method::TASK_QUEUE,
+        json!({ "accountId": ACCOUNT_ID, "task": task }),
+    )
+}
+
+/// docs/web-gateway-plan.md G6, G10: a relayed connection without the admin scope gets
+/// only the open methods and the web's task classes, and a later `hello` can't lift that.
+#[test]
+fn relayed_connection_policy() {
+    let e = Engine::start();
+    let mut c = e.client();
+    let hello = relayed_hello(&mut c, &[]);
+    assert!(hello["features"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(ms_ipc::feature::RELAYED)));
+
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    let account = &list["accounts"][0]["account"];
+    assert_eq!(account["emailAddress"], "me@example.com");
+    assert_eq!(account["settings"]["imap_host"], "127.0.0.1");
+    assert!(account["settings"].get("imap_password").is_none());
+    assert!(account["settings"].get("smtp_password").is_none());
+
+    let forbidden = Some(code::FORBIDDEN_RELAYED);
+    assert_eq!(
+        queue(&mut c, task("t-usage")).unwrap_err().code(),
+        forbidden
+    );
+    let out = e.dir.path().join("exported.eml");
+    let export = json!({ "id": "t-export", "__cls": "GetMessageRFC2822Task", "aid": ACCOUNT_ID,
+                         "messageId": "m1", "filepath": out });
+    assert_eq!(queue(&mut c, export.clone()).unwrap_err().code(), forbidden);
+    // As a notification too: refused without an answer, and nothing written.
+    c.send_raw(
+        format!(
+            "{}\n",
+            json!({ "jsonrpc": "2.0", "method": method::TASK_QUEUE,
+                    "params": { "accountId": ACCOUNT_ID, "task": export } })
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+    assert_eq!(
+        c.call("secrets.set", json!({})).unwrap_err().code(),
+        forbidden
+    );
+    assert_eq!(
+        c.call(method::ACCOUNT_ADD, json!({})).unwrap_err().code(),
+        forbidden
+    );
+    let starred = json!({ "id": "t-star", "__cls": "ChangeStarredTask", "aid": ACCOUNT_ID,
+                          "threadIds": [], "messageIds": [], "starred": true });
+    assert_ne!(
+        queue(&mut c, starred).err().and_then(|e| e.code()),
+        forbidden
+    );
+
+    // A second hello, unrelayed, changes nothing.
+    c.call(method::HELLO, json!({ "protocol": 1, "client": "x" }))
+        .unwrap();
+    assert_eq!(
+        queue(&mut c, task("t-usage2")).unwrap_err().code(),
+        forbidden
+    );
+    assert!(!out.exists());
+
+    // A local connection is unaffected.
+    let mut local = e.hello();
+    queue(&mut local, task("t-local")).unwrap();
+    assert_eq!(
+        local.call("secrets.set", json!({})).unwrap_err().code(),
+        Some(code::METHOD_NOT_FOUND)
+    );
+    e.stop();
+}
+
+#[test]
+fn relayed_admin_scope() {
+    let e = Engine::start();
+    let mut c = e.client();
+    relayed_hello(&mut c, &["admin"]);
+    queue(&mut c, task("t-admin")).unwrap();
+    assert_eq!(
+        c.call("secrets.set", json!({})).unwrap_err().code(),
+        Some(code::METHOD_NOT_FOUND)
+    );
+    // Parent and debug methods stay out of reach.
+    assert_eq!(
+        c.call(method::ENGINE_SHUTDOWN, Value::Null)
+            .unwrap_err()
+            .code(),
+        Some(code::FORBIDDEN_RELAYED)
+    );
+    e.stop();
+}
+
+/// A browser tab reconnecting through the gateway must not take the start-up deltas the
+/// desktop's subscription is waiting for.
+#[test]
+fn relayed_subscriber_leaves_the_backlog() {
+    let e = Engine::start();
+    let mut c = e.hello();
+    queue(&mut c, task("t-early")).unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+
+    let mut relayed = e.client();
+    relayed_hello(&mut relayed, &[]);
+    relayed.subscribe(&SubscribeParams::default()).unwrap();
+    relayed
+        .set_read_timeout(Some(Duration::from_millis(300)))
+        .unwrap();
+    assert!(relayed.read_message().unwrap_err().is_timeout());
+
+    let mut sub = e.hello();
+    let found = sub
+        .subscribe(&SubscribeParams::default())
+        .unwrap()
+        .map(|n| n.unwrap())
+        .any(|n| n.params["modelJSONs"][0]["id"] == "t-early");
+    assert!(found);
+    e.stop();
+}
+
+#[test]
+fn connection_cap() {
+    let e = Engine::start();
+    let max = ms_core::constants::SOCKET_MAX_CONNECTIONS;
+    let mut open: Vec<Client> = (0..max).map(|_| e.client()).collect();
+    // Answered in order per connection, so the last one is accepted once this returns.
+    open.last_mut()
+        .unwrap()
+        .call(method::HELLO, json!({ "protocol": 1 }))
+        .unwrap();
+    let mut extra = e.client();
+    let refused = extra.read_message().unwrap();
+    let Message::Response(r) = refused else {
+        panic!("{refused:?}")
+    };
+    assert_eq!(r.error.map(|e| e.code), Some(code::TOO_MANY_CONNECTIONS));
+    open.pop();
+    let start = Instant::now();
+    loop {
+        let mut c = e.client();
+        if c.hello("socket-test/1").is_ok() {
+            break;
+        }
+        assert!(start.elapsed() < Duration::from_secs(5), "slot not freed");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    drop(open);
+    e.stop();
+}
+
 /// A request without an id runs but gets no answer, `subscribe` included.
 #[test]
 fn notifications_run_unanswered() {

@@ -139,6 +139,9 @@ impl Client {
         let params = HelloParams {
             protocol: PROTOCOL_VERSION,
             client: client.to_owned(),
+            relayed: false,
+            scopes: Vec::new(),
+            device: None,
         };
         self.call_as(method::HELLO, to_value(&params)?)
     }

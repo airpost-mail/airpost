@@ -15,6 +15,7 @@ mod client;
 mod envelope;
 mod frame;
 mod methods;
+pub mod policy;
 mod read;
 
 pub use client::{Client, ClientError, Notifications};
@@ -110,6 +111,10 @@ pub mod feature {
     pub const MESSAGE_HIDDEN: &str = "message-hidden";
     /// `mail.new` notifications for subscribed connections.
     pub const MAIL_NEW: &str = "mail-new";
+    /// `hello.relayed`: the engine applies [`policy`](crate::policy) to relayed
+    /// connections. `tern-gateway` refuses to relay to an engine without it, which would
+    /// ignore the field.
+    pub const RELAYED: &str = "relayed";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
@@ -141,6 +146,11 @@ pub mod code {
     /// The method is only accepted on the parent's stdin (`account.add`, `account.remove`,
     /// `engine.shutdown`), or only on the socket (`subscribe`).
     pub const WRONG_CHANNEL: i64 = -32007;
+    /// A relayed connection asked for a method or task its device's scopes don't allow
+    /// ([`policy`](crate::policy)).
+    pub const FORBIDDEN_RELAYED: i64 = -32008;
+    /// The engine already has as many socket connections as it accepts.
+    pub const TOO_MANY_CONNECTIONS: i64 = -32009;
 }
 
 /// The `state` of an account in `hello`, `engine.status`, `account.list` and `account.state`.

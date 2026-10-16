@@ -237,6 +237,10 @@ pub const SOCKET_QUEUE_BYTES: usize = 64 * 1024 * 1024;
 /// `--socket`: deltas flushed before the first `subscribe` are kept for it up to this many
 /// bytes, so the client that started the engine sees what stdout would have shown it.
 pub const SOCKET_BACKLOG_BYTES: usize = 16 * 1024 * 1024;
+/// `--socket`: connections open at once; each holds two threads. `tern-gateway` keeps at
+/// most 64 of them for its browsers (docs/web-gateway-plan.md 2.3), which leaves room for
+/// the desktop's windows and the CLI.
+pub const SOCKET_MAX_CONNECTIONS: usize = 128;
 /// Log rotation (`rotating_file_sink_mt(path, 1048576 * 5, 3)`).
 pub const LOG_MAX_BYTES: u64 = 1_048_576 * 5;
 pub const LOG_MAX_FILES: usize = 3;

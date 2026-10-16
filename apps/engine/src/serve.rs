@@ -181,6 +181,7 @@ impl Accounts for Engine {
                 state: s.state.to_owned(),
                 connection_error: s.deltas.connection_error(),
                 error: s.error.clone(),
+                account: Some(ms_ipc::policy::public_account_json(s.account.as_json())),
             })
             .collect()
     }

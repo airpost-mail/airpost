@@ -13,6 +13,23 @@ pub struct HelloParams {
     /// Free-form, e.g. `tern-cli/0.1.0`; logged by the engine.
     #[serde(default)]
     pub client: String,
+    /// Set by `tern-gateway` for a connection it relays for a remote device. The engine
+    /// then applies [`policy`](crate::policy) to it. The first `hello` fixes this, `scopes`
+    /// and `device` for the connection.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub relayed: bool,
+    /// The relayed device's scopes, e.g. [`policy::SCOPE_ADMIN`](crate::policy::SCOPE_ADMIN).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scopes: Vec<String>,
+    /// The relayed device, for the engine's log.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device: Option<RelayDevice>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RelayDevice {
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -118,6 +135,10 @@ pub struct AccountStatus {
     /// The `SyncError` JSON that stopped the account, when `state` is `stopped`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
+    /// The account's settings without credentials, from
+    /// [`public_account_json`](crate::policy::public_account_json). `account.list` only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<Value>,
 }
 
 /// `account.list` result.
@@ -262,6 +283,7 @@ mod tests {
                 state: "running".into(),
                 connection_error: false,
                 error: None,
+                account: None,
             }],
         };
         let v = serde_json::to_value(&s).unwrap();
