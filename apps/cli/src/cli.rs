@@ -38,9 +38,10 @@ pub enum Command {
     Status,
     /// The accounts the running engines hold.
     Accounts,
-    /// Print deltas as the engines send them, until interrupted.
+    /// Print deltas and new mail as the engines send them, until interrupted.
     Watch {
-        /// Only these model classes (Thread, Message, Folder, Task, ...).
+        /// Only these model classes (Thread, Message, Folder, Task, ...). New mail is
+        /// printed either way.
         #[arg(
             long = "class",
             short = 'c',
@@ -48,6 +49,9 @@ pub enum Command {
             value_name = "CLASS"
         )]
         classes: Vec<String>,
+        /// Only new mail: one line per message that lands unread in the inbox.
+        #[arg(long, conflicts_with = "classes")]
+        new_mail: bool,
     },
     /// Start a sync pass now.
     Sync,
@@ -56,7 +60,8 @@ pub enum Command {
         #[command(subcommand)]
         command: CalendarCommand,
     },
-    /// Queue, cancel and wait for tasks.
+    /// List, queue, cancel and wait for tasks.
+    #[command(visible_alias = "tasks")]
     Task {
         #[command(subcommand)]
         command: TaskCommand,
@@ -118,6 +123,22 @@ pub enum CalendarCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum TaskCommand {
+    /// The stored tasks: pending ones first, oldest queued first, then finished ones, newest
+    /// first.
+    List {
+        /// Only these statuses: local, remote, complete, cancelled.
+        #[arg(long, value_delimiter = ',', value_name = "STATUS")]
+        status: Vec<String>,
+        /// Only this class, e.g. SendDraftTask.
+        #[arg(long, value_name = "CLASS")]
+        class: Option<String>,
+        /// Only the tasks naming this draft.
+        #[arg(long, value_name = "ID")]
+        header_message_id: Option<String>,
+        /// How many tasks per account (default 50).
+        #[arg(long, short = 'n')]
+        limit: Option<usize>,
+    },
     /// Queue a task: its JSON, or `-` to read it from stdin. `id`, `aid` and `status` are
     /// filled in when missing.
     Queue {
@@ -215,10 +236,12 @@ mod tests {
     #[test]
     fn classes_split_on_commas_and_repeat() {
         let cli = parse(&["watch", "--class", "Thread,Message", "-c", "Task"]).unwrap();
-        let Command::Watch { classes } = cli.command else {
+        let Command::Watch { classes, .. } = cli.command else {
             panic!("watch")
         };
         assert_eq!(classes, ["Thread", "Message", "Task"]);
+        assert!(parse(&["watch", "--new-mail"]).is_ok());
+        assert!(parse(&["watch", "--new-mail", "-c", "Task"]).is_err());
     }
 
     #[test]
@@ -253,5 +276,13 @@ mod tests {
         assert!(parse(&["logs", "acc", "-f"]).is_ok());
         assert!(parse(&["-a", "acc", "logs", "-n", "3"]).is_ok());
         assert!(parse(&["rpc", "engine.status"]).is_ok());
+        let cli = parse(&["tasks", "list", "--status", "local,remote"]).unwrap();
+        let Command::Task {
+            command: TaskCommand::List { status, .. },
+        } = cli.command
+        else {
+            panic!("tasks list")
+        };
+        assert_eq!(status, ["local", "remote"]);
     }
 }

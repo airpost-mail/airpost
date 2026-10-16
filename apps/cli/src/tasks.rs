@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern task queue|cancel|wait`. A task is done when a `Task` delta shows it `complete` or
-//! `cancelled`, as the desktop's `TaskQueue` decides; its `error` says whether it failed.
+//! `tern task list|queue|cancel|wait`. A task is done when a `Task` delta shows it
+//! `complete` or `cancelled`, as the desktop's `TaskQueue` decides; its `error` says whether
+//! it failed.
 
 use std::io::Read;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use ms_ipc::{code, method, ClientError, DeltaParams, TasksGetResult};
+use ms_ipc::{code, feature, method, ClientError, DeltaParams, TasksGetResult, TasksListResult};
 use serde_json::{json, Value};
+use tern_client::tasks::{finished, is_final, TASK_CLASS};
 
 use crate::app::{call, is_not_found, Ctx};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
-use crate::output;
+use crate::output::{self, Table};
 use crate::watch::{deadline, lost, NextEvent, Subscriptions};
 
-const TASK_CLASS: &str = "Task";
+/// The prefix of the task ids the CLI picks.
+const ID_PREFIX: &str = "tern-cli";
 
 /// Reads the task argument: JSON, or `-` for stdin.
 fn read_task(arg: &str) -> Result<Value> {
@@ -43,40 +44,9 @@ fn read_task(arg: &str) -> Result<Value> {
     Ok(task)
 }
 
-/// A task id no other client picks: the CLI's pid, the time in nanoseconds and a counter
-/// (the clock may not tick between two calls).
-fn new_task_id() -> String {
-    static SEQ: AtomicU64 = AtomicU64::new(0);
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or_default();
-    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
-    format!("tern-cli-{}-{nanos:x}-{seq}", std::process::id())
-}
-
 /// Fills in what the desktop's `Task` model always sends: `id`, `aid` and `status`.
-pub fn complete_task(mut task: Value, account_id: &str) -> Value {
-    if let Some(obj) = task.as_object_mut() {
-        obj.entry("id").or_insert_with(|| json!(new_task_id()));
-        obj.entry("aid").or_insert_with(|| json!(account_id));
-        obj.entry("status").or_insert_with(|| json!("local"));
-    }
-    task
-}
-
-/// A finished task found in a `Task` delta.
-pub fn finished(d: &DeltaParams, id: &str) -> Option<Value> {
-    if d.model_class != TASK_CLASS {
-        return None;
-    }
-    d.model_jsons
-        .iter()
-        .find(|t| t["id"].as_str() == Some(id))
-        .filter(|t| {
-            d.kind == "unpersist" || matches!(t["status"].as_str(), Some("complete" | "cancelled"))
-        })
-        .cloned()
+pub fn complete_task(task: Value, account_id: &str) -> Value {
+    tern_client::tasks::complete_task(task, account_id, ID_PREFIX)
 }
 
 fn describe_error(e: &Value) -> String {
@@ -137,6 +107,74 @@ fn wait_on(ctx: &Ctx, mut subs: Subscriptions, id: &str, timeout: Option<u64>) -
             }
         }
     }
+}
+
+/// What `tern task list` filters on.
+#[derive(Debug, Default)]
+pub struct ListFilter {
+    pub status: Vec<String>,
+    pub class: Option<String>,
+    pub header_message_id: Option<String>,
+    pub limit: Option<usize>,
+}
+
+pub fn list(ctx: &Ctx, engines: &mut [Engine], filter: &ListFilter) -> Result<()> {
+    let targets = discovery::targets(engines, ctx.account())?;
+    let mut rows: Vec<(String, Value)> = Vec::new();
+    for t in &targets {
+        if !engines[t.engine].has_feature(feature::TASKS_LIST) {
+            return Err(CliError::failed(format!(
+                "{}: this engine can't list tasks (no tasks.list); update Tern",
+                t.email
+            )));
+        }
+        let params = ms_ipc::TasksListParams {
+            account_id: Some(t.account_id.clone()),
+            status: (!filter.status.is_empty()).then(|| filter.status.clone()),
+            class: filter.class.clone(),
+            header_message_id: filter.header_message_id.clone(),
+            limit: filter.limit,
+        };
+        let params = serde_json::to_value(&params).unwrap_or_else(|_| json!({}));
+        let r: TasksListResult = call(engines, t, method::TASKS_LIST, params)?;
+        rows.extend(r.tasks.into_iter().map(|task| (t.email.clone(), task)));
+    }
+    if ctx.json {
+        output::json(&Value::Array(rows.into_iter().map(|(_, t)| t).collect()));
+        return Ok(());
+    }
+    let multi = targets.len() > 1;
+    let mut headers = vec!["CLASS", "STATUS", "ERROR", "ID"];
+    if multi {
+        headers.insert(0, "ACCOUNT");
+    }
+    let mut table = Table::new(headers, usize::from(multi) + 2);
+    for (email, task) in rows {
+        let error = match &task["error"] {
+            Value::Null => String::new(),
+            e => describe_error(e),
+        };
+        let failed = !error.is_empty();
+        let mut cells = vec![
+            task["__cls"].as_str().unwrap_or("").to_owned(),
+            task["status"].as_str().unwrap_or("").to_owned(),
+            error,
+            task["id"].as_str().unwrap_or("").to_owned(),
+        ];
+        if multi {
+            cells.insert(0, email);
+        }
+        table.row(cells, false);
+        if failed {
+            table.alert(usize::from(multi) + 2);
+        }
+    }
+    if table.is_empty() {
+        output::line("No tasks.");
+    } else {
+        table.print(&ctx.style);
+    }
+    Ok(())
 }
 
 pub fn queue(
@@ -220,10 +258,6 @@ fn get_task(engine: &mut Engine, t: &Target, id: &str) -> Result<Option<Value>> 
     }
 }
 
-fn is_final(task: &Value) -> bool {
-    matches!(task["status"].as_str(), Some("complete" | "cancelled"))
-}
-
 pub fn wait(ctx: &Ctx, mut engines: Vec<Engine>, id: &str, timeout: Option<u64>) -> Result<()> {
     let targets = discovery::targets(&engines, ctx.account())?;
     let mut holder = None;
@@ -297,7 +331,10 @@ mod tests {
             (t["id"].as_str(), t["aid"].as_str()),
             (Some("mine"), Some("other"))
         );
-        assert_ne!(new_task_id(), new_task_id());
+        assert_ne!(
+            complete_task(json!({}), "a")["id"],
+            complete_task(json!({}), "a")["id"]
+        );
     }
 
     #[test]

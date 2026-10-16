@@ -8,7 +8,10 @@ use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use ms_ipc::{method, ClientError, DeltaParams, DisconnectParams, Notification, SubscribeParams};
+use ms_ipc::{
+    method, ClientError, DeltaParams, DisconnectParams, MailNewParams, Notification,
+    SubscribeParams,
+};
 use serde_json::{json, Value};
 
 use crate::app::Ctx;
@@ -226,7 +229,22 @@ pub fn delta_line(d: &DeltaParams, account: &str, time: &str) -> String {
     )
 }
 
-pub fn watch(ctx: &Ctx, engines: Vec<Engine>, classes: Vec<String>) -> Result<()> {
+/// One line for a `mail.new`: time, account, and the message and thread ids.
+pub fn mail_new_line(p: &MailNewParams, account: &str, time: &str) -> String {
+    format!(
+        "{time}  {account}  new mail {}  thread {}",
+        p.message_id, p.thread_id
+    )
+}
+
+/// `tern watch`: deltas of `classes` (every class when empty), and `mail.new` either way.
+/// `new_mail_only` subscribes to no class, so only `mail.new` arrives.
+pub fn watch(
+    ctx: &Ctx,
+    engines: Vec<Engine>,
+    classes: Vec<String>,
+    new_mail_only: bool,
+) -> Result<()> {
     let accounts = match ctx.account() {
         Some(_) => Some(
             discovery::targets(&engines, ctx.account())?
@@ -236,7 +254,11 @@ pub fn watch(ctx: &Ctx, engines: Vec<Engine>, classes: Vec<String>) -> Result<()
         ),
         None => None,
     };
-    let classes = (!classes.is_empty()).then_some(classes);
+    let classes = if new_mail_only {
+        Some(Vec::new())
+    } else {
+        (!classes.is_empty()).then_some(classes)
+    };
     let engines = engines.into_iter().map(|e| (e, false)).collect();
     let mut subs = Subscriptions::start(engines, accounts, classes)?;
     loop {
@@ -256,6 +278,29 @@ pub fn watch(ctx: &Ctx, engines: Vec<Engine>, classes: Vec<String>) -> Result<()
                 let width = ctx.style.width;
                 let l = delta_line(&d, email, &output::clock_time());
                 output::line(&width.map_or(l.clone(), |w| output::truncate(&l, w)));
+            }
+            NextEvent::Note(n) if n.method == method::MAIL_NEW => {
+                let Ok(p) = serde_json::from_value::<MailNewParams>(n.params.clone()) else {
+                    continue;
+                };
+                if ctx.json {
+                    let mut doc = json!({ "event": method::MAIL_NEW });
+                    if let (Some(d), Some(params)) = (doc.as_object_mut(), n.params.as_object()) {
+                        d.extend(params.clone());
+                    }
+                    output::json(&doc);
+                    continue;
+                }
+                let email = subs
+                    .emails
+                    .get(&p.account_id)
+                    .map_or(p.account_id.as_str(), String::as_str);
+                let l = mail_new_line(&p, email, &output::clock_time());
+                output::line(
+                    &ctx.style
+                        .width
+                        .map_or(l.clone(), |w| output::truncate(&l, w)),
+                );
             }
             NextEvent::Note(_) | NextEvent::TimedOut => {}
             // A stream missing an account's deltas would read as complete, so losing any
@@ -283,12 +328,13 @@ pub fn deadline(timeout: Option<u64>) -> Option<Instant> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::discovery::Entry;
     use ms_ipc::{AccountInfo, Client, HelloResult};
+    use tern_client::discovery::Entry;
 
     /// An engine whose connection yields `input` (NDJSON) and then ends.
     fn engine(pid: u32, account: &str, input: String) -> Engine {
         Engine {
+            file: "/tmp/run/x.json".into(),
             entry: Entry {
                 pid,
                 socket: "/tmp/x.sock".into(),
@@ -306,6 +352,7 @@ mod tests {
                     state: "running".into(),
                     error: None,
                 }],
+                features: Vec::new(),
             },
             client: Client::from_streams(
                 Box::new(std::io::Cursor::new(input.into_bytes())),
@@ -383,6 +430,15 @@ mod tests {
             "INBOX"
         );
         assert_eq!(model_summary("File", &json!({"id": "f1"})), "f1");
+        let p = MailNewParams {
+            account_id: "a1".into(),
+            thread_id: "t1".into(),
+            message_id: "m1".into(),
+        };
+        assert_eq!(
+            mail_new_line(&p, "me@x.test", "12:00:00"),
+            "12:00:00  me@x.test  new mail m1  thread t1"
+        );
         assert_eq!(
             model_summary(
                 "ProcessState",

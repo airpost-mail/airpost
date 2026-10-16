@@ -90,8 +90,25 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Contacts { query, limit } => {
             crate::read::contacts(&ctx, &mut engines, &query.join(" "), limit)
         }
-        Command::Watch { classes } => crate::watch::watch(&ctx, engines, classes),
+        Command::Watch { classes, new_mail } => {
+            crate::watch::watch(&ctx, engines, classes, new_mail)
+        }
         Command::Task { command } => match command {
+            TaskCommand::List {
+                status,
+                class,
+                header_message_id,
+                limit,
+            } => crate::tasks::list(
+                &ctx,
+                &mut engines,
+                &crate::tasks::ListFilter {
+                    status,
+                    class,
+                    header_message_id,
+                    limit,
+                },
+            ),
             TaskCommand::Queue {
                 task,
                 wait,
