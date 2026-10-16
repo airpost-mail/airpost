@@ -442,6 +442,7 @@ export function redactAccount(a: AccountJSON): Partial<AccountJSON> {
     provider: a.provider,
     label: a.label,
     aliases: a.aliases,
+    defaultAlias: a.defaultAlias,
     color: a.color,
     settings: {
       imap_host: s.imap_host,
