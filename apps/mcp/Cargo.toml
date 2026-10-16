@@ -1,0 +1,39 @@
+[package]
+name = "tern-mcp"
+description = "MCP server for the Tern mail engine: tools over the engine socket, per-account access policy, audit log"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/ternmail/ternmail"
+publish.workspace = true
+
+[[bin]]
+name = "tern-mcp"
+path = "src/main.rs"
+
+# Talks to running engines over their sockets only (docs/mcp.md); no TLS or SQLite.
+[dependencies]
+ms-ipc.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+sha2.workspace = true
+bs58.workspace = true
+uuid.workspace = true
+base64.workspace = true
+rmcp.workspace = true
+tokio = { workspace = true, features = ["io-std", "rt-multi-thread"] }
+hyper.workspace = true
+hyper-util.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+toml.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

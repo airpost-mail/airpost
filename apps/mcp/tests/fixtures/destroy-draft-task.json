@@ -1,0 +1,7 @@
+{
+  "id": "<temp-id>",
+  "aid": "a1",
+  "status": "local",
+  "messageIds": ["d1"],
+  "__cls": "DestroyDraftTask"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "<temp-id>",
+  "aid": "a1",
+  "status": "local",
+  "source": "MCP",
+  "threadIds": ["t1", "t2"],
+  "messageIds": [],
+  "canBeUndone": true,
+  "unread": false,
+  "__cls": "ChangeUnreadTask"
+}

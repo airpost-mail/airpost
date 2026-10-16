@@ -1,0 +1,9 @@
+{
+  "id": "<temp-id>",
+  "aid": "a1",
+  "status": "local",
+  "draft": {"id": "d1", "aid": "a1", "hMsgId": "H@x.test", "body": "<p>x\u200b</p>", "plaintext": false, "draft": true, "__cls": "Message"},
+  "headerMessageId": "H@x.test",
+  "silent": true,
+  "__cls": "SendDraftTask"
+}

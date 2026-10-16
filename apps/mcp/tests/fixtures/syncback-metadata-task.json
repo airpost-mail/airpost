@@ -1,0 +1,12 @@
+{
+  "id": "<temp-id>",
+  "aid": "a1",
+  "status": "local",
+  "pluginId": "send-later",
+  "modelId": "d1",
+  "modelClassName": "message",
+  "modelHeaderMessageId": "H@x.test",
+  "value": {"expiration": 1900000000, "actionKey": "send"},
+  "undoValue": {"expiration": null},
+  "__cls": "SyncbackMetadataTask"
+}
