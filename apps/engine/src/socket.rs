@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `--socket`: the engine protocol on a Unix domain socket (docs/engine-protocol-plan.md
-//! sections 1 and 2). Unix-only, like the transport; its OS calls are in
-//! [`platform::uds`](crate::platform::uds).
+//! The engine protocol on a Unix domain socket (docs/engine-protocol-plan.md sections 1, 2
+//! and 4), for `sync --socket` and `serve`. Unix-only, like the transport; its OS calls are
+//! in [`platform::uds`](crate::platform::uds).
 //!
 //! One acceptor thread, and per connection a reader thread and a writer thread draining a
 //! bounded queue (1.6). The read methods are answered on the reader thread
-//! ([`crate::read_api`]); requests other than those, `hello` and `subscribe` become
-//! [`Command`]s for the main thread. Each connection's requests are answered in order. The [`Hub`] is the `DeltaStream`'s sink: it
-//! fans each flushed line out to every subscriber whose filter matches, without blocking;
-//! a subscriber whose queue passes the bound is sent `disconnect` and closed (1.4). The
-//! account secrets delta never reaches the socket: it stays on the parent's stdout, where
-//! the secrets came in (section 2).
+//! ([`crate::read_api`]); account-scoped requests become [`Command`]s for that account's
+//! `main` thread, found through [`Accounts`]. Each connection's requests are answered in
+//! order. The [`Hub`] is every account's `DeltaStream` sink: it fans each flushed line out
+//! to every subscriber whose filter matches, without blocking; a subscriber whose queue
+//! passes the bound is sent `disconnect` and closed (1.4). The account secrets delta never
+//! reaches the socket: it stays on the parent's stdout, where the secrets came in
+//! (section 2), and so do `account.add` and `account.remove`.
 
 use std::collections::{HashSet, VecDeque};
 use std::io::{BufReader, ErrorKind, Write};
@@ -26,10 +27,11 @@ use std::time::{Duration, Instant};
 use ms_core::constants::{thread, SOCKET_BACKLOG_BYTES, SOCKET_QUEUE_BYTES};
 use ms_core::Account;
 use ms_ipc::{
-    code, method, AccountInfo, AccountStatus, BodiesFetchParams, CalendarSyncParams,
-    DisconnectParams, EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult,
-    Notification, Request as RpcRequest, Response, SubscribeParams, SyncWakeParams,
-    TaskCancelParams, TaskQueueParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    account_state, code, method, AccountInfo, AccountListResult, AccountStateParams, AccountStatus,
+    BodiesFetchParams, CalendarSyncParams, DisconnectParams, EngineStatusResult, ErrorObject,
+    FrameError, HelloParams, HelloResult, Notification, Request as RpcRequest, Response,
+    SubscribeParams, SyncWakeParams, TaskCancelParams, TaskQueueParams, MAX_LINE_BYTES,
+    PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, SECRETS_UPDATED};
 use serde_json::{json, Value};
@@ -60,14 +62,13 @@ pub fn queue_limit() -> usize {
     SOCKET_QUEUE_BYTES
 }
 
-/// Writes `$CONFIG_DIR_PATH/run/<accountId>.json` (1.5) and returns its path.
+/// Writes `$CONFIG_DIR_PATH/run/<accountId>.json` (1.5) for `sync --socket` and returns
+/// its path.
 pub fn write_discovery(
     config_dir: &Path,
     account_id: &str,
     socket: &Path,
 ) -> std::io::Result<PathBuf> {
-    let dir = config_dir.join("run");
-    platform::uds::create_private_dir(&dir)?;
     let name: String = account_id
         .chars()
         .map(|c| {
@@ -78,15 +79,42 @@ pub fn write_discovery(
             }
         })
         .collect();
+    write_discovery_file(config_dir, &name, socket, |body| {
+        body.insert("accountId".into(), json!(account_id));
+    })
+}
+
+/// Writes `$CONFIG_DIR_PATH/run/engine.json` for `serve`, listing `accounts`, and returns
+/// its path. Rewritten whenever an account is added or removed.
+pub fn write_engine_discovery(
+    config_dir: &Path,
+    socket: &Path,
+    accounts: &[String],
+) -> std::io::Result<PathBuf> {
+    write_discovery_file(config_dir, ENGINE_DISCOVERY_NAME, socket, |body| {
+        body.insert("accounts".into(), json!(accounts));
+    })
+}
+
+/// `run/<name>.json` of a `serve` engine.
+pub const ENGINE_DISCOVERY_NAME: &str = "engine";
+
+fn write_discovery_file(
+    config_dir: &Path,
+    name: &str,
+    socket: &Path,
+    extra: impl FnOnce(&mut serde_json::Map<String, Value>),
+) -> std::io::Result<PathBuf> {
+    let dir = config_dir.join("run");
+    platform::uds::create_private_dir(&dir)?;
     let path = dir.join(format!("{name}.json"));
     let socket = std::path::absolute(socket).unwrap_or_else(|_| socket.to_owned());
-    let body = json!({
-        "pid": std::process::id(),
-        "socket": socket.to_string_lossy(),
-        "protocol": PROTOCOL_VERSION,
-        "accountId": account_id,
-    });
-    platform::uds::write_private_file(&path, body.to_string().as_bytes())?;
+    let mut body = serde_json::Map::new();
+    body.insert("pid".into(), json!(std::process::id()));
+    body.insert("socket".into(), json!(socket.to_string_lossy()));
+    body.insert("protocol".into(), json!(PROTOCOL_VERSION));
+    extra(&mut body);
+    platform::uds::write_private_file(&path, Value::Object(body).to_string().as_bytes())?;
     Ok(path)
 }
 
@@ -229,44 +257,59 @@ fn drop_slow(conn: u64, outbox: &Outbox) {
 struct Subscriber {
     conn: u64,
     outbox: Arc<Outbox>,
-    /// False when `accounts` names none of this engine's accounts.
-    accounts: bool,
+    /// `None` for every account.
+    accounts: Option<HashSet<String>>,
     classes: Option<HashSet<String>>,
 }
 
 impl Subscriber {
-    fn wants(&self, model_class: &str) -> bool {
+    fn wants_account(&self, account_id: &str) -> bool {
         self.accounts
-            && self
-                .classes
-                .as_ref()
-                .is_none_or(|c| c.contains(model_class))
+            .as_ref()
+            .is_none_or(|a| a.contains(account_id))
+    }
+
+    /// `model_class` is `None` for an `account.state` notification, which no class filter
+    /// holds back.
+    fn wants(&self, account_id: &str, model_class: Option<&str>) -> bool {
+        self.wants_account(account_id)
+            && match (model_class, &self.classes) {
+                (Some(class), Some(classes)) => classes.contains(class),
+                _ => true,
+            }
+    }
+
+    /// Only a subscriber that wants every account and every class takes the backlog: a CLI
+    /// watching one account or one class leaves it for the desktop, and taking it would
+    /// throw away the other accounts' lines.
+    fn takes_backlog(&self) -> bool {
+        self.classes.is_none() && self.accounts.is_none()
     }
 }
 
 #[derive(Default)]
 struct Backlog {
-    lines: Vec<(String, Arc<[u8]>)>,
+    lines: Vec<Arc<[u8]>>,
     bytes: usize,
 }
 
 struct HubState {
     subscribers: Vec<Subscriber>,
-    /// Deltas flushed before the first unfiltered `subscribe`, for it. `None` from then on,
-    /// or once it passed [`SOCKET_BACKLOG_BYTES`].
+    /// Notifications sent before the first unfiltered `subscribe`, for it. `None` from then
+    /// on, or once it passed [`SOCKET_BACKLOG_BYTES`].
     backlog: Option<Backlog>,
 }
 
-/// The socket `DeltaSink`: one account's deltas, as `delta` notifications, to every
-/// matching subscriber.
+/// The socket `DeltaSink` of every account, as `delta` notifications, plus the
+/// `account.state` notifications, to every matching subscriber.
 pub struct Hub {
-    account_id: String,
     limit: usize,
     state: Mutex<HubState>,
 }
 
 struct HubSink {
     hub: Arc<Hub>,
+    account_id: String,
     parent: Box<dyn DeltaSink>,
 }
 
@@ -275,15 +318,15 @@ impl DeltaSink for HubSink {
         if model_class == SECRETS_UPDATED {
             self.parent.write_item(model_class, line);
         } else {
-            self.hub.publish(model_class, line);
+            let note = framed(ms_ipc::delta_notification_line(&self.account_id, line).into_bytes());
+            self.hub.publish(&self.account_id, Some(model_class), note);
         }
     }
 }
 
 impl Hub {
-    pub fn new(account_id: &str, limit: usize) -> Arc<Self> {
+    pub fn new(limit: usize) -> Arc<Self> {
         Arc::new(Hub {
-            account_id: account_id.to_owned(),
             limit,
             state: Mutex::new(HubState {
                 subscribers: Vec::new(),
@@ -292,37 +335,50 @@ impl Hub {
         })
     }
 
-    /// The stream's sink: [`SECRETS_UPDATED`] goes to `parent` (stdout), the rest to the
-    /// subscribers.
-    pub fn sink(self: &Arc<Self>, parent: Box<dyn DeltaSink>) -> Box<dyn DeltaSink> {
+    /// The sink of `account_id`'s `DeltaStream`: [`SECRETS_UPDATED`] goes to `parent` (the
+    /// parent's stdout), the rest to the subscribers.
+    pub fn sink(
+        self: &Arc<Self>,
+        account_id: &str,
+        parent: Box<dyn DeltaSink>,
+    ) -> Box<dyn DeltaSink> {
         Box::new(HubSink {
             hub: self.clone(),
+            account_id: account_id.to_owned(),
             parent,
         })
+    }
+
+    /// Sends `account.state` to the subscribers of `params.account_id`.
+    pub fn account_state(&self, params: &AccountStateParams) {
+        let n = Notification::new(
+            method::ACCOUNT_STATE,
+            serde_json::to_value(params).unwrap_or(Value::Null),
+        );
+        self.publish(&params.account_id, None, ms_ipc::encode(&n).into());
     }
 
     fn lock(&self) -> MutexGuard<'_, HubState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    fn publish(&self, model_class: &str, line: &str) {
+    fn publish(&self, account_id: &str, model_class: Option<&str>, note: Arc<[u8]>) {
         let mut guard = self.lock();
         let st = &mut *guard;
         if st.subscribers.is_empty() && st.backlog.is_none() {
             return;
         }
-        let note = framed(ms_ipc::delta_notification_line(&self.account_id, line).into_bytes());
         if let Some(b) = st.backlog.as_mut() {
             if b.bytes + note.len() > SOCKET_BACKLOG_BYTES.min(self.limit) {
                 warn!("-X Dropping the deltas held for the first subscriber: over the bound");
                 st.backlog = None;
             } else {
                 b.bytes += note.len();
-                b.lines.push((model_class.to_owned(), note.clone()));
+                b.lines.push(note.clone());
             }
         }
         st.subscribers.retain(|s| {
-            if !s.wants(model_class) {
+            if !s.wants(account_id, model_class) {
                 return !s.outbox.is_closed();
             }
             match s.outbox.push(note.clone()) {
@@ -338,8 +394,7 @@ impl Hub {
 
     /// Adds or replaces `conn`'s subscription. The response (none for a notification) is
     /// queued under the hub lock, so every delta the connection gets comes after it. The
-    /// first subscriber that wants everything then gets the backlog; a filtered one (a CLI
-    /// watching one class) gets live deltas only and leaves the backlog for the desktop.
+    /// first subscriber that wants every class then gets the backlog of its accounts.
     fn subscribe(&self, sub: Subscriber, response: Option<Arc<[u8]>>) {
         let mut guard = self.lock();
         let st = &mut *guard;
@@ -352,9 +407,8 @@ impl Hub {
                 return;
             }
         }
-        let takes_backlog = sub.accounts && sub.classes.is_none();
-        if let Some(backlog) = st.backlog.take_if(|_| takes_backlog) {
-            for (_, line) in backlog.lines {
+        if let Some(backlog) = st.backlog.take_if(|_| sub.takes_backlog()) {
+            for line in backlog.lines {
                 if let Err(e) = sub.outbox.push(line) {
                     if matches!(e, PushError::Full) {
                         drop_slow(sub.conn, &sub.outbox);
@@ -371,22 +425,85 @@ impl Hub {
     }
 }
 
+// -- Accounts -------------------------------------------------------------------------------
+
+/// The accounts a socket serves and the way to each one's `main` thread. `sync` mode holds
+/// one ([`SingleAccount`]); `serve` mode's registry is [`crate::serve`]'s.
+pub trait Accounts: Send + Sync {
+    /// Every account with its state, for `hello`, `engine.status` and `account.list`.
+    fn statuses(&self) -> Vec<AccountStatus>;
+    /// Ok when the engine holds `account_id`, in any state; [`code::UNKNOWN_ACCOUNT`]
+    /// otherwise.
+    fn check(&self, account_id: &str) -> Result<(), ErrorObject>;
+    /// The command channel of a running account; [`code::ACCOUNT_STOPPED`] for one that
+    /// isn't.
+    fn commands(&self, account_id: &str) -> Result<Sender<Command>, ErrorObject>;
+    /// The channels of every running account.
+    fn all_commands(&self) -> Vec<Sender<Command>>;
+    /// Whether the parent-only methods (`account.add`, ...) exist, so the socket refuses
+    /// them rather than not knowing them.
+    fn has_parent_channel(&self) -> bool;
+}
+
+pub fn unknown_account(account_id: &str) -> ErrorObject {
+    ErrorObject::new(
+        code::UNKNOWN_ACCOUNT,
+        format!("unknown account {account_id}"),
+    )
+}
+
+/// `sync` mode's one account, running for as long as the process.
+pub struct SingleAccount {
+    pub account: Arc<Account>,
+    pub deltas: Arc<DeltaStream>,
+    pub commands: Sender<Command>,
+}
+
+impl Accounts for SingleAccount {
+    fn statuses(&self) -> Vec<AccountStatus> {
+        vec![AccountStatus {
+            account_id: self.account.id().to_owned(),
+            email: self.account.email_address().to_owned(),
+            state: account_state::RUNNING.to_owned(),
+            connection_error: self.deltas.connection_error(),
+            error: None,
+        }]
+    }
+
+    fn check(&self, account_id: &str) -> Result<(), ErrorObject> {
+        if account_id == self.account.id() {
+            return Ok(());
+        }
+        Err(unknown_account(account_id))
+    }
+
+    fn commands(&self, account_id: &str) -> Result<Sender<Command>, ErrorObject> {
+        self.check(account_id)?;
+        Ok(self.commands.clone())
+    }
+
+    fn all_commands(&self) -> Vec<Sender<Command>> {
+        vec![self.commands.clone()]
+    }
+
+    fn has_parent_channel(&self) -> bool {
+        false
+    }
+}
+
 // -- Server ---------------------------------------------------------------------------------
 
 /// What every connection shares.
 pub struct Server {
     pub hub: Arc<Hub>,
-    pub account: Arc<Account>,
-    pub deltas: Arc<DeltaStream>,
+    pub accounts: Arc<dyn Accounts>,
     pub started: Instant,
-    pub commands: Sender<Command>,
     /// Where the read methods open their own read-only database connection.
     pub config_dir: PathBuf,
 }
 
 /// Starts the acceptor thread on a bound listener.
-pub fn serve(listener: UnixListener, server: Server) {
-    let server = Arc::new(server);
+pub fn serve(listener: UnixListener, server: Arc<Server>) {
     crate::modes::spawn(thread::SOCKET, move || accept_loop(&listener, &server));
 }
 
@@ -433,13 +550,11 @@ fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>) {
         warn!("-X Dropping socket connection {id}: {e}");
         return;
     }
-    let reads = ReadApi::new(server.config_dir.clone(), server.account.id().to_owned());
     let conn = Connection {
         id,
-        server,
+        session: Session::new(server),
         outbox: outbox.clone(),
         hello: false,
-        reads,
     };
     let reader = std::thread::Builder::new()
         .name(thread::SOCKET_READER.into())
@@ -480,12 +595,165 @@ fn write_line(mut stream: &UnixStream, mut line: &[u8], outbox: &Outbox) -> bool
     true
 }
 
+// -- Methods --------------------------------------------------------------------------------
+
+/// The methods the socket and `serve` mode's parent channel both answer, with the channel's
+/// read-only database connection.
+pub struct Session {
+    pub server: Arc<Server>,
+    reads: ReadApi,
+}
+
+impl Session {
+    pub fn new(server: Arc<Server>) -> Self {
+        let reads = ReadApi::new(server.config_dir.clone(), server.accounts.clone());
+        Session { server, reads }
+    }
+
+    /// The reply to `req` when it is one of the shared methods, `None` otherwise.
+    pub fn call(&mut self, req: &RpcRequest) -> Option<Reply> {
+        let accounts = &self.server.accounts;
+        Some(match req.method.as_str() {
+            method::HELLO => self.hello(req),
+            method::ENGINE_STATUS => Ok(self.status()),
+            method::ACCOUNT_LIST => to_value(serde_json::to_value(AccountListResult {
+                accounts: accounts.statuses(),
+            })),
+            name if is_read_method(name) => self.reads.call(req),
+            method::TASK_QUEUE => req.params_as::<TaskQueueParams>().and_then(|p| {
+                accounts.check(&p.account_id)?;
+                if !p.task.is_object() {
+                    return Err(ErrorObject::new(
+                        code::INVALID_PARAMS,
+                        "the task must be an object",
+                    ));
+                }
+                self.dispatch(&p.account_id, Request::QueueTask(p.task))
+            }),
+            method::TASK_CANCEL => req
+                .params_as::<TaskCancelParams>()
+                .and_then(|p| self.dispatch(&p.account_id, Request::CancelTask(p.task_id))),
+            method::SYNC_WAKE => {
+                req.params_as::<SyncWakeParams>()
+                    .and_then(|p| match p.account_id {
+                        Some(a) => self.dispatch(&a, Request::WakeWorkers),
+                        None => self.wake_all(),
+                    })
+            }
+            method::BODIES_FETCH => req
+                .params_as::<BodiesFetchParams>()
+                .and_then(|p| self.dispatch(&p.account_id, Request::NeedBodies(p.ids))),
+            method::CALENDAR_SYNC => req
+                .params_as::<CalendarSyncParams>()
+                .and_then(|p| self.dispatch(&p.account_id, Request::SyncCalendar)),
+            _ => return None,
+        })
+    }
+
+    fn hello(&self, req: &RpcRequest) -> Reply {
+        let p = req.params_as::<HelloParams>()?;
+        if p.protocol != PROTOCOL_VERSION {
+            return Err(ErrorObject::new(
+                code::UNSUPPORTED_PROTOCOL,
+                format!(
+                    "protocol {} is not supported; this engine speaks {PROTOCOL_VERSION}",
+                    p.protocol
+                ),
+            )
+            .with_data(json!({ "supported": [PROTOCOL_VERSION] })));
+        }
+        let accounts = self
+            .server
+            .accounts
+            .statuses()
+            .into_iter()
+            .map(|a| AccountInfo {
+                account_id: a.account_id,
+                email: a.email,
+                state: a.state,
+                error: a.error,
+            })
+            .collect();
+        to_value(serde_json::to_value(HelloResult {
+            protocol: PROTOCOL_VERSION,
+            engine: env!("CARGO_PKG_VERSION").to_owned(),
+            pid: std::process::id(),
+            accounts,
+        }))
+    }
+
+    fn status(&self) -> Value {
+        to_value(serde_json::to_value(EngineStatusResult {
+            protocol: PROTOCOL_VERSION,
+            engine: env!("CARGO_PKG_VERSION").to_owned(),
+            pid: std::process::id(),
+            uptime_secs: self.server.started.elapsed().as_secs(),
+            accounts: self.server.accounts.statuses(),
+        }))
+        .unwrap_or(Value::Null)
+    }
+
+    /// Hands `request` to the account's `main` thread and waits for its result.
+    fn dispatch(&self, account_id: &str, request: Request) -> Reply {
+        let commands = self.server.accounts.commands(account_id)?;
+        let rx = send(&commands, request)?;
+        rx.recv()
+            .unwrap_or_else(|_| Err(stopped_before_answering()))
+    }
+
+    /// `sync.wake` without an account: every running account, in parallel.
+    fn wake_all(&self) -> Reply {
+        let pending: Vec<_> = self
+            .server
+            .accounts
+            .all_commands()
+            .iter()
+            .filter_map(|c| send(c, Request::WakeWorkers).ok())
+            .collect();
+        for rx in pending {
+            let _ = rx.recv();
+        }
+        Ok(json!({}))
+    }
+}
+
+fn stopped_before_answering() -> ErrorObject {
+    ErrorObject::new(code::INTERNAL_ERROR, "the engine is shutting down")
+}
+
+fn send(
+    commands: &Sender<Command>,
+    request: Request,
+) -> Result<mpsc::Receiver<Reply>, ErrorObject> {
+    let (tx, rx) = mpsc::channel();
+    commands
+        .send(Command {
+            request,
+            reply: Some(tx),
+        })
+        .map_err(|_| stopped_before_answering())?;
+    Ok(rx)
+}
+
+/// The methods only `serve` mode's parent channel takes.
+pub fn is_parent_method(name: &str) -> bool {
+    matches!(
+        name,
+        method::ACCOUNT_ADD
+            | method::ACCOUNT_REMOVE
+            | method::ENGINE_SHUTDOWN
+            | method::TEST_CRASH
+            | method::TEST_PANIC
+    )
+}
+
+// -- Connection -----------------------------------------------------------------------------
+
 struct Connection {
     id: u64,
-    server: Arc<Server>,
+    session: Session,
     outbox: Arc<Outbox>,
     hello: bool,
-    reads: ReadApi,
 }
 
 impl Connection {
@@ -519,7 +787,7 @@ impl Connection {
                 }
             }
         }
-        self.server.hub.unsubscribe(self.id);
+        self.session.server.hub.unsubscribe(self.id);
         self.outbox.close();
     }
 
@@ -530,7 +798,7 @@ impl Connection {
             Err(PushError::Closed) => false,
             Err(PushError::Full) => {
                 drop_slow(self.id, &self.outbox);
-                self.server.hub.unsubscribe(self.id);
+                self.session.server.hub.unsubscribe(self.id);
                 false
             }
         }
@@ -540,7 +808,19 @@ impl Connection {
     /// which runs but is not answered, or `subscribe`, which queues its own).
     fn handle(&mut self, req: RpcRequest) -> Option<Response> {
         let result = match req.method.as_str() {
-            method::HELLO => self.hello(&req),
+            method::HELLO => {
+                let r = self.session.call(&req).unwrap_or(Ok(Value::Null));
+                if r.is_ok() {
+                    self.hello = true;
+                    let client = req.params.get("client").and_then(Value::as_str);
+                    info!(
+                        "Socket connection {}: hello from {:?}",
+                        self.id,
+                        client.unwrap_or("")
+                    );
+                }
+                r
+            }
             _ if !self.hello => Err(ErrorObject::new(
                 code::HELLO_REQUIRED,
                 "hello must be the first request",
@@ -549,40 +829,21 @@ impl Connection {
                 Ok(()) => return None,
                 Err(e) => Err(e),
             },
-            method::ENGINE_STATUS => Ok(self.status()),
-            name if is_read_method(name) => self.reads.call(&req),
-            method::TASK_QUEUE => req.params_as::<TaskQueueParams>().and_then(|p| {
-                self.check_account(&p.account_id)?;
-                if !p.task.is_object() {
-                    return Err(ErrorObject::new(
-                        code::INVALID_PARAMS,
-                        "the task must be an object",
-                    ));
-                }
-                self.dispatch(Request::QueueTask(p.task))
+            name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
+                Err(ErrorObject::new(
+                    code::WRONG_CHANNEL,
+                    format!(
+                        "{name} is only accepted on the engine's stdin, from the process that \
+                         started it: account credentials never go over the socket"
+                    ),
+                ))
+            }
+            other => self.session.call(&req).unwrap_or_else(|| {
+                Err(ErrorObject::new(
+                    code::METHOD_NOT_FOUND,
+                    format!("unknown method {other}"),
+                ))
             }),
-            method::TASK_CANCEL => req.params_as::<TaskCancelParams>().and_then(|p| {
-                self.check_account(&p.account_id)?;
-                self.dispatch(Request::CancelTask(p.task_id))
-            }),
-            method::SYNC_WAKE => req.params_as::<SyncWakeParams>().and_then(|p| {
-                if let Some(a) = &p.account_id {
-                    self.check_account(a)?;
-                }
-                self.dispatch(Request::WakeWorkers)
-            }),
-            method::BODIES_FETCH => req.params_as::<BodiesFetchParams>().and_then(|p| {
-                self.check_account(&p.account_id)?;
-                self.dispatch(Request::NeedBodies(p.ids))
-            }),
-            method::CALENDAR_SYNC => req.params_as::<CalendarSyncParams>().and_then(|p| {
-                self.check_account(&p.account_id)?;
-                self.dispatch(Request::SyncCalendar)
-            }),
-            other => Err(ErrorObject::new(
-                code::METHOD_NOT_FOUND,
-                format!("unknown method {other}"),
-            )),
         };
         let id = req.id?;
         Some(match result {
@@ -591,99 +852,27 @@ impl Connection {
         })
     }
 
-    fn hello(&mut self, req: &RpcRequest) -> Reply {
-        let p = req.params_as::<HelloParams>()?;
-        if p.protocol != PROTOCOL_VERSION {
-            return Err(ErrorObject::new(
-                code::UNSUPPORTED_PROTOCOL,
-                format!(
-                    "protocol {} is not supported; this engine speaks {PROTOCOL_VERSION}",
-                    p.protocol
-                ),
-            )
-            .with_data(json!({ "supported": [PROTOCOL_VERSION] })));
-        }
-        self.hello = true;
-        info!("Socket connection {}: hello from {:?}", self.id, p.client);
-        let account = &self.server.account;
-        to_value(serde_json::to_value(HelloResult {
-            protocol: PROTOCOL_VERSION,
-            engine: env!("CARGO_PKG_VERSION").to_owned(),
-            pid: std::process::id(),
-            accounts: vec![AccountInfo {
-                account_id: account.id().to_owned(),
-                email: account.email_address().to_owned(),
-                state: "running".to_owned(),
-            }],
-        }))
-    }
-
     fn subscribe(&self, req: &RpcRequest) -> Result<(), ErrorObject> {
         let p = req.params_as::<SubscribeParams>()?;
-        let accounts = match &p.accounts {
-            None => true,
-            Some(list) => {
-                for a in list {
-                    self.check_account(a)?;
-                }
-                !list.is_empty()
+        if let Some(list) = &p.accounts {
+            for a in list {
+                self.session.server.accounts.check(a)?;
             }
-        };
+        }
         let response = req
             .id
             .clone()
             .map(|id| ms_ipc::encode(&Response::ok(Some(id), json!({}))).into());
-        self.server.hub.subscribe(
+        self.session.server.hub.subscribe(
             Subscriber {
                 conn: self.id,
                 outbox: self.outbox.clone(),
-                accounts,
+                accounts: p.accounts.map(|a| a.into_iter().collect()),
                 classes: p.classes.map(|c| c.into_iter().collect()),
             },
             response,
         );
         Ok(())
-    }
-
-    fn status(&self) -> Value {
-        let account = &self.server.account;
-        to_value(serde_json::to_value(EngineStatusResult {
-            protocol: PROTOCOL_VERSION,
-            engine: env!("CARGO_PKG_VERSION").to_owned(),
-            pid: std::process::id(),
-            uptime_secs: self.server.started.elapsed().as_secs(),
-            accounts: vec![AccountStatus {
-                account_id: account.id().to_owned(),
-                email: account.email_address().to_owned(),
-                state: "running".to_owned(),
-                connection_error: self.server.deltas.connection_error(),
-            }],
-        }))
-        .unwrap_or(Value::Null)
-    }
-
-    fn check_account(&self, account_id: &str) -> Result<(), ErrorObject> {
-        if account_id == self.server.account.id() {
-            return Ok(());
-        }
-        Err(ErrorObject::new(
-            code::UNKNOWN_ACCOUNT,
-            format!("unknown account {account_id}"),
-        ))
-    }
-
-    /// Hands `request` to the main thread and waits for its result.
-    fn dispatch(&self, request: Request) -> Reply {
-        let internal = || ErrorObject::new(code::INTERNAL_ERROR, "the engine is shutting down");
-        let (tx, rx) = mpsc::channel();
-        self.server
-            .commands
-            .send(Command {
-                request,
-                reply: Some(tx),
-            })
-            .map_err(|_| internal())?;
-        rx.recv().unwrap_or_else(|_| Err(internal()))
     }
 }
 
@@ -705,12 +894,21 @@ mod tests {
     }
 
     fn subscriber(conn: u64, classes: Option<&[&str]>) -> (Subscriber, Arc<Outbox>) {
+        filtered_subscriber(conn, None, classes)
+    }
+
+    fn filtered_subscriber(
+        conn: u64,
+        accounts: Option<&[&str]>,
+        classes: Option<&[&str]>,
+    ) -> (Subscriber, Arc<Outbox>) {
+        let set = |l: &[&str]| l.iter().map(|s| (*s).to_owned()).collect();
         let outbox = Arc::new(Outbox::new(1 << 20));
         let sub = Subscriber {
             conn,
             outbox: outbox.clone(),
-            accounts: true,
-            classes: classes.map(|c| c.iter().map(|s| (*s).to_owned()).collect()),
+            accounts: accounts.map(set),
+            classes: classes.map(set),
         };
         (sub, outbox)
     }
@@ -726,9 +924,9 @@ mod tests {
 
     #[test]
     fn secrets_go_to_the_parent_only() {
-        let hub = Hub::new("a1", 1 << 20);
+        let hub = Hub::new(1 << 20);
         let parent = Captured::default();
-        let mut sink = hub.sink(Box::new(parent.clone()));
+        let mut sink = hub.sink("a1", Box::new(parent.clone()));
         let (sub, outbox) = subscriber(1, None);
         hub.subscribe(sub, None);
 
@@ -748,8 +946,8 @@ mod tests {
 
     #[test]
     fn secrets_stay_out_of_the_backlog() {
-        let hub = Hub::new("a1", 1 << 20);
-        let mut sink = hub.sink(Box::new(Captured::default()));
+        let hub = Hub::new(1 << 20);
+        let mut sink = hub.sink("a1", Box::new(Captured::default()));
         sink.write_item(
             SECRETS_UPDATED,
             r#"{"modelClass":"ProcessAccountSecretsUpdated","modelJSONs":[{"refresh":"s3cret"}]}"#,
@@ -761,8 +959,8 @@ mod tests {
 
     #[test]
     fn a_filtered_subscriber_leaves_the_backlog() {
-        let hub = Hub::new("a1", 1 << 20);
-        let mut sink = hub.sink(Box::new(Captured::default()));
+        let hub = Hub::new(1 << 20);
+        let mut sink = hub.sink("a1", Box::new(Captured::default()));
         sink.write_item("ProcessState", r#"{"modelClass":"ProcessState"}"#);
         sink.write_item("Task", r#"{"modelClass":"Task"}"#);
 
@@ -780,5 +978,26 @@ mod tests {
         let (late, l_out) = subscriber(3, None);
         hub.subscribe(late, None);
         assert!(queued(&l_out).is_empty());
+    }
+
+    /// A subscriber filtered to one account leaves the backlog, every account's lines in it,
+    /// for the first unfiltered one.
+    #[test]
+    fn an_account_filtered_subscriber_leaves_the_backlog() {
+        let hub = Hub::new(1 << 20);
+        let mut a = hub.sink("a1", Box::new(Captured::default()));
+        let mut b = hub.sink("b1", Box::new(Captured::default()));
+        a.write_item("Task", r#"{"modelClass":"Task","from":"a1"}"#);
+        b.write_item("Task", r#"{"modelClass":"Task","from":"b1"}"#);
+
+        let (watch, w_out) = filtered_subscriber(1, Some(&["a1"]), None);
+        hub.subscribe(watch, None);
+        assert!(queued(&w_out).is_empty());
+
+        let (all, a_out) = subscriber(2, None);
+        hub.subscribe(all, None);
+        let lines = queued(&a_out).concat();
+        assert!(lines.contains("\"accountId\":\"a1\""), "{lines}");
+        assert!(lines.contains("\"accountId\":\"b1\""), "{lines}");
     }
 }

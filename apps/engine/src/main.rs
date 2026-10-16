@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `mailsync`: one process per account, plus one-shot modes (docs/engine-port-plan.md
+//! `mailsync`: one process per account (`sync`), or every account in one process (`serve`,
+//! docs/engine-protocol-plan.md section 4), plus one-shot modes (docs/engine-port-plan.md
 //! section 3).
 //!
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`), Copyright © 2017 Foundry 376,
@@ -14,6 +15,8 @@ mod output;
 mod platform;
 #[cfg(unix)]
 mod read_api;
+#[cfg(unix)]
+mod serve;
 #[cfg(unix)]
 mod socket;
 mod stdin_loop;

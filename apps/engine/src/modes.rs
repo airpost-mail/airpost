@@ -12,10 +12,9 @@ mod install_check;
 mod test_auth;
 
 use std::io::BufRead;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use ms_core::constants::{thread, EXIT_FAILURE, EXIT_OK};
+use ms_core::constants::{EXIT_FAILURE, EXIT_OK};
 use ms_core::{Account, Identity};
 use ms_net::{HttpMetadataBackend, LocalOnly, MetadataBackend, TernServer};
 use serde_json::{json, Value};
@@ -29,6 +28,7 @@ pub fn run(opts: Options) -> i32 {
         Mode::Migrate => return migrate(&opts),
         Mode::InstallCheck => return install_check::run(),
         Mode::ImportLegacy => return import_legacy::run(&opts),
+        Mode::Serve => return serve(&opts),
         _ => {}
     }
     if opts.mode == Mode::Sync && opts.socket.is_some() && cfg!(not(unix)) {
@@ -63,13 +63,26 @@ pub fn run(opts: Options) -> i32 {
         one_shot_error(&format!("Setup Failed: {e}"));
         return EXIT_FAILURE;
     }
-    install_panic_hook();
+    install_panic_hook(false);
 
     match opts.mode {
         Mode::Test => test_auth::run(&account),
         Mode::Sync => sync(&opts, account, identity),
-        Mode::Migrate | Mode::InstallCheck | Mode::ImportLegacy | Mode::Reset => unreachable!(),
+        Mode::Migrate | Mode::InstallCheck | Mode::ImportLegacy | Mode::Reset | Mode::Serve => {
+            unreachable!()
+        }
     }
+}
+
+#[cfg(unix)]
+fn serve(opts: &Options) -> i32 {
+    crate::serve::run(opts)
+}
+
+#[cfg(not(unix))]
+fn serve(_opts: &Options) -> i32 {
+    one_shot_error("--mode serve is not supported on this platform yet");
+    EXIT_FAILURE
 }
 
 /// `runSingleFunctionAndExit`: `"\n" + {"error":null}` or `{"error":"<what>"}`.
@@ -134,7 +147,7 @@ fn read_account(opts: &Options) -> Result<Account, i32> {
 
 /// What the identity line selects (docs/backend-plan.md 4.1, O7).
 #[derive(Debug)]
-enum IdentityLine {
+pub(crate) enum IdentityLine {
     /// `null`, or a Mailspring-shaped identity, which is validated and then ignored.
     None,
     Tern(TernServer),
@@ -143,15 +156,33 @@ enum IdentityLine {
     InvalidTern(ms_net::TernServerError),
 }
 
+/// Why an identity line was refused: the one-shot error, and the text to echo as `log`
+/// (empty when it may carry the Tern server token).
+pub(crate) struct IdentityError {
+    pub message: String,
+    pub log: Option<String>,
+}
+
 fn read_identity(opts: &Options) -> Result<IdentityLine, i32> {
     let text = match &opts.identity {
         Some(i) => i.clone(),
         None => read_line_after_prompt("\nWaiting for Identity JSON:\n"),
     };
+    parse_identity(&text).map_err(|e| {
+        match e.log {
+            Some(log) => one_shot(&json!({ "error": e.message, "log": log })),
+            None => one_shot_error(&e.message),
+        }
+        EXIT_FAILURE
+    })
+}
+
+/// Reads the identity line `sync` mode takes on stdin and `serve` takes in `account.add`.
+pub(crate) fn parse_identity(text: &str) -> Result<IdentityLine, IdentityError> {
     if text == "null" {
         return Ok(IdentityLine::None);
     }
-    let value = serde_json::from_str::<Value>(&text);
+    let value = serde_json::from_str::<Value>(text);
     if let Ok(v) = &value {
         if TernServer::is_tern_server(v) {
             return Ok(match TernServer::from_json(v) {
@@ -165,32 +196,58 @@ fn read_identity(opts: &Options) -> Result<IdentityLine, i32> {
         .and_then(Identity::from_json);
     match identity {
         Ok(i) if i.valid() => Ok(IdentityLine::None),
-        Ok(_) => {
-            one_shot_error("ErrorIdentityMissingFields");
-            Err(EXIT_FAILURE)
-        }
+        Ok(_) => Err(IdentityError {
+            message: "ErrorIdentityMissingFields".to_owned(),
+            log: None,
+        }),
         Err(e) => {
             // A malformed Tern server line carries the token: never echo it.
             let log = if text.contains("tern-server") {
                 ""
             } else {
-                text.as_str()
+                text
             };
-            one_shot(&json!({ "error": format!("Invalid Identity JSON: {e}"), "log": log }));
-            Err(EXIT_FAILURE)
+            Err(IdentityError {
+                message: format!("Invalid Identity JSON: {e}"),
+                log: Some(log.to_owned()),
+            })
         }
     }
 }
 
 /// A panic is a bug: log it as critical (which also writes stderr, where the client picks
 /// it up) and abort, as the C++ top-level handler did for unexpected exceptions.
-fn install_panic_hook() {
-    std::panic::set_hook(Box::new(|info| {
-        let name = std::thread::current().name().unwrap_or("").to_owned();
+///
+/// In `serve` mode a panic on one of an account's threads (they carry its id, and
+/// `WorkerContext::spawn` catches the unwind) only stops that account: it is logged at
+/// error to the account's log and unwinds. Engine-wide threads still abort the process.
+pub(crate) fn install_panic_hook(serve: bool) {
+    std::panic::set_hook(Box::new(move |info| {
+        let current = std::thread::current();
+        let name = current.name().unwrap_or("").to_owned();
+        if serve && ms_core::log::thread_account().is_some() && !is_engine_thread(&name) {
+            tracing::error!("Unhandled panic on thread {name}: {info}");
+            return;
+        }
         ms_core::critical!("Unhandled panic on thread {name}: {info}");
         ms_core::log::flush();
         std::process::abort();
     }));
+}
+
+/// Threads that serve every account. `serve` mode's stdin thread carries an account id for
+/// a moment while it adds one, and must still abort on a panic.
+fn is_engine_thread(name: &str) -> bool {
+    use ms_core::constants::thread;
+    [
+        thread::STDIN,
+        thread::SOCKET,
+        thread::SOCKET_READER,
+        thread::SOCKET_WRITER,
+        thread::SIGNALS,
+        thread::ACCOUNT_STOP,
+    ]
+    .contains(&name)
 }
 
 pub(crate) fn spawn(
@@ -208,8 +265,8 @@ pub(crate) fn spawn(
 }
 
 /// The HTTP backend for a valid Tern server object, `LocalOnly` otherwise.
-fn metadata_backend(
-    opts: &Options,
+pub(crate) fn metadata_backend(
+    config_dir: &std::path::Path,
     account: &Account,
     identity: IdentityLine,
     deltas: &Arc<ms_store::DeltaStream>,
@@ -233,7 +290,7 @@ fn metadata_backend(
     let host = server.host().to_owned();
     let deltas = deltas.clone();
     let on_refresh = Box::new(move || deltas.send_identity_refresh_needed());
-    match HttpMetadataBackend::new(server, account.id(), &opts.config_dir, on_refresh) {
+    match HttpMetadataBackend::new(server, account.id(), config_dir, on_refresh) {
         Ok(b) => {
             tracing::info!("{}", metadata_backend_tern(&host));
             Arc::new(b)
@@ -263,86 +320,89 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
     };
     #[cfg(unix)]
     let deltas = match &socket {
-        Some((hub, _)) => ms_store::DeltaStream::with_sink(
-            hub.sink(Box::new(ms_store::WriteSink(std::io::stdout()))),
-        ),
+        Some((hub, _)) => ms_store::DeltaStream::with_sink(hub.sink(
+            account.id(),
+            Box::new(ms_store::WriteSink(std::io::stdout())),
+        )),
         None => ms_store::DeltaStream::stdout(),
     };
     #[cfg(not(unix))]
     let deltas = ms_store::DeltaStream::stdout();
-    let metadata = metadata_backend(opts, &account, identity, &deltas);
+    let metadata = metadata_backend(&opts.config_dir, &account, identity, &deltas);
     let deltas_for_tokens = deltas.clone();
     let tokens = ms_net::TokenManager::new(Some(Box::new(move |a: &Account| {
         deltas_for_tokens.send_updated_secrets(a)
     })));
-    let ctx = ms_sync::WorkerContext {
-        account: account.clone(),
-        config_dir: opts.config_dir.clone(),
+    let mut ctx = ms_sync::WorkerContext::new(
+        account,
+        opts.config_dir.clone(),
         deltas,
-        clock: ms_core::clock::system(),
-        verbose: opts.verbose,
-        foreground: Arc::new(ms_sync::ForegroundControl::new()),
-        background_mark_all: Arc::new(AtomicBool::new(false)),
-        tokens: Arc::new(tokens),
+        Arc::new(tokens),
         metadata,
-        tasks: Arc::new(ms_tasks::Tasks),
-    };
-
-    // The foreground thread is started by background after its first pass.
-    let c = ctx.clone();
-    let background = spawn(thread::BACKGROUND, move || {
-        ms_sync::background::run_background(c)
-    });
-    let c = ctx.clone();
-    spawn(thread::CAL_CONTACTS, move || {
-        ms_sync::cal_contacts::run_cal_contacts(c)
-    });
-    if !ctx.metadata.is_local_only() {
-        let c = ctx.clone();
-        spawn(thread::METADATA, move || {
-            ms_sync::metadata_worker::run_metadata_worker(c)
-        });
-    }
-    let c = ctx.clone();
-    spawn(thread::METADATA_EXPIRATION, move || {
-        ms_sync::metadata_expiration::run_metadata_expiration(c)
-    });
+        Arc::new(ms_tasks::Tasks),
+        Arc::new(abort_on_failure),
+    );
+    ctx.verbose = opts.verbose;
 
     #[cfg(unix)]
     if let Some((hub, listener)) = socket {
         let path = opts.socket.clone().unwrap_or_default();
         let (account, deltas, orphan) = (ctx.account.clone(), ctx.deltas.clone(), opts.orphan);
         let config_dir = ctx.config_dir.clone();
-        return dispatch::run(ctx, move |commands| {
-            crate::socket::serve(
-                listener,
-                crate::socket::Server {
-                    hub,
+        let dispatcher: Dispatcher = Box::new(move |ctx, rx, commands| {
+            dispatch::run(ctx, rx, move || {
+                let accounts = crate::socket::SingleAccount {
                     account,
                     deltas,
-                    started,
                     commands: commands.clone(),
-                    config_dir,
-                },
-            );
-            let shown = path.to_string_lossy();
-            tracing::info!("{}", ms_core::logmsg::socket_listening(&shown));
-            write_stdout(&format!("{}\n", json!({ "listening": shown })));
-            if !orphan {
-                stdin_loop::spawn_reader(commands);
-            }
+                };
+                crate::socket::serve(
+                    listener,
+                    Arc::new(crate::socket::Server {
+                        hub,
+                        accounts: Arc::new(accounts),
+                        started,
+                        config_dir,
+                    }),
+                );
+                let shown = path.to_string_lossy();
+                tracing::info!("{}", ms_core::logmsg::socket_listening(&shown));
+                write_stdout(&format!("{}\n", json!({ "listening": shown })));
+                if !orphan {
+                    stdin_loop::spawn_reader(commands);
+                }
+            })
         });
+        return run_account(ctx, Some(dispatcher));
     }
     #[cfg(not(unix))]
     let _ = started;
 
-    if opts.orphan {
-        // Blocks forever: the worker never returns.
-        let _ = background.join();
-        EXIT_OK
-    } else {
-        dispatch::run(ctx, stdin_loop::spawn_reader)
-    }
+    // `--orphan` has no transport, so no `main` thread: the process waits on background.
+    let dispatcher: Option<Dispatcher> = (!opts.orphan).then(|| -> Dispatcher {
+        Box::new(|ctx, rx, commands| {
+            dispatch::run(ctx, rx, move || stdin_loop::spawn_reader(commands))
+        })
+    });
+    run_account(ctx, dispatcher)
+}
+
+type Dispatcher = ms_sync::runtime::Dispatcher<dispatch::Command>;
+
+/// Starts the account's threads (the foreground thread is started by background after its
+/// first pass) and blocks until its `main` thread exits, which in practice it doesn't: the
+/// stdin lifeline or a signal ends the process.
+fn run_account(ctx: ms_sync::WorkerContext, dispatcher: Option<Dispatcher>) -> i32 {
+    ms_sync::AccountRuntime::start(ctx, dispatcher).wait();
+    EXIT_OK
+}
+
+/// `sync` mode's failure handler: the account is the process, so a failure ends it, as the
+/// C++ worker loops and main loop did.
+fn abort_on_failure(failure: &ms_sync::AccountFailure) {
+    ms_core::critical!("{}", failure.message);
+    ms_core::log::flush();
+    std::process::abort();
 }
 
 /// Binds `--socket` and writes the discovery file, before any worker starts, so a path that
@@ -359,7 +419,7 @@ fn bind_socket(
         one_shot_error(&message);
         EXIT_FAILURE
     };
-    let listener = crate::platform::uds::bind(path).map_err(fail)?;
+    let listener = crate::platform::uds::bind(path).map_err(|e| fail(e.message))?;
     crate::platform::remove_on_exit(path.to_owned());
     match crate::socket::write_discovery(&opts.config_dir, account.id(), path) {
         Ok(discovery) => crate::platform::remove_on_exit(discovery),
@@ -368,6 +428,6 @@ fn bind_socket(
     if let Err(e) = crate::platform::remove_on_termination() {
         tracing::warn!("-X Could not watch for SIGTERM; the socket files may stay behind: {e}");
     }
-    let hub = crate::socket::Hub::new(account.id(), crate::socket::queue_limit());
+    let hub = crate::socket::Hub::new(crate::socket::queue_limit());
     Ok((hub, listener))
 }

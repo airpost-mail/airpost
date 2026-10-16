@@ -166,17 +166,33 @@ pub mod uds {
         fs::rename(&tmp, path)
     }
 
+    /// Why [`bind`] failed: `message` is the one-shot message for the client, `in_use` that
+    /// another process answers on the socket.
+    pub struct BindError {
+        pub message: String,
+        pub in_use: bool,
+    }
+
+    impl From<String> for BindError {
+        fn from(message: String) -> Self {
+            BindError {
+                message,
+                in_use: false,
+            }
+        }
+    }
+
     /// Binds a `0600` socket at `path`, creating its parent directory as `0700` when it is
-    /// missing. An existing socket file is replaced only when nothing answers on it. The
-    /// error is the one-shot message for the client.
-    pub fn bind(path: &Path) -> Result<UnixListener, String> {
+    /// missing. An existing socket file is replaced only when nothing answers on it.
+    pub fn bind(path: &Path) -> Result<UnixListener, BindError> {
         let shown = path.display();
         let len = path.as_os_str().len();
         if len >= SUN_PATH_LEN {
             return Err(format!(
                 "Socket path {shown} is {len} bytes; this OS allows {}. Choose a shorter path.",
                 SUN_PATH_LEN - 1
-            ));
+            )
+            .into());
         }
         if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
             create_private_dir(parent)
@@ -184,17 +200,20 @@ pub mod uds {
         }
         match fs::symlink_metadata(path) {
             Ok(meta) if !meta.file_type().is_socket() => {
-                return Err(format!("{shown} exists and is not a socket"));
+                return Err(format!("{shown} exists and is not a socket").into());
             }
             Ok(_) => {
                 if UnixStream::connect(path).is_ok() {
-                    return Err(format!("Another process is listening on {shown}"));
+                    return Err(BindError {
+                        message: format!("Another process is listening on {shown}"),
+                        in_use: true,
+                    });
                 }
                 fs::remove_file(path)
                     .map_err(|e| format!("Could not remove the stale socket {shown}: {e}"))?;
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-            Err(e) => return Err(format!("Could not check {shown}: {e}")),
+            Err(e) => return Err(format!("Could not check {shown}: {e}").into()),
         }
         // The umask keeps the socket private between bind and chmod. No other thread
         // creates files this early in the process.

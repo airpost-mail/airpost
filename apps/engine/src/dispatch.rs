@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The main thread's command handler (`runListenOnMainThread`). Commands from stdin and,
-//! with `--socket`, from socket connections arrive over one channel as [`Command`] values
-//! and are handled in order (docs/engine-protocol-plan.md S0). The main thread owns the
-//! `Store` the local phases run on.
+//! An account's `main` thread: the command handler (`runListenOnMainThread`). Commands
+//! from stdin and, with `--socket` or in `serve` mode, from socket connections arrive over
+//! the account's channel as [`Command`] values and are handled in order
+//! (docs/engine-protocol-plan.md S0). The thread owns the `Store` the local phases run on.
 //!
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`), Copyright © 2017 Foundry 376,
 //! GPL-3.0. See NOTICE.md.
@@ -14,11 +14,11 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ms_core::constants::{thread, EXIT_OK, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
+use ms_core::constants::{thread, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
 use ms_core::SyncError;
 use ms_ipc::{code, ErrorObject};
 use ms_store::{Model, Task};
-use ms_sync::WorkerContext;
+use ms_sync::{AccountFailure, WorkerContext};
 use ms_tasks::TaskProcessor;
 use serde_json::{json, Value};
 
@@ -38,6 +38,9 @@ pub enum Request {
     TestCrash,
     /// stdin only.
     TestSegfault,
+    /// `serve` mode's `test.panic`, debug builds only: a panic on the account's `main`
+    /// thread, which stops only that account.
+    TestPanic,
 }
 
 /// A method's result, or the error to answer with.
@@ -49,46 +52,50 @@ pub struct Command {
     pub reply: Option<mpsc::Sender<Reply>>,
 }
 
-/// Opens the main thread's store, cleans up tasks left by the last run, calls `start` with
-/// the sender the transports use, then handles commands until every sender is gone.
-pub fn run(ctx: WorkerContext, start: impl FnOnce(mpsc::Sender<Command>)) -> i32 {
+/// Opens the thread's store, cleans up tasks left by the last run, calls `start` (which
+/// starts the transports), then handles commands until the account stops or every sender
+/// is gone. A database error on the way stops the account.
+pub fn run(ctx: WorkerContext, commands: mpsc::Receiver<Command>, start: impl FnOnce()) {
     let store = match ms_store::Store::open(&ctx.config_dir, ctx.deltas.clone()) {
         Ok(s) => s,
         Err(e) => {
-            ms_core::critical!("Could not open the database: {e}");
-            ms_core::log::flush();
-            std::process::abort();
+            let message = format!("Could not open the database: {e}");
+            return ctx.fail(AccountFailure::new(message, e.to_json()));
         }
     };
     store.set_stream_delay(STREAM_DELAY_MAIN_MS);
     let tasks = TaskProcessor::for_context(&ctx, &store);
     if let Err(e) = tasks.cleanup_tasks_after_launch() {
-        abort_on_task_error(&e);
+        fail_on_task_error(&ctx, &e);
+        return;
     }
 
-    let (tx, rx) = mpsc::channel();
-    start(tx);
+    start();
     let dispatcher = Dispatcher {
         ctx: &ctx,
         tasks: &tasks,
         fg_wake_queued: Arc::new(AtomicBool::new(false)),
         calendar_running: Arc::new(AtomicBool::new(false)),
     };
-    for command in rx {
+    while let Some(command) = ms_sync::runtime::next_command(&ctx, &commands) {
         let result = dispatcher.handle(command.request);
         if let Some(reply) = command.reply {
             let _ = reply.send(result);
         }
     }
-    EXIT_OK
 }
 
-/// A database error from a task's local phase or a cancel leaves the task as it was; the
-/// C++ main loop let it escape and aborted.
-fn abort_on_task_error(e: &ms_core::Error) -> ! {
-    ms_core::critical!("An unexpected error occurred during program execution: {e}");
-    ms_core::log::flush();
-    std::process::abort();
+/// A database error from a task's local phase or a cancel leaves the task as it was and
+/// stops the account (the C++ main loop let it escape and aborted). Returns the reply for
+/// the command that hit it.
+fn fail_on_task_error(ctx: &WorkerContext, e: &ms_core::Error) -> ErrorObject {
+    let message = format!("An unexpected error occurred during program execution: {e}");
+    ctx.fail(AccountFailure::new(message, e.to_json()));
+    ErrorObject::new(
+        code::INTERNAL_ERROR,
+        "the account stopped on a database error",
+    )
+    .with_data(e.to_json())
 }
 
 struct Dispatcher<'a> {
@@ -106,14 +113,14 @@ impl Dispatcher<'_> {
                 // A task that has started (or finished) cannot always be dequeued, but a
                 // deleted draft's pending saves can.
                 if let Err(e) = self.tasks.cancel(&id) {
-                    abort_on_task_error(&e);
+                    return Err(fail_on_task_error(self.ctx, &e));
                 }
                 Ok(json!({}))
             }
             Request::WakeWorkers => {
                 tracing::info!("{}", ms_core::logmsg::waking_all_workers());
                 self.ctx.background_mark_all.store(true, Ordering::SeqCst);
-                ms_core::wake::wake_all_workers();
+                self.ctx.wake_workers();
                 // The network may have changed while asleep; don't leave IDLE hanging on a
                 // dead connection.
                 self.ctx.foreground.interrupt();
@@ -127,11 +134,12 @@ impl Dispatcher<'_> {
             Request::SyncCalendar => Ok(json!({ "started": self.sync_calendar() })),
             Request::TestCrash => {
                 let e = SyncError::fatal("test", "triggered via cin");
-                ms_core::critical!("{}", e.to_json());
-                ms_core::log::flush();
-                std::process::abort();
+                self.ctx
+                    .fail(AccountFailure::new(e.to_json().to_string(), e.to_json()));
+                Ok(json!({}))
             }
             Request::TestSegfault => platform::raise_segfault(),
+            Request::TestPanic => panic!("triggered via test.panic"),
         }
     }
 
@@ -163,18 +171,21 @@ impl Dispatcher<'_> {
         {
             let flag = self.fg_wake_queued.clone();
             let fg = self.ctx.foreground.clone();
-            std::thread::spawn(move || {
+            let spawned = self.ctx.spawn(thread::QUEUE_TASK_DEBOUNCE, move || {
                 std::thread::sleep(Duration::from_millis(QUEUE_TASK_IDLE_DEBOUNCE_MS));
                 fg.interrupt();
                 flag.store(false, Ordering::SeqCst);
             });
+            if spawned.is_err() {
+                self.fg_wake_queued.store(false, Ordering::SeqCst);
+            }
         }
         reply
     }
 
     fn perform_local(&self, mut task: Task) -> Reply {
         if let Err(e) = self.tasks.perform_local(&mut task) {
-            abort_on_task_error(&e);
+            return Err(fail_on_task_error(self.ctx, &e));
         }
         if task.error().is_null() {
             Ok(task.data)
@@ -197,12 +208,10 @@ impl Dispatcher<'_> {
         }
         let flag = self.calendar_running.clone();
         let c = self.ctx.clone();
-        let spawned = std::thread::Builder::new()
-            .name(thread::CALENDAR.into())
-            .spawn(move || {
-                ms_sync::cal_contacts::run_calendar_pass(c);
-                flag.store(false, Ordering::SeqCst);
-            });
+        let spawned = self.ctx.spawn(thread::CALENDAR, move || {
+            ms_sync::cal_contacts::run_calendar_pass(c);
+            flag.store(false, Ordering::SeqCst);
+        });
         if spawned.is_err() {
             self.calendar_running.store(false, Ordering::SeqCst);
             return false;

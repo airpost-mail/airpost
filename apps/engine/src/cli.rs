@@ -13,6 +13,9 @@ use ms_core::constants::{EXIT_FAILURE, EXIT_OK};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Sync,
+    /// Every account in one process, added and removed by the parent over stdin
+    /// (docs/engine-protocol-plan.md section 4).
+    Serve,
     Test,
     Reset,
     Migrate,
@@ -24,6 +27,7 @@ impl Mode {
     fn parse(s: &str) -> Option<Mode> {
         Some(match s {
             "sync" => Mode::Sync,
+            "serve" => Mode::Serve,
             "test" => Mode::Test,
             "reset" => Mode::Reset,
             "migrate" => Mode::Migrate,
@@ -46,7 +50,8 @@ pub struct Options {
     pub orphan: bool,
     pub verbose: bool,
     /// `--socket <path>`: sync mode serves the socket protocol there instead of writing
-    /// deltas to stdout (docs/engine-protocol-plan.md section 2). Other modes ignore it.
+    /// deltas to stdout (docs/engine-protocol-plan.md section 2); serve mode listens there
+    /// instead of `$CONFIG_DIR_PATH/run/engine.sock`. Other modes ignore it.
     pub socket: Option<PathBuf>,
     pub config_dir: PathBuf,
 }
@@ -64,10 +69,10 @@ pub fn usage() -> String {
      \x20 --help  \tPrint usage and exit.\n\
      \x20 --identity, -i  \tIdentity JSON, or null.\n\
      \x20 --account, -a  \tRequired: Account JSON with credentials.\n\
-     \x20 --mode, -m  \tRequired: sync, test, reset, migrate, install-check or import-legacy.\n\
+     \x20 --mode, -m  \tRequired: sync, serve, test, reset, migrate, install-check or import-legacy.\n\
      \x20 --orphan, -o  \tOptional: allow the process to run without a parent bound to stdin.\n\
      \x20 --verbose, -v  \tOptional: log all IMAP and SMTP traffic for debugging purposes.\n\
-     \x20 --socket  \tOptional, sync mode: serve the engine protocol on this Unix socket path.\n"
+     \x20 --socket  \tOptional, sync and serve modes: serve the engine protocol on this Unix socket path.\n"
         .to_owned()
 }
 
@@ -183,6 +188,10 @@ mod tests {
         assert_eq!(o.socket, Some(PathBuf::from("/tmp/e.sock")));
         let o = run(&["--mode", "sync", "--socket=/tmp/f.sock"]);
         assert_eq!(o.socket, Some(PathBuf::from("/tmp/f.sock")));
+
+        let o = run(&["--mode", "serve"]);
+        assert_eq!(o.mode, Mode::Serve);
+        assert_eq!(o.socket, None);
     }
 
     #[test]

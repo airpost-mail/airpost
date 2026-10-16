@@ -65,7 +65,7 @@ fn read_commands(commands: &Sender<Command>) -> ! {
 /// stdin is closed (or broken) for good: the C++ polled `cin.good()` for 30 s before
 /// deciding the parent was gone. A debugger attaching can interrupt stdin briefly; a
 /// closed pipe does not come back, so this just waits out the same window.
-fn wait_for_parent_then_exit() -> ! {
+pub(crate) fn wait_for_parent_then_exit() -> ! {
     let lost_at = Instant::now();
     while lost_at.elapsed() <= Duration::from_secs(STDIN_ORPHAN_TIMEOUT) {
         std::thread::sleep(Duration::from_millis(250));

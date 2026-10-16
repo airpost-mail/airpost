@@ -6,7 +6,6 @@
 //! and the `metadata` thread pulls from it (`MetadataWorker::run`). The local-only default
 //! does neither.
 
-use std::sync::atomic::AtomicBool;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
@@ -18,7 +17,7 @@ use ms_imap::{
 use ms_net::{LocalOnly, MetadataBackend, MetadataDelta, MetadataPush, TokenManager};
 use ms_providers::ServerProfile;
 use ms_store::{DeltaStream, Model, Query, Store, Task, Thread};
-use ms_sync::{ForegroundControl, WorkerContext};
+use ms_sync::WorkerContext;
 use serde_json::json;
 
 const ACCOUNT: &str = "acc1";
@@ -41,6 +40,7 @@ impl MetadataBackend for FakeBackend {
     fn pull(
         &self,
         cursor: Option<&str>,
+        _stop: &dyn Fn() -> bool,
         sink: &mut dyn FnMut(MetadataDelta),
     ) -> ms_core::Result<String> {
         if let Some(deltas) = self.first_pull.lock().unwrap().take() {
@@ -68,18 +68,17 @@ fn context(dir: &std::path::Path, backend: Arc<dyn MetadataBackend>) -> WorkerCo
         "settings": {},
     }))
     .unwrap();
-    WorkerContext {
-        account: Arc::new(account),
-        config_dir: dir.to_owned(),
-        deltas: DeltaStream::new(Box::new(std::io::sink())),
-        clock: Arc::new(ManualClock::new(T0)),
-        verbose: false,
-        foreground: Arc::new(ForegroundControl::new()),
-        background_mark_all: Arc::new(AtomicBool::new(false)),
-        tokens: Arc::new(TokenManager::new(None)),
-        metadata: backend,
-        tasks: Arc::new(ms_tasks::Tasks),
-    }
+    let mut ctx = WorkerContext::new(
+        Arc::new(account),
+        dir.to_owned(),
+        DeltaStream::new(Box::new(std::io::sink())),
+        Arc::new(TokenManager::new(None)),
+        backend,
+        Arc::new(ms_tasks::Tasks),
+        Arc::new(|f: &ms_sync::AccountFailure| panic!("account failed: {}", f.message)),
+    );
+    ctx.clock = Arc::new(ManualClock::new(T0));
+    ctx
 }
 
 fn migrated() -> tempfile::TempDir {

@@ -2,12 +2,13 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The read methods (docs/engine-protocol-plan.md section 3), answered on the calling
-//! socket connection's reader thread from its own read-only connection, never on the main
-//! thread, so a slow query delays neither task local phases nor deltas. Opened on the
-//! connection's first read and kept for its lifetime.
+//! connection's reader thread (or `serve` mode's stdin thread) from its own read-only
+//! connection, never on an account's `main` thread, so a slow query delays neither task
+//! local phases nor deltas. Opened on the connection's first read and kept for its lifetime.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use ms_ipc::{
     code, method, CategoriesListParams, CategoryCounts, ContactsSearchResult, ErrorObject,
@@ -20,6 +21,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::dispatch::Reply;
+use crate::socket::Accounts;
 
 pub fn is_read_method(name: &str) -> bool {
     matches!(
@@ -37,7 +39,8 @@ pub fn is_read_method(name: &str) -> bool {
 
 pub struct ReadApi {
     config_dir: PathBuf,
-    account_id: String,
+    /// Reads are answered for every account the engine holds, running or stopped.
+    accounts: Arc<dyn Accounts>,
     store: Option<ReadStore>,
 }
 
@@ -76,10 +79,10 @@ fn split_counts(categories: Vec<Category>) -> (Vec<Value>, BTreeMap<String, Cate
 }
 
 impl ReadApi {
-    pub fn new(config_dir: PathBuf, account_id: String) -> Self {
+    pub fn new(config_dir: PathBuf, accounts: Arc<dyn Accounts>) -> Self {
         ReadApi {
             config_dir,
-            account_id,
+            accounts,
             store: None,
         }
     }
@@ -94,13 +97,7 @@ impl ReadApi {
     }
 
     fn check_account(&self, account_id: &str) -> Result<(), ErrorObject> {
-        if account_id == self.account_id {
-            return Ok(());
-        }
-        Err(ErrorObject::new(
-            code::UNKNOWN_ACCOUNT,
-            format!("unknown account {account_id}"),
-        ))
+        self.accounts.check(account_id)
     }
 
     /// Answers a method [`is_read_method`] accepts.

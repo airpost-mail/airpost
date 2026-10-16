@@ -21,7 +21,7 @@ undo pairing) that the port keeps.
 | `ms-sync` | worker threads, `MailProcessor`, `MailboxModel`, `WorkerContext`, the task runner seam |
 | `ms-tasks` | `TaskProcessor` |
 | `ms-ipc` | the socket protocol: JSON-RPC envelope, method types, NDJSON framing, blocking client |
-| `mailsync` (here) | CLI, modes, stdin reader, main-thread dispatch, `--socket` server, thread startup |
+| `mailsync` (here) | CLI, modes, stdin reader, main-thread dispatch, `--socket` server, `serve` mode (`serve.rs`: account registry, parent channel), thread startup |
 
 Dependency order: `ms-core` ← everything; `ms-store`, `ms-providers`, `ms-mime`, `ms-net`
 on `ms-core`; `ms-imap`, `ms-smtp` also on `ms-providers`; `ms-dav` on `ms-net`; `ms-sync`
@@ -110,7 +110,9 @@ smaller functions over commentary; a comment that restates the code should be de
 - Threads that log must be spawned with `std::thread::Builder::name`, using the names in
   `ms_core::constants::thread` (`background`, `foreground`, `calContacts`, `metadata`,
   `metadataExpiration`, `calendar`). The log line carries the thread name and the harness
-  reads it.
+  reads it. An account's threads, short-lived ones included, are spawned with
+  `WorkerContext::spawn`, which also carries the account id that routes their lines to
+  `mailsync-<accountId>.log` when one process holds several accounts (`ms_core::log`).
 - Protocol traffic goes through `ms_core::protolog::ProtocolLogger` (`sent …` / `recv …`, one
   line per protocol line), and AUTH payloads are `Direction::SentPrivate` so they are never
   logged.
@@ -128,8 +130,12 @@ smaller functions over commentary; a comment that restates the code should be de
   `Result<T, MailError>`; convert with `MailError::into_sync("<call>")` so the debuginfo
   names the failing call. Logical failures are `SyncError::new(key, debuginfo, retryable,
   offline)` (or `fatal` / `offline`). Constraint races on insert check
-  `Error::is_constraint_violation()`. Workers sleep on retryable errors and abort on the rest;
-  a panic is logged as critical and aborts.
+  `Error::is_constraint_violation()`. Workers sleep on retryable errors; the rest, task
+  local-phase database errors and panics on an account's threads stop that account through
+  `WorkerContext::fail` (`ms_sync::runtime`), whose `sync`-mode handler logs critical and
+  aborts; in `serve` mode it logs at error (nothing on stderr), stops only that account and
+  sends `account.state` `stopped`. A panic on an engine-wide thread (stdin, socket, signals)
+  is logged as critical and aborts in both modes.
 - **Database.** One `Store` per thread (it is `!Send`). SQL is inline uppercase literals;
   repeated statements use `prepare_cached`. Writes that batch deltas run in
   `store.transaction("<function_name>", |s| …)`. The schema is `ms_store::schema::V12_SCHEMA`;
