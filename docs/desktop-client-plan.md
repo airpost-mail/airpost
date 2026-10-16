@@ -1148,3 +1148,26 @@ the desktop doesn't start `tern-mcp http`; old HTTP registrations in Codex and C
 are documented, not removed; an entry pointing at a moved tern-mcp isn't repaired; Microsoft's
 `localhost` redirect against the 127.0.0.1 bind needs the trial check; no `/usr/bin/tern-mcp`
 in the Linux packages; stage 5 decides whether `apiVersion` becomes 1.27.0.
+
+2026-10-16, stage 6 (supervisor and connections), branch `roadmap/client-s6`: delivered.
+`EngineSupervisor` (`src/browser/engine-supervisor.ts`) runs `serve` from main and is the one
+writer to its stdin; accounts come from `config.json`, secrets from `KeyManager`, now a
+main-process class (`src/browser/key-manager.ts`) with a renderer facade over IPC that keeps
+the old API; the Mailspring keychain migration moved with it unchanged.
+`ProcessAccountSecretsUpdated` is stored in main. Each window has its own socket connection
+(`src/engine-connection.ts`); the main window keeps Task handlers, `OnlineStatusStore` and
+`queueTask` routing and gets account events over IPC with ack and replay across reloads. The
+IPC rebroadcast is gone for `serve` only. No engine reuse; the exit-3 loop is unchanged;
+startup `migrate` waits up to 40 s for a live pid in `run/engine.json`. Deviations: only the
+main window subscribes to every account (so it alone takes the startup backlog), other
+windows subscribe to the accounts the engine runs; the main window seeds `OnlineStatusStore`
+from `engine.status` on each connect; commands sent while a window's socket is down are kept
+(bounded) and sent after the reconnect; will-quit waits for `engine.shutdown`, and launches
+during that wait relaunch the app afterwards. Per-account, stdio and the C++ engine still run
+in the main window's `MailsyncBridge`. Open items: no IPC path yet for stdin-only calls from
+other windows (`account.test`, stage 10; `credentials.import`, stage 11); deltas sent while
+a window's socket is down or the main window is reloading are lost to it, so those Task
+handlers don't run; a non-main window misses an account's first deltas until its subscribe
+follows the status; a stale `run/engine.json` with a reused pid costs the full 40 s; Squirrel
+install after the engine stop is unchecked on a signed build; `test-crash` has no socket
+method; KeyManager still keys by email (stage 11).
