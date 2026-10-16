@@ -33,8 +33,8 @@
     "message_id": "<m1@host>",
     "folder_path": "INBOX",
     "uid": 7,
-    "source": "acc1-1057049557Team sync-alice@example.netbob@example.comcarol@example.orgzed@example.com-m1@host",
-    "id": "MVgQFQJfpX4iNu9nzPyfYH5xp35s9yZu8k6aohFg7"
+    "source": "acc1-1057049557Team sync-bob@example.comcarol@example.orgzed@example.com-m1@host",
+    "id": "YJkeT3fZK7dMdjHCDTnDfsYPMAQAdiHU5hApdfjMc"
   },
   {
     "name": "message id without brackets",
@@ -54,8 +54,8 @@
     "message_id": "m1@host",
     "folder_path": "Archive",
     "uid": 99,
-    "source": "acc1-1057049557Team sync-alice@example.netbob@example.comcarol@example.orgzed@example.com-m1@host",
-    "id": "MVgQFQJfpX4iNu9nzPyfYH5xp35s9yZu8k6aohFg7"
+    "source": "acc1-1057049557Team sync-bob@example.comcarol@example.orgzed@example.com-m1@host",
+    "id": "YJkeT3fZK7dMdjHCDTnDfsYPMAQAdiHU5hApdfjMc"
   },
   {
     "name": "no message id",

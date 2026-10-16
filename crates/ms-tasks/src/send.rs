@@ -34,6 +34,11 @@ use crate::TaskProcessor;
 const SENT_POLL_DELAYS: [u64; 4] = [0, 1, 1, 2];
 const SENT_POLL_DELAYS_SERVER_SAVES: [u64; 7] = [0, 1, 1, 2, 2, 3, 3];
 
+/// Saved on the task once SMTP has accepted the message. A relaunch that finds the task
+/// still `remote` with this set knows the message went out, so the draft can go; without it
+/// the engine may have died before or during SMTP and the draft is kept for the user.
+const SMTP_DONE_KEY: &str = "_smtpDone";
+
 /// Metadata whose pluginId starts with this is attached to the thread, prefix stripped.
 const THREAD_METADATA_PREFIX: &str = "thread:";
 
@@ -171,6 +176,11 @@ impl TaskProcessor<'_> {
         session: &mut dyn ImapSession,
     ) -> Result<()> {
         if has(&task.data, "_performRemoteRan") {
+            if has(&task.data, SMTP_DONE_KEY) {
+                // The engine was stopped (the client quit) between SMTP and removing the
+                // draft, usually while it waited for the Sent copy.
+                self.finish_interrupted_send(task, session)?;
+            }
             return Ok(());
         }
         task.data["_performRemoteRan"] = Value::Bool(true);
@@ -235,6 +245,8 @@ impl TaskProcessor<'_> {
         let sent_raw = ms_mime::build(&message)?;
 
         self.deliver(&mut message, multisend, plaintext, &from.email, &sent_raw)?;
+        task.data[SMTP_DONE_KEY] = Value::Bool(true);
+        self.store.save(task)?;
 
         // Delete the draft from the server first, so the user sees it has been sent and the
         // next scan of Drafts does not bring it back.
@@ -322,8 +334,15 @@ impl TaskProcessor<'_> {
                     e.code.name()
                 ),
                 Ok(uid) => {
-                    // Without APPENDUID (no UIDPLUS) the copy cannot be found by UID.
-                    sent_uid = uid.unwrap_or(0);
+                    // Without APPENDUID (no UIDPLUS) the copy is looked up by Message-ID.
+                    // The poll above found none, so a single match is ours; with more the
+                    // server's own copy landed meanwhile and ours can't be told apart.
+                    sent_uid = uid.unwrap_or_else(|| {
+                        match find_recent(session, sent.path(), draft.header_message_id())[..] {
+                            [only] => only,
+                            _ => 0,
+                        }
+                    });
                     appended_to_sent = true;
                 }
             }
@@ -553,6 +572,25 @@ impl TaskProcessor<'_> {
             );
         }
         Ok(())
+    }
+
+    /// The tail of a send whose engine was stopped after SMTP accepted it: the draft's
+    /// server copies and its row go. The Sent copy is not placed again (a copy the
+    /// provider filed is synced as usual).
+    fn finish_interrupted_send(&self, task: &Task, session: &mut dyn ImapSession) -> Result<()> {
+        let draft_json = at(&task.data, "draft");
+        let Some(id) = draft_json.get("id").and_then(Value::as_str) else {
+            return Ok(());
+        };
+        let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", id))? else {
+            return Ok(());
+        };
+        info!(
+            "{}",
+            logmsg::removing_draft_of_interrupted_send(draft.header_message_id())
+        );
+        remove_message_copies_resilient(session, self.store, self.account.id(), &draft)?;
+        self.remove_sent_draft(&draft)
     }
 
     /// Removes the draft that was sent, as stored (its snapshot is what the thread counts

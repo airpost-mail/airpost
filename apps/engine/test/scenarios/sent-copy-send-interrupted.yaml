@@ -1,0 +1,50 @@
+name: sent-copy-send-interrupted
+description: >
+  The user sends a saved draft and quits while the engine waits for the provider's Sent
+  copy, after SMTP accepted the message. The client kills the engine on quit. On relaunch
+  the send task is still `remote` but has already run, so it must not send again; the
+  draft row must go, since the message did go out. Exchange files its Sent copy after the
+  kill, and the next pass syncs it as the only copy in Sent.
+source: "docs/fix-backlog.md F1 item 2 (apps/desktop/app/src/flux/mailsync-bridge.ts:563-567 kills the engine on quit; TaskProcessor.cpp performRemoteSendDraft returns early once _performRemoteRan is set and leaves the draft); Exchange Sent Items copy 0.5-8 s after the SMTP 250 (live O365 sends, 2026-09-27)"
+servers:
+  - {fake: outlook, smtp: true, smtp_sent_copy: "Sent Items", smtp_sent_copy_delay: 6.5}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "interrupted-1@example.test"
+        subject: "Sent just before quitting"
+        body: "<p>Hi</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "bob", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - assert: {counts: {total: 4}}
+  - client.task:
+      __cls: SendDraftTask
+      draft: {stored: "interrupted-1@example.test"}
+      perRecipientBodies: null
+    as: send1
+  - wait: {log: "Sleeping 1 to wait for sent folder", timeout: 60}
+  - restart: {}
+  - wait: {smtp_sent_copies: 1, timeout: 30}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp: {count: 1}
+  server_counts: {Sent Items: 1}
+  counts: {Sent Items: 1, total: 4}   # the draft row is gone; the provider's copy is synced
+  log_count: {"Removing the draft of a send interrupted after SMTP": 1}
+  db_matches_server: {}
+  stable: {passes: 1}
+  running: true

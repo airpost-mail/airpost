@@ -208,6 +208,11 @@ pub fn removing_late_sent_copies(
     format!("- Removing {count} late server copies of sent message {message_id} from {path}, keeping UID {keep_uid}")
 }
 
+/// sent-copy-send-interrupted: `Removing the draft of a send interrupted after SMTP`.
+pub fn removing_draft_of_interrupted_send(header_message_id: &str) -> String {
+    format!("- Removing the draft of a send interrupted after SMTP: {header_message_id}")
+}
+
 // -- Process (main.cpp) ----------------------------------------------------------------------
 
 /// The first line of every sync process's log.

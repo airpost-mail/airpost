@@ -1223,7 +1223,7 @@ fn send_appends_to_sent_when_the_server_files_no_copy() {
     assert_eq!(e.copies(&id), [("Sent".to_owned(), sent_uids[0], None)]);
     assert_eq!(local.json()["_asc"]["f"], sent.id());
     assert_eq!(local.json()["_asc"]["u"], sent_uids[0]);
-    assert_eq!(local.json()["_asc"]["x"], T0 + 30 * 60);
+    assert_eq!(local.json()["_asc"]["x"], T0 + 7 * 24 * 60 * 60);
     assert!(e.body_of(&id).unwrap().contains("Hi Bob"));
     assert!(e
         .sent_folder()
@@ -1407,6 +1407,185 @@ fn late_sent_copies_are_removed_keeping_the_appended_one() {
     assert_eq!(e.imap.uids("Sent"), [kept]);
     assert_eq!(e.copies(&id), [("Sent".to_owned(), kept, None)]);
     assert_eq!(e.sent_folder().local_status()["serverSavesSent"], true);
+    e.assert_invariants();
+}
+
+#[test]
+fn late_sent_copies_are_removed_days_after_the_send() {
+    for (after, removed) in [(2 * 60 * 60, true), (8 * 24 * 60 * 60, false)] {
+        let mut e = env(&["MOVE", "UIDPLUS"]);
+        e.mail_folders();
+        let mut task = e.queue(
+            "SendDraftTask",
+            json!({"draft": draft_json("late-3@example.test", json!({})), "perRecipientBodies": null}),
+        );
+        e.remote(&mut task);
+        let kept = e.imap.uids("Sent")[0];
+        let ours = e.imap.boxes["Sent"].messages[&kept].clone();
+        let id = id_for_message(ACCOUNT, "Sent", &ours);
+
+        let sent = e.sent_folder();
+        let late = e.imap.add("Sent", ours.clone());
+        let fetched = e.imap.boxes["Sent"].messages[&late].clone();
+        MailProcessor::new(&e.account, &e.store)
+            .insert_fallback_to_update_message(&fetched, &sent, T0)
+            .unwrap();
+
+        // Past the C++ 30 minutes, within the 7 days; then past those too.
+        e.store.set_clock(Arc::new(ManualClock::new(T0 + after)));
+        let mut p = processor(&e.store, e.harness());
+        p.remove_late_sent_copies(&sent, &mut e.imap).unwrap();
+        drop(p);
+
+        let expected: Vec<u32> = if removed {
+            vec![kept]
+        } else {
+            vec![kept, late]
+        };
+        assert_eq!(e.imap.uids("Sent"), expected, "{after} s after the send");
+        assert_eq!(e.copies(&id).len(), expected.len());
+        e.assert_invariants();
+    }
+}
+
+#[test]
+fn late_sent_copies_with_another_id_are_matched_by_message_id() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let mut task = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("late-2@example.test", json!({})), "perRecipientBodies": null}),
+    );
+    e.remote(&mut task);
+    let kept = e.imap.uids("Sent")[0];
+    let ours = e.imap.boxes["Sent"].messages[&kept].clone();
+    let id = id_for_message(ACCOUNT, "Sent", &ours);
+
+    // The provider's copy lists other recipients, so it hashes to another id.
+    let sent = e.sent_folder();
+    let mut header = ours.header.clone().unwrap();
+    header.cc = vec![Address::new(None, "carol@example.net")];
+    let late = e.imap.add(
+        "Sent",
+        ImapMessage {
+            header: Some(header),
+            ..ours.clone()
+        },
+    );
+    let fetched = e.imap.boxes["Sent"].messages[&late].clone();
+    let late_id = id_for_message(ACCOUNT, "Sent", &fetched);
+    assert_ne!(late_id, id);
+    MailProcessor::new(&e.account, &e.store)
+        .insert_fallback_to_update_message(&fetched, &sent, T0)
+        .unwrap();
+
+    // A row with the Message-ID that holds no Sent copy (an orphan of a moved INBOX copy)
+    // is not the cleanup's to remove.
+    let inbox = e
+        .store
+        .find::<Folder>(&Query::new().equal("role", "inbox"))
+        .unwrap()
+        .unwrap();
+    let mut header = ours.header.clone().unwrap();
+    header.cc = vec![Address::new(None, "dave@example.net")];
+    let inbox_uid = e.imap.add(
+        "INBOX",
+        ImapMessage {
+            header: Some(header),
+            ..ours
+        },
+    );
+    let inbox_copy = e.imap.boxes["INBOX"].messages[&inbox_uid].clone();
+    let orphan_id = id_for_message(ACCOUNT, "INBOX", &inbox_copy);
+    let processor_ = MailProcessor::new(&e.account, &e.store);
+    processor_
+        .insert_fallback_to_update_message(&inbox_copy, &inbox, T0)
+        .unwrap();
+    processor_
+        .delete_vanished_placements(&inbox, &[inbox_uid])
+        .unwrap();
+    assert!(e.message(&orphan_id).is_some());
+
+    let mut p = processor(&e.store, e.harness());
+    p.remove_late_sent_copies(&sent, &mut e.imap).unwrap();
+    drop(p);
+
+    assert_eq!(e.imap.uids("Sent"), [kept]);
+    assert_eq!(e.copies(&id), [("Sent".to_owned(), kept, None)]);
+    assert!(
+        e.message(&late_id).is_none(),
+        "removed, not left to the orphan sweep"
+    );
+    assert!(e.message(&orphan_id).is_some(), "left to the orphan sweep");
+    e.assert_invariants();
+}
+
+#[test]
+fn send_without_uidplus_finds_the_appended_copy_by_message_id() {
+    let mut e = env(&["MOVE"]);
+    let (sent, _, _) = e.mail_folders();
+    let mut task = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("no-uidplus@example.test", json!({})), "perRecipientBodies": null}),
+    );
+    e.remote(&mut task);
+    assert_eq!(task.status(), "complete", "{}", task.data);
+    assert!(task.data["error"].is_null());
+
+    let sent_uids = e.imap.uids("Sent");
+    assert_eq!(sent_uids.len(), 1);
+    let copy = e.imap.boxes["Sent"].messages[&sent_uids[0]].clone();
+    let id = id_for_message(ACCOUNT, "Sent", &copy);
+    let local = e.message(&id).expect("the appended copy is ingested");
+    assert_eq!(local.json()["_asc"]["f"], sent.id());
+    assert_eq!(local.json()["_asc"]["u"], sent_uids[0]);
+    assert!(e.body_of(&id).unwrap().contains("Hi Bob"));
+    e.assert_invariants();
+}
+
+#[test]
+fn a_send_stopped_after_smtp_drops_the_draft_on_relaunch() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let (_, drafts, _) = e.mail_folders();
+    let delivered = e.deliver(&drafts, 7, MessageFlags::DRAFT);
+    let not_delivered = e.deliver(&drafts, 8, MessageFlags::DRAFT);
+    let stopped = |e: &Env, draft_id: &str, smtp_done: bool| {
+        let mut task = e.queue(
+            "SendDraftTask",
+            json!({
+                "draft": draft_json(&format!("{draft_id}@example.test"), json!({"id": draft_id})),
+                "perRecipientBodies": null,
+            }),
+        );
+        // What a run stopped during the Sent poll (or before SMTP) left on the task.
+        task.data["_performRemoteRan"] = json!(true);
+        if smtp_done {
+            task.data["_smtpDone"] = json!(true);
+        }
+        e.store.save(&mut task).unwrap();
+        task
+    };
+
+    let mut task = stopped(&e, &delivered, true);
+    e.remote(&mut task);
+    assert_eq!(task.status(), "complete", "{}", task.data);
+    assert!(e.message(&delivered).is_none());
+    assert_eq!(
+        e.imap.uids("Drafts").len(),
+        1,
+        "its server copy is gone too"
+    );
+
+    // SMTP may not have run: the draft stays for the user to send again.
+    let mut task = stopped(&e, &not_delivered, false);
+    e.remote(&mut task);
+    assert_eq!(task.status(), "complete", "{}", task.data);
+    assert!(e.message(&not_delivered).is_some());
+
+    assert!(
+        e.imap.outbox.submissions().is_empty(),
+        "nothing is sent again"
+    );
     e.assert_invariants();
 }
 

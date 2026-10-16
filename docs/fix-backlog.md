@@ -38,6 +38,18 @@ The user runs Mailspring 1.26.0, which already has the upstream Sent-copy rewrit
 5. Optional client safety net after the engine fixes: collapse same-`headerMessageId` rows in a
    thread (`src/flux/stores/message-store.ts:280-312`).
 
+Engine half done 2026-10-15 (items 1-3; plan section 5 and section 6 "Send" record the
+divergences; scenarios `sent-copy-bcc`, `sent-copy-send-interrupted`,
+`sent-copy-late-after-window`). Item 3 has no new table: the cleanup starts from the
+account's date index over the 7-day window and filters on `_asc`, which avoids a schema
+migration; revisit if it shows up in a profile. Follow-ups:
+- Client half of item 2: delay quit while a SendDraftTask is in flight.
+- Item 5, the client safety net.
+- A send stopped after SMTP but before the APPEND, on a provider that files no Sent copy
+  (iCloud, Fastmail), still ends with no Sent copy; the relaunch only removes the draft,
+  and the draft's metadata (open and link tracking) is not attached to whatever copy syncs.
+- Item 4 is still a hypothesis.
+
 To pin down on the user's side: which account, whether the duplicate is also in webmail Sent,
 whether Bcc was used or the app was quit right after sending, and the `mailsync-<accountId>.log`
 lines for one affected send.

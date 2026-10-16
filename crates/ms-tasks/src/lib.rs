@@ -17,6 +17,7 @@ use ms_imap::ImapSession;
 use ms_net::{LocalOnly, MetadataBackend, MetadataPush, TokenManager};
 use ms_store::model::{json_i64, json_str};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
+use ms_sync::mail_processor::{MailProcessor, UnplacedMessages};
 use ms_sync::{RemoteTaskRunner, TaskRunnerFactory, WorkerContext};
 use serde_json::Value;
 use tracing::{error, info};
@@ -423,6 +424,26 @@ impl<'a> TaskProcessor<'a> {
     }
 }
 
+impl TaskProcessor<'_> {
+    /// The other messages of this account with `msg`'s Message-ID.
+    fn messages_sharing_header_message_id(&self, msg: &Message) -> Result<Vec<String>> {
+        if msg.header_message_id().is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(self
+            .store
+            .conn()
+            .prepare_cached(
+                "SELECT id FROM Message WHERE headerMessageId = ? AND accountId = ? AND id != ?",
+            )?
+            .query_map(
+                rusqlite::params![msg.header_message_id(), self.account.id(), msg.id()],
+                |r| r.get(0),
+            )?
+            .collect::<rusqlite::Result<_>>()?)
+    }
+}
+
 impl RemoteTaskRunner for TaskProcessor<'_> {
     fn cleanup_old_tasks_at_runtime(&mut self) -> Result<()> {
         self.cleanup_old_tasks()
@@ -435,8 +456,9 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
     /// A sent message appended to Sent because the server's own copy had not appeared yet
     /// may get that copy minutes later (Exchange Online, ~3 min, 2026-09-27), and each
     /// recipient of a multisend adds one. Within `SENT_COPY_CLEANUP_WINDOW` of the send,
-    /// while the appended copy is still there, every other copy in Sent is removed from
-    /// the server and the store (`removeLateSentCopies`).
+    /// while the appended copy (`_asc`) is still there, every other copy in Sent of that
+    /// message, or of a message with its Message-ID, is removed from the server and the
+    /// store (`removeLateSentCopies`).
     fn remove_late_sent_copies(
         &mut self,
         sent: &Folder,
@@ -444,22 +466,27 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
     ) -> Result<()> {
         let now = self.store.now();
         // Runs every pass: start from the messages dated within the window (their Date is
-        // the send time) so the account's date index keeps this off the rest of Sent.
-        let message_ids: Vec<String> = self
+        // the send time) so the account's date index keeps this off the rest of the mail.
+        let holders: Vec<String> = self
             .store
             .conn()
             .prepare_cached(
-                "SELECT mf.messageId FROM Message m JOIN MessageFolder mf ON mf.messageId = m.id \
+                "SELECT DISTINCT m.id FROM Message m JOIN MessageFolder mf ON mf.messageId = m.id \
                  WHERE m.accountId = ? AND m.date >= ? AND mf.folderId = ? AND mf.remoteUID > 0 \
-                 GROUP BY mf.messageId HAVING COUNT(*) > 1",
+                 AND json_extract(m.data, '$._asc.f') = ?",
             )?
             .query_map(
-                rusqlite::params![self.account.id(), now - SENT_COPY_CLEANUP_WINDOW, sent.id()],
+                rusqlite::params![
+                    self.account.id(),
+                    now - SENT_COPY_CLEANUP_WINDOW,
+                    sent.id(),
+                    sent.id()
+                ],
                 |r| r.get(0),
             )?
             .collect::<rusqlite::Result<_>>()?;
 
-        for message_id in message_ids {
+        for message_id in holders {
             let Some(msg) = self
                 .store
                 .find::<Message>(&Query::new().equal("id", &message_id))?
@@ -473,19 +500,39 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
                 continue;
             }
             let keep_uid = json_i64(&asc["u"]) as u32;
+            let kept_present = self
+                .store
+                .placements_for_message(&message_id)?
+                .iter()
+                .any(|p| p.folder_id == sent.id() && p.remote_uid == keep_uid);
+            if !kept_present {
+                continue;
+            }
+
+            // A late copy usually hashes to the same id. One that doesn't (a provider that
+            // rewrote a header the id covers) still has the Message-ID.
             let mut late = UidSet::new();
-            let mut kept_present = false;
             for p in self.store.placements_for_message(&message_id)? {
-                if p.folder_id != sent.id() || p.remote_uid == 0 {
-                    continue;
-                }
-                if p.remote_uid == keep_uid {
-                    kept_present = true;
-                } else {
+                if p.folder_id == sent.id() && p.remote_uid != 0 && p.remote_uid != keep_uid {
                     late.insert(p.remote_uid);
                 }
             }
-            if !kept_present || late.is_empty() {
+            // Only the rows that hold one of the copies being removed: a draft or orphan
+            // with this Message-ID and no Sent copy is not ours to delete below.
+            let mut others = Vec::new();
+            for id in self.messages_sharing_header_message_id(&msg)? {
+                let mut holds_copy = false;
+                for p in self.store.placements_for_message(&id)? {
+                    if p.folder_id == sent.id() && p.remote_uid != 0 {
+                        late.insert(p.remote_uid);
+                        holds_copy = true;
+                    }
+                }
+                if holds_copy {
+                    others.push(id);
+                }
+            }
+            if late.is_empty() {
                 continue;
             }
             if sent.local_status().get(ls::SERVER_SAVES_SENT).is_none() {
@@ -506,6 +553,13 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
             );
             let late: Vec<u32> = late.iter().collect();
             self.remove_sent_copies(session, sent, &late)?;
+            // Those rows lost a copy we deleted ourselves, so it has not moved anywhere: one
+            // left with no copy goes now instead of waiting for the orphan sweep.
+            MailProcessor::new(&self.account, self.store).refresh_messages(
+                &others,
+                UnplacedMessages::Remove,
+                "removeLateSentCopies",
+            )?;
         }
         Ok(())
     }

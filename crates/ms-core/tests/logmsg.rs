@@ -137,6 +137,10 @@ fn foreground_and_tasks() {
         r"Removing 1 late server copies",
         &removing_late_sent_copies(1, "abc", "Sent", 3),
     );
+    assert_matches(
+        r"Removing the draft of a send interrupted after SMTP",
+        &removing_draft_of_interrupted_send("sent-1@example.test"),
+    );
 }
 
 #[test]

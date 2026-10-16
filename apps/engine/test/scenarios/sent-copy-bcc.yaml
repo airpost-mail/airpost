@@ -1,0 +1,43 @@
+name: sent-copy-bcc
+description: >
+  sent-copy-saved-late with a Bcc to the sender's own address. The SMTP wire copy has no
+  Bcc header, so the provider's late Sent copy and the Bcc'd self's INBOX copy lack it,
+  while the copy the engine APPENDs keeps it. The message id must not hash Bcc: the late
+  Sent copy must then be found and removed (one copy left in Sent), and the INBOX and Sent
+  copies must be one message with two placements, not two rows.
+source: "docs/fix-backlog.md F1 item 1 (MailUtils.cpp:639-652 hashes To+Cc+Bcc); Exchange files the submitted (Bcc-stripped) message in Sent Items 0.5-8 s after the SMTP 250 (live O365 sends, 2026-09-27); RFC 5322 3.6.3 (Bcc removed from the copies sent to recipients)"
+servers:
+  - {fake: outlook, smtp: true, smtp_sent_copy: "Sent Items", smtp_sent_copy_delay: 6.5}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SendDraftTask
+      draft:
+        hMsgId: "bcc-1@example.test"
+        subject: "Bcc to myself"
+        body: "<p>Hi</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "bob", email: "bob@example.net"}]
+        cc: []
+        bcc: [{name: "Harness Test", email: "test@example.test"}]
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+      perRecipientBodies: null
+    as: send1
+  - wait: {task: send1, timeout: 90}
+  - wait: {smtp_sent_copies: 1, timeout: 30}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp: {count: 1}
+  server_counts: {Sent Items: 1, INBOX: 4}
+  counts: {Sent Items: 1, INBOX: 4, total: 4}   # the INBOX and Sent copies are one row
+  log_count: {"Placing a new message": 1, "Removing 1 late server copies": 1}
+  db_matches_server: {}
+  stable: {passes: 1}
+  running: true

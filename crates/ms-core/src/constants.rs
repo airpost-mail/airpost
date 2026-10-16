@@ -110,7 +110,9 @@ pub const WORKER_SLEEP: u64 = 120;
 pub const QUEUE_TASK_IDLE_DEBOUNCE_MS: u64 = 300;
 
 /// A Sent copy appearing within this window after a send is the server's late copy of it.
-pub const SENT_COPY_CLEANUP_WINDOW: i64 = 30 * 60;
+/// Days rather than the C++ 30 minutes: a provider that files its copy late can take longer
+/// than that, and the check is cheap (docs/engine-port-plan.md section 6, "Late copies").
+pub const SENT_COPY_CLEANUP_WINDOW: i64 = 7 * 24 * 60 * 60;
 /// Delays between looks for the provider's Sent copy after a send, and the longer series
 /// used once the Sent folder has `serverSavesSent`.
 pub const SENT_POLL_DELAYS: [u64; 4] = [0, 1, 1, 2];

@@ -1,9 +1,11 @@
 //! Golden message ids. `message_ids.json` was produced by an independent Python
 //! implementation (hashlib, `email.header`, a hand-written base58); see the plan, section 5.
-//! Changing an expected id means every existing message gets a new id on resync.
+//! Changing an expected id means every existing message gets a new id on resync. The cases
+//! with a Bcc pin that Bcc is not a participant (docs/fix-backlog.md F1).
 
 use base64::Engine;
 use ms_core::ids::{message_id, message_id_source, MessageIdInput};
+use ms_core::{Address, MessageHeader};
 use serde_json::Value;
 
 #[test]
@@ -23,12 +25,25 @@ fn golden_message_ids() {
             c.get("subject")
                 .map(|s| s.as_str().unwrap().as_bytes().to_vec())
         };
-        let mut recipients: Vec<&str> = Vec::new();
-        for key in ["to", "cc", "bcc"] {
-            if let Some(list) = c.get(key).and_then(Value::as_array) {
-                recipients.extend(list.iter().map(|v| v.as_str().unwrap()));
-            }
-        }
+        // Through `MessageHeader::recipient_emails`, which picks the participants: the
+        // cases with a Bcc pin that it is left out.
+        let addresses = |key: &str| -> Vec<Address> {
+            c.get(key)
+                .and_then(Value::as_array)
+                .map(|list| {
+                    list.iter()
+                        .map(|v| Address::new(None, v.as_str().unwrap()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let header = MessageHeader {
+            to: addresses("to"),
+            cc: addresses("cc"),
+            bcc: addresses("bcc"),
+            ..Default::default()
+        };
+        let recipients = header.recipient_emails();
         let input = MessageIdInput {
             account_id: c["account_id"].as_str().unwrap(),
             date: c.get("date").and_then(Value::as_str),

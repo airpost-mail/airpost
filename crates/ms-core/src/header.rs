@@ -62,12 +62,13 @@ impl MessageHeader {
             .map(|(_, v)| v.as_str())
     }
 
-    /// The addr-specs of To, Cc and Bcc, the participants of the message id.
+    /// The addr-specs of To and Cc, the participants of the message id. Bcc is left out:
+    /// the Sent copy we append keeps it and the copies recipients and providers file do
+    /// not, and all of them must get the same id (docs/fix-backlog.md F1).
     pub fn recipient_emails(&self) -> Vec<&str> {
         self.to
             .iter()
             .chain(&self.cc)
-            .chain(&self.bcc)
             .map(|a| a.email.as_str())
             .collect()
     }

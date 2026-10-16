@@ -40,7 +40,9 @@ pub struct MessageIdInput<'a> {
     /// The Subject header value, RFC 2047 encoded words and raw 8-bit bytes allowed. It is
     /// decoded, trimmed and NFC-normalised.
     pub subject: Option<&'a [u8]>,
-    /// The addr-specs (`local@domain`) of every To, Cc and Bcc address, in any order.
+    /// The addr-specs (`local@domain`) of every To and Cc address, in any order. Not Bcc:
+    /// only the sender's own copy carries it, so it would give that copy a different id
+    /// from the one the provider files in Sent or delivers to a Bcc'd self.
     pub recipients: &'a [&'a str],
     /// The Message-ID header value, angle brackets optional. `None` when the message has
     /// none: the stored `hMsgId` is then a generated `uuid@hostname`, but the hash uses "".

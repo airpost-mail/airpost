@@ -1,0 +1,50 @@
+name: sent-copy-late-after-window
+description: >
+  The provider files its Sent copy long after the send. The engine stopped waiting and
+  APPENDed its own copy; the late copy must still be removed when it turns up hours later,
+  and the appended one kept. Hours are simulated: while the engine is stopped, the expiry
+  of the appended copy's `_asc` marker is moved two hours earlier, which is how it looks
+  two hours after the send (C++ kept the marker for 30 minutes). On the server without
+  UIDPLUS, APPEND reports no UID, so the engine must find its own copy by Message-ID to
+  write the marker at all.
+source: "docs/fix-backlog.md F1 item 3 (SENT_COPY_CLEANUP_WINDOW 30 min, no _asc without APPENDUID); Exchange made one Sent Items copy visible ~3 min after the SMTP 250 (live O365 sends, 2026-09-27); RFC 4315 3 (APPENDUID is a UIDPLUS response code)"
+servers:
+  - {fake: outlook, smtp: true, smtp_sent_copy: "Sent Items", smtp_sent_copy_delay: 8}
+  - {fake: dovecot-without-uidplus, smtp: true, smtp_sent_copy: "Sent", smtp_sent_copy_delay: 8}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SendDraftTask
+      draft:
+        hMsgId: "late-window-1@example.test"
+        subject: "Filed hours later"
+        body: "<p>Hi</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "bob", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+      perRecipientBodies: null
+    as: send1
+  - wait: {task: send1, timeout: 90}
+  - restart:
+      before:
+        - db.sql: "UPDATE Message SET data = json_set(data, '$._asc.x', json_extract(data, '$._asc.x') - 7200) WHERE json_extract(data, '$._asc') IS NOT NULL"
+  - wait: {smtp_sent_copies: 1, timeout: 30}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp: {count: 1}
+  counts: {total: 4}
+  # Lines the engine logged just before the restart's SIGTERM may not reach the file, so
+  # the APPEND is not counted here; the removal names the kept UID.
+  log_count: {"Removing 1 late server copies .* keeping UID 1$": 1}
+  db_matches_server: {}
+  stable: {passes: 1}
+  running: true

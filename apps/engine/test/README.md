@@ -178,7 +178,10 @@ log lines match, to bound a loop the engine should take a known number of times)
 {count, folders, fetched, metadata}}}` (the one-shot flag mail rules run on: no message carries
 it on two deltas, across restarts, and each such delta carries the body; `folders` the
 mailboxes that delta must list, `fetched` whether it is the delta that fetched the body),
-`folder_roles: {path: role}`, `connection_error: {reported: true, cleared: true}`
+`folder_roles: {path: role}`, `thread_labels: {roles: {label path: role or null}, threads:
+[{mailbox, uids, has, lacks, server_has, server_lacks}]}` (Gmail labels on those messages'
+threads by path, each carrying its Label row's role, and their X-GM-LABELS on the server),
+`connection_error: {reported: true, cleared: true}`
 (the ProcessState stream behind the client's offline state), `migrate_output: regex` (the
 last `--mode migrate` stdout) or `{launch: first|last|n, present: [regexes], absent:
 [regexes]}`, `mode_output: {mode: regex}` (a one-shot mode run before sync),
@@ -440,6 +443,9 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | sent-copy-multisend | tracked send: one server copy per recipient, all deleted, one untracked copy kept | fake (+smtp) |
 | sent-copy-cleanup-store-refused | a late copy whose delete is refused keeps its placement and is removed on the next pass (CONDSTORE) | fake (+smtp) |
 | sent-copy-multisend-late | as above with the per-recipient copies filed after the engine stopped waiting | fake (+smtp) |
+| sent-copy-bcc | Bcc to self: the late Bcc-less Sent copy is removed; the INBOX and Sent copies are one row | fake (+smtp) |
+| sent-copy-send-interrupted | engine killed during the Sent poll: on relaunch the draft row goes and nothing is resent | fake (+smtp) |
+| sent-copy-late-after-window | a late copy hours after the send is still removed; without UIDPLUS too | fake (+smtp) |
 | move-without-move-keeps-other-deleted | no-MOVE fallback expunges only the moved UID; another client's `\\Deleted` message survives | fake, dovecot, cyrus |
 | move-without-move-connection-drop | connection lost after the server ran UID EXPUNGE: no plain EXPUNGE on reconnect | fake |
 | folder-roles-by-localized-name | roles by name without SPECIAL-USE: modified UTF-7 names, Borradores, `\\Archive` | fake |
