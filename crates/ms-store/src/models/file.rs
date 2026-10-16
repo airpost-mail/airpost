@@ -132,9 +132,20 @@ impl File {
         name
     }
 
-    /// `files/<id[0:2]>/<id[2:4]>/<id>` under `files_root`, id lowercased.
+    /// `files/<id[0:2]>/<id[2:4]>/<id>` under `files_root`, id lowercased. File ids come
+    /// from clients too (a draft's `files`), so anything but ASCII letters, digits, `-` and
+    /// `_` becomes `_`: an id like `/Users/me/.ssh` or `../..` would otherwise leave
+    /// `files_root` (`Path::join` with an absolute segment replaces the root).
     pub fn dir_in(&self, files_root: &Path) -> PathBuf {
-        let id = self.id().to_lowercase();
+        let id: String = self
+            .id()
+            .chars()
+            .map(|c| match c {
+                'a'..='z' | '0'..='9' | '-' | '_' => c,
+                'A'..='Z' => c.to_ascii_lowercase(),
+                _ => '_',
+            })
+            .collect();
         files_root
             .join(id.get(0..2).unwrap_or(&id))
             .join(id.get(2..4).unwrap_or(""))
@@ -184,5 +195,37 @@ impl Model for File {
         bind_base(self, stmt)?;
         bind_named(stmt, ":filename", self.filename())?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file(id: &str) -> File {
+        File {
+            data: json!({ "id": id }),
+        }
+    }
+
+    #[test]
+    fn dir_in_stays_under_the_root() {
+        let root = Path::new("/files");
+        assert_eq!(
+            file("AbCdef12").dir_in(root),
+            Path::new("/files/ab/cd/abcdef12")
+        );
+        for id in ["/Users/me/.ssh", "../../etc", "a/../../b", "..", "/", "é/x"] {
+            let dir = file(id).dir_in(root);
+            assert!(dir.starts_with(root), "{id} → {}", dir.display());
+            assert!(
+                dir.components().all(|c| matches!(
+                    c,
+                    std::path::Component::RootDir | std::path::Component::Normal(_)
+                )),
+                "{id} → {}",
+                dir.display()
+            );
+        }
     }
 }
