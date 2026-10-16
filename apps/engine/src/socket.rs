@@ -20,7 +20,7 @@ use std::io::{BufReader, ErrorKind, Write};
 use std::net::Shutdown;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -32,9 +32,10 @@ use ms_core::Account;
 use ms_ipc::{
     account_state, code, feature, method, policy, AccountInfo, AccountListResult,
     AccountStateParams, AccountStatus, BodiesFetchParams, CalendarSyncParams, DisconnectParams,
-    EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, MailNewParams,
-    Notification, RelayDevice, Request as RpcRequest, Response, SubscribeParams, SyncWakeParams,
-    TaskCancelParams, TaskQueueParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams,
+    LogsTailResult, MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response,
+    SubscribeParams, SyncWakeParams, TaskCancelParams, TaskQueueParams, LOGS_TAIL_DEFAULT_BYTES,
+    LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
@@ -536,6 +537,22 @@ pub struct Server {
     pub started: Instant,
     /// Where the read methods open their own read-only database connection.
     pub config_dir: PathBuf,
+    pub database: DatabaseGeneration,
+}
+
+/// Bumped when `serve` replaces the database file (`engine.resetDatabase`), so each
+/// session's read connection, still on the deleted file, is reopened.
+#[derive(Clone, Debug, Default)]
+pub struct DatabaseGeneration(Arc<AtomicU64>);
+
+impl DatabaseGeneration {
+    pub fn bump(&self) {
+        self.0.fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn get(&self) -> u64 {
+        self.0.load(Ordering::SeqCst)
+    }
 }
 
 /// Starts the acceptor thread on a bound listener.
@@ -682,7 +699,11 @@ pub struct Session {
 
 impl Session {
     pub fn new(server: Arc<Server>) -> Self {
-        let reads = ReadApi::new(server.config_dir.clone(), server.accounts.clone());
+        let reads = ReadApi::new(
+            server.config_dir.clone(),
+            server.accounts.clone(),
+            server.database.clone(),
+        );
         Session { server, reads }
     }
 
@@ -722,6 +743,9 @@ impl Session {
             method::CALENDAR_SYNC => req
                 .params_as::<CalendarSyncParams>()
                 .and_then(|p| self.dispatch(&p.account_id, Request::SyncCalendar)),
+            method::ENGINE_LOGS_TAIL => req
+                .params_as::<LogsTailParams>()
+                .and_then(|p| logs_tail(&self.server.config_dir, &p)),
             _ => return None,
         })
     }
@@ -827,12 +851,66 @@ fn send(
     Ok(rx)
 }
 
+/// `engine.logs.tail`: the end of `mailsync-<accountId>.log` or `engine.log`. The account
+/// need not be held, so a removed account's log can still be read.
+fn logs_tail(config_dir: &Path, p: &LogsTailParams) -> Reply {
+    use std::io::{Read, Seek, SeekFrom};
+    let path = match &p.account_id {
+        Some(id) => {
+            // The id becomes part of a file name.
+            let valid = !id.is_empty()
+                && id.len() <= 64
+                && id
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+            if !valid {
+                return Err(ErrorObject::new(
+                    code::INVALID_PARAMS,
+                    format!("invalid accountId {id:?}"),
+                ));
+            }
+            ms_core::log::log_path(config_dir, id)
+        }
+        None => config_dir.join(ms_core::constants::ENGINE_LOG_FILE),
+    };
+    let want = p
+        .bytes
+        .unwrap_or(LOGS_TAIL_DEFAULT_BYTES)
+        .min(LOGS_TAIL_MAX_BYTES);
+    let internal = |e: std::io::Error| {
+        ErrorObject::new(
+            code::INTERNAL_ERROR,
+            format!("reading {}: {e}", path.display()),
+        )
+    };
+    let mut file = match std::fs::File::open(&path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            return to_value(serde_json::to_value(LogsTailResult::default()))
+        }
+        Err(e) => return Err(internal(e)),
+    };
+    let len = file.metadata().map_err(internal)?.len();
+    let start = len.saturating_sub(want);
+    file.seek(SeekFrom::Start(start)).map_err(internal)?;
+    let mut buf = Vec::with_capacity((len - start) as usize);
+    file.take(want).read_to_end(&mut buf).map_err(internal)?;
+    to_value(serde_json::to_value(LogsTailResult {
+        text: String::from_utf8_lossy(&buf).into_owned(),
+        truncated: start > 0,
+    }))
+}
+
 /// The methods only `serve` mode's parent channel takes.
 pub fn is_parent_method(name: &str) -> bool {
     matches!(
         name,
         method::ACCOUNT_ADD
             | method::ACCOUNT_REMOVE
+            | method::ACCOUNT_TEST
+            | method::ACCOUNT_RESET
+            | method::ENGINE_RESET_DATABASE
+            | method::ENGINE_SET_LOG_LEVEL
             | method::ENGINE_SHUTDOWN
             | method::TEST_CRASH
             | method::TEST_PANIC

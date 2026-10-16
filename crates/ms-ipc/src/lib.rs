@@ -79,6 +79,22 @@ pub mod method {
     /// `serve` mode, the parent's stdin only: stop every account, remove the socket files
     /// and exit 0.
     pub const ENGINE_SHUTDOWN: &str = "engine.shutdown";
+    /// `serve` mode, the parent's stdin only: check an account's IMAP and SMTP settings,
+    /// as `--mode test` does. The result is that mode's JSON object, with any rotated
+    /// refresh token in its `account`.
+    pub const ACCOUNT_TEST: &str = "account.test";
+    /// `serve` mode, the parent's stdin only: stop and forget the account if the engine
+    /// holds it, then delete its rows from the database (`--mode reset`). The client adds
+    /// it again to resync.
+    pub const ACCOUNT_RESET: &str = "account.reset";
+    /// `serve` mode, the parent's stdin only: stop and forget every account, delete the
+    /// database and create an empty one. The client adds the accounts again.
+    pub const ENGINE_RESET_DATABASE: &str = "engine.resetDatabase";
+    /// `serve` mode, the parent's stdin only: verbose protocol logging until a time, for
+    /// every account; running accounts restart to pick it up.
+    pub const ENGINE_SET_LOG_LEVEL: &str = "engine.setLogLevel";
+    /// The end of an account's log, or of the engine's own log.
+    pub const ENGINE_LOGS_TAIL: &str = "engine.logs.tail";
     /// `serve` mode, the parent's stdin only, debug builds only: stop one account as a
     /// fatal error would (`test-crash` on stdin in `sync` mode).
     pub const TEST_CRASH: &str = "test.crash";

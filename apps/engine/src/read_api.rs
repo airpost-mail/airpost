@@ -25,7 +25,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::dispatch::Reply;
-use crate::socket::Accounts;
+use crate::socket::{Accounts, DatabaseGeneration};
 
 pub fn is_read_method(name: &str) -> bool {
     matches!(
@@ -48,7 +48,9 @@ pub struct ReadApi {
     config_dir: PathBuf,
     /// Reads are answered for every account the engine holds, running or stopped.
     accounts: Arc<dyn Accounts>,
-    store: Option<ReadStore>,
+    database: DatabaseGeneration,
+    /// The connection, and the database generation it was opened on.
+    store: Option<(ReadStore, u64)>,
 }
 
 fn internal(e: impl std::fmt::Display) -> ErrorObject {
@@ -86,21 +88,28 @@ fn split_counts(categories: Vec<Category>) -> (Vec<Value>, BTreeMap<String, Cate
 }
 
 impl ReadApi {
-    pub fn new(config_dir: PathBuf, accounts: Arc<dyn Accounts>) -> Self {
+    pub fn new(
+        config_dir: PathBuf,
+        accounts: Arc<dyn Accounts>,
+        database: DatabaseGeneration,
+    ) -> Self {
         ReadApi {
             config_dir,
             accounts,
+            database,
             store: None,
         }
     }
 
     fn store(&mut self) -> Result<&ReadStore, ErrorObject> {
-        if self.store.is_none() {
+        let generation = self.database.get();
+        if self.store.as_ref().is_none_or(|(_, g)| *g != generation) {
+            self.store = None;
             let store = ReadStore::open(&self.config_dir)
                 .map_err(|e| internal(format!("could not open the database: {e}")))?;
-            self.store = Some(store);
+            self.store = Some((store, generation));
         }
-        Ok(self.store.as_ref().expect("opened above"))
+        Ok(&self.store.as_ref().expect("opened above").0)
     }
 
     fn check_account(&self, account_id: &str) -> Result<(), ErrorObject> {

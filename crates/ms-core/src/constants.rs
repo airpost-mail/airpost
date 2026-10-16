@@ -226,6 +226,9 @@ pub const EXIT_STDIN_CLOSED: i32 = 141;
 pub const ACCOUNT_STOP_TIMEOUT_MS: u64 = 5_000;
 /// How often an account's `main` thread checks for a stop between commands.
 pub const ACCOUNT_STOP_POLL_MS: u64 = 200;
+/// `account.reset` of an account the engine still held: how long to let the threads its stop
+/// left running finish before deleting the account's rows. They cannot be joined.
+pub const ACCOUNT_RESET_STRAGGLER_WAIT_MS: u64 = 10_000;
 /// `serve`: how long `account.add` waits for the account's `main` thread to open the
 /// database before answering with `starting`.
 pub const ACCOUNT_START_WAIT_MS: u64 = 10_000;
@@ -275,4 +278,10 @@ pub mod thread {
     pub const SIGNALS: &str = "signals";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
+    /// `serve`: runs one `account.test` for the parent.
+    pub const ACCOUNT_TEST: &str = "accountTest";
+    /// `serve`: runs one `account.reset` for the parent.
+    pub const ACCOUNT_RESET: &str = "accountReset";
+    /// `serve`: runs `engine.resetDatabase` or `engine.setLogLevel` for the parent.
+    pub const ENGINE_MAINTENANCE: &str = "engineMaintenance";
 }

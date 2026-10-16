@@ -763,3 +763,225 @@ fn a_second_engine_on_the_socket_exits_in_use() {
     e.parent.call(method::ENGINE_STATUS, json!({})).unwrap();
     e.stop();
 }
+
+#[test]
+fn account_test_on_stdin_runs_beside_other_calls() {
+    let mut e = Serve::start();
+    // A server that accepts and never greets keeps the test's IMAP step waiting.
+    let silent = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = silent.local_addr().unwrap().port();
+    let mut slow = account(A);
+    slow["settings"]["imap_port"] = json!(port);
+    let pending = e
+        .parent
+        .send(method::ACCOUNT_TEST, json!({ "account": slow }));
+    // Answered while the test still waits.
+    let listed = e.parent.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(listed["accounts"], json!([]));
+    drop(silent);
+
+    let answer = loop {
+        let msg = e
+            .parent
+            .lines
+            .recv_timeout(Duration::from_secs(120))
+            .unwrap();
+        if msg["id"] == pending {
+            break msg;
+        }
+    };
+    let result = &answer["result"];
+    assert!(result["error"].is_string(), "{answer}");
+    assert_eq!(result["error_service"], "imap");
+    assert_eq!(result["account"], Value::Null);
+    assert!(result["log"].is_string());
+
+    // Refused: an account the engine cannot read, and the socket.
+    let bad = e
+        .parent
+        .call(method::ACCOUNT_TEST, json!({ "account": { "id": "x" } }))
+        .unwrap_err();
+    assert_eq!(bad.code, code::INVALID_PARAMS);
+    let mut c = e.hello();
+    for m in [
+        method::ACCOUNT_TEST,
+        method::ACCOUNT_RESET,
+        method::ENGINE_RESET_DATABASE,
+        method::ENGINE_SET_LOG_LEVEL,
+    ] {
+        let err = c.call(m, json!({})).unwrap_err();
+        assert_eq!(err.code(), Some(code::WRONG_CHANNEL), "{m}");
+    }
+    e.stop();
+}
+
+#[test]
+fn account_reset_forgets_the_account_and_deletes_its_rows() {
+    let mut e = Serve::start();
+    e.parent.add(account(A));
+    e.parent.add(account(B));
+    let mut sub = e.hello();
+    sub.subscribe(&SubscribeParams::default()).unwrap();
+    let mut c = e.hello();
+    for (t, id) in [("t-a", A), ("t-b", B)] {
+        c.call(
+            method::TASK_QUEUE,
+            json!({ "accountId": id, "task": task(t, id) }),
+        )
+        .unwrap();
+    }
+
+    assert_eq!(
+        e.parent
+            .call(method::ACCOUNT_RESET, json!({ "accountId": A }))
+            .unwrap(),
+        json!({})
+    );
+    next_matching(&mut sub, |v| is_state(v, A, "removed"));
+    let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
+    assert_eq!(states(&status), running(&[B]));
+
+    // Added again, A starts empty; B kept its rows.
+    assert_eq!(e.parent.add(account(A))["state"], "running");
+    let gone = c
+        .call(method::TASKS_GET, json!({ "accountId": A, "id": "t-a" }))
+        .unwrap_err();
+    assert_eq!(gone.code(), Some(code::NOT_FOUND));
+    let kept = c
+        .call(method::TASKS_GET, json!({ "accountId": B, "id": "t-b" }))
+        .unwrap();
+    assert_eq!(kept["task"]["id"], "t-b");
+
+    // An account the engine doesn't hold (removed earlier) is reset all the same.
+    e.parent
+        .call(method::ACCOUNT_REMOVE, json!({ "accountId": B }))
+        .unwrap();
+    assert_eq!(
+        e.parent
+            .call(method::ACCOUNT_RESET, json!({ "accountId": B }))
+            .unwrap(),
+        json!({})
+    );
+    assert_eq!(e.parent.add(account(B))["state"], "running");
+    let gone = c
+        .call(method::TASKS_GET, json!({ "accountId": B, "id": "t-b" }))
+        .unwrap_err();
+    assert_eq!(gone.code(), Some(code::NOT_FOUND));
+    e.stop();
+}
+
+#[test]
+fn reset_database_starts_over_and_sessions_reopen_it() {
+    let mut e = Serve::start();
+    e.parent.add(account(A));
+    e.parent.add(account(B));
+    let mut c = e.hello();
+    c.call(
+        method::TASK_QUEUE,
+        json!({ "accountId": A, "task": task("t-a", A) }),
+    )
+    .unwrap();
+    // The session's read connection is open on the old file.
+    c.call(method::TASKS_GET, json!({ "accountId": A, "id": "t-a" }))
+        .unwrap();
+
+    let result = e
+        .parent
+        .call(method::ENGINE_RESET_DATABASE, Value::Null)
+        .unwrap();
+    assert_eq!(result, json!({ "removed": [A, B] }));
+    let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
+    assert_eq!(states(&status), running(&[]));
+    assert_eq!(e.discovery()["accounts"], json!([]));
+    assert!(e.dir.path().join("edgehill.db").exists());
+
+    assert_eq!(e.parent.add(account(A))["state"], "running");
+    let gone = c
+        .call(method::TASKS_GET, json!({ "accountId": A, "id": "t-a" }))
+        .unwrap_err();
+    assert_eq!(gone.code(), Some(code::NOT_FOUND));
+    e.stop();
+}
+
+#[test]
+fn set_log_level_restarts_running_accounts() {
+    let mut e = Serve::start();
+    e.parent.add(account(A));
+    let mut sub = e.hello();
+    sub.subscribe(&SubscribeParams::default()).unwrap();
+    let until = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64
+        + 60_000;
+    let result = e
+        .parent
+        .call(
+            method::ENGINE_SET_LOG_LEVEL,
+            json!({ "verboseUntil": until }),
+        )
+        .unwrap();
+    assert_eq!(result, json!({ "restarted": [A] }));
+    next_matching(&mut sub, |v| is_state(v, A, "removed"));
+    next_matching(&mut sub, |v| is_state(v, A, "running"));
+    let mut c = e.hello();
+    let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
+    assert_eq!(states(&status), running(&[A]));
+    // Accounts added later get it too, and turning it off restarts them again.
+    e.parent.add(account(B));
+    let result = e
+        .parent
+        .call(method::ENGINE_SET_LOG_LEVEL, json!({ "verboseUntil": 0 }))
+        .unwrap();
+    assert_eq!(result, json!({ "restarted": [A, B] }));
+    e.stop();
+}
+
+#[test]
+fn logs_tail_reads_the_end_of_a_log() {
+    let mut e = Serve::start();
+    e.parent.add(account(A));
+    wait_for_log(&e.log(A), "Starting");
+    let mut c = e.hello();
+    let tail = c
+        .call(
+            method::ENGINE_LOGS_TAIL,
+            json!({ "accountId": A, "bytes": 40 }),
+        )
+        .unwrap();
+    assert_eq!(tail["text"].as_str().unwrap().len(), 40);
+    assert_eq!(tail["truncated"], true);
+    let whole = c
+        .call(method::ENGINE_LOGS_TAIL, json!({ "accountId": A }))
+        .unwrap();
+    assert!(whole["text"].as_str().unwrap().contains(A));
+    let engine = c.call(method::ENGINE_LOGS_TAIL, json!({})).unwrap();
+    assert!(engine["text"]
+        .as_str()
+        .unwrap()
+        .contains("Starting the engine"));
+    let none = c
+        .call(
+            method::ENGINE_LOGS_TAIL,
+            json!({ "accountId": "e0e0-none" }),
+        )
+        .unwrap();
+    assert_eq!(none, json!({ "text": "", "truncated": false }));
+    let bad = c
+        .call(
+            method::ENGINE_LOGS_TAIL,
+            json!({ "accountId": "../config" }),
+        )
+        .unwrap_err();
+    assert_eq!(bad.code(), Some(code::INVALID_PARAMS));
+    // The parent channel answers it too.
+    let tail = e
+        .parent
+        .call(
+            method::ENGINE_LOGS_TAIL,
+            json!({ "accountId": A, "bytes": 10 }),
+        )
+        .unwrap();
+    assert_eq!(tail["text"].as_str().unwrap().len(), 10);
+    e.stop();
+}

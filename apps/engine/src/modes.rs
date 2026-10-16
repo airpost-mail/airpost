@@ -9,7 +9,7 @@
 
 mod import_legacy;
 mod install_check;
-mod test_auth;
+pub(crate) mod test_auth;
 
 use std::io::BufRead;
 use std::sync::Arc;
@@ -246,6 +246,7 @@ fn is_engine_thread(name: &str) -> bool {
         thread::SOCKET_WRITER,
         thread::SIGNALS,
         thread::ACCOUNT_STOP,
+        thread::ENGINE_MAINTENANCE,
     ]
     .contains(&name)
 }
@@ -363,6 +364,7 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
                         accounts: Arc::new(accounts),
                         started,
                         config_dir,
+                        database: Default::default(),
                     }),
                 );
                 let shown = path.to_string_lossy();

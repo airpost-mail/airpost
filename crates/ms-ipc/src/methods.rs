@@ -187,6 +187,61 @@ pub struct AccountIdParams {
     pub account_id: String,
 }
 
+/// `account.test` params. The account JSON carries credentials, which is why the method is
+/// only accepted on the parent's stdin.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AccountTestParams {
+    pub account: Value,
+}
+
+/// `engine.resetDatabase` result: the accounts it stopped and forgot.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetDatabaseResult {
+    pub removed: Vec<String>,
+}
+
+/// `engine.setLogLevel` params.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetLogLevelParams {
+    /// Unix milliseconds; verbose logging is on for accounts started before then. 0 or a
+    /// past time turns it off.
+    pub verbose_until: i64,
+}
+
+/// `engine.setLogLevel` result: the accounts restarted to apply it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetLogLevelResult {
+    pub restarted: Vec<String>,
+}
+
+/// The most `engine.logs.tail` returns, and its default.
+pub const LOGS_TAIL_MAX_BYTES: u64 = 1024 * 1024;
+pub const LOGS_TAIL_DEFAULT_BYTES: u64 = 64 * 1024;
+
+/// `engine.logs.tail` params. Without `accountId`, the engine's own log (`engine.log`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogsTailParams {
+    #[serde(default)]
+    pub account_id: Option<String>,
+    /// At most [`LOGS_TAIL_MAX_BYTES`]; [`LOGS_TAIL_DEFAULT_BYTES`] when absent.
+    #[serde(default)]
+    pub bytes: Option<u64>,
+}
+
+/// `engine.logs.tail` result. `text` is the last `bytes` of the current log file, decoded
+/// lossily; empty when the file does not exist.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogsTailResult {
+    pub text: String,
+    /// The file is longer than `text`.
+    pub truncated: bool,
+}
+
 /// `account.state` notification params.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

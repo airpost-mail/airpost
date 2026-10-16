@@ -42,7 +42,6 @@ struct Failure {
 }
 
 pub fn run(account: &Account) -> i32 {
-    let transcript = Arc::new(AccumulatingLogger::default());
     let deltas = ms_store::DeltaStream::stdout();
     let deltas_for_tokens = deltas.clone();
     // A rotated refresh token must reach the client even though the process exits right
@@ -51,18 +50,30 @@ pub fn run(account: &Account) -> i32 {
         deltas_for_tokens.send_updated_secrets(a);
         deltas_for_tokens.flush();
     })));
-
-    let mut service = SERVICE_IMAP;
-    let outcome = test_auth(account, &tokens, &transcript, &mut service);
+    let (resp, ok) = evaluate(account, &tokens);
     deltas.flush();
+    write_stdout(&resp.to_string());
+    if ok {
+        EXIT_OK
+    } else {
+        EXIT_FAILURE
+    }
+}
 
-    let (resp, code) = match outcome {
+/// `account.test` in `serve` mode: the same object, returned. A rotated refresh token is in
+/// the result's `account`, since `serve`'s stdout carries only responses.
+pub fn result(account: &Account) -> Value {
+    evaluate(account, &TokenManager::new(None)).0
+}
+
+/// The test's JSON object, and whether it passed.
+fn evaluate(account: &Account, tokens: &TokenManager) -> (Value, bool) {
+    let transcript = Arc::new(AccumulatingLogger::default());
+    let mut service = SERVICE_IMAP;
+    match test_auth(account, tokens, &transcript, &mut service) {
         Ok(None) => {
             let account = tokens.account_with_current_secrets(account).to_json();
-            (
-                response(Value::Null, service, &transcript, account),
-                EXIT_OK,
-            )
+            (response(Value::Null, service, &transcript, account), true)
         }
         Ok(Some(failure)) => {
             let mut resp = response(
@@ -74,12 +85,10 @@ pub fn run(account: &Account) -> i32 {
             if let Some(advice) = failure.advice {
                 resp["error_advice"] = json!(advice);
             }
-            (resp, EXIT_FAILURE)
+            (resp, false)
         }
-        Err(e) => (raised(&e, service, &transcript), EXIT_FAILURE),
-    };
-    write_stdout(&resp.to_string());
-    code
+        Err(e) => (raised(&e, service, &transcript), false),
+    }
 }
 
 fn response(error: Value, service: &str, transcript: &AccumulatingLogger, account: Value) -> Value {
