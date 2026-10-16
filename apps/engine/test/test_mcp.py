@@ -301,3 +301,32 @@ def test_install_writes_temp_configs_only(tmp_path):
     assert json.loads(claude.read_text())["mcpServers"] == {"mailspring": mailspring}
     status = json.loads(run("status", "--json").stdout)
     assert status["engines"] == [] and status["policy"]["accessLevel"] == "read-only"
+
+
+def test_install_replaces_the_old_plugin_bridge_entry(tmp_path):
+    claude = tmp_path / "claude_desktop_config.json"
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    bridge = lambda dir: {"command": "/Applications/Tern.app/Contents/MacOS/Tern",
+                          "args": ["/x/app.asar.unpacked/mcp-stdio-bridge.js", "--config-dir", str(dir)],
+                          "env": {"ELECTRON_RUN_AS_NODE": "1"}}
+    env = {**os.environ, "HOME": str(tmp_path / "home")}
+    run = lambda *a: subprocess.run([str(mcp_binary()), "--config-dir", str(profile), "install",
+                                     "--client", "claude-desktop", "--config-file", str(claude), *a],
+                                    capture_output=True, text=True, timeout=30, env=env)
+    # Another profile's bridge entry is left alone by --if-stale.
+    other = bridge(tmp_path / "other")
+    claude.write_text(json.dumps({"mcpServers": {"tern": other}}))
+    r = run("--if-stale")
+    assert r.returncode == 0 and r.stdout.startswith("No stale"), r.stdout + r.stderr
+    assert json.loads(claude.read_text())["mcpServers"]["tern"] == other
+    # This profile's is replaced, without --force.
+    claude.write_text(json.dumps({"mcpServers": {"tern": bridge(profile)}}))
+    r = run("--if-stale")
+    assert r.returncode == 0, r.stderr
+    assert json.loads(claude.read_text())["mcpServers"]["tern"]["args"] == ["--config-dir", str(profile)]
+    # A foreign entry is still refused, and --if-stale with --force is a usage error.
+    claude.write_text(json.dumps({"mcpServers": {"tern": {"command": "/usr/bin/other"}}}))
+    r = run()
+    assert r.returncode != 0 and "--force" in r.stderr
+    assert run("--if-stale", "--force").returncode != 0

@@ -60,6 +60,10 @@ enum Command {
         /// Replace a `tern` entry that runs something other than tern-mcp.
         #[arg(long)]
         force: bool,
+        /// Only replace the old desktop plugin's `mcp-stdio-bridge.js` entry for this
+        /// profile; do nothing when there is none.
+        #[arg(long, conflicts_with = "force")]
+        if_stale: bool,
     },
     /// Remove the `tern` server from an MCP client.
     Uninstall {
@@ -220,15 +224,21 @@ fn run(cli: Cli) -> Result<(), String> {
             client,
             ref config_file,
             force,
+            if_stale,
         }) => {
             let dir = config_dir(&cli)?;
             let exe = std::env::current_exe()
                 .and_then(std::fs::canonicalize)
                 .map_err(|e| format!("could not find this binary's path: {e}"))?;
             let entry = install::ServerEntry::for_profile(exe, &dir);
+            let replace = match (force, if_stale) {
+                (true, _) => install::Replace::Any,
+                (_, true) => install::Replace::OnlyStale,
+                _ => install::Replace::Ours,
+            };
             println!(
                 "{}",
-                install::install(client, config_file.as_deref(), &entry, force)?
+                install::install(client, config_file.as_deref(), &entry, replace)?
             );
             Ok(())
         }
@@ -287,6 +297,15 @@ mod tests {
             })
         ));
         assert!(Cli::try_parse_from(["tern-mcp", "install", "--client", "mailspring"]).is_err());
+        assert!(Cli::try_parse_from([
+            "tern-mcp",
+            "install",
+            "--client",
+            "claude-desktop",
+            "--if-stale",
+            "--force",
+        ])
+        .is_err());
     }
 
     #[test]

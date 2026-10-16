@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2329  # build_* are called as build_$platform
-# Builds the release engine (`mailsync`) for macOS and Linux and optionally places it where
-# the desktop build picks it up (apps/desktop/app/mailsync-rs, unpacked from the asar by
+# Builds the release engine (`mailsync`) and the MCP server (`tern-mcp`, apps/mcp) for macOS
+# and Linux and optionally places them where the desktop build picks them up
+# (apps/desktop/app/mailsync-rs and apps/desktop/app/tern-mcp, unpacked from the asar by
 # apps/desktop/app/build/build.js).
 #
 #   build-release.sh [macos] [linux] [--install-desktop[=ARCH]]
@@ -12,8 +13,10 @@
 #   aarch64-apple-darwin/mailsync     x86_64-apple-darwin/mailsync   universal-apple-darwin/mailsync
 #   x86_64-unknown-linux-gnu/mailsync aarch64-unknown-linux-gnu/mailsync
 #
+# and tern-mcp next to each mailsync.
 # Each target directory also gets LICENSE.md, NOTICE.md and THIRD-PARTY-NOTICES.txt (the
-# crates' licences, from third-party-notices.sh), which ship next to the binary. Without
+# engine crates' licences, from third-party-notices.sh) and tern-mcp.THIRD-PARTY-NOTICES.txt
+# (tern-mcp's), which ship next to the binaries. Without
 # cargo-about the notices are skipped with a warning; TERN_REQUIRE_NOTICES=1 (set in CI) makes
 # that an error.
 #
@@ -23,7 +26,8 @@
 # bullseye container (glibc 2.31, older than any distro the desktop's Linux packages
 # support). Linux debug info is split into mailsync.debug next to each binary.
 #
-# --install-desktop copies one binary to apps/desktop/app/mailsync-rs, and its notices to
+# --install-desktop copies one mailsync to apps/desktop/app/mailsync-rs and its tern-mcp to
+# apps/desktop/app/tern-mcp, and the notices to
 # apps/desktop/app/mailsync-rs.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
 # universal (macOS only); the default is the arch build.js packages for: x64 when
 # OVERRIDE_TO_INTEL is set, else the host's.
@@ -40,6 +44,7 @@ export CARGO_TARGET_DIR="$TARGET_DIR"
 OUT_DIR="${OUT_DIR:-$TARGET_DIR/engine-dist}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$PWD/$OUT_DIR" ;; esac
 DESKTOP_APP_DIR="$REPO_ROOT/apps/desktop/app"
+BINARIES=(mailsync tern-mcp)
 LINUX_IMAGE="${LINUX_IMAGE:-rust:$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$REPO_ROOT/rust-toolchain.toml")-bullseye}"
 # Electron 44's floor; also above arm64's 11.0 minimum.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-12.0}"
@@ -73,9 +78,9 @@ cargo_build() {
     local bin
     bin="$(dirname "$("$RUSTUP" which --toolchain "$TOOLCHAIN" cargo)")"
     PATH="$bin:$PATH" RUSTC="$bin/rustc" "$bin/cargo" build --release --locked -p mailsync \
-      --target "$target" "$@"
+      -p tern-mcp --target "$target" "$@"
   else
-    cargo build --release --locked -p mailsync --target "$target" "$@" ||
+    cargo build --release --locked -p mailsync -p tern-mcp --target "$target" "$@" ||
       die "cargo build for $target failed; without rustup the $target standard library must already be installed"
   fi
 }
@@ -91,16 +96,22 @@ generate_notices() {
   fi
   log "Writing $OUT_DIR/THIRD-PARTY-NOTICES.txt"
   "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" "$OUT_DIR/THIRD-PARTY-NOTICES.txt"
+  log "Writing $OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
+  "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
+    "$OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/mcp/Cargo.toml"
 }
 
 collect() {
   local target="$1"
   mkdir -p "$OUT_DIR/$target"
-  cp "$TARGET_DIR/$target/release/mailsync" "$OUT_DIR/$target/mailsync"
+  local b
+  for b in "${BINARIES[@]}"; do
+    cp "$TARGET_DIR/$target/release/$b" "$OUT_DIR/$target/$b"
+  done
   cp "$REPO_ROOT/LICENSE.md" "$REPO_ROOT/NOTICE.md" "$OUT_DIR/$target/"
-  if [ -f "$OUT_DIR/THIRD-PARTY-NOTICES.txt" ]; then
-    cp "$OUT_DIR/THIRD-PARTY-NOTICES.txt" "$OUT_DIR/$target/"
-  fi
+  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt; do
+    if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/$target/"; fi
+  done
   log "$OUT_DIR/$target/mailsync"
 }
 
@@ -113,12 +124,15 @@ build_macos() {
     collect "$t"
   done
   mkdir -p "$OUT_DIR/universal-apple-darwin"
-  lipo -create -output "$OUT_DIR/universal-apple-darwin/mailsync" \
-    "$OUT_DIR/aarch64-apple-darwin/mailsync" "$OUT_DIR/x86_64-apple-darwin/mailsync"
+  local b
+  for b in "${BINARIES[@]}"; do
+    lipo -create -output "$OUT_DIR/universal-apple-darwin/$b" \
+      "$OUT_DIR/aarch64-apple-darwin/$b" "$OUT_DIR/x86_64-apple-darwin/$b"
+  done
   cp "$OUT_DIR/aarch64-apple-darwin/"{LICENSE.md,NOTICE.md} "$OUT_DIR/universal-apple-darwin/"
-  if [ -f "$OUT_DIR/THIRD-PARTY-NOTICES.txt" ]; then
-    cp "$OUT_DIR/THIRD-PARTY-NOTICES.txt" "$OUT_DIR/universal-apple-darwin/"
-  fi
+  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt; do
+    if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/universal-apple-darwin/"; fi
+  done
   lipo "$OUT_DIR/universal-apple-darwin/mailsync" -verify_arch arm64 x86_64
   log "$OUT_DIR/universal-apple-darwin/mailsync ($(lipo -archs "$OUT_DIR/universal-apple-darwin/mailsync"))"
 }
@@ -135,23 +149,24 @@ linux_cross_env() {
 
 # The release profile keeps line tables (debug = 1), which on Linux end up in the binary
 # (~100 MB against ~20 MB without). Ship the stripped binary and keep the DWARF next to it
-# as mailsync.debug, linked by .gnu_debuglink.
+# as <binary>.debug, linked by .gnu_debuglink.
 split_linux_debug() {
-  local bin="$1" arch="$2" objcopy=objcopy
+  local bin="$1" arch="$2" objcopy=objcopy name
   [ "$arch" != "$HOST_ARCH" ] && objcopy="$arch-linux-gnu-objcopy"
   if ! command -v "$objcopy" >/dev/null; then
     log "Not splitting debug info: $objcopy not installed"
     return
   fi
+  name="$(basename "$bin")"
   (
     cd "$(dirname "$bin")"
-    "$objcopy" --only-keep-debug mailsync mailsync.debug
-    "$objcopy" --strip-debug --add-gnu-debuglink=mailsync.debug mailsync
+    "$objcopy" --only-keep-debug "$name" "$name.debug"
+    "$objcopy" --strip-debug --add-gnu-debuglink="$name.debug" "$name"
   )
 }
 
 build_linux_native() {
-  local t arch
+  local t arch b
   for t in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
     arch="${t%%-*}"
     if [ "$arch" != "$HOST_ARCH" ] && ! command -v "$arch-linux-gnu-gcc" >/dev/null; then
@@ -164,7 +179,9 @@ build_linux_native() {
       cargo_build "$t"
     )
     collect "$t"
-    split_linux_debug "$OUT_DIR/$t/mailsync" "$arch"
+    for b in "${BINARIES[@]}"; do
+      split_linux_debug "$OUT_DIR/$t/$b" "$arch"
+    done
     if command -v objdump >/dev/null; then
       log "$t needs glibc $(objdump -T "$OUT_DIR/$t/mailsync" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
     fi
@@ -214,12 +231,20 @@ install_desktop() {
     Linux:x64 | Linux:x86_64) target=x86_64-unknown-linux-gnu ;;
     *) die "no desktop binary for $HOST_OS $arch" ;;
   esac
-  [ -f "$OUT_DIR/$target/mailsync" ] || die "$OUT_DIR/$target/mailsync was not built"
+  local b
+  for b in "${BINARIES[@]}"; do
+    [ -f "$OUT_DIR/$target/$b" ] || die "$OUT_DIR/$target/$b was not built"
+  done
   install -m 755 "$OUT_DIR/$target/mailsync" "$DESKTOP_APP_DIR/mailsync-rs"
-  log "Installed $target into $DESKTOP_APP_DIR/mailsync-rs"
+  install -m 755 "$OUT_DIR/$target/tern-mcp" "$DESKTOP_APP_DIR/tern-mcp"
+  log "Installed $target into $DESKTOP_APP_DIR/mailsync-rs and $DESKTOP_APP_DIR/tern-mcp"
   if [ -f "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" \
       "$DESKTOP_APP_DIR/mailsync-rs.THIRD-PARTY-NOTICES.txt"
+  fi
+  if [ -f "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" ]; then
+    install -m 644 "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" \
+      "$DESKTOP_APP_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
   fi
 }
 

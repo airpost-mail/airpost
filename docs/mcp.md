@@ -1,8 +1,8 @@
 # tern-mcp
 
-`apps/mcp` builds `tern-mcp`, an MCP server for the mail in a Tern profile. It replaces the
-desktop's `mcp-server` plugin (`apps/desktop/app/internal_packages/mcp-server`), which only ran
-inside the Electron app. tern-mcp talks to the running engine over its socket
+`apps/mcp` builds `tern-mcp`, an MCP server for the mail in a Tern profile. It replaced the
+desktop's `mcp-server` plugin, which ran inside the Electron app and has been removed. The
+desktop ships tern-mcp (see "The desktop" below). tern-mcp talks to the running engine over its socket
 (docs/engine-protocol-plan.md): reads go through the read API, and changes are queued as the
 same task JSON the desktop sends (`__cls`, the `DraftFactory` fields), so the desktop and the
 engine can't tell the two apart. The desktop doesn't have to be open, but an engine does
@@ -15,7 +15,7 @@ stdout carries MCP; stderr is the log, which MCP clients keep.
 ```
 tern-mcp [--config-dir DIR]                       # MCP on stdio (also: tern-mcp stdio)
 tern-mcp http [--port N]                           # streamable HTTP on 127.0.0.1, see below
-tern-mcp install   --client claude-desktop|claude-code|codex [--config-file PATH] [--force]
+tern-mcp install   --client claude-desktop|claude-code|codex [--config-file PATH] [--force | --if-stale]
 tern-mcp uninstall --client claude-desktop|claude-code|codex [--config-file PATH]
 tern-mcp status [--json]
 ```
@@ -38,7 +38,13 @@ It never writes or removes the `mailspring` / `mailspring-mcp` entries that Mail
 registers. A config file that doesn't parse is an error and is left untouched; writes go
 through an owner-only temporary file and a rename, following symlinks, and keep the file's
 mode. An existing `tern` entry whose command isn't `tern-mcp` is left alone: `install` refuses
-it unless given `--force`, and `uninstall` refuses it. For Claude Code without `--config-file`
+it unless given `--force`, and `uninstall` refuses it. The exception is the entry the removed
+`mcp-server` plugin wrote: Tern's Electron binary running `…/mcp-stdio-bridge.js` (any argument
+naming that file) with `--config-dir`. The script no longer ships, so `install` replaces that
+entry without `--force` and `uninstall` removes it. `install --if-stale` replaces only that
+entry, and only when its `--config-dir` is the profile being installed (Claude Desktop's config
+is shared by every profile); otherwise it changes nothing and says so. The desktop runs
+`install --client claude-desktop --if-stale` once per profile after the upgrade. For Claude Code without `--config-file`
 the check reads the user-scope entry from `.claude.json` (in `$CLAUDE_CONFIG_DIR`, else the
 home directory); only `claude mcp` writes it. In Codex's config.toml only `[mcp_servers.tern]`
 tables are rewritten; a `tern` written as an inline table or dotted keys is refused, to be
@@ -72,10 +78,13 @@ open Tern.
 - The file is re-read on every call. A file that doesn't parse is an error for every tool, so
   a typo can't widen access.
 - Without `mcp.json`, `accessLevel` and `enabledAccounts` come from the desktop's
-  `config.json` keys `core.mcp.accessLevel` / `core.mcp.enabledAccounts` (what the plugin's
-  preferences pane writes today). HTTP stays off in that fallback. A null `enabled` or
+  `config.json` keys `core.mcp.accessLevel` / `core.mcp.enabledAccounts`, which the removed
+  plugin's pane wrote. The desktop moves them into `mcp.json` on the first launch after the
+  upgrade (and when the pane opens) and deletes `core.mcp`, so the fallback only covers a
+  profile the new desktop hasn't opened yet. HTTP stays off in that fallback and after the
+  move (the plugin's port is kept, its token is not). A null `enabled` or
   `excludedFolderIds` reads as false or `[]`, as in the plugin; any other value that doesn't
-  fit is an error, like a bad `mcp.json`.
+  fit is an error, like a bad `mcp.json`, and the desktop leaves such keys where they are.
 
 ## HTTP
 
@@ -83,6 +92,7 @@ open Tern.
 when `http.enabled` is true. Every request needs `Authorization: Bearer <token>`; the token
 is in `<config-dir>/mcp-token`, created owner-only (0600) on first use. Requests whose `Host`
 isn't a loopback name get 403, which stops DNS rebinding. `install` only writes stdio entries.
+Nothing starts `tern-mcp http` for you; the desktop no longer serves MCP over HTTP itself.
 
 ## Audit log: `<config-dir>/mcp-audit.log`
 
@@ -146,12 +156,23 @@ Changes from the plugin:
 error, and field filters like `from:` are passed to the engine's search as terms rather than
 enforced.
 
-## What the desktop still has to do
+## The desktop
 
-- The MCP preferences pane should write `mcp.json` instead of `core.mcp.*`, and offer
-  `tern-mcp install`.
-- The `mcp-server` plugin should go: its HTTP server also defaults to port 2587, and its
-  install code writes the `mailspring` entries.
-- The desktop's own reply path has the same bug `reply_to_thread` had: `DraftStore._modelifyContext`
-  (thread-list context menu Reply / Reply All) picks the newest message including drafts, and
-  `replyAllItem` checks `canReplyAll` on it.
+- The packaged app ships tern-mcp next to the engine, in `app.asar.unpacked/tern-mcp`
+  (`apps/desktop/app/build/build.js`; `apps/engine/packaging/build-release.sh
+  --install-desktop` builds and places it). A source checkout sets `TERN_MCP_BIN`.
+- Preferences > Integrations > AI assistants edits `mcp.json` with the semantics above (access
+  level, accounts and excluded folders, HTTP on/off and port), and refuses to touch a
+  `mcp.json` that doesn't parse. It shows `tern-mcp status` (engines found), runs the bundled
+  `tern-mcp install` / `uninstall` for Claude Desktop, Claude Code and Codex with their output
+  (and `--force` behind a "Replace It" button when a foreign `tern` entry is in the way), and
+  the newest entries of `mcp-audit.log`.
+- On the main window's start the desktop moves `core.mcp.*` into `mcp.json` and runs
+  `tern-mcp install --client claude-desktop --if-stale` once per profile
+  (`core.ternMcp.staleBridgeEntryChecked`), never in specs or dev mode. On macOS it waits
+  until the app runs from /Applications, since tern-mcp writes its own path into the entry
+  and a copy on a DMG or in ~/Downloads would leave a path that later disappears.
+- The plugin's HTTP registrations point at a server that no longer runs: Codex's
+  `[mcp_servers.tern]` with a `url` (Add refuses it until "Replace It") and Claude Code's
+  user-scope `tern-mcp` entry (another name, left alone; remove it with
+  `claude mcp remove tern-mcp --scope user`).

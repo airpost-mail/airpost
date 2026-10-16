@@ -15,7 +15,7 @@
 //!
 //! Without `mcp.json`, the desktop's `core.mcp.accessLevel` and `core.mcp.enabledAccounts`
 //! in `config.json` are read instead, so settings made in the old preferences pane keep
-//! applying; HTTP stays off in that case, because the desktop plugin serves its own port.
+//! applying; HTTP stays off in that case.
 //! The policy is read again for every tool call.
 
 use std::collections::BTreeMap;

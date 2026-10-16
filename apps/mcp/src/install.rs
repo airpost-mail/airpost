@@ -8,6 +8,12 @@
 //! Mailspring.app registers are left alone, and so is a `tern` entry that doesn't run
 //! tern-mcp unless `--force` is given. A config file that exists but doesn't parse is an
 //! error, never rebuilt, so the user's other servers can't be lost.
+//!
+//! The desktop's removed `mcp-server` plugin registered `tern` as Tern's Electron binary
+//! running `mcp-stdio-bridge.js` from `app.asar.unpacked`. That file no longer ships, so such
+//! an entry is treated as tern-mcp's own: replaced without `--force` and removable.
+//! `--if-stale` replaces only that entry, and only when it is pinned to the same profile,
+//! which is what the desktop runs once after the upgrade.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -18,6 +24,20 @@ pub const ENTRY_NAME: &str = "tern";
 /// Entries Mailspring.app's MCP plugin registers.
 const MAILSPRING_ENTRIES: &[&str] = &["mailspring", "mailspring-mcp"];
 const BINARY_NAME: &str = "tern-mcp";
+/// The stdio bridge the desktop's old `mcp-server` plugin registered.
+const BRIDGE_SCRIPT: &str = "mcp-stdio-bridge.js";
+
+/// What `install` may do to an existing `tern` entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Replace {
+    /// Replace it when it runs tern-mcp or is the old plugin's bridge.
+    Ours,
+    /// Replace whatever it runs (`--force`).
+    Any,
+    /// Replace only the old plugin's bridge pinned to this profile, else change nothing
+    /// (`--if-stale`).
+    OnlyStale,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
 pub enum McpClient {
@@ -142,6 +162,56 @@ fn is_ours(entry: &Value) -> bool {
     is_our_command(entry.get("command").and_then(Value::as_str))
 }
 
+fn string_args(entry: &Value) -> Vec<&str> {
+    entry
+        .get("args")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default()
+}
+
+/// The old plugin's entry: an argument naming `mcp-stdio-bridge.js`, with either separator
+/// since the config may come from Windows.
+fn is_stale_bridge(entry: &Value) -> bool {
+    string_args(entry)
+        .iter()
+        .any(|a| a.rsplit(['/', '\\']).next() == Some(BRIDGE_SCRIPT))
+}
+
+fn config_dir_arg<'a>(args: &[&'a str]) -> Option<&'a str> {
+    args.iter()
+        .position(|a| *a == "--config-dir")
+        .and_then(|i| args.get(i + 1).copied())
+}
+
+/// A stale bridge entry for the profile `entry` is pinned to. The Claude Desktop config is
+/// shared by every profile, so a dev or second profile never takes over another's entry.
+fn is_stale_bridge_for(existing: &Value, entry: &ServerEntry) -> bool {
+    let ours: Vec<&str> = entry.args.iter().map(String::as_str).collect();
+    is_stale_bridge(existing)
+        && match (
+            config_dir_arg(&string_args(existing)),
+            config_dir_arg(&ours),
+        ) {
+            (Some(a), Some(b)) => Path::new(a) == Path::new(b),
+            _ => false,
+        }
+}
+
+fn replaceable(existing: &Value, entry: &ServerEntry, replace: Replace) -> bool {
+    match replace {
+        Replace::Any => true,
+        Replace::Ours => is_ours(existing) || is_stale_bridge(existing),
+        Replace::OnlyStale => is_stale_bridge_for(existing, entry),
+    }
+}
+
+fn no_stale_entry(place: &str) -> String {
+    format!(
+        "No stale '{ENTRY_NAME}' entry from the old desktop plugin in {place}; nothing changed."
+    )
+}
+
 fn foreign_entry(place: &str) -> String {
     format!(
         "The '{ENTRY_NAME}' server in {place} doesn't run {BINARY_NAME}; left as it is. Give \
@@ -169,17 +239,29 @@ pub fn install_json(
     path: &Path,
     entry: &ServerEntry,
     with_type: bool,
-    force: bool,
+    replace: Replace,
 ) -> Result<String, String> {
     let (real, mut config) = read_json(path)?;
+    let place = real.display().to_string();
+    if replace == Replace::OnlyStale
+        && !config
+            .get("mcpServers")
+            .and_then(|s| s.get(ENTRY_NAME))
+            .is_some_and(|e| is_stale_bridge_for(e, entry))
+    {
+        return Ok(no_stale_entry(&place));
+    }
     let servers = config
         .entry("mcpServers")
         .or_insert_with(|| Value::Object(Map::new()));
     let Value::Object(servers) = servers else {
-        return Err(format!("{}: mcpServers is not an object", real.display()));
+        return Err(format!("{place}: mcpServers is not an object"));
     };
-    if servers.get(ENTRY_NAME).is_some_and(|e| !is_ours(e)) && !force {
-        return Err(foreign_entry(&real.display().to_string()));
+    if servers
+        .get(ENTRY_NAME)
+        .is_some_and(|e| !replaceable(e, entry, replace))
+    {
+        return Err(foreign_entry(&place));
     }
     servers.insert(ENTRY_NAME.into(), entry.json(with_type));
     let note = mailspring_note(servers);
@@ -198,7 +280,7 @@ pub fn uninstall_json(path: &Path) -> Result<String, String> {
     };
     match servers.get(ENTRY_NAME) {
         None => return Ok(format!("No '{ENTRY_NAME}' server in {}.", real.display())),
-        Some(e) if !is_ours(e) => {
+        Some(e) if !is_ours(e) && !is_stale_bridge(e) => {
             return Err(format!(
                 "The '{ENTRY_NAME}' server in {} doesn't run {BINARY_NAME}; left as it is.",
                 real.display()
@@ -309,10 +391,15 @@ fn without_codex_entry(real: &Path, content: &str) -> Result<String, String> {
     Ok(text)
 }
 
-pub fn install_codex(path: &Path, entry: &ServerEntry, force: bool) -> Result<String, String> {
+/// The old plugin never wrote a bridge entry to Codex, so `Replace::OnlyStale` changes
+/// nothing here.
+pub fn install_codex(path: &Path, entry: &ServerEntry, replace: Replace) -> Result<String, String> {
+    if replace == Replace::OnlyStale {
+        return Ok(no_stale_entry(&path.display().to_string()));
+    }
     let (real, content) = read_text(path)?;
     let config = parse_toml(&real, &content)?;
-    if codex_entry(&config).is_some_and(|e| !codex_entry_is_ours(e)) && !force {
+    if codex_entry(&config).is_some_and(|e| !codex_entry_is_ours(e)) && replace != Replace::Any {
         return Err(foreign_entry(&real.display().to_string()));
     }
     let mut text = without_codex_entry(&real, &content)?;
@@ -425,12 +512,17 @@ fn claude_code_entry(user_config: Option<&Path>) -> Result<Option<Value>, String
 fn install_claude_code(
     user_config: Option<&Path>,
     entry: &ServerEntry,
-    force: bool,
+    replace: Replace,
     claude: &mut dyn FnMut(&[&str]) -> Result<(), String>,
 ) -> Result<String, String> {
+    const PLACE: &str = "Claude Code (user scope)";
     match claude_code_entry(user_config)? {
-        Some(e) if !is_ours(&e) && !force => {
-            return Err(foreign_entry("Claude Code (user scope)"));
+        Some(e) if replace == Replace::OnlyStale && !is_stale_bridge_for(&e, entry) => {
+            return Ok(no_stale_entry(PLACE));
+        }
+        None if replace == Replace::OnlyStale => return Ok(no_stale_entry(PLACE)),
+        Some(e) if !replaceable(&e, entry, replace) => {
+            return Err(foreign_entry(PLACE));
         }
         // `claude mcp add` doesn't replace an entry of the same name.
         Some(_) => claude(&["mcp", "remove", ENTRY_NAME, "--scope", "user"])?,
@@ -451,7 +543,7 @@ fn uninstall_claude_code(
         None => Ok(format!(
             "No '{ENTRY_NAME}' server in Claude Code (user scope)."
         )),
-        Some(e) if !is_ours(&e) => Err(format!(
+        Some(e) if !is_ours(&e) && !is_stale_bridge(&e) => Err(format!(
             "The '{ENTRY_NAME}' server in Claude Code (user scope) doesn't run {BINARY_NAME}; \
              left as it is."
         )),
@@ -464,13 +556,12 @@ fn uninstall_claude_code(
     }
 }
 
-/// Registers `entry`. An existing `tern` entry that doesn't run tern-mcp is refused unless
-/// `force`.
+/// Registers `entry`, replacing an existing `tern` entry as `replace` allows.
 pub fn install(
     client: McpClient,
     config_file: Option<&Path>,
     entry: &ServerEntry,
-    force: bool,
+    replace: Replace,
 ) -> Result<String, String> {
     match (client, config_file) {
         (McpClient::ClaudeDesktop, f) => {
@@ -478,13 +569,13 @@ pub fn install(
                 .map(Path::to_path_buf)
                 .or_else(claude_desktop_config_path)
                 .ok_or("could not work out Claude Desktop's config path; give --config-file")?;
-            install_json(&path, entry, false, force)
+            install_json(&path, entry, false, replace)
         }
-        (McpClient::ClaudeCode, Some(f)) => install_json(f, entry, true, force),
+        (McpClient::ClaudeCode, Some(f)) => install_json(f, entry, true, replace),
         (McpClient::ClaudeCode, None) => install_claude_code(
             claude_code_user_config().as_deref(),
             entry,
-            force,
+            replace,
             &mut claude_cli,
         ),
         (McpClient::Codex, f) => {
@@ -492,7 +583,7 @@ pub fn install(
                 .map(Path::to_path_buf)
                 .or_else(codex_config_path)
                 .ok_or("could not work out Codex's config path; give --config-file")?;
-            install_codex(&path, entry, force)
+            install_codex(&path, entry, replace)
         }
     }
 }
@@ -544,7 +635,13 @@ mod tests {
             .to_string(),
         )
         .unwrap();
-        let msg = install(McpClient::ClaudeDesktop, Some(&path), &entry(), false).unwrap();
+        let msg = install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Ours,
+        )
+        .unwrap();
         assert!(msg.contains("belongs to Mailspring.app"), "{msg}");
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(
@@ -555,7 +652,13 @@ mod tests {
         assert_eq!(v["mcpServers"]["mailspring"], mailspring);
         assert_eq!(v["globalShortcut"], "Cmd+K");
         // Reinstalling replaces the entry rather than adding another.
-        install(McpClient::ClaudeDesktop, Some(&path), &entry(), false).unwrap();
+        install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Ours,
+        )
+        .unwrap();
         uninstall(McpClient::ClaudeDesktop, Some(&path)).unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert!(v["mcpServers"].get("tern").is_none());
@@ -570,11 +673,14 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("c.json");
         std::fs::write(&path, "{broken").unwrap();
-        assert!(
-            install(McpClient::ClaudeDesktop, Some(&path), &entry(), false)
-                .unwrap_err()
-                .contains("not valid JSON")
-        );
+        assert!(install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Ours
+        )
+        .unwrap_err()
+        .contains("not valid JSON"));
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "{broken");
         std::fs::write(
             &path,
@@ -582,16 +688,28 @@ mod tests {
         )
         .unwrap();
         assert!(uninstall(McpClient::ClaudeDesktop, Some(&path)).is_err());
-        let e = install(McpClient::ClaudeDesktop, Some(&path), &entry(), false).unwrap_err();
+        let e = install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Ours,
+        )
+        .unwrap_err();
         assert!(e.contains("--force"), "{e}");
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(v["mcpServers"]["tern"]["command"], "/usr/bin/other");
-        install(McpClient::ClaudeDesktop, Some(&path), &entry(), true).unwrap();
+        install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Any,
+        )
+        .unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(v["mcpServers"]["tern"]["command"], "/opt/tern/bin/tern-mcp");
         // A missing file is created.
         let fresh = tmp.path().join("sub/new.json");
-        install(McpClient::ClaudeCode, Some(&fresh), &entry(), false).unwrap();
+        install(McpClient::ClaudeCode, Some(&fresh), &entry(), Replace::Ours).unwrap();
         let v: Value = serde_json::from_str(&std::fs::read_to_string(&fresh).unwrap()).unwrap();
         assert_eq!(v["mcpServers"]["tern"]["type"], "stdio");
     }
@@ -606,7 +724,7 @@ mod tests {
             Ok(())
         };
         // Nothing there: add only.
-        install_claude_code(Some(&user), &entry(), false, &mut claude).unwrap();
+        install_claude_code(Some(&user), &entry(), Replace::Ours, &mut claude).unwrap();
         assert!(uninstall_claude_code(Some(&user), &mut claude)
             .unwrap()
             .starts_with("No 'tern'"));
@@ -615,16 +733,16 @@ mod tests {
             json!({"mcpServers": {"tern": {"type": "http", "url": "http://x/mcp"}}}).to_string(),
         )
         .unwrap();
-        let e = install_claude_code(Some(&user), &entry(), false, &mut claude).unwrap_err();
+        let e = install_claude_code(Some(&user), &entry(), Replace::Ours, &mut claude).unwrap_err();
         assert!(e.contains("--force"), "{e}");
         assert!(uninstall_claude_code(Some(&user), &mut claude).is_err());
-        install_claude_code(Some(&user), &entry(), true, &mut claude).unwrap();
+        install_claude_code(Some(&user), &entry(), Replace::Any, &mut claude).unwrap();
         std::fs::write(
             &user,
             json!({"mcpServers": {"tern": {"command": "/old/tern-mcp"}}}).to_string(),
         )
         .unwrap();
-        install_claude_code(Some(&user), &entry(), false, &mut claude).unwrap();
+        install_claude_code(Some(&user), &entry(), Replace::Ours, &mut claude).unwrap();
         uninstall_claude_code(Some(&user), &mut claude).unwrap();
         assert_eq!(
             calls,
@@ -637,6 +755,140 @@ mod tests {
                 "mcp remove"
             ]
         );
+    }
+
+    /// The entry the desktop's old mcp-server plugin wrote (claude-desktop-config.ts).
+    fn bridge_entry(profile: &str) -> Value {
+        json!({"command": "/Applications/Tern.app/Contents/MacOS/Tern",
+            "args": ["/Applications/Tern.app/Contents/Resources/app.asar.unpacked/internal_packages/mcp-server/lib/mcp-stdio-bridge.js",
+                     "--config-dir", profile],
+            "env": {"ELECTRON_RUN_AS_NODE": "1"}})
+    }
+
+    fn servers(path: &Path) -> Value {
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        v["mcpServers"].clone()
+    }
+
+    #[test]
+    fn replaces_the_old_plugin_bridge_without_force_and_still_refuses_foreign_entries() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("claude_desktop_config.json");
+        let profile = "/Users/me/Tern \"x\"";
+        let write = |tern: Value| {
+            std::fs::write(
+                &path,
+                json!({"mcpServers": {"tern": tern, "other": {"command": "x"}}}).to_string(),
+            )
+            .unwrap();
+        };
+
+        write(bridge_entry(profile));
+        install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Ours,
+        )
+        .unwrap();
+        assert_eq!(servers(&path)["tern"]["command"], "/opt/tern/bin/tern-mcp");
+        assert_eq!(servers(&path)["other"], json!({"command": "x"}));
+
+        // A Windows path, and uninstall removes a bridge entry too.
+        write(json!({"command": "C:\\Tern\\Tern.exe",
+            "args": ["C:\\Tern\\resources\\app.asar.unpacked\\mcp-stdio-bridge.js", "--config-dir", profile]}));
+        assert!(uninstall(McpClient::ClaudeDesktop, Some(&path))
+            .unwrap()
+            .starts_with("Removed"));
+        assert!(servers(&path).get("tern").is_none());
+
+        // Anything else is still refused without --force.
+        let foreign = json!({"command": "/usr/local/bin/node", "args": ["/srv/my-bridge.js"]});
+        write(foreign.clone());
+        let e = install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Ours,
+        )
+        .unwrap_err();
+        assert!(e.contains("--force"), "{e}");
+        assert_eq!(servers(&path)["tern"], foreign);
+    }
+
+    #[test]
+    fn if_stale_only_replaces_the_bridge_for_this_profile() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("claude_desktop_config.json");
+        let profile = "/Users/me/Tern \"x\"";
+
+        // No file, no entry: nothing written.
+        let msg = install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::OnlyStale,
+        )
+        .unwrap();
+        assert!(msg.starts_with("No stale"), "{msg}");
+        assert!(!path.exists());
+
+        // Another profile's bridge, an up-to-date entry and a foreign one stay as they are.
+        for tern in [
+            bridge_entry("/Users/me/Library/Application Support/Tern-dev"),
+            entry().json(false),
+            json!({"command": "/usr/bin/other"}),
+        ] {
+            let before = json!({"mcpServers": {"tern": tern}}).to_string();
+            std::fs::write(&path, &before).unwrap();
+            let msg = install(
+                McpClient::ClaudeDesktop,
+                Some(&path),
+                &entry(),
+                Replace::OnlyStale,
+            )
+            .unwrap();
+            assert!(msg.starts_with("No stale"), "{msg}");
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
+        }
+
+        // This profile's bridge is replaced, trailing slash or not.
+        std::fs::write(
+            &path,
+            json!({"mcpServers": {"tern": bridge_entry(&format!("{profile}/"))}}).to_string(),
+        )
+        .unwrap();
+        install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::OnlyStale,
+        )
+        .unwrap();
+        assert_eq!(servers(&path)["tern"], entry().json(false));
+
+        let codex = tmp.path().join("config.toml");
+        assert!(
+            install(McpClient::Codex, Some(&codex), &entry(), Replace::OnlyStale)
+                .unwrap()
+                .starts_with("No stale")
+        );
+        assert!(!codex.exists());
+
+        let user = tmp.path().join(".claude.json");
+        let mut calls = 0;
+        let mut claude = |_: &[&str]| {
+            calls += 1;
+            Ok(())
+        };
+        install_claude_code(Some(&user), &entry(), Replace::OnlyStale, &mut claude).unwrap();
+        std::fs::write(
+            &user,
+            json!({"mcpServers": {"tern": bridge_entry(profile)}}).to_string(),
+        )
+        .unwrap();
+        install_claude_code(Some(&user), &entry(), Replace::OnlyStale, &mut claude).unwrap();
+        assert_eq!(calls, 2, "remove, then add-json");
     }
 
     #[cfg(unix)]
@@ -653,7 +905,13 @@ mod tests {
             .join(format!(".c.json.tern-mcp-{}", std::process::id()));
         std::fs::write(&stale, "old").unwrap();
         std::fs::set_permissions(&stale, std::fs::Permissions::from_mode(0o644)).unwrap();
-        install(McpClient::ClaudeDesktop, Some(&path), &entry(), false).unwrap();
+        install(
+            McpClient::ClaudeDesktop,
+            Some(&path),
+            &entry(),
+            Replace::Ours,
+        )
+        .unwrap();
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
         assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 1);
@@ -683,7 +941,7 @@ mod tests {
             ("model = \n", "not valid TOML"),
         ] {
             std::fs::write(&path, before).unwrap();
-            let e = install(McpClient::Codex, Some(&path), &entry(), false).unwrap_err();
+            let e = install(McpClient::Codex, Some(&path), &entry(), Replace::Ours).unwrap_err();
             assert!(e.contains(needle), "{before}: {e}");
             assert_eq!(std::fs::read_to_string(&path).unwrap(), before);
         }
@@ -693,7 +951,7 @@ mod tests {
         )
         .unwrap();
         assert!(uninstall(McpClient::Codex, Some(&path)).is_err());
-        install(McpClient::Codex, Some(&path), &entry(), true).unwrap();
+        install(McpClient::Codex, Some(&path), &entry(), Replace::Any).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(
             !text.contains("wrapper") && text.contains("tern-mcp"),
@@ -701,7 +959,7 @@ mod tests {
         );
         // Another server inline in [mcp_servers] can sit next to our table.
         std::fs::write(&path, "[mcp_servers]\nother = { command = \"x\" }\n").unwrap();
-        install(McpClient::Codex, Some(&path), &entry(), false).unwrap();
+        install(McpClient::Codex, Some(&path), &entry(), Replace::Ours).unwrap();
         let config = parse_toml(&path, &std::fs::read_to_string(&path).unwrap()).unwrap();
         assert!(codex_entry(&config).is_some_and(codex_entry_is_ours));
         assert!(config["mcp_servers"].get("other").is_some());
@@ -715,7 +973,13 @@ mod tests {
         let link = tmp.path().join("link.json");
         std::fs::write(&real, "{}").unwrap();
         std::os::unix::fs::symlink(&real, &link).unwrap();
-        install(McpClient::ClaudeDesktop, Some(&link), &entry(), false).unwrap();
+        install(
+            McpClient::ClaudeDesktop,
+            Some(&link),
+            &entry(),
+            Replace::Ours,
+        )
+        .unwrap();
         assert!(std::fs::symlink_metadata(&link)
             .unwrap()
             .file_type()
@@ -729,7 +993,7 @@ mod tests {
         let path = tmp.path().join("config.toml");
         let before = "model = \"o4\"\n\n[mcp_servers.mailspring]\nurl = \"http://127.0.0.1:2587/mcp\"\n\n[mcp_servers.tern]\ncommand = \"/old/tern-mcp\"\n\n[mcp_servers.tern.env]\nA = \"1\"\n\n[profiles.x]\nmodel = \"y\"\n";
         std::fs::write(&path, before).unwrap();
-        install(McpClient::Codex, Some(&path), &entry(), false).unwrap();
+        install(McpClient::Codex, Some(&path), &entry(), Replace::Ours).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("[mcp_servers.mailspring]\nurl = \"http://127.0.0.1:2587/mcp\""));
         assert!(text.contains("[profiles.x]\nmodel = \"y\""));
