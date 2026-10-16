@@ -8,8 +8,8 @@ import { ShortcutsSheet } from './ShortcutsSheet';
 import { TopBar } from './TopBar';
 
 export interface AppShellProps {
-  /** Left pane (the mailbox feature's account and folder list). */
-  sidebar: ReactNode;
+  /** Left pane (the mailbox feature's account and folder list). Omit for full-width pages. */
+  sidebar?: ReactNode;
   /** Centre of the top bar (the search feature's trigger). */
   search?: ReactNode;
   /** Right side of the top bar, before the app buttons (connection status). */
@@ -56,25 +56,29 @@ export function AppShell({
           onShowShortcuts={() => setShortcutsSheetOpen(true)}
         />
         {banner}
-        <ResizablePanelGroup
-          orientation="horizontal"
-          defaultLayout={defaultLayout}
-          onLayoutChanged={onLayoutChanged}
-          className="min-h-0 flex-1"
-        >
-          <ResizablePanel id="sidebar" defaultSize="17" minSize={184} maxSize={360} collapsible>
-            <nav
-              aria-label="Mailboxes"
-              className="h-full overflow-hidden bg-sidebar text-sidebar-foreground"
-            >
-              {sidebar}
-            </nav>
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel id="main" minSize="40">
-            <main className="h-full min-w-0 overflow-hidden">{children}</main>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+        {sidebar ? (
+          <ResizablePanelGroup
+            orientation="horizontal"
+            defaultLayout={defaultLayout}
+            onLayoutChanged={onLayoutChanged}
+            className="min-h-0 flex-1"
+          >
+            <ResizablePanel id="sidebar" defaultSize="17" minSize={184} maxSize={360} collapsible>
+              <nav
+                aria-label="Mailboxes"
+                className="h-full overflow-hidden bg-sidebar text-sidebar-foreground"
+              >
+                {sidebar}
+              </nav>
+            </ResizablePanel>
+            <ResizableHandle />
+            <ResizablePanel id="main" minSize="40">
+              <main className="h-full min-w-0 overflow-hidden">{children}</main>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <main className="min-h-0 min-w-0 flex-1 overflow-hidden">{children}</main>
+        )}
         <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsSheetOpen} />
       </div>
       {overlays}

@@ -211,6 +211,12 @@ export function useComposerSession(args: {
       return;
     }
     setComposerHidden(windowKey, true);
+    // Saved first so an undo finds the text even if this composer unmounted meanwhile (an
+    // inline reply whose thread was left reopens as its saved draft).
+    const saved = autosave
+      .cancel()
+      .then(() => saver.save(d))
+      .catch(() => undefined);
     let timer: ReturnType<typeof setTimeout> | undefined = undefined;
     const id = toast('Sending…', {
       duration: delayMs,
@@ -225,7 +231,7 @@ export function useComposerSession(args: {
         },
       },
     });
-    timer = setTimeout(() => void deliver(d, id), delayMs);
+    timer = setTimeout(() => void saved.then(() => deliver(d, id)), delayMs);
   };
 
   const scheduleSend = async (at: Date, pending: PendingRecipients) => {
@@ -268,9 +274,16 @@ export function useComposerSession(args: {
     closeComposer(windowKey);
   };
 
+  /** Saves pending edits now. Returns whether the engine has a copy of the draft. */
+  const keep = async (): Promise<boolean> => {
+    if (dirty.current) await autosave.flush();
+    return saver.hasCopy;
+  };
+
   return {
     draft,
     update,
+    keep,
     status,
     busy,
     setIdentity,

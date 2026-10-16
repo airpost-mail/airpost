@@ -26,7 +26,7 @@ function targetKey(): string | null {
 const inComposer = { scope: 'composer', allowInInputs: true, group: 'Compose' } as const;
 
 export function ComposerHost() {
-  const windows = useComposerWindows();
+  const windows = useComposerWindows().filter((w) => w.placement === 'docked');
   const focused = useFocusedComposer();
   const router = useRouter({ warn: false }) as AnyRouter | undefined;
   const fullscreen = windows.find((w) => w.view === 'fullscreen' && !w.hidden);

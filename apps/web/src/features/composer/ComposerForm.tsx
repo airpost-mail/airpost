@@ -17,7 +17,7 @@ import { allIdentities } from './identities';
 import { QuotedText } from './QuotedText';
 import { RecipientField } from './RecipientField';
 import { SendControls } from './SendControls';
-import { getComposerWindows, setComposerView, type ComposerWindow } from './store';
+import { dockComposer, getComposerWindows, setComposerView, type ComposerWindow } from './store';
 import { TemplatesMenu } from './TemplatesMenu';
 import {
   useComposerSession,
@@ -25,7 +25,7 @@ import {
   type RecipientFieldHandle,
 } from './useComposerSession';
 import { registerWindowActions } from './window-actions';
-import { WindowHeader } from './WindowHeader';
+import { InlineHeader, WindowHeader } from './WindowHeader';
 
 const STATUS_TEXT: Partial<Record<AutosaveStatus, string>> = {
   pending: 'Draft',
@@ -56,7 +56,8 @@ export function ComposerForm({
   const [bccOpen, setBccOpen] = useState(draft.bcc.length > 0);
   const [linkOpen, setLinkOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const minimised = win.view === 'minimised';
+  const inline = win.placement === 'inline';
+  const minimised = !inline && win.view === 'minimised';
   const templates = useCapability('templates').available;
 
   const reveal = (kind: 'cc' | 'bcc') => {
@@ -76,6 +77,13 @@ export function ComposerForm({
 
   const send = () => session.send(pending());
 
+  const popOut = async () => {
+    // The docked window is a fresh editor: hand it the saved draft, or (untouched) the
+    // same reply rebuilt from its source.
+    const saved = await session.keep();
+    dockComposer(win.key, saved ? draft.id : undefined);
+  };
+
   const latest = useRef({ session, reveal, send });
   useEffect(() => {
     latest.current = { session, reveal, send };
@@ -86,8 +94,13 @@ export function ComposerForm({
       registerWindowActions(win.key, {
         send: () => latest.current.send(),
         escape: () => {
-          const view = getComposerWindows().find((w) => w.key === win.key)?.view;
-          setComposerView(win.key, view === 'fullscreen' ? 'normal' : 'minimised');
+          const w = getComposerWindows().find((x) => x.key === win.key);
+          if (w?.placement === 'inline') {
+            // Inline replies have nothing to minimise to; Esc hands the keys back.
+            (document.activeElement as HTMLElement | null)?.blur();
+            return;
+          }
+          setComposerView(win.key, w?.view === 'fullscreen' ? 'normal' : 'minimised');
         },
         showCc: () => latest.current.reveal('cc'),
         showBcc: () => latest.current.reveal('bcc'),
@@ -99,7 +112,7 @@ export function ComposerForm({
   // Replies start in the body; new messages and forwards start with the recipients.
   const startInBody = win.mode === 'reply' || win.mode === 'reply-all' || win.mode === 'edit-draft';
   useEffect(() => {
-    if (minimised) return;
+    if (minimised || win.focusSeq === 0) return;
     const id = requestAnimationFrame(() => {
       if (startInBody && draft.to.length) editor.current?.focus();
       else if (draft.to.length) subjectInput.current?.focus();
@@ -142,20 +155,28 @@ export function ComposerForm({
 
   return (
     <>
-      <WindowHeader
-        windowKey={win.key}
-        title={draftTitle(draft)}
-        view={win.view}
-        onClose={() => void session.close()}
-        status={
-          minimised &&
-          STATUS_TEXT[session.status] && (
-            <span className="font-mono text-2xs text-muted-foreground">
-              {STATUS_TEXT[session.status]}
-            </span>
-          )
-        }
-      />
+      {inline ? (
+        <InlineHeader
+          title={draftTitle(draft)}
+          onPopOut={popOut}
+          onClose={() => void session.close()}
+        />
+      ) : (
+        <WindowHeader
+          windowKey={win.key}
+          title={draftTitle(draft)}
+          view={win.view}
+          onClose={() => void session.close()}
+          status={
+            minimised &&
+            STATUS_TEXT[session.status] && (
+              <span className="font-mono text-2xs text-muted-foreground">
+                {STATUS_TEXT[session.status]}
+              </span>
+            )
+          }
+        />
+      )}
       <div
         className={cn('relative flex min-h-0 flex-1 flex-col', minimised && 'hidden')}
         onDragOver={(e) => {

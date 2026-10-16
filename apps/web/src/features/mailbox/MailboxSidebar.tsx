@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CategoryRole } from '@/engine';
 import { useShortcut } from '@/lib/shortcuts';
-import { getLastAccount, setLastAccount } from './last-account';
+import { setLastAccount, useLastAccount } from './last-account';
 import { isUnifiedRole, STARRED_VIEW_ID, UNIFIED_ACCOUNT_ID } from './mailbox';
 import { AccountNav } from './sidebar/AccountNav';
 import { AccountSwitcher } from './sidebar/AccountSwitcher';
@@ -15,16 +15,22 @@ export function MailboxSidebar() {
   const params = useParams({ strict: false });
   const navigate = useNavigate();
 
-  const known = (id: string | null | undefined) =>
+  const known = (id: string | null | undefined): id is string =>
     !!id && (id === UNIFIED_ACCOUNT_ID || accounts.some((a) => a.account.id === id));
-  const fromUrl = known(params.accountId) ? params.accountId! : null;
-  const last = getLastAccount();
-  const current =
-    fromUrl ?? (known(last) ? last! : (accounts[0]?.account.id ?? UNIFIED_ACCOUNT_ID));
+  const fromUrl = known(params.accountId) ? params.accountId : null;
+  const last = useLastAccount();
+  const scope = known(last)
+    ? last
+    : accounts.length > 1
+      ? UNIFIED_ACCOUNT_ID
+      : (accounts[0]?.account.id ?? UNIFIED_ACCOUNT_ID);
+  // The unified sidebar holds every account's tree, so it stays put whatever the URL
+  // opens. A single-account sidebar follows the URL to another account or to `all`.
+  const current = scope === UNIFIED_ACCOUNT_ID ? scope : (fromUrl ?? scope);
 
   useEffect(() => {
-    if (fromUrl) setLastAccount(fromUrl);
-  }, [fromUrl]);
+    if (fromUrl && current !== last && accounts.length > 0) setLastAccount(current);
+  }, [fromUrl, current, last, accounts.length]);
 
   const go = (role: CategoryRole) => {
     if (current === UNIFIED_ACCOUNT_ID) {
@@ -59,7 +65,7 @@ export function MailboxSidebar() {
       {accounts.length > 0 && <AccountSwitcher accounts={accounts} current={current} />}
       <ScrollArea className="min-h-0 flex-1">
         {current === UNIFIED_ACCOUNT_ID ? (
-          <UnifiedNav accounts={accounts} />
+          <UnifiedNav accounts={accounts} activeAccountId={fromUrl} />
         ) : (
           active && <AccountNav key={active.account.id} data={active} />
         )}

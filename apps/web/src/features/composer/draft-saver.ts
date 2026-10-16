@@ -29,6 +29,10 @@ export class DraftSaver {
     this.copy = { id: d.id, accountId: d.accountId };
   }
 
+  get hasCopy(): boolean {
+    return !!this.copy;
+  }
+
   /** Queues a DestroyDraftTask for the saved copy, if any. Returns whether there was one. */
   destroyCopy(): boolean {
     const prev = this.copy;

@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { AccountJSON } from '@/engine';
+import { setLastAccount } from '../last-account';
 import { UNIFIED_ACCOUNT_ID } from '../mailbox';
 import type { AccountData } from '../use-account-data';
 import { sidebarCount } from './nav-model';
@@ -41,6 +42,7 @@ export function AccountSwitcher({
   const unifiedUnread = accounts.reduce((s, a) => s + inboxUnread(a), 0);
 
   const go = (accountId: string) => {
+    setLastAccount(accountId);
     if (accountId === UNIFIED_ACCOUNT_ID) {
       void navigate({ to: '/$accountId/$folderId', params: { accountId, folderId: 'inbox' } });
       return;

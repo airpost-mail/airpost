@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate } from '@tanstack/react-router';
 import {
+  ArrowLeft,
   AtSign,
   Keyboard,
   Layers,
@@ -45,7 +46,16 @@ export function SettingsLayout() {
         aria-label="Settings"
         className="flex w-52 shrink-0 flex-col gap-4 border-r border-hairline px-3 py-6"
       >
-        <p className="px-2 text-2xl font-semibold tracking-tight">Settings</p>
+        <div className="flex flex-col gap-1">
+          <Link
+            to="/"
+            className="flex h-6 w-fit items-center gap-1 rounded-sm px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden />
+            Back to mail
+          </Link>
+          <p className="px-2 text-2xl font-semibold tracking-tight">Settings</p>
+        </div>
         <ul className="flex flex-col gap-px">
           {NAV.map(({ to, label, icon: Icon }) => (
             <li key={to}>

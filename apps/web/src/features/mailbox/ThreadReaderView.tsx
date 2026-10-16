@@ -1,5 +1,5 @@
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -11,6 +11,12 @@ import {
   useThread,
   type LabelJSON,
 } from '@/engine';
+import {
+  InlineComposer,
+  isInlineDraftDismissed,
+  openComposer,
+  useComposerWindows,
+} from '@/features/composer';
 import { useShortcut } from '@/lib/shortcuts';
 import { useThreadActions } from './actions';
 import { LabelChip } from './LabelChip';
@@ -18,7 +24,7 @@ import { visibleLabels } from './labels';
 import { removeThreads } from './list-bus';
 import { ownAddresses, viewCategoryFor, resolveMailbox } from './mailbox';
 import { openCategoryPicker } from './picker-store';
-import { compose, replyTarget } from './reader/compose';
+import { compose, draftToResume, replyTarget } from './reader/compose';
 import { useExpansion } from './reader/expansion';
 import { MessageList } from './reader/MessageList';
 import { ReaderToolbar } from './reader/ReaderToolbar';
@@ -40,7 +46,22 @@ function ReaderSkeleton() {
 
 export function ThreadReaderView({ accountId, threadId }: { accountId: string; threadId: string }) {
   const { data: thread, isLoading } = useThread(accountId, threadId);
-  const { data: messages } = useMessages(accountId, threadId);
+  const { data: allMessages } = useMessages(accountId, threadId);
+  const composers = useComposerWindows();
+  // Drafts being edited inline show as the composer, not also as a message above it.
+  const editing = useMemo(
+    () =>
+      new Set(
+        composers
+          .filter((w) => w.placement === 'inline' && w.threadId === threadId)
+          .flatMap((w) => [w.editingId, w.draftId].filter((id): id is string => !!id)),
+      ),
+    [composers, threadId],
+  );
+  const messages = useMemo(
+    () => allMessages?.filter((m) => !editing.has(m.id)),
+    [allMessages, editing],
+  );
   const { data: accounts } = useAccounts();
   const account = useAccount(accountId);
   const { all, labels } = useCategories(accountId);
@@ -50,6 +71,32 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
   const route = useParams({ strict: false });
   const expansion = useExpansion(messages);
   useMarkReadOnOpen(thread);
+
+  // A reply draft left in the thread reopens inline, without taking focus.
+  useEffect(() => {
+    if (!allMessages) return;
+    const draft = draftToResume(
+      allMessages,
+      (id) =>
+        isInlineDraftDismissed(id) ||
+        composers.some(
+          (w) =>
+            w.editingId === id ||
+            w.draftId === id ||
+            (w.placement === 'inline' && w.threadId === threadId && !w.hidden),
+        ),
+    );
+    if (draft) {
+      openComposer({
+        mode: 'edit-draft',
+        accountId: draft.aid,
+        threadId,
+        draftId: draft.id,
+        placement: 'inline',
+        focus: false,
+      });
+    }
+  }, [allMessages, composers, threadId]);
 
   const own = useMemo(() => ownAddresses(accounts ?? []), [accounts]);
   const gmail = !!account && isGmailAccount(account);
@@ -143,6 +190,7 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
           ) : (
             <ReaderSkeleton />
           )}
+          <InlineComposer threadId={threadId} />
         </div>
       </div>
     </div>

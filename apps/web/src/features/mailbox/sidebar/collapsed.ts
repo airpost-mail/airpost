@@ -10,9 +10,9 @@ function load(): Record<string, boolean> {
   }
 }
 
-/** A section's collapsed flag, remembered per browser. */
-export function useCollapsed(id: string): [boolean, () => void] {
-  const [collapsed, setCollapsed] = useState(() => load()[id] ?? false);
+/** A section's collapsed flag, remembered per browser once toggled. */
+export function useCollapsed(id: string, initial = false): [boolean, () => void] {
+  const [collapsed, setCollapsed] = useState(() => load()[id] ?? initial);
   const toggle = () => {
     const next = !collapsed;
     setCollapsed(next);

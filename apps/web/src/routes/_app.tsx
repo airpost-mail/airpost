@@ -1,5 +1,5 @@
 // The authenticated shell layout.
-import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { createFileRoute, Outlet, useMatchRoute } from '@tanstack/react-router';
 import { AppShell } from '@/components/AppShell';
 import {
   ConnectionStatus,
@@ -18,9 +18,11 @@ export const Route = createFileRoute('/_app')({
 });
 
 function AppLayout() {
+  // Settings has its own section nav; the mailbox list would only compete with it.
+  const inSettings = !!useMatchRoute()({ to: '/settings', fuzzy: true });
   return (
     <AppShell
-      sidebar={<MailboxSidebar />}
+      sidebar={inSettings ? undefined : <MailboxSidebar />}
       search={<SearchBox />}
       status={<ConnectionStatus />}
       userMenu={<SessionMenu />}

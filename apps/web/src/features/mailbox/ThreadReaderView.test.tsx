@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -16,9 +16,11 @@ import {
   MockEngine,
   type EngineNotification,
   type TaskJSON,
+  tasks,
   type ThreadJSON,
 } from '@/engine';
 import { useComposerWindows } from '@/features/composer';
+import { resetComposers } from '@/features/composer/store';
 import { installShortcuts, resetShortcuts } from '@/lib/shortcuts';
 import { ThreadReaderView } from './ThreadReaderView';
 
@@ -26,10 +28,17 @@ const G = MOCK_ACCOUNT_IDS.gmail;
 
 function Composers() {
   const windows = useComposerWindows();
-  return <output aria-label="composers">{windows.map((w) => w.mode).join(',')}</output>;
+  return (
+    <output aria-label="composers">
+      {windows.map((w) => `${w.mode}:${w.placement}`).join(',')}
+    </output>
+  );
 }
 
-async function setup(pick: (t: ThreadJSON) => boolean) {
+async function setup(
+  pick: (t: ThreadJSON) => boolean,
+  before?: (engine: MockEngine, target: ThreadJSON) => Promise<void>,
+) {
   const engine = new MockEngine({ latency: 0 });
   await engine.connect();
   const { threads: items } = await engine.call('threads.list', {
@@ -39,6 +48,7 @@ async function setup(pick: (t: ThreadJSON) => boolean) {
   });
   const target = items.find(pick);
   if (!target) throw new Error('no fixture thread matches');
+  await before?.(engine, target);
   const queued: TaskJSON[] = [];
   engine.onNotification((n: EngineNotification) => {
     if (n.method === 'delta' && n.params.modelClass === 'Task') {
@@ -88,6 +98,7 @@ beforeEach(() => {
 afterEach(() => {
   uninstall();
   resetShortcuts();
+  act(() => resetComposers());
 });
 
 describe('ThreadReaderView', () => {
@@ -118,6 +129,36 @@ describe('ThreadReaderView', () => {
     await setup((t) => t.unread === 0 && !t.labels.some((l) => l.role === 'drafts'));
     await screen.findAllByRole('article');
     await user.keyboard('r');
-    expect(screen.getByLabelText('composers')).toHaveTextContent('reply');
+    expect(screen.getByLabelText('composers')).toHaveTextContent('reply:inline');
+    const reply = await screen.findByRole('region', { name: 'Reply' });
+    expect(await within(reply).findByRole('textbox', { name: 'Message body' })).toBeVisible();
+  });
+
+  it('reopens a reply draft inline when its thread opens', async () => {
+    await setup(
+      (t) => t.unread === 0 && messageCount(t) >= 2,
+      async (engine, target) => {
+        const { messages } = await engine.call('threads.get', { accountId: G, id: target.id });
+        const last = messages.at(-1)!;
+        const draft = {
+          ...last,
+          id: 'draft-inline-test',
+          hMsgId: 'draft-inline-test@tern',
+          rthMsgId: last.hMsgId,
+          draft: true,
+          date: last.date + 60,
+          body: '<p>Half-written reply</p>',
+          plaintext: false,
+        };
+        await engine.call('task.queue', { accountId: G, task: tasks.syncbackDraft(draft) });
+      },
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('composers')).toHaveTextContent('edit-draft:inline'),
+    );
+    const region = await screen.findByRole('region', { name: 'Draft' });
+    expect(await within(region).findByText('Half-written reply')).toBeInTheDocument();
+    // Shown as the composer, not also as a message in the list above it.
+    expect(screen.queryAllByText('Half-written reply')).toHaveLength(1);
   });
 });

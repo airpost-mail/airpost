@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { ComposerForm } from './ComposerForm';
 import {
   closeComposer,
+  composerLabel,
   setFocusedComposer,
   useFocusedComposer,
   type ComposerView,
@@ -20,6 +21,25 @@ const VIEW_CLASSES: Record<ComposerView, string> = {
     'fixed inset-3 z-50 rounded-lg border-b sm:inset-x-[max(1.5rem,calc((100vw-60rem)/2))] sm:inset-y-8',
 };
 
+/** What a composer shows while its draft is being built, or why it couldn't be. */
+export function ComposerPlaceholder({ error, onClose }: { error?: string; onClose: () => void }) {
+  return error ? (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+      <p className="text-2xl font-semibold tracking-tight text-foreground/80">Not this time</p>
+      <p className="text-sm text-muted-foreground">{error}</p>
+      <Button size="sm" variant="secondary" onClick={onClose}>
+        Close
+      </Button>
+    </div>
+  ) : (
+    <div aria-busy className="flex flex-col gap-3 p-(--pane-gutter)">
+      <Skeleton className="h-4 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-24 w-full" />
+    </div>
+  );
+}
+
 export function ComposerWindow({
   win,
   fallbackAccountId,
@@ -29,14 +49,7 @@ export function ComposerWindow({
 }) {
   const { initial, source, error } = useDraftSource(win, fallbackAccountId);
   const focused = useFocusedComposer() === win.key;
-  const label =
-    win.mode === 'new'
-      ? 'New message'
-      : win.mode === 'forward'
-        ? 'Forward'
-        : win.mode === 'edit-draft'
-          ? 'Draft'
-          : 'Reply';
+  const label = composerLabel(win.mode);
 
   return (
     <section
@@ -64,24 +77,9 @@ export function ComposerWindow({
             view={win.view}
             onClose={() => closeComposer(win.key)}
           />
-          {win.view !== 'minimised' &&
-            (error ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-                <p className="text-2xl font-semibold tracking-tight text-foreground/80">
-                  Not this time
-                </p>
-                <p className="text-sm text-muted-foreground">{error}</p>
-                <Button size="sm" variant="secondary" onClick={() => closeComposer(win.key)}>
-                  Close
-                </Button>
-              </div>
-            ) : (
-              <div aria-busy className="flex flex-col gap-3 p-(--pane-gutter)">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-24 w-full" />
-              </div>
-            ))}
+          {win.view !== 'minimised' && (
+            <ComposerPlaceholder error={error} onClose={() => closeComposer(win.key)} />
+          )}
         </>
       )}
     </section>

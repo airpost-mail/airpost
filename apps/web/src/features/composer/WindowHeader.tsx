@@ -1,11 +1,19 @@
-import { Expand, Maximize2, Minimize2, Minus, Shrink, X } from 'lucide-react';
+import {
+  Expand,
+  Maximize2,
+  Minimize2,
+  Minus,
+  Shrink,
+  SquareArrowOutUpRight,
+  X,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ShortcutKeys } from '@/components/ShortcutKeys';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { focusComposer, setComposerView, type ComposerView } from './store';
 
-function HeaderButton({
+export function HeaderButton({
   label,
   keys,
   onClick,
@@ -92,6 +100,39 @@ export function WindowHeader({
           }
         >
           {view === 'fullscreen' ? <Shrink aria-hidden /> : <Expand aria-hidden />}
+        </HeaderButton>
+        <HeaderButton label="Close and keep draft" onClick={onClose}>
+          <X aria-hidden />
+        </HeaderButton>
+      </div>
+    </div>
+  );
+}
+
+/** The header of an inline reply: what it is, then pop out and close. */
+export function InlineHeader({
+  title,
+  status,
+  onPopOut,
+  onClose,
+}: {
+  title: string;
+  status?: ReactNode;
+  onPopOut: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-hairline pr-1.5 pl-(--pane-gutter)">
+      <h2
+        className="min-w-0 flex-1 truncate text-sm font-medium text-muted-foreground transition-colors group-data-focused/composer:text-foreground"
+        title={title}
+      >
+        {title}
+      </h2>
+      {status}
+      <div className="flex items-center">
+        <HeaderButton label="Pop out" onClick={onPopOut}>
+          <SquareArrowOutUpRight aria-hidden />
         </HeaderButton>
         <HeaderButton label="Close and keep draft" onClick={onClose}>
           <X aria-hidden />
