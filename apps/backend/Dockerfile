@@ -23,6 +23,7 @@ COPY Cargo.toml Cargo.lock about.toml about.hbs LICENSE.md NOTICE.md ./
 COPY crates ./crates
 COPY apps/engine ./apps/engine
 COPY apps/cli ./apps/cli
+COPY apps/gateway ./apps/gateway
 COPY apps/mcp ./apps/mcp
 COPY apps/backend ./apps/backend
 RUN cargo build --release --locked -p tern-backend --bin tern-backend \

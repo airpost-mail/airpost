@@ -273,10 +273,12 @@ After stage 1 is on main, since it touches `crates/ms-ipc`, `crates/ms-store`,
 - **Backlog.** A relayed connection never takes the first-subscriber backlog
   (`socket.rs` `takes_backlog`, per the review), so a browser tab can't take the desktop's
   start-up deltas after an engine restart.
-- **Connection cap** of 64 (configurable), refused with a clear error.
+- **Connection cap** of 128 (`SOCKET_MAX_CONNECTIONS`; the gateway keeps at most 64 for
+  browsers), refused with `-32009`.
 - **Interim `account.list` field `account`**: the Account JSON the engine received in
   `account.add`, copied through an allowlist of fields (id, name, emailAddress, provider,
-  label, aliases, color, IMAP/SMTP host, port, username and security), never a denylist.
+  label, aliases, defaultAlias, color, IMAP/SMTP host, port, username and security), never
+  a denylist.
 - Tests: `tests/socket.rs` for hello with and without `relayed`, a second hello, the method
   refusal, each refused task class and path, a File id with `/` or `..` in a `SendDraftTask`,
   the backlog rule, the cap, the redaction (a secret-shaped fixture never appears).
@@ -449,3 +451,31 @@ web, a per-code attempt counter, the `ui.<client>.*` namespace.
 2026-10-16: draft written, reviewed independently (three high findings: file-system access
 through `task.queue`, newline smuggling past the policy, a second `hello`; all checked
 against the code and fixed in the design), confirmed by the user. W1 and W2 starting.
+
+2026-10-16, rebased on main with DCP stages 1 and 2 (4597493fa). Done, not merged:
+- W1 (web): pairing instead of sign-in, the engine setting, the reconnect contract and close
+  codes, `account.list`, subscription to rendered classes, a plain message for `-32008`.
+- W2 (gateway HTTP): devices store, `pair` / `devices` / `healthcheck`, control socket,
+  cookie, Host and Origin checks, limits, static app with CSP, `/healthz` (packaging, 2.7).
+- W3 (G0): `hello.relayed` / `scopes` / `device` fixed by the first `hello`, `feature`
+  `relayed`, `ms_ipc::policy` (method classes, task allowlist, account allowlist), `-32008`,
+  no backlog for relayed subscribers, the connection cap, `account` in `account.list`, and
+  `File::dir_in` mapping every character outside `[a-z0-9_-]` to `_`.
+- W4 (relay): discovery of the `serve` engine, the relayed `hello` (refused when the engine
+  lacks `relayed`), parse, policy and re-encode per frame, frame limits, revoke and shutdown
+  closing open sockets, engine health in `/session`, `apps/gateway/README.md`. The backend
+  image copies `apps/gateway`, now a workspace member.
+- Tests: gateway unit and HTTP tests; `tests/relay.rs` against a real `serve` engine (hello,
+  `account.list` without secrets, refused method and task, newline smuggling, second
+  `hello`, revoke 4401, engine exit 4502, `/session` up and down); engine `tests/socket.rs`
+  (relayed policy, admin scope, backlog, cap); `dir_in` unit test.
+
+Open:
+- No browser run yet: the web client has only met the gateway through its unit tests and
+  the protocol-level relay test. A trial needs a desktop on the `serve` engine.
+- The harness has no gateway scenario on the fake IMAP server (the relay test uses an
+  account whose servers refuse connections); `test_gateway.py` with a small stdlib
+  WebSocket client is the next test to write.
+- No compression on the WebSocket (axum's `ws` has none); initial-sync deltas over a WAN are
+  unmeasured.
+- W5 (files, DCP 16) next; then W6/W7 (DCP 7 and 9). DCP stage 6 will need one more rebase.

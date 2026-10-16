@@ -9,6 +9,7 @@
 !crates/
 !apps/engine/
 !apps/cli/
+!apps/gateway/
 !apps/mcp/
 !apps/backend/
 **/target/
