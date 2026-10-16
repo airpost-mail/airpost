@@ -90,8 +90,10 @@ label; an empty role is invalid. Like the desktop's mailbox perspective, a categ
 than spam or trash lists only threads in all mail (`ThreadCategory.inAllMail`). Search text is plain: each whitespace-separated term is quoted for FTS5 and all must
 match (contact terms as word prefixes), so no user text is read as FTS syntax.
 
-Phase C (section 4): `account.add`, `account.remove`, `account.test`, `account.reset`,
-`engine.shutdown`; notifications `account.state` (running, stopped with error).
+Phase C (section 4, as built): `account.list` on both channels; `account.add`,
+`account.remove` and `engine.shutdown` on `serve` mode's stdin only; notification
+`account.state`. `account.test` and `account.reset` are not methods: `test` and `reset` stay
+one-shot modes for now.
 
 After phase A: `integrations.translate`,
 `integrations.grammar`, `integrations.enrich`, `integrations.test`, served by the
@@ -104,7 +106,9 @@ Standard JSON-RPC codes for parse (`-32700`, with `id: null`), invalid request, 
 method and invalid params. Engine codes from `-32000` down: unsupported protocol, unknown
 account, task rejected (with the `SyncError` JSON as `data`), hello required (`-32003`),
 not found (`-32004`: a read named a folder, label, thread or message the account doesn't
-have). An unparseable line gets a
+have), account stopped (`-32005`, `data: {state, error}`), account exists (`-32006`,
+`account.add` of a starting or running account), wrong channel (`-32007`: a parent-only
+method on the socket, or `subscribe` on stdin). An unparseable line gets a
 parse error instead of being ignored as stdin does.
 
 ### 1.4 Delivery and backpressure
@@ -310,6 +314,60 @@ What has to change (from the 2026-10-16 audit):
   is fine for its single-account scenarios; new multi-account scenarios (one account's
   fatal error leaves the other syncing, add and remove while running).
 
+### 4.1 Decisions, as built (2026-10-16)
+
+- **Modes.** `--mode serve` starts with no account and binds `--socket <path>`, by default
+  `$CONFIG_DIR_PATH/run/engine.sock`. It writes `run/engine.json` `{pid, socket, protocol,
+  accounts: [ids]}` and rewrites it on every add and remove. `migrate` and `import-legacy`
+  stay one-shot invocations before `serve`; `test` and `reset` stay one-shot modes too (the
+  desktop removes an account from the engine before a reset and adds it back after).
+  `--mode sync`, on stdio or `--socket`, is unchanged: the C++ A/B path and the fallback.
+- **Parent channel.** Secrets never go over the socket. `serve`'s stdin takes JSON-RPC
+  requests in the socket's envelope: `account.add {account, identity}` (the account JSON
+  and the identity line `sync` reads, parsed the same way, one `HttpMetadataBackend` per
+  account), `account.remove {accountId}`, `engine.shutdown`, and every socket method
+  (`hello` is not required, `subscribe` is refused). stdout carries their responses and the
+  `ProcessAccountSecretsUpdated` deltas as `delta` notifications with `accountId`, and
+  nothing else. stdin is read once the socket is bound, so the first response marks the
+  engine ready. The socket refuses `account.add`, `account.remove` and `engine.shutdown`
+  with `-32007`. Closed stdin still exits 141 after 30 s; SIGTERM / SIGINT remove the socket
+  files as in phase A. When another engine answers on the socket (the previous one still
+  shutting down after a window reload), serve exits 3 with the one-shot error; the desktop
+  spawns it again every second, up to 30 times, without counting a crash.
+- **States.** `account.state {accountId, state, error?}`: `starting` (added),
+  `running` (its `main` thread opened the database), `stopped` (with the `SyncError` JSON),
+  `removed`. The state and error are also in `hello`, `engine.status` and `account.list`.
+  `account.state` goes to every subscriber of that account whatever its class filter, and
+  is held in the first subscriber's backlog like deltas. `account.add` answers once the
+  account is `running` (or `stopped`, or after 10 s with `starting`); adding a starting or
+  running account is `-32006`, adding a stopped one restarts it (after its threads have
+  been joined). `account.remove` stops the runtime, answers `{stillRunning: [thread
+  names]}` (threads left past the 5 s stop timeout, which may still write to the database;
+  the desktop waits and retries before a reset), sends `removed` and drops the account from
+  the lists; its database rows stay. A stopped or removed account's `DeltaStream` is closed,
+  so a thread left running cannot publish under its id any more.
+- **Failure isolation.** A non-retryable worker error, a task local-phase database error,
+  `test.crash`, or a panic on one of an account's threads stops only that account: its
+  threads return cooperatively (IDLE interrupted, sleeps woken), an `accountStop` thread
+  joins them (up to 5 s, then leaves stragglers) and then sends `stopped` with the error.
+  The engine never restarts an account. In `serve` the panic hook logs a panic on an
+  account thread at error and lets `WorkerContext::spawn` catch it; a panic on an
+  engine-wide thread (stdin, socket, signals, `accountStop`) still aborts. Per-account
+  failures write nothing to stderr. Commands for a stopped account get `-32005`; reads
+  still answer.
+- **Logs.** One `mailsync-<accountId>.log` per account, same format, rotation and thread
+  names, routed by the account id each of its threads carries (short-lived ones included).
+  Engine-wide lines (socket, stdin, hub) go to `$CONFIG_DIR_PATH/engine.log`. `sync` mode
+  opens no account file, so every line lands in its one log as before.
+- **Per-account machinery.** `WakeSignal` in `WorkerContext`; `sync.wake` without
+  `accountId` wakes every running account. One `TokenManager` per account (so no lock is
+  shared across accounts at all). One `DeltaStream` per account with its own flush thread
+  into the shared hub, coalescing and timing unchanged. Each account's local phases,
+  cancels and debounce run on its own `main` thread fed by a channel. The read API and
+  every account-scoped method route by `accountId`; unknown is `-32001`.
+- **Debug only.** `test.crash {accountId}` and `test.panic {accountId}` on stdin, the
+  per-account `test-crash`.
+
 Out of scope for phase C, and the next real decision: a headless engine started by the CLI
 without the desktop. It needs the engine to own account settings and credentials (OS
 keychain), since it can't read the desktop's safeStorage keyset. The same move would let
@@ -455,3 +513,98 @@ Open (phase B):
   subscription.
 - `apps/engine/CLAUDE.md`'s layout table and `apps/engine/test/README.md` don't mention
   `apps/cli` and `test_cli.py` yet.
+
+Phase C, 2026-10-16, implemented and gated, not committed or trialled in the desktop.
+
+Delivered:
+- C1, isolation: `ms_sync::runtime` (`AccountRuntime`, `WorkerContext::fail` / `spawn` /
+  `request_stop`), per-account log routing in `ms_core::log` (`mailsync-<id>.log` per
+  account, `engine.log` for the rest), `WakeSignal` / `DeadlineSignal` in the account's
+  context and closable, per-account `TokenManager` locks. Workers check the stop flag at
+  their loop points and every sleep wakes on stop. `sync` mode's failure handler logs
+  critical and aborts with the same text as before.
+- C2, `serve`: `apps/engine/src/serve.rs` (registry, parent channel, `accountStop`
+  reaper), `socket.rs` over an `Accounts` trait (one account in `sync`, the registry in
+  `serve`) with a multi-account hub and a `Session` both channels use. `ms-ipc`:
+  `account.*`, `engine.shutdown`, `test.*`, `account.state`, their params and results
+  (`AccountRemoveResult {stillRunning}` included), `error` on `AccountInfo` /
+  `AccountStatus`, codes `-32005` to `-32007`. Protocol stays 1. `EXIT_SOCKET_IN_USE` (3)
+  when another engine answers on the socket. The metadata stream ends on stop
+  (`MetadataBackend::pull` takes a stop check); `DeltaStream::close` drops what a stopped
+  account's leftover threads emit.
+- CLI: discovery reads `run/engine.json` next to `run/<id>.json`; `tern status` and
+  `tern accounts` show each account's state and error key; `tern sync` without
+  `--account` skips stopped accounts.
+- Harness: `MAILSYNC_TRANSPORT=serve` (one engine per scenario, accounts added on stdin,
+  deltas routed by `accountId`, checks that stdout carries only responses and secrets and
+  that no delta crosses accounts). Multi-account scenarios (`account:` on any step,
+  `account.remove` / `account.add`, `wait {stopped}`, `server.set_password`; expectations
+  `accounts`, `stopped`, `engine_log`): `multi-account-side-by-side`,
+  `-fatal-error-isolated`, `-remove-add`, `-task-routing`, on all three transports.
+  `test_cli.py` runs against socket and serve.
+- Desktop: `EngineServeProcess` (`mailsync-process.ts`) and `EngineClient`
+  (`app/src/engine-client.ts`, with `CrashTracker` moved there). `ensure()` diffs
+  AccountStore into `account.add` / `account.remove`; commands route by `accountId` and
+  are held until the add answers; `account.state` stopped counts as a crash for that
+  account and re-adds it (5 in 5 min, then the error state); an engine exit respawns and
+  re-adds every account, with backoff (0, 1, 2, 4, 8 s) and its own 5-in-5-min cutoff;
+  exit 3 respawns every 1 s up to 30 times without counting a crash. Reset Cache removes
+  the account, waits up to 10 s when `stillRunning` isn't empty, runs the one-shot
+  `reset`, then adds it back. Secrets the client added are redacted from engine errors.
+  Spec: `app/spec/engine-client-spec.ts`.
+
+Selecting a process model:
+- Engine: `--mode serve` runs every account in one process; `--mode sync` (stdio, or
+  `--socket`) is one account per process, unchanged, and is what the C++ engine offers.
+- Desktop: the Rust engine runs one `serve` engine by default on macOS and Linux.
+  `TERN_ENGINE_PROCESS=per-account` goes back to phase A's per-account socket processes,
+  and `TERN_ENGINE_TRANSPORT=stdio` to per-account stdio. The C++ engine, Windows and the
+  one-shot modes (`migrate`, `import-legacy`, `test`, `reset`) are unchanged.
+- Harness: `MAILSYNC_TRANSPORT=stdio` (default), `socket` or `serve`.
+
+Gate results: fmt, clippy `-D warnings --locked` and `cargo deny` clean. `cargo test
+--workspace --locked`: 724 passed, 0 failed, 44 ignored; the ignored exit-141 tests (sync
+stdio, sync socket, serve) pass. Harness quick tier, release build, `REQUIRE_TERN=1`: 123
+passed, 1 skipped on each of stdio, socket and serve. Full suite on serve with Docker:
+233 passed, 3 skipped. Every skip is `rules-ready-pre-upgrade-messages` (baseline binary not
+built). Desktop: tsc, eslint and prettier clean; under the Electron spec runner (with the
+worktree's debug engine at `app/mailsync-rs`) `engine-client-spec` 20/20 and the full
+suite 2764 passing, 0 failing. `--mode sync` stdout reviewed against the diff: deltas, the
+`listening` line and the one-shot output are unchanged; the abort texts on stderr are the
+same.
+
+Open (phase C):
+- Desktop trial of `serve` mode on `~/tern-trial` (two real accounts: send, labels + undo,
+  CalDAV, Reset Cache, account add/remove, quit and relaunch), to be done by the
+  coordinator.
+- Next: wire `integrations.*` on the serve engine.
+- Quit: the harness SIGTERMs on restart (as a client quitting) because `engine.shutdown`
+  lets an in-flight `SendDraftTask` finish, which changed `sent-copy-send-interrupted`'s
+  outcome. The desktop sends `engine.shutdown` on unload and kills after 8 s. Decide
+  whether quit should shut down or kill.
+- A thread blocked in a network call sees the stop only when the call returns. `stop`
+  waits 5 s, then leaves it running; it may still write that account's rows (its deltas
+  are dropped). The desktop waits a fixed 10 s on `stillRunning` before a reset; the engine
+  can't report when such a thread ends. Re-adding the account starts new threads beside it.
+- After a stop the metadata reader keeps its HTTP stream open until the next heartbeat (up
+  to 5 s).
+- serve's stdin handles requests one at a time: a slow `task.queue` or an `account.add`
+  (up to 10 s each) delays a later `account.add` or `engine.shutdown`.
+- A command in flight when its account stops gets `-32603` "the engine is shutting down",
+  not `-32005`.
+- Each account has its own `TokenManager`, so `TokenManager::forget` is unused.
+- `test.crash` / `test.panic` are debug-only in serve, while sync's stdin `test-crash`
+  works in release builds; the harness's fatal-error scenario uses an auth failure.
+- `tern watch` ignores `account.state`. No desktop UI uses `starting` / `running` yet.
+- No test drives a non-retryable error from inside a real worker in `serve` (they share
+  `ctx.fail_with` with `test.crash`); no serve test with a Tern identity.
+- In `sync` socket mode a subscriber filtered to its own account no longer takes the
+  backlog (only `accounts: null` and no class filter does). The desktop and harness
+  subscribe with `accounts: null`.
+- On stdio and socket the stopped account's process aborts with SIGABRT, so macOS may
+  write a crash report for it in the multi-account scenarios.
+- Multi-account scenarios use the fake server only; `durations.json` isn't refreshed for
+  them.
+- `--mode sync` still exits 1 on a socket collision.
+- Desktop specs need an engine binary at `apps/desktop/app/mailsync-rs` in the worktree, or
+  the runner prints nothing.
