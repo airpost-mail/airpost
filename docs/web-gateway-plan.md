@@ -221,6 +221,32 @@ Client contract (`WsEngineClient`), matching DCP 4.1 step 2:
   whether the engine dedupes a re-queued task id).
 - Tabs reconnect independently; a revoke reaches every tab through 4401 or `/session`.
 
+### 2.7 Packaging (deployment scenario 3, `docs/deployment-plan.md` 4 and 7)
+
+- One `tern-headless` image with `mailsync`, `tern`, `tern-mcp` and `tern-gateway`; the
+  engine and the gateway run as two compose services from it, as the same non-root uid, so
+  the engine's peer-uid check passes. They share the whole profile volume, not only the
+  socket: the gateway finds the engine through `<config>/run/engine.json` and keeps its own
+  state in `<config>/gateway/` (`devices.json`, `control.sock`, `gateway.json`). Both get
+  `TERN_CONFIG_DIR` pointing at it.
+- `apps/web/dist` is baked into the image and served with `TERN_GATEWAY_WEB_ROOT`, so web and
+  gateway always ship the same version.
+- Health: `GET /healthz` (no auth, no Host check, says nothing about the engine) and
+  `tern-gateway healthcheck` (connects to `TERN_GATEWAY_BIND`, 0.0.0.0 mapped to loopback),
+  for an image without curl. A down engine doesn't fail the gateway's healthcheck.
+- Pairing: `docker compose exec gateway tern-gateway pair [--admin]`; it reaches the running
+  gateway over the control socket in the shared volume.
+- Environment: `TERN_CONFIG_DIR`, `TERN_GATEWAY_BIND` (default `127.0.0.1:5180`; a container
+  sets `0.0.0.0:5180`), `TERN_GATEWAY_PUBLIC_URL` (required off loopback),
+  `TERN_GATEWAY_INSECURE_PUBLIC_URL`, `TERN_GATEWAY_WEB_ROOT`, `TERN_GATEWAY_ALLOW_ORIGINS`,
+  and `TERN_TRUSTED_PROXIES` (the backend's name; default `127.0.0.0/8,::1`).
+- Hostnames: the backend can be public and the gateway VPN-only. The browser never calls the
+  backend (G8), so the backend needs no web origin in its CORS list. On a VPN, give the
+  gateway an https name (e.g. `tailscale cert`) rather than plain http, which needs
+  `TERN_GATEWAY_INSECURE_PUBLIC_URL` and sends the cookie without `Secure`.
+- Until DCP stage 11 there is no headless engine (scope note at the top), so the image's
+  engine service waits for `serve --detached` and engine-owned credentials.
+
 ## 3. Engine work for the gateway (G0)
 
 After stage 1 is on main, since it touches `crates/ms-ipc`, `crates/ms-store`,
