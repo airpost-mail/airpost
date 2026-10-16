@@ -392,3 +392,69 @@ def test_davgen_round_trip():
     f = davgen.vcard_fields(vcf)
     assert f["is_group"] and f["members"] == ["x"]
     assert re.search(r"^KIND:group\r$", vcf, re.M)
+
+
+# -- Tern server (apps/backend) ------------------------------------------------------------------------
+
+def _backend(tmp_path):
+    from harness.servers import backend as backendmod
+    if backendmod.find_backend_binary() is None:
+        pytest.skip("no tern-backend binary (build apps/backend or set TERN_BACKEND_BIN)")
+    return backendmod, backendmod.BackendServer(tmp_path)
+
+
+def test_backend_fixture(tmp_path):
+    """The `backend` fixture: users and tokens through the CLI, `serverId`, a push read back
+    through the pages, the rows surviving an outage, a restore, and a revoked token answered 401."""
+    backendmod, b = _backend(tmp_path)
+    with b:
+        engine = b.device("engine")
+        other = b.device("other-device")
+        assert engine.user_id == other.user_id and engine.token != other.token
+        assert engine.token.startswith("tern_") and b.server_id
+        ident = backendmod.tern_server_identity(b, engine)
+        assert ident["url"] == b.url and ident["serverId"] == b.server_id and ident["userId"] == engine.user_id
+        assert backendmod.cpp_identity(engine)["createdAt"] == backendmod.CPP_IDENTITY_CREATED_AT
+        # The engine binds its cursor to what /me answers; the fixture's identity must agree.
+        me = b.me("engine")
+        assert (me["serverId"], me["userId"]) == (b.server_id, engine.user_id)
+
+        assert b.push("other-device", "acc1", "thread", "t:abc", "thread-snooze", {"expiration": 1}) == 1
+        assert b.push("other-device", "acc1", "thread", "t:abc", "thread-snooze", {"expiration": 2}, version=1) == 2
+        rows = b.rows("engine", "acc1")
+        assert [(r["object_id"], r["plugin_id"], r["v"], r["value"]) for r in rows] == \
+            [("t:abc", "thread-snooze", 2, {"expiration": 2})]
+
+        server_id, port = b.server_id, b.port
+        b.stop()
+        with pytest.raises(OSError):
+            b.request("GET", "/ping", timeout=1)
+        b.start()
+        assert (b.server_id, b.port) == (server_id, port)
+        assert len(b.rows("engine", "acc1")) == 1
+
+        # A restored backup: a new server id, writes after the backup gone, later tokens too.
+        b.backup("one-row")
+        b.device("late-device")
+        b.push("other-device", "acc1", "thread", "t:def", "thread-snooze", {"expiration": 3})
+        b.stop()
+        b.restore("one-row")
+        b.start()
+        assert b.server_id != server_id and b.me("engine")["serverId"] == b.server_id
+        assert [r["object_id"] for r in b.rows("engine", "acc1")] == ["t:abc"]
+        assert "late-device" not in b.devices
+
+        assert b.revoke("engine") == 1
+        assert b.request("GET", "/metadata/acc1", device="engine")[0] == 401
+        assert b.request("GET", "/metadata/acc1", device="other-device")[0] == 200
+
+
+def test_engine_kind(tmp_path, monkeypatch):
+    from harness.servers import backend as backendmod
+    monkeypatch.delenv("HARNESS_ENGINE_KIND", raising=False)
+    fake = tmp_path / "mailsync"
+    fake.write_bytes(b"\0" * ((1 << 20) - 5) + b"RUST_BACKTRACE" + b"\0" * 10)   # straddles a read
+    assert backendmod.engine_kind(fake) == "rust"
+    other = tmp_path / "mailsync-cpp"
+    other.write_bytes(b"\0mailcore\0" * 100)
+    assert backendmod.engine_kind(other) == "cpp"

@@ -183,6 +183,8 @@ fn nothing_matches_the_absent_only_patterns() {
     let lines = [
         sync_loop_complete().to_owned(),
         starting_sync("me@example.com"),
+        metadata_backend_tern("tern.example.com"),
+        metadata_backend_local("no server"),
         waking_all_workers().to_owned(),
         calendar_sync_pass(1, true),
         calendar_sync_pass_complete(1),
@@ -196,4 +198,19 @@ fn nothing_matches_the_absent_only_patterns() {
             assert!(!re.is_match(l), "{p:?} matches {l:?}");
         }
     }
+}
+
+#[test]
+fn metadata_backend_lines() {
+    // backend-metadata-push and backend-identity-invalid; the reason is `invalid <field>` in
+    // apps/engine/src/modes.rs.
+    assert_matches(
+        r"^Metadata backend: tern-server 127\.0\.0\.1",
+        &metadata_backend_tern("127.0.0.1"),
+    );
+    let local = metadata_backend_local("invalid url");
+    assert_matches(r"^Metadata backend: local only \(invalid url\)", &local);
+    assert!(!Regex::new(r"^Metadata backend: tern-server")
+        .unwrap()
+        .is_match(&local));
 }

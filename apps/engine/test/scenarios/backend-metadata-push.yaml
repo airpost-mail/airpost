@@ -1,0 +1,49 @@
+name: backend-metadata-push
+description: >
+  Snooze through the Tern server, both ways. The client snoozes a thread
+  (SyncbackMetadataTask); the engine pushes it and the server stores the row. Another device
+  of the same user snoozes a second thread; the engine receives it on the delta stream and
+  stores it on the Thread with its expiration indexed, as if the client had saved it. The
+  engine gets the Tern server object on its identity line (docs/backend-plan.md 4.1). C++ is
+  not run here: the desktop always gives it a null identity.
+source: "docs/backend-plan.md 3.5 (push, stream), 4.1 (identity line, HttpMetadataBackend), 6.2 B1-H gate"
+servers:
+  - {fake: dovecot}
+backend: {}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - wait:
+      backend_metadata:
+        - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, value: {snoozeCategoryId: null}}
+      timeout: 30
+  - backend.push:
+      threads: {mailbox: INBOX, uids: [2]}
+      plugin: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+  - wait:
+      metadata:
+        - {threads: {mailbox: INBOX, uids: [2]}, plugin: thread-snooze, expiration: true}
+      timeout: 30
+expect:
+  backend_metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, v: 1}
+    - {threads: {mailbox: INBOX, uids: [2]}, plugin: thread-snooze, v: 1}
+    - {threads: {mailbox: INBOX, uids: [3]}, plugin: thread-snooze, absent: true}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+    - {threads: {mailbox: INBOX, uids: [2]}, plugin: thread-snooze, expiration: true}
+    - {threads: {mailbox: INBOX, uids: [3]}, plugin: thread-snooze, absent: true}
+  metadata_expiration:
+    - {threads: {mailbox: INBOX, uids: [1, 2]}, count: 0}
+  log_present: ['^Metadata backend: tern-server 127\.0\.0\.1']
+  db_matches_server: {}
+  running: true

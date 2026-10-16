@@ -1,0 +1,35 @@
+name: backend-identity-invalid
+description: >
+  The identity line is a Tern server object with a plain-http URL on a non-loopback host.
+  The engine refuses it by field name, never logging the token, and runs on the local-only
+  backend: mail sync carries on, a snooze is saved locally, and nothing reaches the server.
+source: "docs/backend-plan.md 4.1 (an invalid tern-server object logs and falls back to LocalOnly; http only for loopback)"
+servers:
+  - {fake: dovecot}
+backend:
+  identity: {url: "http://tern.example.test"}
+mailboxes:
+  INBOX: {messages: 2}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - server.append: {mailbox: INBOX, messages: 1}
+  - sync: pass
+expect:
+  tasks: {snooze: {status: complete, error: null}}
+  log_present: ['^Metadata backend: local only \(invalid url\)']
+  log_absent: ['^Metadata backend: tern-server']
+  deltas: {ProcessIdentityRefreshNeeded: {persist: 0}}
+  backend_metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, absent: true}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+  counts: {INBOX: 3}
+  db_matches_server: {}
+  running: true

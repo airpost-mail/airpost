@@ -220,6 +220,19 @@ pub fn starting_sync(email: &str) -> String {
     format!("------------- Starting Sync ({email}) ---------------")
 }
 
+/// Which metadata backend the sync process uses (docs/backend-plan.md 4.1). Never the token.
+/// backend-metadata-push: `^Metadata backend: tern-server 127\.0\.0\.1`;
+/// backend-identity-invalid: absent `^Metadata backend: tern-server`.
+pub fn metadata_backend_tern(host: &str) -> String {
+    format!("Metadata backend: tern-server {host}")
+}
+
+/// The local-only backend, and why (`no server`, or the refused field of a bad server object).
+/// backend-identity-invalid: `^Metadata backend: local only \(invalid url\)`.
+pub fn metadata_backend_local(reason: &str) -> String {
+    format!("Metadata backend: local only ({reason})")
+}
+
 /// Logged for `wake-workers`.
 pub fn waking_all_workers() -> &'static str {
     "Waking all workers..."

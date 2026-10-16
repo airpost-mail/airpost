@@ -1,0 +1,38 @@
+name: backend-token-revoked
+description: >
+  The engine's device token is revoked on the server. The open stream ends within a
+  heartbeat (5 s) and the reconnect is answered 401; the engine emits
+  ProcessIdentityRefreshNeeded once, makes no further requests, keeps running and syncing
+  mail, and keeps later pushes in its outbox instead of sending them. C++ aborts here, so
+  this is not an oracle scenario.
+source: "docs/backend-plan.md 3.5 (revocation closes the stream), 4.1 (401/403: dormant until restart)"
+servers:
+  - {fake: dovecot}
+backend: {}
+mailboxes:
+  INBOX: {messages: 2}
+steps:
+  - wait: quiescent
+  - backend.revoke: {device: engine}
+  - wait: {delta: {class: ProcessIdentityRefreshNeeded}, timeout: 60}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - server.append: {mailbox: INBOX, messages: 1}
+  - sync: pass
+  # Past several retry intervals (3 s, 6 s): a dormant engine must not signal again.
+  - wait: {seconds: 10}
+expect:
+  tasks: {snooze: {status: complete, error: null}}
+  deltas: {ProcessIdentityRefreshNeeded: {persist: 1}}
+  backend_metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, absent: true}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+  counts: {INBOX: 3}
+  db_matches_server: {}
+  running: true

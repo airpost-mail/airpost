@@ -406,6 +406,8 @@ class PimMixin:
                     if d.wall < since or d.model_class != want.get("class", d.model_class) or d.type != want.get("type", d.type):
                         continue
                     n += sum(1 for m in d.models if pim.row_matches({"data": m}, want.get("where")))
+                    # Signals such as ProcessIdentityRefreshNeeded carry no models.
+                    n += 1 if not d.models and not want.get("where") else 0
                 return n >= int(want.get("count", 1))
             self.ms.wait_for(seen, timeout, f"delta {json.dumps(want)}", poll=0.25)
         if "people_requests" in arg:

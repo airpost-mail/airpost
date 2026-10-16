@@ -8,7 +8,8 @@ engine is exercised exactly as the Mailspring client exercises it.
 ```
 test/
   harness/        drives mailsync, reads its database/log/delta stream, runs scenarios;
-                  servers/people.py is the fake Google OAuth + People API
+                  servers/people.py is the fake Google OAuth + People API,
+                  servers/backend.py runs the Tern server (apps/backend)
   fakeimap/       an in-process, scriptable IMAP server with server "personalities"
   servers/        Dockerfiles + configuration: Dovecot 2.3.21, Cyrus IMAP 3.6, and the
                   CalDAV/CardDAV servers Radicale 3.8 and Baikal 0.10 (sabre/dav 4)
@@ -115,6 +116,7 @@ The other services are populated the same way, before mailsync starts:
 | `legacy_db: {wal, folders, messages, metadata, state, files, sql}` | an `edgehill.db` as the C++ engine leaves it, written before the first `--mode migrate` (`harness/legacy.py`); `wal: true` leaves the writes in the `-wal` file; a draft's `reply_to: <message key>` makes it a reply saved in that message's thread |
 | `import_legacy: true` | run `--mode import-legacy` between migrate and sync, as the client does on every launch (also `restart: {import_legacy: true}`) |
 | `slow: true` / `slow: {kind[:profile]: true}` | the case is in the slow tier (see "Tiers") |
+| `backend: {}` / `backend: {user: email, identity: null \| {field: value}}` | start the Tern server for this run (see "The Tern server" below); the engine gets the `engine` device's identity on every launch, `null` with `identity: null`, or that identity with the given fields replaced (`backend-identity-invalid`) |
 | `xfail: reason` / `skip: reason` | the whole scenario waits on an engine feature: failures are reported as XFAIL (a pass as XPASS), or the case is skipped |
 
 Steps:
@@ -143,7 +145,8 @@ Steps:
 | `people.add_contact / update_contact / delete_contact / add_group / rename_group / delete_group / group_members / expire_sync_tokens` | what contacts.google.com does; `expire_sync_tokens` makes every issued sync token answer 400 "Sync token is expired" |
 | `mark: name` | record the wall clock, for `changed_since` and `metadata_expiration: [{since}]` and `wait: {delta: {since}}` |
 | `wait: {models: {Table: {where, count, match, absent}}, timeout: s}` | until the engine's rows match, as `expect: models` |
-| `wait: {delta: {class, type, where, count, since}, timeout: s}` | until that many models arrived on deltas of that class and type (e.g. `metadata-expiration`, `ProcessAccountSecretsUpdated`) |
+| `wait: {delta: {class, type, where, count, since}, timeout: s}` | until that many models arrived on deltas of that class and type (e.g. `metadata-expiration`, `ProcessAccountSecretsUpdated`); a delta without models (`ProcessIdentityRefreshNeeded`) counts once |
+| `wait: {metadata: [...], timeout: s}`, `wait: {backend_metadata: [...], timeout: s}` | until the engine's (or the server's) metadata matches, as the expectations of the same name |
 | `wait: {people_requests: [...], timeout: s}` | until the fake People API has seen those requests, as `expect: people_requests` |
 | `server.smtp_hold` / `server.smtp_release` | queue self-addressed SMTP deliveries, then deliver them, so the INBOX copy of a sent message arrives after the Sent copy; `smtp_release` takes `at:` like any server step (`rules-ready-inbox-copy-first`) |
 | `hold_engine: true` on a `server.*` step | SIGSTOP the engine while the step runs and SIGCONT after, so a slow server change (a 2300-message APPEND to Cyrus) lands as one batch rather than being split by a pass that wakes from the 120 s sleep halfway (`heavy-fetch-truncation-backlog`) |
@@ -151,6 +154,11 @@ Steps:
 | `db.sql: [statements]` | write the stopped engine's database (only under `restart: {before: [...]}`), to reproduce a stored state whose producing path is unknown; every derived layer must be written consistently |
 | `restart: {binary: path, before: [steps]}` | stop and relaunch on the same database, optionally with another build; `before:` runs steps while the engine is stopped (server state it did not watch happen) |
 | `snapshot: name`, `assert: {...}` | mid-scenario checkpoints |
+| `backend.push: {threads\|messages: selector \| object_type + object_id, plugin, value, version, header_message_id, device}` | another device of the same user writes metadata (`POST /metadata/…`); the selector resolves to the engine's id for one model, `value` takes `{now_plus: s}`, `device` defaults to `other-device` |
+| `backend.get: {path \| url, status, device}` | a GET against the server (a recipient opening a pixel or link), redirects not followed; `status` asserts the answer |
+| `backend.stop` / `backend.start` | an outage: the server stops and comes back on the same port and data dir |
+| `backend.revoke: {device}` | revoke a device's tokens through the CLI (default `engine`) |
+| `backend.backup: {name}` / `backend.restore: {name}` | `tern-backend backup`, then restore it as docs/self-hosting.md says (server stopped; `backend.start` after): a new server id, and writes and tokens made after the backup gone (`backend-server-restored`) |
 
 A scenario may also start on another build with a top-level `binary: ab/mailsync-0df7864`
 (relative to `test/`) and `restart` onto the build under test (`rules-ready-pre-upgrade-messages`).
@@ -239,6 +247,29 @@ arrived within the settle window.
 `{folder: {uid: Placement}}`, and `Server.truth()` reads the same shape back from the server
 over IMAP. Everything else compares those two, which is what lets the scenarios survive the
 placements refactor: only `placements_from_db` changes.
+
+### The Tern server
+
+A scenario with `backend:` runs `tern-backend serve` on a free loopback port with a data dir
+in the run's artifacts (`backend-data/`, its log in `backend.log`). The binary is
+`TERN_BACKEND_BIN`, else the newest `tern-backend` under `CARGO_TARGET_DIR`, the root
+`target/` or `apps/backend/target/`; without one the scenario is skipped. The fixture creates
+the user (`harness@example.test`) and a device token named `engine` through the CLI, takes
+`userId` from `user add`, the token from `token create` and `serverId` from
+`GET /tern/v1/server`. Every engine process of the run gets that token on `--identity`, in its
+engine's shape (docs/backend-plan.md 4.1 and 6.1): the Rust engine the Tern server object
+`{"type":"tern-server","version":1,"url","token","userId","serverId"}`; the C++ engine a
+Mailspring-shaped identity with `IDENTITY_SERVER` set to the server. The engine kind is read
+from the binary (a Rust build carries `RUST_BACKTRACE`; `HARNESS_ENGINE_KIND=rust|cpp`
+overrides). The desktop never gives C++ a server, so C++ runs only as a wire-compatibility
+oracle. `backend.*` steps act as another device; the API client is `BackendServer` in
+`harness/servers/backend.py`, and `test_service_fakes.py::test_backend_fixture` checks it
+without an engine.
+
+`backend_metadata: [{threads|messages: selector | object_type + object_id, plugin, value: {subset}, v: n | {min, max}, absent: true}]`
+is the server's row for the model, read through `GET /metadata/<aid>` as the engine's user, with a token of its own
+(`absent` passes for no row or a tombstone). Every `backend:` scenario also gets
+`backend_token_secret`: no device token appears in the engine's log or stderr.
 
 ## The fake server, and keeping it honest
 
@@ -458,6 +489,11 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | import-legacy-without-legacy-db | no legacy database: success, nothing written | fake |
 | metadata-expiration-snooze | `thread-snooze` expiration streams the Thread as `metadata-expiration` once due, never early, never for other threads, never after the client clears it | fake |
 | metadata-expiration-send-later | `send-later` on a local draft expires while the engine is stopped and is streamed after relaunch; metadata without an expiration never is | fake |
+| backend-metadata-push | snooze pushed to the Tern server, and another device's snooze received on the stream | fake |
+| backend-push-during-outage | a push while the server is down waits in the outbox and drains on reconnect | fake |
+| backend-token-revoked | a revoked token: one ProcessIdentityRefreshNeeded, no abort, pushes kept | fake |
+| backend-server-restored | a server restored from a backup: one ProcessIdentityRefreshNeeded, the cursor discarded, the lost row backfilled | fake |
+| backend-identity-invalid | a non-loopback `http` URL on the identity line: local-only backend by field name, mail sync unaffected | fake |
 | google-people-initial-sync | OAuth-only Gmail account: refresh-token rotation reaches the client, 432 contacts in pages of 400, user groups with members, system groups skipped | fake (people) |
 | google-people-incremental-sync | after a relaunch the stored sync tokens fetch only what changed, including `metadata.deleted` tombstones | fake (people) |
 | google-people-sync-token-expired | an expired sync token falls back to a full listing that also removes contacts deleted meanwhile | fake (people) |

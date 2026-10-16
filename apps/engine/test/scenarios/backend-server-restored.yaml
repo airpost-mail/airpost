@@ -1,0 +1,54 @@
+name: backend-server-restored
+description: >
+  The Tern server is restored from a backup taken before the client snoozed a thread, so it
+  comes back without that row and with a new server id (`tern-backend backup`). On the
+  reconnect, `/tern/v1/me` reports a server id the engine was not bound to: it emits
+  ProcessIdentityRefreshNeeded once (the server's pair differs from the identity line),
+  discards its cursor, backfills its local metadata, and streams from the start, so the
+  lost snooze is back on the server and another device's later snooze still arrives.
+source: "docs/backend-plan.md 4.1 (cursor binding to the /tern/v1/me pair), docs/self-hosting.md (Backups and restores)"
+servers:
+  - {fake: dovecot}
+backend: {}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+  - backend.backup: {name: before-snooze}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - wait:
+      backend_metadata:
+        - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, value: {snoozeCategoryId: null}}
+      timeout: 30
+  - backend.stop: {}
+  - backend.restore: {name: before-snooze}
+  - backend.start: {}
+  - wait: {delta: {class: ProcessIdentityRefreshNeeded}, timeout: 60}
+  - wait:
+      backend_metadata:
+        - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, value: {snoozeCategoryId: null}}
+      timeout: 30
+  - backend.push:
+      threads: {mailbox: INBOX, uids: [2]}
+      plugin: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+  - wait:
+      metadata:
+        - {threads: {mailbox: INBOX, uids: [2]}, plugin: thread-snooze, expiration: true}
+      timeout: 30
+expect:
+  deltas: {ProcessIdentityRefreshNeeded: {persist: 1}}
+  backend_metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, v: {min: 1}}
+    - {threads: {mailbox: INBOX, uids: [2]}, plugin: thread-snooze, v: 1}
+    - {threads: {mailbox: INBOX, uids: [3]}, plugin: thread-snooze, absent: true}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+    - {threads: {mailbox: INBOX, uids: [2]}, plugin: thread-snooze, expiration: true}
+  running: true

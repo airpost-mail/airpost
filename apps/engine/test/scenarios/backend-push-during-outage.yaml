@@ -1,0 +1,36 @@
+name: backend-push-during-outage
+description: >
+  The client snoozes a thread while the Tern server is down. The push fails as retryable, so
+  the engine keeps it in its outbox and completes the task; when the server is back, the
+  metadata thread reconnects, drains the outbox before opening the stream, and the server
+  ends up with the row.
+source: "docs/backend-plan.md 4.1 (outbox, drained on every stream reconnect)"
+servers:
+  - {fake: dovecot}
+backend: {}
+mailboxes:
+  INBOX: {messages: 2}
+steps:
+  - wait: quiescent
+  - backend.stop: {}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - backend.start: {}
+  # The metadata thread backs off 3 s, then doubling, while the server is down.
+  - wait:
+      backend_metadata:
+        - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, value: {snoozeCategoryId: null}}
+      timeout: 60
+expect:
+  tasks: {snooze: {status: complete, error: null}}
+  backend_metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, v: 1}
+    - {threads: {mailbox: INBOX, uids: [2]}, plugin: thread-snooze, absent: true}
+  metadata:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+  running: true

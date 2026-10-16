@@ -35,6 +35,7 @@ from . import invariants
 from . import mailgen
 from .assertions import TRACKED_FLAGS, compare_placements, placement_changes
 from .mailsync import MailsyncError, MailsyncProcess, account_json, describe_exit
+from .scenario_backend import BackendMixin
 from .scenario_pim import PimMixin, ScenarioFailure
 from .servers.base import Server, normalize_message_id
 
@@ -157,7 +158,7 @@ def parse_uids(spec) -> list:
     return out
 
 
-class ScenarioRun(PimMixin):
+class ScenarioRun(PimMixin, BackendMixin):
     """One scenario against one server. Artifacts land in test/runs/<name>-<server>/."""
 
     def __init__(self, scenario: dict, spec: ServerSpec, binary: Optional[Path] = None, keep: bool = False):
@@ -254,6 +255,7 @@ class ScenarioRun(PimMixin):
         if self.spec.kind != "fake" and self.spec.options.get("smtp"):
             self.server.attach_smtp()
         self.ignore_busy = [self.server.server_path(p) for p in self.ignore_busy]
+        self._start_backend()
         existing = set(self.server.mailboxes())
         for name, mspec in (self.sc.get("mailboxes") or {}).items():
             mspec = mspec or {}
@@ -279,6 +281,7 @@ class ScenarioRun(PimMixin):
         modes = ["import-legacy"] if self.sc.get("import_legacy") else []
         self.ms = MailsyncProcess(account, self.work, binary=self._initial_binary(), verbose=True,
                                   env=self._engine_env(), pre_sync_modes=modes)
+        self._attach_backend(self.ms)
         self._write_legacy_db()
 
     def _engine_env(self) -> dict:
@@ -297,6 +300,7 @@ class ScenarioRun(PimMixin):
             self.server.stop()
             if hasattr(self.server, "detach_smtp"):
                 self.server.detach_smtp()
+        self._stop_backend()
         if self.work.exists():
             (self.work / "report.txt").write_text("\n".join(self.report) + "\n")
         if not self.keep and not self.failures and not self.xfails and self.work.exists():
@@ -414,6 +418,8 @@ class ScenarioRun(PimMixin):
             result = self._dav_step(verb[len("dav."):], dict(arg or {}))
         elif verb.startswith("people."):
             result = self._people_step(verb[len("people."):], dict(arg or {}))
+        elif verb.startswith("backend."):
+            result = self._backend_step(verb[len("backend."):], dict(arg or {}))
         elif verb.startswith("server."):
             result = self._server_step(verb[len("server."):], arg or {})
         elif verb.startswith("client."):
@@ -465,6 +471,8 @@ class ScenarioRun(PimMixin):
             self._wait_task(task_id, float(arg.get("timeout", 60)))
         if "models" in arg or "delta" in arg or "people_requests" in arg:
             self._pim_wait(arg)
+        if "backend_metadata" in arg or "metadata" in arg:
+            self._backend_wait(arg)
         if "idle" in arg and self.spec.kind == "fake":
             self.server.imap.wait_for_idle(float(arg.get("timeout", 60)))
 
@@ -506,6 +514,7 @@ class ScenarioRun(PimMixin):
         modes = ["import-legacy"] if arg.get("import_legacy") else []
         self.ms = MailsyncProcess(account, self.work, binary=binary, verbose=True, env=self._engine_env(),
                                   pre_sync_modes=modes)
+        self._attach_backend(self.ms)
         try:
             self.ms.start()
         finally:
@@ -771,6 +780,8 @@ class ScenarioRun(PimMixin):
         """The scenario's `expect`, with `invariants` appended last unless it is `false`, so
         every scenario ends with the derived-state consistency check."""
         expect = dict(self.sc.get("expect") or {})
+        if self.backend:
+            expect.setdefault("backend_token_secret", {})
         inv = expect.pop("invariants", {})
         if inv is not False:
             expect["invariants"] = inv
@@ -1140,7 +1151,8 @@ class ScenarioRun(PimMixin):
         out = []
         for cls, wants in arg.items():
             for typ, n in wants.items():
-                got = sum(len(d.models) for d in self.ms.deltas(cls) if d.type == typ)
+                # A signal delta (ProcessIdentityRefreshNeeded) carries no models and counts once.
+                got = sum(len(d.models) or 1 for d in self.ms.deltas(cls) if d.type == typ)
                 if got != n:
                     out.append(f"expected {n} {cls} {typ} deltas, saw {got}")
         return out
