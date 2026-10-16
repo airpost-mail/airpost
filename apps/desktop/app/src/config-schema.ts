@@ -38,6 +38,17 @@ export default {
             default: true,
             title: localized('Use system accent color'),
           },
+          emailRenderMode: {
+            type: 'string',
+            default: 'auto',
+            enum: ['auto', 'dark', 'original'],
+            enumLabels: [
+              localized('Dark when the theme is dark'),
+              localized('Always dark'),
+              localized('Original colors'),
+            ],
+            title: localized('Email body appearance'),
+          },
         },
       },
       workspace: {
@@ -181,17 +192,6 @@ export default {
             type: 'boolean',
             default: false,
             title: localized('Display conversations in descending chronological order'),
-          },
-          emailRenderMode: {
-            type: 'string',
-            default: 'auto',
-            enum: ['auto', 'dark', 'original'],
-            enumLabels: [
-              localized('Dark when the theme is dark'),
-              localized('Always dark'),
-              localized('Original colors'),
-            ],
-            title: localized('Email body appearance'),
           },
         },
       },

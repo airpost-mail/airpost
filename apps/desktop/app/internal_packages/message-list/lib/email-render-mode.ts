@@ -2,14 +2,14 @@ import MailspringStore from 'mailspring-store';
 import {
   Palette,
   RGBA,
+  composite,
   contrastRatio,
   formatColor,
   isDarkColor,
   parseColor,
 } from '@tern/email-dark';
-import { backgroundColorBehind } from './email-color-detection';
 
-export const EMAIL_RENDER_MODE_KEY = 'core.reading.emailRenderMode';
+export const EMAIL_RENDER_MODE_KEY = 'core.appearance.emailRenderMode';
 
 export type EmailRenderMode = 'auto' | 'dark' | 'original';
 
@@ -28,10 +28,22 @@ export const DEFAULT_DARK_PALETTE: Palette = {
   link: '#8ab4f8',
 };
 
-// The theme colour around `el`: what a transparent email iframe there shows through to.
+const WHITE: RGBA = { r: 255, g: 255, b: 255, a: 1 };
+
+// The colour a transparent email iframe at `el` shows through to: its ancestors' backgrounds
+// composited up to the first opaque one (the message card, in the bundled themes).
 export function themeBackgroundAt(el: HTMLElement): RGBA {
-  const [r, g, b, a] = backgroundColorBehind(el);
-  return { r, g, b, a };
+  const win = el.ownerDocument.defaultView;
+  const layers: RGBA[] = [];
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const color = parseColor(win.getComputedStyle(node).backgroundColor);
+    if (!color || color.a === 0) continue;
+    layers.push(color);
+    if (color.a >= 1) break;
+  }
+  let result = WHITE;
+  for (let i = layers.length - 1; i >= 0; i--) result = composite(layers[i], result);
+  return result;
 }
 
 export function darkeningApplies(themeBackground: RGBA) {

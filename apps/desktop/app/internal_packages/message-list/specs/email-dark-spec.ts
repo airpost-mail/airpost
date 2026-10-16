@@ -1,4 +1,6 @@
 import {
+  applyColorScheme,
+  declaresDarkSupport,
   darkenDocument,
   removeDarkening,
   parseColor,
@@ -47,20 +49,64 @@ const DARK_EMAIL = `
   </td></tr>
 </table>`;
 
+// A newsletter designed dark: a 600px dark wrapper table, nested tables painted with bgcolor,
+// and a white page outside it that the email never paints.
+const DARK_NEWSLETTER = `
+<table id="outer" width="600" align="center" bgcolor="#0f1115" cellpadding="0" cellspacing="0">
+  <tr><td style="padding: 24px">
+    <table id="inner" width="100%" bgcolor="#1b1e24"><tr>
+      <td id="cell" style="color: #e6e6e6; font-size: 16px">
+        Release notes for version 4.2. Faster sync, a new search index and fixes for the
+        calendar view. Read the full changelog on the blog.
+      </td>
+    </tr></table>
+    <p style="color: #9aa0a6">You are subscribed to product updates.</p>
+  </td></tr>
+</table>`;
+
+// Dark-mode-aware: light by default, with its own dark variant behind prefers-color-scheme.
+const SCHEME_AWARE = `
+<style>
+  :root { color-scheme: light dark; }
+  .page { background-color: #ffffff; }
+  .card { background-color: #f6f6f6; color: #202124; }
+  @media (prefers-color-scheme: dark) {
+    .page { background-color: #121212 !important; }
+    .card { background-color: #1e1e1e !important; color: #e8eaed !important; }
+  }
+</style>
+<table id="page" class="page" width="100%" cellpadding="0" cellspacing="0"><tr><td>
+  <table id="card" class="card" width="600" align="center"><tr><td id="text">
+    Your monthly statement is ready. Sign in to view the details of your account activity.
+  </td></tr></table>
+</td></tr></table>`;
+
+// Dark only through a <body> rule, which the host's transparent body hides, and light text.
+const DARK_BODY_RULE = `
+<style>body { background-color: #111111; }</style>
+<div id="text" style="color: #f1f1f1; padding: 20px">
+  Thanks for joining the beta. Your invite code and setup steps are below this message.
+</div>`;
+
 describe('email-dark', function () {
   let iframe: HTMLIFrameElement;
   let doc: Document;
   let wrapper: HTMLElement;
 
-  const load = (html: string) => {
+  // The desktop's email-frame.less forces html and body transparent; so does this frame.
+  const load = (html: string, width = 700) => {
+    if (iframe) iframe.remove();
     iframe = document.createElement('iframe');
     iframe.setAttribute('sandbox', 'allow-same-origin');
-    iframe.style.width = '700px';
+    iframe.style.width = `${width}px`;
     iframe.style.height = '900px';
     document.body.appendChild(iframe);
     doc = iframe.contentDocument;
     doc.open();
-    doc.write(`<!DOCTYPE html><div id="wrapper">${html}</div>`);
+    doc.write(
+      `<!DOCTYPE html><style>html, body { background-color: transparent !important; }</style>` +
+        `<div id="wrapper">${html}</div>`
+    );
     doc.close();
     wrapper = doc.getElementById('wrapper');
   };
@@ -182,5 +228,75 @@ describe('email-dark', function () {
     expect(result.status).toBe('darkened');
     expect(style('wrapper').backgroundColor).toBe('rgb(33, 33, 33)');
     expect(style('para').color).toBe('rgb(238, 238, 238)');
+  });
+
+  describe('already-dark detection', () => {
+    it('detects a dark wrapper table in a wide pane', () => {
+      load(DARK_NEWSLETTER, 1600);
+      expect(darkenDocument(doc, PALETTE, { root: wrapper }).status).toBe('already-dark');
+      expect(style('inner').backgroundColor).toBe('rgb(27, 30, 36)');
+    });
+
+    it('detects dark colours set only by a <body> rule the host hides', () => {
+      load(DARK_BODY_RULE, 1200);
+      expect(darkenDocument(doc, PALETTE, { root: wrapper }).status).toBe('already-dark');
+      expect(style('text').color).toBe('rgb(241, 241, 241)');
+    });
+
+    it('still darkens a light newsletter in a wide pane', () => {
+      load(NEWSLETTER, 1600);
+      expect(darkenDocument(doc, PALETTE, { root: wrapper }).status).toBe('darkened');
+    });
+
+    it('darkens a light email with a small dark footer', () => {
+      load(
+        '<p id="para" style="color: #222">Your parcel is on its way and arrives on Tuesday.</p>' +
+          '<table width="100%" bgcolor="#000000"><tr><td style="color: #fff">Help</td></tr></table>'
+      );
+      expect(darkenDocument(doc, PALETTE, { root: wrapper }).status).toBe('darkened');
+    });
+  });
+
+  describe('emails with their own dark variant', () => {
+    it('recognises color-scheme meta tags and CSS', () => {
+      load('<meta name="color-scheme" content="light dark"><p>Hello</p>');
+      expect(declaresDarkSupport(doc)).toBe(true);
+      load(SCHEME_AWARE);
+      expect(declaresDarkSupport(doc)).toBe(true);
+      load(NEWSLETTER);
+      expect(declaresDarkSupport(doc)).toBe(false);
+    });
+
+    it('follows the scheme it is given, not the OS', () => {
+      load(SCHEME_AWARE);
+      applyColorScheme(iframe, 'light');
+      expect(iframe.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches).toBe(false);
+      applyColorScheme(iframe, 'dark');
+      expect(iframe.contentWindow.matchMedia('(prefers-color-scheme: dark)').matches).toBe(true);
+      expect(style('card').backgroundColor).toBe('rgb(30, 30, 30)');
+    });
+
+    it('is left to its own dark styles', () => {
+      load(SCHEME_AWARE, 1400);
+      applyColorScheme(iframe, 'dark');
+      const result = darkenDocument(doc, PALETTE, { root: wrapper });
+      expect(result.declaresDark).toBe(true);
+      expect(result.status).toBe('already-dark');
+      expect(style('text').color).toBe('rgb(232, 234, 237)');
+    });
+
+    it('is darkened from its light variant when shown light', () => {
+      load(SCHEME_AWARE);
+      applyColorScheme(iframe, 'light');
+      expect(darkenDocument(doc, PALETTE, { root: wrapper }).status).toBe('darkened');
+    });
+
+    it('drops the scheme with the rest of the darkening, for printing', () => {
+      load(SCHEME_AWARE);
+      applyColorScheme(iframe, 'dark');
+      const clone = doc.documentElement.cloneNode(true) as HTMLElement;
+      removeDarkening(clone);
+      expect(clone.querySelector('style[data-email-dark-scheme]')).toBe(null);
+    });
   });
 });

@@ -30,18 +30,6 @@ function contrastRatio(fg: RGBA, bg: RGBA): number {
   return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
 }
 
-// The color a transparent iframe at `el` would show through to: the nearest
-// ancestor with an opaque background, falling back to the document body.
-export function backgroundColorBehind(el: HTMLElement): RGBA {
-  for (let node = el.parentElement; node; node = node.parentElement) {
-    const color = parseComputedColor(window.getComputedStyle(node).backgroundColor);
-    if (color && color[3] > 0) return color;
-  }
-  return (
-    parseComputedColor(window.getComputedStyle(document.body).backgroundColor) || [255, 255, 255, 1]
-  );
-}
-
 // Deliberately far below WCAG's 3:1 minimum. Muted grays like GitHub's `#555`
 // code blocks (~1.9:1 on a dark theme) are still readable enough that flipping
 // the whole message to a white page would be worse; the target is text that is

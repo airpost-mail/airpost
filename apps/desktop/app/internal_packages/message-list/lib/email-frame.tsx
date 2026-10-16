@@ -9,10 +9,10 @@ import {
   Message,
   Autolink,
 } from 'mailspring-exports';
-import { darkenDocument } from '@tern/email-dark';
+import { applyColorScheme, darkenDocument, RGBA } from '@tern/email-dark';
 import { adjustImages } from './adjust-images';
 import EmailFrameStylesStore from './email-frame-styles-store';
-import { backgroundColorBehind, prepareEmailColors } from './email-color-detection';
+import { prepareEmailColors } from './email-color-detection';
 import {
   OriginalColors,
   darkPalette,
@@ -84,15 +84,18 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
     }
   };
 
-  // Dark themes get a darkened copy of the email's colours unless the user chose the original
-  // colours. Otherwise transparent emails blend into the theme and emails that paint their own
-  // backgrounds get the white page they were designed for.
-  _applyColors(iframeEl: HTMLIFrameElement, doc: Document, wrapper: HTMLElement) {
-    const { message } = this.props;
-    this._showingOriginal = OriginalColors.isShowingOriginal(message.id);
-    const themeBackground = themeBackgroundAt(iframeEl);
-
-    if (darkeningApplies(themeBackground) && !this._showingOriginal) {
+  // Dark themes get the email's own dark variant if it has one, else a darkened copy of its
+  // colours, unless the user chose the original colours. Otherwise transparent emails blend
+  // into the theme and emails that paint their own backgrounds get the white page they were
+  // designed for.
+  _applyColors(
+    iframeEl: HTMLIFrameElement,
+    doc: Document,
+    wrapper: HTMLElement,
+    darken: boolean,
+    themeBackground: RGBA
+  ) {
+    if (darken) {
       const { text, link } = EmailFrameStylesStore.themeColors();
       darkenDocument(doc, darkPalette(themeBackground, text, link), {
         root: wrapper,
@@ -102,7 +105,8 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
     }
 
     // prepareEmailColors can replace hardcoded black text with the inherited theme colour.
-    const hasBackground = prepareEmailColors(wrapper, backgroundColorBehind(iframeEl));
+    const { r, g, b, a } = themeBackground;
+    const hasBackground = prepareEmailColors(wrapper, [r, g, b, a]);
     wrapper.classList.toggle('has-background', hasBackground);
   }
 
@@ -122,6 +126,10 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
     const { themeStyles } = EmailFrameStylesStore.styles();
     const restrictWidth = AppEnv.config.get('core.reading.restrictMaxWidth');
 
+    this._showingOriginal = OriginalColors.isShowingOriginal(message.id);
+    const themeBackground = themeBackgroundAt(iframeEl);
+    const darken = darkeningApplies(themeBackground) && !this._showingOriginal;
+
     let content = this.props.content;
     if (!showQuotedText && !message.plaintext) {
       content = QuotedHTMLTransformer.removeQuotedHTML(content, {
@@ -138,6 +146,7 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
           `<div id='inbox-plain-wrapper' class="${process.platform}"></div>`
       );
       doc.close();
+      applyColorScheme(iframeEl, darken ? 'dark' : 'light');
       const plainWrapper = doc.getElementById('inbox-plain-wrapper');
       plainWrapper.innerText = content;
       plainWrapper.setAttribute('role', 'document');
@@ -148,11 +157,13 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
           `<div id='inbox-html-wrapper' class="${process.platform}">${content}</div>`
       );
       doc.close();
+      // Before darkening, so an email's own `prefers-color-scheme: dark` rules are what it sees.
+      applyColorScheme(iframeEl, darken ? 'dark' : 'light');
       const htmlWrapper = doc.getElementById('inbox-html-wrapper');
       if (htmlWrapper) {
         htmlWrapper.setAttribute('role', 'document');
         try {
-          this._applyColors(iframeEl, doc, htmlWrapper);
+          this._applyColors(iframeEl, doc, htmlWrapper, darken, themeBackground);
         } catch (e) {
           AppEnv.reportError(e);
         }

@@ -363,6 +363,11 @@ class PreferencesAppearance extends React.Component<{ config: ConfigLike; config
               config={this.props.config}
             />
           </div>
+          <ConfigSchemaItem
+            configSchema={this.props.configSchema.properties.appearance.properties.emailRenderMode}
+            keyPath="core.appearance.emailRenderMode"
+            config={this.props.config}
+          />
         </section>
         <MenubarStylePicker config={this.props.config} />
         <section>
