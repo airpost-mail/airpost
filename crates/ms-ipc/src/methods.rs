@@ -29,8 +29,11 @@ pub struct HelloResult {
 pub struct AccountInfo {
     pub account_id: String,
     pub email: String,
-    /// `running`; phase C adds `stopped`.
+    /// One of [`account_state`](crate::account_state).
     pub state: String,
+    /// The `SyncError` JSON that stopped the account, when `state` is `stopped`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
 }
 
 /// `null` (or absent) means every account, or every model class.
@@ -104,6 +107,67 @@ pub struct AccountStatus {
     pub state: String,
     /// The last `ProcessState` the account sent: true while it cannot reach its server.
     pub connection_error: bool,
+    /// The `SyncError` JSON that stopped the account, when `state` is `stopped`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
+}
+
+/// `account.list` result.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountListResult {
+    pub accounts: Vec<AccountStatus>,
+}
+
+/// `account.add` params. The account JSON carries credentials, which is why the method is
+/// only accepted on the parent's stdin.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AccountAddParams {
+    /// The account JSON `sync` mode reads from `--account` or stdin.
+    pub account: Value,
+    /// The identity line `sync` mode reads: a Tern server object, a Mailspring identity
+    /// (ignored) or null.
+    #[serde(default)]
+    pub identity: Value,
+}
+
+/// `account.add` result: the account's state when the call returns, `running` once its
+/// `main` thread is up, `stopped` (with `error`) when it failed to start.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountAddResult {
+    pub account_id: String,
+    pub state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
+}
+
+/// `account.remove` result.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountRemoveResult {
+    /// The names of the account's threads still running after the stop timeout, left to
+    /// finish a blocking call (e.g. `background`). Empty when every thread exited.
+    #[serde(default)]
+    pub still_running: Vec<String>,
+}
+
+/// `account.remove`, `test.crash` and `test.panic` params.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountIdParams {
+    pub account_id: String,
+}
+
+/// `account.state` notification params.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountStateParams {
+    pub account_id: String,
+    /// One of [`account_state`](crate::account_state).
+    pub state: String,
+    /// The `SyncError` JSON, with `stopped`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
 }
 
 /// The result of methods that return nothing: `{}`.
@@ -159,11 +223,25 @@ mod tests {
                 email: "e".into(),
                 state: "running".into(),
                 connection_error: false,
+                error: None,
             }],
         };
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["uptimeSecs"], 3);
         assert_eq!(v["accounts"][0]["connectionError"], false);
+        assert!(v["accounts"][0].get("error").is_none());
         assert_eq!(serde_json::from_value::<EngineStatusResult>(v).unwrap(), s);
+
+        let p: AccountAddParams = serde_json::from_value(json!({"account": {"id": "a"}})).unwrap();
+        assert_eq!(p.identity, Value::Null);
+        let n = AccountStateParams {
+            account_id: "a".into(),
+            state: crate::account_state::STOPPED.into(),
+            error: Some(json!({"key": "x"})),
+        };
+        assert_eq!(
+            serde_json::to_value(&n).unwrap(),
+            json!({"accountId": "a", "state": "stopped", "error": {"key": "x"}})
+        );
     }
 }

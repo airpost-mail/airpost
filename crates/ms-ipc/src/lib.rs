@@ -61,6 +61,24 @@ pub mod method {
     pub const SEARCH: &str = "search";
     pub const CONTACTS_SEARCH: &str = "contacts.search";
     pub const TASKS_GET: &str = "tasks.get";
+    /// Every account the engine holds, with its state.
+    pub const ACCOUNT_LIST: &str = "account.list";
+    /// `serve` mode, the parent's stdin only: start syncing an account.
+    pub const ACCOUNT_ADD: &str = "account.add";
+    /// `serve` mode, the parent's stdin only: stop an account and forget it. Its database
+    /// rows stay.
+    pub const ACCOUNT_REMOVE: &str = "account.remove";
+    /// `serve` mode, the parent's stdin only: stop every account, remove the socket files
+    /// and exit 0.
+    pub const ENGINE_SHUTDOWN: &str = "engine.shutdown";
+    /// `serve` mode, the parent's stdin only, debug builds only: stop one account as a
+    /// fatal error would (`test-crash` on stdin in `sync` mode).
+    pub const TEST_CRASH: &str = "test.crash";
+    /// As [`TEST_CRASH`], with a panic on the account's `main` thread.
+    pub const TEST_PANIC: &str = "test.panic";
+    /// Notification: an account changed state, `params` =
+    /// [`AccountStateParams`](crate::AccountStateParams).
+    pub const ACCOUNT_STATE: &str = "account.state";
     /// Notification: one flushed delta, `params` = [`DeltaParams`](crate::DeltaParams).
     pub const DELTA: &str = "delta";
     /// Notification: the engine is about to close the connection, `params` =
@@ -89,4 +107,24 @@ pub mod code {
     pub const HELLO_REQUIRED: i64 = -32003;
     /// A read named a folder, label, thread or message the account does not have.
     pub const NOT_FOUND: i64 = -32004;
+    /// The account is known but not running (it stopped on an error, or is being
+    /// removed); `data` is `{state, error}`.
+    pub const ACCOUNT_STOPPED: i64 = -32005;
+    /// `account.add` named an account that is already starting or running.
+    pub const ACCOUNT_EXISTS: i64 = -32006;
+    /// The method is only accepted on the parent's stdin (`account.add`, `account.remove`,
+    /// `engine.shutdown`), or only on the socket (`subscribe`).
+    pub const WRONG_CHANNEL: i64 = -32007;
+}
+
+/// The `state` of an account in `hello`, `engine.status`, `account.list` and `account.state`.
+pub mod account_state {
+    /// Added; its `main` thread has not opened the database yet.
+    pub const STARTING: &str = "starting";
+    pub const RUNNING: &str = "running";
+    /// Stopped by a failure (`error` says which). The engine does not restart it; the
+    /// client may `account.add` it again.
+    pub const STOPPED: &str = "stopped";
+    /// `account.remove` finished; only sent as an `account.state` notification.
+    pub const REMOVED: &str = "removed";
 }
