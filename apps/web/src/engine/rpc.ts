@@ -1,0 +1,279 @@
+// JSON-RPC 2.0 envelope and the engine's method map (docs/engine-protocol-plan.md, 1.2).
+import type {
+  AccountJSON,
+  ContactJSON,
+  Delta,
+  FileJSON,
+  FolderJSON,
+  LabelJSON,
+  MessageJSON,
+  TaskJSON,
+  ThreadJSON,
+} from './types';
+
+export const PROTOCOL_VERSION = 1;
+
+export type RpcId = number | string;
+
+export interface RpcRequest<M extends string = string, P = unknown> {
+  jsonrpc: '2.0';
+  id: RpcId;
+  method: M;
+  params?: P;
+}
+
+export interface RpcErrorObject {
+  code: number;
+  message: string;
+  data?: unknown;
+}
+
+export type RpcResponse<R = unknown> =
+  | { jsonrpc: '2.0'; id: RpcId; result: R }
+  | { jsonrpc: '2.0'; id: RpcId | null; error: RpcErrorObject };
+
+export interface RpcNotification<M extends string = string, P = unknown> {
+  jsonrpc: '2.0';
+  method: M;
+  params: P;
+}
+
+export const RpcErrorCode = {
+  ParseError: -32700,
+  InvalidRequest: -32600,
+  MethodNotFound: -32601,
+  InvalidParams: -32602,
+  InternalError: -32603,
+  UnsupportedProtocol: -32000,
+  UnknownAccount: -32001,
+  TaskRejected: -32002,
+  HelloRequired: -32003,
+  NotFound: -32004,
+} as const;
+
+export class RpcError extends Error {
+  readonly code: number;
+  readonly data?: unknown;
+
+  constructor({ code, message, data }: RpcErrorObject) {
+    super(message);
+    this.name = 'RpcError';
+    this.code = code;
+    this.data = data;
+  }
+}
+
+export type EmptyResult = Record<string, never>;
+
+export type AccountRunState = 'running' | 'stopped' | 'starting';
+
+export interface EngineAccountSummary {
+  accountId: string;
+  email: string;
+  state: AccountRunState;
+  error?: string;
+}
+
+export interface HelloParams {
+  protocol: number;
+  client: string;
+  // TODO(engine): the hosted engine needs an auth token here or on the WebSocket upgrade.
+  token?: string;
+}
+
+export interface HelloResult {
+  protocol: number;
+  engine: string;
+  pid: number;
+  accounts: EngineAccountSummary[];
+}
+
+/** ms-ipc `EngineStatusResult`. */
+export interface EngineStatus {
+  protocol: number;
+  engine: string;
+  pid: number;
+  uptimeSecs: number;
+  accounts: EngineAccountStatus[];
+}
+
+export interface EngineAccountStatus {
+  accountId: string;
+  email: string;
+  state: AccountRunState;
+  /** The last ProcessState the account sent: true while it cannot reach its server. */
+  connectionError: boolean;
+}
+
+// Read API params and results, as in crates/ms-ipc/src/read.rs. A `limit` defaults to 50
+// and is clamped to 1..=500 by the engine.
+
+export interface CategoriesListParams {
+  accountId: string;
+}
+
+export interface CategoryCount {
+  unread: number;
+  total: number;
+}
+
+/** `counts` is keyed by category id and leaves out categories without a ThreadCounts row. */
+export interface FoldersListResult {
+  folders: FolderJSON[];
+  counts: Record<string, CategoryCount>;
+}
+
+export interface LabelsListResult {
+  labels: LabelJSON[];
+  counts: Record<string, CategoryCount>;
+}
+
+/**
+ * At most one of `folderId`, `labelId` and `role`; none lists every thread of the account.
+ * Outside spam and trash a category lists only threads in all mail.
+ */
+export interface ThreadsListParams {
+  accountId: string;
+  folderId?: string;
+  labelId?: string;
+  role?: string;
+  limit?: number;
+  /** The `next` of the previous page. */
+  before?: string;
+}
+
+/** Newest first by `(lastMessageTimestamp, id)`. `next` is opaque; null on the last page. */
+export interface ThreadsListResult {
+  threads: ThreadJSON[];
+  next: string | null;
+}
+
+export interface ThreadsGetParams {
+  accountId: string;
+  id: string;
+}
+
+/** The thread and its messages, oldest first, without bodies. */
+export interface ThreadsGetResult {
+  thread: ThreadJSON;
+  messages: MessageJSON[];
+}
+
+export interface MessagesGetParams {
+  accountId: string;
+  id: string;
+  /** Include the body from MessageBody. */
+  body?: boolean;
+}
+
+/** `body` is null unless asked for and already fetched (`bodies.fetch` fetches it). */
+export interface MessagesGetResult {
+  message: MessageJSON;
+  body: string | null;
+  files: FileJSON[];
+}
+
+/**
+ * `search` and `contacts.search`. The query is plain text: each whitespace-separated term
+ * must match and nothing is read as syntax. Contact terms match word prefixes.
+ */
+export interface SearchParams {
+  accountId: string;
+  query: string;
+  limit?: number;
+}
+
+/** Matching threads, newest first. */
+export interface SearchResult {
+  threads: ThreadJSON[];
+}
+
+/** Matching contacts that aren't hidden, most referenced first. */
+export interface ContactsSearchResult {
+  contacts: ContactJSON[];
+}
+
+export interface AccountTestResult {
+  ok: boolean;
+  error?: string;
+  log?: string;
+}
+
+export interface IntegrationParams {
+  provider?: string;
+  [key: string]: unknown;
+}
+
+export interface RpcMethods {
+  hello: { params: HelloParams; result: HelloResult };
+  subscribe: {
+    params: { accounts: string[] | null; classes: string[] | null };
+    result: EmptyResult;
+  };
+  'task.queue': { params: { accountId: string; task: TaskJSON }; result: TaskJSON };
+  'task.cancel': { params: { accountId: string; taskId: string }; result: EmptyResult };
+  'sync.wake': { params: { accountId?: string }; result: EmptyResult };
+  'bodies.fetch': { params: { accountId: string; ids: string[] }; result: EmptyResult };
+  'calendar.sync': { params: { accountId: string }; result: { started: boolean } };
+  'engine.status': { params: undefined; result: EngineStatus };
+
+  // Phase B read API.
+  'folders.list': { params: CategoriesListParams; result: FoldersListResult };
+  'labels.list': { params: CategoriesListParams; result: LabelsListResult };
+  'threads.list': { params: ThreadsListParams; result: ThreadsListResult };
+  'threads.get': { params: ThreadsGetParams; result: ThreadsGetResult };
+  'messages.get': { params: MessagesGetParams; result: MessagesGetResult };
+  search: { params: SearchParams; result: SearchResult };
+  'contacts.search': { params: SearchParams; result: ContactsSearchResult };
+
+  // Phase C.
+  'account.add': {
+    params: { account: AccountJSON; identity?: unknown };
+    result: EngineAccountSummary;
+  };
+  'account.remove': { params: { accountId: string }; result: EmptyResult };
+  'account.test': { params: { account: AccountJSON }; result: AccountTestResult };
+  'account.reset': { params: { accountId: string }; result: EmptyResult };
+  'engine.shutdown': { params: undefined; result: EmptyResult };
+
+  // TODO(engine): not in the protocol plan. The hosted engine has to own account settings
+  // (plan section 4, "headless engine"), and the web client needs them to draw the sidebar.
+  'accounts.list': { params: undefined; result: AccountJSON[] };
+
+  // TODO(engine): integrations params and results are not specified yet.
+  'integrations.translate': { params: IntegrationParams; result: unknown };
+  'integrations.grammar': { params: IntegrationParams; result: unknown };
+  'integrations.enrich': { params: IntegrationParams; result: unknown };
+  'integrations.test': { params: IntegrationParams; result: unknown };
+}
+
+export type RpcMethodName = keyof RpcMethods;
+export type RpcParams<M extends RpcMethodName> = RpcMethods[M]['params'];
+export type RpcResult<M extends RpcMethodName> = RpcMethods[M]['result'];
+
+/** Lets `call('engine.status')` omit params while every other method requires them. */
+export type RpcParamsArg<M extends RpcMethodName> =
+  RpcParams<M> extends undefined ? [params?: undefined] : [params: RpcParams<M>];
+
+export interface AccountStateParams {
+  accountId: string;
+  state: AccountRunState;
+  error?: string;
+}
+
+export interface RpcNotifications {
+  delta: Delta;
+  'account.state': AccountStateParams;
+}
+
+export type EngineNotification = {
+  [K in keyof RpcNotifications]: { method: K; params: RpcNotifications[K] };
+}[keyof RpcNotifications];
+
+export function isResponse(msg: unknown): msg is RpcResponse {
+  return typeof msg === 'object' && msg !== null && 'id' in msg && !('method' in msg);
+}
+
+export function isNotification(msg: unknown): msg is RpcNotification {
+  return typeof msg === 'object' && msg !== null && 'method' in msg && !('id' in msg);
+}
