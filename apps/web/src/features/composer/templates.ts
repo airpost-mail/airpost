@@ -1,7 +1,7 @@
 // Message templates. The desktop keeps them as HTML files in its config directory; the web
 // client keeps them in localStorage until the engine has somewhere to put them.
-// TODO(engine): store templates server-side (desktop parity: Templates folder in the config
-// dir) so they follow the user across browsers and the desktop app.
+// TODO(engine): templates move to engine settings (`templates`, DCP stage 3) so they follow
+// the user across browsers and the desktop app.
 import { generateId } from '@/engine';
 import { localStore } from './local-store';
 

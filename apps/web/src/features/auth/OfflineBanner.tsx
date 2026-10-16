@@ -1,7 +1,7 @@
 import { CloudOff, LoaderCircle, WifiOff } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ensureConnected, useEngine } from '@/engine';
+import { ensureConnected, problemMessage, useEngine } from '@/engine';
 import { cn } from '@/lib/utils';
 import { useAfterDelay, useConnectionStatus } from './connection';
 
@@ -14,7 +14,7 @@ const CONNECTING_GRACE_MS = 1500;
  */
 export function OfflineBanner({ className }: { className?: string }) {
   const engine = useEngine();
-  const { state, online } = useConnectionStatus();
+  const { state, problem, online } = useConnectionStatus();
   const slowConnect = useAfterDelay(state === 'connecting', CONNECTING_GRACE_MS);
   const [retrying, setRetrying] = useState(false);
 
@@ -24,8 +24,13 @@ export function OfflineBanner({ className }: { className?: string }) {
     tone = 'offline';
     message = "You're offline. Tern reconnects when the network returns.";
   } else if (state === 'closed') {
+    // An unpaired browser is on its way to /pair; the guard handles it.
+    if (problem === 'unpaired') return null;
     tone = 'offline';
-    message = "Couldn't reach the engine.";
+    message = problemMessage(problem);
+  } else if (state === 'reconnecting' && problem) {
+    tone = 'offline';
+    message = problemMessage(problem);
   } else if (state === 'reconnecting') {
     tone = 'pending';
     message = 'Reconnecting to the engine…';
@@ -37,6 +42,10 @@ export function OfflineBanner({ className }: { className?: string }) {
   }
 
   const retry = () => {
+    if (state === 'reconnecting') {
+      engine.retryNow();
+      return;
+    }
     setRetrying(true);
     ensureConnected(engine)
       .catch(() => undefined)
@@ -59,7 +68,7 @@ export function OfflineBanner({ className }: { className?: string }) {
     >
       <Icon className={cn('size-3.5 shrink-0', tone === 'pending' && 'animate-spin')} aria-hidden />
       <span className="min-w-0 truncate">{message}</span>
-      {online && state === 'closed' && (
+      {online && tone === 'offline' && problem !== 'rejected' && (
         <Button
           variant="ghost"
           size="xs"

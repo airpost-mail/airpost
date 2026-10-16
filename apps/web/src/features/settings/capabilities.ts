@@ -123,8 +123,9 @@ export interface CapabilityContext {
   server: ServerState;
 }
 
-// TODO(engine): the server source comes from the engine's metadata backend state (backend
-// plan 4.2, online mode). Until the engine reports a connected Tern server, there is none.
+// TODO(engine): the server source comes from the engine's `capabilities` (DCP stage 5,
+// docs/web-gateway-plan.md 1.7). Until the engine reports a connected Tern server, there is
+// none.
 export const NO_SERVER: ServerState = { connected: false };
 
 export function resolveCapability(name: CapabilityName, ctx: CapabilityContext): Capability {

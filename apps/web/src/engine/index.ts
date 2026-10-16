@@ -1,6 +1,15 @@
 export * from './types';
 export * from './rpc';
-export type { ConnectionState, EngineClient, Unsubscribe } from './client';
+export {
+  EngineUnavailableError,
+  type ConnectionProblem,
+  type ConnectionState,
+  type EngineClient,
+  type Unsubscribe,
+} from './client';
+export { ENGINE_MODE_KEY, engineMode, GATEWAY_BASE, gatewayWsUrl, type EngineMode } from './mode';
+export { problemMessage, WsEngineClient, type HealthOutcome } from './ws';
+export type { ServerIdentityState } from './cache';
 export { createEngineClient, ensureConnected, waitForTask } from './connect';
 export { EngineProvider } from './provider';
 export { MockEngine } from './mock/engine';

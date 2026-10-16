@@ -13,8 +13,8 @@ export function GeneralSettings() {
   const prefs = usePreferences();
   const { theme, setTheme } = useTheme();
 
-  // TODO(engine): preferences live in this browser only; sync them once the engine or
-  // backend stores per-user settings.
+  // TODO(engine): these preferences stay in this browser in v1; `core.sending.undoSend`
+  // moves to engine settings with DCP stage 3 (docs/web-gateway-plan.md section 4).
   return (
     <SettingsPage title="General" description="Saved in this browser.">
       <SettingsSection title="Appearance">

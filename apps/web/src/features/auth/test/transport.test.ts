@@ -1,92 +1,102 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createHttpAuthTransport, parseLoginResultPage } from '../transport';
-
-const RESULT = {
-  type: 'tern-login',
-  version: 1,
-  token: 'tern_abc',
-  userId: 'u1',
-  serverId: 'srv1',
-  email: 'ada@example.com',
-};
-
-function resultPage(json: object) {
-  const b64 = btoa(JSON.stringify(json)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `<!doctype html><p>Signed in.</p><div id="tern-login-result" hidden>${b64}</div>`;
-}
+import { createHttpGatewayTransport, createMockGatewayTransport } from '../transport';
+import { SESSION } from './helpers';
+import { MemoryStorage } from './memory-storage';
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('parseLoginResultPage', () => {
-  it('decodes the base64url result', () => {
-    expect(parseLoginResultPage(resultPage(RESULT))).toEqual(RESULT);
+function stubFetch(res: () => Response) {
+  const fetchMock = vi.fn(async (..._args: [string, RequestInit?]) => res());
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
 
-  it('ignores pages without a valid result', () => {
-    expect(parseLoginResultPage('<form>Wrong password</form>')).toBeNull();
-    expect(parseLoginResultPage(resultPage({ ...RESULT, type: 'other' }))).toBeNull();
+describe('http gateway transport', () => {
+  it('reads the session on the same origin with the cookie and no token', async () => {
+    const fetchMock = stubFetch(() => json(SESSION));
+    expect(await createHttpGatewayTransport().session()).toEqual(SESSION);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/gateway/v1/session');
+    expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store' });
+    expect(JSON.stringify(init)).not.toMatch(/authorization/i);
+  });
+
+  it('maps 401 on the session to unpaired', async () => {
+    stubFetch(() => new Response(null, { status: 401 }));
+    await expect(createHttpGatewayTransport().session()).rejects.toMatchObject({
+      code: 'unpaired',
+    });
+  });
+
+  it('maps a network failure to unreachable', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+    await expect(createHttpGatewayTransport().session()).rejects.toMatchObject({
+      code: 'unreachable',
+    });
+  });
+
+  it('posts the code and device name as JSON', async () => {
+    const fetchMock = stubFetch(() => json({ device: SESSION.device }));
+    const device = await createHttpGatewayTransport().pair('ABCDEFGHJKLM', 'Laptop');
+    expect(device).toEqual(SESSION.device);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/gateway/v1/pair');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(init?.body as string)).toEqual({
+      code: 'ABCDEFGHJKLM',
+      deviceName: 'Laptop',
+    });
+  });
+
+  it('explains refused codes and rate limits', async () => {
+    const t = createHttpGatewayTransport();
+    stubFetch(() => new Response(null, { status: 401 }));
+    await expect(t.pair('ABCDEFGHJKLM', 'x')).rejects.toMatchObject({ code: 'invalid-code' });
+    stubFetch(() => new Response(null, { status: 400 }));
+    await expect(t.pair('ABCDEFGHJKLM', 'x')).rejects.toMatchObject({ code: 'invalid-code' });
+    stubFetch(() => new Response(null, { status: 429, headers: { 'Retry-After': '30' } }));
+    await expect(t.pair('ABCDEFGHJKLM', 'x')).rejects.toMatchObject({
+      code: 'rate-limited',
+      retryAfterSecs: 30,
+      message: 'Too many attempts. Try again in 30 s.',
+    });
+  });
+
+  it('unpairs with a POST and swallows failures', async () => {
+    const fetchMock = stubFetch(() => new Response(null, { status: 204 }));
+    await createHttpGatewayTransport().unpair();
+    expect(fetchMock.mock.calls[0][0]).toBe('/gateway/v1/unpair');
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('offline');
+      }),
+    );
+    await expect(createHttpGatewayTransport().unpair()).resolves.toBeUndefined();
   });
 });
 
-describe('http auth transport', () => {
-  it('posts the login form and reads the token from the page', async () => {
-    const fetchMock = vi.fn(async () => new Response(resultPage(RESULT), { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const r = await createHttpAuthTransport().login(
-      'https://t.example',
-      'ada@example.com',
-      'pw',
-      'Tern web',
-    );
-
-    expect(r.token).toBe('tern_abc');
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://t.example/tern/v1/login');
-    expect(init.method).toBe('POST');
-    expect(String(init.body)).toBe(
-      'email=ada%40example.com&password=pw&action=login&device=Tern+web',
-    );
-  });
-
-  it('maps a form page without a result to invalid credentials, and 429 to rate-limited', async () => {
-    const t = createHttpAuthTransport();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('<form></form>', { status: 200 })),
-    );
-    await expect(t.login('https://t.example', 'a@b', 'x', 'd')).rejects.toMatchObject({
-      code: 'invalid-credentials',
-    });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('', { status: 429 })),
-    );
-    await expect(t.login('https://t.example', 'a@b', 'x', 'd')).rejects.toMatchObject({
-      code: 'rate-limited',
-    });
-  });
-
-  it('sends the token as a bearer header and maps 401', async () => {
-    const fetchMock = vi.fn(async () => new Response('', { status: 401 }));
-    vi.stubGlobal('fetch', fetchMock);
-    await expect(
-      createHttpAuthTransport().me('https://t.example', 'tern_abc'),
-    ).rejects.toMatchObject({
-      code: 'unauthorized',
-    });
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://t.example/tern/v1/me');
-    expect(init.headers).toEqual({ Authorization: 'Bearer tern_abc' });
-  });
-
-  it('reports an unreachable server', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
-    );
-    await expect(createHttpAuthTransport().server('https://t.example')).rejects.toMatchObject({
-      code: 'unreachable',
-    });
+describe('mock gateway transport', () => {
+  it('starts paired, unpairs and pairs again, storing nothing token-like', async () => {
+    const storage = new MemoryStorage();
+    const t = createMockGatewayTransport(storage, 0);
+    expect((await t.session()).device.name).toBe('Demo browser');
+    await t.unpair();
+    await expect(t.session()).rejects.toMatchObject({ code: 'unpaired' });
+    await t.pair('ABCDEFGHJKLM', 'Laptop');
+    expect((await t.session()).device.name).toBe('Laptop');
+    expect(storage.dump()).not.toMatch(/token|ABCDEFGHJKLM/i);
   });
 });

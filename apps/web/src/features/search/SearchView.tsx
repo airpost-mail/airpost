@@ -222,7 +222,7 @@ function Results({
     );
   }
   if (!engineQuery) {
-    // TODO(engine): drop this once `search` takes before:/after: on its own.
+    // TODO(engine): drop this once `search` takes before:/after: (DCP stage 9).
     return (
       <EmptyState
         title="Almost there"

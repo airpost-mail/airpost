@@ -1,187 +1,163 @@
-// Talks to the Tern server's login and identity routes (docs/backend-plan.md 3.4). Field
-// names are the server's wire names (ms_wire), so they stay camelCase as sent.
+// The gateway's pairing and session routes (docs/web-gateway-plan.md 2.2, 2.3). The device
+// token lives in an httpOnly cookie the gateway sets; this code never sees it.
+import { GATEWAY_BASE } from '@/engine';
 
-export interface ServerFeatures {
-  tracking: boolean;
-  sharing: boolean;
+export interface PairedDevice {
+  id: string;
+  name: string;
+  /** `admin` lets this browser call the engine's local-only methods. */
+  scopes: string[];
+  /** ms since epoch. */
+  pairedAt: number;
 }
 
-/** `GET /tern/v1/server` (no auth). */
-export interface ServerInfo {
-  serverId: string;
-  version: string;
-  publicURL: string;
-  signup: 'open' | 'closed';
-  features: ServerFeatures;
+export interface EngineHealth {
+  state: 'up' | 'down';
+  protocol?: number;
+  engine?: string;
 }
 
-/** The JSON inside `#tern-login-result` after `POST /tern/v1/login`. */
-export interface LoginResult {
-  type: 'tern-login';
-  version: 1;
-  token: string;
-  userId: string;
-  serverId: string;
-  email: string;
+/** `GET /gateway/v1/session`. */
+export interface GatewaySession {
+  device: PairedDevice;
+  engine: EngineHealth;
+  gateway: { version: string };
 }
 
-/** `GET /tern/v1/me` (auth). */
-export interface MeResult {
-  userId: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  trackingNS: string;
-  serverId: string;
-  publicURL: string;
-  features: ServerFeatures;
-}
-
-export type AuthErrorCode =
-  'unreachable' | 'not-tern' | 'invalid-credentials' | 'unauthorized' | 'rate-limited' | 'server';
+export type AuthErrorCode = 'unreachable' | 'invalid-code' | 'unpaired' | 'rate-limited' | 'server';
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode;
-  constructor(code: AuthErrorCode, message: string) {
+  /** From `Retry-After` on a 429. */
+  readonly retryAfterSecs?: number;
+  constructor(code: AuthErrorCode, message: string, retryAfterSecs?: number) {
     super(message);
     this.name = 'AuthError';
     this.code = code;
+    this.retryAfterSecs = retryAfterSecs;
   }
 }
 
-export interface AuthTransport {
+export interface GatewayTransport {
   readonly kind: 'mock' | 'http';
-  server(baseUrl: string): Promise<ServerInfo>;
-  login(baseUrl: string, email: string, password: string, device: string): Promise<LoginResult>;
-  me(baseUrl: string, token: string): Promise<MeResult>;
-  /** Revokes the calling token. Best effort: callers sign out locally whatever happens. */
-  revoke(baseUrl: string, token: string): Promise<void>;
+  /** Throws `AuthError('unpaired')` when the gateway doesn't know this browser. */
+  session(): Promise<GatewaySession>;
+  /** `code` as `normalizePairingCode` returns it. */
+  pair(code: string, deviceName: string): Promise<PairedDevice>;
+  /** Best effort: the caller forgets the session whatever happens. */
+  unpair(): Promise<void>;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** Accepts any credentials; used with the in-browser mock engine. */
-export function createMockAuthTransport(latencyMs = 250): AuthTransport {
-  const info: ServerInfo = {
-    serverId: 'mock',
-    version: 'mock',
-    publicURL: '',
-    signup: 'closed',
-    features: { tracking: false, sharing: false },
+const MOCK_KEY = 'tern.mock-pairing';
+
+interface MockPairing {
+  paired: boolean;
+  name: string;
+}
+
+/** Pairs with any well-formed code; used with the in-browser mock engine. */
+export function createMockGatewayTransport(
+  storage: Storage = localStorage,
+  latencyMs = 250,
+): GatewayTransport {
+  const read = (): MockPairing => {
+    try {
+      const v = JSON.parse(storage.getItem(MOCK_KEY) ?? 'null') as MockPairing | null;
+      if (v && typeof v.paired === 'boolean') return v;
+    } catch {
+      // fall through to the default
+    }
+    return { paired: true, name: 'Demo browser' };
   };
+  const write = (v: MockPairing) => storage.setItem(MOCK_KEY, JSON.stringify(v));
+  const device = (name: string): PairedDevice => ({
+    id: 'mock-device',
+    name,
+    scopes: ['admin'],
+    pairedAt: 0,
+  });
   return {
     kind: 'mock',
-    async server(baseUrl) {
+    async session() {
       await sleep(latencyMs);
-      return { ...info, publicURL: baseUrl };
-    },
-    async login(_baseUrl, email) {
-      await sleep(latencyMs);
+      const p = read();
+      if (!p.paired) throw new AuthError('unpaired', 'This browser is not paired.');
       return {
-        type: 'tern-login',
-        version: 1,
-        token: `tern_mock_${crypto.randomUUID()}`,
-        userId: 'mock-user',
-        serverId: info.serverId,
-        email,
+        device: device(p.name),
+        engine: { state: 'up', protocol: 1, engine: '0.0.0-mock' },
+        gateway: { version: 'mock' },
       };
     },
-    async me(baseUrl) {
+    async pair(_code, deviceName) {
       await sleep(latencyMs);
-      return {
-        userId: 'mock-user',
-        email: 'maya.okafor@gmail.com',
-        firstName: 'Maya',
-        lastName: 'Okafor',
-        trackingNS: 'mock',
-        serverId: info.serverId,
-        publicURL: baseUrl,
-        features: info.features,
-      };
+      write({ paired: true, name: deviceName });
+      return device(deviceName);
     },
-    async revoke() {},
+    async unpair() {
+      write({ paired: false, name: read().name });
+    },
   };
 }
 
-function authHeader(token: string) {
-  return { Authorization: `Bearer ${token}` };
-}
-
-async function request(url: string, init?: RequestInit): Promise<Response> {
+async function request(path: string, init?: RequestInit): Promise<Response> {
   try {
-    // credentials: 'omit' until the server sets a session cookie; the token goes in a header.
-    return await fetch(url, { credentials: 'omit', cache: 'no-store', ...init });
+    return await fetch(`${GATEWAY_BASE}${path}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      ...init,
+      headers: { Accept: 'application/json', ...init?.headers },
+    });
   } catch {
-    // TODO(engine): a cross-origin web client needs the server's CORS layer to allow the web
-    // origin (backend-plan 3.4 only echoes file:// and null). Same-origin hosting avoids it.
     throw new AuthError('unreachable', "Couldn't reach the server.");
   }
 }
 
-function statusError(res: Response): AuthError {
-  if (res.status === 401 || res.status === 403) {
-    return new AuthError('unauthorized', 'The server did not accept this token.');
-  }
-  if (res.status === 429) return new AuthError('rate-limited', 'Too many attempts. Wait a minute.');
-  return new AuthError('server', `The server answered ${res.status}.`);
+function retryAfter(res: Response): number | undefined {
+  const v = Number(res.headers.get('Retry-After'));
+  return Number.isFinite(v) && v > 0 ? v : undefined;
 }
 
-function decodeBase64Url(s: string): string {
-  const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
-  return atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
-}
-
-/** Reads the login result the server embeds in its result page. */
-export function parseLoginResultPage(html: string): LoginResult | null {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const encoded = doc.getElementById('tern-login-result')?.textContent?.trim();
-  if (!encoded) return null;
-  try {
-    const result = JSON.parse(decodeBase64Url(encoded)) as Partial<LoginResult>;
-    if (result.type !== 'tern-login' || result.version !== 1 || !result.token) return null;
-    return result as LoginResult;
-  } catch {
-    return null;
-  }
-}
-
-export function createHttpAuthTransport(): AuthTransport {
+export function createHttpGatewayTransport(): GatewayTransport {
   return {
     kind: 'http',
-    async server(baseUrl) {
-      const res = await request(`${baseUrl}/tern/v1/server`);
-      if (!res.ok) throw new AuthError('not-tern', 'No Tern server answers at this address.');
-      const body = (await res.json().catch(() => null)) as ServerInfo | null;
-      if (!body?.serverId)
-        throw new AuthError('not-tern', 'No Tern server answers at this address.');
+    async session() {
+      const res = await request('/session');
+      if (res.status === 401) throw new AuthError('unpaired', 'This browser is not paired.');
+      if (!res.ok) throw new AuthError('server', `The server answered ${res.status}.`);
+      const body = (await res.json().catch(() => null)) as GatewaySession | null;
+      if (!body?.device?.id) throw new AuthError('server', 'The server sent an unexpected reply.');
       return body;
     },
-    async login(baseUrl, email, password, device) {
-      // TODO(engine): the server's login is an HTML form whose result page embeds the token
-      // (built for the desktop's login window). A web client wants a JSON variant, e.g.
-      // `POST /tern/v1/login` with `Accept: application/json` answering the LoginResult or 401.
-      // Until then we post the form and read `#tern-login-result` from the page.
-      const res = await request(`${baseUrl}/tern/v1/login`, {
+    async pair(code, deviceName) {
+      const res = await request('/pair', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ email, password, action: 'login', device }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, deviceName }),
       });
-      if (res.status === 429) throw statusError(res);
-      if (res.status >= 500) throw statusError(res);
-      const result = parseLoginResultPage(await res.text());
-      if (!result) throw new AuthError('invalid-credentials', 'Wrong email or password.');
-      return result;
+      if (res.status === 400) throw new AuthError('invalid-code', "That isn't a pairing code.");
+      if (res.status === 401) {
+        throw new AuthError(
+          'invalid-code',
+          'That code is wrong, used or expired. Run tern-gateway pair for a new one.',
+        );
+      }
+      if (res.status === 429) {
+        const secs = retryAfter(res);
+        throw new AuthError(
+          'rate-limited',
+          secs ? `Too many attempts. Try again in ${secs} s.` : 'Too many attempts. Wait a minute.',
+          secs,
+        );
+      }
+      if (!res.ok) throw new AuthError('server', `The server answered ${res.status}.`);
+      const body = (await res.json().catch(() => null)) as { device?: PairedDevice } | null;
+      if (!body?.device?.id) throw new AuthError('server', 'The server sent an unexpected reply.');
+      return body.device;
     },
-    async me(baseUrl, token) {
-      const res = await request(`${baseUrl}/tern/v1/me`, { headers: authHeader(token) });
-      if (!res.ok) throw statusError(res);
-      return (await res.json()) as MeResult;
-    },
-    async revoke(baseUrl, token) {
-      await request(`${baseUrl}/tern/v1/tokens/current`, {
-        method: 'DELETE',
-        headers: authHeader(token),
-      }).catch(() => undefined);
+    async unpair() {
+      await request('/unpair', { method: 'POST' }).catch(() => undefined);
     },
   };
 }

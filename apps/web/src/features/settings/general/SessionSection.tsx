@@ -1,41 +1,52 @@
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { serverLabel, useSession, useSignOut } from '@/features/auth';
+import { useServerIdentityState } from '@/engine';
+import { isAdmin, useSession, useSignOut } from '@/features/auth';
 import { SettingRow, SettingsSection } from '../components/SettingsSection';
 
-/** Who is signed in, to which Tern server, and Sign out. */
+/** This browser's pairing, the engine behind the gateway, and Sign out. */
 export function SessionSection() {
   const session = useSession();
   const signOut = useSignOut();
+  const identity = useServerIdentityState();
   if (!session) return null;
-  const demo = session.method === 'demo';
-  const features = session.server.features;
-  const enabled = features
-    ? Object.entries(features)
-        .filter(([, on]) => on)
-        .map(([name]) => name)
-    : [];
+  const { demo, device, engine, gateway } = session;
 
   return (
     <SettingsSection title="Session">
-      <SettingRow label="Signed in as" description={session.user.name || undefined}>
-        <span className="truncate text-sm">{session.user.email}</span>
+      <SettingRow
+        label="This browser"
+        description={
+          isAdmin(session)
+            ? 'Admin access: can also add accounts and change the engine.'
+            : 'Mail access.'
+        }
+      >
+        <span className="truncate text-sm">{device.name}</span>
       </SettingRow>
       <SettingRow
-        label="Tern server"
+        label="Engine"
         description={
           demo
             ? 'The in-browser demo engine with sample mail.'
-            : enabled.length
-              ? `Server features: ${enabled.join(', ')}.`
-              : 'No server features are on.'
+            : engine.state === 'up'
+              ? `Through the gateway at ${window.location.host} (gateway ${gateway.version}).`
+              : "The engine isn't running."
         }
       >
         <span className="truncate font-mono text-xs text-muted-foreground">
-          {demo ? 'demo' : serverLabel(session.server.url)}
+          {demo ? 'demo' : (engine.engine ?? engine.state)}
         </span>
       </SettingRow>
-      <SettingRow label="Sign out" description="Removes this browser's access to your mail.">
+      {identity.refreshNeeded && (
+        <SettingRow
+          label="Tern server"
+          description="The engine's Tern server rejected its sign-in. Sign the engine in again from the desktop app or the CLI."
+        >
+          <span className="text-xs text-warning">Signed out</span>
+        </SettingRow>
+      )}
+      <SettingRow label="Sign out" description="Unpairs this browser from the gateway.">
         <Button variant="outline" size="sm" onClick={() => void signOut()}>
           <LogOut /> Sign out
         </Button>

@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { ConnectionState, EngineClient } from '@/engine';
+import type { ConnectionProblem, ConnectionState, EngineClient } from '@/engine';
 import { EngineContext } from '@/engine/context';
 import { statusFor } from '../connection';
 import { ConnectionStatus } from '../ConnectionStatus';
@@ -12,6 +12,8 @@ function fakeEngine(initial: ConnectionState, kind: 'mock' | 'ws' = 'ws') {
   const engine = {
     kind,
     state: initial,
+    problem: null as ConnectionProblem | null,
+    retryNow: vi.fn(),
     connect: vi.fn(async () => {
       engine.set('open');
       return { protocol: 1, engine: 'fake', pid: 1, accounts: [] };
@@ -24,8 +26,9 @@ function fakeEngine(initial: ConnectionState, kind: 'mock' | 'ws' = 'ws') {
       return () => listeners.delete(l);
     },
     fileUrl: () => null,
-    set(s: ConnectionState) {
+    set(s: ConnectionState, problem: ConnectionProblem | null = null) {
       engine.state = s;
+      engine.problem = problem;
       for (const l of listeners) l(s);
     },
   };
@@ -105,5 +108,27 @@ describe('OfflineBanner', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(engine.connect).toHaveBeenCalled();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it.each([
+    ['server-unreachable', "Couldn't reach the server."],
+    ['engine-down', "The engine isn't running."],
+    ['engine-unreachable', "Couldn't reach the engine."],
+  ] as const)('names the problem while reconnecting (%s)', async (problem, text) => {
+    const engine = fakeEngine('reconnecting');
+    renderWith(engine, <OfflineBanner />);
+    act(() => engine.set('reconnecting', problem));
+    expect(screen.getByRole('status')).toHaveTextContent(text);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(engine.retryNow).toHaveBeenCalled();
+    expect(engine.connect).not.toHaveBeenCalled();
+  });
+
+  it('stays out of the way of an unpaired browser', () => {
+    const engine = fakeEngine('closed');
+    engine.problem = 'unpaired';
+    const { container } = renderWith(engine, <OfflineBanner />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

@@ -1,5 +1,5 @@
 // Recent searches, per browser.
-// TODO(engine): keep these server-side with the other synced preferences.
+// Recent searches stay in this browser in v1 (docs/web-gateway-plan.md section 4).
 import { useSyncExternalStore } from 'react';
 
 const STORAGE_KEY = 'tern.search.recent';

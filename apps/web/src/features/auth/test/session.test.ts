@@ -1,215 +1,110 @@
 import { isRedirect } from '@tanstack/react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { createSessionStore, DEMO_SESSION, displayName } from '../session';
-import { AuthError, createMockAuthTransport } from '../transport';
-import { fakeTransport, ME, MemoryStorage } from './helpers';
+import { createSessionStore } from '../session';
+import { AuthError } from '../transport';
+import { DEVICE, fakeTransport, SESSION, unpaired, unreachable } from './helpers';
 
-const URL_ = 'https://tern.example.com';
-
-function setup(opts: { demo?: boolean; transport?: ReturnType<typeof fakeTransport> } = {}) {
-  const storage = new MemoryStorage();
-  const transport = opts.transport ?? fakeTransport();
-  const store = createSessionStore({
-    storage,
-    transport,
-    demo: opts.demo ? DEMO_SESSION : null,
-  });
-  return { storage, transport, store };
+function setup() {
+  const transport = fakeTransport();
+  return { transport, store: createSessionStore({ transport }) };
 }
 
 describe('session store', () => {
-  it('starts signed out when a login is required', () => {
-    expect(setup().store.get()).toBeNull();
-  });
-
-  it('starts with the demo session for the mock engine', () => {
-    expect(setup({ demo: true }).store.get()?.method).toBe('demo');
-  });
-
-  it('treats corrupt storage as nothing stored', () => {
-    const storage = new MemoryStorage();
-    storage.setItem('tern.session', '{not json');
-    const store = createSessionStore({ storage, transport: fakeTransport(), demo: DEMO_SESSION });
-    expect(store.get()).toEqual(DEMO_SESSION);
-  });
-
-  it('signs in with a password, stores the token and never the password', async () => {
-    const { store, storage, transport } = setup();
-    const seen = vi.fn();
-    store.subscribe(seen);
-
-    const s = await store.signIn({
-      method: 'password',
-      serverUrl: 'tern.example.com/',
-      email: ' ada@example.com ',
-      password: 'correct horse battery staple',
-    });
-
-    expect(transport.login).toHaveBeenCalledWith(
-      URL_,
-      'ada@example.com',
-      'correct horse battery staple',
-      'Tern web',
-    );
-    expect(transport.me).toHaveBeenCalledWith(URL_, 'tern_abc');
-    expect(s).toMatchObject({
-      server: { url: URL_, serverId: 'srv1' },
-      user: { id: 'u1', name: 'Ada Lovelace', email: 'ada@example.com' },
-      token: 'tern_abc',
-      method: 'password',
-    });
-    expect(store.get()).toEqual(s);
-    expect(seen).toHaveBeenCalled();
-    expect(storage.dump()).toContain('tern_abc');
-    expect(storage.dump()).not.toContain('correct horse');
-  });
-
-  it('persists across a reload', async () => {
-    const { store, storage } = setup();
-    await store.signIn({ method: 'device-token', serverUrl: URL_, token: 'tern_xyz' });
-    const reloaded = createSessionStore({ storage, transport: fakeTransport(), demo: null });
-    expect(reloaded.get()?.token).toBe('tern_xyz');
-  });
-
-  it('checks a device token against /tern/v1/me', async () => {
+  it('starts unknown, then loads the session once for every caller', async () => {
     const { store, transport } = setup();
-    await store.signIn({ method: 'device-token', serverUrl: URL_, token: ' tern_xyz ' });
-    expect(transport.login).not.toHaveBeenCalled();
-    expect(transport.me).toHaveBeenCalledWith(URL_, 'tern_xyz');
-    expect(store.get()?.method).toBe('device-token');
+    expect(store.snapshot()).toEqual({ status: 'unknown', session: null });
+    await Promise.all([store.load(), store.load()]);
+    expect(transport.session).toHaveBeenCalledTimes(1);
+    expect(store.snapshot().status).toBe('paired');
+    expect(store.get()).toMatchObject({ device: DEVICE, demo: false });
   });
 
-  it('rejects tokens without the tern_ prefix and ones the server refuses', async () => {
-    const transport = fakeTransport();
-    transport.me.mockRejectedValue(new AuthError('unauthorized', 'nope'));
-    const { store } = setup({ transport });
-    await expect(
-      store.signIn({ method: 'device-token', serverUrl: URL_, token: 'abc' }),
-    ).rejects.toMatchObject({ code: 'invalid-credentials' });
-    await expect(
-      store.signIn({ method: 'device-token', serverUrl: URL_, token: 'tern_gone' }),
-    ).rejects.toMatchObject({ code: 'invalid-credentials' });
-    expect(store.get()).toBeNull();
-  });
-
-  it('refuses plain http to a remote host', async () => {
+  it('reports engine health from the session route', async () => {
     const { store, transport } = setup();
-    await expect(
-      store.signIn({
-        method: 'password',
-        serverUrl: 'http://tern.example.com',
-        email: 'a@b',
-        password: 'x',
-      }),
-    ).rejects.toBeInstanceOf(AuthError);
-    expect(transport.login).not.toHaveBeenCalled();
+    expect(await store.refresh()).toEqual({ ok: true, engineUp: true });
+    transport.session.mockResolvedValueOnce({ ...SESSION, engine: { state: 'down' } });
+    expect(await store.refresh()).toEqual({ ok: true, engineUp: false });
+    expect(store.get()?.engine.state).toBe('down');
   });
 
-  it('accepts any credentials with the mock transport', async () => {
-    const store = createSessionStore({
-      storage: new MemoryStorage(),
-      transport: createMockAuthTransport(0),
-      demo: DEMO_SESSION,
-    });
-    const s = await store.signIn({
-      method: 'password',
-      serverUrl: 'http://localhost:5173',
-      email: 'sam.rivers@example.org',
-      password: '',
-    });
-    expect(s.user).toMatchObject({ email: 'sam.rivers@example.org', name: 'Sam Rivers' });
-    expect(s.token).toMatch(/^tern_mock_/);
+  it('keeps the last session while the gateway is unreachable', async () => {
+    const { store, transport } = setup();
+    await store.load();
+    transport.session.mockRejectedValueOnce(unreachable());
+    expect(await store.refresh()).toEqual({ ok: false, reason: 'unreachable' });
+    expect(store.snapshot().status).toBe('unreachable');
+    expect(store.get()?.device.id).toBe('dev1');
   });
 
-  it('signs out, revokes the token and keeps the demo session away', async () => {
-    const { store, storage, transport } = setup({ demo: true });
-    await store.signIn({ method: 'device-token', serverUrl: URL_, token: 'tern_xyz' });
-    await store.signOut();
-    expect(transport.revoke).toHaveBeenCalledWith(URL_, 'tern_xyz');
-    expect(store.get()).toBeNull();
-    expect(store.notice()).toBe('user');
-    expect(storage.dump()).not.toContain('tern_xyz');
-    const reloaded = createSessionStore({ storage, transport, demo: DEMO_SESSION });
-    expect(reloaded.get()).toBeNull();
-  });
-
-  /** A stored session read back as on the next page load, with a fresh transport. */
-  async function reloadSignedIn() {
-    const { store, storage } = setup();
-    await store.signIn({ method: 'device-token', serverUrl: URL_, token: 'tern_xyz' });
-    const transport = fakeTransport();
-    return { transport, store: createSessionStore({ storage, transport, demo: null }) };
-  }
-
-  it('signs out locally when the server revokes the token', async () => {
-    const { store, transport } = await reloadSignedIn();
-    transport.me.mockRejectedValueOnce(new AuthError('unauthorized', 'gone'));
-
-    await store.revalidate();
-
-    expect(store.get()).toBeNull();
+  it('drops the session on 401 and says the gateway did it', async () => {
+    const { store, transport } = setup();
+    await store.load();
+    transport.session.mockRejectedValueOnce(unpaired());
+    expect(await store.refresh()).toEqual({ ok: false, reason: 'unpaired' });
+    expect(store.snapshot()).toEqual({ status: 'unpaired', session: null });
     expect(store.notice()).toBe('revoked');
-    expect(transport.revoke).not.toHaveBeenCalled();
   });
 
-  it('keeps the session on network errors', async () => {
-    const { store, transport } = await reloadSignedIn();
-    transport.me.mockRejectedValueOnce(new AuthError('unreachable', 'down'));
-    await store.revalidate();
-    expect(store.get()?.token).toBe('tern_xyz');
+  it('shows no notice for a browser that was never paired', async () => {
+    const { store, transport } = setup();
+    transport.session.mockRejectedValueOnce(unpaired());
+    await store.load();
+    expect(store.snapshot().status).toBe('unpaired');
+    expect(store.notice()).toBeNull();
   });
 
-  it('refreshes the profile once per load', async () => {
-    const { store, transport } = await reloadSignedIn();
-    transport.me.mockResolvedValueOnce({ ...ME, firstName: 'Augusta' });
-    await store.revalidate();
-    await store.revalidate();
-    expect(store.get()?.user.name).toBe('Augusta Lovelace');
-    expect(transport.me).toHaveBeenCalledTimes(1);
-  });
-
-  it('picks up a sign-out from another tab', async () => {
-    const { store, storage } = setup();
-    await store.signIn({ method: 'device-token', serverUrl: URL_, token: 'tern_xyz' });
-    storage.setItem('tern.session', JSON.stringify({ v: 1, session: null }));
+  it('pairs with a normalized code and a trimmed name', async () => {
+    const { store, transport } = setup();
+    transport.session.mockRejectedValueOnce(unpaired());
+    await store.load();
     const seen = vi.fn();
     store.subscribe(seen);
-    store.syncFromStorage({ key: 'tern.session' });
-    expect(store.get()).toBeNull();
+
+    const s = await store.pair(' abcd-efgh jklm ', '  Laptop  ');
+
+    expect(transport.pair).toHaveBeenCalledWith('ABCDEFGHJKLM', 'Laptop');
+    expect(s.device.id).toBe('dev1');
+    expect(store.snapshot().status).toBe('paired');
     expect(seen).toHaveBeenCalled();
   });
-});
 
-describe('requireSession', () => {
-  it('redirects to /login with the current location', () => {
-    const { store } = setup();
-    let thrown: unknown;
-    try {
-      store.requireSession({ location: { href: '/acc1/inbox/t1?x=1' } });
-    } catch (err) {
-      thrown = err;
-    }
-    expect(isRedirect(thrown)).toBe(true);
-    expect((thrown as { options: unknown }).options).toMatchObject({
-      to: '/login',
-      search: { redirect: '/acc1/inbox/t1?x=1' },
-    });
+  it('refuses a malformed code without calling the gateway', async () => {
+    const { store, transport } = setup();
+    await expect(store.pair('ABC', 'x')).rejects.toMatchObject({ code: 'invalid-code' });
+    expect(transport.pair).not.toHaveBeenCalled();
   });
 
-  it('lets a signed-in user through and revalidates once per load', async () => {
-    const { store, storage } = setup();
-    await store.signIn({ method: 'device-token', serverUrl: URL_, token: 'tern_xyz' });
-    const transport = fakeTransport();
-    const reloaded = createSessionStore({ storage, transport, demo: null });
-    expect(() => reloaded.requireSession({ location: { href: '/' } })).not.toThrow();
-    expect(() => reloaded.requireSession({ location: { href: '/x' } })).not.toThrow();
-    expect(transport.me).toHaveBeenCalledTimes(1);
+  it('passes the gateway refusal through', async () => {
+    const { store, transport } = setup();
+    transport.pair.mockRejectedValueOnce(new AuthError('invalid-code', 'used'));
+    await expect(store.pair('ABCDEFGHJKLM', 'x')).rejects.toThrow('used');
   });
-});
 
-describe('displayName', () => {
-  it('falls back to the email local part', () => {
-    expect(displayName('', '', 'maya.okafor@gmail.com')).toBe('Maya Okafor');
-    expect(displayName('Ada', '', 'x@y')).toBe('Ada');
+  it('signs out locally even when the gateway call fails', async () => {
+    const { store, transport } = setup();
+    await store.load();
+    transport.unpair.mockRejectedValueOnce(new Error('network'));
+    await store.signOut().catch(() => undefined);
+    expect(store.snapshot()).toEqual({ status: 'unpaired', session: null });
+    expect(store.notice()).toBe('user');
+  });
+
+  it('redirects an unpaired browser to /pair, and a paired one away from it', async () => {
+    const { store, transport } = setup();
+    transport.session.mockRejectedValueOnce(unpaired());
+    const away = await store.requireSession({ location: { href: '/inbox?x=1' } }).catch((e) => e);
+    expect(isRedirect(away)).toBe(true);
+    expect(away.options).toMatchObject({ to: '/pair', search: { redirect: '/inbox?x=1' } });
+
+    await store.pair('ABCDEFGHJKLM', 'x');
+    const back = await store.redirectIfPaired({ search: { redirect: '/inbox' } }).catch((e) => e);
+    expect(isRedirect(back)).toBe(true);
+    expect(back.options).toMatchObject({ href: '/inbox' });
+  });
+
+  it('lets the app load while the gateway is unreachable', async () => {
+    const { store, transport } = setup();
+    transport.session.mockRejectedValueOnce(unreachable());
+    await expect(store.requireSession({ location: { href: '/' } })).resolves.toBeUndefined();
   });
 });

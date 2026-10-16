@@ -12,7 +12,7 @@ import {
   type RpcParamsArg,
   type RpcResult,
 } from '../rpc';
-import type { Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
+import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
 import { ChangeSet } from './changes';
 import { MockStore } from './store';
@@ -95,6 +95,10 @@ export class MockEngine implements EngineClient {
   get state() {
     return this._state;
   }
+
+  readonly problem = null;
+
+  retryNow() {}
 
   async connect(): Promise<HelloResult> {
     this.setState('connecting');
@@ -311,7 +315,7 @@ export class MockEngine implements EngineClient {
         this.requireAccount(p.accountId);
         const t = s.tasks.get(p.taskId);
         if (t && t.status !== 'complete') {
-          // TODO(engine): a real cancel only stops the remote phase; the local changes stay.
+          // A real cancel only stops the remote phase; the local changes stay.
           t.status = 'cancelled';
           t.v += 1;
           const c = new ChangeSet(p.accountId);
@@ -339,7 +343,7 @@ export class MockEngine implements EngineClient {
       },
       'calendar.sync': (p) => {
         this.requireAccount(p.accountId);
-        // TODO(engine): no calendar fixtures yet.
+        // TODO(engine): no calendar fixtures yet; calendar views wait for DCP stage 7.
         return { started: false };
       },
       'engine.status': () => ({
@@ -378,7 +382,8 @@ export class MockEngine implements EngineClient {
         return s.searchContacts(p);
       },
       'account.add': (p) => {
-        // TODO(engine): phase C. The mock accepts the account but has no mail for it.
+        // TODO(engine): `account.add` from the web is DCP stages 11/12 with the admin scope.
+        // The mock accepts the account but has no mail for it.
         s.accounts.set(p.account.id, structuredClone(p.account));
         const c = new ChangeSet(p.account.id);
         c.persist('Account', p.account);
@@ -394,7 +399,8 @@ export class MockEngine implements EngineClient {
         return {};
       },
       'account.test': (p) => {
-        // TODO(engine): phase C `account.test` runs the engine's IMAP/SMTP checks.
+        // TODO(engine): `account.test` on the socket is DCP stage 12 (admin scope); it runs
+        // the engine's IMAP/SMTP checks.
         const ok = !!p.account.settings.imap_host || p.account.provider === 'gmail';
         return ok ? { ok } : { ok, error: 'IMAP host is required' };
       },
@@ -406,13 +412,48 @@ export class MockEngine implements EngineClient {
         setTimeout(() => this.close(), 0);
         return {};
       },
-      'accounts.list': () => [...s.accounts.values()],
+      'account.list': () => ({
+        accounts: [...s.accounts.values()].map((a) => ({
+          accountId: a.id,
+          email: a.emailAddress,
+          state: 'running' as const,
+          connectionError: false,
+          account: redactAccount(a),
+        })),
+      }),
       'integrations.translate': () => notImplemented('integrations.translate'),
       'integrations.grammar': () => notImplemented('integrations.grammar'),
       'integrations.enrich': () => notImplemented('integrations.enrich'),
       'integrations.test': (p) => mockIntegrationTest(p),
     };
   }
+}
+
+/**
+ * The interim `account.list` copy (docs/web-gateway-plan.md section 3): an allowlist of
+ * fields, never a denylist, so no secret reaches the browser.
+ */
+export function redactAccount(a: AccountJSON): Partial<AccountJSON> {
+  const s = a.settings;
+  return {
+    id: a.id,
+    name: a.name,
+    emailAddress: a.emailAddress,
+    provider: a.provider,
+    label: a.label,
+    aliases: a.aliases,
+    color: a.color,
+    settings: {
+      imap_host: s.imap_host,
+      imap_port: s.imap_port,
+      imap_username: s.imap_username,
+      imap_security: s.imap_security,
+      smtp_host: s.smtp_host,
+      smtp_port: s.smtp_port,
+      smtp_username: s.smtp_username,
+      smtp_security: s.smtp_security,
+    },
+  };
 }
 
 /** Checks the settings look complete; the real test calls the provider. */
@@ -427,7 +468,7 @@ function mockIntegrationTest(p: IntegrationParams): { ok: boolean; error?: strin
 }
 
 function notImplemented(method: string): never {
-  // TODO(engine): translate, grammar and enrich are served by the integrations crate; their
-  // results are unspecified, so there is nothing to mock yet.
+  // TODO(engine): translate, grammar and enrich are served by the integrations crate on
+  // `serve` with DCP stage 5; nothing to mock until their results are fixed.
   throw new RpcError({ code: RpcErrorCode.MethodNotFound, message: `${method} is not available` });
 }

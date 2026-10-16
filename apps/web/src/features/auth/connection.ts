@@ -1,5 +1,10 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { useConnectionState, type ConnectionState } from '@/engine';
+import {
+  useConnectionProblem,
+  useConnectionState,
+  type ConnectionProblem,
+  type ConnectionState,
+} from '@/engine';
 
 export type ConnectionStatusKind = 'connected' | 'connecting' | 'offline';
 
@@ -7,6 +12,8 @@ export interface ConnectionStatusInfo {
   status: ConnectionStatusKind;
   /** The engine client's own state, for finer labels. */
   state: ConnectionState;
+  /** Why it isn't connected, when the client knows. */
+  problem: ConnectionProblem | null;
   /** False when the browser itself reports no network. */
   online: boolean;
 }
@@ -37,8 +44,9 @@ export function useBrowserOnline(): boolean {
 
 export function useConnectionStatus(): ConnectionStatusInfo {
   const state = useConnectionState();
+  const problem = useConnectionProblem();
   const online = useBrowserOnline();
-  return { status: statusFor(state, online), state, online };
+  return { status: statusFor(state, online), state, problem, online };
 }
 
 /** True once `active` has held for `ms`; keeps quick connects from flashing a banner. */

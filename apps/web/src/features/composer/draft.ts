@@ -190,8 +190,9 @@ export function forwardDraft(args: { message: MessageJSON; identity: Identity })
     subject: subjectWithPrefix(message.subject, 'Fwd:'),
     threadId: message.threadId,
     forwardedHeaderMessageId: message.hMsgId,
-    // TODO(engine): forwarding re-attaches the original's File records by id; the engine
-    // has to copy the parts from the source message when it builds the MIME message.
+    // TODO(engine): forwarding re-attaches the original's File records by id. SendDraftTask
+    // finds them by id once downloaded, so fetch each first (plan 2.5, step W5) until DCP
+    // stage 13's `draft.create {kind: "forward"}`.
     files: message.files.filter((f) => !f.contentId).map((file) => ({ file })),
     quoted: hasBody ? quoteForForward(message) : null,
     awaitingQuote: !hasBody,

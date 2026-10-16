@@ -17,8 +17,8 @@ import {
 type Pages = InfiniteData<ThreadsListResult, string | null>;
 
 const PAGE_SIZE = 50;
-// TODO(engine): threads.list takes one accountId; a cross-account query (accountId omitted,
-// as `search` allows) would let the engine page the unified views itself.
+// TODO(engine): threads.list takes one accountId; DCP stage 7's `query` with
+// `accounts: null` lets the engine page the unified views itself.
 
 /** Distinct from `useThreads`' key (plain query vs infinite query), same delta prefix. */
 const unifiedKey = (q: ThreadQuery) => [...engineKeys.threadList(q), 'unified'] as const;

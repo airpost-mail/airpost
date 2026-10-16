@@ -15,7 +15,9 @@ export type ModelClass =
   | 'Event'
   | 'Calendar'
   | 'Task'
-  | 'ProcessState';
+  | 'ProcessState'
+  /** The engine's Tern server (backend) rejected its token; carries no models. */
+  | 'ProcessIdentityRefreshNeeded';
 
 /** `{id, aid, v}` from `base_json`, plus the class tag the desktop's deserializer reads. */
 export interface ModelJSON {
@@ -400,6 +402,7 @@ export interface ModelJSONByClass {
   ContactBook: ModelJSON;
   Calendar: ModelJSON;
   ProcessState: ProcessStateJSON;
+  ProcessIdentityRefreshNeeded: never;
 }
 
 /** Not a model: the engine streams its online/offline state alongside the deltas. */

@@ -1,6 +1,6 @@
 export { ConnectionStatus } from './ConnectionStatus';
-export { LoginView } from './LoginView';
 export { OfflineBanner } from './OfflineBanner';
+export { PairView } from './PairView';
 export { SessionGuard } from './SessionGuard';
 export { SessionMenu } from './SessionMenu';
 export {
@@ -10,22 +10,30 @@ export {
   type ConnectionStatusInfo,
   type ConnectionStatusKind,
 } from './connection';
-export { defaultServerUrl, parseServerUrl, safeRedirect, serverLabel } from './server-url';
+export { codeFromHash, defaultDeviceName, normalizePairingCode } from './pairing-code';
+export { safeRedirect } from './redirect';
 export {
-  authRequired,
   getSession,
-  getSessionToken,
   getSignOutNotice,
-  redirectIfSignedIn,
+  isAdmin,
+  markUnpaired,
+  pair,
+  redirectIfPaired,
+  refreshSession,
   requireSession,
-  revalidateSession,
-  signIn,
   signOut,
   subscribeSession,
   useSession,
-  type Credentials,
+  useSessionSnapshot,
   type Session,
+  type SessionStatus,
   type SignOutReason,
 } from './session';
-export { AuthError, type AuthErrorCode, type ServerFeatures, type ServerInfo } from './transport';
+export {
+  AuthError,
+  type AuthErrorCode,
+  type EngineHealth,
+  type GatewaySession,
+  type PairedDevice,
+} from './transport';
 export { useSignOut } from './use-sign-out';

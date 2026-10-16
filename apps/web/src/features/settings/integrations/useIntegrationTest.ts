@@ -7,8 +7,8 @@ import { providerParams } from './store';
 export type TestOutcome = { ok: true } | { ok: false; error: string };
 
 function readResult(result: unknown): TestOutcome {
-  // TODO(engine): `integrations.test` has no result shape yet; accept {ok, error} or any
-  // non-error reply as success.
+  // TODO(engine): `integrations.test`'s result shape comes with DCP stage 5; accept
+  // {ok, error} or any non-error reply as success.
   if (result && typeof result === 'object' && 'ok' in result && result.ok === false) {
     const error = 'error' in result && typeof result.error === 'string' ? result.error : '';
     return { ok: false, error: error || 'The provider rejected the settings.' };

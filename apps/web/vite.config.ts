@@ -4,13 +4,24 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+// `npm run dev` with VITE_TERN_ENGINE=gateway talks to a local tern-gateway through this
+// proxy, so the page and the gateway share an origin as in production (plan G3). Host and
+// Origin stay localhost:5173 (no changeOrigin): start the gateway with
+// `--allow-origin http://localhost:5173`.
+const gateway = process.env.TERN_GATEWAY_URL ?? 'http://127.0.0.1:5180';
+
 export default defineConfig({
   plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
+  server: {
+    proxy: {
+      '/gateway': { target: gateway, ws: true, changeOrigin: false },
+    },
+  },
   build: {
-    // Served as static files by the Rust server later; keep asset paths relative to root.
+    // Served as static files by tern-gateway; keep asset paths relative to root.
     outDir: 'dist',
     sourcemap: true,
   },

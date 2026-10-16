@@ -7,8 +7,8 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { applyDelta, type ThreadPages } from './cache';
-import type { ConnectionState, EngineClient } from './client';
+import { applyDelta, type ServerIdentityState, type ThreadPages } from './cache';
+import type { ConnectionProblem, ConnectionState, EngineClient } from './client';
 import { ensureConnected } from './connect';
 import { useEngine } from './context';
 import { engineKeys, type SearchQuery, type ThreadQuery } from './keys';
@@ -17,6 +17,7 @@ import { optimisticThreads } from './optimistic';
 import {
   RpcError,
   RpcErrorCode,
+  type AccountListEntry,
   type CategoryCount,
   type SearchResult,
   type ThreadsGetResult,
@@ -60,10 +61,40 @@ export function useConnectionState(): ConnectionState {
   );
 }
 
+/**
+ * Account JSON from an `account.list` row. Until the engine's registry (DCP stage 11) the
+ * `account` copy may be missing, so the row's id and email fill a minimal account.
+ */
+export function accountFromListEntry(e: AccountListEntry): AccountJSON {
+  const a = e.account ?? {};
+  const stopped = e.state === 'stopped';
+  return {
+    name: '',
+    provider: 'imap',
+    label: e.email,
+    settings: {},
+    autoaddress: { value: '', type: 'bcc' },
+    aliases: [],
+    defaultAlias: null,
+    color: '',
+    ...a,
+    __cls: 'Account',
+    id: e.accountId,
+    aid: e.accountId,
+    v: a.v ?? 0,
+    emailAddress: a.emailAddress ?? e.email,
+    syncState: stopped ? 'sync_error' : (a.syncState ?? 'ok'),
+    syncError: stopped ? (e.error ?? a.syncError ?? {}) : (a.syncError ?? null),
+  };
+}
+
 export function accountsQuery(client: EngineClient) {
   return queryOptions({
     queryKey: engineKeys.accounts(),
-    queryFn: () => call(client, () => client.call('accounts.list')),
+    queryFn: async () => {
+      const { accounts } = await call(client, () => client.call('account.list'));
+      return accounts.filter((e) => e.state !== 'removed').map(accountFromListEntry);
+    },
     staleTime: Infinity,
   });
 }
@@ -113,6 +144,26 @@ export function useProcessState(): Record<string, ProcessStateJSON> {
     staleTime: Infinity,
   });
   return data ?? {};
+}
+
+/** Whether the engine's Tern server rejected its token since this tab connected. */
+export function useServerIdentityState(): ServerIdentityState {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: engineKeys.serverIdentity(),
+    queryFn: () =>
+      qc.getQueryData<ServerIdentityState>(engineKeys.serverIdentity()) ?? { refreshNeeded: false },
+    staleTime: Infinity,
+  });
+  return data ?? { refreshNeeded: false };
+}
+
+export function useConnectionProblem(): ConnectionProblem | null {
+  const client = useEngine();
+  return useSyncExternalStore(
+    (cb) => client.onStateChange(cb),
+    () => client.problem,
+  );
 }
 
 export function foldersQuery(client: EngineClient, accountId: string) {
@@ -190,8 +241,8 @@ export async function fetchThreadPage(
   await ensureConnected(client);
   if (starred === undefined) return client.call('threads.list', params(before));
   // TODO(engine): threads.list has no flag filters (starred, unread), so Starred reads the
-  // whole account and filters here. A `starred` param, or `role: 'starred'` where the
-  // account has no Starred label, would let the engine page it.
+  // whole account and filters here. DCP stage 7's `query` with a `where` on `starred` lets
+  // the engine page it.
   const threads: ThreadJSON[] = [];
   let next = before;
   for (let i = 0; i < FILTER_ROUNDS; i++) {
@@ -387,7 +438,8 @@ export function useSearch(q: SearchQuery | null, opts: { limit?: number } = {}) 
     queryKey: engineKeys.search({ query, accountId: q?.accountId, limit }),
     queryFn: async (): Promise<SearchHits> => {
       // TODO(engine): `search` takes one accountId; searching every account means one call
-      // per account, merged and cut to `limit` here, with no paging.
+      // per account, merged and cut to `limit` here, with no paging. `search` gains
+      // `accounts` with DCP stage 9.
       const ids = await targetAccounts(qc, client, q?.accountId);
       const results = await Promise.all(
         ids.map((accountId) =>
@@ -414,7 +466,8 @@ export function useContacts(query: string, opts: { accountId?: string; limit?: n
     queryKey: engineKeys.contacts({ query: q, accountId: opts.accountId, limit }),
     queryFn: async (): Promise<ContactJSON[]> => {
       // TODO(engine): `contacts.search` takes one accountId; autocomplete across accounts
-      // calls each one and merges by reference count here.
+      // calls each one and merges by reference count here. DCP stage 7's `query` on Contact
+      // with `accounts: null` replaces it.
       const ids = await targetAccounts(qc, client, opts.accountId);
       const results = await Promise.all(
         ids.map((accountId) =>

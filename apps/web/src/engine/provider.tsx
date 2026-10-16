@@ -1,10 +1,24 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { applyDelta } from './cache';
 import type { EngineClient } from './client';
 import { ensureConnected } from './connect';
 import { EngineContext } from './context';
 import { seedProcessState } from './hooks';
+import { engineKeys } from './keys';
+import type { AccountRunState, AccountStateParams } from './rpc';
+
+/** What an account shows; refetched when the engine restarts it (a reset, or a re-add). */
+function invalidateAccount(qc: QueryClient, accountId: string) {
+  for (const key of [
+    engineKeys.folders(accountId),
+    engineKeys.labels(accountId),
+    engineKeys.threadLists(accountId),
+    engineKeys.messagesAll(accountId),
+  ]) {
+    void qc.invalidateQueries({ queryKey: key });
+  }
+}
 
 /** Connects the client and keeps the query cache in step with its delta stream. */
 export function EngineProvider({
@@ -17,17 +31,31 @@ export function EngineProvider({
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    const lastState = new Map<string, AccountRunState>();
+    const onAccountState = (p: AccountStateParams) => {
+      const before = lastState.get(p.accountId);
+      lastState.set(p.accountId, p.state);
+      // The accounts query maps `stopped` to a sync error, which drives the account banners.
+      void queryClient.invalidateQueries({ queryKey: engineKeys.accounts() });
+      if (before === 'starting' && p.state === 'running')
+        invalidateAccount(queryClient, p.accountId);
+    };
     const off = client.onNotification((n) => {
       if (n.method === 'delta') applyDelta(queryClient, n.params);
-      // TODO(engine): `account.state` (phase C) should drive per-account error banners.
+      else if (n.method === 'account.state') onAccountState(n.params);
     });
     const seed = () =>
       ensureConnected(client)
         .then(() => seedProcessState(queryClient, client))
         .catch((err: unknown) => console.error('engine connect failed', err));
-    // Again on every reconnect: accounts may have gone on- or offline meanwhile.
+    // Deltas sent while the connection was down are lost, so after a reconnect every query
+    // re-reads (engine-protocol-plan 1.4). The first open has nothing stale to refetch.
+    let opened = false;
     const offState = client.onStateChange((s) => {
-      if (s === 'open') void seed();
+      if (s !== 'open') return;
+      if (opened) void queryClient.invalidateQueries();
+      opened = true;
+      void seed();
     });
     void seed();
     return () => {

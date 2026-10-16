@@ -1,7 +1,7 @@
 // Signatures, in the desktop's shape (signature-store.ts): HTML bodies keyed by id, and a
 // default signature per account email address.
-// TODO(engine): signatures live in this browser only; move them to engine- or
-// backend-stored settings so every client shares them.
+// TODO(engine): signatures live in this browser only; they move to engine settings
+// (`signatures`, `defaultSignatures`) with DCP stage 3, shared by every client.
 import { useSyncExternalStore } from 'react';
 import { generateId } from '@/engine';
 

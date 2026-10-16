@@ -27,8 +27,8 @@ export function AttachmentList({ files }: { files: FileJSON[] }) {
     <ul aria-label="Attachments" className="flex flex-wrap gap-2">
       {files.map((f) => {
         const Icon = iconFor(f);
-        // TODO(engine): downloads need the hosted engine's authenticated file route; the
-        // mock hands out placeholder blobs and WsEngineClient.fileUrl returns null.
+        // TODO(engine): downloads need the gateway's file route (DCP stage 16, plan step W5);
+        // the mock hands out placeholder blobs and WsEngineClient.fileUrl returns null.
         const href = engine.fileUrl(f);
         const body = (
           <>

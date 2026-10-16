@@ -4,21 +4,18 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { createEngineClient, EngineProvider } from '@/engine';
-import { getSessionToken, subscribeSession } from '@/features/auth';
+import { markUnpaired, refreshSession } from '@/features/auth';
 import { createQueryClient } from './queryClient';
 import { createAppRouter } from './router';
 import './index.css';
 import '@/lib/preferences';
 
 const queryClient = createQueryClient();
-const engine = createEngineClient({ getToken: getSessionToken });
-// A new token means a new identity on the socket; the next query reconnects with it.
-let token = getSessionToken();
-subscribeSession(() => {
-  const next = getSessionToken();
-  if (next === token) return;
-  token = next;
-  engine.close();
+// The gateway's session route is the client's health check, which also keeps the session
+// store current; the pairing cookie authorises the socket itself.
+const engine = createEngineClient({
+  health: refreshSession,
+  onUnpaired: () => markUnpaired('revoked'),
 });
 const router = createAppRouter({ queryClient, engine });
 

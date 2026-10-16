@@ -29,6 +29,8 @@ export const engineKeys = {
   accounts: () => ['engine', 'accounts'] as const,
   status: () => ['engine', 'status'] as const,
   processState: () => ['engine', 'processState'] as const,
+  /** Set when the engine reports `ProcessIdentityRefreshNeeded`. */
+  serverIdentity: () => ['engine', 'serverIdentity'] as const,
   folders: (accountId: string) => ['engine', 'folders', accountId] as const,
   labels: (accountId: string) => ['engine', 'labels', accountId] as const,
   threadLists: (accountId: string) => ['engine', 'threads', accountId] as const,

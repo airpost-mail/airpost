@@ -8,28 +8,35 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MockEngine } from '@/engine';
 import { EngineContext } from '@/engine/context';
-import { LoginView } from '../LoginView';
-import { safeRedirect } from '../server-url';
+import { PairView } from '../PairView';
+import { safeRedirect } from '../redirect';
+import {
+  getSession,
+  markUnpaired,
+  pair,
+  redirectIfPaired,
+  requireSession,
+  signOut,
+} from '../session';
 import { SessionGuard } from '../SessionGuard';
 import { SessionMenu } from '../SessionMenu';
-import { getSession, redirectIfSignedIn, requireSession, signIn, signOut } from '../session';
 
 function renderApp(path: string) {
   const root = createRootRoute({ component: Outlet });
-  const login = createRoute({
+  const pairRoute = createRoute({
     getParentRoute: () => root,
-    path: '/login',
+    path: '/pair',
     validateSearch: (s: Record<string, unknown>): { redirect?: string } => ({
       redirect: safeRedirect(s.redirect),
     }),
-    beforeLoad: ({ search }) => redirectIfSignedIn({ search }),
-    component: function Login() {
-      return <LoginView redirectTo={login.useSearch().redirect} />;
+    beforeLoad: ({ search }) => redirectIfPaired({ search }),
+    component: function Pair() {
+      return <PairView redirectTo={pairRoute.useSearch().redirect} />;
     },
   });
   const app = createRoute({
@@ -51,7 +58,7 @@ function renderApp(path: string) {
     component: () => <p>Inbox</p>,
   });
   const router = createRouter({
-    routeTree: root.addChildren([login, app.addChildren([home, inbox])]),
+    routeTree: root.addChildren([pairRoute, app.addChildren([home, inbox])]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -65,64 +72,73 @@ function renderApp(path: string) {
   return router;
 }
 
-async function fillAndSubmit(email: string) {
-  const user = userEvent.setup();
-  await user.type(await screen.findByLabelText('Email'), email);
-  await user.type(screen.getByLabelText('Password', { selector: 'input' }), 'anything');
-  const button = screen.getByRole('button', { name: 'Sign in' });
-  await waitFor(() => expect(button).toBeEnabled());
-  await user.click(button);
-}
-
-describe('route guard (mock engine)', () => {
+describe('route guard (mock gateway)', () => {
   beforeEach(async () => {
-    await signIn({
-      method: 'password',
-      serverUrl: 'http://localhost:3000',
-      email: 'maya.okafor@gmail.com',
-      password: '',
-    });
+    await pair('ABCD-EFGH-JKLM', 'Laptop');
   });
 
-  it('lets a signed-in user in and keeps them off /login', async () => {
-    const router = renderApp('/login?redirect=%2Finbox');
+  it('lets a paired browser in and keeps it off /pair', async () => {
+    const router = renderApp('/pair?redirect=%2Finbox');
     expect(await screen.findByText('Inbox')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/inbox');
   });
 
-  it('sends a signed-out user to /login and back to where they were going', async () => {
+  it('sends an unpaired browser to /pair and back to where it was going', async () => {
     await signOut();
     const router = renderApp('/inbox?x=1');
 
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Pair this browser' })).toBeInTheDocument();
     expect(router.state.location.search).toEqual({ redirect: '/inbox?x=1' });
 
-    await fillAndSubmit('sam@example.org');
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Pairing code'), 'wxyz-2345-abcd');
+    await user.clear(screen.getByLabelText('Name for this browser'));
+    await user.type(screen.getByLabelText('Name for this browser'), 'Work laptop');
+    await user.click(screen.getByRole('button', { name: 'Pair' }));
 
     expect(await screen.findByText('Inbox')).toBeInTheDocument();
     expect(router.state.location.href).toBe('/inbox?x=1');
-    expect(getSession()?.user.email).toBe('sam@example.org');
+    expect(getSession()?.device.name).toBe('Work laptop');
+  });
+
+  it('shows why a malformed code is refused', async () => {
+    await signOut();
+    renderApp('/pair');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Pairing code'), 'abc');
+    await user.click(screen.getByRole('button', { name: 'Pair' }));
+    expect(await screen.findByText(/12 letters and digits/)).toBeInTheDocument();
   });
 
   it('signs out from the session menu', async () => {
     const user = userEvent.setup();
     const router = renderApp('/inbox');
-    await user.click(await screen.findByRole('button', { name: /signed in as/i }));
+    await user.click(await screen.findByRole('button', { name: /paired as laptop/i }));
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     expect(await screen.findByText('Signed out.')).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/login');
+    expect(router.state.location.pathname).toBe('/pair');
     expect(getSession()).toBeNull();
-    expect(localStorage.getItem('tern.session')).not.toContain('tern_mock_');
   });
 
-  it('follows a session that ends while the page is open', async () => {
+  it('follows a pairing the gateway ends while the page is open', async () => {
     const router = renderApp('/inbox');
     await screen.findByText('Inbox');
 
-    await act(() => signOut('revoked'));
+    act(() => markUnpaired('revoked'));
 
-    expect(await screen.findByText(/The server signed you out/)).toBeInTheDocument();
+    expect(await screen.findByText(/This browser was unpaired/)).toBeInTheDocument();
     expect(router.state.location.search).toEqual({ redirect: '/inbox' });
+  });
+});
+
+describe('PairView', () => {
+  it('takes the code from the link and clears it from the address bar', async () => {
+    await signOut();
+    window.history.replaceState(null, '', '/pair#ABCD-EFGH-JKLM');
+    renderApp('/pair');
+    expect(await screen.findByLabelText('Pairing code')).toHaveValue('ABCD-EFGH-JKLM');
+    expect(window.location.hash).toBe('');
+    expect(screen.getByText('Check the name, then pair.')).toBeInTheDocument();
   });
 });

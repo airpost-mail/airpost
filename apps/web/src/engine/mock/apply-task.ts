@@ -1,7 +1,7 @@
 // Local phase of each task against the mock store. The remote phase is simulated by the
 // engine wrapper (status `remote` -> `complete` after a delay).
-// TODO(engine): every branch here stands in for the engine's ms-tasks implementation;
-// delete this file when the WebSocket client is the default.
+// Every branch here stands in for the engine's ms-tasks implementation, for the mock and
+// the tests.
 import { generateId, nowSeconds } from '../model';
 import type {
   CategoryJSON,
@@ -140,7 +140,8 @@ export function applyTask(store: MockStore, task: TaskJSON): TaskOutcome {
 
     default:
       // TODO(engine): GetMessageRFC2822Task, EventRSVPTask and the contact tasks have no
-      // mock behaviour; they complete without changing anything.
+      // mock behaviour; they complete without changing anything. Raw-message downloads use
+      // DCP stage 16's file-id mode, RSVP and contact writes stage 18.
       break;
   }
 

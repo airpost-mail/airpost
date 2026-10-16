@@ -1,7 +1,8 @@
 // Sends scheduled drafts when the engine reports their `send-later` metadata expired, as the
 // desktop's send-later plugin does (handleMetadataExpiration): clear the metadata, then send.
-// TODO(engine): this only runs while a tab is open. A draft whose time passes with no client
-// connected waits until one connects; sending it needs a server-side sender on the engine.
+// TODO(engine): this only runs while a tab is open. DCP stage 4's expiration executor sends
+// due drafts itself (gate this on `expiration-executor`); with no desktop running, that also
+// needs stage 11's detached engine.
 import { toast } from 'sonner';
 import {
   ensureConnected,

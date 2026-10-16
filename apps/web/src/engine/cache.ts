@@ -194,6 +194,28 @@ function applyProcessState(qc: QueryClient, d: Delta<'ProcessState'>) {
   });
 }
 
+/** What the engine said about its Tern server connection (plan 1.8). */
+export interface ServerIdentityState {
+  refreshNeeded: boolean;
+}
+
+/**
+ * The delta classes the web uses: those `applyDelta` handles, plus the backend's identity
+ * event (plan 1.8). Metadata expirations arrive as Thread and Message deltas. Subscribing to
+ * fewer classes keeps a large initial sync off the WebSocket.
+ */
+export const RENDERED_CLASSES = [
+  'Thread',
+  'Message',
+  'Folder',
+  'Label',
+  'Account',
+  'Task',
+  'ProcessState',
+  'Contact',
+  'ProcessIdentityRefreshNeeded',
+] as const;
+
 export function applyDelta(qc: QueryClient, delta: Delta) {
   // Expirations are handled by whoever owns the metadata (see send-later); the models
   // themselves did not change.
@@ -214,8 +236,13 @@ export function applyDelta(qc: QueryClient, delta: Delta) {
       return applyProcessState(qc, delta as Delta<'ProcessState'>);
     case 'Contact':
       return void qc.invalidateQueries({ queryKey: engineKeys.contactsAll() });
+    case 'ProcessIdentityRefreshNeeded':
+      return void qc.setQueryData<ServerIdentityState>(engineKeys.serverIdentity(), {
+        refreshNeeded: true,
+      });
     default:
-      // TODO(engine): calendars, events and contact groups have no views yet.
+      // TODO(engine): calendars, events and contact groups have no views yet; their reads
+      // come with DCP stage 7's `query`, writes with stage 18.
       return;
   }
 }

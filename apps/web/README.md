@@ -4,10 +4,11 @@ The browser client for Tern. It talks to the Rust engine (`apps/engine`) over it
 2.0 protocol (`docs/engine-protocol-plan.md`), and builds to static files that a Rust server
 will serve; there is no Node runtime in production.
 
-The hosted engine does not exist yet. Until it does, the app runs against `MockEngine`, an
-in-browser implementation of the same methods and delta notifications over fixture data
-(two accounts, about sixty threads). Places that need real engine behaviour are marked
-`// TODO(engine): …`.
+It reaches the engine through `apps/gateway`, which serves this app's `dist/` and relays
+JSON-RPC over a WebSocket on the same origin (`docs/web-gateway-plan.md`). Without a gateway
+the app runs against `MockEngine`, an in-browser implementation of the same methods and delta
+notifications over fixture data (two accounts, about sixty threads). Places that need engine
+work are marked `// TODO(engine): …` and listed in `TODO-engine.md`.
 
 Stack: Vite, React 19, TypeScript (strict), Tailwind CSS v4, shadcn/ui (Radix), TanStack
 Router (file routes) and TanStack Query, Vitest with React Testing Library.
@@ -24,21 +25,32 @@ npm run lint
 npm test
 ```
 
-### Mock or real engine
+### Mock or gateway
 
-| `VITE_ENGINE_URL`                  | Client                                    |
-| ---------------------------------- | ----------------------------------------- |
-| unset                              | `MockEngine`, in the browser, no network  |
-| `ws://host:port/path` or `wss://…` | `WsEngineClient`, JSON-RPC over WebSocket |
+| Engine    | Selected by                                          | Client                                   |
+| --------- | ---------------------------------------------------- | ---------------------------------------- |
+| `mock`    | default                                              | `MockEngine`, in the browser, no network |
+| `gateway` | `VITE_TERN_ENGINE=gateway` (the gateway's own build) | `WsEngineClient` on `/gateway/v1/ws`     |
+
+In dev builds `localStorage.setItem('tern.engine', 'gateway' | 'mock')` overrides the build
+setting. Against a local gateway, `npm run dev` proxies `/gateway` (HTTP and WebSocket) to
+`TERN_GATEWAY_URL` (default `http://127.0.0.1:5180`) without rewriting Host or Origin, so
+start the gateway with `--allow-origin http://localhost:5173`:
 
 ```sh
-VITE_ENGINE_URL=ws://localhost:7420/rpc npm run dev
+tern-gateway serve --allow-origin http://localhost:5173
+VITE_TERN_ENGINE=gateway npm run dev
+tern-gateway pair            # prints a code and a /pair#<code> link; use the dev origin
 ```
 
-Both implement `EngineClient` (`src/engine/client.ts`), so views and hooks don't change.
-In the mock, `sync.wake` (or a timer every 90 s in dev) delivers a scripted new thread, a few
-older messages arrive without bodies to exercise `bodies.fetch`, and one spam message
-carries a script to check the sandbox.
+The browser pairs with the gateway (`/pair`) and gets an httpOnly cookie; it never holds a
+token. In mock mode the browser starts paired and any 12-character base32 code pairs again.
+
+Both clients implement `EngineClient` (`src/engine/client.ts`), so views and hooks don't
+change. `WsEngineClient` checks `GET /gateway/v1/session` before each connect, reconnects with
+backoff and re-reads every query afterwards (plan 2.6). In the mock, `sync.wake` (or a timer
+every 90 s in dev) delivers a scripted new thread, a few older messages arrive without bodies
+to exercise `bodies.fetch`, and one spam message carries a script to check the sandbox.
 
 ## Layout
 
@@ -60,25 +72,5 @@ link clicks handled by the app (`noopener,noreferrer`). Use `MessageBody` from
 
 ## TODO(engine)
 
-What the web client needs from the engine that the protocol plan doesn't cover yet:
-
-- An HTTP/WebSocket transport. The plan (S1) has a Unix socket only; the web client
-  expects JSON-RPC 2.0 over WebSocket at `VITE_ENGINE_URL`.
-- Auth: a token in `hello`, a cookie from the backend's login, or a subprotocol. Wire it in
-  `src/engine/ws.ts` and `src/features/auth`.
-- Reconnection: backoff, re-`hello`, re-`subscribe`, then invalidate the query cache.
-- `accounts.list`: full account objects (the plan's `hello`/`engine.status` only return
-  `{accountId, email, state}`).
-- `categories.counts`: unread/total per folder and label (the desktop reads ThreadCounts
-  from SQLite directly).
-- `threads.list` with `threadIds`, for loading one thread by id.
-- Attachment downloads over HTTP (`EngineClient.fileUrl`).
-- Confirm the `threads.list` / `search` paging shape (`{items, next: {ts, id}}`) and the sort
-  key (the mock sorts by `lmrt`, the plan says last-message timestamp).
-- Phase C `account.*` methods and `account.state` notifications.
-- `integrations.*` params and results.
-- Calendar, events and contact groups (no fixtures or views yet).
-
-## Licence
-
-GPL-3.0-only. See `LICENSE` and the repository root `LICENSE.md`. Fonts are OFL and bundled.
+`TODO-engine.md` lists every marker with where its work lands (a desktop-client-plan stage,
+the gateway, or web-only), following `docs/web-gateway-plan.md` section 4.

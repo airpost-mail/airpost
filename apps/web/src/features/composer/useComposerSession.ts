@@ -129,9 +129,10 @@ export function useComposerSession(args: {
         size: f.size,
       },
     }));
-    // TODO(engine): attachment bytes need an upload route on the hosted engine (e.g.
-    // POST /files/:accountId returning a File id); until then only the File record is
-    // saved with the draft and the mock sends it without content.
+    // TODO(engine): attachment bytes need the gateway's upload route,
+    // `POST /gateway/v1/files/:accountId` on DCP stage 16's `files.put` (plan step W5);
+    // until then only the File record is saved with the draft and the mock sends it without
+    // content.
     update((d) => ({ ...d, files: [...d.files, ...added] }));
     const total = [...draft.files, ...added].reduce((n, a) => n + a.file.size, 0);
     if (total > ATTACHMENT_WARN_BYTES) {
@@ -203,8 +204,8 @@ export function useComposerSession(args: {
     handOff(true);
     const delayMs = getPreferences().undoSendMs;
     // TODO(engine): undo-send is a client-side delay. If the tab closes inside it the draft
-    // stays saved but unsent; a delayed send on the engine (or SendDraftTask with a
-    // not-before time) would make it survive.
+    // stays saved but unsent. With DCP stage 4's executor the web writes send-later
+    // `{expiration, isUndoSend}` metadata instead; stage 13's `draft.send {delayMs}` later.
     if (delayMs <= 0) {
       setComposerHidden(windowKey, true);
       void deliver(d, toast.loading('Sending…'));

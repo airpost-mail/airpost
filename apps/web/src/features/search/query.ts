@@ -172,7 +172,7 @@ export function toEngineQuery(q: ParsedSearch): string {
   // TODO(engine): `search` is plain text: ms-store quotes every term for FTS5, so from:,
   // to:, subject:, in:, is: and has: are matched as literal words and before:/after: can't
   // be expressed at all. Only the mock understands the operators sent here. The engine
-  // needs the desktop grammar (SearchQueryParser), or at least is:/in:/has: as filters.
+  // gets the desktop grammar with DCP stage 9.
   return serializeSearchQuery({
     terms: q.terms,
     tokens: q.tokens.filter((t) => t.field !== 'before' && t.field !== 'after'),

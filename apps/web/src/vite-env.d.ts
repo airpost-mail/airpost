@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** WebSocket URL of a hosted engine; unset selects the in-browser mock. */
-  readonly VITE_ENGINE_URL?: string;
+  /** `gateway` for the bundle the gateway serves; anything else selects the in-browser mock. */
+  readonly VITE_TERN_ENGINE?: string;
 }
 
 interface ImportMeta {

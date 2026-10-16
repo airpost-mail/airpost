@@ -105,7 +105,8 @@ export async function buildAccount(
     smtp_security: f.smtpSecurity,
     smtp_allow_insecure_ssl: f.allowInsecureSsl,
   };
-  // TODO(engine): the engine should assign the id on `account.add`; this mirrors the desktop.
+  // TODO(engine): the engine assigns the id on `account.add` from DCP stages 11/12; this
+  // mirrors the desktop.
   const id = await accountIdFor(email, settings);
   return {
     id,

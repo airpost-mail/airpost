@@ -49,6 +49,11 @@ export const RpcErrorCode = {
   TaskRejected: -32002,
   HelloRequired: -32003,
   NotFound: -32004,
+  AccountStopped: -32005,
+  AccountExists: -32006,
+  WrongChannel: -32007,
+  /** The gateway or engine refused a method on a relayed connection (plan G6). */
+  NotAllowedRelayed: -32008,
 } as const;
 
 export class RpcError extends Error {
@@ -65,20 +70,27 @@ export class RpcError extends Error {
 
 export type EmptyResult = Record<string, never>;
 
-export type AccountRunState = 'running' | 'stopped' | 'starting';
+export type AccountRunState = 'running' | 'stopped' | 'starting' | 'removed';
+
+/** The `SyncError` JSON that stopped an account. */
+export interface SyncErrorJSON {
+  key?: string;
+  debuginfo?: string;
+  retryable?: boolean;
+  [key: string]: unknown;
+}
 
 export interface EngineAccountSummary {
   accountId: string;
   email: string;
   state: AccountRunState;
-  error?: string;
+  error?: SyncErrorJSON;
 }
 
+/** Auth is on the WebSocket upgrade (the gateway's pairing cookie), not in `hello`. */
 export interface HelloParams {
   protocol: number;
   client: string;
-  // TODO(engine): the hosted engine needs an auth token here or on the WebSocket upgrade.
-  token?: string;
 }
 
 export interface HelloResult {
@@ -103,6 +115,19 @@ export interface EngineAccountStatus {
   state: AccountRunState;
   /** The last ProcessState the account sent: true while it cannot reach its server. */
   connectionError: boolean;
+  error?: SyncErrorJSON;
+}
+
+/**
+ * One `account.list` row. `account` is the non-secret Account JSON copied through an
+ * allowlist (docs/web-gateway-plan.md section 3); an engine without it sends none.
+ */
+export interface AccountListEntry extends EngineAccountStatus {
+  account?: Partial<AccountJSON>;
+}
+
+export interface AccountListResult {
+  accounts: AccountListEntry[];
 }
 
 // Read API params and results, as in crates/ms-ipc/src/read.rs. A `limit` defaults to 50
@@ -236,11 +261,10 @@ export interface RpcMethods {
   'account.reset': { params: { accountId: string }; result: EmptyResult };
   'engine.shutdown': { params: undefined; result: EmptyResult };
 
-  // TODO(engine): not in the protocol plan. The hosted engine has to own account settings
-  // (plan section 4, "headless engine"), and the web client needs them to draw the sidebar.
-  'accounts.list': { params: undefined; result: AccountJSON[] };
+  'account.list': { params: undefined; result: AccountListResult };
 
-  // TODO(engine): integrations params and results are not specified yet.
+  // TODO(engine): integrations params and results come with DCP stage 5
+  // (docs/integrations-plan.md section 4).
   'integrations.translate': { params: IntegrationParams; result: unknown };
   'integrations.grammar': { params: IntegrationParams; result: unknown };
   'integrations.enrich': { params: IntegrationParams; result: unknown };

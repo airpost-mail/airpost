@@ -2,7 +2,7 @@
 // from:, to:, subject:, is:unread|read|starred, in:<role or name>, has:attachment.
 // TODO(engine): the real `search` takes none of these operators. It reads the query as plain
 // text (every term quoted for FTS5), so `from:jonas` only matches the literal words. This
-// grammar is what the client sends; the engine has to grow it (see features/search/query.ts).
+// grammar is what the client sends; the engine grows it with DCP stage 9.
 
 export interface ParsedQuery {
   text: string[];

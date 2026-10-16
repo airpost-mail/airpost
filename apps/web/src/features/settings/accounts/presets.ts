@@ -22,9 +22,10 @@ export interface ProviderPreset {
   passwordHint?: string;
 }
 
-// TODO(engine): Gmail and Microsoft sign in with OAuth on the desktop. The hosted engine
-// needs an OAuth redirect endpoint (and token storage) before the web client can offer it;
-// until then these presets use IMAP with an app password.
+// TODO(engine): Gmail and Microsoft sign in with OAuth on the desktop. From the web it is
+// deferred (docs/web-gateway-plan.md section 4): a gateway on any host can't be a registered
+// redirect URI, so it waits for a fixed redirect page and DCP stage 12's `account.oauth.*`.
+// Until then these presets use IMAP with an app password.
 export const PRESETS: ProviderPreset[] = [
   {
     id: 'gmail',
@@ -107,8 +108,8 @@ export function presetForEmail(email: string): ProviderPreset {
   return PRESETS.find((p) => p.domains.includes(d)) ?? OTHER_PRESET;
 }
 
-// TODO(engine): the desktop also consults mailcore's provider table and MX records; an
-// `account.discover` method on the engine should replace this guess.
+// TODO(engine): the desktop also consults mailcore's provider table and MX records;
+// `account.discover` (DCP stage 12) replaces this guess.
 export function guessServers(email: string): { imap: ServerPreset; smtp: ServerPreset } {
   const d = domainOf(email);
   return {

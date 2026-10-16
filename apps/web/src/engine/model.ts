@@ -102,7 +102,8 @@ export function threadHasRole(thread: ThreadJSON, role: CategoryRole): boolean {
  * first, id descending as the tiebreak.
  */
 // TODO(engine): `threads.list` has no sort key, so lists can't order by last received
-// (`lmrt`) or last sent (`lmst`) as the desktop's Inbox and Sent perspectives do.
+// (`lmrt`) or last sent (`lmst`) as the desktop's Inbox and Sent perspectives do. DCP
+// stage 7's `query` takes an `order`.
 export function compareThreads(a: ThreadJSON, b: ThreadJSON): number {
   if (a.lmt !== b.lmt) return b.lmt - a.lmt;
   return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;

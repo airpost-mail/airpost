@@ -1,8 +1,10 @@
+import { RENDERED_CLASSES } from './cache';
 import type { EngineClient } from './client';
 import { MockEngine } from './mock/engine';
 import type { HelloResult } from './rpc';
 import type { Delta, TaskJSON } from './types';
-import { WsEngineClient } from './ws';
+import { engineMode, gatewayWsUrl } from './mode';
+import { WsEngineClient, type HealthOutcome } from './ws';
 
 const connections = new WeakMap<EngineClient, Promise<HelloResult>>();
 
@@ -17,13 +19,18 @@ export function ensureConnected(client: EngineClient): Promise<HelloResult> {
   return p;
 }
 
-/**
- * Mock unless VITE_ENGINE_URL points at a hosted engine (ws:// or wss://). `getToken` is read
- * on every connect, so closing the client after a sign-in or sign-out is enough to switch.
- */
-export function createEngineClient(opts: { getToken?: () => string | null } = {}): EngineClient {
-  const url = import.meta.env.VITE_ENGINE_URL;
-  if (url) return new WsEngineClient({ url, getToken: opts.getToken });
+export interface CreateEngineOptions {
+  /** `GET /gateway/v1/session` before each connect (gateway mode). */
+  health?: () => Promise<HealthOutcome>;
+  /** The gateway no longer knows this browser. */
+  onUnpaired?: () => void;
+}
+
+/** The mock, or the gateway that served this page, per `engineMode()`. */
+export function createEngineClient(opts: CreateEngineOptions = {}): EngineClient {
+  if (engineMode() === 'gateway') {
+    return new WsEngineClient({ url: gatewayWsUrl(), classes: [...RENDERED_CLASSES], ...opts });
+  }
   return new MockEngine({ incomingEveryMs: import.meta.env.MODE === 'test' ? null : 90_000 });
 }
 

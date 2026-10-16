@@ -1,5 +1,5 @@
 // Client-side preferences, persisted in localStorage. Theme lives in next-themes.
-// TODO(engine): sync preferences across devices once the backend stores them.
+// These stay in this browser in v1 (docs/web-gateway-plan.md section 4).
 import { useSyncExternalStore } from 'react';
 
 export type Density = 'compact' | 'comfortable';

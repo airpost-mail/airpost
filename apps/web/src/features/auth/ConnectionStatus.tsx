@@ -1,9 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useEngine } from '@/engine';
+import { problemMessage, useEngine } from '@/engine';
 import { cn } from '@/lib/utils';
 import { useConnectionStatus, type ConnectionStatusInfo } from './connection';
-import { serverLabel } from './server-url';
-import { useSession } from './session';
 
 function label({ status, state, online }: ConnectionStatusInfo): string {
   if (!online) return 'Offline';
@@ -13,13 +11,13 @@ function label({ status, state, online }: ConnectionStatusInfo): string {
   return 'Disconnected';
 }
 
-function detail(info: ConnectionStatusInfo, kind: 'mock' | 'ws', host: string | null): string {
+function detail(info: ConnectionStatusInfo, kind: 'mock' | 'ws', host: string): string {
   if (!info.online) return 'This browser has no network. Tern reconnects when it returns.';
   if (kind === 'mock') return 'In-browser demo engine with sample mail.';
-  const where = host ? ` at ${host}` : '';
-  if (info.status === 'connected') return `Engine${where} is up to date.`;
-  if (info.status === 'connecting') return `Reaching the engine${where}.`;
-  return `Couldn't reach the engine${where}.`;
+  if (info.status === 'connected') return `Engine at ${host} is up to date.`;
+  if (info.problem) return problemMessage(info.problem);
+  if (info.status === 'connecting') return `Reaching the engine at ${host}.`;
+  return problemMessage(null);
 }
 
 /** Dot plus a short label for the top bar; the tooltip says where and why. */
@@ -31,10 +29,9 @@ export function ConnectionStatus({
   className?: string;
 }) {
   const engine = useEngine();
-  const session = useSession();
   const info = useConnectionStatus();
   const text = label(info);
-  const host = session?.server.url ? serverLabel(session.server.url) : null;
+  const host = window.location.host;
 
   return (
     <TooltipProvider delayDuration={300}>
