@@ -1,6 +1,6 @@
 # Labels on every account
 
-Draft, 2026-10-16, not yet confirmed by the user. The user wants Gmail-style labels on every
+Draft, 2026-10-16. The user confirmed the recommended answers in 0.1 the same day. The user wants Gmail-style labels on every
 account, not only Gmail. Written against `main` at 1e7274c23 (branch `docs/labels`). Engine
 paths are relative to the repo root, desktop paths to `apps/desktop/app/`. Background:
 `docs/architecture.md` (the backend holds metadata, never mail), `docs/backend-plan.md` 3.5
@@ -31,9 +31,9 @@ item n of 0.1.
 | L14 | Search: `in:<label>` works from the first stage through `ThreadSearch.categories`; `label:` lands in the engine grammar with desktop-client-plan stage 9 (T6), not in the desktop parser. |
 | L15 | Colours (7.1). The user picks a label colour scheme, from which every label gets a colour automatically, and can set any colour on a single label. Both are desktop settings, per device, keyed by label name. Chips and dots are drawn from the label's colour mixed with theme variables, never hard-coded colours, so they stay legible in every theme (Darkside included). Desktop only, so it ships first, for today's Gmail labels (stage C1). |
 
-### 0.1 To confirm with the user
+### 0.1 Confirmed with the user
 
-Recommended answer first.
+Recommended answer first; the user accepted every recommendation on 2026-10-16.
 
 1. **Rename on a keyword account.** Rewrite the keyword on every message (the server stays
    the truth, other devices see the new name without a backend), except `$label1`..`$label5`,
@@ -253,6 +253,18 @@ window's `AccountStore` caches it per account from `labels.list` at start and fr
 | Needs a Tern server for multi-device | no | no (colours yes) | yes | no (colours yes) |
 | Rename | server rename | retag every copy (Q1) | registry only | `masterCategories` rename |
 | Empty label | server keeps it | registry only | registry | server keeps it |
+
+### 2.8 Engine shape
+
+One `LabelStore` trait in `ms-tasks` (or a new `ms-labels` module beside it), one implementation per
+store: `GmailLabels`, `KeywordLabels`, `TernLabels`, later `OutlookLabels`. The account's store
+(L9) picks the implementation; `ChangeLabelsTask`, `SyncbackCategoryTask {kind: "label"}`,
+`DestroyCategoryTask {kind: "label"}` and the sync passes call the trait and never branch on the
+provider. Roughly: `labels_of(copy)` (read from a fetched message or metadata), `apply` /
+`remove` (local and remote phase), `create`, `rename`, `delete`, `label_id(name)`. The choice is
+per account, not per provider: two IMAP accounts at different hosts differ by what the server
+allows (4), so a Fastmail account gets `KeywordLabels` and a Yahoo account `TernLabels`. The
+desktop, CLI and tern-mcp only see Label rows and the tasks (L1).
 
 ## 3. Server facts
 
@@ -727,4 +739,4 @@ implemented. Waiting for the user to confirm section 0.1.
 2026-10-16: COPY-fallback fix (step 1) committed on `roadmap/labels` (5f203f1b1,
 `move-without-move-keeps-keywords`). Section 7.1 (label colours, L15, stage C1) added at the
 user's request: a scheme plus per-label colours, desktop only. C1 is next, ahead of L1.
-Questions 1-10 of 0.1 still to confirm.
+The user confirmed questions 1-10 of 0.1 as recommended.
