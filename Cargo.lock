@@ -1551,6 +1551,7 @@ dependencies = [
  "ms-core",
  "ms-dav",
  "ms-imap",
+ "ms-ipc",
  "ms-mime",
  "ms-net",
  "ms-providers",
@@ -1732,6 +1733,14 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tracing",
+]
+
+[[package]]
+name = "ms-ipc"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

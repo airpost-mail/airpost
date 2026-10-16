@@ -20,7 +20,8 @@ undo pairing) that the port keeps.
 | `ms-dav` | DAV XML, vCard, ICS fields, discovery |
 | `ms-sync` | worker threads, `MailProcessor`, `MailboxModel`, `WorkerContext`, the task runner seam |
 | `ms-tasks` | `TaskProcessor` |
-| `mailsync` (here) | CLI, modes, stdin loop, thread startup |
+| `ms-ipc` | the socket protocol: JSON-RPC envelope, method types, NDJSON framing, blocking client |
+| `mailsync` (here) | CLI, modes, stdin reader, main-thread dispatch, `--socket` server, thread startup |
 
 Dependency order: `ms-core` ← everything; `ms-store`, `ms-providers`, `ms-mime`, `ms-net`
 on `ms-core`; `ms-imap`, `ms-smtp` also on `ms-providers`; `ms-dav` on `ms-net`; `ms-sync`

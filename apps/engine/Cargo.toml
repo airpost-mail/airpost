@@ -23,6 +23,7 @@ ms-net.workspace = true
 ms-dav.workspace = true
 ms-sync.workspace = true
 ms-tasks.workspace = true
+ms-ipc.workspace = true
 rustls.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
@@ -31,6 +32,7 @@ tracing.workspace = true
 libc.workspace = true
 
 [dev-dependencies]
+ms-ipc.workspace = true
 regex.workspace = true
 tempfile.workspace = true
 rusqlite.workspace = true

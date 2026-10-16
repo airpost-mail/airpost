@@ -23,7 +23,7 @@ pub mod schema;
 pub mod search;
 pub mod store;
 
-pub use delta::{DeltaItem, DeltaStream};
+pub use delta::{DeltaItem, DeltaSink, DeltaStream, WriteSink, SECRETS_UPDATED};
 pub use model::Model;
 pub use models::{
     Calendar, Contact, ContactBook, ContactGroup, Event, File, FilePart, Folder, GenericModel,

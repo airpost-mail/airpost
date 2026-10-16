@@ -240,6 +240,18 @@ pub fn metadata_backend_local(reason: &str) -> String {
     format!("Metadata backend: local only ({reason})")
 }
 
+/// `--socket`: the socket is bound and accepting. apps/engine/tests/socket.rs waits for it.
+pub fn socket_listening(path: &str) -> String {
+    format!("Listening on socket {path}")
+}
+
+/// `--socket`: a subscriber fell behind past the queue bound and is disconnected.
+/// apps/engine/tests/socket.rs `slow_subscriber_is_dropped` waits for
+/// `^-X Dropping socket connection \d+: `.
+pub fn socket_connection_dropped(conn: u64, reason: &str) -> String {
+    format!("-X Dropping socket connection {conn}: {reason}")
+}
+
 /// Logged for `wake-workers`.
 pub fn waking_all_workers() -> &'static str {
     "Waking all workers..."

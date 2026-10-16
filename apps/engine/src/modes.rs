@@ -22,7 +22,7 @@ use serde_json::{json, Value};
 
 use crate::cli::{Mode, Options};
 use crate::output::{one_shot, one_shot_error, write_stdout};
-use crate::stdin_loop;
+use crate::{dispatch, stdin_loop};
 
 pub fn run(opts: Options) -> i32 {
     match opts.mode {
@@ -30,6 +30,10 @@ pub fn run(opts: Options) -> i32 {
         Mode::InstallCheck => return install_check::run(),
         Mode::ImportLegacy => return import_legacy::run(&opts),
         _ => {}
+    }
+    if opts.mode == Mode::Sync && opts.socket.is_some() && cfg!(not(unix)) {
+        one_shot_error("--socket is not supported on this platform yet");
+        return EXIT_FAILURE;
     }
 
     let account = match read_account(&opts) {
@@ -189,7 +193,10 @@ fn install_panic_hook() {
     }));
 }
 
-fn spawn(name: &'static str, f: impl FnOnce() + Send + 'static) -> std::thread::JoinHandle<()> {
+pub(crate) fn spawn(
+    name: &'static str,
+    f: impl FnOnce() + Send + 'static,
+) -> std::thread::JoinHandle<()> {
     match std::thread::Builder::new().name(name.into()).spawn(f) {
         Ok(h) => h,
         Err(e) => {
@@ -245,6 +252,23 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
         ms_core::logmsg::starting_sync(account.email_address())
     );
 
+    let started = std::time::Instant::now();
+    #[cfg(unix)]
+    let socket = match &opts.socket {
+        Some(path) => match bind_socket(opts, &account, path) {
+            Ok(s) => Some(s),
+            Err(code) => return code,
+        },
+        None => None,
+    };
+    #[cfg(unix)]
+    let deltas = match &socket {
+        Some((hub, _)) => ms_store::DeltaStream::with_sink(
+            hub.sink(Box::new(ms_store::WriteSink(std::io::stdout()))),
+        ),
+        None => ms_store::DeltaStream::stdout(),
+    };
+    #[cfg(not(unix))]
     let deltas = ms_store::DeltaStream::stdout();
     let metadata = metadata_backend(opts, &account, identity, &deltas);
     let deltas_for_tokens = deltas.clone();
@@ -284,11 +308,64 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
         ms_sync::metadata_expiration::run_metadata_expiration(c)
     });
 
+    #[cfg(unix)]
+    if let Some((hub, listener)) = socket {
+        let path = opts.socket.clone().unwrap_or_default();
+        let (account, deltas, orphan) = (ctx.account.clone(), ctx.deltas.clone(), opts.orphan);
+        return dispatch::run(ctx, move |commands| {
+            crate::socket::serve(
+                listener,
+                crate::socket::Server {
+                    hub,
+                    account,
+                    deltas,
+                    started,
+                    commands: commands.clone(),
+                },
+            );
+            let shown = path.to_string_lossy();
+            tracing::info!("{}", ms_core::logmsg::socket_listening(&shown));
+            write_stdout(&format!("{}\n", json!({ "listening": shown })));
+            if !orphan {
+                stdin_loop::spawn_reader(commands);
+            }
+        });
+    }
+    #[cfg(not(unix))]
+    let _ = started;
+
     if opts.orphan {
         // Blocks forever: the worker never returns.
         let _ = background.join();
         EXIT_OK
     } else {
-        stdin_loop::run(ctx)
+        dispatch::run(ctx, stdin_loop::spawn_reader)
     }
+}
+
+/// Binds `--socket` and writes the discovery file, before any worker starts, so a path that
+/// cannot be used fails the launch with a one-shot error. Both files are removed when the
+/// lifeline exits the process or SIGTERM / SIGINT ends it.
+#[cfg(unix)]
+fn bind_socket(
+    opts: &Options,
+    account: &Account,
+    path: &std::path::Path,
+) -> Result<(Arc<crate::socket::Hub>, std::os::unix::net::UnixListener), i32> {
+    let fail = |message: String| {
+        tracing::error!("-X {message}");
+        one_shot_error(&message);
+        EXIT_FAILURE
+    };
+    let listener = crate::platform::uds::bind(path).map_err(fail)?;
+    crate::platform::remove_on_exit(path.to_owned());
+    match crate::socket::write_discovery(&opts.config_dir, account.id(), path) {
+        Ok(discovery) => crate::platform::remove_on_exit(discovery),
+        Err(e) => return Err(fail(format!("Could not write the discovery file: {e}"))),
+    }
+    if let Err(e) = crate::platform::remove_on_termination() {
+        tracing::warn!("-X Could not watch for SIGTERM; the socket files may stay behind: {e}");
+    }
+    let hub = crate::socket::Hub::new(account.id(), crate::socket::queue_limit());
+    Ok((hub, listener))
 }

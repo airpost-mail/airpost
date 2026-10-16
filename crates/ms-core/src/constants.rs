@@ -218,6 +218,12 @@ pub const EXIT_OK: i32 = 0;
 pub const EXIT_FAILURE: i32 = 1;
 pub const EXIT_PATH_CHECK: i32 = 2;
 pub const EXIT_STDIN_CLOSED: i32 = 141;
+/// `--socket`: a connection whose unsent responses and deltas pass this many bytes is sent
+/// a `disconnect` notification and closed (docs/engine-protocol-plan.md 1.4).
+pub const SOCKET_QUEUE_BYTES: usize = 64 * 1024 * 1024;
+/// `--socket`: deltas flushed before the first `subscribe` are kept for it up to this many
+/// bytes, so the client that started the engine sees what stdout would have shown it.
+pub const SOCKET_BACKLOG_BYTES: usize = 16 * 1024 * 1024;
 /// Log rotation (`rotating_file_sink_mt(path, 1048576 * 5, 3)`).
 pub const LOG_MAX_BYTES: u64 = 1_048_576 * 5;
 pub const LOG_MAX_FILES: usize = 3;
@@ -235,4 +241,14 @@ pub mod thread {
     /// The one-off thread a `sync-calendar` command starts.
     pub const CALENDAR: &str = "calendar";
     pub const DELTA_STREAM_FLUSH: &str = "DeltaStreamFlush";
+    /// Reads stdin commands for the main thread and watches for the parent going away.
+    pub const STDIN: &str = "stdin";
+    /// `--socket`: accepts connections.
+    pub const SOCKET: &str = "socket";
+    /// `--socket`: one per connection, reading its requests.
+    pub const SOCKET_READER: &str = "socketReader";
+    /// `--socket`: one per connection, writing its queue.
+    pub const SOCKET_WRITER: &str = "socketWriter";
+    /// `--socket`: removes the socket files on SIGTERM / SIGINT.
+    pub const SIGNALS: &str = "signals";
 }

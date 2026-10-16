@@ -8,9 +8,12 @@
 //! GPL-3.0. See NOTICE.md.
 
 mod cli;
+mod dispatch;
 mod modes;
 mod output;
 mod platform;
+#[cfg(unix)]
+mod socket;
 mod stdin_loop;
 
 use std::process::ExitCode;

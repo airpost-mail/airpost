@@ -11,6 +11,9 @@
 //! earlier entry. A `DeltaStreamFlush` thread writes the buffer, classes in alphabetical
 //! order, when the earliest requested deadline passes; an emit asking for an earlier
 //! deadline than the one scheduled flushes at once. Nothing is flushed on exit.
+//!
+//! Flushed lines go to a [`DeltaSink`]: stdout for the stdio transport, the socket hub
+//! with `--socket` (docs/engine-protocol-plan.md 1.4).
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
@@ -162,6 +165,29 @@ fn write_sorted(v: &Value, out: &mut String) {
     }
 }
 
+/// The model class of the delta carrying the account JSON, passwords and tokens included.
+/// It only goes to the parent process (docs/engine-protocol-plan.md section 2).
+pub const SECRETS_UPDATED: &str = "ProcessAccountSecretsUpdated";
+
+/// Where flushed items go. Called on the flush thread with the buffer locked, once per item
+/// in flush order, so an implementation must not block: a slow consumer is the sink's
+/// problem (the socket hub queues per connection and drops subscribers that fall behind).
+pub trait DeltaSink: Send {
+    /// One item: its model class and its line ([`DeltaItem::dump`]), without a newline.
+    fn write_item(&mut self, model_class: &str, line: &str);
+}
+
+/// A sink writing each line and a newline to `W`, flushing after each, ignoring errors: a
+/// closed stdout must not take the engine down; the client is gone.
+pub struct WriteSink<W>(pub W);
+
+impl<W: Write + Send> DeltaSink for WriteSink<W> {
+    fn write_item(&mut self, _model_class: &str, line: &str) {
+        let _ = self.0.write_all(format!("{line}\n").as_bytes());
+        let _ = self.0.flush();
+    }
+}
+
 #[derive(Default)]
 struct Buffer {
     /// Keyed by model class; flushed in key order.
@@ -172,15 +198,20 @@ struct Buffer {
 }
 
 pub struct DeltaStream {
-    out: Mutex<Box<dyn Write + Send>>,
+    out: Mutex<Box<dyn DeltaSink>>,
     buffer: Mutex<Buffer>,
     cv: Condvar,
 }
 
 impl DeltaStream {
-    /// A stream writing to `out`, with its flush thread. The thread ends when the last
-    /// reference to the stream is dropped.
+    /// A stream writing lines to `out` ([`WriteSink`]), with its flush thread.
     pub fn new(out: Box<dyn Write + Send>) -> Arc<Self> {
+        DeltaStream::with_sink(Box::new(WriteSink(out)))
+    }
+
+    /// A stream flushing into `sink`, with its flush thread. The thread ends when the last
+    /// reference to the stream is dropped.
+    pub fn with_sink(out: Box<dyn DeltaSink>) -> Arc<Self> {
         let stream = Arc::new(DeltaStream {
             out: Mutex::new(out),
             buffer: Mutex::new(Buffer::default()),
@@ -231,25 +262,24 @@ impl DeltaStream {
         let mut out = self.out.lock().unwrap_or_else(|e| e.into_inner());
         for list in items.values() {
             for item in list {
-                // A closed stdout must not take the engine down; the client is gone.
-                let _ = out.write_all(format!("{}\n", item.dump()).as_bytes());
-                let _ = out.flush();
+                out.write_item(&item.model_class, &item.dump());
             }
         }
     }
 
-    /// `ProcessAccountSecretsUpdated` after an OAuth refresh token rotated.
+    /// Whether the last `ProcessState` sent said the account cannot reach its server.
+    pub fn connection_error(&self) -> bool {
+        self.lock().connection_error
+    }
+
+    /// [`SECRETS_UPDATED`] after an OAuth refresh token rotated.
     pub fn send_updated_secrets(&self, account: &Account) {
         let mut j = account.to_json();
         if let Some(obj) = j.as_object_mut() {
             obj.entry("__cls").or_insert_with(|| json!("Account"));
         }
         self.emit(
-            vec![DeltaItem::new(
-                DELTA_TYPE_PERSIST,
-                "ProcessAccountSecretsUpdated",
-                vec![j],
-            )],
+            vec![DeltaItem::new(DELTA_TYPE_PERSIST, SECRETS_UPDATED, vec![j])],
             0,
         );
     }

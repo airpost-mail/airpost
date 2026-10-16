@@ -45,6 +45,9 @@ pub struct Options {
     pub identity: Option<String>,
     pub orphan: bool,
     pub verbose: bool,
+    /// `--socket <path>`: sync mode serves the socket protocol there instead of writing
+    /// deltas to stdout (docs/engine-protocol-plan.md section 2). Other modes ignore it.
+    pub socket: Option<PathBuf>,
     pub config_dir: PathBuf,
 }
 
@@ -63,7 +66,8 @@ pub fn usage() -> String {
      \x20 --account, -a  \tRequired: Account JSON with credentials.\n\
      \x20 --mode, -m  \tRequired: sync, test, reset, migrate, install-check or import-legacy.\n\
      \x20 --orphan, -o  \tOptional: allow the process to run without a parent bound to stdin.\n\
-     \x20 --verbose, -v  \tOptional: log all IMAP and SMTP traffic for debugging purposes.\n"
+     \x20 --verbose, -v  \tOptional: log all IMAP and SMTP traffic for debugging purposes.\n\
+     \x20 --socket  \tOptional, sync mode: serve the engine protocol on this Unix socket path.\n"
         .to_owned()
 }
 
@@ -80,6 +84,7 @@ fn parse_with_env(args: &[String], config_dir: Option<PathBuf>) -> Parsed {
     let mut mode = None;
     let mut account = None;
     let mut identity = None;
+    let mut socket = None;
     let (mut orphan, mut verbose, mut help) = (false, false, false);
 
     let mut i = 0;
@@ -108,6 +113,7 @@ fn parse_with_env(args: &[String], config_dir: Option<PathBuf>) -> Parsed {
             "--identity" | "-i" => identity = value(&mut i),
             "--orphan" | "-o" => orphan = true,
             "--verbose" | "-v" => verbose = true,
+            "--socket" => socket = value(&mut i).map(PathBuf::from),
             // Unknown options and stray values (`--info <email>`) are ignored.
             _ => {}
         }
@@ -128,6 +134,7 @@ fn parse_with_env(args: &[String], config_dir: Option<PathBuf>) -> Parsed {
         identity,
         orphan,
         verbose,
+        socket,
         config_dir,
     })
 }
@@ -170,6 +177,12 @@ mod tests {
         let o = run(&["--mode=migrate", "-o"]);
         assert_eq!(o.mode, Mode::Migrate);
         assert!(o.orphan);
+        assert_eq!(o.socket, None);
+
+        let o = run(&["--mode", "sync", "--socket", "/tmp/e.sock"]);
+        assert_eq!(o.socket, Some(PathBuf::from("/tmp/e.sock")));
+        let o = run(&["--mode", "sync", "--socket=/tmp/f.sock"]);
+        assert_eq!(o.socket, Some(PathBuf::from("/tmp/f.sock")));
     }
 
     #[test]

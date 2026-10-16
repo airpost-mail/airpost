@@ -217,3 +217,16 @@ fn metadata_backend_lines() {
         .unwrap()
         .is_match(&local));
 }
+
+#[test]
+fn socket_lines() {
+    // apps/engine/tests/socket.rs.
+    assert_matches(
+        r"^Listening on socket /tmp/e\.sock$",
+        &socket_listening("/tmp/e.sock"),
+    );
+    assert_matches(
+        r"^-X Dropping socket connection \d+: ",
+        &socket_connection_dropped(3, "its queue passed 10 bytes"),
+    );
+}

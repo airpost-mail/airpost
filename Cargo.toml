@@ -25,6 +25,8 @@ ms-sync = { path = "crates/ms-sync" }
 ms-tasks = { path = "crates/ms-tasks" }
 # Shared with tern-backend, which must not depend on the engine crates above.
 ms-wire = { path = "crates/ms-wire" }
+# The engine socket protocol (docs/engine-protocol-plan.md): serde and serde_json only.
+ms-ipc = { path = "crates/ms-ipc" }
 
 # IMAP. ms-imap has its own parser and command layer (docs/spikes/imap.md); async-imap and
 # imap-proto are dev-dependencies of its spike example only.

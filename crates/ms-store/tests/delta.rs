@@ -559,3 +559,41 @@ fn unpersist_carries_full_json() {
     assert_eq!(t["type"], "unpersist");
     f.assert_invariants();
 }
+
+/// A custom sink gets each flushed item's class with the same line the stdout sink writes.
+#[test]
+fn custom_sink_gets_class_and_stdout_line() {
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Clone, Default)]
+    struct Pairs(Arc<Mutex<Vec<(String, String)>>>);
+    impl ms_store::DeltaSink for Pairs {
+        fn write_item(&mut self, model_class: &str, line: &str) {
+            self.0
+                .lock()
+                .unwrap()
+                .push((model_class.to_owned(), line.to_owned()));
+        }
+    }
+
+    let pairs = Pairs::default();
+    let s = DeltaStream::with_sink(Box::new(pairs.clone()));
+    let (sink, stdout) = stream();
+    for st in [&s, &stdout] {
+        st.emit(
+            vec![
+                item(DELTA_TYPE_PERSIST, "Thread", vec![json!({"id": "t1"})]),
+                item(DELTA_TYPE_UNPERSIST, "Message", vec![json!({"id": "m1"})]),
+            ],
+            0,
+        );
+        st.flush();
+    }
+    let got = pairs.0.lock().unwrap().clone();
+    assert_eq!(
+        got.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>(),
+        ["Message", "Thread"]
+    );
+    let expected: String = got.iter().map(|(_, l)| format!("{l}\n")).collect();
+    assert_eq!(sink.text(), expected);
+}
