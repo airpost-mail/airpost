@@ -1,5 +1,4 @@
 import { localized, React } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
 import * as OnboardingActions from './onboarding-actions';
 
 export default class WelcomePage extends React.Component {
@@ -23,11 +22,6 @@ export default class WelcomePage extends React.Component {
             <p className="hero-text" style={{ fontSize: 46, marginTop: 19 }}>
               {localized('Welcome to Tern')}
             </p>
-            <RetinaImg
-              className="icons"
-              url="mailspring://onboarding/assets/icons-bg@2x.png"
-              mode={RetinaImg.Mode.ContentPreserve}
-            />
           </div>
         </div>
         <div className="footer">

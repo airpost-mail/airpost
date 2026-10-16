@@ -97,7 +97,7 @@ export default class Application extends EventEmitter {
 
     // Dev and spec runs are Electron.app, whose bundle icon is Electron's; packaged builds use tern.icns.
     if (process.platform === 'darwin' && (devMode || specMode)) {
-      app.dock.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'tern-dock.png'));
+      app.dock?.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'tern-dock.png'));
     }
 
     this.syncEngine = resolveSyncEngine(configDirPath, resourcePath);
