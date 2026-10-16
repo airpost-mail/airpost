@@ -92,8 +92,14 @@ match (contact terms as word prefixes), so no user text is read as FTS syntax.
 
 Phase C (section 4, as built): `account.list` on both channels; `account.add`,
 `account.remove` and `engine.shutdown` on `serve` mode's stdin only; notification
-`account.state`. `account.test` and `account.reset` are not methods: `test` and `reset` stay
-one-shot modes for now.
+`account.state`. Desktop-client stage 10 added, on `serve`'s stdin only: `account.test
+{account}` (`--mode test`'s object as the result; a rotated refresh token is in its `account`),
+`account.reset {accountId}` (forgets the account if held, waits for its stragglers, deletes its
+rows; the client adds it again), `engine.resetDatabase` (forgets every account, deletes and
+recreates `edgehill.db`; socket sessions reopen it) and `engine.setLogLevel {verboseUntil}`
+(restarts running accounts); and `engine.logs.tail {accountId?, bytes?}` on the socket. The
+slow ones run on their own threads, so their responses can come out of order. The one-shot
+`test` and `reset` modes stay for the harness and scripts.
 
 After phase A: `integrations.translate`,
 `integrations.grammar`, `integrations.enrich`, `integrations.test`, served by the
@@ -562,6 +568,10 @@ Selecting a process model:
   one-shot modes (`migrate`, `import-legacy`, `test`, `reset`) are unchanged.
 - Harness: `MAILSYNC_TRANSPORT=stdio` (default), `socket` or `serve`.
 
+Desktop-client stage 10 removed the desktop's C++, per-account and stdio paths and the two
+`TERN_ENGINE_*` switches: the desktop runs `serve` only, from app launch, with zero accounts
+too. The engine keeps `--mode sync` for the harness and the C++ oracles.
+
 Gate results: fmt, clippy `-D warnings --locked` and `cargo deny` clean. `cargo test
 --workspace --locked`: 724 passed, 0 failed, 44 ignored; the ignored exit-141 tests (sync
 stdio, sync socket, serve) pass. Harness quick tier, release build, `REQUIRE_TERN=1`: 123
@@ -589,7 +599,8 @@ Open (phase C):
 - After a stop the metadata reader keeps its HTTP stream open until the next heartbeat (up
   to 5 s).
 - serve's stdin handles requests one at a time: a slow `task.queue` or an `account.add`
-  (up to 10 s each) delays a later `account.add` or `engine.shutdown`.
+  (up to 10 s each) delays a later `account.add` or `engine.shutdown`. `account.test`,
+  `account.reset`, `engine.resetDatabase` and `engine.setLogLevel` run on their own threads.
 - A command in flight when its account stops gets `-32603` "the engine is shutting down",
   not `-32005`.
 - Each account has its own `TokenManager`, so `TokenManager::forget` is unused.

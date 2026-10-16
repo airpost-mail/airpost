@@ -1177,3 +1177,31 @@ in every window, never rebroadcast; `ThreadCountsStore` and `unread-notification
 the main window only. The supervisor's `EngineClient` drops stage 1's hello, gone and
 `mail.new` hooks and its `features()`/`request()`; its own connection still receives `mail.new`
 (not class-filtered) and ignores it.
+
+2026-10-16, stage 10 (remove the C++ engine and its fallbacks), branch `roadmap/client-s10`:
+delivered. Engine: on `serve`'s stdin `account.test {account}` (`--mode test`'s object as the
+result, from `test_auth::result`; a rotated refresh token is in its `account` only),
+`account.reset {accountId}` (forgets a held account, waits 10 s for stragglers, deletes its
+rows), `engine.resetDatabase` (forgets every account, deletes `edgehill.db*`, migrates a new
+one in-process; socket read sessions reopen it through a database generation) and
+`engine.setLogLevel {verboseUntil}` (restarts running accounts with their current secrets);
+`engine.logs.tail {accountId?, bytes?}` on the socket (64 KiB default, 1 MiB cap). These four
+stdin calls run on named threads and answer out of order; a panic there fails that call only.
+Desktop: `core.sync.engine`, `MAILSYNC_ENGINE`, `TERN_ENGINE_PROCESS`, `TERN_ENGINE_TRANSPORT`,
+`MailsyncProcess.sync`/`sendMessage`/`test`/`resetCache`/`account`, the main window's
+per-account clients, the IPC rebroadcast, the move-aside of a Rust database for C++ and Attach
+to Xcode are gone. The supervisor starts `serve` at launch with zero accounts (outside spec
+mode) and respawns it without accounts; onboarding's test is `account.test` through the
+supervisor (`SupervisorChannel.TestAccount`), and a rotated token from it is kept; Reset Cache
+is `account.reset` while EngineClient holds the account; Rebuild database calls
+`engine.resetDatabase` and falls back to deleting the files after the engine stopped; the
+failed-`migrate` rebuild at launch still deletes the files (no engine runs then); verbose
+logging is a config change the supervisor passes on as `engine.setLogLevel`, without the
+relaunch; the account log in Preferences comes from `engine.logs.tail`. `serveSocketPath`
+replaces `engineSocketPath`. `legacy/mailsync-cpp` stays for the harness oracles and
+`import-legacy` for Mailspring profiles. Deviations: `MailsyncProcess.test()`, `resetCache()`
+and `sync()` were plugin-visible through `mailspring-exports`, so this is a plugin API break;
+Windows still has no engine (no named pipe yet), as before. Open: no harness scenario drives
+the four stdin calls (the Rust tests in `tests/serve.rs` and `tests/test_mode.rs` do); unused
+"Attach Mailsync to Xcode" strings remain in `lang/*.json`; the SQLite read path is still in
+place (T4).

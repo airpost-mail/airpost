@@ -45,8 +45,7 @@ Desktop checks (not run here: no `node_modules`, npm was installed with `--ignor
   `app/src/browser/mailspring-window.ts`, `app/src/flux/mailsync-bridge.ts`,
   `app/src/config-schema.ts` and `app/spec/mailsync-process-spec.ts` were only syntax-checked.
 - [ ] `apps/engine/packaging/build-release.sh macos --install-desktop`, then launch the app on
-  a profile that has used C++ with `core.sync.engine = "rust"` in config.json (or
-  `MAILSYNC_ENGINE=rust`). Check: the engine is `app.asar.unpacked/mailsync-rs`; the log shows
+  a profile that has used C++. Check: the engine is `app.asar.unpacked/mailsync-rs`; the log shows
   `import-legacy` after `migrate`; `edgehill.legacy-imported.db` exists and
   `_State.legacy-import` is set; local drafts open with their attachments; a reply draft sits
   in its thread; an existing snooze and a send-later fire at their time; mail, contacts and
@@ -59,10 +58,6 @@ Desktop checks (not run here: no `node_modules`, npm was installed with `--ignor
   imports without a dialog, accounts sign in from the shared `Mailspring Safe Storage`
   keychain item, `migrate` and `import-legacy` run on the copy, Mailspring.app keeps
   working, and a second launch does not import again.
-- [ ] Switch back to `cpp`: the database moves to `edgehill.rust.db*`, the console warns with
-  the count of unsent local drafts and pending expiration metadata, C++ resyncs from empty.
-- [ ] A build without `mailsync-rs` and `core.sync.engine = "rust"` runs C++ with a console
-  warning.
 
 Real accounts (each: `--mode test` on both binaries, then a dogfood week with the Rust engine;
 none has run against a real server)
@@ -153,7 +148,6 @@ Decisions
   as in C++ (P4-G open). Keep, or store the group and members in the task to restore it.
 - [ ] Keep the P4/P5 departures from C++ recorded in plan section 6 "DAV" (If-None-Match on
   event creates, undo of refused SyncbackEvent / DestroyContact / CardDAV DestroyContactGroup).
-- [ ] A settings UI for `core.sync.engine` (there is none; config.json or env only).
 - [ ] After the desktop rebrand, drop `mailspring` from the argv[0] check in
   `apps/engine/src/main.rs`.
 - [ ] Schedule `docs/fix-backlog.md` F1-F3 (pause after P6) and F4 (after parity, D5).
@@ -648,19 +642,12 @@ PIM oracles) pass.
   names, at import if it is synced, otherwise through a `DraftThread` pending row when that
   message is first saved.
 
-### Client engine setting (`apps/desktop/app/src/mailsync-process.ts`)
+### Client engine (`apps/desktop/app/src/mailsync-process.ts`)
 
-- `core.sync.engine` (`cpp` default, `rust`) in config.json, overridden by `MAILSYNC_ENGINE`,
-  picks the binary: `mailsync` (C++) or `mailsync-rs` (Rust), side by side in
-  `app.asar.unpacked`. The main process resolves it once before `migrate`
-  (`Application.syncEngine`) and passes it to windows in `loadSettings.syncEngine`. A build
-  without `mailsync-rs` runs C++ with a console warning.
-- With the Rust engine, `MailsyncProcess.migrate` runs `--mode import-legacy` after `migrate`
-  on every launch; a failure is logged and the launch continues.
-- Switching back to C++: before C++ migrates, a database with `_State.engine = rust` is moved
-  to `edgehill.rust.db*` (an older copy is replaced) and C++ resyncs from an empty database.
-  Nothing imports from `edgehill.rust.db`; the client logs a warning with the number of
-  unsent local drafts and pending expiration metadata left there.
+- The desktop runs only the Rust engine, `mailsync-rs` in `app.asar.unpacked` (desktop-client
+  stage 10 removed `core.sync.engine`, `MAILSYNC_ENGINE` and the C++ paths).
+- `MailsyncProcess.migrate` runs `--mode import-legacy` after `migrate` on every launch; a
+  failure is logged and the launch continues.
 
 ### Packaging
 
