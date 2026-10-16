@@ -1736,6 +1736,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ms-integrations"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.21",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ms-ipc"
 version = "0.1.0"
 dependencies = [
