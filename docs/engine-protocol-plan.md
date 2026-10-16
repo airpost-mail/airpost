@@ -70,7 +70,25 @@ after 5 ms); a client that waits for completion watches `Task` deltas, as the de
 `test-crash` and `test-segfault` stay stdin-only, debug builds only.
 
 Phase B (read API, section 3): `folders.list`, `labels.list`, `threads.list`,
-`messages.get`, `search`, `contacts.search`.
+`threads.get`, `messages.get`, `search`, `contacts.search`, `tasks.get`. Every one takes
+`accountId`.
+
+| Method | Params | Result |
+|---|---|---|
+| `folders.list` | — | `folders` (Folder JSON by path), `counts` (`{id: {unread, total}}` from `ThreadCounts`) |
+| `labels.list` | — | `labels`, `counts`, as above |
+| `threads.list` | at most one of `folderId`, `labelId`, `role`; `limit` (50, max 500); `before` | `threads` (Thread JSON), `next` cursor or null |
+| `threads.get` | `id` | `thread`, `messages` (oldest first, no bodies) |
+| `messages.get` | `id`, `body?` (false) | `message`, `body` (null unless asked for and fetched), `files` |
+| `search` | `query`, `limit` | `threads` matching in `ThreadSearch`, newest first |
+| `contacts.search` | `query`, `limit` | `contacts` matching in `ContactSearch`, not hidden, most referenced first |
+| `tasks.get` | `id` | `task` (the stored Task JSON); not found once cleanup dropped it (the newest 100 finished tasks per account are kept) |
+
+`threads.list` orders by `(lastMessageTimestamp, id)` descending; `next` is opaque and
+pages stay stable while threads are added. `role` picks the folder with that role, else the
+label; an empty role is invalid. Like the desktop's mailbox perspective, a category other
+than spam or trash lists only threads in all mail (`ThreadCategory.inAllMail`). Search text is plain: each whitespace-separated term is quoted for FTS5 and all must
+match (contact terms as word prefixes), so no user text is read as FTS syntax.
 
 Phase C (section 4): `account.add`, `account.remove`, `account.test`, `account.reset`,
 `engine.shutdown`; notifications `account.state` (running, stopped with error).
@@ -84,7 +102,9 @@ before phase A lands. No stdin shim.
 
 Standard JSON-RPC codes for parse (`-32700`, with `id: null`), invalid request, unknown
 method and invalid params. Engine codes from `-32000` down: unsupported protocol, unknown
-account, task rejected (with the `SyncError` JSON as `data`). An unparseable line gets a
+account, task rejected (with the `SyncError` JSON as `data`), hello required (`-32003`),
+not found (`-32004`: a read named a folder, label, thread or message the account doesn't
+have). An unparseable line gets a
 parse error instead of being ignored as stdin does.
 
 ### 1.4 Delivery and backpressure
@@ -163,9 +183,37 @@ CLI (`apps/cli`, `tern`, on `clap` + `ms-ipc`):
 - `tern task queue <json|->`, `tern task cancel`, `tern task wait <id>`
 - `tern folders`, `tern threads [--folder|--label] [--limit]`, `tern show <message-id>`,
   `tern search <query>`
-- `tern logs <account> [-f]` (tails `mailsync-<id>.log`; no engine call)
+- `tern logs [<account>] [-f]` (tails `mailsync-<id>.log`; no engine call; the account defaults
+  to `--account`, else the only account with a log)
 - `tern rpc <method> [params]`: raw call, for scripting and debugging
 - `--config-dir` (default: the Tern profile dir per OS), `--json` on every command.
+
+CLI output, as built. Exit codes: 0 ok, 1 the command failed (an engine error, a task that
+failed, a timeout, a lost engine), 2 usage, 3 no engine running or none holds the account.
+`--json` prints one document per command, or NDJSON for streams:
+- `status`: `{engines: [engine.status result + socket]}`; `accounts`: `{accounts:
+  [{accountId, email, state, pid, socket}]}`; `sync`: `{accounts: [id]}`; `calendar sync`:
+  `{accountId, started}`; `rpc`: the method's result as is.
+- `folders` / `labels`: `{folders|labels: [model], counts: {id: {unread, total}}}`, merged
+  over the accounts.
+- `threads`: `{threads: [Thread], next, more}`. `next` is the cursor for `--before` with one
+  account (null on the last page, and always null for a page merged over several accounts);
+  `more` says whether threads were left out either way. `search`: `{threads}`; `contacts`:
+  `{contacts}`.
+- `show`: `{kind: "message", message, body, files}` or `{kind: "thread", thread, messages}`.
+- `task queue`: the task after its local phase; with `--wait`, and `task wait`: the final
+  Task JSON (exit 1 if its `error` is set). `task cancel`: `{accountId, taskId}`.
+- `watch`: NDJSON of `delta` params (`{accountId, modelClass, type, modelJSONs}`). When an
+  engine's connection ends it prints `{event: "disconnect", pid, reason}` and exits 1, so a
+  stream never silently loses an account.
+- `logs`: NDJSON `{line}`.
+
+`task wait` looks the task up with `tasks.get`, subscribes to `Task` deltas, then reads it
+again, so a task that finished before the subscription is reported at once; an unknown id
+fails. Without `--config-dir` or `TERN_CONFIG_DIR` the CLI uses the desktop's profile dir,
+and on Linux falls back to the snap's `~/snap/mailspring/common` when that one has a live
+engine. Output is cut to the terminal width only on a terminal (`COLUMNS` only when the
+terminal doesn't report a size).
 
 Read API (engine): the phase B methods in 1.2, on a read-only `Store` per connection,
 returning the model JSON the desktop already parses, paged by `(lastMessageTimestamp, id)`.
@@ -177,6 +225,45 @@ Binaries: `dist` (cargo-dist, MIT/Apache) for GitHub releases: `tern` and the en
 macOS arm64 and x86_64 and Linux x86_64 and aarch64 (musl, static), a shell installer and a
 Homebrew formula. macOS builds signed and notarized with `apps/engine/packaging/macos`.
 The CLI has no TLS or SQLite, so it stays small.
+
+Release binaries, as set up (2026-10-16):
+- Only `tern` ships. The standalone engine waits for the headless-engine decision (section
+  4): it needs the engine to own credentials, and a release engine exits 2 unless argv[0]
+  contains "tern" or "mailspring" (`apps/engine/src/main.rs`). The engine's own archives
+  stay in `engine-release.yml`.
+- dist 0.32.0, configured in `dist-workspace.toml`; `[profile.dist]` (release, thin LTO, no
+  debug info) in the root `Cargo.toml`; `[package.metadata.dist] dist = true` in
+  `apps/cli/Cargo.toml`, because `publish = false` hides a package from dist. `dist
+  generate` writes `.github/workflows/cli-release.yml`, which is then hand-edited
+  (`allow-dirty = ["ci"]`): top-level `contents: read`, `contents: write` only on `host`, and
+  a path filter on `pull_request`. Re-apply those after regenerating. `precise-builds` keeps
+  the build to `-p tern`.
+- Targets: aarch64 and x86_64 macOS, x86_64 and aarch64 Linux musl, each on a native
+  runner. Artifacts: `tern-<target>.tar.xz`, `tern-installer.sh` (installs to
+  `~/.local/bin` or the XDG bin dir, no updater), `tern.rb`, `source.tar.gz`, checksums and
+  `SOURCE.txt`.
+- Tags are `cli/v<version>` (`cli/v0.1.0`), matching the `version` of `apps/cli`. dist only
+  strips a tag prefix that names a package, so `cli-v0.1.0` fails to parse; any prefix
+  before a `/` works. `tag-namespace = "cli"` keeps `engine-v*` tags out. PRs run `dist
+  plan` only.
+- Licences: every archive carries `LICENSE.md`, `NOTICE.md` and `THIRD-PARTY-NOTICES.txt`.
+  `.github/cli-release-build-setup.yml` (dist's `github-build-setup`) installs cargo-about
+  and runs `apps/engine/packaging/third-party-notices.sh` on `apps/cli/Cargo.toml` before
+  `dist build`; `about.toml` lists the musl targets. `SOURCE.txt` comes from
+  `.github/scripts/source-offer.sh`, as a dist extra artifact.
+- Homebrew: the formula is attached to each release; the tap `ternmail/homebrew-tap` is
+  named but not published to. Once the repo exists, add `publish-jobs = ["homebrew"]` and a
+  `HOMEBREW_TAP_TOKEN` secret.
+- TODO: macOS binaries are unsigned (the linker's ad hoc signature only). dist builds and
+  archives in one step, so `apps/engine/packaging/macos` can't sign in between, and dist's
+  own `macos-sign` signs without a secure timestamp or notarization. curl and Homebrew
+  installs aren't quarantined, so this only bites a tarball downloaded in a browser.
+- Checked locally: `dist plan`, `dist build` for aarch64-apple-darwin (archive holds `tern`
+  and the three notice files), actionlint. The musl binaries were only built with `cargo
+  build --profile dist` in a Docker container (both static); `dist build` for them, the
+  x86_64 macOS build and the installers' global job first run on GitHub. The phase B gate
+  ("dist build for all four targets in CI") needs a tag push, or `pr-run-mode = "upload"`
+  for one PR (`SOURCE.txt` is then a placeholder, since only a tag push has a tag to name).
 
 Gate: CLI integration tests against an engine on the fake server (the harness launches it),
 `dist build` artifacts for all four targets in CI.
@@ -286,3 +373,85 @@ Open:
 - The desktop reports a refused `hello` or a dropped socket as close -2, after a 1 s wait
   for the real exit. The user isn't told about a protocol mismatch any other way.
 - `--orphan --socket` still logs to stdout.
+
+Phase B read API, 2026-10-16, implemented, not committed:
+- `crates/ms-ipc/src/read.rs`: params and results of the seven read methods (1.2), the
+  `NOT_FOUND` code, `READ_DEFAULT_LIMIT` / `READ_MAX_LIMIT`.
+- `crates/ms-store/src/read.rs`: `ReadStore`, a read-only connection (same busy timeout,
+  `query_only`), with the account-scoped queries and the FTS5 quoting (`fts_query`).
+- `apps/engine/src/read_api.rs`: answers the read methods on the socket connection's reader
+  thread, on a `ReadStore` opened at the connection's first read. They never reach the
+  dispatcher. `apps/engine/tests/read_api.rs` checks each method on a seeded database,
+  including paging across inserts, filters, bodies, FTS syntax in user text, not-found, and
+  a read answering while a task's local phase waits on the write lock.
+- `tasks.get` (the stored Task by id), for `tern task wait`; `tests/read_api.rs`
+  `tasks_get`.
+
+Open (read API):
+- Requests on one connection are answered in order, so a read queued behind a slow
+  `task.queue` on the same connection waits for it. Clients that need both use two
+  connections.
+- `Thread.lastMessageTimestamp` has no index; an account-wide `threads.list` sorts in
+  memory. The desktop's lists use `lastMessageReceivedTimestamp` (indexed through
+  `ThreadCategory`). Add an index in a migration if big mailboxes are slow.
+- `search` is plain terms only: no `from:`/`subject:` operators or prefix matching, and no
+  ranking beyond recency. `messages.get` returns `files` from the message JSON, not the
+  `File` table.
+- `threads.list` with no folder, label or role lists every thread of the account, spam and
+  trash included. A stored row whose JSON doesn't parse comes back as null.
+
+Phase B, 2026-10-16, implemented and gated, not committed:
+- Read API: above, plus `tasks.get`.
+- `apps/cli` (`tern`): the commands, `--json` shapes and exit codes in section 3. It finds
+  engines through `<config-dir>/run/*.json`, skips dead pids, says `hello` to each, and
+  without `--account` merges read results over every account. Dependencies: clap, ms-ipc's
+  client, serde, chrono, libc (Unix); no tokio, TLS or SQLite (1.8 MB release binary).
+- Release config: `dist-workspace.toml`, `.github/workflows/cli-release.yml`,
+  `.github/cli-release-build-setup.yml`, `[profile.dist]` (section 3 "Release binaries").
+- CI: `engine.yml` builds `-p mailsync -p tern` and runs `test_cli.py` with
+  `TERN_BIN`; the module fails instead of skipping when `CI` or `REQUIRE_TERN` is set.
+
+Install and run, until the first `cli/v*` release:
+
+```sh
+cargo build --release -p tern            # or: cargo install --path apps/cli --locked
+target/release/tern status               # engines the desktop started, via its profile dir
+tern threads --folder inbox -n 10
+tern show <thread-or-message-id> --body
+tern watch --json | jq .
+tern task queue '{"__cls":"ChangeStarredTask","messageIds":["…"],"starred":true}' --wait
+TERN_CONFIG_DIR=<harness run>/config tern status   # an engine the harness started
+```
+
+The engine has to run with `--socket` (the desktop's default for the Rust engine, or the
+harness with `MAILSYNC_TRANSPORT=socket`). After a release: the shell installer
+`tern-installer.sh`, or `tern.rb` once the tap is published.
+
+Gate results: fmt, clippy `-D warnings` (`--locked`) and `cargo deny` clean. `cargo test
+--workspace --locked`: 709 passed, 43 ignored, 73 binaries. Harness quick tier, release
+build, with `REQUIRE_TERN=1`: 118 passed, 1 skipped on stdio and the same on socket (the
+skip is `rules-ready-pre-upgrade-messages`, baseline binary not built); that includes
+`test_cli.py`. `dist plan` lists the four targets, each archive with `tern`, `LICENSE.md`,
+`NOTICE.md` and `THIRD-PARTY-NOTICES.txt`; `dist generate --check` passes. `dist build
+--artifacts=local --target=aarch64-apple-darwin --tag=cli/v0.1.0` built an archive with those
+four files; `tern --version` runs from it. Tried by hand against one harness engine on
+`fake:dovecot`: status, accounts, folders, threads, search, show and `show --body` on a
+message older than the prefetch window, `task queue --wait` while `watch` printed its Task
+deltas, sync, logs, and the not-found and no-engine exits.
+
+Open (phase B):
+- The phase B gate's `dist build` for all four targets in CI hasn't run: it needs a
+  `cli/v*` tag push or one PR with `pr-run-mode = "upload"`. The musl builds, x86_64 macOS
+  and the global job (installer, formula, `SOURCE.txt`) have only been planned. The plan and
+  announce jobs now run with a read-only token; unverified until that first run.
+- macOS signing and notarization (TODO above). Homebrew publishing waits for the tap repo.
+- The hand-edited `cli-release.yml` and `engine.yml` haven't been through actionlint.
+- Merged multi-account `threads` pages have no cursor; paging needs `--account`.
+- Display width counts chars, so CJK and emoji can overrun a truncated row.
+- `show --body` strips HTML tags roughly. `show <thread-id>` has an empty snippet column for
+  messages whose body isn't fetched.
+- The Linux snap fallback (`~/snap/mailspring/common`) is untested on a snap install.
+- The e2e test sleeps 1 s after starting `watch`, since nothing it prints marks the
+  subscription.
+- `apps/engine/CLAUDE.md`'s layout table and `apps/engine/test/README.md` don't mention
+  `apps/cli` and `test_cli.py` yet.
