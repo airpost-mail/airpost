@@ -25,8 +25,8 @@ allow = [
 unused-allowed-license = "allow"
 
 [licenses.private]
-# The workspace's own crates are unpublished: GPL-3.0-only, except tern-backend and ms-wire
-# (MIT), whose stricter policy is apps/backend/deny.toml.
+# The workspace's own crates are unpublished and all GPL-3.0-only. apps/backend/deny.toml adds
+# the rule that tern-backend never depends on an engine crate.
 ignore = true
 
 [bans]
