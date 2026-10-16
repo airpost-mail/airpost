@@ -1,5 +1,5 @@
-# cargo-about: THIRD-PARTY-NOTICES.txt for the Rust binaries (engine and backend). Generate with
-# apps/engine/packaging/third-party-notices.sh, which also appends the crates' NOTICE files.
+# cargo-about: THIRD-PARTY-NOTICES.txt for the Rust binaries (engine, backend and CLI). Generate
+# with apps/engine/packaging/third-party-notices.sh, which also appends the crates' NOTICE files.
 # The accepted list matches deny.toml.
 
 accepted = [
@@ -21,6 +21,9 @@ targets = [
     "x86_64-apple-darwin",
     "x86_64-unknown-linux-gnu",
     "aarch64-unknown-linux-gnu",
+    # The CLI's Linux binaries (dist-workspace.toml).
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
     "x86_64-pc-windows-msvc",
 ]
 # Build dependencies stay in: proc macros and build scripts emit code into the binary.

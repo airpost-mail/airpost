@@ -1,0 +1,57 @@
+# dist (cargo-dist, axodotdev) config for the CLI's release binaries (`tern`, apps/cli):
+# docs/engine-protocol-plan.md, section 3 "Binaries". `dist generate` writes
+# .github/workflows/cli-release.yml from this file and cli-release-build-setup.yml. The
+# workflow is then hand-edited for least-privilege permissions and a PR path filter
+# (`allow-dirty = ["ci"]` keeps dist from rejecting that): after regenerating, put back
+# the top-level `contents: read`, `host`'s `contents: write` and the `pull_request` paths.
+#
+# Only packages with `[package.metadata.dist] dist = true` ship: every crate in the workspace
+# is `publish = false`, which dist reads as "don't release". The engine (mailsync) stays out
+# until the headless-engine decision (plan section 4).
+
+[workspace]
+members = ["cargo:."]
+
+[dist]
+cargo-dist-version = "0.32.0"
+ci = "github"
+# Release tags are `cli/v0.1.0`. dist can't parse `cli-v0.1.0` (it only strips a prefix that
+# names a package, and the package is `tern`); before a `/` any prefix is allowed. The
+# namespace limits the workflow's tag trigger to `cli…`, so engine-v* tags don't start it.
+tag-namespace = "cli"
+# PRs run `dist plan` only.
+pr-run-mode = "plan"
+allow-dirty = ["ci"]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
+]
+# Build `-p tern` only; the default is the whole workspace, engine and backend included.
+precise-builds = true
+installers = ["shell", "homebrew"]
+install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
+install-updater = false
+# The formula is built and attached to the release. Publishing to the tap waits until the
+# repo exists: then add `publish-jobs = ["homebrew"]` and a HOMEBREW_TAP_TOKEN secret.
+tap = "ternmail/homebrew-tap"
+formula = "tern"
+# The licence, our NOTICE and the crates' licences go into every archive. The notices are
+# written by the build setup steps before `dist build`.
+auto-includes = false
+include = ["LICENSE.md", "NOTICE.md", "target/cli-notices/THIRD-PARTY-NOTICES.txt"]
+github-build-setup = "../cli-release-build-setup.yml"
+
+# SOURCE.txt, the GPLv3 6(d) directions to the Corresponding Source, next to the binaries in
+# the release (dist also attaches source.tar.gz, a git archive of the tag). Built in the
+# workflow's global job; needs GITHUB_* and GH_TOKEN, so a local `dist build` should pass
+# `--artifacts=local`. A run that isn't a tag push (a PR in upload mode) has no tag to
+# point at and writes a placeholder; nothing is published from such a run.
+[[dist.extra-artifacts]]
+artifacts = ["target/cli-source/SOURCE.txt"]
+build = [
+  "bash",
+  "-c",
+  "if [ \"${GITHUB_REF_TYPE:-}\" != tag ]; then mkdir -p target/cli-source && echo 'Not a release build: no tag names this commit.' > target/cli-source/SOURCE.txt; exit 0; fi; .github/scripts/source-offer.sh --no-tag \"$GITHUB_REF_NAME\" target/cli-source \"the Tern command-line client (tern)\"",
+]

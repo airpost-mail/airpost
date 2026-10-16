@@ -1,0 +1,7 @@
+# Steps dist puts into cli-release.yml's build-local-artifacts job before `dist build`
+# (github-build-setup in dist-workspace.toml). They write the crates' licence notices that
+# dist-workspace.toml's `include` adds to every archive. Run `dist generate` after editing.
+- name: Install cargo-about
+  run: cargo install --locked cargo-about --version 0.9.2 --features cli
+- name: Write THIRD-PARTY-NOTICES.txt
+  run: apps/engine/packaging/third-party-notices.sh target/cli-notices/THIRD-PARTY-NOTICES.txt apps/cli/Cargo.toml
