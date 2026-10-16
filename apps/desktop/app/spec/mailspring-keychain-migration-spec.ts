@@ -86,7 +86,7 @@ describe('mailspring-keychain-migration', function () {
       this.outputs.push(new MigrationError('/usr/bin/security failed (44)', false));
       const blob = chromiumBlob('{}', SECRET, 1003, 'v10');
       const err = await rejection(decryptWithMailspringKey(blob));
-      expect(err).toEqual(jasmine.any(MigrationError));
+      expect(err instanceof MigrationError).toBe(true);
       expect(err.retryable).toBe(false);
     });
 
@@ -107,7 +107,9 @@ describe('mailspring-keychain-migration', function () {
 
     it('does not ask for the secret when the blob is not tagged v10', async function () {
       const blob = chromiumBlob('{}', SECRET, 1003, 'v11');
-      expect(await rejection(decryptWithMailspringKey(blob))).toEqual(jasmine.any(MigrationError));
+      expect((await rejection(decryptWithMailspringKey(blob))) instanceof MigrationError).toBe(
+        true
+      );
       expect(mailspringKeychain.run).not.toHaveBeenCalled();
     });
 
@@ -153,7 +155,7 @@ describe('mailspring-keychain-migration', function () {
       );
       const blob = chromiumBlob('{}', SECRET, 1, 'v11');
       const err = await rejection(decryptWithMailspringKey(blob));
-      expect(err).toEqual(jasmine.any(MigrationError));
+      expect(err instanceof MigrationError).toBe(true);
       expect(err.retryable).toBe(true);
     });
   });
@@ -178,7 +180,7 @@ describe('mailspring-keychain-migration', function () {
   it('has nothing to migrate on Windows', async function () {
     mailspringKeychain.platform = 'win32';
     const blob = chromiumBlob('{}', SECRET, 1, 'v10');
-    expect(await rejection(decryptWithMailspringKey(blob))).toEqual(jasmine.any(MigrationError));
+    expect((await rejection(decryptWithMailspringKey(blob))) instanceof MigrationError).toBe(true);
     expect(mailspringKeychain.run).not.toHaveBeenCalled();
   });
 });

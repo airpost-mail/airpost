@@ -45,6 +45,13 @@ describe('KeyManager', function () {
     spyOn(mailspringKeychain, 'run').andCallFake(() =>
       Promise.reject(new Error('no keychain in specs'))
     );
+    // The migration's dialogs are real Electron dialogs, and any spec whose blob fails to
+    // decrypt reaches the migration.
+    spyOn(KeyManager, '_showMigrationFailedNotice');
+    spyOn(KeyManager, '_askToSignInAgainAfterMigrationFailed').andReturn(false);
+    spyOn(KeyManager, '_quitAfterDialog').andCallFake((err: Error) => {
+      throw err;
+    });
   });
 
   afterEach(function () {
@@ -156,7 +163,6 @@ describe('KeyManager', function () {
       spyOn(KeyManager, '_reportFatalError').andCallFake((err: Error) => {
         throw err;
       });
-      spyOn(KeyManager, '_showMigrationFailedNotice');
       this.config[CREDENTIALS_KEY] = mailspringBlob('{"a-imap":"secret"}').toJSON();
     });
 
@@ -244,12 +250,9 @@ describe('KeyManager', function () {
     describe('when the Mailspring secret is out of reach', function () {
       beforeEach(function () {
         this.signInAgain = false;
-        spyOn(KeyManager, '_askToSignInAgainAfterMigrationFailed').andCallFake(
+        (KeyManager._askToSignInAgainAfterMigrationFailed as jasmine.Spy).andCallFake(
           () => this.signInAgain
         );
-        spyOn(KeyManager, '_quitAfterDialog').andCallFake((err: Error) => {
-          throw err;
-        });
       });
 
       const retries = (name: string, setup: (this: any) => void) => {
