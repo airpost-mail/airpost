@@ -78,24 +78,25 @@ Each plugin in `internal_packages/` has:
 
 ## Core Data Flow: Sync Engine, Tasks, and Observable Database
 
-**Important:** The UI is read-only with respect to the database. All database modifications happen in the C++ sync engine (Mailspring-Sync). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
+**Important:** The UI is read-only with respect to the database. All database modifications happen in the Rust sync engine (`apps/engine`, bundled as `app/mailsync-rs`). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
 
-### Sync Engine Communication (`mailsync-process.ts`, `mailsync-bridge.ts`)
+### Sync Engine Communication
 
-The sync engine is a separate C++ process spawned per account:
+One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too (docs/engine-protocol-plan.md section 4, docs/desktop-client-plan.md):
 
-1. **Electron → Sync Engine**: JSON messages sent via stdin (task requests, commands)
-2. **Sync Engine → Electron**: Newline-delimited JSON streamed via stdout (database change deltas)
+1. **Main process → engine, stdin** (`browser/engine-supervisor.ts`, `engine-client.ts`, `mailsync-process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
+2. **Each window ↔ engine, Unix socket** (`engine-connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
 
 ```
-┌─────────────────┐         stdin (JSON)          ┌──────────────────┐
-│   Electron UI   │ ──────────────────────────────▶│  Mailspring-Sync │
-│  (TypeScript)   │                                │      (C++)       │
-│                 │ ◀────────────────────────────── │                  │
-└─────────────────┘    stdout (JSON deltas)        └──────────────────┘
+┌──────────────┐   stdin/stdout (JSON-RPC)   ┌──────────────────┐
+│ Main process │ ◀─────────────────────────▶ │                  │
+└──────────────┘                             │  mailsync-rs     │
+┌──────────────┐   socket (JSON-RPC, deltas) │  --mode serve    │
+│ Each window  │ ◀─────────────────────────▶ │                  │
+└──────────────┘                             └──────────────────┘
 ```
 
-The `MailsyncBridge` (in main window only) manages sync process lifecycle, listens to `Actions.queueTask`, and forwards tasks to the appropriate account's sync process.
+Windows reach the stdin-only calls over IPC (`supervisor-channels.ts`). The `MailsyncBridge` in the main window listens to `Actions.queueTask` and sends tasks on its connection; every window applies the deltas it reads.
 
 ### Task System (`flux/tasks/`)
 
@@ -103,7 +104,7 @@ Tasks represent operations the user wants to perform (send email, star thread, m
 
 **Task Lifecycle:**
 1. UI calls `Actions.queueTask(new SomeTask({...}))`
-2. `MailsyncBridge._onQueueTask()` validates and sends to sync engine via stdin
+2. `MailsyncBridge._onQueueTask()` validates and sends `task.queue` on the main window's socket connection
 3. Sync engine executes the task (local changes + remote API calls)
 4. Sync engine persists task status updates and emits deltas
 5. Task completion triggers `onSuccess()` or `onError()` callbacks

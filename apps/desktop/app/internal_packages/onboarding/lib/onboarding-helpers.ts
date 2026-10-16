@@ -2,7 +2,10 @@
 
 import qs from 'querystring';
 import crypto from 'crypto';
-import { Account, AccountStore, MailsyncProcess, localized } from 'mailspring-exports';
+import { ipcRenderer } from 'electron';
+import { Account, AccountStore, localized } from 'mailspring-exports';
+import { errorFromEngineResult, stripSecretKeys } from '../../../src/mailsync-process';
+import { AccountTestReply, SupervisorChannel } from '../../../src/supervisor-channels';
 import MailspringProviderSettings from './mailspring-provider-settings.json';
 import MailcoreProviderSettings from './mailcore-provider-settings.json';
 import dns from 'dns';
@@ -425,10 +428,21 @@ export async function finalizeAndValidateAccount(account: Account) {
     account.label = account.emailAddress;
   }
 
-  // Test connections to IMAP and SMTP
-  const proc = new MailsyncProcess(AppEnv.getLoadSettings());
-  proc.account = account;
-  await proc.test();
+  // Test connections to IMAP and SMTP: account.test on the engine the main process runs.
+  const reply: AccountTestReply = await ipcRenderer.invoke(
+    SupervisorChannel.TestAccount,
+    account.toJSON()
+  );
+  if (reply.error) {
+    throw new Error(reply.error);
+  }
+  if (reply.result.error) {
+    throw errorFromEngineResult(reply.result, stripSecretKeys);
+  }
+  const rotated = reply.result.account && reply.result.account.settings;
+  if (rotated && rotated.refresh_token) {
+    account.settings.refresh_token = rotated.refresh_token;
+  }
 
   // Record the date of successful auth
   account.authedAt = new Date();

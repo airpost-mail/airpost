@@ -142,7 +142,7 @@ describe('a window engine connection', function () {
     spyOn(OnlineStatusStore, 'trigger');
     applyDeltas(
       got.map((d) => JSON.stringify(d)),
-      { mainWindow: true, rebroadcast: false }
+      { mainWindow: true }
     );
     expect(OnlineStatusStore._offlineProcesses).toEqual({ a1: true });
     OnlineStatusStore._offlineProcesses = {};
@@ -252,8 +252,8 @@ describe('task handlers with two windows open', function () {
 
   // Each window receives the delta on its own connection; only the main window acts on it.
   const inBothWindows = (msg: string) => {
-    applyDeltas([msg], { mainWindow: true, rebroadcast: false });
-    applyDeltas([msg], { mainWindow: false, rebroadcast: false });
+    applyDeltas([msg], { mainWindow: true });
+    applyDeltas([msg], { mainWindow: false });
   };
 
   it('plays one send sound', function () {
@@ -263,44 +263,24 @@ describe('task handlers with two windows open', function () {
   });
 
   it('leaves the task handlers to the main window when a composer bridge reads the delta', function () {
-    const configDirPath = fs.mkdtempSync('/tmp/tern-spec-');
-    const env = {
-      TERN_ENGINE_PROCESS: process.env.TERN_ENGINE_PROCESS,
-      TERN_ENGINE_TRANSPORT: process.env.TERN_ENGINE_TRANSPORT,
-    };
-    delete process.env.TERN_ENGINE_PROCESS;
-    delete process.env.TERN_ENGINE_TRANSPORT;
     spyOn(AppEnv, 'inSpecMode').andReturn(false);
     spyOn(AppEnv, 'isMainWindow').andReturn(false);
     spyOn(AppEnv, 'onReadyToUnload');
-    spyOn(MailsyncBridge.prototype, '_getClientConfiguration').andReturn({
-      configDirPath,
-      resourcePath: '',
-      verbose: false,
-      syncEngine: 'rust',
-    } as any);
     const connection = new EventEmitter();
     spyOn(MailsyncBridge.prototype, '_createConnection').andCallFake(function () {
       connection.on('deltas', this._onIncomingMessages);
       return connection;
     });
-    try {
-      const composer = new MailsyncBridge();
-      expect(composer._mainWindow).toBe(false);
-      expect(composer._connection).toBe(connection);
+    const composer = new MailsyncBridge();
+    expect(composer._mainWindow).toBe(false);
+    expect(composer._connection).toBe(connection);
 
-      const msg = delta(completed());
-      connection.emit('deltas', [msg]);
-      expect(SoundRegistry.playSound).not.toHaveBeenCalled();
-      expect(Actions.draftDeliverySucceeded).not.toHaveBeenCalled();
-      applyDeltas([msg], { mainWindow: true, rebroadcast: false });
-      expect((SoundRegistry.playSound as jasmine.Spy).calls.length).toBe(1);
-    } finally {
-      for (const [key, value] of Object.entries(env)) {
-        if (value !== undefined) process.env[key] = value;
-      }
-      fs.rmSync(configDirPath, { recursive: true, force: true });
-    }
+    const msg = delta(completed());
+    connection.emit('deltas', [msg]);
+    expect(SoundRegistry.playSound).not.toHaveBeenCalled();
+    expect(Actions.draftDeliverySucceeded).not.toHaveBeenCalled();
+    applyDeltas([msg], { mainWindow: true });
+    expect((SoundRegistry.playSound as jasmine.Spy).calls.length).toBe(1);
   });
 
   it('reports one delivery failure', function () {

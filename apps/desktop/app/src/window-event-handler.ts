@@ -107,10 +107,6 @@ export default class WindowEventHandler {
       AppEnv.mailsyncBridge.sendSyncMailNow();
     });
 
-    AppEnv.commands.add(document.body, 'window:attach-to-xcode', () => {
-      AppEnv.mailsyncBridge.attachToXcode();
-    });
-
     AppEnv.commands.add(document.body, 'window:toggle-component-regions', () => {
       ComponentRegistry = ComponentRegistry || require('./registries/component-registry').default;
       ComponentRegistry.toggleComponentRegions();

@@ -1,8 +1,6 @@
 import path from 'path';
-import fs from 'fs';
 import { ipcRenderer } from 'electron';
 import { localized } from '../intl';
-import _ from 'underscore';
 
 import { Task } from './tasks/task';
 import TaskQueue from './stores/task-queue';
@@ -13,18 +11,18 @@ import DatabaseStore from './stores/database-store';
 import OnlineStatusStore from './stores/online-status-store';
 import { DatabaseChangeRecord } from './stores/database-change-record';
 import DatabaseObjectRegistry from '../registries/database-object-registry';
-import { MailsyncProcess, MailsyncProcessExit, resolveSyncEngine } from '../mailsync-process';
-import { CrashTracker, isAuthFailure, serveEngineSelected } from '../engine-client';
 import { EngineConnection } from '../engine-connection';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../engine-events';
-import { THREAD_COUNTS_CLASS } from '../engine-protocol';
+import { LogsTailParams, LogsTailResult, Method, THREAD_COUNTS_CLASS } from '../engine-protocol';
 import { AccountEvent, EngineStatus, SupervisorChannel } from '../supervisor-channels';
-import KeyManager from '../key-manager';
 import * as Actions from './actions';
 import * as Utils from './models/utils';
 import { Model } from 'mailspring-exports';
 
 const VERBOSE_UNTIL_KEY = 'core.sync.verboseUntil';
+
+// How much of an account's log the account details show.
+const CLIENT_LOG_TAIL_BYTES = 3000;
 
 // Model classes whose delta entries have already failed to inflate this session. The
 // same defect repeats on every delta for that class, so it is reported to Sentry once.
@@ -58,14 +56,11 @@ function convertDeltaModels(modelJSONs: any[], modelClass: string) {
 /*
 Applies one batch of delta lines in a window. Every window triggers DatabaseStore and hands
 ThreadCounts deltas to its EngineEvents; only the main window runs what must happen once: Task
-onSuccess/onError (send sound, error dialogs, send hooks), ProcessState into OnlineStatusStore,
-and, for the engines the main window runs itself, ProcessAccountSecretsUpdated into KeyManager
-and the rebroadcast to the other windows.
+onSuccess/onError (send sound, error dialogs, send hooks) and ProcessState into
+OnlineStatusStore. Rotated secrets never reach a window: serve reports them on its stdin, to the
+main process's supervisor.
 */
-export function applyDeltas(
-  msgs: string[],
-  { mainWindow, rebroadcast }: { mainWindow: boolean; rebroadcast: boolean }
-) {
+export function applyDeltas(msgs: string[], { mainWindow }: { mainWindow: boolean }) {
   for (const msg of msgs) {
     if (msg.length === 0) {
       continue;
@@ -97,18 +92,10 @@ export function applyDeltas(
       if (mainWindow) OnlineStatusStore.onSyncProcessStateReceived(modelJSONs[0]);
       continue;
     }
-    if (modelClass === 'ProcessAccountSecretsUpdated' && modelJSONs.length) {
-      if (mainWindow) KeyManager.extractAndStoreAccountSecrets(new Account(modelJSONs[0]));
-      continue;
-    }
-    // Not a model either, and not rebroadcast: ThreadCountsStore applies them where it runs.
+    // Not a model either: ThreadCountsStore applies them where it runs.
     if (modelClass === THREAD_COUNTS_CLASS) {
       EngineEvents.threadCounts({ type, rows: modelJSONs });
       continue;
-    }
-
-    if (rebroadcast) {
-      ipcRenderer.send('mailsync-bridge-rebroadcast-to-all', msg);
     }
 
     const { models, rawJSONs } = convertDeltaModels(modelJSONs, modelClass);
@@ -160,36 +147,20 @@ function runTaskHandlers(record: DatabaseChangeRecord<Model>) {
 }
 
 /*
-The windows' side of the sync engine. With the Rust engine's `serve` mode the main process
-supervises the engine (browser/engine-supervisor.ts) and every window reads deltas on its own
-socket connection; the main window also sends its accounts' commands on it and applies the
-supervisor's account events. The C++ engine and the per-account and stdio modes run in the main
-window, which rebroadcasts their deltas to the other windows.
+The windows' side of the sync engine. The main process supervises the `serve` engine
+(browser/engine-supervisor.ts) and every window reads deltas on its own socket connection; the
+main window also sends its accounts' commands on it and applies the supervisor's account events.
 */
 export default class MailsyncBridge {
-  _crashTracker = new CrashTracker();
-  _clients: { [accountId: string]: MailsyncProcess } = {};
-  // The `serve` engine's socket, which replaces `_clients`.
   _connection: EngineConnection = null;
   _mainWindow = false;
   _appliedEvents = new Set<number>();
   _lastWait: number;
 
   constructor() {
-    if (AppEnv.inSpecMode()) {
-      ipcRenderer.on('mailsync-bridge-message', this._onIncomingRebroadcastMessage);
-      return;
-    }
+    if (AppEnv.inSpecMode()) return;
     this._mainWindow = AppEnv.isMainWindow();
-
-    const { configDirPath, resourcePath, syncEngine } = this._getClientConfiguration();
-    const engine = syncEngine || resolveSyncEngine(configDirPath, resourcePath);
-    if (serveEngineSelected(engine, configDirPath)) {
-      this._connection = this._createConnection();
-    } else if (!this._mainWindow) {
-      ipcRenderer.on('mailsync-bridge-message', this._onIncomingRebroadcastMessage);
-      return;
-    }
+    this._connection = this._createConnection();
 
     AppEnv.onReadyToUnload(this._onReadyToUnload);
     if (!this._mainWindow) return;
@@ -205,14 +176,7 @@ export default class MailsyncBridge {
 
     AppEnv.onBeforeUnload(this._onBeforeUnload);
 
-    if (this._connection) {
-      this._attachToSupervisor();
-    } else {
-      AccountStore.listen(this.ensureClients, this);
-      process.nextTick(() => {
-        this.ensureClients();
-      });
-    }
+    this._attachToSupervisor();
   }
 
   // Public
@@ -223,9 +187,10 @@ export default class MailsyncBridge {
     require('@electron/remote').shell.showItemInFolder(configDirItem); // eslint-disable-line
   }
 
+  // The supervisor follows the setting and passes it to the engine (engine.setLogLevel).
   toggleVerboseLogging() {
     const { configDirPath } = AppEnv.getLoadSettings();
-    let message = localized('Thank you for helping debug Tern. Tern will now restart.');
+    let message = localized('Thank you for helping debug Tern.');
     let phrase = 'disabled';
 
     if (AppEnv.config.get(VERBOSE_UNTIL_KEY)) {
@@ -235,116 +200,58 @@ export default class MailsyncBridge {
       phrase = 'enabled';
       message =
         `Verbose logging will be enabled for the next thirty minutes. This records ` +
-        `all network traffic to your mail providers and will be quite slow. Restart Tern ` +
-        `and wait for your problem to occur, and then submit mailsync-***.log files located ` +
-        `in the directory: \n\n${configDirPath}.\n\nTern will now restart.`;
+        `all network traffic to your mail providers and will be quite slow. Wait for your ` +
+        `problem to occur, and then submit mailsync-***.log files located in the ` +
+        `directory: \n\n${configDirPath}.`;
     }
     AppEnv.showErrorDialog({
       title: localized(`Verbose logging is now %@`, phrase),
       message,
     });
-    require('@electron/remote').app.relaunch();
-    require('@electron/remote').app.quit();
   }
-
-  clients() {
-    return this._clients;
-  }
-
-  // The supervisor follows config.json `accounts` itself for `serve`.
-  ensureClients = _.throttle(async () => {
-    if (this._connection) {
-      return;
-    }
-    const clientsWithoutAccounts = { ...this._clients };
-    const keys = await KeyManager._getKeyHash();
-
-    for (const acct of AccountStore.accounts()) {
-      if (!this._clients[acct.id]) {
-        // client for this account is missing, launch it!
-        this._launchClient(acct, keys);
-      } else {
-        // client for this account exists
-        delete clientsWithoutAccounts[acct.id];
-      }
-    }
-
-    // Any clients left in the `clientsWithoutAccounts` after we looped
-    // through and deleted one for each accountId are ones representing
-    // deleted accounts.
-    for (const client of Object.values(clientsWithoutAccounts)) {
-      client.kill();
-    }
-  }, 100);
 
   async forceRelaunchClient(account: Account) {
-    if (this._connection) {
-      await ipcRenderer.invoke(SupervisorChannel.ForceRelaunch, account.id);
-      return;
-    }
-    const keys = await KeyManager._getKeyHash();
-    this._launchClient(account, keys, { force: true });
+    await ipcRenderer.invoke(SupervisorChannel.ForceRelaunch, account.id);
   }
 
+  // The end of the account's log, from its first whole line; empty when the engine can't say.
   async tailClientLog(accountId: string) {
-    let log = '';
-    const logfile = `mailsync-${accountId}.log`;
     try {
-      const logpath = path.join(AppEnv.getConfigDirPath(), logfile);
-      const { size } = fs.statSync(logpath);
-      const tailSize = Math.min(3000, size);
-      const buffer = Buffer.alloc(tailSize);
-      const fd = fs.openSync(logpath, 'r');
-      fs.readSync(fd, buffer, 0, tailSize, size - tailSize);
-      log = buffer.toString('utf-8');
-      log = log.substr(log.indexOf('\n') + 1);
-    } catch (logErr) {
-      console.warn(`Could not append ${logfile} to mailsync exception report: ${logErr}`);
+      const { text, truncated } = await this._connection.request<LogsTailResult>(
+        Method.EngineLogsTail,
+        { accountId, bytes: CLIENT_LOG_TAIL_BYTES } as LogsTailParams
+      );
+      return truncated ? text.substr(text.indexOf('\n') + 1) : text;
+    } catch (err) {
+      console.warn(`Could not read the sync log of account ${accountId}: ${err}`);
+      return '';
     }
-    return log;
   }
 
   sendSyncMailNow() {
     console.warn('Sending `wake` to all mailsync workers...');
-    if (this._connection) {
-      this._connection
-        .request('sync.wake', {})
-        .catch((err) => console.warn(`sync.wake failed: ${err.message}`));
-      return;
-    }
-    for (const client of Object.values(this._clients)) {
-      client.sendMessage({ type: 'wake-workers' });
-    }
+    this._connection
+      .request(Method.SyncWake, {})
+      .catch((err) => console.warn(`sync.wake failed: ${err.message}`));
   }
 
-  // Only the main window owns sync clients; other windows route through the
-  // main process, which forwards `run-calendar-sync` to the main window.
+  // Only the main window sends account commands; other windows route through the main
+  // process, which forwards `run-calendar-sync` to the main window.
   sendSyncCalendarNow(accountId?: string) {
     if (!AppEnv.isMainWindow()) {
       ipcRenderer.send('command', 'application:sync-calendar', accountId);
       return;
     }
-    if (this._connection) {
-      const ids = accountId ? [accountId] : this._connection.accountIds();
-      for (const id of ids) {
-        if (this._connection.accountIds().includes(id)) {
-          this._connection.send(id, { type: 'sync-calendar' });
-        }
+    const ids = accountId ? [accountId] : this._connection.accountIds();
+    for (const id of ids) {
+      if (this._connection.accountIds().includes(id)) {
+        this._connection.send(id, { type: 'sync-calendar' });
       }
-      return;
-    }
-
-    const clients = accountId
-      ? [this._clients[accountId]].filter(Boolean)
-      : Object.values(this._clients);
-
-    for (const client of clients) {
-      client.sendMessage({ type: 'sync-calendar' });
     }
   }
 
   sendMessageToAccount(accountId: string, json: Record<string, unknown>) {
-    if (this._connection ? !this._connection.send(accountId, json) : !this._clients[accountId]) {
+    if (!this._connection.send(accountId, json)) {
       const { emailAddress } = AccountStore.accountForId(accountId) || { emailAddress: undefined };
       return AppEnv.showErrorDialog({
         title: localized(`Tern is unable to sync %@`, emailAddress),
@@ -353,43 +260,14 @@ export default class MailsyncBridge {
         ),
       });
     }
-    if (!this._connection) {
-      this._clients[accountId].sendMessage(json);
-    }
   }
 
   async resetCacheForAccount(account: Account, { silent }: { silent?: boolean } = {}) {
-    let reset: () => Promise<unknown>;
-    if (this._connection) {
-      // The supervisor drops the account from the engine, resets it and adds it back.
-      const json = account.toJSON();
-      for (const key of ['imap_password', 'smtp_password', 'refresh_token']) {
-        delete json.settings[key];
-      }
-      reset = async () => {
-        const result = await ipcRenderer.invoke(SupervisorChannel.ResetCache, json);
-        if (result && result.error) throw new Error(result.error);
-      };
-    } else {
-      // create a new client that will perform the reset
-      const resetClient = new MailsyncProcess(this._getClientConfiguration());
-      resetClient.account = (await KeyManager.insertAccountSecrets(account)).toJSON();
-
-      // no-op - do not allow us to kill this client - we may be reseting the cache of an
-      // account which does not exist anymore, but we don't want to interrupt this process
-      resetClient.kill = () => {};
-
-      // grab the existing client, if there is one
-      const syncingClient = this._clients[account.id];
-      this._clients[account.id] = resetClient;
-
-      // kill the old client, ensureClients will be a no-op because the
-      // client has already been replaced in our lookup table.
-      if (syncingClient) {
-        syncingClient.kill();
-      }
-      reset = () => resetClient.resetCache();
-    }
+    // The supervisor drops the account from the engine, resets it and adds it back.
+    const reset = async () => {
+      const result = await ipcRenderer.invoke(SupervisorChannel.ResetCache, account.id);
+      if (result && result.error) throw new Error(result.error);
+    };
 
     if (!silent) {
       AppEnv.showErrorDialog({
@@ -421,25 +299,6 @@ export default class MailsyncBridge {
         title: localized(`Cleanup Error`),
         message: localized(`Tern was unable to reset the local cache. %@`, error),
       });
-    } finally {
-      if (!this._connection) {
-        delete this._clients[account.id];
-        process.nextTick(() => {
-          this.ensureClients();
-        });
-      }
-    }
-  }
-
-  // window:attach-to-xcode: the engine, or the last per-account process.
-  attachToXcode() {
-    if (this._connection) {
-      ipcRenderer.send(SupervisorChannel.AttachToXcode);
-      return;
-    }
-    const proc = Object.values(this._clients).pop();
-    if (proc) {
-      proc.attachToXcode();
     }
   }
 
@@ -523,69 +382,6 @@ export default class MailsyncBridge {
     }
   }
 
-  _getClientConfiguration() {
-    const { configDirPath, resourcePath, syncEngine } = AppEnv.getLoadSettings();
-    const verboseUntil = AppEnv.config.get(VERBOSE_UNTIL_KEY) || 0;
-    const verbose = verboseUntil && verboseUntil / 1 > Date.now();
-    if (verbose) {
-      console.warn(`Verbose mailsync logging is enabled until ${new Date(verboseUntil)}`);
-    }
-    return { configDirPath, resourcePath, verbose, syncEngine };
-  }
-
-  async _launchClient(
-    account: Account,
-    keys: { [key: string]: string },
-    { force }: { force?: boolean } = {}
-  ) {
-    const client = new MailsyncProcess(this._getClientConfiguration());
-    this._clients[account.id] = client; // set this synchornously so we never spawn two
-
-    const fullAccountJSON = (await KeyManager.insertAccountSecrets(account, keys)).toJSON();
-
-    if (force) {
-      this._crashTracker.forgetCrashes(fullAccountJSON);
-    } else if (this._crashTracker.tooManyFailures(fullAccountJSON)) {
-      delete this._clients[account.id];
-      return;
-    }
-
-    client.account = fullAccountJSON;
-    client.sync();
-    client.on('deltas', this._onIncomingMessages);
-    client.on('close', ({ code, error, signal }: MailsyncProcessExit) => {
-      if (this._clients[account.id] !== client) {
-        return;
-      }
-
-      delete this._clients[account.id];
-      OnlineStatusStore.onSyncProcessExited(account.id);
-      if (signal === 'SIGTERM') {
-        return;
-      }
-      this._crashTracker.recordClientCrash(fullAccountJSON, { code, error, signal });
-
-      if (this._crashTracker.tooManyFailures(fullAccountJSON)) {
-        Actions.updateAccount(account.id, {
-          syncState: isAuthFailure(error)
-            ? Account.SYNC_STATE_AUTH_FAILED
-            : Account.SYNC_STATE_ERROR,
-          syncError: { code, error, signal },
-        });
-      } else {
-        this.ensureClients();
-      }
-    });
-
-    if (fullAccountJSON.syncState !== Account.SYNC_STATE_OK) {
-      // note: This call triggers ensureClients, and must go after this.clients[id] is set
-      Actions.updateAccount(account.id, {
-        syncState: Account.SYNC_STATE_OK,
-        syncError: null,
-      });
-    }
-  }
-
   _onQueueTask(task: Task) {
     if (!DatabaseObjectRegistry.isInRegistry(task.constructor.name)) {
       console.log(task);
@@ -635,23 +431,7 @@ export default class MailsyncBridge {
   }
 
   _onIncomingMessages = (msgs: string[]) => {
-    applyDeltas(msgs, { mainWindow: this._mainWindow, rebroadcast: !this._connection });
-  };
-
-  _onIncomingRebroadcastMessage = (event: Electron.IpcRendererEvent, msg: string) => {
-    const { type, modelJSONs, modelClass } = JSON.parse(msg);
-    const { models, rawJSONs } = convertDeltaModels(modelJSONs, modelClass);
-    if (models.length === 0) {
-      return;
-    }
-    DatabaseStore.trigger(
-      new DatabaseChangeRecord({
-        type,
-        objectClass: modelClass,
-        objects: models,
-        objectsRawJSON: rawJSONs,
-      })
-    );
+    applyDeltas(msgs, { mainWindow: this._mainWindow });
   };
 
   _onFetchBodies(messages: { id: string; accountId: string }[]) {
@@ -684,12 +464,6 @@ export default class MailsyncBridge {
 
   // The `serve` engine outlives the window; the supervisor stops it when the app quits.
   _onReadyToUnload = () => {
-    if (this._connection) {
-      this._connection.close();
-    }
-    for (const client of Object.values(this._clients)) {
-      client.kill();
-    }
-    this._clients = {};
+    this._connection.close();
   };
 }

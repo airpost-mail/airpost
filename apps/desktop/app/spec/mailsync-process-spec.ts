@@ -1,10 +1,13 @@
 import { EventEmitter } from 'events';
 import fs from 'fs';
-import net from 'net';
-import os from 'os';
-import path from 'path';
-import { lastJSONResponse, MailsyncProcess } from '../src/mailsync-process';
-import { engineSocketPath } from '../src/engine-protocol';
+import {
+  EngineServeProcess,
+  errorFromEngineResult,
+  lastJSONResponse,
+  MailsyncProcess,
+  stripSecretKeys,
+} from '../src/mailsync-process';
+import { FakeEngine, until } from './fake-serve-engine';
 
 describe('lastJSONResponse', function () {
   it('reads a result that has no trailing newline', function () {
@@ -45,8 +48,8 @@ describe('lastJSONResponse', function () {
 });
 
 describe('accumulating mailsync stdout', function () {
-  // mailsync's result line carries the whole IMAP/SMTP conversation in `test` mode, so it
-  // routinely spans more than one 64KB chunk, and a server error or account name is often
+  // mailsync's result line can carry a whole IMAP/SMTP conversation, so it can span more
+  // than one 64KB chunk, and a server error or account name is often
   // non-ASCII. Decoding each chunk on its own splits any multi-byte character that lands on
   // a boundary into two replacement characters.
   const payload = '{"error":"Café serveur"}';
@@ -82,53 +85,71 @@ describe('interpreting a mailsync exit', function () {
     });
   });
 
-  const errorFromTest = (stdout: string, code: number) => {
-    const promise = proc.test();
+  const errorFromRun = (stdout: string, code: number) => {
+    const promise = proc._spawnAndWait('migrate');
     child.stdout.emit('data', Buffer.from(stdout, 'utf-8'));
     child.emit('close', code, null);
     return promise.then(
       () => {
-        throw new Error('expected `test` to reject');
+        throw new Error('expected the run to reject');
       },
       (err) => err
     );
   };
 
-  it('flags a failure the engine classified as this machine being offline', async function () {
-    const err = await errorFromTest(
-      '{"error":"ErrorConnection","error_service":"imap","error_offline":true,"log":"..."}',
-      1
-    );
-    expect(err.isNetworkError).toBe(true);
-  });
-
-  it('does not flag a failure the server itself reported', async function () {
-    const err = await errorFromTest(
-      '{"error":"ErrorAuthentication","error_service":"imap","error_offline":false,"log":"..."}',
-      1
-    );
-    expect(err.isNetworkError).toBe(false);
-  });
-
-  it('does not flag a result from an engine that predates the field', async function () {
-    const err = await errorFromTest('{"error":"ErrorConnection","error_service":"imap"}', 1);
-    expect(err.isNetworkError).toBe(false);
+  it('builds the error from the JSON result of a failed run', async function () {
+    const err = await errorFromRun('{"error":"ErrorParse","error_service":"imap","log":"x"}', 1);
+    expect(err.message).toContain('(IMAP)');
+    expect(err.rawLog).toBe('x');
   });
 
   it('reports a crash as an unknown error, whatever the dump contains', async function () {
-    const err = await errorFromTest('terminate called\n{"offline":true,"retryable":true', 134);
+    const err = await errorFromRun('terminate called\n{"offline":true,"retryable":true', 134);
     expect(err.message).toContain('mailsync: 134');
     expect(err.isNetworkError).toBe(undefined);
   });
 });
 
-describe('migrating for the Rust engine', function () {
-  it('runs import-legacy after migrate and launches anyway when it fails', async function () {
-    const proc = new MailsyncProcess({
-      configDirPath: '/tmp',
-      resourcePath: '/tmp',
-      syncEngine: 'rust',
+describe('the error of a failed account test', function () {
+  const error = (result: any) => errorFromEngineResult(result, stripSecretKeys) as any;
+
+  it('flags a failure the engine classified as this machine being offline', function () {
+    expect(
+      error({ error: 'ErrorConnection', error_service: 'imap', error_offline: true, log: '' })
+        .isNetworkError
+    ).toBe(true);
+  });
+
+  it('does not flag a failure the server itself reported', function () {
+    expect(
+      error({ error: 'ErrorAuthentication', error_service: 'imap', error_offline: false, log: '' })
+        .isNetworkError
+    ).toBe(false);
+  });
+
+  it("marks classified errors as the user's, except the ambiguous ones", function () {
+    expect(error({ error: 'ErrorAuthentication', log: '' }).isUserError).toBe(true);
+    expect(error({ error: 'ErrorParse', log: '' }).isUserError).toBe(false);
+    expect(error({ error: 'Something else', log: '' }).isUserError).toBe(false);
+  });
+
+  it('appends the TLS advice and redacts secret keys in the log', function () {
+    const err = error({
+      error: 'ErrorCertificate',
+      error_service: 'smtp',
+      error_advice: 'Check the certificate.',
+      log: '{"refresh_token":"abc\\"def"}',
     });
+    expect(err.message).toContain('(SMTP) Check the certificate.');
+    expect(err.errorAdvice).toBe('Check the certificate.');
+    expect(err.errorService).toBe('smtp');
+    expect(err.rawLog).toBe('{"refresh_token":"*********"}');
+  });
+});
+
+describe('migrating', function () {
+  it('runs import-legacy after migrate and launches anyway when it fails', async function () {
+    const proc = new MailsyncProcess({ configDirPath: '/tmp', resourcePath: '/tmp' });
     const modes: string[] = [];
     spyOn(proc as any, '_spawnProcess').andCallFake((mode: string) => {
       modes.push(mode);
@@ -153,151 +174,63 @@ describe('migrating for the Rust engine', function () {
   });
 });
 
-describe('the engine socket path', function () {
-  it('is <configDir>/run/<accountId>.sock when it fits', function () {
-    expect(engineSocketPath('/Users/me/.tern', 'a1b2')).toEqual({
-      socketPath: '/Users/me/.tern/run/a1b2.sock',
-      ownDir: null,
-    });
-  });
-
-  it('falls back to a short name in a per-user temp dir', function () {
-    const configDir = `/Users/me/${'x'.repeat(100)}`;
-    const { socketPath, ownDir } = engineSocketPath(configDir, 'a1b2');
-    expect(ownDir).toEqual(path.join(os.tmpdir(), `tern-${process.getuid()}`));
-    expect(path.dirname(socketPath)).toEqual(ownDir);
-    expect(path.basename(socketPath)).toMatch(/^[0-9a-f]{12}\.sock$/);
-    expect(Buffer.byteLength(socketPath)).not.toBeGreaterThan(103);
-  });
-});
-
-describe('syncing over the engine socket', function () {
+describe("the serve engine's socket", function () {
   const ACCOUNT_ID = 'acc1';
   let dir: string = null;
-  let socketPath: string = null;
-  let server: net.Server = null;
-  let conn: net.Socket = null;
-  let received: any[] = [];
-  let onReceived: () => void = null;
-  let proc: MailsyncProcess = null;
-  let child: any = null;
-  let spawnArgs: string[] = null;
-  let savedTransport: string = undefined;
-  // What the fake engine's hello lists; undefined answers as an engine without features.
-  let helloFeatures: string[] = undefined;
-
-  // Resolves once the fake engine has read `n` request lines in total.
-  const requests = (n: number) =>
-    new Promise<any[]>((resolve) => {
-      const check = () => {
-        if (received.length >= n) {
-          onReceived = null;
-          resolve(received.slice(0, n));
-        }
-      };
-      onReceived = check;
-      check();
-    });
+  let fake: FakeEngine = null;
+  let proc: EngineServeProcess = null;
 
   const nextEvent = (emitter: EventEmitter, event: string) =>
     new Promise<any>((resolve) => emitter.once(event, resolve));
 
-  const startFakeEngine = () =>
-    new Promise<void>((resolve) => {
-      server = net.createServer((socket) => {
-        conn = socket;
-        let buffer = '';
-        socket.setEncoding('utf8');
-        socket.on('data', (chunk: string) => {
-          buffer += chunk;
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-          for (const line of lines) {
-            const req = JSON.parse(line);
-            received.push(req);
-            if (req.method === 'tasks.list') {
-              const error = { code: -32601, message: 'unknown method tasks.list' };
-              socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, error })}\n`);
-              continue;
-            }
-            const result =
-              req.method === 'calendar.sync'
-                ? { started: true }
-                : req.method === 'hello' && helloFeatures
-                  ? { protocol: 1, engine: '0.1.0', pid: 1, accounts: [], features: helloFeatures }
-                  : {};
-            socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, result })}\n`);
-          }
-          if (onReceived) onReceived();
-        });
-      });
-      server.listen(socketPath, () => resolve());
-    });
-
-  const listening = () => {
-    child.stdout.emit('data', Buffer.from(`${JSON.stringify({ listening: socketPath })}\n`));
+  const connected = async (n = 2) => {
+    proc.serve();
+    await until('hello and subscribe', () => fake.socket.length >= n);
   };
 
   beforeEach(async function () {
-    savedTransport = process.env.TERN_ENGINE_TRANSPORT;
-    delete process.env.TERN_ENGINE_TRANSPORT;
-    // Short, unlike os.tmpdir() on macOS, so <configDir>/run/<id>.sock is the path used.
+    // Short, unlike os.tmpdir() on macOS, so <configDir>/run/engine.sock is the path used.
     dir = fs.mkdtempSync('/tmp/tern-spec-');
-    fs.mkdirSync(path.join(dir, 'run'));
-    socketPath = path.join(dir, 'run', `${ACCOUNT_ID}.sock`);
-    received = [];
-    conn = null;
-    helloFeatures = undefined;
-
-    proc = new MailsyncProcess({ configDirPath: dir, resourcePath: dir, syncEngine: 'rust' });
-    proc.account = { id: ACCOUNT_ID, emailAddress: 'me@example.com' } as any;
-    child = new EventEmitter();
-    child.stdout = new EventEmitter();
-    child.stderr = new EventEmitter();
-    child.stdin = new EventEmitter();
-    child.stdin.write = jasmine.createSpy('stdin.write');
-    child.kill = jasmine.createSpy('kill');
-    spyOn(proc as any, '_spawnProcess').andCallFake((mode: string, args: string[]) => {
-      spawnArgs = [mode, ...(args || [])];
-      (proc as any)._proc = child;
+    fake = new FakeEngine(dir);
+    await fake.start();
+    proc = new EngineServeProcess({ configDirPath: dir, resourcePath: dir });
+    spyOn(proc as any, '_spawnProcess').andCallFake(function (mode: string, args: string[]) {
+      this._proc = fake.spawn(mode, args);
     });
-    await startFakeEngine();
+    spyOn(console, 'log');
   });
 
   afterEach(function () {
-    if (savedTransport === undefined) {
-      delete process.env.TERN_ENGINE_TRANSPORT;
-    } else {
-      process.env.TERN_ENGINE_TRANSPORT = savedTransport;
-    }
-    (proc as any)._closeSocket();
-    if (conn) conn.destroy();
-    server.close();
+    proc._closeSocket();
+    fake.stop();
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it('passes --socket, says hello and subscribes, then sends what was queued', async function () {
-    proc.sync();
-    expect(spawnArgs).toEqual(['sync', '--socket', socketPath]);
-    proc.sendMessage({ type: 'wake-workers' });
-    listening();
+    proc.serve();
+    expect([fake.spawns[0].mode, ...fake.spawns[0].args]).toEqual([
+      'serve',
+      '--socket',
+      fake.socketPath,
+    ]);
+    proc.wakeAll();
+    await until('three requests', () => fake.socket.length >= 3);
 
-    const [hello, subscribe, wake] = await requests(3);
+    const [hello, subscribe, wake] = fake.socket;
     expect(hello.method).toEqual('hello');
     expect(hello.params.protocol).toEqual(1);
     expect(hello.params.client).toMatch(/^tern-desktop\//);
     expect(subscribe.method).toEqual('subscribe');
     expect(subscribe.params).toEqual({ accounts: null, classes: null });
     expect(wake.method).toEqual('sync.wake');
-    expect(wake.params).toEqual({ accountId: ACCOUNT_ID });
-    expect(child.stdin.write).not.toHaveBeenCalled();
+    expect(fake.stdin.map((r) => r.method)).toEqual(['account.list']);
   });
 
   it('keeps hello.features, answers request() and emits mail.new', async function () {
-    helloFeatures = ['counts', 'mail-new'];
-    proc.sync();
+    fake.socketResults.hello = { protocol: 1, accounts: [], features: ['counts', 'mail-new'] };
+    fake.socketErrors['tasks.list'] = { code: -32601, message: 'unknown method tasks.list' };
     const hello = nextEvent(proc, 'hello');
-    listening();
+    proc.serve();
     expect((await hello).features).toEqual(['counts', 'mail-new']);
     expect(proc.features).toEqual(['counts', 'mail-new']);
 
@@ -308,65 +241,49 @@ describe('syncing over the engine socket', function () {
 
     const mailNew = nextEvent(proc, 'mail-new');
     const params = { accountId: ACCOUNT_ID, threadId: 't1', messageId: 'm1' };
-    conn.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'mail.new', params })}\n`);
+    fake.notify('mail.new', params);
     expect(await mailNew).toEqual(params);
 
     // A request still out when the connection ends is rejected.
     const pending: Promise<any> = proc.request('counts.get', {}).catch((e) => e);
-    (proc as any)._closeSocket();
+    proc._closeSocket();
     expect((await pending).engineExited).toBe(true);
   });
 
   it('reads an engine without hello.features as having none', async function () {
-    proc.sync();
-    expect(proc.features).toBe(null);
     const hello = nextEvent(proc, 'hello');
-    listening();
+    proc.serve();
+    expect(proc.features).toBe(null);
     await hello;
     expect(proc.features).toEqual([]);
   });
 
-  it('emits socket deltas and the stdout lines other than the listening one', async function () {
-    const batches: string[][] = [];
-    proc.on('deltas', (msgs: string[]) => batches.push(msgs));
-    proc.sync();
-    const secrets = JSON.stringify({
-      modelClass: 'ProcessAccountSecretsUpdated',
-      type: 'persist',
-      modelJSONs: [{ id: ACCOUNT_ID }],
-    });
-    child.stdout.emit(
-      'data',
-      Buffer.from(`\nWaiting for Account JSON:\n${JSON.stringify({ listening: socketPath })}\n`)
-    );
-    child.stdout.emit('data', Buffer.from(`${secrets}\n`));
-    await requests(2);
-
+  // The secrets deltas on stdout are in engine-client-spec.
+  it('emits the socket deltas, however the envelope is spaced', async function () {
+    await connected();
     const fromSocket = nextEvent(proc, 'deltas');
     const params = { accountId: ACCOUNT_ID, modelClass: 'Thread', type: 'persist', modelJSONs: [] };
-    conn.write(
+    fake.conn.write(
       `{"jsonrpc":"2.0","method":"delta","params":${JSON.stringify(params)}}\n` +
         `{ "jsonrpc": "2.0", "method": "delta", "params": ${JSON.stringify(params)} }\n`
     );
     const msgs = await fromSocket;
 
-    expect(batches[0]).toEqual(['', 'Waiting for Account JSON:']);
-    expect(batches[1]).toEqual([secrets]);
     expect(msgs.map((m) => JSON.parse(m))).toEqual([params, params]);
   });
 
-  it('maps the stdin commands to methods and leaves the rest on stdin', async function () {
-    proc.sync();
-    listening();
-    await requests(2);
+  it('maps the account commands to socket methods and test-crash to stdin', async function () {
+    spyOn(console, 'warn');
+    await connected();
     const task = { __cls: 'ChangeStarredTask', id: 't1' };
-    proc.sendMessage({ type: 'queue-task', task });
-    proc.sendMessage({ type: 'cancel-task', taskId: 't1' });
-    proc.sendMessage({ type: 'need-bodies', ids: ['m1', 'm2'] });
-    proc.sendMessage({ type: 'sync-calendar' });
-    proc.sendMessage({ type: 'test-crash' });
+    proc.sendToAccount(ACCOUNT_ID, { type: 'queue-task', task });
+    proc.sendToAccount(ACCOUNT_ID, { type: 'cancel-task', taskId: 't1' });
+    proc.sendToAccount(ACCOUNT_ID, { type: 'need-bodies', ids: ['m1', 'm2'] });
+    proc.sendToAccount(ACCOUNT_ID, { type: 'sync-calendar' });
+    proc.sendToAccount(ACCOUNT_ID, { type: 'test-crash' });
 
-    const sent = (await requests(6)).slice(2);
+    await until('the commands', () => fake.socket.length >= 6);
+    const sent = fake.socket.slice(2);
     expect(sent.map((r) => [r.method, r.params])).toEqual([
       ['task.queue', { accountId: ACCOUNT_ID, task }],
       ['task.cancel', { accountId: ACCOUNT_ID, taskId: 't1' }],
@@ -374,43 +291,41 @@ describe('syncing over the engine socket', function () {
       ['calendar.sync', { accountId: ACCOUNT_ID }],
     ]);
     expect(new Set(sent.map((r) => r.id)).size).toEqual(4);
-    expect(child.stdin.write).toHaveBeenCalledWith('{"type":"test-crash"}\n', 'utf-8');
+    await until('test.crash', () => fake.stdinOf('test.crash').length === 1);
+    expect(fake.stdinOf('test.crash')[0].params).toEqual({ accountId: ACCOUNT_ID });
   });
 
   it('kills the engine and closes with -2 when the socket drops', async function () {
-    proc.sync();
-    listening();
-    await requests(2);
+    spyOn(console, 'warn');
+    await connected();
     const closes: any[] = [];
     proc.on('close', (e) => closes.push(e));
-    const clientClosed = nextEvent((proc as any)._socket, 'close');
-    conn.destroy();
+    const clientClosed = nextEvent(proc._socket, 'close');
+    fake.conn.destroy();
     await clientClosed;
 
     // The engine gets a moment to exit on its own, which would carry its real exit code.
     expect(closes).toEqual([]);
     advanceClock(1000);
-    expect(child.kill).toHaveBeenCalled();
+    expect(fake.child.kill).toHaveBeenCalled();
     expect(closes.length).toEqual(1);
     expect(closes[0].code).toEqual(-2);
-    child.emit('exit', null, 'SIGTERM');
+    fake.child.emit('exit', null, 'SIGTERM');
     expect(closes.length).toEqual(1);
   });
 
   it('reports the exit code when the engine exits right after the socket drops', async function () {
-    proc.sync();
-    listening();
-    await requests(2);
+    await connected();
     const closes: any[] = [];
     proc.on('close', (e) => closes.push(e));
-    const clientClosed = nextEvent((proc as any)._socket, 'close');
-    conn.destroy();
+    const clientClosed = nextEvent(proc._socket, 'close');
+    fake.conn.destroy();
     await clientClosed;
-    child.stderr.emit('data', Buffer.from('panicked'));
-    child.emit('exit', 101, null);
+    fake.child.stderr.emit('data', Buffer.from('panicked'));
+    fake.child.emit('exit', 101, null);
     advanceClock(1000);
 
-    expect(child.kill).not.toHaveBeenCalled();
+    expect(fake.child.kill).not.toHaveBeenCalled();
     expect(closes.length).toEqual(1);
     expect(closes[0].code).toEqual(101);
     expect(`${closes[0].error}`).toContain('panicked');
@@ -418,49 +333,27 @@ describe('syncing over the engine socket', function () {
 
   it('treats a disconnect notification as a close', async function () {
     spyOn(console, 'warn');
-    proc.sync();
-    listening();
-    await requests(2);
+    await connected();
     const closed = nextEvent(proc, 'close');
-    conn.write('{"jsonrpc":"2.0","method":"disconnect","params":{"reason":"fell behind"}}\n');
+    fake.notify('disconnect', { reason: 'fell behind' });
     const exit = await closed;
 
     expect(exit.code).toEqual(-2);
     expect(`${exit.error}`).toContain('fell behind');
-    expect(child.kill).toHaveBeenCalled();
+    expect(fake.child.kill).toHaveBeenCalled();
   });
 
-  it('does not report a close when the bridge killed the engine', async function () {
-    proc.sync();
-    listening();
-    await requests(2);
+  it('does not report a socket failure when the engine was killed', async function () {
+    await connected();
     const closes: any[] = [];
     proc.on('close', (e) => closes.push(e));
     proc.kill();
-    const clientClosed = nextEvent((proc as any)._socket, 'close');
-    conn.destroy();
+    const clientClosed = nextEvent(proc._socket, 'close');
+    fake.conn.destroy();
     await clientClosed;
     advanceClock(1000);
     expect(closes).toEqual([]);
-    child.emit('exit', null, 'SIGTERM');
+    fake.child.emit('exit', null, 'SIGTERM');
     expect(closes.map((e) => e.signal)).toEqual(['SIGTERM']);
-  });
-
-  it('stays on stdio with TERN_ENGINE_TRANSPORT=stdio', function () {
-    process.env.TERN_ENGINE_TRANSPORT = 'stdio';
-    proc.sync();
-    expect(spawnArgs).toEqual(['sync']);
-    proc.sendMessage({ type: 'wake-workers' });
-    expect(child.stdin.write).toHaveBeenCalledWith('{"type":"wake-workers"}\n', 'utf-8');
-  });
-
-  it('stays on stdio for the C++ engine', function () {
-    (proc as any).syncEngine = 'cpp';
-    proc.sync();
-    expect(spawnArgs).toEqual(['sync']);
-    const deltas: string[][] = [];
-    proc.on('deltas', (msgs: string[]) => deltas.push(msgs));
-    child.stdout.emit('data', Buffer.from(`${JSON.stringify({ listening: socketPath })}\n`));
-    expect(deltas).toEqual([[JSON.stringify({ listening: socketPath })]]);
   });
 });

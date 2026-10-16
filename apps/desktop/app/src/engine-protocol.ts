@@ -60,9 +60,14 @@ export const Method = {
   TasksList: 'tasks.list',
   MetadataList: 'metadata.list',
   AccountList: 'account.list',
+  EngineLogsTail: 'engine.logs.tail',
   // `serve` mode's stdin only: the account JSON carries credentials.
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
+  AccountTest: 'account.test',
+  AccountReset: 'account.reset',
+  EngineResetDatabase: 'engine.resetDatabase',
+  EngineSetLogLevel: 'engine.setLogLevel',
   EngineShutdown: 'engine.shutdown',
   // `serve` mode's stdin, debug builds only.
   TestCrash: 'test.crash',
@@ -75,7 +80,7 @@ export const Method = {
 } as const;
 
 // What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
-// an engine without `features` (the C++ engine's path, an older Rust engine) has none.
+// an older engine without `features` has none.
 export const Feature = {
   Counts: 'counts',
   TasksList: 'tasks-list',
@@ -258,6 +263,39 @@ export interface AccountRemoveResult {
   stillRunning: string[];
 }
 
+// `account.test`'s result, `--mode test`'s object: `account` (with any rotated refresh token)
+// on success, `error` (an ErrorCodeToTypeMap name) and `log` on failure.
+export interface AccountTestResult {
+  account: Record<string, any> | null;
+  error: string | null;
+  error_service?: string;
+  error_advice?: string;
+  error_offline?: boolean;
+  log: string;
+}
+
+export interface ResetDatabaseResult {
+  removed: string[];
+}
+
+export interface SetLogLevelResult {
+  restarted: string[];
+}
+
+// The most `engine.logs.tail` returns (ms-ipc LOGS_TAIL_MAX_BYTES).
+export const LOGS_TAIL_MAX_BYTES = 1024 * 1024;
+
+// Without `accountId`, the engine's own log.
+export interface LogsTailParams {
+  accountId?: string;
+  bytes?: number;
+}
+
+export interface LogsTailResult {
+  text: string;
+  truncated: boolean;
+}
+
 export interface AccountIdParams {
   accountId: string;
 }
@@ -272,49 +310,29 @@ export interface DisconnectParams {
   reason: string;
 }
 
-// The stdout line the engine prints once the socket is bound.
-export interface ListeningLine {
-  listening: string;
-}
-
-export function parseListeningLine(line: string): string | null {
-  if (!line.startsWith('{"listening"')) return null;
-  try {
-    const json = JSON.parse(line) as ListeningLine;
-    return typeof json.listening === 'string' ? json.listening : null;
-  } catch (err) {
-    return null;
-  }
-}
-
 /*
-Where the engine for `accountId` listens: `<configDir>/run/<accountId>.sock`, or, when that is
-too long for sun_path (configDir under /var/folders, a long profile path), a short name in a
-per-user directory under the temp dir. Returns null if neither fits.
+Where `serve` listens: `<configDir>/run/engine.sock`, or, when that is too long for sun_path
+(configDir under /var/folders, a long profile path), a short name in a per-user directory under
+the temp dir. Returns null if neither fits.
 */
-export function engineSocketPath(
-  configDirPath: string,
-  accountId: string
+export function serveSocketPath(
+  configDirPath: string
 ): { socketPath: string; ownDir: string | null } | null {
-  const preferred = path.join(configDirPath, 'run', `${accountId}.sock`);
+  const preferred = path.join(configDirPath, 'run', 'engine.sock');
   if (Buffer.byteLength(preferred) <= MAX_SOCKET_PATH_BYTES) {
     return { socketPath: preferred, ownDir: null };
   }
   const uid = typeof process.getuid === 'function' ? process.getuid() : 0;
   const ownDir = path.join(os.tmpdir(), `tern-${uid}`);
+  // Hashed as before the per-account engines went, so an existing fallback path is kept.
   const hash = crypto
     .createHash('sha1')
-    .update(configDirPath + accountId)
+    .update(`${configDirPath}engine`)
     .digest('hex')
     .slice(0, 12);
   const socketPath = path.join(ownDir, `${hash}.sock`);
   if (Buffer.byteLength(socketPath) > MAX_SOCKET_PATH_BYTES) return null;
   return { socketPath, ownDir };
-}
-
-// `serve` mode's socket: one per config dir, `<configDir>/run/engine.sock` when it fits.
-export function serveSocketPath(configDirPath: string) {
-  return engineSocketPath(configDirPath, 'engine');
 }
 
 /*

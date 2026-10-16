@@ -3,15 +3,13 @@
 
 /*
 The supervisor of the Rust engine's `serve` mode: one engine process for every account
-(docs/engine-protocol-plan.md section 4). The main process's EngineSupervisor owns it when
-serveEngineSelected() is true; the main window's MailsyncBridge keeps its per-account
-processes otherwise.
+(docs/engine-protocol-plan.md section 4), owned by the main process's EngineSupervisor.
 
-It keeps the engine's accounts equal to the host's (account.add / account.remove), routes
-each account's commands to it, and applies the per-process relaunch rules of the per-account
-path to accounts instead: an `account.state` `stopped` counts as that account's crash and adds
-it again, until CrashTracker's cutoff. An engine exit counts as an engine crash and respawns
-it with every account. Nothing here touches AppEnv or the stores, so the spec drives it with a
+It keeps the engine running, with zero accounts too, and its accounts equal to the host's
+(account.add / account.remove), routes each account's commands to it, and applies relaunch
+rules per account: an `account.state` `stopped` counts as that account's crash and adds it
+again, until CrashTracker's cutoff. An engine exit counts as an engine crash and respawns it
+with every account. Nothing here touches AppEnv or the stores, so the spec drives it with a
 fake engine.
 */
 import type { EngineServeProcess, MailsyncProcessExit } from './mailsync-process';
@@ -21,7 +19,6 @@ import {
   AccountStateParams,
   ErrorCode,
   EXIT_SOCKET_IN_USE,
-  serveSocketPath,
   SyncErrorJSON,
 } from './engine-protocol';
 
@@ -30,7 +27,7 @@ const CRASH_WINDOW_MS = 5 * 60 * 1000;
 const CRASH_LIMIT = 5;
 
 // After a reset's account.remove reported threads still in a blocking call, how long to wait
-// for them before the one-shot reset deletes the account's rows. The engine cannot report
+// for them before account.reset deletes the account's rows. The engine cannot report
 // when they end, since the account is gone from it.
 export const RESET_STRAGGLER_WAIT_MS = 10000;
 
@@ -120,18 +117,6 @@ export function isAuthFailure(error: unknown) {
   );
 }
 
-/*
-Whether the main window runs one `serve` engine for every account: the Rust engine on macOS
-and Linux, unless TERN_ENGINE_PROCESS=per-account (phase A's per-account processes) or
-TERN_ENGINE_TRANSPORT=stdio (per-account on stdio), or no socket path fits.
-*/
-export function serveEngineSelected(syncEngine: string, configDirPath: string) {
-  if (syncEngine !== 'rust' || process.platform === 'win32') return false;
-  if (process.env.TERN_ENGINE_PROCESS === 'per-account') return false;
-  if (process.env.TERN_ENGINE_TRANSPORT === 'stdio') return false;
-  return serveSocketPath(configDirPath) !== null;
-}
-
 export interface EngineAccount {
   id: string;
 }
@@ -190,17 +175,21 @@ export class EngineClient {
   engineCrashes = new CrashTracker();
   engineGaveUp = false;
   shuttingDown = false;
+  // From engine.resetDatabase until the relaunch that follows it.
+  resettingDatabase = false;
   respawnTimer = null;
 
   constructor(host: EngineClientHost) {
     this.host = host;
   }
 
-  // Adds the accounts the engine is missing and removes the ones the host no longer lists.
+  // Starts the engine if none runs, adds the accounts it is missing and removes the ones the
+  // host no longer lists.
   ensure(): Promise<void> {
-    if (this.shuttingDown || this.engineGaveUp || this.respawnTimer) {
+    if (this.shuttingDown || this.engineGaveUp || this.respawnTimer || this.resettingDatabase) {
       return Promise.resolve();
     }
+    if (!this._ensureEngine()) return Promise.resolve();
     const wanted = this.host.accounts();
     const wantedIds = new Set(wanted.map((a) => a.id));
     for (const id of [...this.entries.keys()]) {
@@ -231,8 +220,8 @@ export class EngineClient {
     await this.ensure();
   }
 
-  // Takes the account out of the engine, runs `reset` (the one-shot `--mode reset`), then lets
-  // ensure() add it back if the host still lists it.
+  // Takes the account out of the engine, runs `reset` (account.reset), then lets ensure() add
+  // it back if the host still lists it.
   async resetCache<T>(accountId: string, reset: () => Promise<T>): Promise<T> {
     this._hold(accountId);
     try {
@@ -272,6 +261,27 @@ export class EngineClient {
       this.engine.sendToAccount(accountId, json);
     }
     return true;
+  }
+
+  // Runs a stdin call on the engine, spawning it if none runs.
+  withEngine<T>(call: (engine: EngineServeProcess) => Promise<T>): Promise<T> {
+    const engine = this.shuttingDown ? null : this._ensureEngine();
+    if (!engine) return Promise.reject(new Error('The sync engine is not running'));
+    return call(engine);
+  }
+
+  // Empties the engine's database. The engine forgets every account and ensure() leaves it
+  // that way: the caller relaunches the app.
+  async resetDatabase() {
+    this.resettingDatabase = true;
+    const result = await this.withEngine((engine) => engine.resetDatabase());
+    const ids = [...this.entries.keys()];
+    this.entries.clear();
+    this._changed();
+    for (const id of ids) {
+      this.host.onAccountExited(id);
+    }
+    return result;
   }
 
   wakeAll() {
@@ -487,7 +497,7 @@ export class EngineClient {
     for (const id of ids) {
       this.host.onAccountExited(id);
     }
-    // Killed from outside, as a per-account process could be: the next ensure() respawns it.
+    // Killed from outside: the next ensure() respawns it.
     if (this.shuttingDown || exit.signal === 'SIGTERM') return;
 
     if (exit.code === EXIT_SOCKET_IN_USE && this.inUseExits < ENGINE_IN_USE_RETRIES) {

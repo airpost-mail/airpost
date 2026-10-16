@@ -57,7 +57,7 @@ describe('stage 1 engine events on a window connection', function () {
   const open = (socketPath = fake.socketPath, { mainWindow = true } = {}) => {
     connection = new EngineConnection({ clientName: 'tern-desktop/spec', mainWindow });
     feedEngineEvents(connection, events);
-    connection.on('deltas', (msgs) => applyDeltas(msgs, { mainWindow, rebroadcast: false }));
+    connection.on('deltas', (msgs) => applyDeltas(msgs, { mainWindow }));
     const status: EngineStatus = {
       generation: 1,
       socketPath,
@@ -171,13 +171,13 @@ describe('stage 1 engine events on a window connection', function () {
   });
 });
 
-describe('ThreadCounts deltas of the engines the main window runs', function () {
-  it('go to EngineEvents and are not rebroadcast', function () {
+describe('ThreadCounts deltas', function () {
+  it('go to EngineEvents and not to DatabaseStore', function () {
     spyOn(DefaultEngineEvents, 'threadCounts');
     spyOn(ipcRenderer, 'send');
     spyOn(DatabaseStore, 'trigger');
     const delta = countsDelta('c1', 2, 3);
-    applyDeltas([JSON.stringify(delta)], { mainWindow: true, rebroadcast: true });
+    applyDeltas([JSON.stringify(delta)], { mainWindow: true });
     expect(DefaultEngineEvents.threadCounts).toHaveBeenCalledWith({
       type: 'persist',
       rows: delta.modelJSONs,

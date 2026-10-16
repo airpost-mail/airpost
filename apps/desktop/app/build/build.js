@@ -63,10 +63,10 @@ function spawn(options) {
     const stdout = [];
     const stderr = [];
     const proc = childSpawn(options.cmd, options.args, options.opts);
-    proc.stdout.on('data', data => stdout.push(data.toString()));
-    proc.stderr.on('data', data => stderr.push(data.toString()));
+    proc.stdout.on('data', (data) => stdout.push(data.toString()));
+    proc.stderr.on('data', (data) => stderr.push(data.toString()));
     proc.on('error', reject);
-    proc.on('close', exitCode => {
+    proc.on('close', (exitCode) => {
       const result = { stdout: stdout.join(''), stderr: stderr.join(''), code: exitCode };
       if (exitCode !== 0) {
         console.error(result.stderr);
@@ -82,18 +82,18 @@ const symlinkedPackages = [];
 function resolveRealSymlinkPaths() {
   console.log('---> Resolving symlinks');
   const dirs = ['internal_packages', 'src', 'spec', 'node_modules'];
-  dirs.forEach(dir => {
+  dirs.forEach((dir) => {
     const absoluteDir = path.join(appDir, dir);
-    const entries = fs.readdirSync(absoluteDir).flatMap(name => {
+    const entries = fs.readdirSync(absoluteDir).flatMap((name) => {
       const scopeDir = path.join(absoluteDir, name);
       // Scoped packages (`@tern/email-dark`) are links inside a real `@scope` directory.
       const isScope = dir === 'node_modules' && name.startsWith('@');
       if (isScope && !fs.lstatSync(scopeDir).isSymbolicLink()) {
-        return fs.readdirSync(scopeDir).map(child => path.join(name, child));
+        return fs.readdirSync(scopeDir).map((child) => path.join(name, child));
       }
       return [name];
     });
-    entries.forEach(packageName => {
+    entries.forEach((packageName) => {
       const relativePackageDir = path.join(dir, packageName);
       const absolutePackageDir = path.join(absoluteDir, packageName);
       const realPackagePath = fs.realpathSync(absolutePackageDir).replace('/private/', '/');
@@ -156,8 +156,8 @@ function writeFileEnsureDir(filePath, contents) {
 
 function runTranspilers({ buildPath }) {
   console.log('---> Running TypeScript Compiler');
-  sourceGlobs.forEach(pattern => {
-    glob.sync(pattern, { cwd: buildPath }).forEach(relPath => {
+  sourceGlobs.forEach((pattern) => {
+    glob.sync(pattern, { cwd: buildPath }).forEach((relPath) => {
       const tsPath = path.join(buildPath, relPath);
       const tsCode = fs.readFileSync(tsPath).toString();
       if (/\.js$/.test(tsPath)) return;
@@ -180,7 +180,7 @@ async function runUploadSourceMapsToSentry({ buildPath }) {
   const mapFiles = glob.sync('**/*.js.map', { cwd: buildPath });
 
   const cleanup = () => {
-    mapFiles.forEach(relPath => fs.unlinkSync(path.join(buildPath, relPath)));
+    mapFiles.forEach((relPath) => fs.unlinkSync(path.join(buildPath, relPath)));
     console.log(`---> Cleaned up ${mapFiles.length} source map files`);
   };
 
@@ -255,8 +255,6 @@ function buildPackagerOptions() {
       unpack:
         '{' +
         [
-          'mailsync',
-          'mailsync.exe',
           // The Rust engine and the MCP server, placed by
           // apps/engine/packaging/build-release.sh --install-desktop. Preferences runs
           // tern-mcp, and MCP clients run it from here, so it must be a real file.
@@ -264,7 +262,6 @@ function buildPackagerOptions() {
           'mailsync-rs.exe',
           'tern-mcp',
           'tern-mcp.exe',
-          'mailsync.bin',
           '*.so',
           '*.so.*',
           '*.dll',
@@ -291,9 +288,9 @@ function buildPackagerOptions() {
       /^\/docs_src.*/,
       /^\/script.*/,
       /^\/spec.*/,
-      // The C++ engine is never packaged, even if a local build left one in app/: its
-      // dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not GPL-compatible or have
-      // no licence. Only mailsync-rs ships.
+      // The C++ engine (legacy/mailsync-cpp) is never packaged, even if a local build left one
+      // in app/: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
+      // GPL-compatible or have no licence. Only mailsync-rs ships.
       /^\/mailsync(\.exe|\.bin|\.dSYM.*)?$/,
       // better-sqlite3's test fixture; postinstall deletes it, this catches a stale tree.
       /test_extension\.node$/,
@@ -337,7 +334,7 @@ function buildPackagerOptions() {
           // "Developer ID Application" certs: signing with one the profile doesn't list makes
           // amfid reject the restricted entitlements and the app refuses to launch.
           identity: process.env.APPLE_SIGNING_IDENTITY,
-          optionsForFile: filePath => {
+          optionsForFile: (filePath) => {
             // Only the main app bundle gets the full entitlements plist,
             // which includes restricted entitlements (keychain-access-groups,
             // com.apple.developer.*) that are validated against the embedded
@@ -452,7 +449,9 @@ async function createDebInstaller() {
     const { stdout } = await spawn({ cmd: 'du', args: ['-sk', contentsDir] });
     installedSize = stdout.split(/\s+/).shift() || '200000';
   } catch (err) {
-    console.warn(`---> du failed (${err.message}), defaulting installed size to ${installedSize}KB`);
+    console.warn(
+      `---> du failed (${err.message}), defaulting installed size to ${installedSize}KB`
+    );
   }
 
   const data = {
@@ -529,7 +528,7 @@ async function main() {
   // app/build/create-signed-windows-installer.js because of path issues.
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

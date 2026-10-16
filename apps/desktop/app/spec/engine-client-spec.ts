@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { EngineServeProcess, ENGINE_SHUTDOWN_GRACE_MS } from '../src/mailsync-process';
 import {
@@ -11,7 +12,6 @@ import {
   ENGINE_IN_USE_RETRIES,
   ENGINE_IN_USE_RETRY_MS,
   RESET_STRAGGLER_WAIT_MS,
-  serveEngineSelected,
 } from '../src/engine-client';
 import { EXIT_SOCKET_IN_USE, serveSocketPath } from '../src/engine-protocol';
 import { FakeEngine, tick, until } from './fake-serve-engine';
@@ -50,8 +50,7 @@ describe('the serve engine client', function () {
     spyOn(console, 'log');
     spyOn(console, 'warn');
     host = {
-      createEngine: () =>
-        new EngineServeProcess({ configDirPath: dir, resourcePath: dir, syncEngine: 'rust' }),
+      createEngine: () => new EngineServeProcess({ configDirPath: dir, resourcePath: dir }),
       accounts: () => accounts,
       accountJSONs: async (list) => list.map((a) => accountJSON(a.id)),
       onDeltas: (msgs) => deltas.push(...msgs),
@@ -371,6 +370,31 @@ describe('the serve engine client', function () {
     expect(failures).toEqual([]);
   });
 
+  it('runs the engine with no accounts and spawns one for a stdin call', async function () {
+    accounts = [];
+    await client.ensure();
+    expect(fake.spawns.length).toBe(1);
+    expect(fake.stdinOf('account.add').length).toBe(0);
+
+    fake.child.emit('exit', null, 'SIGTERM');
+    expect(client.engine).toBe(null);
+    const result = await client.withEngine((engine) => engine.resetAccount('a1'));
+    expect(result).toEqual({});
+    expect(fake.spawns.length).toBe(2);
+    expect(fake.stdinOf('account.reset')[0].child).toBe(fake.child);
+  });
+
+  it('forgets every account on a database reset and adds none back', async function () {
+    await started();
+    await client.resetDatabase();
+    expect(fake.stdinOf('engine.resetDatabase').length).toBe(1);
+    expect(client.entries.size).toBe(0);
+    expect(exited.sort()).toEqual(['a1', 'a2']);
+    await client.ensure();
+    await tick();
+    expect(fake.stdinOf('account.add').length).toBe(2);
+  });
+
   it('resolves the shutdown once the engine exits on its own', async function () {
     await started();
     await client.shutdown();
@@ -378,44 +402,20 @@ describe('the serve engine client', function () {
   });
 });
 
-describe('choosing the serve engine', function () {
-  let saved: { [key: string]: string } = {};
-
-  beforeEach(function () {
-    saved = {
-      TERN_ENGINE_PROCESS: process.env.TERN_ENGINE_PROCESS,
-      TERN_ENGINE_TRANSPORT: process.env.TERN_ENGINE_TRANSPORT,
-    };
-    delete process.env.TERN_ENGINE_PROCESS;
-    delete process.env.TERN_ENGINE_TRANSPORT;
+describe('the serve socket path', function () {
+  it('is <configDir>/run/engine.sock when it fits', function () {
+    expect(serveSocketPath('/Users/me/.tern')).toEqual({
+      socketPath: path.join('/Users/me/.tern', 'run', 'engine.sock'),
+      ownDir: null,
+    });
   });
 
-  afterEach(function () {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    }
-  });
-
-  it('runs the Rust engine as one serve process by default', function () {
-    expect(serveEngineSelected('rust', '/tmp/tern')).toBe(process.platform !== 'win32');
-    expect(serveEngineSelected('cpp', '/tmp/tern')).toBe(false);
-  });
-
-  it('keeps per-account processes when asked to', function () {
-    process.env.TERN_ENGINE_PROCESS = 'per-account';
-    expect(serveEngineSelected('rust', '/tmp/tern')).toBe(false);
-    delete process.env.TERN_ENGINE_PROCESS;
-    process.env.TERN_ENGINE_TRANSPORT = 'stdio';
-    expect(serveEngineSelected('rust', '/tmp/tern')).toBe(false);
-  });
-
-  it('places the socket at run/engine.sock', function () {
-    expect(serveSocketPath('/Users/me/.tern').socketPath).toEqual(
-      path.join('/Users/me/.tern', 'run', 'engine.sock')
-    );
+  it('falls back to a short name in a per-user temp dir', function () {
+    const configDir = `/Users/me/${'x'.repeat(100)}`;
+    const { socketPath, ownDir } = serveSocketPath(configDir);
+    expect(ownDir).toEqual(path.join(os.tmpdir(), `tern-${process.getuid()}`));
+    expect(path.dirname(socketPath)).toEqual(ownDir);
+    expect(path.basename(socketPath)).toMatch(/^[0-9a-f]{12}\.sock$/);
+    expect(Buffer.byteLength(socketPath)).not.toBeGreaterThan(103);
   });
 });

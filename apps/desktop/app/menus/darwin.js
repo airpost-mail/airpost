@@ -250,7 +250,6 @@ module.exports = {
           command: 'window:toggle-component-regions',
         },
         { type: 'separator' },
-        { label: localized('Attach Mailsync to Xcode'), command: 'window:attach-to-xcode' },
         { label: localized('Open Mailsync Logs'), command: 'window:open-mailsync-logs' },
       ],
     },

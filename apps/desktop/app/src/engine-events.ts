@@ -4,8 +4,8 @@
 /*
 The serve engine as a window's stores and packages see it: the features its hello announced,
 socket requests to it, and the notifications MailsyncBridge doesn't turn into database changes.
-MailsyncBridge feeds it from the window's EngineConnection; with per-account engines or the C++
-engine nothing does, so `features` stays null and every `has()` is false.
+MailsyncBridge feeds it from the window's EngineConnection; until the first hello (and in spec
+mode) `features` is null and every `has()` is false.
 
 Events: 'connected' (features) after each hello, 'gone' when the connection drops,
 'thread-counts' ({type, rows}) for each ThreadCounts delta, 'mail-new' (MailNewParams).

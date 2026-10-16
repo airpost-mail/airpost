@@ -44,8 +44,11 @@ export class FakeEngine {
   exitOnShutdown = true;
   // False stands in for an engine that could not bind and never reads stdin.
   answerList = true;
-  // Socket results by method, instead of `{}`.
+  // The account.test result, instead of a passed test that echoes the account.
+  testResult: any = null;
+  // Socket results by method, instead of `{}`, and errors, instead of a result.
   socketResults: { [method: string]: any } = {};
+  socketErrors: { [method: string]: { code: number; message: string } } = {};
   // Deltas published before the first subscribe to every account and class, which takes them.
   backlog: any[] | null = null;
 
@@ -79,7 +82,11 @@ export class FakeEngine {
             if (this.socketResults[req.method] !== undefined) {
               result = this.socketResults[req.method];
             }
-            socket.write(`${JSON.stringify({ jsonrpc: '2.0', id: req.id, result })}\n`);
+            const error = this.socketErrors[req.method];
+            const reply = error
+              ? { jsonrpc: '2.0', id: req.id, error }
+              : { jsonrpc: '2.0', id: req.id, result };
+            socket.write(`${JSON.stringify(reply)}\n`);
             const p = req.params || {};
             if (req.method === 'subscribe' && this.backlog && !p.accounts && !p.classes) {
               for (const params of this.backlog) this.notify('delta', params, socket);
@@ -143,6 +150,21 @@ export class FakeEngine {
       }
       case 'account.remove':
         return respond({ stillRunning: this.stillRunning });
+      case 'account.test':
+        return respond(
+          this.testResult || {
+            account: req.params.account,
+            error: null,
+            log: '',
+            error_service: 'smtp',
+          }
+        );
+      case 'account.reset':
+        return respond({});
+      case 'engine.resetDatabase':
+        return respond({ removed: [] });
+      case 'engine.setLogLevel':
+        return respond({ restarted: [] });
       case 'engine.shutdown':
         if (!this.exitOnShutdown) return null;
         return respond({}).then(() => child.emit('exit', 0, null));

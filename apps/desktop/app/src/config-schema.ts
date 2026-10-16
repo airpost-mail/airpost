@@ -22,12 +22,6 @@ export default {
             default: 0,
             title: localized('Enable verbose IMAP / SMTP logging'),
           },
-          // Read by mailsync-process.ts at launch; no UI until the Rust engine is dogfooded.
-          engine: {
-            type: 'string',
-            default: 'cpp',
-            enum: ['cpp', 'rust'],
-          },
         },
       },
       appearance: {

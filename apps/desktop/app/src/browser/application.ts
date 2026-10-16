@@ -33,7 +33,7 @@ import { developerToolsAvailable } from '../developer-tools';
 import MailspringProtocolHandler from './mailspring-protocol-handler';
 import ConfigPersistenceManager from './config-persistence-manager';
 import moveToApplications from './move-to-applications';
-import { MailsyncProcess, resolveSyncEngine, SyncEngine } from '../mailsync-process';
+import { MailsyncProcess } from '../mailsync-process';
 import Config from '../config';
 import { registerQuickpreviewIPCHandlers } from './quickpreview-ipc';
 import { guardAuxiliaryWindowNavigation } from './auxiliary-window-guard';
@@ -51,14 +51,12 @@ import {
   registerEngineSupervisorIPC,
   waitForEarlierEngine,
 } from './engine-supervisor';
-import { serveEngineSelected } from '../engine-client';
 
 // The application's singleton class.
 //
 export default class Application extends EventEmitter {
   resourcePath: string;
   configDirPath: string;
-  syncEngine: SyncEngine;
   config: Config;
   version: string;
   devMode: boolean;
@@ -111,11 +109,9 @@ export default class Application extends EventEmitter {
       app.dock?.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'tern-dock.png'));
     }
 
-    this.syncEngine = resolveSyncEngine(configDirPath, resourcePath);
-
     try {
       await waitForEarlierEngine(configDirPath);
-      const mailsync = new MailsyncProcess({ ...options, syncEngine: this.syncEngine });
+      const mailsync = new MailsyncProcess(options);
       await mailsync.migrate();
     } catch (err) {
       let message = null;
@@ -225,16 +221,14 @@ export default class Application extends EventEmitter {
     }
   }
 
-  // The keyset and, for the Rust engine's `serve` mode, the engine live in the main process;
-  // windows reach both over IPC.
+  // The keyset and the engine live in the main process; windows reach both over IPC.
   startEngineSupervisor() {
     this.keyManager = new KeyManager({ config: this.config });
     registerKeyManagerIPC(ipcMain, this.keyManager);
-    if (!this.specMode && serveEngineSelected(this.syncEngine, this.configDirPath)) {
+    if (!this.specMode) {
       this.engineSupervisor = new EngineSupervisor({
         configDirPath: this.configDirPath,
         resourcePath: this.resourcePath,
-        syncEngine: this.syncEngine,
         config: this.config,
         keyManager: this.keyManager,
         broadcast: (channel, payload) => {
@@ -409,8 +403,19 @@ export default class Application extends EventEmitter {
       app.quit();
     };
     this.windowManager.destroyAllWindows();
-    const stopped = this.engineSupervisor ? this.engineSupervisor.shutdown() : Promise.resolve();
-    stopped.then(() => this._deleteDatabase(done));
+    const supervisor = this.engineSupervisor;
+    if (!supervisor) {
+      this._deleteDatabase(done);
+      return;
+    }
+    // The engine empties the database it holds open; if it can't, the files go once it exited.
+    supervisor.resetDatabase().then(
+      () => supervisor.shutdown().then(done),
+      (err) => {
+        console.error(`engine.resetDatabase failed: ${err}`);
+        return supervisor.shutdown().then(() => this._deleteDatabase(done));
+      }
+    );
   };
 
   _deleteDatabase = (callback) => {
@@ -855,11 +860,6 @@ export default class Application extends EventEmitter {
         return;
       }
       event.sender[method](...args);
-    });
-
-    ipcMain.on('mailsync-bridge-rebroadcast-to-all', (event, ...args) => {
-      const win = BrowserWindow.fromWebContents(event.sender);
-      this.windowManager.sendToAllWindows('mailsync-bridge-message', { except: win }, ...args);
     });
 
     ipcMain.on('action-bridge-rebroadcast-to-all', (event, ...args) => {

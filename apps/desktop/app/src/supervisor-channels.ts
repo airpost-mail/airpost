@@ -40,11 +40,21 @@ export const SupervisorChannel = {
   AckAccountEvents: 'engine-supervisor:ack-account-events',
   // invoke {accountId}
   ForceRelaunch: 'engine-supervisor:force-relaunch',
-  // invoke {account} (no secrets) -> {error?: string}
+  // invoke {accountId} -> {error?: string}
   ResetCache: 'engine-supervisor:reset-cache',
-  // send
-  AttachToXcode: 'engine-supervisor:attach-to-xcode',
+  // invoke {account} (with secrets) -> AccountTestReply. Onboarding's settings check.
+  TestAccount: 'engine-supervisor:test-account',
+  // invoke -> {error?: string}. Removes every account and empties the database; the caller
+  // relaunches.
+  ResetDatabase: 'engine-supervisor:reset-database',
 } as const;
+
+// `account.test`'s result (a failed test is a result with `error`), or why the engine could not
+// run it.
+export interface AccountTestReply {
+  result?: { account: Record<string, any> | null; error: string | null; [key: string]: any };
+  error?: string;
+}
 
 // What the main window's connection needs to route a command: EngineClient's entry state
 // ('adding' until account.add answered, 'removing' while account.remove runs) and whether

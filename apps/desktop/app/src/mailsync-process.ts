@@ -3,35 +3,33 @@
 /*
 Warning! This file is imported from the main process as well as the renderer process
 */
-import { spawn, exec, ChildProcess } from 'child_process';
-import { Readable } from 'stream';
+import { spawn, ChildProcess } from 'child_process';
 import { StringDecoder } from 'string_decoder';
 import path from 'path';
-import os from 'os';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import net from 'net';
 import { localized } from './intl';
 import { developerToolsAvailable } from './developer-tools';
-import { Account } from 'mailspring-exports';
 import {
   AccountAddResult,
   AccountRemoveResult,
   AccountStateParams,
+  AccountTestResult,
   DisconnectParams,
-  engineSocketPath,
   HelloParams,
   HelloResult,
   MailNewParams,
   MAX_LINE_BYTES,
   Method,
-  parseListeningLine,
   PROTOCOL_VERSION,
   RequestId,
   requestForCommand,
+  ResetDatabaseResult,
   RpcResponse,
   RpcError,
   serveSocketPath,
+  SetLogLevelResult,
   SubscribeParams,
   deltaParamsText,
 } from './engine-protocol';
@@ -40,8 +38,6 @@ import {
   GMAIL_CLIENT_ID,
   GMAIL_CLIENT_SECRET,
 } from '../internal_packages/onboarding/lib/onboarding-constants';
-
-let Utils = null;
 
 export interface MailsyncProcessExit {
   code: number;
@@ -133,138 +129,60 @@ export function lastJSONResponse(stdout: string): any | null {
   return null;
 }
 
-/*
-Which sync engine to run: the C++ `mailsync` or the Rust `mailsync-rs`, shipped side by side
-in app.asar.unpacked. `core.sync.engine` in config.json picks one, `MAILSYNC_ENGINE` overrides
-it, and C++ stays the default until the Rust engine has been dogfooded.
-
-The main process resolves this once at startup, before `migrate`, and hands the result to
-every window in its load settings, so all processes of one launch run the engine that
-migrated the database. A changed setting takes effect on the next launch.
-*/
-export type SyncEngine = 'cpp' | 'rust';
-
-const SYNC_ENGINE_BINARIES: { [engine in SyncEngine]: string } = {
-  cpp: 'mailsync',
-  rust: 'mailsync-rs',
-};
-
-function syncEngineBinaryPath(resourcePath: string, engine: SyncEngine) {
-  return path
-    .join(resourcePath, SYNC_ENGINE_BINARIES[engine])
-    .replace('app.asar', 'app.asar.unpacked');
-}
-
-function configuredSyncEngine(configDirPath: string): SyncEngine {
-  const fromEnv = process.env.MAILSYNC_ENGINE;
-  if (fromEnv === 'cpp' || fromEnv === 'rust') {
-    return fromEnv;
-  }
-  // Read config.json directly, as intl.ts does: this runs before Config is loaded.
-  try {
-    const config = JSON.parse(fs.readFileSync(path.join(configDirPath, 'config.json')).toString());
-    if (config['*'].core.sync.engine === 'rust') {
-      return 'rust';
-    }
-  } catch (err) {
-    // first run, or no engine setting
-  }
-  return 'cpp';
-}
-
-// A build without mailsync-rs (no packaging step put it there, or Windows) runs the C++
-// engine rather than failing to launch on a setting the user can only undo in config.json.
-export function resolveSyncEngine(configDirPath: string, resourcePath: string): SyncEngine {
-  const engine = configuredSyncEngine(configDirPath);
-  if (engine === 'rust' && !fs.existsSync(syncEngineBinaryPath(resourcePath, 'rust'))) {
-    console.warn(
-      `The Rust sync engine is selected but ${SYNC_ENGINE_BINARIES.rust} is not in this ` +
-        `build; running the C++ engine`
-    );
-    return 'cpp';
-  }
-  // Source checkouts of the monorepo carry no C++ binary, only the Rust one the engine build
-  // installs.
-  if (
-    engine === 'cpp' &&
-    !fs.existsSync(syncEngineBinaryPath(resourcePath, 'cpp')) &&
-    fs.existsSync(syncEngineBinaryPath(resourcePath, 'rust'))
-  ) {
-    console.warn(
-      `The C++ sync engine is selected but ${SYNC_ENGINE_BINARIES.cpp} is not in this ` +
-        `build; running the Rust engine`
-    );
-    return 'rust';
-  }
-  return engine;
+// The Rust engine, unpacked from the asar by build/build.js.
+export function engineBinaryPath(resourcePath: string) {
+  return path.join(resourcePath, 'mailsync-rs').replace('app.asar', 'app.asar.unpacked');
 }
 
 /*
-The Rust engine's `migrate` moves a C++ database aside itself. The C++ engine opens a
-`user_version = 12` database without migrating it (MailStore.cpp), so on a database the Rust
-engine wrote it would run on Rust-generated ids. Before C++ migrates, move such a database to
-edgehill.rust.db* so C++ starts from an empty one and resyncs.
+The Error a failed `account.test` (or a one-shot mode's JSON result) stands for, with the
+fields onboarding reads: `rawLog`, `errorAdvice`, `errorService`, `isNetworkError` and
+`isUserError`. `stripSecrets` redacts the transcript.
 */
-function moveAsideRustDatabase(configDirPath: string) {
-  const dbPath = path.join(configDirPath, 'edgehill.db');
-  if (!fs.existsSync(dbPath)) return;
-
-  let engine = null;
-  let localOnly = null;
-  try {
-    const Sqlite3 = require('better-sqlite3');
-    const db = new Sqlite3(dbPath, { fileMustExist: true });
-    try {
-      const row = db.prepare('SELECT value FROM `_State` WHERE id = ?').get('engine');
-      engine = row ? row.value : null;
-      if (engine === 'rust') {
-        localOnly = countLocalOnlyRows(db);
-      }
-    } finally {
-      db.close();
-    }
-  } catch (err) {
-    // Unreadable or not one of ours; let mailsync's own migration decide.
-    return;
+export function errorFromEngineResult(response: any, stripSecrets: (text: string) => string) {
+  const isRecognizedMailsyncError = Object.prototype.hasOwnProperty.call(
+    LocalizedErrorStrings,
+    response.error
+  );
+  let msg = isRecognizedMailsyncError ? LocalizedErrorStrings[response.error] : response.error;
+  if (response.error_service) {
+    msg = `${msg} (${response.error_service.toUpperCase()})`;
   }
-  if (engine !== 'rust') return;
-
-  console.log('Moving the Rust engine database aside before the C++ engine migrates');
-  // Nothing imports from edgehill.rust.db, and the next switch back replaces it.
-  if (localOnly && (localOnly.drafts > 0 || localOnly.scheduled > 0)) {
-    console.warn(
-      `Switching to the C++ engine resyncs from the server. ${localOnly.drafts} unsent local ` +
-        `draft(s) and ${localOnly.scheduled} pending snooze/send-later/reminder value(s) stay ` +
-        `only in edgehill.rust.db, which the next switch from Rust to C++ replaces.`
-    );
+  // Set only for a rejected TLS handshake today; arrives unlocalized.
+  if (response.error_advice) {
+    msg = `${msg} ${response.error_advice}`;
   }
-  for (const suffix of ['', '-wal', '-shm']) {
-    const from = `${dbPath}${suffix}`;
-    const to = path.join(configDirPath, `edgehill.rust.db${suffix}`);
-    if (fs.existsSync(to)) fs.unlinkSync(to);
-    if (fs.existsSync(from)) fs.renameSync(from, to);
-  }
+  const error = new Error(msg);
+  (error as any).rawLog = stripSecrets(response.log);
+  (error as any).errorAdvice = response.error_advice || null;
+  (error as any).errorService = response.error_service || null;
+  // Set when the engine classified the failure as this machine being unable to reach the
+  // network, rather than a server refusing or rejecting us.
+  (error as any).isNetworkError = response.error_offline === true;
+  // Errors the engine explicitly classified (bad credentials, unreachable server,
+  // TLS/certificate problems, provider-side rate limits, etc.) describe the mail server or
+  // the user's settings, not a bug - except for the ambiguous codes above, which we still
+  // want reported if they occur. Callers that report unexpected errors to Sentry (e.g.
+  // oauth-signin-page's error handler) check this flag to avoid flooding error tracking
+  // with expected, user-actionable failures.
+  (error as any).isUserError =
+    isRecognizedMailsyncError && !AMBIGUOUS_MAILSYNC_ERRORS.has(response.error);
+  return error;
 }
 
-/* Drafts never uploaded (a UID-0 placement only) and metadata waiting on an expiration:
-what a resync from the server does not bring back to an account without a metadata identity. */
-function countLocalOnlyRows(db: any): { drafts: number; scheduled: number } | null {
-  try {
-    const drafts = db
-      .prepare(
-        'SELECT count(*) AS n FROM Message m WHERE m.draft = 1 AND EXISTS ' +
-          '(SELECT 1 FROM MessageFolder p WHERE p.messageId = m.id AND p.remoteUID = 0) ' +
-          'AND NOT EXISTS ' +
-          '(SELECT 1 FROM MessageFolder p WHERE p.messageId = m.id AND p.remoteUID > 0)'
-      )
-      .get().n;
-    const scheduled = db
-      .prepare('SELECT count(*) AS n FROM ModelPluginMetadata WHERE expiration > ?')
-      .get(Math.floor(Date.now() / 1000)).n;
-    return { drafts, scheduled };
-  } catch (err) {
-    return null;
+// Redacts the values of known secret keys in a log or error text (e.g.
+// "refresh_token":"abc"), which catches secrets the engine rotated and the client has not
+// seen yet.
+export function stripSecretKeys(text: string) {
+  if (!text) return text;
+  let out = text;
+  const SENSITIVE_JSON_KEYS = ['refresh_token', 'access_token', 'imap_password', 'smtp_password'];
+  for (const key of SENSITIVE_JSON_KEYS) {
+    // Match "key":"<anything-but-unescaped-quote>" allowing escaped quotes inside.
+    const re = new RegExp(`("${key}"\\s*:\\s*")(?:\\\\.|[^"\\\\])+(")`, 'g');
+    out = out.replace(re, '$1*********$2');
   }
+  return out;
 }
 
 // A crashed engine closes its socket as it exits. How long a dropped socket waits for the exit
@@ -286,12 +204,16 @@ function ensurePrivateDir(dir: string) {
   }
 }
 
+/*
+The engine binary: the one-shot `migrate` and `import-legacy` the main process runs before
+anything else, and (EngineServeProcess) the `serve` engine every account runs in.
+*/
 export class MailsyncProcess extends EventEmitter {
   _proc: ChildProcess = null;
   _win = null;
 
-  // Socket transport (Rust engine, sync mode). `_socketQueue` holds requests sent before the
-  // engine printed its listening line; it is null once connected and after the connection ends.
+  // The socket connection (EngineServeProcess). `_socketQueue` holds requests sent before the
+  // engine bound its socket; it is null once connected and after the connection ends.
   _socketPath: string = null;
   _socket: net.Socket = null;
   _socketQueue: string[] = null;
@@ -309,32 +231,25 @@ export class MailsyncProcess extends EventEmitter {
   // class, which still brings it every account.state (src/browser/engine-supervisor.ts).
   subscription: SubscribeParams = { accounts: null, classes: null };
 
-  // these must be set before you use the process
-  account: Account = null;
-
   verbose: boolean;
   resourcePath: string;
   configDirPath: string;
-  syncEngine: SyncEngine;
   binaryPath: string;
 
   constructor({
     configDirPath,
     resourcePath,
     verbose,
-    syncEngine,
   }: {
     configDirPath: string;
     resourcePath: string;
     verbose?: boolean;
-    syncEngine?: SyncEngine;
   }) {
     super();
     this.verbose = verbose;
     this.resourcePath = resourcePath;
     this.configDirPath = configDirPath;
-    this.syncEngine = syncEngine || resolveSyncEngine(configDirPath, resourcePath);
-    this.binaryPath = syncEngineBinaryPath(resourcePath, this.syncEngine);
+    this.binaryPath = engineBinaryPath(resourcePath);
   }
 
   _showStatusWindow(mode) {
@@ -395,18 +310,9 @@ export class MailsyncProcess extends EventEmitter {
       GMAIL_CLIENT_ID: GMAIL_CLIENT_ID,
       GMAIL_CLIENT_SECRET: GMAIL_CLIENT_SECRET,
     });
-    // The C++ engine prints its usage and exits when this is empty. Without an identity it
-    // only reads it in install-check mode, which the app doesn't run.
-    if (this.syncEngine === 'cpp') {
-      env.IDENTITY_SERVER = 'unknown';
-    }
-
     const args = [`--mode`, mode];
     if (this.verbose) {
       args.push('--verbose');
-    }
-    if (this.account) {
-      args.push('--info', this.account.emailAddress);
     }
     args.push(...extraArgs);
     this._proc = spawn(this.binaryPath, args, { env });
@@ -419,52 +325,13 @@ export class MailsyncProcess extends EventEmitter {
       this._proc.stdin.setDefaultEncoding('utf-8');
       (this._proc.stdin as any).highWaterMark = 1024 * 1024;
     }
-
-    // stdout may not be present if an error occurred. Error handler hasn't been
-    // attached yet, but will be by the caller of spawnProcess.
-    if (this.account && this._proc.stdout) {
-      this._proc.stdout.once('data', () => {
-        const rs = new Readable();
-        // Both engines read an identity line after the account; `null` means none.
-        rs.push(`${JSON.stringify(this.account)}\nnull\n`);
-        rs.push(null);
-        rs.pipe(this._proc.stdin, { end: false });
-      });
-    }
   }
 
-  // Redacts known secrets from a log/error string before it's surfaced to
-  // the UI, error reporting, or thrown errors. Two strategies are combined:
-  //
-  // 1. Key-based: replace the value of any known sensitive JSON key (e.g.
-  //    "refresh_token":"abc"). This catches secrets the engine has rotated
-  //    and not yet pushed back to us (e.g. ProcessAccountSecretsUpdated),
-  //    where the new value is not present in this.account.
-  // 2. Value-based: replace literal occurrences of the secrets currently
-  //    cached on this.account, in case they appear outside JSON form.
+  // Redacts known secrets from a log or error text before it's surfaced to the UI, error
+  // reporting, or thrown errors. EngineServeProcess also replaces the secrets of the accounts
+  // it was given.
   _stripSecrets(text: string) {
-    if (!text) return text;
-    let out = text;
-
-    const SENSITIVE_JSON_KEYS = ['refresh_token', 'access_token', 'imap_password', 'smtp_password'];
-    for (const key of SENSITIVE_JSON_KEYS) {
-      // Match "key":"<anything-but-unescaped-quote>" allowing escaped quotes inside.
-      const re = new RegExp(`("${key}"\\s*:\\s*")(?:\\\\.|[^"\\\\])+(")`, 'g');
-      out = out.replace(re, '$1*********$2');
-    }
-
-    const cachedSettings = (this.account && this.account.settings) || ({} as any);
-    const cachedValues = [
-      cachedSettings.refresh_token,
-      cachedSettings.imap_password,
-      cachedSettings.smtp_password,
-    ].filter((v): v is string => typeof v === 'string' && v.length > 0);
-
-    for (const v of cachedValues) {
-      out = out.replaceAll(v, '*********');
-    }
-
-    return out;
+    return stripSecretKeys(text);
   }
 
   _spawnAndWait(mode, { onData }: { onData?: (data: any) => void } = {}) {
@@ -511,39 +378,7 @@ export class MailsyncProcess extends EventEmitter {
           if (code === 0) {
             resolve({ response, buffer });
           } else {
-            // Mailsync executed fine, and this is an mailsync error in JSON format
-            const isRecognizedMailsyncError = Object.prototype.hasOwnProperty.call(
-              LocalizedErrorStrings,
-              response.error
-            );
-            let msg = isRecognizedMailsyncError
-              ? LocalizedErrorStrings[response.error]
-              : response.error;
-            if (response.error_service) {
-              msg = `${msg} (${response.error_service.toUpperCase()})`;
-            }
-            // Set only for a rejected TLS handshake today; arrives unlocalized.
-            if (response.error_advice) {
-              msg = `${msg} ${response.error_advice}`;
-            }
-            const error = new Error(msg);
-            (error as any).rawLog = this._stripSecrets(response.log);
-            (error as any).errorAdvice = response.error_advice || null;
-            (error as any).errorService = response.error_service || null;
-            // Set when the engine classified the failure as this machine being unable to
-            // reach the network, rather than a server refusing or rejecting us.
-            (error as any).isNetworkError = response.error_offline === true;
-            // Errors mailsync explicitly classified (bad credentials, unreachable
-            // server, TLS/certificate problems, provider-side rate limits, etc.)
-            // describe the mail server or the user's settings, not a bug in
-            // Mailspring - except for the ambiguous codes above, which we still
-            // want reported if they occur. Callers that report unexpected errors
-            // to Sentry (e.g. oauth-signin-page's error handler) check this flag
-            // to avoid flooding error tracking with expected, user-actionable
-            // failures.
-            (error as any).isUserError =
-              isRecognizedMailsyncError && !AMBIGUOUS_MAILSYNC_ERRORS.has(response.error);
-            return reject(error);
+            return reject(errorFromEngineResult(response, (t) => this._stripSecrets(t)));
           }
         } catch (err) {
           const rawLog = this._stripSecrets(buffer.toString());
@@ -554,8 +389,8 @@ export class MailsyncProcess extends EventEmitter {
   }
 
   // Called when the mailsync child process wrote no parseable JSON result, meaning it
-  // crashed outright or never ran: a segfault inside mailcore, the executable-path check
-  // that exits 2, a missing shared library. The raw log is part of the message because
+  // crashed outright or never ran: a panic, the executable-path check that exits 2, a
+  // missing shared library. The raw log is part of the message because
   // those are diagnosable by the user or by whoever reads the bug report. A process
   // terminated by a signal has a null `code`, which would otherwise read "mailsync: null".
   _buildCrashError(code: number | null, signal: NodeJS.Signals | null, rawLog: string) {
@@ -571,35 +406,6 @@ export class MailsyncProcess extends EventEmitter {
     console.warn('Terminating mailsync...');
     this._killed = true;
     this._proc && this._proc.kill();
-  }
-
-  /*
-  The socket the Rust engine should serve its protocol on, or null for the stdio transport:
-  the C++ engine, Windows, TERN_ENGINE_TRANSPORT=stdio (for debugging), or no usable path.
-  */
-  _socketTransportPath(): string | null {
-    if (this.syncEngine !== 'rust' || process.platform === 'win32' || !this.account) {
-      return null;
-    }
-    if (process.env.TERN_ENGINE_TRANSPORT === 'stdio') {
-      return null;
-    }
-    const location = engineSocketPath(this.configDirPath, this.account.id);
-    if (!location) {
-      console.warn('No socket path short enough for the sync engine; using stdio');
-      return null;
-    }
-    if (location.ownDir) {
-      try {
-        ensurePrivateDir(location.ownDir);
-      } catch (err) {
-        console.warn(
-          `Cannot use ${location.ownDir} for the sync engine socket (${err}); using stdio`
-        );
-        return null;
-      }
-    }
-    return location.socketPath;
   }
 
   _clientName() {
@@ -663,7 +469,7 @@ export class MailsyncProcess extends EventEmitter {
   }
 
   /*
-  Connects to the engine once it printed its listening line, says hello, subscribes to every
+  Connects to the engine once it has bound its socket, says hello, subscribes to every
   delta and emits them as 'deltas' in the stdout shape the bridge reads: the delta object, with
   accountId added. `fail` ends the process with close code -2.
   */
@@ -778,183 +584,9 @@ export class MailsyncProcess extends EventEmitter {
     return null;
   }
 
-  sync() {
-    const socketPath = this._socketTransportPath();
-    this._socketPath = socketPath;
-    this._socketQueue = socketPath ? [] : null;
-    this._spawnProcess('sync', socketPath ? ['--socket', socketPath] : []);
-    let outBuffer = '';
-    let errBuffer = '';
-    let cleanedUp = false;
-    let socketCloseTimer = null;
-
-    // Like a stdin EPIPE: kill the engine and report code -2 so the bridge relaunches it.
-    const failSocket = (error: Error, { now }: { now?: boolean } = {}) => {
-      if (cleanedUp || this._killed) return;
-      const finish = () => {
-        if (cleanedUp || this._killed) return;
-        cleanedUp = true;
-        console.warn(`Sync engine socket failed: ${error}`);
-        this._closeSocket();
-        this._proc.kill();
-        this.emit('close', { code: -2, error, signal: null });
-      };
-      if (now) {
-        finish();
-      } else if (!socketCloseTimer) {
-        socketCloseTimer = setTimeout(finish, SOCKET_CLOSE_GRACE_MS);
-      }
-    };
-
-    if (this._proc.stdout) {
-      this._proc.stdout.on('data', (data) => {
-        const added = data.toString();
-        try {
-          outBuffer += added;
-        } catch (err) {
-          console.error(`Mailsync process buffer is ${outBuffer.length} chars, out of memory.`);
-          outBuffer = '';
-        }
-
-        if (added.indexOf('\n') !== -1) {
-          let msgs = outBuffer.split('\n');
-          outBuffer = msgs.pop();
-          if (socketPath) {
-            // stdout still carries the handshake prompts and ProcessAccountSecretsUpdated.
-            msgs = msgs.filter((msg) => {
-              const listening = parseListeningLine(msg);
-              if (listening === null) return true;
-              this._connectSocket(listening, failSocket);
-              return false;
-            });
-          }
-          this.emit('deltas', msgs);
-        }
-      });
-    }
-    if (this._proc.stderr) {
-      this._proc.stderr.on('data', (data) => {
-        try {
-          errBuffer += data.toString();
-          // Trim to last 100KB if the buffer grows too large to avoid OOM
-          if (errBuffer.length > 100 * 1024) {
-            errBuffer = errBuffer.slice(-100 * 1024);
-          }
-        } catch (err) {
-          console.error(`Mailsync stderr buffer is ${errBuffer.length} chars, out of memory.`);
-          errBuffer = '';
-        }
-      });
-    }
-    // Note: we intentionally do not re-emit this as an 'error' event on `this`.
-    // Nothing in the codebase attaches an 'error' listener to a MailsyncProcess
-    // instance, and Node's EventEmitter throws synchronously when an 'error'
-    // event has no listeners. That throw happened inside this same 'error'
-    // callback on `_proc`, which aborted the remaining `_proc.on('error', ...)`
-    // listener below (the one that actually cleans up and reports failure via
-    // 'close') before it could run — so a transient spawn failure (e.g. EIO)
-    // both crashed the app and prevented MailsyncBridge from ever marking the
-    // account as errored or retrying.
-    this._proc.on('error', (err: Error) => {
-      console.log(`Sync worker exited with ${err}`);
-    });
-
-    // Handle EPIPE and other stdin errors that occur when the child process
-    // exits while we're still trying to write to it. These errors are emitted
-    // asynchronously as 'error' events on stdin rather than thrown from write(),
-    // so the try/catch in sendMessage() does not catch them.
-    if (this._proc.stdin) {
-      this._proc.stdin.on('error', (err: Error) => {
-        if (cleanedUp) return;
-        cleanedUp = true;
-        this._closeSocket();
-        this._proc.kill();
-        this.emit('close', { code: -2, error: err, signal: null });
-      });
-    }
-
-    const onStreamCloseOrExit = (code: number, signal: string) => {
-      if (socketCloseTimer) {
-        clearTimeout(socketCloseTimer);
-        socketCloseTimer = null;
-      }
-      this._closeSocket();
-      if (cleanedUp) {
-        return;
-      }
-
-      let error = null;
-      let lastJSON = null;
-      try {
-        if (outBuffer.length) {
-          // Skip debug output that starts with 'dbg::' prefix
-          if (outBuffer.startsWith('dbg::')) {
-            console.log('Skipping debug output from mailsync:', this._stripSecrets(outBuffer));
-          } else {
-            lastJSON = JSON.parse(outBuffer);
-          }
-        }
-      } catch (parseError) {
-        console.warn('Failed to parse mailsync output as JSON:', this._stripSecrets(outBuffer));
-      } finally {
-        if (lastJSON) {
-          if (lastJSON.error) {
-            error = new Error(this._stripSecrets(lastJSON.error));
-          } else {
-            this.emit('deltas', [outBuffer]);
-          }
-        }
-      }
-
-      if (errBuffer) {
-        error = new Error(this._stripSecrets(errBuffer));
-      }
-
-      cleanedUp = true;
-      this.emit('close', { code, error, signal } as MailsyncProcessExit);
-    };
-
-    this._proc.on('error', (error) => {
-      if (cleanedUp) {
-        return;
-      }
-      cleanedUp = true;
-      this.emit('close', { code: -1, error, signal: null });
-    });
-    this._proc.on('close', onStreamCloseOrExit);
-    this._proc.on('exit', onStreamCloseOrExit);
-  }
-
-  sendMessage(json) {
-    if (!Utils) {
-      Utils = require('mailspring-exports').Utils;
-    }
-    console.log(`Sending to mailsync ${this.account ? this.account.id : '?'}`, json);
-    const request = this._socketPath ? requestForCommand(this.account.id, json) : null;
-    if (request) {
-      this._sendRequest(request.method, request.params);
-      return;
-    }
-    const msg = `${JSON.stringify(json)}\n`;
-    try {
-      this._proc.stdin.write(msg, 'utf-8');
-    } catch (error) {
-      if (error && (error.message.includes('socket has been ended') || error.code === 'EPIPE')) {
-        // The process probably already exited and we missed it somehow,
-        // but try to kill it anyway and then force-emit a 'close' to trigger
-        // the bridge to restart us.
-        this._proc.kill();
-        this.emit('close', { code: -2, error, signal: null });
-      }
-    }
-  }
-
   async migrate() {
-    if (this.syncEngine === 'cpp') {
-      moveAsideRustDatabase(this.configDirPath);
-    }
     try {
-      console.log(`Running database migrations (${this.syncEngine} engine)`);
+      console.log('Running database migrations');
       const { buffer } = await this._spawnAndWait('migrate', {
         onData: (data) => {
           const str = data.toString().toLowerCase();
@@ -966,9 +598,7 @@ export class MailsyncProcess extends EventEmitter {
       // Import while the status window is still up: closing it must be the last step before
       // the main window opens, or the main process stalls with no window (see
       // _closeStatusWindow).
-      if (this.syncEngine === 'rust') {
-        await this._importLegacy();
-      }
+      await this._importLegacy();
       this._closeStatusWindow();
     } catch (err) {
       this._closeStatusWindow();
@@ -987,41 +617,6 @@ export class MailsyncProcess extends EventEmitter {
     } catch (err) {
       console.error(`mailsync --mode import-legacy failed: ${err}`);
     }
-  }
-
-  resetCache() {
-    return this._spawnAndWait('reset');
-  }
-
-  test() {
-    return this._spawnAndWait('test');
-  }
-
-  attachToXcode() {
-    const tmppath = path.join(os.tmpdir(), 'attach.applescript');
-    fs.writeFileSync(
-      tmppath,
-      `
-tell application "Xcode"
-  activate
-end tell
-
-tell application "System Events"
-  tell application process "Xcode"
-    click (menu item "Attach to Process by PID or Name…" of menu 1 of menu bar item "Debug" of menu bar 1)
-  end tell
-  tell application process "Xcode"
-    set value of text field 1 of sheet 1 of window 1 to "${this._proc.pid}"
-  end tell
-  delay 0.5
-  tell application process "Xcode"
-    click button "Attach" of sheet 1 of window 1
-  end tell
-  
-end tell
-    `
-    );
-    exec(`osascript ${tmppath}`);
   }
 }
 
@@ -1050,7 +645,8 @@ export class EngineRequestError extends Error {
 /*
 The Rust engine's `serve` mode: one process for every account (docs/engine-protocol-plan.md
 section 4). stdin and stdout are the parent channel: JSON-RPC requests for account.add,
-account.remove and engine.shutdown, their responses, and the accounts'
+account.remove, account.test, account.reset, engine.resetDatabase, engine.setLogLevel and
+engine.shutdown, their responses, and the accounts'
 ProcessAccountSecretsUpdated deltas, so credentials never touch the socket. Everything else
 goes over the socket, connected once the first stdin response shows the engine has bound it.
 
@@ -1104,8 +700,8 @@ export class EngineServeProcess extends MailsyncProcess {
       this.emit('close', exit);
     };
 
-    // As in sync(): a dropped socket gets a moment for the real exit to arrive, then the
-    // engine is killed and the close reports -2.
+    // A dropped socket gets a moment for the real exit to arrive, then the engine is killed
+    // and the close reports -2.
     const failSocket = (error: Error, { now }: { now?: boolean } = {}) => {
       if (this._closed || this._killed) return;
       const kill = () => {
@@ -1144,7 +740,7 @@ export class EngineServeProcess extends MailsyncProcess {
         }
       });
     }
-    // See sync(): never re-emitted as 'error' on `this`.
+    // Never re-emitted as 'error' on `this`: an EventEmitter with no 'error' listener throws.
     this._proc.on('error', (error: Error) => {
       console.log(`Sync engine exited with ${error}`);
       finish({ code: -1, error, signal: null });
@@ -1242,18 +838,48 @@ export class EngineServeProcess extends MailsyncProcess {
     });
   }
 
-  // `account` is the account JSON with its secrets; `identity` the identity line, null today.
-  addAccount(account: { settings?: Record<string, unknown> }, identity: unknown = null) {
+  _rememberSecrets(account: { settings?: Record<string, unknown> }) {
     const settings = (account && account.settings) || {};
     for (const key of ['refresh_token', 'imap_password', 'smtp_password']) {
       const v = settings[key];
       if (typeof v === 'string' && v.length > 0) this._secretValues.add(v);
     }
+  }
+
+  // `account` is the account JSON with its secrets; `identity` the identity line, null today.
+  addAccount(account: { settings?: Record<string, unknown> }, identity: unknown = null) {
+    this._rememberSecrets(account);
     return this._parentCall<AccountAddResult>(Method.AccountAdd, { account, identity });
   }
 
   removeAccount(accountId: string) {
     return this._parentCall<AccountRemoveResult>(Method.AccountRemove, { accountId });
+  }
+
+  // Checks an account's IMAP and SMTP settings without adding it. The result is
+  // `--mode test`'s object with its log redacted; errorFromEngineResult turns a failed one
+  // into the Error onboarding shows.
+  async testAccount(account: { settings?: Record<string, unknown> }) {
+    this._rememberSecrets(account);
+    const result = await this._parentCall<AccountTestResult>(Method.AccountTest, { account });
+    return { ...result, log: this._stripSecrets(result.log) };
+  }
+
+  // Deletes the account's local data so it syncs from scratch. The engine forgets the
+  // account; the caller adds it again.
+  resetAccount(accountId: string) {
+    return this._parentCall(Method.AccountReset, { accountId });
+  }
+
+  // Removes every account and starts over on an empty database. The caller relaunches.
+  resetDatabase() {
+    return this._parentCall<ResetDatabaseResult>(Method.EngineResetDatabase, {});
+  }
+
+  // Verbose logging until `verboseUntil` (ms since the epoch; 0 turns it off). Running
+  // accounts restart to pick it up.
+  setLogLevel(verboseUntil: number) {
+    return this._parentCall<SetLogLevelResult>(Method.EngineSetLogLevel, { verboseUntil });
   }
 
   // One of the bridge's stdin-shaped commands, for one account.

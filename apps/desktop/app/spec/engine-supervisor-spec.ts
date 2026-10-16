@@ -12,7 +12,7 @@ import {
 } from '../src/browser/engine-supervisor';
 import { KeyManager, secureStorage } from '../src/browser/key-manager';
 import { EngineConnection } from '../src/engine-connection';
-import { EngineServeProcess, MailsyncProcess } from '../src/mailsync-process';
+import { EngineServeProcess } from '../src/mailsync-process';
 import { EngineStatus, SupervisorChannel } from '../src/supervisor-channels';
 import { FakeEngine, tick, until } from './fake-serve-engine';
 
@@ -110,7 +110,6 @@ describe('the engine supervisor', function () {
     supervisor = new EngineSupervisor({
       configDirPath: dir,
       resourcePath: dir,
-      syncEngine: 'rust',
       config,
       keyManager,
       broadcast: (channel, status: EngineStatus) => {
@@ -308,20 +307,59 @@ describe('the engine supervisor', function () {
     await until('the forced add', () => fake.stdinOf('account.add').length === 7);
   });
 
-  it('resets an account out of the engine with its secrets from KeyManager', async function () {
+  it('resets an account with account.reset while it is out of the engine', async function () {
     await started();
-    let resetAccount: any = null;
     let heldDuringReset = false;
-    spyOn(MailsyncProcess.prototype, 'resetCache').andCallFake(function () {
-      resetAccount = this.account;
+    spyOn(EngineServeProcess.prototype, 'resetAccount').andCallFake(function (id: string) {
       heldDuringReset = supervisor.status().accounts.a1.held;
-      return Promise.resolve({ response: {}, buffer: Buffer.from('') });
+      return this._parentCall('account.reset', { accountId: id });
     });
-    await supervisor.resetCache({ id: 'a1', emailAddress: 'a1@example.com', settings: {} });
-    expect(resetAccount.settings.imap_password).toBe('pw-a1');
+    await supervisor.resetCache('a1');
     expect(heldDuringReset).toBe(true);
-    await until('the add', () => fake.stdinOf('account.add').length === 3);
+    expect(fake.stdinOf('account.reset').map((r) => r.params)).toEqual([{ accountId: 'a1' }]);
     expect(fake.stdinOf('account.remove').map((r) => r.params)).toEqual([{ accountId: 'a1' }]);
+    await until('the add', () => fake.stdinOf('account.add').length === 3);
+  });
+
+  it('tests an account on stdin for onboarding, with its secrets redacted after', async function () {
+    config.values.accounts = [];
+    supervisor.start();
+    await until('the engine', () => fake.spawns.length === 1);
+    const account = {
+      id: 'n1',
+      emailAddress: 'n1@example.com',
+      settings: { imap_password: 'pw-n1' },
+    };
+    fake.testResult = {
+      account: null,
+      error: 'ErrorAuthentication',
+      error_service: 'imap',
+      log: 'LOGIN n1 pw-n1\nNO',
+    };
+    const result = await supervisor.testAccount(account);
+    expect(fake.stdinOf('account.test').map((r) => r.params)).toEqual([{ account }]);
+    expect(result.error).toBe('ErrorAuthentication');
+    expect(result.log).toBe('LOGIN n1 *********\nNO');
+    expect(fake.socket.some((r) => JSON.stringify(r).includes('pw-n1'))).toBe(false);
+  });
+
+  it('passes a verbose logging change to the running engine', async function () {
+    await started();
+    const until30 = Date.now() + 30 * 60 * 1000;
+    config.set('core.sync.verboseUntil', until30);
+    await until('the call', () => fake.stdinOf('engine.setLogLevel').length === 1);
+    expect(fake.stdinOf('engine.setLogLevel')[0].params).toEqual({ verboseUntil: until30 });
+    expect(fake.spawns.length).toBe(1);
+  });
+
+  it('empties the database through the engine and leaves its accounts out', async function () {
+    await started();
+    await supervisor.resetDatabase();
+    expect(fake.stdinOf('engine.resetDatabase').length).toBe(1);
+    expect(lastStatus().accounts).toEqual({});
+    config.set('accounts', [configAccount('a1'), configAccount('a2'), configAccount('a3')]);
+    await tick();
+    expect(fake.stdinOf('account.add').length).toBe(2);
   });
 
   it('stops the engine on shutdown and starts none after', async function () {
@@ -336,11 +374,12 @@ describe('the engine supervisor', function () {
     expect(lastStatus().socketPath).toBe(null);
   });
 
-  it('does not start an engine without accounts', async function () {
+  it('starts the engine without accounts, so onboarding has one', async function () {
     config.values.accounts = [];
     supervisor.start();
-    await tick();
-    expect(fake.spawns.length).toBe(0);
+    await until('the ready engine', () => !!lastStatus() && !!lastStatus().socketPath);
+    expect(fake.spawns.length).toBe(1);
+    expect(fake.stdinOf('account.add').length).toBe(0);
   });
 });
 

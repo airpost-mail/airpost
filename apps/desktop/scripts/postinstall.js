@@ -108,7 +108,7 @@ async function run() {
 
   // The mailsync submodule is gone from this monorepo, so there is no upstream build to fetch.
   // The Rust engine is built by apps/engine/packaging/build-release.sh --install-desktop.
-  if (!fs.existsSync('./app/mailsync') && !fs.existsSync('./app/mailsync-rs')) {
+  if (!fs.existsSync('./app/mailsync-rs')) {
     console.log(
       `\n-- No sync engine in ./app. Build the Rust one with ` +
         `'apps/engine/packaging/build-release.sh --install-desktop' (installs app/mailsync-rs). --`

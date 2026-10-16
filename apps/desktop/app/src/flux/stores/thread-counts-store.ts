@@ -19,8 +19,8 @@ type Counts = { [categoryId: string]: { unread: number; total: number } };
 /*
 Unread and total thread counts per folder and label. An engine with the `counts` feature
 answers `counts.get` once per connection and sends every change after it as a ThreadCounts
-delta; without one (per-account engines, the C++ engine, an older Rust engine) the counts are
-read from the ThreadCounts table whenever threads change.
+delta; without one (an older engine, or before the first hello) the counts are read from the
+ThreadCounts table whenever threads change.
 */
 export class ThreadCountsStore extends MailspringStore {
   _counts: Counts = {};

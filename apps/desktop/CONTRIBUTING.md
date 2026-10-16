@@ -92,16 +92,12 @@ npm install
 npm start
 ```
 
-### The Mailsync binary
+### The sync engine
 
-Mailspring's sync engine ([Mailsync](https://github.com/Foundry376/Mailspring-Sync))
-is a separate C++ program that the app spawns per account. You don't need to build
-it: the `postinstall` step of `npm install` downloads the prebuilt `mailsync`
-binary matching the `mailsync` submodule's pinned commit from S3 and unpacks it
-into `./app`. If you've checked out the submodule (`git submodule update --init`)
-in order to work on the sync engine, postinstall skips the download and expects you
-to build it yourself; remove the submodule checkout and re-run `npm run postinstall`
-to go back to the prebuilt binary.
+The sync engine is the Rust program in `apps/engine`; the app runs one process of it for
+every account. Build it and install it as `./app/mailsync-rs` with
+`apps/engine/packaging/build-release.sh --install-desktop`, or run `make desktop` from the
+repo root, which links the debug build there.
 
 ## Development Workflow
 

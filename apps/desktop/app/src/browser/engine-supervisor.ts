@@ -3,31 +3,27 @@
 
 /*
 Runs the Rust engine's `serve` mode from the main process (docs/desktop-client-plan.md 4.1
-step 1), so a window reload leaves it running. The supervisor is the one owner of serve's
-stdin: it adds and removes the accounts in config.json `accounts` with their secrets from
-KeyManager (in main too), stores the rotated tokens serve reports on stdout, and applies
-EngineClient's relaunch rules.
+step 1), from app launch and with zero accounts, so a window reload leaves it running and
+first-run onboarding has an engine to test settings with. The supervisor is the one owner of
+serve's stdin: it adds and removes the accounts in config.json `accounts` with their secrets
+from KeyManager (in main too), stores the rotated tokens serve reports on stdout, applies
+EngineClient's relaunch rules, and makes the stdin-only calls windows ask for over IPC
+(account.test, account.reset, engine.resetDatabase, engine.setLogLevel).
 
 Windows open their own socket connections (src/engine-connection.ts) once Status names a
 ready engine. Its own connection subscribes to no model class, which leaves the deltas and the
 first subscriber's backlog to the windows and still brings it every `account.state`. Account
 events (launched, exited, too many failures) go to the main window, which updates AccountStore
 and OnlineStatusStore; it acks them, and those not acked are handed to its next renderer.
-
-The C++ engine and the per-account and stdio modes stay in the main window's MailsyncBridge.
 */
 import fs from 'fs';
 import path from 'path';
 import { AccountJSON, EngineAccount, EngineClient } from '../engine-client';
-import {
-  EngineServeProcess,
-  MailsyncProcess,
-  MailsyncProcessExit,
-  SyncEngine,
-} from '../mailsync-process';
+import { EngineServeProcess, MailsyncProcessExit } from '../mailsync-process';
 import { AccountSecretsJSON, KeyManager } from './key-manager';
 import {
   AccountEvent,
+  AccountTestReply,
   EngineAccountRoute,
   EngineStatus,
   SupervisorChannel,
@@ -53,7 +49,6 @@ export interface SupervisorTarget {
 export interface EngineSupervisorOptions {
   configDirPath: string;
   resourcePath: string;
-  syncEngine: SyncEngine;
   config: SupervisorConfig;
   keyManager: KeyManager;
   // Sends Status to every window.
@@ -78,7 +73,7 @@ export class EngineSupervisor {
 
   _ensureQueued = false;
   _statusQueued = false;
-  _configSubscription: { dispose(): void } = null;
+  _configSubscriptions: Array<{ dispose(): void }> = [];
 
   constructor(options: EngineSupervisorOptions) {
     this.options = options;
@@ -102,7 +97,11 @@ export class EngineSupervisor {
   }
 
   start() {
-    this._configSubscription = this.options.config.onDidChange('accounts', () => this.ensure());
+    const { config } = this.options;
+    this._configSubscriptions = [
+      config.onDidChange('accounts', () => this.ensure()),
+      config.onDidChange(VERBOSE_UNTIL_KEY, () => this._applyLogLevel()),
+    ];
     this.ensure();
   }
 
@@ -166,22 +165,25 @@ export class EngineSupervisor {
     return this.client.forceRelaunch({ id: accountId });
   }
 
-  // `account` is the account's JSON without secrets: it may already be gone from config.json,
-  // as when it is being deleted.
-  async resetCache(account: AccountSecretsJSON) {
-    const json = await this.options.keyManager.insertAccountSecrets(account);
-    const resetProcess = new MailsyncProcess(this._processOptions());
-    resetProcess.account = json as any;
-    return this.client.resetCache(account.id, () => resetProcess.resetCache());
+  // The account may already be gone from config.json, as when it is being deleted.
+  resetCache(accountId: string) {
+    return this.client.resetCache(accountId, () =>
+      this.client.withEngine((engine) => engine.resetAccount(accountId))
+    );
   }
 
-  attachToXcode() {
-    if (this.client.engine) this.client.engine.attachToXcode();
+  // `account` carries its secrets: onboarding tests settings it has not saved yet.
+  testAccount(account: AccountSecretsJSON) {
+    return this.client.withEngine((engine) => engine.testAccount(account));
+  }
+
+  resetDatabase() {
+    return this.client.resetDatabase();
   }
 
   shutdown() {
     this.stopped = true;
-    if (this._configSubscription) this._configSubscription.dispose();
+    for (const subscription of this._configSubscriptions) subscription.dispose();
     this._readyEngine = null;
     this._statusChanged();
     return this.client.shutdown();
@@ -189,14 +191,27 @@ export class EngineSupervisor {
 
   // Private
 
+  _verboseUntil(): number {
+    return Number(this.options.config.get(VERBOSE_UNTIL_KEY)) || 0;
+  }
+
   _processOptions() {
-    const { configDirPath, resourcePath, syncEngine, config } = this.options;
-    const verboseUntil = config.get(VERBOSE_UNTIL_KEY) || 0;
-    const verbose = verboseUntil && verboseUntil / 1 > Date.now();
+    const { configDirPath, resourcePath } = this.options;
+    const verboseUntil = this._verboseUntil();
+    const verbose = verboseUntil > Date.now();
     if (verbose) {
       console.warn(`Verbose mailsync logging is enabled until ${new Date(verboseUntil)}`);
     }
-    return { configDirPath, resourcePath, verbose: !!verbose, syncEngine };
+    return { configDirPath, resourcePath, verbose };
+  }
+
+  // A running engine restarts its accounts with the new level; a later one starts with it.
+  _applyLogLevel() {
+    const { engine } = this.client;
+    if (!engine) return;
+    engine.setLogLevel(this._verboseUntil()).catch((err) => {
+      if (!err.engineExited) console.warn(`engine.setLogLevel failed: ${err.message}`);
+    });
   }
 
   _createEngine() {
@@ -283,10 +298,19 @@ function serializeExit(exit: MailsyncProcessExit) {
   };
 }
 
+// Errors cross IPC as text.
+async function reply(work: () => Promise<unknown>) {
+  try {
+    await work();
+    return {};
+  } catch (err) {
+    return { error: (err && err.message) || `${err}` };
+  }
+}
+
 /*
-Wires the supervisor to the windows. `supervisor` is null when the engine doesn't run as serve
-(the C++ engine, the per-account and stdio modes, specs): Status is then null and the main
-window's MailsyncBridge runs the engine itself.
+Wires the supervisor to the windows. `supervisor` is null in spec mode, where no engine runs:
+Status is then null.
 */
 export function registerEngineSupervisorIPC(
   ipcMain: Electron.IpcMain,
@@ -311,15 +335,20 @@ export function registerEngineSupervisorIPC(
   ipcMain.handle(SupervisorChannel.ForceRelaunch, (_event, accountId: string) =>
     supervisor.forceRelaunch(accountId)
   );
-  ipcMain.handle(SupervisorChannel.ResetCache, async (_event, account: AccountSecretsJSON) => {
-    try {
-      await supervisor.resetCache(account);
-      return {};
-    } catch (err) {
-      return { error: (err && err.message) || `${err}` };
+  ipcMain.handle(SupervisorChannel.ResetCache, (_event, accountId: string) =>
+    reply(() => supervisor.resetCache(accountId))
+  );
+  ipcMain.handle(SupervisorChannel.ResetDatabase, () => reply(() => supervisor.resetDatabase()));
+  ipcMain.handle(
+    SupervisorChannel.TestAccount,
+    async (_event, account: AccountSecretsJSON): Promise<AccountTestReply> => {
+      try {
+        return { result: await supervisor.testAccount(account) };
+      } catch (err) {
+        return { error: (err && err.message) || `${err}` };
+      }
     }
-  });
-  ipcMain.on(SupervisorChannel.AttachToXcode, () => supervisor.attachToXcode());
+  );
 }
 
 // How long launch waits for an engine from an earlier run before migrating anyway: serve exits
