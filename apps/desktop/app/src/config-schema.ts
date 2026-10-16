@@ -48,6 +48,10 @@ export default {
             default: 'list',
             enum: ['split', 'list', 'splitVertical'],
           },
+          showNavRail: {
+            type: 'boolean',
+            default: true,
+          },
           systemTray: {
             type: 'boolean',
             default: true,

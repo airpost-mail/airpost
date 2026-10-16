@@ -6,13 +6,20 @@ import Sheet from './sheet';
 import Toolbar from './sheet-toolbar';
 import { Flexbox } from './components/flexbox';
 import { InjectedComponentSet } from './components/injected-component-set';
-import { NavRail } from './components/nav-rail';
+import {
+  NavRail,
+  NavRailRestoreButton,
+  SHOW_NAV_RAIL_CONFIG_KEY,
+  isNavRailShown,
+  registerNavRailCommands,
+} from './components/nav-rail';
 import { SheetDeclaration } from './flux/stores/workspace-store';
 import { Disposable } from 'rx-core';
 
 interface SheetContainerState {
   stack: SheetDeclaration[];
   mode: string;
+  showNavRail: boolean;
   error?: string;
 }
 
@@ -40,6 +47,8 @@ export default class SheetContainer extends React.Component<
   _toolbarComponents = {};
   unsubscribe?: () => void;
   windowPropsDisposable?: Disposable;
+  navRailConfigDisposable?: Disposable;
+  navRailCommandsDisposable?: Disposable;
 
   constructor(props) {
     super(props);
@@ -51,6 +60,14 @@ export default class SheetContainer extends React.Component<
     // A hot window mounts with the empty window's load settings and receives the real
     // ones (including `toolbar`) only when it is assigned a window type.
     this.windowPropsDisposable = AppEnv.onWindowPropsReceived(this._onStoreChange);
+
+    if (AppEnv.isMainWindow()) {
+      this.navRailConfigDisposable = AppEnv.config.observe(SHOW_NAV_RAIL_CONFIG_KEY, () => {
+        this.navRailCommandsDisposable?.dispose();
+        this.navRailCommandsDisposable = registerNavRailCommands(isNavRailShown());
+        this._onStoreChange();
+      });
+    }
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -67,12 +84,15 @@ export default class SheetContainer extends React.Component<
     if (this.windowPropsDisposable) {
       this.windowPropsDisposable.dispose();
     }
+    this.navRailConfigDisposable?.dispose();
+    this.navRailCommandsDisposable?.dispose();
   }
 
   _getStateFromStores() {
     return {
       stack: WorkspaceStore.sheetStack(),
       mode: WorkspaceStore.layoutMode(),
+      showNavRail: isNavRailShown(),
     };
   }
 
@@ -148,7 +168,9 @@ export default class SheetContainer extends React.Component<
   render() {
     const totalSheets = this.state.stack.length;
     const topSheet = this.state.stack[totalSheets - 1];
-    const hasNavRail = AppEnv.isMainWindow();
+    // Preferences takes over the window, so it shows neither the rail nor its restore button.
+    const navRailAllowed = AppEnv.isMainWindow() && topSheet !== WorkspaceStore.Sheet.Preferences;
+    const hasNavRail = navRailAllowed && this.state.showNavRail;
 
     if (!topSheet) {
       return <div />;
@@ -184,6 +206,7 @@ export default class SheetContainer extends React.Component<
             height={hasNavRail ? 'auto' : undefined}
             style={{ flex: 1, minWidth: 0 }}
           >
+            {navRailAllowed && !hasNavRail && <NavRailRestoreButton />}
             <div style={{ order: 1, zIndex: 2 }}>
               <InjectedComponentSet
                 matching={{ locations: [topSheet.Header, WorkspaceStore.Sheet.Global.Header] }}

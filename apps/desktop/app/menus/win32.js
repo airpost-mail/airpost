@@ -85,6 +85,16 @@ module.exports = {
           hideWhenDisabled: true,
         },
         {
+          label: localized('Show Sections Bar'),
+          command: 'navigation:show-nav-rail',
+          hideWhenDisabled: true,
+        },
+        {
+          label: localized('Hide Sections Bar'),
+          command: 'navigation:hide-nav-rail',
+          hideWhenDisabled: true,
+        },
+        {
           type: 'separator',
         },
         {

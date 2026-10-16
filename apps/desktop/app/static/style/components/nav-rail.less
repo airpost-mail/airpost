@@ -3,6 +3,8 @@
 .nav-rail {
   flex-shrink: 0;
   width: 48px;
+  display: flex;
+  flex-direction: column;
 
   .nav-rail-item {
     display: flex;
@@ -30,6 +32,51 @@
     &.active img.content-mask {
       background-color: @source-list-active-color;
     }
+  }
+
+  .nav-rail-footer {
+    display: flex;
+    flex-direction: column;
+    margin-top: auto;
+  }
+  .nav-rail-divider {
+    align-self: center;
+    width: 20px;
+    height: 1px;
+    margin: 0 0 8px;
+    background: fade(@text-color, 12%);
+  }
+}
+
+// The toggle-pane icon has its pane on the right; mirrored, it reads as the rail beside the content.
+.nav-rail-toggle img.content-mask,
+.nav-rail-restore img.content-mask {
+  transform: scaleX(-1) /*rtl: none */;
+}
+
+// While the rail is hidden. Faint until hovered so it doesn't compete with the sidebar's last row.
+.nav-rail-restore {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: 0;
+  border-radius: 4px;
+  opacity: 0.5;
+
+  img.content-mask {
+    background-color: @text-color-subtle;
+  }
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    background: fade(@text-color, 6%);
   }
 }
 

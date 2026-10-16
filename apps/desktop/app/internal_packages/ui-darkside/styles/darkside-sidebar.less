@@ -51,6 +51,18 @@
   .nav-rail-item.active img.content-mask {
     background-color: @accent;
   }
+  .nav-rail-divider {
+    background: fade(@sidebar-text, 20%);
+  }
+}
+// Sits over the dark sidebar column while the rail is hidden.
+.nav-rail-restore {
+  img.content-mask {
+    background-color: @sidebar-text;
+  }
+  &:hover {
+    background: fade(@white, 10%);
+  }
 }
 
 // Refactored this to make sure all items
