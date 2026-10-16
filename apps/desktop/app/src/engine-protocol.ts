@@ -55,9 +55,18 @@ export const Method = {
   BodiesFetch: 'bodies.fetch',
   CalendarSync: 'calendar.sync',
   EngineStatus: 'engine.status',
+  AccountList: 'account.list',
+  // `serve` mode's stdin only: the account JSON carries credentials.
+  AccountAdd: 'account.add',
+  AccountRemove: 'account.remove',
+  EngineShutdown: 'engine.shutdown',
+  // `serve` mode's stdin, debug builds only.
+  TestCrash: 'test.crash',
+  TestPanic: 'test.panic',
   // Notifications from the engine.
   Delta: 'delta',
   Disconnect: 'disconnect',
+  AccountState: 'account.state',
 } as const;
 
 export const ErrorCode = {
@@ -72,6 +81,24 @@ export const ErrorCode = {
   // The task's local phase failed; `data` is the SyncError JSON.
   TaskRejected: -32002,
   HelloRequired: -32003,
+  NotFound: -32004,
+  // `data` is `{state, error}`.
+  AccountStopped: -32005,
+  // `account.add` of an account that is starting or running.
+  AccountExists: -32006,
+  // A parent-only method on the socket, or `subscribe` on stdin.
+  WrongChannel: -32007,
+} as const;
+
+// `serve`'s exit code when another engine is listening on its socket, typically the previous
+// one still shutting down (ms_core EXIT_SOCKET_IN_USE).
+export const EXIT_SOCKET_IN_USE = 3;
+
+export const AccountState = {
+  Starting: 'starting',
+  Running: 'running',
+  Stopped: 'stopped',
+  Removed: 'removed',
 } as const;
 
 export interface HelloParams {
@@ -83,6 +110,16 @@ export interface AccountInfo {
   accountId: string;
   email: string;
   state: string;
+  error?: SyncErrorJSON;
+}
+
+// The engine's SyncError JSON, as `account.state` and the status methods carry it.
+export interface SyncErrorJSON {
+  what?: string;
+  key: string;
+  debuginfo?: string;
+  retryable?: boolean;
+  offline?: boolean;
 }
 
 export interface HelloResult {
@@ -131,6 +168,7 @@ export interface AccountStatus {
   email: string;
   state: string;
   connectionError: boolean;
+  error?: SyncErrorJSON;
 }
 
 export interface EngineStatusResult {
@@ -147,6 +185,38 @@ export interface DeltaParams {
   modelClass: string;
   type: 'persist' | 'unpersist' | 'metadata-expiration' | string;
   modelJSONs: unknown[];
+}
+
+export interface AccountListResult {
+  accounts: AccountStatus[];
+}
+
+// `identity` is the identity line `sync` mode reads; null for none.
+export interface AccountAddParams {
+  account: unknown;
+  identity: unknown;
+}
+
+export interface AccountAddResult {
+  accountId: string;
+  state: string;
+  error?: SyncErrorJSON;
+}
+
+// The account's threads still running after the engine's stop timeout. They may still write
+// to its database until a blocking call returns.
+export interface AccountRemoveResult {
+  stillRunning: string[];
+}
+
+export interface AccountIdParams {
+  accountId: string;
+}
+
+export interface AccountStateParams {
+  accountId: string;
+  state: 'starting' | 'running' | 'stopped' | 'removed' | string;
+  error?: SyncErrorJSON;
 }
 
 export interface DisconnectParams {
@@ -191,6 +261,11 @@ export function engineSocketPath(
   const socketPath = path.join(ownDir, `${hash}.sock`);
   if (Buffer.byteLength(socketPath) > MAX_SOCKET_PATH_BYTES) return null;
   return { socketPath, ownDir };
+}
+
+// `serve` mode's socket: one per config dir, `<configDir>/run/engine.sock` when it fits.
+export function serveSocketPath(configDirPath: string) {
+  return engineSocketPath(configDirPath, 'engine');
 }
 
 /*

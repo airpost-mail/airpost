@@ -13,13 +13,17 @@ import DatabaseStore from './stores/database-store';
 import OnlineStatusStore from './stores/online-status-store';
 import { DatabaseChangeRecord } from './stores/database-change-record';
 import DatabaseObjectRegistry from '../registries/database-object-registry';
-import { MailsyncProcess, MailsyncProcessExit } from '../mailsync-process';
+import {
+  EngineServeProcess,
+  MailsyncProcess,
+  MailsyncProcessExit,
+  resolveSyncEngine,
+} from '../mailsync-process';
+import { CrashTracker, EngineClient, isAuthFailure, serveEngineSelected } from '../engine-client';
 import KeyManager from '../key-manager';
 import * as Actions from './actions';
 import * as Utils from './models/utils';
 import { Model } from 'mailspring-exports';
-
-const MAX_CRASH_HISTORY = 10;
 
 const VERBOSE_UNTIL_KEY = 'core.sync.verboseUntil';
 
@@ -52,67 +56,11 @@ function convertDeltaModels(modelJSONs: any[], modelClass: string) {
   return { models, rawJSONs };
 }
 
-/*
-This class keeps track of how often Mailsync workers crash. If a mailsync
-worker exits more than 5 times in <5 minutes, we consider it "too many failures"
-and won't relaunch it until:
-
-- the user restarts the app, clearing the history
-- the user changes the account's settings (updating password, etc.)
-- the user explicitly says "Try Again" in the UI
-
-*/
-class CrashTracker {
-  _timestamps = {};
-  _tooManyFailures = {};
-
-  forgetCrashes(fullAccountJSON: { id: string; settings: Record<string, unknown> }) {
-    const key = this._keyFor(fullAccountJSON);
-    delete this._timestamps[key];
-    delete this._tooManyFailures[key];
-  }
-
-  recordClientCrash(
-    fullAccountJSON: { id: string; settings: Record<string, unknown> },
-    crash: MailsyncProcessExit
-  ) {
-    console.log(`Sync worker exited.`, crash);
-
-    this._appendCrashToHistory(fullAccountJSON);
-
-    // We now let crashpad do this, because Sentry was losing it's mind.
-  }
-
-  _keyFor({ id, settings }) {
-    return JSON.stringify({ id, settings });
-  }
-
-  _appendCrashToHistory(fullAccountJSON: { id: string; settings: Record<string, unknown> }) {
-    const key = this._keyFor(fullAccountJSON);
-    this._timestamps[key] = this._timestamps[key] || [];
-    if (this._timestamps[key].unshift(Date.now()) > MAX_CRASH_HISTORY) {
-      this._timestamps[key].length = MAX_CRASH_HISTORY;
-    }
-
-    // has the client crashed more than 5 times in the last 5 minutes?
-    // If so, do not restart. We'll mark that the account is not syncing.
-    if (
-      this._timestamps[key].length >= 5 &&
-      Date.now() - this._timestamps[key][4] < 5 * 60 * 1000
-    ) {
-      this._tooManyFailures[key] = true;
-    }
-  }
-
-  tooManyFailures(fullAccountJSON: { id: string; settings: Record<string, unknown> }) {
-    const key = this._keyFor(fullAccountJSON);
-    return this._tooManyFailures[key];
-  }
-}
-
 export default class MailsyncBridge {
   _crashTracker = new CrashTracker();
   _clients: { [accountId: string]: MailsyncProcess } = {};
+  // The Rust engine's `serve` mode, which replaces `_clients` (engine-client.ts).
+  _engine: EngineClient = null;
   _lastWait: number;
 
   constructor() {
@@ -129,6 +77,12 @@ export default class MailsyncBridge {
     Actions.queueTasks.listen(this._onQueueTasks, this);
     Actions.cancelTask.listen(this._onCancelTask, this);
     Actions.fetchBodies.listen(this._onFetchBodies, this);
+
+    const { configDirPath, resourcePath, syncEngine } = this._getClientConfiguration();
+    const engine = syncEngine || resolveSyncEngine(configDirPath, resourcePath);
+    if (serveEngineSelected(engine, configDirPath)) {
+      this._engine = this._createEngineClient();
+    }
 
     AccountStore.listen(this.ensureClients, this);
 
@@ -177,6 +131,9 @@ export default class MailsyncBridge {
   }
 
   ensureClients = _.throttle(async () => {
+    if (this._engine) {
+      return this._engine.ensure();
+    }
     const clientsWithoutAccounts = { ...this._clients };
     const keys = await KeyManager._getKeyHash();
 
@@ -199,6 +156,9 @@ export default class MailsyncBridge {
   }, 100);
 
   async forceRelaunchClient(account: Account) {
+    if (this._engine) {
+      return this._engine.forceRelaunch(account);
+    }
     const keys = await KeyManager._getKeyHash();
     this._launchClient(account, keys, { force: true });
   }
@@ -223,6 +183,10 @@ export default class MailsyncBridge {
 
   sendSyncMailNow() {
     console.warn('Sending `wake` to all mailsync workers...');
+    if (this._engine) {
+      this._engine.wakeAll();
+      return;
+    }
     for (const client of Object.values(this._clients)) {
       client.sendMessage({ type: 'wake-workers' });
     }
@@ -233,6 +197,10 @@ export default class MailsyncBridge {
   sendSyncCalendarNow(accountId?: string) {
     if (!AppEnv.isMainWindow()) {
       ipcRenderer.send('command', 'application:sync-calendar', accountId);
+      return;
+    }
+    if (this._engine) {
+      this._engine.syncCalendar(accountId);
       return;
     }
 
@@ -246,7 +214,7 @@ export default class MailsyncBridge {
   }
 
   sendMessageToAccount(accountId: string, json: Record<string, unknown>) {
-    if (!this._clients[accountId]) {
+    if (this._engine ? !this._engine.send(accountId, json) : !this._clients[accountId]) {
       const { emailAddress } = AccountStore.accountForId(accountId) || { emailAddress: undefined };
       return AppEnv.showErrorDialog({
         title: localized(`Mailspring is unable to sync %@`, emailAddress),
@@ -255,13 +223,12 @@ export default class MailsyncBridge {
         ),
       });
     }
-    this._clients[accountId].sendMessage(json);
+    if (!this._engine) {
+      this._clients[accountId].sendMessage(json);
+    }
   }
 
   async resetCacheForAccount(account: Account, { silent }: { silent?: boolean } = {}) {
-    // grab the existing client, if there is one
-    const syncingClient = this._clients[account.id];
-
     // create a new client that will perform the reset
     const resetClient = new MailsyncProcess(this._getClientConfiguration());
     resetClient.account = (await KeyManager.insertAccountSecrets(account)).toJSON();
@@ -270,12 +237,16 @@ export default class MailsyncBridge {
     // account which does not exist anymore, but we don't want to interrupt this process
     resetClient.kill = () => {};
 
-    this._clients[account.id] = resetClient;
+    if (!this._engine) {
+      // grab the existing client, if there is one
+      const syncingClient = this._clients[account.id];
+      this._clients[account.id] = resetClient;
 
-    // kill the old client, ensureClients will be a no-op because the
-    // client has already been replaced in our lookup table.
-    if (syncingClient) {
-      syncingClient.kill();
+      // kill the old client, ensureClients will be a no-op because the
+      // client has already been replaced in our lookup table.
+      if (syncingClient) {
+        syncingClient.kill();
+      }
     }
 
     if (!silent) {
@@ -291,7 +262,10 @@ export default class MailsyncBridge {
     try {
       const start = Date.now();
 
-      await resetClient.resetCache();
+      // The serve engine drops the account first and adds it back after.
+      await (this._engine
+        ? this._engine.resetCache(account.id, () => resetClient.resetCache())
+        : resetClient.resetCache());
 
       if (!silent) {
         AppEnv.showErrorDialog({
@@ -309,14 +283,50 @@ export default class MailsyncBridge {
         message: localized(`Mailspring was unable to reset the local cache. %@`, error),
       });
     } finally {
-      delete this._clients[account.id];
-      process.nextTick(() => {
-        this.ensureClients();
-      });
+      if (!this._engine) {
+        delete this._clients[account.id];
+        process.nextTick(() => {
+          this.ensureClients();
+        });
+      }
+    }
+  }
+
+  // window:attach-to-xcode: the engine, or the last per-account process.
+  attachToXcode() {
+    const proc = this._engine ? this._engine.engine : Object.values(this._clients).pop();
+    if (proc) {
+      proc.attachToXcode();
     }
   }
 
   // Private
+
+  _createEngineClient() {
+    return new EngineClient({
+      createEngine: () => new EngineServeProcess(this._getClientConfiguration()),
+      accounts: () => AccountStore.accounts(),
+      accountJSONs: async (accounts: Account[]) => {
+        const keys = await KeyManager._getKeyHash();
+        return Promise.all(
+          accounts.map(async (a) => (await KeyManager.insertAccountSecrets(a, keys)).toJSON())
+        );
+      },
+      onDeltas: this._onIncomingMessages,
+      onAccountExited: (accountId) => OnlineStatusStore.onSyncProcessExited(accountId),
+      onAccountLaunched: (json) => {
+        if (json.syncState !== Account.SYNC_STATE_OK) {
+          Actions.updateAccount(json.id, { syncState: Account.SYNC_STATE_OK, syncError: null });
+        }
+      },
+      onTooManyFailures: (accountId, exit, authFailure) => {
+        Actions.updateAccount(accountId, {
+          syncState: authFailure ? Account.SYNC_STATE_AUTH_FAILED : Account.SYNC_STATE_ERROR,
+          syncError: exit,
+        });
+      },
+    });
+  }
 
   _getClientConfiguration() {
     const { configDirPath, resourcePath, syncEngine } = AppEnv.getLoadSettings();
@@ -360,15 +370,11 @@ export default class MailsyncBridge {
       }
       this._crashTracker.recordClientCrash(fullAccountJSON, { code, error, signal });
 
-      const isAuthFailure =
-        `${error}`.includes('Response Code: 401') || // mailspring services
-        `${error}`.includes('Response Code: 403') || // mailspring services
-        `${error}`.includes('invalid_grant') || // Google
-        `${error}`.includes('ErrorAuthentication'); // mailcore
-
       if (this._crashTracker.tooManyFailures(fullAccountJSON)) {
         Actions.updateAccount(account.id, {
-          syncState: isAuthFailure ? Account.SYNC_STATE_AUTH_FAILED : Account.SYNC_STATE_ERROR,
+          syncState: isAuthFailure(error)
+            ? Account.SYNC_STATE_AUTH_FAILED
+            : Account.SYNC_STATE_ERROR,
           syncError: { code, error, signal },
         });
       } else {
@@ -554,6 +560,9 @@ export default class MailsyncBridge {
   };
 
   _onReadyToUnload = () => {
+    if (this._engine) {
+      this._engine.shutdown();
+    }
     for (const client of Object.values(this._clients)) {
       client.kill();
     }

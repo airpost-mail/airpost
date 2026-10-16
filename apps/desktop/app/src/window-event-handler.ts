@@ -108,10 +108,7 @@ export default class WindowEventHandler {
     });
 
     AppEnv.commands.add(document.body, 'window:attach-to-xcode', () => {
-      const client = Object.values(AppEnv.mailsyncBridge.clients()).pop();
-      if (client) {
-        client.attachToXcode();
-      }
+      AppEnv.mailsyncBridge.attachToXcode();
     });
 
     AppEnv.commands.add(document.body, 'window:toggle-component-regions', () => {

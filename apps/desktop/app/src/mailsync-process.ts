@@ -5,6 +5,7 @@ Warning! This file is imported from the main process as well as the renderer pro
 */
 import { spawn, exec, ChildProcess } from 'child_process';
 import { Readable } from 'stream';
+import { StringDecoder } from 'string_decoder';
 import path from 'path';
 import os from 'os';
 import { EventEmitter } from 'events';
@@ -14,6 +15,9 @@ import { localized } from './intl';
 import { developerToolsAvailable } from './developer-tools';
 import { Account } from 'mailspring-exports';
 import {
+  AccountAddResult,
+  AccountRemoveResult,
+  AccountStateParams,
   DisconnectParams,
   engineSocketPath,
   HelloParams,
@@ -24,6 +28,8 @@ import {
   RequestId,
   requestForCommand,
   RpcResponse,
+  RpcError,
+  serveSocketPath,
   SubscribeParams,
   deltaParamsText,
 } from './engine-protocol';
@@ -695,6 +701,10 @@ export class MailsyncProcess extends EventEmitter {
       deltas.push(JSON.stringify(msg.params));
       return null;
     }
+    if (msg.method === Method.AccountState) {
+      this.emit('account-state', msg.params as AccountStateParams);
+      return null;
+    }
     if (msg.method === Method.Disconnect) {
       const { reason } = (msg.params || {}) as DisconnectParams;
       console.warn(`Sync engine dropped the connection: ${reason}`);
@@ -962,5 +972,269 @@ end tell
     `
     );
     exec(`osascript ${tmppath}`);
+  }
+}
+
+// How long `engine.shutdown` may take before the engine is killed. The engine stops every
+// account at once and waits up to 5 s for each one's threads.
+export const ENGINE_SHUTDOWN_GRACE_MS = 8000;
+
+// A request on serve mode's stdin that the engine refused (`code`, `data`), or that it never
+// answered because it exited (`engineExited`).
+export class EngineRequestError extends Error {
+  code: number | null;
+  data: unknown;
+  engineExited: boolean;
+
+  constructor(
+    message: string,
+    { code = null, data, engineExited = false }: Partial<RpcError> & { engineExited?: boolean } = {}
+  ) {
+    super(message);
+    this.code = code;
+    this.data = data;
+    this.engineExited = engineExited;
+  }
+}
+
+/*
+The Rust engine's `serve` mode: one process for every account (docs/engine-protocol-plan.md
+section 4). stdin and stdout are the parent channel: JSON-RPC requests for account.add,
+account.remove and engine.shutdown, their responses, and the accounts'
+ProcessAccountSecretsUpdated deltas, so credentials never touch the socket. Everything else
+goes over the socket, connected once the first stdin response shows the engine has bound it.
+
+Emits 'ready' once the engine has bound its socket, 'deltas' (delta params as JSON text, the
+shape the bridge reads), 'account-state' (AccountStateParams), and 'close'
+(MailsyncProcessExit) once, when the engine exits or its socket fails.
+*/
+export class EngineServeProcess extends MailsyncProcess {
+  _parentRequests = new Map<
+    number,
+    { method: string; resolve: (result: any) => void; reject: (error: Error) => void }
+  >();
+  _nextParentId = 1;
+  _closed = false;
+  _shutdownTimer = null;
+  _startupError: string = null;
+  // The secrets of every account added, redacted from what the engine reports. Kept after a
+  // remove, since a late error may still carry them.
+  _secretValues = new Set<string>();
+
+  serve() {
+    const location = serveSocketPath(this.configDirPath);
+    if (!location) {
+      throw new Error('No socket path short enough for the sync engine');
+    }
+    if (location.ownDir) {
+      ensurePrivateDir(location.ownDir);
+    }
+    const socketPath = location.socketPath;
+    this._socketPath = socketPath;
+    this._socketQueue = [];
+    this._spawnProcess('serve', ['--socket', socketPath]);
+
+    const decoder = new StringDecoder('utf8');
+    let outBuffer = '';
+    let errBuffer = '';
+    let socketCloseTimer = null;
+
+    const finish = (exit: MailsyncProcessExit) => {
+      if (this._closed) return;
+      this._closed = true;
+      clearTimeout(socketCloseTimer);
+      clearTimeout(this._shutdownTimer);
+      this._closeSocket();
+      const gone = new EngineRequestError('The sync engine exited', { engineExited: true });
+      for (const { reject } of this._parentRequests.values()) {
+        reject(gone);
+      }
+      this._parentRequests.clear();
+      this.emit('close', exit);
+    };
+
+    // As in sync(): a dropped socket gets a moment for the real exit to arrive, then the
+    // engine is killed and the close reports -2.
+    const failSocket = (error: Error, { now }: { now?: boolean } = {}) => {
+      if (this._closed || this._killed) return;
+      const kill = () => {
+        if (this._closed || this._killed) return;
+        console.warn(`Sync engine socket failed: ${error}`);
+        this._proc.kill();
+        finish({ code: -2, error, signal: null });
+      };
+      if (now) {
+        kill();
+      } else if (!socketCloseTimer) {
+        socketCloseTimer = setTimeout(kill, SOCKET_CLOSE_GRACE_MS);
+      }
+    };
+
+    if (this._proc.stdout) {
+      this._proc.stdout.on('data', (data: Buffer) => {
+        outBuffer += decoder.write(data);
+        if (outBuffer.indexOf('\n') === -1) return;
+        const lines = outBuffer.split('\n');
+        outBuffer = lines.pop();
+        const deltas: string[] = [];
+        for (const line of lines) {
+          this._onParentLine(line, deltas);
+        }
+        if (deltas.length) {
+          this.emit('deltas', deltas);
+        }
+      });
+    }
+    if (this._proc.stderr) {
+      this._proc.stderr.on('data', (data: Buffer) => {
+        errBuffer += data.toString();
+        if (errBuffer.length > 100 * 1024) {
+          errBuffer = errBuffer.slice(-100 * 1024);
+        }
+      });
+    }
+    // See sync(): never re-emitted as 'error' on `this`.
+    this._proc.on('error', (error: Error) => {
+      console.log(`Sync engine exited with ${error}`);
+      finish({ code: -1, error, signal: null });
+    });
+    if (this._proc.stdin) {
+      this._proc.stdin.on('error', (error: Error) => {
+        if (this._closed) return;
+        this._proc.kill();
+        finish({ code: -2, error, signal: null });
+      });
+    }
+    const onExit = (code: number, signal: string) => {
+      const text = errBuffer || this._startupError;
+      finish({ code, error: text ? new Error(this._stripSecrets(text)) : null, signal });
+    };
+    this._proc.on('close', onExit);
+    this._proc.on('exit', onExit);
+
+    // stdin is read only once the socket is bound, so this answer means it can be connected.
+    this._parentCall(Method.AccountList, {}).then(
+      () => {
+        this._connectSocket(socketPath, failSocket);
+        this.emit('ready');
+      },
+      () => {}
+    );
+  }
+
+  _stripSecrets(text: string) {
+    let out = super._stripSecrets(text);
+    if (!out) return out;
+    for (const v of this._secretValues) {
+      out = out.replaceAll(v, '*********');
+    }
+    return out;
+  }
+
+  _onParentLine(line: string, deltas: string[]) {
+    if (!line.trim()) return;
+    const params = deltaParamsText(line);
+    if (params !== null) {
+      deltas.push(params);
+      return;
+    }
+    let msg = null;
+    try {
+      msg = JSON.parse(line);
+    } catch (err) {
+      console.warn(`Sync engine wrote a non-JSON line: ${this._stripSecrets(line)}`);
+      return;
+    }
+    if (msg.jsonrpc === '2.0' && msg.method === undefined) {
+      const pending = msg.id !== null ? this._parentRequests.get(msg.id) : undefined;
+      if (!pending) {
+        console.warn(`Sync engine sent an unexpected response: ${this._stripSecrets(line)}`);
+        return;
+      }
+      this._parentRequests.delete(msg.id);
+      if (msg.error) {
+        const { message, code, data } = msg.error as RpcError;
+        pending.reject(new EngineRequestError(message, { code, data }));
+      } else {
+        pending.resolve(msg.result);
+      }
+      return;
+    }
+    if (msg.method === Method.Delta) {
+      deltas.push(JSON.stringify(msg.params));
+      return;
+    }
+    // The one-shot error the engine prints when it can't start (bind failed, no log file).
+    if (typeof msg.error === 'string') {
+      this._startupError = msg.error;
+      return;
+    }
+    console.warn(`Sync engine wrote an unexpected line: ${this._stripSecrets(line)}`);
+  }
+
+  _parentCall<R = unknown>(method: string, params: unknown): Promise<R> {
+    if (this._closed || !this._proc || !this._proc.stdin) {
+      return Promise.reject(
+        new EngineRequestError('The sync engine is not running', { engineExited: true })
+      );
+    }
+    const id = this._nextParentId++;
+    const line = `${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`;
+    return new Promise<R>((resolve, reject) => {
+      this._parentRequests.set(id, { method, resolve, reject });
+      try {
+        this._proc.stdin.write(line, 'utf-8');
+      } catch (err) {
+        this._parentRequests.delete(id);
+        reject(err);
+      }
+    });
+  }
+
+  // `account` is the account JSON with its secrets; `identity` the identity line, null today.
+  addAccount(account: { settings?: Record<string, unknown> }, identity: unknown = null) {
+    const settings = (account && account.settings) || {};
+    for (const key of ['refresh_token', 'imap_password', 'smtp_password']) {
+      const v = settings[key];
+      if (typeof v === 'string' && v.length > 0) this._secretValues.add(v);
+    }
+    return this._parentCall<AccountAddResult>(Method.AccountAdd, { account, identity });
+  }
+
+  removeAccount(accountId: string) {
+    return this._parentCall<AccountRemoveResult>(Method.AccountRemove, { accountId });
+  }
+
+  // One of the bridge's stdin-shaped commands, for one account.
+  sendToAccount(accountId: string, json: { type?: string; [key: string]: any }) {
+    console.log(`Sending to the sync engine for ${accountId}`, json);
+    const request = requestForCommand(accountId, json);
+    if (request) {
+      this._sendRequest(request.method, request.params);
+    } else if (json.type === 'test-crash') {
+      this._parentCall(Method.TestCrash, { accountId }).catch((err) =>
+        console.warn(`test.crash failed: ${err}`)
+      );
+    } else {
+      console.warn(`The sync engine has no method for ${json.type}`);
+    }
+  }
+
+  wakeAll() {
+    this._sendRequest(Method.SyncWake, {});
+  }
+
+  // Asks the engine to stop every account and exit, and kills it if that takes longer than
+  // `graceMs`. Resolves once it has exited.
+  shutdown(graceMs = ENGINE_SHUTDOWN_GRACE_MS) {
+    if (this._closed || !this._proc) return Promise.resolve();
+    this._killed = true;
+    const closed = new Promise<void>((resolve) => this.once('close', () => resolve()));
+    this._parentCall(Method.EngineShutdown, {}).catch(() => {});
+    this._shutdownTimer = setTimeout(() => {
+      console.warn('The sync engine did not shut down in time; killing it');
+      this._proc.kill();
+    }, graceMs);
+    return closed;
   }
 }
