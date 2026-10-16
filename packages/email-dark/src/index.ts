@@ -16,7 +16,22 @@ export {
   polesFor,
   DARK_LUMINANCE,
 } from './color';
-export { type PaintedRegion, darkShare, isAlreadyDark, ALREADY_DARK_SHARE } from './detect';
+export {
+  type PaintedRegion,
+  type TextSample,
+  darkShare,
+  textDarkShare,
+  isAlreadyDark,
+  ALREADY_DARK_SHARE,
+  DECLARED_DARK_SHARE,
+  MIN_TEXT_WEIGHT,
+} from './detect';
+export {
+  type ColorScheme,
+  applyColorScheme,
+  declaredPageColor,
+  declaresDarkSupport,
+} from './scheme';
 export {
   type Palette,
   type DarkenOptions,

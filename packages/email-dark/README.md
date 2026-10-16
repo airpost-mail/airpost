@@ -6,7 +6,7 @@ practice) and nothing else. Used by the desktop message view; written so `apps/w
 too.
 
 ```ts
-import { darkenDocument, removeDarkening } from '@tern/email-dark';
+import { applyColorScheme, darkenDocument, removeDarkening } from '@tern/email-dark';
 
 const result = darkenDocument(iframe.contentDocument, {
   background: '#212121', // the theme's colours
@@ -15,6 +15,7 @@ const result = darkenDocument(iframe.contentDocument, {
 }, { root: iframe.contentDocument.getElementById('body-wrapper'), imageBrightness: 0.9 });
 // result.status: 'darkened' | 'already-dark' | 'fallback'
 
+applyColorScheme(iframe, 'dark'); // before darkenDocument, after writing the document
 removeDarkening(iframe.contentDocument); // or on a cloned tree before printing
 ```
 
@@ -28,7 +29,14 @@ How it works:
   is ported from Dark Reader (MIT); see `src/color.ts` and NOTICE.md.
 - Images, videos, background images and gradients are left alone, and text over a background
   image or gradient keeps the sender's colour. Images can be dimmed slightly.
-- If most of the painted area is already dark the email is left untouched.
+- Emails designed dark are left untouched. The text votes: what most of it sits on (or, where
+  the backdrop is unknown, whether it is light text). Emails with little text fall back to the
+  share of painted area that is dark. Page the email doesn't paint doesn't vote, and a
+  `<body>` colour set in the email's `<style>` counts even when the host hides it.
+- Emails that declare a dark variant (`color-scheme` meta or CSS, `prefers-color-scheme: dark`
+  rules) only need a quarter of the vote. `applyColorScheme(iframe, 'dark')` makes the frame's
+  `prefers-color-scheme` follow the host theme instead of the OS, so their own dark styles are
+  what gets measured and, usually, shown as they are.
 - The write is one `<style>` element with a rule per distinct set of declarations, plus a
   `data-email-dark` attribute on each changed element. Inline `!important` declarations are
   overridden inline and restored by `removeDarkening`.

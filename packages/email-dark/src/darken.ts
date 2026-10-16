@@ -11,7 +11,14 @@
 // on a cloned tree (used for printing).
 
 import { RGBA, ColorMapper, composite, formatColor, parseColor, polesFor } from './color';
-import { PaintedRegion, isAlreadyDark } from './detect';
+import {
+  ALREADY_DARK_SHARE,
+  DECLARED_DARK_SHARE,
+  PaintedRegion,
+  TextSample,
+  isAlreadyDark,
+} from './detect';
+import { declaredPageColor, declaresDarkSupport, removeColorScheme } from './scheme';
 
 export interface Palette {
   // CSS colours: hex, rgb() or rgba().
@@ -41,6 +48,8 @@ export interface DarkenResult {
   status: DarkenStatus;
   // Elements inspected.
   elements: number;
+  // The email declares a dark variant (see `declaresDarkSupport`).
+  declaresDark: boolean;
 }
 
 export const DEFAULT_MAX_ELEMENTS = 5000;
@@ -96,15 +105,19 @@ interface Frame {
   untouched: boolean;
   region: number;
   regionColor: RGBA;
+  // `regionColor` is a colour the email painted, rather than an assumed white page.
+  regionKnown: boolean;
 }
 
 const copyListeners = new WeakMap<Document, () => void>();
 
-function hasOwnText(el: Element) {
+// Characters of non-whitespace text directly inside `el`.
+function ownTextLength(el: Element) {
+  let length = 0;
   for (let n = el.firstChild; n; n = n.nextSibling) {
-    if (n.nodeType === 3 && /\S/.test((n as Text).data)) return true;
+    if (n.nodeType === 3) length += (n as Text).data.trim().length;
   }
-  return false;
+  return length;
 }
 
 function parsePalette(palette: Palette) {
@@ -121,27 +134,15 @@ function parsePalette(palette: Palette) {
   };
 }
 
-// The colour the email sits on, as the sender intended it. Hosts often force html/body to be
-// transparent, which drops `<body bgcolor>`, so that attribute is consulted too.
-function pageColor(root: Element, win: Window): RGBA {
+// The colour the email sits on: the nearest painted ancestor of `root`, or the page colour the
+// email declares. Null when neither paints anything.
+function pageColor(root: Element, win: Window): RGBA | null {
   for (let n: Element | null = root; n; n = n.parentElement) {
     const c = parseColor(win.getComputedStyle(n).backgroundColor);
     if (c && c.a >= 0.5) return composite(c, WHITE);
   }
-  const doc = root.ownerDocument;
-  const attr = doc.body && doc.body.getAttribute('bgcolor');
-  if (attr) {
-    let c = parseColor(attr);
-    if (!c) {
-      const probe = doc.createElement('span');
-      probe.style.color = attr;
-      root.appendChild(probe);
-      c = parseColor(win.getComputedStyle(probe).color);
-      probe.remove();
-    }
-    if (c && c.a > 0) return composite(c, WHITE);
-  }
-  return WHITE;
+  const declared = declaredPageColor(root.ownerDocument);
+  return declared ? composite(declared, WHITE) : null;
 }
 
 function hasInlineImportant(el: Element, props: string[]) {
@@ -185,20 +186,22 @@ export function darkenDocument(
 ): DarkenResult {
   const win = doc.defaultView;
   const root = options.root || doc.body;
-  if (!win || !root) return { status: 'darkened', elements: 0 };
-  removeDarkening(doc);
+  if (!win || !root) return { status: 'darkened', elements: 0, declaresDark: false };
+  clearDarkening(doc);
 
   const colors = parsePalette(palette);
   const mapper = new ColorMapper(polesFor(colors.background, colors.text));
   const themeForegrounds = new Set([formatColor(colors.text), formatColor(colors.link)]);
   const maxElements = options.maxElements ?? DEFAULT_MAX_ELEMENTS;
 
+  const declaresDark = declaresDarkSupport(doc);
   const page = pageColor(root, win);
   const rootRect = root.getBoundingClientRect();
   const byArea = rootRect.width * rootRect.height > 0;
   const regions: PaintedRegion[] = [
     { color: page, area: byArea ? rootRect.width * rootRect.height : 1 },
   ];
+  const texts: TextSample[] = [];
   const records: ElementRecord[] = [];
 
   const stack: Frame[] = [];
@@ -207,7 +210,13 @@ export function darkenDocument(
       stack.push({ ...frame, el: c });
     }
   };
-  pushChildren({ el: root, untouched: false, region: 0, regionColor: page });
+  pushChildren({
+    el: root,
+    untouched: false,
+    region: 0,
+    regionColor: page || WHITE,
+    regionKnown: !!page,
+  });
 
   let count = 0;
   let overflow = false;
@@ -245,6 +254,7 @@ export function darkenDocument(
       const bg = parseColor(bgValue);
       if (bgImage && bgImage !== 'none') {
         next.untouched = true;
+        next.regionKnown = false;
         next.region = addRegion(frame, el, null);
       } else if (bg && bg.a > 0 && (!frame.untouched || bg.a >= 0.9)) {
         next.untouched = false;
@@ -252,12 +262,23 @@ export function darkenDocument(
         if (mapped && mapped !== bgValue) decls.push(['background-color', mapped]);
         if (bg.a >= 0.5) {
           next.regionColor = composite(bg, frame.regionColor);
+          next.regionKnown = true;
           next.region = addRegion(frame, el, next.regionColor);
         }
       }
     }
 
-    if (COLOR_TAGS.has(tag) || hasOwnText(el)) {
+    const textLength = ownTextLength(el);
+    if (textLength > 0 && cs.visibility !== 'hidden' && parseFloat(cs.fontSize) > 0) {
+      const color = parseColor(cs.color);
+      const backdrop = next.regionKnown ? next.regionColor : null;
+      // Inherited theme text on unpainted page says nothing about the email's design.
+      if (color && color.a > 0 && (backdrop || !themeForegrounds.has(cs.color))) {
+        texts.push({ color: composite(color, next.regionColor), backdrop, weight: textLength });
+      }
+    }
+
+    if (COLOR_TAGS.has(tag) || textLength > 0) {
       const value = cs.color;
       if (next.untouched) {
         // Pin the sender's colour; otherwise it would inherit a mapped ancestor colour.
@@ -293,7 +314,10 @@ export function darkenDocument(
     pushChildren(next);
   }
 
-  if (isAlreadyDark(regions)) return { status: 'already-dark', elements: count };
+  const threshold = declaresDark ? DECLARED_DARK_SHARE : ALREADY_DARK_SHARE;
+  if (isAlreadyDark(regions, texts, threshold)) {
+    return { status: 'already-dark', elements: count, declaresDark };
+  }
 
   const rules: string[] = [];
   const bgValue = formatColor(colors.background);
@@ -352,7 +376,7 @@ export function darkenDocument(
     copyListeners.set(doc, onCopy);
   }
 
-  return { status: overflow ? 'fallback' : 'darkened', elements: count };
+  return { status: overflow ? 'fallback' : 'darkened', elements: count, declaresDark };
 }
 
 function isDocument(target: Document | Element): target is Document {
@@ -360,10 +384,15 @@ function isDocument(target: Document | Element): target is Document {
 }
 
 /**
- * Removes everything `darkenDocument` added under `target`, restoring inline styles it
- * overrode. Works on a detached clone as well as on the live document.
+ * Removes everything `darkenDocument` and `applyColorScheme` added under `target`, restoring
+ * inline styles it overrode. Works on a detached clone as well as on the live document.
  */
 export function removeDarkening(target: Document | Element) {
+  clearDarkening(target);
+  removeColorScheme(target);
+}
+
+function clearDarkening(target: Document | Element) {
   const all = (selector: string): Element[] => {
     const found = Array.from(target.querySelectorAll(selector));
     if (!isDocument(target) && target.matches(selector)) found.unshift(target);
