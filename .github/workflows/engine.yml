@@ -3,9 +3,9 @@ name: engine
 on:
   push:
     branches: [main]
-    paths: ["apps/engine/**", "crates/**", "Cargo.toml", "Cargo.lock", "deny.toml", "rust-toolchain.toml", ".github/workflows/engine.yml"]
+    paths: ["apps/engine/**", "apps/cli/**", "crates/**", "Cargo.toml", "Cargo.lock", "deny.toml", "rust-toolchain.toml", "dist-workspace.toml", ".github/workflows/engine.yml"]
   pull_request:
-    paths: ["apps/engine/**", "crates/**", "Cargo.toml", "Cargo.lock", "deny.toml", "rust-toolchain.toml", ".github/workflows/engine.yml"]
+    paths: ["apps/engine/**", "apps/cli/**", "crates/**", "Cargo.toml", "Cargo.lock", "deny.toml", "rust-toolchain.toml", "dist-workspace.toml", ".github/workflows/engine.yml"]
 
 permissions:
   contents: read
@@ -48,13 +48,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: cargo build --release --locked -p mailsync
+      # tern for test_cli.py, which fails rather than skips without it when CI is set.
+      - run: cargo build --release --locked -p mailsync -p tern
       - run: pip install -r apps/engine/test/requirements.txt
       # -n auto: the pytest.ini default of 16 workers oversubscribes a 4-core runner.
       - run: python3 -m pytest apps/engine/test -n auto
         timeout-minutes: 30
         env:
           HARNESS_RUNS_DIR: ${{ runner.temp }}/harness-runs
+          TERN_BIN: ${{ github.workspace }}/target/release/tern
       # Kept only for failed and xfailed cases: engine log, database, server transcript.
       - uses: actions/upload-artifact@v4
         if: failure()

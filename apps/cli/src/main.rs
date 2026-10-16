@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! `tern`, the command-line client of the Tern mail engine (docs/engine-protocol-plan.md
+//! section 3). It finds the running engines through their discovery files, talks to them
+//! over the socket protocol with `ms-ipc`'s blocking client, and reads nothing else of the
+//! profile but the engine logs.
+
+mod app;
+mod cli;
+mod discovery;
+mod error;
+mod logs;
+mod output;
+mod platform;
+mod read;
+mod status;
+mod tasks;
+mod watch;
+
+use clap::Parser;
+
+fn main() {
+    let cli = match cli::Cli::try_parse() {
+        Ok(cli) => cli,
+        // Help and --version exit 0, usage errors 2.
+        Err(e) => e.exit(),
+    };
+    if let Err(e) = app::run(cli) {
+        let _ =
+            std::io::Write::write_all(&mut std::io::stderr(), format!("tern: {e}\n").as_bytes());
+        std::process::exit(e.exit_code());
+    }
+}

@@ -1,0 +1,33 @@
+[package]
+name = "tern"
+description = "Command-line client for the Tern mail engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage = "https://github.com/ternmail/ternmail"
+publish.workspace = true
+
+[[bin]]
+name = "tern"
+path = "src/main.rs"
+
+# No tokio, TLS or SQLite: the CLI talks to running engines over their sockets only
+# (docs/engine-protocol-plan.md section 3).
+[dependencies]
+ms-ipc.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+# Released with dist (dist-workspace.toml); `publish = false` alone would hide it from dist.
+[package.metadata.dist]
+dist = true
