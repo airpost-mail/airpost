@@ -275,18 +275,21 @@ One compose file, four services, two images:
                     ▼                                      ▼
               tern-backend                     tern-gateway ── static apps/web
                                                     │ unix socket, same uid
-                                                    ▼  (shared volume /run/tern)
+                                                    ▼  (shared profile volume)
                                               mailsync --mode serve --detached
-                                                    │ data volume: profile, accounts.json,
-                                                    │ secrets.enc, edgehill.db
+                                                      profile volume: run/engine.json,
+                                                      accounts.json, secrets.enc, edgehill.db,
+                                                      gateway/ (devices.json, control.sock)
 ```
 
 - `engine` and `gateway` run the same `tern-headless` image with different commands, as
-  the same non-root uid, sharing a volume for `run/`. The engine's peer-uid check (S6) then
+  the same non-root uid, sharing the whole profile volume with `TERN_CONFIG_DIR` set to it
+  in both. The gateway finds the engine through `<config>/run/engine.json` and keeps its own
+  state in `<config>/gateway/` (web-gateway-plan 2.7). The engine's peer-uid check (S6) then
   passes for the gateway and for `docker compose exec engine tern …`; Docker without user
   namespace remapping reports the same uid on both sides.
-- The gateway serves the built `apps/web` from the image, so web and gateway always match in
-  version and the web client talks to its gateway same-origin.
+- The gateway serves the built `apps/web` from the image (`TERN_GATEWAY_WEB_ROOT`), so web
+  and gateway always match in version and the web client talks to its gateway same-origin.
 - The backend stays its own image and service, unchanged from scenario 2.
 - No orchestrator: compose restarts crashed services; on bare metal, systemd units
   (`tern-engine.service`, `tern-gateway.service` with `BindsTo=`), which is what
@@ -303,10 +306,12 @@ One compose file, four services, two images:
 4. Adds mail accounts: `docker compose exec engine tern account add` (IMAP prompt, or OAuth
    with a URL to open on any machine and a code to paste back). Or pairs a browser with the
    admin scope and adds accounts from the web.
-5. `docker compose exec gateway tern-gateway pair --admin` (or whatever the gateway plan
-   settles on) prints a one-time code or link; the user opens `https://mail.example.com`
-   and enters it.
-6. Signs the web client in to the backend for backend features, if the web client uses them.
+5. `docker compose exec gateway tern-gateway pair --admin` prints a one-time code or link
+   (the command reaches the running gateway over `<config>/gateway/control.sock`); the user
+   opens `https://mail.example.com` and enters it. `tern-gateway devices list|revoke|rename`
+   manage paired browsers.
+6. Nothing for the backend in the browser: the engine holds the backend connection and
+   token, and the web client never calls the backend in v1 (web-gateway-plan G8).
 
 ### 4.3 Dependencies (none of this works until they land)
 
@@ -315,7 +320,7 @@ One compose file, four services, two images:
 | `serve --detached` (no parent channel, no exit 141), migrate at startup, autostart of registered accounts, restart policy | desktop-client stage 11 |
 | SecretStore file fallback keyed from `$CREDENTIALS_DIRECTORY` or `TERN_ENGINE_KEY_FILE` | stage 11 |
 | `tern account add` with IMAP and OAuth (OAuth from a headless box needs a device-style or paste-the-redirect flow) | stage 12 |
-| `apps/gateway`: HTTP/WS server, pairing, device tokens, admin scope, static file serving | web-gateway plan |
+| `apps/gateway` (`tern-gateway`): HTTP, pairing and cookies exist on roadmap/web-ready; the engine relay waits for desktop-client stage 1 | web-gateway plan |
 | Engine methods the web client needs (query, files, drafts) | desktop-client stages 7, 9, 13, 16 |
 
 ### 4.4 Config and secrets on a headless box
@@ -326,8 +331,11 @@ One compose file, four services, two images:
   `systemd-creds`) and `$CREDENTIALS_DIRECTORY`, which stage 11 already reads.
 - The key sits on the same disk as `secrets.enc` unless the user stores it elsewhere. The
   guide says so plainly (desktop-client-plan 0.1 item 15).
-- Gateway: its own state volume for device token hashes (format from the gateway plan).
-  Listen address, public origin and trusted proxies from env, like the backend.
+- Gateway: token hashes in `<config>/gateway/devices.json` on the shared profile volume. Env:
+  `TERN_CONFIG_DIR`, `TERN_GATEWAY_BIND` (`0.0.0.0:5180` in the container),
+  `TERN_GATEWAY_PUBLIC_URL` (required off loopback), `TERN_GATEWAY_WEB_ROOT`,
+  `TERN_TRUSTED_PROXIES`; `TERN_GATEWAY_INSECURE_PUBLIC_URL=true` only for plain http off
+  loopback.
 - Integration API keys go through `secrets.set` (stage 12), not env.
 
 ### 4.5 TLS, exposure and proxies
@@ -336,10 +344,9 @@ One compose file, four services, two images:
   redirects and shares) and `mail.example.com` (gateway). The gateway does not have to be
   public; the guide shows a Tailscale or WireGuard-only variant where Caddy binds the
   gateway site to the VPN interface.
-- The web client then calls the backend cross-origin, so the backend's CORS allowlist
-  (today `file://` and `null` only, backend-plan 3.4) needs a configured
-  `TERN_WEB_ORIGINS`. The alternative, one hostname with path routing, collides on `/` and
-  makes the gateway public whenever the backend is (question Q6).
+- The browser never calls the backend (the engine does), so the backend's CORS layer stays
+  as it is. A VPN-only gateway still needs an https name (`tailscale cert`, or a DNS name
+  with a DNS-01 certificate); over plain http its session cookie loses `Secure`.
 - The WebSocket needs `flush_interval -1` and long read timeouts, as the backend stream does.
 
 ### 4.6 Backups and restore
@@ -371,7 +378,9 @@ One compose file, four services, two images:
 
 - Engine: `tern status --json` as the container healthcheck (exits non-zero when the engine
   is unreachable); account states in the output.
-- Gateway: a `/healthz` route (gateway plan) and `tern-gateway healthcheck`.
+- Gateway: `tern-gateway healthcheck` and `GET /healthz` (exist on roadmap/web-ready). It
+  doesn't report on the engine, so a stopped engine doesn't mark the gateway unhealthy; the
+  engine's own healthcheck covers that.
 - Logs: engine files under the data volume plus stderr; gateway stderr.
 - Uninstall: as scenario 2, plus a reminder that OAuth grants stay on Google and Microsoft
   until revoked (`account.remove {revoke: true}` does it per account).
@@ -459,20 +468,22 @@ Not part of the backend, per architecture.md. If offered:
 - Recommendation: don't build it until the hosted backend has run for a while and
   scenario 3 works; decide then (question Q7).
 
-## 7. What this plan needs from the gateway plan
+## 7. Agreed with the gateway plan
 
-To send to `tern-web-ready` once its plan exists:
+Settled with `tern-web-ready` on 2026-10-16 (`docs/web-gateway-plan.md` 2.7, on
+roadmap/web-ready):
 
-1. Binary name and whether it ships as its own image or inside `tern-headless` (this plan
-   assumes inside).
-2. Static serving of `apps/web/dist` by the gateway, with the build baked into the image.
-3. A `healthcheck` subcommand and `/healthz`.
-4. Where device tokens live (a file or SQLite in its own data dir), and a `pair` command
-   runnable through `docker compose exec`.
-5. Env names for bind address, public origin and trusted proxies, matching the backend's
-   (`TERN_GATEWAY_BIND`, `TERN_GATEWAY_PUBLIC_URL`, `TERN_TRUSTED_PROXIES`).
-6. Whether the web client talks to the backend cross-origin (needs `TERN_WEB_ORIGINS` in the
-   backend's CORS layer) or through the gateway.
+1. `tern-gateway` (`apps/gateway`) ships inside `tern-headless`; engine and gateway are two
+   services from it, same non-root uid, sharing the profile volume (`TERN_CONFIG_DIR`).
+2. The gateway serves `apps/web/dist` baked into the image (`TERN_GATEWAY_WEB_ROOT`).
+3. `tern-gateway healthcheck` and `GET /healthz` exist.
+4. Device tokens are hashed in `<config>/gateway/devices.json`; `tern-gateway pair
+   [--admin]` works through `docker compose exec`.
+5. Env names as in 4.4; the default bind is `127.0.0.1:5180`.
+6. The browser never calls the backend in v1, so no `TERN_WEB_ORIGINS`.
+
+The engine service in the image still waits for stage 11; the gateway runs today against a
+desktop-owned engine.
 
 ## 8. Developer experience
 
@@ -593,7 +604,7 @@ Recommended answer first.
 | Q3 | Update channel? | **Static files on GitHub Releases** (Squirrel.Mac JSON, Squirrel.Windows RELEASES), no update server. Linux gets a notice and updates through the package manager or snap. |
 | Q4 | Registry and org? | **`ghcr.io/ternmail/…`**, matching the `ternmail/homebrew-tap` name already in `dist-workspace.toml`. Confirm the GitHub org name. |
 | Q5 | Dev entry point? | **A root `Makefile`.** Nothing to install; `just` reads nicer but is one more prerequisite. |
-| Q6 | Scenario 3 hostnames? | **Two hostnames** (backend public, gateway optionally VPN-only) with a backend CORS allowlist for the web origin. To agree with `tern-web-ready`. |
+| Q6 | Scenario 3 hostnames? | **Two hostnames** (backend public, gateway optionally VPN-only). Agreed with `tern-web-ready`; no backend CORS change, since the browser never calls the backend (section 7). |
 | Q7 | Hosted mail access? | **Not now.** Run the hosted backend first; decide on per-user engines once scenario 3 works, with the trust framing in 6.2. |
 | Q8 | Scheduled backups inside `tern-backend serve`? | **Yes**, off by default, on in the compose file. Distroless has no cron, and it's about 80 lines. |
 | Q9 | Linux package set? | **deb, rpm, snap** as today; no AppImage. Flathub later if users ask. Check the snap name `tern` and the `/usr/bin/tern` clash before the first release. |
