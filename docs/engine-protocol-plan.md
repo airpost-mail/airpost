@@ -125,7 +125,10 @@ Engine:
   instead of stdout, commands come from the socket, and stdin carries only the account and
   identity handshake (secrets stay off argv and off the socket) and the lifeline: closed
   stdin still exits 141 after 30 s. The engine prints `{"listening":"<path>"}` on stdout once
-  bound, which the desktop waits for. Without `--socket` nothing changes.
+  bound, which the desktop waits for. `ProcessAccountSecretsUpdated` (the account JSON after
+  an OAuth refresh) stays on stdout as a stdio delta line and never reaches the socket.
+  SIGTERM and SIGINT remove the socket and discovery file before the engine dies of the
+  signal. Without `--socket` nothing changes.
 - `DeltaSink` in `ms-store`; `accountId` added to the notification envelope from the
   stream's account.
 - Peer uid check and `run/` permissions in `platform.rs`.
@@ -141,7 +144,8 @@ Harness:
 Desktop (after the licence workflow's commits land):
 - `mailsync-process.ts` `sync()` for the Rust engine: spawn with `--socket`, write the
   handshake on stdin as now, wait for `listening`, connect, `hello`, `subscribe`, and emit
-  the same `deltas` events from notification params. `sendMessage` maps the four commands
+  the same `deltas` events from notification params, plus the secrets deltas still read from
+  stdout. `sendMessage` maps the four commands
   to methods. stderr and exit codes keep their meaning; socket errors map to today's
   close codes. C++ keeps the stdio path. The bridge is untouched.
 - Hand-written TS types for the v1 messages next to `mailsync-process.ts`; generating them
@@ -233,3 +237,52 @@ integrations read their API keys in the engine instead of receiving them per req
 | C | logs, failure isolation, per-account dispatch + wake + tokens, `serve` + account methods, desktop bridge, harness multi-account | ~3k Rust, ~600 TS |
 
 Each phase is one workflow, gated as above, committed per package.
+
+## Status
+
+2026-10-16, phase A implemented and gated, not yet committed or trialled in the desktop.
+
+Delivered:
+- `crates/ms-ipc`: envelope, the eight v1 methods' params and results, error codes,
+  `delta` and `disconnect` notifications, NDJSON framing (64 MiB line limit), a blocking
+  `Client`.
+- Engine: `--socket <path>` on `sync`. stdin is read on its own thread and both transports
+  feed one dispatcher (`apps/engine/src/dispatch.rs`, S0). stdin still takes the old
+  commands as well as the handshake and lifeline. `ProcessAccountSecretsUpdated` stays on
+  stdout. Deltas flushed before the first unfiltered subscriber (up to 16 MiB) are held and
+  replayed to it, so early `ProcessState` isn't lost. SIGTERM/SIGINT and exit 141 remove the
+  socket and discovery file. On Windows `--socket` fails with a one-shot error.
+- Harness: `MAILSYNC_TRANSPORT=socket` (`test/harness/mailsync.py`). Scenarios pinning a
+  `binary:` run it on stdio.
+- Desktop: `sync()` with the Rust engine uses the socket by default
+  (`app/src/engine-protocol.ts`, `mailsync-process.ts`), at `run/<accountId>.sock`, or
+  `$TMPDIR/tern-<uid>/<hash>.sock` when that path is too long. The bridge is unchanged.
+
+Selecting a transport: the engine uses stdio unless given `--socket`. The harness uses stdio
+unless `MAILSYNC_TRANSPORT=socket`. The desktop uses the socket for the Rust engine on macOS
+and Linux; `TERN_ENGINE_TRANSPORT=stdio` switches back, and the C++ engine, Windows and the
+one-shot modes always use stdio.
+
+Gate results: fmt, clippy `-D warnings` and `cargo deny` clean. `cargo test --workspace`:
+620 passed, 43 ignored. `tests/socket.rs` passed 5 runs in a row; the ignored exit-141
+tests pass. Harness quick tier: 117 passed, 1 skipped, on both stdio and socket. Full suite
+on socket: 227 passed, 3 skipped. Every skip is `rules-ready-pre-upgrade-messages`, whose
+baseline binary isn't built. Desktop typecheck and eslint are clean. The spec ran 26/26
+under a plain-Node jasmine stand-in, and once end-to-end against the debug engine.
+
+Open:
+- Desktop trial on `~/tern-trial` with the Rust engine (send, labels + undo, CalDAV), to be
+  done by the coordinator.
+- Windows named pipe: not started. The non-Unix cfg paths haven't been checked against
+  `x86_64-pc-windows-msvc`.
+- The desktop spec still has to pass under the real Electron runner after rebasing onto main
+  (the worktree's spec runner imports `moment-round`, which main dropped).
+- The handshake isn't moved: the harness still passes the account on `--account`, and stdin
+  still takes commands in socket mode. The default `--socket` path from 1.5 isn't wired;
+  the flag always takes a value.
+- The peer uid refusal has no test, because it needs a second OS user. There's no cap on
+  concurrent connections (each one costs two threads).
+- An engine nobody subscribes to holds up to 16 MiB of deltas. Decide whether to keep that.
+- The desktop reports a refused `hello` or a dropped socket as close -2, after a 1 s wait
+  for the real exit. The user isn't told about a protocol mismatch any other way.
+- `--orphan --socket` still logs to stdout.
