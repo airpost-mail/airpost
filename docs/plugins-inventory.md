@@ -2,7 +2,7 @@
 
 This document catalogs the Mailspring plugin ecosystem to inform the Tern project's plugin architecture design. It covers community plugins, built-in plugins, and the API surface they depend on.
 
-**Research methodology**: GitHub repository search for "mailspring plugin", "mailspring-plugin" topic, manual code inspection of top plugins by stars. Search conducted October 2026. All API usage verified by reading actual plugin source code.
+**Research methodology**: GitHub repository search for "mailspring plugin", "mailspring-plugin" topic, manual code inspection of top plugins by stars. Search conducted October 2026. All API usage verified by reading actual plugin source code. Built-in counts are packages under `apps/desktop/app/internal_packages` whose `lib/` names the symbol, recounted 2026-10-16 after the `mcp-server` plugin was removed (tern-mcp, `docs/mcp.md`, replaces it).
 
 ---
 
@@ -150,7 +150,6 @@ This document catalogs the Mailspring plugin ecosystem to inform the Tern projec
 | **events** | Calendar event display in message | `ComponentRegistry` role `MessageListHeaders`, `Event` model, `EventRSVPTask` |
 | **list-unsubscribe** | Unsubscribe link UI | `ComponentRegistry` role `message:BodyHeader`, `Message.unsubscribeLinks` |
 | **main-calendar** | Calendar view | `DatabaseStore.findAll(Event)`, `Event`, `Calendar`, `SyncbackEventTask`, `DestroyEventTask`, `EventRSVPTask`, `ComponentRegistry` role `NavRail:Item` |
-| **mcp-server** | MCP server for Claude integration | `DatabaseStore` queries, exposes `Message`/`Thread` via MCP, preferences tab |
 | **message-autoload-images** | Conditional image loading | `ExtensionRegistry.MessageView`, `Message` content manipulation |
 | **message-list** | Message list within thread | `ComponentRegistry`, `MessageStore`, `FocusedContentStore`, `DatabaseStore` |
 | **message-view-on-github** | GitHub notification helper | `ComponentRegistry` role `message:BodyHeader`, parses GitHub URLs from `Message.body` |
@@ -200,7 +199,7 @@ This document catalogs the Mailspring plugin ecosystem to inform the Tern projec
 6. **PreferencesUIStore**: Every plugin with settings registers a tab
 7. **ObservableListDataSource + ListTabular**: Standard pattern for virtualized lists (thread-list, draft-list, contacts)
 8. **No direct SQLite**: All database access via DatabaseStore abstraction
-9. **No MailsyncBridge calls**: All engine communication via Actions.queueTask
+9. **One bridge import**: onboarding imports `MailsyncProcess` to test an account before adding it; every other engine call goes through `Actions.queueTask`
 
 ---
 
@@ -210,10 +209,10 @@ This document catalogs the Mailspring plugin ecosystem to inform the Tern projec
 
 | Symbol | Type | Built-in Plugins | Third-Party Plugins | Coupling Risk | Notes |
 |--------|------|------------------|---------------------|---------------|-------|
-| **Actions** | Event dispatcher | 52 | 5 | **HIGH** | `queueTask`/`queueTasks` are the ONLY write path; many read-only actions (composeReply, openPopover, etc.) are UI-only |
+| **Actions** | Event dispatcher | 35 | 5 | **HIGH** | `queueTask`/`queueTasks` are the ONLY write path; many read-only actions (composeReply, openPopover, etc.) are UI-only |
 | **ComponentRegistry** | UI injection | 45 | 5 | **MEDIUM** | Pure UI rendering; roles are stable; no engine dependency |
 | **ExtensionRegistry** | Pre/post-processors | 23 | 3 | **MEDIUM** | Composer/MessageView extensions transform data; some modify Tasks |
-| **DatabaseStore** | Query interface | 38 | 3 | **HIGH** | Direct queries couple to schema; `listen()` requires delta streaming; no `.inTransaction()` available |
+| **DatabaseStore** | Query interface | 17 | 3 | **HIGH** | Direct queries couple to schema; `listen()` requires delta streaming; no `.inTransaction()` available |
 | **PreferencesUIStore** | Settings tabs | 18 | 4 | **LOW** | UI-only; no engine dependency |
 | **TaskFactory** | Task builders | 12 | 2 | **MEDIUM** | Helpers for creating Tasks; abstracts some complexity but creates engine tasks |
 | **Models (Thread/Message/Contact/Account)** | Data models | 50+ | 5 | **HIGH** | Schema-coupled; many computed properties (Thread.participants, Message.isFromMe) |
@@ -227,8 +226,8 @@ This document catalogs the Mailspring plugin ecosystem to inform the Tern projec
 | **MailboxPerspective** | View definition | 8 | 1 | **MEDIUM** | Custom views; database query builder |
 | **SyncbackMetadataTask** | Plugin metadata | 8 (Pro) | 0 | **HIGH** | Engine writes metadata to database; used for send-later, snooze, tracking |
 | **DatabaseStore.listen()** | Delta stream | 10 | 3 | **HIGH** | Requires engine to emit change deltas |
-| **GetMessageRFC2822Task** | Full headers | 1 | 1 | **HIGH** | Engine must fetch from IMAP and return via Task |
-| **MailsyncProcess/MailsyncBridge** | Direct engine IPC | 0 | 0 | **NONE** | Not exposed to plugins (internal only) |
+| **GetMessageRFC2822Task** | Full headers | 2 | 1 | **HIGH** | Engine must fetch from IMAP and return via Task |
+| **MailsyncProcess/MailsyncBridge** | Direct engine IPC | 1 | 0 | **HIGH** | `MailsyncProcess` is exported; onboarding uses it for the account test. Deprecated in favour of the `Engine` export (docs/desktop-client-plan.md section 6) |
 | **localized/i18n** | Localization | 40+ | 1 | **LOW** | UI strings only |
 
 ### mailspring-component-kit
@@ -311,7 +310,7 @@ This is the **most complex common pattern**; ~8 Pro plugins use it.
 ### Risky Couplings (Broken by Socket-Based Engine)
 
 1. **Direct DatabaseStore queries** (`findAll`, `find`, `findBy`)
-   - **Impact**: 38 built-in + 3 third-party plugins
+   - **Impact**: 17 built-in + 3 third-party plugins
    - **Why risky**: Assumes local SQLite database; schema-coupled
    - **Migration**: Replace with REST/GraphQL API or message-passing queries
    - **Affected patterns**: Thread/message lists, contact lookup, calendar events
@@ -323,7 +322,7 @@ This is the **most complex common pattern**; ~8 Pro plugins use it.
    - **Affected patterns**: Live-updating lists, metadata expiration triggers, spam scanning
 
 3. **Task creation** (Actions.queueTask)
-   - **Impact**: 52 built-in + 5 third-party plugins (universal mutation path)
+   - **Impact**: 35 built-in + 5 third-party plugins (universal mutation path)
    - **Why risky**: Assumes Tasks serialize to JSON and are sent to engine via MailsyncBridge
    - **Migration**: REST API endpoints OR command messages
    - **Decision needed**: Keep Task abstraction (serialize to socket) OR replace with API calls?
@@ -336,7 +335,7 @@ This is the **most complex common pattern**; ~8 Pro plugins use it.
    - **Affected patterns**: Rendering participants, "sent by me" checks, contact lookups
 
 5. **GetMessageRFC2822Task** (fetch full message source)
-   - **Impact**: 1 built-in (phishing-detection) + 1 third-party (spoof-guard)
+   - **Impact**: 2 built-in (message-list, thread-list) + 1 third-party (spoof-guard)
    - **Why risky**: Synchronous IMAP fetch in engine; returns via Task completion
    - **Migration**: Async API endpoint; Task polling OR callback
    - **Affected patterns**: SPF/DKIM header checks
@@ -390,7 +389,7 @@ This is the **most complex common pattern**; ~8 Pro plugins use it.
 
 ### Recommendations for Tern
 
-1. **Keep Task abstraction**: It's universal (52 built-in plugins); serialize to socket or REST
+1. **Keep Task abstraction**: It's universal (35 built-in plugins); serialize to socket or REST
 2. **Replace DatabaseStore.findAll() with API**: Too schema-coupled; provide query builders
 3. **Keep DatabaseStore.listen() via WebSocket**: 10+ plugins need live updates; delta streaming is critical
 4. **Keep Models as rich objects**: Too many plugins depend on computed properties; hydrate fully

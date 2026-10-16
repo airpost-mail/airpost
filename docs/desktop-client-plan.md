@@ -1128,3 +1128,23 @@ catch-up (the desktop's launch-time check drops it, `tern watch --new-mail` prin
 `tasks.list` has no offset; the CLI's `targets()` doesn't dedupe an account held by two
 engines; the three MCP tools page `metadata.list` up to 10,000 messages per account and filter
 tracking in Rust.
+
+2026-10-16, stage 2 (desktop cleanups), branch `roadmap/client-s2`: delivered. The
+`mcp-server` plugin, its HTTP server and the 2587 listener are gone, and so is
+`@modelcontextprotocol/sdk`. tern-mcp is bundled next to `mailsync-rs` (asar unpacked,
+`build-release.sh`, Linux arm64 workflow, deb/rpm from the app directory; the existing
+osxSign and notarisation config already covers it, no build run). `tern-mcp install` replaces
+the old bridge entry without `--force`, and `install --if-stale` replaces it only when it is
+pinned to the same profile; the desktop runs that once, 5 s after start, from the main window
+of an installed copy (not dev mode, and on macOS only from /Applications). Plugins without a
+satisfied `engines.mailspring` are skipped by `semver.satisfies`; `apiVersion` is exported
+(1.26.0). The snooze batch clears only due threads. The OAuth receiver binds 127.0.0.1.
+Deviation: the MCP pane is the "AI assistants" section of Preferences > Integrations, not a
+tab (user's call). It edits `mcp.json` with tern-mcp's validation (re-read before each
+change, unknown keys kept at every level), migrates `core.mcp.*` once with HTTP off, shows a
+`core.mcp` tern-mcp refuses as an error instead of offering defaults, runs tern-mcp for status
+and client install/uninstall, and shows `mcp-audit.log`. Open: `lang/en.json` not updated;
+the desktop doesn't start `tern-mcp http`; old HTTP registrations in Codex and Claude Code
+are documented, not removed; an entry pointing at a moved tern-mcp isn't repaired; Microsoft's
+`localhost` redirect against the 127.0.0.1 bind needs the trial check; no `/usr/bin/tern-mcp`
+in the Linux packages; stage 5 decides whether `apiVersion` becomes 1.27.0.
