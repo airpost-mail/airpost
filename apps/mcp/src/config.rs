@@ -6,48 +6,11 @@
 //! account, and the `core.mcp.*` keys used while there is no `mcp.json`. Credentials in
 //! `config.json` are never read.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::Value;
 
-/// The snap's name in `apps/desktop/snap/snapcraft.yaml`; its profile is
-/// `~/snap/<name>/common`.
-const SNAP_NAME: &str = "mailspring";
-
-/// Where the desktop keeps its profile on this OS, as `apps/cli` resolves it: Electron's
-/// appData plus `Tern`, then on Linux the snap's directory.
-pub fn default_config_dirs() -> Vec<PathBuf> {
-    let env = |k: &str| {
-        std::env::var_os(k)
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-    };
-    let app_data = if cfg!(target_os = "macos") {
-        env("HOME").map(|h| h.join("Library").join("Application Support"))
-    } else if cfg!(windows) {
-        env("APPDATA")
-    } else {
-        env("XDG_CONFIG_HOME").or_else(|| env("HOME").map(|h| h.join(".config")))
-    };
-    let mut dirs: Vec<PathBuf> = app_data.into_iter().map(|d| d.join("Tern")).collect();
-    if cfg!(target_os = "linux") {
-        if let Some(home) = env("HOME") {
-            dirs.push(home.join("snap").join(SNAP_NAME).join("common"));
-        }
-    }
-    dirs
-}
-
-/// The profile without `--config-dir`: the first default dir with a live engine, else the
-/// first that exists, else the first.
-pub fn default_config_dir() -> Option<PathBuf> {
-    let dirs = default_config_dirs();
-    dirs.iter()
-        .find(|d| !crate::discovery::scan(&d.join("run")).live.is_empty())
-        .or_else(|| dirs.iter().find(|d| d.is_dir()))
-        .or_else(|| dirs.first())
-        .cloned()
-}
+pub use tern_client::discovery::default_config_dir;
 
 /// An account as the desktop stores it in `config.json`, without its settings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

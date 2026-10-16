@@ -104,7 +104,7 @@ The plugin's tools keep their names, arguments and output shapes:
 
 | Category | Tools |
 | --- | --- |
-| read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `get_attachment` |
+| read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `get_attachment` |
 | read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send` |
 | read-write-send | `send_draft`, `schedule_send` |
 
@@ -135,8 +135,10 @@ Changes from the plugin:
   description and result say so. `sendAt` without an offset is local time, with or without
   seconds; a date alone is midnight UTC (both as `new Date()` read them).
 
-Not ported, because the read API has no message listing by draft flag or plugin metadata:
-`list_tracked_messages`, `get_top_links` and `list_scheduled_sends`.
+`list_tracked_messages`, `get_top_links` and `list_scheduled_sends` read through
+`metadata.list` and fail with "needs a newer Tern engine" on an engine without it. With
+`tasks.list` (the `tasks-list` feature), the send check before editing a draft sees every queued
+`SendDraftTask`, including the desktop's; without it, only the sends this session queued.
 
 `search_mail` supports plain terms and quoted phrases with `in:`,
 `is:unread|read|starred|unstarred`, `has:attachment`, `before:` and `after:`/`since:`

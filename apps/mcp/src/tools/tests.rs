@@ -669,3 +669,166 @@ fn search_and_listing() {
     );
     assert!(o.first_text().contains("Folder 'f-nope' not found"));
 }
+
+/// Two sent messages with tracking, a scheduled draft and one whose schedule has passed.
+fn tracked() -> Fake {
+    let mut f = fake();
+    f.features = vec![ms_ipc::feature::METADATA_LIST.into()];
+    let ev = |r: &str, ts: i64| json!({"recipient": r, "timestamp": ts});
+    let sent = |id: &str, date: i64, metadata: Value| {
+        json!({"id": id, "aid": "a1", "threadId": "t1", "hMsgId": format!("{id}@x.test"),
+               "subject": format!("Sent {id}"), "date": date, "draft": false,
+               "from": [{"name": "Me", "email": ME}], "to": [{"name": "Bob", "email": "bob@y.test"}],
+               "folders": {"f-in": 9}, "metadata": metadata})
+    };
+    f.messages.push(sent(
+        "s1",
+        3000,
+        json!([
+            {"pluginId": "open-tracking", "value": {"open_count": 2,
+                "open_data": [ev("bob@y.test", 3100), ev("bob@y.test", 5000)]}},
+            {"pluginId": "link-tracking", "value": {"links": [
+                {"url": "https://a.test", "click_count": 3,
+                 "click_data": [ev("x", 3200), ev("y", 3300), ev("x", 3400)]},
+                {"url": "https://b.test", "click_count": 1, "click_data": [ev("x", 3500)]}]}}
+        ]),
+    ));
+    f.messages.push(sent(
+        "s2",
+        2000,
+        json!([{"pluginId": "link-tracking", "value": {"links": [
+            {"url": "https://c.test", "click_count": 5, "click_data": [ev("z", 2100)]}]}}]),
+    ));
+    let future = chrono::Utc::now().timestamp() + 3600;
+    f.messages[1]["metadata"] = json!([{"pluginId": "send-later",
+        "value": {"expiration": future, "actionKey": "send"}}]);
+    let mut past = f.messages[1].clone();
+    past["id"] = json!("d-past");
+    past["hMsgId"] = json!("past@x.test");
+    past["metadata"] = json!([{"pluginId": "send-later", "value": {"expiration": 100}}]);
+    f.messages.push(past);
+    f
+}
+
+#[test]
+fn tracked_messages_and_top_links() {
+    let mut f = tracked();
+    let r = json_of(&run(&mut f, &rw(), "list_tracked_messages", json!({})));
+    assert_eq!(r["total"], 2);
+    let ids: Vec<&str> = r["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["s1", "s2"], "newest first, drafts left out");
+    assert_eq!(r["messages"][0]["opens"]["count"], 2);
+    assert_eq!(
+        r["messages"][0]["to"],
+        json!([{"name": "Bob", "email": "bob@y.test"}])
+    );
+    assert_eq!(r["messages"][1]["opens"], Value::Null);
+    let count = |args: Value, f: &mut Fake| {
+        json_of(&run(f, &rw(), "list_tracked_messages", args))["total"].clone()
+    };
+    assert_eq!(count(json!({"trackingType": "opens"}), &mut f), 1);
+    assert_eq!(count(json!({"minClicks": 5}), &mut f), 1);
+    assert_eq!(count(json!({"minOpens": 1}), &mut f), 1);
+    assert_eq!(
+        count(json!({"sentAfter": "1970-01-01T00:40:00Z"}), &mut f),
+        1,
+        "s1 was sent at 00:50, s2 at 00:33"
+    );
+    assert_eq!(
+        count(json!({"sentBefore": "1970-01-01T00:40:00Z"}), &mut f),
+        1
+    );
+    assert_eq!(
+        count(json!({"openedAfter": "1970-01-01T01:20:00Z"}), &mut f),
+        1,
+        "only s1's 5000 s open is after 4800 s"
+    );
+    let o = run(
+        &mut f,
+        &rw(),
+        "list_tracked_messages",
+        json!({"trackingType": "clicks"}),
+    );
+    assert!(o.is_error, "{}", o.first_text());
+    let o = run(
+        &mut f,
+        &rw(),
+        "list_tracked_messages",
+        json!({"sentAfter": "not a date"}),
+    );
+    assert!(o.first_text().contains("Invalid sentAfter date"));
+
+    let top = json_of(&run(&mut f, &rw(), "get_top_links", json!({"limit": 2})));
+    assert_eq!(
+        top,
+        json!([
+            {"url": "https://c.test", "clickCount": 5, "uniqueRecipients": 1, "messageId": "s2",
+             "threadId": "t1", "subject": "Sent s2", "date": "1970-01-01T00:33:20.000Z",
+             "accountId": "a1"},
+            {"url": "https://a.test", "clickCount": 3, "uniqueRecipients": 2, "messageId": "s1",
+             "threadId": "t1", "subject": "Sent s1", "date": "1970-01-01T00:50:00.000Z",
+             "accountId": "a1"}
+        ])
+    );
+
+    f.features.clear();
+    let o = run(&mut f, &rw(), "get_top_links", json!({}));
+    assert!(
+        o.is_error && o.first_text().contains("needs a newer Tern engine"),
+        "{}",
+        o.first_text()
+    );
+}
+
+#[test]
+fn scheduled_sends_are_the_future_ones() {
+    let mut f = tracked();
+    let r = json_of(&run(&mut f, &rw(), "list_scheduled_sends", json!({})));
+    let r = r.as_array().unwrap();
+    assert_eq!(r.len(), 1, "{r:?}");
+    assert_eq!(r[0]["headerMessageId"], "draft-0@x.test");
+    assert_eq!(r[0]["actionKey"], "send");
+    assert_eq!(r[0]["to"], json!([{"name": "Bob", "email": "bob@y.test"}]));
+    assert!(r[0]["sendAt"].as_str().unwrap().ends_with('Z'));
+    let o = run(
+        &mut f,
+        &rw(),
+        "list_scheduled_sends",
+        json!({"accountId": "nope"}),
+    );
+    assert!(o.first_text().contains("Account 'nope' not found"));
+}
+
+#[test]
+fn a_send_queued_elsewhere_blocks_edits_when_the_engine_lists_tasks() {
+    let mut f = fake();
+    f.features = vec![ms_ipc::feature::TASKS_LIST.into()];
+    f.tasks.insert(
+        "desktop-send".into(),
+        json!({"id": "desktop-send", "aid": "a1", "__cls": "SendDraftTask",
+               "status": "remote", "headerMessageId": "draft-0@x.test"}),
+    );
+    let o = run(
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "body": "x"}),
+    );
+    assert!(
+        o.is_error && o.first_text().contains("being sent"),
+        "{}",
+        o.first_text()
+    );
+    f.tasks.get_mut("desktop-send").unwrap()["status"] = json!("complete");
+    json_of(&run(
+        &mut f,
+        &rw(),
+        "update_draft",
+        json!({"id": "d0", "body": "x"}),
+    ));
+}

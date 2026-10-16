@@ -69,7 +69,11 @@ pub fn is_draft(message: &Value) -> bool {
 
 /// `Message.isHidden()`: a deletion placeholder, or a reminder the user sent themselves
 /// (`… via Tern`, the send-reminders plugin's sender name; `… via Mailspring` before the rename).
+/// An engine with the `message-hidden` feature works it out and sends it as `hidden`.
 pub fn is_hidden(message: &Value) -> bool {
+    if let Some(h) = message.get("hidden").and_then(Value::as_bool) {
+        return h;
+    }
     if str_of(message, "id").starts_with("deleted-") {
         return true;
     }
@@ -167,7 +171,7 @@ fn serialize_contact(c: &Value) -> Value {
            "email": c.get("email").cloned().unwrap_or(Value::Null)})
 }
 
-fn contacts(v: &Value, key: &str) -> Value {
+pub fn contacts(v: &Value, key: &str) -> Value {
     Value::Array(array_of(v, key).iter().map(serialize_contact).collect())
 }
 
@@ -358,5 +362,8 @@ mod tests {
         assert!(!is_hidden(
             &json!({"id": "m", "to": [{"email": "me@x.test"}], "from": [{"email": "me@x.test"}]})
         ));
+        // The engine's answer wins.
+        assert!(is_hidden(&json!({"id": "m", "hidden": true})));
+        assert!(!is_hidden(&json!({"id": "deleted-1", "hidden": false})));
     }
 }

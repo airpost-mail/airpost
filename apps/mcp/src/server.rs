@@ -49,7 +49,7 @@ impl App {
     }
 
     fn engines(&self, client: &str) -> Engines {
-        Engines::connect(&self.config_dir, &format!("tern-mcp/{VERSION} ({client})"))
+        crate::discovery::connect(&self.config_dir, &format!("tern-mcp/{VERSION} ({client})"))
     }
 
     /// Runs a tool and records it.
@@ -65,7 +65,8 @@ impl App {
             },
             Ok(policy) => {
                 let mut engines = self.engines(client);
-                let no_engine = Engines::no_engine_message(&self.config_dir, &engines.problems);
+                let no_engine =
+                    crate::discovery::no_engine_message(&self.config_dir, &engines.problems);
                 let mut ctx = Ctx {
                     backend: &mut engines,
                     policy: &policy,
@@ -113,7 +114,8 @@ impl App {
         let desktop = DesktopConfig::load(&self.config_dir);
         let result = Policy::load(&self.config_dir, &desktop).and_then(|policy| {
             let mut engines = self.engines(client);
-            let no_engine = Engines::no_engine_message(&self.config_dir, &engines.problems);
+            let no_engine =
+                crate::discovery::no_engine_message(&self.config_dir, &engines.problems);
             let mut ctx = Ctx {
                 backend: &mut engines,
                 policy: &policy,
@@ -280,10 +282,12 @@ mod tests {
             "update_draft",
             "delete_draft",
             "send_draft",
+            "list_tracked_messages",
+            "get_top_links",
+            "list_scheduled_sends",
         ] {
             assert!(names.contains(&n), "{n}");
         }
-        assert!(!names.contains(&"list_tracked_messages"));
         let _ = server_config();
     }
 

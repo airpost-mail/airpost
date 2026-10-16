@@ -90,6 +90,48 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             ),
             category: Category::Read,
         },
+        ToolDef {
+            name: "list_tracked_messages",
+            description: "List sent messages that have open-tracking and/or link-tracking enabled, along with their open/click data. Use sentAfter/sentBefore to bound by send date (e.g. \"everything sent this month\") and openedAfter to filter by when the open/click activity itself happened (e.g. \"opened today\"). Answers questions like \"which of my emails have been opened today\" or \"every email I sent this month with link tracking\".",
+            schema: schema(
+                json!({
+                    "accountId": {"type": "string", "description": "Restrict to a single account"},
+                    "trackingType": {"type": "string", "enum": ["opens", "links", "either"], "default": "either", "description": "Only include messages with open-tracking, link-tracking, or either (default)"},
+                    "sentAfter": {"type": "string", "description": "ISO 8601 date - only messages sent after this"},
+                    "sentBefore": {"type": "string", "description": "ISO 8601 date - only messages sent before this"},
+                    "openedAfter": {"type": "string", "description": "ISO 8601 date - only include messages with an open or link-click event at/after this time (filters on activity time, not send date)"},
+                    "minOpens": {"type": "number", "description": "Only include messages with at least this many total opens"},
+                    "minClicks": {"type": "number", "description": "Only include messages with at least this many total link clicks"},
+                    "limit": {"type": "number", "default": 50, "description": "Max results to return (default 50)"},
+                    "offset": {"type": "number", "default": 0, "description": "Offset for pagination"}
+                }),
+                &[],
+            ),
+            category: Category::Read,
+        },
+        ToolDef {
+            name: "get_top_links",
+            description: "Rank links from link-tracking-enabled sent messages by total click count, across a time range. Answers questions like \"what are my highest performing links\" or \"which links get clicked the most\".",
+            schema: schema(
+                json!({
+                    "accountId": {"type": "string", "description": "Restrict to a single account"},
+                    "sentAfter": {"type": "string", "description": "ISO 8601 date - only consider messages sent after this"},
+                    "sentBefore": {"type": "string", "description": "ISO 8601 date - only consider messages sent before this"},
+                    "limit": {"type": "number", "default": 10, "description": "Max number of links to return (default 10)"}
+                }),
+                &[],
+            ),
+            category: Category::Read,
+        },
+        ToolDef {
+            name: "list_scheduled_sends",
+            description: "List drafts that currently have a pending \"Send Later\" schedule, i.e. will be sent automatically at a future time.",
+            schema: schema(
+                json!({"accountId": {"type": "string", "description": "Restrict to a single account"}}),
+                &[],
+            ),
+            category: Category::Read,
+        },
     ]
 }
 
@@ -388,4 +430,272 @@ pub(super) fn get_message_tracking(ctx: &mut Ctx<'_>, args: &Value) -> ToolResul
         "links": links,
     }))
     .with_account(&account.account_id))
+}
+
+const SEND_LATER_ID: &str = "send-later";
+/// Messages a listing tool reads per account before giving up, as [`SCAN_LIMIT`] does for
+/// threads.
+const METADATA_SCAN_LIMIT: usize = 10_000;
+
+/// Every message of `account` with `plugin_id` metadata and `draft` as given, newest first,
+/// through `metadata.list`. An engine without the method gets a message saying so.
+fn metadata_messages(
+    ctx: &mut Ctx<'_>,
+    tool: &str,
+    account: &str,
+    plugin_id: &str,
+    filter: Value,
+) -> Result<Vec<Value>, ToolError> {
+    let mut out = Vec::new();
+    loop {
+        let mut params = filter.clone();
+        params["accounts"] = json!([account]);
+        params["pluginId"] = Value::from(plugin_id);
+        params["limit"] = Value::from(PAGE);
+        params["offset"] = Value::from(out.len());
+        let page = match ctx.call(account, ms_ipc::method::METADATA_LIST, params) {
+            Ok(p) => p,
+            Err(e) if e.is_unknown_method() => {
+                return Err(failed(format!(
+                    "{tool} needs a newer Tern engine (one with metadata.list); update Tern"
+                )))
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let models = array_of(&page, "models");
+        out.extend(models.iter().cloned());
+        if models.len() < PAGE || out.len() >= METADATA_SCAN_LIMIT {
+            return Ok(out);
+        }
+    }
+}
+
+/// An optional ISO 8601 argument as epoch seconds (fractional), the way `new Date()` reads it.
+fn opt_date(args: &Value, key: &str) -> Result<Option<f64>, ToolError> {
+    let Some(s) = opt_str(args, key)? else {
+        return Ok(None);
+    };
+    super::write::parse_send_at(&s, &chrono::Local)
+        .map(|d| Some(d.timestamp_millis() as f64 / 1000.0))
+        .ok_or_else(|| failed(format!("Invalid {key} date: '{s}'")))
+}
+
+/// `sentAfter`/`sentBefore` as `metadata.list`'s exclusive `after`/`before` on whole seconds.
+fn sent_bounds(args: &Value) -> Result<Value, ToolError> {
+    let mut filter = json!({"draft": false});
+    if let Some(a) = opt_date(args, "sentAfter")? {
+        filter["after"] = Value::from(a.floor() as i64);
+    }
+    if let Some(b) = opt_date(args, "sentBefore")? {
+        filter["before"] = Value::from(b.ceil() as i64);
+    }
+    Ok(filter)
+}
+
+/// The sent messages carrying any of `plugins`, once each, newest first, that the policy
+/// lets through.
+fn tracked_messages(
+    ctx: &mut Ctx<'_>,
+    tool: &str,
+    args: &Value,
+    plugins: &[&str],
+) -> Result<Vec<Value>, ToolError> {
+    let account_id = opt_str(args, "accountId")?;
+    let filter = sent_bounds(args)?;
+    let mut found: Vec<Value> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for account in ctx.accounts_for(account_id.as_deref())? {
+        for plugin in plugins {
+            for m in metadata_messages(ctx, tool, &account.account_id, plugin, filter.clone())? {
+                if seen.insert(str_of(&m, "id").to_owned()) {
+                    found.push(m);
+                }
+            }
+        }
+    }
+    found.retain(|m| ctx.policy.message_allowed(m));
+    found.sort_by(|a, b| {
+        i64_of(b, "date")
+            .cmp(&i64_of(a, "date"))
+            .then_with(|| str_of(b, "id").cmp(str_of(a, "id")))
+    });
+    Ok(found)
+}
+
+fn opt_number(args: &Value, key: &str) -> Result<Option<f64>, ToolError> {
+    match args.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Number(n)) => Ok(n.as_f64()),
+        Some(_) => Err(failed(format!(
+            "Invalid arguments: '{key}' must be a number"
+        ))),
+    }
+}
+
+fn timestamps(events: &Value) -> impl Iterator<Item = f64> + '_ {
+    array_of(events, "events")
+        .iter()
+        .filter_map(|e| e.get("timestamp").and_then(Value::as_f64))
+}
+
+fn total_clicks(links: &Value) -> i64 {
+    array_of(links, "links")
+        .iter()
+        .map(|l| i64_of(l, "clickCount"))
+        .sum()
+}
+
+pub(super) fn list_tracked_messages(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let plugins: &[&str] = match opt_str(args, "trackingType")?.as_deref() {
+        None | Some("either") => &[OPEN_TRACKING_ID, LINK_TRACKING_ID],
+        Some("opens") => &[OPEN_TRACKING_ID],
+        Some("links") => &[LINK_TRACKING_ID],
+        Some(_) => {
+            return Err(failed(
+                "Invalid arguments: 'trackingType' must be one of opens, links, either",
+            ))
+        }
+    };
+    let opened_after = opt_date(args, "openedAfter")?;
+    let min_opens = opt_number(args, "minOpens")?;
+    let min_clicks = opt_number(args, "minClicks")?;
+    let limit = opt_count(args, "limit", 50)?;
+    let offset = opt_count(args, "offset", 0)?;
+    let account_id = opt_str(args, "accountId")?;
+    let messages = tracked_messages(ctx, "list_tracked_messages", args, plugins)?;
+
+    let candidates: Vec<(Value, Value, Value)> = messages
+        .into_iter()
+        .map(|m| {
+            let (opens, links) = tracking_summary(&m);
+            (m, opens, links)
+        })
+        .filter(|(_, opens, links)| {
+            if min_opens.is_some_and(|n| opens.is_null() || (i64_of(opens, "count") as f64) < n) {
+                return false;
+            }
+            if min_clicks.is_some_and(|n| (total_clicks(links) as f64) < n) {
+                return false;
+            }
+            if let Some(t) = opened_after {
+                let open = timestamps(opens).any(|ts| ts >= t);
+                let click = array_of(links, "links")
+                    .iter()
+                    .any(|l| timestamps(l).any(|ts| ts >= t));
+                if !open && !click {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+    let total = candidates.len();
+    let page: Vec<Value> = candidates
+        .iter()
+        .skip(offset)
+        .take(limit)
+        .map(|(m, opens, links)| {
+            json!({
+                "id": str_of(m, "id"),
+                "threadId": str_of(m, "threadId"),
+                "subject": str_of(m, "subject"),
+                "to": model::contacts(m, "to"),
+                "date": model::iso_date(i64_of(m, "date")),
+                "accountId": str_of(m, "aid"),
+                "opens": opens,
+                "links": links,
+            })
+        })
+        .collect();
+    let mut o = Output::text(&json!({"total": total, "messages": page}));
+    if let Some(a) = account_id {
+        o = o.with_account(&a);
+    }
+    Ok(o)
+}
+
+pub(super) fn get_top_links(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let limit = opt_count(args, "limit", 10)?;
+    let account_id = opt_str(args, "accountId")?;
+    let messages = tracked_messages(ctx, "get_top_links", args, &[LINK_TRACKING_ID])?;
+    let mut rows: Vec<(i64, Value)> = Vec::new();
+    for m in &messages {
+        let (_, links) = tracking_summary(m);
+        for l in array_of(&links, "links") {
+            let recipients: std::collections::HashSet<String> = array_of(l, "events")
+                .iter()
+                .map(|e| e.get("recipient").map(Value::to_string).unwrap_or_default())
+                .collect();
+            let clicks = i64_of(l, "clickCount");
+            rows.push((
+                clicks,
+                json!({
+                    "url": l.get("url"),
+                    "clickCount": clicks,
+                    "uniqueRecipients": recipients.len(),
+                    "messageId": str_of(m, "id"),
+                    "threadId": str_of(m, "threadId"),
+                    "subject": str_of(m, "subject"),
+                    "date": model::iso_date(i64_of(m, "date")),
+                    "accountId": str_of(m, "aid"),
+                }),
+            ));
+        }
+    }
+    rows.sort_by_key(|(clicks, _)| std::cmp::Reverse(*clicks));
+    let out: Vec<Value> = rows.into_iter().take(limit).map(|(_, r)| r).collect();
+    let mut o = Output::text(&Value::Array(out));
+    if let Some(a) = account_id {
+        o = o.with_account(&a);
+    }
+    Ok(o)
+}
+
+pub(super) fn list_scheduled_sends(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let account_id = opt_str(args, "accountId")?;
+    let now = chrono::Utc::now().timestamp();
+    let mut drafts: Vec<(i64, Value)> = Vec::new();
+    for account in ctx.accounts_for(account_id.as_deref())? {
+        let filter = json!({"draft": true, "hasExpiration": true});
+        for d in metadata_messages(
+            ctx,
+            "list_scheduled_sends",
+            &account.account_id,
+            SEND_LATER_ID,
+            filter,
+        )? {
+            let Some(meta) = plugin_value(&d, SEND_LATER_ID) else {
+                continue;
+            };
+            let expiration = i64_of(meta, "expiration");
+            if expiration > now && ctx.policy.message_allowed(&d) {
+                drafts.push((expiration, d));
+            }
+        }
+    }
+    drafts.sort_by_key(|(expiration, _)| *expiration);
+    let out: Vec<Value> = drafts
+        .iter()
+        .map(|(expiration, d)| {
+            let meta = plugin_value(d, SEND_LATER_ID).unwrap_or(&Value::Null);
+            let action_key = match meta.get("actionKey") {
+                Some(Value::String(k)) if !k.is_empty() => Value::from(k.as_str()),
+                _ => Value::Null,
+            };
+            json!({
+                "headerMessageId": str_of(d, "hMsgId"),
+                "threadId": str_of(d, "threadId"),
+                "subject": str_of(d, "subject"),
+                "to": model::contacts(d, "to"),
+                "accountId": str_of(d, "aid"),
+                "sendAt": model::iso_date(*expiration),
+                "actionKey": action_key,
+            })
+        })
+        .collect();
+    let mut o = Output::text(&Value::Array(out));
+    if let Some(a) = account_id {
+        o = o.with_account(&a);
+    }
+    Ok(o)
 }

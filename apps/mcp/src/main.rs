@@ -100,7 +100,7 @@ fn status(dir: &Path) -> Value {
         Ok(p) => p.summary(),
         Err(e) => json!({"error": e}),
     };
-    let engines = discovery::Engines::connect(
+    let engines = discovery::connect(
         dir,
         &format!("tern-mcp/{} (status)", env!("CARGO_PKG_VERSION")),
     );

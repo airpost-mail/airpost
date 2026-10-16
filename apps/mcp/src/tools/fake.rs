@@ -25,12 +25,16 @@ pub struct Fake {
     pub remote_bodies: HashMap<String, (String, Value)>,
     pub queued: Vec<Value>,
     pub tasks: HashMap<String, Value>,
+    /// What `hello.features` would list. `tasks.list` and `metadata.list` answer only when
+    /// their feature is here, as an older engine doesn't know them.
+    pub features: Vec<String>,
 }
 
 fn not_found(what: &str) -> EngineError {
     EngineError::Rpc {
         code: ms_ipc::code::NOT_FOUND,
         message: format!("no {what}"),
+        data: None,
     }
 }
 
@@ -74,6 +78,10 @@ impl Fake {
 impl Backend for Fake {
     fn accounts(&self) -> Vec<AccountRef> {
         self.accounts.clone()
+    }
+
+    fn has_feature(&self, _account_id: &str, feature: &str) -> bool {
+        self.features.iter().any(|f| f == feature)
     }
 
     fn call(&mut self, account: &str, method: &str, params: Value) -> Result<Value, EngineError> {
@@ -179,9 +187,70 @@ impl Backend for Fake {
                 self.queued.push(task.clone());
                 Ok(task)
             }
+            "tasks.list" if self.has_feature(account, ms_ipc::feature::TASKS_LIST) => {
+                let statuses = array_of(&params, "status").to_vec();
+                let hmid = params.get("headerMessageId").and_then(Value::as_str);
+                let mut tasks: Vec<Value> = self
+                    .tasks
+                    .values()
+                    .filter(|t| str_of(t, "aid") == account)
+                    .filter(|t| statuses.is_empty() || statuses.contains(&t["status"]))
+                    .filter(|t| {
+                        params
+                            .get("class")
+                            .and_then(Value::as_str)
+                            .is_none_or(|c| str_of(t, "__cls") == c)
+                    })
+                    .filter(|t| {
+                        hmid.is_none_or(|h| {
+                            str_of(t, "headerMessageId") == h || str_of(&t["draft"], "hMsgId") == h
+                        })
+                    })
+                    .cloned()
+                    .collect();
+                tasks.sort_by(|a, b| str_of(a, "id").cmp(str_of(b, "id")));
+                Ok(json!({"tasks": tasks}))
+            }
+            "metadata.list" if self.has_feature(account, ms_ipc::feature::METADATA_LIST) => {
+                let plugin = str_of(&params, "pluginId");
+                let num = |k: &str| params.get(k).and_then(Value::as_i64);
+                let mut models: Vec<Value> = Self::of_account(&self.messages, account)
+                    .filter(|m| {
+                        let Some(meta) = array_of(m, "metadata")
+                            .iter()
+                            .find(|x| str_of(x, "pluginId") == plugin)
+                        else {
+                            return false;
+                        };
+                        let date = crate::model::i64_of(m, "date");
+                        let exp = meta["value"].get("expiration").and_then(Value::as_i64);
+                        params
+                            .get("draft")
+                            .and_then(Value::as_bool)
+                            .is_none_or(|d| crate::model::is_draft(m) == d)
+                            && params
+                                .get("hasExpiration")
+                                .and_then(Value::as_bool)
+                                .is_none_or(|h| exp.is_some() == h)
+                            && num("after").is_none_or(|a| date > a)
+                            && num("before").is_none_or(|b| date < b)
+                    })
+                    .cloned()
+                    .collect();
+                models.sort_by(|a, b| {
+                    crate::model::i64_of(b, "date")
+                        .cmp(&crate::model::i64_of(a, "date"))
+                        .then_with(|| str_of(b, "id").cmp(str_of(a, "id")))
+                });
+                let offset = num("offset").unwrap_or(0) as usize;
+                let limit = num("limit").unwrap_or(50) as usize;
+                let models: Vec<Value> = models.into_iter().skip(offset).take(limit).collect();
+                Ok(json!({"models": models}))
+            }
             other => Err(EngineError::Rpc {
                 code: ms_ipc::code::METHOD_NOT_FOUND,
                 message: format!("unknown method {other}"),
+                data: None,
             }),
         }
     }

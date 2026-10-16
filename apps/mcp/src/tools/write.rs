@@ -451,8 +451,9 @@ fn find_draft(
 }
 
 /// Refuses a draft whose send is under way: inside the desktop's Undo Send window (a
-/// `send-later` schedule marked `isUndoSend`), or with a `SendDraftTask` this session
-/// queued that hasn't finished.
+/// `send-later` schedule marked `isUndoSend`), or with a `SendDraftTask` that hasn't
+/// finished. An engine with `tasks.list` knows every queued send, whoever queued it; with an
+/// older one only the sends this session queued are known.
 fn ensure_not_sending(ctx: &mut Ctx<'_>, account: &str, draft: &Value) -> Result<(), ToolError> {
     let hmid = str_of(draft, "hMsgId").to_owned();
     let busy = || {
@@ -469,6 +470,22 @@ fn ensure_not_sending(ctx: &mut Ctx<'_>, account: &str, draft: &Value) -> Result
         if model::bool_of(v, "isUndoSend") && i64_of(v, "expiration") > now_secs() {
             return Err(busy());
         }
+    }
+    if ctx
+        .backend
+        .has_feature(account, ms_ipc::feature::TASKS_LIST)
+    {
+        let r = ctx.call(
+            account,
+            ms_ipc::method::TASKS_LIST,
+            json!({"class": tasks::SEND_DRAFT_TASK, "headerMessageId": hmid,
+                   "status": ["local", "remote"], "limit": 1}),
+        )?;
+        if !array_of(&r, "tasks").is_empty() {
+            return Err(busy());
+        }
+        ctx.session.sends.lock().expect("sends lock").remove(&hmid);
+        return Ok(());
     }
     let pending = ctx
         .session
