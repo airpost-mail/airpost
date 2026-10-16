@@ -1,0 +1,21 @@
+Third-party software notices
+============================
+
+This program includes the following Rust crates. Each licence below is followed by the crates
+it applies to; the text is taken from the crate's own licence file where it has one.
+
+{{#each overview}}
+- {{{name}}} ({{{id}}}): {{count}} crate(s)
+{{/each}}
+{{#each licenses}}
+
+--------------------------------------------------------------------------------
+{{{name}}} ({{{id}}})
+
+Used by:
+{{#each used_by}}
+  {{{crate.name}}} {{{crate.version}}}{{#if crate.repository}} <{{{crate.repository}}}>{{/if}}
+{{/each}}
+
+{{{text}}}
+{{/each}}
