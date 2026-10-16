@@ -1,6 +1,6 @@
 # Tern brand assets
 
-App icon, bird marks and tray icons for Tern. Nothing in `apps/desktop` uses these yet; the table at the end says where each file goes during the rebrand.
+App icon, bird marks and tray icons for Tern. The table at the end says where each file is used in `apps/desktop`.
 
 ## Origin
 
@@ -8,7 +8,7 @@ The artwork was AI-generated with an image generation/editing tool from the user
 
 ## Licence
 
-Licence: not decided (logos are usually excluded from the GPL as trademarks). `tools/build.py` is code and is GPL-3.0-only like the rest of the repo.
+The logos are trademarks, all rights reserved, and not covered by the GPL; forks must replace them. See `LICENSE.md` here. `tools/build.py` is code and is GPL-3.0-only like the rest of the repo.
 
 ## Files
 
@@ -64,16 +64,16 @@ The script wipes and rewrites `masters/` (with `--masters`), `macos/`, `windows/
 
 ## Where each asset goes in apps/desktop
 
-Paths relative to `apps/desktop/app`. Not done yet; this is the plan for the rebrand.
+Paths relative to `apps/desktop/app`. The old Mailspring files listed under "Replaces" are gone; the copies carry the new names.
 
 | Asset | Replaces | Used by |
 | --- | --- | --- |
-| `macos/tern.icns` | `build/resources/mac/mailspring.icns` | `build/build.js` (packager `icon.darwin`). Also what the macOS About panel shows (`application:about` calls the standard About panel). |
-| `windows/tern.ico` | `build/resources/win/mailspring-square.ico` and `mailspring.ico` | `build/build.js` (`icon.win32`), `build/create-signed-windows-installer.js` (`setupIcon`; its `iconUrl` still points at a Mailspring S3 bucket), `src/browser/windows-updater.js` (shortcut icon). |
-| `windows/tern-150px.png`, `tern-75px.png` | `build/resources/win/mailspring-150px.png`, `mailspring-75px.png` | `mailspring.VisualElementsManifest.xml`; its `BackgroundColor='#4ecdc4'` should become the tile navy, about `#0A1A3D`. |
-| `linux/tern-<n>.png` | `build/resources/linux/icons/<n>.png` | Copied to `hicolor/<n>x<n>/apps/` by `build/resources/linux/redhat/mailspring.spec.in`; the deb (`build/build.js`, `script/mkdeb`) takes only `512.png`. |
-| `linux/tern-512.png` | `static/images/mailspring.png` | Window icon on Linux (`src/browser/mailspring-window.ts`), native notifications (`src/native-notifications.ts`), update notification (`src/browser/autoupdate-manager.ts`). |
-| `tray/darwin/*`, `tray/linux/*`, `tray/win32/*` | `internal_packages/system-tray/assets/{darwin,linux,win32}/MenuItem-Inbox-*` | `internal_packages/system-tray/lib/system-tray-icon-store.ts` and `_defaultIconPath` in `src/browser/system-tray-manager.ts` (file names change). `assets/build-win32-ico.py` and the `.psd` files become obsolete. |
-| `web/tern-bird-*` | `internal_packages/onboarding/assets/icons-bg@2x.png` (welcome page, `lib/page-welcome.tsx`) | Onboarding welcome screen; also any About/preferences or website use of the mark. |
+| `macos/tern.icns` | `build/resources/mac/mailspring.icns` (now `tern.icns`) | `build/build.js` (packager `icon.darwin`). Also what the macOS About panel shows (`application:about` calls the standard About panel). |
+| `windows/tern.ico` | `build/resources/win/mailspring-square.ico` and `mailspring.ico` (now `tern.ico`) | `build/build.js` (`icon.win32`), `build/create-signed-windows-installer.js` (`setupIcon`, and `iconUrl` points at this file on GitHub), `src/browser/windows-updater.js` (shortcut icon). |
+| `windows/tern-150px.png`, `tern-75px.png` | `build/resources/win/mailspring-150px.png`, `mailspring-75px.png` | `tern.VisualElementsManifest.xml` (background `#0A1A3D`). |
+| `linux/tern-<n>.png` | `build/resources/linux/icons/<n>.png` (now `tern-<n>.png`) | Installed as `hicolor/<n>x<n>/apps/com.ternmail.tern.png` by `build/resources/linux/redhat/tern.spec.in` and `script/mkdeb`; `tern-512.png` also goes to `/usr/share/pixmaps/tern.png`. |
+| `linux/tern-512.png` | `static/images/mailspring.png` (now `tern.png`) | Window icon on Linux (`src/browser/mailspring-window.ts`), native notifications (`src/native-notifications.ts`), update notification (`src/browser/autoupdate-manager.ts`). |
+| `tray/darwin/*`, `tray/linux/*`, `tray/win32/*` | `internal_packages/system-tray/assets/{darwin,linux,win32}/MenuItem-Inbox-*` | `internal_packages/system-tray/lib/system-tray-icon-store.ts` and `_defaultIconPath` in `src/browser/system-tray-manager.ts`. The old `build-win32-ico.py` and `.psd` files are removed. |
+| `web/tern-bird-on-dark-256.png` | (new) `internal_packages/onboarding/assets/tern-bird-on-dark-256.png` | Mark above the title on the onboarding welcome screen (`lib/page-welcome.tsx`); the generic icon pattern `icons-bg@2x.png` stays as its background. |
 
-Not covered here: `build/resources/mac/file.icns` (document icon), `build/resources/mac/mailspring.icon` (macOS 26 Icon Composer icon, needs layered vector artwork), `build/resources/mac/DMG-Background.png`, and `build/resources/win/loading.gif`.
+Not covered here: a document icon (Mailspring's unused `build/resources/mac/file.icns` was removed), a macOS 26 Icon Composer icon (`tern.icon`, needs layered vector artwork; Mailspring's `mailspring.icon` was removed, so macOS 26 shows `tern.icns`), `build/resources/mac/DMG-Background.png` (unused), and `build/resources/win/loading.gif` (the Windows installer animation).

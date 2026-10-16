@@ -21,6 +21,12 @@ history of this repository.
 
 Tern is not affiliated with or endorsed by Foundry 376 or the Mailspring project.
 
+The Tern name and logos (the app icon, the bird mark and the tray icons, in `assets/brand/` and
+copied into the desktop app) are trademarks of the Tern project, all rights reserved. They are
+not covered by the GPL, and the desktop app's packages include them as its app, window,
+notification and tray icons and on its welcome screen. A fork or other modified version that is
+distributed must replace them and the name with its own; see `assets/brand/LICENSE.md`.
+
 Third-party components that ship inside Tern's binaries are listed with their licences in
 `THIRD-PARTY-NOTICES.txt` next to the engine and backend binaries, and in the desktop app under
 View License in the application menu (`static/all_licenses.html`). The sections below cover code
