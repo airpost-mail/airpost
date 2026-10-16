@@ -42,6 +42,6 @@ pub use contact::{Contact, ContactBook, ContactGroup};
 pub use file::{File, FilePart};
 pub use folder::{Folder, Label};
 pub use generic::GenericModel;
-pub use message::{IncomingMessage, Message, MessageSnapshot};
+pub use message::{is_hidden_json, IncomingMessage, Message, MessageSnapshot};
 pub use task::Task;
 pub use thread::{label_for_xgm_label_name, Thread};

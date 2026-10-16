@@ -16,21 +16,27 @@ use crate::{Model, Store};
 
 fn ensure_thread_counts(id: &str, version: i64, store: &Store) -> Result<()> {
     if version == 1 {
-        store
+        let inserted = store
             .conn()
             .prepare_cached(
                 "INSERT OR IGNORE INTO ThreadCounts (categoryId, unread, total) VALUES (?, 0, 0)",
             )?
             .execute([id])?;
+        if inserted > 0 {
+            crate::counts::emit_rows(store, [id])?;
+        }
     }
     Ok(())
 }
 
 fn remove_thread_counts(id: &str, store: &Store) -> Result<()> {
-    store
+    let removed = store
         .conn()
         .prepare_cached("DELETE FROM ThreadCounts WHERE categoryId = ?")?
         .execute([id])?;
+    if removed > 0 {
+        crate::counts::emit_removed(store, id);
+    }
     Ok(())
 }
 

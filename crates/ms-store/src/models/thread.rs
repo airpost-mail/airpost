@@ -531,12 +531,16 @@ impl Thread {
             let mut change = conn.prepare_cached(
                 "UPDATE ThreadCounts SET unread = unread + ?, total = total + ? WHERE categoryId = ?",
             )?;
+            let mut changed = Vec::new();
             for (category, [unread, total]) in &diffs {
                 if *unread == 0 && *total == 0 {
                     continue;
                 }
-                change.execute(rusqlite::params![unread, total, category])?;
+                if change.execute(rusqlite::params![unread, total, category])? > 0 {
+                    changed.push(*category);
+                }
             }
+            crate::counts::emit_rows(store, changed)?;
 
             if self.search_row_id() != 0 {
                 conn.prepare_cached("UPDATE ThreadSearch SET categories = ? WHERE rowid = ?")?

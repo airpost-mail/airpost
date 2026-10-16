@@ -27,13 +27,13 @@ use std::time::{Duration, Instant};
 use ms_core::constants::{thread, SOCKET_BACKLOG_BYTES, SOCKET_QUEUE_BYTES};
 use ms_core::Account;
 use ms_ipc::{
-    account_state, code, method, AccountInfo, AccountListResult, AccountStateParams, AccountStatus,
-    BodiesFetchParams, CalendarSyncParams, DisconnectParams, EngineStatusResult, ErrorObject,
-    FrameError, HelloParams, HelloResult, Notification, Request as RpcRequest, Response,
-    SubscribeParams, SyncWakeParams, TaskCancelParams, TaskQueueParams, MAX_LINE_BYTES,
-    PROTOCOL_VERSION,
+    account_state, code, feature, method, AccountInfo, AccountListResult, AccountStateParams,
+    AccountStatus, BodiesFetchParams, CalendarSyncParams, DisconnectParams, EngineStatusResult,
+    ErrorObject, FrameError, HelloParams, HelloResult, MailNewParams, Notification,
+    Request as RpcRequest, Response, SubscribeParams, SyncWakeParams, TaskCancelParams,
+    TaskQueueParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
-use ms_store::{DeltaSink, DeltaStream, SECRETS_UPDATED};
+use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
@@ -317,6 +317,8 @@ impl DeltaSink for HubSink {
     fn write_item(&mut self, model_class: &str, line: &str) {
         if model_class == SECRETS_UPDATED {
             self.parent.write_item(model_class, line);
+        } else if model_class == MAIL_NEW {
+            self.hub.mail_new(&self.account_id, line);
         } else {
             let note = framed(ms_ipc::delta_notification_line(&self.account_id, line).into_bytes());
             self.hub.publish(&self.account_id, Some(model_class), note);
@@ -358,17 +360,44 @@ impl Hub {
         self.publish(&params.account_id, None, ms_ipc::encode(&n).into());
     }
 
+    /// Sends `mail.new` for each message in a [`MAIL_NEW`] item to the subscribers of
+    /// `account_id` (docs/desktop-client-plan.md 3.1): no class filter holds it back, and
+    /// nothing is kept for a later subscriber, since mail that arrives with no client
+    /// connected is not announced.
+    fn mail_new(&self, account_id: &str, line: &str) {
+        let Ok(item) = serde_json::from_str::<Value>(line) else {
+            return;
+        };
+        for m in item["modelJSONs"].as_array().into_iter().flatten() {
+            let params = MailNewParams {
+                account_id: account_id.to_owned(),
+                thread_id: m["threadId"].as_str().unwrap_or("").to_owned(),
+                message_id: m["id"].as_str().unwrap_or("").to_owned(),
+            };
+            let n = Notification::new(
+                method::MAIL_NEW,
+                serde_json::to_value(params).unwrap_or(Value::Null),
+            );
+            self.publish_to(account_id, None, ms_ipc::encode(&n).into(), false);
+        }
+    }
+
     fn lock(&self) -> MutexGuard<'_, HubState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     fn publish(&self, account_id: &str, model_class: Option<&str>, note: Arc<[u8]>) {
+        self.publish_to(account_id, model_class, note, true);
+    }
+
+    /// `held` keeps the line for the first unfiltered subscriber while there is none.
+    fn publish_to(&self, account_id: &str, model_class: Option<&str>, note: Arc<[u8]>, held: bool) {
         let mut guard = self.lock();
         let st = &mut *guard;
-        if st.subscribers.is_empty() && st.backlog.is_none() {
+        if st.subscribers.is_empty() && (st.backlog.is_none() || !held) {
             return;
         }
-        if let Some(b) = st.backlog.as_mut() {
+        if let Some(b) = st.backlog.as_mut().filter(|_| held) {
             if b.bytes + note.len() > SOCKET_BACKLOG_BYTES.min(self.limit) {
                 warn!("-X Dropping the deltas held for the first subscriber: over the bound");
                 st.backlog = None;
@@ -679,6 +708,7 @@ impl Session {
             engine: env!("CARGO_PKG_VERSION").to_owned(),
             pid: std::process::id(),
             accounts,
+            features: features(),
         }))
     }
 
@@ -689,6 +719,7 @@ impl Session {
             pid: std::process::id(),
             uptime_secs: self.server.started.elapsed().as_secs(),
             accounts: self.server.accounts.statuses(),
+            features: features(),
         }))
         .unwrap_or(Value::Null)
     }
@@ -715,6 +746,19 @@ impl Session {
         }
         Ok(json!({}))
     }
+}
+
+/// `hello.features` and `engine.status.features`.
+fn features() -> Vec<String> {
+    [
+        feature::COUNTS,
+        feature::TASKS_LIST,
+        feature::METADATA_LIST,
+        feature::MESSAGE_HIDDEN,
+        feature::MAIL_NEW,
+    ]
+    .map(str::to_owned)
+    .to_vec()
 }
 
 fn stopped_before_answering() -> ErrorObject {
@@ -999,5 +1043,46 @@ mod tests {
         let lines = queued(&a_out).concat();
         assert!(lines.contains("\"accountId\":\"a1\""), "{lines}");
         assert!(lines.contains("\"accountId\":\"b1\""), "{lines}");
+    }
+
+    /// `mail.new` routing (docs/desktop-client-plan.md 3.1): by account only, one per
+    /// message, and never held for a later subscriber.
+    #[test]
+    fn mail_new_goes_live_to_the_account_subscribers() {
+        let hub = Hub::new(1 << 20);
+        let mut a = hub.sink("a1", Box::new(Captured::default()));
+        let item = r#"{"modelClass":"MailNew","modelJSONs":[{"id":"m1","threadId":"t1"},{"id":"m2","threadId":"t1"}],"type":"persist"}"#;
+        a.write_item(MAIL_NEW, item);
+        let (early, e_out) = subscriber(1, None);
+        hub.subscribe(early, None);
+        assert!(queued(&e_out).is_empty(), "no backlog for mail.new");
+
+        let (tasks_only, t_out) = subscriber(2, Some(&["Task"]));
+        hub.subscribe(tasks_only, None);
+        let (other, o_out) = filtered_subscriber(3, Some(&["b1"]), None);
+        hub.subscribe(other, None);
+        a.write_item(MAIL_NEW, item);
+        for out in [&e_out, &t_out] {
+            let lines = queued(out);
+            assert_eq!(lines.len(), 2, "{lines:?}");
+            let n: Value = serde_json::from_str(&lines[0]).unwrap();
+            assert_eq!(n["method"], method::MAIL_NEW);
+            assert_eq!(
+                n["params"],
+                json!({"accountId": "a1", "threadId": "t1", "messageId": "m1"})
+            );
+        }
+        assert!(queued(&o_out).is_empty());
+    }
+
+    #[test]
+    fn mail_new_never_reaches_stdout() {
+        let mut sink = ms_store::WriteSink(Vec::new());
+        sink.write_item(MAIL_NEW, r#"{"modelClass":"MailNew"}"#);
+        sink.write_item("Task", r#"{"modelClass":"Task"}"#);
+        assert_eq!(
+            String::from_utf8(sink.0).unwrap(),
+            "{\"modelClass\":\"Task\"}\n"
+        );
     }
 }

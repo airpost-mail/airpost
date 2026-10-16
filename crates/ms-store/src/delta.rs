@@ -169,6 +169,18 @@ fn write_sorted(v: &Value, out: &mut String) {
 /// It only goes to the parent process (docs/engine-protocol-plan.md section 2).
 pub const SECRETS_UPDATED: &str = "ProcessAccountSecretsUpdated";
 
+/// The model class of the items behind the socket's `mail.new` notifications, one JSON
+/// `{id, threadId}` per new message (the id is the message's, so a repeat within one flush
+/// merges). Buffered with the deltas so it goes out only once the message is committed, but
+/// never written as a delta: the socket hub turns it into notifications and every other sink
+/// drops it (docs/desktop-client-plan.md 3.1, 3.5).
+pub const MAIL_NEW: &str = "MailNew";
+
+/// Classes whose items are not deltas and never reach stdout.
+pub fn is_socket_only(model_class: &str) -> bool {
+    model_class == MAIL_NEW
+}
+
 /// Where flushed items go. Called on the flush thread with the buffer locked, once per item
 /// in flush order, so an implementation must not block: a slow consumer is the sink's
 /// problem (the socket hub queues per connection and drops subscribers that fall behind).
@@ -182,7 +194,10 @@ pub trait DeltaSink: Send {
 pub struct WriteSink<W>(pub W);
 
 impl<W: Write + Send> DeltaSink for WriteSink<W> {
-    fn write_item(&mut self, _model_class: &str, line: &str) {
+    fn write_item(&mut self, model_class: &str, line: &str) {
+        if is_socket_only(model_class) {
+            return;
+        }
         let _ = self.0.write_all(format!("{line}\n").as_bytes());
         let _ = self.0.flush();
     }

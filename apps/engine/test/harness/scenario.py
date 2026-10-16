@@ -1357,6 +1357,45 @@ class ScenarioRun(PimMixin, BackendMixin):
             out.append(f"expected the connection error to be cleared, ProcessState deltas were {states}")
         return out
 
+    def expect_mail_new(self, arg) -> list:
+        """`mail.new` on the socket transports: `count` notifications (`mail_new: n` is the
+        same), none naming a message twice, each naming a stored, unread Message of the thread
+        it gives and, with `from`, sent from that address. stdio carries no notifications:
+        there the check is that none leaked onto stdout, as a delta or as a line."""
+        arg = arg if isinstance(arg, dict) else {"count": arg}
+        if self.ms.transport == "stdio":
+            out = [f"MailNew delta on stdout at {d.t:.2f}s: {d.raw}" for d in self.ms.deltas("MailNew")]
+            with self.ms._lock:
+                noise = list(self.ms.state.stdout_noise)
+            out += [f"mail.new on stdout at {t:.2f}s: {line[:200]}" for t, line in noise if "mail.new" in line]
+            return out
+        seen = self.ms.mail_new()
+        ids = [p.get("messageId") for _, p in seen]
+        out = []
+        repeated = sorted({i for i in ids if ids.count(i) > 1})
+        if repeated:
+            out.append(f"mail.new repeated for {repeated}")
+        if "count" in arg and len(seen) != arg["count"]:
+            out.append(f"expected {arg['count']} mail.new, saw {len(seen)}")
+        with self.ms.db() as c:
+            for t, p in seen:
+                row = c.execute("SELECT threadId, unread, subject, data FROM Message WHERE id = ?",
+                                (p.get("messageId"),)).fetchone()
+                if row is None:
+                    out.append(f"mail.new at {t:.2f}s names no stored message: {p}")
+                    continue
+                sender = ((json.loads(row[3]).get("from") or [{}])[0] or {}).get("email", "")
+                if row[0] != p.get("threadId"):
+                    out.append(f"mail.new for {p.get('messageId')} gives thread {p.get('threadId')}, stored {row[0]}")
+                elif not row[1]:
+                    out.append(f"mail.new for {p.get('messageId')} ({row[2]!r}), which is read")
+                elif "from" in arg and sender.lower() != str(arg["from"]).lower():
+                    out.append(f"mail.new for {p.get('messageId')} ({row[2]!r}) from {sender!r}, expected {arg['from']!r}")
+        if out:
+            for t, p in seen:
+                self._note(f"mail.new at {t:.2f}s: {p}")
+        return out
+
     def expect_deltas(self, arg: dict) -> list:
         out = []
         for cls, wants in arg.items():

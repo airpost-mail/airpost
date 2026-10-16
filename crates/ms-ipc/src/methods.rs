@@ -22,6 +22,11 @@ pub struct HelloResult {
     pub engine: String,
     pub pid: u32,
     pub accounts: Vec<AccountInfo>,
+    /// What this engine offers beyond protocol v1's base methods, from
+    /// [`feature`](crate::feature). Clients gate behaviour on these, never on `engine`. Empty
+    /// from an engine that predates them.
+    #[serde(default)]
+    pub features: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,6 +102,9 @@ pub struct EngineStatusResult {
     /// Seconds since the engine started.
     pub uptime_secs: u64,
     pub accounts: Vec<AccountStatus>,
+    /// As in [`HelloResult::features`].
+    #[serde(default)]
+    pub features: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -193,10 +201,39 @@ pub struct DisconnectParams {
     pub reason: String,
 }
 
+/// `mail.new` params: a message that arrived unread in the inbox after the folder's first
+/// headers sync. Sent once per message to the connections subscribed to its account, never
+/// held for a later subscriber; a client that sees a `messageId` twice drops the repeat.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailNewParams {
+    pub account_id: String,
+    pub thread_id: String,
+    pub message_id: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn features_default_to_none() {
+        let h: HelloResult = serde_json::from_value(
+            json!({"protocol": 1, "engine": "0.1.0", "pid": 1, "accounts": []}),
+        )
+        .unwrap();
+        assert!(h.features.is_empty());
+        let n = MailNewParams {
+            account_id: "a".into(),
+            thread_id: "t".into(),
+            message_id: "m".into(),
+        };
+        assert_eq!(
+            serde_json::to_value(&n).unwrap(),
+            json!({"accountId": "a", "threadId": "t", "messageId": "m"})
+        );
+    }
 
     #[test]
     fn camel_case_keys() {
@@ -218,6 +255,7 @@ mod tests {
             engine: "0.1.0".into(),
             pid: 1,
             uptime_secs: 3,
+            features: vec![crate::feature::COUNTS.into()],
             accounts: vec![AccountStatus {
                 account_id: "a".into(),
                 email: "e".into(),
@@ -230,6 +268,7 @@ mod tests {
         assert_eq!(v["uptimeSecs"], 3);
         assert_eq!(v["accounts"][0]["connectionError"], false);
         assert!(v["accounts"][0].get("error").is_none());
+        assert_eq!(v["features"], json!(["counts"]));
         assert_eq!(serde_json::from_value::<EngineStatusResult>(v).unwrap(), s);
 
         let p: AccountAddParams = serde_json::from_value(json!({"account": {"id": "a"}})).unwrap();

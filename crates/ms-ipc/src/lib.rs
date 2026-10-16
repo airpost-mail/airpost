@@ -61,6 +61,13 @@ pub mod method {
     pub const SEARCH: &str = "search";
     pub const CONTACTS_SEARCH: &str = "contacts.search";
     pub const TASKS_GET: &str = "tasks.get";
+    /// Every `ThreadCounts` row of the accounts ([`feature::COUNTS`](crate::feature::COUNTS)).
+    pub const COUNTS_GET: &str = "counts.get";
+    /// Stored tasks by account, status, class or draft ([`feature::TASKS_LIST`](crate::feature::TASKS_LIST)).
+    pub const TASKS_LIST: &str = "tasks.list";
+    /// Messages or threads carrying a plugin's metadata
+    /// ([`feature::METADATA_LIST`](crate::feature::METADATA_LIST)).
+    pub const METADATA_LIST: &str = "metadata.list";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
     /// `serve` mode, the parent's stdin only: start syncing an account.
@@ -84,6 +91,25 @@ pub mod method {
     /// Notification: the engine is about to close the connection, `params` =
     /// [`DisconnectParams`](crate::DisconnectParams).
     pub const DISCONNECT: &str = "disconnect";
+    /// Notification: new mail, `params` = [`MailNewParams`](crate::MailNewParams). Filtered by
+    /// account only, never held for a later subscriber ([`feature::MAIL_NEW`](crate::feature::MAIL_NEW)).
+    pub const MAIL_NEW: &str = "mail.new";
+}
+
+/// The names in `hello.features` and `engine.status.features`
+/// (docs/desktop-client-plan.md 3.1). Each one is additive: a client checks for it before it
+/// relies on the method, field or notification it names.
+pub mod feature {
+    /// `counts.get`, and `ThreadCounts` deltas whenever a category's counts change.
+    pub const COUNTS: &str = "counts";
+    /// `tasks.list`.
+    pub const TASKS_LIST: &str = "tasks-list";
+    /// `metadata.list`.
+    pub const METADATA_LIST: &str = "metadata-list";
+    /// `hidden` on the Message JSON the read methods return (`Message.isHidden()`).
+    pub const MESSAGE_HIDDEN: &str = "message-hidden";
+    /// `mail.new` notifications for subscribed connections.
+    pub const MAIL_NEW: &str = "mail-new";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`

@@ -1,21 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! Read-only queries behind the engine's read API (docs/engine-protocol-plan.md section 3).
+//! Read-only queries behind the engine's read API (docs/engine-protocol-plan.md section 3,
+//! docs/desktop-client-plan.md 3.2).
 //!
 //! A [`ReadStore`] is its own read-only connection, so a socket connection's reader thread
 //! can answer reads without going through the main thread or taking the write lock. Every
-//! query is scoped to one account and returns the stored model JSON (the `data` column) the
-//! desktop already parses.
+//! query is scoped to the accounts it names and returns the stored model JSON (the `data`
+//! column) the desktop already parses; Message JSON also carries `hidden`
+//! ([`crate::models::is_hidden_json`]).
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::time::Duration;
 
 use ms_core::constants::{DATABASE_FILE, SQLITE_BUSY_TIMEOUT_MS};
 use ms_core::Result;
+use rusqlite::types::Value as SqlValue;
 use rusqlite::types::ValueRef;
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Row};
+use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension, Row};
 use serde_json::Value;
+
+use crate::models::is_hidden_json;
 
 /// Rows a read can return once, whatever the caller asks for.
 pub const MAX_LIMIT: usize = 500;
@@ -102,6 +108,84 @@ fn json_column(row: &Row<'_>, idx: usize) -> rusqlite::Result<Value> {
 
 fn clamp(limit: usize) -> i64 {
     limit.clamp(1, MAX_LIMIT) as i64
+}
+
+/// A Message's stored JSON with `hidden` set.
+pub fn with_hidden(mut message: Value) -> Value {
+    let hidden = is_hidden_json(&message);
+    if let Some(obj) = message.as_object_mut() {
+        obj.insert("hidden".into(), Value::Bool(hidden));
+    }
+    message
+}
+
+fn message_column(row: &Row<'_>, idx: usize) -> rusqlite::Result<Value> {
+    json_column(row, idx).map(with_hidden)
+}
+
+/// `?,?,…` for `n` parameters.
+fn placeholders(n: usize) -> String {
+    vec!["?"; n].join(",")
+}
+
+/// What `tasks.list` keeps.
+#[derive(Clone, Debug, Default)]
+pub struct TaskFilter<'a> {
+    pub accounts: &'a [String],
+    /// `None` keeps every status.
+    pub statuses: Option<&'a [String]>,
+    /// The task's `__cls`.
+    pub class: Option<&'a str>,
+    /// Tasks naming this draft, in `headerMessageId` or `draft.hMsgId`.
+    pub header_message_id: Option<&'a str>,
+    pub limit: usize,
+}
+
+impl TaskFilter<'_> {
+    fn keeps(&self, task: &Value) -> bool {
+        let s = |v: &Value, k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_owned();
+        self.statuses
+            .is_none_or(|list| list.iter().any(|st| *st == s(task, "status")))
+            && self.class.is_none_or(|c| s(task, "__cls") == c)
+            && self.header_message_id.is_none_or(|h| {
+                s(task, "headerMessageId") == h
+                    || task.get("draft").is_some_and(|d| s(d, "hMsgId") == h)
+            })
+    }
+}
+
+/// The models `metadata.list` reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MetadataObject {
+    #[default]
+    Message,
+    Thread,
+}
+
+impl MetadataObject {
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "Message" => Some(MetadataObject::Message),
+            "Thread" => Some(MetadataObject::Thread),
+            _ => None,
+        }
+    }
+}
+
+/// What `metadata.list` keeps; see `ms_ipc::MetadataListParams`.
+#[derive(Clone, Debug, Default)]
+pub struct MetadataFilter<'a> {
+    pub accounts: &'a [String],
+    pub plugin_id: &'a str,
+    pub object: MetadataObject,
+    /// Messages only.
+    pub draft: Option<bool>,
+    pub expires_before: Option<i64>,
+    pub has_expiration: Option<bool>,
+    pub after: Option<i64>,
+    pub before: Option<i64>,
+    pub limit: usize,
+    pub offset: usize,
 }
 
 impl ReadStore {
@@ -258,7 +342,7 @@ impl ReadStore {
         let mut stmt = self.conn.prepare_cached(
             "SELECT data FROM Message WHERE threadId = ? AND accountId = ? ORDER BY date ASC, id ASC",
         )?;
-        let rows = stmt.query_map([thread_id, account_id], |r| json_column(r, 0))?;
+        let rows = stmt.query_map([thread_id, account_id], |r| message_column(r, 0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
@@ -266,8 +350,130 @@ impl ReadStore {
         Ok(self
             .conn
             .prepare_cached("SELECT data FROM Message WHERE id = ? AND accountId = ?")?
-            .query_row([id, account_id], |r| json_column(r, 0))
+            .query_row([id, account_id], |r| message_column(r, 0))
             .optional()?)
+    }
+
+    /// The `ThreadCounts` rows of the accounts' folders and labels, by category id. Rows of a
+    /// category that no longer exists are left out.
+    pub fn counts(&self, accounts: &[String]) -> Result<Vec<(String, Counts)>> {
+        let wanted: HashSet<&str> = accounts.iter().map(String::as_str).collect();
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT n.categoryId, n.unread, n.total, c.accountId FROM ThreadCounts n \
+             INNER JOIN (SELECT id, accountId FROM Folder UNION ALL SELECT id, accountId FROM Label) c \
+             ON c.id = n.categoryId ORDER BY n.categoryId",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                Counts {
+                    unread: r.get::<_, Option<i64>>(1)?.unwrap_or(0),
+                    total: r.get::<_, Option<i64>>(2)?.unwrap_or(0),
+                },
+                r.get::<_, Option<String>>(3)?.unwrap_or_default(),
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, counts, account) = row?;
+            if wanted.contains(account.as_str()) {
+                out.push((id, counts));
+            }
+        }
+        Ok(out)
+    }
+
+    /// The stored tasks `filter` keeps, at most `filter.limit` (clamped to [`MAX_LIMIT`]):
+    /// the pending ones (`local`, `remote`) first, oldest queued first, then the finished ones,
+    /// newest first. Pending tasks come first so the hundred finished tasks an account keeps
+    /// can't crowd them out of an unfiltered list.
+    pub fn tasks(&self, filter: &TaskFilter<'_>) -> Result<Vec<Value>> {
+        let wanted: HashSet<&str> = filter.accounts.iter().map(String::as_str).collect();
+        let limit = clamp(filter.limit) as usize;
+        // Note: the table holds the pending tasks plus the newest hundred finished ones per
+        // account, so the filters run here rather than as SQL over JSON in a BLOB column.
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT accountId, data FROM Task ORDER BY rowid ASC")?;
+        let rows = stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, Option<String>>(0)?.unwrap_or_default(),
+                json_column(r, 1)?,
+            ))
+        })?;
+        let mut pending = Vec::new();
+        let mut finished = Vec::new();
+        for row in rows {
+            let (account, task) = row?;
+            if !wanted.contains(account.as_str()) || !filter.keeps(&task) {
+                continue;
+            }
+            match task.get("status").and_then(Value::as_str) {
+                Some("local" | "remote") => pending.push(task),
+                _ => finished.push(task),
+            }
+        }
+        // Rows are updated in place, so rowid order is queue order.
+        finished.reverse();
+        pending.extend(finished);
+        pending.truncate(limit);
+        Ok(pending)
+    }
+
+    /// The messages or threads carrying `filter.plugin_id`'s metadata, newest first.
+    pub fn metadata_models(&self, filter: &MetadataFilter<'_>) -> Result<Vec<Value>> {
+        if filter.accounts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let (table, date) = match filter.object {
+            MetadataObject::Message => ("Message", "date"),
+            MetadataObject::Thread => ("Thread", "lastMessageTimestamp"),
+        };
+        let mut sql = format!(
+            "SELECT m.data FROM ModelPluginMetadata p INNER JOIN {table} m ON m.id = p.id \
+             WHERE p.value = ? AND p.objectType = ? AND p.accountId IN ({})",
+            placeholders(filter.accounts.len())
+        );
+        let mut args: Vec<SqlValue> = vec![
+            SqlValue::Text(filter.plugin_id.to_owned()),
+            SqlValue::Text(table.to_owned()),
+        ];
+        args.extend(filter.accounts.iter().cloned().map(SqlValue::Text));
+        if let (Some(draft), MetadataObject::Message) = (filter.draft, filter.object) {
+            sql.push_str(" AND m.draft = ?");
+            args.push(SqlValue::Integer(draft.into()));
+        }
+        if let Some(t) = filter.expires_before {
+            sql.push_str(" AND p.expiration IS NOT NULL AND p.expiration < ?");
+            args.push(SqlValue::Integer(t));
+        }
+        match filter.has_expiration {
+            Some(true) => sql.push_str(" AND p.expiration IS NOT NULL"),
+            Some(false) => sql.push_str(" AND p.expiration IS NULL"),
+            None => {}
+        }
+        if let Some(t) = filter.after {
+            sql.push_str(&format!(" AND m.{date} > ?"));
+            args.push(SqlValue::Integer(t));
+        }
+        if let Some(t) = filter.before {
+            sql.push_str(&format!(" AND m.{date} < ?"));
+            args.push(SqlValue::Integer(t));
+        }
+        sql.push_str(&format!(
+            " ORDER BY m.{date} DESC, m.id DESC LIMIT ? OFFSET ?"
+        ));
+        args.push(SqlValue::Integer(clamp(filter.limit)));
+        args.push(SqlValue::Integer(
+            filter.offset.min(i64::MAX as usize) as i64
+        ));
+        let mut stmt = self.conn.prepare_cached(&sql)?;
+        let object = filter.object;
+        let rows = stmt.query_map(params_from_iter(args), |r| match object {
+            MetadataObject::Message => message_column(r, 0),
+            MetadataObject::Thread => json_column(r, 0),
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     pub fn task(&self, account_id: &str, id: &str) -> Result<Option<Value>> {

@@ -586,6 +586,29 @@ impl Message {
     }
 }
 
+/// The desktop's `Message.isHidden()` on stored JSON, which the read API reports as
+/// `hidden`: a deletion placeholder, or a reminder or unsnooze the user sent themselves (one
+/// sender, one recipient, the same address, a sender name ending in `via Tern`, or `via
+/// Mailspring` before the rename).
+pub fn is_hidden_json(message: &Value) -> bool {
+    let id = message.get("id").and_then(Value::as_str).unwrap_or("");
+    if ms_core::ids::is_deletion_placeholder_id(id) {
+        return true;
+    }
+    let one = |key: &str| match message.get(key).and_then(Value::as_array) {
+        Some(list) if list.len() == 1 => Some(&list[0]),
+        _ => None,
+    };
+    let (Some(from), Some(to)) = (one("from"), one("to")) else {
+        return false;
+    };
+    let email = |c: &Value| c.get("email").and_then(Value::as_str).map(str::to_owned);
+    let name = from.get("name").and_then(Value::as_str).unwrap_or("");
+    email(from).is_some()
+        && email(from) == email(to)
+        && (name.ends_with("via Tern") || name.ends_with("via Mailspring"))
+}
+
 impl Model for Message {
     model_boilerplate!(
         "Message",

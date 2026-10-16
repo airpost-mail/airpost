@@ -11,6 +11,7 @@
 //! compiler enforces what `MailStore::assertCorrectThread` checked at runtime. Deltas go to
 //! the process-wide [`DeltaStream`], which every store shares.
 
+pub mod counts;
 pub mod delta;
 pub mod invariants;
 pub mod legacy_import;
@@ -24,7 +25,10 @@ pub mod schema;
 pub mod search;
 pub mod store;
 
-pub use delta::{DeltaItem, DeltaSink, DeltaStream, WriteSink, SECRETS_UPDATED};
+pub use counts::THREAD_COUNTS;
+pub use delta::{
+    is_socket_only, DeltaItem, DeltaSink, DeltaStream, WriteSink, MAIL_NEW, SECRETS_UPDATED,
+};
 pub use model::Model;
 pub use models::{
     Calendar, Contact, ContactBook, ContactGroup, Event, File, FilePart, Folder, GenericModel,

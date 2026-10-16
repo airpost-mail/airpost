@@ -1,0 +1,27 @@
+name: mail-new-notifications
+description: >
+  `mail.new` (docs/desktop-client-plan.md 3.5) once per message that lands unread in the inbox
+  after the first headers sync: none for the initial 30, then one each for three unread INBOX
+  arrivals from new@example.test, and none for a read one, for unread mail from the account's
+  own address, or for mail that lands in Archive. On stdio, none may reach stdout.
+source: "unread-notifications/lib/main.ts new-mail rule; MailProcessor::insert_message"
+servers:
+  - {fake: dovecot}
+  - {fake: plain}
+  - {fake: gmail}
+mailboxes:
+  INBOX: {messages: 30, flags: []}
+  Archive: {messages: 3}
+steps:
+  - wait: quiescent
+  - server.append: {mailbox: INBOX, messages: {count: 3, sender: [New Mail, new@example.test]}, flags: []}
+  - server.append: {mailbox: INBOX, messages: 1}
+  - server.append: {mailbox: INBOX, messages: {count: 1, self_addressed: true}, flags: []}
+  - server.append: {mailbox: Archive, messages: 2, flags: []}
+  - wait: {quiescent: true}
+  - sync: pass
+  - wait: {quiescent: true}
+expect:
+  db_matches_server: {}
+  mail_new: {count: 3, from: new@example.test}
+  running: true

@@ -12,7 +12,10 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use ms_ipc::{code, method, Client, ThreadsListResult};
+use ms_ipc::{
+    code, feature, method, Client, CountsGetResult, MessagesGetResult, MetadataListResult,
+    TasksListResult, ThreadsGetResult, ThreadsListResult,
+};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 
@@ -230,15 +233,57 @@ fn seed(config: &Path) {
     );
     insert_contact(&c, OTHER, "c-4", "ann@other.com", "Ann Other", 99, false);
 
-    for (id, account, status) in [
-        ("task-done", ACCOUNT_ID, "complete"),
-        ("task-other", OTHER, "complete"),
+    for (id, account, status, class, extra) in [
+        (
+            "task-done",
+            ACCOUNT_ID,
+            "complete",
+            "ChangeStarredTask",
+            json!({}),
+        ),
+        (
+            "task-other",
+            OTHER,
+            "complete",
+            "ChangeStarredTask",
+            json!({}),
+        ),
+        (
+            "task-send",
+            ACCOUNT_ID,
+            "remote",
+            "SendDraftTask",
+            json!({"headerMessageId": "draft-1@x"}),
+        ),
+        (
+            "task-save",
+            ACCOUNT_ID,
+            "remote",
+            "SyncbackDraftTask",
+            json!({"draft": {"hMsgId": "draft-1@x"}}),
+        ),
     ] {
-        let data = json!({"id": id, "aid": account, "__cls": "ChangeStarredTask", "v": 1,
+        let mut data = json!({"id": id, "aid": account, "__cls": class, "v": 1,
             "status": status, "error": null});
+        for (k, v) in extra.as_object().unwrap() {
+            data[k] = v.clone();
+        }
         c.execute(
             "INSERT INTO Task (id, version, data, accountId, status) VALUES (?, 1, ?, ?, ?)",
             params![id, data.to_string(), account, status],
+        )
+        .unwrap();
+    }
+
+    for (id, plugin, expiration) in [
+        ("m-1", "link-tracking", None),
+        ("m-2", "link-tracking", None),
+        ("m-2", "send-later", Some(1_900_000_000_i64)),
+    ] {
+        c.execute(
+            "INSERT INTO ModelPluginMetadata (id, accountId, objectType, value, expiration) \
+             VALUES (?, ?, 'Message', ?, ?)",
+            params![id, ACCOUNT_ID, plugin, expiration],
         )
         .unwrap();
     }
@@ -725,5 +770,150 @@ fn reads_answer_while_the_dispatcher_is_busy() {
     lock.execute_batch("ROLLBACK").unwrap();
     let r = queued.join().unwrap().unwrap();
     assert_eq!(r["status"], "remote");
+    e.stop();
+}
+
+#[test]
+fn hello_and_status_announce_the_features() {
+    let e = Engine::start();
+    let mut c = Client::connect(&e.socket).unwrap();
+    c.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
+    let hello = c.hello("read-api-test/1").unwrap();
+    for f in [
+        feature::COUNTS,
+        feature::TASKS_LIST,
+        feature::METADATA_LIST,
+        feature::MESSAGE_HIDDEN,
+        feature::MAIL_NEW,
+    ] {
+        assert!(
+            hello.features.iter().any(|x| x == f),
+            "{f} in {:?}",
+            hello.features
+        );
+    }
+    let status: Value = c.call(method::ENGINE_STATUS, json!({})).unwrap();
+    assert_eq!(status["features"], json!(hello.features));
+    e.stop();
+}
+
+#[test]
+fn counts_get() {
+    let e = Engine::start();
+    let mut c = e.hello();
+    let all: CountsGetResult = c.call_as(method::COUNTS_GET, json!({})).unwrap();
+    assert_eq!(
+        serde_json::to_value(&all).unwrap(),
+        json!({"counts": {"f-inbox": {"unread": 2, "total": 60}}})
+    );
+    let mine: CountsGetResult = c
+        .call_as(method::COUNTS_GET, json!({"accounts": [ACCOUNT_ID]}))
+        .unwrap();
+    assert_eq!(mine, all);
+    assert_eq!(
+        error_code(&mut c, method::COUNTS_GET, json!({"accounts": [OTHER]})),
+        Some(code::UNKNOWN_ACCOUNT)
+    );
+    e.stop();
+}
+
+#[test]
+fn tasks_list() {
+    let e = Engine::start();
+    let mut c = e.hello();
+    let list = |c: &mut Client, p: Value| -> Vec<String> {
+        let r: TasksListResult = c.call_as(method::TASKS_LIST, p).unwrap();
+        ids(&r.tasks)
+    };
+    assert_eq!(
+        list(&mut c, json!({})),
+        ["task-send", "task-save", "task-done"],
+        "every account the engine holds, pending first"
+    );
+    assert_eq!(
+        list(
+            &mut c,
+            json!({"accountId": ACCOUNT_ID, "status": ["local", "remote"]})
+        ),
+        ["task-send", "task-save"]
+    );
+    assert_eq!(list(&mut c, json!({"status": ["complete"]})), ["task-done"]);
+    assert_eq!(
+        list(&mut c, json!({"class": "SendDraftTask"})),
+        ["task-send"]
+    );
+    assert_eq!(
+        list(&mut c, json!({"headerMessageId": "draft-1@x"})),
+        ["task-send", "task-save"]
+    );
+    assert_eq!(list(&mut c, json!({"limit": 1})), ["task-send"]);
+    assert_eq!(
+        error_code(&mut c, method::TASKS_LIST, json!({"accountId": OTHER})),
+        Some(code::UNKNOWN_ACCOUNT)
+    );
+    e.stop();
+}
+
+#[test]
+fn metadata_list_and_hidden() {
+    let e = Engine::start();
+    let mut c = e.hello();
+    let list = |c: &mut Client, p: Value| -> Vec<Value> {
+        let r: MetadataListResult = c.call_as(method::METADATA_LIST, p).unwrap();
+        r.models
+    };
+    let tracked = list(&mut c, json!({"pluginId": "link-tracking"}));
+    assert_eq!(ids(&tracked), ["m-2", "m-1"], "newest first");
+    assert!(tracked.iter().all(|m| m["hidden"] == false));
+    assert_eq!(
+        ids(&list(
+            &mut c,
+            json!({"pluginId": "link-tracking", "after": BASE_TS})
+        )),
+        ["m-2"]
+    );
+    assert_eq!(
+        ids(&list(
+            &mut c,
+            json!({"pluginId": "send-later", "hasExpiration": true, "accounts": [ACCOUNT_ID]})
+        )),
+        ["m-2"]
+    );
+    assert!(list(
+        &mut c,
+        json!({"pluginId": "send-later", "expiresBefore": 1_800_000_000})
+    )
+    .is_empty());
+    assert!(list(
+        &mut c,
+        json!({"pluginId": "link-tracking", "objectType": "Thread"})
+    )
+    .is_empty());
+    for bad in [
+        json!({"pluginId": ""}),
+        json!({"pluginId": "x", "objectType": "Contact"}),
+        json!({"pluginId": "x", "objectType": "Thread", "draft": true}),
+        json!({}),
+    ] {
+        assert_eq!(
+            error_code(&mut c, method::METADATA_LIST, bad.clone()),
+            Some(code::INVALID_PARAMS),
+            "{bad}"
+        );
+    }
+    let m: MessagesGetResult = c
+        .call_as(
+            method::MESSAGES_GET,
+            json!({"accountId": ACCOUNT_ID, "id": "m-1"}),
+        )
+        .unwrap();
+    assert_eq!(m.message["hidden"], false);
+    let t: ThreadsGetResult = c
+        .call_as(
+            method::THREADS_GET,
+            json!({"accountId": ACCOUNT_ID, "id": "t:000"}),
+        )
+        .unwrap();
+    assert!(t.messages.iter().all(|m| m["hidden"] == false));
     e.stop();
 }

@@ -11,12 +11,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use ms_ipc::{
-    code, method, CategoriesListParams, CategoryCounts, ContactsSearchResult, ErrorObject,
-    FoldersListResult, LabelsListResult, MessagesGetParams, MessagesGetResult,
-    Request as RpcRequest, SearchParams, SearchResult, TasksGetParams, TasksGetResult,
+    code, method, CategoriesListParams, CategoryCounts, ContactsSearchResult, CountsGetParams,
+    CountsGetResult, ErrorObject, FoldersListResult, LabelsListResult, MessagesGetParams,
+    MessagesGetResult, MetadataListParams, MetadataListResult, Request as RpcRequest, SearchParams,
+    SearchResult, TasksGetParams, TasksGetResult, TasksListParams, TasksListResult,
     ThreadsGetParams, ThreadsGetResult, ThreadsListParams, ThreadsListResult, READ_DEFAULT_LIMIT,
 };
-use ms_store::read::{Category, CategoryTable, Cursor, InCategory, ReadStore};
+use ms_store::read::{
+    Category, CategoryTable, Cursor, InCategory, MetadataFilter, MetadataObject, ReadStore,
+    TaskFilter,
+};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -34,6 +38,9 @@ pub fn is_read_method(name: &str) -> bool {
             | method::SEARCH
             | method::CONTACTS_SEARCH
             | method::TASKS_GET
+            | method::COUNTS_GET
+            | method::TASKS_LIST
+            | method::METADATA_LIST
     )
 }
 
@@ -98,6 +105,25 @@ impl ReadApi {
 
     fn check_account(&self, account_id: &str) -> Result<(), ErrorObject> {
         self.accounts.check(account_id)
+    }
+
+    /// The accounts a multi-account read covers: the ones named, each of which the engine
+    /// must hold, or every account it holds.
+    fn resolve_accounts(&self, named: Option<Vec<String>>) -> Result<Vec<String>, ErrorObject> {
+        match named {
+            Some(list) => {
+                for a in &list {
+                    self.check_account(a)?;
+                }
+                Ok(list)
+            }
+            None => Ok(self
+                .accounts
+                .statuses()
+                .into_iter()
+                .map(|a| a.account_id)
+                .collect()),
+        }
     }
 
     /// Answers a method [`is_read_method`] accepts.
@@ -197,11 +223,78 @@ impl ReadApi {
                     .ok_or_else(|| not_found("task", &p.id))?;
                 to_reply(TasksGetResult { task })
             }
+            method::COUNTS_GET => {
+                let p: CountsGetParams = req.params_as()?;
+                let accounts = self.resolve_accounts(p.accounts)?;
+                let counts = self
+                    .store()?
+                    .counts(&accounts)
+                    .map_err(internal)?
+                    .into_iter()
+                    .map(|(id, n)| {
+                        (
+                            id,
+                            CategoryCounts {
+                                unread: n.unread,
+                                total: n.total,
+                            },
+                        )
+                    })
+                    .collect();
+                to_reply(CountsGetResult { counts })
+            }
+            method::TASKS_LIST => {
+                let p: TasksListParams = req.params_as()?;
+                let accounts = self.resolve_accounts(p.account_id.map(|a| vec![a]))?;
+                let tasks = self
+                    .store()?
+                    .tasks(&TaskFilter {
+                        accounts: &accounts,
+                        statuses: p.status.as_deref(),
+                        class: p.class.as_deref(),
+                        header_message_id: p.header_message_id.as_deref(),
+                        limit: p.limit.unwrap_or(READ_DEFAULT_LIMIT),
+                    })
+                    .map_err(internal)?;
+                to_reply(TasksListResult { tasks })
+            }
+            method::METADATA_LIST => self.metadata_list(req.params_as()?),
             other => Err(ErrorObject::new(
                 code::METHOD_NOT_FOUND,
                 format!("unknown method {other}"),
             )),
         }
+    }
+
+    fn metadata_list(&mut self, p: MetadataListParams) -> Reply {
+        if p.plugin_id.is_empty() {
+            return Err(invalid("pluginId is empty"));
+        }
+        let object = match p.object_type.as_deref() {
+            None => MetadataObject::Message,
+            Some(name) => MetadataObject::parse(name)
+                .ok_or_else(|| invalid("objectType must be Message or Thread"))?,
+        };
+        if object == MetadataObject::Thread && p.draft.is_some() {
+            return Err(invalid("draft only applies to messages"));
+        }
+        let accounts = self.resolve_accounts(p.accounts)?;
+        let models = self
+            .store()?
+            .metadata_models(&MetadataFilter {
+                accounts: &accounts,
+                plugin_id: &p.plugin_id,
+                object,
+                draft: p.draft,
+                expires_before: p.expires_before,
+                has_expiration: p.has_expiration,
+                after: p.after,
+                before: p.before,
+                limit: p.limit.unwrap_or(READ_DEFAULT_LIMIT),
+                offset: p.offset.unwrap_or(0),
+            })
+            .map_err(internal)?;
+        to_reply(MetadataListResult { models })
     }
 
     fn threads_list(&mut self, p: ThreadsListParams) -> Reply {

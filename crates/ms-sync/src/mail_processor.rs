@@ -15,15 +15,16 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ms_core::constants::{
-    CONTACT_MAX_RECIPIENTS, CONTACT_MAX_REFS, CONTACT_SOURCE_MAIL, FILES_DIR, REMOVE_CHUNK,
+    ls, CONTACT_MAX_RECIPIENTS, CONTACT_MAX_REFS, CONTACT_SOURCE_MAIL, DELTA_TYPE_PERSIST,
+    FILES_DIR, REMOVE_CHUNK,
 };
 use ms_core::ids::{contact_key_for_email, MessageIdInput};
 use ms_core::{logmsg, Account, Result, UidSet};
 use ms_imap::ImapMessage;
 use ms_mime::ParsedMessage;
 use ms_store::{
-    Contact, File, FilePart, Folder, IncomingMessage, Message, MessageAttributes, MessageSnapshot,
-    Model, Placement, Query, Store, Thread,
+    Contact, DeltaItem, File, FilePart, Folder, IncomingMessage, Message, MessageAttributes,
+    MessageSnapshot, Model, Placement, Query, Store, Thread, MAIL_NEW,
 };
 use serde_json::{json, Value};
 use tracing::{info, warn};
@@ -238,6 +239,13 @@ impl<'a> MailProcessor<'a> {
             s.append_to_thread_search_content(&mut thread, Some(&msg), None)?;
             s.save(&mut thread)?;
             s.save(&mut msg)?;
+            if self.is_new_mail(&msg, folder, remote.uid, s)? {
+                s.emit(DeltaItem::new(
+                    DELTA_TYPE_PERSIST,
+                    MAIL_NEW,
+                    vec![json!({"id": msg.id(), "threadId": msg.thread_id()})],
+                ));
+            }
 
             s.upsert_thread_references(
                 thread.id(),
@@ -251,6 +259,43 @@ impl<'a> MailProcessor<'a> {
 
         self.upsert_contacts(&msg)?;
         Ok(msg)
+    }
+
+    /// Whether a message just inserted is new mail for `mail.new` (docs/desktop-client-plan.md
+    /// 3.5), as the desktop's unread-notifications decided it: unread, not a draft, in the
+    /// inbox (Gmail: All Mail with `\Inbox`), and not sent from the account's own address or
+    /// an alias. "New" is a UID at or above the folder's recorded UIDNEXT: a folder's first
+    /// pass records UIDNEXT before it walks down from it, so nothing the initial headers sync
+    /// or a later walk-down chunk ingests counts. Servers that report UIDNEXT as 0 never
+    /// count (their deep scans can't tell new mail from old).
+    fn is_new_mail(&self, msg: &Message, folder: &Folder, uid: u32, s: &Store) -> Result<bool> {
+        let uidnext = folder
+            .local_status()
+            .get(ls::UIDNEXT)
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        if uidnext == 0 || u64::from(uid) < uidnext || !msg.is_unread() || msg.is_draft() {
+            return Ok(false);
+        }
+        let from = msg.from()[0]["email"].as_str().unwrap_or("");
+        if !from.is_empty() && self.own_addresses().any(|a| a.eq_ignore_ascii_case(from)) {
+            return Ok(false);
+        }
+        msg.is_in_inbox(s)
+    }
+
+    /// The account's address and its aliases (`Name <email>` or a bare address).
+    fn own_addresses(&self) -> impl Iterator<Item = &str> {
+        let aliases = self.account.as_json()["aliases"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(|a| match (a.rfind('<'), a.rfind('>')) {
+                (Some(l), Some(r)) if l < r => a[l + 1..r].trim(),
+                _ => a.trim(),
+            });
+        std::iter::once(self.account.email_address()).chain(aliases)
     }
 
     /// Records the copy at (folder, uid) on a message that already exists and returns the

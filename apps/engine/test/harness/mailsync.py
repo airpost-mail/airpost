@@ -241,6 +241,7 @@ class ProcessState:
     folder_status: dict = field(default_factory=dict)  # folder id -> latest localStatus
     folder_paths: dict = field(default_factory=dict)   # folder id -> path
     last_delta_t: float = 0.0
+    mail_new: list = field(default_factory=list)       # socket: (t, params) of each `mail.new`
 
 
 class RpcChannel:
@@ -475,6 +476,12 @@ class ServeEngine:
                 if strays:
                     handle._transport_error(f"{d['modelClass']} delta for {aid} carries models of {sorted(strays)}")
                 handle._record_delta(handle.elapsed(), d)
+        elif method == "mail.new":
+            handle = self.handles.get(params.get("accountId"))
+            if handle is None:
+                self._error(f"mail.new for an account never added: {line[:200]!r}")
+            else:
+                handle._record_mail_new(handle.elapsed(), params)
         elif method == "disconnect":
             self._error(f"engine sent disconnect: {params}")
         elif "id" in msg:
@@ -806,6 +813,12 @@ class MailsyncProcess:
                 self._transport_error(f"delta for account {account_id!r}: {line[:200]!r}")
                 return
             self._record_delta(t, params)
+        elif method == "mail.new":
+            params = msg.get("params") or {}
+            if params.get("accountId") != self.account["id"]:
+                self._transport_error(f"mail.new for account {params.get('accountId')!r}: {line[:200]!r}")
+                return
+            self._record_mail_new(t, params)
         elif method == "disconnect":
             self._transport_error(f"engine sent disconnect: {msg.get('params')}")
         elif "id" in msg:
@@ -1027,6 +1040,15 @@ class MailsyncProcess:
                         self.state.folder_paths[m["id"]] = m.get("path")
                     else:
                         self.state.folder_status.pop(m["id"], None)
+
+    def _record_mail_new(self, t: float, params: dict):
+        with self._lock:
+            self.state.mail_new.append((t, dict(params)))
+
+    def mail_new(self) -> list:
+        """The `mail.new` notifications so far, as (t, params). Socket transports only."""
+        with self._lock:
+            return list(self.state.mail_new)
 
     @property
     def log_path(self) -> Path:
