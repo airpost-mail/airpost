@@ -12,12 +12,13 @@ describe('normalizePairingCode', () => {
     expect(normalizePairingCode('ABCD-EFGH-JKLM')).toBe('ABCDEFGHJKLM');
     expect(normalizePairingCode(' abcd efgh jklm ')).toBe('ABCDEFGHJKLM');
     expect(normalizePairingCode('abcdefgh2345')).toBe('ABCDEFGH2345');
+    expect(normalizePairingCode('abc0-1fg8-2345')).toBe('ABCOIFGB2345');
   });
 
   it('refuses the wrong length and characters outside base32', () => {
     expect(normalizePairingCode('ABCD-EFGH')).toBeNull();
     expect(normalizePairingCode('ABCD-EFGH-JKLMN')).toBeNull();
-    expect(normalizePairingCode('ABCD-EFGH-JK01')).toBeNull();
+    expect(normalizePairingCode('ABCD-EFGH-JK9A')).toBeNull();
     expect(normalizePairingCode('ABCD_EFGH_JKLM')).toBeNull();
     expect(normalizePairingCode('')).toBeNull();
   });

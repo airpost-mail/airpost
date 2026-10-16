@@ -4,9 +4,17 @@
 const LENGTH = 12;
 const ALPHABET = /^[A-Z2-7]+$/;
 
-/** The code as sent to the gateway (12 upper-case characters), or null if it isn't one. */
+const LOOKALIKES: Record<string, string> = { '0': 'O', '1': 'I', '8': 'B' };
+
+/**
+ * The code as sent to the gateway (12 upper-case characters), or null if it isn't one.
+ * Digits people read for look-alike letters are mapped as the gateway maps them.
+ */
 export function normalizePairingCode(input: string): string | null {
-  const code = input.replace(/[\s-]+/g, '').toUpperCase();
+  const code = input
+    .replace(/[\s-]+/g, '')
+    .toUpperCase()
+    .replace(/[018]/g, (c) => LOOKALIKES[c]);
   return code.length === LENGTH && ALPHABET.test(code) ? code : null;
 }
 
