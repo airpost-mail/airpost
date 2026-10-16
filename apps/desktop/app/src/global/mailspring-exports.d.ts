@@ -142,6 +142,14 @@ export const FocusedPerspectiveStore: FocusedPerspectiveStore;
 export type SearchableComponentStore =
   typeof import('../flux/stores/searchable-component-store').default;
 export const SearchableComponentStore: SearchableComponentStore;
+export type CapabilityStore = typeof import('../flux/stores/capability-store').default;
+export const CapabilityStore: CapabilityStore;
+export const useCapability: typeof import('../flux/stores/capability-store').useCapability;
+export type {
+  Capability,
+  CapabilityFeature,
+  CapabilitySource,
+} from '../flux/stores/capability-store';
 
 export type ServiceRegistry = typeof import('../registries/service-registry').default;
 export const ServiceRegistry: ServiceRegistry;
@@ -227,6 +235,22 @@ export const MessageUtils: MessageUtils;
 export * from '../services/autolinker';
 export type KeyManager = typeof import('../key-manager').default;
 export const KeyManager: KeyManager;
+export type Integrations = typeof import('../integrations').default;
+export const Integrations: Integrations;
+export type {
+  IntegrationKind,
+  IntegrationProvider,
+  IntegrationSettings,
+  IntegrationsTransport,
+  ProviderConfig,
+  Translation,
+  GrammarCheck,
+  GrammarMatch,
+  ContactProfile,
+  Person,
+  Company,
+  TestReport,
+} from '../integrations';
 export type SoundRegistry = typeof import('../registries/sound-registry').default;
 export const SoundRegistry: SoundRegistry;
 export type MailRulesTemplates = typeof import('../mail-rules-templates');

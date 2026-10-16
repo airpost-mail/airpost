@@ -1,5 +1,11 @@
 import React from 'react';
-import { localized, Message, DraftEditingSession, GrammarCheckPluginAPI } from 'mailspring-exports';
+import {
+  localized,
+  Message,
+  DraftEditingSession,
+  GrammarCheckPluginAPI,
+  CapabilityStore,
+} from 'mailspring-exports';
 import { RetinaImg } from 'mailspring-component-kit';
 import { GrammarCheckStore } from './grammar-check-store';
 
@@ -29,9 +35,7 @@ export class GrammarCheckToggle extends React.Component<{
 
   render() {
     if (!GrammarCheckStore.isAvailable()) {
-      const reason = localized(
-        'Grammar check needs a LanguageTool server, and none is configured.'
-      );
+      const reason = CapabilityStore.unavailableMessage('grammar-check');
       return (
         <button
           tabIndex={-1}

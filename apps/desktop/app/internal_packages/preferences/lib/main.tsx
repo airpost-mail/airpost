@@ -27,6 +27,14 @@ export function activate() {
   );
   PreferencesUIStore.registerPreferencesTab(
     new PreferencesUIStore.TabItem({
+      tabId: 'Integrations',
+      displayName: localized('Integrations'),
+      componentClassFn: () => require('./tabs/preferences-integrations').default,
+      order: 3,
+    })
+  );
+  PreferencesUIStore.registerPreferencesTab(
+    new PreferencesUIStore.TabItem({
       tabId: 'Appearance',
       displayName: localized('Appearance'),
       componentClassFn: () => require('./tabs/preferences-appearance').default,

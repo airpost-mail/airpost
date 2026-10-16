@@ -1,4 +1,4 @@
-import { Utils } from 'mailspring-exports';
+import { Utils, CapabilityStore, Integrations } from 'mailspring-exports';
 
 const CACHE_SIZE = 200;
 const CACHE_INDEX_KEY = 'pp-cache-v3-keys';
@@ -22,9 +22,30 @@ class ParticipantProfileDataSource {
       return {};
     }
 
-    // Profiles are only read from the cache: there is no enrichment server, so nothing new is
-    // fetched and the sidebar shows the local contact and message history.
-    return this.getCache(email) || {};
+    const cached = this.getCache(email);
+    if (cached) {
+      return cached;
+    }
+
+    // Without People Data Labs set up the sidebar shows the local contact and message history.
+    if (!CapabilityStore.isAvailable('contact-enrichment')) {
+      return {};
+    }
+
+    // The engine keeps an in-memory cache too; this one survives restarts.
+    try {
+      const { person, company } = await Integrations.request('integrations.enrich', { email });
+      const profile: { person?: unknown; company?: unknown } = {};
+      if (person) profile.person = person;
+      if (company) profile.company = company;
+      // A no-match isn't kept: providers fill in over time, and the engine caches it for a day.
+      if (person || company) this.setCache(email, profile);
+      return profile;
+    } catch (err) {
+      // Not cached, so the next view retries. Only the key: the message may name the address.
+      console.warn(`Contact lookup failed: ${Integrations.toIntegrationError(err).key}`);
+      return {};
+    }
   }
 
   // LocalStorage Retrieval / Saving

@@ -7,9 +7,15 @@ import {
   MessageViewExtension,
   getCurrentLocale,
   MessageBodyProcessor,
+  CapabilityStore,
 } from 'mailspring-exports';
 
-import { translateMessageBody, isTranslationAvailable, AllLanguages } from './service';
+import {
+  translateMessageBody,
+  isTranslationAvailable,
+  translationDestination,
+  AllLanguages,
+} from './service';
 import { Menu, ButtonDropdown, RetinaImg } from 'mailspring-component-kit';
 
 interface TranslateMessageHeaderProps {
@@ -89,6 +95,7 @@ export class TranslateMessageHeader extends React.Component<
 
   _mounted = false;
   _detectionStarted = false;
+  _unlisten?: () => void;
 
   state: TranslateMessageHeaderState = {
     detected: null,
@@ -97,6 +104,8 @@ export class TranslateMessageHeader extends React.Component<
 
   componentDidMount() {
     this._mounted = true;
+    // Detection waits for a translation provider; start it once one is set up.
+    this._unlisten = CapabilityStore.listen(() => this._detectLanguageIfReady());
     this._detectLanguageIfReady();
   }
 
@@ -106,6 +115,7 @@ export class TranslateMessageHeader extends React.Component<
 
   componentWillUnmount() {
     this._mounted = false;
+    if (this._unlisten) this._unlisten();
   }
 
   _detectLanguageIfReady = async () => {
@@ -322,7 +332,10 @@ export class TranslateMessageHeader extends React.Component<
           <div className="message-centered">
             {localized('Translate from %1$@ to %2$@?', fromLanguage, toLanguage)}
             <div className="note">
-              {localized('Privacy note: text below will be sent to an online translation service.')}
+              {localized(
+                'Privacy note: the text below will be sent to %@.',
+                translationDestination()
+              )}
             </div>
           </div>
         </div>

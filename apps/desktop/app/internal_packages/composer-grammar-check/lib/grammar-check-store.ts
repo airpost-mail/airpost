@@ -1,4 +1,5 @@
 import MailspringStore from 'mailspring-store';
+import { CapabilityStore } from 'mailspring-exports';
 import { GrammarError, LanguageToolBackend } from './grammar-check-service';
 
 interface BlockCheckResult {
@@ -15,10 +16,13 @@ class _GrammarCheckStore extends MailspringStore {
   private _backend: LanguageToolBackend;
   private _abortControllers: Map<string, AbortController> = new Map();
   private _configDisposable: { dispose: () => void } | null = null;
+  private _capabilityUnsub: (() => void) | null = null;
 
   activate() {
     this._backend = new LanguageToolBackend();
     this._readConfig();
+    // The toolbar toggle follows LanguageTool being set up in Preferences > Integrations.
+    this._capabilityUnsub = CapabilityStore.listen(() => this.trigger());
 
     this._configDisposable = AppEnv.config.onDidChange(
       'core.composing.grammarCheck',
@@ -35,6 +39,10 @@ class _GrammarCheckStore extends MailspringStore {
   }
 
   deactivate() {
+    if (this._capabilityUnsub) {
+      this._capabilityUnsub();
+      this._capabilityUnsub = null;
+    }
     if (this._configDisposable) {
       this._configDisposable.dispose();
       this._configDisposable = null;

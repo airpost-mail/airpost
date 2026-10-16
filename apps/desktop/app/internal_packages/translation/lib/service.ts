@@ -1,5 +1,12 @@
 import { LRUCache } from 'lru-cache';
-import { QuotedHTMLTransformer, localized, Actions, RegExpUtils } from 'mailspring-exports';
+import {
+  QuotedHTMLTransformer,
+  localized,
+  Actions,
+  RegExpUtils,
+  CapabilityStore,
+  Integrations,
+} from 'mailspring-exports';
 
 export const TranslatePopupOptions = {
   English: 'en',
@@ -173,18 +180,46 @@ function forEachTranslatableText(doc: Document, callback: (el: Node, text: strin
 const translatedSnippetCache = new LRUCache<string, string>({ max: 1000 });
 let translatedSnippetLang = '';
 
-export const TRANSLATION_UNAVAILABLE = localized(
-  'Translation needs a translation server, and none is configured.'
-);
-
-// There is no translation server yet, so the composer button is disabled and messages in
-// other languages get no translation banner.
 export function isTranslationAvailable() {
-  return false;
+  return CapabilityStore.isAvailable('translation');
 }
 
-async function requestTranslation(html: string, targetLang: string): Promise<string> {
-  throw new Error(TRANSLATION_UNAVAILABLE);
+/** The disabled button's tooltip, from the capability store. */
+export function translationUnavailableMessage() {
+  return CapabilityStore.unavailableMessage('translation');
+}
+
+function providerName() {
+  const { provider } = Integrations.readSettings('translation');
+  return provider ? Integrations.PROVIDERS[provider].name : undefined;
+}
+
+/** Where translated text goes, for the privacy note: the LibreTranslate host, or DeepL. */
+export function translationDestination() {
+  const { provider, url } = Integrations.readSettings('translation');
+  if (provider === 'libretranslate' && url) {
+    try {
+      return new URL(url).host;
+    } catch (err) {
+      // fall through to the provider name
+    }
+  }
+  return providerName() || localized('an online translation service');
+}
+
+// The engine translates (crates/ms-integrations); the blocks go out as HTML so each <b> comes
+// back in order.
+export async function requestTranslation(html: string, targetLang: string): Promise<string> {
+  try {
+    const result = await Integrations.request('integrations.translate', {
+      text: html,
+      target: targetLang,
+      format: 'html',
+    });
+    return result.translatedText;
+  } catch (err) {
+    throw new Error(Integrations.errorMessage(err, providerName()));
+  }
 }
 
 export async function translateMessageBody(
@@ -241,7 +276,7 @@ export async function translateMessageBody(
       if (!silent) {
         AppEnv.showErrorDialog({
           title: localized('Language Conversion Failed'),
-          message: error.toString(),
+          message: error.message || error.toString(),
         });
       }
       return false;

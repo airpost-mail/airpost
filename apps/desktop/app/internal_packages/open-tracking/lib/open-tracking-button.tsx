@@ -1,7 +1,7 @@
 import React from 'react';
 import { Message, DraftEditingSession, localized } from 'mailspring-exports';
 import { MetadataComposerToggleButton } from 'mailspring-component-kit';
-import { PLUGIN_ID, PLUGIN_NAME, isTrackingServerAvailable } from './open-tracking-constants';
+import { PLUGIN_ID, PLUGIN_NAME, trackingUnavailableReason } from './open-tracking-constants';
 
 type Props = { draft: Message; session: DraftEditingSession };
 
@@ -25,11 +25,7 @@ const OpenTrackingButtonInner: React.FC<Props> = ({ draft, session }) => {
       errorMessage={errorMessage}
       draft={draft}
       session={session}
-      unavailableReason={
-        isTrackingServerAvailable()
-          ? undefined
-          : localized('Open tracking needs a tracking server, and none is configured.')
-      }
+      unavailableReason={trackingUnavailableReason()}
     />
   );
 };

@@ -1,3 +1,5 @@
+import { CapabilityStore, Integrations } from 'mailspring-exports';
+
 export interface GrammarError {
   offset: number;
   length: number;
@@ -13,52 +15,6 @@ export interface GrammarError {
   contextText: string;
   contextOffset: number;
   contextLength: number;
-}
-
-export interface LanguageToolMatch {
-  message: string;
-  shortMessage: string;
-  offset: number;
-  length: number;
-  replacements: Array<{ value: string }>;
-  context: {
-    text: string;
-    offset: number;
-    length: number;
-  };
-  sentence: string;
-  rule: {
-    id: string;
-    subId?: string;
-    description: string;
-    issueType: string;
-    category: {
-      id: string;
-      name: string;
-    };
-    urls?: Array<{ value: string }>;
-  };
-}
-
-export interface LanguageToolResponse {
-  software: {
-    name: string;
-    version: string;
-    buildDate: string;
-    apiVersion: number;
-    status: string;
-    premium: boolean;
-  };
-  language: {
-    name: string;
-    code: string;
-    detectedLanguage: {
-      name: string;
-      code: string;
-      confidence?: number;
-    };
-  };
-  matches: LanguageToolMatch[];
 }
 
 export interface GrammarCheckBackend {
@@ -100,37 +56,24 @@ export class LanguageToolBackend implements GrammarCheckBackend {
     }
   }
 
-  // There is no LanguageTool server yet, so the store never checks and the toolbar toggle
-  // is disabled.
   isAvailable(): boolean {
-    return false;
+    return CapabilityStore.isAvailable('grammar-check');
   }
 
+  // The engine calls LanguageTool (crates/ms-integrations) and returns matches already in
+  // GrammarError's shape, misspellings dropped: the composer's spellchecker marks those.
   async check(text: string, messageId: string, language?: string): Promise<GrammarError[]> {
     this._readConfig();
-    const data = await this._request(text, language || this.language);
-
-    const filtered = data.matches.filter((match) => match.rule.issueType !== 'misspelling');
-
-    return filtered.map((match) => ({
-      offset: match.offset,
-      length: match.length,
-      message: match.message,
-      shortMessage: match.shortMessage || '',
-      replacements: match.replacements.map((r) => r.value),
-      ruleId: match.rule.id,
-      ruleDescription: match.rule.description,
-      category: match.rule.category.id,
-      categoryName: match.rule.category.name,
-      issueType: match.rule.issueType,
-      sentence: match.sentence,
-      contextText: match.context.text,
-      contextOffset: match.context.offset,
-      contextLength: match.context.length,
-    }));
-  }
-
-  private async _request(text: string, language: string): Promise<LanguageToolResponse> {
-    throw new Error('No grammar check server is configured.');
+    const lang = language || this.language;
+    try {
+      const result = await Integrations.request('integrations.grammar', {
+        text,
+        language: lang && lang !== 'auto' ? lang : undefined,
+        disabledRules: this.disabledRules,
+      });
+      return result.matches;
+    } catch (err) {
+      throw new Error(Integrations.errorMessage(err, 'LanguageTool'));
+    }
   }
 }

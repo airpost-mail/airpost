@@ -153,6 +153,8 @@ load(`FocusedContactsStore`, 'flux/stores/focused-contacts-store');
 load(`FolderSyncProgressStore`, 'flux/stores/folder-sync-progress-store');
 load(`FocusedPerspectiveStore`, 'flux/stores/focused-perspective-store');
 load(`SearchableComponentStore`, 'flux/stores/searchable-component-store');
+lazyLoad(`CapabilityStore`, 'flux/stores/capability-store');
+lazyLoadWithGetter(`useCapability`, () => require('../flux/stores/capability-store').useCapability);
 
 lazyLoad(`ServiceRegistry`, `registries/service-registry`);
 
@@ -196,6 +198,7 @@ lazyLoad(`MessageUtils`, 'flux/models/message-utils');
 lazyLoad(`EmlUtils`, 'services/eml-utils');
 lazyLoad(`MboxUtils`, 'services/mbox-utils');
 lazyLoad(`KeyManager`, 'key-manager');
+lazyLoad(`Integrations`, 'integrations');
 lazyLoad(`SoundRegistry`, 'registries/sound-registry');
 lazyLoad(`MailRulesTemplates`, 'mail-rules-templates');
 lazyLoad(`MailRulesProcessor`, 'mail-rules-processor');

@@ -1,11 +1,9 @@
 import React from 'react';
-import { localized, Thread } from 'mailspring-exports';
+import { Thread, CapabilityStore } from 'mailspring-exports';
 import { RetinaImg, BindGlobalCommands } from 'mailspring-component-kit';
 
-const UNAVAILABLE = localized('Sharing threads needs a sharing server, and none is configured.');
-
-// Sharing uploads the thread to a server that hosts the public page. There is no such server
-// yet, so the button stays visible but disabled.
+// Sharing uploads the thread to a Tern server that hosts the public page. Until the capability
+// store reports one, the button stays visible but disabled.
 export default class ThreadSharingButton extends React.Component<{ items: any[]; thread: Thread }> {
   static displayName = 'ThreadSharingButton';
 
@@ -21,17 +19,18 @@ export default class ThreadSharingButton extends React.Component<{ items: any[];
     if (this.props.items && this.props.items.length > 1) {
       return <span />;
     }
+    const unavailable = CapabilityStore.unavailableMessage('thread-sharing');
     return (
       <BindGlobalCommands
         commands={{
-          'core:share-item-link': () => AppEnv.showErrorDialog(UNAVAILABLE),
+          'core:share-item-link': () => AppEnv.showErrorDialog(unavailable),
           'core:copy-mailbox-link': () => this._onCopyMailboxLink(),
         }}
       >
         <button
           className="btn btn-toolbar thread-sharing-button"
-          title={UNAVAILABLE}
-          aria-label={UNAVAILABLE}
+          title={unavailable}
+          aria-label={unavailable}
           disabled
           style={{ marginRight: 0 }}
         >

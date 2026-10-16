@@ -1,24 +1,28 @@
 import React, { useRef } from 'react';
-import { localized, Actions, Message, DraftEditingSession } from 'mailspring-exports';
+import {
+  localized,
+  Actions,
+  Message,
+  DraftEditingSession,
+  useCapability,
+  CapabilityStore,
+} from 'mailspring-exports';
 
 import { Menu, RetinaImg } from 'mailspring-component-kit';
-import {
-  TranslatePopupOptions,
-  translateMessageBody,
-  isTranslationAvailable,
-  TRANSLATION_UNAVAILABLE,
-} from './service';
+import { TranslatePopupOptions, translateMessageBody } from './service';
 
 type Props = { draft: Message; session: DraftEditingSession };
 
 const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const { available } = useCapability('translation');
 
   const onTranslate = async (langName: string) => {
     Actions.closePopover();
 
     const langCode = TranslatePopupOptions[langName];
     const translated = await translateMessageBody(draft.body, langCode);
+    if (translated === false) return;
 
     session.changes.add({ body: translated });
     session.changes.commit();
@@ -44,8 +48,9 @@ const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
   if (draft.plaintext) {
     return <span />;
   }
-  const available = isTranslationAvailable();
-  const title = available ? localized('Translate email body…') : TRANSLATION_UNAVAILABLE;
+  const title = available
+    ? localized('Translate email body…')
+    : CapabilityStore.unavailableMessage('translation');
   return (
     <button
       ref={buttonRef}

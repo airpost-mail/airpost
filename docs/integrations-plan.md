@@ -23,21 +23,27 @@ provider the user configures, or wait for a Tern server. Provider logic lives in
 
 ```ts
 type Source = 'local' | 'integration' | 'server';
-CapabilityStore.get(feature): { available: boolean; source: Source; reason?: string }
+CapabilityStore.get(feature): { available: boolean; source: Source; reason?: string; provider? }
+CapabilityStore.isAvailable(feature): boolean
+CapabilityStore.unavailableMessage(feature): string | null  // "Open tracking: Needs a Tern server"
+useCapability(feature)                                      // React hook, re-renders on change
 ```
 
 | Feature | Source | Available when |
 |---|---|---|
 | snooze, send-later, reminders, templates, insights | local | always |
-| translation | integration | a translation provider is enabled |
-| grammar-check | integration | LanguageTool is enabled |
-| contact-enrichment | integration | People Data Labs is enabled |
-| read-receipts, link-tracking, sharing, metadata-sync | server | never yet; `reason: "Needs a Tern server"` |
+| translation | integration | a translation provider is enabled and complete, and the engine transport is up |
+| grammar-check | integration | LanguageTool is enabled (premium: username and key both set), and the transport is up |
+| contact-enrichment | integration | People Data Labs is enabled with a key, and the transport is up |
+| read-receipts, link-tracking, thread-sharing, activity-sharing, metadata-sync | server | never yet; `reason: "Needs a Tern server"` |
 
-`reason` for an unconfigured integration: "Set up a provider in Preferences > Integrations".
-The store listens to the `core.integrations` config and triggers on change. The plugins'
-`isTranslationAvailable()`, `LanguageToolBackend.isAvailable()` and the profile sidebar read
-it instead of returning `false`.
+Reasons for an integration feature, first match wins: "Set up a provider in Preferences >
+Integrations" (off or no provider), "Add the <provider> URL …", "Add your <provider> API key
+…", "Add your <provider> username …", then "Waiting for engine support" while the client's
+transport is the stub. The store listens to the `core.integrations` config, to `credentials`
+(KeyManager rewrites that config key on every keyset change, in any window) and to transport
+changes, and triggers on each. It only records whether each enabled provider's key exists, and
+reads the keyset only when an integration is turned on.
 
 ## 2. Preferences > Integrations
 
@@ -51,10 +57,14 @@ the host and, for DeepL, the characters used) and a one-line privacy note:
 | Grammar | LanguageTool: URL (default `https://api.languagetool.org`), optional premium username and API key | "Drafts are sent to <host> while you type." |
 | Contact info | People Data Labs: key | "Email addresses of people you view are sent to People Data Labs." |
 
-Config (`core.integrations.<kind>`) holds the provider, URL, username flag and `enabled`.
-Keys and the LanguageTool username are in `KeyManager` as `integrations.<provider>.apiKey`
-and `integrations.languagetool.username`. Disabling keeps the key; removing a provider
-deletes it.
+Config (`core.integrations.<kind>`, kinds `translation`, `grammar`, `enrichment`) holds
+`{provider, enabled, url?, username?}`; the LanguageTool premium username is there too.
+API keys are only in the keyset (`KeyManager`) as `integration-<provider>-key`, never shown
+again once saved (the field offers Forget Key). A typed key is saved with Save Key or Enter,
+not on blur, so clicking Test doesn't store an untested key. Turning a provider off keeps its
+key; Remove clears the section's config and deletes the keys of all its providers. Test sends the form's values, a typed key
+over the saved one, as `integrations.test`; until the engine wiring lands it shows "Waiting
+for engine support." without reading the keyset.
 
 ## 3. The crate (`crates/ms-integrations`)
 
@@ -154,27 +164,41 @@ is engine code `-32010` "Integration failed" with the serialized error as `data`
 dispatcher runs these on a worker pool, not the connection's reader thread, since a call can
 take up to 30 s.
 
-## 5. Desktop changes
+## 5. Desktop (built, without the engine wiring)
 
-- `capability-store.ts` and the Integrations tab (sections 1, 2); `KeyManager` gains
-  `getIntegrationKey(provider)` / `setIntegrationKey(provider, value)` over
-  `getPassword` / `replacePassword`.
-- `src/integrations.ts`: `callIntegration(method, params)` reads config and key, adds them as
-  `config`, and sends over the engine socket; maps the error `key` to a localized message.
-- `translation/lib/service.ts`: `requestTranslation(html, target)` calls
-  `integrations.translate` with `format: "html"`; `isTranslationAvailable()` reads the
-  store. The snippet LRU stays (it avoids sending repeated blocks at all); language
-  detection stays local (CLD).
-- `composer-grammar-check`: `LanguageToolBackend._request` calls `integrations.grammar` and
-  returns `matches`; the misspelling filter moves to the engine; `isAvailable()` reads the
-  store.
-- `participant-profile`: `find()` calls `integrations.enrich` when enabled and keeps the
-  localStorage cache as the persistent layer over the engine's in-memory one.
-- Server-sourced features show "Needs a Tern server" from the store instead of their
-  per-plugin disabled messages.
+- `src/flux/stores/capability-store.ts`: `CapabilityStore` and `useCapability`, exported from
+  `mailspring-exports` (section 1).
+- `src/integrations.ts`, exported as `Integrations`: provider metadata, `readSettings` /
+  `writeSettings`, `buildProviderConfig`, and `request(method, params, {kind?, config?})`,
+  which adds `config` (saved settings plus the key read from the keyset per request, or an
+  explicit config for Test) to the params of section 4. A disabled integration is
+  `not-configured` without a call. Errors become `IntegrationError {key, message, retryable,
+  status?, retryAfter?}`, from the bare serialized error or the socket error's `data`;
+  `errorMessage(err, providerName)` gives the short user message per key. The desktop adds
+  `engine-unavailable` and `unknown` to the crate's keys.
+- Transport: `Integrations.setTransport({available, send(method, params)})`. The default is
+  `UnavailableTransport` (`available: false`, every call fails with `engine-unavailable`), marked
+  `TODO(engine)`; while it is in place the store reports no integration feature as available.
+  The engine wiring sets a socket transport once `integrations.*` exists (phase C).
+- `preferences/lib/tabs/preferences-integrations.tsx`: the tab of section 2, order 3.
+- `translation`: `requestTranslation` calls `integrations.translate` with `format: "html"` and
+  returns `translatedText`; `isTranslationAvailable()` and the composer button's tooltip read
+  the store; the message header starts detection when the store changes and its privacy note
+  names the LibreTranslate host or DeepL. The snippet LRU and CLD detection stay.
+- `composer-grammar-check`: `LanguageToolBackend.check` calls `integrations.grammar`
+  (`language` omitted for auto, `disabledRules` from config) and returns `matches` as is;
+  `isAvailable()` and the toggle's tooltip read the store, and `GrammarCheckStore` triggers on
+  store changes.
+- `participant-profile`: `find()` returns the localStorage profile, else calls
+  `integrations.enrich` when `contact-enrichment` is available and stores a match (not a
+  no-match or an error, so those are retried on a later view).
+- Server features (open and link tracking, thread sharing, the activity share button) take
+  their disabled tooltip from `unavailableMessage`; tracking also still needs `PLUGIN_URL`.
 
 ## 6. Open
 
+- The engine transport (`TODO(engine)` in `src/integrations.ts`); the Test button's host and
+  usage output is untested against the real `integrations.test`.
 - Moving keys from the desktop keyset to the engine (with the engine owning credentials
   generally), after which `config` in section 4 drops the key.
 - DeepL marks `/v2/languages` deprecated for `/v3/languages` (no sunset date yet).

@@ -1,0 +1,72 @@
+@import 'ui-variables';
+
+.container-integrations {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+
+  .integrations-intro {
+    margin-top: 0;
+  }
+
+  .integrations-section {
+    padding-bottom: 20px;
+    border-bottom: 1px solid @border-color-divider;
+    margin-bottom: 10px;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .integrations-field {
+    display: flex;
+    align-items: center;
+
+    label {
+      width: 140px;
+      flex-shrink: 0;
+    }
+    input[type='text'],
+    input[type='url'],
+    input[type='password'] {
+      flex: 1;
+      min-width: 0;
+    }
+    select {
+      margin: 0;
+    }
+    .btn {
+      margin-left: 8px;
+    }
+  }
+
+  .integrations-provider-name {
+    color: @text-color;
+  }
+
+  .integrations-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .btn {
+      margin: 0;
+    }
+  }
+
+  .integrations-test-result {
+    font-size: @font-size-smaller;
+    &.ok {
+      color: @color-success;
+    }
+    &.failed {
+      color: @color-error;
+    }
+  }
+
+  .integrations-status,
+  .integrations-privacy {
+    margin: 6px 0 0 0;
+  }
+}
