@@ -8,18 +8,18 @@
 @gray-lighter: darken(@gray-base, 92.5%);
 @white: #0a0a0a;
 
-@accent-primary: var(--system-accent, #58b660);
-// @accent-primary-dark falls through to base/ui-variables.less, which derives
-// it from @accent-primary via color-mix (10% darker). Override here only if
-// a different shade is desired for this theme.
+// Brand cobalt lifted for dark surfaces (Mailspring's dark theme was green).
+@accent-primary: var(--system-accent, #4d8ff4);
+// Deeper than the base 10% mix so #eee text on focused rows keeps AA contrast.
+@accent-primary-dark: var(--system-accent-dark, color-mix(in srgb, @accent-primary, black 28%));
 
 @background-primary: #212121;
 @background-off-primary: #212121;
-@background-secondary: #121212;
+@background-secondary: #111318;
 @background-tertiary: #6d7987;
 
 @border-color-primary: lighten(@background-primary, 10%);
-@border-color-secondary: lighten(@background-secondary, 10%);
+@border-color-secondary: #2a2d33;
 @border-color-tertiary: lighten(@background-tertiary, 10%);
 @border-color-divider: @border-color-secondary;
 
@@ -33,8 +33,9 @@
 @component-active-bg: @text-color;
 
 @text-color-link: @accent-primary;
-@text-color-link-hover: @accent-primary-dark;
-@text-color-link-active: @accent-primary-dark;
+// Lighter on hover: the darker accent shade is too dim for text on dark surfaces.
+@text-color-link-hover: color-mix(in srgb, @accent-primary, white 15%);
+@text-color-link-active: color-mix(in srgb, @accent-primary, white 15%);
 
 @btn-default-bg-color: lighten(@background-primary, 5%);
 @btn-border-color: fadeout(@text-color, 65%);
@@ -43,13 +44,15 @@
 @input-bg: #2e2e2e;
 @input-border: @border-color-divider;
 
-@list-bg: #333;
-@list-border: #383838;
+@list-bg: #31343a;
+@list-border: #383b42;
 @list-selected-color: @text-color-inverse;
 @list-focused-color: @text-color;
 
-@toolbar-background-color: #121212;
-@panel-background-color: #121212;
+@toolbar-background-color: #111318;
+@panel-background-color: #111318;
+// Sidebar selection is text-only, so use the brighter accent shade on the dark panel.
+@source-list-active-color: @accent-primary;
 
 .thread-icon:not(.thread-icon-unread):not(.thread-icon-star) {
   filter: invert(100%);

@@ -14,8 +14,8 @@ window, but it uses a hot window which makes that difficult now. */
 @gray-lighter: lighten(@gray-base, 92.5%); // #eee
 @white: #ffffff;
 
-@blue-dark: #3187e1;
-@blue: #419bf9;
+@blue-dark: #1a5fcc;
+@blue: #1f70ec;
 
 //== Color Descriptors
 @accent-primary: @blue;
@@ -181,7 +181,11 @@ h6 {
       background-color: @btn-emphasis-text-color;
     }
 
-    background: linear-gradient(to bottom, #6bb1f9 0%, #0a80ff 100%);
+    background: linear-gradient(
+      to bottom,
+      lighten(@btn-emphasis-bg-color, 8%) 0%,
+      darken(@btn-emphasis-bg-color, 4%) 100%
+    );
     box-shadow: none;
     border: 1px solid darken(@btn-emphasis-bg-color, 7%);
 
@@ -198,7 +202,11 @@ h6 {
       left: -1px;
       position: absolute;
       z-index: -1;
-      background: linear-gradient(to bottom, #4ca2f9 0%, #015cff 100%);
+      background: linear-gradient(
+        to bottom,
+        darken(@btn-emphasis-bg-color, 2%) 0%,
+        darken(@btn-emphasis-bg-color, 12%) 100%
+      );
     }
     &:active {
       background: -webkit-gradient(

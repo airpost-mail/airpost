@@ -23,8 +23,10 @@ body {
   overflow: hidden;
 
   &.active-true {
-    border: 1px solid #3187e1;
-    box-shadow: 0 0 4px #9ecaed;
+    // @blue, not @accent-primary: this iframe compiles against the previewed
+    // theme, but the ring marks the app's active choice.
+    border: 1px solid @blue;
+    box-shadow: 0 0 4px fade(@blue, 45%);
   }
 
   &.active-false {
