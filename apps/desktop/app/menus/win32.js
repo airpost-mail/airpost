@@ -185,7 +185,6 @@ module.exports = {
           label: localized('Toggle Component Regions'),
           command: 'window:toggle-component-regions',
         },
-        { label: localized('Toggle Screenshot Mode'), command: 'window:toggle-screenshot-mode' },
         { type: 'separator' },
         { label: localized('Open Mailsync Logs'), command: 'window:open-mailsync-logs' },
         { label: localized('View License'), command: 'application:view-license' },

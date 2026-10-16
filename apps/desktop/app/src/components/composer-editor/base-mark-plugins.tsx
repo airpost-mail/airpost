@@ -77,7 +77,9 @@ function isMeaningfulColor(color: string, el: HTMLElement) {
 
   if (isNeutralDefaultColor(color)) return false;
 
-  const isOwnHTML = (el.style.fontFamily || '').includes('Nylas-Pro');
+  // Text copied out of the reading pane carries the frame's font inline; Nylas-Pro is the
+  // family older Mailspring and Nylas Mail builds used, still present in saved drafts.
+  const isOwnHTML = /\b(Inter|Nylas-Pro)\b/.test(el.style.fontFamily || '');
   if (isOwnHTML && color === AppEnv.themes.getEmailTextColor()) return false;
 
   return true;

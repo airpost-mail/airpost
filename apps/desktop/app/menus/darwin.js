@@ -239,7 +239,6 @@ module.exports = {
           label: localized('Toggle Component Regions'),
           command: 'window:toggle-component-regions',
         },
-        { label: localized('Toggle Screenshot Mode'), command: 'window:toggle-screenshot-mode' },
         { type: 'separator' },
         { label: localized('Attach Mailsync to Xcode'), command: 'window:attach-to-xcode' },
         { label: localized('Open Mailsync Logs'), command: 'window:open-mailsync-logs' },

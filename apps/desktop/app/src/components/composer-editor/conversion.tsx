@@ -155,6 +155,7 @@ function parseHtml(html: string) {
 
 // This is copied from slate-html-serializer/index.js and improved to preserve
 // sequential space characters that would be compacted during the HTML display.
+// slate-html-serializer is Copyright (c) 2016-2017 Ian Storm Taylor, MIT licence.
 const TEXT_RULE_IMPROVED: Rule = {
   deserialize: (el) => {
     if (el.tagName && el.tagName.toLowerCase() === 'br') {

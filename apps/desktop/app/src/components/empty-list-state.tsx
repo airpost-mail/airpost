@@ -1,6 +1,5 @@
 import _ from 'underscore';
 import React from 'react';
-import ReactDOM from 'react-dom';
 import classNames from 'classnames';
 import { RetinaImg } from './retina-img';
 import {
@@ -10,8 +9,6 @@ import {
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
 import { SyncingListState } from 'mailspring-component-kit';
-
-const INBOX_ZERO_ANIMATIONS = ['gem', 'oasis', 'tron', 'airstrip', 'galaxy'];
 
 type EmptyPerspectiveStateProps = {
   perspective?: MailboxPerspective;
@@ -45,75 +42,13 @@ class EmptyPerspectiveState extends React.Component<EmptyPerspectiveStateProps> 
   }
 }
 
-class EmptyInboxState extends React.Component<
-  Record<string, unknown>,
-  { width: number; height: number }
-> {
-  static displayName = 'EmptyInboxState';
-
-  _containerSizeObserver: ResizeObserver;
-  _containerEl: HTMLDivElement;
-
-  state = {
-    width: 0,
-    height: 0,
-  };
-
-  componentDidMount() {
-    this._containerSizeObserver = new window.ResizeObserver((entries) =>
-      window.requestAnimationFrame(() =>
-        this.setState({
-          width: entries[0].contentRect.width,
-          height: entries[0].contentRect.height,
-        })
-      )
-    );
-    this._containerSizeObserver.observe(this._containerEl);
-  }
-
-  componentWillUnmount() {
-    this._containerSizeObserver.disconnect();
-  }
-
-  _getScalingFactor = () => {
-    const { width } = this.state;
-    if (!width) {
-      return null;
-    }
-    if (width > 600) {
-      return null;
-    }
-    return (width + 100) / 1000;
-  };
-
-  _getAnimationName = (now?: Date) => {
-    if (now == null) {
-      now = new Date();
-    }
-    const msInADay = 8.64e7;
-    const msSinceEpoch = now.getTime() - now.getTimezoneOffset() * 1000 * 60;
-    const daysSinceEpoch = Math.floor(msSinceEpoch / msInADay);
-    const idx = daysSinceEpoch % INBOX_ZERO_ANIMATIONS.length;
-    return INBOX_ZERO_ANIMATIONS[idx];
-  };
-
-  render() {
-    const animationName = this._getAnimationName();
-    const factor = this._getScalingFactor();
-    const style = factor ? { transform: `scale(${factor})` } : {};
-
-    return (
-      <div className="inbox-zero-animation" ref={(el) => (this._containerEl = el)}>
-        <div className="animation-wrapper" style={style}>
-          <iframe
-            title="animation"
-            src={`animations/inbox-zero/${animationName}/${animationName}.html`}
-          />
-          <div className="message">{localized('Hooray! You’re done.')}</div>
-        </div>
-      </div>
-    );
-  }
+function EmptyInboxState() {
+  return (
+    <div className="inbox-zero">
+      <RetinaImg name="inbox-zero-plain.png" mode={RetinaImg.Mode.ContentPreserve} />
+      <div className="message">{localized('Hooray! You’re done.')}</div>
+    </div>
+  );
 }
 
 class EmptyListState extends React.Component<

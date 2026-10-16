@@ -423,7 +423,6 @@ Located in `internal_packages/theme-picker/`:
 - `ui-dark`
 - `ui-darkside`
 - `ui-taiga`
-- `ui-ubuntu`
 - `ui-less-is-more`
 
 ---

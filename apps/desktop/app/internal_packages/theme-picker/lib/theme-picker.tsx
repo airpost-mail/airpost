@@ -13,7 +13,6 @@ import { Disposable } from 'event-kit';
 // Sort order for built-in themes; community themes not in this list sort last.
 const INTERNAL_THEME_ORDER = [
   'ui-less-is-more',
-  'ui-ubuntu',
   'ui-taiga',
   'ui-darkside',
   DARK_THEME_NAME,

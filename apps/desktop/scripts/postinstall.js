@@ -83,6 +83,17 @@ async function run() {
   // run `npm ls` in ./app - detects missing peer dependencies, etc.
   await npm(`ls`, { cwd: './app', env: 'electron' });
 
+  // better-sqlite3 builds a SQLite extension for its own test suite. Nothing loads it, and the
+  // packager would ship it next to the real binary.
+  const sqliteTestExtension = path.join(
+    appModulesPath,
+    'better-sqlite3',
+    'build',
+    'Release',
+    'test_extension.node'
+  );
+  fs.rmSync(sqliteTestExtension, { force: true });
+
   // if SQlite was not built with HAVE_NANOSLEEP, do not ship this build! We need nanosleep
   // support so that multiple processes can connect to the sqlite file at the same time.
   // Without it, transactions only retry every 1 sec instead of every 10ms, leading to
@@ -100,8 +111,7 @@ async function run() {
   if (!fs.existsSync('./app/mailsync') && !fs.existsSync('./app/mailsync-rs')) {
     console.log(
       `\n-- No sync engine in ./app. Build the Rust one with ` +
-        `'apps/engine/packaging/build-release.sh --install-desktop' (installs app/mailsync-rs), ` +
-        `or copy a C++ mailsync binary to app/mailsync. --`
+        `'apps/engine/packaging/build-release.sh --install-desktop' (installs app/mailsync-rs). --`
     );
   }
 }

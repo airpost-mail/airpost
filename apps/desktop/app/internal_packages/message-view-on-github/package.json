@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "main": "./lib/main",
   "description": "View on Github button",
-  "license": "GPL-3.0",
+  "license": "GPL-3.0-only",
 
   "title":"View on GitHub",
   "description": "Add a \"View On GitHub\" button that appears when viewing GitHub emails.",

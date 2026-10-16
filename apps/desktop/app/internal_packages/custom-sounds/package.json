@@ -2,8 +2,8 @@
   "name": "custom-sounds",
   "version": "0.1.0",
   "main": "./lib/main",
-  "description": "Custom Sounds",
-  "license": "Proprietary",
+  "description": "Sound effects",
+  "license": "GPL-3.0-only",
   "private": true,
   "engines": {
     "mailspring": "*"

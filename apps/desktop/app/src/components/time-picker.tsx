@@ -4,9 +4,15 @@ import moment from 'moment';
 import classnames from 'classnames';
 import { TabGroupContext } from 'mailspring-component-kit';
 
-require('moment-round'); // overrides moment
+const INTERVAL_MINUTES = 30;
+const INTERVAL: [number, 'minutes'] = [INTERVAL_MINUTES, 'minutes'];
 
-const INTERVAL: [any, string] = [30, 'minutes'];
+/** Snaps `m` in place to a multiple of INTERVAL_MINUTES past the local hour. */
+function snapToInterval(m: moment.Moment, mode: 'round' | 'ceil') {
+  const minutes = m.minutes() + m.seconds() / 60 + m.milliseconds() / 60000;
+  const snapped = Math[mode](minutes / INTERVAL_MINUTES) * INTERVAL_MINUTES;
+  return m.minutes(0).seconds(0).milliseconds(0).add(snapped, 'minutes');
+}
 
 type TimePickerProps = {
   value?: number;
@@ -70,7 +76,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
 
   _onArrow(key) {
     let newT = moment(this.props.value);
-    newT = newT.round(...INTERVAL);
+    newT = snapToInterval(newT, 'round');
     if (key === 'ArrowUp') {
       newT = newT.subtract(...INTERVAL);
     } else if (key === 'ArrowDown') {
@@ -179,7 +185,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
     const enteredMoment = moment(this.props.value);
 
     const roundedMoment = moment(enteredMoment);
-    roundedMoment.ceil(...INTERVAL);
+    snapToInterval(roundedMoment, 'ceil');
 
     const firstVisibleMoment = moment(roundedMoment);
     firstVisibleMoment.add(...INTERVAL);
@@ -189,7 +195,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
 
     const startMoment = moment(startVal);
     if (this.props.relativeTo) {
-      startMoment.ceil(...INTERVAL).add(...INTERVAL);
+      snapToInterval(startMoment, 'ceil').add(...INTERVAL);
     }
     const endMoment = moment(startVal).endOf('day');
     const opts = [];

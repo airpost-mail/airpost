@@ -17,5 +17,5 @@
   "description": "Get notifications for open and link tracking activity.",
   "supportedEnvs": ["development", "staging", "production"],
 
-  "license": "GPL-3.0"
+  "license": "GPL-3.0-only"
 }

@@ -57,9 +57,7 @@ export function searchEmojiNames(word: string) {
 
 export function getEmojiImagePath(emojiname: string) {
   EmojiNameToImageTable = EmojiNameToImageTable || require('./emoji-name-to-image-table');
-  return process.platform === 'darwin'
-    ? `images/composer-emoji/apple/${EmojiNameToImageTable[emojiname]}`
-    : `images/composer-emoji/twitter/${EmojiNameToImageTable[emojiname]}`;
+  return `images/composer-emoji/twitter/${EmojiNameToImageTable[emojiname]}`;
 }
 
 function ImageBasedEmoji(props: { name: string }) {

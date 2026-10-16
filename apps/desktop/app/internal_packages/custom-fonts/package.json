@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "main": "./lib/main",
   "description": "Custom Fonts",
-  "license": "Proprietary",
+  "license": "GPL-3.0-only AND OFL-1.1",
   "private": true,
   "syncInit": true,
   "windowTypes": {

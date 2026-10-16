@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "main": "./lib/main",
   "description": "Left panel showing accounts and folders",
-  "license": "GPL-3.0",
+  "license": "GPL-3.0-only",
   "private": true,
   "syncInit": true,
   "engines": {

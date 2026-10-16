@@ -4,7 +4,7 @@
   "main": "./lib/main",
   "title": "MCP Server",
   "description": "Expose Mailspring data via the Model Context Protocol",
-  "license": "GPL-3.0",
+  "license": "GPL-3.0-only",
   "private": true,
   "engines": {
     "mailspring": "*"

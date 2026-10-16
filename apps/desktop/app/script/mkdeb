@@ -49,9 +49,11 @@ for i in 256 128 64 32 16; do
   cp "$LINUX_ASSETS_DIRECTORY/icons/${i}.png" "$TARGET/usr/share/icons/hicolor/${i}x${i}/apps/mailspring.png"
 done
 
-# Copy generated LICENSE.md to /usr/share/doc/mailspring/copyright
+# Tern's notice and licence (written into resources/ by build/generate-licenses.js). The
+# third-party licences are in resources/app.asar.unpacked/static/all_licenses.html.
 mkdir -m $FILE_MODE -p "$TARGET/usr/share/doc/mailspring"
-cp "$TARGET/usr/share/mailspring/LICENSE" "$TARGET/usr/share/doc/mailspring/copyright"
+cat "$TARGET/usr/share/mailspring/resources/NOTICE.md" "$TARGET/usr/share/mailspring/resources/LICENSE.md" \
+  > "$TARGET/usr/share/doc/mailspring/copyright"
 
 # Add lintian overrides
 mkdir -m $FILE_MODE -p "$TARGET/usr/share/lintian/overrides"

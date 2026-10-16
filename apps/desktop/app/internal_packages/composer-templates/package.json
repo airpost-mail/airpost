@@ -9,7 +9,7 @@
   "description": "Create templated messages you can use to pre-fill the composer.",
   "icon": "./icon.png",
 
-  "license": "GPL-3.0",
+  "license": "GPL-3.0-only",
   "private": true,
   "engines": {
     "mailspring": "*"

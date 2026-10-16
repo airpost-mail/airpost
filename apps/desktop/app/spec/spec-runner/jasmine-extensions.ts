@@ -1,8 +1,6 @@
 /* eslint no-prototype-builtins: 0 */
 import _ from 'underscore';
 import moment from 'moment-timezone';
-// On import this will extend the `moment` object
-import 'moment-round';
 
 import TestConstants from './test-constants';
 

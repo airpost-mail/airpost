@@ -1,0 +1,9 @@
+Twemoji
+
+The emoji images in this directory are Twemoji graphics,
+Copyright 2019 Twitter, Inc and other contributors, licensed under CC-BY 4.0:
+https://creativecommons.org/licenses/by/4.0/
+
+Source: https://github.com/twitter/twemoji (now maintained at
+https://github.com/jdecked/twemoji). The images are upstream graphics rendered
+to 64x64 PNG and named by codepoint.

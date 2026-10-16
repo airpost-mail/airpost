@@ -4,9 +4,8 @@ import React, { CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
 import { Utils } from 'mailspring-exports';
 
-// This is a stripped down version of
-// https://github.com/michaelvillar/dynamics.js/blob/master/src/dynamics.coffee#L1179,
-//
+// The spring formula from dynamics.js (MIT, Michael Villar):
+// https://github.com/michaelvillar/dynamics.js/blob/master/src/dynamics.coffee#L1179
 const SpringBounceFactory = (options) => {
   const frequency = Math.max(1, options.frequency / 20);
   const friction = 20 ** (options.friction / 100);

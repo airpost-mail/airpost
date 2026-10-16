@@ -194,6 +194,7 @@ export function shouldDisplayAsImage(
 // See their specs here:
 // https://github.com/angular/angular.js/blob/master/test/ngSanitize/sanitizeSpec.js
 // And the original source here: https://github.com/angular/angular.js/blob/master/src/ngSanitize/sanitize.js#L451
+// AngularJS is Copyright (c) 2010-2020 Google LLC, MIT licence: https://github.com/angular/angular.js/blob/master/LICENSE
 export function encodeHTMLEntities(value: string) {
   const SURROGATE_PAIR_REGEXP = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;
   const pairFix = function (value) {
