@@ -9,9 +9,24 @@ import path from 'path';
 import os from 'os';
 import { EventEmitter } from 'events';
 import fs from 'fs';
+import net from 'net';
 import { localized } from './intl';
 import { developerToolsAvailable } from './developer-tools';
 import { Account } from 'mailspring-exports';
+import {
+  DisconnectParams,
+  engineSocketPath,
+  HelloParams,
+  MAX_LINE_BYTES,
+  Method,
+  parseListeningLine,
+  PROTOCOL_VERSION,
+  RequestId,
+  requestForCommand,
+  RpcResponse,
+  SubscribeParams,
+  deltaParamsText,
+} from './engine-protocol';
 
 import {
   GMAIL_CLIENT_ID,
@@ -244,9 +259,37 @@ function countLocalOnlyRows(db: any): { drafts: number; scheduled: number } | nu
   }
 }
 
+// A crashed engine closes its socket as it exits. How long a dropped socket waits for the exit
+// event, so the close the bridge sees carries the real exit code and stderr.
+const SOCKET_CLOSE_GRACE_MS = 1000;
+
+// The temp-dir fallback for socket paths: ours alone, 0700.
+function ensurePrivateDir(dir: string) {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const stat = fs.lstatSync(dir);
+  if (!stat.isDirectory()) {
+    throw new Error(`${dir} is not a directory`);
+  }
+  if (typeof process.getuid === 'function' && stat.uid !== process.getuid()) {
+    throw new Error(`${dir} belongs to another user`);
+  }
+  if ((stat.mode & 0o077) !== 0) {
+    fs.chmodSync(dir, 0o700);
+  }
+}
+
 export class MailsyncProcess extends EventEmitter {
   _proc: ChildProcess = null;
   _win = null;
+
+  // Socket transport (Rust engine, sync mode). `_socketQueue` holds requests sent before the
+  // engine printed its listening line; it is null once connected and after the connection ends.
+  _socketPath: string = null;
+  _socket: net.Socket = null;
+  _socketQueue: string[] = null;
+  _socketRequests = new Map<RequestId, string>();
+  _nextRequestId = 1;
+  _killed = false;
 
   // these must be set before you use the process
   account: Account = null;
@@ -324,7 +367,7 @@ export class MailsyncProcess extends EventEmitter {
     });
   }
 
-  _spawnProcess(mode) {
+  _spawnProcess(mode, extraArgs: string[] = []) {
     // Build on a null-prototype object so the spawned engine inherits only
     // genuine environment variables, not properties a prototype-pollution bug
     // elsewhere in the process could have added to Object.prototype. See
@@ -347,6 +390,7 @@ export class MailsyncProcess extends EventEmitter {
     if (this.account) {
       args.push('--info', this.account.emailAddress);
     }
+    args.push(...extraArgs);
     this._proc = spawn(this.binaryPath, args, { env });
 
     /* Allow us to buffer up to 1MB on stdin instead of 16k. This is necessary
@@ -507,13 +551,200 @@ export class MailsyncProcess extends EventEmitter {
 
   kill() {
     console.warn('Terminating mailsync...');
+    this._killed = true;
     this._proc && this._proc.kill();
   }
 
+  /*
+  The socket the Rust engine should serve its protocol on, or null for the stdio transport:
+  the C++ engine, Windows, TERN_ENGINE_TRANSPORT=stdio (for debugging), or no usable path.
+  */
+  _socketTransportPath(): string | null {
+    if (this.syncEngine !== 'rust' || process.platform === 'win32' || !this.account) {
+      return null;
+    }
+    if (process.env.TERN_ENGINE_TRANSPORT === 'stdio') {
+      return null;
+    }
+    const location = engineSocketPath(this.configDirPath, this.account.id);
+    if (!location) {
+      console.warn('No socket path short enough for the sync engine; using stdio');
+      return null;
+    }
+    if (location.ownDir) {
+      try {
+        ensurePrivateDir(location.ownDir);
+      } catch (err) {
+        console.warn(
+          `Cannot use ${location.ownDir} for the sync engine socket (${err}); using stdio`
+        );
+        return null;
+      }
+    }
+    return location.socketPath;
+  }
+
+  _clientName() {
+    let version = 'unknown';
+    try {
+      const AppEnv = (global as any).AppEnv;
+      version = AppEnv
+        ? AppEnv.getVersion()
+        : JSON.parse(fs.readFileSync(path.join(this.resourcePath, 'package.json')).toString())
+            .version;
+    } catch (err) {
+      // the version only appears in the engine's log
+    }
+    return `tern-desktop/${version}`;
+  }
+
+  _sendRequest(method: string, params: unknown) {
+    const id = this._nextRequestId++;
+    const line = `${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`;
+    if (this._socket && !this._socket.destroyed) {
+      this._socketRequests.set(id, method);
+      this._socket.write(line, 'utf-8');
+    } else if (this._socketQueue) {
+      this._socketRequests.set(id, method);
+      this._socketQueue.push(line);
+    } else {
+      console.warn(`Not connected to the sync engine; dropped ${method}`);
+    }
+  }
+
+  _closeSocket() {
+    this._socketQueue = null;
+    this._socketRequests.clear();
+    if (this._socket) {
+      // A close we asked for is not a failure.
+      this._socket.removeAllListeners();
+      this._socket.on('error', () => {});
+      this._socket.destroy();
+      this._socket = null;
+    }
+  }
+
+  /*
+  Connects to the engine once it printed its listening line, says hello, subscribes to every
+  delta and emits them as 'deltas' in the stdout shape the bridge reads: the delta object, with
+  accountId added. `fail` ends the process with close code -2.
+  */
+  _connectSocket(listeningPath: string, fail: (error: Error, opts?: { now?: boolean }) => void) {
+    if (this._socket || !this._socketQueue) return;
+    const socket = net.createConnection(listeningPath);
+    socket.setEncoding('utf8');
+    this._socket = socket;
+
+    // Writes before 'connect' are buffered by the socket. The engine reads requests in order,
+    // so hello is handled before anything after it.
+    const queued = this._socketQueue;
+    this._socketQueue = null;
+    this._sendRequest(Method.Hello, {
+      protocol: PROTOCOL_VERSION,
+      client: this._clientName(),
+    } as HelloParams);
+    this._sendRequest(Method.Subscribe, { accounts: null, classes: null } as SubscribeParams);
+    for (const line of queued) {
+      socket.write(line, 'utf-8');
+    }
+
+    let inBuffer = '';
+    socket.on('data', (chunk: string) => {
+      inBuffer += chunk;
+      if (chunk.indexOf('\n') === -1) {
+        if (inBuffer.length > MAX_LINE_BYTES) {
+          inBuffer = '';
+          fail(new Error('The sync engine sent a line over the size limit'), { now: true });
+        }
+        return;
+      }
+      const lines = inBuffer.split('\n');
+      inBuffer = lines.pop();
+      const deltas: string[] = [];
+      let failure: Error = null;
+      for (const line of lines) {
+        failure = this._onSocketLine(line, deltas) || failure;
+      }
+      if (deltas.length) {
+        this.emit('deltas', deltas);
+      }
+      if (failure) {
+        fail(failure, { now: true });
+      }
+    });
+    socket.on('error', (err: Error) => fail(err));
+    socket.on('close', () => fail(new Error('The sync engine closed its socket')));
+  }
+
+  // Adds a delta line to `deltas`, or returns an error that ends the connection.
+  _onSocketLine(line: string, deltas: string[]): Error | null {
+    if (!line) return null;
+    const params = deltaParamsText(line);
+    if (params !== null) {
+      deltas.push(params);
+      return null;
+    }
+    let msg = null;
+    try {
+      msg = JSON.parse(line);
+    } catch (err) {
+      console.warn(`Sync engine sent a non-JSON line: ${this._stripSecrets(line)}`);
+      return null;
+    }
+    if (msg.method === Method.Delta) {
+      deltas.push(JSON.stringify(msg.params));
+      return null;
+    }
+    if (msg.method === Method.Disconnect) {
+      const { reason } = (msg.params || {}) as DisconnectParams;
+      console.warn(`Sync engine dropped the connection: ${reason}`);
+      return new Error(`The sync engine dropped the connection: ${reason}`);
+    }
+    if (msg.method === undefined && msg.id !== undefined) {
+      const response = msg as RpcResponse;
+      const method = this._socketRequests.get(response.id);
+      this._socketRequests.delete(response.id);
+      if (response.error) {
+        const { code, message, data } = response.error;
+        console.warn(
+          `Sync engine refused ${method || `request ${response.id}`}: ${message} (${code})`,
+          data
+        );
+        if (method === Method.Hello) {
+          return new Error(`The sync engine refused hello: ${message}`);
+        }
+      }
+    }
+    return null;
+  }
+
   sync() {
-    this._spawnProcess('sync');
+    const socketPath = this._socketTransportPath();
+    this._socketPath = socketPath;
+    this._socketQueue = socketPath ? [] : null;
+    this._spawnProcess('sync', socketPath ? ['--socket', socketPath] : []);
     let outBuffer = '';
     let errBuffer = '';
+    let cleanedUp = false;
+    let socketCloseTimer = null;
+
+    // Like a stdin EPIPE: kill the engine and report code -2 so the bridge relaunches it.
+    const failSocket = (error: Error, { now }: { now?: boolean } = {}) => {
+      if (cleanedUp || this._killed) return;
+      const finish = () => {
+        if (cleanedUp || this._killed) return;
+        cleanedUp = true;
+        console.warn(`Sync engine socket failed: ${error}`);
+        this._closeSocket();
+        this._proc.kill();
+        this.emit('close', { code: -2, error, signal: null });
+      };
+      if (now) {
+        finish();
+      } else if (!socketCloseTimer) {
+        socketCloseTimer = setTimeout(finish, SOCKET_CLOSE_GRACE_MS);
+      }
+    };
 
     if (this._proc.stdout) {
       this._proc.stdout.on('data', (data) => {
@@ -526,8 +757,17 @@ export class MailsyncProcess extends EventEmitter {
         }
 
         if (added.indexOf('\n') !== -1) {
-          const msgs = outBuffer.split('\n');
+          let msgs = outBuffer.split('\n');
           outBuffer = msgs.pop();
+          if (socketPath) {
+            // stdout still carries the handshake prompts and ProcessAccountSecretsUpdated.
+            msgs = msgs.filter((msg) => {
+              const listening = parseListeningLine(msg);
+              if (listening === null) return true;
+              this._connectSocket(listening, failSocket);
+              return false;
+            });
+          }
           this.emit('deltas', msgs);
         }
       });
@@ -559,8 +799,6 @@ export class MailsyncProcess extends EventEmitter {
       console.log(`Sync worker exited with ${err}`);
     });
 
-    let cleanedUp = false;
-
     // Handle EPIPE and other stdin errors that occur when the child process
     // exits while we're still trying to write to it. These errors are emitted
     // asynchronously as 'error' events on stdin rather than thrown from write(),
@@ -569,12 +807,18 @@ export class MailsyncProcess extends EventEmitter {
       this._proc.stdin.on('error', (err: Error) => {
         if (cleanedUp) return;
         cleanedUp = true;
+        this._closeSocket();
         this._proc.kill();
         this.emit('close', { code: -2, error: err, signal: null });
       });
     }
 
     const onStreamCloseOrExit = (code: number, signal: string) => {
+      if (socketCloseTimer) {
+        clearTimeout(socketCloseTimer);
+        socketCloseTimer = null;
+      }
+      this._closeSocket();
       if (cleanedUp) {
         return;
       }
@@ -626,6 +870,11 @@ export class MailsyncProcess extends EventEmitter {
       Utils = require('mailspring-exports').Utils;
     }
     console.log(`Sending to mailsync ${this.account ? this.account.id : '?'}`, json);
+    const request = this._socketPath ? requestForCommand(this.account.id, json) : null;
+    if (request) {
+      this._sendRequest(request.method, request.params);
+      return;
+    }
     const msg = `${JSON.stringify(json)}\n`;
     try {
       this._proc.stdin.write(msg, 'utf-8');
