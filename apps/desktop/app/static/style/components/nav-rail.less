@@ -80,6 +80,20 @@
   }
 }
 
+// With the rail hidden, the root sidebar gets the inset the rail's card gave it, and room at the
+// bottom so its notifications (dev mode, offline) sit above the restore button. The column takes
+// the sidebar's colour so the padding doesn't show through. :where keeps this at the specificity
+// of a bare column selector, so themes that style the column themselves (Darkside, Less Is More)
+// still win.
+:where(.sheet-container div:has(> .nav-rail-restore)) {
+  .column-RootSidebar,
+  .column-CalendarSidebar {
+    padding-left: 8px;
+    padding-bottom: 32px;
+    background-color: @source-list-bg;
+  }
+}
+
 // The sheets sit on the toolbar's surface as an inset card whose border replaces the toolbar's
 // hairline. Outranks the platform `.sheet-toolbar` borders in workspace.less.
 .sheet-container .sheet-toolbar:has(+ .nav-rail-frame) {
