@@ -106,4 +106,4 @@ fi
 log "launching the desktop on the Rust engine with profile $to"
 log "engine logs: $to/mailsync-<accountId>.log"
 cd "$repo/apps/desktop"
-MAILSYNC_ENGINE=rust exec npm start -- --config-dir-path="$to"
+exec npm start -- --config-dir-path="$to"
