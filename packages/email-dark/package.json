@@ -1,0 +1,12 @@
+{
+  "name": "@tern/email-dark",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Renders HTML email in a dark colour scheme, in place, without running email content",
+  "license": "GPL-3.0-only",
+  "main": "src/index",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "node scripts/test.js"
+  }
+}
