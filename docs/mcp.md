@@ -1,0 +1,155 @@
+# tern-mcp
+
+`apps/mcp` builds `tern-mcp`, an MCP server for the mail in a Tern profile. It replaces the
+desktop's `mcp-server` plugin (`apps/desktop/app/internal_packages/mcp-server`), which only ran
+inside the Electron app. tern-mcp talks to the running engine over its socket
+(docs/engine-protocol-plan.md): reads go through the read API, and changes are queued as the
+same task JSON the desktop sends (`__cls`, the `DraftFactory` fields), so the desktop and the
+engine can't tell the two apart. The desktop doesn't have to be open, but an engine does
+(scheduled sends are the exception, see `schedule_send` below).
+
+stdout carries MCP; stderr is the log, which MCP clients keep.
+
+## Running it
+
+```
+tern-mcp [--config-dir DIR]                       # MCP on stdio (also: tern-mcp stdio)
+tern-mcp http [--port N]                           # streamable HTTP on 127.0.0.1, see below
+tern-mcp install   --client claude-desktop|claude-code|codex [--config-file PATH] [--force]
+tern-mcp uninstall --client claude-desktop|claude-code|codex [--config-file PATH]
+tern-mcp status [--json]
+```
+
+`--config-dir` (or `TERN_CONFIG_DIR`) picks the profile, the same way `tern` does
+(apps/cli): without it, the first default profile with a live engine, else the first that
+exists. `install` pins the profile it resolved into the client entry.
+
+`install` writes one stdio entry named `tern` whose command is this binary (canonical path)
+with `--config-dir DIR`:
+
+- Claude Desktop: `mcpServers.tern` in `claude_desktop_config.json` (macOS
+  `~/Library/Application Support/Claude`, Windows `%APPDATA%\Claude`, else
+  `$XDG_CONFIG_HOME/Claude`).
+- Claude Code: `claude mcp add-json tern … --scope user` (the `claude` binary from PATH, else a
+  login shell), or with `--config-file` the file's top-level `mcpServers`.
+- Codex: a `[mcp_servers.tern]` table in `$CODEX_HOME/config.toml` (default `~/.codex`).
+
+It never writes or removes the `mailspring` / `mailspring-mcp` entries that Mailspring.app
+registers. A config file that doesn't parse is an error and is left untouched; writes go
+through an owner-only temporary file and a rename, following symlinks, and keep the file's
+mode. An existing `tern` entry whose command isn't `tern-mcp` is left alone: `install` refuses
+it unless given `--force`, and `uninstall` refuses it. For Claude Code without `--config-file`
+the check reads the user-scope entry from `.claude.json` (in `$CLAUDE_CONFIG_DIR`, else the
+home directory); only `claude mcp` writes it. In Codex's config.toml only `[mcp_servers.tern]`
+tables are rewritten; a `tern` written as an inline table or dotted keys is refused, to be
+removed by hand.
+
+Engines are found through `<config-dir>/run/*.json`: the per-account files
+(`{pid, socket, protocol, accountId}`) and phase C's shared `engine.json`
+(`{pid, socket, protocol, accounts}`), which wins when both exist. Each tool call scans and
+connects afresh (`hello` with client `tern-mcp/<version> (<MCP client name>)`), so an engine
+restart doesn't need a server restart. With no engine the tools return an error that says to
+open Tern.
+
+## Policy: `<config-dir>/mcp.json`
+
+```json
+{
+  "accessLevel": "read-only",
+  "enabledAccounts": {
+    "<accountId>": {"enabled": true, "excludedFolderIds": ["<folderId>"]}
+  },
+  "http": {"enabled": false, "port": 2587}
+}
+```
+
+- `accessLevel`: `read-only` (default), `read-write` or `read-write-send`, with the plugin's
+  tool categories: read tools need nothing, drafts and thread changes need `read-write`,
+  `send_draft` and `schedule_send` need `read-write-send`. An unknown value is read-only.
+- `enabledAccounts`: empty means every account. Otherwise an account that is absent or has
+  `enabled: false` is invisible: not listed, and its ids answer "not found". Threads and
+  messages in an excluded folder are hidden the same way, and the folder isn't listed.
+- The file is re-read on every call. A file that doesn't parse is an error for every tool, so
+  a typo can't widen access.
+- Without `mcp.json`, `accessLevel` and `enabledAccounts` come from the desktop's
+  `config.json` keys `core.mcp.accessLevel` / `core.mcp.enabledAccounts` (what the plugin's
+  preferences pane writes today). HTTP stays off in that fallback. A null `enabled` or
+  `excludedFolderIds` reads as false or `[]`, as in the plugin; any other value that doesn't
+  fit is an error, like a bad `mcp.json`.
+
+## HTTP
+
+`tern-mcp http` serves MCP's streamable HTTP transport at `http://127.0.0.1:<port>/mcp`, only
+when `http.enabled` is true. Every request needs `Authorization: Bearer <token>`; the token
+is in `<config-dir>/mcp-token`, created owner-only (0600) on first use. Requests whose `Host`
+isn't a loopback name get 403, which stops DNS rebinding. `install` only writes stdio entries.
+
+## Audit log: `<config-dir>/mcp-audit.log`
+
+One JSON object per line, owner-only, rotated to `mcp-audit.log.1` at 4 MiB:
+
+```json
+{"timestamp": 1792137600000, "client": "claude-ai 0.1.0", "toolName": "update_draft",
+ "accountId": "a1", "outcome": "ok", "params": "{\"body\":\"<120 chars>\",\"id\":\"d0\"}",
+ "resultSummary": "ok", "durationMs": 41}
+```
+
+`outcome` is `ok`, `denied` (policy) or `error`. `params` has `body` replaced by its length,
+secret-looking keys (`password`, `token`, `secret`, `authorization`, …) dropped, and is cut to
+200 characters; `resultSummary` is cut to 100. `resources/read` is logged too.
+
+## Tools
+
+The plugin's tools keep their names, arguments and output shapes:
+
+| Category | Tools |
+| --- | --- |
+| read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `get_attachment` |
+| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send` |
+| read-write-send | `send_draft`, `schedule_send` |
+
+Attachments are also served as the resource template `attachment://{messageId}/{fileId}`,
+read from `<config-dir>/files/` (fetching the body first when the file isn't there yet).
+
+Changes from the plugin:
+
+- Every message in `get_thread` / `get_message` carries `draft`, and the server instructions say
+  that `draft: true` is the user's unsent draft.
+- `reply_to_thread` replies to the newest message that is neither a draft nor hidden, or to
+  `messageId` (a draft is refused). The plugin replied to the newest message, which after one
+  reply was the user's own draft, so a second reply quoted the draft instead of the mail.
+  The result has `repliedTo`, `quoted`, `to`, `cc` and `existingDrafts`, with a note to use
+  `update_draft` when one of them was meant to be revised.
+- `update_draft` (new) changes a draft's subject, body, To, Cc or Bcc by `id` or
+  `headerMessageId`. It saves through `SyncbackDraftTask` with the stored draft's identity
+  (id, headerMessageId, thread, reply-to, files, metadata). It refuses a draft being sent: one
+  with a pending send-later/undo-send, or one this server queued `SendDraftTask` for.
+- `delete_draft` (new) queues `DestroyDraftTask`, with the same refusal.
+- `send_draft` and `update_draft` wait for the draft's body (up to 15 s) and read the draft
+  again before building the task. A draft synced from another device gets `plaintext` and its
+  `files` only when its body is downloaded; the header-only copy would fail to send or drop
+  the attachments.
+- `schedule_send` only writes the `send-later` metadata. The engine announces the due send as a
+  `metadata-expiration` delta and the desktop's send-later plugin sends it, so the desktop has
+  to be running at `sendAt`; otherwise the draft goes out when it next opens. The tool
+  description and result say so. `sendAt` without an offset is local time, with or without
+  seconds; a date alone is midnight UTC (both as `new Date()` read them).
+
+Not ported, because the read API has no message listing by draft flag or plugin metadata:
+`list_tracked_messages`, `get_top_links` and `list_scheduled_sends`.
+
+`search_mail` supports plain terms and quoted phrases with `in:`,
+`is:unread|read|starred|unstarred`, `has:attachment`, `before:` and `after:`/`since:`
+(absolute dates). `OR`, `NOT`, negation, parentheses and relative dates are refused with an
+error, and field filters like `from:` are passed to the engine's search as terms rather than
+enforced.
+
+## What the desktop still has to do
+
+- The MCP preferences pane should write `mcp.json` instead of `core.mcp.*`, and offer
+  `tern-mcp install`.
+- The `mcp-server` plugin should go: its HTTP server also defaults to port 2587, and its
+  install code writes the `mailspring` entries.
+- The desktop's own reply path has the same bug `reply_to_thread` had: `DraftStore._modelifyContext`
+  (thread-list context menu Reply / Reply All) picks the newest message including drafts, and
+  `replyAllItem` checks `canReplyAll` on it.
