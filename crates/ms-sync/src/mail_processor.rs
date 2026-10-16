@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `MailProcessor`: turns fetched headers and bodies into Message, Thread, Contact and File
 //! rows, and runs the orphan sweep.
 //!

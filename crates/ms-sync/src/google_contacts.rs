@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Google contacts and contact groups through the People API (`GoogleContactsWorker`).
 //!
 //! Derived from Mailspring-Sync `MailSync/GoogleContactsWorker.cpp` and `.hpp`, Copyright ©

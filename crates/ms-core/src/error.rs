@@ -1,7 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Error types shared by every engine crate.
 //!
-//! Derived from `MailSync/SyncException.cpp`, `MailSync/GenericException.cpp` and the
-//! `ErrorCodeToTypeMap` in `MailSync/constants.h`.
+//! Derived from Mailspring-Sync `MailSync/SyncException.cpp`, `MailSync/GenericException.cpp`
+//! and the `ErrorCodeToTypeMap` in `MailSync/constants.h`, Copyright © 2017 Foundry 376,
+//! GPL-3.0, and mailcore2's `ErrorCode` (`MCMessageConstants.h`), Copyright © 2001-2013
+//! MailCore team, BSD-3-Clause. See NOTICE.md ("mailcore2").
 //!
 //! - [`SyncError`] is the C++ `SyncException`: a logical failure with a key the client
 //!   understands, and the retry policy (`retryable`, `offline`) the workers act on.

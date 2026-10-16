@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Body rendering: which parts make the body, how they are joined, and which become files.
 //!
-//! A port of mailcore2's `MCHTMLRenderer.cpp` as modified for Mailspring (Copyright © the
-//! mailcore2 authors, BSD; modifications Copyright © 2017 Foundry 376, GPL-3.0), driven with
-//! the `CleanHTMLBodyRendererTemplateCallback` of `MailProcessor.cpp`: no templates, no
+//! A port of mailcore2's `MCHTMLRenderer.cpp` as modified for Mailspring (Copyright ©
+//! 2001-2013 MailCore team, BSD-3-Clause; modifications Copyright © 2017 Foundry 376,
+//! GPL-3.0; see NOTICE.md, "mailcore2"), driven with the
+//! `CleanHTMLBodyRendererTemplateCallback` of `MailProcessor.cpp`: no templates, no
 //! tidying, every filter the identity. Rules, plan section 6 "Bodies":
 //! - `multipart/alternative`: HTML, else plain, else the first part; a `text/calendar`
 //!   alternative is rendered after it (Exchange invites).

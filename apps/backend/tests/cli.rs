@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! The `tern-backend` binary: user and token commands, migrate, backup, and `serve`.

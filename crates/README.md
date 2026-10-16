@@ -1,1 +1,1 @@
-Rust library crates. The ms-* engine crates (ms-core, ms-store, ms-imap, ...) are GPL-3.0-only and used by apps/engine only; ms-wire (MIT) holds the wire types shared by apps/engine and apps/backend.
+Rust library crates, all GPL-3.0-only (see the root LICENSE.md and NOTICE.md). The ms-* engine crates (ms-core, ms-store, ms-imap, ...) are used by apps/engine only; ms-wire holds the wire types shared by apps/engine and apps/backend, and depends on no engine crate.

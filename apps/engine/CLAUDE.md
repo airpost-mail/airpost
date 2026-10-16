@@ -88,8 +88,12 @@ smaller functions over commentary; a comment that restates the code should be de
 - Item docs (`///`, `//!`) carry contracts; inline `//` comments sit on one non-obvious
   line and run one or two lines. `// Note:` marks a short inline remark. Longer inline blocks
   only for protocol or provider quirks, with the evidence cited.
-- Every file that ports C++ code opens with a module doc naming the C++ files it derives
-  from and the upstream copyright (Foundry 376, GPL-3.0), as `ms-core/src/lib.rs` does.
+- Every Rust file starts with `// SPDX-License-Identifier: GPL-3.0-only` and
+  `// Copyright (C) 2026 Tern contributors`. A file that ports C++ code then opens with a
+  module doc naming the C++ files it derives from and the upstream copyright (Foundry 376,
+  GPL-3.0), as `ms-core/src/lib.rs` does. Code ported from mailcore2, libetpan or
+  iCalendarLib also names that holder and licence and its NOTICE.md section, as
+  `ms-imap/src/lib.rs` does.
 
 ## Logging
 

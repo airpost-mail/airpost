@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The persisted models (`Models/*.cpp`). Each wraps its JSON and exposes typed accessors
 //! over it; the save/remove hooks keep the derived tables (thread refcounts,
 //! ThreadCategory, ThreadCounts, ThreadSearch, ContactSearch, EventSearch,

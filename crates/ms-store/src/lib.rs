@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The engine's SQLite store.
 //!
 //! Derived from Mailspring-Sync (`MailSync/MailStore.*`, `MailStoreTransaction.*`,

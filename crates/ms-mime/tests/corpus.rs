@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The golden corpus: every message under `tests/corpus/golden` and the copied mailcore2
 //! unit-test messages, parsed with [`ms_mime::parse_message`] and compared with the
 //! reviewed expectations in `tests/corpus/expected/<group>/`:

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! PROPFIND and REPORT bodies, byte for byte as `MailSync/DAVWorker.cpp` sends them
 //! (Copyright © 2017 Foundry 376, GPL-3.0; see NOTICE.md), plus the calendar sync window.
 //!

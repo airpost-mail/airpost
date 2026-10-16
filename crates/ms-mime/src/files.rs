@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! File naming: default names for unnamed parts, the on-disk name, MIME types from
 //! extensions, and the attachment-count rule.
 //!
 //! Derived from Mailspring-Sync `Models/File.cpp:40-65, 92-95` (Copyright © 2017 Foundry
-//! 376, GPL-3.0) and mailcore2 `Attachment::mimeTypeForFilename` (BSD).
+//! 376, GPL-3.0) and mailcore2 `Attachment::mimeTypeForFilename` (Copyright © 2001-2013
+//! MailCore team, BSD-3-Clause). See NOTICE.md ("mailcore2").
 
 /// Files at or below this size with a Content-ID are treated as inline images and not
 /// counted in a thread's `attachmentCount` (`Message::fileCountForThreadList`,

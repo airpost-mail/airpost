@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! DavMail, the IMAP gateway to Exchange (`SyncWorker.cpp:811-834`), Copyright © 2017
 //! Foundry 376, GPL-3.0.
 

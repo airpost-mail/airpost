@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Golden message ids. `message_ids.json` was produced by an independent Python
 //! implementation (hashlib, `email.header`, a hand-written base58); see the plan, section 5.
 //! Changing an expected id means every existing message gets a new id on resync. The cases

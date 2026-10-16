@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! `GET /deltas/<aid>/streaming` (docs/backend-plan.md 3.5): NDJSON over a chunked HTTP/1.1

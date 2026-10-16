@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Consistency checks of the store's derived state against its canonical tables, ported
 //! from `apps/engine/test/harness/invariants.py` so unit tests (here and in the sync and
 //! task crates) can run them after store operations. Keep the two in step.

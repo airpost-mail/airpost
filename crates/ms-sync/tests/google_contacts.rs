@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! GoogleContactsWorker against a canned People API: the full listing, the incremental pass
 //! that follows it, tombstones, photo-only entries, system groups and expired sync tokens.
 //! `GoogleContactsWorker.cpp` is the reference; every case ends in `invariants::check`.

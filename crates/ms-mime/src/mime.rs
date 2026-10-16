@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The MIME part tree of a message, shaped and numbered the way mailcore builds it.
 //!
 //! Derived from mailcore2 `Attachment::attachmentsWithMIME` / `attachmentWithSingleMIME`
 //! (`MCAttachment.cpp`), `MessageParser::setBytes` / `setupPartID` (`MCMessageParser.cpp`)
-//! and `AbstractPart::applyUniquePartID` (`MCAbstractPart.cpp:311-337`), and from libetpan's
-//! `mailmime_parse_with_default` (Copyright © the mailcore2 and libetpan authors, BSD):
+//! and `AbstractPart::applyUniquePartID` (`MCAbstractPart.cpp:311-337`), and from
+//! libetpan's `mailmime_parse_with_default` (Copyright © 2001-2013 MailCore team and ©
+//! 2001-2005 DINH Viet Hoa, BSD-3-Clause; see NOTICE.md, "mailcore2" and "libEtPan!"):
 //! - `multipart/*` without a boundary is a single part;
 //! - `message/rfc822` under base64 or quoted-printable is a single part (an attachment);
 //! - children of `multipart/digest` default to `message/rfc822`;

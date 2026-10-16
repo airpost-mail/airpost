@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! A fetched message (`BODY.PEEK[]`) to what `MailProcessor::retrievedMessageBody` stores:
 //! the body, the plaintext flag, the snippet and search text, the files and the extra
 //! headers.

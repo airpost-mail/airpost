@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Outgoing messages for SendDraft and EventRSVP.
 //!
 //! Derived from mailcore2 `MessageBuilder::mimeAndFilterBccAndForEncryption` and
-//! `MessageHeader::createIMFFieldsAndFilterBcc` (Copyright © the mailcore2 authors, BSD)
-//! and from Mailspring-Sync `TaskProcessor::performRemoteSendDraft` / `performRemoteEventRSVP`
-//! (`TaskProcessor.cpp:2125-2215, 3062-3130`, Copyright © 2017 Foundry 376, GPL-3.0).
+//! `MessageHeader::createIMFFieldsAndFilterBcc` (Copyright © 2001-2013 MailCore team,
+//! BSD-3-Clause) and from Mailspring-Sync `TaskProcessor::performRemoteSendDraft` /
+//! `performRemoteEventRSVP` (`TaskProcessor.cpp:2125-2215, 3062-3130`, Copyright © 2017
+//! Foundry 376, GPL-3.0). See NOTICE.md ("mailcore2").
 //!
 //! Structure, as mailcore builds it:
 //! - HTML: `multipart/alternative` of the flattened text and the HTML; files with a

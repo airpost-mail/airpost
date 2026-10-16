@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! Storage (docs/backend-plan.md 3.3, O4). Handlers hold an `Arc<dyn Repo>` and call it from

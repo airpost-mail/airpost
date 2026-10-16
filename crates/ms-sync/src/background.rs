@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The `background` thread: folder listing, scan passes and the orphan sweep, then it
 //! starts `foreground` (`runBackgroundSyncWorker`, `SyncWorker::syncNow`,
 //! `SyncWorker::syncFoldersAndLabels`).

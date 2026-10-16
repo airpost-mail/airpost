@@ -4,8 +4,9 @@ description = "Wire types shared by tern-backend and the engine's HTTP metadata 
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-# Written from scratch, no GPL-derived code (docs/backend-plan.md O6). Permissive deps only.
-license = "MIT"
+# Written from scratch, no Mailspring-derived code; GPL-3.0-only like the rest of the repo
+# (docs/backend-plan.md O6). Depends on serde only.
+license.workspace = true
 repository.workspace = true
 publish.workspace = true
 

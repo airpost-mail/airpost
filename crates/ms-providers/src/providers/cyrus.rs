@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Cyrus IMAP and Fastmail (`SyncWorker.cpp:1394-1400`), Copyright © 2017 Foundry 376, GPL-3.0.
 
 use super::{greeting_has, host_is};

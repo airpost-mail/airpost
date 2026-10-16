@@ -4,9 +4,10 @@ description = "Self-hostable Tern server: device tokens, metadata sync, tracking
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-# Written from scratch (docs/backend-plan.md O6). Normal dependencies must be permissive and
-# must not include the GPL ms-* crates; `deny.toml` here checks both.
-license = "MIT"
+# Written from scratch, GPL-3.0-only like the rest of the repo (docs/backend-plan.md O6). It
+# shares only ms-wire with the engine and never depends on an engine crate; `deny.toml` here
+# checks that and the licences of its dependencies.
+license.workspace = true
 repository.workspace = true
 publish.workspace = true
 

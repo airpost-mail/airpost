@@ -1,4 +1,8 @@
-//! OAuth token endpoints (`NetworkRequestUtils.cpp:58-100`).
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! OAuth token endpoints. Derived from Mailspring-Sync `NetworkRequestUtils.cpp:58-100`,
+//! Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OAuthProvider {

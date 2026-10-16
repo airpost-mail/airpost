@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The socket under an IMAP session: TCP, TLS and STARTTLS on rustls, COMPRESS=DEFLATE,
 //! response framing (a line plus its literals), and the protocol transcript.
 //!
-//! Plays the part of libetpan's `mailstream_*` and `mailimap_read_line`
-//! (Copyright © the libetpan authors, BSD) and mailcore2's `ConnectionLogger`
-//! hooks (`MCIMAPSession.cpp`, Copyright © MailCore, BSD).
+//! Plays the part of libetpan's `mailstream_*` and `mailimap_read_line` (Copyright ©
+//! 2001-2005 DINH Viet Hoa, BSD-3-Clause) and mailcore2's `ConnectionLogger` hooks
+//! (`MCIMAPSession.cpp`, Copyright © 2001-2013 MailCore team, BSD-3-Clause). See NOTICE.md
+//! ("mailcore2", "libEtPan!").
 
 use std::io;
 use std::pin::Pin;

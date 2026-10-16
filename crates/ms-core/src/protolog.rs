@@ -1,4 +1,10 @@
-//! Protocol transcripts for IMAP and SMTP sessions: mailcore's `ConnectionLogger`.
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! Protocol transcripts for IMAP and SMTP sessions: mailcore's `ConnectionLogger` as
+//! Mailspring-Sync's `MailcoreSPDLogger` (`MailUtils.cpp`) implemented it. mailcore2 is
+//! Copyright © 2001-2013 MailCore team, BSD-3-Clause; Mailspring-Sync is Copyright © 2017
+//! Foundry 376, GPL-3.0. See NOTICE.md ("mailcore2").
 //!
 //! With `--verbose` every line goes to the engine log as `sent <line>` / `recv <line>`,
 //! which the harness parses (`IMAP_LINE` in `test/harness/mailsync.py`) and its hooks match

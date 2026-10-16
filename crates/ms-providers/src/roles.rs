@@ -1,5 +1,9 @@
-//! Folder roles (`MailUtils::roles`, `roleForFolder`, `roleForFolderViaFlags`,
-//! `roleForFolderViaPath` in `MailUtils.cpp`, `COMMON_FOLDER_NAMES` in `constants.h`).
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! Folder roles. Derived from Mailspring-Sync (`MailUtils::roles`, `roleForFolder`,
+//! `roleForFolderViaFlags`, `roleForFolderViaPath` in `MailUtils.cpp`, `COMMON_FOLDER_NAMES`
+//! in `constants.h`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
 use ms_core::FolderFlags;
 

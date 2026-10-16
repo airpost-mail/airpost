@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! Login, auth, server info, `/tern/v1/me`, sign-out, the dead Mailspring paths, account

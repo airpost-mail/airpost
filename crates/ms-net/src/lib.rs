@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Network services other than IMAP and SMTP.
 //!
 //! Derived from Mailspring-Sync (`NetworkRequestUtils.*`, `XOAuth2TokenManager.*`,

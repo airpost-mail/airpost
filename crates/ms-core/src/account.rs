@@ -1,5 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The account and identity the client hands the engine on launch. Derived from
-//! `MailSync/Models/Account.cpp` and `MailSync/Models/Identity.cpp`.
+//! Mailspring-Sync `MailSync/Models/Account.cpp` and `MailSync/Models/Identity.cpp`,
+//! Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! Neither is stored in the database. Both wrap the client's JSON as given so that
 //! `toJSON` round-trips every key, including ones the engine does not read.

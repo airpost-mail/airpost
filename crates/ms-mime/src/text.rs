@@ -1,5 +1,9 @@
-//! String helpers from mailcore2's `MCString.cpp` (Copyright © the mailcore2 authors, BSD):
-//! `stripWhitespace`, `htmlEncodedString`, `htmlMessageContent` and `substringToIndex`.
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! String helpers from mailcore2's `MCString.cpp` (Copyright © 2001-2013 MailCore team,
+//! BSD-3-Clause; see NOTICE.md, "mailcore2"): `stripWhitespace`, `htmlEncodedString`,
+//! `htmlMessageContent` and `substringToIndex`.
 
 /// mailcore's `isWhitespace` set.
 pub(crate) fn is_whitespace(c: char) -> bool {

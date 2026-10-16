@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! A non-local `MetadataBackend` is reached from both ends without touching the workers or
 //! tasks: SyncbackMetadataTask's remote phase pushes to it (`performRemoteSyncbackMetadata`)
 //! and the `metadata` thread pulls from it (`MetadataWorker::run`). The local-only default

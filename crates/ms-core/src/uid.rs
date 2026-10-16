@@ -1,4 +1,8 @@
-//! UID sets: mailcore's `IndexSet` as the workers use it.
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! UID sets: mailcore's `IndexSet` as the workers use it (mailcore2 `MCIndexSet.cpp`,
+//! Copyright © 2001-2013 MailCore team, BSD-3-Clause; see NOTICE.md ("mailcore2")).
 //!
 //! A set is a sorted list of disjoint, non-adjacent ranges. A range may be open-ended
 //! (`12:*`, as VANISHED and `1:*` fetches produce), so a set is not always enumerable;

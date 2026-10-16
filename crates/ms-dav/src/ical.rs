@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The Event columns taken from an ICS resource. Derived from Mailspring-Sync
-//! `MailSync/Models/Event.cpp` (`applyICSEventData`, `endOf`) and `Vendor/icalendarlib`
-//! (`ICalendar::LoadFromString`, `ParseAttendee`, `Date::toUnix`), Copyright © 2017
-//! Foundry 376, GPL-3.0. See NOTICE.md. Parsing is calcard's.
+//! `MailSync/Models/Event.cpp` (`applyICSEventData`, `endOf`), Copyright © 2017 Foundry 376,
+//! GPL-3.0, and iCalendarLib as vendored there (`ICalendar::LoadFromString`,
+//! `ParseAttendee`, `Date::toUnix`), Copyright © Juliusz Gonera, MIT. See NOTICE.md
+//! ("iCalendarLib"). Parsing is calcard's.
 //!
 //! Times follow RFC 5545 §3.3.5, where icalendarlib resolved everything but UTC against the
 //! machine's zone:

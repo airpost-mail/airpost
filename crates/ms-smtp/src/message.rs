@@ -1,10 +1,14 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Message bytes on their way to DATA: the envelope read from the headers, the Bcc filter,
 //! dot-stuffing, and the `test` mode email.
 //!
 //! Derived from mailcore2's `SMTPSession::dataWithFilteredBcc`, `sendMessage(Data *)` and
 //! `checkAccount` (`MCSMTPSession.cpp`) and libetpan's `mailstream_send_data`
-//! (`mailstream_helper.c`), Copyright © 2017 Foundry 376 and the mailcore2 / libetpan
-//! authors, GPL-3.0 / BSD. See NOTICE.md.
+//! (`mailstream_helper.c`). mailcore2 is Copyright © 2001-2013 MailCore team and libetpan
+//! Copyright © 2001-2005 DINH Viet Hoa, both BSD-3-Clause; Mailspring-Sync's changes are
+//! Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md ("mailcore2", "libEtPan!").
 
 use lettre::message::header::{ContentType, UserAgent};
 use lettre::message::Mailbox;

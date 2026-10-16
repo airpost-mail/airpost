@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The `foreground` thread: IDLE on the primary folder, body fetches, task remote phases
 //! (`runForegroundSyncWorker`, `SyncWorker::idleCycleIteration`).
 //!

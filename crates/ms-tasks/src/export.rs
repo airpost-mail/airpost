@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `.eml` export: GetMessageRFC2822Task (one message) and GetManyRFC2822Task (a folder).
 //!
 //! Derived from Mailspring-Sync `MailSync/TaskProcessor.cpp`

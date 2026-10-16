@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The metadata threads against a migrated database: the expiration scan
 //! (`MetadataExpirationWorker.cpp`) and the backend pull with its detached-metadata
 //! hand-off (`MetadataWorker.cpp`, `MailModel::beforeSave`), the pull through an in-test

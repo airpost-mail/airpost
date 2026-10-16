@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The model trait (`MailModel`) and the pieces every model shares: the base columns,
 //! `__cls`, plugin metadata and the `ModelPluginMetadata` / `DetatchedPluginMetadata`
 //! bookkeeping of the base save hooks.

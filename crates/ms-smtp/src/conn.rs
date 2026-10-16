@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! One SMTP connection: the socket (plain or TLS), reply reading, the transcript, EHLO.
 //!
 //! Derived from libetpan's `mailsmtp.c` (`read_response`, `parse_response`,
-//! `mailesmtp_parse_ehlo`, `mailesmtp_starttls`) and `mailsmtp_helper.c` (`mailsmtp_init`),
-//! Copyright © 2017 Foundry 376 and the libetpan authors, GPL-3.0 / BSD. See NOTICE.md.
+//! `mailesmtp_parse_ehlo`, `mailesmtp_starttls`) and `mailsmtp_helper.c` (`mailsmtp_init`).
+//! libetpan is Copyright © 2001-2005 DINH Viet Hoa, BSD-3-Clause; Mailspring-Sync's changes
+//! to it are Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md ("libEtPan!").
 //!
 //! The connection is ours rather than lettre's `AsyncSmtpConnection` because the transcript
 //! has to sit above TLS and mark AUTH payloads private, the AUTH list has to keep the

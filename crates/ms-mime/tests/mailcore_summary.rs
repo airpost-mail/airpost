@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Charset decoding and rendering against mailcore2's summary unit-test expectations
 //! (`unittest/data/summary`, copied to `tests/corpus/mailcore/summary`). mailcore's
 //! expected output is `plainTextRendering()`: a header block, then the flattened HTML

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Every `logmsg` function against the regexes the harness and scenarios use
 //! (apps/engine/test/harness/mailsync.py, apps/engine/test/scenarios/*.yaml). The patterns
 //! are copied verbatim; `re.search` semantics, so they match anywhere in the message.

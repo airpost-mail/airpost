@@ -1,8 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Provider detection, one file per provider. [`resolve`] tries them in [`PROVIDERS`]
 //! order and falls back to the generic profile.
 //!
 //! Detection keys on what the C++ keyed on (host, greeting, capability), plus the greeting
-//! where the C++ used a host but the harness's fake personalities run on localhost.
+//! where the C++ used a host but the harness's fake personalities run on localhost. Derived
+//! from Mailspring-Sync, Copyright © 2017 Foundry 376, GPL-3.0; each provider file names its
+//! sources. See NOTICE.md.
 
 use crate::{ConnectionInfo, ServerProfile};
 

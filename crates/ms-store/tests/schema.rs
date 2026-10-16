@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The schema `migrate` creates must be the C++ engine's V12 schema exactly: the client
 //! and `invariants.py` query it by name, and the placement upsert's ON CONFLICT target
 //! depends on the partial index WHERE clauses.

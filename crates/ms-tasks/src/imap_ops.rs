@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Server-side moves and deletions shared by the message tasks.
 //!
 //! Derived from Mailspring-Sync `MailSync/TaskProcessor.cpp` (`_resolveNewUIDs`,

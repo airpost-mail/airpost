@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! SMTP (mailcore2's `SMTPSession` as used by `TaskProcessor` and `test` mode).
 //!
 //! Derived from Mailspring-Sync (`MailUtils::configureSessionForAccount`, `runTestAuth` in
-//! `main.cpp`) and mailcore2 (`MCSMTPSession.cpp`), Copyright © 2017 Foundry 376 and the
-//! mailcore2 authors, GPL-3.0 / BSD. See NOTICE.md.
+//! `main.cpp`), Copyright © 2017 Foundry 376, GPL-3.0, and mailcore2 (`MCSMTPSession.cpp`)
+//! with the libetpan SMTP code it drives: Copyright © 2001-2013 MailCore team and © 2001-2005
+//! DINH Viet Hoa, BSD-3-Clause. See NOTICE.md ("mailcore2", "libEtPan!").
 //!
 //! [`SmtpClient`] is synchronous: it owns a current-thread tokio runtime and blocks on it,
 //! so it must not be called from inside another runtime. Errors are [`MailError`]s carrying

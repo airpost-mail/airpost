@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! [`Repo`] over rusqlite: one writer connection, so commit order is seq order (3.5), and a

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Blocking work from a thread that may have a tokio runtime entered.
 //!
 //! Plan 4.1 has network threads run a current-thread runtime, and both reqwest's blocking

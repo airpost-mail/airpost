@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! Wire types shared by `tern-backend` and the engine's HTTP metadata backend
 //! (docs/backend-plan.md 3.1, 3.4, 3.5, 4.1).
 //!
-//! MIT, written from scratch: depends on serde and serde_json only, and on no engine crate.
+//! Written from scratch: depends on serde and serde_json only, and on no engine crate.
 //! The metadata protocol keeps the field names the C++ engine speaks: push bodies are
 //! camelCase, page and stream records snake_case except `headerMessageId`. The Tern
 //! endpoints (`/tern/v1/...`) and the engine's identity line are camelCase.

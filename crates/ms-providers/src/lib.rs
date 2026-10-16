@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Everything that depends on which server or provider is on the other end.
 //!
 //! Derived from Mailspring-Sync (the host, greeting and capability checks scattered through
 //! `SyncWorker.cpp`, `MailUtils.cpp`, `TaskProcessor.cpp`, `MCIMAPSession.cpp`, and the
 //! `COMMON_FOLDER_NAMES` table in `constants.h`), Copyright © 2017 Foundry 376, GPL-3.0.
-//! See NOTICE.md.
+//! `MCIMAPSession.cpp` and `MCSMTPSession.cpp` are mailcore2's, Copyright © 2001-2013
+//! MailCore team, BSD-3-Clause. See NOTICE.md ("mailcore2").
 //!
 //! Two layers (docs/engine-port-plan.md section 4.4): capabilities drive the generic code
 //! paths, and a [`ServerProfile`], resolved once per connection, names each quirk as a

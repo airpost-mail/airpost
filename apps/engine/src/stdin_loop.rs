@@ -1,6 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The main thread's command loop (`runListenOnMainThread`): one JSON object per line,
 //! unparseable lines ignored. Once stdin has been closed for more than 30 s the parent is
 //! gone and the process exits 141.
+//!
+//! Derived from Mailspring-Sync `MailSync/main.cpp`, Copyright © 2017 Foundry 376, GPL-3.0.
+//! See NOTICE.md.
 
 use std::io::BufRead;
 use std::sync::atomic::{AtomicBool, Ordering};

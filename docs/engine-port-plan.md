@@ -21,8 +21,8 @@ repo root (section 12).
 | D8 | No feature cuts beyond ones that would pull C dependencies back in (section 2). |
 | D9 | Provider-specific behaviour lives in provider profiles, one file per provider, not as scattered host checks (section 4). |
 | D10 | One monorepo holds the engine, the desktop client, the future backend and shared libs. Name: Tern (GitHub org `ternmail`); see section 12. |
-| D11 | Everything ships under GPL-3.0, the upstream licence (not "or later": that needs the upstream copyright holders' consent). The product is rebranded away from "Mailspring" (section 12). |
-| D12 | One Cargo workspace at the repo root covers the engine, the backend and every Rust library, with one `Cargo.lock`. The backend reuses no engine crate: it is MIT and the `ms-*` crates are GPL. It shares only the MIT `crates/ms-wire` (wire types) with the engine (`docs/backend-plan.md` 3.1). *(Changed 2026-10-16, backend B1-E.)* |
+| D11 | Everything ships under GPL-3.0-only. Upstream is received under GPL-3.0-or-later (its in-app notice grants "any later version"), which permits distributing as GPL-3.0-only; NOTICE.md says so. The product is rebranded away from "Mailspring" (section 12). *(Wording changed 2026-10-16.)* |
+| D12 | One Cargo workspace at the repo root covers the engine, the backend and every Rust library, with one `Cargo.lock`. The backend reuses no engine crate. It shares only `crates/ms-wire` (wire types) with the engine (`docs/backend-plan.md` 3.1). *(Changed 2026-10-16, backend B1-E.)* |
 
 ## 1. Size and expectations
 
@@ -702,9 +702,9 @@ ternmail/
   apps/
     desktop/          Electron client (TS), imported from Mailspring with history
     engine/           mailsync bin crate: CLI, modes, stdin loop, thread startup; harness in test/
-    backend/          self-hostable metadata/tracking/sharing server, Rust, MIT (D3; docs/backend-plan.md)
-  crates/             Rust libraries: the engine's GPL ms-* crates, and the MIT ms-wire shared
-                      by engine and backend
+    backend/          self-hostable metadata/tracking/sharing server, Rust (D3; docs/backend-plan.md)
+  crates/             Rust libraries: the engine's ms-* crates, and ms-wire shared by engine
+                      and backend
   packages/           TS libraries, e.g. protocol types generated from the engine's delta/task
                       structs so the client and engine can't drift
   legacy/
@@ -722,8 +722,9 @@ submodule was removed after the import.
 
 ### GPL-3.0 obligations
 
-Both upstream repos are GPL-3.0. The Rust engine is a translation of the C++ engine, so it is a
-derivative work too. Treat the whole monorepo as GPL-3.0. This is not legal advice.
+Both upstream repos are received under GPL-3.0-or-later. The Rust engine is a translation of the
+C++ engine, so it is a derivative work too. The whole monorepo is distributed as GPL-3.0-only.
+This is not legal advice.
 
 - Keep the upstream copyright and licence notices. Add a top-level NOTICE crediting Foundry 376
   and the Mailspring / Mailspring-Sync contributors, with links to the upstream repos.
@@ -736,10 +737,10 @@ derivative work too. Treat the whole monorepo as GPL-3.0. This is not legal advi
   links into the engine or the client.
 - Dependencies must be GPLv3-compatible. MIT, Apache-2.0, ISC, BSD and MPL-2.0 all are. Add
   `cargo deny` with an allowlist to CI in P0, and the JS equivalent for `apps/desktop`.
-- **`apps/backend`:** a separate program that talks over HTTP is not a derivative of the client.
-  It is written from scratch and licensed MIT (decided 2026-10-15). It must not depend on any
-  GPL-derived crate (`ms-core`, `ms-store`, ...); shared protocol types live in the MIT
-  `crates/ms-wire`, which the GPL engine may use.
+- **`apps/backend`:** a separate program that talks over HTTP, written from scratch. It is
+  GPL-3.0-only like the rest of the repo (decided 2026-10-16, replacing MIT; backend-plan O6)
+  and could move to MIT later by a deliberate decision. It must not depend on any engine crate
+  (`ms-core`, `ms-store`, ...); shared protocol types live in `crates/ms-wire`.
 - **Crates or packages published from `crates/` or `packages/`:** these can carry a permissive licence only if they contain
   no code derived from the GPL sources.
 

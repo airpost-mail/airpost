@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! CalDAV/CardDAV service discovery (RFC 6764): the DAV host from DNS SRV/TXT or a table of
 //! known providers, then `.well-known`, current-user-principal, the home set and the
 //! collections. Derived from Mailspring-Sync `MailSync/DAVWorker.cpp`

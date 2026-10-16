@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! A scripted CalDAV/CardDAV server for DavWorker tests, on ms-dav's `Fake` transport: one
 //! account at `https://dav.test/dav/` with an address book and a calendar home, plus the
 //! multistatus bodies the worker reads. The including crate declares the transport as

@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Content-Transfer-Encoding decoders.
 //!
 //! Derived from mailcore2 `Data::decodedDataUsingEncoding` and libetpan's
-//! `mailmime_part_parse` (Copyright © the mailcore2 and libetpan authors, BSD). All three
-//! decoders are lenient the way libetpan is: bytes outside the alphabet are skipped and a
-//! malformed escape is kept as text, so a damaged part still yields most of its content.
+//! `mailmime_part_parse` (Copyright © 2001-2013 MailCore team and © 2001-2005 DINH Viet
+//! Hoa, BSD-3-Clause; see NOTICE.md, "mailcore2" and "libEtPan!"). All three decoders are
+//! lenient the way libetpan is: bytes outside the alphabet are skipped and a malformed
+//! escape is kept as text, so a damaged part still yields most of its content.
 
 /// The transfer encodings mailcore distinguishes (`Encoding` in `MCMessageConstants.h`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

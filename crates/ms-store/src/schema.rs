@@ -1,12 +1,16 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The V12 schema and connection setup.
 //!
 //! [`V12_SCHEMA`] is the final schema the C++ engine reaches on a fresh database, replayed
 //! from its V1, V3, V4, V6, V7, V8, V9 and V10 setup and index queries (`constants.h`) and
 //! read back from `sqlite_master`. The text is SQLite's stored form, so a database created
-//! here has the same `sqlite_master` as one created by the C++ engine. `ALTER TABLE ADD
-//! COLUMN` appended columns to the stored CREATE TABLE text, which is why some columns sit
-//! after the closing column list in the original order. V6 dropped and recreated `Event`,
-//! so the V1 `EventIsSearchIndexedIndex` no longer exists.
+//! here has the same `sqlite_master` as one created by the C++ engine (Mailspring-Sync,
+//! Copyright © 2017 Foundry 376, GPL-3.0; see NOTICE.md). `ALTER TABLE ADD COLUMN` appended
+//! columns to the stored CREATE TABLE text, which is why some columns sit after the closing
+//! column list in the original order. V6 dropped and recreated `Event`, so the V1
+//! `EventIsSearchIndexedIndex` no longer exists.
 //!
 //! Regenerate or check with `apps/engine/tools/schema_check.py`; `tests/schema.rs` compares
 //! a migrated database against `tests/fixtures/v12_schema.json` and, when the C++ sources

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The `metadata` thread: pulls plugin metadata from the backend and applies it to local
 //! models. Not started for [`ms_net::LocalOnly`] (plan D3).
 //!

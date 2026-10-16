@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Session behaviour against a scripted in-process server: the malformed and unusual
 //! responses no harness server sends (broken envelopes, unparseable lines, FETCH without
 //! ENVELOPE, login error texts, stream failures). Runs without Python or Docker.

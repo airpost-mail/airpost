@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! DavWorker against a scripted server: the etag listings that cover servers without
 //! sync-collection, the sync-token paths' edge cases (Yahoo's empty answer, 507 paging, an
 //! empty multiget, the sync window, a deleted series master), calendar pruning and event

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The P1-I gate: the exchanges of `apps/engine/test/conformance/probes.py`, driven through
 //! [`ms_imap::Session`] against the fake server, Dovecot and Cyrus, plus a scripted
 //! CONDSTORE / QRESYNC / IDLE session and the fake's provider personalities.

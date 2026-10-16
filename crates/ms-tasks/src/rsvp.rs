@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! EventRSVPTask: an iTIP REPLY or COUNTER sent to the organizer as an iMIP message.
 //!
 //! Derived from Mailspring-Sync `MailSync/TaskProcessor.cpp` (`performRemoteSendRSVP`),

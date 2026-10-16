@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Golden tests: every `tests/golden/ics/*.ics` and `tests/golden/vcf/*.vcf` is read and
 //! the fields the engine stores are compared with the `.json` beside it. Run with
 //! `UPDATE_GOLDEN=1` to rewrite the expected files, then review the diff by hand.

@@ -1,9 +1,14 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! mailcore2's `SMTPSession` state machine: connect, log in, send, check the account, and
 //! map every failure to the `ErrorCode` the client and the send task key on.
 //!
 //! Derived from mailcore2's `MCSMTPSession.cpp` and libetpan's `mailsmtp.c`,
-//! `mailsmtp_helper.c` and `mailsmtp_oauth2.c`, Copyright © 2017 Foundry 376 and the
-//! mailcore2 / libetpan authors, GPL-3.0 / BSD. See NOTICE.md.
+//! `mailsmtp_helper.c` and `mailsmtp_oauth2.c`. mailcore2 is Copyright © 2001-2013 MailCore
+//! team and libetpan Copyright © 2001-2005 DINH Viet Hoa, both BSD-3-Clause;
+//! Mailspring-Sync's changes are Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md
+//! ("mailcore2", "libEtPan!").
 
 use std::sync::Arc;
 

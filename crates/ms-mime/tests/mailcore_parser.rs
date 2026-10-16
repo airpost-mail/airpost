@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The part tree against mailcore2's own parser unit-test expectations
 //! (`unittest/data/parser`, copied to `tests/corpus/mailcore/parser`): part types, unique
 //! IDs, MIME types, charsets, filenames, inline flags and Content-IDs.

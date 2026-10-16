@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! RFC 2047 header decoding for the values that feed message ids.
 //!
 //! This is deliberately our own small decoder rather than the MIME library's: ids must not

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Placement helpers, thread refcounting and the derived tables, each scenario checked
 //! against the invariants ported from `apps/engine/test/harness/invariants.py`. The flows
 //! mirror what MailProcessor and TaskProcessor do with the helpers (see "Message Identity

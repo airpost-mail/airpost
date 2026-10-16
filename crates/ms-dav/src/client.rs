@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The CalDAV/CardDAV client the workers (P5) drive. Derived from the protocol half of
 //! Mailspring-Sync `MailSync/DAVWorker.cpp` (`performXMLRequest`, `performVCardRequest`,
 //! `performICSRequest`, `getAuthorizationHeader`, the sync-collection and multiget loops,

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! stdout writes. The client parses stdout, and a write to a closed pipe must not panic
 //! (Rust ignores SIGPIPE, so `println!` would), so every write goes through here and
 //! errors are dropped.

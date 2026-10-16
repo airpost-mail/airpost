@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! `/ping`, server info, `/tern/v1/me`, sign-out and account removal (docs/backend-plan.md 3.4).

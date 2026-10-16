@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Event tasks: SyncbackEvent and DestroyEvent, written through CalDAV.
 //!
 //! Derived from Mailspring-Sync `MailSync/TaskProcessor.cpp` (`performLocalSyncbackEvent`

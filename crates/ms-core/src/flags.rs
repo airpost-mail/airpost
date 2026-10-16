@@ -1,5 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Message and folder flag sets with mailcore's bit values (`MCMessageConstants.h`), shared
 //! by the IMAP layer, provider role detection and the store.
+//!
+//! The values are mailcore2's, Copyright © 2001-2013 MailCore team, BSD-3-Clause. See
+//! NOTICE.md ("mailcore2").
 
 use bitflags::bitflags;
 

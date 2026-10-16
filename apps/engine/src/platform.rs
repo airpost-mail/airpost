@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The few things that differ by OS (plan section 11). Nothing outside this module uses
 //! Unix-only APIs.
 

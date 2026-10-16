@@ -2,6 +2,10 @@
 *
 !Cargo.toml
 !Cargo.lock
+!about.toml
+!about.hbs
+!LICENSE.md
+!NOTICE.md
 !crates/
 !apps/engine/
 !apps/backend/

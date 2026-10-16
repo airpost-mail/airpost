@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The hint shown to the user when a connection fails in TLS (`MailUtils::tlsFailureAdvice`).
 //!
 //! Derived from Mailspring-Sync (`MailSync/MailUtils.cpp`), Copyright © 2017 Foundry 376,

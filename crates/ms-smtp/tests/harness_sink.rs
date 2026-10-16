@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `SmtpClient` against the harness SMTP sink (`apps/engine/test/fakeimap/smtp.py`), the
 //! server the send scenarios run against. Needs `python3` on PATH.
 

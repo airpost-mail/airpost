@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Model hooks outside the placement layer: plugin metadata, search tables, contact groups,
 //! folder status, generic lookup and account reset.
 

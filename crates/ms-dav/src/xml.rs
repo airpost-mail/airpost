@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! WebDAV XML: an owned element tree, multistatus parsing (RFC 4918 §13) and text escaping.
 //! Derived from Mailspring-Sync `MailSync/DavXML.*` and the XPath queries in
 //! `MailSync/DAVWorker.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.

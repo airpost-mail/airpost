@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The `calContacts` thread: CalDAV, CardDAV and Google People on a fixed cadence
 //! (`runCalContactsSyncWorker`), and the one-off `calendar` thread for `sync-calendar`.
 //!

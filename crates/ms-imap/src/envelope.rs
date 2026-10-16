@@ -1,9 +1,14 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! ENVELOPE and fetched header sections to [`MessageHeader`].
 //!
 //! Derived from mailcore2's `MessageHeader::importIMAPEnvelope`, `importIMAPReferences`,
 //! `importIMFFields` (`MCMessageHeader.cpp`) and `Address::addressWithIMAPAddress`
-//! (`MCAddress.cpp`), Copyright © 2017 Foundry 376 / MailCore, GPL-3.0 / BSD, and libetpan's
-//! `mailimf_msg_id_parse` (`mailimf.c`, BSD). See NOTICE.md.
+//! (`MCAddress.cpp`), Copyright © 2001-2013 MailCore team, BSD-3-Clause, with
+//! Mailspring-Sync's changes, Copyright © 2017 Foundry 376, GPL-3.0, and libetpan's
+//! `mailimf_msg_id_parse` (`mailimf.c`), Copyright © 2001-2005 DINH Viet Hoa, BSD-3-Clause.
+//! See NOTICE.md ("mailcore2", "libEtPan!").
 //!
 //! The header-section parser here is deliberately small: it handles the fields the
 //! FullHeaders fallback asks for, not MIME (ms-mime owns that, and ms-imap cannot depend on

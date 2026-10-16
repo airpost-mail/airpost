@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The stdout delta stream. Derived from Mailspring-Sync `MailSync/DeltaStream.*`,
 //! Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md. The contract is in
 //! docs/engine-port-plan.md section 3, "stdout deltas".

@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Where the OAuth token endpoints and the People API live.
 //!
 //! The defaults are the providers' production URLs (`MakeOAuthRefreshRequest` and
-//! `GOOGLE_PEOPLE_ROOT` in the C++ engine). Each can be overridden from the environment so
-//! the harness can point the engine at a fake People API and token endpoint.
+//! `GOOGLE_PEOPLE_ROOT` in Mailspring-Sync, Copyright © 2017 Foundry 376, GPL-3.0; see
+//! NOTICE.md). Each can be overridden from the environment so the harness can point the
+//! engine at a fake People API and token endpoint.
 
 use ms_providers::OAuthProvider;
 

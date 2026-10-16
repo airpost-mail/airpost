@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The client against captured-format responses from each server family. The fixtures
 //! follow each server's documented and observed response shapes (sabre/dav for Baikal and
 //! Nextcloud, Radicale's xmlutils, iCloud's default-namespace style with CDATA bodies,

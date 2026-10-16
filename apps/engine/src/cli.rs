@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Command-line parsing. The C++ used optionparser; this accepts the same spellings
 //! (`--mode sync`, `--mode=sync`, `-m sync`) and ignores options it does not know, such as
-//! the client's `--info <email>`.
+//! the client's `--info <email>`. Derived from the option table in Mailspring-Sync
+//! `MailSync/main.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
 use std::path::PathBuf;
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! Passwords, device tokens and the `Authorization` header (docs/backend-plan.md 3.4, 5).

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! A scripted transport: routes answer by method, URL and an optional body fragment, and
 //! every request is recorded.
 

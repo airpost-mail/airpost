@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Message headers as both the IMAP layer (ENVELOPE) and the MIME layer (full message)
 //! produce them, so ids and models are built the same way from either source.
 

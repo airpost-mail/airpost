@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The [`ImapSession`] implementation.
 //!
 //! Derived from mailcore2's `IMAPSession` (`Vendor/mailcore2/src/core/imap/MCIMAPSession.cpp`:
@@ -5,8 +8,10 @@
 //! `fetchMessages`, `storeFlagsAndCustomFlags`, `storeLabels`, `copyMessages`,
 //! `moveMessages`, `appendMessage…`, `findUIDsOfRecentHeaderMessageID`, `idle`) and the
 //! libetpan commands it drives (`mailimap.c`, `mailimap_sender.c`, `qresync.c`,
-//! `condstore.c`, `uidplus.c`, `xgmlabels.c`, `mailimap_oauth2.c`), Copyright © 2017 Foundry
-//! 376, MailCore and the libetpan authors, GPL-3.0 / BSD. See NOTICE.md.
+//! `condstore.c`, `uidplus.c`, `xgmlabels.c`, `mailimap_oauth2.c`). mailcore2 is Copyright ©
+//! 2001-2013 MailCore team and libetpan Copyright © 2001-2005 DINH Viet Hoa, both
+//! BSD-3-Clause; Mailspring-Sync's changes to them are Copyright © 2017 Foundry 376, GPL-3.0.
+//! See NOTICE.md ("mailcore2", "libEtPan!").
 //!
 //! Errors follow mailcore: a stream failure is `Connection`, an unparseable tagged response
 //! is `Parse` (both drop the connection, so the next call reconnects), and a NO or BAD is

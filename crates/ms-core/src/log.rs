@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The engine log: a `tracing` subscriber that reproduces the C++ engine's spdlog output.
-//! Derived from `MailSync/SPDLogExtensions.hpp`, the logger setup in `main.cpp` and
-//! spdlog's `rotating_file_sink`.
+//! Derived from Mailspring-Sync `MailSync/SPDLogExtensions.hpp` and the logger setup in
+//! `main.cpp`, Copyright © 2017 Foundry 376, GPL-3.0 (see NOTICE.md), and spdlog's
+//! `rotating_file_sink`.
 //!
 //! - `sync` mode without `--orphan` writes `$CONFIG_DIR_PATH/mailsync-<accountId>.log`:
 //!   `<pid> [YYYY-mm-dd HH:MM:SS.mmm] [<thread>] [<level>] <message>`, local time. At

@@ -1,8 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The IMAP session.
 //!
-//! Derived from Mailspring-Sync's use of mailcore2's `IMAPSession` (`Vendor/mailcore2/src/
-//! core/imap/MCIMAPSession.cpp`) and `MailUtils::configureSessionForAccount`, Copyright ©
-//! 2017 Foundry 376, GPL-3.0. See NOTICE.md.
+//! Derived from mailcore2's `IMAPSession` (`Vendor/mailcore2/src/core/imap/
+//! MCIMAPSession.cpp`), Copyright © 2001-2013 MailCore team, BSD-3-Clause, the libetpan
+//! IMAP code it drives, Copyright © 2001-2005 DINH Viet Hoa, BSD-3-Clause, and
+//! Mailspring-Sync's use of them (`MailUtils::configureSessionForAccount`), Copyright © 2017
+//! Foundry 376, GPL-3.0. See NOTICE.md ("mailcore2", "libEtPan!").
 //!
 //! Workers and tasks depend on the [`ImapSession`] trait. Behind it the crate owns the whole
 //! protocol stack (transport, lenient parser, commands); the IMAP spike (plan section 10,

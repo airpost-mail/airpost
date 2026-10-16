@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The task runner seam. `TaskProcessor` lives in ms-tasks, which depends on this crate,
 //! so workers reach it through these traits and the bin passes ms-tasks' factory in.
 

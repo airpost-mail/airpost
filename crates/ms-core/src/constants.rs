@@ -1,6 +1,10 @@
-//! Engine-wide constants and tunables. Derived from `MailSync/constants.h`, the `#define`s at
-//! the top of `MailSync/SyncWorker.cpp`, and values scattered through `main.cpp`,
-//! `MailStore.cpp`, `TaskProcessor.cpp`, `DAVWorker.cpp` and `XOAuth2TokenManager.cpp`.
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! Engine-wide constants and tunables. Derived from Mailspring-Sync `MailSync/constants.h`,
+//! the `#define`s at the top of `MailSync/SyncWorker.cpp`, and values scattered through
+//! `main.cpp`, `MailStore.cpp`, `TaskProcessor.cpp`, `DAVWorker.cpp` and
+//! `XOAuth2TokenManager.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //! Durations are in seconds unless the name says otherwise.
 
 /// Folder `localStatus` keys. Starred ones drive the client's sync progress display.

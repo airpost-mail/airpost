@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The protocol side of calendar and contact sync; the CalDAV/CardDAV workers that drive
 //! it are in ms-sync (P5).
 //!
 //! Derived from Mailspring-Sync (`DAVWorker.cpp` protocol code, `DavXML.*`, `DAVUtils.*`,
-//! `VCard.*`, `Models/Event.cpp` ICS handling, `Vendor/icalendarlib`), Copyright © 2017
-//! Foundry 376, GPL-3.0. See NOTICE.md.
+//! `VCard.*`, `Models/Event.cpp` ICS handling), Copyright © 2017 Foundry 376, GPL-3.0, and
+//! iCalendarLib (`Vendor/icalendarlib`), Copyright © Juliusz Gonera, MIT. See NOTICE.md
+//! ("iCalendarLib").
 //!
 //! - [`DavClient`] makes the requests: discovery, listings, sync-collection, multiget,
 //!   writes. It is blocking (reqwest) and owned by the calContacts thread; it may be

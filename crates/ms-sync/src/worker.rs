@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `SyncWorker`: one IMAP connection and one store, and the folder-scan steps both mail
 //! threads share (range diff, CONDSTORE/QRESYNC changes, VANISHED, body fetches, the body
 //! cache). The background pass is in [`crate::background`], the IDLE cycle in

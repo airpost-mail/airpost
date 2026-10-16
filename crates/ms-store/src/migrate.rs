@@ -1,5 +1,9 @@
-//! `migrate` and `reset` modes (docs/engine-port-plan.md section 9; `MailStore::migrate`,
-//! `MailStore::resetForAccount`).
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! `migrate` and `reset` modes (docs/engine-port-plan.md section 9). Derived from
+//! Mailspring-Sync `MailStore::migrate` and `MailStore::resetForAccount`, Copyright © 2017
+//! Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! The Rust engine does not upgrade C++ databases. A database the C++ engine wrote is moved
 //! aside to `edgehill.legacy.db` (for `import-legacy`) and a fresh V12 database is created;

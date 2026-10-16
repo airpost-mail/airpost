@@ -1,5 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Gmail (`SyncWorker.cpp:961-964`, `MailProcessor.cpp:299-304`, `MCIMAPSession.cpp:1074-1103,
 //! 4500-4515`, `DAVWorker.cpp:445-460`), Copyright © 2017 Foundry 376, GPL-3.0.
+//! mailcore2 (`MC*.cpp`) is Copyright © 2001-2013 MailCore team, BSD-3-Clause. See NOTICE.md
+//! ("mailcore2").
 
 use crate::{ConnectionInfo, MailboxModelKind, OAuthProvider, Provider, ServerProfile};
 

@@ -1,4 +1,8 @@
-//! Typed reads of task JSON with nlohmann's failure behaviour.
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! Typed reads of task JSON with nlohmann's failure behaviour, as Mailspring-Sync's
+//! `TaskProcessor.cpp` saw it (Copyright © 2017 Foundry 376, GPL-3.0; see NOTICE.md).
 //!
 //! The C++ read task fields with `data["key"].get<T>()`, which throws `json::type_error` on
 //! a missing or mistyped field; `performLocal` / `performRemote` turned that into an

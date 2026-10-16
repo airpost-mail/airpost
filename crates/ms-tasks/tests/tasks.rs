@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! TaskProcessor against a migrated database and an in-memory IMAP server, every case
 //! checked with `ms_store::invariants::check`. TaskProcessor.cpp is the reference; the
 //! placement rules are in "Message Identity and Placements" in legacy/mailsync-cpp/CLAUDE.md.

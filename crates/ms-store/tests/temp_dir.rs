@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `Store::open` points SQLite's process-wide temp directory at the config dir, as
 //! `main.cpp` did before every mode. In its own test binary because the setting is global.
 

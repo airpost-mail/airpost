@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! One HTTP exchange, behind a trait so the protocol code runs against captured responses
 //! in tests. The real transport is reqwest's blocking client with ms-net's error mapping
 //! (libcurl's texts as keys), replacing the libcurl handles in Mailspring-Sync

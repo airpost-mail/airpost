@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The `metadataExpiration` thread: emits `metadata-expiration` deltas when snoozes,
 //! send-later and reminders come due. The client acts on the delta (unsnoozes, sends) and
 //! clears the metadata; until it does, every scan sends the model again.

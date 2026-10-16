@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The Google People API client side of `GoogleContactsWorker`. Derived from
 //! `MailSync/GoogleContactsWorker.cpp` (Copyright © 2017 Foundry 376, GPL-3.0).
 //!

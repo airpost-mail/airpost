@@ -18,7 +18,7 @@ engine. Desktop paths are relative to `apps/desktop/app/`.
 | D2 | Every Pro feature stays, with no sign-in requirement | Snooze, send-later and reminders must work with no backend at all. The backend adds multi-device sync, tracking and sharing; it never gates a feature. |
 | D3 | Metadata is local only; multi-device sync is out of scope; remote sync sits behind `MetadataBackend`; nothing calls `*.getmailspring.com` | **Changed.** Multi-device metadata sync is the core of this plan. `LocalOnly` stays the default when no server is configured. D3 and section 3 of the engine plan were updated in B1-E (O7). |
 | D10, D12 | One monorepo, one Cargo workspace; the backend reuses engine crates (ids, metadata models) | **Changed.** The backend reuses no engine crate: it has its own schema and never computes ids (3.1). It joined the root workspace in B1-E; D12 in the engine plan was updated then. |
-| D11 | Everything ships under GPL-3.0-only | The backend and the wire crate are written from scratch and are MIT (O6). The engine and desktop stay GPL-3.0-only. |
+| D11 | Everything ships under GPL-3.0-only | Holds for the backend and the wire crate too (O6, changed 2026-10-16). They are written from scratch, so they could move to MIT later by a deliberate decision. |
 | — | Mailspring ID removed from the desktop (4120f4351, 27f713bf6): no identity store, no sign-in, engines get a `null` identity line | **Changed (2026-10-16).** No Mailspring ID compatibility layer. Tern-native login and a Tern server object on the engine's identity line (3.4, 4.1). Only the metadata protocol stays Mailspring-compatible, for the C++ oracle. |
 
 ## 1. Scope
@@ -72,7 +72,7 @@ covers send-later. Sharing and asset hosting follow in B2.
 | O3 | Auth and identity | **Decided (2026-10-16).** Multi-user data model; single-admin by default. Users are created with `tern-backend user add`; open signup is a config switch, off by default. The user enters a server URL in Tern; the desktop opens the server's login page in its own window, and the result page returns one revocable token per device in its body (3.4). The token lives in the keyset; the engine gets it in the Tern server object on stdin (4.1). | Reuses B0's form, rate limits and token minting. The token never appears in a URL, a redirect or a log. A device-code flow needs a new table, polling and a code page; it is the later path for a CLI and fits the same tokens. |
 | O4 | Storage | SQLite (rusqlite `bundled`, WAL) in v1, behind a `Repo` trait. Postgres only if someone runs a large shared instance. | One file to back up, same crate the engine uses. sqlx's SQLite driver would pull a second `libsqlite3-sys` and collide with rusqlite on `links = "sqlite3"`; a later Postgres backend should use `tokio-postgres`. |
 | O5 | Deployment | One binary, `tern-backend serve`, plain HTTP on `127.0.0.1:5101` behind a TLS reverse proxy (Caddy or similar), plus a Docker image with `/data` as the only volume and `TERN_BIND=0.0.0.0:5101`. | No TLS stack to configure in-process, and no chance of pulling aws-lc-rs. |
-| O6 | Licence | **Decided (2026-10-15): MIT** for `apps/backend` and `crates/ms-wire`. No dependency on GPL-derived crates; permissive deps only. No `/tern/v1/source` endpoint. | The user wants new code permissive. The backend is a separate program over HTTP and reimplements an interface, so it is not a derivative of the GPL code. |
+| O6 | Licence | **Decided (2026-10-16): GPL-3.0-only** for `apps/backend` and `crates/ms-wire`, like the rest of the repo; this replaces the MIT decision of 2026-10-15. Dependencies must be GPL-3.0-compatible. The backend still depends on no engine crate (3.1). No `/tern/v1/source` endpoint: GPLv3 has no network-use clause. | The user chose one licence for the whole repo until a part is deliberately moved. Both crates are written from scratch and depend on no engine crate, so a later move to MIT stays possible while all their code is ours. |
 | O7 | Engine switch for the HTTP backend | **Decided (2026-10-16).** Rust: the HTTP backend when the identity line is a valid Tern server object (4.1); `null` or anything else stays `LocalOnly`. `IDENTITY_SERVER` is not read. Desktop: the server object only when the engine is `rust`; C++ always gets `null`. C++ stays a test oracle, driven by the harness with a Mailspring-shaped identity. | C++ `abort()`s on a revoked token, and the crash handler then marks the mail account `SYNC_STATE_AUTH_FAILED`; it also keeps the head-before-pages bug (7) and has none of the Tern additions. The harness keeps `--identity null` by default, so existing scenarios stay local. This changes plan section 3 ("accepted and ignored"); update it when B1-E lands. |
 | O8 | Public URL for tracking and shares | One `public_url` in server config, returned as `publicURL` by `GET /tern/v1/server` and `/tern/v1/me` (3.4). The client uses it for pixels, redirects and share links, falling back to the server URL. | Tracking and shares only work if recipients can reach the host; the API host may sit on a private network. |
 
@@ -82,8 +82,8 @@ covers send-later. Sharing and asset hosting follow in B2.
 
 | Crate | Role | Depends on |
 |---|---|---|
-| `apps/backend` (`tern-backend`, licence per O6) | Bin + lib: HTTP server, repo, auth, tracking, sharing, CLI. A member of the root workspace since B1-E. `tern_backend::wire` re-exports `ms_wire`. | `ms-wire`; no engine crate, not even as a dev-dependency |
-| `crates/ms-wire` (MIT) | Serde types for the wire protocol: metadata record, push body, stream line (`metadata` / `backend-event`), head response, backfill and claim bodies, the login result, `/tern/v1/server` and `/tern/v1/me` bodies and the engine's Tern server object with its URL check (3.4, 4.1), the constants (heartbeat 5 s × 16 bytes, page size 500, low-speed 30 s, `v` max `u32::MAX`). | serde, serde_json |
+| `apps/backend` (`tern-backend`, GPL-3.0-only per O6) | Bin + lib: HTTP server, repo, auth, tracking, sharing, CLI. A member of the root workspace since B1-E. `tern_backend::wire` re-exports `ms_wire`. | `ms-wire`; no engine crate, not even as a dev-dependency |
+| `crates/ms-wire` (GPL-3.0-only per O6) | Serde types for the wire protocol: metadata record, push body, stream line (`metadata` / `backend-event`), head response, backfill and claim bodies, the login result, `/tern/v1/server` and `/tern/v1/me` bodies and the engine's Tern server object with its URL check (3.4, 4.1), the constants (heartbeat 5 s × 16 bytes, page size 500, low-speed 30 s, `v` max `u32::MAX`). | serde, serde_json |
 | `ms-net` | `HttpMetadataBackend` and its `Outbox` (4.1) on `ms-wire`. | |
 
 The backend does not compute message ids and has its own schema, so it depends on neither
@@ -96,10 +96,11 @@ runs; B1-E joined it to the root (`members = ["apps/engine", "apps/backend", "cr
 `Cargo.lock`, shared versions through `workspace = true`). Licence checks: the root `deny.toml`
 covers the whole workspace with the GPL policy; `cargo deny --manifest-path
 apps/backend/Cargo.toml check` checks tern-backend's normal dependencies alone against
-`apps/backend/deny.toml` (permissive only, no TLS stack or HTTP client, no `ms-*` crate). The
-Docker image builds from the repo root (`docker build -f apps/backend/Dockerfile .`).
+`apps/backend/deny.toml` (the same GPLv3-compatible licences, no TLS stack or HTTP client, no
+engine crate). The Docker image builds from the repo root (`docker build -f
+apps/backend/Dockerfile .`).
 
-Backend dependencies (all MIT or MIT/Apache; confirm current versions and run `cargo deny` in
+Backend dependencies (all permissive; confirm current versions and run `cargo deny` in
 B0, as plan 4.5 did):
 
 | Concern | Crate |
@@ -736,7 +737,8 @@ CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspri
 
 - **B0 (done).** Crate, config, schema, repo, users, tokens and CLI, auth, CORS, `/ping`,
   `/api/me`, `/onboarding`, stubs, account removal, Dockerfile, `docs/self-hosting.md`. MIT
-  headers applied (O6). `/api/me`, `/onboarding` and the stubs are now dead (3.4).
+  headers applied (O6; relicensed GPL-3.0-only on 2026-10-16). `/api/me`, `/onboarding` and
+  the stubs are now dead (3.4).
 - **B1-M (done).** Push, backfill, head, pages, stream, fan-out, claims, with the integration
   tests from 6.1.
 - **Review fixes (2026-10-15).** Stream wake-ups and account-removal closes run inside the
@@ -748,7 +750,7 @@ CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspri
   invalid records and returns them in `rejected`. Login limits use the forwarded client IP from
   trusted proxies, check the IP first, key IPv6 per /64, cap emails at 254 bytes and bound
   concurrent argon2. The data dir is 0700 and the database and backups 0600.
-- **B1-E (2026-10-16, uncommitted).** `crates/ms-wire` (MIT) holds the wire types, with
+- **B1-E (2026-10-16, uncommitted).** `crates/ms-wire` holds the wire types, with
   `TernServer`, `LoginResult`, `ServerInfo` and `Me`; `apps/backend` is in the root workspace.
   Backend: `/tern/v1/server`, `/tern/v1/login`, `/tern/v1/me`, `DELETE /tern/v1/tokens/current`;
   `/onboarding`, `/api/me`, `/api/feature_usage_event`, the stubs, `wire::Identity` and

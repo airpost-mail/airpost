@@ -1,8 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The SASL client mechanisms SMTP AUTH uses, replacing cyrus-sasl.
 //!
 //! Derived from libetpan's `mailesmtp_auth_sasl` (`mailsmtp.c`) and `mailsmtp_oauth2.c`, as
-//! driven by mailcore2's `SMTPSession::login` (`MCSMTPSession.cpp`), Copyright © 2017
-//! Foundry 376 and the libetpan / mailcore2 authors, GPL-3.0 / BSD. See NOTICE.md.
+//! driven by mailcore2's `SMTPSession::login` (`MCSMTPSession.cpp`). libetpan is Copyright ©
+//! 2001-2005 DINH Viet Hoa and mailcore2 Copyright © 2001-2013 MailCore team, both
+//! BSD-3-Clause; Mailspring-Sync's changes are Copyright © 2017 Foundry 376, GPL-3.0. See
+//! NOTICE.md ("mailcore2", "libEtPan!").
 //!
 //! The mechanisms behave like cyrus-sasl's clients: PLAIN sends no authzid when it equals
 //! the authcid, LOGIN answers its two challenges in order without reading their text, and

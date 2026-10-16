@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `--mode install-check`: can this machine reach the network over TLS (plan section 2).
 //!
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`: `runInstallCheck`), Copyright © 2017

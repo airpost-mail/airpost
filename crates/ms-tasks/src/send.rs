@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! SendDraftTask, and the removal of the server's own Sent copies.
 //!
 //! Derived from Mailspring-Sync `MailSync/TaskProcessor.cpp` (`performRemoteSendDraft`,

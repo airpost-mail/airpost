@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! The engine's `HttpMetadataBackend` (ms-net) against a real server (docs/backend-plan.md
 //! 6.1, B1-E): push, stream from `0`, the outbox across a server restart, backfill, the
 //! binding after a server id rotation, the thread anchor echo and 401 dormancy.
 //!
-//! It lives in ms-net so the MIT server crate has no GPL dependency, even a dev one. The
+//! It lives in ms-net so the server crate depends on no engine crate, even as a dev one. The
 //! blocking reqwest client must not run inside a tokio runtime, so each server runs on its
 //! own thread with its own runtime.
 

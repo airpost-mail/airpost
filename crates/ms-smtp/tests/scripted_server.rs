@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `SmtpClient` against a small in-test SMTP server, for what the harness sink does not
 //! cover: TLS and STARTTLS, CRAM-MD5 and DIGEST-MD5 with the RFC 2195 / RFC 2831 vectors,
 //! both XOAUTH2 variants, and the reply-to-error mapping of `internalSendMessage`.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `--mode import-legacy` (docs/engine-port-plan.md section 9): imports what only the C++
 //! engine's database held from the `edgehill.legacy.db` that `migrate` moved aside. The
 //! work is `ms_store::legacy_import`; this is the one-shot wrapper.

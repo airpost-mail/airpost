@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! DAV server quirks as named flags, the DAV counterpart of `ms_providers::ServerProfile`.
 //! Taken from the comments in Mailspring-Sync `MailSync/DAVWorker.cpp` (lines 196-214,
 //! 446, 650, 835, 1020-1023, 1360, 1782-1801, 1968, 2112, 2335; Copyright © 2017 Foundry

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `mailsync`: one process per account, plus one-shot modes (docs/engine-port-plan.md
 //! section 3).
 //!

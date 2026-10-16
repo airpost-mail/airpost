@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Thread search and thread references: the `ThreadSearch` FTS row and the
 //! `ThreadReference` rows that find a thread by Message-ID or References. Derived from
 //! Mailspring-Sync `MailSync/MailProcessor.cpp` (`appendToThreadSearchContent`,

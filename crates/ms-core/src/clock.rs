@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Wall-clock time behind a trait, so tests can drive `_sa` holds, orphan sweeps and scan
 //! intervals without sleeping.
 

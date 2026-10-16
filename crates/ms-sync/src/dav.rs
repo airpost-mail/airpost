@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! CalDAV and CardDAV sync and writes for one account (`DAVWorker`): discovery, the
 //! calendar and address book passes of the calContacts thread, and the event and contact
 //! writes of the task remote phases.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `import-legacy` against C++-shaped databases: V12 (with placements) and pre-V10 (a single
 //! `remoteFolderId` / `remoteUID` per message), through `migrate` as the client runs them.
 

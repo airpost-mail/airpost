@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `MailProcessor` against a migrated database, every case checked with
 //! `ms_store::invariants::check`. The races use a second connection that holds the write
 //! lock while the first reads, as the other worker does (see "Message Identity and

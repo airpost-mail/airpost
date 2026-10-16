@@ -1,5 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! home.pl's IdeaImapServer (`MCIMAPSession.cpp:4502-4504`, `SyncWorker.cpp:447-460`),
 //! Copyright © 2017 Foundry 376, GPL-3.0.
+//! mailcore2 (`MC*.cpp`) is Copyright © 2001-2013 MailCore team, BSD-3-Clause. See NOTICE.md
+//! ("mailcore2").
 
 use super::greeting_has;
 use crate::{ConnectionInfo, Provider, ServerProfile};

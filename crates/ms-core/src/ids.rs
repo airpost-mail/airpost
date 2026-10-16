@@ -1,5 +1,9 @@
-//! Model ids. Derived from `MailUtils.cpp:524-611` and `Thread.cpp:23`; see
-//! docs/engine-port-plan.md section 5 for the message id.
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! Model ids. Derived from Mailspring-Sync `MailUtils.cpp:524-611` and `Thread.cpp:23`,
+//! Copyright © 2017 Foundry 376, GPL-3.0 (see NOTICE.md); docs/engine-port-plan.md section 5
+//! has the message id.
 //!
 //! Every hashed id is `base58(sha256(src)[0..30])` in the Bitcoin alphabet. The client
 //! never parses ids, but they must be deterministic: a message keeps its id across moves,

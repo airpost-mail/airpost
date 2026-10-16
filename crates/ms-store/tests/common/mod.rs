@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Shared fixtures: a migrated database in a temp dir, a store whose delta stream writes
 //! into a buffer, and folder / message builders shaped like what the sync worker writes.
 

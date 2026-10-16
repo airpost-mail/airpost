@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Message placements: one `MessageFolder` row per copy of a message on the server, and the
 //! store helpers that are the only writers of those rows. Derived from Mailspring-Sync
 //! `MailSync/Placement.*` and the placement section of `MailSync/MailStore.*`, Copyright ©

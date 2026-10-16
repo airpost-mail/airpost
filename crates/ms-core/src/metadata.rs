@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Plugin metadata (snooze, send-later, reminders, open/link tracking) as it moves between
 //! models, the `DetatchedPluginMetadata` table and a [`MetadataBackend`]
-//! (`ms_net::metadata`). Derived from `struct Metadata` in `MailSync/MailStore.hpp`.
+//! (`ms_net::metadata`). Derived from `struct Metadata` in Mailspring-Sync
+//! `MailSync/MailStore.hpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
 use serde_json::Value;
 

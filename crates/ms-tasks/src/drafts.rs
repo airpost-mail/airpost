@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! SyncbackDraftTask (local only) and DestroyDraftTask.
 //!
 //! Derived from Mailspring-Sync `MailSync/TaskProcessor.cpp` (`inflateClientDraftJSON`,

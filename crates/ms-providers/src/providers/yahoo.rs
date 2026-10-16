@@ -1,5 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Yahoo and AOL (`TaskProcessor.cpp:129-216`, `SyncWorker.cpp:1212-1224, 1294-1298`,
 //! `MCIMAPSession.cpp:857, 3705`), Copyright © 2017 Foundry 376, GPL-3.0.
+//! mailcore2 (`MC*.cpp`) is Copyright © 2001-2013 MailCore team, BSD-3-Clause. See NOTICE.md
+//! ("mailcore2").
 
 use super::{greeting_has, host_is};
 use crate::{ConnectionInfo, Provider, ServerProfile};

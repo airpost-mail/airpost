@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The SMTP side of SendDraftTask and EventRSVPTask.
 //!
 //! Derived from Mailspring-Sync `MailUtils::configureSessionForAccount(SMTPSession &)`,

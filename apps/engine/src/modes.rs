@@ -1,5 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Mode dispatch, in `main.cpp`'s order: `migrate` and `install-check` before the account
 //! is read, `reset` before the identity, then logging setup, then `test` or `sync`.
+//!
+//! Derived from Mailspring-Sync `MailSync/main.cpp`, Copyright © 2017 Foundry 376, GPL-3.0.
+//! See NOTICE.md.
 
 mod import_legacy;
 mod install_check;

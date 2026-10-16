@@ -1,6 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Process-wide sleep/wake signals: the worker sleep condvar (`MailUtils::sleepWorkerUntil
 //! WakeOrSec` / `wakeAllWorkers`) and the metadata expiration workers' wake handles
 //! (`MetadataExpirationWorkerForAccountId`, `WakeAllMetadataExpirationWorkers`).
+//!
+//! Derived from Mailspring-Sync `MailSync/MailUtils.cpp` and
+//! `MailSync/MetadataExpirationWorker.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See
+//! NOTICE.md.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};

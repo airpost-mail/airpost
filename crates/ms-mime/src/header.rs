@@ -1,12 +1,17 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Header blocks: splitting, decoding (RFC 2047 and raw 8-bit text) and the
 //! [`MessageHeader`] of a full message.
 //!
 //! Derived from mailcore2 `MessageHeader::importIMFFields` and
-//! `String::stringByDecodingMIMEHeaderValue` (Copyright © the mailcore2 authors, BSD) and
-//! libetpan's `mailimf_fields_parse`. Structured fields (addresses, message ids, MIME
-//! parameters with RFC 2231 continuations) are parsed by `mail-parser`; this module feeds it
-//! a UTF-8 copy of the block so raw 8-bit names come out right, and does the unstructured
-//! decoding itself.
+//! `String::stringByDecodingMIMEHeaderValue` (Copyright © 2001-2013 MailCore team,
+//! BSD-3-Clause) and libetpan's `mailimf_fields_parse` (Copyright © 2001-2005 DINH Viet Hoa,
+//! BSD-3-Clause). See NOTICE.md ("mailcore2", "libEtPan!").
+//!
+//! Structured fields (addresses, message ids, MIME parameters with RFC 2231 continuations)
+//! are parsed by `mail-parser`; this module feeds it a UTF-8 copy of the block so raw 8-bit
+//! names come out right, and does the unstructured decoding itself.
 
 use std::borrow::Cow;
 

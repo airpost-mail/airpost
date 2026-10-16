@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
 //! `/tern/v1/login`: the login page the desktop opens in its own window (docs/backend-plan.md

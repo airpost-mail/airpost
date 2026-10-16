@@ -1,9 +1,16 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Log lines that something outside the engine matches on.
 //!
 //! The harness (`apps/engine/test`) waits for and counts these with regexes, and the client
 //! reads a few. Each function names the scenario or harness code that depends on it; change
 //! the wording only together with that consumer. `tests/logmsg.rs` checks every function
 //! against the regexes copied from those files.
+//!
+//! Most of the wording is the C++ engine's (Mailspring-Sync `SyncWorker.cpp`,
+//! `MailProcessor.cpp`, `TaskProcessor.cpp`, `main.cpp`), Copyright © 2017 Foundry 376,
+//! GPL-3.0. See NOTICE.md.
 //!
 //! Formatting follows the C++ engine: `{}` of a bool prints `true` / `false`, paths are
 //! printed as stored (modified UTF-7), and sub-steps are prefixed `"- "`, `"-- "` or `"-X "`

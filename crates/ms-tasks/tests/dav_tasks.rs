@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The CardDAV and CalDAV task phases against a scripted server: a new group card across
 //! a sync that lands before its remote phase, and what a refused remote phase leaves
 //! behind for DestroyContact, DestroyContactGroup and SyncbackEvent. TaskProcessor.cpp and

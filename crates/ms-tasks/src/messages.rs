@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The message tasks: ChangeUnread, ChangeStarred, ChangeFolder (and its undo) and
 //! ChangeLabels.
 //!

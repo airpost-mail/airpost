@@ -1,8 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The EHLO/HELO argument.
 //!
 //! Derived from libetpan's `get_hostname_smart_bg`, `hostname_is_valid_fqdn` and
-//! `get_address_literal` (`mailsmtp.c`), Mailspring's patches to libetpan, Copyright © 2017
-//! Foundry 376 and the libetpan authors, GPL-3.0 / BSD. See NOTICE.md.
+//! `get_address_literal` (`mailsmtp.c`), Mailspring's patches to libetpan. libetpan is
+//! Copyright © 2001-2005 DINH Viet Hoa, BSD-3-Clause; the patches are Copyright © 2017
+//! Foundry 376, GPL-3.0. See NOTICE.md ("libEtPan!").
 //!
 //! RFC 5321 §4.1.1.1 wants a fully qualified domain name or an address literal, and Postfix
 //! (`reject_non_fqdn_helo_hostname`), Exim and Office 365 enforce it. `gethostname()` often

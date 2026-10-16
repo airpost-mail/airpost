@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Plugin metadata sync with a remote backend (plan 4.3). Derived from
 //! `MailSync/MetadataWorker.cpp` and the identity-server calls in `MailSync/TaskProcessor.cpp`
 //! (Copyright © 2017 Foundry 376, GPL-3.0).

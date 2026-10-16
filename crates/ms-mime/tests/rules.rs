@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The rendering and file rules of plan section 6 "Bodies", asserted directly on the golden
 //! corpus inputs so that re-blessing the expectations cannot quietly accept a regression.
 

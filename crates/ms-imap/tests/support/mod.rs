@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Starts a harness IMAP server (`serve.py`) for the integration tests and the spike.
 //!
 //! The fake server needs only Python 3; Dovecot and Cyrus need Docker. `MS_IMAP_SERVERS`

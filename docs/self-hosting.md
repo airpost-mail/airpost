@@ -101,3 +101,10 @@ when the connection is from a `trusted_proxies` address (Caddy sets the header b
 nginx needs the line above). If the proxy is not trusted, every login shares the proxy's
 budget. Only trust addresses that are really your proxy: anyone else connecting from them
 could pick their own rate-limit key.
+
+## Licence
+
+`tern-backend` is GPL-3.0-only (`apps/backend/LICENSE`). Running it, for yourself or for other
+people over the network, puts no obligation on you. If you pass the binary or an image to
+someone else, give them the licence, the third-party notices and the corresponding source
+(GPLv3 section 6), for example a link to the tagged source next to the download.

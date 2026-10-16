@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! JSON-over-HTTP requests with the engine's error mapping. Derived from
 //! `MailSync/NetworkRequestUtils.cpp` (Copyright © 2017 Foundry 376, GPL-3.0).
 //!

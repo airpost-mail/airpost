@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! Contact and contact-group tasks: SyncbackContact, DestroyContact, SyncbackContactGroup,
 //! DestroyContactGroup and ChangeContactGroupMembership.
 //!

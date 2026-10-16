@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! The contact and contact-group tasks of a Gmail account against a canned People API:
 //! each local phase, then the remote phase's request and what it writes back. The
 //! reference is TaskProcessor.cpp (`performLocalDestroyContact` …

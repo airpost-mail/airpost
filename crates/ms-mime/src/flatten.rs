@@ -1,13 +1,17 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! HTML to plain text for snippets, search text and the text alternative of outgoing mail.
 //!
 //! A port of mailcore2's `String::flattenHTMLAndShowBlockquoteAndLink` (`MCString.cpp`,
-//! Copyright © the mailcore2 authors, BSD), which ran libxml2's SAX HTML parser over a
-//! tidied copy of the document. Here html5ever's tokenizer produces the events, and a small
-//! open-element stack stands in for libxml2's implied and auto-closed elements (`<html>`
-//! around everything, `<p>` closed by the next block, end tags that would close a
-//! higher-priority element ignored), so the SAX callbacks below see the nesting they expect.
-//! The callbacks themselves follow mailcore line for line. Output drifts from the C++
-//! engine where tidy would have repaired the markup differently (plan section 2).
+//! Copyright © 2001-2013 MailCore team, BSD-3-Clause; see NOTICE.md, "mailcore2"), which
+//! ran libxml2's SAX HTML parser over a tidied copy of the document. Here html5ever's
+//! tokenizer produces the events, and a small open-element stack stands in for libxml2's
+//! implied and auto-closed elements (`<html>` around everything, `<p>` closed by the next
+//! block, end tags that would close a higher-priority element ignored), so the SAX
+//! callbacks below see the nesting they expect. The callbacks themselves follow mailcore
+//! line for line. Output drifts from the C++ engine where tidy would have repaired the
+//! markup differently (plan section 2).
 
 use std::cell::RefCell;
 

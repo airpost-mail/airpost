@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
 //! `Contact`, `ContactGroup` and `ContactBook`. Derived from Mailspring-Sync
 //! `MailSync/Models/Contact.*`, `ContactGroup.*` and `ContactBook.*`, Copyright © 2017
 //! Foundry 376, GPL-3.0. See NOTICE.md.

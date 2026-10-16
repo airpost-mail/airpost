@@ -1,8 +1,9 @@
 # The backend's own check, on tern-backend's graph only (docs/backend-plan.md 3.1):
 #   cargo deny --manifest-path apps/backend/Cargo.toml check
 # (cargo-deny picks this file, the nearest to the manifest.)
-# The root deny.toml covers the whole workspace with the GPL policy; this one adds what an MIT
-# program needs: permissive licences only, and none of the GPL ms-* crates.
+# tern-backend is GPL-3.0-only like the rest of the workspace, so the licence list is the root
+# one: GPLv3-compatible only. What this file adds is architectural: the server shares only
+# ms-wire with the engine and never depends on an engine crate (backend-plan 3.1).
 
 [graph]
 all-features = false
@@ -29,8 +30,8 @@ allow = [
 unused-allowed-license = "allow"
 
 [licenses.private]
-# tern-backend and ms-wire are MIT (backend-plan O6) and unpublished. The GPL workspace crates
-# are also private, so the bans below keep them out.
+# The workspace's own crates are GPL-3.0-only and unpublished. The engine crates are also
+# private, so the bans below keep them out.
 ignore = true
 
 [bans]
@@ -45,7 +46,7 @@ deny = [
     { crate = "native-tls" },
     { crate = "rustls" },
     { crate = "reqwest" },
-    # GPL-3.0-only workspace crates (Mailspring-derived).
+    # The engine and its crates.
     { crate = "mailsync" },
     { crate = "ms-core" },
     { crate = "ms-store" },

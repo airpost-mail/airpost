@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! What an IMAP session takes and returns: configuration, capabilities, folders, fetched
+//! messages, sync results and the IDLE interrupt.
+//!
+//! Shaped after mailcore2's IMAP types (`MCIMAPSession.h`, `MCIMAPFolder`,
+//! `MCIMAPFolderStatus`, `MCIMAPNamespace`, `MCIMAPMessage`, `MCIMAPSyncResult`), Copyright ©
+//! 2001-2013 MailCore team, BSD-3-Clause, and Mailspring-Sync's
+//! `MailUtils::configureSessionForAccount` and `messagesRequestKindFor`, Copyright © 2017
+//! Foundry 376, GPL-3.0. See NOTICE.md ("mailcore2").
+
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
