@@ -3,7 +3,6 @@ import {
   MailspringAPIRequest,
   APIError,
   localized,
-  FeatureUsageStore,
   Message,
   DraftEditingSession,
 } from 'mailspring-exports';
@@ -20,10 +19,11 @@ type MetadataComposerToggleButtonProps = {
   errorMessage: (...args: any[]) => any;
   draft: Message;
   session: DraftEditingSession;
+  /** When set, the feature can't be turned on (eg. its server is missing) and this is the tooltip. */
+  unavailableReason?: string;
 };
 type MetadataComposerToggleButtonState = {
   pending: boolean;
-  onByDefaultButUsedUp: boolean;
 };
 
 export default class MetadataComposerToggleButton extends React.Component<
@@ -34,20 +34,11 @@ export default class MetadataComposerToggleButton extends React.Component<
 
   constructor(props) {
     super(props);
-
-    const wantsDefault = this._isEnabledByDefault() && !this._isEnabled();
-    this.state = {
-      pending: false,
-      onByDefaultButUsedUp: wantsDefault && !FeatureUsageStore.isUsable(props.pluginId),
-    };
+    this.state = { pending: false };
   }
 
   componentDidMount() {
-    if (
-      this._isEnabledByDefault() &&
-      !this._isEnabled() &&
-      FeatureUsageStore.isUsable(this.props.pluginId)
-    ) {
+    if (!this.props.unavailableReason && this._isEnabledByDefault() && !this._isEnabled()) {
       this._setEnabled(true);
     }
   }
@@ -94,42 +85,21 @@ export default class MetadataComposerToggleButton extends React.Component<
     this.setState({ pending: false });
   }
 
-  _onClick = async (e) => {
-    const { pluginId } = this.props;
-    let nextEnabled = !this._isEnabled();
+  _onClick = () => {
     if (this.state.pending) {
       return;
     }
-
-    const simulateUsedUp = e.shiftKey && e.altKey;
-
-    // note: we don't actually increment the usage counters until you /send/
-    // the message with link and open tracking, we just display the notice
-
-    if (nextEnabled && (!FeatureUsageStore.isUsable(pluginId) || simulateUsedUp)) {
-      try {
-        await FeatureUsageStore.displayUpgradeModal(pluginId, {
-          headerText: localized(`All used up!`),
-          rechargeText: `${localized(
-            `You can get open and click notifications for %1$@ emails each %2$@ with Mailspring Basic.`
-          )} ${localized('Upgrade to Pro today!')}`,
-          iconUrl: `mailspring://${pluginId}/assets/ic-modal-image@2x.png`,
-        });
-      } catch (err) {
-        // user does not have access to this feature
-        if (this.state.onByDefaultButUsedUp) {
-          this.setState({ onByDefaultButUsedUp: false });
-        }
-        nextEnabled = false;
-      }
+    const nextEnabled = !this._isEnabled();
+    if (nextEnabled && this.props.unavailableReason) {
+      return;
     }
-
     AppEnv.config.set(this._configKey(), nextEnabled);
     this._setEnabled(nextEnabled);
   };
 
   render() {
     const enabled = this._isEnabled();
+    const unavailable = !enabled && !!this.props.unavailableReason;
 
     const className = classnames({
       btn: true,
@@ -145,23 +115,19 @@ export default class MetadataComposerToggleButton extends React.Component<
       attrs.name = this.props.iconName;
     }
 
+    const title = unavailable
+      ? this.props.unavailableReason
+      : `${enabled ? localized('Disable') : localized('Enable')} ${this.props.pluginName}`;
+
     return (
       <button
         className={className}
         onClick={this._onClick}
-        title={`${enabled ? localized('Disable') : localized('Enable')} ${this.props.pluginName}`}
-        aria-label={`${enabled ? localized('Disable') : localized('Enable')} ${this.props.pluginName}`}
+        disabled={unavailable}
+        title={title}
+        aria-label={title}
         tabIndex={-1}
       >
-        {this.state.onByDefaultButUsedUp ? (
-          <div style={{ position: 'absolute', zIndex: 2, transform: 'translate(14px, -4px)' }}>
-            <RetinaImg
-              name="tiny-warning-sign.png"
-              mode={RetinaImg.Mode.ContentPreserve}
-              aria-hidden="true"
-            />
-          </div>
-        ) : null}
         <RetinaImg {...attrs} mode={RetinaImg.Mode.ContentIsMask} aria-hidden="true" />
       </button>
     );

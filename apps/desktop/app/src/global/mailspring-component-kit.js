@@ -68,8 +68,6 @@ lazyLoad('FixedPopover', 'fixed-popover');
 lazyLoad('DatePickerPopover', 'date-picker-popover');
 lazyLoad('Modal', 'modal');
 lazyLoad('Webview', 'webview');
-lazyLoad('FeatureUsedUpModal', 'feature-used-up-modal');
-lazyLoad('OpenIdentityPageButton', 'open-identity-page-button');
 lazyLoad('Flexbox', 'flexbox');
 lazyLoad('RetinaImg', 'retina-img');
 lazyLoad('NavRailItem', 'nav-rail');

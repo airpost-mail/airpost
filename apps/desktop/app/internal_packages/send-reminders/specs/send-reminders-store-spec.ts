@@ -23,8 +23,7 @@ async function dispatch(thread: Thread, type = 'persist') {
     objectClass: Thread.name,
     objects: [thread],
   });
-  // updateReminderMetadata queues its task after an awaited feature-usage check;
-  // timers are frozen in specs, so drain microtasks instead of using setTimeout.
+  // Timers are frozen in specs, so drain microtasks instead of using setTimeout.
   for (let i = 0; i < 5; i++) await Promise.resolve();
 }
 

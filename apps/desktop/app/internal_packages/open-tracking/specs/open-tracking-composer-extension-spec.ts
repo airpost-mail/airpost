@@ -1,4 +1,4 @@
-import { Message } from 'mailspring-exports';
+import { Message, IdentityStore } from 'mailspring-exports';
 import OpenTrackingComposerExtension, {
   encodeOpenTrackingToken,
 } from '../lib/open-tracking-composer-extension';
@@ -58,5 +58,30 @@ xdescribe('Open tracking composer extension', function openTrackingComposerExten
         expect(actualAfterBody).toEqual(afterBody);
       });
     });
+  });
+});
+
+describe('Open tracking composer extension without a tracking server', () => {
+  let draft: Message;
+  let root: HTMLElement;
+
+  beforeEach(() => {
+    draft = new Message({ accountId, body: beforeBody, headerMessageId: clientId });
+    draft.directlyAttachMetadata(PLUGIN_ID, { open_count: 0 });
+    root = nodeForHTML(beforeBody);
+  });
+
+  it('leaves the body alone and needs no per-recipient bodies when signed out', () => {
+    spyOn(IdentityStore, 'identity').andReturn(null);
+    OpenTrackingComposerExtension.applyTransformsForSending({ draftBodyRootNode: root, draft });
+    expect(root.innerHTML).toEqual(beforeBody);
+    expect(OpenTrackingComposerExtension.needsPerRecipientBodies(draft)).toBe(false);
+  });
+
+  it('inserts the pixel when an identity is present', () => {
+    spyOn(IdentityStore, 'identity').andReturn({ id: 'x' } as any);
+    OpenTrackingComposerExtension.applyTransformsForSending({ draftBodyRootNode: root, draft });
+    expect(root.innerHTML).toContain(`${PLUGIN_URL}/o/`);
+    expect(OpenTrackingComposerExtension.needsPerRecipientBodies(draft)).toBe(true);
   });
 });

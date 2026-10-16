@@ -3,6 +3,10 @@ import * as Attributes from '../attributes';
 import { AccountStore } from '../stores/account-store';
 import { AttributeValues } from '../models/model';
 
+/**
+ * Nothing queues this task. The class stays registered so task rows already
+ * persisted by older builds still inflate when the engine streams them back.
+ */
 export class SendFeatureUsageEventTask extends Task {
   static attributes = {
     ...Task.attributes,

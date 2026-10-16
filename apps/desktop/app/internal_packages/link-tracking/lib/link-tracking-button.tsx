@@ -7,7 +7,7 @@ import {
   DraftEditingSession,
 } from 'mailspring-exports';
 import { MetadataComposerToggleButton } from 'mailspring-component-kit';
-import { PLUGIN_ID, PLUGIN_NAME } from './link-tracking-constants';
+import { PLUGIN_ID, PLUGIN_NAME, isTrackingServerAvailable } from './link-tracking-constants';
 
 type Props = { draft: Message; session: DraftEditingSession };
 
@@ -39,6 +39,11 @@ const LinkTrackingButtonInner: React.FC<Props> = ({ draft, session }) => {
       errorMessage={errorMessage}
       draft={draft}
       session={session}
+      unavailableReason={
+        isTrackingServerAvailable()
+          ? undefined
+          : localized('Link tracking needs a tracking server, and none is configured.')
+      }
     />
   );
 };

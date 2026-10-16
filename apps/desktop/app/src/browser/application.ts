@@ -416,19 +416,6 @@ export default class Application extends EventEmitter {
       win.browserWindow.inspectElement(x, y);
     });
 
-    this.on('application:add-identity', () => {
-      const onboarding = this.windowManager.get(WindowManager.ONBOARDING_WINDOW);
-      if (onboarding) {
-        onboarding.show();
-        onboarding.focus();
-      } else {
-        this.windowManager.ensureWindow(WindowManager.ONBOARDING_WINDOW, {
-          title: localized('Welcome to Mailspring'),
-          windowProps: {},
-        });
-      }
-    });
-
     this.on('application:add-account', ({ existingAccountJSON, o365SharedMailbox } = {}) => {
       const onboarding = this.windowManager.get(WindowManager.ONBOARDING_WINDOW);
       if (onboarding) {

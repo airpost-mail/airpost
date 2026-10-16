@@ -1,6 +1,6 @@
-import { ComposerExtension, FeatureUsageStore, Message, Contact } from 'mailspring-exports';
+import { ComposerExtension, Message, Contact } from 'mailspring-exports';
 
-import { PLUGIN_ID, PLUGIN_URL } from './open-tracking-constants';
+import { PLUGIN_ID, PLUGIN_URL, isTrackingServerAvailable } from './open-tracking-constants';
 import { OpenTrackingMetadata } from './types';
 
 /**
@@ -26,7 +26,9 @@ export function encodeOpenTrackingToken(params: {
 
 export default class OpenTrackingComposerExtension extends ComposerExtension {
   static needsPerRecipientBodies(draft: Message) {
-    return !draft.plaintext && !!draft.metadataForPluginId(PLUGIN_ID);
+    return (
+      !draft.plaintext && !!draft.metadataForPluginId(PLUGIN_ID) && isTrackingServerAvailable()
+    );
   }
 
   static applyTransformsForSending({
@@ -38,7 +40,7 @@ export default class OpenTrackingComposerExtension extends ComposerExtension {
     draft: Message;
     recipient?: Contact;
   }) {
-    if (draft.plaintext) {
+    if (draft.plaintext || !isTrackingServerAvailable()) {
       return;
     }
 
@@ -81,12 +83,5 @@ export default class OpenTrackingComposerExtension extends ComposerExtension {
     // save the uid info to draft metadata
     metadata.uid = messageUid;
     draft.directlyAttachMetadata(PLUGIN_ID, metadata);
-  }
-
-  static onSendSuccess(draft: Message) {
-    const metadata = draft.metadataForPluginId(PLUGIN_ID);
-    if (metadata) {
-      FeatureUsageStore.markUsed(PLUGIN_ID);
-    }
   }
 }

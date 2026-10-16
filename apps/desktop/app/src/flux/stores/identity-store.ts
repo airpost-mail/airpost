@@ -1,16 +1,12 @@
 import MailspringStore from 'mailspring-store';
 
-import url from 'url';
-import querystring from 'querystring';
-
 import * as Utils from '../models/utils';
 import * as Actions from '../actions';
 import KeyManager from '../../key-manager';
-import { makeRequest, rootURLForServer } from '../mailspring-api-request';
+import { makeRequest } from '../mailspring-api-request';
 import { Disposable } from 'event-kit';
 import { debounce } from 'underscore';
 
-// Note this key name is used when migrating to Mailspring Pro accounts from old N1.
 const PASSWORD_NAME = 'Mailspring Account';
 
 export interface IIdentity {
@@ -19,30 +15,10 @@ export interface IIdentity {
   firstName: string;
   lastName: string;
   emailAddress: string;
-  stripePlan: string;
-  stripePlanEffective: string;
-  featureUsage: {
-    [featureKey: string]: {
-      featureLimitName: 'pro';
-      usedInPeriod: number;
-      quota: number;
-      period: 'weekly' | 'monthly';
-    };
-  };
 }
-
-export type IdentityAuthResponse = IIdentity | { skipped: true };
-
-export const EMPTY_FEATURE_USAGE = {
-  featureLimitName: 'pro',
-  period: 'monthly',
-  usedInPeriod: 0,
-  quota: 0,
-};
 
 class _IdentityStore extends MailspringStore {
   _identity: IIdentity = null;
-  _displayedPasswordError = false;
   _disp: Disposable;
 
   constructor() {
@@ -63,7 +39,6 @@ class _IdentityStore extends MailspringStore {
     this._onIdentityChanged();
 
     this.listenTo(Actions.logoutMailspringIdentity, this._onLogoutMailspringIdentity);
-    this._fetchAndPollRemoteIdentity();
   }
 
   deactivate() {
@@ -81,24 +56,6 @@ class _IdentityStore extends MailspringStore {
       return null;
     }
     return this._identity.id;
-  }
-
-  hasProFeatures() {
-    return this._identity && this._identity.stripePlanEffective !== 'Basic';
-  }
-
-  _fetchAndPollRemoteIdentity() {
-    if (!AppEnv.isMainWindow()) return;
-    const poll = () => {
-      // fetchIdentity can still reject for reasons other than the network request
-      // itself (eg saveIdentity's keychain/config writes) - catch here too so a
-      // background poll never produces an unhandled promise rejection.
-      this.fetchIdentity().catch((err) => {
-        console.warn('IdentityStore: background identity poll failed:', err);
-      });
-    };
-    setTimeout(poll, 1000);
-    setInterval(poll, 1000 * 60 * 10); // 10 minutes
   }
 
   async saveIdentity(identity: IIdentity | null) {
@@ -142,13 +99,9 @@ class _IdentityStore extends MailspringStore {
       : null;
 
     if (this._identity && !this._identity.token) {
-      const message = `Your Mailspring ID password could not be loaded from your keychain. Please visit Preferences > Subscription and click "Setup Mailspring ID" to sign in to your Mailspring account again.\n\nYour Mailspring ID email address is ${this._identity.emailAddress}.`;
-      console.warn(message);
-
-      if (!this._displayedPasswordError) {
-        this._displayedPasswordError = true;
-        AppEnv.showErrorDialog({ title: 'Please Sign In', message });
-      }
+      console.warn(
+        `IdentityStore: the token for Mailspring ID ${this._identity.emailAddress} is missing from the keychain; continuing without an identity.`
+      );
       this._identity = null;
     }
 
@@ -164,63 +117,6 @@ class _IdentityStore extends MailspringStore {
     require('@electron/remote').app.relaunch();
     require('@electron/remote').app.quit();
   };
-
-  /**
-   * This passes utm_source, utm_campaign, and utm_content params to the
-   * Mailspring billing site. Please reference:
-   * https://paper.dropbox.com/doc/Analytics-ID-Unification-oVDTkakFsiBBbk9aeuiA3
-   * for the full list of utm_ labels.
-   */
-  async fetchSingleSignOnURL(
-    path: string,
-    { source, campaign, content }: { source?: string; campaign?: string; content?: string } = {}
-  ) {
-    if (!this._identity) {
-      return Promise.reject(new Error('fetchSingleSignOnURL: no identity set.'));
-    }
-
-    const qs: any = { utm_medium: 'N1' };
-    if (source) {
-      qs.utm_source = source;
-    }
-    if (campaign) {
-      qs.utm_campaign = campaign;
-    }
-    if (content) {
-      qs.utm_content = content;
-    }
-
-    const pathWithUtm = url.parse(path, true);
-    pathWithUtm.query = Object.assign({}, qs, pathWithUtm.query || {});
-
-    const pathWithUtmString = url.format({
-      pathname: pathWithUtm.pathname,
-      query: pathWithUtm.query,
-    });
-
-    if (!pathWithUtmString.startsWith('/')) {
-      throw new Error('fetchSingleSignOnURL: path must start with a leading slash.');
-    }
-
-    const body = new FormData();
-    for (const key of Object.keys(qs)) {
-      body.append(key, qs[key]);
-    }
-    body.append('next_path', pathWithUtmString);
-
-    try {
-      const json = await makeRequest({
-        server: 'identity',
-        path: `/api/login-link?${querystring.stringify(qs)}`,
-        body: body,
-        timeout: 1500,
-        method: 'POST',
-      });
-      return `${rootURLForServer('identity')}${json.path}`;
-    } catch (err) {
-      return `${rootURLForServer('identity')}${path}`;
-    }
-  }
 
   fetchIdentitySoon = debounce(
     () => {

@@ -11,12 +11,6 @@ describe('IdentityStore', function identityStoreSpec() {
       lastName: 'Test',
       email: 'mailspring050test@evanmorikawa.com',
       id: TEST_NYLAS_ID,
-      featureUsage: {
-        feat: {
-          quota: 10,
-          usedInPeriod: 1,
-        },
-      },
       token: 'secret token',
     };
   });
@@ -41,13 +35,13 @@ describe('IdentityStore', function identityStoreSpec() {
     });
 
     it('applies changes synchronously', async () => {
-      const used = () => IdentityStore.identity().featureUsage.feat.usedInPeriod;
-      expect(used()).toBe(1);
+      const firstName = () => IdentityStore.identity().firstName;
+      expect(firstName()).toBe('Mailspring 050');
 
       const next = JSON.parse(JSON.stringify(this.identityJSON));
-      next.featureUsage.feat.usedInPeriod += 1;
+      next.firstName = 'Renamed';
       await IdentityStore.saveIdentity(next);
-      expect(used()).toBe(2);
+      expect(firstName()).toBe('Renamed');
     });
   });
 
@@ -82,7 +76,7 @@ describe('IdentityStore', function identityStoreSpec() {
 
     it('saves the identity returned', async () => {
       const resp = Utils.deepClone(this.identityJSON);
-      resp.featureUsage.feat.quota = 5;
+      resp.lastName = 'Updated';
       spyOn(MailspringAPIRequest, 'makeRequest').andCallFake(() => {
         return Promise.resolve(resp);
       });
@@ -92,7 +86,7 @@ describe('IdentityStore', function identityStoreSpec() {
       expect(options.path).toEqual('/api/me');
       expect(IdentityStore.saveIdentity).toHaveBeenCalled();
       const newIdent = (IdentityStore.saveIdentity as jasmine.Spy).calls[0].args[0];
-      expect(newIdent.featureUsage.feat.quota).toBe(5);
+      expect(newIdent.lastName).toBe('Updated');
       expect(AppEnv.reportError).not.toHaveBeenCalled();
     });
 

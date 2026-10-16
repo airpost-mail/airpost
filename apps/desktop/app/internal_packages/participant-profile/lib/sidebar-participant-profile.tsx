@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  localized,
-  IdentityStore,
-  Contact,
-  FeatureUsageStore,
-  DOMUtils,
-  RegExpUtils,
-  Thread,
-  Utils,
-} from 'mailspring-exports';
+import { localized, Contact, DOMUtils, RegExpUtils, Thread } from 'mailspring-exports';
 import { RetinaImg, ContactProfilePhoto } from 'mailspring-component-kit';
 import moment from 'moment-timezone';
 
@@ -153,7 +144,6 @@ interface SidebarParticipantProfileProps {
 }
 
 interface SidebarParticipantProfileState {
-  trialing: boolean;
   loading: boolean;
   loaded: boolean;
   avatar?: string;
@@ -212,8 +202,7 @@ export default class SidebarParticipantProfile extends React.Component<
   _mounted = false;
 
   state: SidebarParticipantProfileState = {
-    trialing: !IdentityStore.hasProFeatures(),
-    loading: IdentityStore.hasProFeatures(),
+    loading: true,
     loaded: false,
   };
 
@@ -222,7 +211,7 @@ export default class SidebarParticipantProfile extends React.Component<
 
     const contactState = ParticipantProfileDataSource.getCache(props.contact.email);
     if (contactState) {
-      this.state = Object.assign(this.state, { loaded: true }, contactState);
+      this.state = Object.assign(this.state, { loaded: true, loading: false }, contactState);
     }
   }
 
@@ -239,22 +228,6 @@ export default class SidebarParticipantProfile extends React.Component<
   componentWillUnmount() {
     this._mounted = false;
   }
-
-  _onClickedToTry = async () => {
-    try {
-      await FeatureUsageStore.markUsedOrUpgrade('contact-profiles', {
-        headerText: localized('All Contact Previews Used'),
-        rechargeText: `${localized(
-          `You can view contact profiles for %1$@ emails each %2$@ with Mailspring Basic.`
-        )} ${localized('Upgrade to Pro today!')}`,
-        iconUrl: 'mailspring://participant-profile/assets/ic-contact-profile-modal@2x.png',
-      });
-    } catch (err) {
-      // user does not have access to this feature
-      return;
-    }
-    this._onFindContact();
-  };
 
   _onFindContact = async () => {
     if (!this._mounted) {
@@ -283,28 +256,6 @@ export default class SidebarParticipantProfile extends React.Component<
       sel.setBaseAndExtent(anchor, 0, focus, focus.data.length);
     }
   };
-
-  _renderFindCTA() {
-    if (!this.state.trialing || this.state.loaded) {
-      return;
-    }
-    if (!this.props.contact.email || Utils.likelyNonHumanEmail(this.props.contact.email)) {
-      return;
-    }
-
-    return (
-      <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <p>
-          {localized(
-            `The contact sidebar in Mailspring Pro shows information about the people and companies you're emailing with.`
-          )}
-        </p>
-        <div className="btn" onClick={!this.state.loading ? this._onClickedToTry : null}>
-          {!this.state.loading ? localized(`Try it Now`) : localized(`Loading...`)}
-        </div>
-      </div>
-    );
-  }
 
   _renderCompanyInfo() {
     if (!this.state.company || !this.state.company.name) {
@@ -487,8 +438,6 @@ export default class SidebarParticipantProfile extends React.Component<
         {this._renderPersonInfo()}
 
         {this._renderCompanyInfo()}
-
-        {this._renderFindCTA()}
       </div>
     );
   }

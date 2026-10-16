@@ -1,11 +1,5 @@
-import {
-  ComposerExtension,
-  RegExpUtils,
-  FeatureUsageStore,
-  Message,
-  Contact,
-} from 'mailspring-exports';
-import { PLUGIN_ID, PLUGIN_URL } from './link-tracking-constants';
+import { ComposerExtension, RegExpUtils, Message, Contact } from 'mailspring-exports';
+import { PLUGIN_ID, PLUGIN_URL, isTrackingServerAvailable } from './link-tracking-constants';
 
 function forEachATagInBody(
   draftBodyRootNode: HTMLElement,
@@ -44,7 +38,9 @@ function forEachATagInBody(
  */
 export default class LinkTrackingComposerExtension extends ComposerExtension {
   static needsPerRecipientBodies(draft: Message) {
-    return !draft.plaintext && !!draft.metadataForPluginId(PLUGIN_ID);
+    return (
+      !draft.plaintext && !!draft.metadataForPluginId(PLUGIN_ID) && isTrackingServerAvailable()
+    );
   }
 
   static applyTransformsForSending({
@@ -56,7 +52,7 @@ export default class LinkTrackingComposerExtension extends ComposerExtension {
     draft: Message;
     recipient?: Contact;
   }) {
-    if (draft.plaintext) {
+    if (draft.plaintext || !isTrackingServerAvailable()) {
       return;
     }
     const metadata = draft.metadataForPluginId(PLUGIN_ID);
@@ -89,12 +85,5 @@ export default class LinkTrackingComposerExtension extends ComposerExtension {
     metadata.uid = messageUid;
     metadata.links = links;
     draft.directlyAttachMetadata(PLUGIN_ID, metadata);
-  }
-
-  static onSendSuccess(draft: Message) {
-    const metadata = draft.metadataForPluginId(PLUGIN_ID);
-    if (metadata) {
-      FeatureUsageStore.markUsed(PLUGIN_ID);
-    }
   }
 }

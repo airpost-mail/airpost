@@ -134,22 +134,3 @@ body.platform-win32 {
     border-radius: 0;
   }
 }
-
-.feature-usage-modal.contact-profiles {
-  @send-later-color: #777ff0;
-  .feature-header {
-    @from: @send-later-color;
-    @to: lighten(@send-later-color, 10%);
-    background: linear-gradient(to top, @from, @to);
-  }
-  .feature-name {
-    color: @send-later-color;
-  }
-  .pro-description {
-    li {
-      &:before {
-        color: @send-later-color;
-      }
-    }
-  }
-}

@@ -22,7 +22,7 @@ test('Cmd+, opens preferences panel', async () => {
 });
 
 test('preferences shows all expected tabs', async () => {
-  const tabs = ['General', 'Accounts', 'Subscription', 'Appearance', 'Shortcuts', 'Mail Rules', 'Folders', 'Signatures', 'Templates'];
+  const tabs = ['General', 'Accounts', 'Appearance', 'Shortcuts', 'Mail Rules', 'Folders', 'Signatures', 'Templates'];
   for (const tab of tabs) {
     await expect(mainWindow.locator(`.preferences-tabs .item:has-text("${tab}")`)).toBeVisible();
   }

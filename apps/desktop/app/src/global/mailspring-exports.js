@@ -145,7 +145,6 @@ load(`UndoRedoStore`, 'flux/stores/undo-redo-store');
 load(`WorkspaceStore`, 'flux/stores/workspace-store');
 load(`MailRulesStore`, 'flux/stores/mail-rules-store');
 load(`SendActionsStore`, 'flux/stores/send-actions-store');
-load(`FeatureUsageStore`, 'flux/stores/feature-usage-store');
 load(`ThreadCountsStore`, 'flux/stores/thread-counts-store');
 load(`AttachmentStore`, 'flux/stores/attachment-store');
 load(`OnlineStatusStore`, 'flux/stores/online-status-store');

@@ -7,11 +7,9 @@ import {
   MessageViewExtension,
   getCurrentLocale,
   MessageBodyProcessor,
-  IdentityStore,
-  FeatureUsageStore,
 } from 'mailspring-exports';
 
-import { translateMessageBody, AllLanguages, TranslationsUsedLexicon } from './service';
+import { translateMessageBody, AllLanguages } from './service';
 import { Menu, ButtonDropdown, RetinaImg } from 'mailspring-component-kit';
 
 interface TranslateMessageHeaderProps {
@@ -168,7 +166,7 @@ export class TranslateMessageHeader extends React.Component<
       const prefs = getPrefs();
       if (prefs.disabled.includes(detected)) return;
       this.setState({ detected });
-      if (prefs.automatic.includes(detected) && IdentityStore.hasProFeatures()) {
+      if (prefs.automatic.includes(detected)) {
         this._onTranslate('auto');
       }
     });
@@ -181,15 +179,6 @@ export class TranslateMessageHeader extends React.Component<
     if (result) {
       if (!result.enabled) this._onToggleTranslate();
       return;
-    }
-
-    if (!IdentityStore.hasProFeatures()) {
-      try {
-        await FeatureUsageStore.markUsedOrUpgrade('translation', TranslationsUsedLexicon);
-      } catch (err) {
-        // user does not have access to this feature
-        return;
-      }
     }
 
     this.setState({ translating: mode });
@@ -236,21 +225,7 @@ export class TranslateMessageHeader extends React.Component<
     this.forceUpdate();
   };
 
-  _onAlwaysForLanguage = async () => {
-    if (!IdentityStore.hasProFeatures()) {
-      try {
-        await FeatureUsageStore.displayUpgradeModal('translation', {
-          headerText: localized('Translate automatically with Mailspring Pro'),
-          rechargeText: `${localized(
-            "Unfortunately, translation services bill per character and we can't offer this feature for free."
-          )} ${localized('Upgrade to Pro today!')}`,
-          iconUrl: 'mailspring://translation/assets/ic-translation-modal@2x.png',
-        });
-      } catch (err) {
-        return;
-      }
-    }
-
+  _onAlwaysForLanguage = () => {
     const prefs = getPrefs();
     prefs.disabled = prefs.disabled.filter((p) => p !== this.state.detected);
     prefs.automatic = prefs.automatic.concat([this.state.detected]);
@@ -373,7 +348,7 @@ export class TranslateMessageHeader extends React.Component<
                       }
                     : {
                         key: 'always',
-                        label: localized('Always translate %@', fromLanguage) + ` (Pro)`,
+                        label: localized('Always translate %@', fromLanguage),
                         select: this._onAlwaysForLanguage,
                       },
                   {
