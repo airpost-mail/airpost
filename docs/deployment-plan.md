@@ -120,11 +120,11 @@ Windows and nothing on Linux. Replace the feed with static files on the GitHub r
 there is no update server to run:
 
 - macOS: `autoUpdater.setFeedURL({url, serverType: 'json'})` pointing at
-  `https://github.com/ternmail/tern/releases/latest/download/update-<channel>-darwin-<arch>.json`
+  `https://github.com/ternmail/ternmail/releases/latest/download/update-<channel>-darwin-<arch>.json`
   (Squirrel.Mac's static JSON format: `currentRelease` and a `releases` list with the zip
   URL). The release workflow writes it.
 - Windows: Squirrel reads `RELEASES` and the nupkg from
-  `https://github.com/ternmail/tern/releases/latest/download/`.
+  `https://github.com/ternmail/ternmail/releases/latest/download/`.
 - Linux: no in-app install. The app checks the same JSON file and shows "Tern <ver> is
   available" with a link; the package manager (or snap refresh) does the update. An apt and
   dnf repository can come later.
@@ -162,7 +162,7 @@ shipping").
 ### 3.1 What the user does
 
 1. Has a Linux box with Docker and a DNS name (`tern.example.com`) pointing at it.
-2. `curl -LO https://github.com/ternmail/tern/releases/latest/download/tern-backend-compose.tar.gz`,
+2. `curl -LO https://github.com/ternmail/ternmail/releases/latest/download/tern-backend-compose.tar.gz`,
    untars `deploy/backend/`, copies `.env.example` to `.env`, sets `TERN_DOMAIN`.
 3. `docker compose up -d`. Caddy gets a certificate; the backend migrates its database and
    starts; its log says there are no users and how to add one.
@@ -221,8 +221,10 @@ for everyone else. The backend refuses a non-https public URL on a non-loopback 
   as a loop is more moving parts than about 80 lines of Rust (question Q8).
 - Compose mounts `./backups:/backups` and sets `TERN_BACKUP_DIR=/backups`,
   `TERN_BACKUP_INTERVAL=24h`, `TERN_BACKUP_KEEP=14`. The user copies `./backups` off the box.
-- Restore: `docker compose stop backend`, copy the file to the volume as `tern.db`, remove
-  `-wal`/`-shm`, start. Clients re-sync from the new server id (exists).
+- Restore: `docker compose stop backend`, `docker compose run --rm backend restore
+  /backups/<file>` (new: checks the file, removes leftover `-wal`/`-shm`, new server id;
+  refuses while the server holds its data-dir lock), start. Clients re-sync from the new
+  server id.
 - From B2 the data dir also holds `assets/`; backups then need the asset tree. `backup`
   should write a directory (db + hard-linked or copied assets) once assets exist.
 
@@ -244,8 +246,8 @@ for everyone else. The backend refuses a non-https public URL on a non-loopback 
 | Features | The client gates on `features` from `/tern/v1/server` and `/tern/v1/me` (exists), never on the version string. A newer desktop against an older backend shows the feature as unavailable on this server. |
 | Backend older than its database | Refuses to start (exists). |
 
-Add `apiVersion: 1` and `minClient` (empty for now) to `/tern/v1/server`, so a future
-breaking change can tell old desktops to update instead of failing oddly.
+`/tern/v1/server` reports `apiVersion: 1` (done), so a future breaking change can tell old
+desktops to update instead of failing oddly.
 
 ### 3.8 Health and logs
 
@@ -562,7 +564,7 @@ to land first.
 
 | # | Item | Blocked by | Size |
 |---|---|---|---|
-| D1 | Backend: `healthcheck` subcommand, empty-users hint, pre-migration backup, scheduled backups, `TERN_LOG_FORMAT=json`, `apiVersion`/`minClient` in `/tern/v1/server` | — | M |
+| D1 | Backend: `healthcheck` subcommand, empty-users hint, pre-migration backup, scheduled backups, `restore` with a data-dir lock, `TERN_LOG_FORMAT=json`, `apiVersion` in `/tern/v1/server` | — | M |
 | D2 | `deploy/backend/` compose, Caddyfile, `.env.example`, override example; CI `docker compose config` and a compose smoke test | D1 (healthcheck) | S |
 | D3 | `docs/self-hosting.md` rewritten as the scenario 2 guide (install, users, backups, upgrades, uninstall), systemd unit, musl `tern-backend` build | D1, D2 | S |
 | D4 | `release.yml` as a draft-release workflow: rust jobs for all four binaries, musl Linux, image build (push gated on a published release), checksums, provenance; `cli-release.yml` and `engine-release.yml` folded in; one version | — | M |
