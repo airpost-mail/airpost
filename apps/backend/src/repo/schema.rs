@@ -12,7 +12,7 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 /// pages are ordered by rowid, and SQLite only keeps rowids stable across `VACUUM` (and
 /// `VACUUM INTO` backups) when they are aliased by an INTEGER PRIMARY KEY. The composite key
 /// is a UNIQUE constraint, the target of every `INSERT … ON CONFLICT DO UPDATE`.
-const MIGRATIONS: &[&str] = &[r#"
+pub(crate) const MIGRATIONS: &[&str] = &[r#"
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -108,19 +108,22 @@ pub fn schema_version(conn: &Connection) -> rusqlite::Result<u32> {
     conn.query_row("PRAGMA user_version", [], |r| r.get(0))
 }
 
-/// Applies pending migrations, then makes sure the instance has a server id.
-pub fn migrate(
+/// Applies pending `migrations` ([`MIGRATIONS`], or a longer list in tests), then makes sure
+/// the instance has a server id.
+pub(crate) fn migrate(
     conn: &mut Connection,
+    migrations: &[&str],
     new_server_id: impl FnOnce() -> String,
 ) -> Result<(), MigrateError> {
     let current = schema_version(conn)?;
-    if current > SCHEMA_VERSION {
+    let supported = migrations.len() as u32;
+    if current > supported {
         return Err(MigrateError::TooNew {
             found: current,
-            supported: SCHEMA_VERSION,
+            supported,
         });
     }
-    for (i, sql) in MIGRATIONS.iter().enumerate().skip(current as usize) {
+    for (i, sql) in migrations.iter().enumerate().skip(current as usize) {
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute_batch(sql)?;
         tx.pragma_update(None, "user_version", (i + 1) as u32)?;

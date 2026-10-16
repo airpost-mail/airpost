@@ -6,6 +6,7 @@
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::Deserialize;
 
@@ -13,6 +14,9 @@ pub const DEFAULT_DATA_DIR: &str = "/data";
 pub const DEFAULT_BIND: &str = "127.0.0.1:5101";
 /// A proxy on the same host is trusted to report the client address by default.
 pub const DEFAULT_TRUSTED_PROXIES: &[&str] = &["127.0.0.0/8", "::1"];
+pub const DEFAULT_BACKUP_INTERVAL: Duration = Duration::from_secs(24 * 3600);
+pub const DEFAULT_BACKUP_KEEP: usize = 7;
+const MIN_BACKUP_INTERVAL: Duration = Duration::from_secs(60);
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -66,6 +70,25 @@ struct FileConfig {
     signup: Option<Signup>,
     features: Option<FeatureSwitches>,
     trusted_proxies: Option<Vec<String>>,
+    backup: Option<FileBackup>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+struct FileBackup {
+    dir: Option<PathBuf>,
+    interval: Option<String>,
+    keep: Option<usize>,
+}
+
+/// Scheduled backups taken by `serve` (docs/deployment-plan.md 3.5). Off unless a directory
+/// is configured.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackupSchedule {
+    pub dir: PathBuf,
+    pub interval: Duration,
+    /// How many scheduled backups to keep; older ones are deleted.
+    pub keep: usize,
 }
 
 /// An address range, `a.b.c.d/n` or `x::/n`; a bare address is a single host.
@@ -129,12 +152,13 @@ pub struct Config {
     pub features: FeatureSwitches,
     /// Peers whose `X-Forwarded-For` is believed when rate limiting by client address.
     pub trusted_proxies: Vec<IpNet>,
+    pub backup: Option<BackupSchedule>,
 }
 
 impl Config {
     /// Loads the optional file at `path`, then applies `TERN_DATA_DIR`, `TERN_BIND`,
-    /// `TERN_PUBLIC_URL`, `TERN_SIGNUP` and `TERN_TRUSTED_PROXIES` (comma-separated) from
-    /// `env`.
+    /// `TERN_PUBLIC_URL`, `TERN_SIGNUP`, `TERN_TRUSTED_PROXIES` (comma-separated),
+    /// `TERN_BACKUP_DIR`, `TERN_BACKUP_INTERVAL` and `TERN_BACKUP_KEEP` from `env`.
     pub fn load(
         path: Option<&Path>,
         env: impl Fn(&str) -> Option<String>,
@@ -193,6 +217,44 @@ impl Config {
             },
         };
 
+        let file_backup = file.backup.unwrap_or_default();
+        let backup_interval = env("TERN_BACKUP_INTERVAL")
+            .or(file_backup.interval)
+            .map(|s| parse_interval(&s))
+            .transpose()?;
+        let backup_keep = match env("TERN_BACKUP_KEEP") {
+            Some(s) => Some(
+                s.trim()
+                    .parse::<usize>()
+                    .map_err(|e| ConfigError::Invalid {
+                        key: "backup.keep",
+                        message: format!("{s:?}: {e}"),
+                    })?,
+            ),
+            None => file_backup.keep,
+        };
+        let backup = match env("TERN_BACKUP_DIR")
+            .map(PathBuf::from)
+            .or(file_backup.dir)
+            .filter(|d| !d.as_os_str().is_empty())
+        {
+            Some(dir) => {
+                let keep = backup_keep.unwrap_or(DEFAULT_BACKUP_KEEP);
+                if keep == 0 {
+                    return Err(ConfigError::Invalid {
+                        key: "backup.keep",
+                        message: "must be at least 1".into(),
+                    });
+                }
+                Some(BackupSchedule {
+                    dir,
+                    interval: backup_interval.unwrap_or(DEFAULT_BACKUP_INTERVAL),
+                    keep,
+                })
+            }
+            None => None,
+        };
+
         Ok(Config {
             data_dir,
             bind,
@@ -200,6 +262,7 @@ impl Config {
             signup,
             features: file.features.unwrap_or_default(),
             trusted_proxies,
+            backup,
         })
     }
 
@@ -240,6 +303,31 @@ impl Config {
             })
         }
     }
+}
+
+/// `<n>s`, `<n>m`, `<n>h` or `<n>d`, at least a minute.
+fn parse_interval(s: &str) -> Result<Duration, ConfigError> {
+    let invalid = |message: &str| ConfigError::Invalid {
+        key: "backup.interval",
+        message: format!("{s:?}: {message}"),
+    };
+    let t = s.trim();
+    let split = t.len().saturating_sub(1);
+    let unit = match t.get(split..) {
+        Some("s") => 1,
+        Some("m") => 60,
+        Some("h") => 3600,
+        Some("d") => 86400,
+        _ => return Err(invalid("expected a number and s, m, h or d, such as 24h")),
+    };
+    let n: u64 = t[..split]
+        .parse()
+        .map_err(|_| invalid("expected a number and s, m, h or d, such as 24h"))?;
+    let d = Duration::from_secs(n.saturating_mul(unit));
+    if d < MIN_BACKUP_INTERVAL {
+        return Err(invalid("must be at least 1m"));
+    }
+    Ok(d)
 }
 
 fn normalize_public_url(url: &str) -> Result<String, ConfigError> {
@@ -320,7 +408,61 @@ mod tests {
             .trusted_proxies
             .iter()
             .any(|n| n.contains("10.0.0.1".parse().unwrap())));
+        assert_eq!(c.backup, None);
         c.check_public_url_is_safe().unwrap();
+    }
+
+    #[test]
+    fn backup_schedule() {
+        let c = Config::load(None, env(&[("TERN_BACKUP_DIR", "/backups")])).unwrap();
+        assert_eq!(
+            c.backup,
+            Some(BackupSchedule {
+                dir: "/backups".into(),
+                interval: DEFAULT_BACKUP_INTERVAL,
+                keep: DEFAULT_BACKUP_KEEP,
+            })
+        );
+        // An interval or count alone does not turn backups on.
+        let c = Config::load(None, env(&[("TERN_BACKUP_INTERVAL", "1h")])).unwrap();
+        assert_eq!(c.backup, None);
+        let c = Config::load(None, env(&[("TERN_BACKUP_DIR", "")])).unwrap();
+        assert_eq!(c.backup, None);
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tern.toml");
+        std::fs::write(
+            &path,
+            "[backup]\ndir = \"/srv/backups\"\ninterval = \"30m\"\nkeep = 3\n",
+        )
+        .unwrap();
+        let b = Config::load(Some(&path), env(&[])).unwrap().backup.unwrap();
+        assert_eq!(
+            (b.dir, b.interval, b.keep),
+            ("/srv/backups".into(), Duration::from_secs(1800), 3)
+        );
+        let b = Config::load(
+            Some(&path),
+            env(&[("TERN_BACKUP_INTERVAL", "2d"), ("TERN_BACKUP_KEEP", "10")]),
+        )
+        .unwrap()
+        .backup
+        .unwrap();
+        assert_eq!((b.interval, b.keep), (Duration::from_secs(2 * 86400), 10));
+
+        for (k, v) in [
+            ("TERN_BACKUP_INTERVAL", "30s"),
+            ("TERN_BACKUP_INTERVAL", "24"),
+            ("TERN_BACKUP_INTERVAL", "h"),
+            ("TERN_BACKUP_INTERVAL", "-1h"),
+            ("TERN_BACKUP_KEEP", "0"),
+            ("TERN_BACKUP_KEEP", "x"),
+        ] {
+            assert!(
+                Config::load(None, env(&[("TERN_BACKUP_DIR", "/b"), (k, v)])).is_err(),
+                "{k}={v}"
+            );
+        }
     }
 
     #[test]

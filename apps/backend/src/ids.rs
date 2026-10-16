@@ -64,6 +64,14 @@ pub fn format_time(ms: i64) -> String {
         .to_string()
 }
 
+/// UTC timestamps in file names, `%Y%m%dT%H%M%SZ`, which sort in time order.
+pub fn file_time(ms: i64) -> String {
+    chrono::DateTime::from_timestamp_millis(ms)
+        .unwrap_or_default()
+        .format("%Y%m%dT%H%M%SZ")
+        .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

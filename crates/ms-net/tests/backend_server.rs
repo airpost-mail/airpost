@@ -42,6 +42,7 @@ impl Backend {
             signup: Signup::Closed,
             features: FeatureSwitches::default(),
             trusted_proxies: vec![IpNet::parse("127.0.0.0/8").unwrap()],
+            backup: None,
         };
         let (addr_tx, addr_rx) = mpsc::channel();
         let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();

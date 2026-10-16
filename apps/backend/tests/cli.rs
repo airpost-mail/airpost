@@ -18,6 +18,11 @@ fn cmd(data_dir: &Path) -> Command {
         "TERN_BIND",
         "TERN_PUBLIC_URL",
         "TERN_SIGNUP",
+        "TERN_TRUSTED_PROXIES",
+        "TERN_BACKUP_DIR",
+        "TERN_BACKUP_INTERVAL",
+        "TERN_BACKUP_KEEP",
+        "TERN_LOG_FORMAT",
         "RUST_LOG",
     ] {
         c.env_remove(k);
@@ -184,12 +189,33 @@ fn http_get(addr: &str, path: &str) -> String {
     buf
 }
 
+/// Reads stderr lines until one contains `needle`; returns the lines read.
+fn read_until(stderr: &mut impl BufRead, needle: &str) -> String {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut seen = String::new();
+    loop {
+        assert!(Instant::now() < deadline, "no {needle:?} in {seen}");
+        let mut line = String::new();
+        assert!(
+            stderr.read_line(&mut line).unwrap() > 0,
+            "server exited: {seen}"
+        );
+        seen.push_str(&line);
+        if line.contains(needle) {
+            return seen;
+        }
+    }
+}
+
 #[test]
 fn serve_answers_and_stops_on_sigterm() {
     let dir = tempfile::tempdir().unwrap();
-    let mut c = cmd(dir.path());
+    let backups = dir.path().join("backups");
+    let mut c = cmd(&dir.path().join("data"));
     c.env("TERN_BIND", "127.0.0.1:0")
         .env("TERN_PUBLIC_URL", "https://tern.test")
+        .env("TERN_BACKUP_DIR", &backups)
+        .env("TERN_BACKUP_INTERVAL", "1h")
         .env("RUST_LOG", "info")
         .env("NO_COLOR", "1")
         .arg("serve")
@@ -198,19 +224,42 @@ fn serve_answers_and_stops_on_sigterm() {
     let mut child = c.spawn().unwrap();
     let mut stderr = BufReader::new(child.stderr.take().unwrap());
 
-    let deadline = Instant::now() + Duration::from_secs(30);
-    let addr = loop {
-        assert!(Instant::now() < deadline, "no listening line");
-        let mut line = String::new();
-        assert!(stderr.read_line(&mut line).unwrap() > 0, "server exited");
-        if let Some(rest) = line.split("addr=").nth(1) {
-            break rest.split_whitespace().next().unwrap().to_owned();
-        }
-    };
+    let seen = read_until(&mut stderr, "listening");
+    assert!(seen.contains("tern-backend user add"), "{seen}");
+    let addr = seen
+        .split("addr=")
+        .nth(1)
+        .unwrap()
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_owned();
 
     let reply = http_get(&addr, "/ping");
     assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
     assert!(reply.ends_with("{}"), "{reply}");
+
+    // No backup existed, so the first one is taken at startup.
+    read_until(&mut stderr, "backup written");
+    let written: Vec<_> = std::fs::read_dir(&backups).unwrap().collect();
+    assert_eq!(written.len(), 1);
+
+    let health = |bind: &str| {
+        let mut c = cmd(&dir.path().join("data"));
+        c.env("TERN_BIND", bind)
+            .args(["healthcheck", "--timeout", "2"])
+            .output()
+            .unwrap()
+    };
+    let out = health(&addr);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let port = addr.rsplit(':').next().unwrap();
+    // A bind on every interface is checked on loopback.
+    assert!(health(&format!("0.0.0.0:{port}")).status.success());
 
     let status = Command::new("kill")
         .args(["-TERM", &child.id().to_string()])
@@ -222,4 +271,28 @@ fn serve_answers_and_stops_on_sigterm() {
     let mut rest = String::new();
     stderr.read_to_string(&mut rest).unwrap();
     assert!(rest.contains("stopped"), "{rest}");
+    let out = health(&addr);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("connecting to"));
+}
+
+#[test]
+fn json_logs() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut c = cmd(dir.path());
+    c.env("TERN_BIND", "127.0.0.1:0")
+        .env("TERN_PUBLIC_URL", "https://tern.test")
+        .env("TERN_LOG_FORMAT", "json")
+        .arg("serve")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let mut child = c.spawn().unwrap();
+    let mut stderr = BufReader::new(child.stderr.take().unwrap());
+    let seen = read_until(&mut stderr, "listening");
+    for line in seen.lines() {
+        let v: serde_json::Value = serde_json::from_str(line).expect(line);
+        assert!(v["level"].is_string(), "{line}");
+    }
+    child.kill().unwrap();
+    child.wait().unwrap();
 }

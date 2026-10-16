@@ -5,13 +5,16 @@
 
 use std::error::Error;
 use std::io::{BufRead, Write};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, TcpStream};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 
 use crate::auth;
-use crate::config::Config;
+use crate::backup;
+use crate::config::{Config, Signup};
 use crate::http::Server;
 use crate::ids;
 use crate::repo::{Repo, SqliteRepo, User, SCHEMA_VERSION};
@@ -19,7 +22,7 @@ use crate::repo::{Repo, SqliteRepo, User, SCHEMA_VERSION};
 #[derive(Debug, Parser)]
 #[command(name = "tern-backend", version, about = "Self-hostable Tern server")]
 pub struct Cli {
-    /// TOML config file. TERN_DATA_DIR, TERN_BIND, TERN_PUBLIC_URL and TERN_SIGNUP override it.
+    /// TOML config file. TERN_* environment variables override it (docs/self-hosting.md).
     #[arg(long, global = true, env = "TERN_CONFIG")]
     pub config: Option<PathBuf>,
     #[command(subcommand)]
@@ -37,6 +40,13 @@ pub enum Command {
     },
     /// Create or upgrade the database, then exit.
     Migrate,
+    /// Exit 0 if the server answers `GET /ping` on its bind address. For container health
+    /// checks, where the image has no shell or curl.
+    Healthcheck {
+        /// Seconds to wait for the connection and the answer.
+        #[arg(long, default_value_t = 5)]
+        timeout: u64,
+    },
     /// Write a consistent, owner-only copy of the database to PATH (`VACUUM INTO`). The copy
     /// gets a new server id, so engines re-sync from scratch if it is ever restored.
     Backup { path: PathBuf },
@@ -99,15 +109,24 @@ pub enum TokenCommand {
 
 type CliResult = Result<(), Box<dyn Error>>;
 
+/// Text logs on stderr, or one JSON object per line with `TERN_LOG_FORMAT=json`. `RUST_LOG`
+/// sets the level (default `info`).
 pub fn init_logging() {
     use std::io::IsTerminal;
     use tracing_subscriber::EnvFilter;
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt()
+    let format = std::env::var("TERN_LOG_FORMAT").unwrap_or_default();
+    let builder = tracing_subscriber::fmt()
         .with_env_filter(filter)
-        .with_writer(std::io::stderr)
-        .with_ansi(std::io::stderr().is_terminal())
-        .init();
+        .with_writer(std::io::stderr);
+    if format == "json" {
+        builder.json().init();
+    } else {
+        builder.with_ansi(std::io::stderr().is_terminal()).init();
+        if !format.is_empty() && format != "text" {
+            tracing::warn!("TERN_LOG_FORMAT={format:?} is not \"text\" or \"json\"; using text");
+        }
+    }
 }
 
 pub fn run(cli: Cli) -> CliResult {
@@ -125,6 +144,11 @@ pub fn run(cli: Cli) -> CliResult {
                 config.db_path().display(),
                 repo.server_id()?
             )?;
+            Ok(())
+        }
+        Command::Healthcheck { timeout } => {
+            let addr = healthcheck(&config, Duration::from_secs(timeout.max(1)))?;
+            writeln!(out, "ok {addr}")?;
             Ok(())
         }
         Command::Backup { path } => {
@@ -158,18 +182,64 @@ fn serve(config: Config, insecure_public_url: bool) -> CliResult {
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        let repo = Arc::new(SqliteRepo::open(&config.data_dir)?);
-        let server = Server::bind(&config, repo).await?;
+        let repo: Arc<dyn Repo> = Arc::new(SqliteRepo::open(&config.data_dir)?);
+        if config.signup == Signup::Closed && repo.list_users()?.is_empty() {
+            tracing::warn!(
+                "no users yet and signup is closed; create one with `tern-backend user add <email>`"
+            );
+        }
+        let server = Server::bind(&config, repo.clone()).await?;
         tracing::info!(
             addr = %server.local_addr()?,
             public_url = %public_url,
             data_dir = %config.data_dir.display(),
             "listening"
         );
+        let backups = config.backup.clone().map(|schedule| {
+            tracing::info!(
+                dir = %schedule.dir.display(),
+                every_secs = schedule.interval.as_secs(),
+                keep = schedule.keep,
+                "scheduled backups on"
+            );
+            tokio::spawn(backup::run(repo, schedule))
+        });
         server.run(shutdown_signal()).await?;
+        if let Some(task) = backups {
+            task.abort();
+        }
         tracing::info!("stopped");
         Ok(())
     })
+}
+
+/// `GET /ping` on the bind address (loopback when it binds every interface). Returns the
+/// address that answered.
+fn healthcheck(config: &Config, timeout: Duration) -> Result<std::net::SocketAddr, Box<dyn Error>> {
+    let mut addr = config.bind;
+    if addr.ip().is_unspecified() {
+        addr.set_ip(match addr.ip() {
+            IpAddr::V4(_) => Ipv4Addr::LOCALHOST.into(),
+            IpAddr::V6(_) => Ipv6Addr::LOCALHOST.into(),
+        });
+    }
+    let mut stream = TcpStream::connect_timeout(&addr, timeout)
+        .map_err(|e| format!("connecting to {addr}: {e}"))?;
+    stream.set_read_timeout(Some(timeout))?;
+    stream.set_write_timeout(Some(timeout))?;
+    write!(
+        stream,
+        "GET /ping HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n"
+    )?;
+    let mut status = String::new();
+    std::io::BufReader::new(stream)
+        .read_line(&mut status)
+        .map_err(|e| format!("reading from {addr}: {e}"))?;
+    if status.split_whitespace().nth(1) == Some("200") {
+        Ok(addr)
+    } else {
+        Err(format!("unexpected answer from {addr}: {:?}", status.trim_end()).into())
+    }
 }
 
 async fn shutdown_signal() {

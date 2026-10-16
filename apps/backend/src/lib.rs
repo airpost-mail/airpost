@@ -4,6 +4,7 @@
 //! `tern-backend`: the self-hostable Tern server (docs/backend-plan.md).
 
 pub mod auth;
+pub mod backup;
 pub mod cli;
 pub mod config;
 pub mod http;

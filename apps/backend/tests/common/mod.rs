@@ -60,6 +60,7 @@ impl TestServer {
             signup,
             features: FeatureSwitches::default(),
             trusted_proxies: vec![IpNet::parse("127.0.0.0/8").unwrap()],
+            backup: None,
         };
         let repo = Arc::new(SqliteRepo::open(&config.data_dir).unwrap());
         let server = Server::bind(&config, repo.clone()).await.unwrap();

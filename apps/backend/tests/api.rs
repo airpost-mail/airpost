@@ -305,7 +305,7 @@ async fn server_info() {
         serde_json::json!({
             "serverId": s.repo.server_id().unwrap(), "version": env!("CARGO_PKG_VERSION"),
             "publicURL": PUBLIC_URL, "signup": "closed",
-            "features": {"tracking": false, "sharing": false},
+            "features": {"tracking": false, "sharing": false}, "apiVersion": 1,
         })
     );
     s.stop().await;

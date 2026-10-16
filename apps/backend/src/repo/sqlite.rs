@@ -38,6 +38,14 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 impl SqliteRepo {
     /// Opens (creating if needed) `tern.db` in `data_dir` and applies pending migrations.
     pub fn open(data_dir: &Path) -> Result<SqliteRepo> {
+        Self::open_with(data_dir, schema::MIGRATIONS)
+    }
+
+    /// Before upgrading an existing database, writes a copy of it to
+    /// `pre-migrate-<from>-to-<to>-<time>.db` in `data_dir`, so an upgrade can be rolled back
+    /// by restoring the copy and running the previous version. Like [`Repo::backup`], the copy
+    /// has a new server id.
+    fn open_with(data_dir: &Path, migrations: &[&str]) -> Result<SqliteRepo> {
         create_private_dir(data_dir)?;
         let path = data_dir.join("tern.db");
         make_db_private(&path)?;
@@ -46,7 +54,17 @@ impl SqliteRepo {
         writer.pragma_update(None, "journal_mode", "WAL")?;
         writer.pragma_update(None, "synchronous", "NORMAL")?;
         writer.pragma_update(None, "foreign_keys", true)?;
-        schema::migrate(&mut writer, ids::new_server_id)?;
+        let from = schema::schema_version(&writer)?;
+        let to = migrations.len() as u32;
+        if from > 0 && from < to {
+            let copy = data_dir.join(format!(
+                "pre-migrate-{from}-to-{to}-{}.db",
+                ids::file_time(ids::now_ms())
+            ));
+            vacuum_into(&path, &copy)?;
+            tracing::info!(copy = %copy.display(), from, to, "copied the database before migrating");
+        }
+        schema::migrate(&mut writer, migrations, ids::new_server_id)?;
         Ok(SqliteRepo {
             path,
             writer: Mutex::new(writer),
@@ -518,33 +536,39 @@ impl Repo for SqliteRepo {
     }
 
     fn backup(&self, dest: &Path) -> Result<String> {
-        let dest_str = dest.to_str().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "backup path is not UTF-8")
-        })?;
-        // VACUUM INTO accepts an empty file, so the copy gets this file's owner-only mode.
-        create_private_file(dest).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::AlreadyExists {
-                std::io::Error::new(e.kind(), format!("{} already exists", dest.display()))
-            } else {
-                e
-            }
-        })?;
-        let copy = || -> Result<String> {
-            // A separate connection, so the backup does not hold the writer.
-            let conn = Connection::open(&self.path)?;
-            conn.busy_timeout(BUSY_TIMEOUT)?;
-            conn.execute("VACUUM INTO ?1", [dest_str])?;
-            drop(conn);
-            // The copy's seq stops here while the live server goes on. Restored under the
-            // same id, engines would keep cursors past the restored counter and skip writes.
-            let id = ids::new_server_id();
-            set_server_id(&Connection::open(dest)?, &id)?;
-            Ok(id)
-        };
-        copy().inspect_err(|_| {
-            let _ = std::fs::remove_file(dest);
-        })
+        vacuum_into(&self.path, dest)
     }
+}
+
+/// Writes a consistent, owner-only copy of the database at `src` to `dest`, which must not
+/// exist, and gives the copy a new server id, which it returns.
+fn vacuum_into(src: &Path, dest: &Path) -> Result<String> {
+    let dest_str = dest.to_str().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "backup path is not UTF-8")
+    })?;
+    // VACUUM INTO accepts an empty file, so the copy gets this file's owner-only mode.
+    create_private_file(dest).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AlreadyExists {
+            std::io::Error::new(e.kind(), format!("{} already exists", dest.display()))
+        } else {
+            e
+        }
+    })?;
+    let copy = || -> Result<String> {
+        // A separate connection, so the backup does not hold the writer.
+        let conn = Connection::open(src)?;
+        conn.busy_timeout(BUSY_TIMEOUT)?;
+        conn.execute("VACUUM INTO ?1", [dest_str])?;
+        drop(conn);
+        // The copy's seq stops here while the live server goes on. Restored under the
+        // same id, engines would keep cursors past the restored counter and skip writes.
+        let id = ids::new_server_id();
+        set_server_id(&Connection::open(dest)?, &id)?;
+        Ok(id)
+    };
+    copy().inspect_err(|_| {
+        let _ = std::fs::remove_file(dest);
+    })
 }
 
 #[cfg(test)]
@@ -597,6 +621,48 @@ mod tests {
             SqliteRepo::open(dir.path()),
             Err(RepoError::Migrate(schema::MigrateError::TooNew { .. }))
         ));
+    }
+
+    #[test]
+    fn copies_before_migrating() {
+        let pre_migrate = |dir: &Path| -> Vec<PathBuf> {
+            std::fs::read_dir(dir)
+                .unwrap()
+                .map(|e| e.unwrap().path())
+                .filter(|p| p.file_name().unwrap().to_str().unwrap().starts_with("pre-"))
+                .collect()
+        };
+        let dir = tempfile::tempdir().unwrap();
+        // A fresh database and an up-to-date one are not copied.
+        let id = SqliteRepo::open(dir.path()).unwrap().server_id().unwrap();
+        drop(SqliteRepo::open(dir.path()).unwrap());
+        assert!(pre_migrate(dir.path()).is_empty());
+
+        let mut next = schema::MIGRATIONS.to_vec();
+        next.push("CREATE TABLE later (x INTEGER) STRICT;");
+        let repo = SqliteRepo::open_with(dir.path(), &next).unwrap();
+        assert_eq!(repo.schema_version().unwrap(), SCHEMA_VERSION + 1);
+        assert_eq!(repo.server_id().unwrap(), id);
+
+        let copies = pre_migrate(dir.path());
+        assert_eq!(copies.len(), 1);
+        let name = copies[0].file_name().unwrap().to_str().unwrap().to_owned();
+        let prefix = format!("pre-migrate-{SCHEMA_VERSION}-to-{}-", SCHEMA_VERSION + 1);
+        assert!(name.starts_with(&prefix), "{name}");
+        let copy = Connection::open(&copies[0]).unwrap();
+        assert_eq!(schema::schema_version(&copy).unwrap(), SCHEMA_VERSION);
+        let copy_id: String = copy
+            .query_row("SELECT value FROM meta WHERE key = 'server_id'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_ne!(copy_id, id);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&copies[0]).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
     }
 
     #[test]
