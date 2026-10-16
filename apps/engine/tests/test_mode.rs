@@ -445,3 +445,100 @@ fn oauth_refusal_is_an_authentication_error() {
     assert_eq!(run.result["error"], "ErrorConnection");
     assert_eq!(run.result["error_offline"], true);
 }
+
+/// `account.test` on a `serve` engine's stdin: the result object, and every stdout line.
+#[cfg(unix)]
+fn run_serve_test(config: &Path, account: &Value, env: &[(&str, &str)]) -> (Value, Vec<Value>) {
+    use std::process::Stdio;
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_mailsync"));
+    cmd.env("CONFIG_DIR_PATH", config)
+        .args(["--mode", "serve", "--socket"])
+        .arg(config.join("s"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    let mut child = cmd.spawn().unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let request = json!({ "jsonrpc": "2.0", "id": 1, "method": "account.test",
+                          "params": { "account": account } });
+    writeln!(stdin, "{request}").unwrap();
+    let mut lines = vec![];
+    let mut result = Value::Null;
+    for line in BufReader::new(child.stdout.take().unwrap()).lines() {
+        let v: Value = serde_json::from_str(&line.unwrap()).unwrap();
+        lines.push(v.clone());
+        if v["id"] == 1 {
+            result = v["result"].clone();
+            break;
+        }
+    }
+    writeln!(
+        stdin,
+        r#"{{"jsonrpc":"2.0","id":2,"method":"engine.shutdown"}}"#
+    )
+    .unwrap();
+    let status = child.wait().unwrap();
+    assert!(status.success(), "{status:?}");
+    let mut stderr = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr)
+        .unwrap();
+    assert_eq!(stderr, "");
+    (result, lines)
+}
+
+#[cfg(unix)]
+#[test]
+fn serve_account_test_matches_the_mode() {
+    let dir = tempfile::tempdir().unwrap();
+    let imap = imap_server(&["INBOX", "Sent"]);
+    let smtp = smtp_server(true);
+    let acct = account(imap.port, smtp.port, json!({}));
+    let mode = run_test_mode(dir.path(), &acct, &[]);
+    let (serve, lines) = run_serve_test(dir.path(), &acct, &[]);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!(keys(&serve), keys(&mode.result));
+    assert_eq!(serve["error"], Value::Null);
+    assert_eq!(serve["account"], acct);
+
+    let bad = account(imap.port, smtp.port, json!({"imap_password": "wrong"}));
+    let mode = run_test_mode(dir.path(), &bad, &[]);
+    let (serve, _) = run_serve_test(dir.path(), &bad, &[]);
+    assert_eq!(serve["error"], mode.result["error"]);
+    assert_eq!(serve["error_service"], "imap");
+    assert_eq!(serve["account"], Value::Null);
+}
+
+#[cfg(unix)]
+#[test]
+fn serve_account_test_returns_a_rotated_token_in_the_result_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let imap = imap_server(&["INBOX"]);
+    let smtp = smtp_server(true);
+    let url = token_server(
+        200,
+        r#"{"access_token":"at-1","expires_in":3600,"refresh_token":"rt-2"}"#,
+    );
+    let mut acct = account(
+        imap.port,
+        smtp.port,
+        json!({"imap_password": null, "smtp_password": null,
+               "refresh_token": "rt-1", "refresh_client_id": "cid"}),
+    );
+    acct["provider"] = json!("gmail");
+    let (result, lines) = run_serve_test(
+        dir.path(),
+        &acct,
+        &[("MAILSYNC_GOOGLE_TOKEN_URL", url.as_str())],
+    );
+    assert_eq!(result["error"], Value::Null, "{result}");
+    assert_eq!(result["account"]["settings"]["refresh_token"], "rt-2");
+    // No ProcessAccountSecretsUpdated delta: stdout carries only the response.
+    assert_eq!(lines.len(), 1, "{lines:?}");
+}
