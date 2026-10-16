@@ -762,3 +762,11 @@ CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspri
   timeout (still unconfirmed, 7).
 - **Next.** B1-H's Rust half (the fixture's Tern server object), B2-T server side. B1-C waits for
   `apps/desktop` to be free.
+- **Deferred: legacy Mailspring-compatible API.** For now Tern assumes everything is local
+  (`LocalOnly`), and server work waits. Later, consider a `/legacy` route set, off by default
+  behind a server setting: the B0 identity login page, `/api/me` and the stubs (restore from
+  `f9c75b055^:apps/backend/src/http/onboarding.rs` and `api.rs`, with their tests), and the
+  metadata routes mounted a second time under the prefix. Stock Mailspring only reaches it
+  through `env=development` (`http://localhost:5101`, no prefix) plus a local proxy; the C++
+  engine takes `IDENTITY_SERVER=<server>/legacy` directly, which would bring back the C++
+  oracle for the `backend-*` scenarios.
