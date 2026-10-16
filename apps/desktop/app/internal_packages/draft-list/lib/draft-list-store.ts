@@ -1,6 +1,7 @@
 import MailspringStore from 'mailspring-store';
 import {
   Rx,
+  Actions,
   Message,
   OutboxStore,
   AccountStore,
@@ -10,17 +11,28 @@ import {
   FocusedPerspectiveStore,
   DatabaseStore,
   QueryResultSet,
+  FocusedContentStore,
 } from 'mailspring-exports';
 import { ListTabular, ListDataSource } from 'mailspring-component-kit';
 
+/*
+The preview follows the focused draft by headerMessageId, not by id: changing the From
+account recreates the draft under a new id (DraftEditingSession.ensureCorrectAccount), and
+FocusedContentStore drops focus when the old id is unpersisted.
+*/
 class DraftListStore extends MailspringStore {
   constructor() {
     super();
     this.listenTo(FocusedPerspectiveStore, this._onPerspectiveChanged);
+    this.listenTo(Actions.setFocus, this._onSetFocus);
+    this.listenTo(Actions.composePopoutDraft, this._onPopoutDraft);
+    this.listenTo(DatabaseStore, this._onDataChanged);
     this._createListDataSource();
   }
 
   _dataSource: ListDataSource;
+  _focusedHeaderMessageId: string | null = null;
+  _previewFocusHandler: (() => void) | null = null;
 
   dataSource = () => {
     return this._dataSource;
@@ -30,10 +42,104 @@ class DraftListStore extends MailspringStore {
     return Rx.Observable.fromListSelection(this);
   };
 
+  focusedHeaderMessageId = () => {
+    return this._focusedHeaderMessageId;
+  };
+
+  // Drafts a list command applies to: the selection, else the focused draft, else the
+  // keyboard cursor, so Delete works without first checking a row.
+  draftsForCommand = (): Message[] => {
+    const selected = this._dataSource ? this._dataSource.selection.items() : [];
+    if (selected.length > 0) {
+      return selected as Message[];
+    }
+    const focused = FocusedContentStore.focused('draft') as Message | null;
+    if (focused) {
+      return [focused];
+    }
+    const cursor = FocusedContentStore.keyboardCursorEnabled()
+      ? (FocusedContentStore.keyboardCursor('draft') as Message | null)
+      : null;
+    return cursor ? [cursor] : [];
+  };
+
+  setPreviewFocusHandler = (handler: () => void) => {
+    this._previewFocusHandler = handler;
+  };
+
+  clearPreviewFocusHandler = (handler: () => void) => {
+    if (this._previewFocusHandler === handler) {
+      this._previewFocusHandler = null;
+    }
+  };
+
+  // Returns false when no preview composer is mounted to take focus.
+  focusPreview = () => {
+    if (!this._focusedHeaderMessageId || !this._previewFocusHandler) {
+      return false;
+    }
+    this._previewFocusHandler();
+    return true;
+  };
+
   // Inbound Events
 
   _onPerspectiveChanged = () => {
     this._createListDataSource();
+    Actions.setFocus({ collection: 'draft', item: null });
+  };
+
+  _onSetFocus = ({ collection, item }: { collection: string; item: Message | null }) => {
+    if (collection !== 'draft') {
+      return;
+    }
+    const headerMessageId = item ? item.headerMessageId : null;
+    if (headerMessageId !== this._focusedHeaderMessageId) {
+      this._focusedHeaderMessageId = headerMessageId;
+      this.trigger(this);
+    }
+  };
+
+  // Editing the same draft in the preview and a popout makes the two sessions overwrite
+  // each other (Mailspring #2158), so the preview lets go of a draft that pops out.
+  _onPopoutDraft = (headerMessageId: string) => {
+    if (headerMessageId && headerMessageId === this._focusedHeaderMessageId) {
+      Actions.setFocus({ collection: 'draft', item: null });
+    }
+  };
+
+  _onDataChanged = (change: { type: string; objectClass: string; objects: Message[] }) => {
+    const headerMessageId = this._focusedHeaderMessageId;
+    if (!headerMessageId || !change || change.objectClass !== 'Message') {
+      return;
+    }
+    const touched = change.objects.filter((m) => m.headerMessageId === headerMessageId);
+    if (touched.length === 0) {
+      return;
+    }
+    // Every save of the focused draft lands here; only a new id or a removal needs a lookup.
+    const focusedId = FocusedContentStore.focusedId('draft');
+    if (change.type === 'persist' && touched.every((m) => m.draft && m.id === focusedId)) {
+      return;
+    }
+    this._resolveFocusedDraft(headerMessageId);
+  };
+
+  _resolveFocusedDraft = async (headerMessageId: string) => {
+    const perspective = FocusedPerspectiveStore.current();
+    const query = DatabaseStore.findBy<Message>(Message, { headerMessageId, draft: true });
+    if (perspective.accountIds.length < AccountStore.accounts().length) {
+      query.where({ accountId: perspective.accountIds });
+    }
+    const draft = await query;
+    if (headerMessageId !== this._focusedHeaderMessageId) {
+      return;
+    }
+    if (!draft) {
+      Actions.setFocus({ collection: 'draft', item: null });
+    } else if (FocusedContentStore.focusedId('draft') !== draft.id) {
+      Actions.setFocus({ collection: 'draft', item: draft });
+    }
   };
 
   // Internal

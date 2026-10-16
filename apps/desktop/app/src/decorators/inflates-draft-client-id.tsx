@@ -4,13 +4,19 @@ import * as Actions from '../flux/actions';
 import * as Utils from '../flux/models/utils';
 import { Message, DraftEditingSession } from 'mailspring-exports';
 
+interface InflatesDraftClientIdProps {
+  headerMessageId: string;
+  onDraftReady?: () => void;
+  // A preview that swaps drafts as the selection moves must not destroy the pristine ones
+  // it shows: the user never opened them for writing.
+  keepPristineDraft?: boolean;
+}
+
 function InflatesDraftClientId(
   ComposedComponent
-): React.ComponentType<
-  { headerMessageId: string; onDraftReady: () => void } & React.HTMLProps<HTMLElement>
-> {
+): React.ComponentType<InflatesDraftClientIdProps & React.HTMLProps<HTMLElement>> {
   return class extends React.Component<
-    { headerMessageId: string; onDraftReady: () => void } & React.HTMLProps<HTMLElement>,
+    InflatesDraftClientIdProps & React.HTMLProps<HTMLElement>,
     { draft: Message; session: DraftEditingSession; _lastHeaderMessageId: string }
   > {
     static displayName = ComposedComponent.displayName;
@@ -22,7 +28,7 @@ function InflatesDraftClientId(
     static containerRequired = false;
 
     static getDerivedStateFromProps(
-      props: { headerMessageId: string; onDraftReady: () => void },
+      props: InflatesDraftClientIdProps,
       state: { draft: Message; session: DraftEditingSession; _lastHeaderMessageId: string }
     ) {
       // If headerMessageId prop has changed, clear draft and session state
@@ -57,10 +63,12 @@ function InflatesDraftClientId(
     componentWillUnmount() {
       this._mounted = false;
       this._teardownForDraft();
-      this._deleteDraftIfEmpty();
+      if (!this.props.keepPristineDraft) {
+        this._deleteDraftIfEmpty();
+      }
     }
 
-    componentDidUpdate(prevProps: { headerMessageId: string; onDraftReady: () => void }) {
+    componentDidUpdate(prevProps: InflatesDraftClientIdProps) {
       if (prevProps.headerMessageId !== this.props.headerMessageId) {
         // getDerivedStateFromProps has already cleared draft/session state before render
         // Now we just need to teardown the old draft and prepare for the new one

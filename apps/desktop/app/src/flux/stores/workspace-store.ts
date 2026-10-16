@@ -21,6 +21,7 @@ interface SheetSet {
   Preferences: SheetDeclaration;
   Activity: SheetDeclaration;
   Drafts: SheetDeclaration;
+  Draft: SheetDeclaration;
   Main: SheetDeclaration;
   Threads: SheetDeclaration;
   Global: SheetDeclaration;
@@ -183,6 +184,18 @@ class WorkspaceStore extends MailspringStore {
       }
     }
 
+    // Sheet.Draft is defined by the draft-list package.
+    if (collection === 'draft' && Sheet.Draft) {
+      if (this.layoutMode() === 'list') {
+        if (item && this.topSheet() !== Sheet.Draft) {
+          this.pushSheet(Sheet.Draft);
+        }
+        if (!item && this.topSheet() === Sheet.Draft) {
+          this.popSheet();
+        }
+      }
+    }
+
     if (collection === 'file') {
       if (this.layoutMode() === 'list') {
         if (item && this.topSheet() !== Sheet.File) {
@@ -204,6 +217,7 @@ class WorkspaceStore extends MailspringStore {
     // read immediately when turning the reading panel on.
     Actions.setFocus({ collection: 'thread', item: null });
     Actions.setCursorPosition({ collection: 'thread', item: null });
+    Actions.setFocus({ collection: 'draft', item: null });
 
     this._preferredLayoutMode = mode;
     AppEnv.config.set('core.workspace.mode', this._preferredLayoutMode);
@@ -370,6 +384,9 @@ class WorkspaceStore extends MailspringStore {
 
     if (Sheet.Thread && sheet === Sheet.Thread) {
       Actions.setFocus({ collection: 'thread', item: null });
+    }
+    if (Sheet.Draft && sheet === Sheet.Draft) {
+      Actions.setFocus({ collection: 'draft', item: null });
     }
   };
 

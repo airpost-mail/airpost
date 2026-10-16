@@ -1,5 +1,11 @@
 import React from 'react';
-import { Actions, Message } from 'mailspring-exports';
+import {
+  Actions,
+  DOMUtils,
+  Message,
+  WorkspaceStore,
+  FocusedContentStore,
+} from 'mailspring-exports';
 import {
   FluxContainer,
   FocusContainer,
@@ -12,6 +18,10 @@ import * as DraftListColumns from './draft-list-columns';
 class DraftList extends React.Component {
   static displayName = 'DraftList';
   static containerRequired = false;
+  static containerStyles = {
+    minWidth: DOMUtils.getWorkspaceCssNumberProperty('thread-list-min-width', 100),
+    maxWidth: DOMUtils.getWorkspaceCssNumberProperty('thread-list-max-width', 3000),
+  };
 
   render() {
     return (
@@ -45,6 +55,7 @@ class DraftList extends React.Component {
 
   _keymapHandlers = () => {
     return {
+      'core:focus-item': this._onEnter,
       'core:delete-item': this._onRemoveFromView,
       'core:gmail-remove-from-view': this._onRemoveFromView,
       'core:remove-from-view': this._onRemoveFromView,
@@ -57,8 +68,19 @@ class DraftList extends React.Component {
     }
   };
 
+  // In split mode the draft is already open beside the list, so Enter moves into it.
+  _onEnter = () => {
+    if (WorkspaceStore.layoutMode() !== 'list' && DraftListStore.focusPreview()) {
+      return;
+    }
+    const cursor = FocusedContentStore.keyboardCursor('draft');
+    if (cursor) {
+      Actions.setFocus({ collection: 'draft', item: cursor });
+    }
+  };
+
   _onRemoveFromView = () => {
-    for (const draft of DraftListStore.dataSource().selection.items()) {
+    for (const draft of DraftListStore.draftsForCommand()) {
       Actions.destroyDraft(draft);
     }
   };

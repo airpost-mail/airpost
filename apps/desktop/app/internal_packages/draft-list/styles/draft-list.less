@@ -61,3 +61,35 @@
     }
   }
 }
+
+.draft-preview {
+  height: 100%;
+  background: @background-secondary;
+
+  &.draft-preview-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .draft-preview-status {
+    color: @text-color-very-subtle;
+  }
+
+  .draft-preview-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: @padding-large-vertical * 2 @padding-large-horizontal;
+  }
+
+  .draft-preview-composer .composer-outer-wrap {
+    background: @background-primary;
+    box-shadow: 0 0 0.5px rgba(0, 0, 0, 0.28), 0 1px 1.5px rgba(0, 0, 0, 0.08);
+    border-radius: 4px;
+
+    &.focused {
+      box-shadow: 0 0 0.5px rgba(0, 0, 0, 0.28), 0 1px 1.5px rgba(0, 0, 0, 0.08),
+        0 0 3px @accent-primary;
+    }
+  }
+}

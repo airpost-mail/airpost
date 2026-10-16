@@ -38,6 +38,8 @@ interface ComposerViewProps {
   draft: MessageWithEditorState;
   session: DraftEditingSession;
   className?: string;
+  // Set by previews whose list keeps keyboard focus while the selection moves.
+  skipInitialFocus?: boolean;
 }
 interface ComposerViewState {
   quotedTextHidden: boolean;
@@ -101,7 +103,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
     // Note: the way this is implemented, `date` updates each time the draft is saved,
     // so this will autoselect the draft if it has been edited or created in the last 3s.
     const isBrandNew = Date.now() - (date instanceof Date ? date.getTime() : Number(date)) < 3000;
-    if (isBrandNew) {
+    if (isBrandNew && !this.props.skipInitialFocus) {
       const el = ReactDOM.findDOMNode(this) as HTMLElement;
       window.requestAnimationFrame(() => {
         el.scrollIntoView(false);

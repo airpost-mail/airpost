@@ -167,8 +167,8 @@ export class MultiselectList extends React.Component<MultiselectListProps, Multi
   }
 
   private _globalKeymapHandlers() {
+    // Caller handlers go last so a list can override the defaults, e.g. Enter in split mode.
     return {
-      ...this.props.keymapHandlers,
       'core:focus-item': () => this._onEnter(),
       'core:select-item': () => this._onSelectKeyboardItem(),
       'core:next-item': () => this._onShift(1),
@@ -180,6 +180,7 @@ export class MultiselectList extends React.Component<MultiselectListProps, Multi
       'core:pop-sheet': () => this._onDeselect(),
       'multiselect-list:select-all': () => this._onSelectAll(),
       'multiselect-list:deselect-all': () => this._onDeselect(),
+      ...this.props.keymapHandlers,
     };
   }
 
