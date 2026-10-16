@@ -1,15 +1,34 @@
-name: Build for Windows
+name: desktop-build-windows
+
+# Builds the Windows installer. There is no Windows build of the Rust engine yet
+# (docs/engine-port-plan.md section 11), so this app ships without a sync engine unless a
+# C++ mailsync.exe is placed in apps/desktop/app first; see docs/engine-port-status.md.
+#
+# Secrets (all optional; without the AZURE_* ones every signing step is skipped and the
+# installer is unsigned): AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
+# AZURE_TRUSTED_SIGNING_ENDPOINT, with the AZURE_TRUSTED_SIGNING_ACCOUNT_NAME and
+# AZURE_TRUSTED_SIGNING_CERT_PROFILE_NAME variables. AWS_ACCESS_KEY_ID and
+# AWS_SECRET_ACCESS_KEY with the BUILDS_S3_BUCKET variable upload to S3.
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: apps/desktop
+    env:
+      HAVE_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' && secrets.AZURE_TRUSTED_SIGNING_ENDPOINT != '' }}
+      HAVE_AWS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && vars.BUILDS_S3_BUCKET != '' }}
 
     steps:
       - name: Fail if branch is not main
-        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/master'
+        if: github.ref != 'refs/heads/main'
         run: |
           echo "This workflow should not be triggered with workflow_dispatch on a branch other than main"
           exit 1
@@ -21,25 +40,21 @@ jobs:
         uses: actions/cache@v6
         with:
           path: |
-            ./node_modules
-            ./app/node_modules
-          key: windows-2022-deps-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/package-lock.json') }}
+            apps/desktop/node_modules
+            apps/desktop/app/node_modules
+          key: windows-2022-deps-${{ hashFiles('apps/desktop/package-lock.json') }}-${{ hashFiles('apps/desktop/app/package-lock.json') }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            apps/desktop/app/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
-
-      - name: Setup AWS CLI
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
 
       - name: Lint
         run: npm run lint:check
@@ -50,6 +65,7 @@ jobs:
           DEBUG: electron-packager
 
       - name: Sign Application Files with Azure Trusted Signing
+        if: env.HAVE_SIGNING == 'true'
         uses: azure/trusted-signing-action@v0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -58,7 +74,7 @@ jobs:
           endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           trusted-signing-account-name: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ vars.AZURE_TRUSTED_SIGNING_CERT_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\app\dist\mailspring-win32-x64
+          files-folder: ${{ github.workspace }}\apps\desktop\app\dist\mailspring-win32-x64
           files-folder-filter: exe,dll,node
           files-folder-recurse: true
           file-digest: SHA256
@@ -66,6 +82,7 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Set Up Trusted Signing for the Installer Build
+        if: env.HAVE_SIGNING == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -111,6 +128,7 @@ jobs:
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Sign Windows Installer with Azure Trusted Signing
+        if: env.HAVE_SIGNING == 'true'
         uses: azure/trusted-signing-action@v0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -119,7 +137,7 @@ jobs:
           endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           trusted-signing-account-name: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ vars.AZURE_TRUSTED_SIGNING_CERT_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\app\dist
+          files-folder: ${{ github.workspace }}\apps\desktop\app\dist
           files-folder-filter: exe
           files-folder-recurse: false
           file-digest: SHA256
@@ -127,13 +145,33 @@ jobs:
           timestamp-digest: SHA256
 
       - name: Verify Every Shipped Binary Is Signed
+        if: env.HAVE_SIGNING == 'true'
         run: node app/build/verify-windows-signatures.js
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-windows-x64
+          path: |
+            apps/desktop/app/dist/MailspringSetup.exe
+            apps/desktop/app/dist/*.nupkg
+            apps/desktop/app/dist/RELEASES
+
+      - name: Setup AWS CLI
+        if: env.HAVE_AWS == 'true'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
       - name: Sync Artifacts to S3
+        if: env.HAVE_AWS == 'true'
         shell: pwsh
+        env:
+          BUCKET: ${{ vars.BUILDS_S3_BUCKET }}
         run: |
           $commit = git rev-parse --short=8 HEAD
-          aws s3 sync app/dist/ "s3://mailspring-builds/client/$commit/win-x64" `
+          aws s3 sync app/dist/ "s3://$env:BUCKET/client/$commit/win-x64" `
             --acl public-read `
             --exclude "*" `
             --include "MailspringSetup.exe" `

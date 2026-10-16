@@ -74,19 +74,36 @@ none has run against a real server)
 
 Signing, CI and packaging
 
-- [ ] Add a Developer ID Application certificate and the secrets to the GitHub repo:
-  `APPLE_CODESIGN_P12`, `APPLE_CODESIGN_KEY_PASSWORD`, `APPLE_SIGNING_IDENTITY`, plus either
-  `APPLE_API_KEY_P8` / `APPLE_API_KEY_ID` / `APPLE_API_ISSUER` or `APPLE_ID` /
-  `APPLE_ID_PASSWORD` / `APPLE_TEAM_ID`. Without them CI signs ad hoc and skips notarization.
+- [ ] Add the secrets and variables to the GitHub repo. Every signing, notarization, upload
+  and publish step skips when its secrets are absent, so the workflows run without any.
+  - Apple Developer ID (`engine-release.yml`, `desktop-build-macos.yml`):
+    `APPLE_CODESIGN_P12`, `APPLE_CODESIGN_KEY_PASSWORD`, `APPLE_SIGNING_IDENTITY`. Without
+    them the engine is signed ad hoc and the app is built unsigned; neither is notarized.
+  - Notarization: `engine-release.yml` takes `APPLE_API_KEY_P8` / `APPLE_API_KEY_ID` /
+    `APPLE_API_ISSUER` or `APPLE_ID` / `APPLE_ID_PASSWORD` / `APPLE_TEAM_ID`;
+    `desktop-build-macos.yml` takes only the Apple ID set plus `APPLE_ID_ASC_PROVIDER`
+    (electron-packager's `osxNotarize`), and `APPLE_PROVISIONING_PROFILE_B64`.
+  - Windows Trusted Signing (`desktop-build-windows.yml`): `AZURE_TENANT_ID`,
+    `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TRUSTED_SIGNING_ENDPOINT`; variables
+    `AZURE_TRUSTED_SIGNING_ACCOUNT_NAME`, `AZURE_TRUSTED_SIGNING_CERT_PROFILE_NAME`.
+  - Uploads (all desktop builds): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and the
+    variable `BUILDS_S3_BUCKET` (the upstream workflows wrote to Mailspring's bucket);
+    `SNAPCRAFT_STORE_CREDENTIALS` to publish the snap (its name is still `mailspring`);
+    `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` for source maps. Without them the
+    builds are only workflow artifacts.
 - [ ] Run `.github/workflows/engine-release.yml` once (`workflow_dispatch`, then an
   `engine-v*` tag). It has only been checked with actionlint and local runs of each step.
-- [ ] Put `mailsync-rs` into the shipped app: no desktop workflow runs
-  `build-release.sh --install-desktop`, so shipped builds silently fall back to C++. The
-  desktop workflows are in `apps/desktop/.github/workflows/` (`build-macos.yaml`,
-  `build-linux.yaml`, `build-linux-arm64.yaml`, `build-windows.yaml`); GitHub only runs
-  workflows under the repo root's `.github/workflows/`, so they need moving or wrapping first.
-  They will need the Rust toolchain and the signing secrets above.
-- [ ] Windows: there is no Rust build; decide whether Windows ships C++ only for now.
+- [ ] Run each workflow once on GitHub. They are at the repo root now: `engine.yml` (fmt,
+  clippy, cargo test, cargo deny, the harness quick tier, Windows `cargo check`),
+  `backend.yml` (the same for `apps/backend`'s own workspace), `desktop-test.yml` (lint,
+  typecheck, specs with the Rust engine installed; fails when no spec passes) and the
+  manual `desktop-build-{macos,linux,linux-arm64,windows}.yml`. The macOS and Linux builds
+  run `build-release.sh --install-desktop`, so they ship `mailsync-rs`. All were checked
+  only with actionlint 1.7.12; none has run on Actions. The Linux install tests have not run
+  against a package carrying `mailsync-rs`.
+- [ ] Windows: there is no Rust build, and with the C++ submodule gone
+  `desktop-build-windows.yml` packages no engine at all. Decide whether Windows ships C++
+  only for now (a `mailsync.exe` placed in `apps/desktop/app` before the build) or waits.
 - [ ] Optional: build `apps/engine/test/ab/mailsync-a83cc9a` to un-skip
   `rules-ready-pre-upgrade-messages` (x3).
 

@@ -1,17 +1,54 @@
-name: Build for Linux ARM64
+name: desktop-build-linux-arm64
+
+# Builds the arm64 .deb and .rpm with the Rust engine (app/mailsync-rs), builds the snap from
+# the .deb, and installs the packages on several distros.
+#
+# Secrets (all optional): AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY with the
+# BUILDS_S3_BUCKET variable upload the packages to S3; SNAPCRAFT_STORE_CREDENTIALS publishes
+# the snap to the edge channel. Without them those steps are skipped.
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
+  # The desktop builds on 24.04 (see build); the engine builds on 22.04 so its glibc floor
+  # stays at or below the oldest distro test-ubuntu installs on.
+  engine:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.92
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the Rust engine
+        run: apps/engine/packaging/build-release.sh linux
+        env:
+          OUT_DIR: ${{ runner.temp }}/engine-dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: engine-aarch64
+          path: ${{ runner.temp }}/engine-dist/aarch64-unknown-linux-gnu/mailsync
+          retention-days: 1
+
   build:
+    needs: engine
     runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: apps/desktop
+    env:
+      HAVE_AWS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && vars.BUILDS_S3_BUCKET != '' }}
 
     steps:
-      - name: Fail if branch is not master
-        if: github.ref != 'refs/heads/master'
+      - name: Fail if branch is not main
+        if: github.ref != 'refs/heads/main'
         run: |
-          echo "This workflow can only be run on master branch to ensure code-signed builds come from merged PRs"
+          echo "This workflow can only be run on main to ensure code-signed builds come from merged PRs"
           exit 1
 
       - uses: actions/checkout@v7
@@ -31,22 +68,26 @@ jobs:
             uuid-dev xvfb
           # Note: execstack is not available on ARM64 and not needed for aarch64 binaries.
 
+      - name: Download the Rust engine
+        uses: actions/download-artifact@v8
+        with:
+          name: engine-aarch64
+          path: ${{ runner.temp }}/engine
+
+      - name: Install the Rust engine
+        run: install -m 755 "$RUNNER_TEMP/engine/mailsync" app/mailsync-rs
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            apps/desktop/app/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
-        working-directory: .
-
-      - name: Setup AWS CLI
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
 
       - name: Lint
         run: npm run lint:check
@@ -54,48 +95,58 @@ jobs:
       - name: Build
         run: DEBUG=electron-packager npm run build
 
+      - name: Setup AWS CLI
+        if: env.HAVE_AWS == 'true'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
       - name: Sync Artifacts to S3
+        if: env.HAVE_AWS == 'true'
         run: |
-          aws s3 sync app/dist/ "s3://mailspring-builds/client/$(git rev-parse --short=8 HEAD)/linux-arm64" \
+          aws s3 sync app/dist/ "s3://$BUCKET/client/$(git rev-parse --short=8 HEAD)/linux-arm64" \
             --acl public-read \
             --exclude "*" --include "*.deb" --include "*.rpm"
+        env:
+          BUCKET: ${{ vars.BUILDS_S3_BUCKET }}
 
       - name: Upload DEB artifact for testing
         uses: actions/upload-artifact@v7
         with:
           name: mailspring-arm64-deb
-          path: app/dist/*.deb
+          path: apps/desktop/app/dist/*.deb
           retention-days: 1
 
       - name: Upload RPM artifact for testing
         uses: actions/upload-artifact@v7
         with:
           name: mailspring-arm64-rpm
-          path: app/dist/*.rpm
+          path: apps/desktop/app/dist/*.rpm
           retention-days: 1
 
   build-snap:
     needs: build
     runs-on: ubuntu-24.04-arm
+    env:
+      HAVE_SNAP: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS != '' }}
     steps:
-      - name: Fail if branch is not master
-        if: github.ref != 'refs/heads/master'
-        run: |
-          echo "This workflow can only be run on master branch to ensure code-signed builds come from merged PRs"
-          exit 1
-
       - uses: actions/checkout@v7
 
       - name: Download DEB artifact
         uses: actions/download-artifact@v8
         with:
           name: mailspring-arm64-deb
-          path: app/dist/
+          path: apps/desktop/app/dist/
 
       - uses: snapcore/action-build@v1
         id: build-snap
+        with:
+          path: apps/desktop
 
       - uses: snapcore/action-publish@v1
+        if: env.HAVE_SNAP == 'true'
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
@@ -150,7 +201,9 @@ jobs:
             fi
 
             # Verify mailsync binary exists
-            if [ -f /usr/share/mailspring/mailsync ]; then
+            if [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs ]; then
+              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs
+            elif [ -f /usr/share/mailspring/mailsync ]; then
               MAILSYNC_PATH=/usr/share/mailspring/mailsync
             elif [ -f /usr/share/mailspring/mailsync.bin ]; then
               MAILSYNC_PATH=/usr/share/mailspring/mailsync.bin
@@ -223,7 +276,9 @@ jobs:
             fi
 
             # Verify mailsync binary exists
-            if [ -f /usr/share/mailspring/mailsync ]; then
+            if [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs ]; then
+              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs
+            elif [ -f /usr/share/mailspring/mailsync ]; then
               MAILSYNC_PATH=/usr/share/mailspring/mailsync
             elif [ -f /usr/share/mailspring/mailsync.bin ]; then
               MAILSYNC_PATH=/usr/share/mailspring/mailsync.bin

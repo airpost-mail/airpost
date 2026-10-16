@@ -1,0 +1,142 @@
+name: desktop-build-macos
+
+# Builds the macOS desktop app with the Rust engine (app/mailsync-rs) for arm64 and x64.
+#
+# Secrets (all optional; without APPLE_CODESIGN_P12 the app is built unsigned and not
+# notarized, and the S3 upload is skipped without the AWS secrets):
+#   APPLE_CODESIGN_P12, APPLE_CODESIGN_KEY_PASSWORD  Developer ID Application certificate
+#   APPLE_SIGNING_IDENTITY                           its name or SHA-1
+#   APPLE_PROVISIONING_PROFILE_B64                   provisioning profile, base64
+#   APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID, APPLE_ID_ASC_PROVIDER   notarization
+#   SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT    source map upload
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY         S3 upload, with the BUILDS_S3_BUCKET variable
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - os: macos-26
+            arch: arm64
+          - os: macos-26-intel
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/desktop
+    env:
+      HAVE_CERT: ${{ secrets.APPLE_CODESIGN_P12 != '' }}
+      HAVE_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE_B64 != '' }}
+      HAVE_AWS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && vars.BUILDS_S3_BUCKET != '' }}
+
+    steps:
+      - name: Fail if branch is not main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "This workflow can only be run on main to ensure code-signed builds come from merged PRs"
+          exit 1
+
+      - name: Checkout Repo
+        uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@1.92
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build and install the Rust engine
+        run: ../engine/packaging/build-release.sh macos --install-desktop=${{ matrix.arch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Cache NodeJS modules
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/desktop/node_modules
+            apps/desktop/app/node_modules
+          key: ${{ matrix.os }}-${{ runner.arch }}-deps-${{ hashFiles('apps/desktop/package-lock.json') }}-${{ hashFiles('apps/desktop/app/package-lock.json') }}
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Setup Codesigning
+        if: env.HAVE_CERT == 'true'
+        uses: apple-actions/import-codesign-certs@77ba2a2a8f5cfc8c405ebf3159f767c323e238f9 # v7.1.0
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CODESIGN_P12 }}
+          p12-password: ${{ secrets.APPLE_CODESIGN_KEY_PASSWORD }}
+
+      - name: Setup Provisioning Profile
+        if: env.HAVE_CERT == 'true' && env.HAVE_PROFILE == 'true'
+        run: |
+          echo "APPLE_PROVISIONING_PROFILE_PATH=$RUNNER_TEMP/Mailspring.provisionprofile" >> "$GITHUB_ENV"
+          echo "$APPLE_PROVISIONING_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/Mailspring.provisionprofile"
+        env:
+          APPLE_PROVISIONING_PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_B64 }}
+
+      - name: Lint
+        run: npm run lint:check
+
+      # build.js signs when SIGN_BUILD is set and notarizes when APPLE_ID is set, so both are
+      # left empty without a certificate: notarizing an unsigned app fails.
+      - name: Build
+        run: |
+          if [ "$HAVE_CERT" = true ]; then
+            export SIGN_BUILD=true
+          else
+            echo "No signing certificate: building unsigned and not notarizing"
+            unset APPLE_ID
+          fi
+          npm run build
+        env:
+          DEBUG: electron-packager,electron-osx-sign,electron-notarize*
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID_ASC_PROVIDER: ${{ secrets.APPLE_ID_ASC_PROVIDER }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE_PATH: ${{ env.APPLE_PROVISIONING_PROFILE_PATH }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: Rename artifacts
+        if: matrix.arch == 'arm64'
+        run: |
+          mv app/dist/Mailspring.zip app/dist/Mailspring-AppleSilicon.zip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-macos-${{ matrix.arch }}
+          path: apps/desktop/app/dist/*.zip
+
+      - name: Setup AWS CLI
+        if: env.HAVE_AWS == 'true'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Sync artifacts to S3 bucket
+        if: env.HAVE_AWS == 'true'
+        run: |
+          aws s3 sync app/dist/ "s3://$BUCKET/client/$(git rev-parse --short=8 HEAD)/osx" \
+            --acl public-read \
+            --exclude "*" --include "*.zip"
+        env:
+          BUCKET: ${{ vars.BUILDS_S3_BUCKET }}

@@ -7,6 +7,9 @@ on:
   pull_request:
     paths: ["apps/engine/**", "crates/**", "Cargo.toml", "Cargo.lock", "deny.toml", "rust-toolchain.toml", ".github/workflows/engine.yml"]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -34,6 +37,31 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
+
+  # The harness's quick tier: fake servers only, no Docker (apps/engine/test/README.md).
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.92
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: cargo build --release --locked -p mailsync
+      - run: pip install -r apps/engine/test/requirements.txt
+      # -n auto: the pytest.ini default of 16 workers oversubscribes a 4-core runner.
+      - run: python3 -m pytest apps/engine/test -n auto
+        timeout-minutes: 30
+        env:
+          HARNESS_RUNS_DIR: ${{ runner.temp }}/harness-runs
+      # Kept only for failed and xfailed cases: engine log, database, server transcript.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: harness-runs
+          path: ${{ runner.temp }}/harness-runs
+          if-no-files-found: ignore
 
   # No Windows builds until parity (plan section 11), but the code must keep compiling there.
   windows-check:
