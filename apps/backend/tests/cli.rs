@@ -243,6 +243,13 @@ fn serve_answers_and_stops_on_sigterm() {
     read_until(&mut stderr, "backup written");
     let written: Vec<_> = std::fs::read_dir(&backups).unwrap().collect();
     assert_eq!(written.len(), 1);
+    let backup = written.into_iter().next().unwrap().unwrap().path();
+    let data = dir.path().join("data");
+    let backup_arg = backup.to_str().unwrap();
+    let err = fails(&data, &["restore", backup_arg]);
+    assert!(err.contains("running"), "{err}");
+    let err = fails(&data, &["rotate-server-id"]);
+    assert!(err.contains("running"), "{err}");
 
     let health = |bind: &str| {
         let mut c = cmd(&dir.path().join("data"));
@@ -274,6 +281,9 @@ fn serve_answers_and_stops_on_sigterm() {
     let out = health(&addr);
     assert!(!out.status.success());
     assert!(String::from_utf8_lossy(&out.stderr).contains("connecting to"));
+
+    let out = ok(&data, &["restore", backup_arg], None);
+    assert!(out.contains("server id"), "{out}");
 }
 
 #[test]

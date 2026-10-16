@@ -24,6 +24,10 @@ pub enum RepoError {
         crate::wire::MAX_ACCOUNTS_PER_USER
     )]
     AccountLimit,
+    #[error("{} is in use by a running `tern-backend serve`; stop it first", .0.display())]
+    Locked(std::path::PathBuf),
+    #[error("{0}")]
+    NotRestorable(String),
     #[error(transparent)]
     Migrate(#[from] MigrateError),
     #[error(transparent)]

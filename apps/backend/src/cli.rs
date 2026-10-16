@@ -50,8 +50,12 @@ pub enum Command {
     /// Write a consistent, owner-only copy of the database to PATH (`VACUUM INTO`). The copy
     /// gets a new server id, so engines re-sync from scratch if it is ever restored.
     Backup { path: PathBuf },
+    /// Replace the database with the one at PATH (a backup, a pre-migration copy, or a copy
+    /// of a stopped server's tern.db), with a new server id so clients re-sync. The server
+    /// must be stopped.
+    Restore { path: PathBuf },
     /// Give the database a new server id. Run it, with the server stopped, after restoring
-    /// the data dir from anything other than `backup` (a filesystem snapshot, say).
+    /// the data dir by other means than `restore` (a filesystem snapshot, say).
     RotateServerId,
     #[command(subcommand)]
     User(UserCommand),
@@ -160,7 +164,19 @@ pub fn run(cli: Cli) -> CliResult {
             )?;
             Ok(())
         }
+        Command::Restore { path } => {
+            let _lock = SqliteRepo::lock_data_dir(&config.data_dir)?;
+            let id = SqliteRepo::restore(&config.data_dir, &path)?;
+            writeln!(
+                out,
+                "restored {} as {} (server id {id}); clients re-sync their metadata",
+                path.display(),
+                config.db_path().display()
+            )?;
+            Ok(())
+        }
         Command::RotateServerId => {
+            let _lock = SqliteRepo::lock_data_dir(&config.data_dir)?;
             let id = SqliteRepo::open(&config.data_dir)?.rotate_server_id()?;
             writeln!(out, "server id {id}")?;
             Ok(())
@@ -182,6 +198,7 @@ fn serve(config: Config, insecure_public_url: bool) -> CliResult {
         .enable_all()
         .build()?;
     runtime.block_on(async move {
+        let _lock = SqliteRepo::lock_data_dir(&config.data_dir)?;
         let repo: Arc<dyn Repo> = Arc::new(SqliteRepo::open(&config.data_dir)?);
         if config.signup == Signup::Closed && repo.list_users()?.is_empty() {
             tracing::warn!(

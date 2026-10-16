@@ -72,6 +72,92 @@ impl SqliteRepo {
         })
     }
 
+    /// Locks `<data_dir>/serve.lock` for as long as the returned file is open. `serve` holds
+    /// it, so a second server can't share the data dir and `restore` and `rotate-server-id`
+    /// refuse to run under a live one.
+    pub fn lock_data_dir(data_dir: &Path) -> Result<std::fs::File> {
+        create_private_dir(data_dir)?;
+        let mut o = std::fs::OpenOptions::new();
+        o.create(true).write(true).truncate(false);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut o, 0o600);
+        let file = o.open(data_dir.join("serve.lock"))?;
+        match file.try_lock() {
+            Ok(()) => Ok(file),
+            Err(std::fs::TryLockError::WouldBlock) => Err(RepoError::Locked(data_dir.to_owned())),
+            Err(std::fs::TryLockError::Error(e)) => Err(e.into()),
+        }
+    }
+
+    /// Replaces `tern.db` in `data_dir` with a copy of the database at `src` (a backup, a
+    /// pre-migration copy, or a file-level copy of a stopped server's `tern.db`), removing
+    /// any `-wal` and `-shm` left beside the old one. The restored database gets a new server
+    /// id, which is returned, so clients re-sync instead of skipping writes. The caller holds
+    /// [`SqliteRepo::lock_data_dir`].
+    pub fn restore(data_dir: &Path, src: &Path) -> Result<String> {
+        let live = data_dir.join("tern.db");
+        if live.exists() && std::fs::canonicalize(&live)? == std::fs::canonicalize(src)? {
+            return Err(RepoError::NotRestorable(format!(
+                "{} is the live database",
+                src.display()
+            )));
+        }
+        {
+            let conn = Connection::open_with_flags(src, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+            let not_ours = || {
+                RepoError::NotRestorable(format!(
+                    "{} is not a tern-backend database",
+                    src.display()
+                ))
+            };
+            let version = schema::schema_version(&conn).map_err(|_| not_ours())?;
+            if version == 0 {
+                return Err(not_ours());
+            }
+            if version > schema::MIGRATIONS.len() as u32 {
+                return Err(schema::MigrateError::TooNew {
+                    found: version,
+                    supported: schema::MIGRATIONS.len() as u32,
+                }
+                .into());
+            }
+            conn.query_row("SELECT value FROM meta WHERE key = 'server_id'", [], |r| {
+                r.get::<_, String>(0)
+            })
+            .map_err(|_| not_ours())?;
+        }
+        create_private_dir(data_dir)?;
+        let tmp = data_dir.join("tern.db.restoring");
+        let _ = std::fs::remove_file(&tmp);
+        create_private_file(&tmp)?;
+        let copy = || -> Result<String> {
+            // Through SQLite rather than a file copy, so a source still in WAL mode with its
+            // own -wal file is copied whole.
+            let conn = Connection::open_with_flags(src, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+            conn.execute(
+                "VACUUM INTO ?1",
+                [tmp.to_str().ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "data dir is not UTF-8")
+                })?],
+            )?;
+            drop(conn);
+            let id = ids::new_server_id();
+            set_server_id(&Connection::open(&tmp)?, &id)?;
+            Ok(id)
+        };
+        let id = copy().inspect_err(|_| {
+            let _ = std::fs::remove_file(&tmp);
+        })?;
+        for ext in ["-wal", "-shm"] {
+            match std::fs::remove_file(data_dir.join(format!("tern.db{ext}"))) {
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
+                _ => {}
+            }
+        }
+        std::fs::rename(&tmp, &live)?;
+        Ok(id)
+    }
+
     fn open_reader(&self) -> Result<Connection> {
         let conn = Connection::open_with_flags(
             &self.path,
@@ -621,6 +707,81 @@ mod tests {
             SqliteRepo::open(dir.path()),
             Err(RepoError::Migrate(schema::MigrateError::TooNew { .. }))
         ));
+    }
+
+    #[test]
+    fn data_dir_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let held = SqliteRepo::lock_data_dir(dir.path()).unwrap();
+        assert!(matches!(
+            SqliteRepo::lock_data_dir(dir.path()),
+            Err(RepoError::Locked(_))
+        ));
+        drop(held);
+        SqliteRepo::lock_data_dir(dir.path()).unwrap();
+    }
+
+    #[test]
+    fn restore_replaces_the_database() {
+        let (dir, repo) = repo();
+        repo.create_user(&new_user("ada@example.com"), 1).unwrap();
+        let id = repo.server_id().unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let copy = out.path().join("copy.db");
+        repo.backup(&copy).unwrap();
+        repo.create_user(&new_user("bob@example.com"), 2).unwrap();
+        drop(repo);
+        std::fs::write(dir.path().join("tern.db-wal"), b"stale").unwrap();
+        std::fs::write(dir.path().join("tern.db-shm"), b"stale").unwrap();
+
+        let restored_id = SqliteRepo::restore(dir.path(), &copy).unwrap();
+        assert!(!dir.path().join("tern.db-wal").exists());
+        assert!(!dir.path().join("tern.db.restoring").exists());
+        let repo = SqliteRepo::open(dir.path()).unwrap();
+        assert_eq!(repo.server_id().unwrap(), restored_id);
+        assert_ne!(restored_id, id);
+        let emails: Vec<_> = repo
+            .list_users()
+            .unwrap()
+            .into_iter()
+            .map(|u| u.email)
+            .collect();
+        assert_eq!(emails, ["ada@example.com"]);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(dir.path().join("tern.db"))
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+
+        // Not ours, newer than this build, or the live file itself.
+        let junk = out.path().join("junk.db");
+        std::fs::write(&junk, b"not a database").unwrap();
+        assert!(SqliteRepo::restore(dir.path(), &junk).is_err());
+        let empty = out.path().join("empty.db");
+        drop(Connection::open(&empty).unwrap());
+        assert!(matches!(
+            SqliteRepo::restore(dir.path(), &empty),
+            Err(RepoError::NotRestorable(_))
+        ));
+        let newer = out.path().join("newer.db");
+        repo.backup(&newer).unwrap();
+        Connection::open(&newer)
+            .unwrap()
+            .pragma_update(None, "user_version", SCHEMA_VERSION + 1)
+            .unwrap();
+        assert!(matches!(
+            SqliteRepo::restore(dir.path(), &newer),
+            Err(RepoError::Migrate(schema::MigrateError::TooNew { .. }))
+        ));
+        assert!(matches!(
+            SqliteRepo::restore(dir.path(), &dir.path().join("tern.db")),
+            Err(RepoError::NotRestorable(_))
+        ));
+        assert_eq!(repo.server_id().unwrap(), restored_id);
     }
 
     #[test]
