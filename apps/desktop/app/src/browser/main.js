@@ -42,9 +42,9 @@ if (typeof process.setFdLimit === 'function') {
 }
 
 // Tern keeps its own profile so it can run next to Mailspring.app, and imports the Mailspring
-// profile of the same mode on first launch. The app name stays "Mailspring": safeStorage's
-// keychain item ("Mailspring Safe Storage") follows it, and that is what carries saved
-// credentials over.
+// profile of the same mode on first launch. The app name (package.json productName) is "Tern",
+// so safeStorage's keychain item is "Tern Safe Storage"; key-manager.ts carries saved
+// credentials over from Mailspring's.
 const profileDirNames = args => {
   if (args.specMode) return { tern: 'Tern-spec', mailspring: null };
   if (args.devMode) return { tern: 'Tern-dev', mailspring: 'Mailspring-dev' };
@@ -67,8 +67,8 @@ const setupConfigDir = args => {
 
   fs.mkdirSync(configDirPath, { recursive: true });
 
-  // Also moves Electron's local storage and crash dumps here. The default userData follows the
-  // app name, which is Mailspring's profile.
+  // Also moves Electron's local storage and crash dumps here, for --dev and --config-dir-path
+  // too (the default userData would be the app name's folder, "Tern").
   app.setPath('userData', configDirPath);
 
   return { configDirPath, importFromPath };
@@ -120,7 +120,7 @@ const declareOptions = argv => {
   const optimist = require('optimist');
   const options = optimist(argv);
   options.usage(
-    `Mailspring\n\nUsage: mailspring [options] [recipient] [attachment]\n\nRun Mailspring: The open source extensible email client\n\n\`mailspring mailto:johndoe@example.com\` to compose an e-mail to johndoe@example.com.\n\`mailspring ./attachment.txt\` to compose an e-mail with a text file attached.\n\`mailspring --dev\` to start the client in dev mode.\n\`mailspring --test\` to run unit tests.`
+    `Tern\n\nUsage: tern [options] [recipient] [attachment]\n\nRun Tern: The open source extensible email client\n\n\`tern mailto:johndoe@example.com\` to compose an e-mail to johndoe@example.com.\n\`tern ./attachment.txt\` to compose an e-mail with a text file attached.\n\`tern --dev\` to start the client in dev mode.\n\`tern --test\` to run unit tests.`
   );
   options
     .alias('d', 'dev')
@@ -153,7 +153,7 @@ const declareOptions = argv => {
   options
     .alias('c', 'config-dir-path')
     .string('c')
-    .describe('c', 'Override the path to the Mailspring configuration directory');
+    .describe('c', 'Override the path to the Tern configuration directory');
   options
     .alias('s', 'spec-directory')
     .string('s')
@@ -172,7 +172,7 @@ const declareOptions = argv => {
   options
     .alias('b', 'background')
     .boolean('b')
-    .describe('b', 'Start Mailspring in the background');
+    .describe('b', 'Start Tern in the background');
   return options;
 };
 
@@ -213,7 +213,7 @@ const parseCommandLine = argv => {
   let pathsToOpen = [];
 
   // On Windows and Linux, mailto and file opens are passed in argv. Go through
-  // the items and pluck out things that look like mailto:, mailspring:, file paths
+  // the items and pluck out things that look like mailto:, tern:, file paths
   let ignoreNext = false;
   // args._ is all of the non-hyphenated options.
   for (const arg of args._) {
@@ -229,7 +229,8 @@ const parseCommandLine = argv => {
     if (path.resolve(arg) === resourcePath) {
       continue;
     }
-    if (arg.startsWith('mailto:') || arg.startsWith('mailspring:')) {
+    // mailspring: is still accepted from argv: jump lists and links made before the rename.
+    if (arg.startsWith('mailto:') || arg.startsWith('tern:') || arg.startsWith('mailspring:')) {
       urlsToOpen.push(arg);
     } else if (arg[0] !== '-' && arg[0] !== '?' && /[/|\\]/.test(arg)) {
       pathsToOpen.push(arg);
@@ -313,8 +314,9 @@ const start = () => {
     // Must be set before setAppUserModelId so RegisterActivator writes it
     // into the Start Menu shortcut. Without this, action/reply notification
     // events are silently dropped (COM server is never registered).
-    app.setToastActivatorCLSID('{E6AD16B0-2830-48E7-9DB7-439152FA917B}');
-    app.setAppUserModelId('com.squirrel.mailspring.mailspring');
+    const WindowsUpdater = require('./windows-updater');
+    app.setToastActivatorCLSID(WindowsUpdater.TOAST_ACTIVATOR_CLSID);
+    app.setAppUserModelId(WindowsUpdater.APP_USER_MODEL_ID);
   }
 
   // Set the app name explicitly for Linux to ensure the system tray icon
@@ -322,7 +324,7 @@ const start = () => {
   // StatusNotifierItem ID on Linux, causing their tray visibility settings
   // to be synchronized. See: https://github.com/electron/electron/issues/40936
   if (process.platform === 'linux') {
-    app.setName('Mailspring');
+    app.setName('Tern');
   }
 
 
@@ -342,8 +344,8 @@ const start = () => {
   }
 
   // On Windows, register the AppUserModelId with a display name so notifications
-  // show "Mailspring" instead of "com.squirrel.mailspring.mailspring".
-  // Also register mailto: protocol handler so Windows knows Mailspring can handle
+  // show "Tern" instead of the raw AUMID.
+  // Also register mailto: protocol handler so Windows knows Tern can handle
   // mailto: links (this doesn't make it the default, just registers it as an option).
   // This handles existing installations and ensures registration completes even if
   // the Squirrel install hook's detached processes didn't finish in time.

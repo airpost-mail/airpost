@@ -73,8 +73,9 @@ const RegExpUtils = {
     return new RegExp(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/i);
   },
 
+  // tern: links, and mailspring: ones from before the rename.
   mailspringCommandRegex() {
-    return new RegExp(/mailspring:\S+/i);
+    return new RegExp(/\b(?:tern|mailspring):\S+/i);
   },
 
   // Test cases: https://regex101.com/r/pD7iS5/4

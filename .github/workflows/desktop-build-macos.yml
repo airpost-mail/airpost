@@ -89,8 +89,8 @@ jobs:
       - name: Setup Provisioning Profile
         if: env.HAVE_CERT == 'true' && env.HAVE_PROFILE == 'true'
         run: |
-          echo "APPLE_PROVISIONING_PROFILE_PATH=$RUNNER_TEMP/Mailspring.provisionprofile" >> "$GITHUB_ENV"
-          echo "$APPLE_PROVISIONING_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/Mailspring.provisionprofile"
+          echo "APPLE_PROVISIONING_PROFILE_PATH=$RUNNER_TEMP/Tern.provisionprofile" >> "$GITHUB_ENV"
+          echo "$APPLE_PROVISIONING_PROFILE_B64" | base64 --decode > "$RUNNER_TEMP/Tern.provisionprofile"
         env:
           APPLE_PROVISIONING_PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_B64 }}
 
@@ -120,7 +120,7 @@ jobs:
       - name: Rename artifacts
         if: matrix.arch == 'arm64'
         run: |
-          mv app/dist/Mailspring.zip app/dist/Mailspring-AppleSilicon.zip
+          mv app/dist/Tern.zip app/dist/Tern-AppleSilicon.zip
 
       # GPLv3 section 6(d): a tag pins the source and SOURCE.txt, published next to every
       # package, points to it.

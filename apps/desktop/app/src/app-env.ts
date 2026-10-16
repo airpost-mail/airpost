@@ -135,49 +135,14 @@ export default class AppEnvConstructor {
     const MailsyncBridge = require('./flux/mailsync-bridge').default;
     this.mailsyncBridge = new MailsyncBridge();
 
-    process.title = `Mailspring ${this.getWindowType()}`;
+    process.title = `Tern ${this.getWindowType()}`;
     this.onWindowPropsReceived(() => {
-      process.title = `Mailspring ${this.getWindowType()}`;
+      process.title = `Tern ${this.getWindowType()}`;
     });
-
-    // Shortcut phased out in April 2026, remove in June/July 2026
-    if (this.isMainWindow() && process.platform === 'win32') {
-      setTimeout(() => {
-        this.fixStaleWin32LaunchOnSystemStart();
-      }, 1000);
-    }
 
     this.bootComplete = true;
   }
 
-  fixStaleWin32LaunchOnSystemStart() {
-    if (!process.env.APPDATA) {
-      return;
-    }
-    if (window.localStorage.getItem('fixStaleWin32LaunchOnSystemStart')) {
-      return;
-    }
-
-    window.localStorage.setItem('fixStaleWin32LaunchOnSystemStart', 'true');
-
-    const shortcutPath = path.join(
-      process.env.APPDATA,
-      'Microsoft',
-      'Windows',
-      'Start Menu',
-      'Programs',
-      'Startup',
-      'Mailspring.lnk'
-    );
-    const fs = require('fs');
-    const exists = fs.existsSync(shortcutPath);
-    if (exists) {
-      fs.unlink(shortcutPath, () => {});
-      const { SystemStartService } = require('mailspring-exports');
-      const service = new SystemStartService();
-      service.configureToLaunchOnSystemStart();
-    }
-  }
   // This ties window.onerror and process.uncaughtException,handledRejection
   // to the publically callable `reportError` method. This will take care of
   // reporting errors if necessary and hooking into error handling

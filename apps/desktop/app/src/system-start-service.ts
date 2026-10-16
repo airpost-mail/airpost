@@ -37,26 +37,11 @@ class SystemStartServiceDarwin extends SystemStartServiceBase {
   configureToLaunchOnSystemStart() {
     const app = require('@electron/remote').app;
     app.setLoginItemSettings({ openAtLogin: true });
-    this._cleanupLegacyPlist();
   }
 
   dontLaunchOnSystemStart() {
     const app = require('@electron/remote').app;
     app.setLoginItemSettings({ openAtLogin: false });
-    this._cleanupLegacyPlist();
-  }
-
-  _cleanupLegacyPlist() {
-    if (!process.env.HOME) {
-      return;
-    }
-    const plistPath = path.join(
-      process.env.HOME,
-      'Library',
-      'LaunchAgents',
-      'com.mailspring.plist'
-    );
-    fs.unlink(plistPath, () => {});
   }
 }
 
@@ -180,9 +165,9 @@ class SystemStartServiceLinuxBackgroundPortal extends SystemStartServiceBase {
   configureToLaunchOnSystemStart() {
     this.doPortalRequest({
       autostart: true,
-      commandline: ['mailspring', '--background', '%U'],
+      commandline: ['ternmail', '--background', '%U'],
       reason: localized(
-        'Mailspring needs to run in the background to check for new mail and show notifications.'
+        'Tern needs to run in the background to check for new mail and show notifications.'
       ),
     }).catch((error) => {
       console.error('Error configuring to launch on system start:', error);

@@ -120,7 +120,7 @@ jobs:
       - name: Upload DEB artifact for testing
         uses: actions/upload-artifact@v7
         with:
-          name: mailspring-deb
+          name: tern-deb
           path: |
             apps/desktop/app/dist/*.deb
             apps/desktop/app/dist/SOURCE.txt
@@ -129,7 +129,7 @@ jobs:
       - name: Upload RPM artifact for testing
         uses: actions/upload-artifact@v7
         with:
-          name: mailspring-rpm
+          name: tern-rpm
           path: |
             apps/desktop/app/dist/*.rpm
             apps/desktop/app/dist/SOURCE.txt
@@ -146,7 +146,7 @@ jobs:
       - name: Download DEB artifact
         uses: actions/download-artifact@v8
         with:
-          name: mailspring-deb
+          name: tern-deb
           path: apps/desktop/app/dist/
 
       - uses: snapcore/action-build@v1
@@ -172,13 +172,13 @@ jobs:
       - name: Download DEB artifact
         uses: actions/download-artifact@v8
         with:
-          name: mailspring-deb
+          name: tern-deb
 
       - name: Test installation on Ubuntu ${{ matrix.ubuntu_version }}
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace ubuntu:${{ matrix.ubuntu_version }} bash -c "
             set -e
-            echo '=== Testing Mailspring installation on Ubuntu ${{ matrix.ubuntu_version }} ==='
+            echo '=== Testing Tern installation on Ubuntu ${{ matrix.ubuntu_version }} ==='
 
             # Install the DEB package (this will auto-install dependencies)
             cd /workspace
@@ -195,47 +195,47 @@ jobs:
             apt-get install -y xvfb
 
             # Verify installation succeeded
-            dpkg -l | grep mailspring || (echo '✗ Mailspring package not installed' && exit 1)
+            dpkg -l | grep tern || (echo '✗ Tern package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which mailspring || (echo '✗ mailspring binary not found in PATH' && exit 1)
+            which ternmail || (echo '✗ ternmail binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
-            dpkg -L mailspring | head -20
+            dpkg -L tern | head -20
 
-            # Run mailspring --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running mailspring --version...'
-            xvfb-run -a mailspring --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run ternmail --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running ternmail --version...'
+            xvfb-run -a ternmail --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ mailspring --version passed on Ubuntu ${{ matrix.ubuntu_version }}'
+              echo '✓ ternmail --version passed on Ubuntu ${{ matrix.ubuntu_version }}'
             else
-              echo '✗ mailspring --version failed on Ubuntu ${{ matrix.ubuntu_version }}'
+              echo '✗ ternmail --version failed on Ubuntu ${{ matrix.ubuntu_version }}'
               exit 1
             fi
 
             # Verify mailsync binary exists (check multiple locations)
-            if [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/mailspring/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync
-            elif [ -f /usr/share/mailspring/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync.bin
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
+            elif [ -f /usr/share/tern/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/mailsync
+            elif [ -f /usr/share/tern/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
             else
               echo '✗ mailsync binary not found'
-              echo 'Files in /usr/share/mailspring/:'
-              ls -la /usr/share/mailspring/ | head -30
+              echo 'Files in /usr/share/tern/:'
+              ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
@@ -256,7 +256,7 @@ jobs:
               exit 1
             fi
 
-            echo '✓ Mailspring installation test passed on Ubuntu ${{ matrix.ubuntu_version }}'
+            echo '✓ Tern installation test passed on Ubuntu ${{ matrix.ubuntu_version }}'
           "
 
   test-fedora:
@@ -269,13 +269,13 @@ jobs:
       - name: Download RPM artifact
         uses: actions/download-artifact@v8
         with:
-          name: mailspring-rpm
+          name: tern-rpm
 
       - name: Test installation on Fedora ${{ matrix.fedora_version }}
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace fedora:${{ matrix.fedora_version }} bash -c "
             set -e
-            echo '=== Testing Mailspring installation on Fedora ${{ matrix.fedora_version }} ==='
+            echo '=== Testing Tern installation on Fedora ${{ matrix.fedora_version }} ==='
 
             # Install dependencies first
             cd /workspace
@@ -285,55 +285,55 @@ jobs:
             dnf install -y *.rpm
 
             # Verify installation succeeded
-            rpm -q mailspring || (echo '✗ Mailspring package not installed' && exit 1)
+            rpm -q tern || (echo '✗ Tern package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which mailspring || (echo '✗ mailspring binary not found in PATH' && exit 1)
+            which ternmail || (echo '✗ ternmail binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
-            rpm -ql mailspring | head -20
+            rpm -ql tern | head -20
 
-            # Run mailspring --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running mailspring --version...'
-            xvfb-run -a mailspring --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run ternmail --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running ternmail --version...'
+            xvfb-run -a ternmail --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ mailspring --version passed on Fedora ${{ matrix.fedora_version }}'
+              echo '✓ ternmail --version passed on Fedora ${{ matrix.fedora_version }}'
             else
-              echo '✗ mailspring --version failed on Fedora ${{ matrix.fedora_version }}'
+              echo '✗ ternmail --version failed on Fedora ${{ matrix.fedora_version }}'
               exit 1
             fi
 
             # Verify mailsync binary exists (check multiple possible locations and names)
-            if [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/mailspring/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync
-            elif [ -f /usr/share/mailspring/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync.bin
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin
-            elif [ -f /usr/local/share/mailspring/mailsync ]; then
-              echo 'Found mailsync binary at /usr/local/share/mailspring/mailsync'
-              MAILSYNC_PATH=/usr/local/share/mailspring/mailsync
-            elif [ -f /usr/local/share/mailspring/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/local/share/mailspring/mailsync.bin'
-              MAILSYNC_PATH=/usr/local/share/mailspring/mailsync.bin
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
+            elif [ -f /usr/share/tern/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/mailsync
+            elif [ -f /usr/share/tern/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
+            elif [ -f /usr/local/share/tern/mailsync ]; then
+              echo 'Found mailsync binary at /usr/local/share/tern/mailsync'
+              MAILSYNC_PATH=/usr/local/share/tern/mailsync
+            elif [ -f /usr/local/share/tern/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/local/share/tern/mailsync.bin'
+              MAILSYNC_PATH=/usr/local/share/tern/mailsync.bin
             else
               echo '✗ mailsync binary not found'
               echo 'Searching for mailsync in RPM files:'
-              rpm -ql mailspring | grep -i mailsync || echo 'No mailsync found in package'
-              echo 'Files in /usr/share/mailspring/:'
-              ls -la /usr/share/mailspring/ | head -30
+              rpm -ql tern | grep -i mailsync || echo 'No mailsync found in package'
+              echo 'Files in /usr/share/tern/:'
+              ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
@@ -355,7 +355,7 @@ jobs:
               exit 1
             fi
 
-            echo '✓ Mailspring installation test passed on Fedora ${{ matrix.fedora_version }}'
+            echo '✓ Tern installation test passed on Fedora ${{ matrix.fedora_version }}'
           "
 
   test-opensuse:
@@ -365,13 +365,13 @@ jobs:
       - name: Download RPM artifact
         uses: actions/download-artifact@v8
         with:
-          name: mailspring-rpm
+          name: tern-rpm
 
       - name: Test installation on openSUSE Tumbleweed
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace opensuse/tumbleweed bash -c "
             set -e
-            echo '=== Testing Mailspring installation on openSUSE Tumbleweed ==='
+            echo '=== Testing Tern installation on openSUSE Tumbleweed ==='
 
             # Install dependencies first
             cd /workspace
@@ -388,60 +388,60 @@ jobs:
             # Install the RPM package (zypper will auto-resolve dependencies)
             zypper --non-interactive --no-gpg-checks install *.rpm; ZYPPER_EXIT=\$?
             if [ \$ZYPPER_EXIT -ne 0 ] && [ \$ZYPPER_EXIT -ne 107 ]; then
-              echo \"zypper install mailspring failed with exit code \$ZYPPER_EXIT\"
+              echo \"zypper install tern failed with exit code \$ZYPPER_EXIT\"
               exit 1
             fi
 
             # Verify installation succeeded
-            rpm -q mailspring || (echo '✗ Mailspring package not installed' && exit 1)
+            rpm -q tern || (echo '✗ Tern package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which mailspring || (echo '✗ mailspring binary not found in PATH' && exit 1)
+            which ternmail || (echo '✗ ternmail binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
-            rpm -ql mailspring | head -20
+            rpm -ql tern | head -20
 
-            # Run mailspring --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running mailspring --version...'
-            xvfb-run -a mailspring --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run ternmail --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running ternmail --version...'
+            xvfb-run -a ternmail --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ mailspring --version passed on openSUSE Tumbleweed'
+              echo '✓ ternmail --version passed on openSUSE Tumbleweed'
             else
-              echo '✗ mailspring --version failed on openSUSE Tumbleweed'
+              echo '✗ ternmail --version failed on openSUSE Tumbleweed'
               exit 1
             fi
 
             # Verify mailsync binary exists (check multiple possible locations and names)
-            if [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/mailspring/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync
-            elif [ -f /usr/share/mailspring/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync.bin
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin
-            elif [ -f /usr/local/share/mailspring/mailsync ]; then
-              echo 'Found mailsync binary at /usr/local/share/mailspring/mailsync'
-              MAILSYNC_PATH=/usr/local/share/mailspring/mailsync
-            elif [ -f /usr/local/share/mailspring/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/local/share/mailspring/mailsync.bin'
-              MAILSYNC_PATH=/usr/local/share/mailspring/mailsync.bin
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
+            elif [ -f /usr/share/tern/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/mailsync
+            elif [ -f /usr/share/tern/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
+            elif [ -f /usr/local/share/tern/mailsync ]; then
+              echo 'Found mailsync binary at /usr/local/share/tern/mailsync'
+              MAILSYNC_PATH=/usr/local/share/tern/mailsync
+            elif [ -f /usr/local/share/tern/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/local/share/tern/mailsync.bin'
+              MAILSYNC_PATH=/usr/local/share/tern/mailsync.bin
             else
               echo '✗ mailsync binary not found'
               echo 'Searching for mailsync in RPM files:'
-              rpm -ql mailspring | grep -i mailsync || echo 'No mailsync found in package'
-              echo 'Files in /usr/share/mailspring/:'
-              ls -la /usr/share/mailspring/ | head -30
+              rpm -ql tern | grep -i mailsync || echo 'No mailsync found in package'
+              echo 'Files in /usr/share/tern/:'
+              ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
@@ -462,7 +462,7 @@ jobs:
               exit 1
             fi
 
-            echo '✓ Mailspring installation test passed on openSUSE Tumbleweed'
+            echo '✓ Tern installation test passed on openSUSE Tumbleweed'
           "
 
   test-arch:
@@ -472,13 +472,13 @@ jobs:
       - name: Download DEB artifact
         uses: actions/download-artifact@v8
         with:
-          name: mailspring-deb
+          name: tern-deb
 
       - name: Test installation on Arch Linux
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace archlinux:latest bash -c "
             set -e
-            echo '=== Testing Mailspring installation on Arch Linux ==='
+            echo '=== Testing Tern installation on Arch Linux ==='
 
             # Update package database and install required tools and libraries
             pacman -Syu --noconfirm
@@ -496,45 +496,45 @@ jobs:
             tar -xf data.tar.* -C /
 
             # Verify the binary exists and is in PATH
-            ls -la /usr/bin/mailspring
-            ls -la /usr/share/mailspring/
+            ls -la /usr/bin/ternmail
+            ls -la /usr/share/tern/
 
             # List installed files
             echo 'Extracted files:'
-            find /usr/share/mailspring -type f | head -20
+            find /usr/share/tern -type f | head -20
 
-            # Run mailspring --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running mailspring --version...'
-            xvfb-run -a /usr/bin/mailspring --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run ternmail --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running ternmail --version...'
+            xvfb-run -a /usr/bin/ternmail --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ mailspring --version passed on Arch Linux'
+              echo '✓ ternmail --version passed on Arch Linux'
             else
-              echo '✗ mailspring --version failed on Arch Linux'
+              echo '✗ ternmail --version failed on Arch Linux'
               exit 1
             fi
 
             # Verify mailsync binary exists (check multiple locations)
-            if [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/mailspring/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync
-            elif [ -f /usr/share/mailspring/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync.bin
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
+            elif [ -f /usr/share/tern/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/mailsync
+            elif [ -f /usr/share/tern/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
             else
               echo '✗ mailsync binary not found'
-              echo 'Files in /usr/share/mailspring/:'
-              ls -la /usr/share/mailspring/ | head -30
+              echo 'Files in /usr/share/tern/:'
+              ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
@@ -555,7 +555,7 @@ jobs:
               exit 1
             fi
 
-            echo '✓ Mailspring installation test passed on Arch Linux'
+            echo '✓ Tern installation test passed on Arch Linux'
           "
 
   test-linuxmint:
@@ -568,13 +568,13 @@ jobs:
       - name: Download DEB artifact
         uses: actions/download-artifact@v8
         with:
-          name: mailspring-deb
+          name: tern-deb
 
       - name: Test installation on Linux Mint ${{ matrix.mint_version }}
         run: |
           docker run --rm -v ${{ github.workspace }}:/workspace linuxmintd/mint${{ matrix.mint_version }}-amd64 bash -c "
             set -e
-            echo '=== Testing Mailspring installation on Linux Mint ${{ matrix.mint_version }} ==='
+            echo '=== Testing Tern installation on Linux Mint ${{ matrix.mint_version }} ==='
 
             # Install the DEB package using gdebi (what most users use)
             # gdebi has stricter dependency checking than apt-get install -f
@@ -592,47 +592,47 @@ jobs:
             gdebi --non-interactive *.deb
 
             # Verify installation succeeded
-            dpkg -l | grep mailspring || (echo '✗ Mailspring package not installed' && exit 1)
+            dpkg -l | grep tern || (echo '✗ Tern package not installed' && exit 1)
 
             # Verify the binary exists and is executable
-            which mailspring || (echo '✗ mailspring binary not found in PATH' && exit 1)
+            which ternmail || (echo '✗ ternmail binary not found in PATH' && exit 1)
 
             # List installed files
             echo 'Installed files:'
-            dpkg -L mailspring | head -20
+            dpkg -L tern | head -20
 
-            # Run mailspring --version with virtual display (use --no-sandbox for Docker)
-            echo 'Running mailspring --version...'
-            xvfb-run -a mailspring --version --no-sandbox > /tmp/version.txt 2>&1 || true
+            # Run ternmail --version with virtual display (use --no-sandbox for Docker)
+            echo 'Running ternmail --version...'
+            xvfb-run -a ternmail --version --no-sandbox > /tmp/version.txt 2>&1 || true
             cat /tmp/version.txt
 
             # Verify version command succeeded (output should contain a version number)
             if grep -qE '[0-9]+\.[0-9]+\.[0-9]+' /tmp/version.txt; then
-              echo '✓ mailspring --version passed on Linux Mint ${{ matrix.mint_version }}'
+              echo '✓ ternmail --version passed on Linux Mint ${{ matrix.mint_version }}'
             else
-              echo '✗ mailspring --version failed on Linux Mint ${{ matrix.mint_version }}'
+              echo '✗ ternmail --version failed on Linux Mint ${{ matrix.mint_version }}'
               exit 1
             fi
 
             # Verify mailsync binary exists (check multiple locations)
-            if [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs ]; then
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync-rs
-            elif [ -f /usr/share/mailspring/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync
-            elif [ -f /usr/share/mailspring/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/mailsync.bin
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync
-            elif [ -f /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin ]; then
-              echo 'Found mailsync binary at /usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin'
-              MAILSYNC_PATH=/usr/share/mailspring/resources/app.asar.unpacked/mailsync.bin
+            if [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync-rs ]; then
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync-rs
+            elif [ -f /usr/share/tern/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/mailsync
+            elif [ -f /usr/share/tern/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/mailsync.bin
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync
+            elif [ -f /usr/share/tern/resources/app.asar.unpacked/mailsync.bin ]; then
+              echo 'Found mailsync binary at /usr/share/tern/resources/app.asar.unpacked/mailsync.bin'
+              MAILSYNC_PATH=/usr/share/tern/resources/app.asar.unpacked/mailsync.bin
             else
               echo '✗ mailsync binary not found'
-              echo 'Files in /usr/share/mailspring/:'
-              ls -la /usr/share/mailspring/ | head -30
+              echo 'Files in /usr/share/tern/:'
+              ls -la /usr/share/tern/ | head -30
               exit 1
             fi
 
@@ -653,5 +653,5 @@ jobs:
               exit 1
             fi
 
-            echo '✓ Mailspring installation test passed on Linux Mint ${{ matrix.mint_version }}'
+            echo '✓ Tern installation test passed on Linux Mint ${{ matrix.mint_version }}'
           "

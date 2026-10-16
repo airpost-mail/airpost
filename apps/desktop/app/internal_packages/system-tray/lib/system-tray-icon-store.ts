@@ -105,7 +105,7 @@ class SystemTrayIconStore {
   // On Windows, Electron builds the tray HICON from the 1x bitmap of a PNG
   // regardless of the display scale, so a PNG is always blurry above 100%.
   // A multi-size .ico lets Windows pick an exact frame for 125% / 150% / etc.
-  // See assets/build-win32-ico.py.
+  // The icons are built by assets/brand/tools/build.py at the repo root.
   _iconPath = (basename: string) => {
     const ext = platform === 'win32' ? 'ico' : 'png';
     return path.join(__dirname, '..', 'assets', platform, `${basename}.${ext}`);
@@ -113,24 +113,24 @@ class SystemTrayIconStore {
 
   inboxZeroIcon = () => {
     if (platform === 'darwin') {
-      return this._iconPath('MenuItem-Inbox-Zero-Template');
+      return this._iconPath('tern-tray-zero-Template');
     }
-    return this._iconPath(`MenuItem-Inbox-Zero${this._dark()}`);
+    return this._iconPath(`tern-tray-zero${this._dark()}`);
   };
 
   inboxFullIcon = () => {
     if (platform === 'darwin') {
-      return this._iconPath('MenuItem-Inbox-Full-Template');
+      return this._iconPath('tern-tray-full-Template');
     }
-    return this._iconPath(`MenuItem-Inbox-Full${this._dark()}`);
+    return this._iconPath(`tern-tray-full${this._dark()}`);
   };
 
   inboxFullNewIcon = () => {
-    return this._iconPath(`MenuItem-Inbox-Full-NewItems${this._dark()}`);
+    return this._iconPath(`tern-tray-full-new${this._dark()}`);
   };
 
   inboxFullUnreadIcon = () => {
-    return this._iconPath(`MenuItem-Inbox-Full-UnreadItems${this._dark()}`);
+    return this._iconPath(`tern-tray-full-unread${this._dark()}`);
   };
 
   _updateIcon = () => {

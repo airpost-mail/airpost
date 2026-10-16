@@ -18,7 +18,7 @@ function _getMenuTemplate(platform: string, application: Application) {
       type: 'separator',
     },
     {
-      label: localized('Quit Mailspring'),
+      label: localized('Quit Tern'),
       click: () => application.emit('application:quit'),
     },
   ];
@@ -94,7 +94,7 @@ class SystemTrayManager {
       'system-tray',
       'assets',
       'linux',
-      `MenuItem-Inbox-Full${dark}.png`
+      `tern-tray-full${dark}.png`
     );
   }
 

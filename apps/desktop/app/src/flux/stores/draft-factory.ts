@@ -1,3 +1,5 @@
+import os from 'os';
+import { domainToASCII } from 'url';
 import * as Actions from '../actions';
 import DatabaseStore from './database-store';
 import { AccountStore } from './account-store';
@@ -22,6 +24,20 @@ import {
 } from '../../components/composer-editor/plaintext';
 
 let DraftStore: typeof import('./draft-store').default = null;
+
+// Message-IDs are `<UUID>@<domain of the sending address>`, so they don't name the client.
+// Internationalised domains go out in their ASCII (punycode) form. Falls back to the machine's
+// hostname when the address has no usable domain.
+export function generateHeaderMessageId(fromEmail?: string) {
+  const at = (fromEmail || '').lastIndexOf('@');
+  let domain = at === -1 ? '' : fromEmail.slice(at + 1).trim();
+  // domainToASCII returns '' for anything that is not a valid domain.
+  domain = domain && /[^ -~]/.test(domain) ? domainToASCII(domain) : domain;
+  if (!/^[A-Za-z0-9.-]+$/.test(domain)) {
+    domain = (os.hostname() || '').replace(/[^A-Za-z0-9.-]/g, '') || 'localhost';
+  }
+  return `${crypto.randomUUID().toUpperCase()}@${domain}`;
+}
 
 export type ReplyType = 'reply' | 'reply-all';
 export type ReplyBehavior = 'prefer-existing' | 'prefer-existing-if-pristine';
@@ -63,7 +79,7 @@ class DraftFactory {
       version: 0,
       unread: false,
       starred: false,
-      headerMessageId: `${crypto.randomUUID().toUpperCase()}@getmailspring.com`,
+      headerMessageId: null as string,
       from: [account.defaultMe()],
       date: new Date(),
       draft: true,
@@ -75,6 +91,10 @@ class DraftFactory {
     };
 
     const merged = Object.assign(defaults, fields);
+    if (!merged.headerMessageId) {
+      const from = merged.from && merged.from[0];
+      merged.headerMessageId = generateHeaderMessageId(from && from.email);
+    }
 
     const autoContacts = await ContactStore.parseContactsInString(account.autoaddress.value);
     if (account.autoaddress.type === 'cc') {
@@ -307,7 +327,7 @@ class DraftFactory {
     }
 
     return this.createDraft({
-      from: [new Contact({ email: account.emailAddress, name: `${account.name} via Mailspring` })],
+      from: [new Contact({ email: account.emailAddress, name: `${account.name} via Tern` })],
       to: [account.defaultMe()],
       cc: [],
       pristine: false,

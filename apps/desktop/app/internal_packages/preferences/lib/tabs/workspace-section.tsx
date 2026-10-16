@@ -60,13 +60,11 @@ class DefaultMailClientItem extends React.Component<
               if (process.platform === 'win32') {
                 helper.registerForURLScheme('mailto');
               } else {
-                shell.openExternal(
-                  'https://getmailspring.com/docs/choose-mailspring-as-the-default-mail-client-on-linux'
-                );
+                shell.openExternal('https://github.com/ternmail/ternmail#readme');
               }
             }}
           >
-            {localized('Use Mailspring as default mail client')}
+            {localized('Use Tern as default mail client')}
           </div>
         </div>
       );
@@ -80,7 +78,7 @@ class DefaultMailClientItem extends React.Component<
           checked={this.state.defaultClient}
           onChange={this.toggleDefaultMailClient}
         />
-        <label htmlFor="default-client">{localized('Use Mailspring as default mail client')}</label>
+        <label htmlFor="default-client">{localized('Use Tern as default mail client')}</label>
       </div>
     );
   }
@@ -184,7 +182,7 @@ const WorkspaceSection = (props: { config: any; configSchema: any }) => {
       {process.platform === 'linux' && (
         <div className="platform-note">
           {localized(
-            `"Launch on system start" only works in XDG-compliant desktop environments. To enable the Mailspring icon in the system tray, you may need to install libappindicator or libayatana-appindicator.`
+            `"Launch on system start" only works in XDG-compliant desktop environments. To enable the Tern icon in the system tray, you may need to install libappindicator or libayatana-appindicator.`
           )}
         </div>
       )}

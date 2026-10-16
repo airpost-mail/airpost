@@ -111,7 +111,7 @@ describe('mcp-stdio-bridge parseEventStream', function () {
 
 describe('mcp-stdio-bridge', function () {
   beforeEach(function () {
-    this.configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mailspring-bridge-spec-'));
+    this.configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-bridge-spec-'));
     fs.writeFileSync(
       path.join(this.configDir, 'config.json'),
       JSON.stringify({ '*': { core: { mcp: { enabled: true, port: PORT, token: TOKEN } } } })
@@ -130,7 +130,7 @@ describe('mcp-stdio-bridge', function () {
       const client = new BridgeClient(this.configDir);
       try {
         const init = await client.initialize();
-        expect(init.result.serverInfo.name).toBe('mailspring');
+        expect(init.result.serverInfo.name).toBe('tern');
 
         client.send({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
         const { result } = await client.response(2);
@@ -165,7 +165,7 @@ describe('mcp-stdio-bridge', function () {
     });
   });
 
-  it('answers requests with a JSON-RPC error while Mailspring is not listening', function () {
+  it('answers requests with a JSON-RPC error while Tern is not listening', function () {
     waitsForPromise(async () => {
       const client = new BridgeClient(this.configDir);
       try {
@@ -174,7 +174,7 @@ describe('mcp-stdio-bridge', function () {
 
         client.send({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
         const { error } = await client.response(2);
-        expect(error.message).toContain('Mailspring is not running');
+        expect(error.message).toContain('Tern is not running');
       } finally {
         await client.close();
       }

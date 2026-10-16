@@ -1,0 +1,60 @@
+Windows Registry Editor Version 5.00
+
+[{{HKEY_ROOT}}\SOFTWARE\Classes\Tern.Url.mailto]
+"FriendlyTypeName"="Tern Url"
+
+[{{HKEY_ROOT}}\SOFTWARE\Classes\Tern.Url.mailto\shell]
+
+[{{HKEY_ROOT}}\SOFTWARE\Classes\Tern.Url.mailto\shell\open]
+
+[{{HKEY_ROOT}}\SOFTWARE\Classes\Tern.Url.mailto\shell\open\command]
+@="\"{{PATH_TO_ROOT_FOLDER}}\\Update.exe\" --processStart tern.exe --process-start-args %1"
+
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern]
+@="Tern"
+"LocalizedString"="@{{PATH_TO_ROOT_FOLDER}}\\Update.exe,-123"
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\DefaultIcon]
+@="{{PATH_TO_APP_FOLDER}}\\tern.exe,1"
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Capabilities]
+"ApplicationName"="Tern"
+"ApplicationDescription"="A fast, modern mail client designed to help you boost your productivity."
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Capabilities\StartMenu]
+"Mail"="Tern"
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Capabilities\URLAssociations]
+"mailto"="Tern.Url.mailto"
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Protocols]
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Protocols\mailto]
+@="URL:MailTo Protocol"
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Protocols\mailto\DefaultIcon]
+@="{{PATH_TO_APP_FOLDER}}\\tern.exe,1"
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Protocols\mailto\shell]
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Protocols\mailto\shell\open]
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\Protocols\mailto\shell\open\command]
+@="\"{{PATH_TO_ROOT_FOLDER}}\\Update.exe\" --processStart tern.exe --process-start-args %1"
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\shell]
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\shell\open]
+
+[{{HKEY_ROOT}}\SOFTWARE\Clients\Mail\Tern\shell\open\command]
+@="\"{{PATH_TO_ROOT_FOLDER}}\\Update.exe\" --processStart tern.exe"
+
+[{{HKEY_ROOT}}\SOFTWARE\RegisteredApplications]
+"Tern"="Software\\Clients\\Mail\\Tern\\Capabilities"
+
+
+[HKEY_CURRENT_USER\SOFTWARE\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache]
+"{{PATH_TO_ROOT_FOLDER}}\\Update.exe"="Tern"
+"{{PATH_TO_ROOT_FOLDER}}\\Update.exe.FriendlyAppName"="Tern"
+"{{PATH_TO_ROOT_FOLDER}}\\Update.exe.ApplicationCompany"="Tern"

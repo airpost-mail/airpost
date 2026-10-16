@@ -1,0 +1,68 @@
+Name:           <%= name %>
+Version:        <%= version %>
+Release:        0.1%{?dist}
+Summary:        <%= description %>
+License:        GPL-3.0-only
+URL:            https://github.com/ternmail/ternmail
+AutoReqProv:    no # Avoid libchromiumcontent.so missing dependency
+
+%ifarch i386 i486 i586 i686
+Recommends: lsb-core-noarch
+Recommends: (libappindicator-gtk3 or libayatana-appindicator-gtk3)
+# secret-tool reads the passwords a Mailspring install saved, when its profile is imported.
+Recommends: /usr/bin/secret-tool
+Requires: libasound.so.2, libXss.so.1, libsecret-1.so.0, ca-certificates, libgbm.so.1, libgtk-3.so.0, libnss3.so, libnspr4.so, at-spi2-core, xdg-utils, libnotify.so.4
+%else
+Recommends: lsb-core-noarch
+Recommends: (libappindicator-gtk3 or libayatana-appindicator-gtk3)
+# secret-tool reads the passwords a Mailspring install saved, when its profile is imported.
+Recommends: /usr/bin/secret-tool
+Requires: libasound.so.2()(64bit), libXss.so.1()(64bit), libsecret-1.so.0()(64bit), ca-certificates, libgbm.so.1()(64bit), libgtk-3.so.0()(64bit), libnss3.so()(64bit), libnspr4.so()(64bit), at-spi2-core, xdg-utils, libnotify.so.4()(64bit)
+%endif
+
+%description
+<%= description %>
+
+# Don't generate build_id links to prevent conflicts when installing multiple
+# versions of electron apps (`code`, `slack`, etc).
+%define _build_id_links none
+
+%install
+mkdir -p %{buildroot}/usr/share/tern
+cp -r <%= contentsDir %>/* %{buildroot}/usr/share/tern
+
+mkdir -p %{buildroot}/usr/bin/
+
+# "ternmail", not "tern": that is the CLI (apps/cli), which may be installed alongside.
+ln -s ../share/tern/tern %{buildroot}/usr/bin/ternmail
+chmod 755 %{buildroot}/usr/bin/ternmail
+
+mkdir -p %{buildroot}/usr/share/applications/
+mv com.ternmail.tern.desktop %{buildroot}/usr/share/applications/
+
+mkdir -p %{buildroot}/usr/share/metainfo/
+mv com.ternmail.tern.metainfo.xml %{buildroot}/usr/share/metainfo/
+
+for s in 16 32 64 128 256 512; do
+    mkdir -p %{buildroot}/usr/share/icons/hicolor/${s}x${s}/apps
+    cp -p <%= linuxAssetsDir %>/icons/tern-${s}.png %{buildroot}/usr/share/icons/hicolor/${s}x${s}/apps/com.ternmail.tern.png
+done
+
+%files
+/usr/bin/ternmail
+/usr/share/tern
+/usr/share/applications/com.ternmail.tern.desktop
+/usr/share/metainfo/com.ternmail.tern.metainfo.xml
+/usr/share/icons/hicolor/16x16/apps/com.ternmail.tern.png
+/usr/share/icons/hicolor/32x32/apps/com.ternmail.tern.png
+/usr/share/icons/hicolor/64x64/apps/com.ternmail.tern.png
+/usr/share/icons/hicolor/128x128/apps/com.ternmail.tern.png
+/usr/share/icons/hicolor/256x256/apps/com.ternmail.tern.png
+/usr/share/icons/hicolor/512x512/apps/com.ternmail.tern.png
+
+%post
+gtk-update-icon-cache -f /usr/share/icons/hicolor &> /dev/null || :
+update-desktop-database &> /dev/null || :
+
+%postun
+update-desktop-database &> /dev/null || :

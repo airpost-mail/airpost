@@ -12,7 +12,7 @@ import PreferencesMcpAudit from './preferences-mcp-audit';
 import { writeMailspringClaudeDesktopEntry } from './claude-desktop-config';
 
 const execFileAsync = promisify(execFile);
-const CLAUDE_CODE_MCP_NAME = 'mailspring-mcp';
+const CLAUDE_CODE_MCP_NAME = 'tern-mcp';
 
 interface State {
   enabled: boolean;
@@ -25,7 +25,7 @@ interface State {
   claudeStatus: string | null;
   codexStatus: string | null;
   claudeCodeStatus: string | null;
-  // Set true once the user has successfully added Mailspring to any AI tool;
+  // Set true once the user has successfully added Tern to any AI tool;
   // reveals the "Try It!" example prompt beneath the Quick Setup buttons.
   tryItVisible: boolean;
 }
@@ -75,7 +75,7 @@ export default class PreferencesMcp extends React.Component<Record<string, never
 
   _tryItPrompt() {
     return localized(
-      'Read the threads in my inbox using Mailspring - what should I prioritize? Draft a reply to the most important message.'
+      'Read the threads in my inbox using Tern - what should I prioritize? Draft a reply to the most important message.'
     );
   }
 
@@ -157,14 +157,14 @@ export default class PreferencesMcp extends React.Component<Record<string, never
       }
 
       const block = [
-        `[mcp_servers.mailspring]`,
+        `[mcp_servers.tern]`,
         `url = "http://127.0.0.1:${this.state.port}/mcp"`,
         `http_headers = { "Authorization" = "Bearer ${this.state.token}" }`,
       ].join('\n');
 
-      // Replace existing mailspring block or append
+      // Replace existing tern block or append
       // eslint-disable-next-line no-useless-escape
-      const sectionRe = /\[mcp_servers\.mailspring\][^\[]*/s;
+      const sectionRe = /\[mcp_servers\.tern\][^\[]*/s;
       if (sectionRe.test(content)) {
         content = content.replace(sectionRe, block + '\n\n');
       } else {
@@ -313,7 +313,7 @@ export default class PreferencesMcp extends React.Component<Record<string, never
                   <h6>{localized('Quick Setup')}</h6>
                   <p className="mcp-description">
                     {localized(
-                      "Add Mailspring to your AI tools with one click. This writes the connection details to each tool's config file."
+                      "Add Tern to your AI tools with one click. This writes the connection details to each tool's config file."
                     )}
                   </p>
                   <div className="mcp-quick-setup">

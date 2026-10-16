@@ -4,18 +4,18 @@ import os from 'os';
 import { FsUtils } from 'mailspring-exports';
 
 // Claude Desktop only speaks stdio to MCP servers listed in its config file
-// (a `url` entry is not supported and is discarded on launch), so Mailspring
+// (a `url` entry is not supported and is discarded on launch), so Tern
 // registers a stdio bridge that proxies to its HTTP server. The bridge runs
-// under Mailspring's own Electron binary as Node (ELECTRON_RUN_AS_NODE), so
+// under Tern's own Electron binary as Node (ELECTRON_RUN_AS_NODE), so
 // the setup works without any Node.js on the machine and never depends on
-// Claude Desktop's PATH — the failure behind
-// https://community.getmailspring.com/t/mcp-claude-desktop-not-working/14528.
+// Claude Desktop's PATH.
 //
 // This requires Electron's `runAsNode` fuse to stay enabled in the packaged
 // app (it is on by default; no fuses are configured in build.js). Disabling
 // it would silently break every existing Claude Desktop registration.
 
-const ENTRY_NAME = 'mailspring';
+// Not "mailspring": that entry belongs to Mailspring.app, which may be installed alongside.
+const ENTRY_NAME = 'tern';
 
 interface McpServerEntry {
   command: string;
@@ -110,7 +110,7 @@ function pointsAtMissingFiles(entry: Partial<McpServerEntry>): boolean {
 // The registered entry embeds absolute paths that go stale when the app is
 // moved, and on Windows after every Squirrel update (each version installs
 // into its own app-x.y.z directory). Called at startup: rewrites the entry
-// only when Mailspring wrote it and it no longer points at existing files,
+// only when Tern wrote it and it no longer points at existing files,
 // which also migrates the npx form. Skipped for copies that aren't a real
 // install (dev mode, or macOS builds run from Downloads or a mounted DMG) so
 // a registration pointing at /Applications is never repointed at a path that

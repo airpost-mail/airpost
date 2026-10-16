@@ -125,9 +125,7 @@ class _AccountStore extends MailspringStore {
     });
 
     if (message && AppEnv.isMainWindow()) {
-      AppEnv.showErrorDialog(
-        `Mailspring was unable to load your account preferences.\n\n${message}`
-      );
+      AppEnv.showErrorDialog(`Tern was unable to load your account preferences.\n\n${message}`);
     }
   };
 

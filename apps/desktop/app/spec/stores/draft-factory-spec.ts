@@ -17,7 +17,8 @@ import {
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
 
-import DraftFactory from '../../src/flux/stores/draft-factory';
+import os from 'os';
+import DraftFactory, { generateHeaderMessageId } from '../../src/flux/stores/draft-factory';
 
 let msgFromMe = null;
 let fakeThread = null;
@@ -949,6 +950,8 @@ describe('DraftFactory', function draftFactory() {
       const draft = await DraftFactory.createDraft();
       expect(draft.accountId).toEqual(account.id);
       expect(draft.from[0].email).toEqual(account.defaultMe().email);
+      const domain = account.defaultMe().email.split('@')[1];
+      expect(draft.headerMessageId.endsWith(`@${domain}`)).toBe(true);
     });
 
     it("falls back to the perspective's first account when the perspective is multi-account and no thread is focused", async () => {
@@ -1004,5 +1007,40 @@ describe('DraftFactory', function draftFactory() {
       expect(draft.accountId).toEqual(secondAccount.id);
       expect(draft.from[0].email).toEqual(secondAccount.defaultMe().email);
     });
+  });
+});
+
+describe('generateHeaderMessageId', () => {
+  const UUID = '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}';
+
+  it("uses the domain of the sender's address", () => {
+    expect(generateHeaderMessageId('ben@example.co.uk')).toMatch(
+      new RegExp(`^${UUID}@example\\.co\\.uk$`)
+    );
+  });
+
+  it('uses the part after the last @', () => {
+    expect(generateHeaderMessageId('"a@b"@example.com')).toMatch(
+      new RegExp(`^${UUID}@example\\.com$`)
+    );
+  });
+
+  it('uses the ASCII form of an internationalised domain', () => {
+    spyOn(os, 'hostname').andReturn('my-mac.local');
+    expect(generateHeaderMessageId('user@münchen.de')).toMatch(
+      new RegExp(`^${UUID}@xn--mnchen-3ya\\.de$`)
+    );
+  });
+
+  it("falls back to the machine's hostname without a usable domain", () => {
+    spyOn(os, 'hostname').andReturn('my-mac.local');
+    expect(generateHeaderMessageId(undefined)).toMatch(new RegExp(`^${UUID}@my-mac\\.local$`));
+    expect(generateHeaderMessageId('nobody')).toMatch(new RegExp(`^${UUID}@my-mac\\.local$`));
+    expect(generateHeaderMessageId('x@bad domain')).toMatch(new RegExp(`^${UUID}@my-mac\\.local$`));
+  });
+
+  it('falls back to localhost without a hostname', () => {
+    spyOn(os, 'hostname').andReturn('');
+    expect(generateHeaderMessageId('')).toMatch(new RegExp(`^${UUID}@localhost$`));
   });
 });

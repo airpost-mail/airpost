@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.ternmail.tern</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name><%= productName %></name>
+  <summary><%= description %></summary>
+  <description>
+    <p>
+      Tern is an open source desktop email client with a unified inbox, snooze, send later,
+      mail rules, templates, calendar and contacts. It is a fork of Mailspring with a new sync
+      engine written in Rust.
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/ternmail/ternmail</url>
+  <url type="bugtracker">https://github.com/ternmail/ternmail/issues</url>
+  <url type="vcs-browser">https://github.com/ternmail/ternmail</url>
+
+  <launchable type="desktop-id"><%= desktopName %></launchable>
+
+  <developer id="com.ternmail">
+    <name>Tern contributors</name>
+  </developer>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#d7f0f8</color>
+    <color type="primary" scheme_preference="dark">#0A1A3D</color>
+  </branding>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.26.0" date="2026-10-01" />
+    <release version="1.25.0" date="2026-09-19" />
+    <release version="1.24.1" date="2026-09-14" />
+    <release version="1.24.0" date="2026-09-12" />
+    <release version="1.23.0" date="2026-07-19" />
+    <release version="1.22.0" date="2026-06-13" />
+    <release version="1.21.1" date="2026-05-19" />
+    <release version="1.21.0" date="2026-05-05" />
+    <release version="1.20.1" date="2026-04-20" />
+    <release version="1.20.0" date="2026-04-18" />
+    <release version="1.19.1" date="2026-04-07" />
+    <release version="1.19.0" date="2026-03-09" />
+    <release version="1.18.0" date="2026-02-22" />
+    <release version="1.17.4" date="2026-02-11" />
+    <release version="1.17.3" date="2026-01-31" />
+    <release version="1.17.2" date="2026-01-24" />
+    <release version="1.17.1" date="2026-01-15" />
+    <release version="1.17.0" date="2026-01-14" />
+    <release version="1.16.0" date="2025-07-16" />
+    <release version="1.15.1" date="2025-01-27" />
+    <release version="1.15.0" date="2025-01-02" />
+    <release version="1.14.0" date="2024-09-13" />
+    <release version="1.13.3" date="2024-01-08" />
+    <release version="1.13.2" date="2023-12-10" />
+    <release version="1.13.1" date="2023-11-21" />
+    <release version="1.13.0" date="2023-11-20" />
+    <release version="1.12.0" date="2023-11-14" />
+    <release version="1.11.0" date="2023-07-28" />
+    <release version="1.10.8" date="2022-12-29" />
+    <release version="1.10.7" date="2022-11-21" />
+    <release version="1.10.6" date="2022-08-10" />
+    <release version="1.10.5" date="2022-08-10" />
+    <release version="1.10.4" date="2022-08-09" />
+    <release version="1.10.3" date="2022-04-18" />
+    <release version="1.10.2" date="2022-03-29" />
+    <release version="1.10.1" date="2022-03-12" />
+    <release version="1.10.0" date="2022-02-28" />
+    <release version="1.9.2" date="2021-09-06" />
+    <release version="1.9.1" date="2021-04-16" />
+    <release version="1.9.0" date="2021-04-14" />
+    <release version="1.8.0" date="2021-01-20" />
+  </releases>
+</component>

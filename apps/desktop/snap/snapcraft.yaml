@@ -1,6 +1,7 @@
-name: mailspring
+# TODO: the snap name "tern" may be taken in the Snap Store; register it (or pick another) before publishing.
+name: tern
 license: GPL-3.0-only
-adopt-info: mailspring
+adopt-info: tern
 
 confinement: strict
 base: core24
@@ -11,23 +12,23 @@ platforms:
   arm64:
 
 parts:
-  mailspring:
+  tern:
     plugin: nil
     override-pull: |
-      deb="$(ls $CRAFT_PROJECT_DIR/app/dist/mailspring-*.deb)"
+      deb="$(ls $CRAFT_PROJECT_DIR/app/dist/tern-*.deb)"
       craftctl set version="$(basename "$deb" | grep -Eo "[0-9]+.[0-9]+.[0-9]+")"
       dpkg -x "$deb" "$CRAFT_PART_SRC"
     override-build: |
       cp -a "$CRAFT_PART_SRC"/* "$CRAFT_PART_INSTALL"
       craftctl default
-      sed -i 's|Icon=mailspring|Icon=/usr/share/pixmaps/mailspring\.png|' \
-        $CRAFT_PART_INSTALL/usr/share/applications/Mailspring.desktop
+      sed -i 's|Icon=com.ternmail.tern|Icon=/usr/share/pixmaps/tern\.png|' \
+        $CRAFT_PART_INSTALL/usr/share/applications/com.ternmail.tern.desktop
       # GPLv3 6(d): the snap is published to the Store, so the source offer travels inside it.
       install -Dm644 "$CRAFT_PROJECT_DIR/app/dist/SOURCE.txt" \
-        "$CRAFT_PART_INSTALL/usr/share/doc/mailspring/SOURCE.txt"
+        "$CRAFT_PART_INSTALL/usr/share/doc/tern/SOURCE.txt"
     prime:
-      - -usr/share/mailspring/chrome-sandbox
-    parse-info: [usr/share/metainfo/mailspring.metainfo.xml]
+      - -usr/share/tern/chrome-sandbox
+    parse-info: [usr/share/metainfo/com.ternmail.tern.metainfo.xml]
     # The engine needs only glibc (TLS is rustls), so no mail or TLS libraries are staged.
     stage-packages:
       - libxkbfile1
@@ -58,10 +59,10 @@ parts:
       - usr/share/doc/libsecret/libsecret-0.20.5-source.tar.xz
 
 apps:
-  mailspring:
-    command: usr/bin/mailspring --no-sandbox
-    common-id: mailspring
-    desktop: usr/share/applications/Mailspring.desktop
+  tern:
+    command: usr/bin/ternmail --no-sandbox
+    common-id: com.ternmail.tern
+    desktop: usr/share/applications/com.ternmail.tern.desktop
     extensions: [gnome]
     environment:
       HOME: $SNAP_USER_COMMON

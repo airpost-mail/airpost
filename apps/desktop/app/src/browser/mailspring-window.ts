@@ -116,7 +116,7 @@ export default class MailspringWindow extends EventEmitter {
     type GetConstructorArgs<T> = T extends new (options: infer U) => any ? U : never;
     const browserWindowOptions: GetConstructorArgs<typeof BrowserWindow> = {
       show: false,
-      title: title || 'Mailspring',
+      title: title || 'Tern',
       frame,
       width,
       height,
@@ -149,12 +149,9 @@ export default class MailspringWindow extends EventEmitter {
     // taskbar's icon. See https://github.com/atom/atom/issues/4811 for more.
     if (process.platform === 'linux') {
       if (!WindowIconPath) {
-        WindowIconPath = getFirstExistingPath(
-          XDG_DATA_PATHS,
-          path.join('pixmaps', 'mailspring.png')
-        );
+        WindowIconPath = getFirstExistingPath(XDG_DATA_PATHS, path.join('pixmaps', 'tern.png'));
         if (!WindowIconPath) {
-          WindowIconPath = path.resolve(this.resourcePath, 'static', 'images', 'mailspring.png');
+          WindowIconPath = path.resolve(this.resourcePath, 'static', 'images', 'tern.png');
         }
       }
       browserWindowOptions.icon = WindowIconPath;
@@ -385,7 +382,7 @@ export default class MailspringWindow extends EventEmitter {
       const chosen = dialog.showMessageBoxSync(this.browserWindow, {
         type: 'warning',
         buttons: ['Close', 'Keep Waiting'],
-        message: 'Mailspring is not responding',
+        message: 'Tern is not responding',
         detail: 'Would you like to force close it or keep waiting?',
       });
       if (chosen === 0) {
@@ -428,8 +425,8 @@ export default class MailspringWindow extends EventEmitter {
         const chosen = dialog.showMessageBoxSync({
           type: 'warning',
           buttons: ['Close Window', 'Reload', 'Keep It Open'],
-          message: 'Mailspring has crashed',
-          detail: 'Please report this issue to us at support@getmailspring.com.',
+          message: 'Tern has crashed',
+          detail: 'Please report this issue at https://github.com/ternmail/ternmail/issues.',
         });
         if (chosen === 0) {
           this.browserWindow.destroy();

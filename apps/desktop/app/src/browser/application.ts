@@ -105,13 +105,13 @@ export default class Application extends EventEmitter {
       let buttons = [localized('Quit')];
       if (err.toString().includes('ENOENT')) {
         message = localized(
-          `Mailspring could not find the mailsync process. If you're building Mailspring from source, make sure mailsync.tar.gz has been downloaded and unpacked in your working copy.`
+          `Tern could not find the mailsync process. If you're building Tern from source, make sure mailsync.tar.gz has been downloaded and unpacked in your working copy.`
         );
       } else if (err.toString().includes('spawn')) {
-        message = localized(`Mailspring could not spawn the mailsync process. %@`, err.toString());
+        message = localized(`Tern could not spawn the mailsync process. %@`, err.toString());
       } else {
         message = localized(
-          `We encountered a problem with your local email database. %@\n\nCheck that no other copies of Mailspring are running and click Rebuild to reset your local cache.`,
+          `We encountered a problem with your local email database. %@\n\nCheck that no other copies of Tern are running and click Rebuild to reset your local cache.`,
           err.toString()
         );
         buttons = [localized('Quit'), localized('Rebuild')];
@@ -195,11 +195,13 @@ export default class Application extends EventEmitter {
       this.openUrl(pendingUrl);
     }
 
+    // The OS-level scheme is tern:. mailspring: stays the renderer's internal resource scheme
+    // and is left to Mailspring.app, which may be installed alongside.
     if (process.platform === 'linux') {
       const helper = new DefaultClientHelper();
-      helper.registerForURLScheme('mailspring');
+      helper.registerForURLScheme('tern');
     } else {
-      app.setAsDefaultProtocolClient('mailspring');
+      app.setAsDefaultProtocolClient('tern');
     }
   }
 
@@ -289,7 +291,7 @@ export default class Application extends EventEmitter {
     if (!addedToDock && appPath.includes('/Applications/') && appPath.includes('.app/')) {
       const appBundlePath = appPath.split('.app/')[0];
       proc.exec(
-        `defaults write com.apple.dock persistent-apps -array-add "<dict><key>tile-type</key><string>file-tile</string><key>tile-data</key><dict><key>file-type</key><integer>41</integer><key>file-label</key><string>Mailspring</string><key>bundle-identifier</key><string>com.mailspring.mailspring</string><key>file-data</key><dict><key>_CFURLString</key><string>file://${appBundlePath}.app/</string><key>_CFURLStringType</key><integer>15</integer></dict></dict></dict>" && pkill "Dock"`
+        `defaults write com.apple.dock persistent-apps -array-add "<dict><key>tile-type</key><string>file-tile</string><key>tile-data</key><dict><key>file-type</key><integer>41</integer><key>file-label</key><string>Tern</string><key>bundle-identifier</key><string>com.ternmail.tern</string><key>file-data</key><dict><key>_CFURLString</key><string>file://${appBundlePath}.app/</string><key>_CFURLStringType</key><integer>15</integer></dict></dict></dict>" && pkill "Dock"`
       );
       this.config.set('addedToDock', true);
     }
@@ -334,7 +336,7 @@ export default class Application extends EventEmitter {
     if (hasAccount) {
       this.windowManager.ensureWindow(WindowManager.MAIN_WINDOW, {}, behavior);
     } else {
-      const title = localized('Welcome to Mailspring');
+      const title = localized('Welcome to Tern');
       this.windowManager.ensureWindow(WindowManager.ONBOARDING_WINDOW, { title }, behavior);
     }
   }
@@ -463,18 +465,11 @@ export default class Application extends EventEmitter {
     });
 
     this.on('application:view-help', () => {
-      const helpUrl = 'https://getmailspring.com/docs/';
-      shell.openExternal(helpUrl);
-    });
-
-    this.on('application:view-getting-started', () => {
-      const helpUrl = 'https://community.getmailspring.com/pub/quick-start-guide';
-      shell.openExternal(helpUrl);
+      shell.openExternal('https://github.com/ternmail/ternmail#readme');
     });
 
     this.on('application:view-community', () => {
-      const helpUrl = 'https://community.getmailspring.com/';
-      shell.openExternal(helpUrl);
+      shell.openExternal('https://github.com/ternmail/ternmail/issues');
     });
 
     this.on('application:open-preferences', () => {
@@ -658,7 +653,7 @@ export default class Application extends EventEmitter {
         defaultId: 0,
         message,
         detail: `${detail}\n\n${localized(
-          'Reset Theme and Restart restores the bundled automatic, light, and dark themes, clears cached theme styles, and restarts Mailspring. Your accounts, mail, plugins, and other settings are not changed.'
+          'Reset Theme and Restart restores the bundled automatic, light, and dark themes, clears cached theme styles, and restarts Tern. Your accounts, mail, plugins, and other settings are not changed.'
         )}`,
       });
       if (buttonIndex === 0) {
@@ -1044,7 +1039,8 @@ export default class Application extends EventEmitter {
 
     if (parts.protocol === 'mailto:') {
       main.sendMessage('mailto', urlToOpen);
-    } else if (parts.protocol === 'mailspring:') {
+    } else if (parts.protocol === 'tern:' || parts.protocol === 'mailspring:') {
+      // mailspring: is still accepted for links and jump lists made before the rename.
       // Handle notification action URLs from Windows toast notifications
       // These URLs are triggered when users click buttons on Windows toast notifications
       // since Windows toast XML with activationType="background" doesn't work reliably with Electron

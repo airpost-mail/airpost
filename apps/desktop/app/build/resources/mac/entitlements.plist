@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>com.apple.application-identifier</key>
-	<string>TERN_APPLE_TEAM_ID.com.mailspring.mailspring</string>
+	<string>TERN_APPLE_TEAM_ID.com.ternmail.tern</string>
 	<key>com.apple.developer.team-identifier</key>
 	<string>TERN_APPLE_TEAM_ID</string>
 	<key>keychain-access-groups</key>

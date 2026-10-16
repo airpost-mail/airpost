@@ -34,8 +34,8 @@ export default class AccountErrorNotification extends React.Component<
   }
 
   _onContactSupport = (erroredAccount: Account) => {
-    // Pre-fill a new topic in the community forum's Sync Issues category.
-    let url = 'https://community.getmailspring.com/new-topic?category=sync';
+    // Pre-fill a new GitHub issue.
+    let url = 'https://github.com/ternmail/ternmail/issues/new?labels=sync';
     if (erroredAccount) {
       const { syncError } = erroredAccount;
       if (syncError != null) {

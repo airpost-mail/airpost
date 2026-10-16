@@ -5,21 +5,21 @@
  * Read: https://github.com/electron-archive/grunt-electron-installer#handling-squirrel-events
  * Read: https://github.com/electron/electron/blob/master/docs/api/auto-updater.md#windows
  *
- * When Mailspring gets installed on a Windows machine it gets put in:
- * C:\Users\<USERNAME>\AppData\Local\Mailspring\app-x.x.x
+ * When Tern gets installed on a Windows machine it gets put in:
+ * C:\Users\<USERNAME>\AppData\Local\Tern\app-x.x.x
  *
  * The `process.execPath` is:
- * C:\Users\<USERNAME>\AppData\Local\Mailspring\app-x.x.x\nylas.exe
+ * C:\Users\<USERNAME>\AppData\Local\Tern\app-x.x.x\tern.exe
  *
  * We manually copy everything in build/resources/win into a 'resources' folder
  * located inside the main app directory. See runCopyPlatformSpecificResources
  * in package-task.js
  *
  * This means `__dirname` should be:
- * C:\Users\<USERNAME>\AppData\Local\Mailspring\app-x.x.x\resources
+ * C:\Users\<USERNAME>\AppData\Local\Tern\app-x.x.x\resources
  *
- * We also expect Squirrel Windows to have a file called `nylas.exe` at:
- * C:\Users\<USERNAME>\AppData\Local\Mailspring\nylas.exe
+ * We also expect Squirrel Windows to have a file called `tern.exe` at:
+ * C:\Users\<USERNAME>\AppData\Local\Tern\tern.exe
  */
 const ChildProcess = require('child_process');
 const fs = require('fs');
@@ -27,16 +27,21 @@ const path = require('path');
 const os = require('os');
 const { shell } = require('electron');
 
-// C:\Users\<USERNAME>\AppData\Local\Mailspring\app-x.x.x
+// Windows identity, shared with main.js. The toast activator CLSID is Tern's own: reusing
+// Mailspring's would point its COM registration at whichever app registered last.
+const APP_USER_MODEL_ID = 'com.ternmail.tern';
+const TOAST_ACTIVATOR_CLSID = '{F4C2EDE9-B070-46C4-98C2-6B1A53639196}';
+
+// C:\Users\<USERNAME>\AppData\Local\Tern\app-x.x.x
 const appFolder = path.resolve(process.execPath, '..');
 
-// C:\Users\<USERNAME>\AppData\Local\Mailspring\
+// C:\Users\<USERNAME>\AppData\Local\Tern\
 const rootAppDataFolder = path.resolve(appFolder, '..');
 
-// C:\Users\<USERNAME>\AppData\Local\Mailspring\Update.exe
+// C:\Users\<USERNAME>\AppData\Local\Tern\Update.exe
 const updateDotExe = path.join(rootAppDataFolder, 'Update.exe');
 
-// "mailspring.exe"
+// "tern.exe"
 const exeName = path.basename(process.execPath);
 
 // Copy the real environment onto a null-prototype object before spawning, so a
@@ -117,7 +122,7 @@ function createRegistryEntries({ allowEscalation, registerDefaultIfPossible }, c
   const requiresLocalMachine = isWindows7;
 
   // On Windows 7, we must write to LOCAL_MACHINE and need escalated privileges.
-  // Don't do it at install time - wait for the user to ask Mailspring to be the default.
+  // Don't do it at install time - wait for the user to ask Tern to be the default.
   if (requiresLocalMachine && !allowEscalation) {
     callback();
     return;
@@ -135,72 +140,66 @@ function createRegistryEntries({ allowEscalation, registerDefaultIfPossible }, c
     spawnArgs = [regPath];
   }
 
-  fs.readFile(
-    path.join(appFolder, 'resources', 'mailspring-mailto-registration.reg'),
-    (err, data) => {
-      if (err || !data) {
-        callback(err);
+  fs.readFile(path.join(appFolder, 'resources', 'tern-mailto-registration.reg'), (err, data) => {
+    if (err || !data) {
+      callback(err);
+      return;
+    }
+    const importTemplate = data.toString();
+    let importContents = importTemplate.replace(
+      /{{PATH_TO_ROOT_FOLDER}}/g,
+      escapeBackticks(rootAppDataFolder)
+    );
+    importContents = importContents.replace(/{{PATH_TO_APP_FOLDER}}/g, escapeBackticks(appFolder));
+    if (requiresLocalMachine) {
+      importContents = importContents.replace(/{{HKEY_ROOT}}/g, 'HKEY_LOCAL_MACHINE');
+    } else {
+      importContents = importContents.replace(/{{HKEY_ROOT}}/g, 'HKEY_CURRENT_USER');
+    }
+
+    const importTempPath = path.join(os.tmpdir(), `tern-reg-${Date.now()}.reg`);
+
+    fs.writeFile(importTempPath, importContents, (writeErr) => {
+      if (writeErr) {
+        callback(writeErr);
         return;
       }
-      const importTemplate = data.toString();
-      let importContents = importTemplate.replace(
-        /{{PATH_TO_ROOT_FOLDER}}/g,
-        escapeBackticks(rootAppDataFolder)
-      );
-      importContents = importContents.replace(
-        /{{PATH_TO_APP_FOLDER}}/g,
-        escapeBackticks(appFolder)
-      );
-      if (requiresLocalMachine) {
-        importContents = importContents.replace(/{{HKEY_ROOT}}/g, 'HKEY_LOCAL_MACHINE');
-      } else {
-        importContents = importContents.replace(/{{HKEY_ROOT}}/g, 'HKEY_CURRENT_USER');
-      }
 
-      const importTempPath = path.join(os.tmpdir(), `mailspring-reg-${Date.now()}.reg`);
-
-      fs.writeFile(importTempPath, importContents, (writeErr) => {
-        if (writeErr) {
-          callback(writeErr);
-          return;
-        }
-
-        spawn(
-          spawnPath,
-          spawnArgs.concat(['import', escapeBackticks(importTempPath)]),
-          (spawnErr) => {
-            if (isWindows7 && registerDefaultIfPossible) {
-              const defaultReg = path.join(appFolder, 'resources', 'mailspring-mailto-default.reg');
-              spawn(
-                spawnPath,
-                spawnArgs.concat(['import', escapeBackticks(defaultReg)]),
-                (spawnDefaultErr) => {
-                  callback(spawnDefaultErr, true);
-                }
-              );
-            } else {
-              callback(spawnErr, false);
-            }
+      spawn(
+        spawnPath,
+        spawnArgs.concat(['import', escapeBackticks(importTempPath)]),
+        (spawnErr) => {
+          if (isWindows7 && registerDefaultIfPossible) {
+            const defaultReg = path.join(appFolder, 'resources', 'tern-mailto-default.reg');
+            spawn(
+              spawnPath,
+              spawnArgs.concat(['import', escapeBackticks(defaultReg)]),
+              (spawnDefaultErr) => {
+                callback(spawnDefaultErr, true);
+              }
+            );
+          } else {
+            callback(spawnErr, false);
           }
-        );
-      });
-    }
-  );
+        }
+      );
+    });
+  });
 }
 
 exports.spawn = spawnUpdate;
 exports.createRegistryEntries = createRegistryEntries;
 
-// Is the Update.exe installed with Mailspring?
+// Is the Update.exe installed with Tern?
 exports.existsSync = () => fs.existsSync(updateDotExe);
 
 // Register the AppUserModelId with a display name so Windows notifications
-// show "Mailspring" instead of "com.squirrel.mailspring.mailspring"
+// show "Tern" instead of the raw AUMID
 // Registry path: HKEY_CURRENT_USER\SOFTWARE\Classes\AppUserModelId\{AUMID}
 function registerAppUserModelId(callback) {
-  const aumid = 'com.squirrel.mailspring.mailspring';
-  const displayName = 'Mailspring';
-  const iconPath = path.join(appFolder, 'resources', 'mailspring-square.ico');
+  const aumid = APP_USER_MODEL_ID;
+  const displayName = 'Tern';
+  const iconPath = path.join(appFolder, 'resources', 'tern.ico');
 
   let regPath = 'reg.exe';
   if (process.env.SystemRoot) {
@@ -237,17 +236,15 @@ function registerAppUserModelId(callback) {
 }
 
 exports.registerAppUserModelId = registerAppUserModelId;
+exports.APP_USER_MODEL_ID = APP_USER_MODEL_ID;
+exports.TOAST_ACTIVATOR_CLSID = TOAST_ACTIVATOR_CLSID;
 
 // Copy Start Menu tile visual elements (icon PNGs + manifest XML) from the
 // current app-x.x.x/resources directory to the root install directory so
 // Windows can display a branded tile. Errors are ignored — these are optional.
 function copyVisualElements() {
   try {
-    const files = [
-      'mailspring-75px.png',
-      'mailspring-150px.png',
-      'mailspring.VisualElementsManifest.xml',
-    ];
+    const files = ['tern-75px.png', 'tern-150px.png', 'tern.VisualElementsManifest.xml'];
     for (const file of files) {
       fs.copyFileSync(path.join(appFolder, 'resources', file), path.join(rootAppDataFolder, file));
     }
@@ -256,7 +253,7 @@ function copyVisualElements() {
   }
 }
 
-// Restart Mailspring using the version pointed to by the Mailspring.cmd shim.
+// Restart Tern using the version pointed to by the Squirrel Update.exe shim.
 // Uses spawnDetached to ensure the child process survives the parent's exit —
 // the piped-stdio `spawn` function can fail when called during `will-quit`
 // because the Node.js event loop tears down the pipe before Update.exe launches
@@ -274,82 +271,57 @@ exports.restartMailspring = (app) => {
   app.quit();
 };
 
+// Squirrel's own --createShortcut stamps shortcuts with "com.squirrel.<id>.<exe>" as their
+// AppUserModelID and no toast activator, which wouldn't match APP_USER_MODEL_ID (set in
+// main.js), and Windows only delivers toasts and groups taskbar buttons for an AUMID that a
+// Start Menu shortcut carries. So Tern writes its shortcuts itself.
+function shortcutPaths() {
+  return [
+    path.join(process.env.APPDATA, 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Tern.lnk'),
+    path.join(process.env.USERPROFILE || process.env.HOME, 'Desktop', 'Tern.lnk'),
+  ];
+}
+
+function writeShortcuts({ replaceExisting }) {
+  const iconPath = path.join(appFolder, 'resources', 'tern.ico');
+  const shortcutOptions = {
+    // Update.exe --processStart always launches the newest installed app-x.x.x.
+    target: updateDotExe,
+    args: `--processStart ${exeName}`,
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    iconIndex: 0,
+    description: 'The best email app for people and teams at work',
+    appUserModelId: APP_USER_MODEL_ID,
+    toastActivatorClsid: TOAST_ACTIVATOR_CLSID,
+  };
+  for (const shortcutPath of shortcutPaths()) {
+    try {
+      if (replaceExisting || !fs.existsSync(shortcutPath)) {
+        shell.writeShortcutLink(shortcutPath, 'create', shortcutOptions);
+      }
+    } catch (err) {
+      // Ignore - a missing shortcut is not worth failing the install for
+    }
+  }
+}
+
 // Handle --squirrel-install event with fast exit.
 // Squirrel.Windows has a 15-second timeout for hooks. We spawn all necessary
 // processes in detached mode and exit immediately to avoid timeout.
 // See: https://github.com/Squirrel/Squirrel.Windows/issues/501
 // See: https://github.com/Squirrel/Squirrel.Windows/issues/1145
 exports.handleSquirrelInstall = (app) => {
-  // Spawn Update.exe to create shortcuts (detached - won't block exit)
-  spawnDetached(updateDotExe, [
-    '--createShortcut',
-    exeName,
-    '--shortcut-locations',
-    'Desktop,StartMenu',
-  ]);
-
   copyVisualElements();
-
-  // Create fallback shortcuts synchronously (fast)
-  const startMenuPath = path.join(
-    process.env.APPDATA,
-    'Microsoft',
-    'Windows',
-    'Start Menu',
-    'Programs',
-    'Mailspring.lnk'
-  );
-  const desktopPath = path.join(
-    process.env.USERPROFILE || process.env.HOME,
-    'Desktop',
-    'Mailspring.lnk'
-  );
-  const iconPath = path.join(appFolder, 'resources', 'mailspring-square.ico');
-
-  const shortcutOptions = {
-    target: updateDotExe,
-    args: '--processStart mailspring.exe',
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
-    iconIndex: 0,
-    description: 'The best email app for people and teams at work',
-    appUserModelId: 'com.squirrel.mailspring.mailspring',
-    toastActivatorClsid: '{E6AD16B0-2830-48E7-9DB7-439152FA917B}',
-  };
-
-  try {
-    if (!fs.existsSync(startMenuPath)) {
-      shell.writeShortcutLink(startMenuPath, 'create', shortcutOptions);
-    }
-  } catch (err) {
-    // Ignore - Squirrel's method might succeed
-  }
-
-  try {
-    if (!fs.existsSync(desktopPath)) {
-      shell.writeShortcutLink(desktopPath, 'create', shortcutOptions);
-    }
-  } catch (err) {
-    // Ignore - Squirrel's method might succeed
-  }
+  writeShortcuts({ replaceExisting: true });
 
   // Spawn reg.exe to register AUMID (detached - won't block exit)
-  const aumid = 'com.squirrel.mailspring.mailspring';
-  const regKey = `HKEY_CURRENT_USER\\SOFTWARE\\Classes\\AppUserModelId\\${aumid}`;
+  const iconPath = path.join(appFolder, 'resources', 'tern.ico');
+  const regKey = `HKEY_CURRENT_USER\\SOFTWARE\\Classes\\AppUserModelId\\${APP_USER_MODEL_ID}`;
   let regPath = 'reg.exe';
   if (process.env.SystemRoot) {
     regPath = path.join(process.env.SystemRoot, 'System32', 'reg.exe');
   }
-  spawnDetached(regPath, [
-    'add',
-    regKey,
-    '/v',
-    'DisplayName',
-    '/t',
-    'REG_SZ',
-    '/d',
-    'Mailspring',
-    '/f',
-  ]);
+  spawnDetached(regPath, ['add', regKey, '/v', 'DisplayName', '/t', 'REG_SZ', '/d', 'Tern', '/f']);
   if (fs.existsSync(iconPath)) {
     spawnDetached(regPath, ['add', regKey, '/v', 'IconUri', '/t', 'REG_SZ', '/d', iconPath, '/f']);
   }
@@ -364,18 +336,12 @@ exports.handleSquirrelInstall = (app) => {
 
 // Handle --squirrel-updated event with fast exit.
 // Squirrel runs the NEW app version with this flag after extracting an update.
-// We update shortcuts to point to the new version and exit immediately.
-// The actual app restart happens later when the user clicks "Install Update".
+// The shortcuts point at Update.exe, so they only need recreating if the user deleted them,
+// which the update leaves alone. The actual app restart happens later when the user clicks
+// "Install Update".
 exports.handleSquirrelUpdated = (app) => {
-  // Update shortcuts to point to the new app version (detached - won't block exit)
-  spawnDetached(updateDotExe, [
-    '--createShortcut',
-    exeName,
-    '--shortcut-locations',
-    'Desktop,StartMenu',
-  ]);
-
   copyVisualElements();
+  writeShortcuts({ replaceExisting: false });
 
   // Exit immediately - don't wait for spawned processes
   app.quit();
@@ -383,38 +349,14 @@ exports.handleSquirrelUpdated = (app) => {
 
 // Handle --squirrel-uninstall event with fast exit.
 exports.handleSquirrelUninstall = (app) => {
-  // Spawn Update.exe to remove shortcuts (detached - won't block exit)
-  spawnDetached(updateDotExe, ['--removeShortcut', exeName]);
-
-  // Try to remove fallback shortcuts synchronously
-  const startMenuPath = path.join(
-    process.env.APPDATA,
-    'Microsoft',
-    'Windows',
-    'Start Menu',
-    'Programs',
-    'Mailspring.lnk'
-  );
-  const desktopPath = path.join(
-    process.env.USERPROFILE || process.env.HOME,
-    'Desktop',
-    'Mailspring.lnk'
-  );
-
-  try {
-    if (fs.existsSync(startMenuPath)) {
-      fs.unlinkSync(startMenuPath);
+  for (const shortcutPath of shortcutPaths()) {
+    try {
+      if (fs.existsSync(shortcutPath)) {
+        fs.unlinkSync(shortcutPath);
+      }
+    } catch (err) {
+      // Ignore
     }
-  } catch (err) {
-    // Ignore
-  }
-
-  try {
-    if (fs.existsSync(desktopPath)) {
-      fs.unlinkSync(desktopPath);
-    }
-  } catch (err) {
-    // Ignore
   }
 
   // Exit immediately

@@ -2333,9 +2333,9 @@ describe('ICSEventHelpers.createVTIMEZONEString, for zones no single yearly rule
 });
 
 describe('ICSEventHelpers.generateUID', function () {
-  it('is a UUID in the mailspring domain', function () {
+  it('is a UUID in the tern domain', function () {
     expect(ICSEventHelpers.generateUID()).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}@mailspring$/
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}@tern$/
     );
   });
 

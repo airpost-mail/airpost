@@ -1,9 +1,9 @@
 /* eslint import/no-dynamic-require:0 */
 /**
- * Squirrel generates Update.exe, squirrel.exe and mailspring_ExecutionStub.exe
+ * Squirrel generates Update.exe, squirrel.exe and tern_ExecutionStub.exe
  * while building the installer, after the workflow signs the app directory and
  * before it signs the installer. Unsigned, the stub -- which Squirrel installs
- * as %LocalAppData%\Mailspring\mailspring.exe -- trips Smart App Control, so
+ * as %LocalAppData%\Tern\tern.exe -- trips Smart App Control, so
  * pass --signWithParams and let Squirrel sign them itself.
  */
 const fs = require('fs');
@@ -29,7 +29,7 @@ function createVendorDirectory() {
     'vendor'
   );
 
-  const vendorDirectory = path.join(os.tmpdir(), 'mailspring-winstaller-vendor');
+  const vendorDirectory = path.join(os.tmpdir(), 'tern-winstaller-vendor');
   fs.rmSync(vendorDirectory, { recursive: true, force: true });
   fs.cpSync(bundled, vendorDirectory, { recursive: true });
 
@@ -82,17 +82,20 @@ function verifySigningWorks(vendorDirectory) {
 const config = {
   usePackageJson: false,
   outputDirectory: path.join(appDir, 'dist'),
-  appDirectory: path.join(appDir, 'dist', 'mailspring-win32-x64'),
+  appDirectory: path.join(appDir, 'dist', 'Tern-win32-x64'),
   loadingGif: path.join(appDir, 'build', 'resources', 'win', 'loading.gif'),
-  iconUrl: 'http://mailspring-builds.s3.amazonaws.com/assets/mailspring-square.ico',
-  description: 'Mailspring',
+  // Shown in Add/Remove Programs. Must be an http(s) URL; the raw GitHub file is the repo's own
+  // copy of build/resources/win/tern.ico.
+  iconUrl:
+    'https://raw.githubusercontent.com/ternmail/ternmail/main/apps/desktop/app/build/resources/win/tern.ico',
+  description: 'Tern',
   version: version,
-  title: 'Mailspring',
-  authors: 'Foundry 376, LLC',
-  setupIcon: path.join(appDir, 'build', 'resources', 'win', 'mailspring-square.ico'),
-  setupExe: 'MailspringSetup.exe',
-  exe: 'mailspring.exe',
-  name: 'Mailspring',
+  title: 'Tern',
+  authors: 'Tern contributors',
+  setupIcon: path.join(appDir, 'build', 'resources', 'win', 'tern.ico'),
+  setupExe: 'TernSetup.exe',
+  exe: 'tern.exe',
+  name: 'Tern',
 };
 
 if (signWithParams) {

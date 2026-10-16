@@ -245,7 +245,7 @@ export class TranslateMessageHeader extends React.Component<
       buttons: [localized('Yes'), localized('Cancel')],
       message: localized('Are you sure?'),
       detail: localized(
-        'Mailspring will no longer offer to translate messages written in %@.',
+        'Tern will no longer offer to translate messages written in %@.',
         AllLanguages[this.state.detected]
       ),
     });
@@ -271,10 +271,7 @@ export class TranslateMessageHeader extends React.Component<
         <div className="translate-message-header">
           <div className="message with-actions">
             <div className="message-centered">
-              {localized(
-                'Mailspring has translated this message into %@.',
-                AllLanguages[result.toLang]
-              )}
+              {localized('Tern has translated this message into %@.', AllLanguages[result.toLang])}
             </div>
           </div>
           <div className="actions">
