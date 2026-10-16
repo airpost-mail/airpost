@@ -1,15 +1,18 @@
 name: backend
 
 # tern-backend is a member of the root workspace (engine.yml's workspace jobs build and test
-# it too). This workflow runs its own checks fast, and cargo deny on its graph alone with
-# apps/backend/deny.toml: permissive licences only and none of the GPL ms-* crates.
+# it too). This workflow runs its own checks fast, cargo deny on its graph alone with
+# apps/backend/deny.toml (GPLv3-compatible licences, no engine crates), and builds the image,
+# which carries LICENSE.md, NOTICE.md, SOURCE.txt and the crates' THIRD-PARTY-NOTICES.txt.
+# This image is untagged and not published; a publishing job must pass SOURCE_URL, SOURCE_TAG
+# and SOURCE_REVISION (see the Dockerfile).
 
 on:
   push:
     branches: [main]
-    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read
@@ -38,3 +41,22 @@ jobs:
         with:
           manifest-path: apps/backend/Cargo.toml
           command: check
+
+  # Building the image runs third-party-notices.sh, which fails on a crate whose licence
+  # cargo-about cannot identify.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -f apps/backend/Dockerfile -t tern-backend .
+      - name: Check the shipped notices
+        run: |
+          id="$(docker create tern-backend)"
+          docker cp "$id:/usr/share/doc/tern-backend" "$RUNNER_TEMP/doc"
+          docker rm "$id"
+          ls -l "$RUNNER_TEMP/doc"
+          test -s "$RUNNER_TEMP/doc/LICENSE.md"
+          test -s "$RUNNER_TEMP/doc/NOTICE.md"
+          grep -q '^NOTICE files' "$RUNNER_TEMP/doc/THIRD-PARTY-NOTICES.txt"
+          test -s "$RUNNER_TEMP/doc/SOURCE.txt"

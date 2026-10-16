@@ -1,8 +1,9 @@
 name: desktop-build-windows
 
 # Builds the Windows installer. There is no Windows build of the Rust engine yet
-# (docs/engine-port-plan.md section 11), so this app ships without a sync engine unless a
-# C++ mailsync.exe is placed in apps/desktop/app first; see docs/engine-port-status.md.
+# (docs/engine-port-plan.md section 11), so this app ships without a sync engine. It must not
+# ship the C++ engine: legacy/mailsync-cpp's Windows build links the vendored OpenSSL 1.1 DLLs,
+# whose licence is incompatible with the GPL, and the build fails if one is present.
 #
 # Secrets (all optional; without the AZURE_* ones every signing step is skipped and the
 # installer is unsigned): AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
@@ -19,6 +20,9 @@ permissions:
 jobs:
   build:
     runs-on: windows-2022
+    # contents: write only for the source tag (scripts/source-offer.sh).
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: apps/desktop
@@ -55,6 +59,18 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
+
+      - name: Refuse a C++ engine or OpenSSL DLLs
+        shell: bash
+        run: |
+          found="$(find app -path app/node_modules -prune -o -type f \( -iname 'mailsync.exe' \
+            -o -iname 'libcrypto*.dll' -o -iname 'libssl*.dll' -o -iname 'libeay32*.dll' \
+            -o -iname 'ssleay32*.dll' \) -print)"
+          if [ -n "$found" ]; then
+            echo "Not shipping the C++ engine or OpenSSL (GPL-incompatible):"
+            echo "$found"
+            exit 1
+          fi
 
       - name: Lint
         run: npm run lint:check
@@ -148,6 +164,16 @@ jobs:
         if: env.HAVE_SIGNING == 'true'
         run: node app/build/verify-windows-signatures.js
 
+      # GPLv3 section 6(d): a tag pins the source and SOURCE.txt, published next to every
+      # package, points to it.
+      - name: Source offer
+        shell: bash
+        run: |
+          tag="desktop-$(node -p "require('./app/package.json').version")-$(git rev-parse --short=8 HEAD)"
+          ../../.github/scripts/source-offer.sh "$tag" app/dist "the Tern desktop app"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-windows-x64
@@ -155,6 +181,7 @@ jobs:
             apps/desktop/app/dist/MailspringSetup.exe
             apps/desktop/app/dist/*.nupkg
             apps/desktop/app/dist/RELEASES
+            apps/desktop/app/dist/SOURCE.txt
 
       - name: Setup AWS CLI
         if: env.HAVE_AWS == 'true'
@@ -176,4 +203,5 @@ jobs:
             --exclude "*" `
             --include "MailspringSetup.exe" `
             --include "*.nupkg" `
-            --include "RELEASES"
+            --include "RELEASES" `
+            --include "SOURCE.txt"

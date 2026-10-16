@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id><%= name %></id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0+</project_license>
+  <project_license>GPL-3.0-only</project_license>
   <name><%= productName %></name>
   <summary><%= description %></summary>
   <description>
@@ -29,7 +29,7 @@
   <url type="faq">https://getmailspring.com/docs/faq</url>
   <url type="donation">https://www.getmailspring.com/pro</url>
   <url type="contribute">https://github.com/Foundry376/Mailspring/blob/master/CONTRIBUTING.md</url>
-  <url type="vcs-browser">https://github.com/Foundry376/Mailspring</url>
+  <url type="vcs-browser">https://github.com/ternmail/ternmail</url>
 
   <launchable type="desktop-id"><%= desktopName %></launchable>
 

@@ -13,6 +13,7 @@ const glob = require('glob');
 const _ = require('underscore');
 const TypeScript = require('typescript');
 const { packager } = require('@electron/packager');
+const { writeLicenses } = require('./generate-licenses');
 
 const platform = process.platform;
 const rootDir = path.resolve(__dirname, '..', '..');
@@ -22,6 +23,23 @@ const outputDir = path.join(appDir, 'dist');
 const tmpdir = path.resolve(os.tmpdir(), 'nylas-build');
 const packageJSON = require(path.join(appDir, 'package.json'));
 const { compilerOptions } = require(path.join(appDir, 'tsconfig.json'));
+
+const appCopyright =
+  `Copyright (C) 2014-${new Date().getFullYear()} Foundry 376, LLC and Tern contributors. ` +
+  'Licensed under GPL-3.0-only.';
+
+// entitlements.plist carries a TERN_APPLE_TEAM_ID placeholder; signing needs the real team ID,
+// which must match the provisioning profile.
+function macMainEntitlementsPath() {
+  const template = path.join(buildDir, 'resources', 'mac', 'entitlements.plist');
+  const teamId = process.env.APPLE_TEAM_ID;
+  if (!teamId) {
+    throw new Error('SIGN_BUILD needs APPLE_TEAM_ID to fill in entitlements.plist');
+  }
+  const out = path.join(os.tmpdir(), 'tern-entitlements.plist');
+  fs.writeFileSync(out, fs.readFileSync(template, 'utf8').replace(/TERN_APPLE_TEAM_ID/g, teamId));
+  return out;
+}
 
 const sourceGlobs = [
   'internal_packages/**/*.ts',
@@ -113,6 +131,11 @@ function runCopySymlinkedPackages({ buildPath }) {
     fsPlus.removeSync(packagePath);
     fsPlus.copySync(realPackagePath, packagePath);
   });
+}
+
+function runWriteLicenses({ buildPath, platform }) {
+  console.log('---> Writing licences and notices');
+  writeLicenses({ buildPath, platform, commit: execSync('git rev-parse HEAD').toString().trim() });
 }
 
 function writeFileEnsureDir(filePath, contents) {
@@ -214,7 +237,7 @@ function buildPackagerOptions() {
       linux: undefined,
     }[platform],
     name: { darwin: 'Mailspring', win32: 'Mailspring', linux: 'mailspring' }[platform],
-    appCopyright: `Copyright (C) 2014-${new Date().getFullYear()} Foundry 376, LLC. All rights reserved.`,
+    appCopyright,
     derefSymlinks: false,
     asar: {
       unpack:
@@ -253,13 +276,20 @@ function buildPackagerOptions() {
       /^\/docs_src.*/,
       /^\/script.*/,
       /^\/spec.*/,
+      // The C++ engine is never packaged, even if a local build left one in app/: its
+      // dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not GPL-compatible or have
+      // no licence. Only mailsync-rs ships.
+      /^\/mailsync(\.exe|\.bin|\.dSYM.*)?$/,
+      // better-sqlite3's test fixture; postinstall deletes it, this catches a stale tree.
+      /test_extension\.node$/,
       // general dirs we never want
       /[/]+gh-pages$/,
       /[/]+docs$/,
       /[/]+obj[/]+gen/,
       /[/]+\.deps$/,
-      // File types we know we never want in the prod build
-      /\.md$/i,
+      // File types we know we never want in the prod build. Licence and notice files stay,
+      // whatever their extension: MIT, BSD and Apache-2.0 require them in every copy.
+      /^(?!.*[/\\]((MIT|BSD|APACHE)[-._])?(LICEN[CS]E|COPYING|NOTICE)[^/\\]*$).*\.md$/i,
       /\.log$/i,
       /\.yml$/i,
       /\.gz/i,
@@ -306,13 +336,9 @@ function buildPackagerOptions() {
             const isMainExecutable = filePath.endsWith('/Mailspring.app');
             return {
               hardenedRuntime: true,
-              entitlements: path.resolve(
-                appDir,
-                'build',
-                'resources',
-                'mac',
-                isMainExecutable ? 'entitlements.plist' : 'entitlements.child.plist'
-              ),
+              entitlements: isMainExecutable
+                ? macMainEntitlementsPath()
+                : path.join(buildDir, 'resources', 'mac', 'entitlements.child.plist'),
             };
           },
         }
@@ -328,7 +354,7 @@ function buildPackagerOptions() {
     win32metadata: {
       CompanyName: 'Foundry 376, LLC',
       FileDescription: 'Mailspring',
-      LegalCopyright: `Copyright (C) 2014-${new Date().getFullYear()} Foundry 376, LLC. All rights reserved.`,
+      LegalCopyright: appCopyright,
       ProductName: 'Mailspring',
     },
     // NOTE: The following plist keys can NOT be set in the extra.plist since
@@ -346,6 +372,7 @@ function buildPackagerOptions() {
       runWriteCommitHashIntoPackage,
       runUpdateSandboxHelperPermissions,
       runCopySymlinkedPackages,
+      runWriteLicenses,
       runTranspilers,
       runUploadSourceMapsToSentry,
     ],

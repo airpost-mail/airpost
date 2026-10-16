@@ -1,0 +1,9 @@
+Twemoji
+Copyright 2019 Twitter, Inc and other contributors
+https://github.com/twitter/twemoji
+
+The emoji images in static/images/composer-emoji/twitter/ are Twemoji graphics, licensed under
+the Creative Commons Attribution 4.0 International licence (CC-BY 4.0):
+https://creativecommons.org/licenses/by/4.0/legalcode
+
+The images may be resized or re-encoded from the upstream Twemoji PNGs; they are otherwise unchanged.

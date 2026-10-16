@@ -25,19 +25,27 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.92
       - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about --version 0.9.2 --features cli
       - name: Build the Rust engine
         run: apps/engine/packaging/build-release.sh linux
         env:
           OUT_DIR: ${{ runner.temp }}/engine-dist
+          TERN_REQUIRE_NOTICES: 1
       - uses: actions/upload-artifact@v7
         with:
           name: engine-aarch64
-          path: ${{ runner.temp }}/engine-dist/aarch64-unknown-linux-gnu/mailsync
+          path: |
+            ${{ runner.temp }}/engine-dist/aarch64-unknown-linux-gnu/mailsync
+            ${{ runner.temp }}/engine-dist/aarch64-unknown-linux-gnu/THIRD-PARTY-NOTICES.txt
           retention-days: 1
 
   build:
     needs: engine
     runs-on: ubuntu-24.04-arm
+    # contents: write only for the source tag (scripts/source-offer.sh).
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: apps/desktop
@@ -75,7 +83,9 @@ jobs:
           path: ${{ runner.temp }}/engine
 
       - name: Install the Rust engine
-        run: install -m 755 "$RUNNER_TEMP/engine/mailsync" app/mailsync-rs
+        run: |
+          install -m 755 "$RUNNER_TEMP/engine/mailsync" app/mailsync-rs
+          install -m 644 "$RUNNER_TEMP/engine/THIRD-PARTY-NOTICES.txt" app/mailsync-rs.THIRD-PARTY-NOTICES.txt
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -95,6 +105,15 @@ jobs:
       - name: Build
         run: DEBUG=electron-packager npm run build
 
+      # GPLv3 section 6(d): a tag pins the source and SOURCE.txt, published next to every
+      # package, points to it.
+      - name: Source offer
+        run: |
+          tag="desktop-$(node -p "require('./app/package.json').version")-$(git rev-parse --short=8 HEAD)"
+          ../../.github/scripts/source-offer.sh "$tag" app/dist "the Tern desktop app"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Setup AWS CLI
         if: env.HAVE_AWS == 'true'
         uses: aws-actions/configure-aws-credentials@v6
@@ -108,7 +127,7 @@ jobs:
         run: |
           aws s3 sync app/dist/ "s3://$BUCKET/client/$(git rev-parse --short=8 HEAD)/linux-arm64" \
             --acl public-read \
-            --exclude "*" --include "*.deb" --include "*.rpm"
+            --exclude "*" --include "*.deb" --include "*.rpm" --include "SOURCE.txt"
         env:
           BUCKET: ${{ vars.BUILDS_S3_BUCKET }}
 
@@ -116,14 +135,18 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: mailspring-arm64-deb
-          path: apps/desktop/app/dist/*.deb
+          path: |
+            apps/desktop/app/dist/*.deb
+            apps/desktop/app/dist/SOURCE.txt
           retention-days: 1
 
       - name: Upload RPM artifact for testing
         uses: actions/upload-artifact@v7
         with:
           name: mailspring-arm64-rpm
-          path: apps/desktop/app/dist/*.rpm
+          path: |
+            apps/desktop/app/dist/*.rpm
+            apps/desktop/app/dist/SOURCE.txt
           retention-days: 1
 
   build-snap:

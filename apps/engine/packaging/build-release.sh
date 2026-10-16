@@ -12,13 +12,19 @@
 #   aarch64-apple-darwin/mailsync     x86_64-apple-darwin/mailsync   universal-apple-darwin/mailsync
 #   x86_64-unknown-linux-gnu/mailsync aarch64-unknown-linux-gnu/mailsync
 #
+# Each target directory also gets LICENSE.md, NOTICE.md and THIRD-PARTY-NOTICES.txt (the
+# crates' licences, from third-party-notices.sh), which ship next to the binary. Without
+# cargo-about the notices are skipped with a warning; TERN_REQUIRE_NOTICES=1 (set in CI) makes
+# that an error.
+#
 # macOS needs both Rust targets installed; with rustup the script adds them for the
 # toolchain in rust-toolchain.toml. Linux binaries are built natively on a Linux host (the
 # other arch with a cross gcc if one is installed) or, on macOS, the same way in a Debian
 # bullseye container (glibc 2.31, older than any distro the desktop's Linux packages
 # support). Linux debug info is split into mailsync.debug next to each binary.
 #
-# --install-desktop copies one binary to apps/desktop/app/mailsync-rs. ARCH is arm64, x64 or
+# --install-desktop copies one binary to apps/desktop/app/mailsync-rs, and its notices to
+# apps/desktop/app/mailsync-rs.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
 # universal (macOS only); the default is the arch build.js packages for: x64 when
 # OVERRIDE_TO_INTEL is set, else the host's.
 #
@@ -74,10 +80,27 @@ cargo_build() {
   fi
 }
 
+# Generated once per run on the host (the Docker build reuses it through $OUT_DIR): the crate
+# graph is the same for every target listed in about.toml.
+generate_notices() {
+  [ -n "${TERN_SKIP_NOTICES:-}" ] && return 0
+  if ! command -v cargo-about >/dev/null; then
+    [ -n "${TERN_REQUIRE_NOTICES:-}" ] && die "cargo-about not installed (cargo install --locked cargo-about --features cli)"
+    log "Not writing THIRD-PARTY-NOTICES.txt: cargo-about not installed"
+    return 0
+  fi
+  log "Writing $OUT_DIR/THIRD-PARTY-NOTICES.txt"
+  "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" "$OUT_DIR/THIRD-PARTY-NOTICES.txt"
+}
+
 collect() {
   local target="$1"
   mkdir -p "$OUT_DIR/$target"
   cp "$TARGET_DIR/$target/release/mailsync" "$OUT_DIR/$target/mailsync"
+  cp "$REPO_ROOT/LICENSE.md" "$REPO_ROOT/NOTICE.md" "$OUT_DIR/$target/"
+  if [ -f "$OUT_DIR/THIRD-PARTY-NOTICES.txt" ]; then
+    cp "$OUT_DIR/THIRD-PARTY-NOTICES.txt" "$OUT_DIR/$target/"
+  fi
   log "$OUT_DIR/$target/mailsync"
 }
 
@@ -92,6 +115,10 @@ build_macos() {
   mkdir -p "$OUT_DIR/universal-apple-darwin"
   lipo -create -output "$OUT_DIR/universal-apple-darwin/mailsync" \
     "$OUT_DIR/aarch64-apple-darwin/mailsync" "$OUT_DIR/x86_64-apple-darwin/mailsync"
+  cp "$OUT_DIR/aarch64-apple-darwin/"{LICENSE.md,NOTICE.md} "$OUT_DIR/universal-apple-darwin/"
+  if [ -f "$OUT_DIR/THIRD-PARTY-NOTICES.txt" ]; then
+    cp "$OUT_DIR/THIRD-PARTY-NOTICES.txt" "$OUT_DIR/universal-apple-darwin/"
+  fi
   lipo "$OUT_DIR/universal-apple-darwin/mailsync" -verify_arch arm64 x86_64
   log "$OUT_DIR/universal-apple-darwin/mailsync ($(lipo -archs "$OUT_DIR/universal-apple-darwin/mailsync"))"
 }
@@ -162,7 +189,7 @@ build_linux_docker() {
     -v "$TARGET_DIR/linux-docker":/target \
     -v "$OUT_DIR":/out \
     -v tern-engine-cargo-registry:/usr/local/cargo/registry \
-    -e CARGO_TARGET_DIR=/target -e OUT_DIR=/out \
+    -e CARGO_TARGET_DIR=/target -e OUT_DIR=/out -e TERN_SKIP_NOTICES=1 \
     "$LINUX_IMAGE" bash -euo pipefail -c "
       apt-get update -qq >/dev/null
       DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $cross_pkgs >/dev/null
@@ -190,6 +217,10 @@ install_desktop() {
   [ -f "$OUT_DIR/$target/mailsync" ] || die "$OUT_DIR/$target/mailsync was not built"
   install -m 755 "$OUT_DIR/$target/mailsync" "$DESKTOP_APP_DIR/mailsync-rs"
   log "Installed $target into $DESKTOP_APP_DIR/mailsync-rs"
+  if [ -f "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" ]; then
+    install -m 644 "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" \
+      "$DESKTOP_APP_DIR/mailsync-rs.THIRD-PARTY-NOTICES.txt"
+  fi
 }
 
 platforms=()
@@ -212,6 +243,8 @@ if [ ${#platforms[@]} -eq 0 ]; then
   esac
 fi
 
+mkdir -p "$OUT_DIR"
+generate_notices
 for p in "${platforms[@]}"; do "build_$p"; done
 [ -n "$install" ] && install_desktop "$install_arch"
 exit 0

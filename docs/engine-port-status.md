@@ -108,11 +108,38 @@ Signing, CI and packaging
   run `build-release.sh --install-desktop`, so they ship `mailsync-rs`. All were checked
   only with actionlint 1.7.12; none has run on Actions. The Linux install tests have not run
   against a package carrying `mailsync-rs`.
-- [ ] Windows: there is no Rust build, and with the C++ submodule gone
-  `desktop-build-windows.yml` packages no engine at all. Decide whether Windows ships C++
-  only for now (a `mailsync.exe` placed in `apps/desktop/app` before the build) or waits.
+- [ ] Windows: there is no Rust build, so `desktop-build-windows.yml` packages no engine.
+  It must not ship the C++ engine: its Windows build links the OpenSSL 1.1 DLLs in
+  `legacy/mailsync-cpp/Vendor/libetpan/third-party/` (licence incompatible with the GPL), and
+  the workflow fails if a `mailsync.exe` or OpenSSL DLL is in `apps/desktop/app`.
 - [ ] Optional: build `apps/engine/test/ab/mailsync-a83cc9a` to un-skip
   `rules-ready-pre-upgrade-messages` (x3).
+
+Licences and source (GPLv3 sections 4-6)
+
+- [ ] Every published binary carries the licence and notices. Engine archives hold `mailsync`
+  with `LICENSE.md`, `NOTICE.md` and `THIRD-PARTY-NOTICES.txt` (cargo-about, `about.toml`,
+  `apps/engine/packaging/third-party-notices.sh`, which also appends the crates' NOTICE
+  files). The desktop build (`app/build/generate-licenses.js`) writes
+  `static/all_licenses.html` from the pruned app tree, the engine notices and the vendored
+  assets in `app/build/resources/licenses/`, and puts `LICENSE.md`, `NOTICE.md` and
+  `THIRD-PARTY-NOTICES-engine.txt` in `resources/`; on macOS also Electron's `LICENSE.electron`
+  and `LICENSES.chromium.html`. In CI it fails when the engine ships without notices. The
+  backend image has them in `/usr/share/doc/tern-backend`. Check one artifact of each kind
+  after the first CI run, and open View License in a packaged app.
+- [ ] Source offer: each desktop build tags its commit `desktop-<version>-<sha8>` and publishes
+  `SOURCE.txt` (`.github/scripts/source-offer.sh`) next to the packages, in the workflow
+  artifact and on S3. Engine releases (`engine-v*`) attach `SOURCE.txt` and
+  `tern-engine-src-<tag>.tar.gz` (the Cargo workspace with every crate vendored). Keep the
+  tags, the repository and the S3 objects available for as long as a build is offered. The
+  desktop's npm dependencies are referenced by lockfile, not mirrored.
+- [ ] npm packages that ship no licence file get their text from
+  `app/build/resources/licenses/npm/` (`get-document`: MIT from upstream; `html-attributes`
+  and `svg-attributes`: Open Works License 0.9.4, upstream repos gone) or the standard text for
+  their declared licence. The build log names any package left without one; keep that list
+  empty.
+- [ ] The snap builds libsecret 0.20.5 (LGPL-2.1-or-later) from source and ships its COPYING;
+  its source is the upstream tag in `snap/snapcraft.yaml`.
 
 Decisions
 

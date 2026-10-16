@@ -24,11 +24,8 @@ especially looking for anything marked `for-plugin`.
 
 ### Pull requests
 
-The first time you submit a pull request, a bot will ask you to sign a
-standard, bare-bones Contributor License Agreement. The CLA states that you
-waive any patent or copyright claims you might have to the code you're
-contributing. (For example, you can't submit a PR and then sue Mailspring
-for using your code.)
+Contributions are accepted under the project's licence, GPL-3.0-only (see
+LICENSE.md and NOTICE.md at the repository root). There is no CLA.
 
 ## Triaging Issues
 

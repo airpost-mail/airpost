@@ -1,5 +1,5 @@
 name: mailspring
-license: GPL-3.0
+license: GPL-3.0-only
 adopt-info: mailspring
 
 confinement: strict
@@ -22,15 +22,15 @@ parts:
       craftctl default
       sed -i 's|Icon=mailspring|Icon=/usr/share/pixmaps/mailspring\.png|' \
         $CRAFT_PART_INSTALL/usr/share/applications/Mailspring.desktop
+      # GPLv3 6(d): the snap is published to the Store, so the source offer travels inside it.
+      install -Dm644 "$CRAFT_PROJECT_DIR/app/dist/SOURCE.txt" \
+        "$CRAFT_PART_INSTALL/usr/share/doc/mailspring/SOURCE.txt"
     prime:
       - -usr/share/mailspring/chrome-sandbox
     parse-info: [usr/share/metainfo/mailspring.metainfo.xml]
+    # The engine needs only glibc (TLS is rustls), so no mail or TLS libraries are staged.
     stage-packages:
       - libxkbfile1
-      - libsasl2-2
-      - libssl3
-      - libcurl4
-      - libtidy5deb1
       - ca-certificates
     stage:
       - -usr/lib/*/libsecret-*
@@ -45,8 +45,17 @@ parts:
       - -Dgtk_doc=false
       - -Dmanpage=false
       - -Dgcrypt=false
+    # LGPL-2.1-or-later: the licence text and the complete source (section 6(a)) ship in the
+    # snap, since the Store is not a place we can offer the source from.
+    override-build: |
+      craftctl default
+      doc="$CRAFT_PART_INSTALL/usr/share/doc/libsecret"
+      install -Dm644 "$CRAFT_PART_SRC/COPYING" "$doc/COPYING"
+      tar -C "$CRAFT_PART_SRC" --exclude=.git -cJf "$doc/libsecret-0.20.5-source.tar.xz" .
     stage:
       - usr/lib/*/libsecret-*
+      - usr/share/doc/libsecret/COPYING
+      - usr/share/doc/libsecret/libsecret-0.20.5-source.tar.xz
 
 apps:
   mailspring:
