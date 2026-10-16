@@ -1106,3 +1106,25 @@ waits for incomplete drafts; undo send stays on synced metadata; reconnect contr
 mirrored in main; local-only method class; calendar and contacts (stage 18) and service
 plugins (stage 19) added; cheap fixes moved to stages 1 and 2. Nothing implemented. Waiting
 for the user to confirm section 0.1.
+
+2026-10-16, stage 1 delivered (`roadmap/client-s1`): `crates/tern-client` (engine.json-first
+discovery, hello, multi-engine router, typed calls, task builders) under `tern` and
+`tern-mcp`; `hello.features` (`counts`, `tasks-list`, `metadata-list`, `message-hidden`,
+`mail-new`, also in `engine.status`); `counts.get` and the `ThreadCounts` delta; `tasks.list`
+(pending tasks first, oldest queued first, then finished ones newest first, so the hundred
+retained finished tasks can't crowd out pending ones); `metadata.list`; `hidden` on Message
+reads; `mail.new` from `MailProcessor::insert_message` (unread, inbox, not a draft, not from
+the account or an alias, UID at or above the stored UIDNEXT), socket only, live, filtered by
+account. tern-mcp ports `list_scheduled_sends`, `list_tracked_messages`, `get_top_links`, and
+its send check uses `tasks.list`; `tern task list` and `tern watch` on `mail.new`
+(`--new-mail`). Desktop: `ThreadCountsStore` on `counts.get` plus deltas (deltas that arrive
+while `counts.get` is out are replayed on its answer), `unread-notifications` on `mail.new`,
+both behind `hello.features` and fed by the serve engine through `src/engine-events.ts`.
+Deviations: socket tests live in `apps/engine/tests/read_api.rs` and `socket.rs` unit tests
+rather than `tests/socket.rs`. Open: per-account engines and the C++ path still read the
+`ThreadCounts` table and notify from message deltas; no `mail.new` for folders whose UIDNEXT is
+0 or missing; mail that arrived while no client was connected fires `mail.new` at the next
+catch-up (the desktop's launch-time check drops it, `tern watch --new-mail` prints it);
+`tasks.list` has no offset; the CLI's `targets()` doesn't dedupe an account held by two
+engines; the three MCP tools page `metadata.list` up to 10,000 messages per account and filter
+tracking in Rust.
