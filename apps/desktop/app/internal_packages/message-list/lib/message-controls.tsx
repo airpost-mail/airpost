@@ -1,6 +1,7 @@
 /* eslint global-require: 0 */
 
 import React from 'react';
+import ReactDOM from 'react-dom';
 import {
   localized,
   Actions,
@@ -13,6 +14,7 @@ import {
 } from 'mailspring-exports';
 import { RetinaImg, ButtonDropdown, Menu } from 'mailspring-component-kit';
 import { developerToolsAvailable } from '../../../src/developer-tools';
+import { OriginalColors, darkeningApplies, themeBackgroundAt } from './email-render-mode';
 
 interface MessageControlsProps {
   thread: Thread;
@@ -127,6 +129,8 @@ export default class MessageControls extends React.Component<MessageControlsProp
     menu.append(
       new SystemMenuItem({ label: localized('Show Original'), click: this._onShowOriginal })
     );
+    const colorsItem = this._originalColorsMenuItem();
+    if (colorsItem) menu.append(new SystemMenuItem(colorsItem));
     menu.append(
       new SystemMenuItem({
         label: localized('Copy Debug Info to Clipboard'),
@@ -153,6 +157,18 @@ export default class MessageControls extends React.Component<MessageControlsProp
 
     menu.popup({});
   };
+
+  // Offered only when the theme and setting darken emails.
+  _originalColorsMenuItem() {
+    const el = ReactDOM.findDOMNode(this) as HTMLElement | null;
+    if (!el || !darkeningApplies(themeBackgroundAt(el))) return null;
+    const { message } = this.props;
+    const original = OriginalColors.isShowingOriginal(message.id);
+    return {
+      label: original ? localized('Show Dark Colors') : localized('Show Original Colors'),
+      click: () => OriginalColors.setShowingOriginal([message.id], !original),
+    };
+  }
 
   _onShowOriginal = async () => {
     const { message } = this.props;

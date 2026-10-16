@@ -1,12 +1,18 @@
 import React from 'react';
 import { RetinaImg } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
-
-const EMAIL_RENDER_MODE_KEY = 'core.reading.emailRenderMode';
+import EmailFrameStylesStore from './email-frame-styles-store';
+import {
+  EMAIL_RENDER_MODE_KEY,
+  OriginalColors,
+  darkeningApplies,
+  themeBackgroundAt,
+} from './email-render-mode';
 
 interface SubjectLineIconsProps {
   canCollapse: boolean;
   hasCollapsedItems: boolean;
+  messageIds: string[];
 
   onPrint: () => void;
   onPopIn: () => void;
@@ -14,41 +20,57 @@ interface SubjectLineIconsProps {
   onToggleAllExpanded: () => void;
 }
 
-class EmailRenderModeToggle extends React.Component<Record<string, never>, { mode: string }> {
-  _configDisposable?: { dispose: () => void };
+interface OriginalColorsToggleState {
+  applies: boolean;
+  original: boolean;
+}
 
-  constructor(props: Record<string, never>) {
-    super(props);
-    this.state = { mode: this._mode() };
-  }
+// Switches the thread's messages between darkened and original colours. Hidden unless emails
+// are being darkened, which depends on the theme around it.
+class OriginalColorsToggle extends React.Component<
+  { messageIds: string[] },
+  OriginalColorsToggleState
+> {
+  _el: HTMLDivElement | null = null;
+  _disposables: Array<() => void> = [];
+
+  state = { applies: false, original: false };
 
   componentDidMount() {
-    this._configDisposable = AppEnv.config.onDidChange(EMAIL_RENDER_MODE_KEY, () => {
-      this.setState({ mode: this._mode() });
-    });
+    const configDisposable = AppEnv.config.onDidChange(EMAIL_RENDER_MODE_KEY, this._update);
+    this._disposables = [
+      () => configDisposable.dispose(),
+      EmailFrameStylesStore.listen(this._update),
+      OriginalColors.listen(this._update),
+    ];
+    this._update();
+  }
+
+  componentDidUpdate(prevProps: { messageIds: string[] }) {
+    if (prevProps.messageIds.join() !== this.props.messageIds.join()) this._update();
   }
 
   componentWillUnmount() {
-    if (this._configDisposable) {
-      this._configDisposable.dispose();
-    }
+    this._disposables.forEach((dispose) => dispose());
   }
 
-  _mode = () => (AppEnv.config.get(EMAIL_RENDER_MODE_KEY) === 'dark' ? 'dark' : 'light');
-
-  _isDark = () => this.state.mode === 'dark';
+  _update = () => {
+    if (!this._el) return;
+    const { messageIds } = this.props;
+    this.setState({
+      applies: darkeningApplies(themeBackgroundAt(this._el)),
+      original:
+        messageIds.length > 0 && messageIds.every((id) => OriginalColors.isShowingOriginal(id)),
+    });
+  };
 
   _onToggle = () => {
-    const nextMode = this._isDark() ? 'light' : 'dark';
-    AppEnv.config.set(EMAIL_RENDER_MODE_KEY, nextMode);
+    OriginalColors.setShowingOriginal(this.props.messageIds, !this.state.original);
   };
 
   render() {
-    const isDark = this._isDark();
-    const title = isDark
-      ? localized('Switch email view to light mode')
-      : localized('Switch email view to dark mode');
-    const imageName = isDark ? 'toolbar-bulb-on.png' : 'toolbar-bulb-off.png';
+    const { applies, original } = this.state;
+    const title = original ? localized('Show Dark Colors') : localized('Show Original Colors');
 
     return (
       <div
@@ -56,6 +78,10 @@ class EmailRenderModeToggle extends React.Component<Record<string, never>, { mod
         tabIndex={0}
         aria-label={title}
         title={title}
+        style={applies ? undefined : { display: 'none' }}
+        ref={(el) => {
+          this._el = el;
+        }}
         onClick={this._onToggle}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -65,7 +91,7 @@ class EmailRenderModeToggle extends React.Component<Record<string, never>, { mod
         }}
       >
         <RetinaImg
-          name={imageName}
+          name={original ? 'toolbar-bulb-off.png' : 'toolbar-bulb-on.png'}
           mode={RetinaImg.Mode.ContentIsMask}
           style={{ width: 16, height: 16 }}
           aria-hidden="true"
@@ -113,7 +139,7 @@ export const SubjectLineIcons: React.FunctionComponent<SubjectLineIconsProps> = 
     >
       <RetinaImg name="print.png" mode={RetinaImg.Mode.ContentIsMask} aria-hidden="true" />
     </div>
-    <EmailRenderModeToggle />
+    <OriginalColorsToggle messageIds={props.messageIds} />
     {AppEnv.isThreadWindow() ? (
       <div
         role="button"

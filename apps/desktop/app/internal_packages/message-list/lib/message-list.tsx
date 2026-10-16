@@ -523,6 +523,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
         <SubjectLineIcons
           canCollapse={this.state.canCollapse}
           hasCollapsedItems={this.state.hasCollapsedItems}
+          messageIds={(this.state.messages || []).map((m) => m.id)}
           onPrint={this._onPrintThread}
           onPopIn={this._onPopThreadIn}
           onPopOut={this._onPopoutThread}

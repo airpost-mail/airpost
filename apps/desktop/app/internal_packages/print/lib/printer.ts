@@ -1,4 +1,5 @@
 import { AccountStore, Actions, Thread } from 'mailspring-exports';
+import { removeDarkening } from '@tern/email-dark';
 import PrintWindow from './print-window';
 
 class Printer {
@@ -13,12 +14,11 @@ class Printer {
     // These iframes should correspond to the message iframes when a thread is
     // focused
     const iframes = document.getElementsByTagName('iframe');
-    // Grab the html inside the iframes. The dark "email render mode" style inverts
-    // the iframe's <body>; inlined into the print document it would invert the
-    // whole page, so it is dropped here.
+    // Grab the html inside the iframes, without the dark rendering of the email colours:
+    // paper gets the sender's colours.
     const messagesHtml = [].slice.call(iframes).map((iframe) => {
       const root = iframe.contentDocument.documentElement.cloneNode(true) as HTMLElement;
-      root.querySelectorAll('style[data-email-render-mode]').forEach((el) => el.remove());
+      removeDarkening(root);
       return root.innerHTML;
     });
 

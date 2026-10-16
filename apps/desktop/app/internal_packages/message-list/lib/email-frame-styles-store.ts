@@ -1,9 +1,9 @@
 import MailspringStore from 'mailspring-store';
-
-const EMAIL_RENDER_MODE_KEY = 'core.reading.emailRenderMode';
+import { EMAIL_RENDER_MODE_KEY } from './email-render-mode';
 
 class EmailFrameStylesStore extends MailspringStore {
   _styles?: string;
+  _themeColors?: { text: string; link: string };
   _mutationObserver: MutationObserver;
   _configDisposable?: { dispose: () => void };
 
@@ -17,14 +17,32 @@ class EmailFrameStylesStore extends MailspringStore {
       this._findStyles();
       this._listenToStyles();
     }
-    return {
-      themeStyles: this._styles,
-      renderModeStyles: this._emailRenderModeOverrideStyles(),
-    };
+    return { themeStyles: this._styles };
+  }
+
+  // The text and link colours email-frame.less gives a message body under the current theme.
+  themeColors() {
+    if (!this._themeColors) {
+      const scope = document.createElement('span');
+      scope.className = 'ignore-in-parent-frame';
+      const wrapper = document.createElement('div');
+      wrapper.id = 'inbox-html-wrapper';
+      const link = document.createElement('a');
+      wrapper.appendChild(link);
+      scope.appendChild(wrapper);
+      document.body.appendChild(scope);
+      this._themeColors = {
+        text: window.getComputedStyle(wrapper).color,
+        link: window.getComputedStyle(link).color,
+      };
+      scope.remove();
+    }
+    return this._themeColors;
   }
 
   _findStyles = () => {
     this._styles = '';
+    this._themeColors = undefined;
 
     // Include the system accent CSS variables so that var(--system-accent, ...)
     // resolves correctly inside email iframes (which have their own document).
@@ -41,21 +59,6 @@ class EmailFrameStylesStore extends MailspringStore {
     this._styles = this._styles.replace(/.ignore-in-parent-frame/g, '');
     this.trigger();
   };
-
-  _emailRenderModeOverrideStyles() {
-    const mode = AppEnv.config.get(EMAIL_RENDER_MODE_KEY) === 'dark' ? 'dark' : 'light';
-    if (mode === 'light') {
-      return '\nbody { filter: none !important; }' + '\nimg { filter: none !important; }';
-    }
-    if (mode === 'dark') {
-      return (
-        '\n#inbox-html-wrapper { color: black; background: white; }' +
-        '\nbody { filter: invert(100%) hue-rotate(180deg) !important; }' +
-        '\nimg { filter: invert(100%) hue-rotate(180deg) !important; }'
-      );
-    }
-    return '';
-  }
 
   _listenToStyles() {
     const target = document.getElementsByTagName('managed-styles')[0];

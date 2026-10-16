@@ -184,9 +184,13 @@ export default {
           },
           emailRenderMode: {
             type: 'string',
-            default: 'light',
-            enum: ['light', 'dark'],
-            enumLabels: [localized('Light email mode'), localized('Dark email mode')],
+            default: 'auto',
+            enum: ['auto', 'dark', 'original'],
+            enumLabels: [
+              localized('Dark when the theme is dark'),
+              localized('Always dark'),
+              localized('Original colors'),
+            ],
             title: localized('Email body appearance'),
           },
         },

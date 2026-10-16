@@ -25,38 +25,21 @@ describe('EmailFrameStylesStore', () => {
     themeSheet.remove();
   });
 
-  const stylesFor = (mode: string) => {
-    spyOn(AppEnv.config, 'get').andReturn(mode);
+  it('passes theme typography and colors through to the email frame', () => {
     store._findStyles();
-    return store.styles();
-  };
-
-  it('preserves theme typography and colors in light email rendering', () => {
-    const { themeStyles, renderModeStyles } = stylesFor('light');
+    const { themeStyles } = store.styles();
 
     expect(themeStyles).toContain('font-family: test');
     expect(themeStyles).toContain('font-size: 18px; color: pink;');
-    expect(renderModeStyles).not.toContain('color:');
-    expect(renderModeStyles).toContain('body { filter: none !important;');
-    expect(renderModeStyles).toContain('img { filter: none !important; }');
+    expect(themeStyles).not.toContain('ignore-in-parent-frame');
   });
 
-  it('uses one controlled inversion layer for dark email rendering', () => {
-    const { themeStyles, renderModeStyles } = stylesFor('dark');
+  it('reads the theme text and link colors the email frame uses', () => {
+    themeSheet.innerText +=
+      '\n.ignore-in-parent-frame #inbox-html-wrapper { color: rgb(1, 2, 3); }' +
+      '\n.ignore-in-parent-frame a { color: rgb(4, 5, 6); }';
+    store._findStyles();
 
-    expect(themeStyles).toContain('font-size: 18px; color: pink;');
-    // Inversion needs a known black-on-white input, otherwise a transparent
-    // email using the theme's light text would invert to dark-on-dark.
-    expect(renderModeStyles).toContain('#inbox-html-wrapper { color: black; background: white; }');
-    expect(renderModeStyles).toContain('body { filter: invert(100%) hue-rotate(180deg)');
-    expect(renderModeStyles).toContain('img { filter: invert(100%) hue-rotate(180deg)');
-  });
-
-  it('treats legacy theme mode as light email rendering', () => {
-    const { themeStyles, renderModeStyles } = stylesFor('theme');
-
-    expect(themeStyles).toContain('font-size: 18px; color: pink;');
-    expect(renderModeStyles).not.toContain('color:');
-    expect(renderModeStyles).toContain('body { filter: none !important;');
+    expect(store.themeColors()).toEqual({ text: 'rgb(1, 2, 3)', link: 'rgb(4, 5, 6)' });
   });
 });

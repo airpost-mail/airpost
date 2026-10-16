@@ -54,6 +54,8 @@ const sourceGlobs = [
   '!internal_packages/**/node_modules/**/*.ts',
   '!internal_packages/**/node_modules/**/*.tsx',
   '!internal_packages/**/node_modules/**/*.jsx',
+  // Workspace packages from the repo's packages/ dir, linked in as TypeScript source.
+  'node_modules/@tern/*/src/**/*.ts',
 ];
 
 function spawn(options) {
@@ -82,7 +84,16 @@ function resolveRealSymlinkPaths() {
   const dirs = ['internal_packages', 'src', 'spec', 'node_modules'];
   dirs.forEach(dir => {
     const absoluteDir = path.join(appDir, dir);
-    fs.readdirSync(absoluteDir).forEach(packageName => {
+    const entries = fs.readdirSync(absoluteDir).flatMap(name => {
+      const scopeDir = path.join(absoluteDir, name);
+      // Scoped packages (`@tern/email-dark`) are links inside a real `@scope` directory.
+      const isScope = dir === 'node_modules' && name.startsWith('@');
+      if (isScope && !fs.lstatSync(scopeDir).isSymbolicLink()) {
+        return fs.readdirSync(scopeDir).map(child => path.join(name, child));
+      }
+      return [name];
+    });
+    entries.forEach(packageName => {
       const relativePackageDir = path.join(dir, packageName);
       const absolutePackageDir = path.join(absoluteDir, packageName);
       const realPackagePath = fs.realpathSync(absolutePackageDir).replace('/private/', '/');
@@ -149,7 +160,8 @@ function runTranspilers({ buildPath }) {
     glob.sync(pattern, { cwd: buildPath }).forEach(relPath => {
       const tsPath = path.join(buildPath, relPath);
       const tsCode = fs.readFileSync(tsPath).toString();
-      if (/(node_modules|\.js$)/.test(tsPath)) return;
+      if (/\.js$/.test(tsPath)) return;
+      if (/node_modules/.test(tsPath) && !/node_modules[/\\]@tern[/\\]/.test(tsPath)) return;
       if (tsPath.endsWith('.d.ts')) return;
       const outPath = tsPath.replace(path.extname(tsPath), '.js');
       console.log(`  ---> Compiling ${tsPath.slice(tsPath.indexOf('/app') + 4)}`);

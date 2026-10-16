@@ -9,9 +9,16 @@ import {
   Message,
   Autolink,
 } from 'mailspring-exports';
+import { darkenDocument } from '@tern/email-dark';
 import { adjustImages } from './adjust-images';
 import EmailFrameStylesStore from './email-frame-styles-store';
 import { backgroundColorBehind, prepareEmailColors } from './email-color-detection';
+import {
+  OriginalColors,
+  darkPalette,
+  darkeningApplies,
+  themeBackgroundAt,
+} from './email-render-mode';
 
 interface EmailFrameProps {
   content: string;
@@ -24,6 +31,8 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
 
   _mounted = false;
   _unlisten: () => void;
+  _unlistenOriginalColors: () => void;
+  _showingOriginal = false;
   _iframeComponent: EventedIFrame;
   _iframeWrapperEl: HTMLDivElement;
   _iframeDocObserver: ResizeObserver;
@@ -39,6 +48,7 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
     );
     this._writeContent();
     this._unlisten = EmailFrameStylesStore.listen(this._writeContent);
+    this._unlistenOriginalColors = OriginalColors.listen(this._onOriginalColorsChanged);
   }
 
   shouldComponentUpdate(nextProps: EmailFrameProps) {
@@ -64,6 +74,36 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
     this._mounted = false;
     if (this._iframeDocObserver) this._iframeDocObserver.disconnect();
     if (this._unlisten) this._unlisten();
+    if (this._unlistenOriginalColors) this._unlistenOriginalColors();
+  }
+
+  _onOriginalColorsChanged = () => {
+    const { message } = this.props;
+    if (message && OriginalColors.isShowingOriginal(message.id) !== this._showingOriginal) {
+      this._writeContent();
+    }
+  };
+
+  // Dark themes get a darkened copy of the email's colours unless the user chose the original
+  // colours. Otherwise transparent emails blend into the theme and emails that paint their own
+  // backgrounds get the white page they were designed for.
+  _applyColors(iframeEl: HTMLIFrameElement, doc: Document, wrapper: HTMLElement) {
+    const { message } = this.props;
+    this._showingOriginal = OriginalColors.isShowingOriginal(message.id);
+    const themeBackground = themeBackgroundAt(iframeEl);
+
+    if (darkeningApplies(themeBackground) && !this._showingOriginal) {
+      const { text, link } = EmailFrameStylesStore.themeColors();
+      darkenDocument(doc, darkPalette(themeBackground, text, link), {
+        root: wrapper,
+        imageBrightness: 0.9,
+      });
+      return;
+    }
+
+    // prepareEmailColors can replace hardcoded black text with the inherited theme colour.
+    const hasBackground = prepareEmailColors(wrapper, backgroundColorBehind(iframeEl));
+    wrapper.classList.toggle('has-background', hasBackground);
   }
 
   _writeContent = () => {
@@ -79,7 +119,7 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
     // the `border-collapse: collapse` css property while setting a
     // `padding`.
     const { message, showQuotedText } = this.props;
-    const { themeStyles, renderModeStyles } = EmailFrameStylesStore.styles();
+    const { themeStyles } = EmailFrameStylesStore.styles();
     const restrictWidth = AppEnv.config.get('core.reading.restrictMaxWidth');
 
     let content = this.props.content;
@@ -105,7 +145,6 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
       doc.write(
         `<!DOCTYPE html>` +
           `<style>${themeStyles || ''}</style>` +
-          `<style data-email-render-mode>${renderModeStyles || ''}</style>` +
           `<div id='inbox-html-wrapper' class="${process.platform}">${content}</div>`
       );
       doc.close();
@@ -113,10 +152,7 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
       if (htmlWrapper) {
         htmlWrapper.setAttribute('role', 'document');
         try {
-          // Note: In some cases, prepareEmailColors modifies the doc, replacing
-          // hardcoded black text with inherited colors for better theme support.
-          const hasBackground = prepareEmailColors(htmlWrapper, backgroundColorBehind(iframeEl));
-          htmlWrapper.classList.toggle('has-background', hasBackground);
+          this._applyColors(iframeEl, doc, htmlWrapper);
         } catch (e) {
           AppEnv.reportError(e);
         }
