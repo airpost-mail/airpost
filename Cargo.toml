@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["apps/engine", "apps/backend", "apps/cli", "apps/mcp", "crates/*"]
+members = ["apps/engine", "apps/backend", "apps/cli", "apps/gateway", "apps/mcp", "crates/*"]
 
 [workspace.package]
 version = "0.1.0"
