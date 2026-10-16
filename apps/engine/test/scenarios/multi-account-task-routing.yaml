@@ -1,0 +1,52 @@
+name: multi-account-task-routing
+description: >
+  Tasks for two accounts are queued back to back, each with its own accountId. Each must
+  run its local and remote phase in its own account: a's move happens on a's server, b's
+  star and move on b's, each Task row belongs to its account, and neither server sees the
+  other's change.
+source: docs/engine-protocol-plan.md 4.1 (per-account dispatch, routing by accountId)
+servers: [{fake: dovecot}]
+mailboxes:
+  INBOX: {messages: 6}
+  Archive: {messages: 1}
+accounts:
+  b:
+    server: {fake: dovecot}
+    mailboxes:
+      INBOX: {messages: 6}
+      Archive: {messages: 1}
+steps:
+  - wait: quiescent
+  - wait: quiescent
+    account: b
+  - client.task: {__cls: ChangeFolderTask, messages: {mailbox: INBOX, uids: [1, 2]}, folder: Archive}
+    as: move_a
+  - client.task: {__cls: ChangeStarredTask, messages: {mailbox: INBOX, uids: [3]}, starred: true}
+    account: b
+    as: star_b
+  - client.task: {__cls: ChangeFolderTask, messages: {mailbox: INBOX, uids: [4]}, folder: Archive}
+    account: b
+    as: move_b
+  - wait: {task: move_a, timeout: 60}
+  - wait: {task: star_b, timeout: 60}
+    account: b
+  - wait: {task: move_b, timeout: 60}
+    account: b
+  - wait: {quiescent: true}
+  - wait: {quiescent: true}
+    account: b
+expect:
+  server_counts: {INBOX: 4, Archive: 3}
+  db_matches_server: {}
+  tasks: {move_a: {status: complete, error: null}}
+  running: true
+  accounts:
+    b:
+      server_counts: {INBOX: 5, Archive: 2}
+      db_matches_server: {}
+      tasks: {star_b: {status: complete, error: null}, move_b: {status: complete, error: null}}
+      sql:
+        # Scoped to b, so a's task id is not there; the whole table holds all three.
+        - {query: "SELECT count(*) FROM main.Task WHERE json_extract(data, '$.__cls') IN ('ChangeFolderTask', 'ChangeStarredTask')", equals: 3}
+        - {query: "SELECT count(*) FROM Task WHERE json_extract(data, '$.__cls') IN ('ChangeFolderTask', 'ChangeStarredTask')", equals: 2}
+      running: true

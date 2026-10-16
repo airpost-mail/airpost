@@ -83,23 +83,82 @@ counts as 30 s), so one long case does not start last.
 
 ### Transports
 
-`MAILSYNC_TRANSPORT=socket` runs the engine with `--socket` (docs/engine-protocol-plan.md
-section 2) instead of the default `stdio`. The harness waits for `{"listening": …}` on
-stdout, connects, sends `hello` and `subscribe`, and records each `delta` notification as
-the same `Delta` the stdout reader makes; `wake`, `queue_task`, `need_bodies` and
-`sync_calendar` become `sync.wake`, `task.queue`, `bodies.fetch` and `calendar.sync`
-requests. The account still goes on `--account` and stdin stays open as the lifeline
-(test-crash and test-segfault still go there). The socket lives in a fresh `/tmp/ms-*` dir,
-since macOS caps socket paths at 104 bytes. A delta on stdout other than
-`ProcessAccountSecretsUpdated`, a `disconnect`, a failed request (except a task whose local
-phase failed) or the engine closing the socket while running fails the case. A scenario
-that pins `binary:` (the C++ engine, an older build) runs that engine on stdio. The quick
-tier runs in both transports; the phase gate runs `--all` on the socket.
+`MAILSYNC_TRANSPORT` picks how the harness drives the build under test; every scenario runs
+unchanged on each of them, and the phase gates run the quick tier on all three.
+
+- `stdio` (default): one `--mode sync` process per account, the account on `--account`,
+  commands on stdin and deltas on stdout, as the C++ engine and the A/B harness speak.
+- `socket`: the same process with `--socket` (docs/engine-protocol-plan.md section 2). The
+  harness waits for `{"listening": …}` on stdout, connects, sends `hello` and `subscribe`,
+  and records each `delta` notification as the same `Delta` the stdout reader makes;
+  `wake`, `queue_task`, `need_bodies` and `sync_calendar` become `sync.wake`, `task.queue`,
+  `bodies.fetch` and `calendar.sync` requests. The account still goes on `--account` and
+  stdin stays open as the lifeline (test-crash and test-segfault still go there). A delta
+  on stdout other than `ProcessAccountSecretsUpdated`, a `disconnect`, a failed request
+  (except a task whose local phase failed) or the engine closing the socket while running
+  fails the case.
+- `serve`: one `--mode serve` engine per scenario (plan section 4, `ServeEngine` in
+  `harness/mailsync.py`), started after `--mode migrate` (and any `import_legacy` one-shot)
+  as the desktop will. Each account goes in with `account.add {account, identity}` on
+  stdin; stdout must carry only JSON-RPC responses and `ProcessAccountSecretsUpdated` delta
+  notifications. One socket connection subscribes to every account and routes each `delta`
+  and `account.state` by its `accountId` to that account's `MailsyncProcess`, whose records
+  and wrappers are the same as on `socket`. On top of the `socket` checks, a delta for an
+  account never added or already removed, a secrets delta on the socket, or a delta whose
+  models carry another account's `aid` fails the case. An account is `running` while the
+  engine runs and its `account.state` is `starting` or `running`; one that stopped shows
+  as `account stopped with <SyncError key>`. A `restart` (and the client quitting) SIGTERMs
+  the engine; teardown uses `engine.shutdown`. `hold_engine` / `held()` SIGSTOPs the one
+  engine, so it pauses every account, which is fine for the single-account scenarios that
+  use it. Each account logs to its `mailsync-<id>.log` as before; engine-wide lines go to
+  `config/engine.log`.
+
+A scenario that pins `binary:` (the C++ engine, an older build) runs that engine on stdio.
+Each transport's socket lives in a fresh `/tmp/ms-*` dir, since macOS caps socket paths at
+104 bytes.
 
 ```bash
 MAILSYNC_TRANSPORT=socket python3 -m pytest test          # quick tier over the socket
-MAILSYNC_TRANSPORT=socket python3 -m pytest test --all
+MAILSYNC_TRANSPORT=serve python3 -m pytest test           # quick tier on one serve engine
+MAILSYNC_TRANSPORT=serve python3 -m pytest test --all
 ```
+
+### Several accounts
+
+A scenario can hold more accounts than its own (`multi-account-*`). They share its config
+dir and `edgehill.db`, as the client's accounts do: on `serve` they are added to the same
+engine, on `stdio` and `socket` each runs in its own process (as the desktop ran them
+before phase C), started without another `--mode migrate`.
+
+```yaml
+servers: [{fake: dovecot}]           # account `a`, the scenario's own
+mailboxes: {INBOX: {messages: 10}}
+accounts:
+  b:
+    server: {fake: dovecot}          # its own server; omit to log in to the scenario's
+    mailboxes: {INBOX: {messages: 5}}
+    account: {password: wrong}       # account_json overrides; the id is c0ffee-b
+steps:
+  - wait: quiescent
+  - wait: quiescent
+    account: b                       # any step, run against b's engine handle and server
+  - account.remove: b                # account.remove on serve; stops b's process elsewhere
+  - account.add: b                   # back in, then waits for a pass that began after it
+expect:
+  db_matches_server: {}
+  accounts:
+    b: {stopped: {key: ErrorAuthentication}, counts: {INBOX: 5}}
+```
+
+With more than one account every database query the harness makes is scoped to the
+account it checks (temp views over each table with an `accountId` column, shadowing it);
+`main.<Table>` in an `sql` expectation still reads the whole table, and the invariants check
+the whole database. `stopped: {key: regex}` expects the account to have stopped on a
+non-retryable error: its `account.state` error on serve, the SyncError its process logged
+as critical before aborting elsewhere; `wait: {stopped: true}` waits for that.
+`engine_log: {present, absent}` checks `engine.log` on serve and passes elsewhere.
+`server.set_password: {password}` (fake only) makes the next login with the old password
+fail. `restart` is refused in a scenario with several accounts.
 
 ## How a scenario works
 
@@ -170,6 +229,10 @@ Steps:
 | `wait: {people_requests: [...], timeout: s}` | until the fake People API has seen those requests, as `expect: people_requests` |
 | `server.smtp_hold` / `server.smtp_release` | queue self-addressed SMTP deliveries, then deliver them, so the INBOX copy of a sent message arrives after the Sent copy; `smtp_release` takes `at:` like any server step (`rules-ready-inbox-copy-first`) |
 | `hold_engine: true` on a `server.*` step | SIGSTOP the engine while the step runs and SIGCONT after, so a slow server change (a 2300-message APPEND to Cyrus) lands as one batch rather than being split by a pass that wakes from the 120 s sleep halfway (`heavy-fetch-truncation-backlog`) |
+| `account: <name>` on any step | run it against that account of `accounts:` (`a` is the scenario's own); see "Several accounts" |
+| `account.remove: name` / `account.add: name` or `{name, wait, timeout}` | take a further account out and put it back while the others run; while it is out, `account:` steps on it can still run server steps and database `assert`s |
+| `server.set_password: {password}` | the fake server refuses the old password from the next login on (an auth failure, which stops the account) |
+| `wait: {stopped: true, timeout: s}` | until the account is down (its process exited, or its `account.state` is `stopped`) |
 | `force_scans: {}` | backdate `lastDeep`/`lastShallow` in the DB and wake (see Stopgaps) |
 | `db.sql: [statements]` | write the stopped engine's database (only under `restart: {before: [...]}`), to reproduce a stored state whose producing path is unknown; every derived layer must be written consistently |
 | `restart: {binary: path, before: [steps]}` | stop and relaunch on the same database, optionally with another build; `before:` runs steps while the engine is stopped (server state it did not watch happen) |
@@ -215,7 +278,8 @@ last `--mode migrate` stdout) or `{launch: first|last|n, present: [regexes], abs
 [regexes]}`, `mode_output: {mode: regex}` (a one-shot mode run before sync),
 `smtp: {count, messages: [{recipients, headers: {name: value}, attachments: {filename:
 content}}]}` (what the SMTP sink received, in order),
-`unchanged_since: snapshot`, `running`, `exit`. Any expectation given as a mapping may carry
+`unchanged_since: snapshot`, `running`, `exit`, `stopped: {key: regex}`, `engine_log:
+{present, absent}`, `accounts: {name: {expectations}}` (see "Several accounts"). Any expectation given as a mapping may carry
 `xfail: reason` for a known engine bug: it is recorded, not failed, and reported as XPASS
 once it starts passing.
 
@@ -522,6 +586,10 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | dav-incremental-sync | `sync-calendar` pass applies exactly the changed events; contacts after a relaunch; unchanged collections send nothing | radicale, baikal |
 | dav-create-update-delete | event, contact and group tasks PUT/DELETE with the right preconditions and keep the stored etags current | radicale, baikal |
 | dav-etag-conflict | writes with a stale etag get 412 and fail as `etag-conflict` without overwriting the other client's change | radicale, baikal |
+| multi-account-side-by-side | two accounts in one database: own rows, own log, own delta stream, new mail reaches only its account | fake ×2 |
+| multi-account-fatal-error-isolated | an auth failure stops only that account (serve: `account.state` stopped; else its process); the other keeps syncing | fake ×2 |
+| multi-account-remove-add | remove and re-add one account while the other syncs; rows kept, catch-up without churn | fake ×2 |
+| multi-account-task-routing | tasks queued back to back for two accounts run on the right account and server | fake ×2 |
 
 Known engine failures are marked `xfail` in the scenario with the reason; `pytest -rxX`
 lists them and an `XPASS` line means the marker can be removed. Each open one gets a write-up

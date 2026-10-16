@@ -1,0 +1,37 @@
+name: multi-account-fatal-error-isolated
+description: >
+  Account b's password is changed elsewhere while both accounts run. Its next login is
+  refused (AUTHENTICATIONFAILED), a non-retryable error, so b stops: on serve its
+  account.state turns `stopped` with the ErrorAuthentication SyncError and the engine keeps
+  running; on stdio and socket its own process aborts, as before phase C. Account a must
+  keep syncing: new mail on its server still arrives.
+source: docs/engine-protocol-plan.md 4.1 (failure isolation)
+servers: [{fake: dovecot}]
+mailboxes:
+  INBOX: {messages: 10}
+accounts:
+  b:
+    server: {fake: dovecot}
+    mailboxes:
+      INBOX: {messages: 5}
+steps:
+  - wait: quiescent
+  - wait: quiescent
+    account: b
+  - server.set_password: {password: changed-elsewhere}
+    account: b
+  # The foreground's IDLE notices the drop at once and logs in again, with the old password.
+  - server.drop_connections: {}
+    account: b
+  - wait: {stopped: true, timeout: 60}
+    account: b
+  - server.append: {mailbox: INBOX, messages: 3}
+  - sync: pass
+expect:
+  counts: {INBOX: 13}
+  db_matches_server: {}
+  running: true
+  accounts:
+    b:
+      stopped: {key: ErrorAuthentication}
+      counts: {INBOX: 5}

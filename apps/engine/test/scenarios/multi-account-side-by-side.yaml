@@ -1,0 +1,44 @@
+name: multi-account-side-by-side
+description: >
+  Two accounts on two servers share one config dir and one database. On `serve` one engine
+  holds both; on stdio and socket each runs in its own process, as the desktop runs them
+  before phase C. Each syncs its mailboxes into its own rows, logs to its own
+  mailsync-<id>.log and gets its own delta stream (on serve the harness checks each delta's
+  models against the envelope's accountId), and new mail on one server reaches only its
+  account.
+source: docs/engine-protocol-plan.md section 4 (phase C, harness multi-account)
+servers: [{fake: dovecot}]
+mailboxes:
+  INBOX: {messages: 12}
+  OnlyA: {messages: 3}
+accounts:
+  b:
+    server: {fake: dovecot}
+    mailboxes:
+      INBOX: {messages: 7}
+      OnlyB: {messages: 4}
+steps:
+  - wait: quiescent
+  - wait: quiescent
+    account: b
+  - server.append: {mailbox: INBOX, messages: 2}
+  - server.append: {mailbox: OnlyB, messages: 3}
+    account: b
+  - sync: pass
+  - sync: pass
+    account: b
+expect:
+  counts: {INBOX: 14, OnlyA: 3, total: 17}
+  db_matches_server: {}
+  log_present: ["^Sync loop complete\\.$", "^Idling on folder"]
+  log_absent: ["OnlyB"]
+  # Engine-wide lines only: nothing an account's threads log lands there.
+  engine_log: {present: ["Starting the engine \\(serve\\)"], absent: ["Sync loop complete", "OnlyA", "OnlyB", "\\[background\\]", "\\[foreground\\]"]}
+  running: true
+  accounts:
+    b:
+      counts: {INBOX: 7, OnlyB: 7, total: 14}
+      db_matches_server: {}
+      log_present: ["^Sync loop complete\\.$", "^Idling on folder"]
+      log_absent: ["OnlyA"]
+      running: true

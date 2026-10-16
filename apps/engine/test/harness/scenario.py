@@ -15,6 +15,7 @@ runs against it, and what must be true afterwards. See test/README.md for the vo
       db_matches_server: {}
       stable: {passes: 1}
 """
+import contextlib
 import email
 import email.policy
 import json
@@ -120,6 +121,25 @@ def scenario_slow(sc: dict, spec: "ServerSpec") -> bool:
     return bool(per_server(sc.get("slow"), spec))
 
 
+@dataclass
+class ExtraAccount:
+    """A scenario's further account (`accounts: {b: {...}}`): its own server, or the
+    scenario's when it names none, and the engine handle it currently runs in."""
+    name: str
+    account: dict
+    server: Server
+    own_server: bool
+    ignore_busy: list
+    ms: Optional[MailsyncProcess] = None
+    earlier_deltas: list = field(default_factory=list)
+    # The handle `account.remove` stopped, for database reads while the account is out.
+    removed: Optional[MailsyncProcess] = None
+
+
+# The primary account's name in `account:` step keys and `accounts:` expectations.
+PRIMARY_ACCOUNT = "a"
+
+
 def make_server(spec: ServerSpec, log_path: Optional[str]) -> Server:
     if spec.kind == "fake":
         from .servers.fake import FakeServer
@@ -180,6 +200,8 @@ class ScenarioRun(PimMixin, BackendMixin):
         self.xfails: list = []          # expectations that failed and were expected to (known engine bugs)
         self.xpasses: list = []         # expectations marked xfail that passed: remove the marker
         self.migrate_outputs: list = []  # what every `--mode migrate` printed, first launch first
+        self.accounts: dict = {}        # name -> ExtraAccount, the scenario's `accounts:`
+        self._removed_standin = False   # self.ms is a removed account's stopped handle
         self._pim_init()
 
     # -- setup --------------------------------------------------------------------------------
@@ -290,6 +312,73 @@ class ScenarioRun(PimMixin, BackendMixin):
                                   transport=self._transport_for(binary))
         self._attach_backend(self.ms)
         self._write_legacy_db()
+        self._setup_accounts()
+
+    def _setup_accounts(self):
+        """`accounts: {name: {server?, mailboxes?, account?}}`: further accounts in the same
+        config dir and database, as the client holds them. `server` (an entry like those in
+        `servers:`) gives the account its own server, seeded from its `mailboxes`; without it
+        the account logs in to the scenario's server as another device of the same user.
+        `account` overrides fields of its Account JSON (e.g. `password`). Its id is
+        `c0ffee-<name>`. Steps take `account: <name>` to act on it (`a` is the primary), and
+        `expect: {accounts: {<name>: {...}}}` checks it."""
+        for name, opts in (self.sc.get("accounts") or {}).items():
+            opts = opts or {}
+            if name == PRIMARY_ACCOUNT:
+                raise ScenarioFailure(f"accounts: {PRIMARY_ACCOUNT!r} is the scenario's own account")
+            server, own = self.server, False
+            if opts.get("server"):
+                spec = ServerSpec.parse(opts["server"])
+                if spec.kind in DOCKER_KINDS and spec.kind not in available_server_kinds():
+                    raise ScenarioSkipped(f"account {name} needs {spec.id}")
+                server, own = make_server(spec, str(self.work / f"server-{name}.log")), True
+                server.start()
+                for mb, mspec in (opts.get("mailboxes") or {}).items():
+                    mspec = mspec or {}
+                    if mb not in set(server.mailboxes()):
+                        server.create_mailbox(mb, mspec.get("special_use"))
+                    if mspec.get("messages"):
+                        server.populate(mb, self._next_messages(mspec["messages"]), mspec.get("flags", ["\\Seen"]))
+            kw = server.account_kwargs()
+            kw.update(opts.get("account") or {})
+            kw.setdefault("account_id", f"c0ffee-{name}")
+            ignore = [server.server_path(p) for p in (opts.get("quiescence") or {}).get("ignore_busy", [])]
+            self.accounts[name] = ExtraAccount(name, account_json(**kw), server, own, ignore)
+        if self.accounts:
+            self.ms.scoped_db = True
+
+    def _new_account_process(self, acct: ExtraAccount) -> MailsyncProcess:
+        ms = MailsyncProcess(acct.account, self.work, binary=self.binary, verbose=True, env=self._engine_env(),
+                             transport=self._transport_for(self.binary), name=acct.name, peer=self.ms)
+        ms.scoped_db = True
+        self._attach_backend(ms)
+        return ms
+
+    def _start_accounts(self):
+        for acct in self.accounts.values():
+            acct.ms = self._new_account_process(acct)
+            acct.ms.start()
+            self._note(f"account {acct.name} ({acct.account['id']}) started on {acct.ms.transport}")
+
+    @contextlib.contextmanager
+    def _as_account(self, name: Optional[str]):
+        """Runs a step or expectations against account `name`: its engine handle, server and
+        ignore_busy stand in for the primary's."""
+        if name in (None, PRIMARY_ACCOUNT):
+            yield
+            return
+        acct = self.accounts.get(name)
+        if acct is None:
+            raise ScenarioFailure(f"no account {name!r} (accounts: {sorted(self.accounts)})")
+        # A removed account stands in with the handle it was removed from: server steps and
+        # database expectations work on it, engine steps fail.
+        saved = (self.ms, self.server, self.ignore_busy, self._removed_standin)
+        self.ms, self.server, self.ignore_busy = acct.ms or acct.removed, acct.server, acct.ignore_busy
+        self._removed_standin = acct.ms is None
+        try:
+            yield
+        finally:
+            self.ms, self.server, self.ignore_busy, self._removed_standin = saved
 
     def _engine_env(self) -> dict:
         """The server's endpoint overrides (DAV hosts, the fake Google endpoints) plus the
@@ -300,8 +389,16 @@ class ScenarioRun(PimMixin, BackendMixin):
         return env
 
     def teardown(self):
+        # Further accounts first: on serve the primary's stop shuts the shared engine down.
+        for acct in self.accounts.values():
+            if acct.ms:
+                with contextlib.suppress(Exception):
+                    acct.ms.stop()
+            if acct.own_server:
+                with contextlib.suppress(Exception):
+                    acct.server.stop()
         if self.ms:
-            code = self.ms.stop()
+            code = self.ms.stop(graceful=True)
             self._note(f"mailsync stopped ({describe_exit(code)})")
         if self.server:
             self.server.stop()
@@ -331,8 +428,9 @@ class ScenarioRun(PimMixin, BackendMixin):
             finally:
                 if self.ms.migrate_output:
                     self.migrate_outputs.append(self.ms.migrate_output)
-            started = True
             self._note(f"mailsync {self.ms.binary.resolve().name} started against {self.spec.id} on port {self.server.port}; migrate said: {self.ms.migrate_output}")
+            self._start_accounts()
+            started = True
             for step in self.sc.get("steps") or []:
                 self.run_step(step)
             self.check_expectations(self._final_expectations())
@@ -384,10 +482,14 @@ class ScenarioRun(PimMixin, BackendMixin):
     def run_step(self, step, allow_client: bool = True):
         if isinstance(step, str):
             step = {step: {}}
-        (verb, arg), = [(k, v) for k, v in step.items() if k not in ("as", "note", "hold_engine")]
+        (verb, arg), = [(k, v) for k, v in step.items() if k not in ("as", "note", "hold_engine", "account")]
         label = step.get("as")
-        self._note(f"step {verb} {json.dumps(arg) if not isinstance(arg, str) else arg}")
-        if step.get("hold_engine"):
+        who = f" (account {step['account']})" if step.get("account") else ""
+        self._note(f"step {verb}{who} {json.dumps(arg) if not isinstance(arg, str) else arg}")
+        if step.get("account"):
+            with self._as_account(step["account"]):
+                result = self._run_step_verb(verb, arg, allow_client)
+        elif step.get("hold_engine"):
             # Server steps only: anything that waits on the engine would wait forever.
             if not verb.startswith("server."):
                 raise ScenarioFailure(f"hold_engine applies to server steps, not {verb}")
@@ -418,6 +520,10 @@ class ScenarioRun(PimMixin, BackendMixin):
             result = self._db_sql(arg)
         elif verb == "assert":
             self.check_expectations(arg)
+        elif verb == "account.add":
+            result = self._account_add(arg)
+        elif verb == "account.remove":
+            result = self._account_remove(arg)
         elif verb == "mark":
             # Wall clock, so a mark compares with deltas from every engine process.
             self.marks[arg if isinstance(arg, str) else label or "mark"] = result = time.time()
@@ -480,6 +586,15 @@ class ScenarioRun(PimMixin, BackendMixin):
             self._pim_wait(arg)
         if "backend_metadata" in arg or "metadata" in arg:
             self._backend_wait(arg)
+        if "stopped" in arg:
+            # Until the account is down: its process exited (stdio, socket) or its
+            # account.state is stopped (serve). wait_for would raise at that very moment.
+            deadline = time.monotonic() + float(arg.get("timeout", 60))
+            while self.ms.running:
+                if time.monotonic() > deadline:
+                    raise TimeoutError(f"the account still runs after {arg.get('timeout', 60)}s\n{self.ms.describe()}")
+                time.sleep(0.1)
+            self._note(f"account down: {self.ms.describe_stop()}")
         if "idle" in arg and self.spec.kind == "fake":
             self.server.imap.wait_for_idle(float(arg.get("timeout", 60)))
 
@@ -505,7 +620,49 @@ class ScenarioRun(PimMixin, BackendMixin):
         self.snapshots[name] = snap
         return snap
 
+    def _account_remove(self, name: str):
+        """Takes account `name` out while the others run: `account.remove` on serve, the
+        client stopping that account's process on stdio and socket."""
+        acct = self.accounts.get(name)
+        if acct is None or acct.ms is None:
+            raise ScenarioFailure(f"account.remove: no running account {name!r}")
+        if acct.ms.transport == "serve":
+            result = acct.ms.remove_account()
+            self._note(f"account {name} removed: {json.dumps(result)}")
+        else:
+            code = acct.ms.stop()
+            result = {}
+            self._note(f"account {name}'s process stopped ({describe_exit(code)})")
+        acct.earlier_deltas += acct.ms.deltas()
+        acct.removed, acct.ms = acct.ms, None
+        return result
+
+    def _account_add(self, arg):
+        """Adds account `name` back (`account.add: b` or `{name: b, wait: true}`) and waits for
+        a sync pass that started after the add, then quiescence."""
+        name, opts = (arg, {}) if isinstance(arg, str) else (arg["name"], arg)
+        acct = self.accounts.get(name)
+        if acct is None:
+            raise ScenarioFailure(f"account.add: no account {name!r}")
+        if acct.ms is not None:
+            raise ScenarioFailure(f"account.add: account {name} is already added")
+        added = time.time()
+        acct.removed = None
+        acct.ms = self._new_account_process(acct)
+        acct.ms.start()
+        self._note(f"account {name} added on {acct.ms.transport}")
+        if opts.get("wait", True):
+            ms = acct.ms
+            # The log outlives the remove; only a pass that began after the add counts.
+            ms.wait_for(lambda: any(l.msg == "Sync loop complete." and l.wall >= added
+                                    for l in ms.log("background", engine_only=True)),
+                        float(opts.get("timeout", 120)), "a sync pass after account.add")
+            with self._as_account(name):
+                self.ms.wait_quiescent(timeout=float(opts.get("timeout", 180)), ignore_busy=self.ignore_busy)
+
     def _restart(self, arg: dict):
+        if self.accounts:
+            raise ScenarioFailure("restart is not supported in a scenario with several accounts")
         code = self.ms.stop()
         self.earlier_deltas += self.ms.deltas()
         self._note(f"mailsync stopped for restart (exit {code})")
@@ -661,6 +818,11 @@ class ScenarioRun(PimMixin, BackendMixin):
             s.set_uidnext(arg["mailbox"], int(arg["value"]))
         elif op == "drop_connections":
             s.drop_connections()
+        elif op == "set_password":
+            # Fake only: the next login with the old password is refused (AUTHENTICATIONFAILED).
+            if self.server.kind != "fake":
+                raise ScenarioFailure("server.set_password needs the fake server")
+            s.imap.credentials = (s.username, str(arg["password"]))
         elif op == "pause":
             pass  # with `at` + `delay`: holds one reply without changing the server
         elif op == "reject":
@@ -795,8 +957,15 @@ class ScenarioRun(PimMixin, BackendMixin):
         return expect
 
     def check_expectations(self, expect: dict):
+        problems = self._expectation_problems(expect)
+        for p in problems:
+            self._note("FAIL " + p)
+        if problems:
+            raise ScenarioFailure("\n".join(problems))
+
+    def _expectation_problems(self, expect: dict) -> list:
         problems = []
-        crash_expected = False
+        crash_expected = "stopped" in expect
         for key, arg in expect.items():
             arg = dict(arg) if isinstance(arg, dict) else (arg or {})
             xfail = self._xfail_reason(arg.pop("xfail", None)) if isinstance(arg, dict) else None
@@ -821,13 +990,45 @@ class ScenarioRun(PimMixin, BackendMixin):
                 continue
             problems += found
         if self.ms and self.ms.transport_errors:
-            problems.append("socket transport: " + "; ".join(self.ms.transport_errors))
-        if self.ms and self.ms.exit_code is not None and not expect.get("exit") and not crash_expected:
-            problems.append(f"mailsync stopped ({describe_exit(self.ms.exit_code)})\n{self.ms.stderr_tail()}")
-        for p in problems:
-            self._note("FAIL " + p)
-        if problems:
-            raise ScenarioFailure("\n".join(problems))
+            problems.append(f"{self.ms.transport} transport: " + "; ".join(self.ms.transport_errors))
+        if (self.ms and self.ms.proc and not self.ms.running and not expect.get("exit") and not crash_expected
+                and not self._removed_standin):
+            problems.append(f"mailsync stopped ({self.ms.describe_stop()})\n{self.ms.stderr_tail()}")
+        return problems
+
+    def expect_accounts(self, arg: dict) -> list:
+        """{name: {expectation: arg, ...}}: the scenario's further accounts, each checked
+        against its own engine handle and server (`_as_account`)."""
+        out = []
+        for name, sub in arg.items():
+            with self._as_account(name):
+                out += [f"account {name}: {p}" for p in self._expectation_problems(dict(sub or {}))]
+        return out
+
+    def expect_stopped(self, arg) -> list:
+        """The account stopped on a non-retryable error and stays stopped: `{key: regex}`
+        matches the SyncError key. serve reports it in `account.state`; stdio and socket abort
+        the account's process, which logs it as critical first."""
+        if self.ms.running:
+            return [f"expected the account to have stopped, it is still running"]
+        err = self.ms.stopped_error()
+        if err is None:
+            return [f"the account is down ({self.ms.describe_stop()}) but no error stopped it"]
+        want = arg.get("key") if isinstance(arg, dict) else None
+        if want and not re.search(want, str(err.get("key"))):
+            return [f"the account stopped with {json.dumps(err)[:300]}, expected key /{want}/"]
+        return []
+
+    def expect_engine_log(self, arg: dict) -> list:
+        """serve only (other transports have no engine.log): `{present: [regex], absent:
+        [regex]}` over `engine.log`, where lines from threads of no account go."""
+        if self.ms.transport != "serve":
+            return []
+        path = self.ms.config_dir / "engine.log"
+        text = path.read_text(errors="replace") if path.exists() else ""
+        out = [f"engine.log does not contain /{p}/" for p in arg.get("present") or [] if not re.search(p, text, re.M)]
+        out += [f"engine.log contains /{p}/" for p in arg.get("absent") or [] if re.search(p, text, re.M)]
+        return out
 
     def _xfail_reason(self, xfail):
         """`xfail: reason` applies to every server; `xfail: {dovecot: reason, "fake:plain": reason}`
@@ -851,7 +1052,7 @@ class ScenarioRun(PimMixin, BackendMixin):
                 self.ms.wait_quiescent(timeout=60, ignore_busy=self.ignore_busy)
             except TimeoutError:
                 self._note(f"invariants: engine not quiescent after 60s ({getattr(self.ms, 'wait_reason', '')}); checking anyway")
-        with self.ms.db() as c:
+        with self.ms.db(scoped=False) as c:
             return invariants.check(c, skip=arg.get("skip") or [])
 
     def expect_migrate_output(self, pattern) -> list:
@@ -949,7 +1150,7 @@ class ScenarioRun(PimMixin, BackendMixin):
         return out
 
     def expect_running(self, arg) -> list:
-        return [] if self.ms.running else [f"mailsync is not running ({describe_exit(self.ms.exit_code)})"]
+        return [] if self.ms.running else [f"mailsync is not running ({self.ms.describe_stop()})"]
 
     def expect_exit(self, arg) -> list:
         code = self.ms.exit_code

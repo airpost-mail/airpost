@@ -134,7 +134,8 @@ class BackendMixin:
         """Added to every `backend:` scenario: no device token appears in the engine's log or
         stderr, whichever field of the identity line was refused (docs/backend-plan.md 4.1)."""
         b = self._backend()
-        files = [*self.ms.config_dir.glob("mailsync-*.log*"), self.ms.stderr_path]
+        files = [*self.ms.config_dir.glob("mailsync-*.log*"), *self.ms.config_dir.glob("engine.log*"),
+                 *self.ms.work_dir.glob("stderr*.log")]
         out = []
         for f in files:
             text = f.read_text(errors="replace") if f.exists() else ""

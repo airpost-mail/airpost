@@ -1,6 +1,7 @@
 """
 End-to-end test of the `tern` CLI (apps/cli, docs/engine-protocol-plan.md section 3): a real
-engine on the fake IMAP server with the socket transport, and the CLI pointed at its config
+engine on the fake IMAP server, once per account on the socket transport (`run/<id>.json`)
+and once as a `serve` engine (`run/engine.json`), and the CLI pointed at its config
 dir through --config-dir, so it finds the engine by its discovery file the way it finds the
 desktop's engines.
 
@@ -59,13 +60,13 @@ def tern_binary() -> Path:
     return max(built, key=lambda c: c.stat().st_mtime)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", params=["socket", "serve"])
 def engine(request):
     binary = request.config.getoption("--mailsync")
-    run = ScenarioRun(dict(SCENARIO), ServerSpec.parse({"fake": "dovecot"}),
+    run = ScenarioRun(dict(SCENARIO, name=f"{SCENARIO['name']}-{request.param}"), ServerSpec.parse({"fake": "dovecot"}),
                       binary=Path(binary) if binary else None, keep=request.config.getoption("--keep"))
     run.setup()
-    run.ms.transport = "socket"
+    run.ms.transport = request.param
     try:
         run.ms.start()
         run.ms.wait_quiescent(timeout=180)

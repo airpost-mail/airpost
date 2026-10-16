@@ -1,0 +1,45 @@
+name: multi-account-remove-add
+description: >
+  Account b is removed and added back while account a keeps running: `account.remove` /
+  `account.add` on serve's stdin, the client stopping and starting b's process on stdio and
+  socket. a syncs new mail while b is out. b's rows stay in the database while it is out,
+  and after the add it picks up what arrived on its server meanwhile without duplicating
+  or churning rows.
+source: docs/engine-protocol-plan.md 4.1 (account.add / account.remove)
+servers: [{fake: dovecot}]
+mailboxes:
+  INBOX: {messages: 10}
+accounts:
+  b:
+    server: {fake: dovecot}
+    mailboxes:
+      INBOX: {messages: 6}
+      Archive: {messages: 2}
+steps:
+  - wait: quiescent
+  - wait: quiescent
+    account: b
+  - account.remove: b
+  # b's rows stay while it is out.
+  - assert: {counts: {INBOX: 6, Archive: 2, total: 8}}
+    account: b
+  - server.append: {mailbox: INBOX, messages: 2}
+  - sync: pass
+  - server.append: {mailbox: INBOX, messages: 3}
+    account: b
+  - server.move: {mailbox: INBOX, uids: [1], to: Archive}
+    account: b
+  - account.add: b
+  - sync: pass
+    account: b
+  - sync: pass
+expect:
+  counts: {INBOX: 12, total: 12}
+  db_matches_server: {}
+  running: true
+  accounts:
+    b:
+      counts: {INBOX: 8, Archive: 3, total: 11}
+      db_matches_server: {}
+      stable: {passes: 1}
+      running: true
