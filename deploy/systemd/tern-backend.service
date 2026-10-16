@@ -1,0 +1,47 @@
+# Tern backend as a system service (docs/self-hosting.md, "Without Docker").
+#   useradd --system --home-dir /var/lib/tern-backend --shell /usr/sbin/nologin tern
+#   install -m 755 tern-backend /usr/local/bin/
+#   install -d -m 755 /etc/tern-backend
+#   install -m 640 -g tern tern.toml /etc/tern-backend/    # from tern.toml.example
+#   cp tern-backend.service /etc/systemd/system/ && systemctl enable --now tern-backend
+# Admin commands run as the same user, so files they create stay readable by the server:
+#   sudo -u tern tern-backend --config /etc/tern-backend/tern.toml user add you@example.com
+
+[Unit]
+Description=Tern backend
+Documentation=https://github.com/ternmail/ternmail/blob/main/docs/self-hosting.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=tern
+Group=tern
+ExecStart=/usr/local/bin/tern-backend --config /etc/tern-backend/tern.toml serve
+StateDirectory=tern-backend
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

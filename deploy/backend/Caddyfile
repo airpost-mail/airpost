@@ -1,0 +1,8 @@
+# The metadata stream (/deltas/<aid>/streaming) is a long-lived response with a heartbeat every
+# 5 s; flush_interval -1 stops Caddy from buffering it. Caddy sets X-Forwarded-For, which the
+# backend reads for login rate limits (TERN_TRUSTED_PROXIES).
+{$TERN_DOMAIN} {
+	reverse_proxy backend:5101 {
+		flush_interval -1
+	}
+}

@@ -10,9 +10,9 @@ name: backend
 on:
   push:
     branches: [main]
-    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read
@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the image
-        run: docker build -f apps/backend/Dockerfile -t tern-backend .
+        run: docker build -f apps/backend/Dockerfile -t tern-backend -t tern-backend:ci .
       - name: Check the shipped notices
         run: |
           id="$(docker create tern-backend)"
@@ -60,3 +60,25 @@ jobs:
           test -s "$RUNNER_TEMP/doc/NOTICE.md"
           grep -q '^NOTICE files' "$RUNNER_TEMP/doc/THIRD-PARTY-NOTICES.txt"
           test -s "$RUNNER_TEMP/doc/SOURCE.txt"
+      # deploy/backend as a self-hoster runs it, with the image just built: the backend turns
+      # healthy, Caddy serves it over TLS (its internal CA for localhost), backups are written.
+      - name: Compose smoke test
+        working-directory: deploy/backend
+        env:
+          TERN_DOMAIN: localhost
+          TERN_VERSION: ci
+        run: |
+          c() { docker compose -f compose.yaml -f compose.build.yaml "$@"; }
+          c config -q
+          c up -d --no-build --wait --wait-timeout 120 || { c logs; exit 1; }
+          curl -fsk https://localhost/ping
+          curl -fsk https://localhost/tern/v1/server | grep -q '"apiVersion":1'
+          c exec backend tern-backend user add ci@example.com > /dev/null
+          c logs backend | grep -q 'backup written'
+          name="$(c cp backend:/backups - | tar -t | grep -m1 -E '^backups/tern-[0-9T]+Z\.db$' | cut -d/ -f2)"
+          test -n "$name"
+          c stop backend
+          c run --rm backend restore "/backups/$name"
+          c up -d --no-build --wait --wait-timeout 60
+          curl -fsk https://localhost/ping
+          c down -v
