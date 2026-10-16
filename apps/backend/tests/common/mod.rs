@@ -236,20 +236,17 @@ fn form_encode(s: &str) -> String {
     out
 }
 
-/// What `page-authenticate.tsx` does: the text of `#identity-result`, `atob`, `JSON.parse`.
-/// `atob` maps each byte to one char, so the decoded bytes must be ASCII.
-pub fn identity_result(html: &str) -> Option<serde_json::Value> {
+/// The decoded `#tern-login-result` of a login page: base64url without padding, decoding to
+/// ASCII JSON.
+pub fn login_result(html: &str) -> Option<serde_json::Value> {
     use base64::Engine;
-    let start = html.find("id=\"identity-result\"")?;
+    let start = html.find("id=\"tern-login-result\"")?;
     let open_end = start + html[start..].find('>')? + 1;
     let close = open_end + html[open_end..].find("</div>")?;
     let text = html[open_end..close].trim();
-    let bytes = base64::engine::general_purpose::STANDARD
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(text)
-        .expect("base64");
-    assert!(
-        bytes.is_ascii(),
-        "identity-result must decode to ASCII for atob"
-    );
-    Some(serde_json::from_slice(&bytes).expect("identity JSON"))
+        .expect("base64url");
+    assert!(bytes.is_ascii(), "tern-login-result must decode to ASCII");
+    Some(serde_json::from_slice(&bytes).expect("login result JSON"))
 }

@@ -2,15 +2,16 @@
 //! models. Not started for [`ms_net::LocalOnly`] (plan D3).
 //!
 //! Derived from Mailspring-Sync `MailSync/MetadataWorker.cpp` (Copyright © 2017 Foundry 376,
-//! GPL-3.0). See NOTICE.md. The identity-server transport (`/metadata`, `/deltas/…/head`,
-//! `/deltas/…/streaming`) is the backend's business; this thread keeps the cursor, applies
-//! what arrives and backs off on errors.
+//! GPL-3.0). See NOTICE.md. The server transport is the backend's business; this thread
+//! keeps the cursor and its binding to a server and user, applies what arrives and backs off
+//! on errors.
 
 use std::sync::Arc;
 
 use ms_core::{Metadata, Result};
-use ms_net::{MetadataBackend, MetadataDelta};
-use ms_store::{Query, Store};
+use ms_net::{MetadataBackend, MetadataDelta, MetadataPush};
+use ms_store::{Message, Query, Store};
+use serde_json::Value;
 use tracing::{info, warn};
 
 use crate::WorkerContext;
@@ -64,8 +65,13 @@ impl<'a> MetadataWorker<'a> {
         format!("cursor-{}", self.account_id)
     }
 
-    /// The saved cursor; `None` before the first pull and after `Store::reset_for_account`
-    /// clears it, which makes the backend deliver everything again.
+    fn binding_key(&self) -> String {
+        format!("metadata-binding-{}", self.account_id)
+    }
+
+    /// The saved cursor; `None` before the first pull and after a binding change discards
+    /// it, which makes the backend deliver everything again. `Store::reset_for_account`
+    /// writes `"0"`, which the backend also treats as the start.
     pub fn cursor(&self) -> Result<Option<String>> {
         Ok(self
             .store
@@ -77,9 +83,11 @@ impl<'a> MetadataWorker<'a> {
         self.store.save_key_value(&self.cursor_key(), cursor)
     }
 
-    /// One `pull` from the saved cursor until the backend closes the stream, applying each
-    /// delta as it arrives and saving the cursor the backend hands back.
+    /// Checks the binding, drains the outbox, then pulls from the saved cursor until the
+    /// backend closes the stream, applying each delta as it arrives and saving the cursor
+    /// the backend hands back.
     pub fn pull_once(&self) -> Result<()> {
+        self.check_binding()?;
         let cursor = self.cursor()?;
         let mut failed = None;
         let resume = self.backend.pull(cursor.as_deref(), &mut |delta| {
@@ -96,10 +104,30 @@ impl<'a> MetadataWorker<'a> {
         self.set_cursor(&resume)
     }
 
+    /// A cursor is a position on one server for one user. A missing or different binding
+    /// (first pull, a restored server, another user, or a cursor `import-legacy` carried from
+    /// Mailspring) discards the cursor and re-sends local state as backfill. The binding is
+    /// saved last, so a crash in between repeats the whole step.
+    fn check_binding(&self) -> Result<()> {
+        let Some(binding) = self.backend.binding()? else {
+            return Ok(());
+        };
+        if self.store.get_key_value(&self.binding_key())?.as_deref() != Some(binding.as_str()) {
+            self.store.save_key_value(&self.cursor_key(), "")?;
+            let local = local_metadata(self.store, &self.account_id)?;
+            self.backend.rebind(&local)?;
+            self.store.save_key_value(&self.binding_key(), &binding)?;
+        }
+        self.backend.drain_outbox()
+    }
+
     /// `onDelta`.
     fn on_delta(&self, delta: MetadataDelta) -> Result<()> {
         match delta {
             MetadataDelta::Metadata(m) => apply_metadata(self.store, &m),
+            MetadataDelta::AnchoredThreadMetadata(m, anchor) => {
+                apply_anchored_thread_metadata(self.store, &m, &anchor)
+            }
             MetadataDelta::Cursor(c) => self.set_cursor(&c),
             MetadataDelta::IdentityRefreshNeeded => {
                 self.store.delta_stream().send_identity_refresh_needed();
@@ -150,4 +178,113 @@ pub fn apply_metadata(store: &Store, m: &Metadata) -> Result<()> {
         }
         Ok(())
     })
+}
+
+/// Thread metadata from another device, whose thread id may differ here: applied to the thread
+/// that holds the anchor message, else to the thread of that id, else kept under the pending
+/// key `import-legacy` uses, which the anchor message's first save attaches.
+pub fn apply_anchored_thread_metadata(store: &Store, m: &Metadata, anchor: &str) -> Result<()> {
+    let local_thread: Option<String> = store
+        .conn()
+        .prepare_cached(
+            "SELECT threadId FROM Message WHERE headerMessageId = ? AND accountId = ? AND threadId != '' ORDER BY rowid LIMIT 1",
+        )?
+        .query_map(rusqlite::params![anchor, m.account_id], |r| r.get(0))?
+        .next()
+        .transpose()?;
+    let exists = |id: &str| -> Result<bool> {
+        Ok(store
+            .find_generic(
+                "thread",
+                &Query::new()
+                    .equal("id", id)
+                    .equal("accountId", m.account_id.as_str()),
+            )?
+            .is_some())
+    };
+    let target = match local_thread {
+        Some(t) => t,
+        None if exists(&m.object_id)? => m.object_id.clone(),
+        None => {
+            info!(
+                "Received metadata V{} for thread {} before its message <{anchor}>; waiting for it.",
+                m.version, m.object_id
+            );
+            let pending = Metadata {
+                object_id: ms_store::legacy_import::pending_thread_key(anchor, &m.object_id),
+                object_type: "Thread".into(),
+                ..m.clone()
+            };
+            return store.transaction("applyMetadataJSON", |s| {
+                s.save_detached_plugin_metadata(&pending)
+            });
+        }
+    };
+    apply_metadata(
+        store,
+        &Metadata {
+            object_id: target,
+            ..m.clone()
+        },
+    )
+}
+
+/// Every metadata value the account holds, as pushes: what a new binding backfills. Thread
+/// values carry their anchor.
+pub fn local_metadata(store: &Store, account_id: &str) -> Result<Vec<MetadataPush>> {
+    let rows: Vec<(String, String)> = store
+        .conn()
+        .prepare_cached(
+            "SELECT DISTINCT id, objectType FROM ModelPluginMetadata WHERE accountId = ? ORDER BY objectType, id",
+        )?
+        .query_map([account_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut out = Vec::new();
+    for (id, class) in rows {
+        let query = Query::new()
+            .equal("id", id.as_str())
+            .equal("accountId", account_id);
+        let Some(model) = store.find_generic(&class, &query)? else {
+            continue;
+        };
+        let header_message_id = match class.to_ascii_lowercase().as_str() {
+            "message" => store
+                .find::<Message>(&Query::new().equal("id", id.as_str()))?
+                .map(|m| m.header_message_id().to_owned())
+                .filter(|h| !h.is_empty()),
+            "thread" => thread_anchor(store, &id)?,
+            _ => None,
+        };
+        let Some(entries) = model.json().get("metadata").and_then(Value::as_array) else {
+            continue;
+        };
+        for e in entries {
+            let value = e.get("value").cloned().unwrap_or(Value::Null);
+            let Some(plugin_id) = e.get("pluginId").and_then(Value::as_str) else {
+                continue;
+            };
+            out.push(MetadataPush {
+                account_id: account_id.to_owned(),
+                model_id: id.clone(),
+                model_class: class.clone(),
+                plugin_id: plugin_id.to_owned(),
+                value,
+                version: e.get("v").and_then(Value::as_i64).unwrap_or(0),
+                header_message_id: header_message_id.clone(),
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// The Message-ID of the message whose id forms `thread_id` (`t:<message id>`), if it is
+/// still here.
+pub fn thread_anchor(store: &Store, thread_id: &str) -> Result<Option<String>> {
+    let Some(message_id) = thread_id.strip_prefix("t:") else {
+        return Ok(None);
+    };
+    Ok(store
+        .find::<Message>(&Query::new().equal("id", message_id))?
+        .map(|m| m.header_message_id().to_owned())
+        .filter(|h| !h.is_empty()))
 }

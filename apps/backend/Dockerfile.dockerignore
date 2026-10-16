@@ -1,0 +1,10 @@
+# Build context is the repo root (see Dockerfile).
+*
+!Cargo.toml
+!Cargo.lock
+!crates/
+!apps/engine/
+!apps/backend/
+**/target/
+apps/engine/test/
+apps/engine/tools/

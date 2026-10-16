@@ -406,14 +406,24 @@ impl<'a> TaskProcessor<'a> {
         if self.metadata.is_local_only() {
             return Ok(());
         }
+        let model_id = get_str(at(data, "modelId"))?;
+        let model_class = json_str(data, "modelClassName").to_owned();
+        let mut header_message_id = at(data, "modelHeaderMessageId")
+            .as_str()
+            .filter(|h| !h.is_empty())
+            .map(str::to_owned);
+        // Threads have no Message-ID of their own; the anchor lets other devices find theirs.
+        if header_message_id.is_none() && model_class.eq_ignore_ascii_case("thread") {
+            header_message_id = ms_sync::metadata_worker::thread_anchor(self.store, &model_id)?;
+        }
         let push = MetadataPush {
             account_id: self.account.id().to_owned(),
-            model_id: get_str(at(data, "modelId"))?,
-            model_class: json_str(data, "modelClassName").to_owned(),
+            model_id,
+            model_class,
             plugin_id: get_str(at(data, "pluginId"))?,
             value: at(data, "value").clone(),
             version: json_i64(at(data, "modelMetadataNewVersion")),
-            header_message_id: at(data, "modelHeaderMessageId").as_str().map(str::to_owned),
+            header_message_id,
         };
         self.metadata.push(&push)?;
         info!(

@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use ms_core::{Account, Clock, Identity};
+use ms_core::{Account, Clock};
 use ms_net::{MetadataBackend, TokenManager};
 use ms_store::DeltaStream;
 
@@ -35,7 +35,6 @@ pub use tasks::{RemoteTaskRunner, TaskRunnerFactory};
 #[derive(Clone)]
 pub struct WorkerContext {
     pub account: Arc<Account>,
-    pub identity: Option<Arc<Identity>>,
     pub config_dir: PathBuf,
     pub deltas: Arc<DeltaStream>,
     pub clock: Arc<dyn Clock>,

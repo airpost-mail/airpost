@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Tern contributors
 
-//! `/ping`, `/api/me`, the compatibility stubs and account removal (docs/backend-plan.md 3.4).
+//! `/ping`, server info, `/tern/v1/me`, sign-out and account removal (docs/backend-plan.md 3.4).
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -9,19 +9,55 @@ use axum::Json;
 use serde_json::{json, Value};
 
 use super::{ApiError, AppState, AuthUser};
-use crate::wire::Identity;
+use crate::config::Signup;
+use crate::ids;
+use crate::wire::{Me, ServerInfo, SignupMode};
 
 pub async fn ping() -> Json<Value> {
     Json(json!({}))
 }
 
-pub async fn me(State(state): State<AppState>, AuthUser(auth): AuthUser) -> Json<Identity> {
-    Json(state.identity(&auth.user, None))
+/// `GET /tern/v1/server`, no auth.
+pub async fn server_info(State(state): State<AppState>) -> Json<ServerInfo> {
+    let s = &state.0;
+    Json(ServerInfo {
+        server_id: s.server_id.clone(),
+        version: env!("CARGO_PKG_VERSION").to_owned(),
+        public_url: s.public_url.clone(),
+        signup: match s.signup {
+            Signup::Open => SignupMode::Open,
+            Signup::Closed => SignupMode::Closed,
+        },
+        features: s.features,
+    })
 }
 
-/// No quotas, but `markUsed` still queues the task and C++ runs it (section 1).
-pub async fn feature_usage_event(_auth: AuthUser) -> StatusCode {
-    StatusCode::NO_CONTENT
+/// `GET /tern/v1/me`.
+pub async fn me(State(state): State<AppState>, AuthUser(auth): AuthUser) -> Json<Me> {
+    let s = &state.0;
+    let user = auth.user;
+    Json(Me {
+        user_id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        tracking_ns: user.tracking_ns,
+        server_id: s.server_id.clone(),
+        public_url: s.public_url.clone(),
+        features: s.features,
+    })
+}
+
+/// `DELETE /tern/v1/tokens/current`: sign-out. Streams of the token end at their next
+/// heartbeat, when they re-check it.
+pub async fn revoke_current_token(
+    State(state): State<AppState>,
+    AuthUser(auth): AuthUser,
+) -> Result<StatusCode, ApiError> {
+    let id = auth.token_id;
+    let now = ids::now_ms();
+    state.blocking(move |r| r.revoke_token(id, now)).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn not_found() -> ApiError {

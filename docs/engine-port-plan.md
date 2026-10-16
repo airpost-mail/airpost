@@ -13,7 +13,7 @@ repo root (section 12).
 |---|---|
 | D1 | Pure Rust. No mailcore2, libetpan, ICU, tidy, ctemplate, libxml2, curl, cyrus-sasl or OpenSSL; no C++ FFI. |
 | D2 | Keep every Pro / Mailspring ID feature (snooze, send-later, reminders, open/link tracking sends, thread metadata). Remove the sign-in requirement: the engine runs with `--identity null` as a normal mode, not a degraded one. |
-| D3 | Metadata is local only for now. Multi-device sync is out of scope, but remote sync sits behind a `MetadataBackend` trait so a self-hostable backend can be added later without touching workers or tasks. Nothing calls `*.getmailspring.com`. |
+| D3 | Metadata sync goes through the `MetadataBackend` trait. `LocalOnly` (metadata stays in the local database) is the default; with a Tern server object on the identity line the engine uses `HttpMetadataBackend` against the self-hostable `apps/backend` for multi-device sync (`docs/backend-plan.md` 4.1). Nothing calls `*.getmailspring.com`. *(Changed 2026-10-16, backend B1-E.)* |
 | D4 | Fresh database. The Rust engine never reads or migrates a C++-era DB in place. An optional `import-legacy` mode carries over local data that would otherwise be lost (section 9). Message ids no longer have to match the C++ engine byte-for-byte. |
 | D5 | The client contract is frozen: CLI, stdin/stdout protocol and SQLite schema stay exactly as they are, so the existing harness can A/B the Rust binary against the C++ one. Protocol redesign comes after parity. |
 | D6 | CalDAV/CardDAV and Google People contacts are in scope but come last. |
@@ -22,7 +22,7 @@ repo root (section 12).
 | D9 | Provider-specific behaviour lives in provider profiles, one file per provider, not as scattered host checks (section 4). |
 | D10 | One monorepo holds the engine, the desktop client, the future backend and shared libs. Name: Tern (GitHub org `ternmail`); see section 12. |
 | D11 | Everything ships under GPL-3.0, the upstream licence (not "or later": that needs the upstream copyright holders' consent). The product is rebranded away from "Mailspring" (section 12). |
-| D12 | One Cargo workspace at the repo root covers the engine, the backend and every Rust library, so the backend (Rust) reuses engine crates such as ids and metadata models. |
+| D12 | One Cargo workspace at the repo root covers the engine, the backend and every Rust library, with one `Cargo.lock`. The backend reuses no engine crate: it is MIT and the `ms-*` crates are GPL. It shares only the MIT `crates/ms-wire` (wire types) with the engine (`docs/backend-plan.md` 3.1). *(Changed 2026-10-16, backend B1-E.)* |
 
 ## 1. Size and expectations
 
@@ -74,8 +74,8 @@ Everything the C++ engine does is ported, with these exceptions:
 | SASL PLAIN, LOGIN, XOAUTH2, CRAM-MD5, DIGEST-MD5 | Implemented in Rust (lettre plus our own code for the last two) | |
 | `install-check` mode | Same JSON shape, with checks that make sense without C deps: HTTP reachability, IMAP TLS handshake, SMTP connect. `tidy_check` / `legacy_tls_check` report success. | Most checks existed to diagnose missing shared libraries. |
 | `SendFeatureUsageEventTask` | Accepted and completed with no network call | Quotas came from the Mailspring server (D3) |
-| `SyncbackMetadataTask` remote phase | Calls `MetadataBackend::push`. The default `LocalOnly` backend is a no-op. | D3 |
-| `MetadataWorker` (delta stream from id server) | Becomes `MetadataBackend::pull`. Not started with `LocalOnly`. | D3 |
+| `SyncbackMetadataTask` remote phase | Calls `MetadataBackend::push`. The default `LocalOnly` backend is a no-op; the HTTP backend queues pushes it cannot deliver in an outbox. | D3 |
+| `MetadataWorker` (delta stream from id server) | Becomes `MetadataBackend::pull`. Not started with `LocalOnly`. With a Tern server: binding check, outbox drain, then the stream from the cursor. | D3 |
 | `/api/resolve-dav-hosts` | Replaced by a local DNS SRV lookup (`hickory-resolver`) | D3 |
 | libtidy + libxml2 HTML flattening (snippets, search text) | Replaced by an html5ever-based flattener. Snippet text drifts slightly. | No C deps |
 | ICU charset detection and CoreFoundation / ICU conversion | `chardetng` + `encoding_rs`. Bodies differ only on mislabelled mail. | No C deps |
@@ -90,7 +90,8 @@ Everything else stays, including:
 **Process and CLI**
 - **Modes:** `sync`, `test`, `reset`, `migrate`, `install-check`, plus the new `import-legacy`.
 - **Options:** `--identity` (JSON or `null`), `--account`, `--orphan`, `--verbose`. Ignore unknown options such as `--info <email>`, which the client passes.
-- **Environment:** `CONFIG_DIR_PATH` is required. `IDENTITY_SERVER` is accepted and ignored.
+- **Identity line** (stdin after the account line, or `--identity`, which is for tests only): `null` runs with `LocalOnly`. A Tern server object `{"type":"tern-server","version":1,"url","token","userId","serverId"}` selects `HttpMetadataBackend`; an invalid one is logged by field (never the token) and falls back to `LocalOnly`. Any other object is validated as before (`ErrorIdentityMissingFields`, `Invalid Identity JSON`) and then ignored. See `docs/backend-plan.md` 4.1. *(Changed 2026-10-16: the identity was accepted and ignored.)*
+- **Environment:** `CONFIG_DIR_PATH` is required. `IDENTITY_SERVER` is accepted and not read.
 - **Path check:** release builds exit 2 unless the lowercased argv[0] contains `mailspring`. The harness symlinks around this. Under the rebrand (D11) the check uses the new product name; update the harness symlink at the same time.
 - **Account handshake:** without `--account`, print `"\nWaiting for Account JSON:\n"` before reading stdin. The client waits for that first stdout data before writing the account line and the identity line (`../Mailspring/app/src/mailsync-process.ts:220-228`).
 - **One-shot output:** one-shot modes print `"\n" + {"error":null|msg}`.
@@ -701,8 +702,9 @@ ternmail/
   apps/
     desktop/          Electron client (TS), imported from Mailspring with history
     engine/           mailsync bin crate: CLI, modes, stdin loop, thread startup; harness in test/
-    backend/          self-hostable metadata/tracking/sharing server, Rust (D3), not started
-  crates/             Rust libraries (ms-core, ms-store, ms-imap, ...) shared by engine and backend
+    backend/          self-hostable metadata/tracking/sharing server, Rust, MIT (D3; docs/backend-plan.md)
+  crates/             Rust libraries: the engine's GPL ms-* crates, and the MIT ms-wire shared
+                      by engine and backend
   packages/           TS libraries, e.g. protocol types generated from the engine's delta/task
                       structs so the client and engine can't drift
   legacy/

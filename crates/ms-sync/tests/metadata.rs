@@ -394,3 +394,164 @@ fn pull_applies_deltas_and_resumes_from_the_saved_cursor() {
         [None, Some("c1".to_owned())]
     );
 }
+
+/// A backend bound to a server: `binding` answers what the test sets, `rebind` and the
+/// cursors it is pulled from are recorded, and every pull ends at once at `"c-next"`.
+#[derive(Default)]
+struct BoundBackend {
+    binding: Mutex<Option<String>>,
+    rebinds: Mutex<Vec<Vec<MetadataPush>>>,
+    drains: Mutex<usize>,
+    cursors_seen: Mutex<Vec<Option<String>>>,
+}
+
+impl MetadataBackend for BoundBackend {
+    fn push(&self, _push: &MetadataPush) -> Result<()> {
+        Ok(())
+    }
+
+    fn pull(&self, cursor: Option<&str>, _sink: &mut dyn FnMut(MetadataDelta)) -> Result<String> {
+        self.cursors_seen
+            .lock()
+            .unwrap()
+            .push(cursor.map(str::to_owned));
+        Ok("c-next".into())
+    }
+
+    fn binding(&self) -> Result<Option<String>> {
+        Ok(self.binding.lock().unwrap().clone())
+    }
+
+    fn rebind(&self, local: &[MetadataPush]) -> Result<()> {
+        self.rebinds.lock().unwrap().push(local.to_vec());
+        Ok(())
+    }
+
+    fn drain_outbox(&self) -> Result<()> {
+        *self.drains.lock().unwrap() += 1;
+        Ok(())
+    }
+}
+
+#[test]
+fn a_new_binding_discards_the_cursor_and_backfills_local_metadata() {
+    let f = fixture();
+    let mut m = Message::new(json!({
+        "id": "m1", "aid": ACCOUNT, "v": 0, "hMsgId": "first@x", "threadId": "t:m1",
+        "subject": "s", "date": T0, "folders": [], "labels": [],
+    }));
+    f.store.save(&mut m).unwrap();
+    let mut t = f.thread("m1");
+    f.set_metadata(&mut t, "thread-snooze", json!({"expiration": T0 + 30}));
+    f.set_metadata(&mut m, "open-tracking", json!({"open_count": 1}));
+    // A cursor from somewhere else, e.g. carried over by import-legacy.
+    f.store
+        .save_key_value(&format!("cursor-{ACCOUNT}"), "c-mailspring")
+        .unwrap();
+
+    let backend = Arc::new(BoundBackend::default());
+    *backend.binding.lock().unwrap() = Some("s1:u1".into());
+    let worker = MetadataWorker::new(ACCOUNT, &f.store, backend.clone());
+    worker.pull_once().unwrap();
+
+    let rebinds = backend.rebinds.lock().unwrap().clone();
+    assert_eq!(rebinds.len(), 1);
+    let mut local = rebinds[0].clone();
+    local.sort_by(|a, b| a.model_class.cmp(&b.model_class));
+    assert_eq!(local.len(), 2, "{local:?}");
+    assert_eq!(
+        (
+            local[0].model_class.as_str(),
+            local[0].plugin_id.as_str(),
+            local[0].version
+        ),
+        ("Message", "open-tracking", 1)
+    );
+    assert_eq!(local[0].header_message_id.as_deref(), Some("first@x"));
+    assert_eq!(
+        (local[1].model_id.as_str(), local[1].plugin_id.as_str()),
+        ("t:m1", "thread-snooze")
+    );
+    assert_eq!(
+        local[1].header_message_id.as_deref(),
+        Some("first@x"),
+        "thread anchor"
+    );
+    assert_eq!(
+        f.store
+            .get_key_value(&format!("metadata-binding-{ACCOUNT}"))
+            .unwrap()
+            .as_deref(),
+        Some("s1:u1")
+    );
+
+    // Same binding: no backfill, resume from the saved cursor. Another server: start over.
+    worker.pull_once().unwrap();
+    *backend.binding.lock().unwrap() = Some("s2:u1".into());
+    worker.pull_once().unwrap();
+    assert_eq!(backend.rebinds.lock().unwrap().len(), 2);
+    assert_eq!(
+        *backend.cursors_seen.lock().unwrap(),
+        [None, Some("c-next".to_owned()), None]
+    );
+    assert_eq!(*backend.drains.lock().unwrap(), 3);
+}
+
+#[test]
+fn anchored_thread_metadata_reaches_the_local_thread() {
+    let f = fixture();
+    let mut m = Message::new(json!({
+        "id": "local1", "aid": ACCOUNT, "v": 0, "hMsgId": "anchor@x", "threadId": "t:local1",
+        "subject": "s", "date": T0, "folders": [], "labels": [],
+    }));
+    f.store.save(&mut m).unwrap();
+    let local = f.thread("local1");
+    let remote = |id: &str| Metadata {
+        object_type: "thread".into(),
+        object_id: id.into(),
+        account_id: ACCOUNT.into(),
+        plugin_id: "thread-snooze".into(),
+        version: 4,
+        value: json!({"expiration": T0 + 30}),
+    };
+    let backend = Arc::new(FakeBackend::default());
+    backend.pulls.lock().unwrap().push_back((
+        vec![
+            MetadataDelta::AnchoredThreadMetadata(remote("t:elsewhere"), "anchor@x".into()),
+            MetadataDelta::AnchoredThreadMetadata(remote("t:elsewhere2"), "later@x".into()),
+        ],
+        Ok("c1".into()),
+    ));
+    MetadataWorker::new(ACCOUNT, &f.store, backend)
+        .pull_once()
+        .unwrap();
+    let t = f
+        .store
+        .find::<Thread>(&Query::new().equal("id", local.id()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(t.json()["metadata"][0]["v"], 4);
+    assert_eq!(
+        f.count("SELECT count(*) FROM DetatchedPluginMetadata WHERE objectId = 't:elsewhere'"),
+        0
+    );
+
+    // The anchor message arrives later: its first save attaches the waiting value.
+    assert_eq!(
+        f.count("SELECT count(*) FROM DetatchedPluginMetadata WHERE objectId LIKE 't:<later@x>%'"),
+        1
+    );
+    let later = f.thread("local2");
+    let mut m2 = Message::new(json!({
+        "id": "local2", "aid": ACCOUNT, "v": 0, "hMsgId": "later@x", "threadId": later.id(),
+        "subject": "s", "date": T0, "folders": [], "labels": [],
+    }));
+    f.store.save(&mut m2).unwrap();
+    let t = f
+        .store
+        .find::<Thread>(&Query::new().equal("id", later.id()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(t.json()["metadata"][0]["v"], 4);
+    assert_eq!(f.count("SELECT count(*) FROM DetatchedPluginMetadata"), 0);
+}

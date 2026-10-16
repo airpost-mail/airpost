@@ -38,8 +38,9 @@ pub enum Signup {
     Open,
 }
 
-/// Server-side switches for the optional features. A feature is advertised in `/api/me` only
-/// when it is both enabled here and implemented by this build.
+/// Server-side switches for the optional features. A feature is advertised in
+/// `/tern/v1/server` and `/tern/v1/me` only when it is both enabled here and implemented by
+/// this build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FeatureSwitches {

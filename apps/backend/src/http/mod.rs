@@ -6,8 +6,8 @@
 mod api;
 mod error;
 mod hub;
+mod login;
 mod metadata;
-mod onboarding;
 mod stream;
 
 use std::future::Future;
@@ -20,7 +20,7 @@ use axum::extract::{DefaultBodyLimit, FromRequestParts, Request};
 use axum::http::header::{AUTHORIZATION, CONTENT_TYPE};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, HeaderValue, Method};
-use axum::routing::{any, delete, get, post};
+use axum::routing::{delete, get, post};
 use axum::serve::ListenerExt;
 use axum::Router;
 use governor::{DefaultKeyedRateLimiter, Quota, RateLimiter};
@@ -37,11 +37,11 @@ use hub::Hub;
 use crate::auth;
 use crate::config::{Config, ConfigError, IpNet, Signup};
 use crate::ids;
-use crate::repo::{Authenticated, Repo, RepoError, User};
-use crate::wire::{self, Features, Identity, TernInfo};
+use crate::repo::{Authenticated, Repo, RepoError};
+use crate::wire::{self, Features};
 
-/// Features this build implements. `/api/me` advertises a feature only when it is also
-/// enabled in the config. Tracking arrives in B2-T, sharing in B2-S.
+/// Features this build implements. `/tern/v1/server` and `/tern/v1/me` advertise a feature
+/// only when it is also enabled in the config. Tracking arrives in B2-T, sharing in B2-S.
 pub const IMPLEMENTED_FEATURES: Features = Features {
     tracking: false,
     sharing: false,
@@ -145,27 +145,6 @@ impl AppState {
     {
         let repo = self.0.repo.clone();
         Ok(tokio::task::spawn_blocking(move || f(repo.as_ref())).await??)
-    }
-
-    /// The identity JSON for `user`, with `token` for `/onboarding` and without for `/api/me`.
-    pub fn identity(&self, user: &User, token: Option<String>) -> Identity {
-        Identity {
-            id: user.id.clone(),
-            token,
-            first_name: user.first_name.clone(),
-            last_name: user.last_name.clone(),
-            email_address: user.email.clone(),
-            created_at: ids::format_created_at(user.created_at),
-            stripe_plan: wire::STRIPE_PLAN.to_owned(),
-            stripe_plan_effective: wire::STRIPE_PLAN.to_owned(),
-            feature_usage: Default::default(),
-            tern: Some(TernInfo {
-                server_id: self.0.server_id.clone(),
-                public_url: self.0.public_url.clone(),
-                tracking_ns: user.tracking_ns.clone(),
-                features: self.0.features,
-            }),
-        }
     }
 
     /// The client's address: the peer, or for a trusted proxy the nearest `X-Forwarded-For`
@@ -332,14 +311,10 @@ fn trace_layer() -> TraceLayer<
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/ping", get(api::ping))
-        .route("/api/me", get(api::me))
-        .route("/api/feature_usage_event", post(api::feature_usage_event))
-        .route("/api/resolve-dav-hosts", any(api::not_found))
-        .route("/api/login-link", any(api::not_found))
-        .route("/api/newsletter/{*rest}", any(api::not_found))
-        .route("/api/translate", any(api::not_found))
-        .route("/api/grammar/check", any(api::not_found))
-        .route("/api/info-for-email-v2/{*rest}", any(api::not_found))
+        .route("/tern/v1/server", get(api::server_info))
+        .route("/tern/v1/login", get(login::form).post(login::submit))
+        .route("/tern/v1/me", get(api::me))
+        .route("/tern/v1/tokens/current", delete(api::revoke_current_token))
         .route("/tern/v1/accounts/{aid}", delete(api::delete_account))
         .route(
             "/metadata/{aid}/{object_id}/{plugin_id}",
@@ -356,11 +331,6 @@ pub fn router(state: AppState) -> Router {
             "/tern/v1/claim/{aid}/{object_id}/{plugin_id}/{expiration}",
             post(metadata::claim),
         )
-        .route(
-            "/onboarding",
-            get(onboarding::form).post(onboarding::submit),
-        )
-        .route("/onboarding/skip", get(onboarding::skip))
         .fallback(api::not_found)
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
         .layer(trace_layer())

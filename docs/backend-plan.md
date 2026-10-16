@@ -16,9 +16,10 @@ engine. Desktop paths are relative to `apps/desktop/app/`.
 | # | Decision | Consequence for the backend |
 |---|---|---|
 | D2 | Every Pro feature stays, with no sign-in requirement | Snooze, send-later and reminders must work with no backend at all. The backend adds multi-device sync, tracking and sharing; it never gates a feature. |
-| D3 | Metadata is local only; multi-device sync is out of scope; remote sync sits behind `MetadataBackend`; nothing calls `*.getmailspring.com` | **Changed.** Multi-device metadata sync is the core of this plan. `LocalOnly` stays the default when no server is configured. Update D3 in the engine plan when B1-E lands, together with the section 3 change in O7. |
-| D10, D12 | One monorepo, one Cargo workspace; the backend reuses engine crates (ids, metadata models) | **Changed.** The backend reuses no engine crate: it has its own schema and never computes ids (3.1). It starts in its own workspace and joins the root one in B1-E (6.2). Update D12 in the engine plan at the same time. |
+| D3 | Metadata is local only; multi-device sync is out of scope; remote sync sits behind `MetadataBackend`; nothing calls `*.getmailspring.com` | **Changed.** Multi-device metadata sync is the core of this plan. `LocalOnly` stays the default when no server is configured. D3 and section 3 of the engine plan were updated in B1-E (O7). |
+| D10, D12 | One monorepo, one Cargo workspace; the backend reuses engine crates (ids, metadata models) | **Changed.** The backend reuses no engine crate: it has its own schema and never computes ids (3.1). It joined the root workspace in B1-E; D12 in the engine plan was updated then. |
 | D11 | Everything ships under GPL-3.0-only | The backend and the wire crate are written from scratch and are MIT (O6). The engine and desktop stay GPL-3.0-only. |
+| — | Mailspring ID removed from the desktop (4120f4351, 27f713bf6): no identity store, no sign-in, engines get a `null` identity line | **Changed (2026-10-16).** No Mailspring ID compatibility layer. Tern-native login and a Tern server object on the engine's identity line (3.4, 4.1). Only the metadata protocol stays Mailspring-compatible, for the C++ oracle. |
 
 ## 1. Scope
 
@@ -28,32 +29,28 @@ replacement. **Later**: wanted, not in v1.
 
 | Item | Treatment | Why |
 |---|---|---|
-| Plugin identity gate (`src/package-manager.ts:133`) | Client | Drop `isIdentityRequired` from thread-snooze, send-reminders and activity; keep it on open-tracking and link-tracking. The other gated plugins activate live at sign-in (`package-manager.ts:55`), so B1-C handles each of them first (rows below). |
-| Mailspring ID sign-in webview (`onboarding/lib/page-authenticate.tsx`) | Backend + client | The backend serves a compatible `/onboarding` page (3.4). The client stops forcing the page on first run; it is reached from Preferences. |
-| `/api/me` refresh and poll | Backend | How the client learns the identity and server features, and how it notices a revoked token (4.2). |
-| Feature quotas, `/api/feature_usage_event` | Dropped | No plans or quotas. The backend still answers the POST with 204: `markUsed` queues `SendFeatureUsageEventTask` even when `featureUsage` is `{}` (`feature-usage-store.tsx:128-139`), and C++ runs it. |
-| Pro checks and upsell (`hasProFeatures`, `page-initial-subscription.tsx`, please-subscribe notif) | Client | `hasProFeatures()` returns true; remove the subscription page and notification. |
-| `/api/login-link`, `/payment`, `/dashboard` | Dropped | Billing only. |
-| Login-link rewriting of links in emails (`src/components/evented-iframe.tsx:226-240`) | Client | Remove: it turns any link under the identity server into a single-sign-on call. |
+| Plugin identity gate, Pro checks and upsell, login-link rewriting | Done (client) | Removed with Mailspring ID (4120f4351, 27f713bf6). Server features are disabled with a tooltip until a server is connected (`docs/pro-features-backend.md`). |
+| Sign-in (was the Mailspring ID webview and `/api/me`) | Backend + client | Tern login against a user-configured server URL, one device token per install (3.4). `GET /tern/v1/me` replaces `/api/me`. |
+| Feature quotas, `/api/feature_usage_event`, `/api/login-link`, `/payment`, `/dashboard` | Dropped | No plans or quotas; the desktop no longer queues `SendFeatureUsageEventTask`. |
 | Open tracking | Backend, new Tern URL format | Needs a public host that writes events into metadata. Mailspring's `/o/<token>.png` pixels point at `link.getmailspring.com` and can never reach a Tern server, so the format is replaced (3.6). |
 | Link tracking | Backend, new Tern URL format | Same, plus a safe redirect. |
 | Metadata push, pull, delta stream | Backend | The core of the server. v1 carries message metadata (tracking state) and, with the thread anchor in B1-E, thread metadata (snooze, reminders). Send-later never syncs: it lives on drafts, which are local-only (O1). |
-| `identity-refresh-needed` backend event | Backend | Sent when the identity or server feature set changes, so the client re-fetches `/api/me`. |
-| Thread sharing (`/api/save-public-asset`, public viewer) | Backend, phase B2 | Needs upload, public storage and a viewer page. Until B2-S, B1-C gates the plugin on `tern.features.sharing`; it otherwise uploads to a missing endpoint and builds `shared.getmailspring.com` URLs. |
+| `identity-refresh-needed` backend event | Backend | Sent when the user's profile or the server feature set changes, so the client re-fetches `/tern/v1/me`. |
+| Thread sharing (`/api/save-public-asset`, public viewer) | Backend, phase B2 | Needs upload, public storage and a viewer page. Disabled with a tooltip today; B2-S enables it when `features.sharing` is on. |
 | Activity report sharing (`/api/share-static-page`) | Backend, phase B2 | Same storage as sharing. |
 | Signature photo upload | Backend, phase B2 | Same storage. The URL is baked into delivered mail, so it must stay up. |
 | Company logo (`logo.getmailspring.com`) | Dropped | No free logo service to proxy. The client removes the option; existing URL entry still works. |
 | Signature social icons (`www.getmailspring.com/signature-assets/*.gif`) | Backend static files, phase B2; client fallback | Data URIs are blocked by many mail clients, so the icons need a host. Without a server the client renders text links. The GIFs need Tern-owned replacements. |
-| Translation (`/api/translate`) | Client, in B1-C | Auto-translate is on once `hasProFeatures` is true, so with an identity it calls the backend's 404. Gate the plugin on a user-configured LibreTranslate URL (`{q, source:"auto", target, format:"html"}` → `{translatedText}`), with the adapter in `translation/lib/service.ts`. |
-| Contact enrichment (`/api/info-for-email-v2`) | Dropped, in B1-C | No free data source. Disable the participant-profile plugin before sign-in ships. |
-| Grammar check (`/api/grammar/check`) | Client, in B1-C | The response is already LanguageTool's `/v2/check`. Call a user-configured LanguageTool URL directly (form-encoded `text`, `language`); hide the toggle when none is set. Must land before sign-in is offered. |
+| Translation (`/api/translate`) | Client, in B1-C | Disabled today. Enable it on a user-configured LibreTranslate URL (`{q, source:"auto", target, format:"html"}` → `{translatedText}`), with the adapter in `translation/lib/service.ts`. |
+| Contact enrichment (`/api/info-for-email-v2`) | Dropped | No free data source; the plugin makes no lookups (27f713bf6). |
+| Grammar check (`/api/grammar/check`) | Client, in B1-C | Disabled today. The response is already LanguageTool's `/v2/check`; call a user-configured LanguageTool URL directly (form-encoded `text`, `language`). |
 | Newsletter opt-in | Dropped | |
 | Gmail / O365 OAuth | Client | Tern's own Google and Azure app registrations; the loopback server shows its own "finished" page instead of redirecting to `id.getmailspring.com/oauth/finished`. |
 | Auto-update (`updates.getmailspring.com`) | Client now; Tern feed later | Disable first: a Tern build can install Mailspring over itself today. A later feed can come from GitHub releases and is not this server's job. |
 | Native crash reporter (`id.getmailspring.com/report-crash`) | Client | Disable. |
 | Sentry DSN (Mailspring's project) | Client | Disable, or a Tern DSN configured at build time. |
-| Engine identity input (`--identity`, stdin) | Engine | Selects the HTTP backend in the Rust engine (4.1). The desktop gives C++ `null` (O7). |
-| `/api/resolve-dav-hosts` | Done in the engine | Rust resolves SRV locally. The backend answers 404, which the C++ engine reads as "no DAV, skip". |
+| Engine identity input (`--identity`, stdin) | Engine | Carries the Tern server object that selects the HTTP backend in the Rust engine (4.1). C++ keeps getting `null` (O7). |
+| `/api/resolve-dav-hosts` | Done in the engine | Rust resolves SRV locally. C++ only calls it with an identity (harness oracle runs), and reads the backend's default 404 as "no DAV, skip". |
 | `/ping` | Backend | One line; also the container health check. |
 | `@getmailspring.com` Message-IDs (`src/flux/stores/draft-factory.ts:66`) | Client | Use the sender's domain. |
 | "Sent from Mailspring" signature, help links, `remove-tracking-pixels` host patterns | Client | Branding. |
@@ -62,7 +59,7 @@ replacement. **Later**: wanted, not in v1.
 
 What v1 of the backend is, given the recommendations in section 2: accounts and device tokens,
 the metadata protocol with the Tern additions (backfill, claims, the thread anchor echo), Tern
-open and link tracking, `/api/me`, `/onboarding`, `/ping` and the compatibility stubs. Multi-device
+open and link tracking, the Tern login and `/tern/v1/me` (3.4), and `/ping`. Multi-device
 in v1 means tracking state and, once B1-E's thread anchor lands, snooze and reminders; it never
 covers send-later. Sharing and asset hosting follow in B2.
 
@@ -71,13 +68,13 @@ covers send-later. Sharing and asset hosting follow in B2.
 | # | Question | Recommendation | Reason |
 |---|---|---|---|
 | O1 | Features in v1 | Metadata sync and Tern open/link tracking in v1, with the thread anchor (4.1) in B1-E so snooze and reminders sync. Thread sharing, activity sharing and signature assets in B2, same release if they are ready. Translation, grammar and enrichment never in the backend. Send-later stays single-device. | Without the anchor, thread metadata parks in `DetatchedPluginMetadata` on the second device for most threads (7), and v1 multi-device would only carry tracking state, which only the sending device writes anyway. The anchor is wire-compatible and small. Sharing needs storage, a viewer and HTML sanitizing, which roughly doubles the surface. |
-| O2 | Wire compatibility with the Mailspring ID API, or a new API | Compatible for the identity, `/api/me`, `/onboarding` and the metadata protocol: same paths, auth, bodies and stream framing. Tracking uses a new Tern URL format (3.6). Tern-only endpoints live under `/tern/v1/`. | The engine trait, the C++ engine and the client speak the metadata protocol, so compatibility there lets the C++ engine act as the backend's oracle, and lets the unmodified desktop in `env=development` (which maps the id host to `http://localhost:5101`) sign in against a local backend. Tracking URLs have no such constraint: every one already delivered points at `link.getmailspring.com`, and 4.2 rewrites `PLUGIN_URL` anyway. |
-| O3 | Auth and identity | Multi-user data model; single-admin by default. Users are created with `tern-backend user add`; open signup is a config switch, off by default. Login is email + password (argon2id) on `/onboarding`, which mints one revocable token per device and returns it in `#identity-result`. The engine gets the token as it does today, in the identity JSON on stdin. | Matches the client's existing flow (webview → identity JSON → keychain → engine stdin), so the client needs no new sign-in UI. Per-device tokens make a lost laptop revocable. Pasting raw tokens is clumsier than a password and gives nothing back. |
+| O2 | Wire compatibility with the Mailspring ID API, or a new API | **Decided (2026-10-16).** Compatible for the metadata protocol only: same paths, Basic auth, bodies and stream framing. Login, server info and every other Tern endpoint live under `/tern/v1/`; tracking uses a new URL format (3.6). | The C++ engine speaks the metadata protocol, so compatibility there keeps it as the backend's oracle in the harness. The desktop no longer has a Mailspring ID client, so identity compatibility buys nothing. |
+| O3 | Auth and identity | **Decided (2026-10-16).** Multi-user data model; single-admin by default. Users are created with `tern-backend user add`; open signup is a config switch, off by default. The user enters a server URL in Tern; the desktop opens the server's login page in its own window, and the result page returns one revocable token per device in its body (3.4). The token lives in the keyset; the engine gets it in the Tern server object on stdin (4.1). | Reuses B0's form, rate limits and token minting. The token never appears in a URL, a redirect or a log. A device-code flow needs a new table, polling and a code page; it is the later path for a CLI and fits the same tokens. |
 | O4 | Storage | SQLite (rusqlite `bundled`, WAL) in v1, behind a `Repo` trait. Postgres only if someone runs a large shared instance. | One file to back up, same crate the engine uses. sqlx's SQLite driver would pull a second `libsqlite3-sys` and collide with rusqlite on `links = "sqlite3"`; a later Postgres backend should use `tokio-postgres`. |
-| O5 | Deployment | One binary, `tern-backend serve`, plain HTTP on `127.0.0.1:5101` behind a TLS reverse proxy (Caddy or similar), plus a Docker image with `/data` as the only volume and `TERN_BIND=0.0.0.0:5101`. | No TLS stack to configure in-process, and no chance of pulling aws-lc-rs. Port 5101 is the client's development mapping (O2). |
+| O5 | Deployment | One binary, `tern-backend serve`, plain HTTP on `127.0.0.1:5101` behind a TLS reverse proxy (Caddy or similar), plus a Docker image with `/data` as the only volume and `TERN_BIND=0.0.0.0:5101`. | No TLS stack to configure in-process, and no chance of pulling aws-lc-rs. |
 | O6 | Licence | **Decided (2026-10-15): MIT** for `apps/backend` and `crates/ms-wire`. No dependency on GPL-derived crates; permissive deps only. No `/tern/v1/source` endpoint. | The user wants new code permissive. The backend is a separate program over HTTP and reimplements an interface, so it is not a derivative of the GPL code. |
-| O7 | Engine switch for the HTTP backend | Rust: use the HTTP backend when the identity is non-null and `IDENTITY_SERVER` is an `http(s)` URL whose host is not `*.getmailspring.com`; otherwise `LocalOnly`. Desktop: pass the server identity only when `core.sync.engine` is `rust`, and `--identity null` to C++. C++ stays a test oracle, driven by the harness. | The desktop already passes `IDENTITY_SERVER = rootURLForServer('identity')`. The pending desktop diff adds `core.sync.engine` with `cpp` as the default (`config-schema.ts`, `mailsync-process.ts`). Given a Tern identity, C++ `abort()`s on a revoked token, and the crash handler then marks the mail account `SYNC_STATE_AUTH_FAILED`; C++ also keeps the head-before-pages bug (7) and has none of the Tern additions. The harness keeps `--identity null` by default, so existing scenarios stay local. This changes plan section 3 ("accepted and ignored"); update it when B1-E lands. |
-| O8 | Public URL for tracking and shares | One `public_url` in server config, returned by `/api/me` as `tern.publicURL`. The client uses it for pixels, redirects and share links, falling back to the server URL. | Tracking and shares only work if recipients can reach the host; the API host may sit on a private network. |
+| O7 | Engine switch for the HTTP backend | **Decided (2026-10-16).** Rust: the HTTP backend when the identity line is a valid Tern server object (4.1); `null` or anything else stays `LocalOnly`. `IDENTITY_SERVER` is not read. Desktop: the server object only when the engine is `rust`; C++ always gets `null`. C++ stays a test oracle, driven by the harness with a Mailspring-shaped identity. | C++ `abort()`s on a revoked token, and the crash handler then marks the mail account `SYNC_STATE_AUTH_FAILED`; it also keeps the head-before-pages bug (7) and has none of the Tern additions. The harness keeps `--identity null` by default, so existing scenarios stay local. This changes plan section 3 ("accepted and ignored"); update it when B1-E lands. |
+| O8 | Public URL for tracking and shares | One `public_url` in server config, returned as `publicURL` by `GET /tern/v1/server` and `/tern/v1/me` (3.4). The client uses it for pixels, redirects and share links, falling back to the server URL. | Tracking and shares only work if recipients can reach the host; the API host may sit on a private network. |
 
 ## 3. Architecture
 
@@ -85,21 +82,22 @@ covers send-later. Sharing and asset hosting follow in B2.
 
 | Crate | Role | Depends on |
 |---|---|---|
-| `apps/backend` (`tern-backend`, licence per O6) | Bin + lib: HTTP server, repo, auth, tracking, sharing, CLI. Until B1-E it has its own `[workspace]` table, `Cargo.lock` and target dir. | `wire` module (below); no engine crate |
-| `tern_backend::wire` → `crates/ms-wire` (MIT) | Serde types for the wire protocol: metadata record, push body, stream line (`metadata` / `backend-event`), head response, backfill and claim bodies, identity JSON, the constants (heartbeat 5 s × 16 bytes, page size 500, low-speed 30 s, `v` max `u32::MAX`). Starts as a module of the backend; B1-E moves it to `crates/ms-wire` when the backend joins the root workspace. | serde, serde_json |
-| `ms-net` | Gets `HttpMetadataBackend` (4.1) on `ms-wire`, in B1-E. | |
+| `apps/backend` (`tern-backend`, licence per O6) | Bin + lib: HTTP server, repo, auth, tracking, sharing, CLI. A member of the root workspace since B1-E. `tern_backend::wire` re-exports `ms_wire`. | `ms-wire`; no engine crate, not even as a dev-dependency |
+| `crates/ms-wire` (MIT) | Serde types for the wire protocol: metadata record, push body, stream line (`metadata` / `backend-event`), head response, backfill and claim bodies, the login result, `/tern/v1/server` and `/tern/v1/me` bodies and the engine's Tern server object with its URL check (3.4, 4.1), the constants (heartbeat 5 s × 16 bytes, page size 500, low-speed 30 s, `v` max `u32::MAX`). | serde, serde_json |
+| `ms-net` | `HttpMetadataBackend` and its `Outbox` (4.1) on `ms-wire`. | |
 
 The backend does not compute message ids and has its own schema, so it depends on neither
 `ms-store` nor `ms-core`; converting a wire record to `ms_core::Metadata` is one function in
 ms-net. The point of `ms-wire` is that the engine and server cannot drift on the wire format,
 as `packages/` does for client protocol types.
 
-Why a separate workspace first: the root `members = ["apps/engine", "crates/*"]`
-(`Cargo.toml:4`) would pick up a half-written `crates/ms-wire` the moment the directory exists
-and break the engine workflow's cargo runs, and adding the backend to the root would touch
-`Cargo.toml` and `Cargo.lock`, which that workflow owns. The cost is that the backend cannot use
-`workspace = true` dependencies or the root `[profile.release]` until B1-E; it pins the same
-versions by hand.
+The backend started in its own workspace so it could not break the engine workflow's cargo
+runs; B1-E joined it to the root (`members = ["apps/engine", "apps/backend", "crates/*"]`, one
+`Cargo.lock`, shared versions through `workspace = true`). Licence checks: the root `deny.toml`
+covers the whole workspace with the GPL policy; `cargo deny --manifest-path
+apps/backend/Cargo.toml check` checks tern-backend's normal dependencies alone against
+`apps/backend/deny.toml` (permissive only, no TLS stack or HTTP client, no `ms-*` crate). The
+Docker image builds from the repo root (`docker build -f apps/backend/Dockerfile .`).
 
 Backend dependencies (all MIT or MIT/Apache; confirm current versions and run `cargo deny` in
 B0, as plan 4.5 did):
@@ -152,7 +150,7 @@ backend's normal dependencies.
 
 | Table | Columns | Notes |
 |---|---|---|
-| `users` | `id` (random 24 chars), `email` unique, `first_name`, `last_name`, `password_hash`, `tracking_ns` (random 128-bit, base64url) unique, `created_at`, `disabled_at` | `id` is `identity.id`. `tracking_ns` scopes tracking URLs (3.6). |
+| `users` | `id` (random 24 chars), `email` unique, `first_name`, `last_name`, `password_hash`, `tracking_ns` (random 128-bit, base64url) unique, `created_at`, `disabled_at` | `id` is the `userId` of the login result and the engine's server object. `tracking_ns` scopes tracking URLs (3.6). |
 | `tokens` | `id`, `user_id`, `hash` (sha256) unique, `name`, `created_at`, `last_used_at`, `revoked_at` | Format `tern_` + base64url(32 random bytes). Only the hash is stored. |
 | `accounts` | `user_id`, `aid`, `created_at`; PK `(user_id, aid)` | Created on first use; at most 50 per user. `aid` is the client's 8-hex id (`idForAccount`), not unique across users. |
 | `metadata` | `id` (INTEGER PRIMARY KEY), `user_id`, `aid`, `object_type`, `object_id`, `plugin_id`, `v`, `value` (JSON text), `header_message_id`, `tracking_id`, `seq`, `created_at`, `updated_at`; UNIQUE `(user_id, aid, object_type, object_id, plugin_id)`, the upsert target | `id` aliases the rowid: SQLite only keeps rowids stable across `VACUUM` and `VACUUM INTO` (backups) when an INTEGER PRIMARY KEY aliases them, and pages are ordered by it (3.5). One row per plugin value, including tombstones (`{}` / `[]`). `header_message_id` is the last non-null pushed (thread anchor, 4.1). `tracking_id` is copied from `value.trackingId` for `open-tracking` / `link-tracking`. Indexes `(user_id, aid, seq)` and `(user_id, plugin_id, tracking_id)`. |
@@ -165,32 +163,43 @@ All writes to `metadata` are `INSERT … ON CONFLICT DO UPDATE`, never `INSERT O
 replace deletes and reinserts, giving the row a new rowid, which moves it across page offsets
 (3.5).
 
-### 3.4 Identity, auth and the compatibility endpoints
+### 3.4 Auth, login and server info
 
-- **Auth on every API call:** `Authorization: Basic base64("<token>:")` (what `makeRequest` and
-  the engine send); `Bearer <token>` also accepted. 401 for unknown, revoked or disabled.
-- **`GET /onboarding?version=&skipSupported=true`:** a server-rendered login form. On success
-  the response page contains `<div id="identity-result">base64(identity JSON)</div>`, which
-  `page-authenticate.tsx` reads on `did-finish-load`, and carries `Cache-Control: no-store`
-  because it holds the token. With `skipSupported` a Skip link renders `{"skipped":true}`. Each
-  login creates a device token named from the User-Agent.
-- **`GET /api/me`:** the identity without `token`:
-  `{id, firstName, lastName, emailAddress, createdAt ("%Y-%m-%dT%H:%M:%S.000Z"), stripePlan:"Tern", stripePlanEffective:"Tern", featureUsage:{}, tern:{serverId, publicURL, trackingNS, features:{tracking, sharing}}}`.
-  `createdAt` is the user's creation time and always present: the C++ engine throws at startup
-  without it, and a date after 2018-02-15 keeps C++ on id schema 1 (`MailUtils::setBaseIDVersion`).
-  `serverId` is random per instance, created at `migrate`; the engine binds cursors to it (4.1).
-  A non-`Basic` plan makes `hasProFeatures()` true in an unmodified client; empty `featureUsage`
-  makes every feature unlimited.
-- **Stubs:** `POST /api/feature_usage_event` → 204 (still queued by `markUsed`, section 1).
-  `GET /ping` → 200 `{}`. `/api/resolve-dav-hosts`, `/api/login-link`, `/api/newsletter/*`,
-  `/api/translate`, `/api/grammar/check`, `/api/info-for-email-v2/*` → 404.
+- **Auth on every API call:** `Authorization: Basic base64("<token>:")` (what C++ sends; the
+  Rust engine sends the same); `Bearer <token>` also accepted. 401 for unknown, revoked or
+  disabled.
+- **`GET /tern/v1/server`** (no auth): `{"serverId", "version", "publicURL", "signup":
+  "open"|"closed", "features": {"tracking", "sharing"}}`. The desktop calls it when the user
+  enters a URL, to check it is a Tern server before opening the login window. `serverId` is
+  random per instance, created at `migrate` and changed by `backup` / `rotate-server-id` (3.2).
+- **Login:** `GET /tern/v1/login?device=<name>` renders B0's form (email, password; sign-up
+  when open); it posts form-encoded `email`, `password`, `action`, `device` to
+  `POST /tern/v1/login`. Success is a `200` page, never a redirect, with
+  `<div id="tern-login-result" hidden>base64url(JSON)</div>` (no padding; the JSON is ASCII,
+  non-ASCII as `\u` escapes) and JSON
+  `{"type":"tern-login","version":1,"token":"tern_…","userId":"…","serverId":"…","email":"…"}`.
+  Each login mints a device token named from `device` (at most 64 chars) or the User-Agent.
+  Form and result pages carry `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and
+  `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; form-action 'self'`;
+  no scripts and no third-party resources. Rate limits and argon2 permits as B0 (5).
+- **`GET /tern/v1/me`** (auth): `{"userId", "email", "firstName", "lastName", "trackingNS",
+  "serverId", "publicURL", "features": {"tracking", "sharing"}}`. The desktop reads it after
+  login and on `ProcessIdentityRefreshNeeded`; the Rust engine reads it before each stream
+  connect (4.1). 401 means the token is gone.
+- **`DELETE /tern/v1/tokens/current`** (auth): revokes the calling token, `204`. Sign-out.
+- **`GET /ping`** → 200 `{}`, the container health check.
 - **Account removal:** `DELETE /tern/v1/accounts/<aid>` deletes the account's metadata, events
   and claims, and closes its streams.
-- **CORS:** the renderer calls with `fetch`, `credentials: 'include'` and an `Authorization`
-  header; there is no `webSecurity` override and `main.js:419` only rewrites CSP, so Electron
-  enforces CORS. B0 adds a `tower-http` CORS layer unconditionally: echo `Origin` only for
-  `file://` and `null` (never `*`), allow credentials and the `Authorization` and `Content-Type`
-  headers, and answer `OPTIONS` preflights.
+- **Dead after the switch** (removed in B1-E): `/onboarding`, `/onboarding/skip`, `/api/me`,
+  `/api/feature_usage_event`, and the 404 stubs for `/api/resolve-dav-hosts`,
+  `/api/login-link`, `/api/newsletter/*`, `/api/translate`, `/api/grammar/check`,
+  `/api/info-for-email-v2/*` (the fallback 404 covers them). With them go `wire::Identity`,
+  `STRIPE_PLAN` and the `createdAt` formatting. B0's users, tokens, CLI, auth extractor, login
+  limits and CORS layer stay.
+- **CORS:** the renderer calls with `fetch` and an `Authorization` header; there is no
+  `webSecurity` override and `main.js:419` only rewrites CSP, so Electron enforces CORS. The
+  `tower-http` CORS layer echoes `Origin` only for `file://` and `null` (never `*`), allows credentials
+  and the `Authorization` and `Content-Type` headers, and answers `OPTIONS` preflights.
 
 ### 3.5 Metadata sync protocol
 
@@ -302,7 +311,7 @@ client pushes after the send as today:
 - `open-tracking`: `{trackingId, recipients: {<rid>: <email>}, open_count, open_data}`.
 - `link-tracking`: `{trackingId, recipients, links: [{url, click_count, click_data}]}`.
 
-URLs, with `<ns>` the sender's `tern.trackingNS` from `/api/me`:
+URLs, with `<ns>` the sender's `trackingNS` from `/tern/v1/me`:
 - pixel `<public_url>/t/o/<ns>/<trackingId>.<rid>.png`;
 - link `<public_url>/t/l/<ns>/<trackingId>/<i>.<rid>?u=<url-encoded original>`.
 
@@ -349,7 +358,9 @@ read `open_data` / `click_data` with an email `recipient` as they do today.
 
 ### 3.7 Sharing and assets (B2)
 
-- `POST /api/save-public-asset` (multipart `filename`, `file`) → `{link}`. The client's
+- Paths are Tern-only (O2); the desktop's Mailspring upload code is gone, so nothing needs the
+  old `/api/save-public-asset` and `/api/share-static-page` paths.
+- `POST /tern/v1/assets` (multipart `filename`, `file`) → `{link}`. The client's
   `filename` (`<fileId>/<displayName>`, `sig-<id>-<rand>.png`, or a thread key) is kept as
   `client_key` and `display_name` only; storage paths come from the sha256. Re-uploading a live
   `client_key` replaces the content and keeps the slug, which is how the client updates a shared
@@ -364,7 +375,7 @@ read `open_data` / `click_data` with an email `recipient` as they do today.
 - Links: `<public_url>/a/<slug>/<display_name>` for files and signatures,
   `<public_url>/thread/<slug>` for threads (rendered by the viewer), `<public_url>/p/<slug>`
   for activity pages.
-- `POST /api/share-static-page` `{key, html}` → `{link}`.
+- `POST /tern/v1/pages` `{key, html}` → `{link}`.
 - Thread viewer: server-rendered from the stored fields, bodies through `ammonia`.
 - Static signature icons at `/static/signature/<name>.gif`.
 - Signature images: the client sets `width` / `height` on the `<img>` instead of Mailspring's
@@ -372,10 +383,10 @@ read `open_data` / `click_data` with an email `recipient` as they do today.
 - Limits: 25 MiB per file, 2 MiB per page, 1 GiB per user (config). A daily job deletes
   `kind = file` assets no longer referenced by any of the user's live shared threads (Mailspring
   never deleted them). It never touches `signature` (referenced from delivered mail) or `page`.
-- The client builds the share URL itself (`thread-sharing/lib/main.tsx:41-49`,
-  `shared.getmailspring.com/thread/<identity.id>/<key>`). Change it to store the returned
-  `link` as `url` in the thread-sharing metadata and read it from there, so other devices get
-  it too and the URL carries the server's random slug, not the guessable `<threadId>-<ts>` key.
+- The client stores the returned `link` as `url` in the thread-sharing metadata and reads it
+  from there, so other devices get it too and the URL carries the server's random slug, not
+  the guessable `<threadId>-<ts>` key. (Mailspring built `shared.getmailspring.com/thread/<identity.id>/<key>`
+  itself; that code is gone since 27f713bf6.)
 
 ### 3.8 Expiration claims (Tern-only)
 
@@ -391,9 +402,22 @@ anyway (D2: no feature depends on the server), accepting a possible duplicate.
 
 ### 4.1 Engine (`crates/ms-net`, `crates/ms-sync`, `crates/ms-store`, `apps/engine/src/modes.rs`)
 
-- **`HttpMetadataBackend { base_url, token, server_id, push_client, stream_client, outbox }`**
-  in ms-net on `ms-wire`; the trait does not change, because credentials go into the
-  constructor.
+- **Tern server object.** The identity line the engine reads after the account line (stdin;
+  `--identity` takes the same JSON, for tests only, since argv is visible to other users):
+  `{"type":"tern-server","version":1,"url":"https://tern.example.com","token":"tern_…","userId":"…","serverId":"…"}`,
+  as `ms_wire::TernServer`, whose `Debug` redacts `token`. `url` is the base URL the user
+  configured: scheme, host, optional port and path prefix; no trailing slash, query, fragment or
+  userinfo; `https`, or `http` only for a loopback host; never `*.getmailspring.com`.
+  - `null`: `LocalOnly`, unchanged.
+  - `type` `tern-server` with a bad `url`, an empty field or another `version`: log an error
+    naming the field (never the token), then `LocalOnly`. Mail sync carries on.
+  - Any other object (a Mailspring-shaped identity): validated as today
+    (`ErrorIdentityMissingFields`, `Invalid Identity JSON`), then ignored: `LocalOnly`.
+- **`HttpMetadataBackend { server: TernServer, push_client, stream_client, outbox }`**
+  in ms-net on `ms-wire`; credentials and the account id go into the constructor. The trait
+  gained three defaulted methods the `metadata` thread calls before each pull: `binding()`
+  (the `/tern/v1/me` pair), `rebind(local)` (clear the outbox, queue backfill) and
+  `drain_outbox()`; `MetadataDelta` gained `AnchoredThreadMetadata(Metadata, hmid)`.
   - `push_client` is `HttpClient::new()`. `stream_client` is a separate blocking reqwest client
     with `http1_only()` (the workspace reqwest enables `http2`, which would negotiate h2 through
     Caddy; C++ forces HTTP/1.1 in `MetadataWorker.cpp:131`) and `timeout(30 s)`. In blocking
@@ -402,20 +426,31 @@ anyway (D2: no feature depends on the server), accepting a possible duplicate.
     per-read timeout matching curl's low-speed abort, not a total one. The stream must be read
     through `Read`, never `.text()`/`.bytes()`, and must not use `RequestBuilder::timeout`,
     which is total. If a test shows otherwise, add a watchdog that drops the response.
-  - `push`: the POST in 3.5, Basic auth. 401/403 is non-retryable and fails the task, as in C++.
-    On a retryable error (connect, timeout, 429, 5xx) it writes the record to the outbox and
-    returns success, so the task semantics stay as they are.
-  - **Outbox:** a `MetadataOutbox` table in the engine store (account, object type and id,
-    plugin, version, value, header Message-ID; latest per key wins). The metadata thread drains
-    it on every stream (re)connect, before opening the stream.
+  - `push`: the POST in 3.5, Basic auth. On a retryable error (connect, timeout, 429, 5xx) or
+    401/403 it writes the record to the outbox and returns success, so the task semantics stay
+    as they are.
+  - **Outbox:** a `MetadataOutbox` table in `edgehill.db` (account, object type and id,
+    plugin, version, value, header Message-ID, backfill flag; latest per key wins), created by
+    `ms_net::Outbox` on first use so a migrated database keeps the C++ V12 schema. Ids are
+    AUTOINCREMENT so removing a sent entry never drops a newer push for the same key. A push
+    that reaches the server deletes what is queued for its key, and pushes and drained entries
+    are sent one at a time under a lock, so an older queued value never lands after a newer one
+    (the server keeps the last write). The metadata thread drains it on every stream
+    (re)connect, after the binding check and before opening the stream; a value queued while a
+    stream is open waits for the next connect (the server ends streams after an hour).
   - **Backfill:** on the first pull for an account against this server, queue every
     `ModelPluginMetadata` row of the account into the outbox flagged as backfill and send them
     through `/tern/v1/backfill/<aid>` (3.5). This covers metadata created under `LocalOnly` and
     metadata brought in by `import-legacy`. Records listed in `rejected` are dropped from the
     outbox, not retried.
-  - **Cursor binding:** the cursor is stored with the identity's `tern.serverId` and
-    `identity.id`. A missing or different pair means "first pull": discard the cursor,
-    backfill, stream from `0`. The user matters because seq is global and only filtered per
+  - **Cursor binding:** before each stream connect the metadata thread calls
+    `GET /tern/v1/me` (3.4) and binds to the `(serverId, userId)` it returns, stored in
+    `_State` as `metadata-binding-<aid>` = `"<serverId>:<userId>"` next to `cursor-<aid>`. A
+    missing or different pair means "first pull": discard the cursor, clear the outbox (its
+    records were meant for another server or user; the backfill re-sends local state), backfill,
+    stream from `0`. If the pair differs from the server object's, the server's wins: log it and
+    emit `IdentityRefreshNeeded` once so the desktop updates its copy. The server id matters
+    because a restore rotates it (3.2). The user matters because seq is global and only filtered per
     user: after signing in as another user on the same server (or `user delete` and re-adding
     the user, which gives a new id), the old cursor would skip the new user's rows below it.
     `import-legacy` carries the C++ `cursor-<aid>` (`legacy_import.rs` header), which is a
@@ -425,8 +460,12 @@ anyway (D2: no feature depends on the server), accepting a possible duplicate.
   - `pull(Some(c))`: stream from `c`; for each line emit `Metadata` then `Cursor(c)`; ignore
     0–1 byte lines; log and skip bad JSON. Return the last cursor on a clean end. 429 and 5xx
     are retryable.
-  - 401/403 on the stream: emit `IdentityRefreshNeeded` once, then return a retryable error so
-    the worker backs off (3 s … 300 s). C++ aborts here.
+  - **401/403** on any call (`/tern/v1/me`, push, backfill, stream): emit
+    `IdentityRefreshNeeded` (`ProcessIdentityRefreshNeeded`) once and go dormant for the rest of
+    the process: no more requests, pushes go to the outbox, `pull` returns a retryable error
+    without a request so the worker backs off (3 s … 300 s). The desktop answers with a restart
+    (4.2); the outbox survives it and drains after a re-login to the same server and user. C++
+    aborts here.
   - The query string carries `p` and `cursor`, no `ih`.
   - `record_feature_usage` stays the no-op default.
 - **Thread anchor** (wire-compatible; C++ ignores extra fields):
@@ -437,44 +476,48 @@ anyway (D2: no feature depends on the server), accepting a possible duplicate.
     with that Message-ID to its `threadId`. With no such message yet, it parks the record under
     the `t:<hmid>…` pending key `import-legacy` already uses (`legacy_import.rs:80-95`), so the
     message's first save attaches it.
-- **`modes.rs`:** build the backend from `IDENTITY_SERVER` and `ctx.identity` per O7,
-  replacing the hard-coded `Arc::new(ms_net::LocalOnly)`. Log the choice through `ms_core::logmsg`.
+- **`modes.rs`:** parse the identity line as above and build the backend from it per O7,
+  replacing the hard-coded `Arc::new(ms_net::LocalOnly)`; `IDENTITY_SERVER` is not read.
+  `WorkerContext.identity` is unused today and can go. Log the choice (server host, never the
+  token) through `ms_core::logmsg`.
 - **Doc fixes** found in the sweep: `MetadataPush::model_class` is lowercase; the
   `MetadataWorker::cursor` doc says a reset clears the cursor, but it writes `"0"`.
 - Unchanged: workers, tasks and the expiration worker.
 
 ### 4.2 Client (`apps/desktop/app`)
 
-Needed for the backend:
-- `rootURLForServer('identity')` returns config `tern.serverURL`; empty means no server, and
-  `makeRequest` already refuses to run without an identity.
-- The identity is stored with the server URL it was issued by. On launch, and when
-  `tern.serverURL` changes, an identity whose URL does not match is dropped, so a carried-over
-  Mailspring `config.identity` is never polled against a Tern server.
-- Preferences: a "Tern server" pane (URL, Sign in → the existing `/onboarding` webview,
-  Sign out) replacing `preferences-identity.tsx`.
-- Restart the mailsync processes when the identity changes. Today the bridge only reads
-  `IdentityStore.identity()` when it spawns a client, and only logout relaunches the app.
-- Pass the identity to the engine only when `core.sync.engine` is `rust`; C++ gets `null` (O7).
-- Revocation: `fetchIdentity` swallows a 401 from `/api/me` (`identity-store.ts:242-267`), so
-  after a revoke the engine backs off forever and the user sees nothing. On 401, mark the server
-  signed out in the Tern server pane and restart the engines with identity `null`.
-- Plugins that activate at sign-in (section 1), all before sign-in is offered: disable
-  participant-profile; gate translation on a LibreTranslate URL; switch grammar to a LanguageTool
-  URL; gate thread-sharing on `tern.features.sharing`. Drop `isIdentityRequired` from
-  thread-snooze, send-reminders and activity; keep it on open-tracking and link-tracking.
-- Tracking: the composer extensions generate `trackingId`, `rid` and the `recipients` map, and
-  build the 3.6 URLs from `identity.tern.publicURL` and `identity.tern.trackingNS`; toggles
-  appear only when a server is connected.
+Needed for the backend (all B1-C):
+- **Server URL.** Preferences gets a "Tern server" section: URL field, Sign in, Sign out,
+  status. The URL is validated as in 4.1 (`https`, or `http` on loopback) and probed with
+  `GET /tern/v1/server` before Sign in is enabled.
+- **Login.** Sign in opens a `BrowserWindow` on `<url>/tern/v1/login?device=<hostname>` with
+  an in-memory session partition (no `persist:`), `sandbox`, no preload, no node integration.
+  On each `did-finish-load` whose origin is the server's, the main process reads
+  `#tern-login-result` with `executeJavaScript`, decodes it, checks `type`/`version`, closes the
+  window and clears the partition. Navigation outside the server's origin is blocked.
+- **Storage.** The token goes in the keyset under `tern-server-token`; config `tern.server`
+  holds `{url, userId, serverId, email}`, plus `trackingNS`, `publicURL` and `features` from
+  `GET /tern/v1/me` after login. Both stay out of logs and error reports (add the token to the
+  redaction in `mailsync-process.ts`). Mailspring's carried-over `identity` key is never read.
+- **Engines.** The bridge builds the 4.1 object from `tern.server` and the keyset and writes it
+  in place of `null` when the engine is `rust`; C++ always gets `null`. Sign in, sign out and a
+  URL change restart every mailsync process (the line is only written at spawn).
+- **Sign out** calls `DELETE /tern/v1/tokens/current` (best effort), deletes the keyset entry
+  and `tern.server` except `url`, and restarts the engines.
+- **Refresh and revocation.** On `ProcessIdentityRefreshNeeded`, and at launch, call
+  `GET /tern/v1/me`: on 200 update `tern.server`; on 401 sign out locally (no DELETE) and show
+  "signed out by the server" in the pane. Network errors change nothing.
+- **Plugins.** Server-backed features are disabled with a tooltip today
+  (`docs/pro-features-backend.md`). They turn on from `tern.server.features` once a server is
+  connected: tracking builds the 3.6 URLs from `publicURL` and `trackingNS` and generates
+  `trackingId`, `rid` and `recipients`; sharing in B2-S.
 - Snooze and send-reminders claim an expiration (3.8) before acting when a server is connected.
 - Thread sharing stores and reads the returned `link` (3.7).
 - Signature images get `width` / `height` attributes (3.7).
 
-Client-only, no server: the gate change and onboarding cleanup from section 1,
-`hasProFeatures()` true, removing the login-link rewriting in `evented-iframe.tsx`, cutting the
-updater, crash reporter and Sentry, Tern OAuth client ids, Message-ID domain, grammar via
-LanguageTool URL, branding strings. These touch files the engine workflow is editing (6.2), so
-they wait with the rest of B1-C.
+Client-only, no server: translation via a LibreTranslate URL and grammar via a LanguageTool URL
+(section 1), Tern OAuth client ids, Message-ID domain, branding strings. The updater, crash
+reporter and Sentry are being handled outside this plan.
 
 ## 5. Security and privacy
 
@@ -510,7 +553,7 @@ they wait with the rest of B1-C.
   are revocable per device. HTTPS is required
   for non-loopback public URLs (3.2). No cookies, so the uploaded HTML cannot ride a session.
   CORS allows only the app's `file://` / `null` origins (3.4). The login result page is
-  `no-store`.
+  `no-store`, and the token never appears in a URL or a redirect (3.4).
 - **Rate limits and sizes.** Authenticated: 20 req/s per token, burst 100. Public (`/t`, `/a`,
   `/thread`, `/p`): 10 req/s per IP, applied to recording for `/t` (the pixel is always
   returned). Body limits: 64 KiB metadata, 25 MiB uploads, 2 MiB pages. Accounts: 50 per user.
@@ -527,7 +570,10 @@ they wait with the rest of B1-C.
   tracking URL validation, redirect validation, cursor replay from `0`, tombstones in pages,
   rowid stability across updates, `v` clamping, `ns` scoping (another user's row with the same
   `trackingId` is never found), claims.
-- **Backend integration tests** (`apps/backend/tests`): start the server on an ephemeral port
+- **Backend integration tests** (`apps/backend/tests`): the login form and result page
+  (decode `#tern-login-result`, `no-store`, no token in any `Location`), `/tern/v1/server`,
+  `/tern/v1/me`, `DELETE /tern/v1/tokens/current`, and 404 for the dead paths in 3.4. Start the
+  server on an ephemeral port
   with a temp data dir, drive it with a plain HTTP client; streaming tests use paused tokio time
   for the 5 s heartbeat, the 1 h close, revocation and the 429 stream limit; a CORS preflight
   test.
@@ -539,10 +585,15 @@ they wait with the rest of B1-C.
   round-trip. `apps/engine/tests/metadata_backend.rs` gains a case with the HTTP backend.
 - **Harness** (`apps/engine/test`):
   - A `backend` fixture in `harness/servers/backend.py`. It runs `TERN_BACKEND_BIN` (like
-    `MAILSYNC_BIN`) and creates a user and token via the CLI.
+    `MAILSYNC_BIN`), creates a user and token via the CLI, takes `userId` from `user add` and
+    `serverId` from `GET /tern/v1/server`, and checks `GET /tern/v1/me` returns the same pair.
+    `backend.backup` / `backend.restore` follow the restore procedure in `docs/self-hosting.md`.
   - A `backend:` scenario key. Scenario YAML has no identity key today: `scenario.py` builds
     `MailsyncProcess` without `identity=` (`mailsync.py:204`). The key makes the scenario pass
-    the identity and set `IDENTITY_SERVER` to the fixture's URL.
+    `--identity`: the 4.1 Tern server object for Rust; for C++ a Mailspring-shaped
+    `{"id": userId, "emailAddress", "firstName": "", "lastName": "", "token", "createdAt": "2018-02-16T00:00:00.000Z"}`
+    with `IDENTITY_SERVER` set to the fixture's URL (C++ throws without `createdAt`; a date
+    after 2018-02-15 keeps it on id schema 1, `MailUtils::setBaseIDVersion`).
   - Scenario steps: `backend: push` (another device writes), `backend: get <url>` (a recipient
     hits a pixel or link), `backend: stop` / `start` (outage), `expect: backend_metadata`.
   - The engine only sends what the client gave it, so a scenario puts the 3.6 pixel and links
@@ -552,14 +603,20 @@ they wait with the rest of B1-C.
     `backend-push-during-outage` (outbox), `backend-backfill-local-metadata`,
     `backend-token-revoked` (expects `ProcessIdentityRefreshNeeded`, no abort),
     `backend-open-tracking`, `backend-link-tracking`, `backend-tracking-before-push`,
-    `backend-link-unknown-interstitial`.
-- **C++ oracle:** `backend-metadata-push`, `backend-metadata-from-other-device`,
+    `backend-link-unknown-interstitial`. Written so far (B1-H): `backend-metadata-push`,
+    `backend-push-during-outage`, `backend-token-revoked`, `backend-server-restored` (restore
+    from an older backup: new `serverId`, cursor discarded, backfill) and
+    `backend-identity-invalid` (plain `http` on a non-loopback host stays `LocalOnly`). Every
+    `backend:` scenario also checks that no device token reaches the engine's log or stderr.
+- **C++ oracle** (optional, not part of any gate: the desktop always gives C++ `null`; run with
+  `MAILSYNC_BIN` pointing at a C++ build): `backend-metadata-push`, `backend-metadata-from-other-device`,
   `backend-cursor-reset-replays`, `backend-stream-reconnect` and the tracking scenarios also run
   against the upstream C++ binary. It speaks the original protocol (head + pages + stream,
   `version: null`), so passing both engines is the wire-compatibility check. Not in the oracle
   set: `backend-token-revoked` (C++ `abort()`s), and the outbox, backfill and anchor scenarios
   (Tern additions C++ lacks).
-- **Desktop:** a spec for `rootURLForServer` config and the identity/server-URL binding; manual
+- **Desktop:** specs for URL validation, decoding the login result, the engine line per engine
+  kind, and sign-out on a 401 from `/tern/v1/me`; manual
   runs of sign-in, snooze across two machines, and a tracked send to a real mailbox.
 
 ### 6.2 Work breakdown
@@ -567,52 +624,45 @@ they wait with the rest of B1-C.
 Packages within a phase are independent. A phase starts when the packages it depends on have
 passed their gates.
 
-**Running next to the engine workflow.** B0, B1-M, the server side of B2-T, and B2-S live only
-in `apps/backend`, which has its own `[workspace]`, `Cargo.lock` and target dir until B1-E, so
-they touch neither the root manifest nor files the engine workflow edits. Everything else
-waits:
-- B1-E, B1-H and the client side of B2 touch `crates/ms-net`, `crates/ms-sync`,
-  `crates/ms-store`, `apps/engine`, `apps/engine/test` or `apps/desktop`, all being edited now.
-  Schedule them after the engine workflow, or hand them to it.
-- B1-C is blocked: the engine workflow has uncommitted edits to `mailsync-process.ts`,
-  `mailsync-bridge.ts`, `application.ts`, `mailspring-window.ts`, `config-schema.ts` and
-  `build.js`. It starts when those land, or goes to that workflow.
+**Scheduling (2026-10-16).** The engine workflow is done, so B1-E and B1-H can start now, in
+parallel. `apps/desktop` is off limits until B1-C is scheduled (another workflow is editing it),
+so nothing in B1-E or B1-H touches it. B1-E lands the 3.4 endpoints first, since B1-H's fixture
+reads `serverId` from `GET /tern/v1/server`.
 
-**B0 Foundation (serial, one agent).**
-- `apps/backend` crate with its own `[workspace]` table, MIT licence (O6), the `wire` module with the types and constants from 3.1, `cargo deny` passing. No
-  `crates/ms-wire` directory and no change to the root `Cargo.toml` or `Cargo.lock`.
-- Config, data dir, SQLite schema with migrations (upserts only), the `Repo` trait over rusqlite.
-- Users, tokens and CLI (including `user delete`); the auth extractor; the CORS layer; `/ping`,
-  `/api/me`, `/onboarding`, the stubs in 3.4, `DELETE /tern/v1/accounts/<aid>`.
-- Dockerfile (`TERN_BIND=0.0.0.0:5101`) and a `docs/self-hosting.md` stub with the proxy
-  settings from 3.2.
-- Gate: unit and integration tests, including one that GETs `/onboarding`, POSTs the login,
-  extracts `#identity-result`, base64-decodes it, and asserts `id`, `token`, `emailAddress` and
-  `createdAt` (after 2018-02-15), plus `Cache-Control: no-store` on the page. A run of the
-  unmodified desktop with `env=development` against `localhost:5101` is a manual,
-  non-blocking check.
+**B0 Foundation (done).** Crate, config, schema, repo, users, tokens and CLI, auth extractor,
+CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspring-compatible
+`/onboarding`, `/api/me` and stubs are replaced in B1-E (3.4).
 
 **B1 (parallel, after B0).**
-- **B1-M metadata server:** push with the version rule, backfill, head, pages with tombstones,
-  stream with heartbeats, watch fan-out, the 429 limit, 1 h close, revocation close, the claim
-  endpoint (3.8). Gate: integration tests from 6.1.
-- **B1-E engine backend** (after the engine workflow): move the wire module to `crates/ms-wire`
+- **B1-M metadata server (done):** push with the version rule, backfill, head, pages with
+  tombstones, stream with heartbeats, watch fan-out, the 429 limit, 1 h close, revocation
+  close, the claim endpoint (3.8).
+- **B1-E engine backend and Tern auth** (done): in `apps/backend`, the 3.4 endpoints
+  (`/tern/v1/server`, `/tern/v1/login`, `/tern/v1/me`, `DELETE /tern/v1/tokens/current`) and
+  removal of the dead ones; then move the wire module to `crates/ms-wire` (with `TernServer`)
   and add `apps/backend` to the root workspace in one change; `HttpMetadataBackend` with its
-  stream client, the outbox, backfill, cursor binding, the thread anchor, the O7 switch in
-  `modes.rs`, 401 and 429 handling, the doc fixes in 4.1; plan sections 0 (D3, D12) and 3
-  updated. Gate: the engine-against-server tests in `apps/backend/tests`; workspace
-  fmt/clippy/test; the existing harness suite unchanged (still `LocalOnly`).
-- **B1-H harness** (after the engine workflow): the `backend` fixture, the `backend:` scenario
-  key and step kinds. Gate: a smoke scenario where the Rust and C++ engines both push and
-  receive a snooze.
-- **B1-C client** (blocked, see above): server URL config and the identity binding, the
-  Preferences pane, restart on identity change, identity only to the Rust engine, 401 handling,
-  the plugin gating, expiration claims, and the client-only items in 4.2.
+  stream client, the outbox, backfill, the `(serverId, userId)` cursor binding, the thread
+  anchor, the identity-line parsing and O7 switch in `modes.rs`, 401/403 dormancy and 429
+  handling, the doc fixes in 4.1; plan sections 0 (D3, D12) and 3 updated. Gate: backend
+  integration tests (6.1), the engine-against-server tests in `apps/backend/tests`, a CLI test
+  for each identity-line case in 4.1; workspace fmt/clippy/test; the existing harness suite
+  unchanged (still `LocalOnly`).
+- **B1-H harness** (done): the `backend` fixture (`userId` from `user add`, `serverId` from
+  `/tern/v1/server`), the `backend:` scenario key with the per-engine identity in 6.1, and the
+  step kinds. Gate: `backend-metadata-push`, where the Rust engine pushes a snooze and receives
+  another device's snooze through the fixture (C++ dropped from the gate, see the oracle note
+  in 6.1).
+- **B1-C client** (after B1-E; when `apps/desktop` is free): everything in 4.2: the Tern server
+  section in Preferences, the login window, token in the keyset and `tern.server` in config,
+  the server object to the Rust engine and `null` to C++, engine restarts on sign-in, sign-out
+  and URL change, refresh and 401 handling, feature gating from `tern.server.features`,
+  expiration claims, and the client-only items. Gate: the desktop specs in 6.1 and a manual
+  sign-in against a local backend with the Rust engine.
 
 **B2 (parallel, after B1-M; scenarios need B1-E and B1-H).**
 - **B2-T tracking:** `/t/o`, `/t/l`, validation, interstitial, pending events, merge-on-push,
-  dedupe and caps; client tracking ids and URLs from `tern.publicURL` / `tern.trackingNS`. Gate:
-  the tracking scenarios on both engines.
+  dedupe and caps; client tracking ids and URLs from `publicURL` / `trackingNS` of
+  `GET /tern/v1/me` (client side after B1-C). Gate: the tracking scenarios on both engines.
 - **B2-S sharing and assets:** upload, unshare-by-revoke, ingest stripping, static page, viewer
   with sanitizing, signature icons, quotas, the cleanup job; client `url` in thread-sharing
   metadata and signature dimensions. Gate: integration tests and a manual share from the
@@ -664,9 +714,29 @@ waits:
 
 ## Status
 
+**Decisions for review (2026-10-16, no Mailspring ID):**
+1. Login is a server-rendered page in a sandboxed Electron window with an in-memory session;
+   the token comes back in the result page body, never in a URL (3.4, 4.2). Device-code login
+   is left for a future CLI.
+2. `GET /tern/v1/server` (public: serverId, publicURL, signup, features) and `GET /tern/v1/me`
+   (auth: user, trackingNS, serverId, publicURL, features) replace `/api/me`; sign-out is
+   `DELETE /tern/v1/tokens/current`.
+3. The engine's identity line becomes
+   `{"type":"tern-server","version":1,"url","token","userId","serverId"}` for Rust only. An
+   invalid Tern object logs and falls back to `LocalOnly`; it does not exit (4.1).
+4. The cursor binds to the `(serverId, userId)` that `/tern/v1/me` returns before each stream
+   connect, not to the stdin copy, so a restored server is noticed without a desktop restart.
+5. After a 401/403 the engine stops calling the server until restarted and keeps pushes in
+   the outbox; the desktop checks `/tern/v1/me` and signs out on 401.
+6. Plain `http` is accepted only for loopback hosts, in the desktop and the engine.
+7. All Mailspring-compatible endpoints except the metadata protocol and `/ping` go; B2 upload
+   paths move to `/tern/v1/assets` and `/tern/v1/pages`.
+8. The backend auth work is part of B1-E, not a new package. Token in the keyset as
+   `tern-server-token`; non-secret server info in config `tern.server`.
+
 - **B0 (done).** Crate, config, schema, repo, users, tokens and CLI, auth, CORS, `/ping`,
-  `/api/me`, `/onboarding`, stubs, account removal, Dockerfile, `docs/self-hosting.md`. Headers
-  say GPL-3.0-only until O6 is applied to the code.
+  `/api/me`, `/onboarding`, stubs, account removal, Dockerfile, `docs/self-hosting.md`. MIT
+  headers applied (O6). `/api/me`, `/onboarding` and the stubs are now dead (3.4).
 - **B1-M (done).** Push, backfill, head, pages, stream, fan-out, claims, with the integration
   tests from 6.1.
 - **Review fixes (2026-10-15).** Stream wake-ups and account-removal closes run inside the
@@ -677,6 +747,18 @@ waits:
   copy a new server id, and `rotate-server-id` exists for other restores (3.2). Backfill skips
   invalid records and returns them in `rejected`. Login limits use the forwarded client IP from
   trusted proxies, check the IP first, key IPv6 per /64, cap emails at 254 bytes and bound
-  concurrent argon2. The data dir is 0700 and the database and backups 0600. Cursor binding to
-  `(serverId, identity.id)` is a B1-E change (4.1).
-- **Next.** B1-E and B1-H wait for the engine workflow; B2-T can start.
+  concurrent argon2. The data dir is 0700 and the database and backups 0600.
+- **B1-E (2026-10-16, uncommitted).** `crates/ms-wire` (MIT) holds the wire types, with
+  `TernServer`, `LoginResult`, `ServerInfo` and `Me`; `apps/backend` is in the root workspace.
+  Backend: `/tern/v1/server`, `/tern/v1/login`, `/tern/v1/me`, `DELETE /tern/v1/tokens/current`;
+  `/onboarding`, `/api/me`, `/api/feature_usage_event`, the stubs, `wire::Identity` and
+  `STRIPE_PLAN` removed. Engine: `HttpMetadataBackend` with the outbox, backfill, binding,
+  thread anchor (push and apply), 401/403 dormancy and retryable 429/5xx; the identity-line
+  switch in `modes.rs`; `WorkerContext.identity` removed. Tests: `crates/ms-net/tests/backend_server.rs`
+  (push and stream from 0 with the anchor, outbox across a restart, backfill, binding after a
+  rotation, revoked token, path prefix), ms-sync binding and anchor tests, a CLI test per
+  identity-line case. Not done: an HTTP-backend case in `apps/engine/tests/metadata_backend.rs`
+  (covered by `crates/ms-net/tests/backend_server.rs` instead), and a test of the 30 s per-read stream
+  timeout (still unconfirmed, 7).
+- **Next.** B1-H's Rust half (the fixture's Tern server object), B2-T server side. B1-C waits for
+  `apps/desktop` to be free.

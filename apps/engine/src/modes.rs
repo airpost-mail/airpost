@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use ms_core::constants::{thread, EXIT_FAILURE, EXIT_OK};
 use ms_core::{Account, Identity};
+use ms_net::{HttpMetadataBackend, LocalOnly, MetadataBackend, TernServer};
 use serde_json::{json, Value};
 
 use crate::cli::{Mode, Options};
@@ -38,7 +39,7 @@ pub fn run(opts: Options) -> i32 {
     }
 
     let identity = match read_identity(&opts) {
-        Ok(i) => i.map(Arc::new),
+        Ok(i) => i,
         Err(code) => return code,
     };
 
@@ -121,25 +122,51 @@ fn read_account(opts: &Options) -> Result<Account, i32> {
     Ok(account)
 }
 
-fn read_identity(opts: &Options) -> Result<Option<Identity>, i32> {
+/// What the identity line selects (docs/backend-plan.md 4.1, O7).
+#[derive(Debug)]
+enum IdentityLine {
+    /// `null`, or a Mailspring-shaped identity, which is validated and then ignored.
+    None,
+    Tern(TernServer),
+    /// A `tern-server` object that failed validation: logged once logging is up, then
+    /// `LocalOnly`. Mail sync carries on.
+    InvalidTern(ms_net::TernServerError),
+}
+
+fn read_identity(opts: &Options) -> Result<IdentityLine, i32> {
     let text = match &opts.identity {
         Some(i) => i.clone(),
         None => read_line_after_prompt("\nWaiting for Identity JSON:\n"),
     };
     if text == "null" {
-        return Ok(None);
+        return Ok(IdentityLine::None);
     }
-    let identity = serde_json::from_str::<Value>(&text)
+    let value = serde_json::from_str::<Value>(&text);
+    if let Ok(v) = &value {
+        if TernServer::is_tern_server(v) {
+            return Ok(match TernServer::from_json(v) {
+                Ok(s) => IdentityLine::Tern(s),
+                Err(e) => IdentityLine::InvalidTern(e),
+            });
+        }
+    }
+    let identity = value
         .map_err(|e| e.to_string())
         .and_then(Identity::from_json);
     match identity {
-        Ok(i) if i.valid() => Ok(Some(i)),
+        Ok(i) if i.valid() => Ok(IdentityLine::None),
         Ok(_) => {
             one_shot_error("ErrorIdentityMissingFields");
             Err(EXIT_FAILURE)
         }
         Err(e) => {
-            one_shot(&json!({ "error": format!("Invalid Identity JSON: {e}"), "log": text }));
+            // A malformed Tern server line carries the token: never echo it.
+            let log = if text.contains("tern-server") {
+                ""
+            } else {
+                text.as_str()
+            };
+            one_shot(&json!({ "error": format!("Invalid Identity JSON: {e}"), "log": log }));
             Err(EXIT_FAILURE)
         }
     }
@@ -167,20 +194,59 @@ fn spawn(name: &'static str, f: impl FnOnce() + Send + 'static) -> std::thread::
     }
 }
 
-fn sync(opts: &Options, account: Arc<Account>, identity: Option<Arc<Identity>>) -> i32 {
+/// The HTTP backend for a valid Tern server object, `LocalOnly` otherwise.
+fn metadata_backend(
+    opts: &Options,
+    account: &Account,
+    identity: IdentityLine,
+    deltas: &Arc<ms_store::DeltaStream>,
+) -> Arc<dyn MetadataBackend> {
+    use ms_core::logmsg::{metadata_backend_local, metadata_backend_tern};
+    let server = match identity {
+        IdentityLine::None => {
+            tracing::info!("{}", metadata_backend_local("no server"));
+            return Arc::new(LocalOnly);
+        }
+        IdentityLine::InvalidTern(e) => {
+            tracing::error!("Ignoring the Tern server identity: {e}");
+            tracing::info!(
+                "{}",
+                metadata_backend_local(&format!("invalid {}", e.field))
+            );
+            return Arc::new(LocalOnly);
+        }
+        IdentityLine::Tern(s) => s,
+    };
+    let host = server.host().to_owned();
+    let deltas = deltas.clone();
+    let on_refresh = Box::new(move || deltas.send_identity_refresh_needed());
+    match HttpMetadataBackend::new(server, account.id(), &opts.config_dir, on_refresh) {
+        Ok(b) => {
+            tracing::info!("{}", metadata_backend_tern(&host));
+            Arc::new(b)
+        }
+        Err(e) => {
+            tracing::error!("Could not set up the Tern server backend: {e}");
+            tracing::info!("{}", metadata_backend_local("setup failed"));
+            Arc::new(LocalOnly)
+        }
+    }
+}
+
+fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
     tracing::info!(
         "{}",
         ms_core::logmsg::starting_sync(account.email_address())
     );
 
     let deltas = ms_store::DeltaStream::stdout();
+    let metadata = metadata_backend(opts, &account, identity, &deltas);
     let deltas_for_tokens = deltas.clone();
     let tokens = ms_net::TokenManager::new(Some(Box::new(move |a: &Account| {
         deltas_for_tokens.send_updated_secrets(a)
     })));
     let ctx = ms_sync::WorkerContext {
         account: account.clone(),
-        identity,
         config_dir: opts.config_dir.clone(),
         deltas,
         clock: ms_core::clock::system(),
@@ -188,7 +254,7 @@ fn sync(opts: &Options, account: Arc<Account>, identity: Option<Arc<Identity>>) 
         foreground: Arc::new(ms_sync::ForegroundControl::new()),
         background_mark_all: Arc::new(AtomicBool::new(false)),
         tokens: Arc::new(tokens),
-        metadata: Arc::new(ms_net::LocalOnly),
+        metadata,
         tasks: Arc::new(ms_tasks::Tasks),
     };
 

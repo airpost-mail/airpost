@@ -2,15 +2,15 @@
 //! `MailSync/MetadataWorker.cpp` and the identity-server calls in `MailSync/TaskProcessor.cpp`
 //! (Copyright © 2017 Foundry 376, GPL-3.0).
 //!
-//! Tern has no metadata server yet, so the default is [`LocalOnly`]: metadata lives in the
-//! local database, pushes are dropped and the `metadata` thread does not pull. A future
-//! backend implements this trait and nothing else changes.
+//! Without a Tern server the backend is [`LocalOnly`]: metadata lives in the local database,
+//! pushes are dropped and the `metadata` thread does not pull. With one it is
+//! [`crate::HttpMetadataBackend`] (docs/backend-plan.md 4.1).
 //!
 //! Nothing calls the Mailspring identity server (D3). Each C++ call site and its answer:
 //!
 //! | C++ call | Answer |
 //! |---|---|
-//! | `MetadataWorker` `/metadata/<aid>`, `/deltas/<aid>/head`, `/deltas/<aid>/streaming` | [`MetadataBackend::pull`]; the thread is not started for [`LocalOnly`] |
+//! | `MetadataWorker` `/metadata/<aid>`, `/deltas/<aid>/head`, `/deltas/<aid>/streaming` | [`MetadataBackend::pull`]; the thread is not started for [`LocalOnly`]. The HTTP backend streams from cursor `0` instead of head + pages |
 //! | `performRemoteSyncbackMetadata` `POST /metadata/<aid>/<id>/<plugin>` | [`MetadataBackend::push`]; a no-op for [`LocalOnly`] |
 //! | `performRemoteSendFeatureUsageEvent` `POST /api/feature_usage_event` | [`MetadataBackend::record_feature_usage`]; a no-op |
 //! | `DAVWorker` `POST /api/resolve-dav-hosts` (DNS SRV through the server) | ms-dav resolves SRV records locally |
@@ -24,13 +24,16 @@ use serde_json::Value;
 pub struct MetadataPush {
     pub account_id: String,
     pub model_id: String,
-    /// `modelClassName`: `Thread`, `Message`, `Contact`, …
+    /// `modelClassName` as the client sent it (`Thread`, `Message`, `Contact`; any case). The
+    /// wire carries it lowercased.
     pub model_class: String,
     pub plugin_id: String,
     pub value: Value,
     /// `modelMetadataNewVersion`.
     pub version: i64,
-    /// Lets the backend attach metadata to a message that has a different id elsewhere.
+    /// Lets another device find the model when its id differs there: the message's
+    /// Message-ID, or for a thread the Message-ID of the message its id is made from (the
+    /// thread anchor, 4.1).
     pub header_message_id: Option<String>,
 }
 
@@ -40,10 +43,14 @@ pub enum MetadataDelta {
     /// One plugin's metadata on one model. The worker applies it if it is newer than what
     /// the model holds, or keeps it in `DetatchedPluginMetadata` until the model arrives.
     Metadata(Metadata),
+    /// Thread metadata with its anchor: the Message-ID of the message whose id formed the
+    /// thread id on the device that pushed it. Thread ids differ across devices, so the
+    /// worker finds the local thread through that message.
+    AnchoredThreadMetadata(Metadata, String),
     /// Everything before this point has been delivered: the worker stores the cursor and
     /// resumes from it after a restart (`setDeltaCursor` after each streamed delta).
     Cursor(String),
-    /// The backend rejected the identity; the client must refresh it
+    /// The server says the identity changed; the client must refresh it
     /// (`ProcessIdentityRefreshNeeded`).
     IdentityRefreshNeeded,
 }
@@ -59,6 +66,24 @@ pub trait MetadataBackend: Send + Sync {
     /// so it should block while the backend has nothing new. A retryable `SyncError`
     /// backs off (3 s up to 300 s); any other error ends the process.
     fn pull(&self, cursor: Option<&str>, sink: &mut dyn FnMut(MetadataDelta)) -> Result<String>;
+
+    /// Called by the `metadata` thread before each pull: the `"<serverId>:<userId>"` the
+    /// stored cursor must belong to, or `None` for a backend without one. When it differs
+    /// from the stored binding the thread discards the cursor and calls [`Self::rebind`].
+    fn binding(&self) -> Result<Option<String>> {
+        Ok(None)
+    }
+
+    /// The binding changed: drop queued pushes, which were meant for another server or
+    /// user, and queue `local` (every metadata value this account holds) as backfill.
+    fn rebind(&self, _local: &[MetadataPush]) -> Result<()> {
+        Ok(())
+    }
+
+    /// Sends queued pushes and backfill. Called after the binding check, before `pull`.
+    fn drain_outbox(&self) -> Result<()> {
+        Ok(())
+    }
 
     /// A client feature was used (`SendFeatureUsageEventTask`). Usage counts fed
     /// Mailspring's plan limits, which Tern does not have.

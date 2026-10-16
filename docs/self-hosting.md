@@ -11,15 +11,15 @@ non-loopback host unless you pass `--insecure-public-url`.
 
 Docker:
 
-    docker build -t tern-backend apps/backend
+    docker build -f apps/backend/Dockerfile -t tern-backend .
     docker run -d --name tern -v tern-data:/data -p 127.0.0.1:5101:5101 \
         -e TERN_PUBLIC_URL=https://tern.example.com tern-backend
 
 Without Docker:
 
-    cargo build --release --manifest-path apps/backend/Cargo.toml
+    cargo build --release -p tern-backend
     TERN_DATA_DIR=/var/lib/tern TERN_PUBLIC_URL=https://tern.example.com \
-        apps/backend/target/release/tern-backend serve
+        target/release/tern-backend serve
 
 ## Configuration
 
@@ -30,7 +30,7 @@ Without Docker:
 | `data_dir` | `TERN_DATA_DIR` | `/data` | Holds `tern.db` (SQLite, WAL). |
 | `bind` | `TERN_BIND` | `127.0.0.1:5101` | The image sets `0.0.0.0:5101`. |
 | `public_url` | `TERN_PUBLIC_URL` | `http://<bind>` | Where clients and mail recipients reach the server. Required when binding `0.0.0.0`. |
-| `signup` | `TERN_SIGNUP` | `closed` | `open` lets anyone create an account on `/onboarding`. |
+| `signup` | `TERN_SIGNUP` | `closed` | `open` lets anyone create an account on `/tern/v1/login`. |
 | `[features] tracking`, `sharing` | | `true` | Server-side switches; advertised only once implemented. |
 | `trusted_proxies` | `TERN_TRUSTED_PROXIES` | `["127.0.0.0/8", "::1"]` | Peers whose `X-Forwarded-For` is used to find the client address for login rate limits. Comma-separated in the env var; empty trusts none. With Docker, add the address the proxy connects from (for example the bridge network, `172.16.0.0/12`). |
 
@@ -48,7 +48,7 @@ Without Docker:
 
 With Docker, run them as `docker exec tern tern-backend user add …`.
 
-Signing in from the desktop at `/onboarding` mints one token per device; revoke it to sign that
+Signing in from the desktop at `/tern/v1/login` mints one token per device; revoke it to sign that
 device out. Don't share one token between two running clients: a new metadata stream from a
 token replaces that token's previous stream for the same account.
 

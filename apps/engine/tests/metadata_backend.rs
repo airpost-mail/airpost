@@ -67,7 +67,6 @@ fn context(dir: &std::path::Path, backend: Arc<dyn MetadataBackend>) -> WorkerCo
     .unwrap();
     WorkerContext {
         account: Arc::new(account),
-        identity: None,
         config_dir: dir.to_owned(),
         deltas: DeltaStream::new(Box::new(std::io::sink())),
         clock: Arc::new(ManualClock::new(T0)),

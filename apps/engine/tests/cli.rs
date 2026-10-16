@@ -220,6 +220,66 @@ fn sync_starts_logs_and_takes_commands() {
     );
 }
 
+/// The identity line picks the metadata backend (docs/backend-plan.md 4.1): a valid Tern
+/// server object the HTTP one, `null`, a Mailspring identity or a bad Tern object the local
+/// one. None of them stops mail sync.
+#[test]
+fn identity_line_selects_the_metadata_backend() {
+    let tern = |url: &str, version: u32| {
+        format!(
+            r#"{{"type":"tern-server","version":{version},"url":"{url}","token":"tern_secret_token","userId":"u1","serverId":"s1"}}"#
+        )
+    };
+    let cases = [
+        (tern("http://127.0.0.1:9", 1), r"Metadata backend: tern-server 127\.0\.0\.1:9", true),
+        (tern("http://tern.example.com", 1), r"Metadata backend: local only \(invalid url\)", false),
+        (tern("https://tern.example.com", 2), r"Metadata backend: local only \(invalid version\)", false),
+        (
+            r#"{"emailAddress":"me@example.com","token":"t","createdAt":"2018-02-16T00:00:00.000Z"}"#.to_owned(),
+            r"Metadata backend: local only \(no server\)",
+            false,
+        ),
+        ("null".to_owned(), r"Metadata backend: local only \(no server\)", true),
+    ];
+    for (i, (identity, expected, via_stdin)) in cases.into_iter().enumerate() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(mailsync(dir.path())
+            .args(["--mode", "migrate"])
+            .output()
+            .unwrap()
+            .status
+            .success());
+        let mut cmd = mailsync(dir.path());
+        cmd.args(["--mode", "sync", "--account", ACCOUNT]);
+        if !via_stdin {
+            cmd.args(["--identity", &identity]);
+        }
+        let mut child = cmd.spawn().unwrap();
+        let mut stdin = child.stdin.take().unwrap();
+        if via_stdin {
+            stdin.write_all(format!("{identity}\n").as_bytes()).unwrap();
+            stdin.flush().unwrap();
+        }
+        let log = dir.path().join("mailsync-c0ffee-harness.log");
+        let text = wait_for_log(
+            &log,
+            &regex::Regex::new(&format!("(?m){expected}")).unwrap(),
+            Duration::from_secs(10),
+        );
+        assert!(
+            !text.contains("tern_secret_token"),
+            "case {i} logged the token"
+        );
+        assert!(child.try_wait().unwrap().is_none(), "case {i} exited");
+        child.kill().unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(
+            !String::from_utf8_lossy(&out.stdout).contains("tern_secret_token"),
+            "case {i}"
+        );
+    }
+}
+
 /// Takes 30 s: `cargo test -p mailsync -- --ignored`.
 #[test]
 #[ignore]

@@ -199,8 +199,7 @@ fn find_user(repo: &dyn Repo, email: &str) -> Result<User, Box<dyn Error>> {
 }
 
 fn time(ms: Option<i64>) -> String {
-    ms.map(ids::format_created_at)
-        .unwrap_or_else(|| "-".to_owned())
+    ms.map(ids::format_time).unwrap_or_else(|| "-".to_owned())
 }
 
 fn user(repo: &dyn Repo, cmd: UserCommand, out: &mut impl Write) -> CliResult {

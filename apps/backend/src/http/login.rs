@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Tern contributors
 
-//! `/onboarding`: the login page the desktop opens in a webview (docs/backend-plan.md 3.4).
+//! `/tern/v1/login`: the login page the desktop opens in its own window (docs/backend-plan.md
+//! 3.4).
 //!
-//! `page-authenticate.tsx` reads `#identity-result` on every `did-finish-load` and, when it is
-//! present, decodes it with `JSON.parse(atob(text))`. Each successful login mints a device
-//! token named from the User-Agent. Pages are `no-store`; the result page holds the token.
+//! Success is a 200 page, never a redirect, whose `#tern-login-result` holds
+//! base64url(JSON [`LoginResult`]) without padding, so the token never appears in a URL. Each
+//! successful login mints a device token named from the `device` field or the User-Agent.
+//! Pages are `no-store` and run no scripts.
 
 use std::net::SocketAddr;
 
@@ -16,7 +18,7 @@ use axum::http::header::{
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use axum::Form;
-use base64::engine::general_purpose::STANDARD;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 use serde::Deserialize;
@@ -26,10 +28,12 @@ use crate::auth;
 use crate::config::Signup;
 use crate::ids;
 use crate::repo::RepoError;
+use crate::wire::{LoginResult, LOGIN_RESULT_ELEMENT_ID, LOGIN_RESULT_TYPE, LOGIN_RESULT_VERSION};
 
-// No frame-ancestors: the desktop embeds the page in a <webview>.
-const CSP: &str =
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'";
+const CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; \
+     base-uri 'none'; frame-ancestors 'none'";
+/// Longest device name taken from the form; longer names are cut.
+pub const MAX_DEVICE_CHARS: usize = 64;
 
 const STYLE: &str = r#"
 body { font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0;
@@ -45,13 +49,12 @@ input[type=email], input[type=password], input[type=text] { display: block; widt
 button { width: 100%; padding: 9px; font-size: 15px; border: 0; border-radius: 4px;
          background: #2f6fdf; color: #fff; cursor: pointer; }
 .error { background: #fdecea; color: #a1281c; padding: 10px 12px; border-radius: 4px; margin-bottom: 16px; }
-.skip { display: block; text-align: center; margin-top: 20px; color: #555; }
 "#;
 
 #[derive(Debug, Default, Deserialize)]
-pub struct OnboardingQuery {
-    #[serde(rename = "skipSupported")]
-    skip_supported: Option<String>,
+pub struct LoginQuery {
+    #[serde(default)]
+    device: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -62,7 +65,7 @@ pub struct SubmitForm {
     password: String,
     first_name: String,
     last_name: String,
-    skip_supported: String,
+    device: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -72,7 +75,7 @@ enum Mode {
 }
 
 struct FormPage<'a> {
-    skip_supported: bool,
+    device: &'a str,
     signup_open: bool,
     error: Option<(Mode, &'a str)>,
     email: &'a str,
@@ -105,26 +108,25 @@ fn layout(title: &str, body: Markup) -> Markup {
 
 fn render_form(page: &FormPage) -> Markup {
     let error_for = |mode: Mode| page.error.filter(|(m, _)| *m == mode).map(|(_, e)| e);
-    let skip = if page.skip_supported { "true" } else { "" };
     layout(
         "Sign in to Tern",
         html! {
             h1 { "Sign in to your Tern server" }
             // Relative actions keep working when the server sits under a path prefix.
-            form method="post" action="onboarding" {
+            form method="post" action="login" {
                 @if let Some(e) = error_for(Mode::Login) { div.error role="alert" { (e) } }
                 input type="hidden" name="action" value="login";
-                input type="hidden" name="skip_supported" value=(skip);
+                input type="hidden" name="device" value=(page.device);
                 label { "Email" input type="email" name="email" value=(page.email) required autofocus; }
                 label { "Password" input type="password" name="password" required; }
                 button type="submit" { "Sign in" }
             }
             @if page.signup_open {
                 h2 { "New here? Create an account" }
-                form method="post" action="onboarding" {
+                form method="post" action="login" {
                     @if let Some(e) = error_for(Mode::Signup) { div.error role="alert" { (e) } }
                     input type="hidden" name="action" value="signup";
-                    input type="hidden" name="skip_supported" value=(skip);
+                    input type="hidden" name="device" value=(page.device);
                     label { "First name" input type="text" name="first_name" maxlength="100"; }
                     label { "Last name" input type="text" name="last_name" maxlength="100"; }
                     label { "Email" input type="email" name="email" required; }
@@ -135,18 +137,14 @@ fn render_form(page: &FormPage) -> Markup {
                     button type="submit" { "Create account" }
                 }
             }
-            @if page.skip_supported {
-                a.skip href="onboarding/skip" { "Skip for now" }
-            }
         },
     )
 }
 
-/// JSON with every non-ASCII character as a `\u` escape. `atob` yields one char per byte, so
-/// base64 of UTF-8 would garble non-ASCII names in the client; pure ASCII decodes the same
-/// either way.
+/// JSON with every non-ASCII character as a `\u` escape, so a client that decodes the base64
+/// with `atob` (one char per byte) gets the same text as one that decodes UTF-8.
 fn ascii_json(value: &impl serde::Serialize) -> String {
-    let raw = serde_json::to_string(value).expect("identity serializes");
+    let raw = serde_json::to_string(value).expect("login result serializes");
     let mut out = String::with_capacity(raw.len());
     for c in raw.chars() {
         if c.is_ascii() {
@@ -161,32 +159,42 @@ fn ascii_json(value: &impl serde::Serialize) -> String {
     out
 }
 
-fn render_result(message: &str, payload: &impl serde::Serialize) -> Markup {
-    let encoded = STANDARD.encode(ascii_json(payload));
+fn render_result(message: &str, result: &LoginResult) -> Markup {
+    let encoded = URL_SAFE_NO_PAD.encode(ascii_json(result));
     layout(
         "Tern",
         html! {
             h1 { (message) }
-            div id="identity-result" hidden { (encoded) }
+            p { "You can close this window." }
+            div id=(LOGIN_RESULT_ELEMENT_ID) hidden { (encoded) }
         },
     )
 }
 
-pub async fn form(State(state): State<AppState>, Query(q): Query<OnboardingQuery>) -> Response {
+/// The device token's name: the form's `device`, else the User-Agent.
+fn token_name(device: &str, headers: &HeaderMap) -> String {
+    let device = device.trim();
+    if device.is_empty() || device.chars().any(char::is_control) {
+        return auth::token_name_from_user_agent(
+            headers.get(USER_AGENT).and_then(|v| v.to_str().ok()),
+        );
+    }
+    device.chars().take(MAX_DEVICE_CHARS).collect()
+}
+
+fn clip_device(device: &str) -> String {
+    device.chars().take(MAX_DEVICE_CHARS).collect()
+}
+
+pub async fn form(State(state): State<AppState>, Query(q): Query<LoginQuery>) -> Response {
+    let device = clip_device(&q.device);
     let page = FormPage {
-        skip_supported: q.skip_supported.as_deref() == Some("true"),
+        device: &device,
         signup_open: state.0.signup == Signup::Open,
         error: None,
         email: "",
     };
     respond(StatusCode::OK, render_form(&page))
-}
-
-pub async fn skip() -> Response {
-    respond(
-        StatusCode::OK,
-        render_result("Skipped", &serde_json::json!({ "skipped": true })),
-    )
 }
 
 pub async fn submit(
@@ -201,9 +209,10 @@ pub async fn submit(
         Mode::Login
     };
     let signup_open = state.0.signup == Signup::Open;
+    let device = clip_device(&f.device);
     let fail = |status: StatusCode, message: &str, email: &str| {
         let page = FormPage {
-            skip_supported: f.skip_supported == "true",
+            device: &device,
             signup_open,
             error: Some((mode, message)),
             email,
@@ -230,8 +239,7 @@ pub async fn submit(
         );
     }
 
-    let token_name =
-        auth::token_name_from_user_agent(headers.get(USER_AGENT).and_then(|v| v.to_str().ok()));
+    let token_name = token_name(&f.device, &headers);
     let now = ids::now_ms();
     let email = f.email.clone();
     let password = f.password.clone();
@@ -282,9 +290,16 @@ pub async fn submit(
 
     match outcome {
         Ok(Outcome::SignedIn(user, token)) => {
-            let identity = state.identity(&user, Some(token));
+            let result = LoginResult {
+                kind: LOGIN_RESULT_TYPE.to_owned(),
+                version: LOGIN_RESULT_VERSION,
+                token,
+                user_id: user.id.clone(),
+                server_id: state.0.server_id.clone(),
+                email: user.email.clone(),
+            };
             let message = format!("Signed in as {}", user.email);
-            respond(StatusCode::OK, render_result(&message, &identity))
+            respond(StatusCode::OK, render_result(&message, &result))
         }
         Ok(Outcome::Rejected(status, message)) => {
             let email = if mode == Mode::Login {
@@ -296,7 +311,7 @@ pub async fn submit(
         }
         Err(e) => {
             // ApiError::Internal logs when turned into a response; log here instead.
-            tracing::error!(error = ?e, "onboarding failed");
+            tracing::error!(error = ?e, "login failed");
             fail(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Something went wrong. Try again.",

@@ -56,8 +56,8 @@ pub fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-/// The identity's `createdAt` format, `%Y-%m-%dT%H:%M:%S.000Z` (3.4).
-pub fn format_created_at(ms: i64) -> String {
+/// UTC timestamps in CLI listings, `%Y-%m-%dT%H:%M:%S.000Z`.
+pub fn format_time(ms: i64) -> String {
     chrono::DateTime::from_timestamp_millis(ms)
         .unwrap_or_default()
         .format("%Y-%m-%dT%H:%M:%S.000Z")
@@ -93,10 +93,7 @@ mod tests {
 
     #[test]
     fn created_at_format() {
-        assert_eq!(
-            format_created_at(1_518_652_800_123),
-            "2018-02-15T00:00:00.000Z"
-        );
-        assert_eq!(format_created_at(0), "1970-01-01T00:00:00.000Z");
+        assert_eq!(format_time(1_518_652_800_123), "2018-02-15T00:00:00.000Z");
+        assert_eq!(format_time(0), "1970-01-01T00:00:00.000Z");
     }
 }

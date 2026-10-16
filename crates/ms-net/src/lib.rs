@@ -10,12 +10,16 @@
 
 pub mod endpoints;
 pub mod http;
+pub mod http_metadata;
 pub mod metadata;
 pub mod oauth;
+pub mod outbox;
 pub mod people;
 
 pub use endpoints::Endpoints;
 pub use http::HttpClient;
+pub use http_metadata::HttpMetadataBackend;
 pub use metadata::{LocalOnly, MetadataBackend, MetadataDelta, MetadataPush};
+pub use ms_wire::{TernServer, TernServerError};
 pub use oauth::{AccessToken, RotateCallback, TokenManager};
 pub use people::PeopleClient;

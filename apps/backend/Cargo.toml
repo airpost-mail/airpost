@@ -1,57 +1,47 @@
-[workspace]
-# Own workspace until B1-E joins it to the root one (docs/backend-plan.md 3.1). Versions shared
-# with the root workspace are pinned by hand to match it.
-
 [package]
 name = "tern-backend"
-description = "Self-hostable Tern server: identity, metadata sync, tracking"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.92"
+description = "Self-hostable Tern server: device tokens, metadata sync, tracking"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+# Written from scratch (docs/backend-plan.md O6). Normal dependencies must be permissive and
+# must not include the GPL ms-* crates; `deny.toml` here checks both.
 license = "MIT"
-repository = "https://github.com/ternmail/ternmail"
-publish = false
+repository.workspace = true
+publish.workspace = true
 
 [[bin]]
 name = "tern-backend"
 path = "src/main.rs"
 
 [dependencies]
+ms-wire.workspace = true
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "form", "tokio", "tower-log", "original-uri", "matched-path"] }
-tokio = { version = "1.53", features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time"] }
 tower = { version = "0.5", default-features = false }
 tower-http = { version = "0.7", features = ["cors", "trace", "limit"] }
 http-body = "1.1"
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite.workspace = true
 argon2 = "0.6"
-rand = "0.10"
-sha2 = "0.11"
-base64 = "0.23"
+rand.workspace = true
+sha2.workspace = true
+base64.workspace = true
 governor = "0.10"
 # Already in the tree through tokio; for TCP keepalive and TCP_USER_TIMEOUT on accepted sockets.
 socket2 = { version = "0.6", features = ["all"] }
 maud = "0.27"
 clap = { version = "4.6", features = ["derive", "env"] }
 toml = { version = "1.1", default-features = false, features = ["parse", "serde", "std"] }
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "2.0"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "ansi", "env-filter"] }
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["fmt", "ansi", "env-filter"] }
 
 [dev-dependencies]
-tokio = { version = "1.53", features = ["test-util", "io-util"] }
+tokio = { workspace = true, features = ["test-util", "io-util"] }
 hyper = { version = "1", features = ["client", "server", "http1"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "http1", "tokio", "service"] }
 http-body-util = "0.1"
-tempfile = "3.27"
-
-[profile.release]
-debug = 1
-
-# argon2 at default cost takes seconds unoptimized; tests hash and verify passwords.
-[profile.dev.package.argon2]
-opt-level = 3
-[profile.dev.package.blake2]
-opt-level = 3
+tempfile.workspace = true

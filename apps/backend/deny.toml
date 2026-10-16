@@ -1,9 +1,12 @@
-# cargo deny check — docs/backend-plan.md 3.1. Same licence policy as the root deny.toml
-# (docs/engine-port-plan.md section 12): permissive licences only, since tern-backend is MIT.
+# The backend's own check, on tern-backend's graph only (docs/backend-plan.md 3.1):
+#   cargo deny --manifest-path apps/backend/Cargo.toml check
+# (cargo-deny picks this file, the nearest to the manifest.)
+# The root deny.toml covers the whole workspace with the GPL policy; this one adds what an MIT
+# program needs: permissive licences only, and none of the GPL ms-* crates.
 
 [graph]
 all-features = false
-# Dev-dependencies never ship. B1-E dev-depends on ms-net, which brings reqwest and rustls.
+# Dev-dependencies never ship.
 exclude-dev = true
 
 [licenses]
@@ -26,7 +29,8 @@ allow = [
 unused-allowed-license = "allow"
 
 [licenses.private]
-# tern-backend itself is MIT (backend-plan O6) and unpublished.
+# tern-backend and ms-wire are MIT (backend-plan O6) and unpublished. The GPL workspace crates
+# are also private, so the bans below keep them out.
 ignore = true
 
 [bans]
@@ -41,6 +45,18 @@ deny = [
     { crate = "native-tls" },
     { crate = "rustls" },
     { crate = "reqwest" },
+    # GPL-3.0-only workspace crates (Mailspring-derived).
+    { crate = "mailsync" },
+    { crate = "ms-core" },
+    { crate = "ms-store" },
+    { crate = "ms-providers" },
+    { crate = "ms-imap" },
+    { crate = "ms-mime" },
+    { crate = "ms-smtp" },
+    { crate = "ms-net" },
+    { crate = "ms-dav" },
+    { crate = "ms-sync" },
+    { crate = "ms-tasks" },
 ]
 
 [advisories]

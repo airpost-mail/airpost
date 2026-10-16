@@ -1,12 +1,13 @@
 [workspace]
 resolver = "2"
-# apps/backend joins once it exists (docs/engine-port-plan.md section 12).
-members = ["apps/engine", "crates/*"]
+members = ["apps/engine", "apps/backend", "crates/*"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.92"
+# The engine and the ms-* crates. tern-backend and ms-wire are MIT and set their own
+# (docs/backend-plan.md O6).
 license = "GPL-3.0-only"
 repository = "https://github.com/ternmail/ternmail"
 publish = false
@@ -23,6 +24,8 @@ ms-net = { path = "crates/ms-net" }
 ms-dav = { path = "crates/ms-dav" }
 ms-sync = { path = "crates/ms-sync" }
 ms-tasks = { path = "crates/ms-tasks" }
+# MIT: shared with tern-backend, which must not depend on the GPL crates above.
+ms-wire = { path = "crates/ms-wire" }
 
 # IMAP. ms-imap has its own parser and command layer (docs/spikes/imap.md); async-imap and
 # imap-proto are dev-dependencies of its spike example only.
@@ -80,3 +83,10 @@ tempfile = "3.27"
 
 [profile.release]
 debug = 1
+
+# tern-backend: argon2 at default cost takes seconds unoptimized; its tests hash and verify
+# passwords.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3

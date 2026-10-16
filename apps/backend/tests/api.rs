@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 Tern contributors
 
-//! B0 gate (docs/backend-plan.md 6.2): onboarding, auth, `/api/me`, stubs, account removal and
-//! CORS against a server on an ephemeral port.
+//! Login, auth, server info, `/tern/v1/me`, sign-out, the dead Mailspring paths, account
+//! removal and CORS against a server on an ephemeral port (docs/backend-plan.md 3.4, 6.1).
 
 mod common;
 
-use common::{basic, identity_result, TestServer, PUBLIC_URL};
+use common::{basic, login_result, TestServer, PUBLIC_URL};
 use hyper::{Method, StatusCode};
 use tern_backend::config::Signup;
 use tern_backend::repo::Repo;
 
-const UA: &str = "Mozilla/5.0 Mailspring/1.17.0 Electron/37";
+const UA: &str = "Mozilla/5.0 Tern/1.17.0 Electron/37";
 
 #[tokio::test]
 async fn ping() {
@@ -23,34 +23,38 @@ async fn ping() {
 }
 
 #[tokio::test]
-async fn onboarding_login_returns_identity() {
+async fn login_returns_token_in_the_page_body() {
     let s = TestServer::start(Signup::Closed).await;
     let user = s.add_user("Ada@Example.com", "correct horse");
 
     let page = s
         .get(
-            "/onboarding?version=1.17.0&skipSupported=true",
+            "/tern/v1/login?device=Ada%27s%20laptop",
             &[("user-agent", UA)],
         )
         .await;
     assert_eq!(page.status, StatusCode::OK);
     assert_eq!(page.header("cache-control"), Some("no-store"));
+    assert_eq!(page.header("referrer-policy"), Some("no-referrer"));
+    let csp = page.header("content-security-policy").unwrap();
+    assert!(csp.starts_with("default-src 'none'; style-src 'unsafe-inline'; form-action 'self'"));
     assert!(page
         .header("content-type")
         .unwrap()
         .starts_with("text/html"));
-    assert!(page.body.contains(r#"action="onboarding""#));
-    assert!(page.body.contains(r#"href="onboarding/skip""#));
+    assert!(page.body.contains(r#"action="login""#));
+    assert!(page.body.contains(r#"name="device" value="Ada's laptop""#));
+    assert!(!page.body.contains("<script"));
     assert!(!page.body.contains("Create account"), "sign-up is closed");
-    assert!(identity_result(&page.body).is_none());
+    assert!(login_result(&page.body).is_none());
 
     let res = s
         .post_form(
-            "/onboarding",
+            "/tern/v1/login",
             &[("user-agent", UA)],
             &[
                 ("action", "login"),
-                ("skip_supported", "true"),
+                ("device", "Ada's laptop"),
                 ("email", "ada@example.com"),
                 ("password", "correct horse"),
             ],
@@ -58,60 +62,81 @@ async fn onboarding_login_returns_identity() {
         .await;
     assert_eq!(res.status, StatusCode::OK);
     assert_eq!(res.header("cache-control"), Some("no-store"));
-    let id = identity_result(&res.body).expect("#identity-result");
-
-    assert_eq!(id["id"], user.id.as_str());
-    assert_eq!(id["emailAddress"], "ada@example.com");
-    assert_eq!(id["firstName"], "Ada");
-    assert_eq!(id["lastName"], "Lovelace");
-    let token = id["token"].as_str().unwrap();
+    assert_eq!(res.header("referrer-policy"), Some("no-referrer"));
+    assert!(res.header("location").is_none());
+    assert!(!res.body.contains("<script"));
+    let result = login_result(&res.body).expect("#tern-login-result");
+    let token = result["token"].as_str().unwrap().to_owned();
     assert!(token.starts_with("tern_"), "{token}");
-    let created_at = id["createdAt"].as_str().unwrap();
-    let parsed = chrono::NaiveDateTime::parse_from_str(created_at, "%Y-%m-%dT%H:%M:%S.000Z")
-        .unwrap_or_else(|e| panic!("{created_at}: {e}"));
-    let cutoff = chrono::NaiveDate::from_ymd_opt(2018, 2, 15)
-        .unwrap()
-        .and_hms_opt(0, 0, 0)
-        .unwrap();
-    assert!(parsed > cutoff, "{created_at}");
-    assert_eq!(id["stripePlan"], "Tern");
-    assert_eq!(id["stripePlanEffective"], "Tern");
-    assert_eq!(id["featureUsage"], serde_json::json!({}));
-    assert_eq!(id["tern"]["serverId"], s.repo.server_id().unwrap().as_str());
-    assert_eq!(id["tern"]["publicURL"], PUBLIC_URL);
-    assert_eq!(id["tern"]["trackingNS"], user.tracking_ns.as_str());
+    assert_eq!(
+        result,
+        serde_json::json!({
+            "type": "tern-login", "version": 1, "token": token, "userId": user.id,
+            "serverId": s.repo.server_id().unwrap(), "email": "ada@example.com",
+        })
+    );
+    // The token appears once, inside the hidden element, and nowhere in plain text.
+    assert!(!res.body.contains(&token));
 
     // The token works, and it is named after the device.
-    let me = s.get("/api/me", &[("authorization", &basic(token))]).await;
+    let me = s
+        .get("/tern/v1/me", &[("authorization", &basic(&token))])
+        .await;
     assert_eq!(me.status, StatusCode::OK);
-    let me = me.json();
-    assert!(me.get("token").is_none());
-    let mut expected = id.clone();
-    expected.as_object_mut().unwrap().remove("token");
-    assert_eq!(me, expected);
+    assert_eq!(
+        me.json(),
+        serde_json::json!({
+            "userId": user.id, "email": "ada@example.com", "firstName": "Ada",
+            "lastName": "Lovelace", "trackingNS": user.tracking_ns,
+            "serverId": s.repo.server_id().unwrap(), "publicURL": PUBLIC_URL,
+            "features": {"tracking": false, "sharing": false},
+        })
+    );
     let tokens = s.repo.list_tokens(Some(&user.id)).unwrap();
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0].name, UA);
+    assert_eq!(tokens[0].name, "Ada's laptop");
 
-    // A second login is a second device.
-    let again = s
-        .post_form(
-            "/onboarding",
-            &[],
-            &[("email", "ada@example.com"), ("password", "correct horse")],
-        )
-        .await;
-    let second = identity_result(&again.body).unwrap();
-    assert_ne!(second["token"], id["token"]);
-    assert_eq!(
-        s.repo.list_tokens(Some(&user.id)).unwrap()[1].name,
-        "unknown device"
-    );
+    // A second login is a second device; without `device` the User-Agent names it, and
+    // without either a placeholder does. Long device names are cut to 64 chars.
+    let long = "d".repeat(100);
+    for (device, ua, expected) in [
+        ("", UA, UA.to_owned()),
+        ("", "", "unknown device".to_owned()),
+        (long.as_str(), "", "d".repeat(64)),
+    ] {
+        let headers: Vec<(&str, &str)> = if ua.is_empty() {
+            vec![]
+        } else {
+            vec![("user-agent", ua)]
+        };
+        let again = s
+            .post_form(
+                "/tern/v1/login",
+                &headers,
+                &[
+                    ("email", "ada@example.com"),
+                    ("password", "correct horse"),
+                    ("device", device),
+                ],
+            )
+            .await;
+        let second = login_result(&again.body).unwrap();
+        assert_ne!(second["token"], token.as_str());
+        assert_eq!(
+            s.repo
+                .list_tokens(Some(&user.id))
+                .unwrap()
+                .last()
+                .unwrap()
+                .name,
+            expected
+        );
+    }
     s.stop().await;
 }
 
 #[tokio::test]
-async fn onboarding_rejects_bad_credentials() {
+async fn login_rejects_bad_credentials() {
     let s = TestServer::start(Signup::Closed).await;
     let user = s.add_user("ada@example.com", "correct horse");
     for (email, password) in [
@@ -121,20 +146,20 @@ async fn onboarding_rejects_bad_credentials() {
     ] {
         let r = s
             .post_form(
-                "/onboarding",
+                "/tern/v1/login",
                 &[],
                 &[("email", email), ("password", password)],
             )
             .await;
         assert_eq!(r.status, StatusCode::UNAUTHORIZED, "{email}");
         assert_eq!(r.header("cache-control"), Some("no-store"));
-        assert!(identity_result(&r.body).is_none());
+        assert!(login_result(&r.body).is_none());
         assert!(r.body.contains("Incorrect email address or password."));
     }
     s.repo.set_user_disabled(&user.id, true, 1).unwrap();
     let r = s
         .post_form(
-            "/onboarding",
+            "/tern/v1/login",
             &[],
             &[("email", "ada@example.com"), ("password", "correct horse")],
         )
@@ -145,11 +170,11 @@ async fn onboarding_rejects_bad_credentials() {
 }
 
 #[tokio::test]
-async fn onboarding_escapes_input() {
+async fn login_escapes_input() {
     let s = TestServer::start(Signup::Closed).await;
     let r = s
         .post_form(
-            "/onboarding",
+            "/tern/v1/login",
             &[],
             &[("email", "\"><script>alert(1)</script>"), ("password", "x")],
         )
@@ -160,13 +185,13 @@ async fn onboarding_escapes_input() {
 }
 
 #[tokio::test]
-async fn onboarding_rate_limits_logins() {
+async fn login_rate_limits_logins() {
     let s = TestServer::start(Signup::Closed).await;
     s.add_user("ada@example.com", "correct horse");
     for _ in 0..5 {
         let r = s
             .post_form(
-                "/onboarding",
+                "/tern/v1/login",
                 &[],
                 &[("email", "ada@example.com"), ("password", "nope")],
             )
@@ -176,26 +201,26 @@ async fn onboarding_rate_limits_logins() {
     // Even the right password is refused once the budget is spent.
     let r = s
         .post_form(
-            "/onboarding",
+            "/tern/v1/login",
             &[],
             &[("email", "ada@example.com"), ("password", "correct horse")],
         )
         .await;
     assert_eq!(r.status, StatusCode::TOO_MANY_REQUESTS);
-    assert!(identity_result(&r.body).is_none());
+    assert!(login_result(&r.body).is_none());
     s.stop().await;
 }
 
 /// Behind a trusted proxy (the test peer is loopback), each client has its own budget, keyed by
 /// the rightmost `X-Forwarded-For` hop that is not a trusted proxy.
 #[tokio::test]
-async fn onboarding_rate_limits_by_forwarded_client() {
+async fn login_rate_limits_by_forwarded_client() {
     let s = TestServer::start(Signup::Closed).await;
     let login = |xff: &'static str, email: &'static str| {
         let s = &s;
         async move {
             s.post_form(
-                "/onboarding",
+                "/tern/v1/login",
                 &[("x-forwarded-for", xff)],
                 &[("email", email), ("password", "nope")],
             )
@@ -245,13 +270,13 @@ async fn onboarding_rate_limits_by_forwarded_client() {
 }
 
 #[tokio::test]
-async fn onboarding_rejects_oversized_email_before_rate_limiting() {
+async fn login_rejects_oversized_email_before_rate_limiting() {
     let s = TestServer::start(Signup::Closed).await;
     let long = format!("{}@example.com", "a".repeat(300));
     for _ in 0..6 {
         let r = s
             .post_form(
-                "/onboarding",
+                "/tern/v1/login",
                 &[],
                 &[("email", long.as_str()), ("password", "nope")],
             )
@@ -261,7 +286,7 @@ async fn onboarding_rejects_oversized_email_before_rate_limiting() {
     // No budget was spent.
     let r = s
         .post_form(
-            "/onboarding",
+            "/tern/v1/login",
             &[],
             &[("email", "ada@example.com"), ("password", "nope")],
         )
@@ -271,20 +296,21 @@ async fn onboarding_rejects_oversized_email_before_rate_limiting() {
 }
 
 #[tokio::test]
-async fn onboarding_skip() {
+async fn server_info() {
     let s = TestServer::start(Signup::Closed).await;
-    let page = s.get("/onboarding", &[]).await;
-    assert!(
-        !page.body.contains("onboarding/skip"),
-        "no skip link without skipSupported"
-    );
-    let r = s.get("/onboarding/skip", &[]).await;
+    let r = s.get("/tern/v1/server", &[]).await;
     assert_eq!(r.status, StatusCode::OK);
-    assert_eq!(r.header("cache-control"), Some("no-store"));
     assert_eq!(
-        identity_result(&r.body).unwrap(),
-        serde_json::json!({"skipped": true})
+        r.json(),
+        serde_json::json!({
+            "serverId": s.repo.server_id().unwrap(), "version": env!("CARGO_PKG_VERSION"),
+            "publicURL": PUBLIC_URL, "signup": "closed",
+            "features": {"tracking": false, "sharing": false},
+        })
     );
+    s.stop().await;
+    let s = TestServer::start(Signup::Open).await;
+    assert_eq!(s.get("/tern/v1/server", &[]).await.json()["signup"], "open");
     s.stop().await;
 }
 
@@ -293,7 +319,7 @@ async fn signup_closed_by_default() {
     let s = TestServer::start(Signup::Closed).await;
     let r = s
         .post_form(
-            "/onboarding",
+            "/tern/v1/login",
             &[],
             &[
                 ("action", "signup"),
@@ -303,7 +329,7 @@ async fn signup_closed_by_default() {
         )
         .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
-    assert!(identity_result(&r.body).is_none());
+    assert!(login_result(&r.body).is_none());
     assert!(s.repo.list_users().unwrap().is_empty());
     s.stop().await;
 }
@@ -311,14 +337,14 @@ async fn signup_closed_by_default() {
 #[tokio::test]
 async fn signup_open() {
     let s = TestServer::start(Signup::Open).await;
-    let page = s.get("/onboarding?skipSupported=true", &[]).await;
+    let page = s.get("/tern/v1/login", &[]).await;
     assert!(page.body.contains("Create account"));
 
     let signup = |email: &'static str, password: &'static str| {
         let s = &s;
         async move {
             s.post_form(
-                "/onboarding",
+                "/tern/v1/login",
                 &[],
                 &[
                     ("action", "signup"),
@@ -337,14 +363,15 @@ async fn signup_open() {
 
     let r = signup("zoe@example.com", "long enough").await;
     assert_eq!(r.status, StatusCode::OK);
-    // Non-ASCII names survive the atob round trip as \u escapes.
-    let id = identity_result(&r.body).unwrap();
-    assert_eq!(id["firstName"], "Zoë");
-    assert_eq!(id["lastName"], "Ñúñez");
-    assert_eq!(id["emailAddress"], "zoe@example.com");
+    let id = login_result(&r.body).unwrap();
+    assert_eq!(id["email"], "zoe@example.com");
     let token = id["token"].as_str().unwrap();
-    let me = s.get("/api/me", &[("authorization", &basic(token))]).await;
-    assert_eq!(me.json()["id"], id["id"]);
+    let me = s
+        .get("/tern/v1/me", &[("authorization", &basic(token))])
+        .await;
+    assert_eq!(me.json()["userId"], id["userId"]);
+    assert_eq!(me.json()["firstName"], "Zoë");
+    assert_eq!(me.json()["lastName"], "Ñúñez");
 
     let r = signup("ZOE@example.com", "long enough").await;
     assert_eq!(r.status, StatusCode::CONFLICT);
@@ -358,7 +385,7 @@ async fn api_auth() {
     let user = s.add_user("ada@example.com", "correct horse");
     let token = s.add_token(&user);
 
-    let r = s.get("/api/me", &[]).await;
+    let r = s.get("/tern/v1/me", &[]).await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     assert!(
         r.header("www-authenticate").is_none(),
@@ -371,20 +398,21 @@ async fn api_auth() {
         format!("Token {token}"),
         basic(""),
     ] {
-        let r = s.get("/api/me", &[("authorization", &bad)]).await;
+        let r = s.get("/tern/v1/me", &[("authorization", &bad)]).await;
         assert_eq!(r.status, StatusCode::UNAUTHORIZED, "{bad}");
     }
 
     let r = s
-        .get("/api/me", &[("authorization", &format!("Bearer {token}"))])
+        .get(
+            "/tern/v1/me",
+            &[("authorization", &format!("Bearer {token}"))],
+        )
         .await;
     assert_eq!(r.status, StatusCode::OK);
-    assert_eq!(r.json()["id"], user.id.as_str());
-    // Mailspring's "Basic" plan would turn Pro features off in an unmodified client.
-    assert_eq!(r.json()["stripePlanEffective"], "Tern");
+    assert_eq!(r.json()["userId"], user.id.as_str());
     // Nothing implemented yet, so nothing advertised.
     assert_eq!(
-        r.json()["tern"]["features"],
+        r.json()["features"],
         serde_json::json!({"tracking": false, "sharing": false})
     );
 
@@ -398,11 +426,13 @@ async fn api_auth() {
     assert!(s.repo.list_tokens(None).unwrap()[0].last_used_at.is_some());
 
     s.repo.set_user_disabled(&user.id, true, 1).unwrap();
-    let r = s.get("/api/me", &[("authorization", &basic(&token))]).await;
+    let r = s
+        .get("/tern/v1/me", &[("authorization", &basic(&token))])
+        .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     s.repo.set_user_disabled(&user.id, false, 1).unwrap();
     assert_eq!(
-        s.get("/api/me", &[("authorization", &basic(&token))])
+        s.get("/tern/v1/me", &[("authorization", &basic(&token))])
             .await
             .status,
         StatusCode::OK
@@ -410,13 +440,56 @@ async fn api_auth() {
 
     let id = s.repo.list_tokens(None).unwrap()[0].id;
     s.repo.revoke_token(id, 2).unwrap();
-    let r = s.get("/api/me", &[("authorization", &basic(&token))]).await;
+    let r = s
+        .get("/tern/v1/me", &[("authorization", &basic(&token))])
+        .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     s.stop().await;
 }
 
 #[tokio::test]
-async fn stubs() {
+async fn sign_out_revokes_only_the_calling_token() {
+    let s = TestServer::start(Signup::Closed).await;
+    let user = s.add_user("ada@example.com", "correct horse");
+    let laptop = basic(&s.add_token(&user));
+    let phone = basic(&s.add_token(&user));
+    let r = s
+        .request(Method::DELETE, "/tern/v1/tokens/current", &[], "")
+        .await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    let r = s
+        .request(
+            Method::DELETE,
+            "/tern/v1/tokens/current",
+            &[("authorization", &laptop)],
+            "",
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::NO_CONTENT);
+    let me = |auth: String| {
+        let s = &s;
+        async move {
+            s.get("/tern/v1/me", &[("authorization", &auth)])
+                .await
+                .status
+        }
+    };
+    assert_eq!(me(laptop.clone()).await, StatusCode::UNAUTHORIZED);
+    assert_eq!(me(phone).await, StatusCode::OK);
+    let r = s
+        .request(
+            Method::DELETE,
+            "/tern/v1/tokens/current",
+            &[("authorization", &laptop)],
+            "",
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    s.stop().await;
+}
+
+#[tokio::test]
+async fn mailspring_paths_are_gone() {
     let s = TestServer::start(Signup::Closed).await;
     let user = s.add_user("ada@example.com", "correct horse");
     let auth = basic(&s.add_token(&user));
@@ -424,27 +497,11 @@ async fn stubs() {
         ("authorization", auth.as_str()),
         ("content-type", "application/json"),
     ];
-
-    let r = s
-        .request(
-            Method::POST,
-            "/api/feature_usage_event",
-            &h,
-            r#"{"feature":"snooze"}"#,
-        )
-        .await;
-    assert_eq!(r.status, StatusCode::NO_CONTENT);
-    let r = s
-        .request(
-            Method::POST,
-            "/api/feature_usage_event",
-            &[],
-            r#"{"feature":"snooze"}"#,
-        )
-        .await;
-    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
-
     for path in [
+        "/onboarding",
+        "/onboarding/skip",
+        "/api/me",
+        "/api/feature_usage_event",
         "/api/resolve-dav-hosts",
         "/api/login-link",
         "/api/newsletter/subscribe",
@@ -452,6 +509,7 @@ async fn stubs() {
         "/api/grammar/check",
         "/api/info-for-email-v2/a@b.c",
         "/api/save-public-asset",
+        "/api/share-static-page",
         "/nope",
     ] {
         for method in [Method::GET, Method::POST] {
@@ -509,7 +567,7 @@ async fn cors() {
         let r = s
             .request(
                 Method::OPTIONS,
-                "/api/me",
+                "/tern/v1/me",
                 &[
                     ("origin", origin),
                     ("access-control-request-method", "GET"),
@@ -534,7 +592,7 @@ async fn cors() {
     }
 
     // Errors carry the headers too, or the renderer cannot read the 401.
-    let r = s.get("/api/me", &[("origin", "null")]).await;
+    let r = s.get("/tern/v1/me", &[("origin", "null")]).await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     assert_eq!(r.header("access-control-allow-origin"), Some("null"));
 
@@ -542,7 +600,7 @@ async fn cors() {
         let r = s
             .request(
                 Method::OPTIONS,
-                "/api/me",
+                "/tern/v1/me",
                 &[("origin", origin), ("access-control-request-method", "GET")],
                 "",
             )
@@ -567,7 +625,7 @@ async fn body_limit() {
     let r = s
         .request(
             Method::POST,
-            "/onboarding",
+            "/tern/v1/login",
             &[("content-type", "application/x-www-form-urlencoded")],
             format!("email=a&password={big}"),
         )

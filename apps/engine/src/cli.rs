@@ -35,7 +35,9 @@ pub struct Options {
     pub mode: Mode,
     /// `--account` JSON; read from stdin after a prompt when absent.
     pub account: Option<String>,
-    /// `--identity` JSON or `null`; read from stdin after a prompt when absent.
+    /// `--identity` JSON (a Tern server object, or a Mailspring identity, which is ignored)
+    /// or `null`; read from stdin after a prompt when absent. Tests only: argv is visible to
+    /// other users.
     pub identity: Option<String>,
     pub orphan: bool,
     pub verbose: bool,
@@ -62,7 +64,7 @@ pub fn usage() -> String {
 }
 
 /// Parses everything after argv[0]. `CONFIG_DIR_PATH` is read here too; `IDENTITY_SERVER`
-/// is accepted and ignored.
+/// is not read: the Tern server comes in the identity line (docs/backend-plan.md 4.1).
 pub fn parse(args: &[String]) -> Parsed {
     parse_with_env(args, std::env::var_os("CONFIG_DIR_PATH").map(PathBuf::from))
 }

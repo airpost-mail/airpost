@@ -9,4 +9,6 @@ pub mod config;
 pub mod http;
 pub mod ids;
 pub mod repo;
-pub mod wire;
+
+/// The wire types live in `crates/ms-wire`, shared with the engine.
+pub use ms_wire as wire;
