@@ -19,6 +19,7 @@ pub mod model;
 pub mod models;
 pub mod placement;
 pub mod query;
+pub mod read;
 pub mod schema;
 pub mod search;
 pub mod store;

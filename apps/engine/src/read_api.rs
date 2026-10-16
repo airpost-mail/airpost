@@ -1,0 +1,265 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! The read methods (docs/engine-protocol-plan.md section 3), answered on the calling
+//! socket connection's reader thread from its own read-only connection, never on the main
+//! thread, so a slow query delays neither task local phases nor deltas. Opened on the
+//! connection's first read and kept for its lifetime.
+
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+use ms_ipc::{
+    code, method, CategoriesListParams, CategoryCounts, ContactsSearchResult, ErrorObject,
+    FoldersListResult, LabelsListResult, MessagesGetParams, MessagesGetResult,
+    Request as RpcRequest, SearchParams, SearchResult, TasksGetParams, TasksGetResult,
+    ThreadsGetParams, ThreadsGetResult, ThreadsListParams, ThreadsListResult, READ_DEFAULT_LIMIT,
+};
+use ms_store::read::{Category, CategoryTable, Cursor, InCategory, ReadStore};
+use serde::Serialize;
+use serde_json::Value;
+
+use crate::dispatch::Reply;
+
+pub fn is_read_method(name: &str) -> bool {
+    matches!(
+        name,
+        method::FOLDERS_LIST
+            | method::LABELS_LIST
+            | method::THREADS_LIST
+            | method::THREADS_GET
+            | method::MESSAGES_GET
+            | method::SEARCH
+            | method::CONTACTS_SEARCH
+            | method::TASKS_GET
+    )
+}
+
+pub struct ReadApi {
+    config_dir: PathBuf,
+    account_id: String,
+    store: Option<ReadStore>,
+}
+
+fn internal(e: impl std::fmt::Display) -> ErrorObject {
+    ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
+}
+
+fn not_found(what: &str, id: &str) -> ErrorObject {
+    ErrorObject::new(code::NOT_FOUND, format!("no {what} {id}"))
+}
+
+fn invalid(why: &str) -> ErrorObject {
+    ErrorObject::new(code::INVALID_PARAMS, format!("invalid params: {why}"))
+}
+
+fn to_reply(v: impl Serialize) -> Reply {
+    serde_json::to_value(v).map_err(internal)
+}
+
+fn split_counts(categories: Vec<Category>) -> (Vec<Value>, BTreeMap<String, CategoryCounts>) {
+    let mut counts = BTreeMap::new();
+    let mut models = Vec::with_capacity(categories.len());
+    for c in categories {
+        if let Some(n) = c.counts {
+            counts.insert(
+                c.id,
+                CategoryCounts {
+                    unread: n.unread,
+                    total: n.total,
+                },
+            );
+        }
+        models.push(c.data);
+    }
+    (models, counts)
+}
+
+impl ReadApi {
+    pub fn new(config_dir: PathBuf, account_id: String) -> Self {
+        ReadApi {
+            config_dir,
+            account_id,
+            store: None,
+        }
+    }
+
+    fn store(&mut self) -> Result<&ReadStore, ErrorObject> {
+        if self.store.is_none() {
+            let store = ReadStore::open(&self.config_dir)
+                .map_err(|e| internal(format!("could not open the database: {e}")))?;
+            self.store = Some(store);
+        }
+        Ok(self.store.as_ref().expect("opened above"))
+    }
+
+    fn check_account(&self, account_id: &str) -> Result<(), ErrorObject> {
+        if account_id == self.account_id {
+            return Ok(());
+        }
+        Err(ErrorObject::new(
+            code::UNKNOWN_ACCOUNT,
+            format!("unknown account {account_id}"),
+        ))
+    }
+
+    /// Answers a method [`is_read_method`] accepts.
+    pub fn call(&mut self, req: &RpcRequest) -> Reply {
+        match req.method.as_str() {
+            method::FOLDERS_LIST => {
+                let p: CategoriesListParams = req.params_as()?;
+                self.check_account(&p.account_id)?;
+                let rows = self
+                    .store()?
+                    .categories(CategoryTable::Folder, &p.account_id)
+                    .map_err(internal)?;
+                let (folders, counts) = split_counts(rows);
+                to_reply(FoldersListResult { folders, counts })
+            }
+            method::LABELS_LIST => {
+                let p: CategoriesListParams = req.params_as()?;
+                self.check_account(&p.account_id)?;
+                let rows = self
+                    .store()?
+                    .categories(CategoryTable::Label, &p.account_id)
+                    .map_err(internal)?;
+                let (labels, counts) = split_counts(rows);
+                to_reply(LabelsListResult { labels, counts })
+            }
+            method::THREADS_LIST => self.threads_list(req.params_as()?),
+            method::THREADS_GET => {
+                let p: ThreadsGetParams = req.params_as()?;
+                self.check_account(&p.account_id)?;
+                let store = self.store()?;
+                let thread = store
+                    .thread(&p.account_id, &p.id)
+                    .map_err(internal)?
+                    .ok_or_else(|| not_found("thread", &p.id))?;
+                let messages = store
+                    .thread_messages(&p.account_id, &p.id)
+                    .map_err(internal)?;
+                to_reply(ThreadsGetResult { thread, messages })
+            }
+            method::MESSAGES_GET => {
+                let p: MessagesGetParams = req.params_as()?;
+                self.check_account(&p.account_id)?;
+                let store = self.store()?;
+                let message = store
+                    .message(&p.account_id, &p.id)
+                    .map_err(internal)?
+                    .ok_or_else(|| not_found("message", &p.id))?;
+                let body = if p.body {
+                    store.message_body(&p.id).map_err(internal)?
+                } else {
+                    None
+                };
+                let files = message
+                    .get("files")
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                to_reply(MessagesGetResult {
+                    message,
+                    body,
+                    files,
+                })
+            }
+            method::SEARCH => {
+                let p: SearchParams = req.params_as()?;
+                self.check_account(&p.account_id)?;
+                let threads = self
+                    .store()?
+                    .search_threads(
+                        &p.account_id,
+                        &p.query,
+                        p.limit.unwrap_or(READ_DEFAULT_LIMIT),
+                    )
+                    .map_err(internal)?;
+                to_reply(SearchResult { threads })
+            }
+            method::CONTACTS_SEARCH => {
+                let p: SearchParams = req.params_as()?;
+                self.check_account(&p.account_id)?;
+                let contacts = self
+                    .store()?
+                    .search_contacts(
+                        &p.account_id,
+                        &p.query,
+                        p.limit.unwrap_or(READ_DEFAULT_LIMIT),
+                    )
+                    .map_err(internal)?;
+                to_reply(ContactsSearchResult { contacts })
+            }
+            method::TASKS_GET => {
+                let p: TasksGetParams = req.params_as()?;
+                self.check_account(&p.account_id)?;
+                let task = self
+                    .store()?
+                    .task(&p.account_id, &p.id)
+                    .map_err(internal)?
+                    .ok_or_else(|| not_found("task", &p.id))?;
+                to_reply(TasksGetResult { task })
+            }
+            other => Err(ErrorObject::new(
+                code::METHOD_NOT_FOUND,
+                format!("unknown method {other}"),
+            )),
+        }
+    }
+
+    fn threads_list(&mut self, p: ThreadsListParams) -> Reply {
+        self.check_account(&p.account_id)?;
+        let filters = [&p.folder_id, &p.label_id, &p.role]
+            .iter()
+            .filter(|f| f.is_some())
+            .count();
+        if filters > 1 {
+            return Err(invalid("give at most one of folderId, labelId and role"));
+        }
+        // Roleless folders and labels store "", which must not pick one of them.
+        if p.role.as_deref() == Some("") {
+            return Err(invalid("role is empty"));
+        }
+        let before = match &p.before {
+            Some(s) => Some(Cursor::decode(s).ok_or_else(|| invalid("before is not a cursor"))?),
+            None => None,
+        };
+        let account = p.account_id.as_str();
+        let store = self.store()?;
+        // (id, role) of the category to list, the role deciding whether threads outside
+        // all mail show.
+        let category: Option<(String, String)> = if let Some(id) = &p.folder_id {
+            let role = store
+                .category_role(CategoryTable::Folder, account, id)
+                .map_err(internal)?
+                .ok_or_else(|| not_found("folder", id))?;
+            Some((id.clone(), role))
+        } else if let Some(id) = &p.label_id {
+            let role = store
+                .category_role(CategoryTable::Label, account, id)
+                .map_err(internal)?
+                .ok_or_else(|| not_found("label", id))?;
+            Some((id.clone(), role))
+        } else if let Some(role) = &p.role {
+            let id = store
+                .category_for_role(account, role)
+                .map_err(internal)?
+                .ok_or_else(|| not_found("folder or label with role", role))?;
+            Some((id, role.clone()))
+        } else {
+            None
+        };
+        let page = store
+            .threads(
+                account,
+                category.as_ref().map(|(id, role)| InCategory { id, role }),
+                p.limit.unwrap_or(READ_DEFAULT_LIMIT),
+                before.as_ref(),
+            )
+            .map_err(internal)?;
+        to_reply(ThreadsListResult {
+            threads: page.threads,
+            next: page.next.map(|c| c.encode()),
+        })
+    }
+}

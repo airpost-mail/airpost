@@ -6,8 +6,9 @@
 //! [`platform::uds`](crate::platform::uds).
 //!
 //! One acceptor thread, and per connection a reader thread and a writer thread draining a
-//! bounded queue (1.6). Requests other than `hello` and `subscribe` become [`Command`]s for
-//! the main thread and are answered in order. The [`Hub`] is the `DeltaStream`'s sink: it
+//! bounded queue (1.6). The read methods are answered on the reader thread
+//! ([`crate::read_api`]); requests other than those, `hello` and `subscribe` become
+//! [`Command`]s for the main thread. Each connection's requests are answered in order. The [`Hub`] is the `DeltaStream`'s sink: it
 //! fans each flushed line out to every subscriber whose filter matches, without blocking;
 //! a subscriber whose queue passes the bound is sent `disconnect` and closed (1.4). The
 //! account secrets delta never reaches the socket: it stays on the parent's stdout, where
@@ -36,6 +37,7 @@ use tracing::{info, warn};
 
 use crate::dispatch::{Command, Reply, Request};
 use crate::platform;
+use crate::read_api::{is_read_method, ReadApi};
 
 /// How long a blocked write waits before the writer checks whether its connection is
 /// being dropped.
@@ -378,6 +380,8 @@ pub struct Server {
     pub deltas: Arc<DeltaStream>,
     pub started: Instant,
     pub commands: Sender<Command>,
+    /// Where the read methods open their own read-only database connection.
+    pub config_dir: PathBuf,
 }
 
 /// Starts the acceptor thread on a bound listener.
@@ -429,11 +433,13 @@ fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>) {
         warn!("-X Dropping socket connection {id}: {e}");
         return;
     }
+    let reads = ReadApi::new(server.config_dir.clone(), server.account.id().to_owned());
     let conn = Connection {
         id,
         server,
         outbox: outbox.clone(),
         hello: false,
+        reads,
     };
     let reader = std::thread::Builder::new()
         .name(thread::SOCKET_READER.into())
@@ -479,6 +485,7 @@ struct Connection {
     server: Arc<Server>,
     outbox: Arc<Outbox>,
     hello: bool,
+    reads: ReadApi,
 }
 
 impl Connection {
@@ -543,6 +550,7 @@ impl Connection {
                 Err(e) => Err(e),
             },
             method::ENGINE_STATUS => Ok(self.status()),
+            name if is_read_method(name) => self.reads.call(&req),
             method::TASK_QUEUE => req.params_as::<TaskQueueParams>().and_then(|p| {
                 self.check_account(&p.account_id)?;
                 if !p.task.is_object() {

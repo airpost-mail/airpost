@@ -13,6 +13,8 @@ mod modes;
 mod output;
 mod platform;
 #[cfg(unix)]
+mod read_api;
+#[cfg(unix)]
 mod socket;
 mod stdin_loop;
 

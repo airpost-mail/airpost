@@ -312,6 +312,7 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
     if let Some((hub, listener)) = socket {
         let path = opts.socket.clone().unwrap_or_default();
         let (account, deltas, orphan) = (ctx.account.clone(), ctx.deltas.clone(), opts.orphan);
+        let config_dir = ctx.config_dir.clone();
         return dispatch::run(ctx, move |commands| {
             crate::socket::serve(
                 listener,
@@ -321,6 +322,7 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
                     deltas,
                     started,
                     commands: commands.clone(),
+                    config_dir,
                 },
             );
             let shown = path.to_string_lossy();

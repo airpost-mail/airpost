@@ -15,6 +15,7 @@ mod client;
 mod envelope;
 mod frame;
 mod methods;
+mod read;
 
 pub use client::{Client, ClientError, Notifications};
 pub use envelope::{
@@ -23,6 +24,7 @@ pub use envelope::{
 };
 pub use frame::{encode, read_frame, write_frame, FrameError};
 pub use methods::*;
+pub use read::*;
 
 /// The protocol version a `hello` names. Additive changes (a new method, a new optional
 /// field) keep it; a breaking change bumps it.
@@ -35,6 +37,12 @@ pub const JSONRPC_VERSION: &str = "2.0";
 /// error and ends the connection.
 pub const MAX_LINE_BYTES: usize = 64 * 1024 * 1024;
 
+/// The rows a read method returns when the request names no `limit`.
+pub const READ_DEFAULT_LIMIT: usize = 50;
+
+/// The most rows a read method returns; a larger `limit` is clamped to it.
+pub const READ_MAX_LIMIT: usize = 500;
+
 /// Method and notification names.
 pub mod method {
     pub const HELLO: &str = "hello";
@@ -45,6 +53,14 @@ pub mod method {
     pub const BODIES_FETCH: &str = "bodies.fetch";
     pub const CALENDAR_SYNC: &str = "calendar.sync";
     pub const ENGINE_STATUS: &str = "engine.status";
+    pub const FOLDERS_LIST: &str = "folders.list";
+    pub const LABELS_LIST: &str = "labels.list";
+    pub const THREADS_LIST: &str = "threads.list";
+    pub const THREADS_GET: &str = "threads.get";
+    pub const MESSAGES_GET: &str = "messages.get";
+    pub const SEARCH: &str = "search";
+    pub const CONTACTS_SEARCH: &str = "contacts.search";
+    pub const TASKS_GET: &str = "tasks.get";
     /// Notification: one flushed delta, `params` = [`DeltaParams`](crate::DeltaParams).
     pub const DELTA: &str = "delta";
     /// Notification: the engine is about to close the connection, `params` =
@@ -71,4 +87,6 @@ pub mod code {
     pub const TASK_REJECTED: i64 = -32002;
     /// A request other than `hello` came before a successful `hello`.
     pub const HELLO_REQUIRED: i64 = -32003;
+    /// A read named a folder, label, thread or message the account does not have.
+    pub const NOT_FOUND: i64 = -32004;
 }

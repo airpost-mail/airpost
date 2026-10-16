@@ -205,7 +205,7 @@ fn errors_parse_method_params_account() {
 
     let code_of = |c: &mut Client, m: &str, p: Value| c.call(m, p).unwrap_err().code();
     assert_eq!(
-        code_of(&mut c, "folders.list", json!({})),
+        code_of(&mut c, "no.such.method", json!({})),
         Some(code::METHOD_NOT_FOUND)
     );
     assert_eq!(
