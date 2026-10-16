@@ -29,7 +29,7 @@ item n of 0.1.
 | L12 | Outlook categories via Graph come after desktop-client-plan stage 12, when OAuth moves into the engine (T14), and only if the user wants them (Q3). Exchange's IMAP doesn't take custom keywords (verified for on-prem, strongly indicated for Exchange Online, 3.3), so until then Microsoft accounts use `tern`. |
 | L13 | `Account.usesLabels()` keeps its meaning, "the Gmail label model", because plugins call it. A new `Account.supportsLabels()` is true once the engine reports a store for the account (2.6); it is false before the first folder sync and against an engine without the feature (the C++ engine), which keeps today's UI. |
 | L14 | Search: `in:<label>` works from the first stage through `ThreadSearch.categories`; `label:` lands in the engine grammar with desktop-client-plan stage 9 (T6), not in the desktop parser. |
-| L15 | Colours (7.1). A curated palette of 25 named colours, one per Outlook preset (`preset0`..`preset24`), so a colour maps across stores without loss. A label's colour is a palette key in the registry (L11), or none, which keeps today's hue derived from the name. Chips and dots are drawn from the label's base colour mixed with theme variables, never with hard-coded colours, so every theme (Darkside included) controls contrast. The rendering ships first, for today's Gmail labels (stage C1). |
+| L15 | Colours (7.1). The user picks a label colour scheme, from which every label gets a colour automatically, and can set any colour on a single label. Both are desktop settings, per device, keyed by label name. Chips and dots are drawn from the label's colour mixed with theme variables, never hard-coded colours, so they stay legible in every theme (Darkside included). Desktop only, so it ships first, for today's Gmail labels (stage C1). |
 
 ### 0.1 To confirm with the user
 
@@ -76,10 +76,8 @@ Recommended answer first.
 10. **Hybrid sidebar.** Two sections per non-Gmail account, Folders then Labels, instead of
     one mixed section? *Two sections.* One section titled by the inbox's class
     (`sidebar-section.ts:217-228`, V) can't name both.
-11. **Custom colours.** Palette only in v1, no free hex picker? *Palette only.* 25 colours
-    cover Gmail's and Thunderbird's hues (7.1), every one maps to an Outlook preset, and each is
-    checked for contrast in every theme. A custom hex can't be guaranteed legible in all themes
-    and has no Outlook equivalent; it can be added later as a nearest-preset mapping if users ask.
+11. **Label colours.** Decided by the user, 2026-10-16: keep it simple, a scheme the app
+    colours labels from, plus full per-label customisation (any colour). 7.1.
 
 ## 1. Today
 
@@ -173,7 +171,7 @@ Same table and columns as today. New JSON fields, all optional so Gmail rows sta
   "role": "",                    // "" for user labels; "important" for $Important (Q5)
   "store": "keywords",           // gmail | keywords | tern | outlook
   "key": "clients/acme",         // keywords: the atom; outlook: the category name; absent for gmail and tern
-  "color": "dark-blue",          // palette key from the registry (L11, 7.1); absent = the desktop's hue
+  "color": "#3b82f6",            // from the registry (L11); absent = the desktop's colour (7.1)
   "system": false                // true for $label1..5 and Important (rename is display-only)
 }
 ```
@@ -220,7 +218,7 @@ the rule later needs a rescan (`lastDeep = 0` on every folder), which a migratio
 Object type `label`, object id = the label id, plugin id `tern-labels`, one row per label:
 
 ```jsonc
-{"name": "Clients/Acme", "color": "dark-blue", "createdAt": 1760600000, "deletedAt": null}
+{"name": "Clients/Acme", "color": "#3b82f6", "createdAt": 1760600000, "deletedAt": null}
 ```
 
 - `gmail` and `keywords`: holds the colour and, for a label no message carries yet, its
@@ -526,26 +524,29 @@ gradient and inset shadow, and `backgroundColorDark` for the dots in the label a
 with `filter: contrast(110%) brightness(85%)` (`ui-dark/styles/ui-variables.less:67`), the
 thread list greys chips on a selected row with `filter: brightness(600%) grayscale(100%)`
 (`thread-list.less:30-36`), and Darkside paints them `@accent` on a focused row
-(`darkside-labels.less`). No colour is stored, so a user can't pick one.
+(`darkside-labels.less`). The user can't choose a colour.
 
-**Palette.** 25 keys in Outlook preset order: `red`, `orange`, `brown`, `yellow`, `green`,
-`teal`, `olive`, `blue`, `purple`, `cranberry` (preset0..9), `steel`, `dark-steel`, `gray`,
-`dark-gray`, `black` (10..14), `dark-red` .. `dark-cranberry` (15..24, the dark form of 0..9).
-Mapping across stores:
+**What the user gets.** Two ways to colour labels, both in the desktop only:
+- **A scheme.** Preferences > Appearance > "Label colours" picks one of a few schemes:
+  Automatic (today's hue from the name, the default, so nothing changes unless the user picks
+  another), Bright, Pastel, Muted, Earth, Grey. A scheme is a list of 12 colours; each label gets
+  the colour at `hash(lowercased name) % 12`, so a label keeps its colour as labels come and go,
+  and "Work" has the same colour in every account.
+- **Per label.** "Colour..." in the sidebar label menu and on each row of the label picker: the
+  current scheme's 12 swatches, a free colour picker (any colour), and "Reset" back to the scheme.
+  A per-label colour beats the scheme.
 
-| Store or client | Colour model | Mapping |
-|---|---|---|
-| Outlook (L7) | `color` = `None` or `preset0`..`preset24`; the actual colour depends on the Outlook client (W: Graph `outlookCategory`) | one key per preset, both ways; `None` = no colour (derived hue) |
-| Thunderbird | per-install prefs, never on the server (3.1) | `$label1`..`$label5` defaults to `red`, `orange`, `green`, `blue`, `purple` (Thunderbird's `#FF0000`, `#FF9900`, `#009900`, `#3333FF`, `#993399`); other keywords get the derived hue |
-| Gmail | a fixed list of about 100 background/text hex pairs, settable only through the Gmail API (W: Gmail API `users.labels`); X-GM-LABELS carries no colour (U) | none: Tern syncs Gmail over IMAP and doesn't see Gmail's colours, so Gmail labels start on the derived hue and take Tern colours from the registry. The families cover Gmail's hue columns (red, orange, yellow, green, teal, blue, purple, pink as `cranberry`) should a Gmail API import ever be wanted |
-| `keywords`, `tern` | registry only | key as stored |
+**Storage.** Desktop config, per device: `core.appearance.labelColorScheme` and
+`core.appearance.labelColors` (`{lowercased label name: "#rrggbb"}`). Keyed by name rather than
+label id, so one choice covers the label in every account (matching the unified label views,
+Q7) and survives a Gmail rename, whose id changes; the rename handler moves the entry to the
+new name. No engine change, so it works for today's Gmail labels and later for keyword and
+`tern` labels unchanged. Syncing colours between devices is left for later: it would go through
+the Tern backend with the registry (L4), as a user-level setting.
 
-Each key's base colour is Tern's own value, defined in the theme variables (a theme may retune
-it), and chosen so the mixes below pass the contrast check in every bundled theme.
-
-**Rendering.** Every label resolves to one base colour: `var(--label-<key>)` for a registry
-colour, else `hsl(<hue()> 62% 47%)`, so labels without a colour keep today's hue. The inline
-style sets only `--label-base`; the stylesheet derives the rest from theme variables:
+**Legibility in every theme.** Every label resolves to one base colour (per-label colour, else
+the scheme's, else `hsl(<hue()> 62% 47%)` for Automatic). The inline style sets only
+`--label-base`; the stylesheet derives the chip and dot from theme variables:
 
 ```less
 .mail-label {
@@ -557,33 +558,27 @@ style sets only `--label-base`; the stylesheet derives the rest from theme varia
 ```
 
 - Each theme sets `--label-surface` and `--label-ink` from its own LESS variables (background
-  and text colour), the mix percentages, and the 25 `--label-<key>` values, in one
-  `label-colors.less` per theme over a default in `static/style`. Scopes with a different
-  background redefine the surface and ink: Darkside's dark sidebar for dots, a selected or
-  focused thread row (surface = `@accent` or the selection colour), the dark message pane. That
-  replaces the three filter rules above.
+  and text colour) and the mix percentages, in one `label-colors.less` per theme over a default
+  in `static/style`. Scopes with a different background redefine surface and ink: Darkside's
+  dark sidebar, a selected or focused thread row (surface = `@accent` or the selection colour),
+  the dark message pane. That replaces the three filter rules above.
+- Because chip text is mixed toward the theme's ink and the background toward its surface, a
+  free colour stays readable: a dark blue picked in a light theme still gives light text on a
+  dark-blue tint in ui-dark. The scheme colours are checked for contrast in every bundled theme;
+  free colours aren't guaranteed, only kept close by the mix.
 - `color-mix` and `oklab` are in Electron 44's Chromium (`apps/desktop/package.json:50`, V for
-  the version). Mixing in oklab keeps perceived lightness even across hues, which `hsl()` doesn't
-  (yellow and blue at the same `hsl` lightness differ widely in contrast).
+  the version). Mixing in oklab keeps perceived lightness even across hues, which `hsl()` doesn't.
 - `LabelColorizer` keeps its exported functions for plugins (`color`, `backgroundColor`,
-  `backgroundColorDark`, `styles`), now returning the same `color-mix(...)` strings, and gains
+  `backgroundColorDark`, `styles`), returning the same `color-mix(...)` strings, and gains
   `baseColor(label)` and `dotStyle(label)`. The snooze chip (`snooze-mail-label.less`) uses the
-  same variables.
-- The gradient and white inset highlight go: they assume a light chip.
+  same variables. The gradient and white inset highlight go: they assume a light chip.
 
-**Overrides.** "Edit colour" in the label picker and the sidebar label menu shows the palette as
-a grid in preset order plus "Automatic" (no colour). It queues `SyncbackCategoryTask {kind:
-"label", color}`; the engine writes the registry row (L11) and, on `outlook` labels, PATCHes the
-category's `color` (L7), where the server is the truth and the registry mirrors it. Colours sync
-between devices only with a Tern server; without one they stay on the device (`LocalOnly`).
-System keyword labels (`$label1`..`$label5`) start on their Thunderbird mapping and can be
-changed like any other.
-
-**Order.** The palette and the theme-aware rendering don't depend on L2 or L3, so they come
-first (C1), for today's Gmail labels on the derived hue. Stored colours need the registry,
-which this section pulls forward from L4 into C2: only the colour and existence parts (the
-`label` metadata object type, `color` on Label JSON and `SyncbackCategoryTask`, "Edit colour"
-for Gmail labels). The `tern`-store parts of the registry (names, merge, tombstones) stay in L4.
+**Other clients.** Thunderbird's `$label1`..`$label5` start on Thunderbird's colours (`#FF0000`,
+`#FF9900`, `#009900`, `#3333FF`, `#993399`, 3.1) unless the user sets one. Gmail's own label
+colours live only in the Gmail API (W: Gmail API `users.labels`), which Tern doesn't use, so Tern
+doesn't read or write them. Outlook categories (L7) carry one of 25 presets (W: Graph
+`outlookCategory`): Tern shows the preset's colour unless the user sets one, and writes the
+nearest preset when it does.
 
 ## 8. Engine, CLI and MCP surface
 
@@ -605,21 +600,20 @@ Sizes are rough. "Stage n" without a prefix refers to `docs/desktop-client-plan.
 
 | # | Stage | Depends on | Size |
 |---|---|---|---|
-| C1 | Label colours, rendering (7.1): palette keys and per-theme `label-colors.less` (ui-light default, ui-dark, ui-darkside, ui-taiga, ui-less-is-more), `LabelColorizer` on `--label-base`, chip, dot and picker styles, the filter rules removed, contrast spec. Today's Gmail labels on the derived hue | — | ~250 TS/LESS |
-| C2 | Label colours, storage (7.1): `label` metadata object type in the engine (`LocalOnly`, backend allow-list with Q9), `color` on Label JSON and `SyncbackCategoryTask`, "Edit colour" in the label picker and sidebar menu for Gmail labels | C1; after stage 1 (touches `crates/ms-sync`) | ~250 Rust, ~200 TS |
+| C1 | Label colours (7.1): schemes and per-label colours in desktop config, Preferences > Appearance picker, "Colour..." in the sidebar menu and label picker, per-theme `label-colors.less` (ui-light default, ui-dark, ui-darkside, ui-taiga, ui-less-is-more), `LabelColorizer` on `--label-base`, the filter rules removed, contrast spec. Today's Gmail labels | — | ~450 TS/LESS |
 | L1 | IMAP groundwork: PERMANENTFLAGS and FLAGS in `SelectInfo`; `store_keywords`; keywords in `MessageAttributes`, `matches`, the per-copy column; COPY-fallback STORE fix; profile `keyword_labels`; fake IMAP per-personality PERMANENTFLAGS, keyword limit, drop mode | — | ~700 Rust, ~200 Python |
 | L2 | Keyword store: store choice, label discovery from copies, Label JSON fields, per-store resolver in the thread rollup, `ChangeLabelsTask` / `SyncbackCategoryTask` / `DestroyCategoryTask` with `kind`, rename as retag, read-back check, sent-copy keywords, `labels.list.store`; tern-mcp and CLI changes | L1 | ~1.3k Rust |
 | L3 | Desktop hybrid UI: `supportsLabels`, sidebar sections, picker, chips, perspectives, TaskFactory, rules action set, keymaps | L2; after stage 2 (mcp-server deleted) | ~900 TS |
-| L4 | `tern` store and the rest of the registry: `tern-labels` metadata, names and merge for `tern` labels, `LabelStoreMigrationTask`, Preferences override | L2, L3, C2 | ~1k Rust, ~250 TS |
+| L4 | `tern` store and registry: `tern-labels` metadata, `label` object type in engine and backend, merge, `LabelStoreMigrationTask`, Preferences override | L2, L3 | ~1.1k Rust, ~50 backend, ~300 TS |
 | L5 | `label:` in the engine search grammar | L2, stage 9 | ~150 Rust |
 | L6 | Unified label views | L3 | ~300 TS |
-| L7 | Outlook categories via Graph (Q3), colours as presets (7.1) | L4, stage 12 | ~2k Rust |
+| L7 | Outlook categories via Graph (Q3), colours as nearest preset (7.1) | L4, stage 12 | ~2k Rust |
 
-Order: C1 first, now: it touches only the desktop's label rendering and theme stylesheets
-(`mail-label.tsx`, `extra.less`, `thread-list.less`, the pickers, `category-selection.tsx`, the
-`ui-*` themes), none of which desktop-client stages 1, 2 or 6 change; the theme worktrees
-(`ui/theme`, `ui/email-dark`) are checked with ternmail-ab before the `ui-*` files are edited.
-C2 after stage 1 is on main, beside L2. L1 and L2 any time; they touch the IMAP layer, placements and tasks, which no
+Order: C1 first, now: it touches only the desktop's label rendering, theme stylesheets and two
+config keys (`mail-label.tsx`, `extra.less`, `thread-list.less`, the pickers,
+`category-selection.tsx`, the sidebar label menu, Preferences > Appearance, the `ui-*` themes),
+none of which desktop-client stages 1, 2 or 6 change; the theme worktrees (`ui/theme`,
+`ui/email-dark`) are checked with ternmail-ab before the `ui-*` files are edited. L1 and L2 any time; they touch the IMAP layer, placements and tasks, which no
 desktop-client stage touches. L3 after stage 2, and before stage 14 so the rules port in 14
 carries the hybrid action set; it touches category-picker, account-sidebar, mail-label-set,
 TaskFactory and perspectives, none of which stages 1-13 change, so it can run beside them.
@@ -669,12 +663,11 @@ non-ASCII); resolver per store; label id derivation; the registry merge.
 Backend (L4): `crates/ms-net/tests/backend_server.rs` gains a `label` row round trip and two
 devices labelling the same message.
 
-Colours (C1, C2): a spec that computes the oklab mixes in TS for every palette key and a hue
-every 15°, against each bundled theme's surface and ink (selected rows and Darkside's sidebar
-included), and requires 4.5:1 for chip text on the chip and 3:1 for dots on their surface (WCAG
-1.4.3, 1.4.11); `LabelColorizer` returning the same colour for a Gmail label with no registry
-row as the derived hue; the registry round trip of `color` through `SyncbackCategoryTask`; the
-Outlook preset mapping both ways (L7).
+Colours (C1): a spec that computes the oklab mixes in TS for every scheme colour and a hue
+every 15° (Automatic), against each bundled theme's surface and ink (selected rows and Darkside's
+sidebar included), requiring 4.5:1 for chip text on the chip and 3:1 for dots on their surface
+(WCAG 1.4.3, 1.4.11); scheme assignment stable by name; a per-label colour beating the scheme;
+Automatic giving today's hue; a rename moving the per-label colour.
 
 Desktop (L3): specs for the hybrid sidebar sections, picker on a keyword account, chips showing
 labels but not folders, perspective remove and drag on a label view, `TaskFactory` archive on a
@@ -732,5 +725,6 @@ research pass on Thunderbird tags, keyword limits and Exchange (section 3). Noth
 implemented. Waiting for the user to confirm section 0.1.
 
 2026-10-16: COPY-fallback fix (step 1) committed on `roadmap/labels` (5f203f1b1,
-`move-without-move-keeps-keywords`). Section 7.1 (label colours, L15, Q11, stages C1 and C2)
-added at the user's request; C1 is next, ahead of L1.
+`move-without-move-keeps-keywords`). Section 7.1 (label colours, L15, stage C1) added at the
+user's request: a scheme plus per-label colours, desktop only. C1 is next, ahead of L1.
+Questions 1-10 of 0.1 still to confirm.
