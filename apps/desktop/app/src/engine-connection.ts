@@ -20,6 +20,9 @@ routed by the account states in the status the way EngineClient.send routes them
 account.add answered, dropped while a reset holds the account, refused when the engine doesn't
 run it, and kept while the socket is down so the reconnect sends them. Credentials never pass
 here.
+
+MailsyncBridge feeds the window's EngineEvents from it: the hello's features and request() while
+connected, and each mail.new.
 */
 import { EventEmitter } from 'events';
 import net from 'net';
@@ -29,6 +32,7 @@ import {
   EngineStatusResult,
   HelloParams,
   HelloResult,
+  MailNewParams,
   MAX_LINE_BYTES,
   Method,
   PROTOCOL_VERSION,
@@ -81,7 +85,8 @@ export function processStateDeltas(accounts: AccountStatus[]) {
 }
 
 /*
-Emits 'deltas' (string[]), 'connected' (HelloResult) once hello answered, and 'disconnected'.
+Emits 'deltas' (string[]), 'connected' (HelloResult) as hello's answer is read (before the
+deltas after it), 'mail-new' (MailNewParams) after the deltas read with it, and 'disconnected'.
 */
 export class EngineConnection extends EventEmitter {
   clientName: string;
@@ -252,23 +257,26 @@ export class EngineConnection extends EventEmitter {
     this._generation = generation;
 
     // Writes before 'connect' are buffered by the socket, and the engine reads in order, so
-    // hello is handled first.
-    this.request<HelloResult>(Method.Hello, {
-      protocol: PROTOCOL_VERSION,
-      client: this.clientName,
-    } as HelloParams).then(
+    // hello is handled first. 'connected' goes out as its answer is read, so the features are
+    // known before the deltas that follow it are applied.
+    this.request<HelloResult>(
+      Method.Hello,
+      { protocol: PROTOCOL_VERSION, client: this.clientName } as HelloParams,
       (hello) => {
         if (this._socket !== socket) return;
         this.hello = hello;
         this._reconnectDelay = RECONNECT_FIRST_DELAY_MS;
-        this.emit('connected', hello);
-      },
-      (err) => {
-        if (this._socket !== socket) return;
-        console.warn(`The sync engine refused hello: ${err.message}`);
-        this._disconnect();
+        try {
+          this.emit('connected', hello);
+        } catch (err) {
+          console.error(`A sync engine 'connected' listener failed: ${err}`);
+        }
       }
-    );
+    ).catch((err) => {
+      if (this._socket !== socket) return;
+      console.warn(`The sync engine refused hello: ${err.message}`);
+      this._disconnect();
+    });
     this._subscribe();
     if (this.mainWindow) {
       this.request<EngineStatusResult>(Method.EngineStatus, {}, (result, deltas) => {
@@ -296,11 +304,13 @@ export class EngineConnection extends EventEmitter {
       const lines = inBuffer.split('\n');
       inBuffer = lines.pop();
       const deltas: string[] = [];
+      const mailNew: MailNewParams[] = [];
       let drop = false;
       for (const line of lines) {
-        drop = this._onLine(line, deltas) || drop;
+        drop = this._onLine(line, deltas, mailNew) || drop;
       }
       if (deltas.length) this.emit('deltas', deltas);
+      for (const params of mailNew) this.emit('mail-new', params);
       if (drop) this._dropped(socket);
     });
     socket.on('error', (err: Error) => {
@@ -310,8 +320,9 @@ export class EngineConnection extends EventEmitter {
     socket.on('close', () => this._dropped(socket));
   }
 
-  // Adds a delta to `deltas`, settles a request, or returns true when the engine dropped us.
-  _onLine(line: string, deltas: string[]): boolean {
+  // Adds a delta to `deltas` or a mail.new to `mailNew`, settles a request, or returns true
+  // when the engine dropped us.
+  _onLine(line: string, deltas: string[], mailNew: MailNewParams[] = []): boolean {
     if (!line) return false;
     const params = deltaParamsText(line);
     if (params !== null) {
@@ -327,6 +338,10 @@ export class EngineConnection extends EventEmitter {
     }
     if (msg.method === Method.Delta) {
       deltas.push(JSON.stringify(msg.params));
+      return false;
+    }
+    if (msg.method === Method.MailNew) {
+      if (msg.params) mailNew.push(msg.params as MailNewParams);
       return false;
     }
     if (msg.method === Method.Disconnect) {

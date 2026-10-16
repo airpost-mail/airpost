@@ -2,13 +2,13 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-The serve engine as the main window's stores and packages see it: the features its hello
-announced, socket requests to it, and the notifications MailsyncBridge doesn't turn into
-database changes. MailsyncBridge feeds it; with per-account engines or the C++ engine nothing
-does, so `features` stays null and every `has()` is false.
+The serve engine as a window's stores and packages see it: the features its hello announced,
+socket requests to it, and the notifications MailsyncBridge doesn't turn into database changes.
+MailsyncBridge feeds it from the window's EngineConnection; with per-account engines or the C++
+engine nothing does, so `features` stays null and every `has()` is false.
 
-Events: 'connected' (features) after each hello, 'gone' when the engine exits, 'thread-counts'
-({type, rows}) for each ThreadCounts delta, 'mail-new' (MailNewParams).
+Events: 'connected' (features) after each hello, 'gone' when the connection drops,
+'thread-counts' ({type, rows}) for each ThreadCounts delta, 'mail-new' (MailNewParams).
 */
 import { EventEmitter } from 'events';
 import type { MailNewParams, ThreadCountsRow } from './engine-protocol';

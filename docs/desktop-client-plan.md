@@ -1170,4 +1170,10 @@ a window's socket is down or the main window is reloading are lost to it, so tho
 handlers don't run; a non-main window misses an account's first deltas until its subscribe
 follows the status; a stale `run/engine.json` with a reused pid costs the full 40 s; Squirrel
 install after the engine stop is unchecked on a signed build; `test-crash` has no socket
-method; KeyManager still keys by email (stage 11).
+method; KeyManager still keys by email (stage 11). Rebased on stages 1 and 2: each window's
+connection feeds its `EngineEvents` (hello features as the answer is read, `request()` for
+`counts.get`, `gone` on a drop, `mail.new`) and `applyDeltas` hands `ThreadCounts` deltas to it
+in every window, never rebroadcast; `ThreadCountsStore` and `unread-notifications` still run in
+the main window only. The supervisor's `EngineClient` drops stage 1's hello, gone and
+`mail.new` hooks and its `features()`/`request()`; its own connection still receives `mail.new`
+(not class-filtered) and ignores it.

@@ -16,6 +16,8 @@ import DatabaseObjectRegistry from '../registries/database-object-registry';
 import { MailsyncProcess, MailsyncProcessExit, resolveSyncEngine } from '../mailsync-process';
 import { CrashTracker, isAuthFailure, serveEngineSelected } from '../engine-client';
 import { EngineConnection } from '../engine-connection';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../engine-events';
+import { THREAD_COUNTS_CLASS } from '../engine-protocol';
 import { AccountEvent, EngineStatus, SupervisorChannel } from '../supervisor-channels';
 import KeyManager from '../key-manager';
 import * as Actions from './actions';
@@ -54,10 +56,11 @@ function convertDeltaModels(modelJSONs: any[], modelClass: string) {
 }
 
 /*
-Applies one batch of delta lines in a window. Every window triggers DatabaseStore; only the main
-window runs what must happen once: Task onSuccess/onError (send sound, error dialogs, send
-hooks), ProcessState into OnlineStatusStore, and, for the engines the main window runs itself,
-ProcessAccountSecretsUpdated into KeyManager and the rebroadcast to the other windows.
+Applies one batch of delta lines in a window. Every window triggers DatabaseStore and hands
+ThreadCounts deltas to its EngineEvents; only the main window runs what must happen once: Task
+onSuccess/onError (send sound, error dialogs, send hooks), ProcessState into OnlineStatusStore,
+and, for the engines the main window runs itself, ProcessAccountSecretsUpdated into KeyManager
+and the rebroadcast to the other windows.
 */
 export function applyDeltas(
   msgs: string[],
@@ -98,6 +101,11 @@ export function applyDeltas(
       if (mainWindow) KeyManager.extractAndStoreAccountSecrets(new Account(modelJSONs[0]));
       continue;
     }
+    // Not a model either, and not rebroadcast: ThreadCountsStore applies them where it runs.
+    if (modelClass === THREAD_COUNTS_CLASS) {
+      EngineEvents.threadCounts({ type, rows: modelJSONs });
+      continue;
+    }
 
     if (rebroadcast) {
       ipcRenderer.send('mailsync-bridge-rebroadcast-to-all', msg);
@@ -116,6 +124,21 @@ export function applyDeltas(
     DatabaseStore.trigger(record);
     if (mainWindow) runTaskHandlers(record);
   }
+}
+
+// The window's EngineEvents follows its connection: the features of each hello and requests on
+// it until the connection drops, and the mail.new notifications.
+export function feedEngineEvents(
+  connection: EngineConnection,
+  events: EngineEventsType = EngineEvents
+) {
+  connection.on('connected', (hello) =>
+    events.connected((hello && hello.features) || [], (method, params) =>
+      connection.request(method, params)
+    )
+  );
+  connection.on('disconnected', () => events.gone());
+  connection.on('mail-new', (params) => events.mailNew(params));
 }
 
 // Runs task success / error handlers if the task is now complete.
@@ -428,6 +451,7 @@ export default class MailsyncBridge {
       mainWindow: this._mainWindow,
     });
     connection.on('deltas', this._onIncomingMessages);
+    feedEngineEvents(connection);
     let statusSeen = false;
     ipcRenderer.on(SupervisorChannel.Status, (_event, status: EngineStatus) => {
       statusSeen = true;
