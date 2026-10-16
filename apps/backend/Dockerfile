@@ -2,7 +2,9 @@
 #   docker build -f apps/backend/Dockerfile -t tern-backend .
 # Dockerfile.dockerignore keeps the context to the workspace sources.
 # The image binds 0.0.0.0:5101 (loopback is unreachable from a proxy container) and keeps all
-# state in /data. Set TERN_PUBLIC_URL to the https URL clients and recipients use.
+# state in /data; /backups is there for scheduled backups (TERN_BACKUP_DIR). The health check is
+# `tern-backend healthcheck`, since the image has no shell or curl. Set TERN_PUBLIC_URL to the
+# https URL clients and recipients use.
 # /usr/share/doc/tern-backend holds the licence (GPL-3.0-only), NOTICE.md, the crates'
 # licences and SOURCE.txt. A published image must be built with SOURCE_URL (the repository URL)
 # and SOURCE_TAG (a tag naming the commit built), which SOURCE.txt and the OCI labels point to.
@@ -16,14 +18,17 @@ RUN apt-get update -qq \
  && rm -rf /var/lib/apt/lists/* \
  && cargo install --locked cargo-about --version 0.9.2 --features cli
 COPY Cargo.toml Cargo.lock about.toml about.hbs LICENSE.md NOTICE.md ./
-# Cargo reads every member's manifest; only tern-backend and ms-wire are compiled.
+# Cargo reads every workspace member's manifest and targets, so every Rust app is copied (and
+# listed in Dockerfile.dockerignore); only tern-backend and ms-wire are compiled.
 COPY crates ./crates
 COPY apps/engine ./apps/engine
+COPY apps/cli ./apps/cli
+COPY apps/mcp ./apps/mcp
 COPY apps/backend ./apps/backend
 RUN cargo build --release --locked -p tern-backend --bin tern-backend \
  && apps/engine/packaging/third-party-notices.sh /doc/THIRD-PARTY-NOTICES.txt apps/backend/Cargo.toml \
  && cp LICENSE.md NOTICE.md /doc/ \
- && mkdir -p /data
+ && mkdir -p /data /backups
 ARG SOURCE_URL=
 ARG SOURCE_TAG=
 # GPLv3 6(d) and LGPL-2.1 6: directions to the source of tern-backend and of the Debian packages
@@ -52,6 +57,8 @@ LABEL org.opencontainers.image.licenses="GPL-3.0-only" \
 COPY --from=build /src/target/release/tern-backend /usr/local/bin/tern-backend
 COPY --from=build /doc /usr/share/doc/tern-backend
 COPY --from=build --chown=nonroot:nonroot /data /data
+# Empty and owned by the server, so a volume mounted here (deploy/backend) is writable.
+COPY --from=build --chown=nonroot:nonroot /backups /backups
 ENV TERN_DATA_DIR=/data \
     TERN_BIND=0.0.0.0:5101
 VOLUME /data

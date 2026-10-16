@@ -8,6 +8,8 @@
 !NOTICE.md
 !crates/
 !apps/engine/
+!apps/cli/
+!apps/mcp/
 !apps/backend/
 **/target/
 apps/engine/test/
