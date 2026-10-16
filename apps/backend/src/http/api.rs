@@ -29,6 +29,7 @@ pub async fn server_info(State(state): State<AppState>) -> Json<ServerInfo> {
             Signup::Closed => SignupMode::Closed,
         },
         features: s.features,
+        api_version: crate::wire::API_VERSION,
     })
 }
 

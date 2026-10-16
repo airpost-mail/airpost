@@ -32,6 +32,9 @@ pub const MAX_VALUE_BYTES: usize = 64 * 1024;
 pub const MAX_STREAMS_PER_ACCOUNT: usize = 4;
 /// Server-side limit on accounts per user.
 pub const MAX_ACCOUNTS_PER_USER: usize = 50;
+/// `apiVersion` in [`ServerInfo`]: the generation of the `/tern/v1` API. Additive changes
+/// keep it; a breaking change moves to `/tern/v2` and bumps it.
+pub const API_VERSION: u32 = 1;
 /// The server ends a stream cleanly after this long; clients reconnect with their cursor.
 pub const STREAM_MAX_SECS: u64 = 3600;
 /// Body limit for `POST /tern/v1/backfill/<aid>`. Each record's `value` is still capped at
@@ -189,6 +192,13 @@ pub struct ServerInfo {
     pub signup: SignupMode,
     #[serde(default)]
     pub features: Features,
+    /// Absent from servers built before it was added, which speak 1.
+    #[serde(default = "api_version_1")]
+    pub api_version: u32,
+}
+
+fn api_version_1() -> u32 {
+    1
 }
 
 /// `GET /tern/v1/me`. The engine binds its cursors to `(server_id, user_id)` from here.
@@ -610,12 +620,18 @@ mod tests {
             public_url: "https://t.example".into(),
             signup: SignupMode::Closed,
             features: Features::default(),
+            api_version: API_VERSION,
         };
         assert_eq!(
             serde_json::to_value(&info).unwrap(),
             json!({"serverId": "s", "version": "0.1.0", "publicURL": "https://t.example",
-                   "signup": "closed", "features": {"tracking": false, "sharing": false}})
+                   "signup": "closed", "features": {"tracking": false, "sharing": false},
+                   "apiVersion": 1})
         );
+        let old: ServerInfo = serde_json::from_value(json!({"serverId": "s", "version": "0.1.0",
+            "publicURL": "https://t.example", "signup": "open"}))
+        .unwrap();
+        assert_eq!(old.api_version, 1);
         let me: Me = serde_json::from_value(json!({
             "userId": "u", "email": "e@x", "firstName": "F", "lastName": "L",
             "trackingNS": "n", "serverId": "s", "publicURL": "https://t.example",
