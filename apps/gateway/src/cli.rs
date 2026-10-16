@@ -25,7 +25,8 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
     args_conflicts_with_subcommands = true
 )]
 pub struct Cli {
-    /// The engine's profile directory; the gateway keeps its state in `<dir>/gateway`.
+    /// The engine's profile directory (default: the desktop's); the gateway keeps its state
+    /// in `<dir>/gateway`.
     #[arg(long, env = "TERN_CONFIG_DIR", global = true)]
     config_dir: Option<PathBuf>,
     #[command(subcommand)]
@@ -158,6 +159,7 @@ pub fn run(cli: Cli) -> Result<()> {
     }
     let config_dir = cli
         .config_dir
+        .or_else(tern_client::discovery::default_config_dir)
         .ok_or("pass --config-dir or set TERN_CONFIG_DIR to the engine's profile directory")?;
     let state_dir = config_dir.join("gateway");
     match cli.command {

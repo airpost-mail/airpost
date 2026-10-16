@@ -13,6 +13,9 @@ name = "tern-gateway"
 path = "src/main.rs"
 
 [dependencies]
+ms-ipc.workspace = true
+tern-client.workspace = true
+futures.workspace = true
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "tower-log", "ws"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time", "io-util"] }
 tower = { version = "0.5", default-features = false }
@@ -34,5 +37,4 @@ tracing-subscriber = { workspace = true, features = ["fmt", "ansi", "env-filter"
 tokio = { workspace = true, features = ["test-util"] }
 tokio-tungstenite = "0.29"
 http-body-util = "0.1"
-futures = { workspace = true }
 tempfile.workspace = true

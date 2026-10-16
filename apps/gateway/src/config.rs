@@ -162,7 +162,9 @@ pub struct Config {
     pub allowed_origins: Vec<Origin>,
     pub trusted_proxies: Vec<IpNet>,
     pub web_root: Option<PathBuf>,
-    /// `<engine config dir>/gateway`.
+    /// The engine's profile directory, where `run/engine.json` names its socket.
+    pub config_dir: PathBuf,
+    /// `<config_dir>/gateway`.
     pub state_dir: PathBuf,
 }
 
@@ -226,6 +228,7 @@ impl Config {
             trusted_proxies: parse_trusted_proxies(input.trusted_proxies)?,
             web_root: input.web_root,
             state_dir: input.config_dir.join("gateway"),
+            config_dir: input.config_dir,
         })
     }
 

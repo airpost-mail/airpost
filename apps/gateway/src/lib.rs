@@ -9,4 +9,5 @@ pub mod cli;
 pub mod config;
 pub mod control;
 pub mod devices;
+pub mod engine;
 pub mod http;

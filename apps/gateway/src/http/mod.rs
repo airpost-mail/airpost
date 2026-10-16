@@ -36,6 +36,7 @@ pub use ws::close;
 
 use crate::config::Config;
 use crate::devices::{Device, DeviceFile, DevicesError, Snapshot};
+use crate::engine::{EngineInfo, ProbeCache};
 
 /// Pairing attempts per minute per client address (IPv4, or IPv6 /64).
 const PAIR_PER_IP_PER_MINUTE: u32 = 5;
@@ -69,6 +70,9 @@ struct Inner {
     upgrades: DefaultKeyedRateLimiter<String>,
     sockets: Mutex<Sockets>,
     csp: HeaderValue,
+    probe: ProbeCache,
+    /// Set when the server stops, so open WebSockets close with 1001.
+    shutdown: watch::Sender<bool>,
 }
 
 #[derive(Default)]
@@ -95,6 +99,8 @@ impl AppState {
             upgrades: RateLimiter::keyed(per_minute(UPGRADES_PER_DEVICE_PER_MINUTE)),
             sockets: Mutex::default(),
             csp,
+            probe: ProbeCache::default(),
+            shutdown: watch::channel(false).0,
             config,
         })))
     }
@@ -113,6 +119,14 @@ impl AppState {
 
     pub fn generation(&self) -> watch::Receiver<u64> {
         self.0.generation.subscribe()
+    }
+
+    fn shutdown(&self) -> watch::Receiver<bool> {
+        self.0.shutdown.subscribe()
+    }
+
+    async fn engine(&self) -> EngineInfo {
+        self.0.probe.get(&self.0.config.config_dir).await
     }
 
     /// Re-reads `devices.json`; open WebSockets of devices that are gone then close.
@@ -525,8 +539,12 @@ impl Server {
             }
         });
         let app = router(self.state.clone()).into_make_service_with_connect_info::<SocketAddr>();
+        let state = self.state.clone();
         let out = axum::serve(self.listener, app)
-            .with_graceful_shutdown(shutdown)
+            .with_graceful_shutdown(async move {
+                shutdown.await;
+                state.0.shutdown.send_replace(true);
+            })
             .await;
         housekeeping.abort();
         self.state.housekeeping().await;

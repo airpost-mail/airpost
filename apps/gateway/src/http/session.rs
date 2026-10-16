@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{now_ms, ApiError, AppState, Paired, COOKIE_MAX_AGE_SECS};
 use crate::devices::Device;
+use crate::engine::EngineInfo;
 
 /// Largest pairing request body.
 const PAIR_BODY_LIMIT: usize = 4096;
@@ -40,11 +41,6 @@ impl From<&Device> for DeviceInfo {
 }
 
 #[derive(Serialize)]
-pub struct EngineInfo {
-    state: &'static str,
-}
-
-#[derive(Serialize)]
 pub struct GatewayInfo {
     version: &'static str,
 }
@@ -60,8 +56,7 @@ pub struct SessionInfo {
 pub async fn session(State(state): State<AppState>, paired: Paired) -> Response {
     let body = SessionInfo {
         device: (&paired.device).into(),
-        // Until the relay exists (W4) there is no engine connection to probe.
-        engine: EngineInfo { state: "down" },
+        engine: state.engine().await,
         gateway: GatewayInfo {
             version: env!("CARGO_PKG_VERSION"),
         },
