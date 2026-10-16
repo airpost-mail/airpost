@@ -104,7 +104,7 @@ export default class MailsyncBridge {
 
   toggleVerboseLogging() {
     const { configDirPath } = AppEnv.getLoadSettings();
-    let message = localized('Thank you for helping debug Mailspring. Mailspring will now restart.');
+    let message = localized('Thank you for helping debug Tern. Tern will now restart.');
     let phrase = 'disabled';
 
     if (AppEnv.config.get(VERBOSE_UNTIL_KEY)) {
@@ -114,9 +114,9 @@ export default class MailsyncBridge {
       phrase = 'enabled';
       message =
         `Verbose logging will be enabled for the next thirty minutes. This records ` +
-        `all network traffic to your mail providers and will be quite slow. Restart Mailspring ` +
+        `all network traffic to your mail providers and will be quite slow. Restart Tern ` +
         `and wait for your problem to occur, and then submit mailsync-***.log files located ` +
-        `in the directory: \n\n${configDirPath}.\n\nMailspring will now restart.`;
+        `in the directory: \n\n${configDirPath}.\n\nTern will now restart.`;
     }
     AppEnv.showErrorDialog({
       title: localized(`Verbose logging is now %@`, phrase),
@@ -217,7 +217,7 @@ export default class MailsyncBridge {
     if (this._engine ? !this._engine.send(accountId, json) : !this._clients[accountId]) {
       const { emailAddress } = AccountStore.accountForId(accountId) || { emailAddress: undefined };
       return AppEnv.showErrorDialog({
-        title: localized(`Mailspring is unable to sync %@`, emailAddress),
+        title: localized(`Tern is unable to sync %@`, emailAddress),
         message: localized(
           `In order to perform actions on this mailbox, you need to resolve the sync issue. Visit Preferences > Accounts for more information.`
         ),
@@ -253,7 +253,7 @@ export default class MailsyncBridge {
       AppEnv.showErrorDialog({
         title: localized(`Cleanup Started`),
         message: localized(
-          `Mailspring is clearing its cache %@. Depending on the size of the mailbox, this may take a few seconds or a few minutes. An alert will appear when cleanup is complete.`,
+          `Tern is clearing its cache %@. Depending on the size of the mailbox, this may take a few seconds or a few minutes. An alert will appear when cleanup is complete.`,
           account.emailAddress
         ),
       });
@@ -271,7 +271,7 @@ export default class MailsyncBridge {
         AppEnv.showErrorDialog({
           title: localized(`Cleanup Complete`),
           message: localized(
-            `Mailspring reset the local cache for %@ in %@ seconds. Your mailbox will now begin to sync again.`,
+            `Tern reset the local cache for %@ in %@ seconds. Your mailbox will now begin to sync again.`,
             account.emailAddress,
             Math.ceil((Date.now() - start) / 1000)
           ),
@@ -280,7 +280,7 @@ export default class MailsyncBridge {
     } catch (error) {
       AppEnv.showErrorDialog({
         title: localized(`Cleanup Error`),
-        message: localized(`Mailspring was unable to reset the local cache. %@`, error),
+        message: localized(`Tern was unable to reset the local cache. %@`, error),
       });
     } finally {
       if (!this._engine) {

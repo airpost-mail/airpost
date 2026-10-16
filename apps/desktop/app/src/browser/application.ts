@@ -105,7 +105,7 @@ export default class Application extends EventEmitter {
       let buttons = [localized('Quit')];
       if (err.toString().includes('ENOENT')) {
         message = localized(
-          `Tern could not find the mailsync process. If you're building Tern from source, make sure mailsync.tar.gz has been downloaded and unpacked in your working copy.`
+          `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p mailsync\` and copy target/release/mailsync to apps/desktop/app/mailsync-rs.`
         );
       } else if (err.toString().includes('spawn')) {
         message = localized(`Tern could not spawn the mailsync process. %@`, err.toString());
