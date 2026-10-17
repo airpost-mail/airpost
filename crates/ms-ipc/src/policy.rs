@@ -50,9 +50,13 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::TASKS_LIST
         | method::METADATA_LIST
         | method::ACCOUNT_LIST => MethodClass::Open,
-        method::ACCOUNT_ADD | method::ACCOUNT_REMOVE | method::ENGINE_SHUTDOWN => {
-            MethodClass::ParentOnly
-        }
+        method::ACCOUNT_ADD
+        | method::ACCOUNT_REMOVE
+        | method::ACCOUNT_TEST
+        | method::ACCOUNT_RESET
+        | method::ENGINE_RESET_DATABASE
+        | method::ENGINE_SET_LOG_LEVEL
+        | method::ENGINE_SHUTDOWN => MethodClass::ParentOnly,
         method::TEST_CRASH | method::TEST_PANIC => MethodClass::Debug,
         _ => MethodClass::LocalOnly,
     }
