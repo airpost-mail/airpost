@@ -37,7 +37,9 @@ pub struct Placement {
     pub unread: bool,
     pub starred: bool,
     pub draft: bool,
-    /// X-GM-LABELS of this copy (Gmail only).
+    /// The copy's labels as the server stores them: X-GM-LABELS on Gmail, label keywords
+    /// (lowercased, `ms_core::keywords::label_keywords`) elsewhere. The column is still
+    /// `remoteXGMLabels`.
     pub labels: Vec<String>,
     /// Set while an optimistic move is in flight.
     pub pending_folder_id: Option<String>,
@@ -92,7 +94,8 @@ pub struct MessageAttributes {
     pub unread: bool,
     pub starred: bool,
     pub draft: bool,
-    /// Sorted X-GM-LABELS, without `\Trash` and `\Spam` (Gmail exposes those as folders).
+    /// Sorted X-GM-LABELS, without `\Trash` and `\Spam` (Gmail exposes those as folders), or
+    /// the copy's label keywords ([`MessageAttributes::from_keywords`]).
     pub labels: Vec<String>,
     /// The row's message, set only by [`Store::fetch_messages_attributes_in_range`];
     /// attributes read from the server carry no id.
@@ -128,6 +131,15 @@ impl MessageAttributes {
             draft: (flags.contains(MessageFlags::DRAFT) || draft_label) && !trash_or_spam,
             labels,
             message_id: String::new(),
+        }
+    }
+
+    /// A copy on a server whose labels are keywords (docs/labels-plan.md 2.4): the label
+    /// keywords among `keywords`, lowercased and sorted.
+    pub fn from_keywords(uid: u32, flags: ms_core::MessageFlags, keywords: &[String]) -> Self {
+        MessageAttributes {
+            labels: ms_core::keywords::label_keywords(keywords),
+            ..Self::from_flags(uid, flags, None)
         }
     }
 

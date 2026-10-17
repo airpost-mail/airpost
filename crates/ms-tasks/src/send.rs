@@ -22,7 +22,7 @@ use ms_imap::{FetchKind, ImapSession, StoreOp};
 use ms_mime::{OutgoingAttachment, OutgoingBody, OutgoingMessage};
 use ms_store::model::json_str;
 use ms_store::{File, Folder, Label, Message, Model, Query, Task, Thread};
-use ms_sync::mail_processor::MailProcessor;
+use ms_sync::mail_processor::{CopyLabels, MailProcessor};
 use ms_sync::mailbox_model;
 use serde_json::{json, Value};
 use tracing::{error, info};
@@ -414,6 +414,8 @@ impl TaskProcessor<'_> {
         let parsed = ms_mime::parse_message(&sent_raw)?;
         let mut processor = MailProcessor::new(&self.account, self.store);
         processor.is_gmail = gmail;
+        processor.keyword_labels =
+            CopyLabels::for_profile(session.profile()) == CopyLabels::Keywords;
         if let Some(dir) = &self.config_dir {
             processor = processor.with_config_dir(dir);
         }

@@ -6,12 +6,31 @@ from .db import Placements
 from .servers.base import Truth, normalize_message_id
 
 # The engine models exactly these IMAP flags (unread, starred, draft). \Deleted, \Answered
-# and keywords are not stored, so they cannot be compared.
+# and keywords are not stored as flags, so they cannot be compared; label keywords are
+# compared as labels (`labels: true`).
 TRACKED_FLAGS = {"\\Seen", "\\Flagged", "\\Draft"}
+
+# ms_core::keywords: which keywords are labels off Gmail (docs/labels-plan.md 2.4).
+_NON_LABEL_KEYWORDS = {"junk", "nonjunk", "notjunk", "junkrecorded", "redirected", "forwarded", "old"}
+_LABEL_DOLLAR_KEYWORDS = {"$label1", "$label2", "$label3", "$label4", "$label5", "$important"}
+
+
+def label_keywords(flags: Iterable[str]) -> set:
+    """The label keywords among a copy's flags, lowercased, as the engine records them."""
+    out = set()
+    for f in flags:
+        k = f.lower()
+        if k.startswith("\\"):
+            continue
+        if k in _LABEL_DOLLAR_KEYWORDS or (not k.startswith("$") and k not in _NON_LABEL_KEYWORDS):
+            out.add(k)
+    return out
 
 
 def compare_placements(local: Placements, truth: Truth, mailboxes: Optional[Iterable[str]] = None,
-                       check_flags: bool = True, check_labels: bool = False, ignore_empty: bool = True) -> list:
+                       check_flags: bool = True, check_labels: bool = False, ignore_empty: bool = True,
+                       keyword_labels: bool = False) -> list:
+    """`keyword_labels`: the server's labels are its label keywords, not X-GM-LABELS."""
     diffs = []
     names = set(mailboxes) if mailboxes else set(truth) | {p for p, u in local.items() if u or not ignore_empty}
     for mb in sorted(names):
@@ -34,8 +53,9 @@ def compare_placements(local: Placements, truth: Truth, mailboxes: Optional[Iter
             if check_flags and set(l.flags) & TRACKED_FLAGS != set(r["flags"]) & TRACKED_FLAGS:
                 diffs.append(f"{mb} UID {uid}: flags {sorted(set(l.flags) & TRACKED_FLAGS)} locally vs "
                              f"{sorted(set(r['flags']) & TRACKED_FLAGS)} on server")
-            if check_labels and set(l.labels) != set(r.get("labels", ())):
-                diffs.append(f"{mb} UID {uid}: labels {sorted(l.labels)} locally vs {sorted(r.get('labels', ()))} on server")
+            want = label_keywords(r["flags"]) if keyword_labels else set(r.get("labels", ()))
+            if check_labels and set(l.labels) != want:
+                diffs.append(f"{mb} UID {uid}: labels {sorted(l.labels)} locally vs {sorted(want)} on server")
     return diffs
 
 

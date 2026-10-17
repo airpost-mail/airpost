@@ -1,0 +1,40 @@
+name: keyword-labels-reach-copies
+description: >
+  Off Gmail the engine records each copy's label keywords as its labels, ahead of the
+  keyword label store: lowercased, with flag keywords ($Junk, NonJunk, $MDNSent) left out.
+  Another client tags messages, then changes one tag; the copies follow through
+  CHANGEDSINCE, or the scans on servers without CONDSTORE. The folder status records that
+  the server lets clients create keywords. No Label rows exist yet, so threads show no
+  chips.
+source: "docs/labels-plan.md 2.4, 4, 5; RFC 9051 7.1 (PERMANENTFLAGS \\*)"
+servers:
+  - {fake: dovecot}
+  - {fake: plain}
+  - {fake: keywords-in-flags}
+  - {dovecot: qresync}
+  - {cyrus: fastmail}
+mailboxes:
+  INBOX: {messages: 6}
+  Archive: {messages: 2}
+steps:
+  - wait: quiescent
+  - server.flags: {mailbox: INBOX, uids: [2], add: ["$label1", "Work", "$Junk", "NonJunk"]}
+  - server.flags: {mailbox: INBOX, uids: [3], add: ["clients/acme", "$MDNSent"]}
+  - server.flags: {mailbox: Archive, uids: [1], add: ["todo"]}
+  - wait: {seconds: 1}
+  - force_scans: {}
+  - assert:
+      db_matches_server: {labels: true}
+  - server.flags: {mailbox: INBOX, uids: [2], remove: ["Work"], add: ["$label3"]}
+  - wait: {seconds: 1}
+  - force_scans: {}
+expect:
+  db_matches_server: {labels: true}
+  folder_status:
+    INBOX: {keywords: true}
+    Archive: {keywords: true}
+  thread_labels:
+    threads:
+      - {mailbox: INBOX, uids: [2, 3], lacks: ["$label1", "$label3", "clients/acme"]}
+  stable: {passes: 1}
+  running: true

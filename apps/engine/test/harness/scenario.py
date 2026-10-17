@@ -1210,7 +1210,8 @@ class ScenarioRun(PimMixin, BackendMixin):
             local = self._named(dbmod.placements(c))
         truth = self.server.truth()
         return compare_placements(local, truth, mailboxes=arg.get("mailboxes"),
-                                  check_flags=arg.get("flags", True), check_labels=arg.get("labels", False))
+                                  check_flags=arg.get("flags", True), check_labels=arg.get("labels", False),
+                                  keyword_labels=not self.server.gmail)
 
     def expect_invariants(self, arg: dict) -> list:
         """Derived state (message snapshots, thread refcounts, ThreadCategory, ThreadCounts)

@@ -384,3 +384,56 @@ fn gmail_copy_in_trash_replaces_all_mail() {
     );
     assert_invariants(&store);
 }
+
+/// Off Gmail, a copy's label keywords are its labels (docs/labels-plan.md 2.4): lowercased,
+/// flag keywords left out, and a keyword change alone updates the copy.
+#[test]
+fn keyword_labels_on_copies() {
+    let dir = migrated();
+    let acct = account();
+    let store = open(dir.path(), T0);
+    let inbox = folder(&store, "INBOX", "inbox");
+    let mut processor = MailProcessor::new(&acct, &store);
+    processor.keyword_labels = true;
+    let labels_of = |id: &str| {
+        let rows = store.placements_for_message(id).unwrap();
+        assert_eq!(rows.len(), 1);
+        (
+            rows[0].labels.clone(),
+            load(&store, id).unwrap().data["labels"].clone(),
+        )
+    };
+
+    let mut msg = remote("kw@x", 5, MessageFlags::SEEN);
+    msg.keywords = ["Work", "$Junk", "$label2", "NonJunk"]
+        .map(String::from)
+        .into();
+    let m = processor
+        .insert_fallback_to_update_message(&msg, &inbox, T0)
+        .unwrap();
+    assert_eq!(
+        labels_of(m.id()),
+        (
+            vec!["$label2".into(), "work".into()],
+            json!(["$label2", "work"])
+        )
+    );
+    assert_invariants(&store);
+
+    msg.keywords = vec!["$Label2".into()];
+    processor
+        .insert_fallback_to_update_message(&msg, &inbox, T0)
+        .unwrap();
+    assert_eq!(
+        labels_of(m.id()),
+        (vec!["$label2".into()], json!(["$label2"]))
+    );
+    assert_invariants(&store);
+
+    processor.keyword_labels = false;
+    processor
+        .insert_fallback_to_update_message(&msg, &inbox, T0)
+        .unwrap();
+    assert_eq!(labels_of(m.id()), (vec![], json!([])));
+    assert_invariants(&store);
+}

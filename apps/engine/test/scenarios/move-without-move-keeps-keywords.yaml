@@ -32,6 +32,6 @@ expect:
       - {message_id: "<harness-3-e480dd9e@example.test>", flags: ["\\Seen"], includes: ["\\Answered", "$Forwarded", "$label1", "work"]}
       - {message_id: "<harness-4-79f05e78@example.test>", flags: ["\\Flagged"], includes: ["clients/acme"]}
   server_counts: {INBOX: 8, Archive: 3}
-  db_matches_server: {}
+  db_matches_server: {labels: true}
   stable: {passes: 1}
   running: true

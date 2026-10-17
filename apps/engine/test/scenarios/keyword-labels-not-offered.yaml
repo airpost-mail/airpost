@@ -1,0 +1,18 @@
+name: keyword-labels-not-offered
+description: >
+  Servers whose PERMANENTFLAGS lack \* (Yahoo, Proton Bridge, Exchange) do not let clients
+  create keywords; the folder status says so, which is what sends such an account to the
+  Tern label store.
+source: "docs/labels-plan.md 3.2, 4; RFC 9051 7.1"
+servers:
+  - {fake: yahoo}
+  - {fake: proton-bridge}
+  - {fake: outlook}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+expect:
+  folder_status:
+    INBOX: {keywords: false}
+  running: true

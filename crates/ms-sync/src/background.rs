@@ -822,6 +822,11 @@ impl Background {
             set_ls(folder, ls::MESSAGE_COUNT, remote.message_count);
             set_ls(folder, ls::UNSEEN_COUNT, remote.unseen_count);
             set_ls(folder, ls::RECENT_COUNT, remote.recent_count);
+            // As of this connection's last SELECT of the folder, so a mailbox that fills up
+            // (RFC 9051 7.1) is noticed at the next one.
+            if let Some(kw) = self.w.session.allows_new_keywords(&path) {
+                set_ls(folder, ls::KEYWORDS, kw);
+            }
 
             // Some bodies alongside the header walk, so snippets show early.
             let mut more_to_do = self.w.sync_message_bodies(folder)?;

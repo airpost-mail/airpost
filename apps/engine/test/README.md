@@ -447,7 +447,11 @@ Things learned from Dovecot while building the conformance suite, all now modell
   `icloud`, `gmail`, `yahoo` (permuted COPYUID), `cyrus-vanished` (Dovecot plus Cyrus's
   VANISHED clipped at `*`, cyrus-imapd #6071), `yahoo-messagelimit` (enforces
   MESSAGELIMIT=50 on UID FETCH, RFC 9738), `inbox-only` (no SPECIAL-USE, only INBOX
-  configured: roles by name), `hmailserver` (STATUS reports UIDNEXT 0).
+  configured: roles by name), `hmailserver` (STATUS reports UIDNEXT 0), `keywords-in-flags`
+  (`\*` in the untagged FLAGS, not PERMANENTFLAGS, as Zoho). `outlook`, `yahoo` and
+  `proton-bridge` send PERMANENTFLAGS without `\*`, so no keywords can be created there.
+  `FakeServer.set_keyword_limit(mailbox, n)` caps a mailbox's keywords (`NO [LIMIT]`, then
+  PERMANENTFLAGS without `\*`, as Cyrus) and `set_drop_keywords()` makes STORE keep none.
   `fake:dovecot-without-condstore-qresync` style names strip capabilities.
   Hostname-gated engine behaviour (iCloud, Outlook) needs the account's `imap_host` to
   resolve to 127.0.0.1; a scenario declares `{fake: icloud, imap_host: imap.mail.me.com}`
@@ -598,6 +602,8 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | sent-copy-late-after-window | a late copy hours after the send is still removed; without UIDPLUS too | fake (+smtp) |
 | move-without-move-keeps-other-deleted | no-MOVE fallback expunges only the moved UID; another client's `\\Deleted` message survives | fake, dovecot, cyrus |
 | move-without-move-keeps-keywords | no-MOVE fallback keeps keywords, `\\Answered` and `$Forwarded` on the moved copy (add/remove STORE, not a replacing one) | fake, dovecot, cyrus |
+| keyword-labels-reach-copies | off Gmail a copy's label keywords become its labels (lowercased, flag keywords left out) and follow another client's changes; `localStatus.keywords` is true | fake, dovecot, cyrus |
+| keyword-labels-not-offered | PERMANENTFLAGS without `\\*` (Yahoo, Proton Bridge, Exchange): `localStatus.keywords` is false | fake |
 | move-without-move-connection-drop | connection lost after the server ran UID EXPUNGE: no plain EXPUNGE on reconnect | fake |
 | folder-roles-by-localized-name | roles by name without SPECIAL-USE: modified UTF-7 names, Borradores, `\\Archive` | fake |
 | status-uidnext-zero-new-mail | STATUS UIDNEXT 0 (hMailServer): new mail found from the message count on the next pass | fake |

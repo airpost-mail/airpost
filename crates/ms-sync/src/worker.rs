@@ -25,7 +25,7 @@ use rusqlite::params;
 use serde_json::Value;
 use tracing::{error, info, warn};
 
-use crate::mail_processor::{attributes_of, id_for_message, MailProcessor};
+use crate::mail_processor::{attributes_of, id_for_message, CopyLabels, MailProcessor};
 use crate::WorkerContext;
 
 /// A mailcore `Range`: `location` through `location + length` inclusive, `length`
@@ -236,7 +236,12 @@ impl SyncWorker {
         let mut p = MailProcessor::new(&self.ctx.account, &self.store)
             .with_config_dir(&self.ctx.config_dir);
         p.is_gmail = self.is_gmail();
+        p.keyword_labels = self.copy_labels() == CopyLabels::Keywords;
         p
+    }
+
+    pub fn copy_labels(&self) -> CopyLabels {
+        CopyLabels::for_profile(self.session.profile())
     }
 
     pub fn has_capability(&self, cap: &str) -> bool {
@@ -379,7 +384,7 @@ impl SyncWorker {
             let existing = local.remove(&uid);
             let mut same = existing
                 .as_ref()
-                .is_some_and(|l| l.matches(&attributes_of(remote_msg)));
+                .is_some_and(|l| l.matches(&attributes_of(remote_msg, self.copy_labels())));
 
             // With headers in hand, a row that names another message is wrong however well
             // its flags match (a mis-paired COPYUID). Ingesting the UID gives it to the
