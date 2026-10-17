@@ -148,6 +148,7 @@ load(`SignatureStore`, 'flux/stores/signature-store');
 load(`MessageStore`, 'flux/stores/message-store');
 load(`ContactStore`, 'flux/stores/contact-store');
 load(`CategoryStore`, 'flux/stores/category-store');
+load(`LabelColorStore`, 'flux/stores/label-color-store');
 load(`UndoRedoStore`, 'flux/stores/undo-redo-store');
 load(`WorkspaceStore`, 'flux/stores/workspace-store');
 load(`MailRulesStore`, 'flux/stores/mail-rules-store');

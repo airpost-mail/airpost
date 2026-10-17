@@ -177,6 +177,7 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
       this.props.item.onExport != null ||
       this.props.item.onExportMbox != null ||
       this.props.item.onCreateChild != null ||
+      this.props.item.onEditColor != null ||
       this.props.item.onMarkAllAsRead != null
     );
   };
@@ -223,6 +224,11 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
 
   _onEdited = (value: string) => {
     this._runCallback('onEdited', value);
+  };
+
+  _onEditColor = () => {
+    const node = ReactDOM.findDOMNode(this) as HTMLElement;
+    this._runCallback('onEditColor', node.getBoundingClientRect());
   };
 
   _onEdit = () => {
@@ -286,6 +292,10 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
         item.onCreateChild && {
           label: isLabel ? localized(`New Sublabel...`) : localized(`New Subfolder...`),
           click: this._onCreateChildTriggered,
+        },
+        item.onEditColor && {
+          label: localized('Change Color...'),
+          click: this._onEditColor,
         },
         item.onEdited && {
           label: `${localized(`Rename`)} ${contextMenuLabel}`,
@@ -361,6 +371,7 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
               name={item.iconName}
               fallback={'folder.png'}
               mode={RetinaImg.Mode.ContentIsMask}
+              style={item.iconColor ? { backgroundColor: item.iconColor } : undefined}
             />
           </div>
         )}

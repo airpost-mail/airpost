@@ -1,7 +1,11 @@
-import { RetinaImg, RovingTabIndexToolbar } from 'mailspring-component-kit';
+import { LabelColorizer, RetinaImg, RovingTabIndexToolbar } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
 import React from 'react';
 import { isWaylandSession } from '../../../../src/browser/is-wayland';
+import {
+  LABEL_COLOR_SCHEMES,
+  LABEL_COLOR_SCHEME_NAMES,
+} from '../../../../src/flux/stores/label-color-store';
 import SystemTrayIconStore from '../../../system-tray/lib/system-tray-icon-store';
 import { ConfigLike } from '../types';
 import ConfigSchemaItem from './config-schema-item';
@@ -298,6 +302,51 @@ class TrayIconThemePicker extends React.Component<{ config: ConfigLike }> {
   }
 }
 
+class LabelColorSchemePicker extends React.Component<{ config: ConfigLike }> {
+  kp = 'core.appearance.labelColorScheme';
+
+  render() {
+    const val = this.props.config.get(this.kp) || 'automatic';
+    const names = {
+      automatic: localized('Automatic'),
+      bright: localized('Bright'),
+      pastel: localized('Pastel'),
+      muted: localized('Muted'),
+      earth: localized('Earth'),
+    };
+    const hues = Array.from({ length: 12 }, (_, i) => `hsl(${i * 30}, 62%, 47%)`);
+
+    return (
+      <section>
+        <h6>{localized('Label Colors')}</h6>
+        {LABEL_COLOR_SCHEME_NAMES.map((name) => (
+          <label key={name} htmlFor={`label-color-scheme-${name}`} className="label-color-scheme">
+            <input
+              id={`label-color-scheme-${name}`}
+              type="radio"
+              value={name}
+              name="labelColorScheme"
+              checked={val === name}
+              onChange={(e) => this.props.config.set(this.kp, e.target.value)}
+            />
+            <span className="scheme-name">{names[name]}</span>
+            {(name === 'automatic' ? hues : LABEL_COLOR_SCHEMES[name]).map((color) => (
+              <span
+                key={color}
+                className="swatch"
+                style={{ backgroundColor: LabelColorizer.dotColorFor(color) }}
+              />
+            ))}
+          </label>
+        ))}
+        <div className="platform-note">
+          {localized('Right-click a label in the sidebar to give it a color of its own.')}
+        </div>
+      </section>
+    );
+  }
+}
+
 const AppearanceModeOption = function AppearanceModeOption(props: {
   mode: string;
   active?: boolean;
@@ -369,6 +418,7 @@ class PreferencesAppearance extends React.Component<{ config: ConfigLike; config
             config={this.props.config}
           />
         </section>
+        <LabelColorSchemePicker config={this.props.config} />
         <MenubarStylePicker config={this.props.config} />
         <section>
           <h6>{localized('Scaling')}</h6>

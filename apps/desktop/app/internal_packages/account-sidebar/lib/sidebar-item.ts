@@ -2,9 +2,12 @@ import { imapUtf7 } from 'mailspring-exports';
 
 import fs from 'fs';
 import _str from 'underscore.string';
-import { OutlineViewItem } from 'mailspring-component-kit';
+import React from 'react';
+import { OutlineViewItem, LabelColorizer, LabelColorPopover } from 'mailspring-component-kit';
 import {
   MailboxPerspective,
+  Label,
+  LabelColorStore,
   FocusedPerspectiveStore,
   SyncbackCategoryTask,
   DestroyCategoryTask,
@@ -282,6 +285,18 @@ const onEditItem = function (item: ISidebarItem, value: string) {
       newName: newDisplayName,
     })
   );
+  LabelColorStore.renameCustomColor(category.displayName, newDisplayName);
+};
+
+const onEditColor = function (item: ISidebarItem, originRect: DOMRect) {
+  const category = item.perspective.category();
+  if (!category) {
+    return;
+  }
+  Actions.openPopover(React.createElement(LabelColorPopover, { label: category }), {
+    originRect,
+    direction: 'right',
+  });
 };
 
 export default class SidebarItem {
@@ -373,6 +388,11 @@ export default class SidebarItem {
     }
     if (opts.onMarkAllAsRead == null && perspective.category()) {
       opts.onMarkAllAsRead = onMarkAllAsRead;
+    }
+    const category = categories.length === 1 ? categories[0] : null;
+    if (category instanceof Label && !category.role) {
+      opts.iconColor = LabelColorizer.backgroundColorDark(category);
+      opts.onEditColor = onEditColor;
     }
     opts.contextMenuLabel = contextMenuLabel;
     return this.forPerspective(id, perspective, opts);

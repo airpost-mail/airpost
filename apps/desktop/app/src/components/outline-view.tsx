@@ -8,6 +8,7 @@ export interface IOutlineViewItem {
   id?: string;
   title?: string;
   iconName?: string;
+  iconColor?: string;
   name?: string;
   children?: IOutlineViewItem[];
   contextMenuLabel?: string;
@@ -30,6 +31,7 @@ export interface IOutlineViewItem {
   onExport?: (...args: any[]) => any;
   onExportMbox?: (...args: any[]) => any;
   onCreateChild?: (...args: any[]) => any;
+  onEditColor?: (...args: any[]) => any;
 }
 
 interface OutlineViewProps {

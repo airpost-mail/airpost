@@ -9,6 +9,7 @@ import {
   OutboxStore,
   FocusedPerspectiveStore,
   CategoryStore,
+  LabelColorStore,
 } from 'mailspring-exports';
 
 import SidebarSection from './sidebar-section';
@@ -69,6 +70,7 @@ class SidebarStore extends MailspringStore {
     this.listenTo(OutboxStore, this._updateSections);
     this.listenTo(ThreadCountsStore, this._updateSections);
     this.listenTo(CategoryStore, this._updateSections);
+    this.listenTo(LabelColorStore, this._updateSections);
 
     this.configSubscription = AppEnv.config.onDidChange(
       'core.workspace.showUnreadForAllCategories',

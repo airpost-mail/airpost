@@ -128,6 +128,7 @@ lazyLoad('ResizableRegion', 'resizable-region');
 lazyLoad('AccountColorBar', 'account-color-bar');
 lazyLoadFrom('MailLabel', 'mail-label');
 lazyLoadFrom('LabelColorizer', 'mail-label');
+lazyLoad('LabelColorPopover', 'label-color-popover');
 lazyLoad('MailLabelSet', 'mail-label-set');
 lazyLoad('MailImportantIcon', 'mail-important-icon');
 

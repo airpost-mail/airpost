@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { RetinaImg } from './retina-img';
-import { Label } from 'mailspring-exports';
+import LabelColorStore from '../flux/stores/label-color-store';
 
 type MailLabelProps = {
   label: {
@@ -12,34 +12,64 @@ type MailLabelProps = {
   onRemove?: (...args: any[]) => any;
 };
 
+// A chip is a tint of the label's hue with text in a deep shade of it (light themes), or the
+// reverse (dark themes). The lightness and chroma bounds are theme variables
+// (static/style/mixins/label-colors.less) picked from each theme's own backgrounds, so any
+// label colour keeps 4.5:1 text contrast; the fallbacks are the light-theme values.
+const chipBackground = (base: string) =>
+  `oklch(from ${base} clamp(var(--label-chip-lmin, 0.86), l, var(--label-chip-lmax, 0.95)) min(c, var(--label-chip-cmax, 0.16)) h)`;
+
+const chipText = (base: string) =>
+  `oklch(from ${base} var(--label-text-l, 0.4) min(c, var(--label-text-cmax, 0.18)) h)`;
+
+const dot = (base: string) =>
+  `oklch(from ${base} clamp(var(--label-dot-lmin, 0.3), l, var(--label-dot-lmax, 0.58)) c h)`;
+
 export const LabelColorizer = {
+  /** A dot of any colour, fitted to the theme (scheme previews, the colour picker). */
+  dotColorFor(base: string) {
+    return dot(base);
+  },
+
+  /** The label's own colour, before it is fitted to the theme. */
+  baseColor(label) {
+    return LabelColorStore.colorFor(label);
+  },
+
   color(label) {
-    return `hsl(${label.hue()}, 50%, 34%)`;
+    return chipText(LabelColorizer.baseColor(label));
   },
 
   backgroundColor(label) {
-    return `hsl(${label.hue()}, 62%, 87%)`;
+    return chipBackground(LabelColorizer.baseColor(label));
   },
 
+  /** A dot or icon tint on the surrounding background (pickers, sidebar). */
   backgroundColorDark(label) {
-    return `hsl(${label.hue()}, 62%, 57%)`;
+    return dot(LabelColorizer.baseColor(label));
   },
 
   styles(label) {
-    const styles: any = {
+    return {
       color: LabelColorizer.color(label),
       backgroundColor: LabelColorizer.backgroundColor(label),
-      boxShadow: `inset 0 0 1px hsl(${label.hue()}, 62%, 47%), inset 0 1px 1px rgba(255,255,255,0.5), 0 0.5px 0 rgba(255,255,255,0.5)`,
     };
-    if (process.platform !== 'win32') {
-      styles.backgroundImage = 'linear-gradient(rgba(255,255,255, 0.4), rgba(255,255,255,0))';
-    }
-    return styles;
   },
 };
 
+function useLabelColors() {
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    const unlisten = LabelColorStore.listen(() => setVersion((v) => v + 1));
+    return () => {
+      unlisten();
+    };
+  }, []);
+}
+
 export const MailLabel: React.FC<MailLabelProps> = React.memo(
   ({ label, onRemove }) => {
+    useLabelColors();
     const removable = onRemove && !label.isLockedCategory();
     let classname = 'mail-label';
     let content: JSX.Element | string = label.displayName;

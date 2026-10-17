@@ -6,6 +6,7 @@ export interface ISidebarItem {
   contextMenuLabel: string;
   count: number;
   iconName: string;
+  iconColor?: string;
   children: ISidebarItem[];
   perspective: MailboxPerspective;
   selected: boolean;
@@ -17,6 +18,7 @@ export interface ISidebarItem {
   onExportMbox?: () => void;
   onMarkAllAsRead?: (item: ISidebarItem) => void;
   onCreateChild?: (item, childName: string) => void;
+  onEditColor?: (item, originRect: DOMRect) => void;
   onCollapseToggled: () => void;
   onDrop: (item, event) => void;
   shouldAcceptDrop: (item, event) => void;

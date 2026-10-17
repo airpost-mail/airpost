@@ -28,11 +28,12 @@
   }
 
   .mail-label {
-    // Note - these !important styles override values set by a style tag
-    // since the color of the label is detemined programatically.
+    // !important to override the label's own colours, which are inline styles.
     background: fade(@text-color-inverse, 20%) !important;
-    box-shadow: none !important;
-    filter: brightness(600%) grayscale(100%);
+    color: @text-color-inverse !important;
+    .x {
+      background-color: @text-color-inverse !important;
+    }
   }
 }
 

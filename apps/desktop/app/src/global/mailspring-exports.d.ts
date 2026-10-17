@@ -116,6 +116,8 @@ export type ContactStore = typeof import('../flux/stores/contact-store').default
 export const ContactStore: ContactStore;
 export type CategoryStore = typeof import('../flux/stores/category-store').default;
 export const CategoryStore: CategoryStore;
+export type LabelColorStore = typeof import('../flux/stores/label-color-store').default;
+export const LabelColorStore: LabelColorStore;
 export type UndoRedoStore = typeof import('../flux/stores/undo-redo-store').default;
 export const UndoRedoStore: UndoRedoStore;
 export type WorkspaceStore = typeof import('../flux/stores/workspace-store').default;

@@ -68,6 +68,7 @@ export * from '../components/mail-label';
 
 export const AccountColorBar: typeof import('../components/account-color-bar').default;
 export const MailLabelSet: typeof import('../components/mail-label-set').default;
+export const LabelColorPopover: typeof import('../components/label-color-popover').default;
 export const MailImportantIcon: typeof import('../components/mail-important-icon').default;
 
 export const ScenarioEditor: typeof import('../components/scenario-editor').default;

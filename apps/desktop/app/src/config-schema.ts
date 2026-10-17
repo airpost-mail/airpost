@@ -43,6 +43,16 @@ export default {
             ],
             title: localized('Email body appearance'),
           },
+          labelColorScheme: {
+            type: 'string',
+            default: 'automatic',
+            enum: ['automatic', 'bright', 'pastel', 'muted', 'earth'],
+          },
+          // Lowercased label display name -> CSS colour, set from the sidebar's "Colour..." menu.
+          labelColors: {
+            type: 'object',
+            default: {},
+          },
         },
       },
       workspace: {
