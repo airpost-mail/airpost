@@ -16,6 +16,7 @@ pub mod error;
 pub mod flags;
 pub mod header;
 pub mod ids;
+pub mod keywords;
 pub mod log;
 pub mod logmsg;
 pub mod metadata;

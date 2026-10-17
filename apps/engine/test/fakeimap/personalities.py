@@ -49,6 +49,11 @@ class Personality:
     list_special_use: bool = True
     quirks: dict = field(default_factory=dict)   # quirk name -> citation
     gmail: bool = False
+    # PERMANENTFLAGS at SELECT. \* means clients may create keywords (RFC 9051 7.1); servers
+    # without it ignore new keywords (docs/labels-plan.md 3.2).
+    permanentflags: str = "\\Answered \\Flagged \\Deleted \\Seen \\Draft \\*"
+    # \* in the untagged FLAGS instead of PERMANENTFLAGS (Zoho); Thunderbird accepts either.
+    flags_star: bool = False
 
     def has(self, quirk: str) -> bool:
         return quirk in self.quirks
@@ -116,6 +121,8 @@ proton_bridge = _register(Personality(
     postauth_capabilities="IMAP4rev1 LITERAL+ ID IDLE UNSELECT UIDPLUS MOVE CHILDREN NAMESPACE",
     greeting="Proton Mail Bridge ready.",
     id_response='("name" "Proton Mail Bridge")',
+    # Labels are mailboxes; no keywords (proton-bridge internal/services/imapservice/connector.go).
+    permanentflags="\\Answered \\Flagged \\Deleted \\Seen \\Draft",
     mailboxes=[
         ("INBOX", []),
         ("All Mail", ["\\All"]),
@@ -194,6 +201,9 @@ outlook = _register(Personality(
     postauth_capabilities="IMAP4rev1 AUTH=PLAIN AUTH=XOAUTH2 SASL-IR UIDPLUS MOVE ID UNSELECT CHILDREN IDLE NAMESPACE LITERAL+",
     greeting="The Microsoft Exchange IMAP4 service is ready.",
     id_response='("name" "Microsoft Exchange")',
+    # No client keywords: an Office 365 transcript from 2017 (bugzilla.mozilla.org 1407280
+    # comment 4). NEEDS-RECORDING against a current Exchange Online tenant.
+    permanentflags="\\Seen \\Answered \\Flagged \\Deleted \\Draft $MDNSent",
     mailboxes=[("INBOX", []), ("Drafts", ["\\Drafts"]), ("Sent Items", ["\\Sent"]),
                ("Deleted Items", ["\\Trash"]), ("Junk Email", ["\\Junk"]), ("Archive", ["\\Archive"])],
     quirks={
@@ -264,6 +274,8 @@ yahoo = _register(Personality(
                           "X-MSG-EXT OBJECTID IDLE ENABLE UIDONLY X-UIDONLY LIST-EXTENDED LIST-STATUS "
                           "SPECIAL-USE MESSAGELIMIT=1000 PARTIAL APPENDLIMIT=41697280",
     greeting="Welcome! IMAP Server up and ready to accept your request",
+    # No \* (senders.yahooinc.com developer documentation). NEEDS-RECORDING for the exact list.
+    permanentflags="\\Answered \\Flagged \\Deleted \\Seen \\Draft",
     quirks={
         "copyuid-permuted": "COPYUID lists ascending source and destination ranges while the UIDs "
                             "assigned are a permutation of the destination range; 2 of 18 pairs "
@@ -302,6 +314,7 @@ yahoo_messagelimit = _register(Personality(
     preauth_capabilities=yahoo.preauth_capabilities,
     postauth_capabilities=yahoo.postauth_capabilities.replace("MESSAGELIMIT=1000", "MESSAGELIMIT=50"),
     greeting=yahoo.greeting,
+    permanentflags=yahoo.permanentflags,
     quirks={
         **yahoo.quirks,
         "messagelimit-enforced": "UID FETCH over more than MESSAGELIMIT messages processes only the "
@@ -334,4 +347,17 @@ hmailserver = _register(Personality(
     greeting="hMailServer",
     list_special_use=False,
     quirks={"status-uidnext-zero": "STATUS answers UIDNEXT 0 (Geary imap-status-data.vala)"},
+))
+
+keywords_in_flags = _register(Personality(
+    name="keywords-in-flags",
+    description="Dovecot with \\* in the untagged FLAGS at SELECT and not in PERMANENTFLAGS, as Zoho "
+                "announces that new keywords may be created. Only that is modelled; the rest is the "
+                "dovecot personality.",
+    source="imap-proto source comment on Zoho's FLAGS; Thunderbird nsImapServerResponseParser.cpp "
+           "accepts \\* in either (docs/labels-plan.md 3.2). NEEDS-RECORDING against Zoho.",
+    preauth_capabilities=DOVECOT_PREAUTH,
+    postauth_capabilities=DOVECOT_POSTAUTH,
+    permanentflags="\\Answered \\Flagged \\Deleted \\Seen \\Draft",
+    flags_star=True,
 ))

@@ -138,6 +138,8 @@ pub(crate) enum Untagged {
         uids: UidSet,
     },
     Id(Vec<(String, String)>),
+    /// `* FLAGS (...)` at SELECT.
+    Flags(Vec<String>),
     /// Anything else (FLAGS, SEARCH, LSUB extensions, …), by its uppercased keyword.
     Other(String),
 }
@@ -208,6 +210,10 @@ fn parse_untagged(t: &mut Tokenizer<'_>) -> Result<Untagged, ParseError> {
         "NAMESPACE" => parse_namespace(t),
         "VANISHED" => parse_vanished(t)?,
         "ID" => parse_id(t),
+        "FLAGS" => Untagged::Flags(match t.next_token() {
+            Some(Token::List(items)) => items.iter().filter_map(Token::text).collect(),
+            _ => vec![],
+        }),
         _ => Untagged::Other(word_s),
     })
 }

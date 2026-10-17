@@ -203,6 +203,7 @@ impl ImapSession for FakeSession {
             uid_next: b.uid_next,
             highest_modseq: 0,
             exists: b.messages.len() as u32,
+            ..Default::default()
         })
     }
     fn select_if_needed(&mut self, _: &str) -> ms_imap::Result<()> {
@@ -294,6 +295,25 @@ impl ImapSession for FakeSession {
                     StoreOp::Add => m.flags.insert(flags),
                     StoreOp::Remove => m.flags.remove(flags),
                     StoreOp::Set => m.flags = flags,
+                }
+            }
+        }
+        Ok(())
+    }
+    fn store_keywords(
+        &mut self,
+        path: &str,
+        uids: &UidSet,
+        op: StoreOp,
+        keywords: &[String],
+    ) -> ms_imap::Result<()> {
+        self.check("STORE", format!("{path} {uids} {op:?} {keywords:?}"))?;
+        for m in self.boxes.get_mut(path).unwrap().messages.values_mut() {
+            if uids.contains(m.uid) {
+                match op {
+                    StoreOp::Add => m.keywords.extend(keywords.iter().cloned()),
+                    StoreOp::Remove => m.keywords.retain(|k| !keywords.contains(k)),
+                    StoreOp::Set => unreachable!("keyword STOREs add or remove"),
                 }
             }
         }

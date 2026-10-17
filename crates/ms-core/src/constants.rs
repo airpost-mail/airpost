@@ -31,6 +31,9 @@ pub mod ls {
     pub const RECENT_COUNT: &str = "recentCount";
     /// Sent only: the SMTP server has filed a copy of a send here before.
     pub const SERVER_SAVES_SENT: &str = "serverSavesSent";
+    /// The server takes new keywords in this folder (`\*` in PERMANENTFLAGS or FLAGS at
+    /// the last SELECT; docs/labels-plan.md 4).
+    pub const KEYWORDS: &str = "keywords";
 }
 
 pub const MAILSPRING_FOLDER_PREFIX_V1: &str = "[Mailspring]";

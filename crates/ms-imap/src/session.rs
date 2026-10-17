@@ -92,6 +92,8 @@ struct Inner {
     /// instead of ENVELOPE, after the server returned FETCH responses without one.
     full_headers: bool,
     vanished: HashMap<String, UidSet>,
+    /// Per folder: the last SELECT allowed new keywords (`SelectInfo::allows_new_keywords`).
+    new_keywords: HashMap<String, bool>,
     last_tls_error: Option<String>,
 }
 
@@ -288,6 +290,7 @@ impl Inner {
             xlist: false,
             full_headers: false,
             vanished: HashMap::new(),
+            new_keywords: HashMap::new(),
             last_tls_error: None,
         }
     }
@@ -737,8 +740,10 @@ impl Inner {
         }
         let mut info = SelectInfo::default();
         for u in &reply.untagged {
-            if let Untagged::Exists(n) = u {
-                info.exists = *n;
+            match u {
+                Untagged::Exists(n) => info.exists = *n,
+                Untagged::Flags(flags) => info.flags = flags.clone(),
+                _ => {}
             }
         }
         for code in reply.codes() {
@@ -747,9 +752,20 @@ impl Inner {
                 "UIDNEXT" => info.uid_next = code.number().unwrap_or(0) as u32,
                 "HIGHESTMODSEQ" => info.highest_modseq = code.number().unwrap_or(0),
                 "NOMODSEQ" => info.highest_modseq = 0,
+                "PERMANENTFLAGS" => {
+                    let list = code
+                        .args
+                        .trim()
+                        .trim_start_matches('(')
+                        .trim_end_matches(')');
+                    info.permanent_flags =
+                        Some(list.split_whitespace().map(str::to_owned).collect());
+                }
                 _ => {}
             }
         }
+        self.new_keywords
+            .insert(path.to_owned(), info.allows_new_keywords());
         self.current_folder = Some(path.to_owned());
         self.state = State::Selected;
         Ok(info)
@@ -1487,6 +1503,10 @@ impl ImapSession for Session {
         self.rt.block_on(self.inner.select(path))
     }
 
+    fn allows_new_keywords(&self, path: &str) -> Option<bool> {
+        self.inner.new_keywords.get(path).copied()
+    }
+
     fn select_if_needed(&mut self, path: &str) -> Result<()> {
         self.rt.block_on(self.inner.select_if_needed(path))
     }
@@ -1564,6 +1584,36 @@ impl ImapSession for Session {
             return Ok(());
         }
         let item = format!("{}FLAGS.SILENT {}", store_sign(op), flag_list(flags));
+        self.rt
+            .block_on(self.inner.store(path, uids, STORE_FLAGS_CHUNK, &item))
+    }
+
+    fn store_keywords(
+        &mut self,
+        path: &str,
+        uids: &UidSet,
+        op: StoreOp,
+        keywords: &[String],
+    ) -> Result<()> {
+        if op == StoreOp::Set {
+            return Err(MailError::new(
+                ErrorCode::Store,
+                "a keyword STORE adds or removes; FLAGS would replace the system flags",
+            ));
+        }
+        if let Some(bad) = keywords
+            .iter()
+            .find(|k| !ms_core::keywords::is_keyword_atom(k))
+        {
+            return Err(MailError::new(
+                ErrorCode::Store,
+                format!("not a keyword: {bad:?}"),
+            ));
+        }
+        if uids.is_empty() || keywords.is_empty() {
+            return Ok(());
+        }
+        let item = format!("{}FLAGS.SILENT ({})", store_sign(op), keywords.join(" "));
         self.rt
             .block_on(self.inner.store(path, uids, STORE_FLAGS_CHUNK, &item))
     }

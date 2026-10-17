@@ -185,12 +185,29 @@ pub struct ListedFolder {
     pub flags: FolderFlags,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SelectInfo {
     pub uid_validity: u32,
     pub uid_next: u32,
     pub highest_modseq: u64,
     pub exists: u32,
+    /// `[PERMANENTFLAGS (...)]` as sent, `None` when the server sent none.
+    pub permanent_flags: Option<Vec<String>>,
+    /// The untagged `FLAGS` list: the flags and keywords defined in the mailbox.
+    pub flags: Vec<String>,
+}
+
+impl SelectInfo {
+    /// New keywords can be stored here: `\*` in PERMANENTFLAGS, or in FLAGS (Zoho), as
+    /// Thunderbird reads it. A server at its per-mailbox keyword limit drops `\*`
+    /// (RFC 9051 7.1).
+    pub fn allows_new_keywords(&self) -> bool {
+        self.permanent_flags
+            .iter()
+            .flatten()
+            .chain(&self.flags)
+            .any(|f| f == "\\*")
+    }
 }
 
 /// STATUS results. Missing items are 0.

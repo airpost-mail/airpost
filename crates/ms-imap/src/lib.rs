@@ -74,6 +74,11 @@ pub trait ImapSession {
     fn list_folders(&mut self) -> Result<Vec<ListedFolder>>;
     /// A plain SELECT, even if `path` is already selected.
     fn select(&mut self, path: &str) -> Result<SelectInfo>;
+    /// Whether the last SELECT of `path` on this connection allowed new keywords
+    /// (`SelectInfo::allows_new_keywords`); `None` before one.
+    fn allows_new_keywords(&self, _path: &str) -> Option<bool> {
+        None
+    }
     fn select_if_needed(&mut self, path: &str) -> Result<()>;
     fn noop(&mut self) -> Result<()>;
     /// STATUS (UNSEEN MESSAGES RECENT UIDNEXT UIDVALIDITY [HIGHESTMODSEQ]).
@@ -106,6 +111,16 @@ pub trait ImapSession {
         uids: &UidSet,
         op: StoreOp,
         flags: MessageFlags,
+    ) -> Result<()>;
+    /// `+FLAGS.SILENT` / `-FLAGS.SILENT` of keywords, which must be keyword atoms
+    /// (`ms_core::keywords::is_keyword_atom`). `StoreOp::Set` is refused: it would replace
+    /// the system flags too.
+    fn store_keywords(
+        &mut self,
+        path: &str,
+        uids: &UidSet,
+        op: StoreOp,
+        keywords: &[String],
     ) -> Result<()>;
     /// X-GM-LABELS. Labels are passed as the client names them; `\Inbox` etc. as-is.
     fn store_labels(

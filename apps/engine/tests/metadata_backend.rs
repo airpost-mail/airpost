@@ -313,6 +313,15 @@ impl ImapSession for NoImap {
     ) -> ms_imap::Result<()> {
         unused()
     }
+    fn store_keywords(
+        &mut self,
+        _: &str,
+        _: &UidSet,
+        _: StoreOp,
+        _: &[String],
+    ) -> ms_imap::Result<()> {
+        unused()
+    }
     fn store_labels(
         &mut self,
         _: &str,

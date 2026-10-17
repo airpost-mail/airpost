@@ -19,7 +19,7 @@ from typing import Callable, Optional
 
 from . import imapfmt
 from .personalities import Personality, personality as get_personality
-from .store import GmailStore, LabelView, Message, Store, StoreEvent
+from .store import GmailStore, KeywordLimit, LabelView, Message, Store, StoreEvent
 
 CRLF = b"\r\n"
 
@@ -625,11 +625,20 @@ class Session(socketserver.StreamRequestHandler):
             with self.cv:
                 self.pending.clear()
             self.view = mb.uids()
-            self.send(b"* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)")
+            # Dovecot lists the mailbox's keywords in FLAGS. A mailbox at its keyword limit
+            # drops \* (RFC 9051 7.1).
+            full = mb.keywords_full()
+            flags = ["\\Answered", "\\Flagged", "\\Deleted", "\\Seen", "\\Draft"] + sorted(mb.keywords.values())
+            if self.p.flags_star and not full:
+                flags.append("\\*")
+            self.send(f"* FLAGS ({' '.join(flags)})".encode())
             if examine:
                 self.send(b"* OK [PERMANENTFLAGS ()] Read-only mailbox.")
             else:
-                self.send(b"* OK [PERMANENTFLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft \\*)] Flags permitted.")
+                permanent = mb.permanentflags if mb.permanentflags is not None else self.p.permanentflags.split()
+                if full:
+                    permanent = [f for f in permanent if f != "\\*"]
+                self.send(f"* OK [PERMANENTFLAGS ({' '.join(permanent)})] Flags permitted.".encode())
             self.send(b"* %d EXISTS" % len(self.view))
             # \Recent belongs to the first session that selects the mailbox for writing
             if examine:
@@ -869,7 +878,11 @@ class Session(socketserver.StreamRequestHandler):
         if "X-GM-LABELS" in base:
             changed = self.store.set_labels(self.selected, uids, op, [v.strip('"') for v in value], origin=self)
         else:
-            changed = self.store.store_flags(self.selected, uids, op, value, origin=self)
+            try:
+                changed = self.store.store_flags(self.selected, uids, op, value, origin=self)
+            except KeywordLimit as e:
+                self.no(tag, str(e), code="LIMIT")
+                return
         for m in changed:
             u = mb.view_uid(m) if isinstance(mb, LabelView) else m.uid
             if u not in self.view:

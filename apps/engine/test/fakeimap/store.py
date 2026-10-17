@@ -21,6 +21,11 @@ from typing import Callable, Iterable, Optional
 SYSTEM_FLAGS = {"\\Seen", "\\Answered", "\\Flagged", "\\Deleted", "\\Draft"}
 
 
+class KeywordLimit(Exception):
+    """A STORE would define more keywords than the mailbox allows (Cyrus's
+    IMAP_USERFLAG_EXHAUSTED, RFC 9051 7.1 `NO [LIMIT]`)."""
+
+
 class Message:
     __slots__ = ("uid", "flags", "modseq", "internaldate", "raw", "_parsed", "gm_msgid", "gm_thrid", "labels")
 
@@ -85,7 +90,22 @@ class Mailbox:
         self.subscribed = subscribed
         self.recent: set = set()             # UIDs no session has yet seen (\Recent)
         self.gm_index: dict = {}             # gm_msgid -> Message (Gmail stores)
-        self.permanentflags = sorted(SYSTEM_FLAGS) + ["\\*"]
+        # PERMANENTFLAGS at SELECT; None sends the personality's.
+        self.permanentflags: Optional[list] = None
+        # Keywords defined in the mailbox, lowercased -> as first seen. A real server keeps a
+        # keyword's slot after its last message loses it (Cyrus until cyr_expire), so this only
+        # grows.
+        self.keywords: dict = {}
+        # At most this many keywords (Cyrus allows 100 created by clients); None is no limit.
+        self.keyword_limit: Optional[int] = None
+
+    def note_keywords(self, flags: Iterable[str]):
+        for f in flags:
+            if not f.startswith("\\"):
+                self.keywords.setdefault(f.lower(), f)
+
+    def keywords_full(self) -> bool:
+        return self.keyword_limit is not None and len(self.keywords) >= self.keyword_limit
 
     # -- queries -------------------------------------------------------------------------
     def by_uid(self, uid: int) -> Optional[Message]:
@@ -159,6 +179,9 @@ class Store:
         self._listeners: list = []
         self._gm_counter = 1 << 60
         self.transcript: list = []   # (t, "event", description) for debugging
+        # STORE answers OK but keeps no keyword, as a server that ignores keywords it does not
+        # list in PERMANENTFLAGS may (RFC 9051 7.1); for the engine's read-back check.
+        self.drop_keywords = False
 
     # -- listeners -----------------------------------------------------------------------
     def add_listener(self, fn: Callable[[StoreEvent], None]):
@@ -221,6 +244,7 @@ class Store:
             m.gm_thrid = self._gm_counter
             self._gm_counter += 1
             m.labels = set(labels)
+            mb.note_keywords(m.flags)
             mb.uidnext += 1
             mb.add(m)
             mb.recent.add(m.uid)
@@ -242,16 +266,27 @@ class Store:
         with self.lock:
             mb = self.get(mailbox)
             flags = set(flags)
+            if self.drop_keywords and op != "remove":
+                flags = {f for f in flags if f.startswith("\\")}
+            if op != "remove":
+                new = {f.lower() for f in flags if not f.startswith("\\")} - set(mb.keywords)
+                if new and mb.keyword_limit is not None and len(mb.keywords) + len(new) > mb.keyword_limit:
+                    raise KeywordLimit(f"At most {mb.keyword_limit} flags in one mailbox supported")
+                mb.note_keywords(flags)
             changed = []
             for uid in uids:
                 m = mb.by_uid(uid)
                 if m is None:
                     continue
                 before = set(m.flags)
+                # Flags and keywords match case-insensitively, as on Dovecot and Cyrus
+                # (probe_keywords); a keyword keeps the spelling it was first stored with.
                 if op == "add":
-                    m.flags |= flags
+                    have = {f.lower() for f in m.flags}
+                    m.flags |= {f for f in flags if f.lower() not in have}
                 elif op == "remove":
-                    m.flags -= flags
+                    gone = {f.lower() for f in flags}
+                    m.flags = {f for f in m.flags if f.lower() not in gone}
                 else:
                     m.flags = set(flags)
                 if m.flags == before:

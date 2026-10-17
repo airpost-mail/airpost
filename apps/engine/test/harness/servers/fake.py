@@ -123,6 +123,15 @@ class FakeServer(Server):
     def duplicate(self, mailbox, uids, dest):
         self.store.duplicate(mailbox, list(uids), dest)
 
+    def set_keyword_limit(self, mailbox, limit):
+        """At most `limit` keywords in `mailbox` (None: no limit). A STORE past it answers
+        NO [LIMIT], and PERMANENTFLAGS loses \\* once the mailbox is full, as on Cyrus."""
+        self.store.get(mailbox).keyword_limit = limit
+
+    def set_drop_keywords(self, on=True):
+        """STOREs answer OK and keep no keyword."""
+        self.store.drop_keywords = on
+
     def drop_connections(self):
         for s in list(self.imap.sessions):
             if not s.closed:

@@ -721,6 +721,97 @@ fn scripted_session(s: &mut ServerProc) {
     other.disconnect();
 }
 
+fn has_keyword(m: &ms_imap::ImapMessage, k: &str) -> bool {
+    m.keywords.iter().any(|x| x.eq_ignore_ascii_case(k))
+}
+
+fn keywords_of(s: &mut Session, path: &str, uid: u32) -> ms_imap::ImapMessage {
+    let mut r = s
+        .fetch_by_uid(path, FetchKind::Light, &UidSet::single(uid))
+        .unwrap()
+        .messages;
+    assert_eq!(r.len(), 1, "{path} {uid}");
+    r.remove(0)
+}
+
+/// probe_keywords: keyword STORE, what another session sees, the modseq bump, the FLAGS list
+/// at SELECT, and COPY keeping keywords (docs/labels-plan.md 3.2, 5).
+fn keywords(s: &mut ServerProc) {
+    let mut a = session(s);
+    let mut b = session(s);
+    let info = a.select("INBOX").unwrap();
+    assert!(info.allows_new_keywords(), "{info:?}");
+    assert!(info
+        .permanent_flags
+        .as_ref()
+        .unwrap()
+        .iter()
+        .any(|f| f == "\\*"));
+    assert_eq!(a.allows_new_keywords("INBOX"), Some(true));
+    assert_eq!(a.allows_new_keywords("Archive"), None);
+    let hms = info.highest_modseq;
+
+    let kws = ["work".to_owned(), "$label1".to_owned()];
+    a.store_keywords("INBOX", &UidSet::range(1, Some(2)), StoreOp::Add, &kws)
+        .unwrap();
+    let m = keywords_of(&mut b, "INBOX", 1);
+    assert!(
+        has_keyword(&m, "work") && has_keyword(&m, "$label1"),
+        "{m:?}"
+    );
+    assert!(
+        m.flags.contains(MessageFlags::SEEN),
+        "system flags untouched"
+    );
+    if a.is_qresync_enabled() {
+        let r = b
+            .sync_by_uid("INBOX", FetchKind::Light, &all(), hms)
+            .unwrap();
+        assert_eq!(uids_of(&r.modified_or_added), vec![1, 2]);
+    }
+    let info = b.select("INBOX").unwrap();
+    assert!(
+        info.flags.iter().any(|f| f.eq_ignore_ascii_case("work")),
+        "{info:?}"
+    );
+
+    a.store_keywords(
+        "INBOX",
+        &UidSet::single(1),
+        StoreOp::Remove,
+        &["WORK".to_owned()],
+    )
+    .unwrap();
+    let m = keywords_of(&mut b, "INBOX", 1);
+    assert!(
+        !has_keyword(&m, "work") && has_keyword(&m, "$label1"),
+        "{m:?}"
+    );
+    assert!(m.flags.contains(MessageFlags::SEEN));
+
+    a.copy_uids("INBOX", &UidSet::single(2), "Archive").unwrap();
+    let archive = a.fetch_by_uid("Archive", FetchKind::Light, &all()).unwrap();
+    let copied = archive.messages.last().unwrap();
+    assert!(
+        has_keyword(copied, "work") && has_keyword(copied, "$label1"),
+        "{copied:?}"
+    );
+
+    let err = a
+        .store_keywords("INBOX", &UidSet::single(1), StoreOp::Set, &kws)
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::Store);
+    let err = a
+        .store_keywords(
+            "INBOX",
+            &UidSet::single(1),
+            StoreOp::Add,
+            &["two words".to_owned()],
+        )
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::Store);
+}
+
 macro_rules! server_tests {
     ($kind:ident, $profile:expr) => {
         mod $kind {
@@ -753,6 +844,12 @@ macro_rules! server_tests {
             #[ignore = "needs python3 and the harness servers"]
             fn store() {
                 run(super::store);
+            }
+
+            #[test]
+            #[ignore = "needs python3 and the harness servers"]
+            fn keywords() {
+                run(super::keywords);
             }
 
             #[test]
@@ -913,6 +1010,62 @@ mod personalities {
         let mut a = session(&s);
         a.list_folders().unwrap();
         assert_eq!(a.profile().provider, Provider::ProtonBridge);
+    }
+
+    #[test]
+    #[ignore = "needs python3"]
+    fn no_keywords_without_star() {
+        for p in ["outlook", "yahoo", "proton-bridge"] {
+            let s = fake(p);
+            let mut a = session(&s);
+            let info = a.select("INBOX").unwrap();
+            assert!(!info.allows_new_keywords(), "{p}: {info:?}");
+            assert_eq!(a.allows_new_keywords("INBOX"), Some(false));
+        }
+        let s = fake("keywords-in-flags");
+        let mut a = session(&s);
+        let info = a.select("INBOX").unwrap();
+        assert!(!info
+            .permanent_flags
+            .as_ref()
+            .unwrap()
+            .iter()
+            .any(|f| f == "\\*"));
+        assert!(info.allows_new_keywords(), "\\* in FLAGS counts: {info:?}");
+    }
+
+    #[test]
+    #[ignore = "needs python3"]
+    fn keyword_limit_and_drop() {
+        let mut s = fake("dovecot");
+        s.call("set_keyword_limit", json!(["INBOX", 2]));
+        let mut a = session(&s);
+        let one = |k: &str| vec![k.to_owned()];
+        a.store_keywords("INBOX", &UidSet::single(1), StoreOp::Add, &one("a"))
+            .unwrap();
+        a.store_keywords("INBOX", &UidSet::single(2), StoreOp::Add, &one("b"))
+            .unwrap();
+        // A keyword already defined still fits.
+        a.store_keywords("INBOX", &UidSet::single(3), StoreOp::Add, &one("A"))
+            .unwrap();
+        let err = a
+            .store_keywords("INBOX", &UidSet::single(3), StoreOp::Add, &one("c"))
+            .unwrap_err();
+        assert_eq!(err.code, ErrorCode::Store);
+        assert!(err.detail.starts_with("[LIMIT]"), "{err:?}");
+        assert!(!a.select("INBOX").unwrap().allows_new_keywords());
+        assert_eq!(a.allows_new_keywords("INBOX"), Some(false));
+
+        let mut s = fake("dovecot");
+        s.call("set_drop_keywords", json!([true]));
+        let mut a = session(&s);
+        a.store_keywords("INBOX", &UidSet::single(1), StoreOp::Add, &one("work"))
+            .unwrap();
+        let m = a
+            .fetch_by_uid("INBOX", FetchKind::Light, &UidSet::single(1))
+            .unwrap()
+            .messages;
+        assert!(m[0].keywords.is_empty(), "{m:?}");
     }
 
     #[test]
