@@ -541,12 +541,13 @@ thread list greys chips on a selected row with `filter: brightness(600%) graysca
 **What the user gets.** Two ways to colour labels, both in the desktop only:
 - **A scheme.** Preferences > Appearance > "Label colours" picks one of a few schemes:
   Automatic (today's hue from the name, the default, so nothing changes unless the user picks
-  another), Bright, Pastel, Muted, Earth, Grey. A scheme is a list of 12 colours; each label gets
+  another), Bright, Pastel, Muted, Earth. A scheme is a list of 12 colours; each label gets
   the colour at `hash(lowercased name) % 12`, so a label keeps its colour as labels come and go,
   and "Work" has the same colour in every account.
-- **Per label.** "Colour..." in the sidebar label menu and on each row of the label picker: the
-  current scheme's 12 swatches, a free colour picker (any colour), and "Reset" back to the scheme.
-  A per-label colour beats the scheme.
+- **Per label.** "Change Color..." in the sidebar label menu opens a popover with the current
+  scheme's 12 swatches (Bright's on Automatic), a free colour picker (any colour), and "Use
+  Scheme Color". A per-label colour beats the scheme. The sidebar tints each label's icon with
+  its colour. The same popover can go on the label picker's rows with L3.
 
 **Storage.** Desktop config, per device: `core.appearance.labelColorScheme` and
 `core.appearance.labelColors` (`{lowercased label name: "#rrggbb"}`). Keyed by name rather than
@@ -557,33 +558,34 @@ new name. No engine change, so it works for today's Gmail labels and later for k
 the Tern backend with the registry (L4), as a user-level setting.
 
 **Legibility in every theme.** Every label resolves to one base colour (per-label colour, else
-the scheme's, else `hsl(<hue()> 62% 47%)` for Automatic). The inline style sets only
-`--label-base`; the stylesheet derives the chip and dot from theme variables:
+the scheme's, else `hsl(<hue()>, 62%, 47%)` for Automatic). `LabelColorizer`
+(`src/components/mail-label.tsx`) fits it to the theme with CSS relative colours, keeping the
+hue and clamping OKLab lightness and OKLCH chroma to bounds the stylesheet sets:
 
-```less
-.mail-label {
-  background: color-mix(in oklab, var(--label-base) var(--label-chip-tint), var(--label-surface));
-  color: color-mix(in oklab, var(--label-base) var(--label-chip-ink-mix), var(--label-ink));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--label-base) var(--label-chip-edge), transparent);
-}
-.label-dot { background: color-mix(in oklab, var(--label-base) var(--label-dot-mix), var(--label-ink)); }
+```css
+background: oklch(from <base> clamp(var(--label-chip-lmin), l, var(--label-chip-lmax)) min(c, var(--label-chip-cmax)) h);
+color:      oklch(from <base> var(--label-text-l) min(c, var(--label-text-cmax)) h);
+dot:        oklch(from <base> clamp(var(--label-dot-lmin), l, var(--label-dot-lmax)) c h);
 ```
 
-- Each theme sets `--label-surface` and `--label-ink` from its own LESS variables (background
-  and text colour) and the mix percentages, in one `label-colors.less` per theme over a default
-  in `static/style`. Scopes with a different background redefine surface and ink: Darkside's
-  dark sidebar, a selected or focused thread row (surface = `@accent` or the selection colour),
-  the dark message pane. That replaces the three filter rules above.
-- Because chip text is mixed toward the theme's ink and the background toward its surface, a
-  free colour stays readable: a dark blue picked in a light theme still gives light text on a
-  dark-blue tint in ui-dark. The scheme colours are checked for contrast in every bundled theme;
-  free colours aren't guaranteed, only kept close by the mix.
-- `color-mix` and `oklab` are in Electron 44's Chromium (`apps/desktop/package.json:50`, V for
-  the version). Mixing in oklab keeps perceived lightness even across hues, which `hsl()` doesn't.
+- A chip is a tint of the label's hue with text in a deep shade of it on light themes, as today,
+  and the reverse on dark ones. The bounds come from LESS guards on the theme's own background
+  lightness (`static/style/mixins/label-colors.less`): chips from `@list-bg`, dots from
+  `@background-primary`, sidebar dots from `@source-list-bg`, and Darkside's dark sidebar from
+  `@sidebar`. No theme carries colour lists; a new theme gets the right bounds from its
+  variables.
+- The bounds hold 4.5:1 for chip text (worst case 5.0:1) and 3:1 for dots on the bundled
+  themes' surfaces (worst case 3.5:1), for every scheme colour and the Automatic hues; the spec
+  checks this against the stylesheet's values. A free colour keeps its hue and gets the same
+  lightness bounds, so it stays legible too.
+- Relative colour syntax, `clamp()` and `oklch` are in Electron 44's Chromium
+  (`apps/desktop/package.json:50`, V for the version; the spec checks Chromium parses them). The
+  expressions live in TypeScript: LESS 3.13 would try to evaluate `min()`/`clamp()` itself.
 - `LabelColorizer` keeps its exported functions for plugins (`color`, `backgroundColor`,
-  `backgroundColorDark`, `styles`), returning the same `color-mix(...)` strings, and gains
-  `baseColor(label)` and `dotStyle(label)`. The snooze chip (`snooze-mail-label.less`) uses the
-  same variables. The gradient and white inset highlight go: they assume a light chip.
+  `backgroundColorDark` for dots, `styles`) and gains `baseColor(label)` and
+  `dotColorFor(color)`. ui-dark's `filter` on chips goes, the thread list's selected-row rule
+  sets colours instead of a filter, and the snooze chip's icon takes the text colour. The
+  gradient and white inset highlight go: they assume a light chip.
 
 **Other clients.** Thunderbird's `$label1`..`$label5` start on Thunderbird's colours (`#FF0000`,
 `#FF9900`, `#009900`, `#3333FF`, `#993399`, 3.1) unless the user sets one. Gmail's own label
@@ -612,7 +614,7 @@ Sizes are rough. "Stage n" without a prefix refers to `docs/desktop-client-plan.
 
 | # | Stage | Depends on | Size |
 |---|---|---|---|
-| C1 | Label colours (7.1): schemes and per-label colours in desktop config, Preferences > Appearance picker, "Colour..." in the sidebar menu and label picker, per-theme `label-colors.less` (ui-light default, ui-dark, ui-darkside, ui-taiga, ui-less-is-more), `LabelColorizer` on `--label-base`, the filter rules removed, contrast spec. Today's Gmail labels | — | ~450 TS/LESS |
+| C1 | Label colours (7.1): schemes and per-label colours in desktop config, Preferences > Appearance picker, "Change Color..." in the sidebar menu, theme bounds in `label-colors.less`, `LabelColorizer` on relative colours, the filter rules removed, contrast spec. Today's Gmail labels | — | ~600 TS/LESS |
 | L1 | IMAP groundwork: PERMANENTFLAGS and FLAGS in `SelectInfo`; `store_keywords`; keywords in `MessageAttributes`, `matches`, the per-copy column; COPY-fallback STORE fix; profile `keyword_labels`; fake IMAP per-personality PERMANENTFLAGS, keyword limit, drop mode | — | ~700 Rust, ~200 Python |
 | L2 | Keyword store: store choice, label discovery from copies, Label JSON fields, per-store resolver in the thread rollup, `ChangeLabelsTask` / `SyncbackCategoryTask` / `DestroyCategoryTask` with `kind`, rename as retag, read-back check, sent-copy keywords, `labels.list.store`; tern-mcp and CLI changes | L1 | ~1.3k Rust |
 | L3 | Desktop hybrid UI: `supportsLabels`, sidebar sections, picker, chips, perspectives, TaskFactory, rules action set, keymaps | L2; after stage 2 (mcp-server deleted) | ~900 TS |
@@ -622,10 +624,9 @@ Sizes are rough. "Stage n" without a prefix refers to `docs/desktop-client-plan.
 | L7 | Outlook categories via Graph (Q3), colours as nearest preset (7.1) | L4, stage 12 | ~2k Rust |
 
 Order: C1 first, now: it touches only the desktop's label rendering, theme stylesheets and two
-config keys (`mail-label.tsx`, `extra.less`, `thread-list.less`, the pickers,
-`category-selection.tsx`, the sidebar label menu, Preferences > Appearance, the `ui-*` themes),
-none of which desktop-client stages 1, 2 or 6 change; the theme worktrees (`ui/theme`,
-`ui/email-dark`) are checked with ternmail-ab before the `ui-*` files are edited. L1 and L2 any time; they touch the IMAP layer, placements and tasks, which no
+config keys (`mail-label.tsx`, `extra.less`, `thread-list.less`, the pickers' dots, the sidebar
+label menu, Preferences > Appearance, ui-dark and Darkside), none of which desktop-client stages
+1, 2 or 6 change. L1 and L2 any time; they touch the IMAP layer, placements and tasks, which no
 desktop-client stage touches. L3 after stage 2, and before stage 14 so the rules port in 14
 carries the hybrid action set; it touches category-picker, account-sidebar, mail-label-set,
 TaskFactory and perspectives, none of which stages 1-13 change, so it can run beside them.
