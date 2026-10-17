@@ -207,8 +207,8 @@ A keyword is a label when it is `$label1`..`$label5`, `$Important`, or doesn't s
 `NotJunk`, `JunkRecorded`, `Redirected`, `Forwarded`, `Old`). Everything else starting with
 `$` is a registered or client flag (3.2: `$Forwarded`, `$MDNSent`, `$Junk`, `$NotJunk`,
 `$Phishing`, `$SubmitPending`, `$Submitted`, `$MailFlagBit0..2`, `$hasattachment`, `$muted`,
-`$followed`, …) and is ignored. Matching is case-insensitive (Cyrus compares that way, JMAP
-mandates it, Thunderbird lowercases its keys).
+`$followed`, …) and is ignored. Matching is case-insensitive (Dovecot and Cyrus compare that way, checked by the ms-imap
+`keywords` probe; JMAP mandates it; Thunderbird lowercases its keys).
 
 The filter runs when copies are read, so only label keywords reach `MessageFolder`. Changing
 the rule later needs a rescan (`lastDeep = 0` on every folder), which a migration can do.
@@ -392,21 +392,21 @@ stay within 50 characters.
 ## 4. Capability detection
 
 1. `SelectInfo` gains `permanent_flags` (parsed from `[PERMANENTFLAGS (...)]`) and
-   `flags` (the untagged `FLAGS`). The background worker records `kw` (`\*` in either) in
-   the folder's `localStatus` at every SELECT, so a mailbox that fills up (RFC 9051 7.1) is
+   `flags` (the untagged `FLAGS`). The background worker records `keywords` (`\*` in either) in
+   the folder's `localStatus` after the folder's pass, from that connection's last SELECT, so a mailbox that fills up (RFC 9051 7.1) is
    noticed at its next SELECT.
 2. `ServerProfile` gains `keyword_labels: Auto | Off`. Off: Gmail (Gmail does take keywords,
    3.2, but its labels are X-GM-LABELS) and Microsoft hosts, as a guard should Exchange Online
    ever start listing `\*` without storing categories. Yahoo, AOL and Proton Bridge need no
    rule: they don't list `\*`.
 3. At the first folder sync after the upgrade (or after account add), with no
-   `label-store-<aid>` in `_State`: Gmail → `gmail`; INBOX `kw` true and the profile Auto →
+   `label-store-<aid>` in `_State`: Gmail → `gmail`; INBOX `keywords` true and the profile Auto →
    `keywords`; else `tern`. Recorded once (L9).
 4. **Read-back check.** The first `ChangeLabelsTask` on a `keywords` account fetches FLAGS of
    one changed copy after the STORE. If the keyword isn't there, the task fails with
    `keywords-not-stored`, the engine records `label-store-check-<aid> = failed`, and the
    desktop offers to switch the account to `tern` (the migration task, 6). No silent switch.
-5. **Per-folder.** A folder whose `kw` is false (read-only, shared, or full) can't take a label
+5. **Per-folder.** A folder whose `keywords` is false (read-only, shared, or full) can't take a label
    on its copies. `ChangeLabelsTask` skips those copies, keeps the label on the others, and
    reports `keywords-refused` with the folder paths in the task's error so the UI can say
    which folder. A STORE answered `NO [LIMIT]` (a full mailbox, as Cyrus does at 100
@@ -419,10 +419,13 @@ passes see them: CHANGEDSINCE on CONDSTORE servers (a keyword STORE bumps the mo
 3.1.1), the shallow (2 min) and deep (10 min) attribute scans elsewhere
 (`crates/ms-core/src/constants.rs:60-61`), and unsolicited FETCH during IDLE. The changes:
 `MessageAttributes` carries the filtered keywords, `matches` compares them, and the placement
-writes them into the per-copy label column. The column stays `remoteXGMLabels` in SQL until
-the C++ engine is deleted (desktop-client-plan stage 10) and is renamed `remote_labels` in
-Rust now; on non-Gmail accounts it is always `[]` today, so reusing it needs no migration.
-The first scan after the upgrade updates every message that carries a label keyword, once.
+writes them into the per-copy label column (`Placement.labels`, lowercased). The column stays
+`remoteXGMLabels` in SQL until the C++ engine is deleted (desktop-client-plan stage 10); on
+non-Gmail accounts it was always `[]`, so reusing it needs no migration. L1 records them on
+every account whose profile allows keyword labels, before any store is chosen, so the first
+scan after the L1 upgrade updates every message that carries a label keyword, once, and L2
+starts with them in place. Until L2 there are no keyword Label rows, so the thread rollup
+counts nothing and no chip shows.
 
 **Writing (keywords).** `ChangeLabelsTask`'s local phase sets the label on every copy of
 every message of the thread and holds the scan off with `_sa` as today; the remote phase runs
@@ -615,7 +618,7 @@ Sizes are rough. "Stage n" without a prefix refers to `docs/desktop-client-plan.
 | # | Stage | Depends on | Size |
 |---|---|---|---|
 | C1 | Label colours (7.1): schemes and per-label colours in desktop config, Preferences > Appearance picker, "Change Color..." in the sidebar menu, theme bounds in `label-colors.less`, `LabelColorizer` on relative colours, the filter rules removed, contrast spec. Today's Gmail labels | — | ~600 TS/LESS |
-| L1 | IMAP groundwork: PERMANENTFLAGS and FLAGS in `SelectInfo`; `store_keywords`; keywords in `MessageAttributes`, `matches`, the per-copy column; COPY-fallback STORE fix; profile `keyword_labels`; fake IMAP per-personality PERMANENTFLAGS, keyword limit, drop mode | — | ~700 Rust, ~200 Python |
+| L1 | IMAP groundwork: PERMANENTFLAGS and FLAGS in `SelectInfo`; `store_keywords`; keywords in `MessageAttributes`, `matches`, the per-copy column; COPY-fallback STORE fix; profile `keyword_labels`; fake IMAP per-personality PERMANENTFLAGS, keyword limit, drop mode. Done 2026-10-17 | — | ~700 Rust, ~200 Python |
 | L2 | Keyword store: store choice, label discovery from copies, Label JSON fields, per-store resolver in the thread rollup, `ChangeLabelsTask` / `SyncbackCategoryTask` / `DestroyCategoryTask` with `kind`, rename as retag, read-back check, sent-copy keywords, `labels.list.store`; tern-mcp and CLI changes | L1 | ~1.3k Rust |
 | L3 | Desktop hybrid UI: `supportsLabels`, sidebar sections, picker, chips, perspectives, TaskFactory, rules action set, keymaps | L2; after stage 2 (mcp-server deleted) | ~900 TS |
 | L4 | `tern` store and registry: `tern-labels` metadata, `label` object type in engine and backend, merge, `LabelStoreMigrationTask`, Preferences override | L2, L3 | ~1.1k Rust, ~50 backend, ~300 TS |
@@ -741,3 +744,26 @@ implemented. Waiting for the user to confirm section 0.1.
 `move-without-move-keeps-keywords`). Section 7.1 (label colours, L15, stage C1) added at the
 user's request: a scheme plus per-label colours, desktop only. C1 is next, ahead of L1.
 The user confirmed questions 1-10 of 0.1 as recommended.
+
+2026-10-17: C1 (label colours) committed and fast-forwarded to main. L1 done on
+`roadmap/labels`:
+- `SelectInfo` has `permanent_flags` and `flags`, `allows_new_keywords()` (`\*` in either).
+  The session remembers it per folder (`ImapSession::allows_new_keywords`) and the background
+  worker records `localStatus.keywords` after each folder's pass.
+- `ImapSession::store_keywords` (`+FLAGS` / `-FLAGS` only; `Set` and non-atoms refused).
+- `ms_core::keywords`: the 2.4 filter (`is_label_keyword`, `label_keywords`) and
+  `is_keyword_atom`.
+- Off Gmail, where the profile allows keyword labels, copies record their label keywords in
+  `Placement.labels` (`MessageAttributes::from_keywords`, `CopyLabels`), so a keyword change
+  is a change. The thread rollup skips accounts without Label rows.
+- `ServerProfile.keyword_labels` (`Auto`; `Off` for Gmail and Microsoft).
+- Fake IMAP: PERMANENTFLAGS per personality (`outlook`, `yahoo`, `proton-bridge` without
+  `\*`), `keywords-in-flags` (Zoho style), FLAGS at SELECT listing the mailbox's keywords,
+  `set_keyword_limit` (`NO [LIMIT]`, then no `\*`), `set_drop_keywords`, keywords matched
+  case-insensitively as on Dovecot and Cyrus.
+- Tests: the ms-imap `keywords` probe on fake, Dovecot and Cyrus, plus fake personality, limit
+  and drop tests; scenarios `keyword-labels-reach-copies` and `keyword-labels-not-offered`.
+  The conformance suite in Python has no `probe_keywords`; the ms-imap probe covers the same
+  exchanges against the real servers.
+- Moved to L2: Thunderbird key derivation (only needed to create labels).
+
