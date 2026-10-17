@@ -6,7 +6,9 @@
 //! mailcore2 (`MC*.cpp`) is Copyright © 2001-2013 MailCore team, BSD-3-Clause. See NOTICE.md
 //! ("mailcore2").
 
-use crate::{ConnectionInfo, MailboxModelKind, OAuthProvider, Provider, ServerProfile};
+use crate::{
+    ConnectionInfo, KeywordLabels, MailboxModelKind, OAuthProvider, Provider, ServerProfile,
+};
 
 /// mailcore's `IMAPCapabilityGmail`.
 pub fn detect(info: &ConnectionInfo) -> bool {
@@ -17,6 +19,8 @@ pub fn profile() -> ServerProfile {
     ServerProfile {
         provider: Provider::Gmail,
         mailbox_model: MailboxModelKind::GmailLabels,
+        // Gmail stores keywords, but its labels are X-GM-LABELS.
+        keyword_labels: KeywordLabels::Off,
         oauth: Some(OAuthProvider::Google),
         // Gmail advertises XLIST but its LIST carries the same special-use flags.
         xlist_disabled: true,

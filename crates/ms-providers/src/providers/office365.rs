@@ -8,7 +8,7 @@
 //! ("mailcore2").
 
 use super::{greeting_has, host_is};
-use crate::{ConnectionInfo, OAuthProvider, Provider, ServerProfile};
+use crate::{ConnectionInfo, KeywordLabels, OAuthProvider, Provider, ServerProfile};
 
 pub fn detect(info: &ConnectionInfo) -> bool {
     host_is(info, "office365.com")
@@ -20,6 +20,9 @@ pub fn profile() -> ServerProfile {
     ServerProfile {
         provider: Provider::Office365,
         oauth: Some(OAuthProvider::Microsoft),
+        // Exchange does not support client-defined keywords (MS-STANXIMAP); Outlook categories
+        // are not exposed over IMAP. A guard should Exchange Online ever list `\*`.
+        keyword_labels: KeywordLabels::Off,
         list_no_is_connection_error: true,
         late_sent_copies: true,
         ..ServerProfile::default()

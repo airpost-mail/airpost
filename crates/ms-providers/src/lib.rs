@@ -79,6 +79,16 @@ pub enum MailboxModelKind {
     GmailLabels,
 }
 
+/// Whether labels may live in IMAP keywords on this server (docs/labels-plan.md 4).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum KeywordLabels {
+    /// When the server lets clients create keywords (`\*` in PERMANENTFLAGS or FLAGS).
+    #[default]
+    Auto,
+    /// Never, whatever the server announces.
+    Off,
+}
+
 /// Named quirk flags (plan 4.4). Defaults are the generic-server behaviour, which is the
 /// C++ behaviour for every server: where the C++ applies a workaround unconditionally, the
 /// flag defaults to on and a provider turns it off only when it must.
@@ -86,6 +96,7 @@ pub enum MailboxModelKind {
 pub struct ServerProfile {
     pub provider: Provider,
     pub mailbox_model: MailboxModelKind,
+    pub keyword_labels: KeywordLabels,
     /// The OAuth token endpoint family, when the account authenticates with OAuth.
     pub oauth: Option<OAuthProvider>,
 
@@ -165,6 +176,7 @@ impl Default for ServerProfile {
         ServerProfile {
             provider: Provider::Generic,
             mailbox_model: MailboxModelKind::Folders,
+            keyword_labels: KeywordLabels::Auto,
             oauth: None,
             xlist_disabled: false,
             disable_qresync: false,

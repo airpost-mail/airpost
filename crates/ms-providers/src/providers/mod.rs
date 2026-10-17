@@ -125,7 +125,7 @@ pub(crate) fn host_is(info: &ConnectionInfo, domain: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MailboxModelKind, OAuthProvider, Provider};
+    use crate::{KeywordLabels, MailboxModelKind, OAuthProvider, Provider};
 
     fn info(host: &str, greeting: &str, caps: &str) -> ConnectionInfo {
         ConnectionInfo {
@@ -294,6 +294,7 @@ mod tests {
         assert!(gmail.xlist_disabled && gmail.literal_plus_search && gmail.people_api_contacts);
         assert!(!gmail.skip_all_mail_folder);
         assert_eq!(gmail.oauth, Some(OAuthProvider::Google));
+        assert_eq!(gmail.keyword_labels, KeywordLabels::Off);
         assert_eq!(
             gmail.caldav_url("a@gmail.com").as_deref(),
             Some("https://apidata.googleusercontent.com/caldav/v2/a@gmail.com")
@@ -302,6 +303,13 @@ mod tests {
         let o365 = resolve(&info("outlook.office365.com", "", ""));
         assert!(o365.list_no_is_connection_error && o365.late_sent_copies);
         assert_eq!(o365.oauth, Some(OAuthProvider::Microsoft));
+        assert_eq!(o365.keyword_labels, KeywordLabels::Off);
+        let exchange = resolve(&info(
+            "mail.example.test",
+            "The Microsoft Exchange IMAP4 service is ready.",
+            "",
+        ));
+        assert_eq!(exchange.keyword_labels, KeywordLabels::Off);
 
         assert!(resolve(&info("imap.mail.me.com", "", "")).disable_qresync);
 
@@ -335,6 +343,7 @@ mod tests {
         assert_eq!(generic, ServerProfile::default());
         assert!(generic.skip_all_mail_folder && generic.merge_duplicate_list_entries);
         assert!(!generic.disable_qresync);
+        assert_eq!(generic.keyword_labels, KeywordLabels::Auto);
         // Behaviours the C++ applies to every server, whichever provider showed them first.
         assert!(
             !generic.trust_copyuid_pairing
