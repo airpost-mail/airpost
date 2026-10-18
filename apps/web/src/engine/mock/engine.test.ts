@@ -49,6 +49,26 @@ describe('MockEngine', () => {
     await engine.connect();
   });
 
+  it('keeps uploaded bytes and names raw-message exports by file id', async () => {
+    const blob = new Blob(['hi'], { type: 'text/plain' });
+    const file = await engine.uploadFile(G, blob, 'hi.txt');
+    expect(file).toMatchObject({ aid: G, __cls: 'File', filename: 'hi.txt', size: 2 });
+    expect(engine.features?.has('files')).toBe(true);
+    await expect(engine.prepareFile(file)).resolves.toBeUndefined();
+
+    const task = await engine.call('task.queue', {
+      accountId: G,
+      task: {
+        id: 't-eml',
+        __cls: 'GetMessageRFC2822Task',
+        aid: G,
+        v: 0,
+        messageId: 'm1',
+      } as TaskJSON,
+    });
+    expect(task.__cls === 'GetMessageRFC2822Task' && task.fileId).toBeTruthy();
+  });
+
   it('says hello with both accounts', async () => {
     const hello = await engine.call('hello', { protocol: 1, client: 'test' });
     expect(hello.accounts.map((a) => a.accountId).sort()).toEqual([G, I].sort());

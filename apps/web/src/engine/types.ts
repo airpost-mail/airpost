@@ -341,7 +341,10 @@ export interface ChangeRoleMappingTaskJSON extends TaskBaseJSON {
 export interface GetMessageRFC2822TaskJSON extends TaskBaseJSON {
   __cls: 'GetMessageRFC2822Task';
   messageId: string;
-  filepath: string;
+  /** Local clients only. Without it (file-id mode) the engine saves the File `fileId`. */
+  filepath?: string | null;
+  /** Set by the engine's local phase in file-id mode; read the file with `fileUrl`. */
+  fileId?: string;
 }
 
 export interface EventRSVPTaskJSON extends TaskBaseJSON {

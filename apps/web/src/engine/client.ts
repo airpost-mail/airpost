@@ -51,7 +51,18 @@ export interface EngineClient {
   /** Also called when `problem` changes. */
   onStateChange(listener: (state: ConnectionState) => void): Unsubscribe;
 
-  // TODO(engine): downloads need the gateway's file route, `GET /gateway/v1/files/:accountId/
-  // :fileId` on DCP stage 16's `files.get` (docs/web-gateway-plan.md 2.5, step W5).
-  fileUrl(file: FileJSON): string | null;
+  /**
+   * Where the browser downloads a file: the gateway's file route on engines with
+   * `EngineFeature.Files`, else null. `inline` asks for a URL an `<img>` can show (`cid:`
+   * parts); the gateway serves only recognised raster images inline.
+   */
+  fileUrl(file: FileJSON, opts?: { inline?: boolean }): string | null;
+  /** Stores a picked file as a new File for a draft of `accountId` (`files.put`). */
+  uploadFile(accountId: string, file: Blob, name: string): Promise<FileJSON>;
+  /**
+   * Makes sure the engine has the file's bytes, downloading the message's body if needed:
+   * SendDraftTask attaches files from the engine's files directory by id. Rejects when the
+   * file can't be had.
+   */
+  prepareFile(file: FileJSON): Promise<void>;
 }

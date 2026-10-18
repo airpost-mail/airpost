@@ -23,7 +23,7 @@ and event reads with a read-only agenda, and calendar fixtures in the mock. Engi
 
 - `src/features/mailbox/list/senders.ts:3`: message count and per-message senders on Thread
   JSON. No DCP stage yet (a full Message `query` per list page is the wrong cost).
-- `src/engine/hooks.ts:527`: `search` across accounts. DCP 9.
+- `src/engine/hooks.ts:522`: `search` across accounts. DCP 9.
 - `src/features/search/query.ts:172`, `src/engine/mock/search.ts:3`,
   `src/features/search/SearchView.tsx:225`: search operators and dates. DCP 9.
 - `src/features/calendar/CalendarView.tsx:3`: creating, editing and answering events, and
@@ -31,17 +31,16 @@ and event reads with a read-only agenda, and calendar fixtures in the mock. Engi
 
 ## Tasks
 
-- `src/engine/mock/apply-task.ts:142`: RFC2822, RSVP and contact tasks in the mock. Raw
-  messages DCP 16 (file-id mode), RSVP and contacts DCP 18.
-- `src/features/composer/useComposerSession.ts:206`: undo-send surviving a closed tab. DCP 4
+- `src/engine/mock/apply-task.ts:147`: RSVP and contact tasks in the mock. DCP 18.
+- `src/features/composer/useComposerSession.ts:246`: undo-send surviving a closed tab. DCP 4
   (send-later metadata fired by the executor), then DCP 13 (`draft.send {delayMs}`).
 - `src/features/composer/send-later-runner.ts:3`: sending with no tab open. DCP 4 executor
   (gate the runner on `expiration-executor`); with no desktop running, DCP 11.
 
 ## Accounts
 
-- `src/engine/mock/engine.ts:402`: `account.add` from the web. DCP 11/12, admin scope.
-- `src/engine/mock/engine.ts:419`: `account.test` on the socket. DCP 12, admin scope.
+- `src/engine/mock/engine.ts:427`: `account.add` from the web. DCP 11/12, admin scope.
+- `src/engine/mock/engine.ts:444`: `account.test` on the socket. DCP 12, admin scope.
 - `src/features/settings/accounts/actions.ts:30`: `account.test {accountId}` with stored
   credentials. DCP 12.
 - `src/features/settings/accounts/actions.ts:47`: `account.reset` on the socket. DCP 12, admin
@@ -54,17 +53,18 @@ and event reads with a read-only agenda, and calendar fixtures in the mock. Engi
 
 ## Attachments
 
-- `src/engine/client.ts:54`, `src/engine/ws.ts:191`,
-  `src/features/mailbox/reader/AttachmentList.tsx:30`: downloads. DCP 16 `files.get` + GW
-  route (W5).
-- `src/features/composer/useComposerSession.ts:132`: uploads. DCP 16 `files.put` + GW route
-  (W5).
-- `src/features/composer/draft.ts:193`: forwards re-attach by id. Works once the files are
-  downloaded (fetch first, W5); DCP 13 later.
+Done in step W5 (DCP 16, markers removed): downloads link to the gateway's file route when
+the engine announces `files` (`EngineFeature.Files`); `cid:` images load from it with
+`?inline=1`, which the reader frame's CSP allows (`img-src 'self'`); the composer uploads
+each picked file at once (`POST /gateway/v1/files/:accountId`, `files.put`) and saves and
+sends only uploaded ones; before SendDraftTask (and before scheduling a send) every
+attachment, a forwarded original's included, is fetched with `HEAD` on its download route,
+which makes the engine download it. GetMessageRFC2822Task's file-id mode is in the types
+and the mock; nothing in the web asks for a raw message yet.
 
 ## Integrations
 
-- `src/engine/rpc.ts:347`, `src/engine/mock/engine.ts:489`: translate, grammar and enrich
+- `src/engine/rpc.ts:349`, `src/engine/mock/engine.ts:514`: translate, grammar and enrich
   shapes. DCP 5.
 - `src/features/settings/integrations/useIntegrationTest.ts:10`: `integrations.test` result.
   DCP 5.

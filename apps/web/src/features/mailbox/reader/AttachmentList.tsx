@@ -27,8 +27,7 @@ export function AttachmentList({ files }: { files: FileJSON[] }) {
     <ul aria-label="Attachments" className="flex flex-wrap gap-2">
       {files.map((f) => {
         const Icon = iconFor(f);
-        // TODO(engine): downloads need the gateway's file route (DCP stage 16, plan step W5);
-        // the mock hands out placeholder blobs and WsEngineClient.fileUrl returns null.
+        // Null on an engine without `files`.
         const href = engine.fileUrl(f);
         const body = (
           <>
@@ -54,7 +53,7 @@ export function AttachmentList({ files }: { files: FileJSON[] }) {
                     {body}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent>Downloads aren't available yet</TooltipContent>
+                <TooltipContent>This engine can't serve attachments; update it</TooltipContent>
               </Tooltip>
             )}
           </li>

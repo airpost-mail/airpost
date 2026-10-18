@@ -1,5 +1,6 @@
-import { FileText, X } from 'lucide-react';
+import { CircleAlert, FileText, LoaderCircle, X } from 'lucide-react';
 import { formatBytes } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import type { DraftAttachment } from './draft';
 
 export function AttachmentList({
@@ -12,12 +13,25 @@ export function AttachmentList({
   if (files.length === 0) return null;
   return (
     <ul aria-label="Attachments" className="flex flex-wrap gap-1.5 px-(--pane-gutter) pb-3">
-      {files.map(({ file }) => (
+      {files.map(({ file, upload }) => (
         <li
           key={file.id}
-          className="group/file flex h-8 max-w-60 items-center gap-2 rounded-md border bg-card pr-1 pl-2 text-xs"
+          aria-busy={upload === 'pending' || undefined}
+          className={cn(
+            'group/file flex h-8 max-w-60 items-center gap-2 rounded-md border bg-card pr-1 pl-2 text-xs',
+            upload === 'failed' && 'border-destructive text-destructive',
+          )}
         >
-          <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          {upload === 'pending' ? (
+            <LoaderCircle
+              className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+              aria-label="Uploading"
+            />
+          ) : upload === 'failed' ? (
+            <CircleAlert className="size-3.5 shrink-0" aria-label="Upload failed" />
+          ) : (
+            <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          )}
           <span className="truncate" title={file.filename}>
             {file.filename}
           </span>

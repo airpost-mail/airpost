@@ -372,3 +372,85 @@ describe('WsEngineClient', () => {
     expect(t.sockets.length).toBe(before + 1);
   });
 });
+
+describe('WsEngineClient files', () => {
+  const file = {
+    id: 'f/1',
+    aid: 'acc 1',
+    v: 1,
+    __cls: 'File' as const,
+    messageId: 'm1',
+    contentId: null,
+    contentType: 'application/pdf',
+    filename: 'a.pdf',
+    size: 3,
+  };
+
+  async function connected(features: string[], fetchImpl: typeof fetch = vi.fn()) {
+    const onUnpaired = vi.fn();
+    const t = setup({ fetch: fetchImpl, onUnpaired });
+    void t.client.connect();
+    await flush();
+    const s = t.current();
+    s.accept();
+    await flush();
+    s.reply(s.last('hello')!.id, { ...HELLO, features });
+    await flush();
+    s.reply(s.last('subscribe')!.id, {});
+    await flush();
+    return { client: t.client, onUnpaired };
+  }
+
+  it('hands out the file routes only when the engine serves files', async () => {
+    const before = setup();
+    expect(before.client.fileUrl(file)).toBeNull();
+    const old = await connected(['query']);
+    expect(old.client.fileUrl(file)).toBeNull();
+    const { client } = await connected(['query', 'files']);
+    expect(client.fileUrl(file)).toBe('/gateway/v1/files/acc%201/f%2F1');
+    expect(client.fileUrl(file, { inline: true })).toBe('/gateway/v1/files/acc%201/f%2F1?inline=1');
+  });
+
+  it('uploads by POST and returns the engine File', async () => {
+    const stored = { ...file, id: 'engine-id', messageId: '' };
+    const fetchImpl = vi.fn(
+      async () => new Response(JSON.stringify({ fileId: 'engine-id', file: stored })),
+    );
+    const { client } = await connected(['files'], fetchImpl as unknown as typeof fetch);
+    const blob = new Blob(['abc'], { type: 'text/plain' });
+    await expect(client.uploadFile('acc 1', blob, 'a b.txt')).resolves.toEqual(stored);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/gateway/v1/files/acc%201?name=a%20b.txt');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(blob);
+    expect(init.headers).toEqual({ 'Content-Type': 'text/plain' });
+  });
+
+  it("reports the gateway's message for a refused upload, and unpaired on 401", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'too-large', message: 'At most 25 MB.' }), {
+          status: 413,
+        }),
+      )
+      .mockResolvedValueOnce(new Response('', { status: 401 }));
+    const { client, onUnpaired } = await connected(['files'], fetchImpl);
+    await expect(client.uploadFile('a', new Blob(['x']), 'x')).rejects.toThrow('At most 25 MB.');
+    await expect(client.uploadFile('a', new Blob(['x']), 'x')).rejects.toThrow();
+    expect(onUnpaired).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares a file with HEAD on its download route', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }));
+    const { client } = await connected(['files'], fetchImpl);
+    await client.prepareFile(file);
+    expect(fetchImpl).toHaveBeenCalledWith('/gateway/v1/files/acc%201/f%2F1', { method: 'HEAD' });
+    await expect(client.prepareFile(file)).rejects.toThrow("a.pdf isn't available.");
+    const old = await connected(['query'], fetchImpl);
+    await expect(old.client.prepareFile(file)).rejects.toThrow();
+  });
+});

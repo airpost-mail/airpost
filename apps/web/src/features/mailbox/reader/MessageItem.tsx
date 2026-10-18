@@ -50,7 +50,7 @@ export function MessageItem({
   const resolveCid = useCallback(
     (cid: string) => {
       const file = m.files.find((f) => f.contentId === cid);
-      return file ? engine.fileUrl(file) : null;
+      return file ? engine.fileUrl(file, { inline: true }) : null;
     },
     [m.files, engine],
   );

@@ -9,6 +9,7 @@ import {
   type Unsubscribe,
 } from './client';
 import {
+  EngineFeature,
   PROTOCOL_VERSION,
   RpcError,
   RpcErrorCode,
@@ -22,6 +23,7 @@ import {
   type RpcRequest,
   type RpcResult,
 } from './rpc';
+import { GATEWAY_BASE } from './mode';
 import type { FileJSON } from './types';
 
 /** What `GET /gateway/v1/session` said before a connect. */
@@ -88,6 +90,31 @@ export interface WsEngineClientOptions {
   classes?: string[] | null;
   createSocket?: (url: string) => WebSocket;
   random?: () => number;
+  /** The gateway's file routes (plan 2.5). */
+  filesBase?: string;
+  fetch?: typeof fetch;
+}
+
+/** A file route answered with an error; `status` is the HTTP status. */
+export class FileRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'FileRequestError';
+  }
+}
+
+async function fileError(res: Response, fallback: string): Promise<FileRequestError> {
+  let message = fallback;
+  try {
+    const body = (await res.json()) as { message?: unknown };
+    if (typeof body.message === 'string') message = body.message;
+  } catch {
+    // Not the gateway's JSON error.
+  }
+  return new FileRequestError(res.status, message);
 }
 
 const CLIENT_NAME = 'tern-web/0.1.0';
@@ -113,7 +140,10 @@ export class WsEngineClient implements EngineClient {
   private wake: (() => void) | null = null;
   private endSession: ((end: SessionEnd) => void) | null = null;
   private readonly opts: Required<
-    Pick<WsEngineClientOptions, 'url' | 'timeoutMs' | 'waitMs' | 'createSocket' | 'random'>
+    Pick<
+      WsEngineClientOptions,
+      'url' | 'timeoutMs' | 'waitMs' | 'createSocket' | 'random' | 'filesBase' | 'fetch'
+    >
   > &
     WsEngineClientOptions;
 
@@ -123,6 +153,8 @@ export class WsEngineClient implements EngineClient {
       waitMs: 10_000,
       createSocket: (url) => new WebSocket(url),
       random: Math.random,
+      filesBase: `${GATEWAY_BASE}/files`,
+      fetch: (input, init) => fetch(input, init),
       ...opts,
     };
   }
@@ -187,10 +219,33 @@ export class WsEngineClient implements EngineClient {
     return () => this.stateListeners.delete(listener);
   }
 
-  fileUrl(_file: FileJSON): string | null {
-    // TODO(engine): the gateway's download route arrives with DCP stage 16
-    // (docs/web-gateway-plan.md 2.5, step W5).
-    return null;
+  /** Null until a handshake shows the engine serves files. */
+  fileUrl(file: FileJSON, opts: { inline?: boolean } = {}): string | null {
+    if (!this._features?.has(EngineFeature.Files)) return null;
+    const url = `${this.opts.filesBase}/${encodeURIComponent(file.aid)}/${encodeURIComponent(file.id)}`;
+    return opts.inline ? `${url}?inline=1` : url;
+  }
+
+  async uploadFile(accountId: string, file: Blob, name: string): Promise<FileJSON> {
+    const url = `${this.opts.filesBase}/${encodeURIComponent(accountId)}?name=${encodeURIComponent(name)}`;
+    const res = await this.opts.fetch(url, {
+      method: 'POST',
+      body: file,
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    });
+    if (res.status === 401) this.opts.onUnpaired?.();
+    if (!res.ok) throw await fileError(res, `The upload failed (${res.status}).`);
+    const body = (await res.json()) as { fileId: string; file: FileJSON };
+    return body.file;
+  }
+
+  async prepareFile(file: FileJSON): Promise<void> {
+    const url = this.fileUrl(file);
+    if (!url) throw new FileRequestError(0, "This engine can't serve files.");
+    // HEAD runs files.get, which downloads the body when the file isn't on disk yet.
+    const res = await this.opts.fetch(url, { method: 'HEAD' });
+    if (res.status === 401) this.opts.onUnpaired?.();
+    if (!res.ok) throw new FileRequestError(res.status, `${file.filename} isn't available.`);
   }
 
   private isOpen(): boolean {

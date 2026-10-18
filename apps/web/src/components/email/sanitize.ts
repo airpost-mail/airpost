@@ -8,9 +8,14 @@ export function hasRemoteContent(html: string): boolean {
   return REMOTE_RE.test(html);
 }
 
-/** CSP for the frame document. Remote images are opt-in per message. */
+/**
+ * CSP for the frame document. Remote images are opt-in per message; `'self'` lets inline
+ * parts load from the gateway's file route (`cid:` rewritten, docs/web-gateway-plan.md 2.5).
+ * The frame is same-origin (`allow-same-origin`), so `'self'` is the app's origin and the
+ * pairing cookie goes along.
+ */
 export function frameCsp(allowRemoteImages: boolean): string {
-  const img = allowRemoteImages ? 'data: blob: https: http:' : 'data: blob:';
+  const img = allowRemoteImages ? "'self' data: blob: https: http:" : "'self' data: blob:";
   return [
     "default-src 'none'",
     `img-src ${img}`,

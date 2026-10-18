@@ -1,5 +1,5 @@
 import type { ConnectionState, EngineClient, Unsubscribe } from '../client';
-import { nowSeconds } from '../model';
+import { generateId, nowSeconds } from '../model';
 import {
   EngineFeature,
   PROTOCOL_VERSION,
@@ -20,7 +20,7 @@ import { runQuery } from './query';
 import { MockStore } from './store';
 
 /** What the mock announces in `hello.features` unless told otherwise. */
-export const MOCK_FEATURES: readonly string[] = [EngineFeature.Query];
+export const MOCK_FEATURES: readonly string[] = [EngineFeature.Query, EngineFeature.Files];
 
 export interface MockEngineOptions {
   /** `hello.features`; `[]` stands in for an engine without `query`. */
@@ -92,6 +92,8 @@ export class MockEngine implements EngineClient {
   private readonly handlers: Handlers;
   private readonly announced: readonly string[];
   private _features: ReadonlySet<string> | null = null;
+  /** Bytes of `uploadFile`, by File id. */
+  private readonly uploads = new Map<string, Blob>();
 
   constructor(opts: MockEngineOptions = {}) {
     const l = opts.latency ?? [40, 140];
@@ -164,11 +166,34 @@ export class MockEngine implements EngineClient {
   }
 
   fileUrl(file: FileJSON): string | null {
-    // Placeholder bytes so download links work in the mock.
-    const blob = new Blob([`Mock attachment ${file.filename} (${file.size} bytes)\n`], {
-      type: 'text/plain',
-    });
+    // Uploads keep their bytes; everything else gets placeholder bytes so links work.
+    const blob =
+      this.uploads.get(file.id) ??
+      new Blob([`Mock attachment ${file.filename} (${file.size} bytes)\n`], {
+        type: 'text/plain',
+      });
     return typeof URL.createObjectURL === 'function' ? URL.createObjectURL(blob) : null;
+  }
+
+  async uploadFile(accountId: string, file: Blob, name: string): Promise<FileJSON> {
+    await this.delay(2);
+    const stored: FileJSON = {
+      id: generateId(),
+      aid: accountId,
+      v: 0,
+      __cls: 'File',
+      messageId: '',
+      contentId: null,
+      contentType: file.type || 'application/octet-stream',
+      filename: name,
+      size: file.size,
+    };
+    this.uploads.set(stored.id, file);
+    return stored;
+  }
+
+  async prepareFile(_file: FileJSON): Promise<void> {
+    await this.delay();
   }
 
   /** Delivers the next scripted incoming thread. Exposed for tests and the dev console. */

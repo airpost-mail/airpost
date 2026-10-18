@@ -26,6 +26,8 @@ function fakeEngine(initial: ConnectionState, kind: 'mock' | 'ws' = 'ws') {
       return () => listeners.delete(l);
     },
     fileUrl: () => null,
+    uploadFile: vi.fn(),
+    prepareFile: vi.fn(async () => {}),
     set(s: ConnectionState, problem: ConnectionProblem | null = null) {
       engine.state = s;
       engine.problem = problem;

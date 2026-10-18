@@ -49,6 +49,10 @@ export interface RecipientFieldHandle {
 /** Most providers reject messages above 25 MB once encoded. */
 const ATTACHMENT_WARN_BYTES = 25 * 1024 * 1024;
 
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export function useComposerSession(args: {
   windowKey: string;
   initial: { draft: DraftState; existing: boolean };
@@ -115,11 +119,13 @@ export function useComposerSession(args: {
 
   const addFiles = (files: File[]) => {
     if (files.length === 0) return;
+    const accountId = draft.accountId;
     const added: DraftAttachment[] = files.map((f) => ({
       local: f,
+      upload: 'pending',
       file: {
         id: generateId(),
-        aid: draft.accountId,
+        aid: accountId,
         v: 0,
         __cls: 'File',
         messageId: draft.id,
@@ -129,19 +135,46 @@ export function useComposerSession(args: {
         size: f.size,
       },
     }));
-    // TODO(engine): attachment bytes need the gateway's upload route,
-    // `POST /gateway/v1/files/:accountId` on DCP stage 16's `files.put` (plan step W5);
-    // until then only the File record is saved with the draft and the mock sends it without
-    // content.
     update((d) => ({ ...d, files: [...d.files, ...added] }));
     const total = [...draft.files, ...added].reduce((n, a) => n + a.file.size, 0);
     if (total > ATTACHMENT_WARN_BYTES) {
       toast.warning('Attachments are over 25 MB; many servers will refuse the message.');
     }
+    const replace = (placeholder: string, next: DraftAttachment) =>
+      update((d) => ({
+        ...d,
+        files: d.files.map((a) => (a.file.id === placeholder ? next : a)),
+      }));
+    for (const a of added) {
+      const local = a.local!;
+      client.uploadFile(accountId, local, local.name).then(
+        (file) => replace(a.file.id, { local, file }),
+        (err: unknown) => {
+          replace(a.file.id, { ...a, upload: 'failed' });
+          toast.error(`Couldn't attach ${local.name}: ${errorText(err)}`);
+        },
+      );
+    }
   };
 
   const removeFile = (id: string) =>
     update((d) => ({ ...d, files: d.files.filter((f) => f.file.id !== id) }));
+
+  /**
+   * SendDraftTask reads attachments from the engine's files directory by id, so a forwarded
+   * original's files must be downloaded first; uploads are there already.
+   */
+  const prepareFiles = async (d: DraftState) => {
+    for (const { file } of d.files) {
+      try {
+        await client.prepareFile(file);
+      } catch (err) {
+        throw new Error(`the attachment ${file.filename} isn't available (${errorText(err)})`, {
+          cause: err,
+        });
+      }
+    }
+  };
 
   /** Merges recipients still being typed and checks the draft can go out. */
   const prepare = (pending: PendingRecipients): DraftState | null => {
@@ -155,6 +188,14 @@ export function useComposerSession(args: {
         next = { ...next, [kind]: dedupeContacts([...next[kind], ...r.contacts]) };
     }
     if (next !== draft) update(() => next);
+    if (next.files.some((f) => f.upload === 'pending')) {
+      toast('Wait for the attachments to finish uploading.');
+      return null;
+    }
+    if (next.files.some((f) => f.upload === 'failed')) {
+      toast.error('Remove the attachments that failed to upload.');
+      return null;
+    }
     if (invalid.length) {
       toast.error(`Check the address “${invalid[0]}”.`);
       return null;
@@ -170,6 +211,7 @@ export function useComposerSession(args: {
   const deliver = async (d: DraftState, toastId: string | number) => {
     toast.loading('Sending…', { id: toastId, action: undefined, duration: Infinity });
     try {
+      await prepareFiles(d);
       const task = tasks.sendDraft(draftToMessage(d));
       const done = waitForTask(client, task.id);
       await queueTask(client, task);
@@ -180,7 +222,7 @@ export function useComposerSession(args: {
       toast.success('Sent', { id: toastId, duration: 3000 });
       closeComposer(windowKey);
     } catch (err) {
-      toast.error(`Couldn't send: ${err instanceof Error ? err.message : String(err)}`, {
+      toast.error(`Couldn't send: ${errorText(err)}`, {
         id: toastId,
         duration: 8000,
       });
@@ -245,14 +287,15 @@ export function useComposerSession(args: {
     handedOff.current = true;
     await autosave.cancel();
     try {
+      await prepareFiles(d);
       // The engine fires a metadata-expiration delta at `at`; useSendLaterRunner sends it.
       await queueTask(client, tasks.syncbackDraft(draftToMessage(d)));
       closeComposer(windowKey);
       toast.success(`Scheduled for ${formatSendLater(at)}`);
-    } catch {
+    } catch (err) {
       handedOff.current = false;
       setBusy(false);
-      toast.error("Couldn't schedule the message.");
+      toast.error(`Couldn't schedule the message: ${errorText(err)}`);
     }
   };
 

@@ -138,10 +138,14 @@ export function applyTask(store: MockStore, task: TaskJSON): TaskOutcome {
       break;
     }
 
+    case 'GetMessageRFC2822Task':
+      // File-id mode: the engine names the File; the mock's fileUrl serves placeholder bytes.
+      if (!task.filepath) task.fileId = generateId();
+      break;
+
     default:
-      // TODO(engine): GetMessageRFC2822Task, EventRSVPTask and the contact tasks have no
-      // mock behaviour; they complete without changing anything. Raw-message downloads use
-      // DCP stage 16's file-id mode, RSVP and contact writes stage 18.
+      // TODO(engine): EventRSVPTask and the contact tasks have no mock behaviour; they
+      // complete without changing anything. RSVP and contact writes are DCP stage 18.
       break;
   }
 

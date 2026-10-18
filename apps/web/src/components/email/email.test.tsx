@@ -15,6 +15,9 @@ describe('email sanitising', () => {
     expect(frameCsp(false)).not.toContain('https:');
     expect(frameCsp(true)).toContain('https:');
     expect(frameCsp(false)).toContain("default-src 'none'");
+    // Inline parts come from the gateway's file route on the app's origin.
+    expect(frameCsp(false)).toContain("img-src 'self' data: blob:");
+    expect(frameCsp(true)).toContain("img-src 'self' data: blob: https: http:");
   });
 
   it('strips scripts, meta refresh and base tags, and resolves cid', () => {
@@ -63,7 +66,7 @@ describe('MessageBody', () => {
   it('offers to load remote images', () => {
     render(<MessageBody body='<img src="https://x.example/a.png">' />);
     const frame = screen.getByTitle('Message body');
-    expect(frame.getAttribute('srcdoc')).not.toContain('img-src data: blob: https:');
+    expect(frame.getAttribute('srcdoc')).not.toContain("img-src 'self' data: blob: https:");
     fireEvent.click(screen.getByRole('button', { name: 'Load images' }));
     expect(screen.getByTitle('Message body').getAttribute('srcdoc')).toContain('https: http:');
   });

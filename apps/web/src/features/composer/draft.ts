@@ -20,8 +20,13 @@ export type ReplyMode = 'reply' | 'reply-all';
 
 export interface DraftAttachment {
   file: FileJSON;
-  /** Bytes picked in this browser that the engine does not have yet. */
+  /** Bytes picked in this browser. */
   local?: File;
+  /**
+   * The bytes are on their way to the engine (`files.put` through the gateway), or didn't
+   * get there. Until then `file` is a placeholder that is neither saved nor sent.
+   */
+  upload?: 'pending' | 'failed';
 }
 
 export interface DraftState {
@@ -190,9 +195,8 @@ export function forwardDraft(args: { message: MessageJSON; identity: Identity })
     subject: subjectWithPrefix(message.subject, 'Fwd:'),
     threadId: message.threadId,
     forwardedHeaderMessageId: message.hMsgId,
-    // TODO(engine): forwarding re-attaches the original's File records by id. SendDraftTask
-    // finds them by id once downloaded, so fetch each first (plan 2.5, step W5) until DCP
-    // stage 13's `draft.create {kind: "forward"}`.
+    // The original's File records, by id: SendDraftTask attaches them from the engine's
+    // files directory, so the composer fetches each before sending (`prepareFile`).
     files: message.files.filter((f) => !f.contentId).map((file) => ({ file })),
     quoted: hasBody ? quoteForForward(message) : null,
     awaitingQuote: !hasBody,
@@ -275,7 +279,9 @@ export function draftToMessage(draft: DraftState): MessageJSON {
     cc: draft.cc,
     bcc: draft.bcc,
     replyTo: [],
-    files: draft.files.map((f) => ({ ...f.file, messageId: draft.id, aid: draft.accountId })),
+    files: draft.files
+      .filter((f) => !f.upload)
+      .map((f) => ({ ...f.file, messageId: draft.id, aid: draft.accountId })),
     metadata: draft.metadata,
   };
 }

@@ -26,6 +26,8 @@ function fakeClient() {
       return () => stateListeners.delete(l);
     },
     fileUrl: () => null,
+    uploadFile: vi.fn(),
+    prepareFile: vi.fn(async () => {}),
     set(s: ConnectionState) {
       client.state = s;
       for (const l of stateListeners) l(s);

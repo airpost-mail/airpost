@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -9,6 +9,7 @@ import {
   MOCK_ACCOUNT_IDS,
   MockEngine,
   type ContactRef,
+  type FileJSON,
   type TaskJSON,
 } from '@/engine';
 import { setPreferences } from '@/lib/preferences';
@@ -156,5 +157,70 @@ describe('ComposerHost', () => {
     await user.click(await within(win).findByRole('button', { name: 'Close and keep draft' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(queued).toHaveLength(0);
+  });
+
+  it("uploads attachments, then sends them by the engine's id", async () => {
+    setPreferences({ undoSendMs: 0 });
+    const { engine, queued, user } = setup();
+    let finish: (f: FileJSON) => void = () => {};
+    const upload = vi
+      .spyOn(engine, 'uploadFile')
+      .mockImplementation(() => new Promise<FileJSON>((r) => (finish = r)));
+    const prepare = vi.spyOn(engine, 'prepareFile');
+    act(
+      () =>
+        void openComposer({ mode: 'new', accountId: G, subject: 'Hi', to: [{ email: 'b@x.io' }] }),
+    );
+    const win = await screen.findByRole('dialog', { name: 'New message' });
+    await within(win).findByRole('button', { name: 'Attach files' });
+    const input = win.querySelector<HTMLInputElement>('input[type=file]')!;
+    const picked = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(input, { target: { files: [picked] } });
+    expect(upload).toHaveBeenCalledWith(G, picked, 'notes.txt');
+    expect(await within(win).findByLabelText('Uploading')).toBeInTheDocument();
+
+    // Not while the upload runs.
+    await user.click(within(win).getByRole('button', { name: /^Send$/ }));
+    expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
+
+    const stored: FileJSON = {
+      id: 'engine-file-1',
+      aid: G,
+      v: 1,
+      __cls: 'File',
+      messageId: '',
+      contentId: null,
+      contentType: 'text/plain',
+      filename: 'notes.txt',
+      size: 5,
+    };
+    act(() => finish(stored));
+    await waitFor(() => expect(within(win).queryByLabelText('Uploading')).toBeNull());
+    await user.click(within(win).getByRole('button', { name: /^Send$/ }));
+    await waitFor(() => expect(ofClass(queued, 'SendDraftTask')).toHaveLength(1));
+    const [send] = ofClass(queued, 'SendDraftTask');
+    expect(send.__cls === 'SendDraftTask' && send.draft.files.map((f) => f.id)).toEqual([
+      'engine-file-1',
+    ]);
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ id: 'engine-file-1' }));
+  });
+
+  it("doesn't send when an attachment can't be had", async () => {
+    setPreferences({ undoSendMs: 0 });
+    const { engine, queued, user } = setup();
+    vi.spyOn(engine, 'prepareFile').mockRejectedValue(new Error('gone'));
+    act(
+      () =>
+        void openComposer({ mode: 'new', accountId: G, subject: 'Hi', to: [{ email: 'b@x.io' }] }),
+    );
+    const win = await screen.findByRole('dialog', { name: 'New message' });
+    await within(win).findByRole('button', { name: 'Attach files' });
+    const input = win.querySelector<HTMLInputElement>('input[type=file]')!;
+    fireEvent.change(input, { target: { files: [new File(['x'], 'a.txt')] } });
+    await waitFor(() => expect(within(win).queryByLabelText('Uploading')).toBeNull());
+    await user.click(within(win).getByRole('button', { name: /^Send$/ }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'New message' })).toBeVisible());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
   });
 });

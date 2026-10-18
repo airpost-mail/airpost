@@ -106,6 +106,8 @@ export interface HelloResult {
 export const EngineFeature = {
   /** `query`, with plain search only (DCP stage 7). */
   Query: 'query',
+  /** `files.*` (DCP stage 16): the gateway's file routes work. */
+  Files: 'files',
 } as const;
 
 /** ms-ipc `EngineStatusResult`. */
