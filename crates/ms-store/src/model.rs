@@ -167,6 +167,15 @@ pub fn bind_base<M: Model>(model: &M, stmt: &mut Statement<'_>) -> Result<()> {
     Ok(())
 }
 
+/// The value a model's `metadata` array holds for `plugin_id`, if any.
+pub fn metadata_value<'a>(data: &'a Value, plugin_id: &str) -> Option<&'a Value> {
+    data.get("metadata")?
+        .as_array()?
+        .iter()
+        .find(|m| json_str(m, "pluginId") == plugin_id)
+        .map(|m| &m["value"])
+}
+
 /// Plugin ids and versions of a model's `metadata` array, for the change check in
 /// [`metadata_after_save`].
 pub type MetadataVersions = BTreeMap<String, i64>;

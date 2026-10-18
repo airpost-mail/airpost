@@ -44,4 +44,4 @@ pub use folder::{Folder, Label};
 pub use generic::GenericModel;
 pub use message::{is_hidden_json, IncomingMessage, Message, MessageSnapshot};
 pub use task::Task;
-pub use thread::{label_for_xgm_label_name, Thread};
+pub use thread::{label_for_xgm_label_name, Thread, SEND_REMINDERS_PLUGIN};

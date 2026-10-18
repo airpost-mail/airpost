@@ -20,9 +20,13 @@ use serde_json::{json, Value};
 
 use crate::model::{
     base_json, bind_base, bind_named, json_i64, json_str, metadata_after_remove,
-    metadata_after_save, metadata_before_save, metadata_versions, object_or_err, MetadataVersions,
+    metadata_after_save, metadata_before_save, metadata_value, metadata_versions, object_or_err,
+    MetadataVersions,
 };
 use crate::{Label, Message, MessageSnapshot, Model, Store};
+
+/// The send-reminders plugin's id (`internal_packages/send-reminders`).
+pub const SEND_REMINDERS_PLUGIN: &str = "send-reminders";
 
 /// `fmt` of a thread with no dated message yet (`INT_MAX`).
 const FIRST_MESSAGE_TIMESTAMP_UNSET: i64 = i32::MAX as i64;
@@ -89,6 +93,30 @@ impl Thread {
         self.initial_lmst = self.last_message_sent_timestamp();
         self.initial_lmrt = self.last_message_received_timestamp();
         self.initial_category_ids = self.category_ids();
+    }
+
+    /// What a save does to a pending reminder, from `send-reminders-store.ts`
+    /// (`_onDatabaseChanged`), so every client sees it without the desktop open: a reminder
+    /// that carries an `expiration` but no `lastReplyTimestamp` (one the engine promoted from
+    /// a draft, or one another client wrote) gets the thread's `lastMessageReceivedTimestamp`
+    /// as its baseline; once that timestamp moves away from the baseline a reply arrived and
+    /// the reminder is cleared (`{}`). `None` when nothing changes.
+    pub fn reminder_update(&self) -> Option<Value> {
+        let value = metadata_value(&self.data, SEND_REMINDERS_PLUGIN)?;
+        if !value.get("expiration").is_some_and(Value::is_number) {
+            return None;
+        }
+        let lmrt = self.last_message_received_timestamp();
+        match value.get("lastReplyTimestamp").filter(|v| v.is_number()) {
+            None => {
+                let mut next = value.clone();
+                next["lastReplyTimestamp"] = json!(lmrt);
+                next["shouldNotify"] = json!(false);
+                Some(next)
+            }
+            Some(baseline) if json_i64(baseline) != lmrt => Some(json!({})),
+            Some(_) => None,
+        }
     }
 
     pub fn subject(&self) -> &str {
@@ -615,7 +643,11 @@ impl Model for Thread {
     }
 
     fn before_save(&mut self, store: &Store) -> Result<()> {
-        metadata_before_save(self, store)
+        metadata_before_save(self, store)?;
+        if let Some(value) = self.reminder_update() {
+            self.upsert_metadata(SEND_REMINDERS_PLUGIN, &value, None);
+        }
+        Ok(())
     }
 
     fn after_save(&mut self, store: &Store) -> Result<()> {
@@ -676,4 +708,37 @@ fn system_label<'a>(name: &str, all_labels: &'a [Label]) -> Option<&'a Label> {
             .iter()
             .any(|p| path.strip_prefix(p).is_some_and(is_system_name))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn thread(lmrt: i64, value: Value) -> Thread {
+        Thread::new(json!({
+            "id": "t1", "aid": "a1", "v": 1, "lmrt": lmrt,
+            "metadata": [{"pluginId": SEND_REMINDERS_PLUGIN, "v": 1, "value": value}],
+        }))
+    }
+
+    #[test]
+    fn reminders_get_a_baseline_and_clear_on_reply() {
+        let fresh = thread(
+            100,
+            json!({"expiration": 500, "sentHeaderMessageId": "s@x"}),
+        );
+        assert_eq!(
+            fresh.reminder_update(),
+            Some(json!({
+                "expiration": 500, "sentHeaderMessageId": "s@x",
+                "lastReplyTimestamp": 100, "shouldNotify": false,
+            }))
+        );
+        let waiting = thread(100, json!({"expiration": 500, "lastReplyTimestamp": 100}));
+        assert_eq!(waiting.reminder_update(), None);
+        let replied = thread(200, json!({"expiration": 500, "lastReplyTimestamp": 100}));
+        assert_eq!(replied.reminder_update(), Some(json!({})));
+        let fired = thread(200, json!({"expiration": null, "lastReplyTimestamp": 100}));
+        assert_eq!(fired.reminder_update(), None);
+    }
 }

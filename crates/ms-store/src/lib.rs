@@ -35,6 +35,7 @@ pub use model::Model;
 pub use models::{
     Calendar, Contact, ContactBook, ContactGroup, Event, File, FilePart, Folder, GenericModel,
     IcsEventFields, IncomingMessage, Label, Message, MessageSnapshot, Task, Thread, FILES_TMP_DIR,
+    SEND_REMINDERS_PLUGIN,
 };
 pub use placement::{FetchableCopy, MessageAttributes, Placement};
 pub use query::Query;
