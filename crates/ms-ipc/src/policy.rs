@@ -70,6 +70,14 @@ pub fn method_class(name: &str) -> MethodClass {
         method::TEST_CRASH | method::TEST_PANIC => MethodClass::Debug,
         // Paths on the engine's machine; browsers use the gateway's file routes.
         method::FILES_GET | method::FILES_READ | method::FILES_PUT => MethodClass::LocalOnly,
+        // The engine makes HTTP requests to the URL in the params' `config`, from the
+        // user's machine and network.
+        method::INTEGRATIONS_TRANSLATE
+        | method::INTEGRATIONS_DETECT
+        | method::INTEGRATIONS_LANGUAGES
+        | method::INTEGRATIONS_GRAMMAR
+        | method::INTEGRATIONS_ENRICH
+        | method::INTEGRATIONS_TEST => MethodClass::LocalOnly,
         _ => MethodClass::LocalOnly,
     }
 }
@@ -291,6 +299,10 @@ mod tests {
             assert_eq!(method_class(m), MethodClass::LocalOnly);
             assert!(!relayed_method_allowed(m, &[]));
             assert!(relayed_method_allowed(m, &admin));
+        }
+        for m in ["integrations.translate", "integrations.test"] {
+            assert_eq!(method_class(m), MethodClass::LocalOnly);
+            assert!(!relayed_method_allowed(m, &[]));
         }
         let put = |p: Value| relayed_request_allowed("files.put", &p, &admin);
         assert!(put(json!({"accountId": "a", "name": "x", "data": ""})));

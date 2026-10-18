@@ -152,6 +152,7 @@ mod tests {
                     })
                     .collect(),
                 features: Vec::new(),
+                capabilities: None,
             },
             client: Client::from_streams(Box::new(std::io::empty()), Box::new(std::io::sink())),
         }

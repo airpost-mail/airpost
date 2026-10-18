@@ -60,6 +60,11 @@ pub const SETTINGS_KEYS: &[(&str, SettingKind)] = &[
     ("mailRulesAutoSince", SettingKind::Count),
     ("resurfacing.snoozeBody", SettingKind::String),
     ("resurfacing.reminderBody", SettingKind::String),
+    // `{provider, enabled, url?, username?}`, never a key (docs/integrations-plan.md 2).
+    // They decide `capabilities.integrations`.
+    ("core.integrations.translation", SettingKind::Object),
+    ("core.integrations.grammar", SettingKind::Object),
+    ("core.integrations.enrichment", SettingKind::Object),
 ];
 
 pub fn setting_kind(key: &str) -> Option<SettingKind> {

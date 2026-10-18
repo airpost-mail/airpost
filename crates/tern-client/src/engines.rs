@@ -417,6 +417,7 @@ mod tests {
                     })
                     .collect(),
                 features: features.iter().map(|f| (*f).to_owned()).collect(),
+                capabilities: None,
             },
             client: Client::from_streams(
                 Box::new(std::io::Cursor::new(input.as_bytes().to_vec())),

@@ -15,6 +15,7 @@ mod client;
 mod envelope;
 mod files;
 mod frame;
+mod integrations;
 mod mail;
 mod methods;
 pub mod policy;
@@ -28,6 +29,7 @@ pub use envelope::{
 };
 pub use files::*;
 pub use frame::{encode, read_frame, write_frame, FrameError};
+pub use integrations::*;
 pub use mail::*;
 pub use methods::*;
 pub use read::*;
@@ -150,6 +152,22 @@ pub mod method {
     /// Sent to every subscribed connection whatever its filter, never held for a later
     /// subscriber: a client calls `settings.get` after `subscribe`.
     pub const SETTINGS_CHANGED: &str = "settings.changed";
+    /// The `integrations.*` methods ([`feature::INTEGRATIONS`](crate::feature::INTEGRATIONS)),
+    /// params and results in docs/integrations-plan.md section 4. Each carries the
+    /// provider's `config`, key included, until the engine owns the credentials. Local
+    /// clients only, answered out of order on the engine's integrations workers (T21); a
+    /// provider failure is [`code::INTEGRATION_FAILED`](crate::code::INTEGRATION_FAILED).
+    pub const INTEGRATIONS_TRANSLATE: &str = "integrations.translate";
+    pub const INTEGRATIONS_DETECT: &str = "integrations.detect";
+    pub const INTEGRATIONS_LANGUAGES: &str = "integrations.languages";
+    pub const INTEGRATIONS_GRAMMAR: &str = "integrations.grammar";
+    pub const INTEGRATIONS_ENRICH: &str = "integrations.enrich";
+    pub const INTEGRATIONS_TEST: &str = "integrations.test";
+    /// Notification: the engine's `capabilities` changed ([`feature::CAPABILITIES`](crate::feature::CAPABILITIES)),
+    /// `params` = the new capabilities object, whole. Sent to every subscribed connection
+    /// whatever its filter, never held for a later subscriber: `hello` and `engine.status`
+    /// carry the current value.
+    pub const CAPABILITIES_CHANGED: &str = "capabilities.changed";
 }
 
 /// The names in `hello.features` and `engine.status.features`
@@ -190,6 +208,11 @@ pub mod feature {
     pub const SNOOZE: &str = "snooze";
     /// `messages.unsubscribe`.
     pub const UNSUBSCRIBE: &str = "unsubscribe";
+    /// The `integrations.*` methods (docs/integrations-plan.md section 4).
+    pub const INTEGRATIONS: &str = "integrations";
+    /// `capabilities` in `hello` and `engine.status`, and `capabilities.changed`
+    /// ([`Capabilities`](crate::Capabilities)).
+    pub const CAPABILITIES: &str = "capabilities";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
@@ -226,6 +249,13 @@ pub mod code {
     pub const FORBIDDEN_RELAYED: i64 = -32008;
     /// The engine already has as many socket connections as it accepts.
     pub const TOO_MANY_CONNECTIONS: i64 = -32009;
+    /// "Integration failed": a provider call failed; `data` is the serialized
+    /// `IntegrationError` `{key, message, retryable, status?, retryAfter?}`.
+    pub const INTEGRATION_FAILED: i64 = -32010;
+    // -32011 is the AI methods' (docs/ai-plan.md).
+    /// The engine's workers for this kind of call are all busy and their queue is full; the
+    /// client may try again later.
+    pub const ENGINE_BUSY: i64 = -32012;
 }
 
 /// The `state` of an account in `hello`, `engine.status`, `account.list` and `account.state`.

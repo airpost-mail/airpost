@@ -353,6 +353,7 @@ mod tests {
                     error: None,
                 }],
                 features: Vec::new(),
+                capabilities: None,
             },
             client: Client::from_streams(
                 Box::new(std::io::Cursor::new(input.into_bytes())),

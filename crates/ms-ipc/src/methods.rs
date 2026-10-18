@@ -44,6 +44,10 @@ pub struct HelloResult {
     /// from an engine that predates them.
     #[serde(default)]
     pub features: Vec<String>,
+    /// What the engine can do for the client now ([`feature::CAPABILITIES`](crate::feature::CAPABILITIES));
+    /// `capabilities.changed` carries later values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<crate::Capabilities>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,6 +126,9 @@ pub struct EngineStatusResult {
     /// As in [`HelloResult::features`].
     #[serde(default)]
     pub features: Vec<String>,
+    /// As in [`HelloResult::capabilities`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<crate::Capabilities>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -378,6 +385,7 @@ mod tests {
             pid: 1,
             uptime_secs: 3,
             features: vec![crate::feature::COUNTS.into()],
+            capabilities: None,
             accounts: vec![AccountStatus {
                 account_id: "a".into(),
                 email: "e".into(),
