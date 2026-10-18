@@ -3,11 +3,13 @@
 
 //! The HTTP client, the runtime it runs on, and the streaming loop.
 //!
-//! reqwest's async client on a private current-thread tokio runtime that callers block on,
-//! rather than its blocking client: a blocking body read can't be interrupted, and
-//! cancelling (`ai.cancel`, a closed connection) has to drop the provider connection while
-//! the model is still thinking. Tokio lets several threads block on one current-thread
-//! runtime at once (`Runtime::block_on`), so engine threads share it.
+//! reqwest's async client on a private tokio runtime that callers block on, rather than
+//! its blocking client: a blocking body read can't be interrupted, and cancelling
+//! (`ai.cancel`, a closed connection) has to drop the provider connection while the model
+//! is still thinking. Engine threads block on the runtime at once (`Runtime::block_on`).
+//! It has one worker thread, which runs hyper's connection tasks between calls: without
+//! it a cancelled request's socket stays open, and the provider keeps generating, until
+//! the next call.
 //!
 //! Each request logs one line with the provider kind, host, model, feature, status, token
 //! counts and timing; never the path, the prompt or the answer.
@@ -84,7 +86,11 @@ pub(crate) struct ChatFailure {
 impl Http {
     pub fn new(connect_timeout: Duration) -> Result<Self> {
         ms_integrations::ensure_crypto_provider();
-        let runtime = tokio::runtime::Builder::new_current_thread()
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            // The engine's AI worker lane name, so a panic in a connection task is
+            // contained there too.
+            .thread_name("ai")
             .enable_all()
             .build()
             .map_err(|_| AiError::Offline {

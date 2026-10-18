@@ -396,6 +396,17 @@ impl Ai {
         context: &MailContext,
         opts: &ReplyOpts,
     ) -> Result<Vec<Suggestion>> {
+        self.suggest_replies_until(config, context, opts, None)
+    }
+
+    /// [`Ai::suggest_replies`], stopped with `cancelled` once `cancel` is cancelled.
+    pub fn suggest_replies_until(
+        &self,
+        config: &ProviderConfig,
+        context: &MailContext,
+        opts: &ReplyOpts,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Vec<Suggestion>> {
         let target = config.target(true)?;
         let count = opts.count.clamp(1, MAX_SUGGESTIONS);
         let key = cache_key("suggestions", config, &target, context, &count.to_string());
@@ -409,7 +420,7 @@ impl Ai {
             context,
             prompt::suggestions(count),
             Some(prompt::suggestions_schema()),
-            &mut Discard,
+            &mut cancel::Until(cancel),
             true,
         )?;
         let suggestions = reply::parse(&g.text, count);

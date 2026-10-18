@@ -797,6 +797,31 @@ fn cancelled_token_sends_nothing() {
 }
 
 #[test]
+fn token_cancels_suggestions() {
+    let reply = slow_stream(ProviderKind::Ollama).first_chunk_after(Duration::from_secs(2));
+    let server = MockServer::start(move |_| reply.clone());
+    let token = CancelToken::new();
+    let canceller = token.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(200));
+        canceller.cancel();
+    });
+    let started = Instant::now();
+    let e = ai()
+        .suggest_replies_until(
+            &config(ProviderKind::Ollama, &server),
+            &thread(),
+            &ReplyOpts::default(),
+            Some(&token),
+        )
+        .unwrap_err();
+    assert_eq!(e, AiError::Cancelled);
+    assert!(started.elapsed() < Duration::from_secs(1));
+    // Cancelled isn't retried.
+    assert_eq!(server.count(), 1);
+}
+
+#[test]
 fn missing_settings() {
     let server = MockServer::start(|_| stream_reply(ProviderKind::OpenAi, &["x"]));
     let mut c = config(ProviderKind::Anthropic, &server);

@@ -42,6 +42,19 @@ impl Sink for Discard {
     }
 }
 
+/// The sink of calls that return only the whole text but can be cancelled.
+pub(crate) struct Until<'a>(pub Option<&'a CancelToken>);
+
+impl Sink for Until<'_> {
+    fn delta(&mut self, _: &str) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    fn cancel_token(&self) -> Option<&CancelToken> {
+        self.0
+    }
+}
+
 /// Cancels a request in flight. Clones share the state; cancelling is permanent.
 #[derive(Clone, Default)]
 pub struct CancelToken(Arc<Inner>);
