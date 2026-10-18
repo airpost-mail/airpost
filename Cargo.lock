@@ -1923,6 +1923,8 @@ dependencies = [
 name = "ms-store"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "chrono-tz",
  "ms-core",
  "rusqlite",
  "serde",
@@ -3165,6 +3167,7 @@ dependencies = [
 name = "tern-client"
 version = "0.1.0"
 dependencies = [
+ "iana-time-zone",
  "libc",
  "ms-ipc",
  "serde",
