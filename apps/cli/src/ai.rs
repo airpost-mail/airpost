@@ -59,7 +59,7 @@ pub fn summarize(ctx: &Ctx, engines: &mut [Engine], thread: &str, refresh: bool)
             if let Ok(d) = serde_json::from_value::<AiDeltaParams>(n.params.clone()) {
                 if d.stream_id == stream_id {
                     streamed = true;
-                    output::text(&d.text);
+                    output::text(&output::plain_text(&d.text));
                 }
             }
         },
@@ -72,9 +72,11 @@ pub fn summarize(ctx: &Ctx, engines: &mut [Engine], thread: &str, refresh: bool)
     if streamed {
         output::line("");
     } else {
-        output::line(result["text"].as_str().unwrap_or_default());
+        output::line(&output::plain_text(
+            result["text"].as_str().unwrap_or_default(),
+        ));
     }
-    let model = result["model"].as_str().unwrap_or("the model");
+    let model = output::one_line(result["model"].as_str().unwrap_or("the model"));
     let cached = if result["cached"] == true {
         ", cached"
     } else {
@@ -120,7 +122,7 @@ pub fn triage(
     let mut out = Vec::new();
     for (t, params) in jobs {
         require(engines, &t, feature::AI_TRIAGE, "triage")?;
-        let (job, done) = run_job(&mut engines[t.engine], params, |done, total| {
+        let (job, done, stopped) = run_job(&mut engines[t.engine], params, |done, total| {
             if live {
                 output::text(&format!("\r{}: {done}/{total}", t.email));
             }
@@ -128,6 +130,13 @@ pub fn triage(
         .map_err(|e| CliError::call(&t.email, method::AI_TRIAGE_RUN, e))?;
         if live && job.queued > 0 {
             output::text("\r");
+        }
+        if stopped {
+            return Err(CliError::failed(format!(
+                "{}: triage stopped after {done} of {} threads: the account stopped, the job \
+                 was cancelled or triage was turned off",
+                t.email, job.queued
+            )));
         }
         if !ctx.json {
             let n = job.queued;
@@ -189,20 +198,23 @@ fn triage_accounts(ctx: &Ctx, engines: &mut [Engine], targets: Vec<Target>) -> R
     Ok(picked)
 }
 
-/// Runs one `ai.triage.run` and waits for its last `ai.triage.progress`. No read timeout:
-/// a rate-limited provider pauses the job for minutes without a word.
+/// Runs one `ai.triage.run` and waits for its last `ai.triage.progress`: the job, how many
+/// threads it got through and whether it stopped early. No read timeout: a rate-limited
+/// provider pauses the job for minutes without a word; the engine closing the connection
+/// ends the wait with an error.
 fn run_job(
     engine: &mut Engine,
     params: Value,
     mut progress: impl FnMut(usize, usize),
-) -> std::result::Result<(AiTriageRunResult, usize), ClientError> {
+) -> std::result::Result<(AiTriageRunResult, usize, bool), ClientError> {
     let r = streaming_call(engine, method::AI_TRIAGE_RUN, params, None, |_| {})?;
     let job: AiTriageRunResult =
         serde_json::from_value(r).map_err(|e| ClientError::Protocol(e.to_string()))?;
     if job.queued == 0 {
-        return Ok((job, 0));
+        return Ok((job, 0, false));
     }
     let mut done = 0;
+    let mut stopped = false;
     with_timeout(engine, None, |engine| loop {
         let n = engine.client.next_notification()?;
         if n.method != method::AI_TRIAGE_PROGRESS {
@@ -213,13 +225,17 @@ fn run_job(
         };
         if p.job_id == job.job_id {
             done = p.done;
+            if p.stopped {
+                stopped = true;
+                return Ok(());
+            }
             progress(p.done, p.total);
             if p.done >= p.total {
                 return Ok(());
             }
         }
     })?;
-    Ok((job, done))
+    Ok((job, done, stopped))
 }
 
 pub fn usage(ctx: &Ctx, engines: &mut [Engine], days: Option<u32>) -> Result<()> {

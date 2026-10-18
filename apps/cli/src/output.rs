@@ -100,6 +100,15 @@ pub fn truncate(s: &str, max: usize) -> String {
     out
 }
 
+/// Model or mail text as the terminal may show it: control characters (ESC and the C1
+/// controls that start CSI and OSC sequences: colours, links, clipboard writes, titles) are
+/// dropped; line breaks and tabs stay.
+pub fn plain_text(s: &str) -> String {
+    s.chars()
+        .filter(|&c| !c.is_control() || c == '\n' || c == '\t')
+        .collect()
+}
+
 /// Control characters and line breaks as spaces, so one field stays on one line.
 pub fn one_line(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -478,6 +487,14 @@ fn tidy_lines(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_text_drops_terminal_controls() {
+        let osc8 = "see \u{1b}]8;;https://evil.example\u{7}here\u{1b}]8;;\u{7}";
+        assert_eq!(plain_text(osc8), "see ]8;;https://evil.examplehere]8;;");
+        assert_eq!(plain_text("a\u{9b}31mb\rc"), "a31mbc");
+        assert_eq!(plain_text("line one\n\tline two"), "line one\n\tline two");
+    }
     use chrono::FixedOffset;
     use serde_json::json;
 
