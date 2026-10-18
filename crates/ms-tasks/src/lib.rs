@@ -288,6 +288,10 @@ impl<'a> TaskProcessor<'a> {
             Ok(())
         })();
         if let Err(e) = result {
+            if class == "SendDraftTask" && self.defer_send_until_online(task, &e) {
+                self.store.save(task)?;
+                return Err(e);
+            }
             self.fail(task, e)?;
         }
         self.store.save(task)
@@ -592,6 +596,10 @@ impl TaskRunnerFactory for Tasks {
         ctx: &WorkerContext,
     ) -> Box<dyn RemoteTaskRunner + 'a> {
         Box::new(TaskProcessor::for_context(ctx, store))
+    }
+
+    fn perform_local(&self, store: &Store, ctx: &WorkerContext, task: &mut Task) -> Result<()> {
+        TaskProcessor::for_context(ctx, store).perform_local(task)
     }
 }
 

@@ -16,9 +16,10 @@ use ms_imap::{
     ImapSession, ListedFolder, Namespace, SelectInfo, StoreOp, SyncResult, UidMapping,
 };
 use ms_providers::ServerProfile;
-use ms_store::{DeltaStream, File, Folder, Message, Model, Query, Store, Task};
+use ms_store::{DeltaStream, File, Folder, Message, Model, Query, Store, Task, Thread};
+use ms_sync::expiration_executor::{Executor, Outcome};
 use ms_sync::mail_processor::{id_for_message, MailProcessor};
-use ms_sync::RemoteTaskRunner;
+use ms_sync::{EngineSettings, RemoteTaskRunner};
 use ms_tasks::{Mailer, TaskProcessor};
 use serde_json::{json, Value};
 
@@ -412,6 +413,8 @@ struct Outbox {
     sent: Arc<Mutex<Vec<Submission>>>,
     /// Submissions from this index on are refused.
     refuse_from: Arc<Mutex<Option<usize>>>,
+    /// The server can't be reached.
+    offline: Arc<Mutex<bool>>,
 }
 
 impl Outbox {
@@ -420,6 +423,9 @@ impl Outbox {
     }
 
     fn push(&self, sub: Submission) -> Result<(), MailError> {
+        if *self.offline.lock().unwrap() {
+            return Err(MailError::new(ErrorCode::Connection, "connection refused"));
+        }
         let mut sent = self.sent.lock().unwrap();
         if let Some(n) = *self.refuse_from.lock().unwrap() {
             if sent.len() >= n {
@@ -1832,4 +1838,566 @@ fn send_reads_attachments_from_the_files_dir() {
         "nothing sent without the file"
     );
     e.assert_invariants();
+}
+
+// -- The expiration executor (docs/desktop-client-plan.md 3.3) ----------------------------
+
+struct TestSettings(Value);
+
+impl EngineSettings for TestSettings {
+    fn get(&self, key: &str) -> Option<Value> {
+        self.0.get(key).cloned()
+    }
+}
+
+/// Bodies the executor asked the foreground worker for.
+type Fetched = Arc<Mutex<Vec<String>>>;
+
+impl Env {
+    fn executor(&self, settings: Value) -> (Executor<'_>, Fetched) {
+        let fetched = Fetched::default();
+        let into = fetched.clone();
+        let processor = self.processor();
+        let executor = Executor::new(
+            self.account.clone(),
+            &self.store,
+            self._dir.path(),
+            Arc::new(TestSettings(settings)),
+            Box::new(move |task| processor.perform_local(task)),
+            Box::new(move |ids| into.lock().unwrap().extend(ids)),
+        );
+        (executor, fetched)
+    }
+
+    fn handle(&self, class: &str, id: &str, plugin: &str, now: i64) -> Outcome {
+        self.executor(json!({}))
+            .0
+            .handle(class, id, plugin, now)
+            .unwrap()
+    }
+
+    /// A draft saved as the composer saves one, with `send-later` metadata. Returns its id.
+    fn scheduled_draft(&self, header_message_id: &str, extra: Value, value: Value) -> String {
+        self.queue(
+            "SyncbackDraftTask",
+            json!({"draft": draft_json(header_message_id, extra)}),
+        );
+        let id = self
+            .store
+            .find::<Message>(&Query::new().equal("headerMessageId", header_message_id))
+            .unwrap()
+            .unwrap()
+            .id()
+            .to_owned();
+        self.queue(
+            "SyncbackMetadataTask",
+            json!({
+                "modelId": id, "modelClassName": "message",
+                "modelHeaderMessageId": header_message_id, "pluginId": "send-later",
+                "value": value,
+            }),
+        );
+        id
+    }
+
+    fn metadata_of<M: Model>(&self, id: &str, plugin: &str) -> Value {
+        let model = self
+            .store
+            .find::<M>(&Query::new().equal("id", id))
+            .unwrap()
+            .unwrap();
+        ms_store::model::metadata_value(model.json(), plugin)
+            .cloned()
+            .unwrap_or(Value::Null)
+    }
+
+    fn thread_of(&self, message_id: &str) -> Thread {
+        let m = self.message(message_id).unwrap();
+        self.store
+            .find::<Thread>(&Query::new().equal("id", m.thread_id()))
+            .unwrap()
+            .unwrap()
+    }
+
+    fn set_thread_metadata(&self, thread_id: &str, plugin: &str, value: Value) {
+        self.queue(
+            "SyncbackMetadataTask",
+            json!({"modelId": thread_id, "modelClassName": "thread", "pluginId": plugin, "value": value}),
+        );
+    }
+}
+
+#[test]
+fn executor_sends_a_due_draft_once_and_clears_its_schedule() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let (_, _, archive) = e.mail_folders();
+    let inbox = e
+        .store
+        .find::<Folder>(&Query::new().equal("role", "inbox"))
+        .unwrap()
+        .unwrap();
+    let parent = e.deliver(&inbox, 1, MessageFlags::empty());
+    let thread_id = e.message(&parent).unwrap().thread_id().to_owned();
+    let id = e.scheduled_draft(
+        "later-1@example.test",
+        json!({"threadId": thread_id, "body": "<p>Hi\u{200B}</p><img src=\"cid:kept\">", "files": [
+            {"id": "f-kept", "aid": ACCOUNT, "v": 1, "__cls": "File", "filename": "a.png", "contentId": "kept"},
+            {"id": "f-gone", "aid": ACCOUNT, "v": 1, "__cls": "File", "filename": "b.png", "contentId": "gone"},
+        ]}),
+        json!({"expiration": T0 + 10, "actionKey": "send-and-archive"}),
+    );
+    let dir = e._dir.path().join("files/f-/ke/f-kept");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("a.png"), "PNG").unwrap();
+
+    assert_eq!(
+        e.handle("Message", &id, "send-later", T0 + 10),
+        Outcome::Done
+    );
+    let value = e.metadata_of::<Message>(&id, "send-later");
+    assert!(value["expiration"].is_null(), "{value}");
+    let sends = e.tasks_of("SendDraftTask");
+    assert_eq!(sends.len(), 1);
+    let send = &sends[0];
+    assert_eq!(send.status(), "remote");
+    assert_eq!(send.data["silent"], false);
+    assert_eq!(send.data["retryWhenOnline"], true);
+    let files: Vec<&str> = send.data["draft"]["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(files, ["f-kept"], "the unreferenced inline file is pruned");
+    let archive_task = &e.tasks_of("ChangeFolderTask")[0];
+    assert_eq!(archive_task.data["folder"]["id"], archive.id());
+    assert_eq!(archive_task.data["threadIds"], json!([thread_id]));
+
+    let mut send = send.clone();
+    e.remote(&mut send);
+    assert!(send.data["error"].is_null(), "{}", send.data);
+    assert_eq!(e.imap.outbox.submissions().len(), 1);
+    // A second look finds nothing due: the row is gone with the expiration.
+    assert_eq!(
+        e.store
+            .conn()
+            .query_row(
+                "SELECT count(*) FROM ModelPluginMetadata WHERE expiration IS NOT NULL",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+        0
+    );
+}
+
+#[test]
+fn executor_leaves_client_finalized_and_unknown_actions_to_the_client() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let finalize = e.scheduled_draft(
+        "client-1@example.test",
+        json!({}),
+        json!({"expiration": T0, "clientFinalize": true}),
+    );
+    let custom = e.scheduled_draft(
+        "client-2@example.test",
+        json!({}),
+        json!({"expiration": T0, "actionKey": "send-and-snooze"}),
+    );
+    assert_eq!(
+        e.handle("Message", &finalize, "send-later", T0),
+        Outcome::Declined
+    );
+    assert_eq!(
+        e.handle("Message", &custom, "send-later", T0),
+        Outcome::Declined
+    );
+    assert_eq!(
+        e.handle("Message", &custom, "open-tracking", T0),
+        Outcome::Declined
+    );
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+}
+
+#[test]
+fn executor_fails_a_draft_whose_from_is_not_the_account() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let id = e.scheduled_draft(
+        "stranger-1@example.test",
+        json!({"from": [{"email": "someone@else.example"}]}),
+        json!({"expiration": T0, "actionKey": "send"}),
+    );
+    assert_eq!(e.handle("Message", &id, "send-later", T0), Outcome::Done);
+    let value = e.metadata_of::<Message>(&id, "send-later");
+    assert!(value["expiration"].is_null());
+    assert!(
+        value["error"]
+            .as_str()
+            .unwrap()
+            .contains("someone@else.example"),
+        "{value}"
+    );
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+}
+
+#[test]
+fn executor_waits_for_an_incomplete_draft_then_fails_it() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let (_, drafts, _) = e.mail_folders();
+    // A draft synced from another device: headers only, no body yet.
+    let id = e.deliver(&drafts, 7, MessageFlags::DRAFT);
+    let mut draft = e.message(&id).unwrap();
+    draft.data["from"] = json!([{"email": "me@example.com"}]);
+    draft.upsert_metadata(
+        "send-later",
+        &json!({"expiration": T0, "actionKey": "send"}),
+        None,
+    );
+    e.store.save(&mut draft).unwrap();
+
+    let (executor, fetched) = e.executor(json!({}));
+    let mut now = T0;
+    for wait in [60, 120, 240, 480] {
+        assert_eq!(
+            executor.handle("Message", &id, "send-later", now).unwrap(),
+            Outcome::Waiting(now + wait)
+        );
+        assert_eq!(
+            executor
+                .handle("Message", &id, "send-later", now + 1)
+                .unwrap(),
+            Outcome::Waiting(now + wait),
+            "no second fetch before the look is due"
+        );
+        now += wait;
+    }
+    assert_eq!(fetched.lock().unwrap().len(), 4);
+    assert_eq!(
+        executor.handle("Message", &id, "send-later", now).unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    let value = e.metadata_of::<Message>(&id, "send-later");
+    assert!(value["error"].as_str().unwrap().contains("body"), "{value}");
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+}
+
+#[test]
+fn executor_body_fetch_completes_a_waiting_draft() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let (_, drafts, _) = e.mail_folders();
+    let id = e.deliver(&drafts, 8, MessageFlags::DRAFT);
+    let mut draft = e.message(&id).unwrap();
+    draft.data["from"] = json!([{"email": "me@example.com"}]);
+    draft.upsert_metadata(
+        "send-later",
+        &json!({"expiration": T0, "actionKey": "send"}),
+        None,
+    );
+    e.store.save(&mut draft).unwrap();
+    let (executor, _) = e.executor(json!({}));
+    assert_eq!(
+        executor.handle("Message", &id, "send-later", T0).unwrap(),
+        Outcome::Waiting(T0 + 60)
+    );
+    // The body arrives.
+    let mut draft = e.message(&id).unwrap();
+    draft.data["plaintext"] = json!(false);
+    e.store.save(&mut draft).unwrap();
+    e.store
+        .conn()
+        .execute(
+            "REPLACE INTO MessageBody (id, value) VALUES (?, '<p>Body</p>')",
+            [&id],
+        )
+        .unwrap();
+    assert_eq!(
+        executor
+            .handle("Message", &id, "send-later", T0 + 60)
+            .unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    assert_eq!(e.tasks_of("SendDraftTask").len(), 1);
+}
+
+#[test]
+fn executor_clears_send_later_on_a_message_that_is_no_longer_a_draft() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let (sent, _, _) = e.mail_folders();
+    let id = e.deliver(&sent, 9, MessageFlags::SEEN);
+    let mut m = e.message(&id).unwrap();
+    m.upsert_metadata("send-later", &json!({"expiration": T0}), None);
+    e.store.save(&mut m).unwrap();
+    assert_eq!(e.handle("Message", &id, "send-later", T0), Outcome::Done);
+    assert!(e.metadata_of::<Message>(&id, "send-later")["expiration"].is_null());
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+}
+
+#[test]
+fn executor_unsnoozes_to_the_inbox_and_resurfaces() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let (_, _, _) = e.mail_folders();
+    let snoozed = e.folder("Snoozed", "snoozed");
+    let inbox = e
+        .store
+        .find::<Folder>(&Query::new().equal("role", "inbox"))
+        .unwrap()
+        .unwrap();
+    let id = e.deliver(&snoozed, 3, MessageFlags::SEEN);
+    let thread = e.thread_of(&id);
+    e.set_thread_metadata(thread.id(), "thread-snooze", json!({"expiration": T0}));
+
+    let (executor, _) = e.executor(json!({"resurfacing.snoozeBody": "<p>Back on top</p>"}));
+    assert_eq!(
+        executor
+            .handle("Thread", thread.id(), "thread-snooze", T0)
+            .unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    assert!(e.metadata_of::<Thread>(thread.id(), "thread-snooze")["expiration"].is_null());
+    let moves = e.tasks_of("ChangeFolderTask");
+    assert_eq!(moves.len(), 1);
+    assert_eq!(moves[0].data["folder"]["id"], inbox.id());
+    assert_eq!(moves[0].data["sourceFolderIds"], json!([snoozed.id()]));
+    let sends = e.tasks_of("SendDraftTask");
+    assert_eq!(sends.len(), 1);
+    let draft = &sends[0].data["draft"];
+    assert_eq!(sends[0].data["silent"], true);
+    assert_eq!(draft["from"][0]["name"], "me@example.com via Tern");
+    assert_eq!(draft["to"][0]["email"], "me@example.com");
+    assert_eq!(draft["rthMsgId"], "m3@x");
+    assert_eq!(draft["subject"], thread.subject());
+    assert_eq!(draft["body"], "<p>Back on top</p>");
+    assert!(e.tasks_of("ChangeUnreadTask").is_empty());
+
+    // On the wire: from the account to itself, in reply to the thread's newest message.
+    let mut send = sends[0].clone();
+    e.remote(&mut send);
+    assert!(send.data["error"].is_null(), "{}", send.data);
+    let wire = e.imap.outbox.submissions()[0].text();
+    for h in [
+        "via Tern\" <me@example.com>",
+        "To: \"me@example.com\" <me@example.com>",
+        "In-Reply-To: <m3@x>",
+    ] {
+        assert!(wire.contains(h), "{h} missing from\n{wire}");
+    }
+    assert!(ms_store::models::is_hidden_json(draft));
+}
+
+#[test]
+fn executor_unsnooze_without_resurfacing_marks_unread() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let snoozed = e.folder("Snoozed", "snoozed");
+    let id = e.deliver(&snoozed, 4, MessageFlags::SEEN);
+    let thread = e.thread_of(&id);
+    e.set_thread_metadata(thread.id(), "thread-snooze", json!({"expiration": T0}));
+    let (executor, _) = e.executor(json!({"core.notifications.unsnoozeToTop": false}));
+    assert_eq!(
+        executor
+            .handle("Thread", thread.id(), "thread-snooze", T0)
+            .unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    assert_eq!(e.tasks_of("ChangeFolderTask").len(), 1);
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+    let unread = e.tasks_of("ChangeUnreadTask");
+    assert_eq!(unread.len(), 1);
+    assert_eq!(unread[0].data["unread"], true);
+}
+
+#[test]
+fn executor_swaps_the_snoozed_label_for_the_inbox_on_gmail() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let all = e.folder("[Gmail]/All Mail", "all");
+    let label = |path: &str, role: &str| {
+        let mut l = ms_store::Label::new(&ms_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+        l.set_path(path);
+        l.set_role(role);
+        l
+    };
+    let mut inbox = label("INBOX", "inbox");
+    let mut snoozed = label("[Mailspring]/Snoozed", "snoozed");
+    e.store.save(&mut inbox).unwrap();
+    e.store.save(&mut snoozed).unwrap();
+    let id = e.deliver(&all, 5, MessageFlags::SEEN);
+    let mut thread = e.thread_of(&id);
+    thread.data["labels"] = json!([snoozed.to_json()]);
+    e.store.save(&mut thread).unwrap();
+    e.set_thread_metadata(thread.id(), "thread-snooze", json!({"expiration": T0}));
+    assert_eq!(
+        e.handle("Thread", thread.id(), "thread-snooze", T0),
+        Outcome::Done
+    );
+    let changes = e.tasks_of("ChangeLabelsTask");
+    assert_eq!(changes.len(), 1);
+    assert_eq!(changes[0].data["labelsToAdd"][0]["id"], inbox.id());
+    assert_eq!(changes[0].data["labelsToRemove"][0]["id"], snoozed.id());
+    assert!(e.tasks_of("ChangeFolderTask").is_empty());
+}
+
+#[test]
+fn executor_clears_a_snooze_on_a_thread_that_left_snoozed() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    e.folder("Snoozed", "snoozed");
+    let inbox = e
+        .store
+        .find::<Folder>(&Query::new().equal("role", "inbox"))
+        .unwrap()
+        .unwrap();
+    let id = e.deliver(&inbox, 6, MessageFlags::SEEN);
+    let thread = e.thread_of(&id);
+    e.set_thread_metadata(thread.id(), "thread-snooze", json!({"expiration": T0}));
+    assert_eq!(
+        e.handle("Thread", thread.id(), "thread-snooze", T0),
+        Outcome::Done
+    );
+    assert!(e.metadata_of::<Thread>(thread.id(), "thread-snooze")["expiration"].is_null());
+    assert!(e.tasks_of("ChangeFolderTask").is_empty());
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+}
+
+#[test]
+fn executor_reminds_without_a_reply_and_a_reply_clears_the_reminder() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let inbox = e
+        .store
+        .find::<Folder>(&Query::new().equal("role", "inbox"))
+        .unwrap()
+        .unwrap();
+    let (quiet, answered) = (
+        e.deliver(&inbox, 10, MessageFlags::SEEN),
+        e.deliver(&inbox, 11, MessageFlags::SEEN),
+    );
+    let (quiet, answered) = (e.thread_of(&quiet), e.thread_of(&answered));
+    for t in [&quiet, &answered] {
+        e.set_thread_metadata(
+            t.id(),
+            "send-reminders",
+            json!({"expiration": T0 + 100, "sentHeaderMessageId": "mine@example.com"}),
+        );
+        let value = e.metadata_of::<Thread>(t.id(), "send-reminders");
+        assert_eq!(
+            value["lastReplyTimestamp"],
+            t.last_message_received_timestamp(),
+            "baseline"
+        );
+        assert_eq!(value["shouldNotify"], false);
+    }
+    // A reply moves the answered thread's lastMessageReceivedTimestamp: the save clears it.
+    let mut t = e
+        .store
+        .find::<Thread>(&Query::new().equal("id", answered.id()))
+        .unwrap()
+        .unwrap();
+    t.data["lmrt"] = json!(t.last_message_received_timestamp() + 50);
+    e.store.save(&mut t).unwrap();
+    assert_eq!(
+        e.metadata_of::<Thread>(answered.id(), "send-reminders"),
+        json!({})
+    );
+
+    let (executor, _) = e.executor(json!({}));
+    assert_eq!(
+        executor
+            .handle("Thread", quiet.id(), "send-reminders", T0 + 100)
+            .unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    let value = e.metadata_of::<Thread>(quiet.id(), "send-reminders");
+    assert!(value["expiration"].is_null(), "{value}");
+    assert_eq!(value["shouldNotify"], true);
+    let sends = e.tasks_of("SendDraftTask");
+    assert_eq!(sends.len(), 1);
+    assert_eq!(sends[0].data["draft"]["rthMsgId"], "mine@example.com");
+    assert!(sends[0].data["draft"]["body"]
+        .as_str()
+        .unwrap()
+        .contains("no one has replied"));
+}
+
+#[test]
+fn engine_sends_wait_out_an_unreachable_server() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    *e.imap.outbox.offline.lock().unwrap() = true;
+    let mut deferred = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("offline-1@example.test", json!({})), "perRecipientBodies": null, "retryWhenOnline": true}),
+    );
+    let mut failed = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("offline-2@example.test", json!({})), "perRecipientBodies": null}),
+    );
+    let err = processor(&e.store, e.harness())
+        .perform_remote(&mut deferred, &mut e.imap)
+        .unwrap_err();
+    assert!(err.is_retryable(), "{err}");
+    assert_eq!(deferred.status(), "remote");
+    assert!(deferred.data.get("_performRemoteRan").is_none());
+    assert_eq!(deferred.data["_offlineSince"], T0);
+    // A client's own send fails as before, now marked retryable.
+    e.remote(&mut failed);
+    assert_eq!(failed.status(), "complete");
+    assert_eq!(failed.data["error"]["key"], "send-failed");
+    assert_eq!(failed.data["error"]["retryable"], true);
+
+    *e.imap.outbox.offline.lock().unwrap() = false;
+    e.remote(&mut deferred);
+    assert_eq!(deferred.status(), "complete");
+    assert!(deferred.data["error"].is_null(), "{}", deferred.data);
+    assert_eq!(e.imap.outbox.submissions().len(), 1);
+
+    // After a day of failures the send fails like any other.
+    *e.imap.outbox.offline.lock().unwrap() = true;
+    let mut old = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json("offline-3@example.test", json!({})), "perRecipientBodies": null,
+               "retryWhenOnline": true, "_offlineSince": T0 - 24 * 60 * 60}),
+    );
+    e.remote(&mut old);
+    assert_eq!(old.status(), "complete");
+    assert_eq!(old.data["error"]["key"], "send-failed");
+}
+
+#[test]
+fn expiration_scan_runs_the_executor_on_due_rows_only() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let snoozed = e.folder("Snoozed", "snoozed");
+    let (a, b) = (
+        e.deliver(&snoozed, 20, MessageFlags::SEEN),
+        e.deliver(&snoozed, 21, MessageFlags::SEEN),
+    );
+    let (a, b) = (e.thread_of(&a), e.thread_of(&b));
+    e.set_thread_metadata(a.id(), "thread-snooze", json!({"expiration": T0}));
+    e.set_thread_metadata(b.id(), "thread-snooze", json!({"expiration": T0 + 3600}));
+    let (executor, _) = e.executor(json!({"core.notifications.unsnoozeToTop": false}));
+    let clock = Arc::new(ManualClock::new(T0));
+    let worker = ms_sync::metadata_expiration::MetadataExpirationWorker::new(
+        ACCOUNT,
+        &e.store,
+        DeltaStream::new(Box::new(std::io::sink())),
+        clock,
+    )
+    .with_executor(executor);
+    assert_eq!(
+        worker.scan().unwrap(),
+        T0 + 3600,
+        "wakes for the other snooze"
+    );
+    drop(worker);
+    let moves = e.tasks_of("ChangeFolderTask");
+    assert_eq!(moves.len(), 1);
+    assert_eq!(moves[0].data["threadIds"], json!([a.id()]));
+    assert!(e.metadata_of::<Thread>(b.id(), "thread-snooze")["expiration"].is_number());
 }

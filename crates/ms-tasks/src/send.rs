@@ -14,10 +14,13 @@
 use std::path::Path;
 use std::time::Duration;
 
-use ms_core::constants::{ls, FILES_DIR, SENT_COPY_CLEANUP_WINDOW};
+use ms_core::constants::{
+    ls, ENGINE_SEND_OFFLINE_RETRY_WINDOW, FILES_DIR, SENT_COPY_CLEANUP_WINDOW,
+};
 use ms_core::{logmsg, Address, Error, MessageFlags, Result, SyncError, UidSet};
 use ms_imap::{FetchKind, ImapSession, StoreOp};
 use ms_mime::{OutgoingAttachment, OutgoingBody, OutgoingMessage};
+use ms_store::model::json_str;
 use ms_store::{File, Folder, Label, Message, Model, Query, Task, Thread};
 use ms_sync::mail_processor::MailProcessor;
 use ms_sync::mailbox_model;
@@ -41,6 +44,13 @@ const SENT_POLL_DELAYS_SERVER_SAVES: [u64; 7] = [0, 1, 1, 2, 2, 3, 3];
 /// still `remote` with this set knows the message went out, so the draft can go; without it
 /// the engine may have died before or during SMTP and the draft is kept for the user.
 const SMTP_DONE_KEY: &str = "_smtpDone";
+
+/// `SendDraftTask` key: a send the engine queued itself, which waits out an unreachable
+/// server instead of failing (`ms_sync::expiration_executor::RETRY_WHEN_ONLINE_KEY`).
+const RETRY_WHEN_ONLINE_KEY: &str = ms_sync::expiration_executor::RETRY_WHEN_ONLINE_KEY;
+
+/// When a deferred send first failed to reach its server.
+const OFFLINE_SINCE_KEY: &str = "_offlineSince";
 
 /// Metadata whose pluginId starts with this is attached to the thread, prefix stripped.
 const THREAD_METADATA_PREFIX: &str = "thread:";
@@ -492,7 +502,10 @@ impl TaskProcessor<'_> {
             e.detail
         );
         let err = if succeeded.is_empty() {
-            SyncError::fatal("send-failed", e.code.name())
+            // Retryable (an unreachable server) only matters to a send that may wait for
+            // the account to come back online ([`Self::defer_send_until_online`]).
+            let code = SyncError::from_code(e.code, "");
+            SyncError::new("send-failed", e.code.name(), code.retryable, code.offline)
         } else {
             SyncError::fatal(
                 "send-partially-failed",
@@ -582,6 +595,42 @@ impl TaskProcessor<'_> {
             .find::<Message>(&Query::new().equal("id", draft.id()))?;
         let mut target = stored.unwrap_or_else(|| draft.clone());
         self.store.remove(&mut target)
+    }
+
+    /// A send the engine started itself (`retryWhenOnline`, docs/tech-debt.md TD33) that
+    /// failed on a retryable error before SMTP accepted it goes back to `remote`, to run
+    /// again once the account is online, for up to a day after its first such failure.
+    /// Returns whether it did; the task is left for the caller to save.
+    pub(crate) fn defer_send_until_online(&self, task: &mut Task, e: &Error) -> bool {
+        let Error::Sync(s) = e else {
+            return false;
+        };
+        let retry = task
+            .data
+            .get(RETRY_WHEN_ONLINE_KEY)
+            .and_then(Value::as_bool)
+            == Some(true);
+        if !retry || !s.retryable || has(&task.data, SMTP_DONE_KEY) {
+            return false;
+        }
+        let now = self.store.now();
+        let since = match task.data.get(OFFLINE_SINCE_KEY).and_then(Value::as_i64) {
+            Some(since) => since,
+            None => now,
+        };
+        if now - since >= ENGINE_SEND_OFFLINE_RETRY_WINDOW {
+            return false;
+        }
+        info!(
+            "{}",
+            logmsg::send_deferred_until_online(json_str(&task.data, "headerMessageId"), &s.key)
+        );
+        task.data[OFFLINE_SINCE_KEY] = json!(since);
+        if let Some(obj) = task.data.as_object_mut() {
+            obj.remove("_performRemoteRan");
+        }
+        task.set_status("remote");
+        true
     }
 
     /// `draft.metadata` becomes SyncbackMetadataTasks on the sent message, or on its thread

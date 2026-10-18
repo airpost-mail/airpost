@@ -203,7 +203,7 @@ impl<'a> Executor<'a> {
         let body = self.body(draft.id())?.unwrap_or_default();
         let missing_file = kept_files(draft, &body)
             .into_iter()
-            .any(|f| File { data: f }.find_on_disk(&self.files_root).is_none());
+            .any(|f| File { data: f }.find_in(&self.files_root).is_none());
         Ok(missing_file.then_some("attachments"))
     }
 
