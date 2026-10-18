@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use ms_ipc::{
     code, feature, method, Client, ClientError, CountsGetParams, CountsGetResult, HelloResult,
-    MetadataListParams, MetadataListResult, SettingsGetParams, SettingsValues, TasksListParams,
-    TasksListResult, PROTOCOL_VERSION,
+    MetadataListParams, MetadataListResult, QueryParams, QueryResult, SettingsGetParams,
+    SettingsValues, TasksListParams, TasksListResult, PROTOCOL_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -197,6 +197,12 @@ impl Engine {
             }),
         )
         .map(drop)
+    }
+
+    /// `query` ([`feature::QUERY`](ms_ipc::feature::QUERY)). `accounts: None` reads every
+    /// account this engine holds.
+    pub fn query(&mut self, params: &QueryParams) -> Result<QueryResult, EngineError> {
+        self.call_as(method::QUERY, to_params(params))
     }
 }
 
@@ -387,6 +393,22 @@ mod tests {
             })
             .unwrap();
         assert_eq!(r.models.len(), 1);
+
+        let page = r#"{"jsonrpc":"2.0","id":1,"result":{"rows":[{"id":"t1"}],"nextCursor":null}}"#;
+        let mut e = engine(
+            &[("a1", "a@x.test")],
+            &[ms_ipc::feature::QUERY],
+            &format!("{page}\n"),
+        );
+        let r = e
+            .query(&QueryParams {
+                class: "Thread".into(),
+                cursor: Some(String::new()),
+                limit: Some(1),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!((r.rows.len(), r.next_cursor), (1, Some(None)));
     }
 
     #[test]
