@@ -187,6 +187,20 @@ def test_cli_end_to_end(engine, tmp_path):
     found = tern.json("search", "zebra", "QUARTERLY")["threads"]
     assert [t["subject"] for t in found] == [SUBJECT]
     assert tern.json("search", "zebra", "nothing-like-this")["threads"] == []
+    # The engine reads the search grammar, dates in the CLI's zone and clock.
+    assert "search-grammar" in status["engines"][0]["features"]
+    def subjects(*query):
+        return sorted(t["subject"] for t in tern.json("search", *query)["threads"])
+    assert subjects("zebra OR walrus") == [OLD_SUBJECT, SUBJECT]
+    assert subjects("(zebra OR walrus) NOT subject:walrus") == [SUBJECT]
+    assert subjects("subject:zebra", "in:inbox") == [SUBJECT]
+    assert subjects("zebra", "before:2100-01-01") == [SUBJECT]
+    assert subjects("zebra", 'after:"2 days ago"', "before:1990-01-01") == []
+    assert subjects("in:trash", "zebra") == []
+    r = tern.run("search", "(zebra", expect=2)
+    assert "never closed" in r.stderr
+    r = tern.run("search", "after:someday", expect=2)
+    assert "isn't a date" in r.stderr
     thread = tern.json("show", found[0]["id"])
     assert thread["kind"] == "thread"
     [message] = thread["messages"]

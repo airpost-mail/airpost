@@ -186,6 +186,11 @@ def test_mcp_end_to_end(engine, tmp_path):
 
         [found] = mcp.call("search_mail", {"query": "zebra"})
         assert found["subject"] == SUBJECT
+        # The engine's search grammar: fields, OR, NOT and dates, which tern-mcp passes on.
+        [same] = mcp.call("search_mail", {"query": "(subject:zebra OR nothing-like-this) NOT in:trash"})
+        assert same["id"] == found["id"]
+        assert mcp.call("search_mail", {"query": "zebra before:1990-01-01"}) == []
+        assert "never closed" in mcp.call("search_mail", {"query": "(zebra"}, expect_error=True)
         thread_id = found["id"]
         thread = mcp.call("get_thread", {"threadId": thread_id})
         [received] = thread["messages"]
