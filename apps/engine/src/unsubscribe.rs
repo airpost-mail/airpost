@@ -196,14 +196,15 @@ impl Call {
             WAITING.fetch_sub(1, Ordering::SeqCst);
             return Err(e);
         }
-        Ok(Deferred::Later(Box::new(move || {
-            struct Slot;
-            impl Drop for Slot {
-                fn drop(&mut self) {
-                    WAITING.fetch_sub(1, Ordering::SeqCst);
-                }
+        struct Slot;
+        impl Drop for Slot {
+            fn drop(&mut self) {
+                WAITING.fetch_sub(1, Ordering::SeqCst);
             }
-            let slot = Slot;
+        }
+        // Taken here so work dropped without running (a full lane) gives it back.
+        let slot = Slot;
+        Ok(Deferred::Later(Box::new(move || {
             let headers = self.wait_for_body(self.server.config_dir.clone())?;
             drop(slot);
             let chosen = self.choose(&headers)?;

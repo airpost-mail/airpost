@@ -49,6 +49,7 @@ use crate::cli::Options;
 use crate::dispatch::{self, Command, Reply, Request};
 use crate::output::{one_shot_error, write_stdout};
 use crate::socket::{self, Accounts, Hub, Server, Session};
+use crate::workers::{self, Lane};
 
 type Runtime = AccountRuntime<Command>;
 
@@ -901,10 +902,10 @@ fn is_slow_parent_method(name: &str) -> bool {
     )
 }
 
-/// Runs a slow parent method on its own thread, which answers when done. The account
-/// methods' threads carry the account's id, so a panic in them is logged to its log and
-/// answered as an error instead of ending the process; the engine-wide ones abort on a
-/// panic, as the stdin thread would.
+/// Runs a slow parent method on its lane's workers ([`crate::workers`]), which answer when
+/// done. The account methods' jobs carry the account's id, so they log to its log, and their
+/// lanes are contained: a panic is answered as an error instead of ending the process. The
+/// engine-wide ones run one at a time and abort on a panic, as the stdin thread would.
 fn spawn_parent_call(engine: Arc<Engine>, req: RpcRequest) {
     let request_id = req.id.clone();
     let answer = move |result: Reply| {
@@ -915,75 +916,56 @@ fn spawn_parent_call(engine: Arc<Engine>, req: RpcRequest) {
             });
         }
     };
-    let (name, account_id, work): (&str, Option<String>, ParentWork) = match req.method.as_str() {
-        method::ACCOUNT_TEST => {
-            let account = match req
-                .params_as::<AccountTestParams>()
-                .and_then(|p| parse_account(p.account))
-            {
-                Ok(a) => a,
-                Err(e) => return answer(Err(e)),
-            };
-            let id = account.id().to_owned();
-            (
-                thread::ACCOUNT_TEST,
-                Some(id),
-                Box::new(move |e| e.test_account(&account)),
-            )
-        }
-        method::ACCOUNT_RESET => {
-            let p = match req.params_as::<AccountResetParams>() {
-                Ok(p) => p,
-                Err(e) => return answer(Err(e)),
-            };
-            let id = p.account_id.clone();
-            (
-                thread::ACCOUNT_RESET,
-                Some(id),
-                Box::new(move |e| e.reset_account(&p.account_id, p.keep_metadata)),
-            )
-        }
-        method::ENGINE_RESET_DATABASE => {
-            let p = match req.params_as::<ResetDatabaseParams>() {
-                Ok(p) => p,
-                Err(e) => return answer(Err(e)),
-            };
-            (
-                thread::ENGINE_MAINTENANCE,
-                None,
-                Box::new(move |e| e.reset_database(p.keep_metadata)),
-            )
-        }
-        _ => {
-            let params = req.clone();
-            (
-                thread::ENGINE_MAINTENANCE,
-                None,
-                Box::new(move |e| e.set_log_level(&params)),
-            )
-        }
-    };
-    let contained = account_id.is_some();
-    let spawned = ms_core::log::spawn_account_thread(account_id.map(Into::into), name, move || {
-        let result = if contained {
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&engine))).unwrap_or_else(
-                |_| {
-                    Err(ErrorObject::new(
-                        code::INTERNAL_ERROR,
-                        "the call panicked; see the log",
-                    ))
-                },
-            )
-        } else {
-            work(&engine)
+    let (lane, account_id, work): (&'static Lane, Option<String>, ParentWork) =
+        match req.method.as_str() {
+            method::ACCOUNT_TEST => {
+                let account = match req
+                    .params_as::<AccountTestParams>()
+                    .and_then(|p| parse_account(p.account))
+                {
+                    Ok(a) => a,
+                    Err(e) => return answer(Err(e)),
+                };
+                let id = account.id().to_owned();
+                (
+                    &workers::ACCOUNT_TEST,
+                    Some(id),
+                    Box::new(move |e| e.test_account(&account)),
+                )
+            }
+            method::ACCOUNT_RESET => {
+                let p = match req.params_as::<AccountResetParams>() {
+                    Ok(p) => p,
+                    Err(e) => return answer(Err(e)),
+                };
+                let id = p.account_id.clone();
+                (
+                    &workers::ACCOUNT_RESET,
+                    Some(id),
+                    Box::new(move |e| e.reset_account(&p.account_id, p.keep_metadata)),
+                )
+            }
+            method::ENGINE_RESET_DATABASE => {
+                let p = match req.params_as::<ResetDatabaseParams>() {
+                    Ok(p) => p,
+                    Err(e) => return answer(Err(e)),
+                };
+                (
+                    &workers::ENGINE_MAINTENANCE,
+                    None,
+                    Box::new(move |e| e.reset_database(p.keep_metadata)),
+                )
+            }
+            _ => {
+                let params = req.clone();
+                (
+                    &workers::ENGINE_MAINTENANCE,
+                    None,
+                    Box::new(move |e| e.set_log_level(&params)),
+                )
+            }
         };
-        answer(result);
-    });
-    if let Err(e) = spawned {
-        ms_core::critical!("Could not start the {name} thread: {e}");
-        ms_core::log::flush();
-        std::process::abort();
-    }
+    lane.submit(account_id.map(Into::into), move || work(&engine), answer);
 }
 
 fn respond(response: &Response) {

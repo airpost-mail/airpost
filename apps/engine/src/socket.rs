@@ -31,12 +31,12 @@ use ms_core::constants::{
 use ms_core::Account;
 use ms_ipc::{
     account_state, code, feature, method, policy, AccountInfo, AccountListResult,
-    AccountStateParams, AccountStatus, BodiesFetchParams, CalendarSyncParams, DisconnectParams,
-    EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams,
-    LogsTailResult, MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response,
-    SettingsGetParams, SettingsValues, SubscribeParams, SyncWakeParams, TaskCancelParams,
-    TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES,
-    LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    AccountStateParams, AccountStatus, BodiesFetchParams, CalendarSyncParams, Capabilities,
+    DisconnectParams, EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult,
+    LogsTailParams, LogsTailResult, MailNewParams, Notification, RelayDevice,
+    Request as RpcRequest, Response, SettingsGetParams, SettingsValues, SubscribeParams,
+    SyncWakeParams, TaskCancelParams, TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams,
+    LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
@@ -44,9 +44,11 @@ use tracing::{info, warn};
 
 use crate::dispatch::{Command, Deferred, Reply, Request};
 use crate::files::is_files_method;
+use crate::integrations_api::{self, is_capability_setting, is_integrations_method};
 use crate::platform;
 use crate::read_api::{is_read_method, ReadApi};
-use crate::settings::Settings;
+use crate::settings::{Settings, SettingsGuard};
+use crate::workers::{self, Lane};
 
 /// How long a blocked write waits before the writer checks whether its connection is
 /// being dropped.
@@ -418,6 +420,26 @@ impl Hub {
                 }
             }
         });
+    }
+
+    /// Sends `capabilities.changed` to every subscriber, the connection whose change caused
+    /// it included; nothing is kept for a later one, which reads `hello`.
+    fn capabilities_changed(&self, capabilities: &Capabilities) {
+        let n = Notification::new(
+            method::CAPABILITIES_CHANGED,
+            serde_json::to_value(capabilities).unwrap_or(Value::Null),
+        );
+        let note: Arc<[u8]> = ms_ipc::encode(&n).into();
+        self.lock()
+            .subscribers
+            .retain(|s| match s.outbox.push(note.clone()) {
+                Ok(()) => true,
+                Err(PushError::Closed) => false,
+                Err(PushError::Full) => {
+                    drop_slow(s.conn, &s.outbox);
+                    false
+                }
+            });
     }
 
     fn lock(&self) -> MutexGuard<'_, HubState> {
@@ -842,6 +864,7 @@ impl Session {
             pid: std::process::id(),
             accounts,
             features: features(&self.server),
+            capabilities: capabilities(&self.server),
         }))
     }
 
@@ -853,6 +876,7 @@ impl Session {
             uptime_secs: self.server.started.elapsed().as_secs(),
             accounts: self.server.accounts.statuses(),
             features: features(&self.server),
+            capabilities: capabilities(&self.server),
         }))
         .unwrap_or(Value::Null)
     }
@@ -905,10 +929,26 @@ fn features(server: &Server) -> Vec<String> {
     .to_vec();
     if server.settings.is_some() {
         out.push(feature::SETTINGS.to_owned());
-        // The settings store is serve's, and so is the executor that reads it.
+        // The settings store is serve's, and so is the executor that reads it, the
+        // integrations and the capabilities that follow the settings.
         out.push(feature::EXPIRATION_EXECUTOR.to_owned());
+        out.push(feature::INTEGRATIONS.to_owned());
+        out.push(feature::CAPABILITIES.to_owned());
     }
     out
+}
+
+/// `serve`'s capabilities; `sync` mode has none.
+fn capabilities(server: &Server) -> Option<Capabilities> {
+    server
+        .settings
+        .as_ref()
+        .map(|store| capabilities_of(&store.lock()))
+}
+
+/// An unreadable store reads as empty: every integration not set up.
+fn capabilities_of(guard: &SettingsGuard<'_>) -> Capabilities {
+    integrations_api::capabilities(&guard.get(None).unwrap_or_default())
 }
 
 /// `settings.get` or `settings.set` on `server`'s store, which must exist. `deliver` runs
@@ -937,9 +977,20 @@ fn settings_call(
         })
     } else {
         req.params_as::<SettingsValues>().and_then(|p| {
+            let before = p
+                .values
+                .keys()
+                .any(|k| is_capability_setting(k))
+                .then(|| capabilities_of(&guard));
             let changed = guard.set(p.values)?;
             if !changed.is_empty() {
                 server.hub.settings_changed(&changed, origin);
+            }
+            if let Some(before) = before {
+                let after = capabilities_of(&guard);
+                if after != before {
+                    server.hub.capabilities_changed(&after);
+                }
             }
             Ok(json!({}))
         })
@@ -1145,17 +1196,27 @@ impl Connection {
             name if is_files_method(name) => match self.session.files_call(&req) {
                 Deferred::Now(r) => r,
                 Deferred::Later(work) => {
-                    self.answer_later(thread::FILES, req.id, work);
+                    self.answer_later(&workers::FILES, req.id, work);
                     return None;
                 }
             },
             method::MESSAGES_UNSUBSCRIBE => match self.session.unsubscribe_call(&req) {
                 Deferred::Now(r) => r,
                 Deferred::Later(work) => {
-                    self.answer_later(thread::UNSUBSCRIBE, req.id, work);
+                    self.answer_later(&workers::UNSUBSCRIBE, req.id, work);
                     return None;
                 }
             },
+            // serve's, beside the settings that decide their capabilities.
+            name if is_integrations_method(name) && self.session.server.settings.is_some() => {
+                let id = req.id.clone();
+                self.answer_later(
+                    &workers::INTEGRATIONS,
+                    id,
+                    Box::new(move || integrations_api::call(&req)),
+                );
+                return None;
+            }
             name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
                 Err(ErrorObject::new(
                     code::WRONG_CHANNEL,
@@ -1179,19 +1240,18 @@ impl Connection {
         })
     }
 
-    /// Runs `work` on a thread named `name` and queues its answer then, out of order with
-    /// this connection's later requests (T21).
+    /// Runs `work` on one of `lane`'s workers and queues its answer then, out of order with
+    /// this connection's later requests (T21). A full lane answers `ENGINE_BUSY` now.
     fn answer_later(
         &self,
-        name: &'static str,
+        lane: &'static Lane,
         id: Option<ms_ipc::Id>,
         work: Box<dyn FnOnce() -> Reply + Send>,
     ) {
         let conn = self.id;
         let outbox = self.outbox.clone();
         let hub = self.session.server.hub.clone();
-        crate::modes::spawn(name, move || {
-            let result = work();
+        lane.submit(None, work, move |result| {
             let Some(id) = id else {
                 return;
             };

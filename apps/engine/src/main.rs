@@ -12,6 +12,8 @@ mod cli;
 mod dispatch;
 #[cfg(unix)]
 mod files;
+#[cfg(unix)]
+mod integrations_api;
 mod modes;
 mod output;
 mod platform;
@@ -26,6 +28,7 @@ mod socket;
 mod stdin_loop;
 #[cfg(unix)]
 mod unsubscribe;
+mod workers;
 
 use std::process::ExitCode;
 

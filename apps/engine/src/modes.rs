@@ -219,12 +219,17 @@ pub(crate) fn parse_identity(text: &str) -> Result<IdentityLine, IdentityError> 
 ///
 /// In `serve` mode a panic on one of an account's threads (they carry its id, and
 /// `WorkerContext::spawn` catches the unwind) only stops that account: it is logged at
-/// error to the account's log and unwinds. Engine-wide threads still abort the process.
+/// error to the account's log and unwinds. So does a panic on a contained worker
+/// ([`crate::workers`]), which answers its call with an error. Engine-wide threads still
+/// abort the process.
 pub(crate) fn install_panic_hook(serve: bool) {
     std::panic::set_hook(Box::new(move |info| {
         let current = std::thread::current();
         let name = current.name().unwrap_or("").to_owned();
-        if serve && ms_core::log::thread_account().is_some() && !is_engine_thread(&name) {
+        // A contained worker answers the call that panicked and goes on.
+        if crate::workers::is_contained(&name)
+            || (serve && ms_core::log::thread_account().is_some() && !is_engine_thread(&name))
+        {
             tracing::error!("Unhandled panic on thread {name}: {info}");
             return;
         }

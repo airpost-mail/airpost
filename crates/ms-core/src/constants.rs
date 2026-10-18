@@ -287,7 +287,8 @@ pub mod thread {
     pub const SIGNALS: &str = "signals";
     /// `--socket`: the workers answering `files.get` once its download has written the file.
     pub const FILES: &str = "files";
-    /// `--socket`: makes one `messages.unsubscribe` one-click POST.
+    /// `--socket`: the workers running `messages.unsubscribe` calls that wait for a body or
+    /// make a one-click POST.
     pub const UNSUBSCRIBE: &str = "unsubscribe";
     /// `serve`: the workers running `integrations.*` calls.
     pub const INTEGRATIONS: &str = "integrations";
