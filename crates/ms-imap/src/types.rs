@@ -282,6 +282,8 @@ pub struct IdleInterrupt {
 struct IdleInterruptInner {
     pending: AtomicBool,
     notify: tokio::sync::Notify,
+    /// Set by [`IdleInterrupt::interrupt_at`]: a wait ends by then at the latest.
+    deadline: std::sync::Mutex<Option<std::time::Instant>>,
 }
 
 impl IdleInterrupt {
@@ -299,15 +301,45 @@ impl IdleInterrupt {
         self.inner.pending.swap(false, Ordering::SeqCst)
     }
 
+    /// Ends the waits from `at` on, as if [`IdleInterrupt::interrupt`] were called then
+    /// (None: no deadline). The deadline stays until replaced.
+    pub fn interrupt_at(&self, at: Option<std::time::Instant>) {
+        *self.deadline() = at;
+        self.inner.notify.notify_one();
+    }
+
+    /// The deadline [`IdleInterrupt::interrupt_at`] set, if any.
+    pub fn deadline_at(&self) -> Option<std::time::Instant> {
+        *self.deadline()
+    }
+
+    fn deadline(&self) -> std::sync::MutexGuard<'_, Option<std::time::Instant>> {
+        self.inner
+            .deadline
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
     /// Resolves once [`IdleInterrupt::interrupt`] has been called (now or earlier), and
-    /// clears the flag.
+    /// clears the flag, or once the [`IdleInterrupt::interrupt_at`] deadline passed.
     pub async fn wait(&self) {
         loop {
             let notified = self.inner.notify.notified();
             if self.take() {
                 return;
             }
-            notified.await;
+            match self.deadline_at() {
+                Some(at) => {
+                    if at <= std::time::Instant::now() {
+                        return;
+                    }
+                    tokio::select! {
+                        _ = notified => {}
+                        _ = tokio::time::sleep_until(at.into()) => return,
+                    }
+                }
+                None => notified.await,
+            }
         }
     }
 }
@@ -322,7 +354,27 @@ impl std::fmt::Debug for IdleInterrupt {
 
 #[cfg(test)]
 mod tests {
-    use super::Namespace;
+    use super::{IdleInterrupt, Namespace};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn idle_interrupt_deadline_ends_the_wait() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        let i = IdleInterrupt::new();
+        let start = Instant::now();
+        i.interrupt_at(Some(start + Duration::from_millis(50)));
+        rt.block_on(i.wait());
+        assert!(start.elapsed() >= Duration::from_millis(50));
+        // A passed deadline ends every wait until it is replaced.
+        rt.block_on(i.wait());
+        i.interrupt_at(None);
+        i.interrupt();
+        rt.block_on(i.wait());
+        assert!(!i.take());
+    }
 
     fn ns(prefix: &str, delimiter: Option<char>) -> Namespace {
         Namespace {
