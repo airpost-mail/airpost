@@ -110,6 +110,14 @@ document keeps every policy across `doc.open()`. The regex now only drives the b
 preview follows the global setting only, as it has no sender; print allows remote images only if
 every printed message does.
 
+Review fixes (roadmap/security, a7e9107e6). CSP 'self' and `file:` match file://host/... (a UNC
+path on Windows) from a file: document, so `webRequest.onBeforeRequest` now cancels hosted file:
+URLs on the default session, and the quick-preview partition only allows file: inside its bundle
+and `<config>/files`. Copy Image and dragging an inline image into a draft work with `tern-file:`.
+The banner counts http(s) URLs only (any `url(`/`image-set(`, not cid:/data:). Still open: the
+composer's quoted body renders in the main window without the message CSP, so its remote images
+load even when blocking is on.
+
 Verified (regex run in node). "Block remote images" rewrites HTML with the pattern in
 `internal_packages/message-autoload-images/lib/autoload-images-store.ts:25-35`. It misses
 `background:#fff url(https://…)`, `background:no-repeat url(…)`, CSS escapes like `\75rl(`, and
@@ -295,7 +303,10 @@ mailspring:`, `frame-src 'none'`, `object-src 'none'` (it was unquoted), and `co
 the Google/Microsoft OAuth endpoints and api.github.com. Autoconfig, one-click unsubscribe and
 Save Image fetch hosts from user data, so they go through `ExternalFetch` (main-process
 `net.fetch`, no cookies, Tern windows only). The signature preview runs through
-`SanitizeTransformer`. The `app://` scheme move is still open.
+`SanitizeTransformer`. The `app://` scheme move is still open. Review fixes (a7e9107e6):
+`static/db-migration.html` and `db-vacuum.html` carry the same policy and the drift spec checks
+every static page. In a file: window `script-src 'self'` still matches any local file, which the
+`app://` move would fix.
 
 Verified. The header policy (`src/browser/main.js:456-470`) and the meta tag
 (`static/index.html:6`) are meant to match but the header adds `'unsafe-inline'`, so only the meta
