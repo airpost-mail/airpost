@@ -408,8 +408,23 @@ async fn closing_a_websocket_closes_its_engine_connection() {
     );
 }
 
+/// Every `ai.*` method of docs/ai-plan.md section 3. Until stages 3 and 11 each can carry the
+/// provider config, so the relayed `config` refusal has to cover all of them.
+const AI_METHODS: &[&str] = &[
+    "ai.models",
+    "ai.test",
+    "ai.summarize",
+    "ai.suggestReplies",
+    "ai.draftReply",
+    "ai.triage.run",
+    "ai.triage.list",
+    "ai.cancel",
+    "ai.usage",
+];
+
 /// The gateway applies ms-ipc's relay policy to `ai.*` requests, params included, so the
-/// `config` refusal AI2 adds there holds on both sides (G6). Until then `ai.*` are local-only.
+/// `config` refusal AI2 adds there holds on both sides (G6) for every `ai.*` method. Until
+/// then `ai.*` are local-only.
 #[tokio::test(flavor = "multi_thread")]
 async fn relayed_ai_config_follows_the_shared_policy() {
     let mut s = Setup::start().await;
@@ -418,30 +433,36 @@ async fn relayed_ai_config_follows_the_shared_policy() {
     let provider = json!({ "provider": "p" });
     for admin in [false, true] {
         let scopes: Vec<String> = if admin { vec!["admin".into()] } else { vec![] };
-        if policy::method_class("ai.models") == policy::MethodClass::Open {
-            assert!(
-                !policy::relayed_request_allowed("ai.models", &config, &scopes),
-                "a relayed ai.* request may never carry config"
-            );
+        for &method in AI_METHODS {
+            if policy::method_class(method) == policy::MethodClass::Open {
+                assert!(
+                    !policy::relayed_request_allowed(method, &config, &scopes),
+                    "a relayed {method} request may never carry config"
+                );
+            }
         }
         let cookie = s.pair(admin).await;
         let tag = format!("admin-{admin}");
         let (mut ws, n) = s.ws(&cookie, &tag).await;
-        for (id, params) in [(2, &config), (3, &provider)] {
-            let allowed = policy::relayed_request_allowed("ai.models", params, &scopes);
-            let res = ws.call(id, "ai.models", params.clone()).await;
-            if allowed {
-                assert!(res.get("result").is_some(), "{res}");
-            } else {
-                assert_eq!(res["error"]["code"], -32008, "{res}");
+        let mut id = 2;
+        for &method in AI_METHODS {
+            for params in [&config, &provider] {
+                let allowed = policy::relayed_request_allowed(method, params, &scopes);
+                let res = ws.call(id, method, params.clone()).await;
+                id += 1;
+                if allowed {
+                    assert!(res.get("result").is_some(), "{method}: {res}");
+                } else {
+                    assert_eq!(res["error"]["code"], -32008, "{method}: {res}");
+                }
+                // The fake logs a request before it answers.
+                s.drain();
+                let reached = s.log.iter().any(|e| {
+                    matches!(e, Event::Request(m, name, p)
+                        if *m == n && name == method && p == params)
+                });
+                assert_eq!(reached, allowed, "admin {admin}: {method} {params}");
             }
-            // The fake logs a request before it answers.
-            s.drain();
-            let reached = s
-                .log
-                .iter()
-                .any(|e| matches!(e, Event::Request(m, method, p) if *m == n && method == "ai.models" && p == params));
-            assert_eq!(reached, allowed, "admin {admin}: {params}");
         }
     }
 }
