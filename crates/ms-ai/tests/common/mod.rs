@@ -466,6 +466,7 @@ pub fn thread() -> MailContext {
                 from: ann,
                 subject: None,
                 body: Some(format!("{BODY}. Can you make it?")),
+                body_omitted: false,
                 attachments: vec!["agenda.pdf".into()],
             },
             ContextMessage {
@@ -474,6 +475,7 @@ pub fn thread() -> MailContext {
                 from: bo,
                 subject: None,
                 body: Some("Probably, let me check.".into()),
+                body_omitted: false,
                 attachments: Vec::new(),
             },
         ],

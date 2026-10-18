@@ -45,6 +45,9 @@ pub struct ContextMessage {
     /// Plain text with quoted replies dropped. `None` sends only the date, sender and
     /// subject (triage's older messages).
     pub body: Option<String>,
+    /// The engine left the body out to stay within its read cap: the model is told, as for
+    /// a body the budget cuts.
+    pub body_omitted: bool,
     /// File names only; attachment content is never sent.
     pub attachments: Vec<String>,
 }
@@ -173,7 +176,12 @@ impl MailContext {
                 .as_deref()
                 .map(|b| self.body(b))
                 .filter(|b| !b.is_empty());
-            if let Some(body) = body {
+            if body.is_none() && message.body_omitted {
+                remaining = remaining.saturating_sub(units(LEFT_OUT) + 1);
+                block.push('\n');
+                block.push_str(LEFT_OUT);
+                cut += 1;
+            } else if let Some(body) = body {
                 let (text, was_cut) = if units(&body) < remaining {
                     (body, false)
                 } else if remaining >= MIN_EXCERPT_UNITS {
@@ -229,6 +237,7 @@ impl MailContext {
                 .part(&m.from.address)
                 .part(m.subject.as_deref().unwrap_or("\0"))
                 .part(m.body.as_deref().unwrap_or("\0"))
+                .part(if m.body_omitted { "o" } else { "-" })
                 .part(&m.attachments.join("\0"));
         }
         key
@@ -535,6 +544,7 @@ impl fmt::Debug for ContextMessage {
         f.debug_struct("ContextMessage")
             .field("id", &self.id)
             .field("body_chars", &self.body.as_deref().map(chars))
+            .field("body_omitted", &self.body_omitted)
             .field("attachments", &self.attachments.len())
             .finish_non_exhaustive()
     }
@@ -557,6 +567,7 @@ mod tests {
             from,
             subject: None,
             body: Some(body.into()),
+            body_omitted: false,
             attachments: Vec::new(),
         }
     }
@@ -770,6 +781,22 @@ mod tests {
         assert!(r
             .text
             .contains("from Bo Chen (you)\nSubject: Re: Offsite moved\nAttachments: plan.pdf\n"));
+        assert!(!r.truncated && !r.text.contains(LEFT_OUT));
+    }
+
+    #[test]
+    fn a_body_the_engine_left_out_is_noted() {
+        let mut t = thread(&["latest", "x"]);
+        t.messages[0].body = None;
+        t.messages[0].body_omitted = true;
+        let r = t.render(4000);
+        assert!(r.truncated);
+        assert!(r.text.contains(LEFT_OUT), "{}", r.text);
+        assert!(r.text.contains("Note: part of one message left out"));
+        let key = |t: &MailContext| t.key_parts(KeyBuilder::new("k")).finish();
+        let mut header_only = t.clone();
+        header_only.messages[0].body_omitted = false;
+        assert_ne!(key(&t), key(&header_only));
     }
 
     #[test]
