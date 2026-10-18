@@ -1942,3 +1942,31 @@ Open, low findings from the stage 11 review:
 Trial pending (not run): migrate the trial profile, restart the app, check both accounts sync;
 run `serve --detached` with the desktop closed and check mail still syncs; update the app with
 the detached engine running.
+
+2026-10-18, stage 11 gate (attempt 2), branch `roadmap/client-next`, merged to main. Rebased on
+main (the AI3 desktop work) without conflicts. Gate: fmt, clippy, `cargo test --workspace`
+(green on the second run, see below), `cargo deny check` (advisories, bans, licences and sources
+ok since the dbus-secret-service switch), release build of mailsync, tern, tern-mcp and
+tern-gateway, harness quick tier on serve with the release binaries (144 passed, 4 skipped),
+desktop lint, typecheck, the engine-client, engine-settings, engine-supervisor, key-manager,
+account-store, mailsync-process, oauth-revocation, account-error and capability-store specs (152
+passing) and the ai package specs (50 passing), since both sides changed `engine-protocol.ts`.
+No code changed in this step. The first `cargo test --workspace` run failed once in
+`ms-store --test legacy_import` (`migrate_sets_draft_files_aside_and_import_restores_them`:
+SQLite CannotOpen while migrate created the FTS shadow tables); it passed in five reruns of
+that test and in the full rerun. Likely cause, not fixed: `set_temp_directory` is process-wide,
+so parallel tests point SQLite's temp files at another test's temp dir, which may already be
+deleted; migrate's VACUUM ran there on main as well. No new decisions.
+
+Open: the low findings from the stage 11 review listed above (account.add storing desktop state
+such as `syncState`/`syncError`; `compact()`'s TRUNCATE checkpoint stalling writers; the two
+`registry::forget()` gaps; `start_registered` racing `account.remove`; the `account.remove
+{forget}` docs in `crates/ms-ipc`; store selection not tied to the config directory; the fuzz
+crate built only by the nightly job; `detachedEngineToReuse` not checking `hello.credentials`;
+the older-engine fallback after the move; `credentialsBeforeEngine` written only once; no stage
+11 row in section 6's plugin table; the Mailspring keychain migration still writing the Tern
+keyset first, leaving a second encrypted copy in config.json). The `legacy_import` flake above.
+Nothing for tern-web.
+Trial pending (not run): migrate the trial profile, restart the app, check both accounts sync;
+run `serve --detached` with the desktop closed and check mail still syncs; update the app with
+the detached engine running.
