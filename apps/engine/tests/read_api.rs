@@ -800,13 +800,22 @@ fn search_grammar_and_accounts() {
     // In Auckland (UTC+12) BASE_TS is already the 14th.
     assert!(dated("quarterly before:2020-09-14", "Pacific/Auckland").is_empty());
     assert_eq!(dated("quarterly before:2020-09-14", "UTC"), ["t:001"]);
+    // A zone the engine can't read only fails the date terms; long queries run.
+    let mut p = grammar("quarterly");
+    p["tz"] = json!("UTC0");
+    assert_eq!(search(p), Ok(vec!["t:001".into()]));
+    let words = vec!["quarterly"; 200].join(" ");
+    assert_eq!(search(grammar(&words)), Ok(vec!["t:001".into()]));
+    let deep = vec!["quarterly"; 40].join(" NOT ");
     for (q, extra) in [
         ("after:someday", json!({})),
         ("after:yesterday", json!({"now": null})),
-        ("x", json!({"tz": "Mars/Base"})),
+        ("x after:2020-09-13", json!({"tz": "Mars/Base"})),
         ("(x", json!({})),
         ("is:weird", json!({})),
         ("", json!({})),
+        ("quarterly - report", json!({})),
+        (deep.as_str(), json!({})),
     ] {
         let mut p = grammar(q);
         for (k, v) in extra.as_object().unwrap() {

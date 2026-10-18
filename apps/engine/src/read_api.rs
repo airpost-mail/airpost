@@ -289,8 +289,7 @@ impl ReadApi {
         };
         let dates;
         let search = if p.grammar {
-            dates = DateContext::new(p.tz.as_deref(), p.now)
-                .map_err(|e| invalid(&format!("search: {e}")))?;
+            dates = DateContext::new(p.tz.as_deref(), p.now);
             ThreadSearch::Grammar {
                 text: &p.query,
                 dates,
