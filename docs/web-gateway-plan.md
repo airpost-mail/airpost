@@ -337,7 +337,7 @@ gateway (section 2); **Web** = web-only.
 | `tasks.ts:98` no local phase for expunge/category tasks | Web (already waits for deltas) |
 | `apply-task.ts:142` RFC2822, RSVP, contact tasks in the mock | Web (mock); RFC2822 via DCP 16's file-id mode; RSVP and contacts DCP 18 |
 | `mock/engine.ts:314` cancel semantics | Web (document) |
-| `useComposerSession.ts:205` undo-send survives a closed tab | DCP 4: the web writes send-later `{expiration, isUndoSend}` metadata and the executor fires it; DCP 13's `draft.send {delayMs}` later |
+| `useComposerSession.ts:205` undo-send survives a closed tab | Done with DCP 4: the web writes send-later `{expiration, isUndoSend}` metadata and the executor sends it (timer kept for engines without `expiration-executor`); DCP 13's `draft.send {delayMs}` later |
 | `send-later-runner.ts:3` sends with no tab open | DCP 4 executor (runner gated on `expiration-executor`); with no desktop running, DCP 11 |
 
 ### Accounts
@@ -737,7 +737,16 @@ capabilities and executor, branch `roadmap/web-ready`, not merged:
   `expiration-executor` (DCP 4). The mock keeps a settings store (refusing the keys a
   non-admin device can't set) and announces `settings` and `capabilities`, not
   `expiration-executor`, so dev keeps the runner. `TODO-engine.md` regenerated: 14 markers.
-- Open: undo-send is still a client-side delay (DCP 13 `draft.send {delayMs}`); signatures
+- Review fixes: with `expiration-executor` undo send writes send-later `{expiration: now +
+  delay, isUndoSend: true}` with the draft and the engine sends it, so it survives the tab
+  closing; Undo clears it with `{expiration: null, isUndoSend: true}`, and the toast follows
+  the executor's SendDraftTask (or its `error` on the metadata). Engines without the feature
+  keep the in-tab timer. The mock runs the send-later half of the executor when it announces
+  the feature. The undo-send select shows an engine value outside its list (one set from the
+  CLI); a `-32008` from `integrations.test` now says testing needs an admin device.
+  `TODO-engine.md`: 13 markers.
+- Open: the undo-send expiration uses the browser's clock, so a browser far off the engine's
+  clock gets a shorter or longer delay (DCP 13 `draft.send {delayMs}` removes that); signatures
   and templates stay in the browser, since a device without admin can't set `signatures` or
   `templates`; `integrations.*` stay local-only, so only admin devices can test or use
   providers from the web; the web shows the engine's `Mailspring` container folder (parent of
