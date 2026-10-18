@@ -78,6 +78,17 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::INTEGRATIONS_GRAMMAR
         | method::INTEGRATIONS_ENRICH
         | method::INTEGRATIONS_TEST => MethodClass::LocalOnly,
+        // A relayed request may not name the provider URL or the switches
+        // (relayed_request_allowed); the engine uses its own.
+        method::AI_MODELS
+        | method::AI_TEST
+        | method::AI_SUMMARIZE
+        | method::AI_SUGGEST_REPLIES
+        | method::AI_DRAFT_REPLY
+        | method::AI_CANCEL
+        | method::AI_USAGE
+        | method::AI_TRIAGE_RUN
+        | method::AI_TRIAGE_LIST => MethodClass::Open,
         _ => MethodClass::LocalOnly,
     }
 }
@@ -150,8 +161,15 @@ pub fn relayed_settings_allowed(values: &Map<String, Value>, scopes: &[String]) 
             .all(|k| RELAYED_SETTINGS_KEYS.contains(&k.as_str()))
 }
 
+/// The `ai.*` params only a local client may send, admin scope or not: `config` would make
+/// the engine send mail, and the key, to any URL a remote device names, hosts on the
+/// user's network included (docs/ai-plan.md section 3), and `settings` would let it opt
+/// accounts in.
+const AI_LOCAL_PARAMS: &[&str] = &["config", "settings"];
+
 /// Whether a relayed device with `scopes` may make the request `name` with `params`: the
-/// method's class, and for `task.queue` and `settings.set` what the params ask for.
+/// method's class, and for `task.queue`, `settings.set`, `files.put` and `ai.*` what the
+/// params ask for.
 pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) -> bool {
     if !relayed_method_allowed(name, scopes) {
         return false;
@@ -169,6 +187,12 @@ pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) ->
         method::FILES_PUT => params
             .as_object()
             .is_some_and(|p| p.get("path").is_none_or(Value::is_null)),
+        // Positional params are refused for the same reason.
+        ai if ai.starts_with("ai.") => params.as_object().is_some_and(|p| {
+            AI_LOCAL_PARAMS
+                .iter()
+                .all(|k| p.get(*k).is_none_or(Value::is_null))
+        }),
         _ => true,
     }
 }
@@ -304,6 +328,10 @@ mod tests {
             assert_eq!(method_class(m), MethodClass::LocalOnly);
             assert!(!relayed_method_allowed(m, &[]));
         }
+        for m in ["ai.models", "ai.summarize", "ai.cancel", "ai.triage.list"] {
+            assert_eq!(method_class(m), MethodClass::Open, "{m}");
+        }
+        assert_eq!(method_class("ai.other"), MethodClass::LocalOnly);
         let put = |p: Value| relayed_request_allowed("files.put", &p, &admin);
         assert!(put(json!({"accountId": "a", "name": "x", "data": ""})));
         assert!(put(json!({"accountId": "a", "name": "x", "path": null})));
@@ -313,6 +341,35 @@ mod tests {
         assert!(!put(json!(["a", "x", null, null, "/etc/passwd"])));
         assert!(!put(json!(["a", "x", null, "aGk="])));
         assert!(!put(json!(null)));
+    }
+
+    #[test]
+    fn relayed_ai_requests_never_carry_config_or_settings() {
+        let admin = [SCOPE_ADMIN.to_owned()];
+        for scopes in [&[][..], &admin[..]] {
+            let ok = |p: Value| relayed_request_allowed("ai.summarize", &p, scopes);
+            assert!(ok(
+                json!({"accountId": "a", "threadId": "t", "provider": "p"})
+            ));
+            assert!(ok(
+                json!({"accountId": "a", "threadId": "t", "config": null})
+            ));
+            assert!(!ok(json!({"accountId": "a", "threadId": "t",
+                "config": {"id": "p", "kind": "openai", "url": "http://192.168.1.10/v1"}})));
+            assert!(!ok(json!({"accountId": "a", "threadId": "t",
+                "settings": {"accounts": ["a"]}})));
+            assert!(!ok(json!(["a", "t"])));
+            assert!(!relayed_request_allowed(
+                "ai.test",
+                &json!({"config": {"id": "p", "kind": "ollama"}}),
+                scopes
+            ));
+            assert!(relayed_request_allowed(
+                "ai.cancel",
+                &json!({"streamId": "s"}),
+                scopes
+            ));
+        }
     }
 
     #[test]

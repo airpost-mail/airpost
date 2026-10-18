@@ -11,6 +11,7 @@
 //! without pulling in the engine. The engine serves the protocol; this crate also has a
 //! blocking [`Client`], used by the CLI and the engine's tests.
 
+mod ai;
 mod client;
 mod envelope;
 mod files;
@@ -22,6 +23,7 @@ pub mod policy;
 mod read;
 mod settings;
 
+pub use ai::*;
 pub use client::{Client, ClientError, Notifications};
 pub use envelope::{
     delta_notification_line, parse_message, parse_request, ErrorObject, Id, Message, Notification,
@@ -168,6 +170,31 @@ pub mod method {
     /// whatever its filter, never held for a later subscriber: `hello` and `engine.status`
     /// carry the current value.
     pub const CAPABILITIES_CHANGED: &str = "capabilities.changed";
+    /// The `ai.*` methods ([`feature::AI`](crate::feature::AI)), params and results in
+    /// docs/ai-plan.md section 3 and [`crate::AiSettings`]. Until the engine keeps the AI
+    /// settings and keys, local clients send the provider `config`, key included, and the
+    /// `settings` with each call; a relayed connection may send neither
+    /// ([`policy`](crate::policy)). Answered out of order on the engine's AI workers (T21);
+    /// a failed model call is [`code::AI_FAILED`](crate::code::AI_FAILED).
+    pub const AI_MODELS: &str = "ai.models";
+    pub const AI_TEST: &str = "ai.test";
+    pub const AI_SUMMARIZE: &str = "ai.summarize";
+    pub const AI_SUGGEST_REPLIES: &str = "ai.suggestReplies";
+    pub const AI_DRAFT_REPLY: &str = "ai.draftReply";
+    /// Answered at once, in order: stops the calling connection's stream `streamId`.
+    pub const AI_CANCEL: &str = "ai.cancel";
+    /// Token counts per day, provider and feature since the engine started.
+    pub const AI_USAGE: &str = "ai.usage";
+    /// Inbox triage (docs/ai-plan.md section 4); not served yet.
+    pub const AI_TRIAGE_RUN: &str = "ai.triage.run";
+    pub const AI_TRIAGE_LIST: &str = "ai.triage.list";
+    /// Notification: the next piece of a streamed answer, `params` =
+    /// [`AiDeltaParams`](crate::AiDeltaParams). Sent only to the connection that started the
+    /// stream, in order, without `subscribe`; the call's response comes after the last one
+    /// and carries the whole text.
+    pub const AI_DELTA: &str = "ai.delta";
+    /// Notification: triage progress for the connection that called `ai.triage.run`.
+    pub const AI_TRIAGE_PROGRESS: &str = "ai.triage.progress";
 }
 
 /// The names in `hello.features` and `engine.status.features`
@@ -213,6 +240,8 @@ pub mod feature {
     /// `capabilities` in `hello` and `engine.status`, and `capabilities.changed`
     /// ([`Capabilities`](crate::Capabilities)).
     pub const CAPABILITIES: &str = "capabilities";
+    /// The `ai.*` methods but triage, `ai.delta`, and `capabilities.ai`.
+    pub const AI: &str = "ai";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
@@ -252,7 +281,9 @@ pub mod code {
     /// "Integration failed": a provider call failed; `data` is the serialized
     /// `IntegrationError` `{key, message, retryable, status?, retryAfter?}`.
     pub const INTEGRATION_FAILED: i64 = -32010;
-    // -32011 is the AI methods' (docs/ai-plan.md).
+    /// "AI request failed": a model call failed or the account or feature is off; `data`
+    /// is the serialized `AiError` `{key, message, retryable, status?, retryAfter?}`.
+    pub const AI_FAILED: i64 = -32011;
     /// The engine's workers for this kind of call are all busy and their queue is full; the
     /// client may try again later.
     pub const ENGINE_BUSY: i64 = -32012;

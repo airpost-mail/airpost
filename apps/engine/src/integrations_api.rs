@@ -194,6 +194,7 @@ pub fn capabilities(settings: &Map<String, Value>) -> Capabilities {
                 provider: provider.map(str::to_owned),
                 credentials: reason.is_none().then(|| CREDENTIALS_PER_REQUEST.to_owned()),
                 reason: reason.map(str::to_owned),
+                ..Capability::default()
             },
         );
     }

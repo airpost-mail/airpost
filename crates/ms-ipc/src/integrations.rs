@@ -39,7 +39,9 @@ pub mod capability_reason {
 }
 
 /// [`Capability::credentials`]: the client sends the provider's key with each request (in
-/// `config`), so the engine can't tell whether one is saved; the client checks.
+/// `config`), so the engine can't tell whether one is saved; the client checks. On an
+/// [`Capabilities::ai`] entry it also means the client sends the AI switches, which it
+/// applies itself.
 pub const CREDENTIALS_PER_REQUEST: &str = "request";
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -50,7 +52,11 @@ pub struct Capabilities {
     /// By [`server_feature`].
     #[serde(default)]
     pub server: BTreeMap<String, Capability>,
-    /// Groups a newer engine adds (`ai`), kept as they came.
+    /// By [`ai_feature`](crate::ai_feature) (docs/ai-plan.md section 3): the AI features
+    /// this engine serves. A feature it doesn't serve yet is absent.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ai: BTreeMap<String, Capability>,
+    /// Groups a newer engine adds, kept as they came.
     #[serde(flatten)]
     pub other: Map<String, Value>,
 }
@@ -64,6 +70,10 @@ pub struct Capability {
     /// [`CREDENTIALS_PER_REQUEST`], or absent when the engine needs none from the client.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credentials: Option<String>,
+    /// Whether the provider runs on this computer or network (AI entries), which the
+    /// privacy note names.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local: Option<bool>,
     /// Why it is unavailable, from [`capability_reason`]; absent when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
@@ -82,11 +92,13 @@ mod tests {
                 "grammar": {"available": false, "reason": "not-set-up"},
             },
             "server": {"linkTracking": {"available": false, "reason": "needs-tern-server"}},
-            "ai": {"summary": {"available": false}},
+            "ai": {"summary": {"available": true, "credentials": "request"}},
+            "later": {"x": {"available": false}},
         });
         let c: Capabilities = serde_json::from_value(v.clone()).unwrap();
         assert!(c.integrations["translation"].available);
-        assert_eq!(c.other["ai"], json!({"summary": {"available": false}}));
+        assert!(c.ai["summary"].available);
+        assert_eq!(c.other["later"], json!({"x": {"available": false}}));
         assert_eq!(serde_json::to_value(&c).unwrap(), v);
     }
 }
