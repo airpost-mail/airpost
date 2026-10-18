@@ -19,6 +19,7 @@ import { formatContact } from './recipients';
 import { openComposer, resetComposers } from './store';
 
 const G = MOCK_ACCOUNT_IDS.gmail;
+const I = MOCK_ACCOUNT_IDS.imap;
 
 function setup() {
   const engine = new MockEngine({ incomingEveryMs: null });
@@ -203,6 +204,56 @@ describe('ComposerHost', () => {
       'engine-file-1',
     ]);
     expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ id: 'engine-file-1' }));
+  });
+
+  it('uploads picked files again when From moves to another account', async () => {
+    setPreferences({ undoSendMs: 0 });
+    const { engine, queued, user } = setup();
+    const upload = vi.spyOn(engine, 'uploadFile');
+    act(
+      () =>
+        void openComposer({ mode: 'new', accountId: G, subject: 'Hi', to: [{ email: 'b@x.io' }] }),
+    );
+    let win = await screen.findByRole('dialog', { name: 'New message' });
+    await within(win).findByRole('button', { name: 'Attach files' });
+    const picked = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(win.querySelector<HTMLInputElement>('input[type=file]')!, {
+      target: { files: [picked] },
+    });
+    await waitFor(() => expect(within(win).queryByLabelText('Uploading')).toBeNull());
+
+    const from = within(win).getByRole('combobox', { name: 'From' });
+    from.focus();
+    await user.keyboard('{Enter}');
+    await user.click(await screen.findByRole('option', { name: /maya@okafor\.studio/ }));
+    await waitFor(() => expect(upload).toHaveBeenCalledWith(I, picked, 'notes.txt'));
+    const moved = await upload.mock.results[1].value;
+    await waitFor(() => expect(within(win).queryByLabelText('Uploading')).toBeNull());
+
+    // Saved under the new account, the draft names the File the engine keeps there.
+    await waitFor(
+      () =>
+        expect(
+          ofClass(queued, 'SyncbackDraftTask').filter(
+            (t) => t.__cls === 'SyncbackDraftTask' && t.draft.aid === I,
+          ),
+        ).not.toHaveLength(0),
+      { timeout: 3000 },
+    );
+    const saved = ofClass(queued, 'SyncbackDraftTask').at(-1)!;
+    const draft = saved.__cls === 'SyncbackDraftTask' ? saved.draft : null;
+    expect(draft!.files.map((f) => [f.id, f.aid])).toEqual([[moved.id, I]]);
+
+    // Reopened and sent, the attachment is still there to fetch.
+    await user.click(within(win).getByRole('button', { name: 'Close and keep draft' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    act(() => void openComposer({ mode: 'edit-draft', accountId: I, draftId: draft!.id }));
+    win = await screen.findByRole('dialog');
+    await within(win).findByText('notes.txt');
+    await user.click(within(win).getByRole('button', { name: /^Send$/ }));
+    await waitFor(() => expect(ofClass(queued, 'SendDraftTask')).toHaveLength(1));
+    const [send] = ofClass(queued, 'SendDraftTask');
+    expect(send.__cls === 'SendDraftTask' && send.draft.files.map((f) => f.id)).toEqual([moved.id]);
   });
 
   it("doesn't send when an attachment can't be had", async () => {

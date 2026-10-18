@@ -240,15 +240,25 @@ export function draftFromMessage(message: MessageJSON): DraftState {
 /** Moves a draft to another sending identity. A different account means a new draft there. */
 export function changeIdentity(draft: DraftState, identity: Identity): DraftState {
   if (identity.accountId === draft.accountId) return { ...draft, from: identity.contact };
+  const id = generateId();
   return {
     ...draft,
-    id: generateId(),
+    id,
     headerMessageId: generateHeaderMessageId(identity.contact.email.split('@')[1]),
     accountId: identity.accountId,
     from: identity.contact,
     // The thread belongs to the old account; the reply headers still thread it for recipients.
     threadId: undefined,
-    files: draft.files.filter((f) => f.local),
+    // The engine keeps a File under the account it was put to, so picked files go up again
+    // under the new one (the session's `upload`). Fresh placeholder ids let an upload still running
+    // for the old account land nowhere.
+    files: draft.files
+      .filter((f) => f.local)
+      .map((f) => ({
+        local: f.local,
+        upload: 'pending' as const,
+        file: { ...f.file, id: generateId(), aid: identity.accountId, messageId: id },
+      })),
   };
 }
 

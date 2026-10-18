@@ -92,8 +92,8 @@ export class MockEngine implements EngineClient {
   private readonly handlers: Handlers;
   private readonly announced: readonly string[];
   private _features: ReadonlySet<string> | null = null;
-  /** Bytes of `uploadFile`, by File id. */
-  private readonly uploads = new Map<string, Blob>();
+  /** `uploadFile`'s bytes and the account they went to, by File id. */
+  private readonly uploads = new Map<string, { accountId: string; blob: Blob }>();
 
   constructor(opts: MockEngineOptions = {}) {
     const l = opts.latency ?? [40, 140];
@@ -168,7 +168,7 @@ export class MockEngine implements EngineClient {
   fileUrl(file: FileJSON): string | null {
     // Uploads keep their bytes; everything else gets placeholder bytes so links work.
     const blob =
-      this.uploads.get(file.id) ??
+      this.uploads.get(file.id)?.blob ??
       new Blob([`Mock attachment ${file.filename} (${file.size} bytes)\n`], {
         type: 'text/plain',
       });
@@ -188,12 +188,16 @@ export class MockEngine implements EngineClient {
       filename: name,
       size: file.size,
     };
-    this.uploads.set(stored.id, file);
+    this.uploads.set(stored.id, { accountId, blob: file });
     return stored;
   }
 
-  async prepareFile(_file: FileJSON): Promise<void> {
+  async prepareFile(file: FileJSON): Promise<void> {
     await this.delay();
+    // As the engine's files.get: an upload is found only under the account it was put to.
+    const upload = this.uploads.get(file.id);
+    if (upload && upload.accountId !== file.aid)
+      throw new Error(`${file.filename} isn't available.`);
   }
 
   /** Delivers the next scripted incoming thread. Exposed for tests and the dev console. */

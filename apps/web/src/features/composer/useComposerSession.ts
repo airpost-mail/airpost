@@ -107,11 +107,18 @@ export function useComposerSession(args: {
   };
 
   const setIdentity = (identity: Identity) => {
-    if (identity.accountId !== draft.accountId) {
-      // The old account's copy would linger in its Drafts otherwise.
-      void autosave.cancel().then(() => saver.destroyCopy());
+    if (identity.accountId === draft.accountId) {
+      update((d) => changeIdentity(d, identity));
+      return;
     }
-    update((d) => changeIdentity(d, identity));
+    // The old account's copy would linger in its Drafts otherwise.
+    void autosave.cancel().then(() => saver.destroyCopy());
+    const next = changeIdentity(draft, identity);
+    update(() => next);
+    upload(
+      next.accountId,
+      next.files.filter((f) => f.upload === 'pending'),
+    );
   };
 
   const setRecipients = (kind: RecipientKind, list: ContactRef[]) =>
@@ -140,12 +147,17 @@ export function useComposerSession(args: {
     if (total > ATTACHMENT_WARN_BYTES) {
       toast.warning('Attachments are over 25 MB; many servers will refuse the message.');
     }
+    upload(accountId, added);
+  };
+
+  /** Puts each placeholder's bytes to `accountId` and swaps in the engine's File. */
+  const upload = (accountId: string, placeholders: DraftAttachment[]) => {
     const replace = (placeholder: string, next: DraftAttachment) =>
       update((d) => ({
         ...d,
         files: d.files.map((a) => (a.file.id === placeholder ? next : a)),
       }));
-    for (const a of added) {
+    for (const a of placeholders) {
       const local = a.local!;
       client.uploadFile(accountId, local, local.name).then(
         (file) => replace(a.file.id, { local, file }),
