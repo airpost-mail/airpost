@@ -1121,7 +1121,9 @@ vCard, run nightly for 5 minutes each (`.github/workflows/fuzz.yml`; not run loc
 toolchain here). The literal length uses saturating arithmetic. A message whose processing
 panics is quarantined (`quarantine-<folderId>-<uidvalidity>` in `_State`, up to 1000 UIDs) and
 skipped, so the account keeps syncing; this works in `serve`, where account threads run under
-`catch_unwind`. No harness scenario injects such a message yet.
+`catch_unwind`. Scenario `ingest-panic-quarantines-uid` (serve) makes one message panic through
+`TERN_ENGINE_TEST_PANIC_SUBJECT` and checks the quarantine key, the other messages and that the
+account keeps running.
 
 Inferred: no concrete panic found. The IMAP parser and envelope code
 (`crates/ms-imap/src/parser.rs`, `envelope.rs`), MIME (`crates/ms-mime/src/mime.rs`, `header.rs`,

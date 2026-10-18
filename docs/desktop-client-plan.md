@@ -1765,7 +1765,8 @@ only), drops the accounts' keys from `credentials` and sets `credentialsMovedToE
 account.add the engine `stored` drops that account's copy. `account.add` then goes without
 secrets. EngineClient on such an engine leaves stopped accounts with `retryAt` to the engine,
 treats one without as given up (with `authFailed`), never sends `account.remove` to restart or
-reset an account, and removes accounts the engine has that config.json doesn't list. At launch
+reset an account, and removes from the engine only the accounts deleted in the app (see the
+review fixes below). At launch
 `detachedEngineToReuse` joins a detached engine with the bundled build and protocol once the
 credentials moved; any other detached engine gets `engine.shutdown` on its socket and launch
 waits for it as before. Dev runs (unpackaged, and `make desktop`) set `TERN_ENGINE_KEY_FILE` to
@@ -1789,9 +1790,8 @@ before `migrate`, so a second engine can't start beside it, and accepts connecti
 and `engine.resetDatabase` keep the registration (listed stopped until added again). The
 restart delay base can be set with `TERN_ENGINE_RESTART_DELAY_MS` in every build (the harness
 sets 10 minutes). Autostarted accounts use the identity of the latest `account.add` (none until
-a client adds one). config.json `accounts` stays the list the desktop runs and `AccountStore`
-stays on config.json: switching it to `account.list`/`account.changed` waits for stage 12, when
-onboarding and account edits go through the engine. Integration keys stay in KeyManager too
+a client adds one). config.json `accounts` stays the list the desktop runs and the copy it
+edits until stage 12's `account.update` (see the review fixes below). Integration keys stay in KeyManager too
 (copied into the engine, read from KeyManager until stage 12). Once the secrets moved, windows
 reading an account's secrets (OAuth revocation, the reconnect form) get them from
 `credentialsBeforeEngine`. A downgraded build finds only the integration keys and asks to sign
@@ -1807,7 +1807,52 @@ removing an account added after the move doesn't revoke its Google grant (the en
 from stage 12). If a joined detached engine's socket drops, the supervisor spawns its own engine,
 which may find the socket in use until the detached one exits. A detached engine that refuses
 `hello` (another protocol) can't be asked to stop; launch then waits 40 s and migrates anyway.
-The fuzz job hasn't run, and no scenario injects a message that panics. Nothing for tern-web.
+The fuzz job hasn't run. Nothing for tern-web.
 Trial pending (not run): migrate the trial profile, restart the app, check both accounts sync;
 run `serve --detached` with the desktop closed and check mail still syncs; update the app with
 the detached engine running.
+
+2026-10-18, stage 11 review fixes (branch `roadmap/client-next`, not merged). Engine:
+`account.add` fills in stored secrets only when the account names the servers they were
+stored for (`registry::same_servers`: provider, `refresh_client_id`, and each of IMAP and
+SMTP's host, port, username, security, `allow_insecure_ssl` and `allow_cleartext`); other
+servers without secrets get INVALID_PARAMS ("new server settings need new credentials"), and
+with secrets they replace the stored set. A detached engine writes nothing secret to stdout: a
+rotated token it can't store stays in the token manager with a warning, and secrets deltas are
+dropped. On a detached socket `account.test`, `account.reset`, `engine.resetDatabase` and
+`engine.setLogLevel` run on the same worker lanes as on stdin and answer out of order, so a
+panic in `account.test` is answered as an error. `TERN_ENGINE_TEST_PANIC_SUBJECT` makes ingest
+panic on the message with that subject (scenario `ingest-panic-quarantines-uid`). New tests:
+`stored_secrets_are_not_sent_to_other_servers`, `a_detached_engine_writes_no_secrets_to_stdout`,
+`a_panic_in_account_test_on_a_detached_socket_is_answered`,
+`a_detached_engine_refuses_parent_methods_on_relayed_connections` (relayed connections get
+FORBIDDEN_RELAYED, admin scope or not, before the WRONG_CHANNEL check is reached),
+`relayed_connections_get_public_account_fields_only`,
+`an_auth_failure_stops_the_account_until_it_is_added_again`, and
+`stored_secrets_fill_in_only_for_the_same_servers`. Desktop: `AccountStore` (main window), on an
+engine with Feature.Accounts, adds the accounts in `account.list` that config.json lacks after
+each hello and applies `account.changed` (all fields but `syncState`/`syncError`); config.json
+stays the copy the desktop edits, so `account.list` never overwrites an account it has.
+EngineClient no longer removes the engine's accounts that config.json doesn't list; the
+supervisor keeps the ids deleted from config.json under `accountsToRemoveFromEngine` until the
+engine's `account.remove` answers, and only those are removed (on any engine, joined ones
+included, since they are only accounts the user deleted here). KeyManager's copy of an account's
+secrets is dropped after `stored: true` only once the move completed. Accounts with no secrets in
+`credentials` or `credentialsBeforeEngine` are left out of `credentials.import` (they need a
+reconnect) so they don't keep the move from completing. Checks: `cargo test -p mailsync -p
+ms-sync`, clippy and fmt; harness quick tier on serve with debug binaries (143 passed, 4
+skipped); desktop lint, typecheck and the engine, account-store, mailsync-process, key-manager,
+oauth-revocation and account-error specs (155 passing).
+
+Decisions taken, to confirm: `TERN_ENGINE_TEST_PANIC_SUBJECT` is read in release builds too
+(the harness and CI run release binaries; unset, nothing panics). An `account.add` whose servers
+differ and that carries no secrets is refused without clearing the stored ones (the
+registration stays as it was). `account.changed` for an account the desktop has updates it;
+`account.list` only adds missing ones, since the engine's copy is the last one added and may be
+older than config.json. A desktop delete is remembered across launches, but an account deleted
+by a build older than stage 11 stays registered in the engine and now shows up again in
+AccountStore.
+
+Open: the review asked for WRONG_CHANNEL on relayed parent methods; the engine answers
+FORBIDDEN_RELAYED there (the relay policy refuses them first), and the test checks that. Trial
+pending (not run), as above.
