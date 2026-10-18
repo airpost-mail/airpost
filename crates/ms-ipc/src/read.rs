@@ -219,6 +219,97 @@ pub struct MetadataListResult {
     pub models: Vec<Value>,
 }
 
+/// `query` (desktop-client-plan 3.2): the JSON form of the desktop's `ModelQuery`
+/// (`Query.toJSON()`). `where` is a matcher (`{attr, op, value}`, `{and|or|not: [..]}`) or a
+/// list of them, all of which must match. `accounts: None` reads every account. An empty
+/// `order` is the class's natural order. `cursor` pages by keyset: `""` for the first page,
+/// then the last page's `nextCursor`. No limit is applied when `limit` is absent.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryParams {
+    pub class: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<Vec<String>>,
+    #[serde(default, rename = "where", skip_serializing_if = "Option::is_none")]
+    pub where_: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<QuerySearch>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub order: Vec<QueryOrder>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub distinct: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub include: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ids_only: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub count: bool,
+}
+
+/// `query.search`. `grammar: false` is the plain FTS prefix match of `.search(text)`;
+/// `grammar: true` (the search grammar, with `tz` and `now` for date terms) is refused with
+/// `INVALID_PARAMS` and `data: {"unsupported": "search-grammar"}` until the engine has it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuerySearch {
+    pub text: String,
+    #[serde(default)]
+    pub grammar: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tz: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now: Option<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QueryOrder {
+    pub attr: String,
+    /// `"asc"` or `"desc"`.
+    pub dir: String,
+}
+
+/// `query`'s result: `rows` always (empty for `idsOnly` and `count`), `ids` for `idsOnly`,
+/// `count` for `count`, and `nextCursor` for a cursor query (`null` after the last page).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryResult {
+    pub rows: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ids: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<i64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "double_option"
+    )]
+    pub next_cursor: Option<Option<String>>,
+}
+
+/// `Some(None)` as `null`, `None` as absent.
+mod double_option {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &Option<Option<String>>, s: S) -> Result<S::Ok, S::Error> {
+        match v {
+            Some(inner) => inner.serialize(s),
+            None => s.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<Option<Option<String>>, D::Error> {
+        Option::<String>::deserialize(d).map(Some)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +361,49 @@ mod tests {
         assert!(serde_json::from_value::<MetadataListParams>(json!({})).is_err());
         let p: CountsGetParams = serde_json::from_value(json!({})).unwrap();
         assert_eq!(p.accounts, None);
+    }
+
+    #[test]
+    fn query_shape() {
+        let p: QueryParams = serde_json::from_value(json!({
+            "class": "Thread", "accounts": null,
+            "where": {"and": [{"attr": "inAllMail", "op": "=", "value": true}]},
+            "search": {"text": "ann", "grammar": false},
+            "order": [{"attr": "lastMessageReceivedTimestamp", "dir": "desc"}],
+            "limit": 100, "offset": null, "cursor": "", "distinct": true, "include": [],
+            "idsOnly": false, "count": false,
+        }))
+        .unwrap();
+        assert_eq!(
+            (p.accounts.as_ref(), p.limit, p.distinct),
+            (None, Some(100), true)
+        );
+        assert_eq!(p.cursor.as_deref(), Some(""));
+        let back = serde_json::to_value(&p).unwrap();
+        assert_eq!(back["order"][0]["dir"], "desc");
+        assert!(back.get("idsOnly").is_none() && back.get("accounts").is_none());
+
+        let r = |v: Value| serde_json::from_value::<QueryResult>(v).unwrap();
+        assert_eq!(r(json!({"rows": []})).next_cursor, None);
+        assert_eq!(
+            r(json!({"rows": [], "nextCursor": null})).next_cursor,
+            Some(None)
+        );
+        let end = QueryResult {
+            next_cursor: Some(None),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_value(end).unwrap(),
+            json!({"rows": [], "nextCursor": null})
+        );
+        let ids = QueryResult {
+            ids: Some(vec!["t1".into()]),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_value(ids).unwrap(),
+            json!({"rows": [], "ids": ["t1"]})
+        );
     }
 }

@@ -71,6 +71,9 @@ pub mod method {
     /// Messages or threads carrying a plugin's metadata
     /// ([`feature::METADATA_LIST`](crate::feature::METADATA_LIST)).
     pub const METADATA_LIST: &str = "metadata.list";
+    /// A ModelQuery over the stored models ([`feature::QUERY`](crate::feature::QUERY),
+    /// desktop-client-plan 3.2).
+    pub const QUERY: &str = "query";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
     /// `serve` mode, the parent's stdin only: start syncing an account.
@@ -136,6 +139,8 @@ pub mod feature {
     pub const TASKS_LIST: &str = "tasks-list";
     /// `metadata.list`.
     pub const METADATA_LIST: &str = "metadata-list";
+    /// `query`, with plain search (`search.grammar: false`) only.
+    pub const QUERY: &str = "query";
     /// `hidden` on the Message JSON the read methods return (`Message.isHidden()`).
     pub const MESSAGE_HIDDEN: &str = "message-hidden";
     /// `mail.new` notifications for subscribed connections.

@@ -49,6 +49,7 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::COUNTS_GET
         | method::TASKS_LIST
         | method::METADATA_LIST
+        | method::QUERY
         | method::ACCOUNT_LIST
         // settings.set is open for the keys in RELAYED_SETTINGS_KEYS only
         // (relayed_settings_allowed).
