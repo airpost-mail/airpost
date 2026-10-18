@@ -841,6 +841,31 @@ composer for a draft the user never wrote.
 
 ### TD34. Message bodies render inside the Node-enabled renderer (before stage 5)
 
+Done (roadmap/client-next). The reading pane's message bodies render in the message frame
+(`src/message-frame`): an iframe on `tern-message://frame/message.html`, a standard secure scheme
+the main process serves (`browser/message-frame-protocol-handler.ts`), sandboxed with
+`allow-scripts allow-forms` and no `allow-same-origin`, so it is cross-origin to the app window and
+Chromium runs it in its own sandboxed renderer process without Node (checked from the spec with
+`getAppMetrics`). Its CSP (TD2's message policy plus `script-src` for the frame's one script and
+`base-uri 'none'`) comes as a header and as the first element; the remote-images variant is a
+second page URL, and `will-frame-navigate` only lets the app window, never the frame itself, load
+either. The frame script is the app's own DOM code (darkening, colour detection, autolink, image
+sizing, find-in-thread highlighting, form interception) packed by a small CommonJS bundler that
+refuses Node modules (`src/frame-script-bundler.ts`). EmailFrame posts `render` and `search`;
+the frame posts its height, links, forms, keys, mouse events, the context-menu target, focus and
+search match boxes, which the app checks before acting on. `SearchableComponentStore` takes remote
+regions (boxes instead of DOM matches). Printing and translation's language detection read the
+body through the bridge (`messageFrameContent`). `renderedMessageBodyIntoDocument` gets `{body,
+message, iframe}` from plugin API 1.27: `body` is a `MessageBody` (`querySelectorAll`,
+`setAttributes`, `insertElement`, `getBoundingClientRect`, `addEventListener` for click and
+mousedown, all promises that reject after a re-render; event-handler attributes, scripts, frames,
+forms and styles are refused); reading `document` throws, warned once per extension. Link
+tracking uses it. The app CSP's `frame-src` is now `tern-message://frame`; `mailspring:` fonts get
+`Access-Control-Allow-Origin: *` (fonts load in CORS mode); the chrome-i18n content script ignores
+messages that aren't the app window's own strings. Still open: the clipped-message, show-original,
+print and quick-preview windows and the composer's quoted body still render in Node-enabled
+documents (with TD2's CSP); keyboard events reach the app as re-dispatched copies, as before.
+
 Verified. Every window is a `MailspringWindow` with `nodeIntegration: true`,
 `contextIsolation: false`, no sandbox (`src/browser/mailspring-window.ts:124-128`). The message
 body is a same-origin `about:blank` iframe in that renderer (`email-frame.tsx:222`). Its sandbox
