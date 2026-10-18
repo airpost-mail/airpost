@@ -122,10 +122,33 @@ pub fn open_connection(config_dir: &Path) -> Result<Connection> {
     conn.busy_timeout(Duration::from_millis(SQLITE_BUSY_TIMEOUT_MS))?;
     // journal_mode returns a row, so it cannot go through execute_batch's step-to-done.
     let _mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))?;
+    // journal_size_limit: the WAL is cut back to 64 MB after each checkpoint instead of
+    // keeping the size the largest write pass gave it (TD46).
     conn.execute_batch(
-        "PRAGMA main.page_size = 4096; PRAGMA main.cache_size = 10000; PRAGMA main.synchronous = NORMAL;",
+        "PRAGMA main.page_size = 4096; PRAGMA main.cache_size = 10000; PRAGMA main.synchronous = NORMAL; PRAGMA main.journal_size_limit = 67108864;",
     )?;
     Ok(conn)
+}
+
+/// Pages [`compact`] frees per call: 8 MB at the 4 KB page size.
+pub const INCREMENTAL_VACUUM_PAGES: u32 = 2048;
+
+/// Frees up to [`INCREMENTAL_VACUUM_PAGES`] unused pages (a no-op on a database without
+/// incremental auto-vacuum) and checkpoints the WAL, truncating it. Neither is needed for
+/// correctness, so failures (a reader holding the WAL, a busy database) are only logged.
+pub fn compact(conn: &Connection) {
+    let freed = conn.execute_batch(&format!(
+        "PRAGMA main.incremental_vacuum({INCREMENTAL_VACUUM_PAGES});"
+    ));
+    if let Err(e) = freed {
+        tracing::warn!("-X Incremental vacuum failed: {e}");
+    }
+    let checkpoint = conn.query_row("PRAGMA main.wal_checkpoint(TRUNCATE)", [], |r| {
+        r.get::<_, i64>(0)
+    });
+    if let Err(e) = checkpoint {
+        tracing::warn!("-X WAL checkpoint failed: {e}");
+    }
 }
 
 /// Points SQLite's temp files at `CONFIG_DIR_PATH` (the C++ set `sqlite3_temp_directory`),

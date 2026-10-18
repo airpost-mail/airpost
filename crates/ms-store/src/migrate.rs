@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 use ms_core::constants::{
     DATABASE_FILE, FILES_DIR, LEGACY_DATABASE_FILE, SCHEMA_VERSION, STATE_ENGINE_KEY,
-    STATE_ENGINE_RUST, VACUUM_INTERVAL, VACUUM_TIME_KEY,
+    STATE_ENGINE_RUST, VACUUM_TIME_KEY,
 };
 use ms_core::{Clock, Error, Result};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
@@ -29,12 +29,17 @@ pub struct MigrateOutcome {
     pub moved_legacy: bool,
     /// A new V12 database was created.
     pub created: bool,
-    pub vacuumed: bool,
 }
 
-/// Runs `--mode migrate`. Progress lines go to `out`, which is stdout in the bin: the
-/// client opens its progress window when it sees `running migration` or `running vacuum`
-/// (`mailsync-process.ts:501-517`). The final `{"error":...}` line is the caller's.
+/// Runs `--mode migrate` (and `serve` before it accepts connections). Progress lines go to
+/// `out`, which is stdout in the bin: the client opens its progress window when it sees
+/// `running migration` (`mailsync-process.ts:501-517`). The final `{"error":...}` line is
+/// the caller's.
+///
+/// There is no full VACUUM here any more (TD46): a new database uses `auto_vacuum =
+/// INCREMENTAL` and the background worker frees pages a little at a time
+/// ([`crate::Store::compact`]). A database created before that keeps its free pages until
+/// a VACUUM converts it.
 pub fn migrate(
     config_dir: &Path,
     clock: &dyn Clock,
@@ -55,6 +60,9 @@ pub fn migrate(
     let version: i32 = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
 
     if version == 0 {
+        // The WAL pragma already wrote the header, so the mode takes a VACUUM, instant on
+        // an empty database.
+        conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")?;
         if !outcome.moved_legacy {
             // The C++ engine printed this for a new database too; the client ignores it.
             write_progress(out, "\nRunning Setup")?;
@@ -79,20 +87,6 @@ pub fn migrate(
     // Note: a version above SCHEMA_VERSION comes from a newer build; leave it alone, as the
     // C++ engine did.
 
-    let vacuum_time = get_key_value(&conn, VACUUM_TIME_KEY)?
-        .and_then(|v| v.trim().parse::<i64>().ok())
-        .unwrap_or(0);
-    if clock.now() - vacuum_time > VACUUM_INTERVAL {
-        write_progress(out, "\nRunning Vacuum\n")?;
-        // Updated first so a VACUUM that fails (usually a full disk) is not retried on
-        // every launch.
-        save_key_value(&conn, VACUUM_TIME_KEY, &clock.now().to_string())?;
-        if let Err(e) = conn.execute_batch("VACUUM") {
-            // Not mandatory: report it and let the app launch.
-            write_progress(out, &format!("\nVacuuming failed with SQLite error:\n{e}"))?;
-        }
-        outcome.vacuumed = true;
-    }
     Ok(outcome)
 }
 
@@ -119,7 +113,7 @@ pub fn reset_account(conn: &Connection, account_id: &str, keep_metadata: bool) -
     crate::metadata_stash::save(&tx, &stash)?;
     save_key_value(&tx, &format!("cursor-{account_id}"), "0")?;
     tx.commit()?;
-    conn.execute_batch("VACUUM")?;
+    crate::schema::compact(conn);
     Ok(())
 }
 

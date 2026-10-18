@@ -33,7 +33,7 @@ fn migrated_schema() -> (tempfile::TempDir, Vec<Value>) {
     let mut out = Vec::new();
     let clock = ManualClock::new(1_700_000_000);
     let outcome = ms_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
-    assert!(outcome.created && !outcome.moved_legacy && !outcome.vacuumed);
+    assert!(outcome.created && !outcome.moved_legacy);
     let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
     let version: i32 = conn
         .pragma_query_value(None, "user_version", |r| r.get(0))
@@ -171,10 +171,19 @@ fn legacy_database_is_moved_aside() {
     assert_eq!(outcome, Default::default());
     assert!(out.is_empty());
 
-    // 31 days later it vacuums.
+    // No full VACUUM months later either: the new database vacuums incrementally.
     clock.advance(31 * 24 * 3600);
     let mut out = Vec::new();
     let outcome = ms_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
-    assert!(outcome.vacuumed);
-    assert_eq!(String::from_utf8(out).unwrap(), "\nRunning Vacuum\n");
+    assert_eq!(outcome, Default::default());
+    assert!(out.is_empty());
+    let conn = ms_store::schema::open_connection(dir.path()).unwrap();
+    let mode: i64 = conn
+        .pragma_query_value(None, "auto_vacuum", |r| r.get(0))
+        .unwrap();
+    assert_eq!(mode, 2, "incremental");
+    let limit: i64 = conn
+        .pragma_query_value(None, "journal_size_limit", |r| r.get(0))
+        .unwrap();
+    assert_eq!(limit, 64 * 1024 * 1024);
 }

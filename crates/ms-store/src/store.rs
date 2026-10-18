@@ -209,6 +209,15 @@ impl Store {
         self.invalidate_category_caches();
     }
 
+    /// After a panic caught inside [`Store::transaction`]: rolls the open transaction back
+    /// and drops its deltas, so the store can be used again.
+    pub fn abandon_after_panic(&self) {
+        if self.tx.borrow().depth > 0 {
+            self.rollback();
+            self.tx.borrow_mut().depth = 0;
+        }
+    }
+
     pub fn in_transaction(&self) -> bool {
         self.tx.borrow().depth > 0
     }
@@ -238,6 +247,12 @@ impl Store {
     /// `keep_metadata`, and deleted otherwise (the account is being removed).
     pub fn reset_for_account(&self, account_id: &str, keep_metadata: bool) -> Result<()> {
         migrate::reset_account(&self.conn, account_id, keep_metadata)
+    }
+
+    /// Frees some unused pages and truncates the WAL ([`crate::schema::compact`]); the
+    /// background worker calls it after its hourly cache cleanup.
+    pub fn compact(&self) {
+        crate::schema::compact(&self.conn);
     }
 
     // -- Models -------------------------------------------------------------------------
