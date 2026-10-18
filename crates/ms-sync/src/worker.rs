@@ -203,6 +203,9 @@ impl SyncWorker {
                 .map(Some);
         }
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if is_test_panic_message(remote_msg) {
+                panic!("{TEST_PANIC_SUBJECT_ENV} matched UID {uid}");
+            }
             self.processor().insert_fallback_to_update_message(
                 remote_msg,
                 folder,
@@ -784,6 +787,27 @@ impl SyncWorker {
         }
         Ok(())
     }
+}
+
+/// A subject that makes processing the message panic, so the harness can check the
+/// quarantine (scenario `ingest-panic-quarantines-uid`). Read in every build because the
+/// harness runs release builds; unset, nothing panics.
+pub const TEST_PANIC_SUBJECT_ENV: &str = "TERN_ENGINE_TEST_PANIC_SUBJECT";
+
+fn is_test_panic_message(remote_msg: &ms_imap::ImapMessage) -> bool {
+    static SUBJECT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    let wanted = SUBJECT.get_or_init(|| {
+        std::env::var(TEST_PANIC_SUBJECT_ENV)
+            .ok()
+            .filter(|s| !s.is_empty())
+    });
+    wanted.as_deref().is_some_and(|w| {
+        remote_msg
+            .header
+            .as_ref()
+            .and_then(|h| h.subject.as_deref())
+            == Some(w)
+    })
 }
 
 /// UIDs quarantined per folder, the newest kept.
