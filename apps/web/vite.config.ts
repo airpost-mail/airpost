@@ -2,7 +2,7 @@ import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 // `npm run dev` with VITE_TERN_ENGINE=gateway talks to a local tern-gateway through this
 // proxy, so the page and the gateway share an origin as in production (plan G3). Host and
@@ -30,5 +30,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // e2e/ is the Playwright run against a real engine (npm run e2e).
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 });
