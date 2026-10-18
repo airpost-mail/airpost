@@ -22,5 +22,5 @@ fn open_sets_the_temp_directory_before_reset_vacuums() {
         .query_row("PRAGMA temp_store_directory", [], |r| r.get(0))
         .unwrap();
     assert_eq!(dir, config.path().to_string_lossy());
-    store.reset_for_account("acc1").unwrap();
+    store.reset_for_account("acc1", true).unwrap();
 }

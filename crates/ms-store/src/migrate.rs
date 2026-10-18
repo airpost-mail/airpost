@@ -97,16 +97,22 @@ pub fn migrate(
 }
 
 /// `--mode reset`: deletes everything belonging to one account and resets its metadata
-/// cursor so metadata is fetched again on resync. The account's plugin metadata is kept in
-/// `DetatchedPluginMetadata` by Message-ID and attached again as the resync brings the
-/// messages back ([`crate::metadata_stash`]); `ACCOUNT_RESET_QUERIES`' delete of that table
-/// is skipped.
-pub fn reset_account(conn: &Connection, account_id: &str) -> Result<()> {
-    let stash = crate::metadata_stash::collect(conn, Some(account_id))?;
+/// cursor so metadata is fetched again on resync. With `keep_metadata` (a reset that resyncs
+/// the account) its plugin metadata is kept in `DetatchedPluginMetadata` by Message-ID and
+/// attached again as the resync brings the messages back ([`crate::metadata_stash`]), and
+/// `ACCOUNT_RESET_QUERIES`' delete of that table is skipped. Without it (the account is being
+/// removed) the metadata goes too: account ids are derived from the address and hosts, so
+/// metadata kept for a removed account would come back to life if it were added again.
+pub fn reset_account(conn: &Connection, account_id: &str, keep_metadata: bool) -> Result<()> {
+    let stash = if keep_metadata {
+        crate::metadata_stash::collect(conn, Some(account_id))?
+    } else {
+        Vec::new()
+    };
     let tx = conn.unchecked_transaction()?;
     for sql in schema::ACCOUNT_RESET_QUERIES
         .iter()
-        .filter(|sql| !sql.contains("`DetatchedPluginMetadata`"))
+        .filter(|sql| !keep_metadata || !sql.contains("`DetatchedPluginMetadata`"))
     {
         tx.execute(sql, [account_id])?;
     }

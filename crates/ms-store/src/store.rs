@@ -232,11 +232,12 @@ impl Store {
         self.tx.borrow_mut().deltas.clear();
     }
 
-    /// `--mode reset`: deletes everything of one account (`ACCOUNT_RESET_QUERIES`) but its
-    /// plugin metadata, kept by Message-ID for the resync ([`crate::metadata_stash`]), resets
-    /// its metadata cursor so metadata is fetched again on resync, and vacuums.
-    pub fn reset_for_account(&self, account_id: &str) -> Result<()> {
-        migrate::reset_account(&self.conn, account_id)
+    /// `--mode reset`: deletes everything of one account (`ACCOUNT_RESET_QUERIES`), resets
+    /// its metadata cursor so metadata is fetched again on resync, and vacuums. Its plugin
+    /// metadata is kept by Message-ID for the resync ([`crate::metadata_stash`]) when
+    /// `keep_metadata`, and deleted otherwise (the account is being removed).
+    pub fn reset_for_account(&self, account_id: &str, keep_metadata: bool) -> Result<()> {
+        migrate::reset_account(&self.conn, account_id, keep_metadata)
     }
 
     // -- Models -------------------------------------------------------------------------

@@ -677,7 +677,7 @@ fn reset_for_account_clears_every_table() {
         .save_key_value(&format!("cursor-{ACCOUNT}"), "1234")
         .unwrap();
 
-    f.store.reset_for_account(ACCOUNT).unwrap();
+    f.store.reset_for_account(ACCOUNT, true).unwrap();
     for table in [
         "Message",
         "Thread",
@@ -719,6 +719,45 @@ fn reset_for_account_clears_every_table() {
 }
 
 #[test]
+fn removing_an_account_drops_its_plugin_metadata() {
+    let f = fixture();
+    let inbox = f.folder("INBOX", "inbox");
+    let msg = f.insert("m@x", &inbox, 1, attrs(1, true), None);
+    let mut m = f.load(msg.id());
+    m.upsert_metadata("send-later", &json!({"expiration": 1_900_000_000}), None);
+    f.store.save(&mut m).unwrap();
+    let mut t = f.thread(msg.thread_id()).unwrap();
+    t.upsert_metadata("thread-snooze", &json!({"expiration": 1_900_000_100}), None);
+    f.store.save(&mut t).unwrap();
+    // Rows an earlier reset kept go too.
+    f.store.reset_for_account(ACCOUNT, true).unwrap();
+    assert!(count(&f, "SELECT COUNT(*) FROM DetatchedPluginMetadata") > 0);
+    f.store
+        .conn()
+        .execute(
+            "INSERT INTO DetatchedPluginMetadata (objectId, objectType, accountId, pluginId, value, version) \
+             VALUES ('<o@x>', 'Message', 'other', 'send-later', '{}', 1)",
+            [],
+        )
+        .unwrap();
+
+    f.store.reset_for_account(ACCOUNT, false).unwrap();
+    assert_eq!(
+        count(
+            &f,
+            &format!("SELECT COUNT(*) FROM DetatchedPluginMetadata WHERE accountId = '{ACCOUNT}'")
+        ),
+        0
+    );
+    assert_eq!(
+        count(&f, "SELECT COUNT(*) FROM DetatchedPluginMetadata"),
+        1,
+        "another account's rows stay"
+    );
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM ModelPluginMetadata"), 0);
+}
+
+#[test]
 fn reset_keeps_metadata_for_the_resync() {
     let f = fixture();
     let inbox = f.folder("INBOX", "inbox");
@@ -734,7 +773,7 @@ fn reset_keeps_metadata_for_the_resync() {
     t.upsert_metadata("cleared", &json!({}), None);
     f.store.save(&mut t).unwrap();
 
-    f.store.reset_for_account(ACCOUNT).unwrap();
+    f.store.reset_for_account(ACCOUNT, true).unwrap();
     // One message row, and the thread's value under each of its two Message-IDs; the empty
     // value is not kept.
     assert_eq!(count(&f, "SELECT COUNT(*) FROM DetatchedPluginMetadata"), 3);
