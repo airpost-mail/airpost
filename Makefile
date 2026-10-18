@@ -14,7 +14,8 @@ STACK := docker compose -f deploy/dev/compose.yaml
 # `make stack PROFILE=backend` adds the backend to the fake mail servers.
 PROFILE ?=
 STACK_PROFILE := $(if $(PROFILE),--profile $(PROFILE))
-RELEASE_BINS := MAILSYNC_BIN=target/release/mailsync TERN_BIN=target/release/tern TERN_MCP_BIN=target/release/tern-mcp
+RELEASE_BINS := MAILSYNC_BIN=target/release/mailsync TERN_BIN=target/release/tern TERN_MCP_BIN=target/release/tern-mcp \
+	TERN_GATEWAY_BIN=target/release/tern-gateway
 
 .PHONY: help
 help: ## List the targets
@@ -40,12 +41,12 @@ $(VENV): apps/engine/test/requirements.txt
 	@touch $(VENV)
 
 .PHONY: build
-build: ## Debug builds of mailsync, tern, tern-mcp and tern-backend
-	cargo build -p mailsync -p tern -p tern-mcp -p tern-backend
+build: ## Debug builds of mailsync, tern, tern-mcp, tern-gateway and tern-backend
+	cargo build -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-backend
 
 .PHONY: release
 release: ## Release builds of the same
-	cargo build --release --locked -p mailsync -p tern -p tern-mcp -p tern-backend
+	cargo build --release --locked -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-backend
 
 .PHONY: desktop
 desktop: build ## Run the desktop on .dev/profile with the debug engine
@@ -85,8 +86,9 @@ stack-reset: ## Stop the local stack and delete its data
 .PHONY: test
 test: $(VENV) ## Workspace tests and the harness quick tier (debug engine)
 	cargo test --workspace
-	cargo build -p mailsync -p tern -p tern-mcp
-	MAILSYNC_BIN=target/debug/mailsync TERN_BIN=target/debug/tern TERN_MCP_BIN=target/debug/tern-mcp $(PY) -m pytest apps/engine/test -q
+	cargo build -p mailsync -p tern -p tern-mcp -p tern-gateway
+	MAILSYNC_BIN=target/debug/mailsync TERN_BIN=target/debug/tern TERN_MCP_BIN=target/debug/tern-mcp \
+		TERN_GATEWAY_BIN=target/debug/tern-gateway $(PY) -m pytest apps/engine/test -q
 
 .PHONY: lint
 lint: ## fmt, clippy, cargo deny, and the JS linters
