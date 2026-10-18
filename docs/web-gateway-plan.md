@@ -166,6 +166,15 @@ frame's gains the file route (`<origin>/gateway/v1/files/`), not all of `'self'`
   the gateway stops reading that engine connection, so the engine's own slow-subscriber
   drop (EPP 1.4) applies and the gateway's memory stays bounded. The web subscribes only to
   the classes it renders.
+- **Heartbeat.** The gateway pings each WebSocket every 30 s and closes it with 1001 when
+  nothing has come from the browser for 45 s (the interval plus a 15 s timeout), which drops
+  the tab's engine connection and so cancels any AI stream it started (ai-plan A7). Any
+  frame counts, not only a pong. A ping can't overtake the bytes queued ahead of it, so a
+  slow tab reading through a burst also counts as alive when a write to it that had to wait
+  moves on (its socket turns writable only when the browser acknowledges bytes), and
+  during a burst a ping goes out every 64 KiB as well, so that a tab reading through what
+  the socket buffers took meets one often. Browsers answer pings themselves; the web
+  client does nothing. The times are fixed (tests shorten them through `Config`).
 - **Logs.** Method name (known names only, anything else as `unknown(<len>)`), device id,
   response code and duration; connection open and close with the close code. Never params,
   results, cookies, pairing codes or query strings.
@@ -200,7 +209,7 @@ frame's gains the file route (`<origin>/gateway/v1/files/`), not all of `'self'`
 | Code | Meaning | Client |
 |---|---|---|
 | 1000 | client closed | — |
-| 1001, 1006, 1011, 1012 | gateway going away, network drop, gateway error or restart | reconnect with backoff |
+| 1001, 1006, 1011, 1012 | gateway going away or the browser missed the heartbeat (2.4), network drop, gateway error or restart | reconnect with backoff |
 | 4008 | the engine dropped this subscriber for falling behind | reconnect with backoff (no immediate retry), then re-read |
 | 4400 | protocol error (bad frame, `hello` not first or repeated, frame too big) | stop; log; bug |
 | 4401 | device unknown or revoked | stop; go to `/pair` with "This browser was unpaired" |
@@ -593,3 +602,36 @@ Open:
 - Open: `search` has no paging; a client that needs more than 500 results pages `query` with
   the grammar.
 
+2026-10-18, WebSocket heartbeat and the `file_routes` flake, branch `roadmap/web-ready`, not
+merged:
+- Gateway: a ping every 30 s on each browser WebSocket; close with 1001 ("the browser
+  stopped answering pings") after 45 s with nothing from the browser (2.4, 2.6). 1001
+  rather than 1011 because nothing failed in the gateway; the web already reconnects with
+  backoff on both, so apps/web is unchanged. The relay no longer awaits each send to the
+  browser: frames wait in a queue of at most 256 KiB (past it the engine connection isn't
+  read, past twice that the browser isn't either), and browser frames are read while a
+  write waits, so a pong never sits behind the backlog. A waiting write that moves on
+  counts as hearing from the browser, and a ping also follows every 64 KiB written; without
+  the second, a tab reading 1 MB/s through what loopback socket buffers held was closed in
+  the test. When the engine connection ends, what is queued still reaches the browser
+  before the 4502 or 4008. The close frame gets 5 s. Interval and timeout live in
+  `Config::heartbeat` (no flag or env var); tests use 300 ms and 700 ms.
+- `file_routes` flake (ConnectionReset at relay.rs:392 under load): the gateway answered 413
+  to a chunked upload past the cap with the rest of the body unread, and closing a socket
+  with unread bytes sends a reset, which can reach the client before it reads the answer.
+  The gateway now reads and drops the rest of such a body (up to another 25 MiB or 5 s)
+  before the 413; a body declared too large is still refused at once. The test now sends
+  4 MiB past the cap, which failed every time before the fix, and writes head and body in
+  one write so small refused bodies are in the server's buffer when it answers.
+- Tests: `apps/gateway/tests/heartbeat.rs` against the fake engine (now
+  `tests/common/mod.rs`, shared with `notifications.rs`): a hand-written client that never
+  pongs is closed with 1001 within interval + timeout and its engine connection closes
+  mid-stream; a library client that pongs and a client that only sends stay open over
+  three silences with their engine connections; a client reading a 5 MB `ai.delta` burst at
+  about 1 MB/s isn't closed and gets every delta in order. Run under 16 CPU-bound
+  processes as well.
+- Open: a tab that takes more than 45 s to read 64 KiB, or one large frame the socket
+  buffers took whole, without the gateway's writes waiting, can still be closed, and then
+  reconnects; the web doesn't refuse a file
+  over 25 MB before uploading it, and a browser may see the reset from an early 413 on a
+  declared-size body as a network error rather than the gateway's message.
