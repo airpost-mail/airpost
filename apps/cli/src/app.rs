@@ -96,6 +96,15 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Contacts { query, limit } => {
             crate::read::contacts(&ctx, &mut engines, &query.join(" "), limit)
         }
+        Command::Snooze { threads, until } => {
+            crate::mail_actions::snooze(&ctx, &mut engines, &threads, &until)
+        }
+        Command::Unsnooze { threads } => {
+            crate::mail_actions::unsnooze(&ctx, &mut engines, &threads)
+        }
+        Command::Unsubscribe { message, method } => {
+            crate::mail_actions::unsubscribe(&ctx, &mut engines, &message, method.as_deref())
+        }
         Command::Watch { classes, new_mail } => {
             crate::watch::watch(&ctx, engines, classes, new_mail)
         }

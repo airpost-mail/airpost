@@ -11,6 +11,7 @@ mod cli;
 mod discovery;
 mod error;
 mod logs;
+mod mail_actions;
 mod output;
 mod platform;
 mod read;

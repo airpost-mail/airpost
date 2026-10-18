@@ -97,6 +97,30 @@ pub enum Command {
         #[arg(long, short = 'n')]
         limit: Option<usize>,
     },
+    /// Move threads to Snoozed until a time, as the desktop's snooze menu does.
+    Snooze {
+        #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
+        threads: Vec<String>,
+        /// 30m, 2h, 3d, 1w, tomorrow (9:00), a date (9:00 that day) or a date and time
+        /// (2026-11-02T14:30, local unless it has an offset).
+        #[arg(long, value_name = "WHEN")]
+        until: String,
+    },
+    /// End a snooze now: the threads go back to the inbox.
+    Unsnooze {
+        #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
+        threads: Vec<String>,
+    },
+    /// Unsubscribe from the list a message came from, by its List-Unsubscribe header:
+    /// one-click when it offers it, else by sending the unsubscribe mail, else print the web
+    /// link to open.
+    Unsubscribe {
+        #[arg(value_name = "MESSAGE_ID")]
+        message: String,
+        /// Use this way only.
+        #[arg(long, value_parser = ["one-click", "mailto", "web"])]
+        method: Option<String>,
+    },
     /// Print an account's engine log (no engine needed).
     Logs {
         /// Account id or email address. Defaults to `--account`, else the only account with
@@ -319,6 +343,20 @@ mod tests {
         assert!(parse(&["logs", "acc", "-f"]).is_ok());
         assert!(parse(&["-a", "acc", "logs", "-n", "3"]).is_ok());
         assert!(parse(&["rpc", "engine.status"]).is_ok());
+        let cli = parse(&["snooze", "t1", "t2", "--until", "2h"]).unwrap();
+        let Command::Snooze { threads, until } = cli.command else {
+            panic!("snooze")
+        };
+        assert_eq!((threads.len(), until.as_str()), (2, "2h"));
+        assert_eq!(parse(&["snooze", "t1"]).unwrap_err().exit_code(), 2);
+        assert!(parse(&["unsnooze", "t1"]).is_ok());
+        assert!(parse(&["unsubscribe", "m1", "--method", "mailto"]).is_ok());
+        assert_eq!(
+            parse(&["unsubscribe", "m1", "--method", "body-link"])
+                .unwrap_err()
+                .exit_code(),
+            2
+        );
         let cli = parse(&["tasks", "list", "--status", "local,remote"]).unwrap();
         let Command::Task {
             command: TaskCommand::List { status, .. },

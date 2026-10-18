@@ -29,6 +29,7 @@ SUBJECT = "Quarterly zebra report"
 # `show --body` has to ask for it with bodies.fetch.
 OLD_SUBJECT = "Ancient walrus memo"
 INBOX_MESSAGES = 8
+LIST_SUBJECT = "Flamingo digest"
 
 SCENARIO = {
     "name": "cli-end-to-end",
@@ -36,12 +37,16 @@ SCENARIO = {
     "mailboxes": {
         "INBOX": {"messages": INBOX_MESSAGES},
         "Archive": {"messages": 3},
+        "[Mailspring]/Snoozed": {},
     },
     "setup": [
         {"server.append": {"mailbox": "INBOX", "messages": {"count": 1, "subject": SUBJECT,
                                                             "attachment": ["report.bin", "binary payload"]}}},
         {"server.append": {"mailbox": "Archive", "messages": {"count": 1, "subject": OLD_SUBJECT,
                                                               "age_days": 200}}},
+        {"server.append": {"mailbox": "Archive", "messages": {
+            "count": 1, "subject": LIST_SUBJECT,
+            "extra_headers": {"List-Unsubscribe": "<https://lists.example.net/u/3?t=abc>"}}}},
     ],
 }
 
@@ -278,6 +283,42 @@ def test_cli_end_to_end(engine, tmp_path):
     else:
         r = tern.run("settings", "get", expect=1)
         assert "doesn't keep settings" in r.stderr
+
+    # Snooze and unsnooze through the engine (docs/desktop-client-plan.md 3.3).
+    assert "snooze" in status["engines"][0]["features"]
+    def in_role(role, thread_id):
+        return any(t["id"] == thread_id for t in tern.json("threads", "--role", role, "--all")["threads"])
+    def wait_until(cond, what, timeout=30):
+        deadline = time.monotonic() + timeout
+        while not cond():
+            assert time.monotonic() < deadline, what
+            time.sleep(0.5)
+    snoozed = tern.json("snooze", found[0]["id"], "--until", "2h")
+    [group] = snoozed["accounts"]
+    assert group["accountId"] == account_id and len(group["taskIds"]) == 2
+    assert snoozed["until"] > time.time() + 7000
+    wait_until(lambda: in_role("snoozed", found[0]["id"]), "the thread reaches Snoozed")
+    assert not in_role("inbox", found[0]["id"])
+    text = tern.run("unsnooze", found[0]["id"], json_out=False).stdout
+    assert text.strip() == "Unsnoozed 1 thread"
+    wait_until(lambda: in_role("inbox", found[0]["id"]), "the thread is back in the inbox")
+    r = tern.run("snooze", found[0]["id"], "--until", "2020-01-01", expect=2)
+    assert "in the past" in r.stderr
+    tern.run("snooze", found[0]["id"], "--until", "whenever", expect=2)
+    r = tern.run("unsnooze", "no-such-thread", expect=1)
+    assert "no thread no-such-thread" in r.stderr
+
+    # Unsubscribe: a web-only header gives the link back; a message without one fails.
+    [listed] = tern.json("search", "flamingo")["threads"]
+    [list_message] = tern.json("show", listed["id"])["messages"]
+    r = tern.json("unsubscribe", list_message["id"], timeout=60)
+    assert r == {"method": "web", "ok": True, "url": "https://lists.example.net/u/3?t=abc"}
+    text = tern.run("unsubscribe", list_message["id"], json_out=False, timeout=60).stdout
+    assert "open https://lists.example.net/u/3?t=abc" in text
+    r = tern.run("unsubscribe", list_message["id"], "--method", "one-click", expect=1, timeout=60)
+    assert "no one-click" in r.stderr
+    r = tern.run("unsubscribe", message["id"], expect=1, timeout=60)
+    assert "List-Unsubscribe" in r.stderr
 
     log = tern.run("logs", account_id, "-n", "5", json_out=False).stdout.splitlines()
     assert len(log) == 5
