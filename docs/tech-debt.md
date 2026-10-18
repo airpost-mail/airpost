@@ -256,6 +256,18 @@ greets with no TLS. The UI shows no warning.
 
 ### TD5. "Reset Accounts and Settings" runs under a live engine and re-imports Mailspring
 
+Done (roadmap/security, 782eaac27). Preferences sends `application:reset-profile`; main confirms
+with a detail text that names the directory and lists what goes, stops `config.json` writes,
+destroys the windows, stops the engine through `EngineSupervisor.shutdown()` (serve's
+`engine.shutdown`, killed after the grace period), clears the default session's storage, then
+deletes everything in the config dir except the running instance's `Singleton*` lock
+(`src/browser/profile-reset.ts`) and writes `skip-mailspring-import` last.
+`shouldImportMailspringProfile` returns false while that marker exists. The dir is whatever
+`main.js` resolved (`Tern`, `Tern-dev`, `--config-dir-path`, snap); the filesystem root, the home
+folder and `appData` are refused. Entries that can't be deleted are listed and the app relaunches
+anyway. Not done: an "Import from Mailspring again?" choice. The supervisor and `engine.shutdown`
+named under Size already exist, so nothing waits on stages 6 or 10.
+
 Verified, except the engine-still-running part, which is inferred from the code path.
 `internal_packages/preferences/lib/tabs/preferences-general.tsx:29-49` asks only "Are you sure?",
 then runs `fs.rm(configDir, {recursive})` from the renderer and relaunches. Nothing tells main or
@@ -590,6 +602,15 @@ greps for "N passing". The runner is a 2668-line `@ts-nocheck` fork of Jasmine 1
 - Size: small.
 
 ### TD23. No permission handlers; `--harmony`
+
+Done (roadmap/security, 560387678). `main.js` installs `src/browser/permission-policy.ts` on every
+session as it is created (`session-created`, plus the default session at `ready`), which covers
+default, `quickpreview`, `in-memory-only` and any plugin partition. Request and check handlers
+allow only `notifications` and `clipboard-sanitized-write` (CopyButton, thread sharing), only to
+the main frame of a `MailspringWindow` on a `file:` URL; dev mode logs each denial once.
+Tern's own notifications come from main and need no permission, so `notifications` is there for
+plugins. `--js-flags=--harmony` is gone (no staged-feature APIs in the tree, TS targets es2024).
+The autoplay switch stays: new-mail sounds play through an `Audio` element with no user gesture.
 
 Verified. No `setPermissionRequestHandler` or `setPermissionCheckHandler` on the default,
 `quickpreview` or `in-memory-only` sessions, so Electron grants media, geolocation, clipboard-read
