@@ -395,3 +395,53 @@ of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (141 p
 skipped); desktop lint and typecheck clean, the ai package's specs (50) and the specs of the
 modules it touches (engine client and events, CapabilityStore, package manager, the other
 capability and engine-using packages) pass. No web changes. Open as above.
+
+2026-10-18, AI4 on `roadmap/ai`: triage. Settings: the engine's store takes `core.ai.providers`,
+`core.ai.features`, `core.ai.accounts`, `core.ai.includeAddresses` and `core.ai.limits`
+(`{triagePerHour?, dailyTokens?: {providerId: n}}`) under `feature::AI_TRIAGE` (`ai-triage`).
+They are named after the desktop's config key paths (`core.ai`), so stage 3's mirror carries
+them unchanged; that is the smallest change to stage 3's key list, and a deviation from the
+`ai.*` names in section 9. A relayed connection may read them but never write them, admin or
+not. Every `ai.*` call uses the stored provider and switches when the request has none (a
+request's `config` and `settings` still win), so keyless Ollama works with nothing sent per
+request; keyed providers still need the key per request until stage 11.
+`apps/engine/src/ai_triage.rs`: each account's `aiTriage` thread takes `mail.new` items off its
+delta stream and `ai.triage.run` jobs into a bounded queue (1000 new-mail items, 8 jobs), with
+one request in flight per provider across accounts, `triagePerHour` (200) per account, the
+daily token cap, and a pause on `rate-limited` or `quota-exceeded` until `retryAfter` (15
+minutes without one) during which `capabilities.ai.triage` is unavailable (`rate-limited`,
+`quota-exceeded`; `needs-engine-key` for a keyed provider, `not-set-up` otherwise). The input is
+the thread's latest inbound message (`Bodies::LatestInbound`); the answer is stored as
+`tern-ai-triage` thread metadata `{category, needsReply, reason, messageId, model, v, at}`
+through `SyncbackMetadataTask`'s local phase. A thread already triaged for its latest inbound
+message at this prompt version is skipped, and a value with `source: "user"` is never
+replaced. The plugin id is local-only in ms-net (`LOCAL_ONLY_PLUGINS`): never pushed, rebound
+or pulled, and ms-tasks skips its remote phase; a reset drops it from the metadata stash.
+`ai.triage.run` (`threadIds` or `sinceDays`, at most 200; a local client may send `config`) answers
+`{jobId, queued}`, then `ai.triage.progress` goes to the calling connection; jobs outlive the
+connection and only it can cancel them (`ai.cancel {jobId}`). `ai.triage.list` pages the
+opted-in accounts' triaged inbox threads by category (`needs-reply` also matches `needsReply`).
+Usage is persisted in `<config>/ai-usage.json` (90 days) and `core.ai.limits.dailyTokens` caps
+each provider per local day. Log lines (`ms_core::logmsg`): `- AI triage stored for thread …`,
+`-X AI triage paused for N s: …`, `AI triage resumed`.
+CLI: `tern ai summarize <thread> [--refresh]` streams `ai.delta` to stdout, `tern ai triage
+[--since 7d | thread ids]` waits for the job's progress (the engine finishes it if interrupted),
+`tern ai usage [--days]`; no provider config is sent, so they use the engine's stored providers.
+Desktop (plugin API 1.29.0): the mirror carries `core.ai.*` with an engine that lists
+`ai-triage` (`writeSettings` keeps `limits`); CapabilityStore has `ai-triage` with the engine's
+reasons; `internal_packages/ai` adds the chip (`Thread:MailLabel`, needs-reply and important
+only) with a correction menu that files `source: "user"`, "Needs reply" in the sidebar for each
+account with triage on (a perspective over `ai.triage.list`, asked again on Thread changes; the
+sidebar now skips an extension's null item and rebuilds when an extension registers), and
+Preferences > AI gets the triage switch, "Triage inbox" per opted-in account (last 7 days, with
+progress and Stop) and a privacy row.
+Tests: `apps/engine/tests/ai_api.rs` (stored settings, the daily cap, run/list/no re-ask/user
+value kept, the rate-limit pause and capabilities, job cancellation), unit tests in ms-ai,
+ms-net, ms-store, ms-ipc and the engine, the CLI's clap tests, the harness `test_ai.py` with a
+fake Ollama (`harness/servers/ai.py`): `ai_triage_new_mail`, `ai_triage_rate_limit_pause` and
+`tern ai`, and desktop specs (triage, capabilities, the settings mirror).
+
+Open after AI4: background triage with a keyed provider waits for stage 11 (engine-held keys);
+the usage chart in Preferences > AI is not built (`ai.usage` and `tern ai usage` have the data);
+`core.ai.limits` has no UI; AI5 (web) waits for tern-web's relay of `ai.delta` and
+`ai.triage.progress`.
