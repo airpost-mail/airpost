@@ -9,7 +9,9 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use ms_ipc::{method, ClientError, READ_DEFAULT_LIMIT, READ_MAX_LIMIT};
+use ms_ipc::{
+    code, feature, method, ClientError, SearchResult, READ_DEFAULT_LIMIT, READ_MAX_LIMIT,
+};
 use serde_json::{json, Map, Value};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
@@ -319,20 +321,57 @@ fn print_threads(ctx: &Ctx, targets: &[Target], threads: &[(Value, usize)]) {
     table.print(&ctx.style);
 }
 
+/// Engines with the search grammar take the query as typed (`from:`, `in:`, `OR`, dates in
+/// the local zone) and every account they hold in one call; older ones get it as plain
+/// words, account by account.
 pub fn search(ctx: &Ctx, engines: &mut [Engine], query: &str, limit: Option<usize>) -> Result<()> {
     let targets = discovery::targets(engines, ctx.account())?;
     let mut found = Vec::new();
+    let mut asked = vec![false; targets.len()];
     for (i, t) in targets.iter().enumerate() {
-        let mut params = json!({ "accountId": t.account_id, "query": query });
-        if let Some(n) = limit {
-            params["limit"] = json!(n);
+        if asked[i] {
+            continue;
         }
-        let mut r: Value = call(engines, t, method::SEARCH, params)?;
-        let page = r["threads"]
-            .as_array_mut()
-            .map(std::mem::take)
-            .unwrap_or_default();
-        found.extend(page.into_iter().map(|v| (v, i)));
+        let page: Vec<Value> = if engines[t.engine].has_feature(feature::SEARCH_GRAMMAR) {
+            let on_engine: Vec<usize> = (i..targets.len())
+                .filter(|&j| targets[j].engine == t.engine)
+                .collect();
+            let mut params = tern_client::search::grammar_search(query, limit);
+            params.accounts = Some(
+                on_engine
+                    .iter()
+                    .map(|&j| targets[j].account_id.clone())
+                    .collect(),
+            );
+            for &j in &on_engine {
+                asked[j] = true;
+            }
+            let params = serde_json::to_value(params).expect("params");
+            match call_raw::<SearchResult>(engines, t, method::SEARCH, params) {
+                Ok(r) => r.threads,
+                // The query doesn't parse, or names a date the engine doesn't read.
+                Err(ClientError::Rpc(e)) if e.code == code::INVALID_PARAMS => {
+                    let why = e.message.trim_start_matches("invalid params: search: ");
+                    return Err(CliError::usage(format!("search: {why}")));
+                }
+                Err(e) => return Err(CliError::call(&t.email, method::SEARCH, e)),
+            }
+        } else {
+            asked[i] = true;
+            let mut params = json!({ "accountId": t.account_id, "query": query });
+            if let Some(n) = limit {
+                params["limit"] = json!(n);
+            }
+            let r: SearchResult = call(engines, t, method::SEARCH, params)?;
+            r.threads
+        };
+        for thread in page {
+            let owner = targets
+                .iter()
+                .position(|x| x.engine == t.engine && x.account_id == str_of(&thread, "aid"))
+                .unwrap_or(i);
+            found.push((thread, owner));
+        }
     }
     sort_threads(&mut found);
     found.truncate(limit.unwrap_or(READ_DEFAULT_LIMIT).clamp(1, READ_MAX_LIMIT));

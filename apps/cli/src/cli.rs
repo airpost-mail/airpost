@@ -80,7 +80,10 @@ pub enum Command {
         #[arg(long)]
         body: bool,
     },
-    /// Threads matching every word of the query.
+    /// Threads matching the query, in the search bar's grammar: words, "phrases",
+    /// from:, to:, subject:, in:, is:unread|read|starred|unstarred, has:attachment,
+    /// before:/after: dates (2024-03-01, yesterday, "3 days ago", 2w), AND, OR, NOT and
+    /// parentheses. An engine without the grammar matches every word instead.
     Search {
         #[arg(required = true, num_args = 1.., value_name = "QUERY")]
         query: Vec<String>,
