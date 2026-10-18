@@ -754,14 +754,11 @@ impl<'a> MailProcessor<'a> {
     /// `retrievedFileData`. The file goes where the client looks for it
     /// (`File::client_path_in`); C++ wrote `safeFilename`, which the client could not find
     /// for names its `safeDisplayName` changes further (trailing dots, control characters).
+    /// It appears whole, for `files.get` waiting on it.
     fn write_file_data(&self, file: &File, data: &[u8]) -> std::io::Result<()> {
         let Some(config_dir) = &self.config_dir else {
             return Ok(());
         };
-        let path = file.client_path_in(&config_dir.join(FILES_DIR));
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        std::fs::write(path, data)
+        file.write_in(&config_dir.join(FILES_DIR), data).map(|_| ())
     }
 }
