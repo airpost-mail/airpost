@@ -30,6 +30,8 @@ pub struct Fake {
     pub features: Vec<String>,
     /// The engine's settings store, answered when `features` has `settings`.
     pub settings: serde_json::Map<String, Value>,
+    /// The params of each grammar `search` call.
+    pub searches: Vec<Value>,
 }
 
 fn not_found(what: &str) -> EngineError {
@@ -159,6 +161,21 @@ impl Backend for Fake {
                 };
                 let files = array_of(&message, "files").to_vec();
                 Ok(json!({"message": message, "body": body, "files": files}))
+            }
+            "search" if params["grammar"] == json!(true) => {
+                // The engine parses the grammar; here every thread of the account matches,
+                // and `(x` doesn't parse.
+                self.searches.push(params.clone());
+                if str_of(&params, "query") == "(x" {
+                    return Err(EngineError::Rpc {
+                        code: ms_ipc::code::INVALID_PARAMS,
+                        message: "invalid params: search: a '(' is never closed".into(),
+                        data: None,
+                    });
+                }
+                let threads: Vec<Value> =
+                    Self::of_account(&self.threads, account).cloned().collect();
+                Ok(json!({"threads": threads}))
             }
             "search" => {
                 let q = str_of(&params, "query").to_lowercase();

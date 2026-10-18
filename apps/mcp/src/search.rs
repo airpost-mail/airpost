@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `search_mail`'s query language on top of the engine's plain-term `search`. Free text,
+//! `search_mail` on an engine without the search grammar (feature `search-grammar`, which
+//! parses the query itself): the query language on top of the plain-term `search`. Free text,
 //! `from:`, `to:` and `subject:` values become search terms (the engine matches each term
 //! anywhere in the thread's indexed text, so the field isn't enforced); `in:`, `is:`,
 //! `has:attachment` and `before:`/`after:`/`since:` with exact dates filter the results.

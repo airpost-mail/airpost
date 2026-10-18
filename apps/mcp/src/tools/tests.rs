@@ -718,6 +718,40 @@ fn search_and_listing() {
     assert!(o.first_text().contains("Folder 'f-nope' not found"));
 }
 
+#[test]
+fn search_hands_the_grammar_to_the_engine() {
+    let mut f = fake();
+    f.features = vec![ms_ipc::feature::SEARCH_GRAMMAR.into()];
+    f.threads.push(
+        json!({"id": "t2", "aid": "a1", "subject": "Other", "unread": 0,
+        "starred": 0, "lmt": 3000, "lmrt": 3000, "labels": [], "participants": [],
+        "folders": [{"id": "f-secret", "path": "Secret", "role": ""}]}),
+    );
+    let q = "(from:bob OR from:carol) NOT in:trash after:yesterday";
+    let r = json_of(&run(&mut f, &rw(), "search_mail", json!({"query": q})));
+    // No filters of tern-mcp's own: the engine's answer, newest first.
+    assert_eq!(r.as_array().unwrap().len(), 2);
+    assert_eq!((&r[0]["id"], &r[1]["id"]), (&json!("t2"), &json!("t1")));
+    let sent = &f.searches[0];
+    assert_eq!(sent["query"], q);
+    assert_eq!(sent["grammar"], true);
+    assert!(sent["now"].as_i64().unwrap() > 1_700_000_000, "{sent}");
+    // The access policy still applies.
+    let excl = policy(
+        "read-write",
+        json!({"a1": {"enabled": true, "excludedFolderIds": ["f-secret"]}}),
+    );
+    let r = json_of(&run(&mut f, &excl, "search_mail", json!({"query": "x"})));
+    assert_eq!(r.as_array().unwrap().len(), 1);
+    assert_eq!(r[0]["id"], "t1");
+    let o = run(&mut f, &rw(), "search_mail", json!({"query": "(x"}));
+    assert!(
+        o.is_error && o.first_text().contains("never closed"),
+        "{}",
+        o.first_text()
+    );
+}
+
 /// Two sent messages with tracking, a scheduled draft and one whose schedule has passed.
 fn tracked() -> Fake {
     let mut f = fake();

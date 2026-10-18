@@ -36,7 +36,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "search_mail",
-            description: "Search for email threads. Plain words must all match somewhere in the thread (sender, recipients, subject or body); \"quoted phrases\" match together. Keywords: from:<text>, to:<text> and subject:<text> add their value as a search word; in:<folder> (a folder/label's standard role when it has one, e.g. \"in:sent\", \"in:inbox\", \"in:trash\", \"in:drafts\", \"in:spam\", \"in:archive\" — this works across providers without looking up folder names first; otherwise the folder/label name or path); is:unread|read|starred|unstarred; has:attachment; before:<date> and after:<date>/since:<date> with an exact date like 2026/05/31 or 2026-05-31. Adjacent terms are combined with AND. OR, NOT, parentheses and relative dates (\"yesterday\") are not supported. Examples: 'in:sent project alpha', 'from:alice is:unread', 'to:bob has:attachment after:2026/01/01'. Each result's `lastMessageReceivedTimestamp` orders the list, newest first.",
+            description: "Search for email threads, in Tern's search bar grammar. Plain words must all match somewhere in the thread (sender, recipients, subject, folder names or body), each as a word prefix; \"quoted phrases\" match together. Fields: from:<text>, to:<text>, subject:<text>, in:<folder> (a standard role such as in:inbox, in:sent, in:drafts, in:trash, in:spam, in:archive works across providers; otherwise a folder/label name or path), is:unread|read|starred|unstarred, has:attachment, before:<date> and after:<date> (or since:). Dates: 2026-05-31 or 2026/05/31, \"may 31 2026\", month or weekday names, today, yesterday, \"3 days ago\", 3d/2w/6m/1y, \"last week|month|year\"; after: includes its day, before: excludes it, both in the user's time zone. Terms are combined with AND unless joined by OR; NOT x excludes x (e.g. 'budget NOT in:trash'); parentheses group. Examples: 'in:sent project alpha', 'from:alice is:unread', '(from:bob OR from:carol) has:attachment after:2026/01/01'. Each result's `lastMessageReceivedTimestamp` orders the list, newest first.",
             schema: schema(
                 json!({
                     "query": {"type": "string", "description": "Search query string"},
@@ -234,7 +234,7 @@ fn received_ts(t: &Value) -> i64 {
 }
 
 pub(super) fn search_mail(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
-    let query = crate::search::parse(&req_str(args, "query")?).map_err(failed)?;
+    let text = req_str(args, "query")?;
     let account_id = opt_str(args, "accountId")?;
     let limit = opt_count(args, "limit", 150)?;
     let offset = opt_count(args, "offset", 0)?;
@@ -242,48 +242,17 @@ pub(super) fn search_mail(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let accounts = ctx.accounts_for(account_id.as_deref())?;
 
     let mut found: Vec<Value> = Vec::new();
+    let mut plain: Option<crate::search::Query> = None;
     for account in &accounts {
         let id = account.account_id.as_str();
-        // Every in: must hold; each resolves to the categories it names here.
-        let mut groups: Vec<Vec<String>> = Vec::new();
-        if !query.folders.is_empty() {
-            let cats = ctx.categories(id)?;
-            for f in &query.folders {
-                let ids = resolve_in(&cats, f);
-                if ids.is_empty() {
-                    groups.clear();
-                    break;
-                }
-                groups.push(ids);
-            }
-            if groups.is_empty() {
-                continue;
-            }
-        }
-        let policy = ctx.policy;
-        let keep = |t: &Value| {
-            query.matches(t) && groups.iter().all(|g| in_any(t, g)) && policy.thread_allowed(t)
-        };
-        if query.terms.is_empty() {
-            // No words: list the first in: category (or everything) and filter the rest.
-            let first = groups.first().and_then(|g| g.first()).cloned();
-            let cats = ctx.categories_by_id(id)?;
-            let kind = first.as_deref().map(|c| {
-                if cats.get(c).is_some_and(|v| str_of(v, "__cls") == "Label") {
-                    "labelId"
-                } else {
-                    "folderId"
-                }
-            });
-            let cat = first.as_deref().zip(kind).map(|(c, k)| (k, c));
-            found.extend(collect_threads(ctx, id, cat, want, &keep)?);
+        if ctx.backend.has_feature(id, ms_ipc::feature::SEARCH_GRAMMAR) {
+            found.extend(grammar_search(ctx, id, &text)?);
         } else {
-            let r = ctx.call(
-                id,
-                ms_ipc::method::SEARCH,
-                json!({"query": query.terms.join(" "), "limit": PAGE}),
-            )?;
-            found.extend(array_of(&r, "threads").iter().filter(|t| keep(t)).cloned());
+            if plain.is_none() {
+                plain = Some(crate::search::parse(&text).map_err(failed)?);
+            }
+            let query = plain.as_ref().expect("parsed above");
+            found.extend(plain_search(ctx, id, query, want)?);
         }
     }
     found.sort_by_key(|t| std::cmp::Reverse(received_ts(t)));
@@ -298,6 +267,77 @@ pub(super) fn search_mail(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         o = o.with_account(&a);
     }
     Ok(o)
+}
+
+/// The engine parses the query (feature `search-grammar`) in the local zone and clock;
+/// only the access policy is applied here.
+fn grammar_search(ctx: &mut Ctx<'_>, account: &str, text: &str) -> Result<Vec<Value>, ToolError> {
+    let params = tern_client::search::grammar_search(text, Some(PAGE));
+    let params = serde_json::to_value(params).expect("params");
+    let r = ctx
+        .call(account, ms_ipc::method::SEARCH, params)
+        .map_err(|e| {
+            if e.code() == Some(ms_ipc::code::INVALID_PARAMS) {
+                failed(format!("The search query can't be used: {e}"))
+            } else {
+                e.into()
+            }
+        })?;
+    let policy = ctx.policy;
+    Ok(array_of(&r, "threads")
+        .iter()
+        .filter(|t| policy.thread_allowed(t))
+        .cloned()
+        .collect())
+}
+
+/// An engine without the grammar: plain terms through `search`, the filters applied here.
+fn plain_search(
+    ctx: &mut Ctx<'_>,
+    id: &str,
+    query: &crate::search::Query,
+    want: usize,
+) -> Result<Vec<Value>, ToolError> {
+    // Every in: must hold; each resolves to the categories it names here.
+    let mut groups: Vec<Vec<String>> = Vec::new();
+    if !query.folders.is_empty() {
+        let cats = ctx.categories(id)?;
+        for f in &query.folders {
+            let ids = resolve_in(&cats, f);
+            if ids.is_empty() {
+                return Ok(Vec::new());
+            }
+            groups.push(ids);
+        }
+    }
+    let policy = ctx.policy;
+    let keep = |t: &Value| {
+        query.matches(t) && groups.iter().all(|g| in_any(t, g)) && policy.thread_allowed(t)
+    };
+    if query.terms.is_empty() {
+        // No words: list the first in: category (or everything) and filter the rest.
+        let first = groups.first().and_then(|g| g.first()).cloned();
+        let cats = ctx.categories_by_id(id)?;
+        let kind = first.as_deref().map(|c| {
+            if cats.get(c).is_some_and(|v| str_of(v, "__cls") == "Label") {
+                "labelId"
+            } else {
+                "folderId"
+            }
+        });
+        let cat = first.as_deref().zip(kind).map(|(c, k)| (k, c));
+        return collect_threads(ctx, id, cat, want, &keep);
+    }
+    let r = ctx.call(
+        id,
+        ms_ipc::method::SEARCH,
+        json!({"query": query.terms.join(" "), "limit": PAGE}),
+    )?;
+    Ok(array_of(&r, "threads")
+        .iter()
+        .filter(|t| keep(t))
+        .cloned()
+        .collect())
 }
 
 pub(super) fn list_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
