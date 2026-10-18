@@ -1,0 +1,97 @@
+[
+  {
+    "name": "plain",
+    "email": "me@example.com",
+    "settings": {
+      "imap_username": "me@example.com",
+      "imap_host": "imap.example.com",
+      "smtp_username": "me@example.com",
+      "smtp_host": "smtp.example.com",
+      "imap_port": 993,
+      "imap_security": "SSL / TLS"
+    },
+    "id": "643bdc06"
+  },
+  {
+    "name": "gmail",
+    "email": "ben@gmail.com",
+    "settings": {
+      "imap_username": "ben@gmail.com",
+      "imap_host": "imap.gmail.com",
+      "smtp_username": "ben@gmail.com",
+      "smtp_host": "smtp.gmail.com",
+      "refresh_client_id": "x"
+    },
+    "id": "6c210fa1"
+  },
+  {
+    "name": "o365 shared mailbox",
+    "email": "shared@contoso.com",
+    "settings": {
+      "imap_username": "shared@contoso.com",
+      "imap_host": "outlook.office365.com",
+      "smtp_username": "owner@contoso.com",
+      "smtp_host": "smtp.office365.com"
+    },
+    "id": "6c2f5205"
+  },
+  {
+    "name": "no settings",
+    "email": "nohosts@example.com",
+    "settings": {},
+    "id": "e98c3e5a"
+  },
+  {
+    "name": "missing and null",
+    "email": "partial@example.com",
+    "settings": {
+      "imap_host": "imap.example.com",
+      "smtp_host": null
+    },
+    "id": "160ae12d"
+  },
+  {
+    "name": "escapes and non-ascii",
+    "email": "Jöhn.Dœ@exämple.org",
+    "settings": {
+      "imap_username": "jöhn \"q\" \\ dœ /",
+      "imap_host": "imap.exämple.org",
+      "smtp_username": "tab\there\nnl\r\u0001\u001f\b\f",
+      "smtp_host": "smtp.exämple.org"
+    },
+    "id": "eb2a329c"
+  },
+  {
+    "name": "astral and html",
+    "email": "emoji@example.com",
+    "settings": {
+      "imap_username": "😀 user",
+      "imap_host": "mail.example.com",
+      "smtp_username": "</script> ",
+      "smtp_host": "mail.example.com"
+    },
+    "id": "739fb0a3"
+  },
+  {
+    "name": "email-without-domain username",
+    "email": "jane@me.com",
+    "settings": {
+      "imap_username": "jane",
+      "imap_host": "imap.mail.me.com",
+      "smtp_username": "jane@me.com",
+      "smtp_host": "smtp.mail.me.com"
+    },
+    "id": "801420ea"
+  },
+  {
+    "name": "number",
+    "email": "num@example.com",
+    "settings": {
+      "imap_username": "num",
+      "imap_host": "h",
+      "smtp_username": 7,
+      "smtp_host": "s"
+    },
+    "id": "3af8c477"
+  }
+]

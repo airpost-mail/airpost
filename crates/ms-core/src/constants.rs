@@ -302,6 +302,9 @@ pub mod thread {
     pub const AI: &str = "ai";
     /// `serve`: one per account, triaging its new inbox mail and `ai.triage.run` jobs.
     pub const AI_TRIAGE: &str = "aiTriage";
+    /// `serve`: the workers running `account.discover`, `account.oauth.complete` and
+    /// `account.add` / `account.setSecrets` with a test.
+    pub const ACCOUNT_SETUP: &str = "accountSetup";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
     /// `serve`: starts the registered accounts at engine start, and restarts a stopped one
