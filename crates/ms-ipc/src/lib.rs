@@ -13,6 +13,7 @@
 
 mod client;
 mod envelope;
+mod files;
 mod frame;
 mod methods;
 pub mod policy;
@@ -24,6 +25,7 @@ pub use envelope::{
     delta_notification_line, parse_message, parse_request, ErrorObject, Id, Message, Notification,
     Request, Response,
 };
+pub use files::*;
 pub use frame::{encode, read_frame, write_frame, FrameError};
 pub use methods::*;
 pub use read::*;
@@ -74,6 +76,14 @@ pub mod method {
     /// A ModelQuery over the stored models ([`feature::QUERY`](crate::feature::QUERY),
     /// desktop-client-plan 3.2).
     pub const QUERY: &str = "query";
+    /// A File by id, downloaded first when missing ([`feature::FILES`](crate::feature::FILES)),
+    /// params [`FilesGetParams`](crate::FilesGetParams). Local clients only; answered out of
+    /// order while it waits for the download.
+    pub const FILES_GET: &str = "files.get";
+    /// A chunk of a downloaded File, params [`FilesReadParams`](crate::FilesReadParams).
+    pub const FILES_READ: &str = "files.read";
+    /// Stores bytes as a new File for a draft, params [`FilesPutParams`](crate::FilesPutParams).
+    pub const FILES_PUT: &str = "files.put";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
     /// `serve` mode, the parent's stdin only: start syncing an account.
@@ -151,6 +161,9 @@ pub mod feature {
     pub const RELAYED: &str = "relayed";
     /// `settings.get`, `settings.set` and `settings.changed`.
     pub const SETTINGS: &str = "settings";
+    /// `files.get`, `files.read`, `files.put`, and GetMessageRFC2822Task's file-id mode (no
+    /// `filepath`: the export becomes the File `fileId`, set by the local phase).
+    pub const FILES: &str = "files";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`

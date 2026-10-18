@@ -63,6 +63,8 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::ENGINE_SET_LOG_LEVEL
         | method::ENGINE_SHUTDOWN => MethodClass::ParentOnly,
         method::TEST_CRASH | method::TEST_PANIC => MethodClass::Debug,
+        // Paths on the engine's machine; browsers use the gateway's file routes.
+        method::FILES_GET | method::FILES_READ | method::FILES_PUT => MethodClass::LocalOnly,
         _ => MethodClass::LocalOnly,
     }
 }
@@ -82,7 +84,9 @@ pub fn is_admin(scopes: &[String]) -> bool {
 
 /// The task classes a relayed device without [`SCOPE_ADMIN`] may queue: the ones the web
 /// client sends. The RFC 2822 export tasks write to a path the client names, so they stay
-/// out; so do the event and contact tasks until they have been reviewed for the web.
+/// out, except GetMessageRFC2822Task without a `filepath` (file-id mode, see
+/// [`relayed_task_allowed`]); so do the event and contact tasks until they have been
+/// reviewed for the web.
 pub const RELAYED_TASK_CLASSES: &[&str] = &[
     "ChangeUnreadTask",
     "ChangeStarredTask",
@@ -103,9 +107,13 @@ pub fn relayed_task_allowed(task: &Value, scopes: &[String]) -> bool {
     if is_admin(scopes) {
         return true;
     }
-    task.get("__cls")
-        .and_then(Value::as_str)
-        .is_some_and(|cls| RELAYED_TASK_CLASSES.contains(&cls))
+    match task.get("__cls").and_then(Value::as_str) {
+        Some("GetMessageRFC2822Task") => task
+            .get("filepath")
+            .is_none_or(|p| p.is_null() || p.as_str() == Some("")),
+        Some(cls) => RELAYED_TASK_CLASSES.contains(&cls),
+        None => false,
+    }
 }
 
 /// The settings a relayed device without [`SCOPE_ADMIN`] may write. The rest carry HTML the
@@ -143,6 +151,8 @@ pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) ->
             .get("values")
             .and_then(Value::as_object)
             .is_some_and(|v| relayed_settings_allowed(v, scopes)),
+        // Admin or not, a remote device never names a path for the engine to read.
+        method::FILES_PUT => params.get("path").is_none_or(Value::is_null),
         _ => true,
     }
 }
@@ -266,6 +276,17 @@ mod tests {
         assert!(relayed_method_allowed("secrets.set", &admin));
         assert!(!relayed_method_allowed("account.add", &admin));
         assert!(!relayed_method_allowed("test.crash", &admin));
+        for m in ["files.get", "files.read", "files.put"] {
+            assert_eq!(method_class(m), MethodClass::LocalOnly);
+            assert!(!relayed_method_allowed(m, &[]));
+            assert!(relayed_method_allowed(m, &admin));
+        }
+        let put = |p: Value| relayed_request_allowed("files.put", &p, &admin);
+        assert!(put(json!({"accountId": "a", "name": "x", "data": ""})));
+        assert!(put(json!({"accountId": "a", "name": "x", "path": null})));
+        assert!(!put(
+            json!({"accountId": "a", "name": "x", "path": "/etc/passwd"})
+        ));
     }
 
     #[test]
@@ -274,6 +295,20 @@ mod tests {
         assert!(relayed_task_allowed(&t("ChangeStarredTask"), &[]));
         assert!(!relayed_task_allowed(&t("GetMessageRFC2822Task"), &[]));
         assert!(!relayed_task_allowed(&t("GetManyRFC2822Task"), &[]));
+        let export = |extra: Value| {
+            let mut v = json!({"__cls": "GetMessageRFC2822Task", "messageId": "m1"});
+            v.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            v
+        };
+        assert!(relayed_task_allowed(&export(json!({})), &[]));
+        assert!(relayed_task_allowed(
+            &export(json!({"filepath": null})),
+            &[]
+        ));
+        assert!(relayed_task_allowed(&export(json!({"filepath": ""})), &[]));
+        assert!(!relayed_task_allowed(&export(json!({"filepath": 1})), &[]));
         assert!(!relayed_task_allowed(&json!({}), &[]));
         assert!(relayed_task_allowed(
             &t("GetMessageRFC2822Task"),
