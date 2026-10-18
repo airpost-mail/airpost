@@ -144,6 +144,21 @@ impl OAuthProvider {
         self.client(&|k| std::env::var(k).ok())
     }
 
+    /// Every client an existing account may be bound to (`refresh_client_id`): the one
+    /// [`OAuthProvider::client`] signs in with, then the built-in one, which accounts signed
+    /// in before a new client was configured keep until they reconnect (plan 0.1 item 18).
+    pub fn refresh_clients(self, env: &dyn Fn(&str) -> Option<String>) -> Vec<Client> {
+        let current = self.client(env);
+        let mut out = vec![current.clone()];
+        if self == OAuthProvider::Google && current.id != DEFAULT_GMAIL_CLIENT_ID {
+            out.push(Client {
+                id: DEFAULT_GMAIL_CLIENT_ID.to_owned(),
+                secret: default_gmail_client_secret(),
+            });
+        }
+        out
+    }
+
     /// Where the provider sends the browser after sign-in: the loopback address the client's
     /// receiver listens on. Microsoft's registration names `localhost` and a path.
     pub fn redirect_uri(self, port: u16) -> String {
@@ -259,6 +274,28 @@ fn default_gmail_client_secret() -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_google_client_keeps_the_built_in_one_for_refreshes() {
+        let env = |k: &str| match k {
+            ENV_GMAIL_CLIENT_ID => Some("tern-id".to_owned()),
+            ENV_GMAIL_CLIENT_SECRET => Some("tern-secret".to_owned()),
+            _ => None,
+        };
+        let clients = OAuthProvider::Google.refresh_clients(&env);
+        assert_eq!(clients.len(), 2);
+        assert_eq!(clients[0].id, "tern-id");
+        assert_eq!(clients[0].secret.as_deref(), Some("tern-secret"));
+        assert_eq!(clients[1].id, DEFAULT_GMAIL_CLIENT_ID);
+        assert_eq!(clients[1].secret, default_gmail_client_secret());
+        assert!(clients[1].secret.is_some());
+
+        let none = |_: &str| None;
+        if option_env!("MS_GMAIL_CLIENT_ID").is_none() {
+            assert_eq!(OAuthProvider::Google.refresh_clients(&none).len(), 1);
+        }
+        assert_eq!(OAuthProvider::Microsoft.refresh_clients(&none).len(), 1);
+    }
 
     #[test]
     fn clients_come_from_the_environment_first() {
