@@ -28,27 +28,38 @@ use chrono_tz::Tz;
 use crate::search_grammar::GrammarError;
 
 /// The zone and clock a request's date terms are read in.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct DateContext {
-    pub tz: Tz,
+    /// The zone, or the name the request gave that isn't one. A bad name is an error only
+    /// once a date term needs it, so a client with an odd `TZ` can still search by words.
+    tz: Result<Tz, String>,
     /// Unix seconds. `None`: only terms with a full date resolve.
     pub now: Option<i64>,
 }
 
 impl DateContext {
     /// `tz` is an IANA name; `None` is UTC.
-    pub fn new(tz: Option<&str>, now: Option<i64>) -> Result<DateContext, GrammarError> {
+    pub fn new(tz: Option<&str>, now: Option<i64>) -> DateContext {
         let tz = match tz {
-            None => Tz::UTC,
-            Some(name) => name.parse::<Tz>().map_err(|_| {
-                GrammarError(format!("search.tz {name:?} is not an IANA time zone"))
-            })?,
+            None => Ok(Tz::UTC),
+            Some(name) => name.parse::<Tz>().map_err(|_| name.to_owned()),
         };
-        Ok(DateContext { tz, now })
+        DateContext { tz, now }
     }
 
     pub fn utc(now: Option<i64>) -> DateContext {
-        DateContext { tz: Tz::UTC, now }
+        DateContext {
+            tz: Ok(Tz::UTC),
+            now,
+        }
+    }
+
+    /// The zone, or the error a date term gets when the request named no zone.
+    pub fn tz(&self) -> Result<Tz, GrammarError> {
+        self.tz
+            .as_ref()
+            .copied()
+            .map_err(|name| GrammarError(format!("search.tz {name:?} is not an IANA time zone")))
     }
 
     fn today(&self, term: &str) -> Result<NaiveDate, GrammarError> {
@@ -59,20 +70,21 @@ impl DateContext {
         })?;
         let utc = DateTime::<Utc>::from_timestamp(now, 0)
             .ok_or_else(|| GrammarError("search.now is out of range".into()))?;
-        Ok(utc.with_timezone(&self.tz).date_naive())
+        Ok(utc.with_timezone(&self.tz()?).date_naive())
     }
 
     /// The first instant of `day` in the zone. A day starting in a DST gap starts at the
     /// first time that exists.
-    fn start_of(&self, day: NaiveDate) -> i64 {
+    fn start_of(&self, day: NaiveDate) -> Result<i64, GrammarError> {
+        let tz = self.tz()?;
         let mut t = day.and_time(NaiveTime::MIN);
         for _ in 0..48 {
-            if let Some(dt) = self.tz.from_local_datetime(&t).earliest() {
-                return dt.timestamp();
+            if let Some(dt) = tz.from_local_datetime(&t).earliest() {
+                return Ok(dt.timestamp());
             }
             t += chrono::Duration::minutes(30);
         }
-        day.and_time(NaiveTime::MIN).and_utc().timestamp()
+        Ok(day.and_time(NaiveTime::MIN).and_utc().timestamp())
     }
 }
 
@@ -267,7 +279,7 @@ fn day(term: &str, ctx: &DateContext) -> Result<NaiveDate, GrammarError> {
 
 /// The first instant (unix seconds) of the day `term` names, in `ctx`'s zone.
 pub fn resolve(term: &str, ctx: &DateContext) -> Result<i64, GrammarError> {
-    Ok(ctx.start_of(day(term, ctx)?))
+    ctx.start_of(day(term, ctx)?)
 }
 
 #[cfg(test)]
@@ -278,7 +290,7 @@ mod tests {
     const NOW: i64 = 1_791_990_000;
 
     fn day_in(term: &str, tz: &str) -> String {
-        let ctx = DateContext::new(Some(tz), Some(NOW)).unwrap();
+        let ctx = DateContext::new(Some(tz), Some(NOW));
         day(term, &ctx)
             .unwrap_or_else(|e| panic!("{term}: {e}"))
             .to_string()
@@ -348,9 +360,8 @@ mod tests {
 
     #[test]
     fn start_of_day_in_the_zone() {
-        let at = |tz: &str, term: &str| {
-            resolve(term, &DateContext::new(Some(tz), Some(NOW)).unwrap()).unwrap()
-        };
+        let at =
+            |tz: &str, term: &str| resolve(term, &DateContext::new(Some(tz), Some(NOW))).unwrap();
         // Lisbon is UTC+1 in summer: 2024-07-01 00:00 is 2024-06-30 23:00 UTC.
         assert_eq!(at("Europe/Lisbon", "2024-07-01"), 1_719_788_400);
         assert_eq!(at("UTC", "2024-07-01"), 1_719_792_000);
@@ -361,7 +372,7 @@ mod tests {
 
     #[test]
     fn errors() {
-        let ctx = DateContext::new(Some("Europe/Lisbon"), Some(NOW)).unwrap();
+        let ctx = DateContext::new(Some("Europe/Lisbon"), Some(NOW));
         for term in [
             "",
             "someday",
@@ -379,11 +390,14 @@ mod tests {
         ] {
             assert!(day(term, &ctx).is_err(), "{term:?} resolved");
         }
-        let no_now = DateContext::new(None, None).unwrap();
+        let no_now = DateContext::new(None, None);
         assert!(day("2024-03-01", &no_now).is_ok());
         assert!(day("march 2024", &no_now).is_ok());
         let e = day("yesterday", &no_now).unwrap_err();
         assert!(e.0.contains("search.now"), "{e}");
-        assert!(DateContext::new(Some("Mars/Olympus"), None).is_err());
+        // A bad zone is an error once a date needs it.
+        let mars = DateContext::new(Some("Mars/Olympus"), None);
+        let e = resolve("2024-03-01", &mars).unwrap_err();
+        assert!(e.0.contains("Mars/Olympus"), "{e}");
     }
 }

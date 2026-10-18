@@ -27,7 +27,7 @@ use crate::search_dates::DateContext;
 use crate::search_grammar::{self, Where};
 
 /// What `search` matches threads with.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum ThreadSearch<'a> {
     /// Plain terms, each matched anywhere (see [`fts_query`]).
     Plain(&'a str),

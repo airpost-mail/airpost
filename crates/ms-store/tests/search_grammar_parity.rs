@@ -347,3 +347,92 @@ fn search_reads_the_grammar_across_accounts() {
     assert!(ids(grammar("budget"), &["other".to_owned()]).is_empty());
     assert!(store.search_threads(&accounts, &grammar("(x"), 50).is_err());
 }
+
+/// The longest and deepest queries the grammar takes run on SQLite: FTS5's parser has a
+/// fixed stack, which a right-nested chain of 34 terms overflowed.
+#[test]
+fn long_and_deep_queries_run_on_sqlite() {
+    let dir = tempfile::tempdir().unwrap();
+    build(dir.path());
+    let store = ReadStore::open(dir.path()).unwrap();
+    let accounts = vec![AID.to_owned()];
+    let run = |q: &str| {
+        let s = ThreadSearch::Grammar {
+            text: q,
+            dates: DateContext::utc(None),
+        };
+        store
+            .search_threads(&accounts, &s, 50)
+            .map(|v| v.len())
+            .map_err(|e| format!("{e:?}"))
+    };
+    let depth = search_grammar::MAX_MATCH_DEPTH;
+    // `x NOT (y NOT (...))` nests one level a term; `a OR (b (a OR (...)))` too.
+    let nots = |n: usize| vec!["budget"; n].join(" NOT ");
+    let alternating = |n: usize| {
+        (0..n - 1)
+            .map(|i| {
+                if i % 2 == 0 {
+                    "budget OR ("
+                } else {
+                    "budget ("
+                }
+            })
+            .collect::<String>()
+            + "budget"
+            + &")".repeat(n - 1)
+    };
+    for (q, found) in [
+        (vec!["budget"; search_grammar::MAX_TOKENS].join(" "), 3),
+        (
+            vec!["budget"; search_grammar::MAX_TOKENS / 2].join(" OR "),
+            3,
+        ),
+        (vec!["budget review"; 67].join(" OR "), 1),
+        (nots(depth), 0),
+        (nots(depth - 1), 3),
+        (alternating(depth), 3),
+        // The rest on `Thread` columns, nested as deep as the token cap allows.
+        (vec!["budget is:unread"; 50].join(" "), 2),
+        (vec!["is:unread"; 50].join(" NOT "), 0),
+        (vec!["budget OR is:starred"; 33].join(" OR "), 4),
+    ] {
+        assert_eq!(run(&q), Ok(found), "{q}");
+    }
+    for q in [nots(depth + 1), alternating(depth + 1)] {
+        let e = run(&q).unwrap_err();
+        assert!(
+            e.starts_with("Invalid(") && e.contains("nests too deeply"),
+            "{q}: {e}"
+        );
+    }
+}
+
+#[test]
+fn terms_without_letters_are_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    build(dir.path());
+    let store = ReadStore::open(dir.path()).unwrap();
+    let accounts = vec![AID.to_owned()];
+    let run = |q: &str| {
+        let s = ThreadSearch::Grammar {
+            text: q,
+            dates: DateContext::utc(None),
+        };
+        store
+            .search_threads(&accounts, &s, 50)
+            .map(|v| v.len())
+            .map_err(|e| format!("{e:?}"))
+    };
+    for q in [
+        "budget - review",
+        "budget : x",
+        "budget \"\"",
+        "from:\"...\"",
+    ] {
+        let e = run(q).unwrap_err();
+        assert!(e.starts_with("Invalid("), "{q}: {e}");
+    }
+    assert_eq!(run("subject:re:budget"), Ok(1));
+    assert_eq!(run("subject:budget"), Ok(3));
+}

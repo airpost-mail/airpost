@@ -752,7 +752,7 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
                 )));
             }
             let grammar_error = |e: GrammarError| invalid(format!("search: {e}"));
-            let dates = DateContext::new(s.tz.as_deref(), s.now).map_err(grammar_error)?;
+            let dates = DateContext::new(s.tz.as_deref(), s.now);
             let w = search_grammar::thread_condition(&s.text, &dates).map_err(grammar_error)?;
             Some(SearchClause::Grammar(w))
         }
@@ -1303,10 +1303,13 @@ mod tests {
             json!({"class": "Thread", "search": {"text": "after:someday", "grammar": true}})
         )
         .contains("isn't a date"));
-        assert!(error(
-            json!({"class": "Thread", "search": {"text": "x", "grammar": true, "tz": "Nowhere"}})
-        )
+        // A bad zone fails the date terms that need it, not a search by words.
+        assert!(error(json!({"class": "Thread", "search":
+            {"text": "x after:2024-03-01", "grammar": true, "tz": "Nowhere"}}))
         .contains("IANA"));
+        compile(&query(json!({"class": "Thread", "search":
+            {"text": "x", "grammar": true, "tz": "UTC0"}})))
+        .unwrap();
         assert!(error(json!({"class": "Account"})).contains("no class"));
         assert!(error(
             json!({"class": "Thread", "where": {"attr": "snippet", "op": "=", "value": "x"}})

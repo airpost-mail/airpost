@@ -25,11 +25,15 @@
 //! - A keyword is a field only when a `:` follows it: `trip to paris` is three words (the
 //!   desktop throws and falls back to a plain search).
 //! - A quoted token is never a keyword or a parenthesis: `"or"` and `"("` are text.
-//! - A word glued to a `:` (`http://x.test`, `re:hello`) stays one word; the desktop splits
-//!   it into words and a `:` that matches nothing.
+//! - A word glued to a `:` (`http://x.test`, `re:hello`, `subject:re:hello`) stays one word;
+//!   the desktop splits it into words and a `:` that matches nothing.
+//! - A term with no letters or digits (`-`, a stray `:`, `""`) is an error: the index has
+//!   nothing to match it with, and it would empty the search.
 //! - `is:` and `has:` with another value, a missing value, a stray `)`, empty parentheses
 //!   and a trailing `AND`/`OR`/`NOT` are errors (the desktop throws on some, crashes on
 //!   others and silently matches nothing on the rest).
+//! - At most [`MAX_TOKENS`] tokens, and the part answered by the index nests at most
+//!   [`MAX_MATCH_DEPTH`] deep (runs of AND or OR are flat), for FTS5's parser stack.
 //! - Dates are resolved by [`crate::search_dates`] against the request's zone and clock;
 //!   `after:` includes its day (`>=` the day's start), `before:` excludes it.
 
@@ -182,15 +186,30 @@ fn expect<'a>(text: &'a str, word: &str) -> Result<&'a str, GrammarError> {
 
 type Parsed<'a> = Result<(Option<Expr>, &'a str), GrammarError>;
 
-/// A field's value: one word or quoted phrase.
+/// A field's value: one word (with any `:` glued to it, as for a plain word) or quoted
+/// phrase.
 fn field_value<'a>(text: &'a str, field: &str) -> Result<(String, &'a str), GrammarError> {
     match next_token(text)? {
-        (Some(t), rest) if t.quoted || !is_special(t.s.chars().next().unwrap_or(' ')) => {
-            Ok((t.s, rest))
+        (Some(t), rest) if t.quoted => Ok((t.s, rest)),
+        (Some(t), rest) if !is_special(t.s.chars().next().unwrap_or(' ')) => {
+            Ok(glued_word(t.s, rest))
         }
         _ => err(format!(
             "{field}: needs a value, a word or a \"quoted phrase\""
         )),
+    }
+}
+
+/// `text`, if the index has something to match it with. The tokenizer keeps only letters
+/// and digits, and a phrase without any matches nothing, which would empty the whole
+/// search without a word.
+fn searchable(text: String) -> Result<String, GrammarError> {
+    if text.chars().any(char::is_alphanumeric) {
+        Ok(text)
+    } else if text.trim().is_empty() {
+        err("an empty \"\" phrase has nothing to search for")
+    } else {
+        err(format!("{text:?} has no letters or digits to search for"))
     }
 }
 
@@ -256,6 +275,10 @@ fn parse_simple(text: &str) -> Parsed<'_> {
             return Ok((Some(exp), rest));
         }
         let (text, rest) = field_value(after_colon, field)?;
+        let text = match field {
+            "before" | "after" | "since" => text,
+            _ => searchable(text)?,
+        };
         let exp = match field {
             "from" => Expr::From { text },
             "to" => Expr::To { text },
@@ -273,9 +296,11 @@ fn parse_simple(text: &str) -> Parsed<'_> {
         return Ok((Some(exp), rest));
     }
     if tok.quoted {
-        return Ok((Some(Expr::Generic { text: tok.s }), after));
+        let text = searchable(tok.s)?;
+        return Ok((Some(Expr::Generic { text }), after));
     }
     let (text, rest) = glued_word(tok.s, after);
+    let text = searchable(text)?;
     Ok((Some(Expr::Generic { text }), rest))
 }
 
@@ -402,32 +427,114 @@ impl Expr {
 
     /// `MatchQueryExpressionVisitor`: the FTS5 expression of a match-compatible subtree.
     /// Every value is one quoted phrase (inner quotes doubled) matched as a prefix, so no
-    /// character in it is read as FTS syntax.
+    /// character in it is read as FTS syntax. A run of ANDs or ORs is written flat, and so is
+    /// a left run of NOTs (FTS5's NOT is left-associative), because FTS5's parser has a
+    /// fixed stack that a right-nested chain of a few dozen terms overflows.
     fn match_expression(&self) -> String {
-        let phrase = |column: &str, t: &str| {
+        let mut out = String::new();
+        self.write_match(&mut out);
+        out
+    }
+
+    fn write_match(&self, out: &mut String) {
+        let phrase = |out: &mut String, column: &str, t: &str| {
             let t = t.replace('"', "\"\"");
             if column.is_empty() {
-                format!("(\"{t}\"*)")
+                out.push_str(&format!("(\"{t}\"*)"));
             } else {
-                format!("({column} : \"{t}\"*)")
+                out.push_str(&format!("({column} : \"{t}\"*)"));
             }
         };
         match self {
-            Expr::And { e1, e2 } => {
-                format!("({} AND {})", e1.match_expression(), e2.match_expression())
+            Expr::From { text } => phrase(out, "from_", text),
+            Expr::To { text } => phrase(out, "to_", text),
+            Expr::Subject { text } => phrase(out, "subject", text),
+            Expr::In { text } => phrase(out, "categories", text),
+            Expr::Generic { text } => phrase(out, "", text),
+            Expr::And { .. } | Expr::Or { .. } | Expr::Not { .. } => {
+                let (sep, operands) = self.operands();
+                out.push('(');
+                for (i, e) in operands.into_iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(sep);
+                    }
+                    e.write_match(out);
+                }
+                out.push(')');
             }
-            Expr::Or { e1, e2 } => {
-                format!("({} OR {})", e1.match_expression(), e2.match_expression())
-            }
-            Expr::Not { e1, e2 } => {
-                format!("({} NOT {})", e1.match_expression(), e2.match_expression())
-            }
-            Expr::From { text } => phrase("from_", text),
-            Expr::To { text } => phrase("to_", text),
-            Expr::Subject { text } => phrase("subject", text),
-            Expr::In { text } => phrase("categories", text),
-            Expr::Generic { text } => phrase("", text),
             other => unreachable!("not match compatible: {other:?}"),
+        }
+    }
+
+    /// A binary node's operator and the operands it is written flat with: the leaves of a
+    /// run of the same AND or OR, or the left run of a NOT (`(a NOT b) NOT c` is
+    /// `a NOT b NOT c`; `a NOT (b NOT c)` keeps its parentheses).
+    fn operands(&self) -> (&'static str, Vec<&Expr>) {
+        fn run<'a>(
+            e: &'a Expr,
+            same: fn(&Expr) -> Option<(&Expr, &Expr)>,
+            out: &mut Vec<&'a Expr>,
+        ) {
+            // Iterative on the right, where the parser nests.
+            let mut e = e;
+            while let Some((e1, e2)) = same(e) {
+                run(e1, same, out);
+                e = e2;
+            }
+            out.push(e);
+        }
+        let mut out = Vec::new();
+        match self {
+            Expr::And { .. } => {
+                run(
+                    self,
+                    |e| match e {
+                        Expr::And { e1, e2 } => Some((&**e1, &**e2)),
+                        _ => None,
+                    },
+                    &mut out,
+                );
+                (" AND ", out)
+            }
+            Expr::Or { .. } => {
+                run(
+                    self,
+                    |e| match e {
+                        Expr::Or { e1, e2 } => Some((&**e1, &**e2)),
+                        _ => None,
+                    },
+                    &mut out,
+                );
+                (" OR ", out)
+            }
+            Expr::Not { .. } => {
+                let mut e = self;
+                let mut rights = Vec::new();
+                while let Expr::Not { e1, e2 } = e {
+                    rights.push(e2.as_ref());
+                    e = e1;
+                }
+                out.push(e);
+                out.extend(rights.into_iter().rev());
+                (" NOT ", out)
+            }
+            _ => (" ", vec![self]),
+        }
+    }
+
+    /// How deep [`Expr::match_expression`] nests its parentheses.
+    fn match_depth(&self) -> usize {
+        match self {
+            Expr::And { .. } | Expr::Or { .. } | Expr::Not { .. } => {
+                1 + self
+                    .operands()
+                    .1
+                    .into_iter()
+                    .map(Expr::match_depth)
+                    .max()
+                    .unwrap_or(0)
+            }
+            _ => 1,
         }
     }
 
@@ -450,6 +557,10 @@ impl Expr {
     }
 }
 
+/// How deep a `ThreadSearch MATCH` expression may nest. The bundled SQLite's FTS5 parser
+/// overflows its stack at 34 levels.
+pub const MAX_MATCH_DEPTH: usize = 30;
+
 /// A `WHERE` clause and its parameters, in order.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Where {
@@ -468,6 +579,12 @@ pub fn compile_thread(expr: &Expr, dates: &DateContext) -> Result<Where, Grammar
 
 fn thread_where(expr: &Expr, dates: &DateContext, w: &mut Where) -> Result<(), GrammarError> {
     if expr.is_match_compatible() {
+        if expr.match_depth() > MAX_MATCH_DEPTH {
+            return err(format!(
+                "the search nests too deeply: at most {MAX_MATCH_DEPTH} levels of NOT and \
+                 parentheses"
+            ));
+        }
         w.sql.push_str(
             "(`Thread`.`id` IN (SELECT `content_id` FROM `ThreadSearch` WHERE `ThreadSearch` MATCH ?))",
         );
@@ -676,9 +793,14 @@ mod tests {
             p("a \"OR\" b"),
             and(generic("a"), and(generic("OR"), generic("b")))
         );
-        assert_eq!(p("\"(\""), generic("("));
+        assert_eq!(p("\"(a\""), generic("(a"));
         assert_eq!(p("http://x.test/a"), generic("http://x.test/a"));
         assert_eq!(p("re:hello"), generic("re:hello"));
+        assert_eq!(p("subject:re:hello"), subject("re:hello"));
+        assert_eq!(
+            p("to:mailto:x@y.test b"),
+            and(to("mailto:x@y.test"), generic("b"))
+        );
         assert_eq!(
             p("this is it"),
             and(generic("this"), and(generic("is"), generic("it")))
@@ -705,6 +827,14 @@ mod tests {
             "foo AND",
             "foo NOT",
             "(foo OR) bar",
+            "a - b",
+            "a : b",
+            "\"\"",
+            "a \" \"",
+            "\"--\" OR a",
+            "from:\"\"",
+            "subject:-",
+            "\"(\"",
         ] {
             assert!(parse(q).is_err(), "{q:?} parsed as {:?}", parse(q));
         }
@@ -743,6 +873,32 @@ mod tests {
             r#"((subject : "a"*) NOT (to_ : "b"*))"#
         );
         assert_eq!(p("say\"hi").match_expression(), r#"("say""hi"*)"#);
+        // Runs of one operator are flat; other nesting keeps its parentheses.
+        assert_eq!(
+            p("a b (c d)").match_expression(),
+            r#"(("a"*) AND ("b"*) AND ("c"*) AND ("d"*))"#
+        );
+        assert_eq!(
+            p("a OR (b OR c)").match_expression(),
+            r#"(("a"*) OR ("b"*) OR ("c"*))"#
+        );
+        assert_eq!(
+            p("(a b) OR c").match_expression(),
+            r#"((("a"*) AND ("b"*)) OR ("c"*))"#
+        );
+        assert_eq!(
+            p("(a NOT b) NOT c").match_expression(),
+            r#"(("a"*) NOT ("b"*) NOT ("c"*))"#
+        );
+        assert_eq!(
+            p("a NOT b NOT c").match_expression(),
+            r#"(("a"*) NOT (("b"*) NOT ("c"*)))"#
+        );
+        assert_eq!(
+            p("(a b) NOT c").match_expression(),
+            r#"((("a"*) AND ("b"*)) NOT ("c"*))"#
+        );
+        assert_eq!(p(&vec!["a"; MAX_TOKENS].join(" ")).match_depth(), 2);
     }
 
     #[test]
