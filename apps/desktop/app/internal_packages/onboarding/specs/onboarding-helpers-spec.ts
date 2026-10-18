@@ -6,7 +6,7 @@ import { ExternalFetch } from '../../../src/external-fetch';
 const AUTOCONFIG_IMAP_HOST = 'imap.autoconfig.example';
 const AUTOCONFIG_SMTP_HOST = 'smtp.autoconfig.example';
 
-function autoconfigXML(domain: string) {
+function autoconfigXML(domain: string, imapSocket = 'SSL', smtpSocket = 'STARTTLS') {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <clientConfig version="1.1">
   <emailProvider id="${domain}">
@@ -15,14 +15,14 @@ function autoconfigXML(domain: string) {
     <incomingServer type="imap">
       <hostname>${AUTOCONFIG_IMAP_HOST}</hostname>
       <port>993</port>
-      <socketType>SSL</socketType>
+      <socketType>${imapSocket}</socketType>
       <username>%EMAILADDRESS%</username>
       <authentication>password-cleartext</authentication>
     </incomingServer>
     <outgoingServer type="smtp">
       <hostname>${AUTOCONFIG_SMTP_HOST}</hostname>
       <port>587</port>
-      <socketType>STARTTLS</socketType>
+      <socketType>${smtpSocket}</socketType>
       <username>%EMAILADDRESS%</username>
       <authentication>password-cleartext</authentication>
     </outgoingServer>
@@ -32,13 +32,14 @@ function autoconfigXML(domain: string) {
 
 // Responds to the two URLs TryThunderbirdAutoconfig probes for the domains listed in
 // `servingDomains`, and 404s everything else.
-function stubAutoconfig(servingDomains: string[]) {
+function stubAutoconfig(servingDomains: string[], sockets: [string, string] = ['SSL', 'STARTTLS']) {
   spyOn(ExternalFetch, 'fetch').andCallFake((url: string) => {
     const domain = servingDomains.find(
       (d) => url === `https://autoconfig.${d}/mail/config-v1.1.xml`
     );
     if (domain) {
-      return Promise.resolve({ ok: true, text: () => Promise.resolve(autoconfigXML(domain)) });
+      const xml = autoconfigXML(domain, ...sockets);
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(xml) });
     }
     return Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' });
   });
@@ -101,6 +102,28 @@ describe('expandAccountWithCommonSettings', function onboardingHelpersTests() {
     expect(account.settings.smtp_host).toEqual(AUTOCONFIG_SMTP_HOST);
     expect(account.settings.smtp_security).toEqual('STARTTLS');
     expect(account.settings.container_folder).toEqual('');
+  });
+
+  it('picks STARTTLS on the standard ports for a provider that used to ship none', async () => {
+    stubAutoconfig([]);
+    const account = await expandAccountWithCommonSettings(accountFor('user@terra.es'));
+
+    expect(account.settings.imap_host).toEqual('imap4.terra.es');
+    expect(account.settings.imap_port).toEqual(143);
+    expect(account.settings.imap_security).toEqual('STARTTLS');
+    expect(account.settings.smtp_port).toEqual(587);
+    expect(account.settings.smtp_security).toEqual('STARTTLS');
+  });
+
+  it('tries STARTTLS when autoconfig says plain', async () => {
+    stubAutoconfig(['plain-autoconfig.example'], ['plain', 'plain']);
+    const account = await expandAccountWithCommonSettings(
+      accountFor('user@plain-autoconfig.example')
+    );
+
+    expect(account.settings.imap_host).toEqual(AUTOCONFIG_IMAP_HOST);
+    expect(account.settings.imap_security).toEqual('STARTTLS');
+    expect(account.settings.smtp_security).toEqual('STARTTLS');
   });
 
   it('falls back to imap./smtp. for a domain with no template and no autoconfig', async () => {

@@ -3,6 +3,13 @@ import React from 'react';
 import { localized, Account } from 'mailspring-exports';
 import CreatePageForForm from './decorators/create-page-for-form';
 import FormField from './form-field';
+import {
+  MailProtocol,
+  cleartextConsentKey,
+  isLoopbackHost,
+  needsCleartextConsent,
+  securityForPort,
+} from './connection-security';
 
 const StandardIMAPPorts = [143, 993];
 const StandardSMTPPorts = [25, 465, 587];
@@ -19,7 +26,7 @@ interface AccountIMAPSettingsFormProps {
   onFieldKeyPress: () => void;
 }
 
-class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormProps> {
+export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormProps> {
   static displayName = 'AccountIMAPSettingsForm';
 
   static submitLabel = () => {
@@ -45,13 +52,19 @@ class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormPro
     // Note: we explicitly don't check that an SMTP username / password
     // is provided because occasionally those gateways don't require them!
 
-    for (const type of ['imap', 'smtp']) {
+    for (const type of ['imap', 'smtp'] as MailProtocol[]) {
       if (!account.settings[`${type}_host`]) {
         return { errorMessage, errorFieldNames, populated: false };
       }
       if (!Number.isInteger(account.settings[`${type}_port`] / 1)) {
         errorMessage = localized('Please provide a valid port number.');
         errorFieldNames.push(`${type}_port`);
+      }
+      if (needsCleartextConsent(account.settings, type)) {
+        errorMessage = localized(
+          'Choose SSL / TLS or STARTTLS, or confirm that your password can be sent unencrypted.'
+        );
+        errorFieldNames.push(cleartextConsentKey(type));
       }
     }
 
@@ -62,7 +75,7 @@ class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormPro
     ipcRenderer.send('resize-window', { width: 900, height: 660 });
   }
 
-  renderPortDropdown(protocol) {
+  renderPortDropdown(protocol: MailProtocol) {
     if (!['imap', 'smtp'].includes(protocol)) {
       throw new Error(`Can't render port dropdown for protocol '${protocol}'`);
     }
@@ -80,28 +93,17 @@ class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormPro
 
     // When you change the port, automatically switch the security setting to
     // the standard for that port. Lots of people don't update that field and
-    // are getting confused.
+    // are getting confused. No port implies cleartext: 143 and 25 get STARTTLS.
     const onPortChange = (event: { target: { value: string; id: string } }) => {
       const port = Number(event.target.value);
+      const security = securityForPort(protocol, port);
 
       onFieldChange(
         { target: { value: port, id: event.target.id } },
         {
           afterSetState: () => {
-            if (port === 143 && settings.imap_security !== 'none') {
-              onFieldChange({ target: { value: 'none', id: 'settings.imap_security' } });
-            }
-            if (port === 993 && settings.imap_security !== 'SSL / TLS') {
-              onFieldChange({ target: { value: 'SSL / TLS', id: 'settings.imap_security' } });
-            }
-            if (port === 25 && settings.smtp_security !== 'none') {
-              onFieldChange({ target: { value: 'none', id: 'settings.smtp_security' } });
-            }
-            if (port === 465 && settings.smtp_security !== 'SSL / TLS') {
-              onFieldChange({ target: { value: 'SSL / TLS', id: 'settings.smtp_security' } });
-            }
-            if (port === 587 && settings.smtp_security !== 'STARTTLS') {
-              onFieldChange({ target: { value: 'STARTTLS', id: 'settings.smtp_security' } });
+            if (security && settings[`${protocol}_security`] !== security) {
+              onFieldChange({ target: { value: security, id: `settings.${protocol}_security` } });
             }
           },
         }
@@ -155,13 +157,16 @@ class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormPro
     );
   }
 
-  renderSecurityDropdown(protocol) {
+  renderSecurityDropdown(protocol: MailProtocol) {
     const {
       account: { settings },
       submitting,
       onFieldKeyPress,
       onFieldChange,
     } = this.props;
+    const consentKey = cleartextConsentKey(protocol);
+    const askConsent =
+      settings[`${protocol}_security`] === 'none' && !isLoopbackHost(settings[`${protocol}_host`]);
 
     return (
       <div>
@@ -199,6 +204,21 @@ class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormPro
             {localized('Allow insecure SSL')}
           </label>
         </span>
+        {askConsent && (
+          <div style={{ paddingTop: '6px' }}>
+            <input
+              type="checkbox"
+              id={`settings.${consentKey}`}
+              disabled={submitting}
+              checked={settings[consentKey] === true}
+              onKeyPress={onFieldKeyPress}
+              onChange={onFieldChange}
+            />
+            <label htmlFor={`settings.${consentKey}`} className="checkbox">
+              {localized('Send password unencrypted')}
+            </label>
+          </div>
+        )}
       </div>
     );
   }

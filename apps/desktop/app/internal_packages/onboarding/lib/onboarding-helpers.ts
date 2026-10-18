@@ -22,6 +22,7 @@ import {
   createOAuthState,
 } from './onboarding-constants';
 import { parseStringPromise } from 'xml2js';
+import { discoveredSecurity } from './connection-security';
 
 interface TokenResponse {
   access_token: string;
@@ -140,14 +141,22 @@ export async function expandAccountWithCommonSettings(account: Account) {
       imap_port: imap.port,
       imap_username: usernameWithFormat('email'),
       imap_password: populated.settings.imap_password,
-      imap_security: imap.starttls ? 'STARTTLS' : imap.ssl || imap.tls ? 'SSL / TLS' : 'none',
+      imap_security: discoveredSecurity(
+        'imap',
+        imap.starttls ? 'STARTTLS' : imap.ssl || imap.tls ? 'SSL / TLS' : undefined,
+        Number(imap.port)
+      ),
       imap_allow_insecure_ssl: false,
 
       smtp_host: (smtp.hostname || '').replace('{domain}', domain),
       smtp_port: smtp.port,
       smtp_username: usernameWithFormat('email'),
       smtp_password: populated.settings.smtp_password || populated.settings.imap_password,
-      smtp_security: smtp.starttls ? 'STARTTLS' : smtp.ssl || smtp.tls ? 'SSL / TLS' : 'none',
+      smtp_security: discoveredSecurity(
+        'smtp',
+        smtp.starttls ? 'STARTTLS' : smtp.ssl || smtp.tls ? 'SSL / TLS' : undefined,
+        Number(smtp.port)
+      ),
       smtp_allow_insecure_ssl: false,
 
       container_folder: '',
@@ -179,27 +188,13 @@ export async function expandAccountWithCommonSettings(account: Account) {
     };
   }
 
-  let imap_port = Number(mstemplate.imap_port);
-  let imap_security = mstemplate.imap_security;
-  if (!imap_security && !imap_port) {
-    imap_security = 'SSL / TLS';
-    imap_port = 993;
-  } else if (!imap_security && imap_port) {
-    imap_security = imap_port === 993 ? 'SSL / TLS' : 'none';
-  } else if (imap_security && !imap_port) {
-    imap_port = imap_security === 'SSL / TLS' ? 993 : 143;
-  }
+  const imap_port =
+    Number(mstemplate.imap_port) || (mstemplate.imap_security === 'STARTTLS' ? 143 : 993);
+  const imap_security = discoveredSecurity('imap', mstemplate.imap_security, imap_port);
 
-  let smtp_port = Number(mstemplate.smtp_port);
-  let smtp_security = mstemplate.smtp_security;
-  if (!smtp_security && !smtp_port) {
-    smtp_security = 'SSL / TLS';
-    smtp_port = 465;
-  } else if (!smtp_security && smtp_port) {
-    smtp_security = smtp_port === 587 ? 'STARTTLS' : smtp_port === 465 ? 'SSL / TLS' : 'none';
-  } else if (smtp_security && !smtp_port) {
-    smtp_port = smtp_security === 'STARTTLS' ? 587 : smtp_security === 'SSL / TLS' ? 465 : 25;
-  }
+  const smtp_port =
+    Number(mstemplate.smtp_port) || (mstemplate.smtp_security === 'STARTTLS' ? 587 : 465);
+  const smtp_security = discoveredSecurity('smtp', mstemplate.smtp_security, smtp_port);
 
   const defaults = {
     imap_host: mstemplate.imap_host.replace('%EMAILDOMAIN%', domain),
@@ -475,10 +470,9 @@ async function TryThunderbirdAutoconfig(
         break;
     }
 
+    // A `plain` server is tried with STARTTLS: discovery never picks cleartext, the user
+    // opts into it on the settings page.
     switch (server.socketType) {
-      case 'plain':
-        details.security = 'None';
-        break;
       case 'STARTTLS':
         details.security = 'STARTTLS';
         break;
