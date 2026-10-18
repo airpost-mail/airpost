@@ -10,6 +10,7 @@ import {
   profileResetDetail,
   resetProfileDirectory,
 } from '../src/browser/profile-reset';
+import { TERN_PROFILE_MARKER, markTernProfile } from '../src/browser/profile-marker';
 
 function write(file: string, contents = 'x') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -36,15 +37,21 @@ describe('resetProfileDirectory', function () {
     write(path.join(tern, 'Local Storage', 'leveldb', 'CURRENT'), 'ls');
     write(path.join(tern, 'mailsync-abc.log'), 'log');
     write(path.join(tern, 'SingletonLock'), 'lock');
+    write(path.join(tern, 'lockfile'), 'lock');
+    markTernProfile(tern);
   });
 
   afterEach(function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('empties the profile except the running instance lock, and leaves the marker', function () {
+  it('empties the profile except the running instance lock, and leaves the markers', function () {
     expect(resetProfileDirectory(tern)).toEqual([]);
-    expect(fs.readdirSync(tern).sort()).toEqual(['SingletonLock', SKIP_MAILSPRING_IMPORT_MARKER]);
+    expect(fs.readdirSync(tern).sort()).toEqual(
+      [TERN_PROFILE_MARKER, 'SingletonLock', 'lockfile', SKIP_MAILSPRING_IMPORT_MARKER].sort()
+    );
+    // Still marked, so it can be reset again.
+    expect(canResetProfileDirectory(tern)).toBe(true);
   });
 
   it('keeps the next launch from importing the Mailspring profile again', function () {
@@ -73,6 +80,16 @@ describe('resetProfileDirectory', function () {
     expect(fs.existsSync(path.join(tern, SKIP_MAILSPRING_IMPORT_MARKER))).toBe(true);
   });
 
+  it("doesn't report Chromium storage that clearStorageData already emptied", function () {
+    const realRmSync = fs.rmSync;
+    spyOn(fs, 'rmSync').andCallFake((entry: string, options: fs.RmOptions) => {
+      if (path.basename(entry) === 'Local Storage') throw new Error('EBUSY');
+      realRmSync(entry, options);
+    });
+    expect(resetProfileDirectory(tern)).toEqual([]);
+    expect(console.error).toHaveBeenCalled();
+  });
+
   it('refuses directories that hold more than the profile', function () {
     expect(canResetProfileDirectory(tern)).toBe(true);
     expect(canResetProfileDirectory(os.homedir())).toBe(false);
@@ -84,6 +101,39 @@ describe('resetProfileDirectory', function () {
     expect(() => resetProfileDirectory(root, [root])).toThrow();
     expect(fs.existsSync(path.join(tern, 'config.json'))).toBe(true);
   });
+
+  it('refuses a directory Tern did not mark as its profile', function () {
+    fs.rmSync(path.join(tern, TERN_PROFILE_MARKER));
+    expect(canResetProfileDirectory(tern)).toBe(false);
+    expect(() => resetProfileDirectory(tern)).toThrow();
+    expect(fs.existsSync(path.join(tern, 'config.json'))).toBe(true);
+  });
+
+  it('refuses a folder that contains a protected one, even when marked', function () {
+    const appData = path.join(root, 'AppData');
+    write(path.join(appData, 'Other', 'x'));
+    markTernProfile(root);
+    expect(canResetProfileDirectory(root, [appData])).toBe(false);
+    expect(canResetProfileDirectory(tern, [appData])).toBe(true);
+    expect(canResetProfileDirectory(path.dirname(os.homedir()))).toBe(false);
+  });
+
+  it('refuses a link to a protected folder', function () {
+    const appData = path.join(root, 'AppData');
+    write(path.join(appData, TERN_PROFILE_MARKER));
+    const link = path.join(root, 'link');
+    fs.symlinkSync(appData, link, 'dir');
+    expect(canResetProfileDirectory(link, [appData])).toBe(false);
+  });
+
+  if (process.platform === 'darwin' || process.platform === 'win32') {
+    it('refuses a protected folder spelled in another case', function () {
+      const appData = path.join(root, 'AppData');
+      write(path.join(appData, TERN_PROFILE_MARKER));
+      expect(canResetProfileDirectory(path.join(root, 'appdata'), [appData])).toBe(false);
+      expect(canResetProfileDirectory(os.homedir().toUpperCase())).toBe(false);
+    });
+  }
 
   it('names the directory in the confirmation', function () {
     expect(profileResetDetail(tern)).toContain(tern);

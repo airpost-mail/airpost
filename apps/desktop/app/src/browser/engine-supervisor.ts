@@ -427,6 +427,8 @@ export class QuitGate {
   // From the held will-quit until the engine stopped.
   waiting = false;
   done = false;
+  // A reset that relaunches the app (application.ts) defers launches too, for its own relaunch.
+  relaunching = false;
   _launchArgs: string[] = null;
 
   // Takes a will-quit: `stop` runs, then `quit` with the launches that arrived meanwhile.
@@ -452,8 +454,15 @@ export class QuitGate {
 
   // True while the app is quitting: the launch happens after the relaunch instead.
   deferLaunch(args: string[] = []) {
-    if (!this.waiting && !this.done) return false;
+    if (!this.waiting && !this.done && !this.relaunching) return false;
     this._launchArgs = (this._launchArgs || []).concat(args);
     return true;
+  }
+
+  // The launches deferred so far, for a relaunch the caller does itself; null when none arrived.
+  takeLaunchArgs() {
+    const args = this._launchArgs;
+    this._launchArgs = null;
+    return args;
   }
 }

@@ -58,4 +58,12 @@ describe('QuitGate', function () {
     await tick();
     expect(quit).toHaveBeenCalledWith(null);
   });
+
+  it('defers launches during a reset relaunch and hands them over once', function () {
+    gate.relaunching = true;
+    expect(gate.deferLaunch(['mailto:x@y.z'])).toBe(true);
+    expect(gate.deferLaunch()).toBe(true);
+    expect(gate.takeLaunchArgs()).toEqual(['mailto:x@y.z']);
+    expect(gate.takeLaunchArgs()).toBe(null);
+  });
 });

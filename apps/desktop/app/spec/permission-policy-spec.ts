@@ -40,6 +40,20 @@ describe('permissionAllowed', function () {
     expect(permissionAllowed(ask({ appWindow: false }))).toBe(false);
   });
 
+  it('allows fullscreen and clipboard writes to the pdf.js viewer main frame only', function () {
+    const viewer = { appWindow: false, pdfViewer: true, requestingUrl: 'file:///x/viewer.html' };
+    expect(permissionAllowed(ask({ ...viewer, permission: 'fullscreen' }))).toBe(true);
+    expect(permissionAllowed(ask({ ...viewer, permission: 'clipboard-sanitized-write' }))).toBe(
+      true
+    );
+    expect(permissionAllowed(ask({ ...viewer, permission: 'notifications' }))).toBe(false);
+    expect(permissionAllowed(ask({ ...viewer, permission: 'clipboard-read' }))).toBe(false);
+    expect(
+      permissionAllowed(ask({ ...viewer, permission: 'fullscreen', isMainFrame: false }))
+    ).toBe(false);
+    expect(permissionAllowed(ask({ appWindow: false, permission: 'fullscreen' }))).toBe(false);
+  });
+
   it('denies an app window that is not showing the app', function () {
     expect(permissionAllowed(ask({ requestingUrl: 'https://example.com/' }))).toBe(false);
     expect(permissionAllowed(ask({ requestingUrl: undefined }))).toBe(false);
@@ -100,5 +114,30 @@ describe('installPermissionHandlers', function () {
     install(false);
     request(appContents, 'geolocation', () => {}, details);
     expect((console.warn as jasmine.Spy).callCount).toBe(1);
+  });
+});
+
+describe('isPdfViewerURL', function () {
+  const { isPdfViewerURL } = require('../src/browser/quickpreview-ipc');
+  const path = require('path');
+  const { pathToFileURL } = require('url');
+  const viewer = path.join(
+    __dirname,
+    '..',
+    'src',
+    'quickpreview',
+    'pdfjs-4.3.136',
+    'web',
+    'viewer.html'
+  );
+
+  it('matches the bundled viewer with its query, and nothing else', function () {
+    const url = pathToFileURL(viewer).href;
+    expect(isPdfViewerURL(`${url}?file=${encodeURIComponent('file:///tmp/a.pdf')}`)).toBe(true);
+    expect(isPdfViewerURL(url.replace('viewer.html', 'other.html'))).toBe(false);
+    expect(isPdfViewerURL('file:///tmp/web/viewer.html')).toBe(false);
+    expect(isPdfViewerURL(url.replace('file:///', 'file://host/'))).toBe(false);
+    expect(isPdfViewerURL('https://example.com/web/viewer.html')).toBe(false);
+    expect(isPdfViewerURL(undefined)).toBe(false);
   });
 });

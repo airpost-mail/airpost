@@ -409,6 +409,7 @@ export default class Application extends EventEmitter {
   }: { errorMessage?: string; keepMetadata?: boolean } = {}) => {
     if (this._resettingAndRelaunching) return;
     this._resettingAndRelaunching = true;
+    this.quitGate.relaunching = true;
 
     if (errorMessage) {
       dialog.showMessageBoxSync({
@@ -421,10 +422,7 @@ export default class Application extends EventEmitter {
       });
     }
 
-    const done = () => {
-      app.relaunch();
-      app.quit();
-    };
+    const done = () => this._relaunch();
     this.windowManager.destroyAllWindows();
     const supervisor = this.engineSupervisor;
     if (!supervisor) {
@@ -451,7 +449,7 @@ export default class Application extends EventEmitter {
         buttons: [localized('Okay')],
         message: localized('Could not reset accounts and settings'),
         detail: localized(
-          `%@ holds more than Tern's files, so Tern won't empty it.`,
+          `%@ wasn't created by Tern or holds more than Tern's files, so Tern won't empty it.`,
           this.configDirPath
         ),
       });
@@ -471,6 +469,7 @@ export default class Application extends EventEmitter {
       : dialog.showMessageBoxSync(options);
     if (choice !== 1 || this._resettingAndRelaunching) return;
     this._resettingAndRelaunching = true;
+    this.quitGate.relaunching = true;
 
     this.configPersistenceManager.discarded = true;
     this.windowManager.destroyAllWindows();
@@ -498,9 +497,16 @@ export default class Application extends EventEmitter {
         ),
       });
     }
-    app.relaunch();
-    app.quit();
+    this._relaunch();
   };
+
+  // A Dock click, second instance or mailto: link that arrived during a reset opens after it.
+  _relaunch() {
+    const launchArgs = this.quitGate.takeLaunchArgs();
+    if (launchArgs) app.relaunch({ args: process.argv.slice(1).concat(launchArgs) });
+    else app.relaunch();
+    app.quit();
+  }
 
   _deleteDatabase = (callback) => {
     this.deleteFileWithRetry(path.join(this.configDirPath, 'edgehill.db'), callback);

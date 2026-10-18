@@ -17,6 +17,8 @@ export default class WindowManager {
 
   initializeInBackground: boolean;
   _windows: { [key: string]: MailspringWindow } = {};
+  // Set by destroyAllWindows, which only runs before a reset relaunches the app.
+  _closedForRelaunch = false;
   windowLauncher: WindowLauncher;
 
   constructor({
@@ -107,6 +109,7 @@ export default class WindowManager {
   }
 
   newWindow(options = {}) {
+    if (this._closedForRelaunch) return null;
     const win = this.windowLauncher.newWindow(options);
     const existingKey = this._registeredKeyForWindow(win);
 
@@ -169,6 +172,7 @@ export default class WindowManager {
     const win = this._windows[windowKey];
 
     if (!win) {
+      if (this._closedForRelaunch) return;
       this.newWindow(this._coreWindowOpts(windowKey, windowExtraOpts));
       // After creating the main window, clear the background flag so any
       // future recreations (crash recovery, database reset) show normally.
@@ -212,7 +216,10 @@ export default class WindowManager {
     }
   }
 
+  // Before a reset relaunches the app: no window opens after this, so none can load the old
+  // accounts or write into the profile being deleted.
   destroyAllWindows() {
+    this._closedForRelaunch = true;
     this.windowLauncher.cleanupBeforeAppQuit();
     for (const windowKey of Object.keys(this._windows)) {
       this._windows[windowKey].browserWindow.destroy();

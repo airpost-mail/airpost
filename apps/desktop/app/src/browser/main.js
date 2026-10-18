@@ -51,7 +51,9 @@ const profileDirNames = args => {
   return { tern: 'Tern', mailspring: 'Mailspring' };
 };
 
-// Returns the config dir, and the Mailspring profile to import from when the default dir is used.
+// Returns the config dir, the Mailspring profile to import from when the default dir is used, and
+// whether the dir is Tern's own (profile-marker.ts): the default one, or a --config-dir-path
+// that didn't exist yet or was empty.
 const setupConfigDir = args => {
   const names = profileDirNames(args);
   const appData = app.getPath('appData');
@@ -65,13 +67,17 @@ const setupConfigDir = args => {
     importFromPath = null;
   }
 
+  const ownsConfigDir =
+    !args.configDirPath ||
+    !fs.existsSync(configDirPath) ||
+    (fs.statSync(configDirPath).isDirectory() && fs.readdirSync(configDirPath).length === 0);
   fs.mkdirSync(configDirPath, { recursive: true });
 
   // Also moves Electron's local storage and crash dumps here, for --dev and --config-dir-path
   // too (the default userData would be the app name's folder, "Tern").
   app.setPath('userData', configDirPath);
 
-  return { configDirPath, importFromPath };
+  return { configDirPath, importFromPath, ownsConfigDir };
 };
 
 // Starts the first-launch import. The promise resolves once the profile is ready to use: to
@@ -378,7 +384,7 @@ const start = () => {
 
   const options = parseCommandLine(process.argv);
   // Before the error logger: it starts the crash reporter, which writes under userData.
-  const { configDirPath, importFromPath } = setupConfigDir(options);
+  const { configDirPath, importFromPath, ownsConfigDir } = setupConfigDir(options);
   global.errorLogger = setupErrorLogger(options);
   options.configDirPath = configDirPath;
 
@@ -407,12 +413,14 @@ const start = () => {
   }
 
   setupCompileCache(configDirPath, options.devMode);
+  if (ownsConfigDir) require('./profile-marker').markTernProfile(configDirPath);
 
   // Every session gets the deny-by-default permission handlers as it is created: the default
   // one, quickpreview's and the <webview> partition, and any a plugin opens.
   const installPermissionHandlers = ses => {
     require('./permission-policy').installPermissionHandlers(ses, {
       isAppWindow: require('./mailspring-window').isMailspringWindowContents,
+      isPdfViewer: require('./quickpreview-ipc').isPdfViewerURL,
       logDenials: options.devMode,
     });
   };

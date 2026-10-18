@@ -4,34 +4,82 @@
 /*
 The file half of "Reset Accounts and Settings" (application:reset-profile in application.ts,
 which first destroys the windows and stops the engine). Everything in the profile goes except
-Chromium's single-instance lock, which the running app still holds, and the marker that stops
-the next launch from importing the Mailspring profile again is written last, into the emptied
-directory.
+Chromium's single-instance lock, which the running app still holds, and the profile marker. The
+marker that stops the next launch from importing the Mailspring profile again is written last,
+into the emptied directory.
 */
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { localized } from '../intl';
 import { SKIP_MAILSPRING_IMPORT_MARKER } from './mailspring-profile-import';
+import { TERN_PROFILE_MARKER, hasTernProfileMarker } from './profile-marker';
 
-// SingletonLock, SingletonSocket and SingletonCookie belong to this running instance.
+// The running instance's single-instance lock: SingletonLock, SingletonSocket and SingletonCookie
+// on macOS and Linux, `lockfile` on Windows (held open, so it can't be deleted there anyway).
+// The profile marker stays so the emptied directory can be reset again.
 function isKept(name: string) {
-  return name.startsWith('Singleton');
+  return name.startsWith('Singleton') || name === 'lockfile' || name === TERN_PROFILE_MARKER;
 }
 
-// Refuses a directory whose contents aren't only Tern's: the filesystem root, the home folder
-// and the folders that hold every app's profile (a --config-dir-path pointing at them).
+// Chromium's storage for the default session, which clearStorageData has already emptied. On
+// Windows the network service and the storage backends keep some of these open, so they can
+// fail to delete; that is logged, not reported to the user.
+const CHROMIUM_STORAGE = new Set([
+  'Cookies',
+  'Cookies-journal',
+  'Network',
+  'Local Storage',
+  'Session Storage',
+  'IndexedDB',
+  'Service Worker',
+  'Shared Dictionary',
+  'SharedStorage',
+  'WebStorage',
+  'blob_storage',
+  'DIPS',
+  'Trust Tokens',
+  'GPUCache',
+  'Code Cache',
+  'DawnGraphiteCache',
+  'DawnWebGPUCache',
+]);
+
+// Case-insensitive on macOS and Windows (their default filesystems), symlinks resolved, so
+// `/users/me` or a link to the home folder compares equal to it.
+function canonicalPath(p: string) {
+  let resolved = path.resolve(p);
+  try {
+    resolved = fs.realpathSync.native(resolved);
+  } catch {
+    // A path that doesn't exist yet compares as given.
+  }
+  return process.platform === 'darwin' || process.platform === 'win32'
+    ? resolved.toLowerCase()
+    : resolved;
+}
+
+function isSameOrAncestor(dir: string, of: string) {
+  if (dir === of) return true;
+  return of.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep);
+}
+
+// Only empties a directory Tern marked as its profile (profile-marker.ts), and never the
+// filesystem root, the home folder, the folders that hold every app's profile, or a folder that
+// contains one of them.
 export function canResetProfileDirectory(configDirPath: string, protectedPaths: string[] = []) {
   if (!configDirPath || !path.isAbsolute(configDirPath)) return false;
-  const dir = path.resolve(configDirPath);
-  if (dir === path.parse(dir).root) return false;
-  return ![os.homedir(), ...protectedPaths].filter(Boolean).some((p) => path.resolve(p) === dir);
+  const dir = canonicalPath(configDirPath);
+  if (dir === canonicalPath(path.parse(dir).root)) return false;
+  const protectedDirs = [os.homedir(), ...protectedPaths].filter(Boolean).map(canonicalPath);
+  if (protectedDirs.some((p) => isSameOrAncestor(dir, p))) return false;
+  return hasTernProfileMarker(configDirPath);
 }
 
 /**
  * Deletes the contents of `configDirPath`, then writes the import marker. Returns the entries
- * that could not be deleted (eg. a file another process holds open on Windows); the marker is
- * written either way.
+ * that could not be deleted (eg. a file another process holds open on Windows), leaving out
+ * Chromium storage that is already empty; the marker is written either way.
  */
 export function resetProfileDirectory(configDirPath: string, protectedPaths: string[] = []) {
   if (!canResetProfileDirectory(configDirPath, protectedPaths)) {
@@ -45,7 +93,7 @@ export function resetProfileDirectory(configDirPath: string, protectedPaths: str
       fs.rmSync(entry, { recursive: true, force: true, maxRetries: 3 });
     } catch (err) {
       console.error(`Could not delete ${entry}: ${err}`);
-      failed.push(entry);
+      if (!CHROMIUM_STORAGE.has(name)) failed.push(entry);
     }
   }
   fs.writeFileSync(

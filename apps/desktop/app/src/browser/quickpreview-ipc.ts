@@ -35,6 +35,29 @@ const normalizeForComparison = (filePath: string) => {
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 };
 
+const pdfViewerPath = path.join(
+  __dirname.replace('app.asar', 'app.asar.unpacked'),
+  '..',
+  'quickpreview',
+  'pdfjs-4.3.136',
+  'web',
+  'viewer.html'
+);
+
+/** True for the bundled pdf.js viewer that the quick preview window shows PDFs in. */
+export function isPdfViewerURL(url: string | undefined) {
+  if (!url || !/^file:/i.test(url)) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.host) return false;
+    parsed.search = '';
+    parsed.hash = '';
+    return normalizeForComparison(fileURLToPath(parsed)) === normalizeForComparison(pdfViewerPath);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Validate that the IPC sender is the bundled quickpreview renderer. Matching the
  * full file path, not a suffix, keeps a remote page or a lookalike local file at
