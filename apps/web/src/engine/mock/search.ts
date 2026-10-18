@@ -147,7 +147,21 @@ function parseAnd(text: string): Parsed {
   return [{ type: 'and', e1: lhs, e2: rhs }, afterRhs];
 }
 
+/** Tokens a query may have, as in the engine. */
+export const MAX_SEARCH_TOKENS = 200;
+
 export function parseSearch(text: string): SearchExpr {
+  let tail = text;
+  for (let i = 0; i < MAX_SEARCH_TOKENS; i++) {
+    const [t, r] = nextToken(tail);
+    if (!t) break;
+    tail = r;
+  }
+  if (nextToken(tail)[0]) {
+    fail(
+      `search: the search is too long: at most ${MAX_SEARCH_TOKENS} words, operators and parentheses`,
+    );
+  }
   const [exp, rest] = parseAnd(text);
   if (!exp) fail('search: the search has nothing to look for');
   if (nextToken(rest)[0]) fail("search: a ')' has no '(' before it");

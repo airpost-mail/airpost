@@ -2,7 +2,7 @@
 // (crates/ms-store/src/search_grammar.rs, search_dates.rs), so the two don't drift.
 import { describe, expect, it } from 'vitest';
 import { RpcErrorCode } from '../rpc';
-import { parseSearch, resolveSearchDate, type SearchExpr } from './search';
+import { MAX_SEARCH_TOKENS, parseSearch, resolveSearchDate, type SearchExpr } from './search';
 
 const generic = (text: string): SearchExpr => ({ type: 'generic', text });
 const and = (e1: SearchExpr, e2: SearchExpr): SearchExpr => ({ type: 'and', e1, e2 });
@@ -64,6 +64,10 @@ describe('parseSearch', () => {
       );
     }
     for (const q of ['foo OR', 'foo AND', 'foo NOT']) expect(() => parseSearch(q), q).toThrow();
+    const long = Array(MAX_SEARCH_TOKENS).fill('a').join(' ');
+    expect(() => parseSearch(long)).not.toThrow();
+    expect(() => parseSearch(`${long} b`)).toThrow(/too long/);
+    expect(() => parseSearch('('.repeat(100_000))).toThrow(/too long/);
   });
 });
 
