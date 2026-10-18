@@ -150,24 +150,27 @@ fn apply_flags(account: &mut Value, args: &AccountAddArgs) {
     };
     set("imap_host", args.imap_host.as_ref().map(|v| json!(v)));
     set("imap_port", args.imap_port.map(|v| json!(v)));
-    set(
-        "imap_security",
-        args.imap_security.as_ref().map(|v| json!(v)),
-    );
+    set("imap_security", args.imap_security.as_deref().map(security));
     set(
         "imap_username",
         args.imap_username.as_ref().map(|v| json!(v)),
     );
     set("smtp_host", args.smtp_host.as_ref().map(|v| json!(v)));
     set("smtp_port", args.smtp_port.map(|v| json!(v)));
-    set(
-        "smtp_security",
-        args.smtp_security.as_ref().map(|v| json!(v)),
-    );
+    set("smtp_security", args.smtp_security.as_deref().map(security));
     set(
         "smtp_username",
         args.smtp_username.as_ref().map(|v| json!(v)),
     );
+}
+
+/// The engine's names for `tls` and `starttls`.
+fn security(flag: &str) -> Value {
+    json!(if flag == "tls" {
+        "SSL / TLS"
+    } else {
+        "STARTTLS"
+    })
 }
 
 /// One line from stdin with `--password-stdin`, else a prompt without echo on a terminal.
@@ -424,6 +427,47 @@ fn decode(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flags_override_discovery() {
+        use clap::Parser;
+        let cli = crate::cli::Cli::try_parse_from([
+            "tern",
+            "account",
+            "add",
+            "a@b.test",
+            "--imap-security",
+            "tls",
+            "--smtp-port",
+            "587",
+            "--smtp-security",
+            "starttls",
+            "--name",
+            "A",
+        ])
+        .unwrap();
+        let crate::cli::Command::Account {
+            command: crate::cli::AccountCommand::Add(args),
+        } = cli.command
+        else {
+            panic!("not account add");
+        };
+        let mut account = json!({"settings": {"imap_security": "STARTTLS", "smtp_port": 465}});
+        apply_flags(&mut account, &args);
+        assert_eq!(account["name"], "A");
+        assert_eq!(account["settings"]["imap_security"], "SSL / TLS");
+        assert_eq!(account["settings"]["smtp_security"], "STARTTLS");
+        assert_eq!(account["settings"]["smtp_port"], 587);
+        assert!(crate::cli::Cli::try_parse_from([
+            "tern",
+            "account",
+            "add",
+            "a@b.test",
+            "--imap-security",
+            "none"
+        ])
+        .is_err());
+    }
 
     #[test]
     fn queries_decode() {
