@@ -39,7 +39,7 @@ mod thread;
 
 pub use calendar::{Calendar, Event, IcsEventFields};
 pub use contact::{Contact, ContactBook, ContactGroup};
-pub use file::{File, FilePart};
+pub use file::{File, FilePart, TMP_DIR as FILES_TMP_DIR};
 pub use folder::{Folder, Label};
 pub use generic::GenericModel;
 pub use message::{is_hidden_json, IncomingMessage, Message, MessageSnapshot};

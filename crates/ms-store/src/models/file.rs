@@ -4,6 +4,7 @@
 //! `File`: an attachment or inline part of a message. Derived from Mailspring-Sync
 //! `MailSync/Models/File.*`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
+use std::io;
 use std::path::{Path, PathBuf};
 
 use ms_core::Result;
@@ -24,6 +25,11 @@ pub struct FilePart<'a> {
     pub filename: &'a str,
     pub size: u64,
 }
+
+/// Where [`File::write_in`] fills files before renaming them into place, under the files
+/// root. Ids are lowercase letters, digits, `-` and `_` (see [`File::dir_in`]), so no file's
+/// directory can be this one.
+pub const TMP_DIR: &str = ".tmp";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct File {
@@ -49,6 +55,25 @@ impl File {
         };
         data["filename"] = json!(name);
         data["size"] = json!(part.size);
+        File { data }
+    }
+
+    /// A file the engine makes itself rather than finds in a message: a client's upload
+    /// (`files.put`, `message_id` empty until a draft carries it) or an RFC 2822 export.
+    pub fn create_local(
+        id: &str,
+        account_id: &str,
+        message_id: &str,
+        filename: &str,
+        content_type: &str,
+        size: u64,
+    ) -> Self {
+        let mut data = base_json(id, account_id, 0);
+        data["messageId"] = json!(message_id);
+        data["contentId"] = Value::Null;
+        data["contentType"] = json!(content_type);
+        data["filename"] = json!(filename);
+        data["size"] = json!(size);
         File { data }
     }
 
@@ -157,6 +182,64 @@ impl File {
         self.dir_in(files_root).join(self.safe_display_name())
     }
 
+    /// The file on disk, if it is there: [`client_path_in`](Self::client_path_in), then
+    /// `MailUtils::pathForFile` (`safeFilename`), then the file's directory if it holds
+    /// exactly one file, for a name the client's rule has since changed.
+    pub fn find_in(&self, files_root: &Path) -> Option<PathBuf> {
+        let client = self.client_path_in(files_root);
+        if client.is_file() {
+            return Some(client);
+        }
+        let dir = self.dir_in(files_root);
+        let cpp = dir.join(self.safe_filename());
+        if cpp.is_file() {
+            return Some(cpp);
+        }
+        let mut files = std::fs::read_dir(&dir)
+            .ok()?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.is_file());
+        match (files.next(), files.next()) {
+            (Some(only), None) => Some(only),
+            _ => None,
+        }
+    }
+
+    /// Writes `data` at [`client_path_in`](Self::client_path_in), replacing what is there.
+    /// Readers polling for the file ([`find_in`](Self::find_in)) see it whole or not at all.
+    pub fn write_in(&self, files_root: &Path, data: &[u8]) -> io::Result<PathBuf> {
+        self.place_in(files_root, |tmp| std::fs::write(tmp, data))
+    }
+
+    /// As [`write_in`](Self::write_in), with the bytes of the file at `source`.
+    pub fn copy_in(&self, files_root: &Path, source: &Path) -> io::Result<PathBuf> {
+        self.place_in(files_root, |tmp| std::fs::copy(source, tmp).map(|_| ()))
+    }
+
+    /// Fills a temporary file under `files_root/.tmp` and renames it into place: same
+    /// file system, so the rename is atomic.
+    fn place_in(
+        &self,
+        files_root: &Path,
+        fill: impl FnOnce(&Path) -> io::Result<()>,
+    ) -> io::Result<PathBuf> {
+        let dest = self.client_path_in(files_root);
+        let tmp_dir = files_root.join(TMP_DIR);
+        std::fs::create_dir_all(&tmp_dir)?;
+        let tmp = tmp_dir.join(format!("{}.part", ms_core::ids::random_id()));
+        let placed = fill(&tmp).and_then(|()| {
+            if let Some(dir) = dest.parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            std::fs::rename(&tmp, &dest)
+        });
+        if let Err(e) = placed {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(e);
+        }
+        Ok(dest)
+    }
+
     pub fn part_id(&self) -> &str {
         json_str(&self.data, "partId")
     }
@@ -227,5 +310,43 @@ mod tests {
                 dir.display()
             );
         }
+    }
+
+    #[test]
+    fn written_files_are_found() {
+        let root = tempfile::tempdir().unwrap();
+        let f = File::create_local("abcdef", "a1", "", "re:port.txt", "text/plain", 3);
+        let path = f.write_in(root.path(), b"one").unwrap();
+        assert_eq!(path, root.path().join("ab/cd/abcdef/re-port.txt"));
+        assert_eq!(f.find_in(root.path()).unwrap(), path);
+        f.write_in(root.path(), b"two").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"two");
+        // Nothing is left behind in the temporary directory.
+        assert_eq!(
+            std::fs::read_dir(root.path().join(TMP_DIR))
+                .unwrap()
+                .count(),
+            0
+        );
+
+        let src = root.path().join("src.bin");
+        std::fs::write(&src, b"copied").unwrap();
+        let g = File::create_local("ghijkl", "a1", "", "x.bin", "", 6);
+        assert_eq!(
+            std::fs::read(g.copy_in(root.path(), &src).unwrap()).unwrap(),
+            b"copied"
+        );
+        assert!(g
+            .copy_in(root.path(), &root.path().join("missing"))
+            .is_err());
+        assert_eq!(
+            std::fs::read_dir(root.path().join(TMP_DIR))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert!(File::create_local("zzzzzz", "a1", "", "y", "", 0)
+            .find_in(root.path())
+            .is_none());
     }
 }

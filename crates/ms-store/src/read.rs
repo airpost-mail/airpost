@@ -484,6 +484,14 @@ impl ReadStore {
             .optional()?)
     }
 
+    pub fn file(&self, account_id: &str, id: &str) -> Result<Option<Value>> {
+        Ok(self
+            .conn
+            .prepare_cached("SELECT data FROM File WHERE id = ? AND accountId = ?")?
+            .query_row([id, account_id], |r| json_column(r, 0))
+            .optional()?)
+    }
+
     /// The stored body, `None` when it has not been fetched (no row, or the NULL row a
     /// pending fetch leaves).
     pub fn message_body(&self, id: &str) -> Result<Option<String>> {

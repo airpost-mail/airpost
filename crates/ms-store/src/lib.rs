@@ -33,7 +33,7 @@ pub use delta::{
 pub use model::Model;
 pub use models::{
     Calendar, Contact, ContactBook, ContactGroup, Event, File, FilePart, Folder, GenericModel,
-    IcsEventFields, IncomingMessage, Label, Message, MessageSnapshot, Task, Thread,
+    IcsEventFields, IncomingMessage, Label, Message, MessageSnapshot, Task, Thread, FILES_TMP_DIR,
 };
 pub use placement::{FetchableCopy, MessageAttributes, Placement};
 pub use query::Query;
