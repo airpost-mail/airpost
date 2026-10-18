@@ -17,6 +17,7 @@ pub mod invariants;
 pub mod legacy_import;
 pub mod migrate;
 pub mod model;
+pub mod model_query;
 pub mod models;
 pub mod placement;
 pub mod query;

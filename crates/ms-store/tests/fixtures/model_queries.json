@@ -1,0 +1,2308 @@
+{
+  "generatedBy": "apps/desktop/app/spec/model-query-capture-spec.ts",
+  "queries": [
+    {
+      "name": "inbox-page-1",
+      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox"
+              ]
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 10,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-inbox') AND `ThreadCategory`.`inAllMail` != 0  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 10 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "inbox-page-2",
+      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox"
+              ]
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 10,
+        "offset": 10,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-inbox') AND `ThreadCategory`.`inAllMail` != 0  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 10 OFFSET 10)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "inbox-ids",
+      "site": "src/flux/models/query-subscription.ts _getQueryForRange (idsOnly)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox"
+              ]
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": true,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`id` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-inbox') AND `ThreadCategory`.`inAllMail` != 0  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "unified-inbox",
+      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox",
+                "f-a2-inbox"
+              ]
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-inbox','f-a2-inbox') AND `ThreadCategory`.`inAllMail` != 0  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "sent",
+      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-sent",
+                "f-a2-sent"
+              ]
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageSentTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-sent','f-a2-sent') AND `ThreadCategory`.`inAllMail` != 0  ORDER BY `ThreadCategory`.`lastMessageSentTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageSentTimestamp` DESC"
+    },
+    {
+      "name": "trash",
+      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-trash"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-trash')  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "two-categories-distinct",
+      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox",
+                "f-a1-work"
+              ]
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": true,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT DISTINCT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-inbox','f-a1-work') AND `ThreadCategory`.`inAllMail` != 0  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "label",
+      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "l-a2-travel"
+              ]
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('l-a2-travel') AND `ThreadCategory`.`inAllMail` != 0  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "starred-all-accounts",
+      "site": "src/mailbox-perspective.ts StarredMailboxPerspective.threads",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "starred",
+              "op": "!=",
+              "value": 0
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`starred` != 0 AND `Thread`.`inAllMail` != 0  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0"
+    },
+    {
+      "name": "starred-one-account",
+      "site": "src/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "starred",
+              "op": "!=",
+              "value": 0
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            },
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a2"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`starred` != 0 AND `Thread`.`inAllMail` != 0 AND `Thread`.`accountId` = 'a2'  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0"
+    },
+    {
+      "name": "empty-perspective",
+      "site": "src/mailbox-perspective.ts EmptyMailboxPerspective.threads",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "lastMessageReceivedTimestamp",
+              "op": "=",
+              "value": -1
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 0,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`lastMessageReceivedTimestamp` = -1  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 0"
+    },
+    {
+      "name": "unread",
+      "site": "src/flux/models/unread-query-subscription.ts buildQuery",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox"
+              ]
+            },
+            {
+              "attr": "unread",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-inbox') AND `ThreadCategory`.`unread` != 0  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "unread-recently-read",
+      "site": "src/flux/models/unread-query-subscription.ts buildQuery (recentlyReadIds)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox"
+              ]
+            },
+            {
+              "or": [
+                {
+                  "attr": "unread",
+                  "op": "!=",
+                  "value": 0
+                },
+                {
+                  "attr": "id",
+                  "op": "in",
+                  "value": [
+                    "t02",
+                    "t04"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 100,
+        "offset": 0,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` WHERE `id` IN (SELECT `id` FROM `ThreadCategory` WHERE `ThreadCategory`.`value` IN ('f-a1-inbox') AND (`ThreadCategory`.`unread` != 0 OR `ThreadCategory`.`id` in ('t02','t04'))  ORDER BY `ThreadCategory`.`lastMessageReceivedTimestamp` DESC LIMIT 100 OFFSET 0)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC"
+    },
+    {
+      "name": "mark-all-read",
+      "site": "internal_packages/account-sidebar/lib/sidebar-item.ts onMarkAllAsRead",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox"
+              ]
+            },
+            {
+              "attr": "unread",
+              "op": "!=",
+              "value": 0
+            },
+            {
+              "attr": "inAllMail",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` INNER JOIN `ThreadCategory` AS `M7` ON `M7`.`id` = `Thread`.`id` WHERE `M7`.`value` IN ('f-a1-inbox') AND `Thread`.`unread` != 0 AND `Thread`.`inAllMail` != 0  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC "
+    },
+    {
+      "name": "permalink-date",
+      "site": "internal_packages/thread-list/lib/thread-permalink-handler.ts (date)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "subject",
+              "op": "=",
+              "value": "Subject 07"
+            },
+            {
+              "and": [
+                {
+                  "attr": "firstMessageTimestamp",
+                  "op": "<",
+                  "value": 1700007120
+                },
+                {
+                  "attr": "firstMessageTimestamp",
+                  "op": ">",
+                  "value": 1700006880
+                }
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`subject` = 'Subject 07' AND (`Thread`.`firstMessageTimestamp` < 1700007120 AND `Thread`.`firstMessageTimestamp` > 1700006880)  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 1"
+    },
+    {
+      "name": "permalink-last-date",
+      "site": "internal_packages/thread-list/lib/thread-permalink-handler.ts (lastDate)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "subject",
+              "op": "=",
+              "value": "Subject 08"
+            },
+            {
+              "or": [
+                {
+                  "and": [
+                    {
+                      "attr": "lastMessageSentTimestamp",
+                      "op": "<",
+                      "value": 1700008620
+                    },
+                    {
+                      "attr": "lastMessageSentTimestamp",
+                      "op": ">",
+                      "value": 1700008380
+                    }
+                  ]
+                },
+                {
+                  "and": [
+                    {
+                      "attr": "lastMessageReceivedTimestamp",
+                      "op": "<",
+                      "value": 1700008620
+                    },
+                    {
+                      "attr": "lastMessageReceivedTimestamp",
+                      "op": ">",
+                      "value": 1700008380
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`subject` = 'Subject 08' AND ((`Thread`.`lastMessageSentTimestamp` < 1700008620 AND `Thread`.`lastMessageSentTimestamp` > 1700008380) OR (`Thread`.`lastMessageReceivedTimestamp` < 1700008620 AND `Thread`.`lastMessageReceivedTimestamp` > 1700008380))  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 1"
+    },
+    {
+      "name": "mail-rules-inbox",
+      "site": "src/flux/stores/mail-rules-store.ts _processAllMessages",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            },
+            {
+              "attr": "categories",
+              "op": "contains",
+              "value": "f-a1-inbox"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 5,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` INNER JOIN `ThreadCategory` AS `M37` ON `M37`.`id` = `Thread`.`id` WHERE `Thread`.`accountId` = 'a1' AND `M37`.`value` = 'f-a1-inbox'  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 5"
+    },
+    {
+      "name": "mail-rules-inbox-before",
+      "site": "src/flux/stores/mail-rules-store.ts _processAllMessages (lastTimestamp)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            },
+            {
+              "attr": "categories",
+              "op": "contains",
+              "value": "f-a1-inbox"
+            },
+            {
+              "attr": "lastMessageReceivedTimestamp",
+              "op": "<",
+              "value": 1700012000
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 5,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` INNER JOIN `ThreadCategory` AS `M42` ON `M42`.`id` = `Thread`.`id` WHERE `Thread`.`accountId` = 'a1' AND `M42`.`value` = 'f-a1-inbox' AND `Thread`.`lastMessageReceivedTimestamp` < 1700012000  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 5"
+    },
+    {
+      "name": "search-result-ids",
+      "site": "internal_packages/thread-search/lib/search-query-subscription.ts _onSearchResults",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "in",
+              "value": [
+                "t01",
+                "t05",
+                "t30",
+                "missing"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`id` in ('t01','t05','t30','missing')  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC "
+    },
+    {
+      "name": "thread-by-id",
+      "site": "DatabaseStore.find(Thread) (draft-store, message-list, activity, mail rules)",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "t03"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`id` = 't03'  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 1"
+    },
+    {
+      "name": "thread-findby-id-limit",
+      "site": "internal_packages/thread-list/lib/thread-list-context-menu.ts copyPermalink",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "t04"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`id` = 't04'  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC LIMIT 1"
+    },
+    {
+      "name": "threads-by-ids",
+      "site": "internal_packages/unread-notifications/lib/main.ts _threadsForMessages",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "in",
+              "value": [
+                "t02",
+                "t26"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`id` in ('t02','t26')  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC "
+    },
+    {
+      "name": "missing-models",
+      "site": "src/flux/models/query-subscription.ts _fetchMissingModels",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "in",
+              "value": [
+                "t09",
+                "t10",
+                "t11"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread`  WHERE `Thread`.`id` in ('t09','t10','t11')  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC "
+    },
+    {
+      "name": "thread-count",
+      "site": "DatabaseStore.count",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "categories",
+              "op": "containsAny",
+              "value": [
+                "f-a1-inbox"
+              ]
+            },
+            {
+              "attr": "unread",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": true
+      },
+      "sql": "SELECT COUNT(*) as count FROM `Thread` INNER JOIN `ThreadCategory` AS `M6` ON `M6`.`id` = `Thread`.`id` WHERE `M6`.`value` IN ('f-a1-inbox') AND `Thread`.`unread` != 0  "
+    },
+    {
+      "name": "snoozed-threads",
+      "site": "ModelWithMetadata.pluginMetadata on Thread",
+      "query": {
+        "class": "Thread",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "pluginMetadata",
+              "op": "contains",
+              "value": "thread-snooze"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "lastMessageReceivedTimestamp",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Thread`.`data` FROM `Thread` INNER JOIN `ModelPluginMetadata` AS `M9` ON `M9`.`id` = `Thread`.`id` WHERE `M9`.`value` = 'thread-snooze'  ORDER BY `Thread`.`lastMessageReceivedTimestamp` DESC "
+    },
+    {
+      "name": "thread-messages",
+      "site": "src/flux/stores/message-store.ts _fetchFromCache",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "threadId",
+              "op": "=",
+              "value": "t03"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`threadId` = 't03'  ORDER BY `Message`.`date` ASC "
+    },
+    {
+      "name": "thread-messages-no-body",
+      "site": "internal_packages/thread-list/lib/thread-list-data-source.ts _observableForThreadMessages",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "threadId",
+              "op": "=",
+              "value": "t05"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`threadId` = 't05'  ORDER BY `Message`.`date` ASC "
+    },
+    {
+      "name": "messages-of-threads",
+      "site": "internal_packages/thread-list/lib/thread-list-data-source.ts (missingIds)",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "threadId",
+              "op": "in",
+              "value": [
+                "t01",
+                "t02",
+                "t27"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`threadId` in ('t01','t02','t27')  ORDER BY `Message`.`date` ASC "
+    },
+    {
+      "name": "latest-not-draft",
+      "site": "src/flux/stores/draft-factory.ts createDraftForResurfacing",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "threadId",
+              "op": "=",
+              "value": "t06"
+            },
+            {
+              "attr": "draft",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`threadId` = 't06' AND `Message`.`draft` = 0  ORDER BY `Message`.`date` DESC LIMIT 1"
+    },
+    {
+      "name": "reply-candidates",
+      "site": "src/flux/stores/draft-store.ts _getMessageAndThread",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "threadId",
+              "op": "=",
+              "value": "t06"
+            },
+            {
+              "attr": "draft",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`threadId` = 't06' AND `Message`.`draft` = 0  ORDER BY `Message`.`date` DESC "
+    },
+    {
+      "name": "eml-latest",
+      "site": "src/services/eml-utils.ts latestMessages",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "threadId",
+              "op": "=",
+              "value": "t07"
+            },
+            {
+              "attr": "draft",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`threadId` = 't07' AND `Message`.`draft` = 0  ORDER BY `Message`.`date` DESC LIMIT 1"
+    },
+    {
+      "name": "message-by-id-with-body",
+      "site": "src/flux/stores/draft-store.ts _getMessageAndThread",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "m03-2"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`id` = 'm03-2'  ORDER BY `Message`.`date` ASC LIMIT 1"
+    },
+    {
+      "name": "message-pending-body",
+      "site": "src/flux/stores/draft-store.ts (body not fetched yet)",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "m04-1"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`id` = 'm04-1'  ORDER BY `Message`.`date` ASC LIMIT 1"
+    },
+    {
+      "name": "message-by-id",
+      "site": "DatabaseStore.find(Message) (event-rsvp-task, undo-redo-toast)",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "m10-1"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`id` = 'm10-1'  ORDER BY `Message`.`date` ASC LIMIT 1"
+    },
+    {
+      "name": "draft-by-header",
+      "site": "src/flux/stores/draft-editing-session.ts prepare",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "headerMessageId",
+              "op": "=",
+              "value": "<d02@x.test>"
+            },
+            {
+              "attr": "draft",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`headerMessageId` = '<d02@x.test>' AND `Message`.`draft` != 0  ORDER BY `Message`.`date` ASC LIMIT 1"
+    },
+    {
+      "name": "draft-list",
+      "site": "internal_packages/draft-list/lib/draft-list-store.ts _onPerspectiveChanged",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "draft",
+              "op": "!=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": 200,
+        "offset": 0,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`draft` != 0  ORDER BY `Message`.`date` DESC LIMIT 200 OFFSET 0"
+    },
+    {
+      "name": "draft-list-one-account",
+      "site": "internal_packages/draft-list/lib/draft-list-store.ts (accountId)",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "draft",
+              "op": "!=",
+              "value": 0
+            },
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": 200,
+        "offset": 0,
+        "distinct": false,
+        "include": [
+          "body"
+        ],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data`, IFNULL(`MessageBody`.`value`, '!NULLVALUE!') AS `body`  FROM `Message` LEFT OUTER JOIN `MessageBody` ON `MessageBody`.`id` = `Message`.`id` WHERE `Message`.`draft` != 0 AND `Message`.`accountId` = 'a1'  ORDER BY `Message`.`date` DESC LIMIT 200 OFFSET 0"
+    },
+    {
+      "name": "messages-by-ids",
+      "site": "internal_packages/unread-notifications/lib/main.ts _onNewMessages",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "in",
+              "value": [
+                "m01-1",
+                "m25-2"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`id` in ('m01-1','m25-2')  ORDER BY `Message`.`date` ASC "
+    },
+    {
+      "name": "activity",
+      "site": "internal_packages/activity/lib/activity-data-source.ts buildQuery",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "pluginMetadata",
+              "op": "containsAny",
+              "value": [
+                "open-tracking",
+                "link-tracking"
+              ]
+            },
+            {
+              "attr": "draft",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": 20,
+        "offset": null,
+        "distinct": true,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT DISTINCT `Message`.`data` FROM `Message` INNER JOIN `ModelPluginMetadata` AS `M48` ON `M48`.`id` = `Message`.`id` WHERE `M48`.`value` IN ('open-tracking','link-tracking') AND `Message`.`draft` = 0  ORDER BY `Message`.`date` DESC LIMIT 20"
+    },
+    {
+      "name": "activity-accounts-dates",
+      "site": "internal_packages/activity/lib/activity-data-source.ts buildQuery (filters)",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "pluginMetadata",
+              "op": "containsAny",
+              "value": [
+                "open-tracking",
+                "link-tracking"
+              ]
+            },
+            {
+              "attr": "draft",
+              "op": "=",
+              "value": 0
+            },
+            {
+              "attr": "accountId",
+              "op": "in",
+              "value": [
+                "a1",
+                "a2"
+              ]
+            },
+            {
+              "attr": "date",
+              "op": ">",
+              "value": 1700003000
+            },
+            {
+              "attr": "date",
+              "op": "<",
+              "value": 1700030000
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": true,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT DISTINCT `Message`.`data` FROM `Message` INNER JOIN `ModelPluginMetadata` AS `M5` ON `M5`.`id` = `Message`.`id` WHERE `M5`.`value` IN ('open-tracking','link-tracking') AND `Message`.`draft` = 0 AND `Message`.`accountId` in ('a1','a2') AND `Message`.`date` > 1700003000 AND `Message`.`date` < 1700030000  ORDER BY `Message`.`date` DESC "
+    },
+    {
+      "name": "message-scan",
+      "site": "internal_packages/activity/lib/message-scan.ts",
+      "query": {
+        "class": "Message",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "in",
+              "value": [
+                "a1",
+                "a2"
+              ]
+            },
+            {
+              "attr": "date",
+              "op": ">",
+              "value": 1700005000
+            },
+            {
+              "attr": "date",
+              "op": "<",
+              "value": 1700025000
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "date",
+            "dir": "asc"
+          }
+        ],
+        "limit": 15,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Message`.`data` FROM `Message`  WHERE `Message`.`accountId` in ('a1','a2') AND `Message`.`date` > 1700005000 AND `Message`.`date` < 1700025000  ORDER BY `Message`.`date` ASC LIMIT 15"
+    },
+    {
+      "name": "folders",
+      "site": "src/global/mailspring-observables.ts categories",
+      "query": {
+        "class": "Folder",
+        "accounts": null,
+        "where": null,
+        "search": null,
+        "order": [],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Folder`.`data` FROM `Folder`   "
+    },
+    {
+      "name": "labels-for-account",
+      "site": "src/global/mailspring-observables.ts forAccount",
+      "query": {
+        "class": "Label",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a2"
+            }
+          ]
+        },
+        "search": null,
+        "order": [],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Label`.`data` FROM `Label`  WHERE `Label`.`accountId` = 'a2'  "
+    },
+    {
+      "name": "tasks",
+      "site": "src/flux/stores/task-queue.ts",
+      "query": {
+        "class": "Task",
+        "accounts": null,
+        "where": null,
+        "search": null,
+        "order": [],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Task`.`data` FROM `Task`   "
+    },
+    {
+      "name": "contact-search",
+      "site": "src/flux/stores/contact-store.ts searchContacts",
+      "query": {
+        "class": "Contact",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "refs",
+              "op": ">",
+              "value": 0
+            },
+            {
+              "attr": "hidden",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": {
+          "text": "ann",
+          "grammar": false
+        },
+        "order": [
+          {
+            "attr": "refs",
+            "dir": "desc"
+          }
+        ],
+        "limit": 20,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Contact`.`data` FROM `Contact`  WHERE `Contact`.`id` IN (SELECT `content_id` FROM `ContactSearch` WHERE `ContactSearch` MATCH '\"ann\"*' LIMIT 1000) AND `Contact`.`refs` > 0 AND `Contact`.`hidden` = 0  ORDER BY `Contact`.`refs` DESC LIMIT 20"
+    },
+    {
+      "name": "contact-search-quoted",
+      "site": "src/flux/stores/contact-store.ts searchContacts (quotes)",
+      "query": {
+        "class": "Contact",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "refs",
+              "op": ">",
+              "value": 0
+            },
+            {
+              "attr": "hidden",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": {
+          "text": " 'bo",
+          "grammar": false
+        },
+        "order": [
+          {
+            "attr": "refs",
+            "dir": "desc"
+          }
+        ],
+        "limit": 20,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Contact`.`data` FROM `Contact`  WHERE `Contact`.`id` IN (SELECT `content_id` FROM `ContactSearch` WHERE `ContactSearch` MATCH '\"bo\"*' LIMIT 1000) AND `Contact`.`refs` > 0 AND `Contact`.`hidden` = 0  ORDER BY `Contact`.`refs` DESC LIMIT 20"
+    },
+    {
+      "name": "top-contacts",
+      "site": "src/flux/stores/contact-store.ts topContacts",
+      "query": {
+        "class": "Contact",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "refs",
+              "op": ">",
+              "value": 0
+            },
+            {
+              "attr": "hidden",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "refs",
+            "dir": "desc"
+          }
+        ],
+        "limit": 10,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Contact`.`data` FROM `Contact`  WHERE `Contact`.`refs` > 0 AND `Contact`.`hidden` = 0  ORDER BY `Contact`.`refs` DESC LIMIT 10"
+    },
+    {
+      "name": "contacts-list",
+      "site": "internal_packages/contacts/lib/Store.ts",
+      "query": {
+        "class": "Contact",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "refs",
+              "op": ">",
+              "value": 0
+            },
+            {
+              "attr": "hidden",
+              "op": "=",
+              "value": 0
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Contact`.`data` FROM `Contact`  WHERE `Contact`.`refs` > 0 AND `Contact`.`hidden` = 0  ORDER BY `Contact`.`id` DESC "
+    },
+    {
+      "name": "contacts-not-mail",
+      "site": "internal_packages/contacts/lib/Store.ts (source)",
+      "query": {
+        "class": "Contact",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "refs",
+              "op": ">",
+              "value": 0
+            },
+            {
+              "attr": "hidden",
+              "op": "=",
+              "value": 0
+            },
+            {
+              "attr": "source",
+              "op": "!=",
+              "value": "mail"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Contact`.`data` FROM `Contact`  WHERE `Contact`.`refs` > 0 AND `Contact`.`hidden` = 0 AND `Contact`.`source` != 'mail'  ORDER BY `Contact`.`id` DESC "
+    },
+    {
+      "name": "contacts-in-groups",
+      "site": "src/components/participants-text-field.tsx _onAdd",
+      "query": {
+        "class": "Contact",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "contactGroups",
+              "op": "containsAny",
+              "value": [
+                "g1",
+                "g2"
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Contact`.`data` FROM `Contact` INNER JOIN `ContactContactGroup` AS `M45` ON `M45`.`id` = `Contact`.`id` WHERE `M45`.`value` IN ('g1','g2')  ORDER BY `Contact`.`id` DESC "
+    },
+    {
+      "name": "focused-contact",
+      "site": "src/flux/stores/focused-contacts-store.ts",
+      "query": {
+        "class": "Contact",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            },
+            {
+              "attr": "email",
+              "op": "=",
+              "value": "c03@x.test"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Contact`.`data` FROM `Contact`  WHERE `Contact`.`accountId` = 'a1' AND `Contact`.`email` = 'c03@x.test'  ORDER BY `Contact`.`id` DESC LIMIT 1"
+    },
+    {
+      "name": "contact-groups",
+      "site": "src/flux/stores/contact-store.ts searchContactGroups",
+      "query": {
+        "class": "ContactGroup",
+        "accounts": null,
+        "where": null,
+        "search": null,
+        "order": [
+          {
+            "attr": "name",
+            "dir": "asc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `ContactGroup`.`data` FROM `ContactGroup`   ORDER BY `ContactGroup`.`name` ASC "
+    },
+    {
+      "name": "contact-books",
+      "site": "internal_packages/contacts/lib/Store.ts",
+      "query": {
+        "class": "ContactBook",
+        "accounts": null,
+        "where": null,
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "asc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `ContactBook`.`data` FROM `ContactBook`   ORDER BY `ContactBook`.`id` ASC "
+    },
+    {
+      "name": "calendars",
+      "site": "internal_packages/main-calendar/lib/core/calendar-sidebar.tsx",
+      "query": {
+        "class": "Calendar",
+        "accounts": null,
+        "where": null,
+        "search": null,
+        "order": [],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Calendar`.`data` FROM `Calendar`   "
+    },
+    {
+      "name": "calendars-for-account",
+      "site": "internal_packages/events/lib/event-header.tsx",
+      "query": {
+        "class": "Calendar",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            }
+          ]
+        },
+        "search": null,
+        "order": [],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Calendar`.`data` FROM `Calendar`  WHERE `Calendar`.`accountId` = 'a1'  "
+    },
+    {
+      "name": "calendar-by-id",
+      "site": "internal_packages/main-calendar/lib/core/calendar-rsvp.ts",
+      "query": {
+        "class": "Calendar",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "cal2"
+            }
+          ]
+        },
+        "search": null,
+        "order": [],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Calendar`.`data` FROM `Calendar`  WHERE `Calendar`.`id` = 'cal2'  LIMIT 1"
+    },
+    {
+      "name": "events-in-range",
+      "site": "internal_packages/main-calendar/lib/core/calendar-data-source.ts buildObservable",
+      "query": {
+        "class": "Event",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "and": [
+                {
+                  "or": [
+                    {
+                      "and": [
+                        {
+                          "attr": "recurrenceStart",
+                          "op": "<=",
+                          "value": 1700060000
+                        },
+                        {
+                          "attr": "recurrenceEnd",
+                          "op": ">=",
+                          "value": 1700020000
+                        }
+                      ]
+                    },
+                    {
+                      "and": [
+                        {
+                          "attr": "recurrenceStart",
+                          "op": "<=",
+                          "value": 1700060000
+                        },
+                        {
+                          "attr": "recurrenceStart",
+                          "op": ">=",
+                          "value": 1700020000
+                        }
+                      ]
+                    },
+                    {
+                      "and": [
+                        {
+                          "attr": "recurrenceEnd",
+                          "op": ">=",
+                          "value": 1700020000
+                        },
+                        {
+                          "attr": "recurrenceEnd",
+                          "op": "<=",
+                          "value": 1700060000
+                        }
+                      ]
+                    },
+                    {
+                      "and": [
+                        {
+                          "attr": "recurrenceEnd",
+                          "op": ">=",
+                          "value": 1700060000
+                        },
+                        {
+                          "attr": "recurrenceStart",
+                          "op": "<=",
+                          "value": 1700020000
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "attr": "calendarId",
+                  "op": "not in",
+                  "value": [
+                    "cal2",
+                    "nope"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Event`.`data` FROM `Event`  WHERE (((`Event`.`recurrenceStart` <= 1700060000 AND `Event`.`recurrenceEnd` >= 1700020000) OR (`Event`.`recurrenceStart` <= 1700060000 AND `Event`.`recurrenceStart` >= 1700020000) OR (`Event`.`recurrenceEnd` >= 1700020000 AND `Event`.`recurrenceEnd` <= 1700060000) OR (`Event`.`recurrenceEnd` >= 1700060000 AND `Event`.`recurrenceStart` <= 1700020000)) AND `Event`.`calendarId` not in ('cal2','nope'))  ORDER BY `Event`.`id` DESC "
+    },
+    {
+      "name": "events-by-uid",
+      "site": "internal_packages/main-calendar/lib/main.tsx, events/lib/event-header.tsx",
+      "query": {
+        "class": "Event",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "icsuid",
+              "op": "=",
+              "value": "uid-03"
+            },
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Event`.`data` FROM `Event`  WHERE `Event`.`icsuid` = 'uid-03' AND `Event`.`accountId` = 'a1'  ORDER BY `Event`.`id` DESC "
+    },
+    {
+      "name": "events-nearby",
+      "site": "internal_packages/events/lib/event-header.tsx (conflicts)",
+      "query": {
+        "class": "Event",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            },
+            {
+              "attr": "recurrenceStart",
+              "op": "<",
+              "value": 1700040000
+            },
+            {
+              "attr": "recurrenceEnd",
+              "op": ">",
+              "value": 1700010000
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": null,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Event`.`data` FROM `Event`  WHERE `Event`.`accountId` = 'a1' AND `Event`.`recurrenceStart` < 1700040000 AND `Event`.`recurrenceEnd` > 1700010000  ORDER BY `Event`.`id` DESC "
+    },
+    {
+      "name": "event-master",
+      "site": "internal_packages/main-calendar/lib/core/mailspring-calendar.tsx _onDelete",
+      "query": {
+        "class": "Event",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "accountId",
+              "op": "=",
+              "value": "a1"
+            },
+            {
+              "attr": "calendarId",
+              "op": "=",
+              "value": "cal1"
+            },
+            {
+              "attr": "icsuid",
+              "op": "=",
+              "value": "uid-03"
+            },
+            {
+              "attr": "recurrenceId",
+              "op": "=",
+              "value": ""
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Event`.`data` FROM `Event`  WHERE `Event`.`accountId` = 'a1' AND `Event`.`calendarId` = 'cal1' AND `Event`.`icsuid` = 'uid-03' AND `Event`.`recurrenceId` = ''  ORDER BY `Event`.`id` DESC LIMIT 1"
+    },
+    {
+      "name": "event-by-id",
+      "site": "DatabaseStore.find(Event) (calendar-rsvp, popovers, mailspring-calendar)",
+      "query": {
+        "class": "Event",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "e05"
+            }
+          ]
+        },
+        "search": null,
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `Event`.`data` FROM `Event`  WHERE `Event`.`id` = 'e05'  ORDER BY `Event`.`id` DESC LIMIT 1"
+    },
+    {
+      "name": "event-search",
+      "site": "internal_packages/main-calendar/lib/core/event-search-bar.tsx",
+      "query": {
+        "class": "Event",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "calendarId",
+              "op": "not in",
+              "value": [
+                "cal3",
+                "x"
+              ]
+            }
+          ]
+        },
+        "search": {
+          "text": "lunch",
+          "grammar": false
+        },
+        "order": [
+          {
+            "attr": "id",
+            "dir": "desc"
+          }
+        ],
+        "limit": 10,
+        "offset": null,
+        "distinct": true,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT DISTINCT `Event`.`data` FROM `Event`  WHERE `Event`.`calendarId` not in ('cal3','x') AND `Event`.`id` IN (SELECT `content_id` FROM `EventSearch` WHERE `EventSearch` MATCH '\"lunch\"*' LIMIT 1000)  ORDER BY `Event`.`id` DESC LIMIT 10"
+    },
+    {
+      "name": "file-by-id",
+      "site": "DatabaseStore.find(File)",
+      "query": {
+        "class": "File",
+        "accounts": null,
+        "where": {
+          "and": [
+            {
+              "attr": "id",
+              "op": "=",
+              "value": "file2"
+            }
+          ]
+        },
+        "search": null,
+        "order": [],
+        "limit": 1,
+        "offset": null,
+        "distinct": false,
+        "include": [],
+        "idsOnly": false,
+        "count": false
+      },
+      "sql": "SELECT `File`.`data` FROM `File`  WHERE `File`.`id` = 'file2'  LIMIT 1"
+    }
+  ]
+}
