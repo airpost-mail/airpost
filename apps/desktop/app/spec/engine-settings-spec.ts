@@ -7,7 +7,12 @@ import ConfigPersistenceManager, {
   registerConfigIPC,
 } from '../src/browser/config-persistence-manager';
 import { EngineSupervisor, SupervisorConfig } from '../src/browser/engine-supervisor';
-import { EngineSettingsMirror, PUSHED_KEY, touchesKey } from '../src/browser/engine-settings';
+import {
+  EngineSettingsMirror,
+  KEPT_KEY,
+  STORE_KEY,
+  touchesKey,
+} from '../src/browser/engine-settings';
 import { KeyManager } from '../src/browser/key-manager';
 import { ConfigChannel } from '../src/config-channels';
 import { EngineServeProcess } from '../src/mailsync-process';
@@ -99,7 +104,7 @@ describe('the engine-owned settings in the main process', function () {
     });
     // One call per key, and nothing that isn't engine-owned.
     expect(settingsCalls().filter((r) => r.method === 'settings.set').length).toBe(2);
-    expect(configOnDisk()[PUSHED_KEY]).toBe(true);
+    expect(configOnDisk()[STORE_KEY]).toBe('store-1');
 
     // Another client changed one key and cleared the other while the app was closed.
     supervisor.client.engine._closeSocket();
@@ -115,9 +120,71 @@ describe('the engine-owned settings in the main process', function () {
     expect(configOnDisk().core.sending.undoSend).toBe(30000);
   });
 
+  it('copies config.json again into a store the engine started anew', async function () {
+    fake.settings = {};
+    writeConfig({ core: { sending: { undoSend: 15000 } }, signatures: { s1: SIGNATURE } });
+    await launch();
+    supervisor.client.engine._closeSocket();
+
+    // settings.json was lost or set aside: an empty store with a new id.
+    fake.settings = {};
+    fake.settingsStoreId = 'store-2';
+    fake.socket = [];
+    await launch();
+    expect(manager.get('core.sending.undoSend')).toBe(15000);
+    expect(manager.get('signatures')).toEqual({ s1: SIGNATURE });
+    expect(fake.settings).toEqual({
+      'core.sending.undoSend': 15000,
+      signatures: { s1: SIGNATURE },
+    });
+    await until('the store id', () => configOnDisk()[STORE_KEY] === 'store-2');
+  });
+
+  it('keeps config.json when the engine cannot read its settings', async function () {
+    fake.settings = {};
+    fake.socketErrors['settings.get'] = { code: -32603, message: 'could not read settings.json' };
+    writeConfig({ [STORE_KEY]: 'store-1', core: { sending: { undoSend: 15000 } } });
+    await launch();
+    expect(settingsCalls().map((r) => r.method)).toEqual(['settings.get']);
+    expect(manager.get('core.sending.undoSend')).toBe(15000);
+    expect(configOnDisk().core.sending.undoSend).toBe(15000);
+  });
+
+  it('keeps a value whose copy the engine refused', async function () {
+    fake.settings = {};
+    fake.socketErrors['settings.set'] = { code: -32602, message: 'refused' };
+    writeConfig({ core: { sending: { undoSend: 15000 } }, signatures: { s1: SIGNATURE } });
+    await launch();
+    await until('the store id', () => configOnDisk()[STORE_KEY] === 'store-1');
+    expect(configOnDisk()[KEPT_KEY]).toEqual(['core.sending.undoSend', 'signatures']);
+    expect(manager.get('core.sending.undoSend')).toBe(15000);
+    supervisor.client.engine._closeSocket();
+
+    // The same store, still without the values: config.json keeps them and copies nothing.
+    // (The fake stores a set before it answers with the error.)
+    delete fake.socketErrors['settings.set'];
+    fake.settings = {};
+    fake.socket = [];
+    await launch();
+    expect(settingsCalls().map((r) => r.method)).toEqual(['settings.get']);
+    expect(manager.get('core.sending.undoSend')).toBe(15000);
+    expect(manager.get('signatures')).toEqual({ s1: SIGNATURE });
+
+    // Once the engine has a value, it wins and the key is no longer kept.
+    const before = changes.length;
+    fake.notify('settings.changed', { values: { 'core.sending.undoSend': 5000 } }, fake.conn);
+    await until('the change', () => changes.length > before);
+    expect(manager.get('core.sending.undoSend')).toBe(5000);
+    expect(configOnDisk()[KEPT_KEY]).toEqual(['signatures']);
+    // A local write the engine takes ends the other.
+    manager.setRawValue('signatures', { s1: SIGNATURE, s2: SIGNATURE }, null);
+    await until('the set', () => configOnDisk()[KEPT_KEY] === undefined);
+    expect(fake.settings.signatures.s2).toEqual(SIGNATURE);
+  });
+
   it('gives a window booting after launch the engine signature synchronously', async function () {
     fake.settings = { signatures: { s1: SIGNATURE }, defaultSignatures: { 'ann@x.test': 's1' } };
-    writeConfig({ [PUSHED_KEY]: true, signatures: {} });
+    writeConfig({ [STORE_KEY]: 'store-1', signatures: {} });
     await launch();
 
     const handlers = {};
@@ -140,7 +207,7 @@ describe('the engine-owned settings in the main process', function () {
 
   it('forwards local writes of engine keys only and applies settings.changed', async function () {
     fake.settings = {};
-    writeConfig({ [PUSHED_KEY]: true });
+    writeConfig({ [STORE_KEY]: 'store-1' });
     await launch();
 
     manager.setRawValue('core.themes', ['ui-dark'], null);
@@ -168,7 +235,7 @@ describe('the engine-owned settings in the main process', function () {
 
   it('keeps a local write over a notification the engine applied before it', async function () {
     fake.settings = {};
-    writeConfig({ [PUSHED_KEY]: true });
+    writeConfig({ [STORE_KEY]: 'store-1' });
     await launch();
     const engine = supervisor.client.engine;
     manager.setRawValue('core.composing.html', false, null);
@@ -186,7 +253,7 @@ describe('the engine-owned settings in the main process', function () {
     manager.setRawValue('core.sending.undoSend', 5000, null);
     expect(settingsCalls()).toEqual([]);
     expect(configOnDisk().core.sending.undoSend).toBe(5000);
-    expect(configOnDisk()[PUSHED_KEY]).toBeUndefined();
+    expect(configOnDisk()[STORE_KEY]).toBeUndefined();
   });
 
   it('matches writes to the keys they can change', function () {

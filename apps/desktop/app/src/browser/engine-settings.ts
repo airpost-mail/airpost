@@ -7,10 +7,13 @@ config.json, which the main process's ConfigPersistenceManager holds, and the `s
 settings store, over the supervisor's socket connection. Windows keep reading config
 synchronously and never talk to the store.
 
-- On each engine whose hello lists `settings`: the first time ever, push the values config.json
-  has (the one-time move); then push the keys written while no engine took them; then
-  `settings.get`, and the engine wins: its values replace config.json's, and a key it has no
-  value for is cleared.
+- On each engine whose hello lists `settings`: `settings.get`, which also names the store. A
+  store config.json's values were never copied into (a first launch, or a store the engine
+  started anew after losing or setting aside settings.json) gets them, one `settings.set` per
+  key; then the keys written while no engine took them are pushed; and the engine wins for the
+  rest: its values replace config.json's, and a key it has no value for is cleared. A key whose
+  copy the engine refused is kept in config.json instead (KEPT_KEY) until the engine has a value.
+  When `settings.get` fails, config.json is left as it is.
 - A local write of an engine-owned key goes to `settings.set`, one call per key, so a value the
   engine refuses doesn't hold back the others.
 - `settings.changed` (another client's change) is applied to config.json and the windows.
@@ -35,8 +38,14 @@ export const ENGINE_SETTINGS_KEYS = [
   'defaultSignatures',
 ];
 
-// Set in config.json once its values have been pushed to an engine store.
-export const PUSHED_KEY = 'engineSettingsPushed';
+// The id (settings.get's `storeId`) of the engine store config.json's values were copied into.
+export const STORE_KEY = 'engineSettingsStore';
+// Engine-owned keys config.json keeps although the store has no value: the copy was refused.
+export const KEPT_KEY = 'engineSettingsKept';
+// The store of an engine that names none.
+const UNNAMED_STORE = 'unnamed';
+
+type SetOutcome = 'stored' | 'refused' | 'exited';
 
 // How long launch waits for the first sync before it opens windows with config.json's values.
 export const ENGINE_SETTINGS_WAIT_MS = 3000;
@@ -118,51 +127,84 @@ export class EngineSettingsMirror {
   }
 
   async _sync(engine: SettingsEngine) {
-    const firstPush = !this.host.get(PUSHED_KEY);
-    const keys = ENGINE_SETTINGS_KEYS.filter((key) =>
-      firstPush ? this.host.get(key) !== undefined : this._unsent.has(key)
-    );
     try {
-      const pushed = this._sendKeys(engine, keys);
-      if (firstPush) {
-        await pushed;
-        if (this.engine !== engine) return;
-        this.host.applyEngineValues({ [PUSHED_KEY]: true });
-      }
-      const { values } = await engine.request<SettingsValues>(Method.SettingsGet, {
+      const { values, storeId } = await engine.request<SettingsValues>(Method.SettingsGet, {
         keys: ENGINE_SETTINGS_KEYS,
       });
       if (this.engine !== engine) return;
+      const store = storeId || UNNAMED_STORE;
+      const copy = store !== this.host.get(STORE_KEY);
+      const keys = ENGINE_SETTINGS_KEYS.filter(
+        (key) => this._unsent.has(key) || (copy && this.host.get(key) !== undefined)
+      );
+      const sent = this._sendKeys(engine, keys);
+      // The keys just sent are in flight, so _apply leaves them.
       this._apply(values || {}, ENGINE_SETTINGS_KEYS);
+      if (!copy) return;
+      const outcomes = await sent;
+      if (this.engine !== engine || outcomes.includes('exited')) return;
+      const refused = keys.filter((_key, i) => outcomes[i] === 'refused');
+      this.host.applyEngineValues({
+        [STORE_KEY]: store,
+        [KEPT_KEY]: refused.length ? refused : undefined,
+      });
     } catch (err) {
       console.warn(`Could not read the engine's settings: ${err.message}`);
     }
   }
 
+  _kept(): string[] {
+    const kept = this.host.get(KEPT_KEY);
+    return Array.isArray(kept) ? kept : [];
+  }
+
   // Applies the engine's values of `keys` (a key absent from `values` has none).
   _apply(values: { [key: string]: unknown }, keys: string[]) {
+    const kept = this._kept();
     const changes: { [key: string]: unknown } = {};
+    const valued: string[] = [];
     for (const key of keys) {
-      if (!ENGINE_SETTINGS_KEYS.includes(key) || this._inFlight.has(key)) continue;
+      if (!ENGINE_SETTINGS_KEYS.includes(key) || this._inFlight.has(key) || this._unsent.has(key)) {
+        continue;
+      }
       const value = local(values[key]);
+      if (kept.includes(key)) {
+        if (value === undefined) continue;
+        valued.push(key);
+      }
       if (!_.isEqual(value, this.host.get(key))) changes[key] = value;
     }
+    if (valued.length) changes[KEPT_KEY] = this._without(kept, valued);
     if (Object.keys(changes).length) this.host.applyEngineValues(changes);
   }
 
-  // Resolves once every set has been answered; a refused one is logged and dropped.
-  _sendKeys(engine: SettingsEngine, keys: string[]) {
+  _without(kept: string[], keys: string[]) {
+    const left = kept.filter((k) => !keys.includes(k));
+    return left.length ? left : undefined;
+  }
+
+  // Resolves once every set has been answered, with each one's outcome; a refused one is
+  // logged and dropped.
+  _sendKeys(engine: SettingsEngine, keys: string[]): Promise<SetOutcome[]> {
     return Promise.all(
       keys.map((key) => {
         this._inFlight.set(key, (this._inFlight.get(key) || 0) + 1);
         const values = { [key]: wire(this.host.get(key)) };
         return engine.request(Method.SettingsSet, { values }).then(
-          () => this._answered(key, true),
-          (err) => {
+          (): SetOutcome => {
+            this._answered(key, true);
+            const kept = this._kept();
+            if (kept.includes(key)) {
+              this.host.applyEngineValues({ [KEPT_KEY]: this._without(kept, [key]) });
+            }
+            return 'stored';
+          },
+          (err): SetOutcome => {
             if (!err.engineExited) {
               console.warn(`The engine refused the setting ${key}: ${err.message}`);
             }
             this._answered(key, !err.engineExited);
+            return err.engineExited ? 'exited' : 'refused';
           }
         );
       })

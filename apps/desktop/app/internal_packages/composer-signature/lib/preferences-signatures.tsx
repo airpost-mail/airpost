@@ -166,7 +166,12 @@ class SignatureEditor extends React.Component<SignatureEditorProps, SignatureEdi
 
         <div className="section preview">
           <div className="label">{localized('Preview')}</div>
-          <div className="preview" dangerouslySetInnerHTML={{ __html: signature.body }} />
+          {/* Sanitized like a message body: signatures can come from other clients through
+          the engine's settings, and this window runs with Node. */}
+          <div
+            className="preview"
+            dangerouslySetInnerHTML={{ __html: SanitizeTransformer.runSync(signature.body || '') }}
+          />
         </div>
 
         <div className="section">

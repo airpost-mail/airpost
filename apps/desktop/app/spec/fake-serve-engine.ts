@@ -54,6 +54,8 @@ export class FakeEngine {
   // The settings store, when the engine announces `settings`: settings.get and settings.set
   // answer from it.
   settings: { [key: string]: any } | null = null;
+  // settings.get's storeId.
+  settingsStoreId = 'store-1';
 
   constructor(dir: string) {
     this.dir = dir;
@@ -113,7 +115,7 @@ export class FakeEngine {
         for (const k of Object.keys(this.settings)) {
           if (!p.keys || p.keys.includes(k)) values[k] = this.settings[k];
         }
-        return { values };
+        return { values, storeId: this.settingsStoreId };
       }
       case 'settings.set':
         for (const [k, v] of Object.entries(p.values || {})) {

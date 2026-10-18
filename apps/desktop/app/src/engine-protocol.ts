@@ -198,6 +198,9 @@ export interface SettingsGetParams {
 // without a stored value is absent.
 export interface SettingsValues {
   values: { [keyPath: string]: unknown };
+  // settings.get only: the store's id, new whenever the engine starts a store from nothing
+  // (no settings.json, or a corrupt one set aside).
+  storeId?: string;
 }
 
 // null means every account, or every model class.

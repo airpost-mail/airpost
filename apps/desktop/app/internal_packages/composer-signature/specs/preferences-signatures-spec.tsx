@@ -29,6 +29,26 @@ const makeComponent = (props = {}) => {
 describe('PreferencesSignatures', function preferencesSignatures() {
   this.component = null;
 
+  describe('the preview', () => {
+    it('renders the signature sanitized', () => {
+      const sig = {
+        id: '3',
+        title: 'three',
+        body: '<img src="x" onerror="window.__sigPreview = 1"><b>Ann</b><script>1</script>',
+      };
+      spyOn(SignatureStore, 'getSignatures').andReturn({ '3': sig });
+      spyOn(SignatureStore, 'selectedSignature').andReturn(sig);
+      spyOn(SignatureStore, 'getDefaults').andReturn({});
+      const component = makeComponent() as any;
+      const preview = ReactTestUtils.scryRenderedDOMComponentsWithClass(component, 'preview').find(
+        (el) => el.tagName === 'DIV' && !el.classList.contains('section')
+      );
+      expect(preview.innerHTML).toContain('<b>Ann</b>');
+      expect(preview.innerHTML).not.toContain('onerror');
+      expect(preview.innerHTML).not.toContain('<script');
+    });
+  });
+
   describe('when there are signatures', () => {
     beforeEach(() => {
       spyOn(SignatureStore, 'getSignatures').andReturn(SIGNATURES);
