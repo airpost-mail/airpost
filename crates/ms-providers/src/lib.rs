@@ -15,6 +15,7 @@
 //! flag. Each provider is one file under `providers/` with a `detect` function and its
 //! profile, matched in order with the generic default last.
 
+pub mod discovery;
 pub mod oauth;
 pub mod providers;
 pub mod roles;

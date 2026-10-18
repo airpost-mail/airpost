@@ -1,0 +1,6010 @@
+{
+ "version": 1,
+ "matchers": [
+  {
+   "id": "pobox",
+   "domains": [
+    "pobox\\.com"
+   ],
+   "mx": [
+    "mx-1\\.pobox\\.com",
+    "mx-2\\.pobox\\.com",
+    "mx-3\\.pobox\\.com",
+    "mx-1\\.rightbox\\.com",
+    "mx-2\\.rightbox\\.com",
+    "mx-3\\.rightbox\\.com"
+   ],
+   "imap": {
+    "host": "mail.pobox.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.pobox.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "hushmail",
+   "domains": [
+    "hushmail\\.com"
+   ],
+   "imap": {
+    "host": "imap.hushmail.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.hushmail.com",
+    "port": 587,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "mail",
+   "domains": [
+    "mail\\.com"
+   ],
+   "imap": {
+    "host": "imap.mail.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.mail.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "secureserver",
+   "domains": [
+    "secureserver\\.net"
+   ],
+   "mx": [
+    "mailstore[0-9]?\\.secureserver\\.net",
+    "mailstore[0-9]?\\.asia\\.secureserver\\.net",
+    "smtp\\.asia\\.secureserver\\.net",
+    "smtp\\.secureserver\\.net"
+   ],
+   "imap": {
+    "host": "imap.secureserver.net",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtpout.secureserver.net",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "zoho",
+   "domains": [
+    "zoho\\.com"
+   ],
+   "mx": [
+    "mx\\.zoho\\.com",
+    "mx[0-9]*\\.zoho\\.com"
+   ],
+   "imap": {
+    "host": "imap.zoho.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.zoho.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "icloud",
+   "domains": [
+    "me\\.com",
+    "mac\\.com",
+    "icloud\\.com"
+   ],
+   "imap": {
+    "host": "imap.mail.me.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.mail.me.com",
+    "port": 587,
+    "security": "STARTTLS"
+   }
+  },
+  {
+   "id": "dreamhost",
+   "mx": [
+    "mx1\\.sub3\\.homie\\.mail\\.dreamhost\\.com",
+    "mx2\\.sub3\\.homie\\.mail\\.dreamhost\\.com",
+    "mx1\\.sub4\\.homie\\.mail\\.dreamhost\\.com",
+    "mx2\\.sub4\\.homie\\.mail\\.dreamhost\\.com",
+    "mx1\\.sub5\\.homie\\.mail\\.dreamhost\\.com",
+    "mx2\\.sub5\\.homie\\.mail\\.dreamhost\\.com",
+    "mx1\\.balanced\\.homie\\.mail\\.dreamhost\\.com",
+    "mx2\\.balanced\\.homie\\.mail\\.dreamhost\\.com"
+   ],
+   "imap": {
+    "host": "mail.{domain}",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "mail.{domain}",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "euro-apple",
+   "domains": [
+    "euro\\.apple\\.com"
+   ],
+   "imap": {
+    "host": "phonehome.euro.apple.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "phonehome.apple.com",
+    "port": 587,
+    "security": "STARTTLS"
+   }
+  },
+  {
+   "id": "aol",
+   "domains": [
+    "aim\\.com",
+    "aol\\..*",
+    "jp\\.aol\\.com"
+   ],
+   "imap": {
+    "host": "imap.aol.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.aol.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "yahoo.co.jp",
+   "domains": [
+    "yahoo\\.co\\.jp"
+   ],
+   "imap": {
+    "host": "imap.mail.yahoo.co.jp",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.mail.yahoo.co.jp",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "yahoo",
+   "domains": [
+    "yahoo\\..*",
+    "ymail\\.com",
+    "rocketmail\\.com",
+    "xtra\\.co\\.nz"
+   ],
+   "mx": [
+    "mta5\\.am0\\.yahoodns\\.net",
+    "mta6\\.am0\\.yahoodns\\.net",
+    "mta7\\.am0\\.yahoodns\\.net"
+   ],
+   "exclude": [
+    "yahoo\\.co\\.jp"
+   ],
+   "imap": {
+    "host": "imap.mail.yahoo.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.mail.yahoo.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "gmail",
+   "domains": [
+    "googlemail\\.com",
+    "gmail\\.com"
+   ],
+   "mx": [
+    "aspmx2\\.googlemail\\.com",
+    "aspmx\\.l\\.google\\.com",
+    "aspmx3\\.googlemail\\.com",
+    "alt1\\.aspmx\\.l\\.google\\.com",
+    "alt2\\.aspmx\\.l\\.google\\.com",
+    "alt1\\.gmail-smtp-in\\.l\\.google\\.com",
+    "alt2\\.gmail-smtp-in\\.l\\.google\\.com",
+    "alt3\\.gmail-smtp-in\\.l\\.google\\.com",
+    "alt4\\.gmail-smtp-in\\.l\\.google\\.com",
+    "gmail-smtp-in\\.l\\.google\\.com",
+    "smtp\\.google\\.com"
+   ],
+   "imap": {
+    "host": "imap.gmail.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "security": "STARTTLS"
+   }
+  },
+  {
+   "id": "gmx",
+   "domains": [
+    "gmx\\..*",
+    "caramail\\..*"
+   ],
+   "imap": {
+    "host": "imap.gmx.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "mail.gmx.com",
+    "port": 587,
+    "security": "STARTTLS"
+   }
+  },
+  {
+   "id": "fastmail",
+   "domains": [
+    "123mail\\.org",
+    "fastmail\\..*",
+    "airpost\\.net",
+    "eml\\.cc",
+    "fmail\\.co\\.uk",
+    "fmgirl\\.com",
+    "fmguy\\.com",
+    "mailbolt\\.com",
+    "mailcan\\.com",
+    "mailhaven\\.com",
+    "mailmight\\.com",
+    "ml1\\.net",
+    "mm\\.st",
+    "myfastmail\\.com",
+    "proinbox\\.com",
+    "promessage\\.com",
+    "rushpost\\.com",
+    "sent\\.as",
+    "sent\\.at",
+    "sent\\.com",
+    "speedymail\\.org",
+    "warpmail\\.net",
+    "xsmail\\.com",
+    "150mail\\.com",
+    "150ml\\.com",
+    "16mail\\.com",
+    "2-mail\\.com",
+    "4email\\.net",
+    "50mail\\.com",
+    "allmail\\.net",
+    "bestmail\\.us",
+    "cluemail\\.com",
+    "elitemail\\.org",
+    "emailcorner\\.net",
+    "emailengine\\.net",
+    "emailengine\\.org",
+    "emailgroups\\.net",
+    "emailplus\\.org",
+    "emailuser\\.net",
+    "f-m\\.fm",
+    "fast-email\\.com",
+    "fast-mail\\.org",
+    "fastem\\.com",
+    "fastemail\\.us",
+    "fastemailer\\.com",
+    "fastest\\.cc",
+    "fastimap\\.com",
+    "fastmailbox\\.net",
+    "fastmessaging\\.com",
+    "fea\\.st",
+    "fmailbox\\.com",
+    "ftml\\.net",
+    "h-mail\\.us",
+    "hailmail\\.net",
+    "imap-mail\\.com",
+    "imap\\.cc",
+    "imapmail\\.org",
+    "inoutbox\\.com",
+    "internet-e-mail\\.com",
+    "internet-mail\\.org",
+    "internetemails\\.net",
+    "internetmailing\\.net",
+    "jetemail\\.net",
+    "justemail\\.net",
+    "letterboxes\\.org",
+    "mail-central\\.com",
+    "mail-page\\.com",
+    "mailandftp\\.com",
+    "mailas\\.com",
+    "mailc\\.net",
+    "mailforce\\.net",
+    "mailftp\\.com",
+    "mailingaddress\\.org",
+    "mailite\\.com",
+    "mailnew\\.com",
+    "mailsent\\.net",
+    "mailservice\\.ms",
+    "mailup\\.net",
+    "mailworks\\.org",
+    "mymacmail\\.com",
+    "nospammail\\.net",
+    "ownmail\\.net",
+    "petml\\.com",
+    "postinbox\\.com",
+    "postpro\\.net",
+    "realemail\\.net",
+    "reallyfast\\.biz",
+    "reallyfast\\.info",
+    "speedpost\\.net",
+    "ssl-mail\\.com",
+    "swift-mail\\.com",
+    "the-fastest\\.net",
+    "the-quickest\\.com",
+    "theinternetemail\\.com",
+    "veryfast\\.biz",
+    "veryspeedy\\.net",
+    "yepmail\\.net",
+    "your-mail\\.com",
+    "operamail\\.com"
+   ],
+   "mx": [
+    "in1.smtp.messagingengine.com",
+    "in2.smtp.messagingengine.com",
+    "in1-smtp.messagingengine.com",
+    "in2-smtp.messagingengine.com"
+   ],
+   "imap": {
+    "host": "imap.fastmail.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.fastmail.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "apple",
+   "domains": [
+    "apple\\.com"
+   ],
+   "imap": {
+    "host": "phonehome.apple.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "phonehome.apple.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "asia-apple",
+   "domains": [
+    "asia\\.apple\\.com"
+   ],
+   "imap": {
+    "host": "phonehome.asia.apple.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "phonehome.asia.apple.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "rackspace",
+   "mx": [
+    "mx1\\.emailsrvr\\.com",
+    "mx2\\.emailsrvr\\.com"
+   ],
+   "imap": {
+    "host": "secure.emailsrvr.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "secure.emailsrvr.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "ovh",
+   "mx": [
+    "mx\\d\\.ovh\\.net"
+   ],
+   "imap": {
+    "host": "mail.{domain}",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "mail.{domain}",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "outlook",
+   "domains": [
+    "outlook\\.com",
+    "outlook\\.com\\.ar",
+    "outlook\\.com\\.au",
+    "outlook\\.at",
+    "outlook\\.be",
+    "outlook\\.com\\.br",
+    "outlook\\.cl",
+    "outlook\\.cz",
+    "outlook\\.dk",
+    "outlook\\.fr",
+    "outlook\\.de",
+    "outlook\\.com\\.gr",
+    "outlook\\.co\\.id",
+    "outlook\\.ie",
+    "outlook\\.it",
+    "outlook\\.hu",
+    "outlook\\.jp",
+    "outlook\\.kr",
+    "outlook\\.lv",
+    "outlook\\.my",
+    "outlook\\.co\\.nz",
+    "outlook\\.com\\.pe",
+    "outlook\\.ph",
+    "outlook\\.pt",
+    "outlook\\.sa",
+    "outlook\\.sg",
+    "outlook\\.sk",
+    "outlook\\.es",
+    "outlook\\.co\\.th",
+    "outlook\\.com\\.tr",
+    "outlook\\.com\\.vn",
+    "hotmail\\.com",
+    "hotmail\\.co\\.uk",
+    "hotmail\\.fr",
+    "hotmail\\.de",
+    "hotmail\\.be",
+    "hotmail\\.com\\.ar",
+    "hotmail\\.es",
+    "hotmail\\.com\\.mx",
+    "hotmail\\.com",
+    "live\\.com",
+    "live\\.fr",
+    "live\\.de",
+    "live\\.be",
+    "live\\.com\\.ar",
+    "live\\.com\\.mx",
+    "live\\.co\\.uk"
+   ],
+   "mx": [
+    ".*\\.mail\\.outlook\\.com"
+   ],
+   "imap": {
+    "host": "imap-mail.outlook.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp-mail.outlook.com",
+    "port": 587,
+    "security": "STARTTLS"
+   }
+  },
+  {
+   "id": "qq",
+   "domains": [
+    "qq\\.com"
+   ],
+   "imap": {
+    "host": "imap.exmail.qq.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.exmail.qq.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "mailru",
+   "domains": [
+    "mail\\.ru",
+    "inbox\\.ru",
+    "list\\.ru",
+    "bk\\.ru",
+    "mail\\.ua"
+   ],
+   "imap": {
+    "host": "imap.mail.ru",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.mail.ru",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "yandex",
+   "domains": [
+    "yandex\\.ru",
+    "yandex\\.ua",
+    "yandex\\.kz",
+    "yandex\\.by",
+    "yandex\\.com",
+    "yandex\\.com\\.tr"
+   ],
+   "mx": [
+    "mx\\.yandex\\.net(\\.)?"
+   ],
+   "imap": {
+    "host": "imap.yandex.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.yandex.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "comcast",
+   "mx": [
+    "mx1\\.comcast\\.net",
+    "mx2\\.comcast\\.net"
+   ],
+   "imap": {
+    "host": "imap.comcast.net",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.comcast.net",
+    "port": 587,
+    "security": "STARTTLS"
+   }
+  },
+  {
+   "id": "ukrnet",
+   "domains": [
+    "ukr\\.net"
+   ],
+   "imap": {
+    "host": "imap.ukr.net",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.ukr.net",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "rambler",
+   "domains": [
+    "rambler\\.ru",
+    "lenta\\.ru",
+    "autorambler\\.ru",
+    "myrambler\\.ru",
+    "ro\\.ru",
+    "r0\\.ru"
+   ],
+   "imap": {
+    "host": "imap.rambler.ru",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.rambler.ru",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "wp.pl",
+   "domains": [
+    "wp\\.pl"
+   ],
+   "imap": {
+    "host": "imap.wp.pl",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.wp.pl",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "o2.pl",
+   "domains": [
+    "o2\\.pl"
+   ],
+   "imap": {
+    "host": "poczta.o2.pl",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "poczta.o2.pl",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  },
+  {
+   "id": "hostinger",
+   "mx": [
+    "mx[0-9]*\\.hostinger\\.*"
+   ],
+   "imap": {
+    "host": "imap.hostinger.com",
+    "port": 993,
+    "security": "SSL / TLS"
+   },
+   "smtp": {
+    "host": "smtp.hostinger.com",
+    "port": 465,
+    "security": "SSL / TLS"
+   }
+  }
+ ],
+ "domains": {
+  "1031.inord.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "123mail.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "126.com": {
+   "imap_host": "imap.126.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.126.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "12fuel.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "12mail.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "12move.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "163.com": {
+   "imap_host": "imap.163.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.163.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "1und1.de": {
+   "imap_host": "imap.1und1.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.1und1.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "2die4.com": {
+   "alias": "mail.com"
+  },
+  "2senior.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "3rdeyedev.com": {
+   "imap_host": "mail.3rdeyedev.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.3rdeyedev.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "a1.net": {
+   "imap_host": "securemail.a1.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "securemail.a1.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "abc.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "abc.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "accountant.com": {
+   "alias": "mail.com"
+  },
+  "active24.com": {
+   "imap_host": "email.active24.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "email.active24.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "activist.com": {
+   "alias": "mail.com"
+  },
+  "adexec.com": {
+   "alias": "mail.com"
+  },
+  "adres.pl": {
+   "alias": "onet.pl"
+  },
+  "africamail.com": {
+   "alias": "mail.com"
+  },
+  "agate.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "agate.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "aim.com": {
+   "alias": "aol.com"
+  },
+  "aircraftmail.com": {
+   "alias": "mail.com"
+  },
+  "alabama.usa.com": {
+   "alias": "mail.com"
+  },
+  "alaska.usa.com": {
+   "alias": "mail.com"
+  },
+  "alice.it": {
+   "imap_host": "in.alice.it",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "out.alice.it",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "allergist.com": {
+   "alias": "mail.com"
+  },
+  "alumni.com": {
+   "alias": "mail.com"
+  },
+  "alumnidirector.com": {
+   "alias": "mail.com"
+  },
+  "alumnos.upm.es": {
+   "imap_host": "correo.alumnos.upm.es",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.upm.es",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "am0.yahoodns.net": {
+   "alias": "yahoo.com"
+  },
+  "amail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "amail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "amber.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "amber.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "americamail.com": {
+   "alias": "mail.com"
+  },
+  "ameritech.net": {
+   "alias": "att.net"
+  },
+  "amethyst.broba.cc": {
+   "alias": "broba.cc"
+  },
+  "amorki.pl": {
+   "alias": "onet.pl"
+  },
+  "amorous.com": {
+   "alias": "mail.com"
+  },
+  "anarki.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "anderledes.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "angelic.com": {
+   "alias": "mail.com"
+  },
+  "aol.co.nz": {
+   "alias": "aol.com"
+  },
+  "aol.co.uk": {
+   "alias": "aol.com"
+  },
+  "aol.com": {
+   "imap_host": "imap.aol.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.aol.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "aol.com.ar": {
+   "alias": "aol.com"
+  },
+  "aol.com.au": {
+   "alias": "aol.com"
+  },
+  "aol.com.br": {
+   "alias": "aol.com"
+  },
+  "aol.com.mx": {
+   "alias": "aol.com"
+  },
+  "aol.de": {
+   "alias": "aol.com"
+  },
+  "aol.es": {
+   "alias": "aol.com"
+  },
+  "aol.fr": {
+   "alias": "aol.com"
+  },
+  "aol.it": {
+   "alias": "aol.com"
+  },
+  "aol.se": {
+   "alias": "aol.com"
+  },
+  "aon.at": {
+   "alias": "a1.net"
+  },
+  "apost.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "apost.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "aqua.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "aqua.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "archaeologist.com": {
+   "alias": "mail.com"
+  },
+  "arcor.de": {
+   "alias": "vodafonemail.de"
+  },
+  "arizona.usa.com": {
+   "alias": "mail.com"
+  },
+  "artlover.com": {
+   "alias": "mail.com"
+  },
+  "arubapec.it": {
+   "imap_host": "imaps.pec.aruba.it",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtps.pec.aruba.it",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "asia-mail.com": {
+   "alias": "mail.com"
+  },
+  "atheist.com": {
+   "alias": "mail.com"
+  },
+  "att.net": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "outbound.att.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "australiamail.com": {
+   "alias": "mail.com"
+  },
+  "autistici.org": {
+   "imap_host": "mail.autistici.org",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.autistici.org",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "autograf.pl": {
+   "alias": "onet.pl"
+  },
+  "ballade.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ballade.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "bartender.net": {
+   "alias": "mail.com"
+  },
+  "bay.gunmanet.ne.jp": {
+   "alias": "bay.wind.ne.jp"
+  },
+  "bay.gunmanet.or.jp": {
+   "alias": "bay.wind.ne.jp"
+  },
+  "bay.wind.co.jp": {
+   "alias": "bay.wind.ne.jp"
+  },
+  "bay.wind.jp": {
+   "alias": "bay.wind.ne.jp"
+  },
+  "bay.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "bay.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "bb-niigata.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "pop.bb-niigata.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "bc.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "begavet.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "beige.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "beige.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "belgacom.net": {
+   "alias": "skynet.be"
+  },
+  "bell.net": {
+   "imap_host": "imap.bell.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtphm.sympatico.ca",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "bellsouth.net": {
+   "alias": "att.net"
+  },
+  "berlin.com": {
+   "alias": "mail.com"
+  },
+  "bigger.com": {
+   "alias": "mail.com"
+  },
+  "biglobe.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.biglobe.ne.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "bigpond.com": {
+   "imap_host": "imap.telstra.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.telstra.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "bigpond.net": {
+   "alias": "bigpond.com"
+  },
+  "bigpond.net.au": {
+   "alias": "bigpond.com"
+  },
+  "bikerider.com": {
+   "alias": "mail.com"
+  },
+  "birdlover.com": {
+   "alias": "mail.com"
+  },
+  "bitnisse.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "bk.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "bk.ru": {
+   "alias": "mail.ru"
+  },
+  "blader.com": {
+   "alias": "mail.com"
+  },
+  "blu.it": {
+   "alias": "libero.it"
+  },
+  "blue.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "blue.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "bluemail.ch": {
+   "alias": "swisscom.ch"
+  },
+  "bluewin.ch": {
+   "alias": "swisscom.ch"
+  },
+  "blueyonder.co.uk": {
+   "imap_host": "imap4.blueyonder.co.uk",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.blueyonder.co.uk",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "bmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "bmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "boardermail.com": {
+   "alias": "mail.com"
+  },
+  "bol.com.br": {
+   "imap_host": "imap.bol.com.br",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtps.bol.com.br",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "bolero.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "bolero.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "bp.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "bpost.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "bpost.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "brazilmail.com": {
+   "alias": "mail.com"
+  },
+  "bresnan.net": {
+   "alias": "charter.net"
+  },
+  "brew-master.com": {
+   "alias": "mail.com"
+  },
+  "broba.cc": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.broba.cc",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "brown.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "brown.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "btinternet.com": {
+   "imap_host": "mail.btinternet.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.btinternet.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "btopenworld.com": {
+   "alias": "btinternet.com"
+  },
+  "bu.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "buziaczek.pl": {
+   "alias": "onet.pl"
+  },
+  "california.usa.com": {
+   "alias": "mail.com"
+  },
+  "californiamail.com": {
+   "alias": "mail.com"
+  },
+  "camel.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "camel.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "cameo.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "cameo.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "caress.com": {
+   "alias": "mail.com"
+  },
+  "casema.nl": {
+   "alias": "ziggo.nl"
+  },
+  "catlover.com": {
+   "alias": "mail.com"
+  },
+  "cc9.ne.jp": {
+   "imap_host": "pop.cc9.ne.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "msa.cc9.ne.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ceaaces.gob.ec": {
+   "imap_host": "mail.ceaaces.gob.ec",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.ceaaces.gob.ec",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "cek.ne.jp": {
+   "imap_host": "imap.cek.ne.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtpa.cek.ne.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "centurylink.net": {
+   "imap_host": "mail.centurylink.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.centurylink.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "centurytel.net": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtpauth.centurytel.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "cgl.ucsf.edu": {
+   "imap_host": "plato.cgl.ucsf.edu",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "plato.cgl.ucsf.edu",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "charter.com": {
+   "imap_host": "mobile.charter.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mobile.charter.net",
+   "smtp_port": 587,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "charter.net": {
+   "imap_host": "mobile.charter.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mobile.charter.net",
+   "smtp_port": 587,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "cheerful.com": {
+   "alias": "mail.com"
+  },
+  "chef.net": {
+   "alias": "mail.com"
+  },
+  "chello.nl": {
+   "alias": "ziggo.nl"
+  },
+  "chemist.com": {
+   "alias": "mail.com"
+  },
+  "chinamail.com": {
+   "alias": "mail.com"
+  },
+  "city.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "clds.net": {
+   "alias": "centurytel.net"
+  },
+  "clerk.com": {
+   "alias": "mail.com"
+  },
+  "cliffhanger.com": {
+   "alias": "mail.com"
+  },
+  "clio.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.clio.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "club-internet.fr": {
+   "alias": "sfr.fr"
+  },
+  "clustermail.de": {
+   "imap_host": "mail.clustermail.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.clustermail.de",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "cmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "cmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "cneweb.de": {
+   "alias": "versatel.de"
+  },
+  "co1.wind.jp": {
+   "alias": "co1.wind.ne.jp"
+  },
+  "co1.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "co1.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "co2.wind.jp": {
+   "alias": "co2.wind.ne.jp"
+  },
+  "co2.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "co2.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "co3.wind.jp": {
+   "alias": "co3.wind.ne.jp"
+  },
+  "co3.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "co3.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "coastalnow.net": {
+   "alias": "centurytel.net"
+  },
+  "cochill.net": {
+   "alias": "centurytel.net"
+  },
+  "cocoa.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "cocoa.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "coda.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "coda.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "collector.org": {
+   "alias": "mail.com"
+  },
+  "columnist.com": {
+   "alias": "mail.com"
+  },
+  "comcast.net": {
+   "imap_host": "imap.comcast.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.comcast.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "comic.com": {
+   "alias": "mail.com"
+  },
+  "compuserve.com": {
+   "alias": "aol.com"
+  },
+  "computer4u.com": {
+   "alias": "mail.com"
+  },
+  "concerto.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "concerto.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "consultant.com": {
+   "alias": "mail.com"
+  },
+  "contractor.net": {
+   "alias": "mail.com"
+  },
+  "cool.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "coolsite.net": {
+   "alias": "mail.com"
+  },
+  "coral.broba.ccv": {
+   "alias": "broba.cc"
+  },
+  "coral.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "coral.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "corp.mail.ru": {
+   "alias": "mail.ru"
+  },
+  "correo.ugr.es": {
+   "imap_host": "correo.ugr.es",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "correo.ugr.es",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "counsellor.com": {
+   "alias": "mail.com"
+  },
+  "count.com": {
+   "alias": "mail.com"
+  },
+  "couple.com": {
+   "alias": "mail.com"
+  },
+  "courante.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "courante.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "cox.net": {
+   "imap_host": "imap.cox.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.cox.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "cpost.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "cpost.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "cream.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "cream.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "cs.com": {
+   "alias": "aol.com"
+  },
+  "cswnet.com": {
+   "alias": "centurytel.net"
+  },
+  "cty-net.com": {
+   "alias": "cty-net.ne.jp"
+  },
+  "cty-net.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtps.cty-net.ne.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "cutey.com": {
+   "alias": "mail.com"
+  },
+  "cyber-wizard.com": {
+   "alias": "mail.com"
+  },
+  "cyberdude.com": {
+   "alias": "mail.com"
+  },
+  "cyberdude.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "cybergal.com": {
+   "alias": "mail.com"
+  },
+  "cyberia.pl": {
+   "alias": "onet.pl"
+  },
+  "cyberjunkie.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "dallasmail.com": {
+   "alias": "mail.com"
+  },
+  "dan.gunmanet.ne.jp": {
+   "alias": "dan.wind.ne.jp"
+  },
+  "dan.gunmanet.or.jp": {
+   "alias": "dan.wind.ne.jp"
+  },
+  "dan.wind.co.jp": {
+   "alias": "dan.wind.ne.jp"
+  },
+  "dan.wind.jp": {
+   "alias": "dan.wind.ne.jp"
+  },
+  "dan.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "dan.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "dance.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "dance.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "daum.net": {
+   "imap_host": "imap.daum.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.daum.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "dbzmail.com": {
+   "alias": "mail.com"
+  },
+  "dd.iij4u.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mbox.iij4u.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "deliveryman.com": {
+   "alias": "mail.com"
+  },
+  "df.eu": {
+   "imap_host": "sslin.df.eu",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "sslout.df.eu",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "diamond.broba.cc": {
+   "alias": "broba.cc"
+  },
+  "dianrong.com": {
+   "imap_host": "imap.exmail.qq.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.exmail.qq.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "diplomats.com": {
+   "alias": "mail.com"
+  },
+  "disciples.com": {
+   "alias": "mail.com"
+  },
+  "dk-online.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "dk2net.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "dmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "dmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "doctor.com": {
+   "alias": "mail.com"
+  },
+  "doglover.com": {
+   "alias": "mail.com"
+  },
+  "dondominio.com": {
+   "imap_host": "imap.dondominio.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.dondominio.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "doramail.com": {
+   "alias": "mail.com"
+  },
+  "dr.com": {
+   "alias": "mail.com"
+  },
+  "dublin.com": {
+   "alias": "mail.com"
+  },
+  "e23.jp": {
+   "alias": "iijmio-mail.jp"
+  },
+  "earthling.net": {
+   "alias": "mail.com"
+  },
+  "earthlink.net": {
+   "imap_host": "imap.earthlink.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtpauth.earthlink.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "ebony.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ebony.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "edgeppe.com": {
+   "imap_host": "mail4.hostingplatform.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail4.hostingplatform.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "educa.madrid.org": {
+   "imap_host": "imap.educa.madrid.org",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp01.educa.madrid.org",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "elinstallatoer.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "elpasotel.net": {
+   "imap_host": "mail.elpasotel.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.elpasotel.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "elsker.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "elvis.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "elvisfan.com": {
+   "alias": "mail.com"
+  },
+  "emadisonriver.com": {
+   "alias": "centurytel.net"
+  },
+  "emadisonriver.net": {
+   "alias": "centurytel.net"
+  },
+  "email.com": {
+   "alias": "mail.com"
+  },
+  "email.cz": {
+   "alias": "seznam.cz"
+  },
+  "email.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "email.gmx": {
+   "alias": "gmx.net"
+  },
+  "email.it": {
+   "imap_host": "imapmail.email.it",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.email.it",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "email.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "email.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "emailsrvr.com": {
+   "imap_host": "secure.emailsrvr.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "secure.emailsrvr.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "embarqmail.com": {
+   "alias": "centurylink.net"
+  },
+  "engineer.com": {
+   "alias": "mail.com"
+  },
+  "englandmail.com": {
+   "alias": "mail.com"
+  },
+  "ent.uz": {
+   "imap_host": "mail.ent.uz",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.ent.uz",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "europe.com": {
+   "alias": "mail.com"
+  },
+  "europemail.com": {
+   "alias": "mail.com"
+  },
+  "ewe.net": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.ewe.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "ewetel.de": {
+   "alias": "ewe.net"
+  },
+  "execs.com": {
+   "alias": "mail.com"
+  },
+  "fald.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "fan.com": {
+   "alias": "mail.com"
+  },
+  "fantasy.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "fantasy.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "fastmail": {
+   "imap_host": "imap.fastmail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.fastmail.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "fastmail.com": {
+   "alias": "fastmail"
+  },
+  "fastmail.fm": {
+   "alias": "fastmail"
+  },
+  "fastwebnet.it": {
+   "imap_host": "imap.fastwebnet.it",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.fastwebnet.it",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "fedt.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "feelings.com": {
+   "alias": "mail.com"
+  },
+  "feminin.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "ff.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "film.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "financier.com": {
+   "alias": "mail.com"
+  },
+  "fireman.net": {
+   "alias": "mail.com"
+  },
+  "flamenco.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "flamenco.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "flash.net": {
+   "alias": "att.net"
+  },
+  "florida.usa.com": {
+   "alias": "mail.com"
+  },
+  "fmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "fmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "foni.net": {
+   "alias": "versatel.de"
+  },
+  "footballer.com": {
+   "alias": "mail.com"
+  },
+  "forening.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "foxmail.com": {
+   "imap_host": "imap.qq.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.qq.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "free.fr": {
+   "imap_host": "imap.free.fr",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.free.fr",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "freeler.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "freenet.de": {
+   "imap_host": "mx.freenet.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mx.freenet.de",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "fuga.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "fuga.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "gadefejer.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "gallatinriver.net": {
+   "alias": "centurytel.net"
+  },
+  "gandi.net": {
+   "imap_host": "mail.gandi.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.gandi.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "gardener.com": {
+   "alias": "mail.com"
+  },
+  "garnet.broba.cc": {
+   "alias": "broba.cc"
+  },
+  "gason.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "gatech.edu": {
+   "imap_host": "mail.gatech.edu",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mail.gatech.edu",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "gazeta.pl": {
+   "imap_host": "imap.gazeta.pl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.gazeta.pl",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "gelsennet.de": {
+   "alias": "versatel.de"
+  },
+  "geologist.com": {
+   "alias": "mail.com"
+  },
+  "germanymail.com": {
+   "alias": "mail.com"
+  },
+  "giallo.it": {
+   "alias": "libero.it"
+  },
+  "gigahost.dk": {
+   "imap_host": "mail.gigahost.dk",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.gigahost.dk",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "gigapec.it": {
+   "alias": "arubapec.it"
+  },
+  "gmail": {
+   "imap_host": "imap.gmail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.gmail.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "gmail.com": {
+   "alias": "googlemail.com"
+  },
+  "gmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "gmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "gmx": {
+   "alias": "gmx.com"
+  },
+  "gmx.at": {
+   "alias": "gmx.net"
+  },
+  "gmx.biz": {
+   "alias": "gmx.net"
+  },
+  "gmx.ca": {
+   "alias": "gmx.com"
+  },
+  "gmx.ch": {
+   "alias": "gmx.net"
+  },
+  "gmx.cn": {
+   "alias": "gmx.com"
+  },
+  "gmx.co.in": {
+   "alias": "gmx.com"
+  },
+  "gmx.co.uk": {
+   "alias": "gmx.com"
+  },
+  "gmx.com": {
+   "imap_host": "imap.gmx.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.gmx.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "gmx.com.br": {
+   "alias": "gmx.com"
+  },
+  "gmx.com.my": {
+   "alias": "gmx.com"
+  },
+  "gmx.com.tr": {
+   "alias": "gmx.com"
+  },
+  "gmx.de": {
+   "alias": "gmx.net"
+  },
+  "gmx.es": {
+   "alias": "gmx.com"
+  },
+  "gmx.eu": {
+   "alias": "gmx.net"
+  },
+  "gmx.fr": {
+   "alias": "gmx.com"
+  },
+  "gmx.hk": {
+   "alias": "gmx.com"
+  },
+  "gmx.ie": {
+   "alias": "gmx.com"
+  },
+  "gmx.info": {
+   "alias": "gmx.net"
+  },
+  "gmx.it": {
+   "alias": "gmx.com"
+  },
+  "gmx.li": {
+   "alias": "gmx.com"
+  },
+  "gmx.net": {
+   "imap_host": "imap.gmx.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.gmx.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "gmx.org": {
+   "alias": "gmx.net"
+  },
+  "gmx.ph": {
+   "alias": "gmx.com"
+  },
+  "gmx.pt": {
+   "alias": "gmx.com"
+  },
+  "gmx.ru": {
+   "alias": "gmx.com"
+  },
+  "gmx.se": {
+   "alias": "gmx.com"
+  },
+  "gmx.sg": {
+   "alias": "gmx.com"
+  },
+  "gmx.tm": {
+   "alias": "gmx.com"
+  },
+  "gmx.tw": {
+   "alias": "gmx.com"
+  },
+  "gmx.us": {
+   "alias": "gmx.com"
+  },
+  "go.tvm.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "go.tvm.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "go2.pl": {
+   "alias": "o2.pl"
+  },
+  "go4more.de": {
+   "alias": "1und1.de"
+  },
+  "goneo.de": {
+   "imap_host": "imap.goneo.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.goneo.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "goo.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.goo.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "google.com": {
+   "alias": "googlemail.com"
+  },
+  "googlemail.com": {
+   "imap_host": "imap.gmail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.gmail.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "graduate.org": {
+   "alias": "mail.com"
+  },
+  "gransy.com": {
+   "imap_host": "imap.gransy.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.gransy.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "grape.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "grape.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "graphic-designer.com": {
+   "alias": "mail.com"
+  },
+  "gray.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "gray.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "grics.net": {
+   "alias": "centurytel.net"
+  },
+  "grin.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "grov.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "gulftel.com": {
+   "alias": "centurytel.net"
+  },
+  "hackermail.com": {
+   "alias": "mail.com"
+  },
+  "hahah.nl": {
+   "alias": "ziggo.nl"
+  },
+  "hairdresser.net": {
+   "alias": "mail.com"
+  },
+  "hal.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.hal.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "hana.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.hana.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "hardworking.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "heaven.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "hemmelig.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "hetnet.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "hetzner.de": {
+   "imap_host": "mail.your-server.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.your-server.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "hh.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "hilarious.com": {
+   "alias": "mail.com"
+  },
+  "hockeymail.com": {
+   "alias": "mail.com"
+  },
+  "home.nl": {
+   "alias": "ziggo.nl"
+  },
+  "homemail.com": {
+   "alias": "mail.com"
+  },
+  "hostinger.com": {
+   "imap_host": "imap.hostinger.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.hostinger.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "hot-shot.com": {
+   "alias": "mail.com"
+  },
+  "hotmail.be": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.ca": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.cl": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.id": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.il": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.in": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.jp": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.kr": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.th": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.uk": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.co.za": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.com": {
+   "imap_host": "outlook.office365.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.office365.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "hotmail.com.ar": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.com.au": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.com.br": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.com.hk": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.com.tr": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.com.tw": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.com.vn": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.cz": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.de": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.dk": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.es": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.fi": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.fr": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.gr": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.hu": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.it": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.lt": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.lv": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.my": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.nl": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.no": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.ph": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.rs": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.se": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.sg": {
+   "alias": "hotmail.com"
+  },
+  "hotmail.sk": {
+   "alias": "hotmail.com"
+  },
+  "hour.com": {
+   "alias": "mail.com"
+  },
+  "huleboer.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "humanoid.net": {
+   "alias": "mail.com"
+  },
+  "i.softbank.jp": {
+   "imap_host": "imap.softbank.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.softbank.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ic-net.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.ic-net.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ic.ac.uk": {
+   "alias": "office365"
+  },
+  "icloud": {
+   "imap_host": "imap.mail.me.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.me.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "icloud.com": {
+   "alias": "me.com"
+  },
+  "iCloud.com": {
+   "alias": "icloud"
+  },
+  "iijmio-mail.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mbox.iijmio-mail.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "iinet.net.au": {
+   "imap_host": "mail.iinet.net.au",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.iinet.net.au",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "iiyama-catv.ne.jp": {
+   "imap_host": "imap.iiyama-catv.ne.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtpa.iiyama-catv.ne.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "illinois.usa.com": {
+   "alias": "mail.com"
+  },
+  "image.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "imail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "imail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "iname.com": {
+   "alias": "mail.com"
+  },
+  "inbound.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "inbox.eu": {
+   "alias": "inbox.lv"
+  },
+  "inbox.la": {
+   "alias": "inbox.lv"
+  },
+  "inbox.lt": {
+   "alias": "inbox.lv"
+  },
+  "inbox.lv": {
+   "imap_host": "mail.%EMAILDOMAIN%",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.%EMAILDOMAIN%",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "inbox.ru": {
+   "alias": "mail.ru"
+  },
+  "indbakke.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "indigo.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "indigo.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "inet-shibata.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "po.inet-shibata.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "infile.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "info.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "ingpec.eu": {
+   "alias": "arubapec.it"
+  },
+  "innocent.com": {
+   "alias": "mail.com"
+  },
+  "inorbit.com": {
+   "alias": "mail.com"
+  },
+  "instruction.com": {
+   "alias": "mail.com"
+  },
+  "instructor.net": {
+   "alias": "mail.com"
+  },
+  "insurer.com": {
+   "alias": "mail.com"
+  },
+  "interia.pl": {
+   "imap_host": "poczta.interia.pl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "poczta.interia.pl",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "internetserver.cz": {
+   "alias": "gransy.com"
+  },
+  "internode.on.net": {
+   "imap_host": "mail.internode.on.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.internode.on.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "inwind.it": {
+   "alias": "libero.it"
+  },
+  "io.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "iol.it": {
+   "alias": "libero.it"
+  },
+  "ipax.at": {
+   "imap_host": "mail.ipax.at",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.ipax.at",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "irelandmail.com": {
+   "alias": "mail.com"
+  },
+  "ispgateway.de": {
+   "alias": "df.eu"
+  },
+  "it.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "italymail.com": {
+   "alias": "mail.com"
+  },
+  "ivory.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ivory.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "iwafune.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "po.iwafune.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ix.netcom.com": {
+   "alias": "earthlink.net"
+  },
+  "jade.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "jade.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "janis.or.jp": {
+   "imap_host": "imaps.janis.or.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtps.janis.or.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "japan.com": {
+   "alias": "mail.com"
+  },
+  "jazztel.es": {
+   "alias": "googlemail.com"
+  },
+  "jet.ne.jp": {
+   "imap_host": "imap.jet.ne.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.jet.ne.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ji.jet.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp02.jet.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "jmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "jmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "journalist.com": {
+   "alias": "mail.com"
+  },
+  "jyde.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "k1.gunmanet.ne.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "k1.gunmanet.or.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "k1.wind.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "k1.wind.ne.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "kabelmail.de": {
+   "alias": "vodafonemail.de"
+  },
+  "kelcom.net": {
+   "imap_host": "pop.kelcom.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.kelcom.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "keromail.com": {
+   "alias": "mail.com"
+  },
+  "khaki.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "khaki.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "kidcity.be": {
+   "alias": "skynet.be"
+  },
+  "kittymail.com": {
+   "alias": "mail.com"
+  },
+  "kk.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "kl.gunmanet.ne.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "kl.gunmanet.or.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "kl.wind.co.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "kl.wind.jp": {
+   "alias": "kl.wind.ne.jp"
+  },
+  "kl.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "kl.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "klog.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "kmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "kmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "knus.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "kokuyou.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.kokuyou.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "koreamail.com": {
+   "alias": "mail.com"
+  },
+  "kpnmail.nl": {
+   "imap_host": "imap.kpnmail.nl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.kpnmail.nl",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "kpnplanet.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "krudt.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "kulturel.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "kundenserver.de": {
+   "alias": "1und1.de"
+  },
+  "lapis.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "lapis.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "laposte.net": {
+   "imap_host": "imap.laposte.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.laposte.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "larsen.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "lawyer.com": {
+   "alias": "mail.com"
+  },
+  "lazy.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "legislator.com": {
+   "alias": "mail.com"
+  },
+  "lemon.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "lemon.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "libero.it": {
+   "imap_host": "imapmail.libero.it",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.libero.it",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "lilac.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "lilac.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "lime.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "lime.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "linuxmail.org": {
+   "alias": "mail.com"
+  },
+  "list.ru": {
+   "alias": "mail.ru"
+  },
+  "live.at": {
+   "alias": "hotmail.com"
+  },
+  "live.be": {
+   "alias": "hotmail.com"
+  },
+  "live.ca": {
+   "alias": "hotmail.com"
+  },
+  "live.cl": {
+   "alias": "hotmail.com"
+  },
+  "live.cn": {
+   "alias": "hotmail.com"
+  },
+  "live.co.jp": {
+   "alias": "hotmail.com"
+  },
+  "live.co.kr": {
+   "alias": "hotmail.com"
+  },
+  "live.co.uk": {
+   "alias": "hotmail.com"
+  },
+  "live.co.za": {
+   "alias": "hotmail.com"
+  },
+  "live.com": {
+   "alias": "hotmail.com"
+  },
+  "live.com.ar": {
+   "alias": "hotmail.com"
+  },
+  "live.com.au": {
+   "alias": "hotmail.com"
+  },
+  "live.com.mx": {
+   "alias": "hotmail.com"
+  },
+  "live.com.my": {
+   "alias": "hotmail.com"
+  },
+  "live.com.ph": {
+   "alias": "hotmail.com"
+  },
+  "live.com.pt": {
+   "alias": "hotmail.com"
+  },
+  "live.com.sg": {
+   "alias": "hotmail.com"
+  },
+  "live.de": {
+   "alias": "hotmail.com"
+  },
+  "live.dk": {
+   "alias": "hotmail.com"
+  },
+  "live.fi": {
+   "alias": "hotmail.com"
+  },
+  "live.fr": {
+   "alias": "hotmail.com"
+  },
+  "live.hk": {
+   "alias": "hotmail.com"
+  },
+  "live.ie": {
+   "alias": "hotmail.com"
+  },
+  "live.in": {
+   "alias": "hotmail.com"
+  },
+  "live.it": {
+   "alias": "hotmail.com"
+  },
+  "live.jp": {
+   "alias": "hotmail.com"
+  },
+  "live.nl": {
+   "alias": "hotmail.com"
+  },
+  "live.no": {
+   "alias": "hotmail.com"
+  },
+  "live.ru": {
+   "alias": "hotmail.com"
+  },
+  "live.se": {
+   "alias": "hotmail.com"
+  },
+  "livemail.tw": {
+   "alias": "hotmail.com"
+  },
+  "london.com": {
+   "alias": "mail.com"
+  },
+  "loveable.com": {
+   "alias": "mail.com"
+  },
+  "lovecat.com": {
+   "alias": "mail.com"
+  },
+  "lystig.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "m2.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "m3.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "m4.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "m5.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "m6.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "m7.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "m8.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "m9.cty-net.ne.jp": {
+   "alias": "cty-net.ne.jp"
+  },
+  "ma100.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mac.com": {
+   "alias": "me.com"
+  },
+  "mad.scientist.com": {
+   "alias": "mail.com"
+  },
+  "madisonriver.biz": {
+   "alias": "centurytel.net"
+  },
+  "madonnafan.com": {
+   "alias": "mail.com"
+  },
+  "madrid.com": {
+   "alias": "mail.com"
+  },
+  "magenta.de": {
+   "alias": "t-online.de"
+  },
+  "mahoroba.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.mahoroba.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "mail.am0.yahoodns.net": {
+   "alias": "yahoo.com"
+  },
+  "mail.com": {
+   "imap_host": "imap.mail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "mail.de": {
+   "imap_host": "imap.mail.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.de",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "mail.dia.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "mail.dk": {
+   "imap_host": "imap.mail.dk",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "asmtp.mail.dk",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "mail.ee": {
+   "imap_host": "%EMAILDOMAIN%",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "%EMAILDOMAIN%",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "mail.gm0.yahoodns.net": {
+   "alias": "aol.com"
+  },
+  "mail.gmx": {
+   "alias": "gmx.net"
+  },
+  "mail.gunmanet.jp": {
+   "alias": "mail.wind.ne.jp"
+  },
+  "mail.gunmanet.ne.jp": {
+   "alias": "mail.wind.ne.jp"
+  },
+  "mail.gunmanet.or.jp": {
+   "alias": "mail.wind.ne.jp"
+  },
+  "mail.iwafune.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.iwafune.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "mail.org": {
+   "alias": "mail.com"
+  },
+  "mail.protection.outlook.com": {
+   "alias": "office365.com"
+  },
+  "mail.ru": {
+   "imap_host": "imap.mail.ru",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.ru",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "mail.telenor.dk": {
+   "imap_host": "mail.telenor.dk",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.telenor.dk",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "mail.wind.co.jp": {
+   "alias": "mail.wind.ne.jp"
+  },
+  "mail.wind.jp": {
+   "alias": "mail.wind.ne.jp"
+  },
+  "mail.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "mailbox.org": {
+   "imap_host": "imap.mailbox.org",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mailbox.org",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "mailoo.org": {
+   "imap_host": "imap.mailoo.org",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mailoo.org",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "marchmail.com": {
+   "alias": "mail.com"
+  },
+  "maroon.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "maroon.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "maskulin.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "me.com": {
+   "imap_host": "imap.mail.me.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.mail.me.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "mebtel.net": {
+   "alias": "centurytel.net"
+  },
+  "mein.gmx": {
+   "alias": "gmx.net"
+  },
+  "meo.pt": {
+   "alias": "sapo.pt"
+  },
+  "MessagingEngine": {
+   "imap_host": "imap.fastmail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.fastmail.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "messagingengine.com": {
+   "alias": "MessagingEngine"
+  },
+  "mexicomail.com": {
+   "alias": "mail.com"
+  },
+  "min-postkasse.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "mindless.com": {
+   "alias": "mail.com"
+  },
+  "mindspring.com": {
+   "alias": "earthlink.net"
+  },
+  "minister.com": {
+   "alias": "mail.com"
+  },
+  "minuet.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "minuet.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "miobox.jp": {
+   "alias": "iijmio-mail.jp"
+  },
+  "miomio.jp": {
+   "alias": "iijmio-mail.jp"
+  },
+  "ml.murakami.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ml.murakami.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ml.shibata.ne.jp": {
+   "alias": "pop.shibata.ne.jp"
+  },
+  "mnet.ne.jp": {
+   "imap_host": "mail.mnet.ne.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.mnet.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "mobil.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "mobsters.com": {
+   "alias": "mail.com"
+  },
+  "monarchy.com": {
+   "alias": "mail.com"
+  },
+  "mopera.net": {
+   "imap_host": "mail.mopera.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mail.mopera.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "moscowmail.com": {
+   "alias": "mail.com"
+  },
+  "msn.com": {
+   "alias": "hotmail.com"
+  },
+  "multiweb.nl": {
+   "alias": "ziggo.nl"
+  },
+  "munich.com": {
+   "alias": "mail.com"
+  },
+  "musician.org": {
+   "alias": "mail.com"
+  },
+  "muslim.com": {
+   "alias": "mail.com"
+  },
+  "musling.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "mx1.tiki.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp-auth.tiki.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "mx2.et.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx2.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx2.wt.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx21.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx22.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx3.et.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx3.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx31.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx32.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx35.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx36.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx4.et.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx4.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx41.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx5.et.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx5.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx51.et.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx51.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx52.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx6.et.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx6.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx61.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx7.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx71.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx8.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx81.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx82.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx9.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mx91.tiki.ne.jp": {
+   "alias": "mx1.tiki.ne.jp"
+  },
+  "mypec.eu": {
+   "alias": "arubapec.it"
+  },
+  "myself.com": {
+   "alias": "mail.com"
+  },
+  "narod.ru": {
+   "alias": "yandex.ru"
+  },
+  "natteliv.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "naver.com": {
+   "imap_host": "imap.naver.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.naver.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "navy.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "navy.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "netbruger.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "netscape.com": {
+   "alias": "aol.com"
+  },
+  "netscape.net": {
+   "alias": "aol.com"
+  },
+  "neuf.fr": {
+   "alias": "sfr.fr"
+  },
+  "newyork.usa.com": {
+   "alias": "mail.com"
+  },
+  "nifty.com": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.nifty.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "nn.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "nsat.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.nsat.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "ntlworld.com": {
+   "imap_host": "imap.ntlworld.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.ntlworld.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "ntymail.com": {
+   "imap_host": "webmail.ntymail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "webmail.ntymail.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "null.net": {
+   "alias": "mail.com"
+  },
+  "nvbell.net": {
+   "alias": "att.net"
+  },
+  "nwmlm.com": {
+   "imap_host": "ssl0.ovh.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ssl0.ovh.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "nycmail.com": {
+   "alias": "mail.com"
+  },
+  "o2.pl": {
+   "imap_host": "poczta.o2.pl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "poczta.o2.pl",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "oath.com": {
+   "alias": "mail.com"
+  },
+  "ocn.ad.jp": {
+   "alias": "ocn.ne.jp"
+  },
+  "ocn.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.ocn.ne.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "office365": {
+   "imap_host": "outlook.office365.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.office365.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "office365.com": {
+   "imap_host": "outlook.office365.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.office365.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "olc.protection.outlook.com": {
+   "alias": "hotmail.com"
+  },
+  "olive.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "olive.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "on.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "one.com": {
+   "imap_host": "imap.one.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "send.one.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "one.cz": {
+   "imap_host": "imap.registrator.cz",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.registrator.cz",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "onet.com.pl": {
+   "alias": "onet.pl"
+  },
+  "onet.eu": {
+   "alias": "onet.pl"
+  },
+  "onet.pl": {
+   "imap_host": "imap.poczta.onet.pl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.poczta.onet.pl",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "online.de": {
+   "alias": "1und1.de"
+  },
+  "onlinehome.de": {
+   "alias": "1und1.de"
+  },
+  "onmicrosoft.com": {
+   "alias": "office365.com"
+  },
+  "onsbrabantnet.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "onsmail.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "onsnet.nu": {
+   "alias": "kpnmail.nl"
+  },
+  "onsneteindhoven.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "onsnetnuenen.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "op.pl": {
+   "alias": "onet.pl"
+  },
+  "opal.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "opal.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "opoczta.pl": {
+   "alias": "onet.pl"
+  },
+  "optician.com": {
+   "alias": "mail.com"
+  },
+  "optonline.net": {
+   "imap_host": "mail.optonline.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.optonline.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "oracle.com": {
+   "imap_host": "stbeehive.oracle.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "stbeehive.oracle.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "orange.fr": {
+   "imap_host": "imap.orange.fr",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.orange.fr",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "orange.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "orange.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "orchid.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "orchid.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "outlook.at": {
+   "alias": "hotmail.com"
+  },
+  "outlook.be": {
+   "alias": "hotmail.com"
+  },
+  "outlook.cl": {
+   "alias": "hotmail.com"
+  },
+  "outlook.co.id": {
+   "alias": "hotmail.com"
+  },
+  "outlook.co.il": {
+   "alias": "hotmail.com"
+  },
+  "outlook.co.th": {
+   "alias": "hotmail.com"
+  },
+  "outlook": {
+   "alias": "hotmail.com"
+  },
+  "outlook.com": {
+   "alias": "hotmail.com"
+  },
+  "outlook.com.ar": {
+   "alias": "hotmail.com"
+  },
+  "outlook.com.au": {
+   "alias": "hotmail.com"
+  },
+  "outlook.com.br": {
+   "alias": "hotmail.com"
+  },
+  "outlook.com.gr": {
+   "alias": "hotmail.com"
+  },
+  "outlook.com.tr": {
+   "alias": "hotmail.com"
+  },
+  "outlook.com.vn": {
+   "alias": "hotmail.com"
+  },
+  "outlook.cz": {
+   "alias": "hotmail.com"
+  },
+  "outlook.de": {
+   "alias": "hotmail.com"
+  },
+  "outlook.dk": {
+   "alias": "hotmail.com"
+  },
+  "outlook.es": {
+   "alias": "hotmail.com"
+  },
+  "outlook.fr": {
+   "alias": "hotmail.com"
+  },
+  "outlook.hu": {
+   "alias": "hotmail.com"
+  },
+  "outlook.ie": {
+   "alias": "hotmail.com"
+  },
+  "outlook.in": {
+   "alias": "hotmail.com"
+  },
+  "outlook.it": {
+   "alias": "hotmail.com"
+  },
+  "outlook.jp": {
+   "alias": "hotmail.com"
+  },
+  "outlook.kr": {
+   "alias": "hotmail.com"
+  },
+  "outlook.lv": {
+   "alias": "hotmail.com"
+  },
+  "outlook.my": {
+   "alias": "hotmail.com"
+  },
+  "outlook.ph": {
+   "alias": "hotmail.com"
+  },
+  "outlook.pt": {
+   "alias": "hotmail.com"
+  },
+  "outlook.sa": {
+   "alias": "hotmail.com"
+  },
+  "outlook.sg": {
+   "alias": "hotmail.com"
+  },
+  "outlook.sk": {
+   "alias": "hotmail.com"
+  },
+  "ovh.net": {
+   "imap_host": "ssl0.ovh.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ssl0.ovh.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "pacbell.net": {
+   "alias": "att.net"
+  },
+  "pacificwest.com": {
+   "alias": "mail.com"
+  },
+  "pal.kijimadaira.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.pal.kijimadaira.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "palette.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "palette.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "parabox.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.parabox.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "pdx.edu": {
+   "imap_host": "psumail.pdx.edu",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mailhost.pdx.edu",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "peach.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "peach.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "pec.it": {
+   "alias": "arubapec.it"
+  },
+  "pedal.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "pengemand.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "peoplepc.com": {
+   "imap_host": "imap.peoplepc.com",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtpauth.peoplepc.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "petlover.com": {
+   "alias": "mail.com"
+  },
+  "photographer.net": {
+   "alias": "mail.com"
+  },
+  "planet.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "plank.life": {
+   "imap_host": "mail.plank.life",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.plank.life",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "playful.com": {
+   "alias": "mail.com"
+  },
+  "plum.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "plum.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "pm.me": {
+   "imap_host": "127.0.0.1",
+   "imap_port": 1143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "imap_allow_insecure_ssl": true,
+   "smtp_host": "127.0.0.1",
+   "smtp_port": 1025,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email",
+   "smtp_allow_insecure_ssl": true,
+   "container_folder": "Folders"
+  },
+  "pmczuid.nl": {
+   "imap_host": "mail.pmczuid.nl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.pmczuid.nl",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "po.dcn.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "po.dcn.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "po.gunmanet.ne.jp": {
+   "alias": "po.wind.ne.jp"
+  },
+  "po.gunmanet.or.jp": {
+   "alias": "po.wind.ne.jp"
+  },
+  "po.wind.co.jp": {
+   "alias": "po.wind.ne.jp"
+  },
+  "po.wind.jp": {
+   "alias": "po.wind.ne.jp"
+  },
+  "po.wind.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "po.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "pobox.com": {
+   "imap_host": "mail.pobox.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.pobox.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "poczta.onet.eu": {
+   "alias": "onet.pl"
+  },
+  "poczta.onet.pl": {
+   "alias": "onet.pl"
+  },
+  "poetic.com": {
+   "alias": "mail.com"
+  },
+  "pokerface.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "politician.com": {
+   "alias": "mail.com"
+  },
+  "polka.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "polka.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "pop.shibata.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "%EMAILDOMAIN%",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "popstar.com": {
+   "alias": "mail.com"
+  },
+  "post.com": {
+   "alias": "mail.com"
+  },
+  "post.cybercity.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "post.cz": {
+   "alias": "seznam.cz"
+  },
+  "post.dia.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "posteo.at": {
+   "alias": "posteo.de"
+  },
+  "posteo.be": {
+   "alias": "posteo.de"
+  },
+  "posteo.ca": {
+   "alias": "posteo.de"
+  },
+  "posteo.ch": {
+   "alias": "posteo.de"
+  },
+  "posteo.cl": {
+   "alias": "posteo.de"
+  },
+  "posteo.co": {
+   "alias": "posteo.de"
+  },
+  "posteo.co.uk": {
+   "alias": "posteo.de"
+  },
+  "posteo.com": {
+   "alias": "posteo.de"
+  },
+  "posteo.com.br": {
+   "alias": "posteo.de"
+  },
+  "posteo.cr": {
+   "alias": "posteo.de"
+  },
+  "posteo.cz": {
+   "alias": "posteo.de"
+  },
+  "posteo.de": {
+   "imap_host": "posteo.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "posteo.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "posteo.dk": {
+   "alias": "posteo.de"
+  },
+  "posteo.ee": {
+   "alias": "posteo.de"
+  },
+  "posteo.es": {
+   "alias": "posteo.de"
+  },
+  "posteo.eu": {
+   "alias": "posteo.de"
+  },
+  "posteo.fi": {
+   "alias": "posteo.de"
+  },
+  "posteo.gl": {
+   "alias": "posteo.de"
+  },
+  "posteo.gr": {
+   "alias": "posteo.de"
+  },
+  "posteo.hn": {
+   "alias": "posteo.de"
+  },
+  "posteo.hr": {
+   "alias": "posteo.de"
+  },
+  "posteo.hu": {
+   "alias": "posteo.de"
+  },
+  "posteo.ie": {
+   "alias": "posteo.de"
+  },
+  "posteo.in": {
+   "alias": "posteo.de"
+  },
+  "posteo.is": {
+   "alias": "posteo.de"
+  },
+  "posteo.it": {
+   "alias": "posteo.de"
+  },
+  "posteo.jp": {
+   "alias": "posteo.de"
+  },
+  "posteo.la": {
+   "alias": "posteo.de"
+  },
+  "posteo.li": {
+   "alias": "posteo.de"
+  },
+  "posteo.lt": {
+   "alias": "posteo.de"
+  },
+  "posteo.lu": {
+   "alias": "posteo.de"
+  },
+  "posteo.me": {
+   "alias": "posteo.de"
+  },
+  "posteo.mx": {
+   "alias": "posteo.de"
+  },
+  "posteo.my": {
+   "alias": "posteo.de"
+  },
+  "posteo.net": {
+   "alias": "posteo.de"
+  },
+  "posteo.nl": {
+   "alias": "posteo.de"
+  },
+  "posteo.no": {
+   "alias": "posteo.de"
+  },
+  "posteo.nz": {
+   "alias": "posteo.de"
+  },
+  "posteo.org": {
+   "alias": "posteo.de"
+  },
+  "posteo.pe": {
+   "alias": "posteo.de"
+  },
+  "posteo.pl": {
+   "alias": "posteo.de"
+  },
+  "posteo.pm": {
+   "alias": "posteo.de"
+  },
+  "posteo.pt": {
+   "alias": "posteo.de"
+  },
+  "posteo.ro": {
+   "alias": "posteo.de"
+  },
+  "posteo.se": {
+   "alias": "posteo.de"
+  },
+  "posteo.sg": {
+   "alias": "posteo.de"
+  },
+  "posteo.si": {
+   "alias": "posteo.de"
+  },
+  "posteo.tn": {
+   "alias": "posteo.de"
+  },
+  "posteo.uk": {
+   "alias": "posteo.de"
+  },
+  "posteo.us": {
+   "alias": "posteo.de"
+  },
+  "postman.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "pp.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "presidency.com": {
+   "alias": "mail.com"
+  },
+  "priest.com": {
+   "alias": "mail.com"
+  },
+  "privat.dia.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "privatmail.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "prodigy.net": {
+   "alias": "att.net"
+  },
+  "programmer.net": {
+   "alias": "mail.com"
+  },
+  "prokonto.pl": {
+   "alias": "o2.pl"
+  },
+  "proton.me": {
+   "alias": "protonmail"
+  },
+  "protonmail": {
+   "imap_host": "127.0.0.1",
+   "imap_port": 1143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "imap_allow_insecure_ssl": true,
+   "smtp_host": "127.0.0.1",
+   "smtp_port": 1025,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email",
+   "smtp_allow_insecure_ssl": true,
+   "container_folder": "Folders"
+  },
+  "protonmail.ch": {
+   "alias": "protonmail"
+  },
+  "protonmail.com": {
+   "alias": "protonmail"
+  },
+  "proximus.be": {
+   "alias": "skynet.be"
+  },
+  "pseudonim.pl": {
+   "alias": "onet.pl"
+  },
+  "ptd.net": {
+   "imap_host": "promail.ptd.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "promail.ptd.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "publicist.com": {
+   "alias": "mail.com"
+  },
+  "purple.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "purple.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "q.com": {
+   "imap_host": "mail.q.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.q.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "qq.com": {
+   "imap_host": "imap.qq.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.qq.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "quake.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "quicknet.nl": {
+   "alias": "ziggo.nl"
+  },
+  "rainbow.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "rainbow.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "rambler.ru": {
+   "imap_host": "imap.rambler.ru",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.rambler.ru",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "razcall.com": {
+   "alias": "ziggo.nl"
+  },
+  "razcall.nl": {
+   "alias": "ziggo.nl"
+  },
+  "ready.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "realtyagent.com": {
+   "alias": "mail.com"
+  },
+  "reborn.com": {
+   "alias": "mail.com"
+  },
+  "red.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "red.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "reggaefan.com": {
+   "alias": "mail.com"
+  },
+  "religious.com": {
+   "alias": "mail.com"
+  },
+  "repairman.com": {
+   "alias": "mail.com"
+  },
+  "representative.com": {
+   "alias": "mail.com"
+  },
+  "republika.pl": {
+   "alias": "onet.pl"
+  },
+  "rescueteam.com": {
+   "alias": "mail.com"
+  },
+  "revenue.com": {
+   "alias": "mail.com"
+  },
+  "riseup.net": {
+   "imap_host": "mail.riseup.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mail.riseup.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "rmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "rmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "rocketmail.com": {
+   "alias": "yahoo.com"
+  },
+  "rocketship.com": {
+   "alias": "mail.com"
+  },
+  "rockfan.com": {
+   "alias": "mail.com"
+  },
+  "rogers.com": {
+   "alias": "yahoo"
+  },
+  "rome.com": {
+   "alias": "mail.com"
+  },
+  "rondo.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "rondo.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "rose.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "rose.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "rouge.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "rouge.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "royal.net": {
+   "alias": "mail.com"
+  },
+  "rr.com": {
+   "imap_host": "mail.twc.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.twc.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "rr.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "rub.de": {
+   "imap_host": "mail.ruhr-uni-bochum.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "smtp_host": "mail.ruhr-uni-bochum.de",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS"
+  },
+  "ruby.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ruby.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ruhrnet-online.de": {
+   "alias": "versatel.de"
+  },
+  "runbox.com": {
+   "imap_host": "mail.runbox.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mail.runbox.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "runestone.net": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.runestone.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "rzone.de": {
+   "alias": "strato.de"
+  },
+  "saintly.com": {
+   "alias": "mail.com"
+  },
+  "sakunet.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.sakunet.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "salesperson.net": {
+   "alias": "mail.com"
+  },
+  "sanfranmail.com": {
+   "alias": "mail.com"
+  },
+  "sapo.ao": {
+   "alias": "sapo.pt"
+  },
+  "sapo.cv": {
+   "alias": "sapo.pt"
+  },
+  "sapo.mz": {
+   "alias": "sapo.pt"
+  },
+  "sapo.pt": {
+   "imap_host": "imap.sapo.pt",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.sapo.pt",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "sapo.tl": {
+   "alias": "sapo.pt"
+  },
+  "sbcglobal.net": {
+   "alias": "att.net"
+  },
+  "schlund.de": {
+   "alias": "1und1.de"
+  },
+  "schwaz.net": {
+   "imap_host": "imap.schwaz.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.schwaz.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "scientist.com": {
+   "alias": "mail.com"
+  },
+  "scotlandmail.com": {
+   "alias": "mail.com"
+  },
+  "sea.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "sea.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "secret.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "secretary.net": {
+   "alias": "mail.com"
+  },
+  "secureserver.net": {
+   "alias": "wildwestdomains.com"
+  },
+  "seductive.com": {
+   "alias": "mail.com"
+  },
+  "sent.com": {
+   "alias": "fastmail"
+  },
+  "sepia.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "sepia.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "serenade.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "serenade.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "serversp.us": {
+   "imap_host": "167.114.109.252",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "167.114.109.252",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "seznam.cz": {
+   "imap_host": "imap.seznam.cz",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.seznam.cz",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "sfr.fr": {
+   "imap_host": "imap.sfr.fr",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.sfr.fr",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "sfu.ca": {
+   "imap_host": "imap.sfu.ca",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mailgate.sfu.ca",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "shaw.ca": {
+   "imap_host": "imap.shaw.ca",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mail.shaw.ca",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "silk.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "silk.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "silver.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "silver.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "singapore.com": {
+   "alias": "mail.com"
+  },
+  "sjtu.edu.cn": {
+   "imap_host": "mail.sjtu.edu.cn",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.sjtu.edu.cn",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "sky.com": {
+   "imap_host": "imap.tools.sky.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.tools.sky.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "sky.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "sky.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "skynet.be": {
+   "imap_host": "imap.proximus.be",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "relay.proximus.be",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "sleepy.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "smail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "smtp.cz": {
+   "alias": "active24.com"
+  },
+  "snakebite.com": {
+   "alias": "mail.com"
+  },
+  "snelnet.net": {
+   "alias": "kpnmail.nl"
+  },
+  "snet.net": {
+   "alias": "att.net"
+  },
+  "snow.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "snow.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "so.wind.jp": {
+   "alias": "so.wind.ne.jp"
+  },
+  "so.wind.ne.jp": {
+   "imap_host": "so.wind.ne.jp",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "so.wind.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "sofort-start.de": {
+   "alias": "1und1.de"
+  },
+  "sofort-surf.de": {
+   "alias": "1und1.de"
+  },
+  "sofortstart.de": {
+   "alias": "1und1.de"
+  },
+  "sofortsurf.de": {
+   "alias": "1und1.de"
+  },
+  "sonata.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "sonata.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "songwriter.net": {
+   "alias": "mail.com"
+  },
+  "soon.com": {
+   "alias": "mail.com"
+  },
+  "soverin.net": {
+   "imap_host": "imap.soverin.net",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.soverin.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "spainmail.com": {
+   "alias": "mail.com"
+  },
+  "spectrum.net": {
+   "alias": "charter.net"
+  },
+  "spoko.pl": {
+   "alias": "onet.pl"
+  },
+  "spoluzaci.cz": {
+   "alias": "seznam.cz"
+  },
+  "sporty.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "ss.iij4u.or.jp": {
+   "alias": "dd.iij4u.or.jp"
+  },
+  "startmail.com": {
+   "imap_host": "imap.startmail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.startmail.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "strato.de": {
+   "imap_host": "imap.strato.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.strato.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "student.tuwien.ac.at": {
+   "imap_host": "mail.student.tuwien.ac.at",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mail.student.tuwien.ac.at",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "studenti.univr.it": {
+   "imap_host": "univr.mail.cineca.it",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "univr.smtpauth.cineca.it",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "suite.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "suite.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "superbruger.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "suttamagga.it": {
+   "imap_host": "imaps.aruba.it",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtps.aruba.it",
+   "smtp_port": 465,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "swbell.net": {
+   "alias": "att.net"
+  },
+  "swisscom.ch": {
+   "imap_host": "imaps.bluewin.ch",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtpauths.bluewin.ch",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "sympatico.ca": {
+   "alias": "bell.net"
+  },
+  "symphony.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "symphony.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "t-online.de": {
+   "imap_host": "secureimap.t-online.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "securesmtp.t-online.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "talent.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "talk21.com": {
+   "alias": "btinternet.com"
+  },
+  "tanke.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "taupe.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "taupe.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "taxidriver.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "teachers.org": {
+   "alias": "mail.com"
+  },
+  "techie.com": {
+   "alias": "mail.com"
+  },
+  "technologist.com": {
+   "alias": "mail.com"
+  },
+  "teens.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "teknik.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "telebel.de": {
+   "alias": "versatel.de"
+  },
+  "telefonica.net": {
+   "imap_host": "imap.telefonica.net",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.telefonica.net",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "telelev.de": {
+   "alias": "versatel.de"
+  },
+  "telenet.be": {
+   "imap_host": "imap.telenet.be",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.telenet.be",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "teleos-web.de": {
+   "alias": "ewe.net"
+  },
+  "telfort.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "telstra.com": {
+   "alias": "bigpond.com"
+  },
+  "terra.com": {
+   "imap_host": "imap.terra.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.terra.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "terra.es": {
+   "imap_host": "imap4.terra.es",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "mailhost.terra.es",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "texas.usa.com": {
+   "alias": "mail.com"
+  },
+  "thegame.com": {
+   "alias": "mail.com"
+  },
+  "therapist.net": {
+   "alias": "mail.com"
+  },
+  "thinline.cz": {
+   "imap_host": "mail.cesky-hosting.cz",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.cesky-hosting.cz",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "tiki.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp-auth.tiki.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "tip.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "tiscali.cz": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.tiscali.cz",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "tiscali.it": {
+   "imap_host": "imap.tiscali.it",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.tiscali.it",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "tiscali.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "tiscalimail.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "tjekket.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "tlen.pl": {
+   "alias": "o2.pl"
+  },
+  "tmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "tmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "toccata.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "toccata.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "toke.com": {
+   "alias": "mail.com"
+  },
+  "tokyo.com": {
+   "alias": "mail.com"
+  },
+  "toothfairy.com": {
+   "alias": "mail.com"
+  },
+  "topaz.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "topaz.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "traceroute.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "trio.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "trio.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "tv.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "tvstar.com": {
+   "alias": "mail.com"
+  },
+  "ucsd.edu": {
+   "imap_host": "mail.ucsd.edu",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.ucsd.edu",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "ugenstilbud.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "ukr.net": {
+   "imap_host": "imap.ukr.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.ukr.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "umail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "umail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "umich.edu": {
+   "imap_host": "imap.gmail.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.gmail.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "umpire.com": {
+   "alias": "mail.com"
+  },
+  "ungdom.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "uni-bremen.de": {
+   "imap_host": "imap.uni-bremen.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.uni-bremen.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "uol.com.br": {
+   "imap_host": "imap.uol.com.br",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtps.uol.com.br",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "upcmail.nl": {
+   "alias": "ziggo.nl"
+  },
+  "usa.com": {
+   "alias": "mail.com"
+  },
+  "uwaterloo.ca": {
+   "imap_host": "mailservices.uwaterloo.ca",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mailservices.uwaterloo.ca",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "uymail.com": {
+   "alias": "mail.com"
+  },
+  "verizon.net": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.verizon.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "versanet.de": {
+   "alias": "versatel.de"
+  },
+  "versatel.de": {
+   "imap_host": "mx.versatel.de",
+   "imap_port": 143,
+   "imap_security": "STARTTLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.versatel.de",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "video.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "violet.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "violet.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "vip.cybercity.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "vip.onet.pl": {
+   "alias": "onet.pl"
+  },
+  "virgin.net": {
+   "imap_host": "imap4.virgin.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.virgin.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "virginmedia.com": {
+   "imap_host": "imap.virginmedia.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.virginmedia.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "vittig.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "vm.aikis.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "mail.aikis.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "vmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "vmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "vodafonemail.de": {
+   "imap_host": "imap.vodafonemail.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.vodafonemail.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "vp.pl": {
+   "alias": "onet.pl"
+  },
+  "vp.tiki.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "vs.tiki.ne.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "wallet.com": {
+   "alias": "mail.com"
+  },
+  "waltz.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "waltz.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "wanadoo.fr": {
+   "alias": "orange.fr"
+  },
+  "wans.net": {
+   "alias": "att.net"
+  },
+  "watch-out.ca": {
+   "imap_host": "imap.zoho.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.zoho.com",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "wave.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "wave.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "web.de": {
+   "imap_host": "imap.web.de",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.web.de",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "webhuset.no": {
+   "imap_host": "imap.webhuset.no",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.webhuset.no",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "webname.com": {
+   "alias": "mail.com"
+  },
+  "websupport.sk": {
+   "imap_host": "imap.websupport.sk",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.websupport.sk",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "weirdness.com": {
+   "alias": "mail.com"
+  },
+  "white.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "white.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "who.net": {
+   "alias": "mail.com"
+  },
+  "whoever.com": {
+   "alias": "mail.com"
+  },
+  "wildwestdomains.com": {
+   "imap_host": "imap.secureserver.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtpout.secureserver.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "windowslive.com": {
+   "alias": "hotmail.com"
+  },
+  "wine.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "wine.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "winning.com": {
+   "alias": "mail.com"
+  },
+  "witty.com": {
+   "alias": "mail.com"
+  },
+  "wmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "wmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "wmconnect.com": {
+   "alias": "aol.com"
+  },
+  "wo.cz": {
+   "alias": "tiscali.cz"
+  },
+  "wol.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "worker.com": {
+   "alias": "mail.com"
+  },
+  "workmail.com": {
+   "alias": "mail.com"
+  },
+  "worldmail.cz": {
+   "alias": "tiscali.cz"
+  },
+  "worldonline.cz": {
+   "alias": "tiscali.cz"
+  },
+  "worldonline.dk": {
+   "alias": "mail.telenor.dk"
+  },
+  "wp.pl": {
+   "imap_host": "imap.wp.pl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.wp.pl",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "writeme.com": {
+   "alias": "mail.com"
+  },
+  "wxs.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "x-il.jp": {
+   "alias": "iijmio-mail.jp"
+  },
+  "xmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "xmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "xp.wind.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "xp.wind.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "xpost.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "xpost.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "xs4all.nl": {
+   "alias": "kpnmail.nl"
+  },
+  "xtra.co.nz": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "send.xtra.co.nz",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ya.ru": {
+   "alias": "yandex.ru"
+  },
+  "yahoo": {
+   "imap_host": "imap.mail.yahoo.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.yahoo.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "yahoo.ca": {
+   "alias": "yahoo"
+  },
+  "yahoo.co.id": {
+   "alias": "yahoo"
+  },
+  "yahoo.co.in": {
+   "alias": "yahoo"
+  },
+  "yahoo.co.jp": {
+   "imap_host": "imap.mail.yahoo.co.jp",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.yahoo.co.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "yahoo.co.nz": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.co.uk": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.com": {
+   "imap_host": "imap.mail.yahoo.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.mail.yahoo.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "yahoo.com.ar": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.com.au": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.com.br": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.com.hk": {
+   "alias": "yahoo"
+  },
+  "yahoo.com.mx": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.com.tw": {
+   "alias": "yahoo"
+  },
+  "yahoo.com.vn": {
+   "alias": "yahoo"
+  },
+  "yahoo.de": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.es": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.fr": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.gr": {
+   "alias": "yahoo"
+  },
+  "yahoo.in": {
+   "alias": "yahoo"
+  },
+  "yahoo.it": {
+   "alias": "yahoo.com"
+  },
+  "yahoo.pl": {
+   "alias": "yahoo"
+  },
+  "yahoo.se": {
+   "alias": "yahoo.com"
+  },
+  "yahoodns.net": {
+   "alias": "yahoo.com"
+  },
+  "yandex": {
+   "imap_host": "imap.yandex.ru",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "smtp.yandex.ru",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "yandex.by": {
+   "alias": "yandex.ru"
+  },
+  "yandex.com": {
+   "alias": "yandex.ru"
+  },
+  "yandex.kz": {
+   "alias": "yandex.ru"
+  },
+  "yandex.net": {
+   "alias": "yandex.ru"
+  },
+  "yandex.ru": {
+   "imap_host": "imap.yandex.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.yandex.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "yandex.ua": {
+   "alias": "yandex.ru"
+  },
+  "ybb.ne.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ybbsmtp.mail.yahoo.co.jp",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "yeah.net": {
+   "imap_host": "imap.yeah.net",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.yeah.net",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "yellow.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "yellow.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "ymail.com": {
+   "alias": "yahoo.com"
+  },
+  "ymail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ymail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "your-server.de": {
+   "alias": "hetzner.de"
+  },
+  "yours.com": {
+   "alias": "mail.com"
+  },
+  "ypost.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "ypost.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "zeelandnet.nl": {
+   "imap_host": "mail.zeelandnet.nl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email-without-domain",
+   "smtp_host": "mail.zeelandnet.nl",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "zeggis.com": {
+   "alias": "ziggo.nl"
+  },
+  "zeggis.nl": {
+   "alias": "ziggo.nl"
+  },
+  "ziggo.nl": {
+   "imap_host": "imap.ziggo.nl",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.ziggo.nl",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email"
+  },
+  "ziggomail.com": {
+   "alias": "ziggo.nl"
+  },
+  "zinders.nl": {
+   "alias": "ziggo.nl"
+  },
+  "zmail.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "zmail.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  },
+  "zoho.com": {
+   "imap_host": "imap.zoho.com",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "smtp.zoho.com",
+   "smtp_port": 465,
+   "smtp_security": "SSL / TLS",
+   "smtp_user_format": "email"
+  },
+  "zohomail.com": {
+   "alias": "zoho.com"
+  },
+  "zpost.plala.or.jp": {
+   "imap_host": "",
+   "imap_port": 993,
+   "imap_security": "SSL / TLS",
+   "imap_user_format": "email",
+   "smtp_host": "zpost.mail.plala.or.jp",
+   "smtp_port": 587,
+   "smtp_security": "STARTTLS",
+   "smtp_user_format": "email-without-domain"
+  }
+ }
+}
