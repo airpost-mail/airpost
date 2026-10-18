@@ -379,13 +379,16 @@ impl Reply {
 }
 
 impl Setup {
+    /// Sends `head` and `body` in one write. The server may answer before it reads the
+    /// whole body, and must then read the rest before it closes: bytes left unread make the
+    /// close a reset, which can cost the client the answer.
     async fn raw(&self, head: String, body: Vec<u8>) -> Reply {
         let mut s = TcpStream::connect(self.addr).await.unwrap();
         let (mut r, mut w) = s.split();
         let write = async {
-            // The server may answer and close before it reads the whole body.
-            let _ = w.write_all(head.as_bytes()).await;
-            let _ = w.write_all(&body).await;
+            let mut bytes = head.into_bytes();
+            bytes.extend_from_slice(&body);
+            let _ = w.write_all(&bytes).await;
         };
         let mut out = Vec::new();
         let (_, read) = tokio::join!(write, r.read_to_end(&mut out));
@@ -586,7 +589,8 @@ async fn file_routes() {
         )
         .await;
     assert_eq!(declared.status, 413);
-    let big = vec![0u8; (25 << 20) + 1];
+    // Well past the cap, so that much of it is still unread when the gateway refuses it.
+    let big = vec![0u8; (29 << 20) + 1];
     let mut chunked = format!("{:x}\r\n", big.len()).into_bytes();
     chunked.extend_from_slice(&big);
     chunked.extend_from_slice(b"\r\n0\r\n\r\n");

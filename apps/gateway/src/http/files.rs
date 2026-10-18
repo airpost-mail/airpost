@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use axum::body::Body;
+use axum::body::{Body, BodyDataStream};
 use axum::extract::{Path as UrlPath, Query, Request, State};
 use axum::http::header::{
     CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_SECURITY_POLICY, CONTENT_TYPE,
@@ -37,6 +37,8 @@ pub const MAX_UPLOAD_BYTES: u64 = 25 << 20;
 /// `files.get` may wait out a body download; the engine gives up after 30 s.
 const GET_TIMEOUT: Duration = Duration::from_secs(45);
 const PUT_TIMEOUT: Duration = Duration::from_secs(60);
+/// How long the rest of an oversized upload is read and dropped before the 413.
+const DRAIN_WAIT: Duration = Duration::from_secs(5);
 /// Uploads left behind (a crash between the write and the delete) are removed after this.
 const INCOMING_MAX_AGE: Duration = Duration::from_secs(24 * 3600);
 const INCOMING_DIR: &str = "incoming";
@@ -233,6 +235,23 @@ pub struct UploadQuery {
     name: String,
 }
 
+/// Reads and drops the rest of a body refused part way, for a while, before the 413. The
+/// connection closes after the answer, and closing with request bytes unread makes the
+/// kernel send a reset, which can reach the client before it has read the answer (RFC 9112
+/// 9.6). A body declared too large is answered at once instead: it can't be read in time.
+async fn drain(body: &mut BodyDataStream) {
+    let _ = tokio::time::timeout(DRAIN_WAIT, async {
+        let mut n: u64 = 0;
+        while let Some(Ok(chunk)) = body.next().await {
+            n += chunk.len() as u64;
+            if n > MAX_UPLOAD_BYTES {
+                break;
+            }
+        }
+    })
+    .await;
+}
+
 /// Deletes the upload's temporary file however the request ends.
 struct TempFile(PathBuf);
 
@@ -287,6 +306,8 @@ pub async fn upload(
         let chunk = chunk.map_err(|_| ApiError::BadRequest("The upload was cut short."))?;
         written += chunk.len() as u64;
         if written > MAX_UPLOAD_BYTES {
+            drop(out);
+            drain(&mut body).await;
             return Err(too_large());
         }
         out.write_all(&chunk).await.map_err(io_error)?;
