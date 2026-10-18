@@ -125,7 +125,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "list_scheduled_sends",
-            description: "List drafts that currently have a pending \"Send Later\" schedule, i.e. will be sent automatically at a future time.",
+            description: "List drafts with a \"Send Later\" schedule. state is scheduled (sendAt is in the future), due (sendAt passed and the draft hasn't gone out yet: being sent, waiting for the draft's body, or Tern wasn't running) or failed (Tern gave up; error says why and the draft stays unsent until it is rescheduled or sent).",
             schema: schema(
                 json!({"accountId": {"type": "string", "description": "Restrict to a single account"}}),
                 &[],
@@ -654,9 +654,11 @@ pub(super) fn get_top_links(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
 pub(super) fn list_scheduled_sends(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let account_id = opt_str(args, "accountId")?;
     let now = chrono::Utc::now().timestamp();
+    // Failed sends first (no expiration), then by send time.
     let mut drafts: Vec<(i64, Value)> = Vec::new();
     for account in ctx.accounts_for(account_id.as_deref())? {
-        let filter = json!({"draft": true, "hasExpiration": true});
+        // Without hasExpiration: a send the engine gave up on has none, only an error.
+        let filter = json!({"draft": true});
         for d in metadata_messages(
             ctx,
             "list_scheduled_sends",
@@ -664,35 +666,31 @@ pub(super) fn list_scheduled_sends(ctx: &mut Ctx<'_>, args: &Value) -> ToolResul
             SEND_LATER_ID,
             filter,
         )? {
-            let Some(meta) = plugin_value(&d, SEND_LATER_ID) else {
+            if !ctx.policy.message_allowed(&d) {
+                continue;
+            }
+            let Some(schedule) = model::scheduled_send(&d, now) else {
                 continue;
             };
-            let expiration = i64_of(meta, "expiration");
-            if expiration > now && ctx.policy.message_allowed(&d) {
-                drafts.push((expiration, d));
+            let at = plugin_value(&d, SEND_LATER_ID)
+                .and_then(|m| m.get("expiration"))
+                .and_then(Value::as_i64)
+                .unwrap_or(i64::MIN);
+            let mut row = json!({
+                "headerMessageId": str_of(&d, "hMsgId"),
+                "threadId": str_of(&d, "threadId"),
+                "subject": str_of(&d, "subject"),
+                "to": model::contacts(&d, "to"),
+                "accountId": str_of(&d, "aid"),
+            });
+            if let (Some(row), Value::Object(schedule)) = (row.as_object_mut(), schedule) {
+                row.extend(schedule);
             }
+            drafts.push((at, row));
         }
     }
-    drafts.sort_by_key(|(expiration, _)| *expiration);
-    let out: Vec<Value> = drafts
-        .iter()
-        .map(|(expiration, d)| {
-            let meta = plugin_value(d, SEND_LATER_ID).unwrap_or(&Value::Null);
-            let action_key = match meta.get("actionKey") {
-                Some(Value::String(k)) if !k.is_empty() => Value::from(k.as_str()),
-                _ => Value::Null,
-            };
-            json!({
-                "headerMessageId": str_of(d, "hMsgId"),
-                "threadId": str_of(d, "threadId"),
-                "subject": str_of(d, "subject"),
-                "to": model::contacts(d, "to"),
-                "accountId": str_of(d, "aid"),
-                "sendAt": model::iso_date(*expiration),
-                "actionKey": action_key,
-            })
-        })
-        .collect();
+    drafts.sort_by_key(|(at, _)| *at);
+    let out: Vec<Value> = drafts.into_iter().map(|(_, row)| row).collect();
     let mut o = Output::text(&Value::Array(out));
     if let Some(a) = account_id {
         o = o.with_account(&a);

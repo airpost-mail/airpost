@@ -18,6 +18,9 @@ use crate::tasks;
 
 const SEND_LATER_ID: &str = "send-later";
 const DEFAULT_SEND_ACTION_KEY: &str = "send";
+/// The after-send actions the engine's expiration executor performs itself
+/// (ms-sync `expiration_executor::SEND_ACTIONS`).
+const ENGINE_SEND_ACTIONS: [&str; 2] = ["send", "send-and-archive"];
 /// Draft threads `find_draft` looks through when a Message-ID isn't the id the engine
 /// gives drafts created on this device.
 const DRAFT_SCAN: usize = 100;
@@ -168,12 +171,12 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "schedule_send",
-            description: "Schedule an existing draft to be sent automatically at a future date/time, equivalent to the \"Send Later\" composer button. The Tern engine sends it at that time with no window open (the result's note says when an older engine needs the desktop app instead). Use cancel_scheduled_send to undo.",
+            description: "Schedule an existing draft to be sent automatically at a future date/time, equivalent to the \"Send Later\" composer button. The Tern engine sends it at that time with no window open (the result's note says when the desktop app must send it instead: an older engine, or an actionKey other than send / send-and-archive). Use cancel_scheduled_send to undo, and list_scheduled_sends to see whether it went out or failed.",
             schema: schema(
                 json!({
                     "headerMessageId": {"type": "string", "description": "The headerMessageId of the draft to schedule"},
                     "sendAt": {"type": "string", "description": "ISO 8601 date-time in the future to send the draft at; without an offset it is local time"},
-                    "actionKey": {"type": "string", "description": "Optional send action key to use when the draft is sent (defaults to the account's default send action)"}
+                    "actionKey": {"type": "string", "description": "Optional send action key to use when the draft is sent (defaults to send). The engine performs send and send-and-archive; other keys are plugin actions the desktop app performs"}
                 }),
                 &["headerMessageId", "sendAt"],
             ),
@@ -654,16 +657,24 @@ pub(super) fn schedule_send(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         return Err(failed("sendAt must be in the future"));
     }
     let (account, draft) = find_draft(ctx, None, Some(&hmid), None)?;
+    let action_key = action_key.unwrap_or_else(|| DEFAULT_SEND_ACTION_KEY.into());
+    let mut value = json!({"expiration": when.timestamp(), "actionKey": action_key});
+    // A send action only a desktop plugin performs: the engine leaves the send to the app.
+    let engine_action = ENGINE_SEND_ACTIONS.contains(&action_key.as_str());
+    if !engine_action {
+        value["clientFinalize"] = json!(true);
+    }
     let task = tasks::syncback_message_metadata(
         &draft,
         SEND_LATER_ID,
-        json!({"expiration": when.timestamp(), "actionKey": action_key.unwrap_or_else(|| DEFAULT_SEND_ACTION_KEY.into())}),
+        value,
         Some(json!({"expiration": null})),
     );
     ctx.queue(&account.account_id, task)?;
-    let note = if ctx
-        .backend
-        .has_feature(&account.account_id, ms_ipc::feature::EXPIRATION_EXECUTOR)
+    let note = if engine_action
+        && ctx
+            .backend
+            .has_feature(&account.account_id, ms_ipc::feature::EXPIRATION_EXECUTOR)
     {
         SCHEDULE_NOTE
     } else {
@@ -681,7 +692,8 @@ pub(super) fn schedule_send(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
 /// An engine with the expiration executor sends a due draft itself.
 const SCHEDULE_NOTE: &str = "The Tern engine sends the draft at sendAt by itself; if it isn't \
                              running then, the draft goes out when it next starts.";
-/// An older engine only announces a due send-later; the desktop's send-later plugin sends it.
+/// An older engine only announces a due send-later, and a newer one leaves a send action it
+/// doesn't perform to the app; the desktop's send-later plugin sends it.
 const SCHEDULE_NOTE_DESKTOP: &str = "This Tern engine leaves scheduled drafts to the desktop \
                                      app: it must be running at sendAt, or the draft goes out \
                                      when the app next opens.";

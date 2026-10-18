@@ -652,6 +652,22 @@ fn schedule_send_says_who_does_the_send() {
         .timestamp();
     let task = f.queued.last().unwrap();
     assert_eq!(task["value"]["expiration"], want, "{task}");
+    assert_eq!(task["value"]["clientFinalize"], Value::Null, "{task}");
+
+    // A plugin's send action: the engine would decline it, so the row says the app sends it.
+    let out = json_of(&run(
+        &mut f,
+        &send,
+        "schedule_send",
+        json!({"headerMessageId": "draft-0@x.test", "sendAt": at, "actionKey": "send-and-snooze"}),
+    ));
+    assert!(
+        out["note"].as_str().unwrap().contains("desktop app"),
+        "{out}"
+    );
+    let task = f.queued.last().unwrap();
+    assert_eq!(task["value"]["actionKey"], "send-and-snooze", "{task}");
+    assert_eq!(task["value"]["clientFinalize"], true, "{task}");
 }
 
 #[test]
@@ -818,15 +834,47 @@ fn tracked_messages_and_top_links() {
 }
 
 #[test]
-fn scheduled_sends_are_the_future_ones() {
+fn scheduled_sends_include_due_and_failed_ones() {
     let mut f = tracked();
+    let mut failed = f.messages[1].clone();
+    failed["id"] = json!("d-failed");
+    failed["hMsgId"] = json!("failed@x.test");
+    failed["metadata"] = json!([{"pluginId": "send-later", "value": {"expiration": null,
+        "actionKey": "send", "error": "The draft's From address isn't one of this account's."}}]);
+    f.messages.push(failed);
+    let mut cancelled = f.messages[1].clone();
+    cancelled["id"] = json!("d-cancelled");
+    cancelled["hMsgId"] = json!("cancelled@x.test");
+    cancelled["metadata"] = json!([{"pluginId": "send-later", "value": {"expiration": null}}]);
+    f.messages.push(cancelled);
+
     let r = json_of(&run(&mut f, &rw(), "list_scheduled_sends", json!({})));
     let r = r.as_array().unwrap();
-    assert_eq!(r.len(), 1, "{r:?}");
-    assert_eq!(r[0]["headerMessageId"], "draft-0@x.test");
-    assert_eq!(r[0]["actionKey"], "send");
-    assert_eq!(r[0]["to"], json!([{"name": "Bob", "email": "bob@y.test"}]));
-    assert!(r[0]["sendAt"].as_str().unwrap().ends_with('Z'));
+    let states: Vec<(&str, &str)> = r
+        .iter()
+        .map(|s| {
+            (
+                s["headerMessageId"].as_str().unwrap(),
+                s["state"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        states,
+        [
+            ("failed@x.test", "failed"),
+            ("past@x.test", "due"),
+            ("draft-0@x.test", "scheduled")
+        ],
+        "{r:?}"
+    );
+    assert!(r[0]["error"].as_str().unwrap().contains("From address"));
+    assert_eq!(r[0]["sendAt"], Value::Null);
+    assert_eq!(r[1]["sendAt"], "1970-01-01T00:01:40.000Z");
+    assert_eq!(r[2]["actionKey"], "send");
+    assert_eq!(r[2]["to"], json!([{"name": "Bob", "email": "bob@y.test"}]));
+    assert!(r[2]["sendAt"].as_str().unwrap().ends_with('Z'));
+    assert_eq!(r[2].get("error"), None);
     let o = run(
         &mut f,
         &rw(),

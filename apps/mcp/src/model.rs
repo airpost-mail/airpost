@@ -247,7 +247,7 @@ pub fn message_detail(
             .cloned()
             .unwrap_or(Value::Null)
     };
-    json!({
+    let mut detail = json!({
         "id": str_of(message, "id"),
         "headerMessageId": str_of(message, "hMsgId"),
         "threadId": str_of(message, "threadId"),
@@ -266,7 +266,13 @@ pub fn message_detail(
         "replyToHeaderMessageId": opt_str("rthMsgId"),
         "accountId": str_of(message, "aid"),
         "folders": folders,
-    })
+    });
+    if is_draft(message) {
+        if let Some(s) = scheduled_send(message, chrono::Utc::now().timestamp()) {
+            detail["scheduledSend"] = s;
+        }
+    }
+    detail
 }
 
 /// `serializeThreadDetail`: messages oldest first; the caller drops blocked ones.
@@ -281,6 +287,39 @@ pub fn thread_detail(thread: &Value, messages: Vec<Value>) -> Value {
         "categories": thread_categories(thread),
         "messages": messages,
     })
+}
+
+/// A draft's `send-later` schedule as the tools show it: `scheduled` until `sendAt`; `due`
+/// once that has passed and the draft is still there (being sent, waiting for its body from
+/// the server, or the engine wasn't running); `failed` when the engine gave up on it, with
+/// `error` saying why (docs/desktop-client-plan.md 3.3). None without a schedule, or once it
+/// was cancelled.
+pub fn scheduled_send(message: &Value, now: i64) -> Option<Value> {
+    let value = &array_of(message, "metadata")
+        .iter()
+        .find(|m| str_of(m, "pluginId") == "send-later")?["value"];
+    let action_key = match value.get("actionKey") {
+        Some(Value::String(k)) if !k.is_empty() => Value::from(k.as_str()),
+        _ => Value::Null,
+    };
+    let error = value
+        .get("error")
+        .and_then(Value::as_str)
+        .filter(|e| !e.is_empty());
+    match (value.get("expiration").and_then(Value::as_i64), error) {
+        (Some(at), _) => Some(json!({
+            "state": if at > now { "scheduled" } else { "due" },
+            "sendAt": iso_date(at),
+            "actionKey": action_key,
+        })),
+        (None, Some(error)) => Some(json!({
+            "state": "failed",
+            "sendAt": Value::Null,
+            "actionKey": action_key,
+            "error": error,
+        })),
+        (None, None) => None,
+    }
 }
 
 /// A draft in a thread, as `reply_to_thread` lists them.
@@ -350,6 +389,28 @@ mod tests {
                     "size": 3, "isInline": true}])
         );
         assert_eq!(d["body"], "<p>b</p>");
+        assert_eq!(d.get("scheduledSend"), None);
+
+        // A send the engine gave up on shows on the draft, with why.
+        let mut failed = msg.clone();
+        failed["metadata"] = json!([{"pluginId": "send-later",
+            "value": {"expiration": null, "error": "Its body didn't arrive."}}]);
+        let d = message_detail(&failed, None, &folders);
+        assert_eq!(
+            d["scheduledSend"],
+            json!({"state": "failed", "sendAt": null, "actionKey": null,
+                   "error": "Its body didn't arrive."})
+        );
+        let mut due = msg.clone();
+        due["metadata"] = json!([{"pluginId": "send-later",
+            "value": {"expiration": 100, "actionKey": "send", "error": "stale"}}]);
+        assert_eq!(
+            scheduled_send(&due, 200).unwrap(),
+            json!({"state": "due", "sendAt": "1970-01-01T00:01:40.000Z", "actionKey": "send"})
+        );
+        assert_eq!(scheduled_send(&due, 50).unwrap()["state"], "scheduled");
+        due["metadata"][0]["value"] = json!({"expiration": null});
+        assert_eq!(scheduled_send(&due, 50), None);
     }
 
     #[test]
