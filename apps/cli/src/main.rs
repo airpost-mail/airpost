@@ -6,6 +6,7 @@
 //! over the socket protocol with `ms-ipc`'s blocking client, and reads nothing else of the
 //! profile but the engine logs.
 
+mod account;
 mod ai;
 mod app;
 mod cli;

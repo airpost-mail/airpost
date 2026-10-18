@@ -38,6 +38,11 @@ pub enum Command {
     Status,
     /// The accounts the running engines hold.
     Accounts,
+    /// Add an account to the serve engine.
+    Account {
+        #[command(subcommand)]
+        command: AccountCommand,
+    },
     /// Print deltas and new mail as the engines send them, until interrupted.
     Watch {
         /// Only these model classes (Thread, Message, Folder, Task, ...). New mail is
@@ -152,6 +157,74 @@ pub enum Command {
         /// The params object; `accountId` picks the engine when several run.
         params: Option<String>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AccountCommand {
+    /// Add an account. IMAP accounts (the default) get the servers Tern finds for the
+    /// address, changed by the flags below, and a password: asked for on a terminal, or one
+    /// line on stdin with --password-stdin. Gmail, Office 365 and Outlook accounts sign in
+    /// in the browser. The engine tests the account before it keeps it.
+    Add(AccountAddArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct AccountAddArgs {
+    /// The account's email address.
+    pub email: String,
+    /// imap, gmail, office365, outlook, or a preset the servers come from (yahoo, icloud,
+    /// fastmail, ...).
+    #[arg(long, default_value = "imap")]
+    pub provider: String,
+    /// Your name, as recipients see it.
+    #[arg(long)]
+    pub name: Option<String>,
+    #[arg(long, value_name = "HOST")]
+    pub imap_host: Option<String>,
+    #[arg(long, value_name = "PORT")]
+    pub imap_port: Option<u16>,
+    /// tls or starttls; Tern never sends a password unencrypted.
+    #[arg(long, value_parser = ["tls", "starttls"])]
+    pub imap_security: Option<String>,
+    #[arg(long, value_name = "USER")]
+    pub imap_username: Option<String>,
+    #[arg(long, value_name = "HOST")]
+    pub smtp_host: Option<String>,
+    #[arg(long, value_name = "PORT")]
+    pub smtp_port: Option<u16>,
+    /// tls or starttls.
+    #[arg(long, value_parser = ["tls", "starttls"])]
+    pub smtp_security: Option<String>,
+    #[arg(long, value_name = "USER")]
+    pub smtp_username: Option<String>,
+    /// Read the password (IMAP and SMTP) from the first line of stdin.
+    #[arg(long)]
+    pub password_stdin: bool,
+    /// Office 365: open this shared mailbox with your own sign-in.
+    #[arg(long, value_name = "EMAIL")]
+    pub shared_mailbox: Option<String>,
+    /// Print the sign-in address instead of opening the browser.
+    #[arg(long)]
+    pub no_browser: bool,
+    /// The port on 127.0.0.1 the browser's sign-in comes back to.
+    #[arg(long, default_value_t = 12141)]
+    pub port: u16,
+    /// How many seconds to wait for the sign-in.
+    #[arg(long, default_value_t = 300)]
+    pub timeout: u64,
+}
+
+impl AccountAddArgs {
+    pub fn has_server_flags(&self) -> bool {
+        self.imap_host.is_some()
+            || self.imap_port.is_some()
+            || self.imap_security.is_some()
+            || self.imap_username.is_some()
+            || self.smtp_host.is_some()
+            || self.smtp_port.is_some()
+            || self.smtp_security.is_some()
+            || self.smtp_username.is_some()
+    }
 }
 
 #[derive(Debug, Subcommand)]

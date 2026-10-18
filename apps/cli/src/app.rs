@@ -9,7 +9,9 @@ use ms_ipc::{code, ClientError};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::cli::{AiCommand, CalendarCommand, Cli, Command, SettingsCommand, TaskCommand};
+use crate::cli::{
+    AccountCommand, AiCommand, CalendarCommand, Cli, Command, SettingsCommand, TaskCommand,
+};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
 use crate::output::Style;
@@ -73,6 +75,9 @@ pub fn run(cli: Cli) -> Result<()> {
     match cli.command {
         Command::Status => crate::status::status(&ctx, &mut engines),
         Command::Accounts => crate::status::accounts(&ctx, &engines),
+        Command::Account {
+            command: AccountCommand::Add(args),
+        } => crate::account::add(&ctx, &mut engines, &args),
         Command::Sync => crate::status::sync(&ctx, &mut engines),
         Command::Calendar {
             command: CalendarCommand::Sync,
