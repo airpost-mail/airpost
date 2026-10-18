@@ -2020,7 +2020,9 @@ Decision taken, to confirm:
 - `TERN_TEST_DISCOVERY` overrides discovery in debug builds only, for the tests.
 - An OAuth reconnect keeps the account's id and settings and must sign in to the same address.
 - `server.set` restarts the running accounts with the new identity and clears an explicit one;
-  the token goes in with `secrets.set` first.
+  the token goes in with `secrets.set` after it. A `server.set` naming another url, user or
+  server id deletes the stored `tern-server-token`; a token stored before any server
+  (`credentials.import`) is kept.
 - Reconnect asks for the credentials again, since the engine never returns them.
 - Remove calls `account.remove {revoke, deleteData}` on the window's connection before
   config.json lets go of the account; the JS revocation stays only for an engine without
@@ -2038,3 +2040,29 @@ shared mailbox form. tern-web: `apps/web` still has its own presets (`presets.ts
 `account-draft.ts`) and should move its onboarding to `account.discover`/`account.oauth.*`.
 Trial pending (not run): add an IMAP account and an OAuth account (not the production
 accounts), reconnect one, remove one, and save an integration key.
+
+Stage 12 review fixes, 2026-10-18. A stored integration key is filled in only for the provider's
+default endpoint (no `url`) or the `url` the engine's `core.integrations.<kind>` settings give
+that provider; a request naming another host must carry its own `apiKey`, so `integrations.*`
+can't read a key out (unit cases plus `a_stored_key_goes_only_to_the_stored_url`). `server.set`
+to another server deletes `tern-server-token` (serve test in
+`accounts_secrets_and_the_server_are_edited_on_the_socket`). The token manager keeps every
+Google client an account may be bound to: the legacy `GMAIL_CLIENT_ID` pair, the configured one
+and the built-in one, and sends the secret of the account's `refresh_client_id`, so setting
+Tern's own client leaves older Gmail accounts refreshing. OAuth onboarding passes the user's
+default container folder to `account.oauth.begin` for a new account. `account.reset` starts a
+held, registered account again from the registry with its identity once the rows are gone (a
+later `account.add` answers ACCOUNT_EXISTS, which the desktop and harness already take as
+running), so a socket reset leaves it syncing. `test_gateway.py` now expects an admin device's
+`secrets.has` to pass and `credentials.import` to be refused, instead of `account.add` refused.
+
+Decision taken, to confirm: Preferences' Reset still goes through the supervisor
+(`SupervisorChannel.ResetCache`), not `account.reset` on the window's connection. The main
+process holds the account on stdin, and its `EngineClient.resetCache` holds the account's
+commands and forgets its entry around the reset; a reset from the window would race that. Move
+it when the supervisor stops holding accounts.
+
+Not run: none of these fixes was compiled or tested. The disk had under 200 MB free, so no
+cargo build, desktop spec run or harness run was possible; desktop typecheck and lint pass. The
+gate must run `cargo test` for ms-providers, ms-net and mailsync (serve and integrations
+tests), the onboarding specs (`oauth-signin-page-spec.tsx` is new) and `test_gateway.py`.
