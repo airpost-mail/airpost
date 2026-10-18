@@ -100,6 +100,16 @@ own.
 
 ### TD2. Remote-image blocking is a regex; the message iframe has no CSP
 
+Done (roadmap/security, f3bd26b43). The reading pane, clipped-message, show-original and print
+documents start with a CSP meta from `src/content-security-policy.ts` (`img-src`/`font-src` get
+`https: http:` only when allowed; `form-action 'none'`). Inline cid images are served as
+`tern-file:` from `<config>/files` with traversal and symlink escape rejected. MessageBodyProcessor
+returns `remoteImages` from the new `MessageViewExtension.allowsRemoteImages` hook (the autoload
+plugin answers; the setting decides if nothing does) and a change remounts the iframe, since a
+document keeps every policy across `doc.open()`. The regex now only drives the banner. Quick
+preview follows the global setting only, as it has no sender; print allows remote images only if
+every printed message does.
+
 Verified (regex run in node). "Block remote images" rewrites HTML with the pattern in
 `internal_packages/message-autoload-images/lib/autoload-images-store.ts:25-35`. It misses
 `background:#fff url(https://…)`, `background:no-repeat url(…)`, CSS escapes like `\75rl(`, and
@@ -257,6 +267,11 @@ yarn.
 
 ### TD10. Forms in mail can navigate the reading pane
 
+Done (roadmap/security, f3bd26b43). `EventedIFrame` cancels every submit in the frame, confirms,
+then opens the GET URL with its fields (POST: the action URL only) through `openLink`. The message
+CSP's `form-action 'none'` covers the gap before its listener attaches, and `MailspringWindow`'s
+`will-frame-navigate` handler blocks subframe navigation away from `about:blank`.
+
 Inferred from code; not run. The message iframe allows forms
 (`internal_packages/message-list/lib/email-frame.tsx:222`, `sandbox="allow-forms
 allow-same-origin"`), the sanitizer keeps `form`, `button`, `action` and `method`
@@ -273,6 +288,14 @@ submit handler, and `will-navigate` guards only the top frame
 - Size: ~40 TS.
 
 ### TD11. App CSP duplicated and weak; signature preview unsanitised
+
+Done (roadmap/security, f3bd26b43). `AppContentSecurityPolicy` is sent by `main.js` and copied in
+`static/index.html`; a spec fails if they differ. `script-src 'self'`, `default-src 'self'
+mailspring:`, `frame-src 'none'`, `object-src 'none'` (it was unquoted), and `connect-src` lists
+the Google/Microsoft OAuth endpoints and api.github.com. Autoconfig, one-click unsubscribe and
+Save Image fetch hosts from user data, so they go through `ExternalFetch` (main-process
+`net.fetch`, no cookies, Tern windows only). The signature preview runs through
+`SanitizeTransformer`. The `app://` scheme move is still open.
 
 Verified. The header policy (`src/browser/main.js:456-470`) and the meta tag
 (`static/index.html:6`) are meant to match but the header adds `'unsafe-inline'`, so only the meta
