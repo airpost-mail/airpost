@@ -747,7 +747,10 @@ With `HttpMetadataBackend` configured, the cursor reset does replay from the bac
   snooze and send-later state.
 - Status (2026-10-18, `roadmap/client-next`): fixed for `--mode reset`, `account.reset` and
   `engine.resetDatabase` (`crates/ms-store/src/metadata_stash.rs`; scenarios
-  `reset-keeps-plugin-metadata`, `expiration-reset-keeps-snooze`). Still open: the desktop's
+  `reset-keeps-plugin-metadata`, `expiration-reset-keeps-snooze`). Removing an account does not
+  keep it: `account.reset {keepMetadata: false}` and `engine.resetDatabase {keepMetadata: false}`
+  (from the desktop's account removal) delete it, since a re-added account has the same id
+  (`remove-account-drops-plugin-metadata`). Still open: the desktop's
   file-deleting fallbacks (Rebuild after the engine stopped, the failed-`migrate` rebuild at
   launch) delete the database without the stash.
 
@@ -767,7 +770,9 @@ composer for a draft the user never wrote.
 - Status (2026-10-18, stage 4): `onError` logs and returns for silent tasks. Sends the engine
   starts itself (`retryWhenOnline`: scheduled sends, undo send, resurfacing messages) go back to
   `remote` on a retryable SMTP error before the server accepted them, for up to a day after the
-  first one, and run again after the worker's sleep or a wake (`expiration-send-offline`). Open
+  first one. The foreground skips such a send for 2 minutes (or until `wake-workers`) and goes on
+  fetching and idling meanwhile, so an account whose SMTP server alone is down stays online
+  (`expiration-send-offline`). Open
   for stage 13: the same for sends from the composer (`draft.send`), and the "Queued, sends when
   online" state on the draft.
 

@@ -1444,3 +1444,25 @@ a send two minutes out, close the window and keep the engine, see it arrive once
 and set a reminder by hand and see both come back with no window open; once with the UI in a
 language other than English, check the resurfacing text.
 
+2026-10-18, stage 4 review fixes, branch `roadmap/client-next`. Account removal forgets the
+plugin metadata: `account.reset` takes `keepMetadata` (default true, Reset Cache) and
+`engine.resetDatabase` too; the desktop's removal passes false on both paths
+(`resetCacheForAccount(account, {keepMetadata: false})`, `application:reset-database
+{keepMetadata: false}` for the last account), so an account added back, whose id is the same,
+gets no old schedules (`remove-account-drops-plugin-metadata`, ms-store and ms-ipc tests, a
+supervisor spec). A deferred engine send no longer stalls the foreground: the task is skipped
+for 2 minutes (`DEFERRED_RETRY`) or until `wake-workers`, the inbox is still fetched and idled on
+with the IDLE (or the non-IDLE wait) bounded by the retry time (`IdleInterrupt::interrupt_at`),
+and the account isn't reported offline for an SMTP-only failure (`expiration-send-offline` now
+appends inbox mail while SMTP is down and expects it within 30 s and no connection error). The
+desktop send-later handler mirrors the engine's decline rule (acts on `clientFinalize` or on a
+draft whose `actionKey` the engine doesn't perform, via `SendActionsStore.enginePerformsSendAction`);
+tern-mcp's `schedule_send` marks a non-engine `actionKey` `clientFinalize` and says the app sends
+it. `list_scheduled_sends` now lists `scheduled`, `due` (past `sendAt`, not sent yet) and `failed`
+(with `error`) drafts, and a draft read through `get_message`/`get_thread` carries
+`scheduledSend`. Decisions taken, to confirm: `keepMetadata` as an optional param on the
+existing methods rather than waiting for stage 12's `account.remove {deleteData}`; deferred sends
+are retried every 2 minutes and on `wake-workers`; the MCP list puts failed sends first, and a
+stale `error` next to a new expiration is not shown. Trial pending: remove and re-add a test
+account that had a snoozed thread and see the snooze gone.
+
