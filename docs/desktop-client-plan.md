@@ -1678,3 +1678,50 @@ outside the app that is in no package. `PLUGIN_SYSTEM_ARCHITECTURE.md` covers 1.
 `engine-api-spec`, `files.rs` unit tests, desktop lint and typecheck. Decisions taken, to
 confirm: an unknown caller is named by its file path in the refusal; the integration keys a
 local write changes while the engine lacks `integrations` stay unsent until one has it.
+
+2026-10-18, stage 5 gate and merge, branch `roadmap/client-next`: merged to main. Rebased on
+main after stages 9 (engine half) and 15 (tern-web) landed. Stage 15's `messages.unsubscribe`
+ran on its own `unsubscribe` thread through `answer_later`, which now takes a lane: it runs on a
+new contained `workers::UNSUBSCRIBE` lane (24 threads, 8 queued; `unsubscribe.rs` already caps
+calls waiting for a body at 16 and one-click POSTs at 8, so every call gets a thread at once),
+and stage 15's `Deferred` replaces this branch's `FilesReply`. The waiting-for-a-body slot in
+`unsubscribe.rs` is now taken before the work is queued, so work dropped unrun gives it back. The
+gate found `runs_up_to_its_threads_at_once_then_queues_then_refuses` flaky: a burst submitted
+before the new threads picked their jobs was refused early. A lane now counts as waiting only
+the queued jobs no free thread will take (`max_queued` plus the threads not running a job).
+Gate green: fmt, clippy, `cargo test --workspace`, `cargo deny`, release build of mailsync, tern,
+tern-mcp and tern-gateway, the harness quick tier on serve with the release binaries (140
+passed, 4 skipped), desktop lint, typecheck and the affected specs (engine, message-frame,
+capability, integrations, translation, preferences, settings, package-manager, link-tracking,
+unsubscribe, email-frame, CSP, searchable, snooze; 246 passing). Decisions taken, to confirm:
+the unsubscribe lane's sizes and containment (a panic there now answers `-32603` instead of
+aborting); the lane queue rule above.
+
+Open, from the review (low): `capabilities_of` (`socket.rs`) reads the whole settings store
+(`guard.get(None)`, cloning templates, mail rules, signatures and the rest) for three keys, on
+every `hello` and `engine.status` and twice on each `settings.set` touching
+`core.integrations.*`, under the store's lock. Queued `integrations.*` jobs keep running after
+their connection closes (no cancellation; the closed outbox only drops the answer), so a
+composer or popout closed with grammar or translate calls queued (up to 64, each up to 30 s)
+still sends the text and key to the provider and holds lane threads other windows wait for. A
+window can miss a capabilities change between its `hello` and its `subscribe`
+(`engine-connection.ts`): `capabilities.changed` only reaches subscribers, which at launch
+races main's mirror pushing `core.integrations.*`; a client should re-read
+`engine.status` after subscribing. In a contained lane only `work` runs under
+`catch_unwind`: a panicking `answer` closure ends the thread without decrementing `threads` (or
+`busy`), and after `max_threads` of those the lane runs and answers nothing. `files.read` still
+runs inline on the connection's reader thread (`Deferred::Now`), reading up to
+`FILES_READ_MAX_BYTES` while that connection's later requests wait, though T21 lists it among
+the slow methods for the worker pool. The TD29 guard fails open: `callerPackageFromStack`
+returns null and the call is allowed when the first frame outside `src/` is in no package
+directory (a dev package through a symlink whose realpath differs, `eval`/`new Function`, a
+temp dir, or a stack cut by `Error.stackTraceLimit` before the plugin's frame). Nothing reads a
+plugin's `tern.engineFeatures` or `tern.capabilities` to list it unactivated with the reason in
+Preferences > Plugins (section 6), though `Engine.features` and `capabilities` now exist.
+`EngineRequestRefused` is exported to plugins as a type only (`mailspring-exports.js` has no
+runtime export), so `err instanceof EngineRequestRefused` doesn't work. Approvals in
+`core.plugins.engineMethodApprovals` are keyed by package name only, so a different package
+installed later under the same name inherits the user's yes for account and secret methods.
+Trial pending (not run): translate a message with LibreTranslate in a popout; grammar check a
+draft in a composer window; open messages with images, links, forms and find-in-thread in the
+sandboxed frame; one-click unsubscribe on a test list now that it runs on a lane.
