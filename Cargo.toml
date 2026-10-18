@@ -29,6 +29,9 @@ ms-wire = { path = "crates/ms-wire" }
 ms-ipc = { path = "crates/ms-ipc" }
 # The client half of that protocol, for tern, tern-mcp and the gateway.
 tern-client = { path = "crates/tern-client" }
+# Third-party providers (docs/integrations-plan.md) and model providers (docs/ai-plan.md).
+ms-integrations = { path = "crates/ms-integrations" }
+ms-ai = { path = "crates/ms-ai" }
 
 # IMAP. ms-imap has its own parser and command layer (docs/spikes/imap.md); async-imap and
 # imap-proto are dev-dependencies of its spike example only.

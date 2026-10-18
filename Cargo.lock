@@ -1759,6 +1759,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ms-ai"
+version = "0.1.0"
+dependencies = [
+ "ms-integrations",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ms-core"
 version = "0.1.0"
 dependencies = [
