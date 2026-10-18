@@ -1205,3 +1205,26 @@ Windows still has no engine (no named pipe yet), as before. Open: no harness sce
 the four stdin calls (the Rust tests in `tests/serve.rs` and `tests/test_mode.rs` do); unused
 "Attach Mailsync to Xcode" strings remain in `lang/*.json`; the SQLite read path is still in
 place (T4).
+
+2026-10-18, tern-client (branch `roadmap/client-next`) takes stages 3, 4, 5, 8, 11, 12, 13, 14,
+17, 18, 19 and their tech-debt items. Run one stage at a time in one worktree (the disk has
+about 20 GB free, not enough for a target directory per stage), each merged to main after its
+gate. Order and rough sizes:
+
+| Order | Stage | Folded in | Size |
+|---|---|---|---|
+| 1 | 3 settings store | TD35 (Config writes off `@electron/remote`) | ~400 Rust, ~300 TS |
+| 2 | 4 expiration executor | TD32 before it, TD33 queue | ~1.8k Rust, −220 TS |
+| 3 | 5 integrations on serve, `Engine` export | TD34 before it, TD29 | ~600 Rust, ~1k TS |
+| 4 | 11 accounts and secrets | TD43, TD44, TD45, TD46, TD12 engine half | ~2.5k Rust, ~300 TS |
+| 5 | 12 onboarding through the engine | TD47, TD4's no-cleartext rule kept | ~1k Rust, −500 TS |
+| 6 | 13 draft pipeline | TD48, TD49 (send), TD33 queue | ~1.8k Rust, −700 TS |
+| 7 | TD39 folder identity | before 14 | ~1 week |
+| 8 | 14 mail rules | | ~1k Rust, −300 TS |
+| 9 | 19 service plugins | | ~400 Rust, ~150 TS |
+| 10 | 17 tracking and claims | needs backend tracking endpoints | ~500 Rust |
+| 11 | 8 DatabaseStore on `query` (flag and reconnect only) | TD40, TD41; waits for stage 7 | ~300 TS |
+| 12 | 18 calendar and contacts | TD50; waits for stage 7 | ~2.5-3k Rust, −4k TS |
+
+Trial checks on `~/tern-trial` are left to the user; each stage lists its trial steps as
+pending.
