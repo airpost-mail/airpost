@@ -203,6 +203,24 @@ Tag, LaunchBit, Mandrill; `internal_packages/remove-tracking-pixels/lib/main.ts:
 
 ### TD4. Onboarding and the engine fall back to cleartext IMAP/SMTP
 
+Done (roadmap/security, a7ff50c51, 1f20eb6dd). `Security::from_setting` accepts exactly `"SSL / TLS"`,
+`"STARTTLS"` and `"none"` (what the desktop's menu stores); `Account::validate` refuses any
+other, empty or missing value with `Account has an invalid imap_security: … (expected …)`,
+which `--mode sync`/`test` print as their one-shot error and `account.add`/`account.test`
+return as INVALID_PARAMS, before any connection. The accessors fall back to TLS on an
+unvalidated account. Harness scenario `account-security-refused` (all three transports):
+`none` syncs from the plaintext fake server, an empty `imap_security` and a `"None"`
+`smtp_security` are refused with no connection to their servers. Onboarding: ports 143 and 25
+pick STARTTLS; discovery (Mailcore, provider table, autoconfig `plain`) never picks `none`;
+choosing `none` for a non-loopback host blocks Connect until "Send password unencrypted" is
+checked (stored as `settings.<imap|smtp>_allow_cleartext`), with `127.0.0.1`, `localhost` and
+`::1` exempt. The provider table's 135 `none` entries (plus soverin.net, which had no
+`imap_security` on port 143) now say STARTTLS on 143/587 (port 25 moved to 587). Hosts weren't
+probed: one without STARTTLS now fails onboarding's connection test, and the user can pick
+`none` with the checkbox. Older autoconfig code stored `"None"` for a `plain` server; such an
+account is now refused with the error above until the user picks a security again (no
+migration). The stage 12 rules are in `docs/desktop-client-plan.md` under stage 12.
+
 Verified. Typing port 143 sets IMAP security to `none`, port 25 does the same for SMTP
 (`internal_packages/onboarding/lib/page-account-settings-imap.tsx:90-98`). Discovery picks `none`
 for any IMAP port other than 993 and any SMTP port other than 465/587 (`onboarding-helpers.ts:185`,

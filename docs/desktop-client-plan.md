@@ -991,8 +991,17 @@ deletes SQLite after 10. 10 to 12 move credentials, which is the prerequisite fo
 - Desktop: onboarding and reconnect as in 4.5; redirect receiver in main on `127.0.0.1`;
   integrations keys through `secrets.set`.
 - CLI: `tern account add` (IMAP and OAuth with a loopback receiver).
-- Tests: id derivation vectors; OAuth against a mock provider; discovery tables; a relayed
-  connection refused on every local-only method.
+- Connection security (TD4, keep in the rewrite): the engine accepts exactly `"SSL / TLS"`,
+  `"STARTTLS"` and `"none"` for `imap_security`/`smtp_security` and refuses anything else,
+  empty or missing at `account.add`/`account.test` (`Account::validate`). `account.discover`
+  never returns `none`: ports 143 and 25 mean STARTTLS, an autoconfig `plain` server is tried
+  with STARTTLS, unknown ports default to STARTTLS. Saving `none` needs an explicit "Send
+  password unencrypted" checkbox (`settings.<imap|smtp>_allow_cleartext`), except for
+  `127.0.0.1`, `localhost` and `::1` (Proton Bridge). `ms-providers` ports the cleaned
+  `mailspring-provider-settings.json`, which has no `none` entry; the desktop rules are in
+  `internal_packages/onboarding/lib/connection-security.ts`.
+- Tests: id derivation vectors; OAuth against a mock provider; discovery tables (no `none`
+  anywhere); a relayed connection refused on every local-only method.
 - Trial: add an IMAP account and one OAuth account (not the user's production accounts),
   reconnect one, remove one.
 
