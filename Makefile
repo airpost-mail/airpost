@@ -52,7 +52,7 @@ release: ## Release builds of the same
 desktop: build ## Run the desktop on .dev/profile with the debug engine
 	ln -sf ../../../target/debug/mailsync apps/desktop/app/mailsync-rs
 	mkdir -p $(PROFILE_DIR)
-	cd apps/desktop && npm start -- --config-dir-path="$(PROFILE_DIR)"
+	cd apps/desktop && TERN_ENGINE_KEY_FILE="$(abspath $(PROFILE_DIR))/engine-dev.key" npm start -- --config-dir-path="$(PROFILE_DIR)"
 
 .PHONY: tern
 tern: ## Run the CLI against the dev desktop's engine: make tern ARGS="status"
