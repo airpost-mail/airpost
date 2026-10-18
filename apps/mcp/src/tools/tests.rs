@@ -946,3 +946,89 @@ fn a_send_queued_elsewhere_blocks_edits_when_the_engine_lists_tasks() {
         json!({"id": "d0", "body": "x"}),
     ));
 }
+
+#[test]
+fn snooze_and_unsnooze_go_through_the_engine() {
+    let mut f = fake();
+    let at = (chrono::Local::now() + chrono::Duration::hours(3))
+        .format("%Y-%m-%dT%H:%M")
+        .to_string();
+    let args = json!({"threadIds": ["t1"], "until": at});
+    // An engine without the methods says so.
+    let o = run(&mut f, &rw(), "snooze_threads", args.clone());
+    assert!(
+        o.is_error && o.first_text().contains("update Tern"),
+        "{}",
+        o.first_text()
+    );
+    f.features.push(ms_ipc::feature::SNOOZE.into());
+    let out = json_of(&run(&mut f, &rw(), "snooze_threads", args));
+    assert_eq!(out["snoozed"], 1);
+    let (m, params) = f.actions.last().unwrap();
+    assert_eq!(m, "threads.snooze");
+    assert_eq!(params["threadIds"], json!(["t1"]));
+    let want = chrono::NaiveDateTime::parse_from_str(&at, "%Y-%m-%dT%H:%M")
+        .unwrap()
+        .and_local_timezone(chrono::Local)
+        .earliest()
+        .unwrap()
+        .timestamp();
+    assert_eq!(params["until"], want);
+
+    let past = run(
+        &mut f,
+        &rw(),
+        "snooze_threads",
+        json!({"threadIds": ["t1"], "until": "2020-01-01T09:00"}),
+    );
+    assert!(past.is_error && past.first_text().contains("future"));
+    let ro = run(
+        &mut f,
+        &policy("read-only", json!({})),
+        "snooze_threads",
+        json!({"threadIds": ["t1"], "until": at}),
+    );
+    assert!(ro.is_error && ro.denied);
+
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "unsnooze_threads",
+        json!({"threadIds": ["t1"]}),
+    ));
+    assert_eq!(out["unsnoozed"], 1);
+    assert_eq!(f.actions.last().unwrap().0, "threads.unsnooze");
+    let missing = run(
+        &mut f,
+        &rw(),
+        "unsnooze_threads",
+        json!({"threadIds": ["nope"]}),
+    );
+    assert!(missing.is_error && missing.first_text().contains("not found"));
+}
+
+#[test]
+fn unsubscribe_needs_send_access_and_says_what_to_do() {
+    let mut f = fake();
+    f.features.push(ms_ipc::feature::UNSUBSCRIBE.into());
+    f.messages[0]["hListUnsub"] = json!("<https://lists.y.test/u/1>");
+    let send = policy("read-write-send", json!({}));
+    let o = run(&mut f, &rw(), "unsubscribe", json!({"messageId": "m1"}));
+    assert!(o.is_error && o.denied, "{}", o.first_text());
+    let out = json_of(&run(
+        &mut f,
+        &send,
+        "unsubscribe",
+        json!({"messageId": "m1", "method": "web"}),
+    ));
+    assert_eq!(out["url"], "https://lists.y.test/u/1");
+    assert!(out["note"].as_str().unwrap().contains("browser"));
+    let (_, params) = f.actions.last().unwrap();
+    assert_eq!(params["method"], "web");
+    let o = run(&mut f, &send, "unsubscribe", json!({"messageId": "d0"}));
+    assert!(
+        o.is_error && o.first_text().contains("List-Unsubscribe"),
+        "{}",
+        o.first_text()
+    );
+}

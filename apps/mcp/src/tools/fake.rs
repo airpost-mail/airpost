@@ -32,6 +32,8 @@ pub struct Fake {
     pub settings: serde_json::Map<String, Value>,
     /// The params of each grammar `search` call.
     pub searches: Vec<Value>,
+    /// `threads.snooze`, `threads.unsnooze` and `messages.unsubscribe` calls: method, params.
+    pub actions: Vec<(String, Value)>,
 }
 
 fn not_found(what: &str) -> EngineError {
@@ -278,6 +280,23 @@ impl Backend for Fake {
                 let limit = num("limit").unwrap_or(50) as usize;
                 let models: Vec<Value> = models.into_iter().skip(offset).take(limit).collect();
                 Ok(json!({"models": models}))
+            }
+            "threads.snooze" | "threads.unsnooze" => {
+                self.actions.push((method.to_owned(), params));
+                Ok(json!({"taskIds": ["task-move", "task-meta"]}))
+            }
+            "messages.unsubscribe" => {
+                self.actions.push((method.to_owned(), params.clone()));
+                let message = Self::of_account(&self.messages, account)
+                    .find(|m| str_of(m, "id") == str_of(&params, "messageId"))
+                    .cloned()
+                    .ok_or_else(|| not_found("message"))?;
+                let list = str_of(&message, "hListUnsub");
+                if list.is_empty() {
+                    return Err(not_found("List-Unsubscribe header"));
+                }
+                let url = list.trim_matches(|c| c == '<' || c == '>');
+                Ok(json!({"method": "web", "ok": true, "url": url}))
             }
             other => Err(EngineError::Rpc {
                 code: ms_ipc::code::METHOD_NOT_FOUND,

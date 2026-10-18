@@ -72,7 +72,7 @@ open Tern.
 
 - `accessLevel`: `read-only` (default), `read-write` or `read-write-send`, with the plugin's
   tool categories: read tools need nothing, drafts and thread changes need `read-write`,
-  `send_draft` and `schedule_send` need `read-write-send`. An unknown value is read-only.
+  `send_draft`, `schedule_send` and `unsubscribe` need `read-write-send`. An unknown value is read-only.
 - `enabledAccounts`: empty means every account. Otherwise an account that is absent or has
   `enabled: false` is invisible: not listed, and its ids answer "not found". Threads and
   messages in an excluded folder are hidden the same way, and the folder isn't listed.
@@ -116,8 +116,8 @@ The plugin's tools keep their names, arguments and output shapes:
 | Category | Tools |
 | --- | --- |
 | read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `get_attachment` |
-| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send` |
-| read-write-send | `send_draft`, `schedule_send` |
+| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads` |
+| read-write-send | `send_draft`, `schedule_send`, `unsubscribe` |
 
 Attachments are also served as the resource template `attachment://{messageId}/{fileId}`,
 read from `<config-dir>/files/` (fetching the body first when the file isn't there yet).
@@ -146,6 +146,16 @@ Changes from the plugin:
   `metadata-expiration` delta and the desktop's send-later plugin sends it, so the desktop
   has to be running at `sendAt`; the result's `note` says which applies. `sendAt` without an offset is local time, with or without
   seconds; a date alone is midnight UTC (both as `new Date()` read them).
+
+- `snooze_threads` (new) and `unsnooze_threads` (new) call the engine's `threads.snooze` and
+  `threads.unsnooze` (the `snooze` feature, docs/desktop-client-plan.md 3.3): the move to or
+  from Snoozed and the `thread-snooze` metadata in one call. `until` reads as `sendAt` does.
+  The engine's expiration executor brings the threads back; an engine without it leaves that
+  to the desktop.
+- `unsubscribe` (new) calls `messages.unsubscribe` (the `unsubscribe` feature): the engine
+  makes the one-click POST or sends the mailto message from the account, and a web-only list
+  comes back as a `url` with a note to have the user open it. It is in the send category
+  because it can send mail.
 
 `list_tracked_messages`, `get_top_links` and `list_scheduled_sends` read through
 `metadata.list` and fail with "needs a newer Tern engine" on an engine without it. With

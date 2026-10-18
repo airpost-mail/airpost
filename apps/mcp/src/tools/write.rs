@@ -161,6 +161,36 @@ pub(super) fn definitions() -> Vec<ToolDef> {
             category: Category::Write,
         },
         ToolDef {
+            name: "snooze_threads",
+            description: "Snooze threads until a date/time, as the app's Snooze menu does: they move out of the inbox to Snoozed and come back to the top of the inbox at that time (the Tern engine brings them back by itself). Use unsnooze_threads to bring them back early.",
+            schema: schema(
+                json!({
+                    "threadIds": string_list_schema("Thread IDs to snooze"),
+                    "until": {"type": "string", "description": "ISO 8601 date-time in the future to bring the threads back at; without an offset it is local time"}
+                }),
+                &["threadIds", "until"],
+            ),
+            category: Category::Write,
+        },
+        ToolDef {
+            name: "unsnooze_threads",
+            description: "End the snooze of threads now: those still in Snoozed move back to the inbox.",
+            schema: schema(json!({"threadIds": string_list_schema("Thread IDs to unsnooze")}), &["threadIds"]),
+            category: Category::Write,
+        },
+        ToolDef {
+            name: "unsubscribe",
+            description: "Unsubscribe from the mailing list a message came from, using its List-Unsubscribe header: the engine makes the one-click request (RFC 8058) when the list offers it, otherwise sends the unsubscribe email. When the list only has a web page, the result's url must be opened by the user in a browser; tell them. Fails when the message has no List-Unsubscribe header.",
+            schema: schema(
+                json!({
+                    "messageId": {"type": "string", "description": "ID of a message from the list"},
+                    "method": {"type": "string", "enum": ["one-click", "mailto", "web"], "description": "Use only this way (default: the best the list offers)"}
+                }),
+                &["messageId"],
+            ),
+            category: Category::Send,
+        },
+        ToolDef {
             name: "send_draft",
             description: "Send an existing draft by its headerMessageId",
             schema: schema(
@@ -969,4 +999,100 @@ pub(super) fn set_starred(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         Output::text(&json!({"updated": ids.len(), "starred": starred})),
         &groups,
     ))
+}
+
+fn require_feature(ctx: &Ctx<'_>, account_id: &str, feature: &str) -> Result<(), ToolError> {
+    if ctx.backend.has_feature(account_id, feature) {
+        Ok(())
+    } else {
+        Err(failed(format!(
+            "The Tern engine for account '{account_id}' can't do this ({feature}); update Tern"
+        )))
+    }
+}
+
+pub(super) fn snooze_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let ids = req_str_list(args, "threadIds")?;
+    let until = req_str(args, "until")?;
+    let when = parse_send_at(&until, &chrono::Local)
+        .ok_or_else(|| failed(format!("Invalid until date: '{until}'")))?;
+    if when.timestamp() <= now_secs() {
+        return Err(failed("until must be in the future"));
+    }
+    let groups = threads_by_account(ctx, &ids)?;
+    for (account, _) in &groups {
+        require_feature(ctx, &account.account_id, ms_ipc::feature::SNOOZE)?;
+    }
+    for (account, threads) in &groups {
+        ctx.call(
+            &account.account_id,
+            ms_ipc::method::THREADS_SNOOZE,
+            json!({"threadIds": ids_of(threads), "until": when.timestamp()}),
+        )
+        .map_err(ToolError::from)?;
+    }
+    Ok(with_single_account(
+        Output::text(&json!({
+            "snoozed": ids.len(),
+            "until": when.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        })),
+        &groups,
+    ))
+}
+
+pub(super) fn unsnooze_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let ids = req_str_list(args, "threadIds")?;
+    let groups = threads_by_account(ctx, &ids)?;
+    for (account, _) in &groups {
+        require_feature(ctx, &account.account_id, ms_ipc::feature::SNOOZE)?;
+    }
+    for (account, threads) in &groups {
+        ctx.call(
+            &account.account_id,
+            ms_ipc::method::THREADS_UNSNOOZE,
+            json!({"threadIds": ids_of(threads)}),
+        )
+        .map_err(ToolError::from)?;
+    }
+    Ok(with_single_account(
+        Output::text(&json!({"unsnoozed": ids.len()})),
+        &groups,
+    ))
+}
+
+pub(super) fn unsubscribe(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
+    let message_id = req_str(args, "messageId")?;
+    let wanted = opt_str(args, "method")?;
+    let (account, _) = ctx.find_message(&message_id, None)?;
+    let aid = account.account_id.clone();
+    require_feature(ctx, &aid, ms_ipc::feature::UNSUBSCRIBE)?;
+    let mut params = json!({"messageId": message_id});
+    if let Some(m) = wanted {
+        params["method"] = json!(m);
+    }
+    let r = ctx
+        .call(&aid, ms_ipc::method::MESSAGES_UNSUBSCRIBE, params)
+        .map_err(|e| {
+            if e.is_not_found() {
+                failed(format!(
+                    "Message '{message_id}' has no usable List-Unsubscribe header"
+                ))
+            } else {
+                e.into()
+            }
+        })?;
+    let mut out = r.clone();
+    if r["ok"] != json!(true) {
+        return Err(failed(format!(
+            "Unsubscribing by {} failed: {}",
+            str_of(&r, "method"),
+            str_of(&r, "error")
+        )));
+    }
+    out["note"] = json!(match str_of(&r, "method") {
+        "one-click" => "Unsubscribed: the list confirmed the one-click request.",
+        "mailto" => "The unsubscribe email is being sent from this account.",
+        _ => "This list unsubscribes on its web page: ask the user to open the url in a browser.",
+    });
+    Ok(Output::text(&out).with_account(&aid))
 }

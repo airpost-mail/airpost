@@ -159,6 +159,9 @@ pub fn call(ctx: &mut Ctx<'_>, name: &str, args: &Value) -> Output {
         "send_draft" => write::send_draft(ctx, args),
         "schedule_send" => write::schedule_send(ctx, args),
         "cancel_scheduled_send" => write::cancel_scheduled_send(ctx, args),
+        "snooze_threads" => write::snooze_threads(ctx, args),
+        "unsnooze_threads" => write::unsnooze_threads(ctx, args),
+        "unsubscribe" => write::unsubscribe(ctx, args),
         _ => Err(failed(format!("Unknown tool '{name}'"))),
     };
     match result {
