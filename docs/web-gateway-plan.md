@@ -687,5 +687,8 @@ merged:
   New Rust tests for each (`cli` unit tests, `relay.rs` `/session` right after the kill and
   `a_close_from_the_browser_is_answered`).
 - Open: the test doesn't cover heartbeats (the Rust `heartbeat.rs` does), the 4008 slow
-  subscriber, rate limits past pairing, or a browser; the CI harness job still doesn't build
-  tern-mcp, which `test_mcp.py` requires when `CI` is set.
+  subscriber, rate limits past pairing, or a browser.
+- Review fixes: `serve` validates the config and binds the control socket before the TCP port
+  (a refused config never listens, a second gateway says "another gateway is running"); the
+  log check covers every token minted, a `secrets.set` value and the encoded upload name; the
+  CI harness job builds tern-mcp and sets `TERN_MCP_BIN`.
