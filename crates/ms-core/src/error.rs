@@ -354,6 +354,24 @@ impl Error {
         self.as_sync().is_some_and(SyncError::is_retryable)
     }
 
+    /// What a worker loop sleeps through and retries rather than stopping the account
+    /// for (TD44): a retryable `SyncError`, a database that is busy, locked, full or failed
+    /// an I/O call, and I/O errors. A corrupt database or a schema error stays fatal.
+    pub fn is_transient(&self) -> bool {
+        match self {
+            Error::Sync(e) => e.is_retryable(),
+            Error::Database(rusqlite::Error::SqliteFailure(e, _)) => matches!(
+                e.code,
+                rusqlite::ErrorCode::DatabaseBusy
+                    | rusqlite::ErrorCode::DatabaseLocked
+                    | rusqlite::ErrorCode::SystemIoFailure
+                    | rusqlite::ErrorCode::DiskFull
+            ),
+            Error::Io(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_offline(&self) -> bool {
         self.as_sync().is_some_and(SyncError::is_offline)
     }
@@ -409,6 +427,26 @@ pub fn unexpected_error_json(what: &str) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn busy_full_and_io_errors_are_transient() {
+        let sqlite = |code: i32| {
+            Error::Database(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(code),
+                None,
+            ))
+        };
+        assert!(sqlite(rusqlite::ffi::SQLITE_BUSY).is_transient());
+        assert!(sqlite(rusqlite::ffi::SQLITE_LOCKED).is_transient());
+        assert!(sqlite(rusqlite::ffi::SQLITE_FULL).is_transient());
+        assert!(sqlite(rusqlite::ffi::SQLITE_IOERR).is_transient());
+        assert!(!sqlite(rusqlite::ffi::SQLITE_CORRUPT).is_transient());
+        assert!(!sqlite(rusqlite::ffi::SQLITE_ERROR).is_transient());
+        assert!(Error::Io(std::io::Error::other("x")).is_transient());
+        assert!(Error::from(SyncError::offline("ErrorConnection", "x")).is_transient());
+        assert!(!Error::from(SyncError::fatal("k", "x")).is_transient());
+        assert!(!Error::other("x").is_transient());
+    }
+
     use super::*;
 
     #[test]

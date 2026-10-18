@@ -132,7 +132,9 @@ pub const SCHEMA_VERSION: i32 = 12;
 pub const STATE_ENGINE_KEY: &str = "engine";
 pub const STATE_ENGINE_RUST: &str = "rust";
 pub const VACUUM_TIME_KEY: &str = "VACUUM_TIME";
-pub const VACUUM_INTERVAL: i64 = 30 * 24 * 60 * 60;
+/// Task data: when (Unix seconds) a remote phase put back after a retryable error runs
+/// again; the foreground worker skips the task before then (TD43).
+pub const TASK_NEXT_ATTEMPT_KEY: &str = "_nextAttemptAt";
 pub const DATABASE_FILE: &str = "edgehill.db";
 pub const LEGACY_DATABASE_FILE: &str = "edgehill.legacy.db";
 pub const FILES_DIR: &str = "files";
@@ -296,6 +298,11 @@ pub mod thread {
     pub const AI: &str = "ai";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
+    /// `serve`: starts the registered accounts at engine start, and restarts a stopped one
+    /// after its backoff.
+    pub const ACCOUNT_RESTART: &str = "accountRestart";
+    /// `serve`: hashes the executable for `hello.build`.
+    pub const BUILD_ID: &str = "buildId";
     /// `serve`: the workers running `account.test` for the parent.
     pub const ACCOUNT_TEST: &str = "accountTest";
     /// `serve`: the workers running `account.reset` for the parent.
