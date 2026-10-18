@@ -1619,7 +1619,9 @@ name = "mailsync"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "chrono",
  "libc",
+ "ms-ai",
  "ms-core",
  "ms-dav",
  "ms-imap",

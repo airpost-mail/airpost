@@ -8,6 +8,8 @@
 //! Derived from Mailspring-Sync (`MailSync/main.cpp`), Copyright © 2017 Foundry 376,
 //! GPL-3.0. See NOTICE.md.
 
+#[cfg(unix)]
+mod ai_api;
 mod cli;
 mod dispatch;
 #[cfg(unix)]

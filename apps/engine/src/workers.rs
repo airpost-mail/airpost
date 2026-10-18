@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! Worker lanes for the calls the engine answers out of order (T21): `integrations.*`,
-//! `files.*` downloads and `serve`'s slow parent methods. Each lane is a named, bounded set
+//! `ai.*`, `files.*` downloads and `serve`'s slow parent methods. Each lane is a named, bounded set
 //! of threads with a bounded queue. Threads start as work arrives, up to the lane's limit,
 //! and end after [`IDLE`] without work; a call that finds the queue full is answered
 //! [`code::ENGINE_BUSY`] at once.
@@ -27,6 +27,9 @@ const IDLE: Duration = Duration::from_secs(30);
 
 /// Provider HTTP calls, each up to 30 s (ms-integrations' timeout).
 pub static INTEGRATIONS: Lane = Lane::new(thread::INTEGRATIONS, 8, 64, true);
+/// Model calls, each up to 120 s (ms-ai's total timeout); a streamed one holds its thread
+/// while it streams.
+pub static AI: Lane = Lane::new(thread::AI, 8, 32, true);
 /// `files.get` waiting for a download; a message's inline images come together. A call
 /// queued here is still answered within its wait: the deadline starts when it arrives.
 pub static FILES: Lane = Lane::new(thread::FILES, 32, 512, true);
@@ -41,6 +44,7 @@ pub static ENGINE_MAINTENANCE: Lane = Lane::new(thread::ENGINE_MAINTENANCE, 1, 1
 
 const CONTAINED: &[&Lane] = &[
     &INTEGRATIONS,
+    &AI,
     &FILES,
     &UNSUBSCRIBE,
     &ACCOUNT_TEST,

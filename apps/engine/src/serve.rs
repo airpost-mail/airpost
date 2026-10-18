@@ -655,6 +655,7 @@ impl Engine {
                 .map_err(|e| {
                     ErrorObject::new(code::INTERNAL_ERROR, format!("reset failed: {e}"))
                 })?;
+            crate::ai_api::clear_cache();
             info!("Account {id} reset");
             Ok(json!({}))
         })();
@@ -714,6 +715,7 @@ impl Engine {
             if let Err(e) = ms_store::metadata_stash::save_database(&self.config_dir, &kept) {
                 warn!("-X Could not keep the plugin metadata of the old database: {e}");
             }
+            crate::ai_api::clear_cache();
             info!(
                 "Database reset; {} accounts removed, {} plugin metadata values kept",
                 ids.len(),

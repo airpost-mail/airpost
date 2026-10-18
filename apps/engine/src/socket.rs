@@ -18,6 +18,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::io::{BufReader, ErrorKind, Write};
 use std::net::Shutdown;
+use std::ops::ControlFlow;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -31,9 +32,9 @@ use ms_core::constants::{
 use ms_core::Account;
 use ms_ipc::{
     account_state, code, feature, method, policy, AccountInfo, AccountListResult,
-    AccountStateParams, AccountStatus, BodiesFetchParams, CalendarSyncParams, Capabilities,
-    DisconnectParams, EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult,
-    LogsTailParams, LogsTailResult, MailNewParams, Notification, RelayDevice,
+    AccountStateParams, AccountStatus, AiDeltaParams, BodiesFetchParams, CalendarSyncParams,
+    Capabilities, DisconnectParams, EngineStatusResult, ErrorObject, FrameError, HelloParams,
+    HelloResult, LogsTailParams, LogsTailResult, MailNewParams, Notification, RelayDevice,
     Request as RpcRequest, Response, SettingsGetParams, SettingsValues, SubscribeParams,
     SyncWakeParams, TaskCancelParams, TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams,
     LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
@@ -42,6 +43,7 @@ use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
+use crate::ai_api::{self, is_ai_method, Streams};
 use crate::dispatch::{Command, Deferred, Reply, Request};
 use crate::files::is_files_method;
 use crate::integrations_api::{self, is_capability_setting, is_integrations_method};
@@ -701,6 +703,7 @@ fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>, slot: Open
         outbox: outbox.clone(),
         hello: false,
         relay: None,
+        ai_streams: Arc::default(),
     };
     let reader = std::thread::Builder::new()
         .name(thread::SOCKET_READER.into())
@@ -930,10 +933,11 @@ fn features(server: &Server) -> Vec<String> {
     if server.settings.is_some() {
         out.push(feature::SETTINGS.to_owned());
         // The settings store is serve's, and so is the executor that reads it, the
-        // integrations and the capabilities that follow the settings.
+        // integrations, the AI methods and the capabilities that follow the settings.
         out.push(feature::EXPIRATION_EXECUTOR.to_owned());
         out.push(feature::INTEGRATIONS.to_owned());
         out.push(feature::CAPABILITIES.to_owned());
+        out.push(feature::AI.to_owned());
     }
     out
 }
@@ -948,7 +952,9 @@ fn capabilities(server: &Server) -> Option<Capabilities> {
 
 /// An unreadable store reads as empty: every integration not set up.
 fn capabilities_of(guard: &SettingsGuard<'_>) -> Capabilities {
-    integrations_api::capabilities(&guard.get(None).unwrap_or_default())
+    let mut caps = integrations_api::capabilities(&guard.get(None).unwrap_or_default());
+    caps.ai = ai_api::capabilities();
+    caps
 }
 
 /// `settings.get` or `settings.set` on `server`'s store, which must exist. `deliver` runs
@@ -1093,6 +1099,8 @@ struct Connection {
     /// Set by the first successful `hello` that says `relayed`; a later `hello` can't
     /// change it.
     relay: Option<Relay>,
+    /// The connection's `ai.*` calls in flight, cancelled when it closes.
+    ai_streams: Arc<Streams>,
 }
 
 struct Relay {
@@ -1138,6 +1146,7 @@ impl Connection {
             }
         }
         self.session.server.hub.unsubscribe(self.id);
+        self.ai_streams.close();
         self.outbox.close();
     }
 
@@ -1217,6 +1226,16 @@ impl Connection {
                 );
                 return None;
             }
+            method::AI_CANCEL if self.session.server.settings.is_some() => {
+                self.ai_streams.cancel(&req)
+            }
+            method::AI_USAGE if self.session.server.settings.is_some() => ai_api::usage(&req),
+            name if is_ai_method(name) && self.session.server.settings.is_some() => {
+                match self.ai_call(&req) {
+                    Ok(()) => return None,
+                    Err(e) => Err(e),
+                }
+            }
             name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
                 Err(ErrorObject::new(
                     code::WRONG_CHANNEL,
@@ -1264,6 +1283,31 @@ impl Connection {
                 hub.unsubscribe(conn);
             }
         });
+    }
+
+    /// Checks an `ai.*` model call and reads its mail here, then runs it on the AI workers
+    /// with a sink that sends its `ai.delta` notifications to this connection only, ahead
+    /// of the response.
+    fn ai_call(&mut self, req: &RpcRequest) -> Result<(), ErrorObject> {
+        let call = ai_api::prepare(req, &mut self.session.reads, &*self.session.server.accounts)?;
+        let registration = self.ai_streams.register(call.stream_id())?;
+        let mut sink = AiSink {
+            conn: self.id,
+            outbox: self.outbox.clone(),
+            hub: self.session.server.hub.clone(),
+            stream_id: call.stream_id().map(str::to_owned),
+            token: registration.token.clone(),
+        };
+        self.answer_later(
+            &workers::AI,
+            req.id.clone(),
+            Box::new(move || {
+                let reply = call.run(&mut sink);
+                drop(registration);
+                reply
+            }),
+        );
+        Ok(())
     }
 
     fn on_first_hello(&mut self, req: &RpcRequest) {
@@ -1316,6 +1360,45 @@ impl Connection {
             response,
         );
         Ok(())
+    }
+}
+
+/// Where an `ai.*` call's text goes as it streams: `ai.delta` on the calling connection,
+/// when the call named a `streamId`. A closed or dropped connection stops the call.
+struct AiSink {
+    conn: u64,
+    outbox: Arc<Outbox>,
+    hub: Arc<Hub>,
+    stream_id: Option<String>,
+    token: ms_ai::CancelToken,
+}
+
+impl ms_ai::Sink for AiSink {
+    fn delta(&mut self, text: &str) -> ControlFlow<()> {
+        let Some(stream_id) = &self.stream_id else {
+            return ControlFlow::Continue(());
+        };
+        let n = Notification::new(
+            method::AI_DELTA,
+            serde_json::to_value(AiDeltaParams {
+                stream_id: stream_id.clone(),
+                text: text.to_owned(),
+            })
+            .unwrap_or(Value::Null),
+        );
+        match self.outbox.push(ms_ipc::encode(&n).into()) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(PushError::Closed) => ControlFlow::Break(()),
+            Err(PushError::Full) => {
+                drop_slow(self.conn, &self.outbox);
+                self.hub.unsubscribe(self.conn);
+                ControlFlow::Break(())
+            }
+        }
+    }
+
+    fn cancel_token(&self) -> Option<&ms_ai::CancelToken> {
+        Some(&self.token)
     }
 }
 

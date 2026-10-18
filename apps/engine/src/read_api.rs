@@ -112,7 +112,7 @@ impl ReadApi {
         }
     }
 
-    fn store(&mut self) -> Result<&ReadStore, ErrorObject> {
+    pub(crate) fn store(&mut self) -> Result<&ReadStore, ErrorObject> {
         let generation = self.database.get();
         if self.store.as_ref().is_none_or(|(_, g)| *g != generation) {
             self.store = None;
