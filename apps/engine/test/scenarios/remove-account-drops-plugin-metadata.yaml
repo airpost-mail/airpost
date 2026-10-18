@@ -1,0 +1,45 @@
+name: remove-account-drops-plugin-metadata
+description: >
+  The user schedules a draft and snoozes a thread, then removes the account (the desktop's
+  removal resets it with keepMetadata false) and adds the same account again, whose id is
+  the same. Nothing of the removed account's plugin metadata comes back: the resynced thread
+  carries no snooze, no DetatchedPluginMetadata row is left, and nothing is unsnoozed or sent.
+source: "docs/tech-debt.md TD32; docs/desktop-client-plan.md 3.3"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+  "[Mailspring]/Snoozed": {}
+setup:
+  - server.append: {mailbox: "[Mailspring]/Snoozed", messages: {message_id: "<removed-snoozed-1@example.test>", subject: "Snoozed before the removal"}}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {header_message_ids: ["removed-snoozed-1@example.test"]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 20}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - mark: snoozed
+  - reset_account: {keep_metadata: false}
+  - assert:
+      metadata:
+        - {threads: {header_message_ids: ["removed-snoozed-1@example.test"]}, plugin: thread-snooze, absent: true}
+      sql:
+        - {db: main, query: "SELECT count(*) FROM DetatchedPluginMetadata", equals: 0}
+        - {db: main, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 0}
+  # Well past the snooze's expiration: nothing comes due.
+  - wait: {until: snoozed, plus: 40}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp: {count: 0}
+  server_counts: {INBOX: 1, "[Mailspring]/Snoozed": 1}
+  models:
+    Task:
+      where: {__cls: ChangeFolderTask}
+      count: 0
+  db_matches_server: {}
+  running: true

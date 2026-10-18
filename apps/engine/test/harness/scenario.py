@@ -700,13 +700,19 @@ class ScenarioRun(PimMixin, BackendMixin):
         """What Preferences' Reset Cache does: `account.reset` on serve (the engine forgets the
         account and deletes its rows) and `account.add` again; on stdio and socket the
         account's process stops, `--mode reset` runs and the process starts again. Then waits
-        for a sync pass that began after it, and quiescence."""
+        for a sync pass that began after it, and quiescence. `keep_metadata: false` (serve only)
+        is what removing the account does: its plugin metadata goes too; adding it again then
+        is adding the same account back."""
         if self.accounts:
             raise ScenarioFailure("reset_account is not supported in a scenario with several accounts")
         started = time.time()
+        params = {"accountId": self.ms.account["id"]}
+        if "keep_metadata" in arg:
+            if self.ms.transport != "serve":
+                raise ScenarioFailure("reset_account keep_metadata needs the serve transport")
+            params["keepMetadata"] = bool(arg["keep_metadata"])
         if self.ms.transport == "serve":
-            aid = self.ms.account["id"]
-            result = self.ms.engine.parent.call("account.reset", {"accountId": aid}, 60)
+            result = self.ms.engine.parent.call("account.reset", params, 60)
             self._note(f"account.reset answered {json.dumps(result)}")
             self.ms.engine.add(self.ms)
         else:

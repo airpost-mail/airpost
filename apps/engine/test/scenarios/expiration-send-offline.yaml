@@ -2,8 +2,10 @@ name: expiration-send-offline
 description: >
   A scheduled send comes due while the SMTP server can't be reached. A send the engine
   started itself has no window to report a failure to, so instead of failing once it goes
-  back to the queue and the account reports itself offline; when the server is back (here a
-  Sync Mail ends the worker's sleep) it goes out, once.
+  back to the queue. IMAP still works, so the account stays online and the foreground keeps
+  fetching the inbox and idling: new mail arrives within seconds, not at the next background
+  pass. When the server is back (here a Sync Mail, which also retries deferred sends) it
+  goes out, once.
 source: "docs/tech-debt.md TD33; docs/desktop-client-plan.md 3.3"
 transports: [serve]
 servers:
@@ -43,6 +45,8 @@ steps:
           where: {__cls: SendDraftTask}
           count: 1
           match: [{status: remote, error: null}]
+  - server.append: {mailbox: INBOX, messages: 1}
+  - wait: {counts: {INBOX: 2}, timeout: 30}
   - server.smtp_start: {}
   - client.wake: {}
   - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 90}
@@ -59,4 +63,6 @@ expect:
       count: 1
       match: [{status: complete, error: null}]
   server_counts: {Sent: 1}
+  counts: {INBOX: 2}
+  connection_error: {reported: false}
   running: true
