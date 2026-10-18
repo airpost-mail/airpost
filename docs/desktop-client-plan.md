@@ -2066,3 +2066,36 @@ Not run: none of these fixes was compiled or tested. The disk had under 200 MB f
 cargo build, desktop spec run or harness run was possible; desktop typecheck and lint pass. The
 gate must run `cargo test` for ms-providers, ms-net and mailsync (serve and integrations
 tests), the onboarding specs (`oauth-signin-page-spec.tsx` is new) and `test_gateway.py`.
+
+Stage 12 gate, attempt 2, 2026-10-18. Rebased on main (AI4 and triage): kept both sides in
+`ms-core` thread names, `ms-ipc` features, the CLI modules and the desktop protocol's method
+list. `cargo fmt --all --check` passes. The rest of the gate didn't run: the disk had under
+200 MB free, so no clippy, `cargo test`, `cargo deny`, release build or harness run. Not merged.
+
+Open from the review (low), not fixed:
+- Autoconfig checks only the final URL's scheme. reqwest follows redirects, so https → http →
+  https://attacker/config.xml is accepted and an on-path attacker can hand out its own servers.
+  The "only over https, redirects included" decision above doesn't hold until each hop is
+  checked (a redirect policy that refuses http).
+- `ms-ipc` policy leaves `account.reorder` and `account.update` (display fields) open to relayed
+  devices without the admin scope, while plan 3.6 puts every account method but `account.list`
+  and `account.discover` in the local-only class; the decision above saying the account methods
+  are local-only is inaccurate. Decision taken, to confirm: keep them open (they write no
+  secret), or close them to match 3.6 (recommended). `account.reorder` also sends no
+  notification, so other clients see the new order only on their next `account.list`.
+- Tests: the OAuth mock-provider test always passes `test: false`, leaving untested
+  `account.oauth.complete`'s default path (test, then add with the rotated token), the Microsoft
+  branch (Graph `/me`, the 200-with-error body, the id_token fallback, the shared mailbox
+  settings), and a successful socket `account.test` whose result must carry no secrets.
+- TD47 is not marked done in `docs/tech-debt.md`, and two parts are left: the stale tile names
+  ("Gmail or G Suite", "FastMail" in `account-providers.tsx`) and the desktop and web tiles
+  coming from `account.discover`.
+- Likely, not verified: an account added through the socket restarts once right after
+  onboarding. The desktop sets `authedAt` after the engine stored the account, AccountStore
+  saves config.json, and the supervisor, which has no entry for it, sends `account.add` on
+  stdin; `authedAt` isn't in `CLIENT_STATE_FIELDS`, so the stored form differs and the engine
+  restarts the account it just started.
+- The Gmail refresh client finding (only the configured client has a secret) is fixed by the
+  review fixes above (every Google client an account may be bound to is kept).
+
+Trial pending (not run): as listed above.
