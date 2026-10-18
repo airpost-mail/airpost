@@ -137,8 +137,15 @@ export function declaredPageColor(doc: Document): RGBA | null {
  */
 export function applyColorScheme(frame: HTMLIFrameElement, scheme: ColorScheme) {
   frame.style.colorScheme = scheme;
-  const doc = frame.contentDocument;
-  if (!doc || !doc.documentElement) return;
+  if (frame.contentDocument) applyDocumentColorScheme(frame.contentDocument, scheme);
+}
+
+/**
+ * The document half of `applyColorScheme`, for code running inside a cross-origin frame;
+ * the embedder sets the iframe element's `color-scheme` itself.
+ */
+export function applyDocumentColorScheme(doc: Document, scheme: ColorScheme) {
+  if (!doc.documentElement) return;
   let style = doc.querySelector(`style[${SCHEME_ATTR}]`);
   if (!style) {
     style = doc.createElement('style');

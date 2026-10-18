@@ -29,6 +29,7 @@ export {
 export {
   type ColorScheme,
   applyColorScheme,
+  applyDocumentColorScheme,
   declaredPageColor,
   declaresDarkSupport,
 } from './scheme';
