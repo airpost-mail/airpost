@@ -4,8 +4,9 @@
 //! The `integrations.*` methods on `serve`'s socket (docs/integrations-plan.md section 4),
 //! over [`ms_integrations`], and the engine's `capabilities` (docs/desktop-client-plan.md
 //! 3.1). Each call carries its provider `config`; a key it lacks comes from the secret
-//! store (`integration:<provider>`, [`with_stored_key`]). Nothing here keeps or logs it. The socket runs the calls on the
-//! integrations workers ([`crate::workers::INTEGRATIONS`]), since one can take up to 30 s.
+//! store (`integration:<provider>`, [`with_stored_key`]). Nothing here keeps or logs it. The
+//! socket runs the calls on the integrations workers ([`crate::workers::INTEGRATIONS`]), since
+//! one can take up to 30 s.
 
 use std::sync::{Arc, Mutex};
 
