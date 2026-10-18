@@ -637,6 +637,63 @@ mod tests {
         assert!(autoconfig_settings("not xml", "a@b.c").is_none());
     }
 
+    /// The cases of the desktop's onboarding-helpers spec, which tested the JS copy.
+    #[test]
+    fn the_desktop_specs_cases() {
+        let proton = |net: &mut Net| discover("user@proton.me", "imap", net);
+        let d = proton(&mut Net::default());
+        assert_eq!(s(&d, "imap_host"), "127.0.0.1");
+        assert_eq!(s(&d, "imap_port"), 1143);
+        assert_eq!(s(&d, "smtp_host"), "127.0.0.1");
+        assert_eq!(s(&d, "container_folder"), "Folders");
+        let d = discover("user@protonmail.com", "imap", &mut Net::default());
+        assert_eq!(s(&d, "container_folder"), "Folders");
+
+        // Autoconfig gives the servers; the container folder still comes from the table.
+        let mut net = Net::default();
+        net.pages.insert(
+            "https://autoconfig.proton.me/mail/config-v1.1.xml".into(),
+            AUTOCONFIG.replace("corp.test\">", "proton.me\">"),
+        );
+        let d = proton(&mut net);
+        assert_eq!(d.source, Source::Autoconfig);
+        assert_eq!(s(&d, "imap_host"), "mail.proton.me");
+        assert_eq!(s(&d, "container_folder"), "Folders");
+
+        let d = discover("user@terra.es", "imap", &mut Net::default());
+        assert_eq!(s(&d, "imap_host"), "imap4.terra.es");
+        assert_eq!(s(&d, "imap_port"), 143);
+        assert_eq!(s(&d, "imap_security"), SECURITY_STARTTLS);
+        assert_eq!(s(&d, "smtp_port"), 587);
+        assert_eq!(s(&d, "smtp_security"), SECURITY_STARTTLS);
+
+        let d = discover("user@plain-imap.example", "imap", &mut Net::default());
+        assert_eq!(s(&d, "imap_host"), "imap.plain-imap.example");
+        assert_eq!(s(&d, "imap_port"), 993);
+        assert_eq!(s(&d, "imap_security"), SECURITY_TLS);
+        assert_eq!(s(&d, "smtp_host"), "smtp.plain-imap.example");
+        assert_eq!(s(&d, "smtp_port"), 465);
+        assert_eq!(s(&d, "container_folder"), "");
+
+        let mut net = Net {
+            mx: vec!["smtp.google.com".into()],
+            ..Default::default()
+        };
+        let d = discover("user@workspace.example", "imap", &mut net);
+        assert_eq!(s(&d, "imap_host"), "imap.gmail.com");
+        assert!(net.fetched.is_empty());
+
+        let mut net = Net::default();
+        let d = discover("user@contoso.example", "office365", &mut net);
+        assert_eq!(s(&d, "imap_host"), "outlook.office365.com");
+        assert_eq!(s(&d, "smtp_host"), "smtp.office365.com");
+        assert!(net.fetched.is_empty(), "no autoconfig for OAuth");
+
+        let d = discover("user@unknown-domain.example", "yahoo", &mut Net::default());
+        assert_eq!(s(&d, "imap_host"), "imap.mail.yahoo.com");
+        assert_eq!(s(&d, "smtp_host"), "smtp.mail.yahoo.com");
+    }
+
     #[test]
     fn securities() {
         assert_eq!(discovered_security("imap", None, 143), SECURITY_STARTTLS);
