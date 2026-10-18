@@ -254,10 +254,15 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
 - **`hello.features`** and the same list in `engine.status`: `["query", "search-grammar",
   "expiration-executor", "settings", "draft-pipeline", "rules", "integrations", "accounts",
   "files", ...]`. Clients gate behaviour on features, never on versions. D C M W.
-- **`capabilities`** in `hello` and `engine.status`, plus a `capabilities.changed`
-  notification: `{translate: {provider, available}, grammar: …, enrich: …, tracking:
-  {available, reason}, sharing: …}`. Replaces the desktop-only decisions in
-  `src/flux/stores/capability-store.ts`. D M W.
+- **`capabilities`** in `hello` and `engine.status` (features `integrations` and
+  `capabilities`), plus a `capabilities.changed` notification carrying the whole new value:
+  `{integrations: {translation, grammar, enrichment}, server: {readReceipts, linkTracking,
+  threadSharing, activitySharing, metadataSync}}` (ms-ipc `Capabilities`). Each entry is
+  `{available, provider?, credentials?, reason?}`: `provider` the one the user chose (e.g.
+  `deepl`); `credentials: "request"` means the client sends the key in the request and checks
+  it has one; `reason`, absent when available, is `not-set-up`, `missing-url` or
+  `needs-tern-server`. Groups a client doesn't know (`ai`) are kept as they came. Replaces the
+  desktop-only decisions in `src/flux/stores/capability-store.ts`. D M W.
 - **Out-of-order replies (T21).** A small worker pool per engine; methods tagged slow are
   answered when done. ~150 Rust. D W.
 - **`crates/tern-client` (T20).** From `apps/cli/src/discovery.rs` (411), `apps/mcp/src/
@@ -756,7 +761,9 @@ the file store via `TERN_ENGINE_KEY_FILE`.
   and contacts created or edited from the CLI, tern-mcp or web need stage 18.
 
 **New.** `Engine` export: `Engine.request(method, params)`, `Engine.subscribe(filter, cb)`,
-`Engine.features`. Plugins reach the read API, `integrations.*`, `metadata.list` and anything
+`Engine.features`, `has`, `capabilities`, `connected`, `onDidChange`. `request` refuses `hello`
+and `subscribe` (the window connection's own) and, without `tern.engineMethods` and the user's
+yes, the local-only methods (TD29). Plugins reach the read API, `integrations.*`, `metadata.list` and anything
 added later through it, instead of importing `MailsyncProcess`.
 
 **Versioning.**
@@ -766,7 +773,8 @@ added later through it, instead of importing `MailsyncProcess`.
 - `Package.isEngineSet()` becomes `semver.satisfies(PLUGIN_API_VERSION, engines?.mailspring)`
   inside the try (fixes the crash in section 1). `semver` (ISC) becomes a direct dependency.
 - Optional manifest block `"tern": {"engineFeatures": [...], "capabilities": [...],
-  "service": {...}}`. A plugin whose features or capabilities are missing is listed but not
+  "engineMethods": [...], "service": {...}}`. `engineMethods` (stage 5) lists the local-only
+  methods the plugin calls through `Engine.request`. A plugin whose features or capabilities are missing is listed but not
   activated, with the reason in Preferences > Plugins.
 - `deprecate(name, {since, replacement, removeIn})` for exports in
   `mailspring-exports.js`. The lazy getters there (`:13-28`) replace themselves with a plain
@@ -780,6 +788,7 @@ added later through it, instead of importing `MailsyncProcess`.
 |---|---|---|
 | 2 | semver check | plugins with an unsatisfiable range stop loading; with `*` or `>=1.x` nothing changes |
 | 4 | engine executes expirations | none, as long as their drafts are marked `clientFinalize` (T9); plugins that listened for `metadata-expiration` of the built-in ids stop getting them |
+| 5 (1.27.0) | message body in a cross-origin frame (TD34) | `renderedMessageBodyIntoDocument` gets `body` (MessageBody) instead of `document`; reading `document` throws. Plugins that read it break, although `^1.26.0` still matches 1.27.0 |
 | 8 | reads over the engine | private `DatabaseStore._query` with raw SQL fails; queries on non-`queryable` attributes fail with an error instead of a SQL error; reads during an engine restart wait up to 10 s, then reject (4.1 step 2). No change to tasks: `Actions.queueTask.listen` in the main window still sees every desktop window's tasks through `ActionBridge`, and never CLI or MCP tasks (use Task deltas for those) |
 | 9 | search in the engine | `structuredSearch(ast)` deprecated in favour of `Query.searchText`; date terms outside the documented subset fail |
 | 13 | draft pipeline in the engine | send hooks don't run for CLI, MCP or engine-executed sends (documented) |
@@ -1639,11 +1648,14 @@ TD29 asks on the first call, not at install (no install step reads the manifest 
 in `core.plugins.engineMethodApprovals` and a no for the session, and never asks for the app's
 code or bundled packages. `Engine.subscribe` gets the window connection's notifications except
 deltas (DatabaseStore has those), filtered by method and `accountId`. 1.27.0 is a minor bump
-although `renderedMessageBodyIntoDocument` no longer gets `document`.
+although `renderedMessageBodyIntoDocument` no longer gets `document`: that breaks plugins within
+their semver range (`^1.26.0` matches 1.27.0 and they still activate; their hook throws on each
+render). The section 6 table, `PLUGIN_SYSTEM_ARCHITECTURE.md` and `apps/desktop/CHANGELOG.md`
+say so; the alternative is 2.0.0.
 
 Open: tern-web: the gateway and `apps/web` don't relay `integrations.*` to non-admin devices
 (local-only), and the web client should read `capabilities` from `hello` and
-`capabilities.changed`; relaying them safely needs the engine to use its own saved config and
+`capabilities.changed`, shape in 3.1; relaying them safely needs the engine to use its own saved config and
 keys (3.6) instead of the URL in the request. tern-ai: `capabilities.ai` can go in as another
 group (ms-ipc `Capabilities.other` keeps it today), and `ai.*` can run on a new lane in
 `workers.rs`; `-32011` is left free. Preferences > Integrations still keeps keys in the keyset
@@ -1652,3 +1664,17 @@ TD30). The Test button is untested against a real provider. TD34 leaves the clip
 show-original, print and quick-preview windows and the composer's quoted body as Node-enabled
 documents. Trial pending (not run): translate a message with LibreTranslate in a popout; grammar
 check a draft in a composer window.
+
+Stage 5 review fixes: the settings mirror records the keys it copied into a store
+(`engineSettingsCopiedKeys`; a store named before it existed counts as having the six
+pre-stage-5 keys), so a newly mirrored key is copied into an existing store instead of being
+cleared, and the `core.integrations.*` keys are mirrored only with an engine that lists
+`integrations`, so an older engine never clears them. `files.get` takes its 30 s deadline when the
+call arrives, so time queued on the files lane counts against it. `Engine.request` refuses `hello`
+and `subscribe`. The caller lookup also matches a package's realpath, walks past the app's
+`node_modules`, parses paths with parentheses, and refuses local-only methods to a caller
+outside the app that is in no package. `PLUGIN_SYSTEM_ARCHITECTURE.md` covers 1.27.0, `MessageBody`,
+`Engine`, `tern.engineMethods` and the trust model. Checks: `engine-settings-spec`,
+`engine-api-spec`, `files.rs` unit tests, desktop lint and typecheck. Decisions taken, to
+confirm: an unknown caller is named by its file path in the refusal; the integration keys a
+local write changes while the engine lacks `integrations` stay unsent until one has it.
