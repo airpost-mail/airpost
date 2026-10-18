@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import Sqlite3 from 'better-sqlite3';
 import {
+  SKIP_MAILSPRING_IMPORT_MARKER,
   importMailspringProfile,
   shouldImportMailspringProfile,
 } from '../src/browser/mailspring-profile-import';
@@ -134,6 +135,13 @@ describe('importMailspringProfile', function () {
     expect(await importMailspringProfile(from, to)).toBe(false);
     expect(fs.readFileSync(path.join(to, 'config.json'), 'utf8')).toEqual('{"tern":true}');
     expect(fs.existsSync(path.join(to, 'packages'))).toBe(false);
+  });
+
+  it('does nothing after a reset left the skip marker', async function () {
+    write(path.join(to, SKIP_MAILSPRING_IMPORT_MARKER));
+    expect(shouldImportMailspringProfile(from, to)).toBe(false);
+    expect(await importMailspringProfile(from, to)).toBe(false);
+    expect(fs.readdirSync(to)).toEqual([SKIP_MAILSPRING_IMPORT_MARKER]);
   });
 
   it('does nothing without a Mailspring profile', async function () {

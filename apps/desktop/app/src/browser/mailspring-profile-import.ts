@@ -16,6 +16,10 @@ import path from 'path';
 const CONFIG_FILE = 'config.json';
 const DATABASE_FILE = 'edgehill.db';
 
+// Written by "Reset Accounts and Settings" (src/browser/profile-reset.ts) into the emptied
+// profile, so the relaunch starts empty instead of copying the Mailspring profile in again.
+export const SKIP_MAILSPRING_IMPORT_MARKER = 'skip-mailspring-import';
+
 const SKIPPED_NAMES = new Set([
   'Cache',
   'Code Cache',
@@ -42,7 +46,11 @@ function isCopiedEntry(name: string) {
 }
 
 export function shouldImportMailspringProfile(from: string, to: string) {
-  return !fs.existsSync(path.join(to, CONFIG_FILE)) && fs.existsSync(path.join(from, CONFIG_FILE));
+  return (
+    !fs.existsSync(path.join(to, CONFIG_FILE)) &&
+    !fs.existsSync(path.join(to, SKIP_MAILSPRING_IMPORT_MARKER)) &&
+    fs.existsSync(path.join(from, CONFIG_FILE))
+  );
 }
 
 async function backupDatabase(source: string, destination: string) {

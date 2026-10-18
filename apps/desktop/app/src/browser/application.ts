@@ -11,6 +11,7 @@ import {
   dialog,
   nativeImage,
   powerMonitor,
+  session,
   shell,
 } from 'electron';
 
@@ -48,6 +49,11 @@ import {
 } from './notification-ipc';
 import WindowsTaskbarManager from './windows-taskbar-manager';
 import { resetThemeForRecovery } from './theme-recovery';
+import {
+  canResetProfileDirectory,
+  profileResetDetail,
+  resetProfileDirectory,
+} from './profile-reset';
 import { KeyManager, registerKeyManagerIPC } from './key-manager';
 import {
   EngineSupervisor,
@@ -435,6 +441,67 @@ export default class Application extends EventEmitter {
     );
   };
 
+  // "Reset Accounts and Settings": nothing may still be writing to the profile while it goes.
+  _resetProfileAndRelaunch = async () => {
+    if (this._resettingAndRelaunching) return;
+    const protectedPaths = [app.getPath('appData')];
+    if (!canResetProfileDirectory(this.configDirPath, protectedPaths)) {
+      dialog.showMessageBoxSync({
+        type: 'error',
+        buttons: [localized('Okay')],
+        message: localized('Could not reset accounts and settings'),
+        detail: localized(
+          `%@ holds more than Tern's files, so Tern won't empty it.`,
+          this.configDirPath
+        ),
+      });
+      return;
+    }
+    const options = {
+      type: 'warning' as const,
+      message: localized('Reset accounts and settings?'),
+      detail: profileResetDetail(this.configDirPath),
+      buttons: [localized('Cancel'), localized('Reset')],
+      defaultId: 0,
+      cancelId: 0,
+    };
+    const parent = BrowserWindow.getFocusedWindow();
+    const choice = parent
+      ? dialog.showMessageBoxSync(parent, options)
+      : dialog.showMessageBoxSync(options);
+    if (choice !== 1 || this._resettingAndRelaunching) return;
+    this._resettingAndRelaunching = true;
+
+    this.configPersistenceManager.discarded = true;
+    this.windowManager.destroyAllWindows();
+    if (this.engineSupervisor) await this.engineSupervisor.shutdown();
+    // Local storage, IndexedDB and cookies are open in this process; cleared through Chromium
+    // so it doesn't write them back after their files are gone.
+    await session.defaultSession
+      .clearStorageData()
+      .catch((err) => console.error(`Could not clear storage data: ${err}`));
+
+    let failed: string[];
+    try {
+      failed = resetProfileDirectory(this.configDirPath, protectedPaths);
+    } catch (err) {
+      failed = [`${this.configDirPath}: ${err.message}`];
+    }
+    if (failed.length) {
+      dialog.showMessageBoxSync({
+        type: 'warning',
+        buttons: [localized('Okay')],
+        message: localized('Some files could not be deleted'),
+        detail: localized(
+          `Tern restarts now. Delete these yourself to finish the reset:\n\n%@`,
+          failed.join('\n')
+        ),
+      });
+    }
+    app.relaunch();
+    app.quit();
+  };
+
   _deleteDatabase = (callback) => {
     this.deleteFileWithRetry(path.join(this.configDirPath, 'edgehill.db'), callback);
     this.deleteFileWithRetry(path.join(this.configDirPath, 'edgehill.db-wal'));
@@ -476,6 +543,7 @@ export default class Application extends EventEmitter {
     });
 
     this.on('application:reset-database', this._resetDatabaseAndRelaunch);
+    this.on('application:reset-profile', this._resetProfileAndRelaunch);
 
     this.on('application:quit', () => {
       app.quit();

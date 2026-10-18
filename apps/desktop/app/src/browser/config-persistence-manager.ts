@@ -22,6 +22,8 @@ type ChangeListener = (settings: object, sourceWebcontentsId?: number) => void;
 
 export default class ConfigPersistenceManager implements SettingsHost {
   userWantsToPreserveErrors = false;
+  // Set once the profile is being reset: a later write would put the old settings back.
+  discarded = false;
   saveRetries = 0;
   settings = {};
   configDirPath: string;
@@ -152,7 +154,7 @@ export default class ConfigPersistenceManager implements SettingsHost {
   }
 
   save = () => {
-    if (this.userWantsToPreserveErrors) {
+    if (this.userWantsToPreserveErrors || this.discarded) {
       return;
     }
     const allSettings = { '*': this.settings };

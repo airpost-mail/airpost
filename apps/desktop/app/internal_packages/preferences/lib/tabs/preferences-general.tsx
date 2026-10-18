@@ -1,6 +1,5 @@
 /* eslint global-require: 0*/
 import React from 'react';
-import fs from 'fs';
 import { localized } from 'mailspring-exports';
 import ConfigSchemaItem from './config-schema-item';
 import WorkspaceSection from './workspace-section';
@@ -14,38 +13,14 @@ class PreferencesGeneral extends React.Component<{
 }> {
   static displayName = 'PreferencesGeneral';
 
-  _onReboot = () => {
-    console.log('general relaunch');
-    const app = require('@electron/remote').app;
-    app.relaunch();
-    app.quit();
-  };
-
   _onResetEmailsThatIgnoreWarnings = () => {
     localStorage.removeItem('recipientWarningBlacklist');
   };
 
+  // Main confirms, stops the engine, empties the profile and relaunches.
   _onResetAccountsAndSettings = () => {
-    const chosen = require('@electron/remote').dialog.showMessageBoxSync({
-      type: 'info',
-      message: localized('Are you sure?'),
-      buttons: [localized('Cancel'), localized('Reset')],
-    });
-
-    if (chosen === 1) {
-      fs.rm(AppEnv.getConfigDirPath(), { recursive: true, force: true }, (err) => {
-        if (err) {
-          return AppEnv.showErrorDialog(
-            localized(
-              `Could not reset accounts and settings. Please delete the folder %@ manually.\n\n%@`,
-              AppEnv.getConfigDirPath(),
-              err.toString()
-            )
-          );
-        }
-        this._onReboot();
-      });
-    }
+    const ipc = require('electron').ipcRenderer;
+    ipc.send('command', 'application:reset-profile');
   };
 
   _onResetEmailCache = () => {
