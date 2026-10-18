@@ -7,13 +7,20 @@
 //! Derived from Mailspring-Sync `MailSync/SyncWorker.cpp` and the worker loop in
 //! `MailSync/main.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex};
+use std::time::{Duration, Instant};
 
 use ms_core::constants::{ls, WORKER_SLEEP};
 use ms_core::{logmsg, Error, ErrorCode, Result, SyncError};
 use ms_imap::{IdleInterrupt, ImapSession};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
 use tracing::{error, info, warn};
+
+/// How long a send put back for when its server is reachable again waits before the
+/// foreground tries it again, unless `wake-workers` comes first (docs/tech-debt.md TD33).
+const DEFERRED_RETRY: Duration = Duration::from_secs(WORKER_SLEEP);
 
 use crate::worker::{ls_u32, set_ls, Range, SyncWorker};
 use crate::WorkerContext;
@@ -27,6 +34,8 @@ pub struct ForegroundControl {
     /// Wakes a worker on a server without IDLE, which waits here instead (`idleCv`).
     signalled: Mutex<bool>,
     cv: Condvar,
+    /// `wake-workers` asks for the deferred sends to be tried now rather than at their time.
+    retry_deferred: AtomicBool,
 }
 
 impl ForegroundControl {
@@ -46,14 +55,39 @@ impl ForegroundControl {
     }
 
     /// Blocks until [`ForegroundControl::interrupt`] is called, or returns at once if it
-    /// was called since the last wait. Leaves the IDLE interrupt pending, so the next
-    /// iteration still sees it.
+    /// was called since the last wait, or at the [`ForegroundControl::wake_at`] time. Leaves
+    /// the IDLE interrupt pending, so the next iteration still sees it.
     pub fn wait_for_interrupt(&self) {
+        let deadline = self.interrupt.deadline_at();
         let mut signalled = self.signalled.lock().unwrap_or_else(|e| e.into_inner());
         while !*signalled {
-            signalled = self.cv.wait(signalled).unwrap_or_else(|e| e.into_inner());
+            match deadline {
+                Some(at) => {
+                    let now = Instant::now();
+                    if at <= now {
+                        return;
+                    }
+                    signalled = self
+                        .cv
+                        .wait_timeout(signalled, at - now)
+                        .unwrap_or_else(|e| e.into_inner())
+                        .0;
+                }
+                None => signalled = self.cv.wait(signalled).unwrap_or_else(|e| e.into_inner()),
+            }
         }
         *signalled = false;
+    }
+
+    /// Ends the IDLE (or the wait without one) at `at` at the latest; None for no limit.
+    fn wake_at(&self, at: Option<Instant>) {
+        self.interrupt.interrupt_at(at);
+    }
+
+    /// `wake-workers`: the deferred sends are tried at the next iteration.
+    pub fn retry_deferred(&self) {
+        self.retry_deferred.store(true, Ordering::SeqCst);
+        self.interrupt();
     }
 
     /// `need-bodies`: queued in order, duplicates dropped.
@@ -106,6 +140,10 @@ struct Foreground {
     /// The last IDLE ended in an error: its connection is gone with the VANISHED it had,
     /// so the inbox is re-selected before the CHANGEDSINCE fetch (`idleExitedWithError`).
     idle_exited_with_error: bool,
+    /// Sends put back for when their server is reachable again (TD33), skipped until
+    /// `retry_at`. The account stays online meanwhile: its IMAP side works.
+    deferred: HashSet<String>,
+    retry_at: Option<Instant>,
 }
 
 impl Foreground {
@@ -113,6 +151,8 @@ impl Foreground {
         Ok(Foreground {
             w: SyncWorker::new(ctx)?,
             idle_exited_with_error: false,
+            deferred: HashSet::new(),
+            retry_at: None,
         })
     }
 
@@ -165,28 +205,54 @@ impl Foreground {
     /// Runs every task waiting for its remote phase, oldest first. Tasks queued while
     /// these run (a SendDraftTask queueing a SyncbackMetadataTask) are picked up by the next
     /// round instead of waiting for the next iteration.
+    ///
+    /// A send put back because its server can't be reached (a deferred send, TD33) doesn't
+    /// end the iteration: the others run, the inbox is still fetched and idled on, and the
+    /// send is skipped until its retry time or `wake-workers`, which the IDLE is bounded by.
     fn run_remote_tasks(&mut self) -> Result<()> {
+        let retry_now = self
+            .w
+            .ctx
+            .foreground
+            .retry_deferred
+            .swap(false, Ordering::SeqCst);
+        if retry_now || self.retry_at.is_some_and(|at| at <= Instant::now()) {
+            self.deferred.clear();
+            self.retry_at = None;
+        }
         let w = &mut self.w;
         let mut runner = w.ctx.tasks.remote_runner(&w.store, &w.ctx);
         runner.cleanup_old_tasks_at_runtime()?;
         let mut after_rowid: i64 = -1;
-        // A task put back for when the account is online again (a deferred send): the
-        // others still run, then the worker sleeps on its error and tries again.
-        let mut deferred: Option<Error> = None;
         loop {
             let tasks = remote_tasks_after(&w.store, w.ctx.account.id(), &mut after_rowid)?;
             if tasks.is_empty() {
-                return deferred.map_or(Ok(()), Err);
+                break;
             }
             for mut task in tasks {
+                if self.deferred.contains(task.id()) {
+                    continue;
+                }
                 match runner.perform_remote(&mut task, &mut w.session) {
-                    Err(e @ Error::Sync(_)) => {
-                        deferred.get_or_insert(e);
+                    Err(Error::Sync(_)) => {
+                        self.deferred.insert(task.id().to_owned());
+                        if self.retry_at.is_none() {
+                            info!(
+                                "-- Trying deferred sends again in {}s",
+                                DEFERRED_RETRY.as_secs()
+                            );
+                            self.retry_at = Some(Instant::now() + DEFERRED_RETRY);
+                        }
                     }
                     other => other?,
                 }
             }
         }
+        if self.deferred.is_empty() {
+            self.retry_at = None;
+        }
+        w.ctx.foreground.wake_at(self.retry_at);
+        Ok(())
     }
 
     fn idle_cycle_iteration(&mut self) -> Result<()> {
@@ -406,6 +472,19 @@ mod tests {
         c.interrupt();
         t.join().unwrap();
         // The IDLE flag stays for the worker's next check.
+        assert!(c.idle_interrupt().take());
+    }
+
+    #[test]
+    fn wait_for_interrupt_ends_at_the_retry_time() {
+        let c = ForegroundControl::new();
+        let start = Instant::now();
+        c.wake_at(Some(start + Duration::from_millis(30)));
+        c.wait_for_interrupt();
+        assert!(start.elapsed() >= Duration::from_millis(30));
+        assert!(!c.idle_interrupt().take(), "a deadline is not an interrupt");
+        c.retry_deferred();
+        assert!(c.retry_deferred.load(Ordering::SeqCst));
         assert!(c.idle_interrupt().take());
     }
 }
