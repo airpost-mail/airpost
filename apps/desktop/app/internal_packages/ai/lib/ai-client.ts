@@ -28,7 +28,8 @@ const ENGINE_FEATURE = 'ai';
 /**
  * crates/ms-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
  * ai.*), `engine-disconnected` (the connection dropped), `engine-busy` (the engine's AI lane is
- * full, -32012) and `keyset` (the saved key could not be read).
+ * full, -32012), `keyset` (the saved key could not be read) and `stopped` (a triage job ended
+ * early: the account stopped or triage was turned off).
  */
 export type AiErrorKey =
   | 'not-configured'
@@ -47,6 +48,7 @@ export type AiErrorKey =
   | 'engine-disconnected'
   | 'engine-busy'
   | 'keyset'
+  | 'stopped'
   | 'unknown';
 
 const KNOWN_KEYS: AiErrorKey[] = [
@@ -158,6 +160,8 @@ export function errorMessage(err: unknown, providerName?: string): string {
       return localized('Tern is busy with other AI requests. Try again in a moment.');
     case 'keyset':
       return localized('Could not read the saved API key: %@', e.message);
+    case 'stopped':
+      return localized('Stopped before the end.');
     default:
       return localized('Something went wrong with %@.', name);
   }

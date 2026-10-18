@@ -387,6 +387,7 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
   componentWillUnmount() {
     for (const unlisten of this._unlisten) unlisten();
     // A job runs on in the engine; only its progress stops showing.
+    for (const run of this._runs.values()) run.dispose();
     this._runs.clear();
   }
 

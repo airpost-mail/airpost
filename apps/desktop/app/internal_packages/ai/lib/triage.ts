@@ -64,10 +64,29 @@ export function triageOf(thread: Thread | null | undefined): TriageValue | null 
   return value;
 }
 
+function seconds(date: Date | null | undefined) {
+  return date instanceof Date ? date.getTime() / 1000 : 0;
+}
+
+/**
+ * Whether the user replied since the value said "needs reply": mail sent after the last mail
+ * came in, or, for a value the user filed, after filing it. As ms-store `triaged_threads`.
+ */
+export function answered(value: TriageValue, thread: Thread | null | undefined) {
+  const sent = seconds(thread && thread.lastMessageSentTimestamp);
+  if (!sent) return false;
+  if (value.source === 'user' && typeof value.at === 'number' && value.at > sent) return false;
+  return sent >= seconds(thread.lastMessageReceivedTimestamp);
+}
+
 /** The chip a thread shows: only needs-reply and important, to keep the list quiet. */
-export function chipCategory(value: TriageValue | null): 'needs-reply' | 'important' | null {
+export function chipCategory(
+  value: TriageValue | null,
+  thread?: Thread | null
+): 'needs-reply' | 'important' | null {
   if (!value) return null;
-  if (value.category === 'needs-reply' || value.needsReply) return 'needs-reply';
+  const needsReply = value.category === 'needs-reply' || value.needsReply;
+  if (needsReply && !answered(value, thread)) return 'needs-reply';
   if (value.category === 'important') return 'important';
   return null;
 }
@@ -112,9 +131,14 @@ export function triageShownFor(accountId: string) {
 export interface TriageRun {
   /** Resolves with the job once the engine queued it. */
   started: Promise<AiTriageRunResult>;
-  /** Resolves when every thread is done. */
+  /**
+   * Resolves when every thread is done; rejects when the job stopped early (`stopped`), was
+   * cancelled (`cancelled`) or the engine went away (`engine-disconnected`).
+   */
   finished: Promise<void>;
   cancel(): void;
+  /** Stops watching the job, which runs on in the engine. */
+  dispose(): void;
 }
 
 /**
@@ -127,6 +151,8 @@ export function triageInbox(
   onProgress: (done: number, total: number) => void = () => {}
 ): TriageRun {
   let jobId: string | null = null;
+  // Stop was clicked before ai.triage.run answered: the job is cancelled once its id comes.
+  let cancelled = false;
   let finish: () => void;
   let fail: (err: AiError) => void;
   const finished = new Promise<void>((resolve, reject) => {
@@ -136,6 +162,10 @@ export function triageInbox(
   // The first progress can arrive before the reply's continuation runs: keep it until then.
   const early: AiTriageProgressParams[] = [];
   const seen = (p: AiTriageProgressParams) => {
+    if (p.stopped) {
+      fail(new AiError({ key: 'stopped', message: `triage stopped after ${p.done} threads` }));
+      return;
+    }
     onProgress(p.done, p.total);
     if (p.done >= p.total) finish();
   };
@@ -145,6 +175,14 @@ export function triageInbox(
     if (jobId === null) early.push(p);
     else if (p.jobId === jobId) seen(p);
   });
+  // The connection dropped: no more progress comes for this job.
+  const gone = () =>
+    fail(new AiError({ key: 'engine-disconnected', message: 'the engine went away' }));
+  Engine.events.on('gone', gone);
+  const dispose = () => {
+    subscription.dispose();
+    Engine.events.removeListener('gone', gone);
+  };
   const started = (async () => {
     try {
       if (!Engine.has(TRIAGE_ENGINE_FEATURE)) {
@@ -161,6 +199,10 @@ export function triageInbox(
         config: await configFor(provider),
       });
       jobId = result.jobId;
+      if (cancelled) {
+        Engine.request('ai.cancel', { jobId }).catch(() => {});
+        return result;
+      }
       for (const p of early.splice(0)) if (p.jobId === jobId) seen(p);
       if (result.queued === 0) finish();
       return result;
@@ -170,10 +212,7 @@ export function triageInbox(
       throw e;
     }
   })();
-  finished.then(
-    () => subscription.dispose(),
-    () => subscription.dispose()
-  );
+  finished.then(dispose, dispose);
   // The caller may watch only one of the two.
   started.catch(() => {});
   finished.catch(() => {});
@@ -181,9 +220,11 @@ export function triageInbox(
     started,
     finished,
     cancel() {
+      cancelled = true;
       if (jobId) Engine.request('ai.cancel', { jobId }).catch(() => {});
       fail(new AiError({ key: 'cancelled' }));
     },
+    dispose,
   };
 }
 

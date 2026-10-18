@@ -48,6 +48,22 @@ describe('AI triage', () => {
       expect(chipCategory(null)).toBe(null);
     });
 
+    it('drops the needs-reply chip once the user replied', () => {
+      const at = (secs: number) => new Date(secs * 1000);
+      const thread = triaged(null);
+      thread.lastMessageReceivedTimestamp = at(100);
+      thread.lastMessageSentTimestamp = at(200);
+      expect(chipCategory({ category: 'needs-reply' }, thread)).toBe(null);
+      expect(chipCategory({ category: 'important', needsReply: true }, thread)).toBe('important');
+      // Filed by the user after replying: it stands.
+      const filed = { category: 'needs-reply' as const, source: 'user' as const, at: 300 };
+      expect(chipCategory(filed, thread)).toBe('needs-reply');
+      expect(chipCategory({ ...filed, at: 150 }, thread)).toBe(null);
+      // New mail after the reply.
+      thread.lastMessageReceivedTimestamp = at(250);
+      expect(chipCategory({ category: 'needs-reply' }, thread)).toBe('needs-reply');
+    });
+
     it("files a correction as the user's, which triage never replaces", () => {
       const queueTask = spyOn(Actions, 'queueTask');
       const thread = triaged({
@@ -146,6 +162,69 @@ describe('AI triage', () => {
       await run.finished.catch((e) => (key = e.key));
       expect(key).toBe('cancelled');
       expect(sent.find((s) => s.method === 'ai.cancel').params).toEqual({ jobId: 'j2' });
+    });
+
+    it('fails when the engine stops the job early', async () => {
+      setUpTriage();
+      fakeEngine(
+        { 'ai.triage.run': () => ({ jobId: 'j3', queued: 3 }) },
+        { features: TRIAGE_FEATURES }
+      );
+      const progress: Array<[number, number]> = [];
+      const run = triageInbox(ACCOUNT_ID, (done, total) => progress.push([done, total]));
+      await run.started;
+      Engine.events.notification('ai.triage.progress', { jobId: 'j3', done: 1, total: 3 });
+      Engine.events.notification('ai.triage.progress', {
+        jobId: 'j3',
+        done: 1,
+        total: 3,
+        stopped: true,
+      });
+      let key = null;
+      await run.finished.catch((e) => (key = e.key));
+      expect(key).toBe('stopped');
+      expect(progress).toEqual([[1, 3]]);
+    });
+
+    it('fails when the engine goes away', async () => {
+      setUpTriage();
+      fakeEngine(
+        { 'ai.triage.run': () => ({ jobId: 'j4', queued: 3 }) },
+        { features: TRIAGE_FEATURES }
+      );
+      const run = triageInbox(ACCOUNT_ID);
+      await run.started;
+      Engine.events.emit('gone');
+      let key = null;
+      await run.finished.catch((e) => (key = e.key));
+      expect(key).toBe('engine-disconnected');
+    });
+
+    it('cancels a job stopped before the engine answered', async () => {
+      setUpTriage();
+      const sent = fakeEngine(
+        { 'ai.triage.run': () => ({ jobId: 'j5', queued: 3 }) },
+        { features: TRIAGE_FEATURES }
+      );
+      const run = triageInbox(ACCOUNT_ID);
+      run.cancel();
+      await run.started;
+      expect(sent.find((s) => s.method === 'ai.cancel').params).toEqual({ jobId: 'j5' });
+    });
+
+    it('stops listening once disposed', async () => {
+      setUpTriage();
+      fakeEngine(
+        { 'ai.triage.run': () => ({ jobId: 'j6', queued: 2 }) },
+        { features: TRIAGE_FEATURES }
+      );
+      const progress: Array<[number, number]> = [];
+      const run = triageInbox(ACCOUNT_ID, (done, total) => progress.push([done, total]));
+      await run.started;
+      run.dispose();
+      Engine.events.notification('ai.triage.progress', { jobId: 'j6', done: 1, total: 2 });
+      expect(progress).toEqual([]);
+      expect(Engine.events.listenerCount('gone')).toBe(0);
     });
 
     it('asks for a model when triage has none', async () => {

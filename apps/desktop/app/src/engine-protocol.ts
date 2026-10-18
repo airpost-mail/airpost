@@ -603,6 +603,8 @@ export interface AiTriageProgressParams {
   jobId: string;
   done: number;
   total: number;
+  /** The job ended after `done` threads: cancelled, the account stopped or triage turned off. */
+  stopped?: boolean;
 }
 
 export interface AiTriageListResult {

@@ -62,7 +62,7 @@ export class TriageChip extends React.Component<{ thread: Thread }> {
 
   render() {
     const value = triageOf(this.props.thread);
-    const category = chipCategory(value);
+    const category = chipCategory(value, this.props.thread);
     if (!category) return null;
     const label = {
       displayName: categoryLabel(category),
@@ -74,12 +74,7 @@ export class TriageChip extends React.Component<{ thread: Thread }> {
         ? localized('You filed this. Click to change.')
         : localized('Sorted by AI. Click to change.');
     return (
-      <span
-        className={`ai-triage-chip ai-triage-${category}`}
-        title={title}
-        onClick={this._onMenu}
-        onContextMenu={this._onMenu}
-      >
+      <span className={`ai-triage-chip ai-triage-${category}`} title={title} onClick={this._onMenu}>
         <MailLabel label={label} />
       </span>
     );

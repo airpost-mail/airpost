@@ -76,11 +76,8 @@ export class NeedsReplyMailboxPerspective extends MailboxPerspective {
     return new NeedsReplySubscription(this.accountIds);
   }
 
+  // Nothing is dropped into the view; its threads move, archive and trash as inbox threads do.
   canReceiveThreadsFromAccountIds() {
-    return false;
-  }
-
-  canMoveThreadsTo() {
     return false;
   }
 }
