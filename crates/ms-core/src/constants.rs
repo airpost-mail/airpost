@@ -285,16 +285,19 @@ pub mod thread {
     pub const SOCKET_WRITER: &str = "socketWriter";
     /// `--socket`: removes the socket files on SIGTERM / SIGINT.
     pub const SIGNALS: &str = "signals";
-    /// `--socket`: answers one `files.get` once its download has written the file.
+    /// `--socket`: the workers answering `files.get` once its download has written the file.
     pub const FILES: &str = "files";
     /// `--socket`: makes one `messages.unsubscribe` one-click POST.
     pub const UNSUBSCRIBE: &str = "unsubscribe";
+    /// `serve`: the workers running `integrations.*` calls.
+    pub const INTEGRATIONS: &str = "integrations";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
-    /// `serve`: runs one `account.test` for the parent.
+    /// `serve`: the workers running `account.test` for the parent.
     pub const ACCOUNT_TEST: &str = "accountTest";
-    /// `serve`: runs one `account.reset` for the parent.
+    /// `serve`: the workers running `account.reset` for the parent.
     pub const ACCOUNT_RESET: &str = "accountReset";
-    /// `serve`: runs `engine.resetDatabase` or `engine.setLogLevel` for the parent.
+    /// `serve`: the worker running `engine.resetDatabase` and `engine.setLogLevel` for the
+    /// parent, one at a time.
     pub const ENGINE_MAINTENANCE: &str = "engineMaintenance";
 }
