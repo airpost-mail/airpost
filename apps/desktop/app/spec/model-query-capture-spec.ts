@@ -664,6 +664,9 @@ const SITES: Site[] = [
 ];
 
 function capture() {
+  // Join aliases come from a global counter; reset it so the SQL doesn't depend on which specs
+  // ran first.
+  Matcher.muid = 0;
   return {
     generatedBy: 'apps/desktop/app/spec/model-query-capture-spec.ts',
     queries: SITES.map(({ name, site, build }) => {
