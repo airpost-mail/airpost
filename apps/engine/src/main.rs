@@ -18,6 +18,8 @@ mod read_api;
 #[cfg(unix)]
 mod serve;
 #[cfg(unix)]
+mod settings;
+#[cfg(unix)]
 mod socket;
 mod stdin_loop;
 

@@ -985,3 +985,93 @@ fn logs_tail_reads_the_end_of_a_log() {
     assert_eq!(tail["text"].as_str().unwrap().len(), 10);
     e.stop();
 }
+
+#[test]
+fn settings_round_trip_and_notify_the_other_connections() {
+    let mut e = Serve::start();
+    let mut writer = e.hello();
+    let mut watcher = e.hello();
+    let status = writer.call(method::ENGINE_STATUS, json!({})).unwrap();
+    assert!(status["features"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("settings")));
+    for c in [&mut writer, &mut watcher] {
+        // A class filter doesn't hold settings.changed back.
+        c.call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
+            .unwrap();
+    }
+    assert_eq!(
+        writer.call(method::SETTINGS_GET, json!({})).unwrap(),
+        json!({ "values": {} })
+    );
+
+    let values =
+        json!({ "core.sending.undoSend": 15000, "signatures": { "s1": { "body": "<b>hi</b>" } } });
+    assert_eq!(
+        writer
+            .call(method::SETTINGS_SET, json!({ "values": values }))
+            .unwrap(),
+        json!({})
+    );
+    let n = next_matching(&mut watcher, |v| v["method"] == method::SETTINGS_CHANGED);
+    assert_eq!(n["params"], json!({ "values": values }));
+    let got = watcher
+        .call(
+            method::SETTINGS_GET,
+            json!({ "keys": ["core.sending.undoSend", "core.composing.html"] }),
+        )
+        .unwrap();
+    assert_eq!(got, json!({ "values": { "core.sending.undoSend": 15000 } }));
+    let file: Value =
+        serde_json::from_slice(&std::fs::read(e.dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(file, values);
+
+    // The parent's change reaches every subscriber, the writer included; a cleared key is
+    // null in the notification.
+    e.parent
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { "signatures": null, "core.sending.undoSend": 15000 } }),
+        )
+        .unwrap();
+    for c in [&mut writer, &mut watcher] {
+        let n = next_matching(c, |v| v["method"] == method::SETTINGS_CHANGED);
+        assert_eq!(n["params"], json!({ "values": { "signatures": null } }));
+    }
+    // The writer saw nothing of its own first change.
+    writer
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { "core.composing.html": false } }),
+        )
+        .unwrap();
+    watcher
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { "core.composing.html": true } }),
+        )
+        .unwrap();
+    let n = next_matching(&mut writer, |v| v["method"] == method::SETTINGS_CHANGED);
+    assert_eq!(
+        n["params"],
+        json!({ "values": { "core.composing.html": true } })
+    );
+
+    let bad = writer
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { "core.themes": ["x"] } }),
+        )
+        .unwrap_err();
+    assert_eq!(bad.code(), Some(code::INVALID_PARAMS));
+    let bad = writer
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { "core.sending.undoSend": "5s" } }),
+        )
+        .unwrap_err();
+    assert_eq!(bad.code(), Some(code::INVALID_PARAMS));
+    e.stop();
+}

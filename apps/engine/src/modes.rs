@@ -365,6 +365,7 @@ fn sync(opts: &Options, account: Arc<Account>, identity: IdentityLine) -> i32 {
                         started,
                         config_dir,
                         database: Default::default(),
+                        settings: None,
                     }),
                 );
                 let shown = path.to_string_lossy();

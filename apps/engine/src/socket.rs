@@ -34,8 +34,9 @@ use ms_ipc::{
     AccountStateParams, AccountStatus, BodiesFetchParams, CalendarSyncParams, DisconnectParams,
     EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams,
     LogsTailResult, MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response,
-    SubscribeParams, SyncWakeParams, TaskCancelParams, TaskQueueParams, LOGS_TAIL_DEFAULT_BYTES,
-    LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    SettingsGetParams, SettingsValues, SubscribeParams, SyncWakeParams, TaskCancelParams,
+    TaskQueueParams, LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES,
+    PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
@@ -44,6 +45,7 @@ use tracing::{info, warn};
 use crate::dispatch::{Command, Reply, Request};
 use crate::platform;
 use crate::read_api::{is_read_method, ReadApi};
+use crate::settings::Settings;
 
 /// How long a blocked write waits before the writer checks whether its connection is
 /// being dropped.
@@ -389,6 +391,33 @@ impl Hub {
         }
     }
 
+    /// Sends `settings.changed` to every subscriber but `origin`, the connection that made
+    /// the change (docs/desktop-client-plan.md 3.1): no filter holds it back, and nothing is
+    /// kept for a later subscriber, which calls `settings.get` instead.
+    fn settings_changed(&self, values: &serde_json::Map<String, Value>, origin: Option<u64>) {
+        let n = Notification::new(
+            method::SETTINGS_CHANGED,
+            serde_json::to_value(SettingsValues {
+                values: values.clone(),
+            })
+            .unwrap_or(Value::Null),
+        );
+        let note: Arc<[u8]> = ms_ipc::encode(&n).into();
+        self.lock().subscribers.retain(|s| {
+            if Some(s.conn) == origin {
+                return !s.outbox.is_closed();
+            }
+            match s.outbox.push(note.clone()) {
+                Ok(()) => true,
+                Err(PushError::Closed) => false,
+                Err(PushError::Full) => {
+                    drop_slow(s.conn, &s.outbox);
+                    false
+                }
+            }
+        });
+    }
+
     fn lock(&self) -> MutexGuard<'_, HubState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -538,6 +567,9 @@ pub struct Server {
     /// Where the read methods open their own read-only database connection.
     pub config_dir: PathBuf,
     pub database: DatabaseGeneration,
+    /// `serve` mode's settings store; `sync` mode has none, since several per-account
+    /// processes would each hold their own copy of the file.
+    pub settings: Option<Arc<Settings>>,
 }
 
 /// Bumped when `serve` replaces the database file (`engine.resetDatabase`), so each
@@ -746,6 +778,9 @@ impl Session {
             method::ENGINE_LOGS_TAIL => req
                 .params_as::<LogsTailParams>()
                 .and_then(|p| logs_tail(&self.server.config_dir, &p)),
+            method::SETTINGS_GET | method::SETTINGS_SET if self.server.settings.is_some() => {
+                settings_call(&self.server, req, None, |_| {})
+            }
             _ => return None,
         })
     }
@@ -779,7 +814,7 @@ impl Session {
             engine: env!("CARGO_PKG_VERSION").to_owned(),
             pid: std::process::id(),
             accounts,
-            features: features(),
+            features: features(&self.server),
         }))
     }
 
@@ -790,7 +825,7 @@ impl Session {
             pid: std::process::id(),
             uptime_secs: self.server.started.elapsed().as_secs(),
             accounts: self.server.accounts.statuses(),
-            features: features(),
+            features: features(&self.server),
         }))
         .unwrap_or(Value::Null)
     }
@@ -820,8 +855,8 @@ impl Session {
 }
 
 /// `hello.features` and `engine.status.features`.
-fn features() -> Vec<String> {
-    [
+fn features(server: &Server) -> Vec<String> {
+    let mut out: Vec<String> = [
         feature::COUNTS,
         feature::TASKS_LIST,
         feature::METADATA_LIST,
@@ -830,7 +865,47 @@ fn features() -> Vec<String> {
         feature::RELAYED,
     ]
     .map(str::to_owned)
-    .to_vec()
+    .to_vec();
+    if server.settings.is_some() {
+        out.push(feature::SETTINGS.to_owned());
+    }
+    out
+}
+
+/// `settings.get` or `settings.set` on `server`'s store, which must exist. `deliver` runs
+/// with the store still locked, and so does the `settings.changed` a change sends to every
+/// subscriber but `origin`: a connection that queues its answer in `deliver` gets it in
+/// order with the notifications of other connections' changes.
+fn settings_call(
+    server: &Server,
+    req: &RpcRequest,
+    origin: Option<u64>,
+    deliver: impl FnOnce(&Reply),
+) -> Reply {
+    let Some(store) = &server.settings else {
+        return Err(ErrorObject::new(
+            code::METHOD_NOT_FOUND,
+            format!("unknown method {}", req.method),
+        ));
+    };
+    let mut guard = store.lock();
+    let result = if req.method == method::SETTINGS_GET {
+        req.params_as::<SettingsGetParams>().and_then(|p| {
+            to_value(serde_json::to_value(SettingsValues {
+                values: guard.get(p.keys.as_deref()),
+            }))
+        })
+    } else {
+        req.params_as::<SettingsValues>().and_then(|p| {
+            let changed = guard.set(p.values)?;
+            if !changed.is_empty() {
+                server.hub.settings_changed(&changed, origin);
+            }
+            Ok(json!({}))
+        })
+    };
+    deliver(&result);
+    result
 }
 
 fn stopped_before_answering() -> ErrorObject {
@@ -1009,6 +1084,21 @@ impl Connection {
                 Ok(()) => return None,
                 Err(e) => Err(e),
             },
+            method::SETTINGS_GET | method::SETTINGS_SET
+                if self.session.server.settings.is_some() =>
+            {
+                let id = req.id.clone();
+                // Answered from `deliver`, under the store's lock.
+                let _ = settings_call(&self.session.server, &req, Some(self.id), |result| {
+                    if let Some(id) = id {
+                        self.respond(match result {
+                            Ok(v) => Response::ok(Some(id), v.clone()),
+                            Err(e) => Response::err(Some(id), e.clone()),
+                        });
+                    }
+                });
+                return None;
+            }
             name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
                 Err(ErrorObject::new(
                     code::WRONG_CHANNEL,

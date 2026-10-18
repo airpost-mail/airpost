@@ -106,6 +106,7 @@ pub fn run(opts: &Options) -> i32 {
         started: Instant::now(),
         config_dir: opts.config_dir.clone(),
         database,
+        settings: Some(Arc::new(crate::settings::Settings::open(&opts.config_dir))),
     });
     socket::serve(listener, server.clone());
     info!(
