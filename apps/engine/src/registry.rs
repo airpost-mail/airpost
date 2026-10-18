@@ -112,6 +112,24 @@ impl Registry {
         self.get(id).is_some()
     }
 
+    /// `account` with its stored secrets in place of any it lacks, when it is registered
+    /// with the same servers and usernames ([`same_servers`]). An account that names other
+    /// servers gets none: a client that can reach the engine must not be able to send a
+    /// stored password or token somewhere else (docs/desktop-client-plan.md section 5).
+    /// Returns the account and whether it is registered with other servers.
+    pub fn with_secrets_for_same_servers(&self, account: Value) -> Result<(Value, bool), String> {
+        let Some(id) = account_id(&account) else {
+            return Ok((account, false));
+        };
+        match self.get(id) {
+            Some(registered) if same_servers(&registered, &account) => {
+                Ok((self.with_secrets(account)?, false))
+            }
+            Some(_) => Ok((account, true)),
+            None => Ok((account, false)),
+        }
+    }
+
     /// `account` with the secrets the store holds for it in place of any it lacks.
     pub fn with_secrets(&self, mut account: Value) -> Result<Value, String> {
         let Some(id) = account_id(&account).map(str::to_owned) else {
@@ -294,6 +312,39 @@ fn setting_str<'a>(account: &'a Value, key: &str) -> Option<&'a str> {
         .filter(|s| !s.is_empty())
 }
 
+/// The settings that say where an account's secrets go: its servers, usernames, how it
+/// connects, and for OAuth the client the refresh token belongs to.
+const CONNECTION_SETTINGS: [&str; 13] = [
+    "refresh_client_id",
+    "imap_host",
+    "imap_port",
+    "imap_username",
+    "imap_security",
+    "imap_allow_insecure_ssl",
+    "imap_allow_cleartext",
+    "smtp_host",
+    "smtp_port",
+    "smtp_username",
+    "smtp_security",
+    "smtp_allow_insecure_ssl",
+    "smtp_allow_cleartext",
+];
+
+/// Whether `a` and `b` send their secrets to the same place: same provider and
+/// [`CONNECTION_SETTINGS`]. A port given as a number or a string counts as the same.
+pub fn same_servers(a: &Value, b: &Value) -> bool {
+    let text = |v: Option<&Value>| match v {
+        None | Some(Value::Null) => String::new(),
+        Some(Value::String(s)) => s.trim().to_owned(),
+        Some(other) => other.to_string(),
+    };
+    let setting = |v: &Value, k: &str| text(v.get("settings").and_then(|s| s.get(k)));
+    text(a.get("provider")) == text(b.get("provider"))
+        && CONNECTION_SETTINGS
+            .iter()
+            .all(|k| setting(a, k) == setting(b, k))
+}
+
 /// Whether `account` carries any secret setting.
 pub fn has_secrets(account: &Value) -> bool {
     SECRET_SETTINGS
@@ -459,6 +510,33 @@ mod tests {
         assert!(!r.store_refresh_token("nope", "rotated").unwrap());
         let full = r.with_secrets(r.get("a1").unwrap()).unwrap();
         assert_eq!(full["settings"]["refresh_token"], "rotated");
+    }
+
+    #[test]
+    fn stored_secrets_fill_in_only_for_the_same_servers() {
+        let dir = tempfile::tempdir().unwrap();
+        let r = registry(dir.path());
+        r.register(&account("a1", "a@x.test", Some("pw"))).unwrap();
+        let (same, other) = r
+            .with_secrets_for_same_servers(account("a1", "a@x.test", None))
+            .unwrap();
+        assert!(!other);
+        assert_eq!(same["settings"]["imap_password"], "pw");
+        let mut moved = account("a1", "a@x.test", None);
+        moved["settings"]["smtp_host"] = json!("mail.evil.test");
+        let (moved, other) = r.with_secrets_for_same_servers(moved).unwrap();
+        assert!(other);
+        assert!(moved["settings"].get("smtp_password").is_none());
+        let (unknown, other) = r
+            .with_secrets_for_same_servers(account("a2", "a@x.test", None))
+            .unwrap();
+        assert!(!other);
+        assert!(unknown["settings"].get("imap_password").is_none());
+
+        let mut port = account("a1", "a@x.test", None);
+        port["settings"]["imap_port"] = json!("993");
+        port["label"] = json!("Work");
+        assert!(same_servers(&account("a1", "a@x.test", None), &port));
     }
 
     #[test]

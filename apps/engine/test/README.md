@@ -587,6 +587,7 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | folder-roles-by-localized-name | roles by name without SPECIAL-USE: modified UTF-7 names, Borradores, `\\Archive` | fake |
 | status-uidnext-zero-new-mail | STATUS UIDNEXT 0 (hMailServer): new mail found from the message count on the next pass | fake |
 | list-refused-transiently | O365 `NO Server Unavailable` to LIST: offline and retried, not a crash | fake |
+| ingest-panic-quarantines-uid | a message whose processing panics (`TERN_ENGINE_TEST_PANIC_SUBJECT`) is quarantined by UID and skipped; the rest syncs and the account keeps running (serve) | fake |
 | fresh-db-replaces-legacy | a C++ database (writes still in its WAL) is moved to `edgehill.legacy.db*`, a fresh V12 is created, `files/` emptied, "Running Migration" printed; nothing imported; no migration on the next launch | fake |
 | import-legacy-carries-metadata | `--mode import-legacy` carries snooze/reminder metadata (re-keyed by headerMessageId), a local draft with body and file, and `_State` cursors | fake |
 | import-legacy-from-cpp-engine | the same from a database the C++ engine wrote (`binary: cpp`): the draft's attachment survives migrate, metadata attaches as sync ingests mail, the imported snooze and send-later fire as `metadata-expiration`; People sync tokens are not carried | fake (slow) |

@@ -1,0 +1,33 @@
+name: ingest-panic-quarantines-uid
+description: >
+  Processing one message panics (TERN_ENGINE_TEST_PANIC_SUBJECT makes the engine panic on
+  the message with that subject, as a parser bug on hostile input would). The panic is
+  caught around that message's ingest: its UID is quarantined in the folder's
+  `quarantine-<folder>-<uidvalidity>` key and skipped from then on, the other messages
+  sync, and the account keeps running instead of stopping at every pass (TD45).
+source: "docs/tech-debt.md TD45"
+transports: [serve]
+servers:
+  - {fake: dovecot}
+env:
+  TERN_ENGINE_TEST_PANIC_SUBJECT: "Tern test panic"
+mailboxes:
+  INBOX:
+    messages: 3
+setup:
+  - server.append: {mailbox: INBOX, messages: {message_id: "<panics-1@example.test>", subject: "Tern test panic"}}
+  - server.append: {mailbox: INBOX, messages: {count: 2}}
+steps:
+  - wait: {log: "processing the message panicked; it is skipped from now on", timeout: 60}
+  - wait: quiescent
+  - sync: pass
+  - wait: quiescent
+expect:
+  counts: {INBOX: 5}
+  models:
+    Message: {where: {headerMessageId: "panics-1@example.test"}, count: 0}
+  sql:
+    - {db: main, query: "SELECT value FROM _State WHERE id LIKE 'quarantine-%'", equals: [["[4]"]]}
+  log_count: {"processing the message panicked": 1}
+  log_absent: ["\\[critical\\]"]
+  running: true

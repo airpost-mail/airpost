@@ -15,6 +15,10 @@
 //! setLogLevel) run on their own threads and answer when done, so responses can come out of
 //! order. Closed stdin still exits 141 after 30 s.
 //!
+//! `--detached` has no parent channel: local, non-relayed socket connections take the parent
+//! methods but `credentials.import`, the slow ones on the same worker lanes, and nothing secret
+//! goes to stdout, which is then a terminal or a service log.
+//!
 //! Each account runs in its own [`AccountRuntime`] with its own `DeltaStream` into the
 //! shared hub, `main` thread and log file. A failure on one of its threads stops that
 //! account alone and sends `account.state` `stopped` with the error once its threads have
@@ -51,8 +55,8 @@ use crate::dispatch::{self, Command, Reply, Request};
 use crate::output::{one_shot_error, write_stdout};
 use crate::registry::{self, Registry as Registered};
 use crate::restart::{self, Decision, History};
-use crate::socket::{self, Accounts, Hub, Server, Session};
-use crate::workers::{self, Lane};
+use crate::socket::{self, Accounts, Hub, Server, Session, SocketJob, SocketParentCall};
+use crate::workers;
 
 type Runtime = AccountRuntime<Command>;
 
@@ -303,11 +307,23 @@ impl Accounts for Engine {
         self.detached
     }
 
-    fn socket_parent_call(&self, req: &RpcRequest) -> Option<Reply> {
+    fn socket_parent_call(&self, req: &RpcRequest) -> Option<SocketParentCall> {
         if !self.detached {
             return None;
         }
-        Some(match req.method.as_str() {
+        if is_slow_parent_method(&req.method) {
+            let Some(engine) = self.me.upgrade() else {
+                return Some(SocketParentCall::Now(Err(ErrorObject::new(
+                    code::INTERNAL_ERROR,
+                    "the engine is stopping",
+                ))));
+            };
+            return Some(match slow_parent_job(engine, req) {
+                Ok(job) => SocketParentCall::Later(job),
+                Err(e) => SocketParentCall::Now(Err(e)),
+            });
+        }
+        Some(SocketParentCall::Now(match req.method.as_str() {
             method::CREDENTIALS_IMPORT => Err(ErrorObject::new(
                 code::WRONG_CHANNEL,
                 "credentials.import is only accepted on the engine's stdin",
@@ -325,7 +341,7 @@ impl Accounts for Engine {
                 Ok(json!({}))
             }
             _ => self.parent_call(req),
-        })
+        }))
     }
 
     fn check(&self, account_id: &str) -> Result<(), ErrorObject> {
@@ -395,13 +411,22 @@ impl Drop for AccountScope {
     }
 }
 
-/// An account's secrets delta, as a `delta` notification on the parent's stdout.
+/// An account's secrets delta, as a `delta` notification on the parent's stdout. A detached
+/// engine has no parent: its stdout is a terminal or a service log, so the delta is dropped.
 struct ParentSink {
     account_id: String,
+    detached: bool,
 }
 
 impl DeltaSink for ParentSink {
     fn write_item(&mut self, _model_class: &str, line: &str) {
+        if self.detached {
+            warn!(
+                "-X Account {}: dropped a secrets delta, a detached engine has no parent",
+                self.account_id
+            );
+            return;
+        }
         let note = ms_ipc::delta_notification_line(&self.account_id, line);
         write_stdout(&format!("{note}\n"));
     }
@@ -549,7 +574,9 @@ impl Engine {
     /// account failed to start, or [`ACCOUNT_START_WAIT_MS`] passed).
     ///
     /// The account is registered: the secrets it carries are stored, the ones it lacks come
-    /// from the store, and the engine starts it itself from then on. `stored` is false when
+    /// from the store, and the engine starts it itself from then on. Stored secrets are used
+    /// only with the servers and usernames they were stored for: an account added with other
+    /// ones must carry its secrets, which then replace the stored set. `stored` is false when
     /// the store refused, and the account then runs only until the engine stops. A running
     /// account added with another identity, other settings or other secrets restarts with
     /// them; added as it runs, it answers ACCOUNT_EXISTS.
@@ -557,11 +584,15 @@ impl Engine {
         let p: AccountAddParams = req.params_as()?;
         let mut json = p.account;
         let sent_secrets = registry::has_secrets(&json);
-        if registry::account_id(&json).is_some() {
-            match self.registered.with_secrets(json.clone()) {
-                Ok(full) => json = full,
-                Err(e) => warn!("-X Could not read the stored secrets: {e}"),
+        match self.registered.with_secrets_for_same_servers(json.clone()) {
+            Ok((_, true)) if !sent_secrets => {
+                return Err(invalid(
+                    "new server settings need new credentials: the account is registered \
+                     with other servers or usernames",
+                ))
             }
+            Ok((full, _)) => json = full,
+            Err(e) => warn!("-X Could not read the stored secrets: {e}"),
         }
         let account = parse_account(json)?;
         let id = account.id().to_owned();
@@ -733,14 +764,17 @@ impl Engine {
             &id,
             Box::new(ParentSink {
                 account_id: id.clone(),
+                detached: self.detached,
             }),
         ));
         let metadata =
             crate::modes::metadata_backend(&self.config_dir, &account, identity, &deltas);
         let for_tokens = deltas.clone();
         let weak = self.weak();
+        let detached = self.detached;
         // A registered account's rotated token goes to the store; any other account's to
-        // the parent, as before the engine kept secrets.
+        // the parent, as before the engine kept secrets. A detached engine has no parent, so
+        // the token stays in the token manager, which the account's restarts use.
         let tokens = ms_net::TokenManager::new(Some(Box::new(move |a: &Account| {
             let stored = weak.upgrade().map(|engine| {
                 engine
@@ -748,15 +782,23 @@ impl Engine {
                     .store_refresh_token(a.id(), a.refresh_token())
             });
             match stored {
-                Some(Ok(true)) => info!("Stored the rotated refresh token of {}", a.id()),
-                Some(Err(e)) => {
-                    warn!(
-                        "-X Could not store the rotated refresh token of {}: {e}",
-                        a.id()
-                    );
-                    for_tokens.send_updated_secrets(a)
+                Some(Ok(true)) => {
+                    info!("Stored the rotated refresh token of {}", a.id());
+                    return;
                 }
-                _ => for_tokens.send_updated_secrets(a),
+                Some(Err(e)) => warn!(
+                    "-X Could not store the rotated refresh token of {}: {e}",
+                    a.id()
+                ),
+                _ => {}
+            }
+            if detached {
+                warn!(
+                    "-X The rotated refresh token of {} is kept until the engine stops",
+                    a.id()
+                );
+            } else {
+                for_tokens.send_updated_secrets(a);
             }
         })));
         let weak = self.weak();
@@ -1007,6 +1049,12 @@ impl Engine {
     /// hold. Runs on its own thread.
     fn test_account(&self, account: &Account) -> Reply {
         info!("Testing account {}", account.id());
+        // Debug builds: the test fails as a bug in it would (serve tests).
+        if cfg!(debug_assertions)
+            && account.settings().get(TEST_PANIC_SETTING) == Some(&json!(true))
+        {
+            panic!("{TEST_PANIC_SETTING} in account.test");
+        }
         Ok(crate::modes::test_auth::result(account))
     }
 
@@ -1199,22 +1247,12 @@ impl Engine {
 }
 
 impl Engine {
-    /// A parent method on a detached engine's socket, answered on the connection's thread.
+    /// A quick parent method on a detached engine's socket, answered on the connection's
+    /// thread; the slow ones go to [`slow_parent_job`]'s lanes, as on stdin.
     fn parent_call(&self, req: &RpcRequest) -> Reply {
         match req.method.as_str() {
             method::ACCOUNT_ADD => self.add(req),
             method::ACCOUNT_REMOVE => self.remove(req),
-            method::ACCOUNT_TEST => req
-                .params_as::<AccountTestParams>()
-                .and_then(|p| parse_account(p.account))
-                .and_then(|a| self.test_account(&a)),
-            method::ACCOUNT_RESET => req
-                .params_as::<AccountResetParams>()
-                .and_then(|p| self.reset_account(&p.account_id, p.keep_metadata)),
-            method::ENGINE_RESET_DATABASE => req
-                .params_as::<ResetDatabaseParams>()
-                .and_then(|p| self.reset_database(p.keep_metadata)),
-            method::ENGINE_SET_LOG_LEVEL => self.set_log_level(req),
             method::TEST_CRASH | method::TEST_PANIC if cfg!(debug_assertions) => {
                 self.test_failure(req)
             }
@@ -1225,6 +1263,9 @@ impl Engine {
         }
     }
 }
+
+/// An account setting that makes `account.test` panic in debug builds.
+const TEST_PANIC_SETTING: &str = "tern_test_panic";
 
 /// How long a detached engine waits after answering `engine.shutdown` before it exits.
 const SHUTDOWN_FLUSH_MS: u64 = 300;
@@ -1294,7 +1335,19 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
             crate::platform::exit_now(EXIT_OK);
         }
         if is_slow_parent_method(&req.method) {
-            spawn_parent_call(engine.clone(), req);
+            let request_id = req.id.clone();
+            let answer = move |result: Reply| {
+                if let Some(id) = request_id {
+                    respond(&match result {
+                        Ok(v) => Response::ok(Some(id), v),
+                        Err(e) => Response::err(Some(id), e),
+                    });
+                }
+            };
+            match slow_parent_job(engine.clone(), &req) {
+                Ok((lane, account, work)) => lane.submit(account, work, answer),
+                Err(e) => answer(Err(e)),
+            }
             continue;
         }
         let result = handle_parent(&engine, &mut session, &req);
@@ -1307,9 +1360,6 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
     }
 }
 
-/// A slow parent method's work, run on its own thread.
-type ParentWork = Box<dyn FnOnce(&Engine) -> Reply + Send>;
-
 fn is_slow_parent_method(name: &str) -> bool {
     matches!(
         name,
@@ -1320,70 +1370,50 @@ fn is_slow_parent_method(name: &str) -> bool {
     )
 }
 
-/// Runs a slow parent method on its lane's workers ([`crate::workers`]), which answer when
-/// done. The account methods' jobs carry the account's id, so they log to its log, and their
-/// lanes are contained: a panic is answered as an error instead of ending the process. The
-/// engine-wide ones run one at a time and abort on a panic, as the stdin thread would.
-fn spawn_parent_call(engine: Arc<Engine>, req: RpcRequest) {
-    let request_id = req.id.clone();
-    let answer = move |result: Reply| {
-        if let Some(id) = request_id {
-            respond(&match result {
-                Ok(v) => Response::ok(Some(id), v),
-                Err(e) => Response::err(Some(id), e),
-            });
+/// A slow parent method's job for its lane's workers ([`crate::workers`]), which answer when
+/// done, on stdin or on a detached engine's socket. The account methods' jobs carry the
+/// account's id, so they log to its log, and their lanes are contained: a panic is answered
+/// as an error instead of ending the process. The engine-wide ones run one at a time and
+/// abort on a panic, as the stdin thread would.
+fn slow_parent_job(engine: Arc<Engine>, req: &RpcRequest) -> Result<SocketJob, ErrorObject> {
+    Ok(match req.method.as_str() {
+        method::ACCOUNT_TEST => {
+            let account = req
+                .params_as::<AccountTestParams>()
+                .and_then(|p| parse_account(p.account))?;
+            let id = account.id().into();
+            (
+                &workers::ACCOUNT_TEST,
+                Some(id),
+                Box::new(move || engine.test_account(&account)),
+            )
         }
-    };
-    let (lane, account_id, work): (&'static Lane, Option<String>, ParentWork) =
-        match req.method.as_str() {
-            method::ACCOUNT_TEST => {
-                let account = match req
-                    .params_as::<AccountTestParams>()
-                    .and_then(|p| parse_account(p.account))
-                {
-                    Ok(a) => a,
-                    Err(e) => return answer(Err(e)),
-                };
-                let id = account.id().to_owned();
-                (
-                    &workers::ACCOUNT_TEST,
-                    Some(id),
-                    Box::new(move |e| e.test_account(&account)),
-                )
-            }
-            method::ACCOUNT_RESET => {
-                let p = match req.params_as::<AccountResetParams>() {
-                    Ok(p) => p,
-                    Err(e) => return answer(Err(e)),
-                };
-                let id = p.account_id.clone();
-                (
-                    &workers::ACCOUNT_RESET,
-                    Some(id),
-                    Box::new(move |e| e.reset_account(&p.account_id, p.keep_metadata)),
-                )
-            }
-            method::ENGINE_RESET_DATABASE => {
-                let p = match req.params_as::<ResetDatabaseParams>() {
-                    Ok(p) => p,
-                    Err(e) => return answer(Err(e)),
-                };
-                (
-                    &workers::ENGINE_MAINTENANCE,
-                    None,
-                    Box::new(move |e| e.reset_database(p.keep_metadata)),
-                )
-            }
-            _ => {
-                let params = req.clone();
-                (
-                    &workers::ENGINE_MAINTENANCE,
-                    None,
-                    Box::new(move |e| e.set_log_level(&params)),
-                )
-            }
-        };
-    lane.submit(account_id.map(Into::into), move || work(&engine), answer);
+        method::ACCOUNT_RESET => {
+            let p = req.params_as::<AccountResetParams>()?;
+            let id = p.account_id.as_str().into();
+            (
+                &workers::ACCOUNT_RESET,
+                Some(id),
+                Box::new(move || engine.reset_account(&p.account_id, p.keep_metadata)),
+            )
+        }
+        method::ENGINE_RESET_DATABASE => {
+            let p = req.params_as::<ResetDatabaseParams>()?;
+            (
+                &workers::ENGINE_MAINTENANCE,
+                None,
+                Box::new(move || engine.reset_database(p.keep_metadata)),
+            )
+        }
+        _ => {
+            let params = req.clone();
+            (
+                &workers::ENGINE_MAINTENANCE,
+                None,
+                Box::new(move || engine.set_log_level(&params)),
+            )
+        }
+    })
 }
 
 fn respond(response: &Response) {

@@ -1408,36 +1408,116 @@ fn a_rotated_token_is_stored_and_used_after_a_restart() {
     e.stop();
 }
 
+/// A `serve --detached` engine with no parent channel, its stdout captured.
+struct Detached {
+    dir: tempfile::TempDir,
+    socket: PathBuf,
+    child: Child,
+}
+
+impl Detached {
+    /// Starts one without `--mode migrate` first: serve migrates.
+    fn start(env: &[(&str, String)]) -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("s").join("e.sock");
+        let mut cmd = mailsync(dir.path());
+        cmd.args(["--mode", "serve", "--detached", "--socket"])
+            .arg(&socket)
+            .stdin(Stdio::null());
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
+        let child = cmd.spawn().unwrap();
+        let d = Detached { dir, socket, child };
+        let deadline = Instant::now() + WAIT;
+        while !d.discovery().exists() {
+            assert!(Instant::now() < deadline, "no discovery file");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        d
+    }
+
+    fn discovery(&self) -> PathBuf {
+        self.dir.path().join("run").join("engine.json")
+    }
+
+    fn log(&self, id: &str) -> PathBuf {
+        self.dir.path().join(format!("mailsync-{id}.log"))
+    }
+
+    fn connect(&self) -> Client {
+        let c = Client::connect(&self.socket).unwrap();
+        c.set_read_timeout(Some(WAIT)).unwrap();
+        c
+    }
+
+    fn hello(&self) -> Client {
+        let mut c = self.connect();
+        c.hello("serve-test/1").unwrap();
+        c
+    }
+
+    /// `engine.shutdown` on the socket; checks the exit and stderr and returns stdout.
+    fn shutdown(mut self) -> String {
+        assert_eq!(
+            self.hello()
+                .call(method::ENGINE_SHUTDOWN, json!({}))
+                .unwrap(),
+            json!({})
+        );
+        let deadline = Instant::now() + WAIT;
+        let status = loop {
+            if let Some(s) = self.child.try_wait().unwrap() {
+                break s;
+            }
+            assert!(Instant::now() < deadline, "did not exit");
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        assert_eq!(status.code(), Some(0));
+        let mut stderr = String::new();
+        let mut stdout = String::new();
+        self.child
+            .stderr
+            .take()
+            .unwrap()
+            .read_to_string(&mut stderr)
+            .unwrap();
+        self.child
+            .stdout
+            .take()
+            .unwrap()
+            .read_to_string(&mut stdout)
+            .unwrap();
+        assert_eq!(stderr, "");
+        assert!(!self.discovery().exists());
+        stdout
+    }
+}
+
+impl Drop for Detached {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+fn add_on(c: &mut Client, account: Value) -> Result<Value, ClientError> {
+    c.call(
+        method::ACCOUNT_ADD,
+        json!({ "account": account, "identity": null }),
+    )
+}
+
 #[test]
 fn a_detached_engine_migrates_and_takes_parent_methods_on_the_socket() {
-    let dir = tempfile::tempdir().unwrap();
-    let socket = dir.path().join("s").join("e.sock");
-    // No `--mode migrate` first: serve migrates.
-    let mut child = mailsync(dir.path())
-        .args(["--mode", "serve", "--detached", "--socket"])
-        .arg(&socket)
-        .stdin(Stdio::null())
-        .spawn()
-        .unwrap();
-    let discovery = dir.path().join("run").join("engine.json");
-    let deadline = Instant::now() + WAIT;
-    while !discovery.exists() {
-        assert!(Instant::now() < deadline, "no discovery file");
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    let d: Value = serde_json::from_slice(&std::fs::read(&discovery).unwrap()).unwrap();
+    let e = Detached::start(&[]);
+    let d: Value = serde_json::from_slice(&std::fs::read(e.discovery()).unwrap()).unwrap();
     assert_eq!(d["detached"], true, "{d}");
-    let mut c = Client::connect(&socket).unwrap();
-    c.set_read_timeout(Some(WAIT)).unwrap();
+    let mut c = e.connect();
     let hello = c.hello("serve-test/1").unwrap();
     assert!(hello.detached, "{hello:?}");
 
-    let added = c
-        .call(
-            method::ACCOUNT_ADD,
-            json!({ "account": account(A), "identity": null }),
-        )
-        .unwrap();
+    let added = add_on(&mut c, account(A)).unwrap();
     assert_eq!(added["state"], "running", "{added}");
     let refused = c
         .call(
@@ -1445,30 +1525,327 @@ fn a_detached_engine_migrates_and_takes_parent_methods_on_the_socket() {
             json!({ "accounts": [], "secrets": {} }),
         )
         .unwrap_err();
-    let ClientError::Rpc(obj) = &refused else {
-        panic!("{refused:?}")
-    };
-    assert_eq!(obj.code, code::WRONG_CHANNEL);
-    assert_eq!(
-        c.call(method::ENGINE_SHUTDOWN, json!({})).unwrap(),
-        json!({})
+    assert_eq!(refused.code(), Some(code::WRONG_CHANNEL));
+    assert_eq!(e.shutdown(), "");
+}
+
+/// Stored secrets go only to the servers they were stored for: a client that names other
+/// servers without secrets is refused (docs/desktop-client-plan.md section 5).
+#[test]
+fn stored_secrets_are_not_sent_to_other_servers() {
+    let e = Detached::start(&[no_retry()]);
+    let mut c = e.hello();
+    let mut stored = account(A);
+    stored["settings"]["imap_password"] = json!("imap-s3cret");
+    stored["settings"]["smtp_password"] = json!("smtp-s3cret");
+    assert_eq!(add_on(&mut c, stored.clone()).unwrap()["stored"], true);
+
+    let attacker = TcpListener::bind("127.0.0.1:0").unwrap();
+    attacker.set_nonblocking(true).unwrap();
+    let port = attacker.local_addr().unwrap().port();
+    let mut bare = stored.clone();
+    for k in ["imap_password", "smtp_password"] {
+        bare["settings"].as_object_mut().unwrap().remove(k);
+    }
+    for (key, value) in [
+        ("imap_port", json!(port)),
+        ("smtp_port", json!(port)),
+        ("imap_username", json!("someone-else")),
+        ("imap_allow_insecure_ssl", json!(true)),
+    ] {
+        let mut redirected = bare.clone();
+        redirected["settings"][key] = value;
+        let refused = add_on(&mut c, redirected).unwrap_err();
+        assert_eq!(
+            refused.code(),
+            Some(code::INVALID_PARAMS),
+            "{key}: {refused:?}"
+        );
+    }
+    let mut provider = bare.clone();
+    provider["provider"] = json!("gmail");
+    let refused = add_on(&mut c, provider).unwrap_err();
+    assert_eq!(refused.code(), Some(code::INVALID_PARAMS));
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(
+        attacker.accept().is_err(),
+        "the engine connected to the new port"
     );
-    let deadline = Instant::now() + WAIT;
-    let status = loop {
-        if let Some(s) = child.try_wait().unwrap() {
-            break s;
-        }
-        assert!(Instant::now() < deadline, "did not exit");
-        std::thread::sleep(Duration::from_millis(50));
-    };
-    assert_eq!(status.code(), Some(0));
-    let mut stderr = String::new();
-    child
-        .stderr
-        .take()
+
+    // The registration is unchanged; the same servers, a port as a string, still match.
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(list["accounts"][0]["account"]["settings"]["imap_port"], 1);
+    let mut same = bare.clone();
+    same["settings"]["imap_port"] = json!("1");
+    assert_eq!(add_on(&mut c, same).unwrap()["stored"], true);
+
+    // With new secrets the new servers replace the old ones and their stored secrets.
+    let mut moved = stored.clone();
+    moved["settings"]["smtp_host"] = json!("localhost");
+    moved["settings"]["smtp_password"] = json!("new-s3cret");
+    moved["settings"]
+        .as_object_mut()
         .unwrap()
-        .read_to_string(&mut stderr)
+        .remove("imap_password");
+    let refused = add_on(&mut c, moved.clone()).unwrap_err();
+    assert_eq!(refused.code(), Some(code::INVALID_PARAMS), "{refused:?}");
+    moved["settings"]["imap_password"] = json!("new-s3cret");
+    add_on(&mut c, moved).unwrap();
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(
+        list["accounts"][0]["account"]["settings"]["smtp_host"],
+        "localhost"
+    );
+    let mut back = bare.clone();
+    back["settings"]["smtp_host"] = json!("localhost");
+    let again = add_on(&mut c, back).unwrap_err();
+    assert_eq!(again.code(), Some(code::ACCOUNT_EXISTS), "{again:?}");
+    e.shutdown();
+}
+
+/// A detached engine has no parent: a rotated token it can't store stays in memory and never
+/// reaches stdout, which is a terminal or a service log.
+#[test]
+fn a_detached_engine_writes_no_secrets_to_stdout() {
+    let (url, _) = token_server();
+    let e = Detached::start(&[
+        ("MAILSYNC_GOOGLE_TOKEN_URL", url),
+        ("TERN_ENGINE_SECRET_STORE", "none".to_owned()),
+        no_retry(),
+    ]);
+    let mut c = e.hello();
+    let added = add_on(&mut c, oauth_account(A)).unwrap();
+    assert_eq!(added["stored"], false, "{added}");
+    let log = wait_for_log(
+        &e.log(A),
+        "The rotated refresh token of .* is kept until the engine stops",
+    );
+    assert!(!log.contains("s3cret"), "{log}");
+    assert_eq!(e.shutdown(), "");
+}
+
+/// The slow parent methods run on the workers' lanes on a detached engine's socket too: a
+/// panic in `account.test` is answered as an error, and the connection and engine go on.
+#[test]
+fn a_panic_in_account_test_on_a_detached_socket_is_answered() {
+    let e = Detached::start(&[]);
+    let mut c = e.hello();
+    let mut panics = account(A);
+    panics["settings"]["tern_test_panic"] = json!(true);
+    let refused = c
+        .call(method::ACCOUNT_TEST, json!({ "account": panics }))
+        .unwrap_err();
+    assert_eq!(refused.code(), Some(code::INTERNAL_ERROR), "{refused:?}");
+    let tested = c
+        .call(method::ACCOUNT_TEST, json!({ "account": account(B) }))
         .unwrap();
-    assert_eq!(stderr, "");
-    assert!(!discovery.exists());
+    assert!(tested.is_object(), "{tested}");
+    assert_eq!(add_on(&mut c, account(A)).unwrap()["state"], "running");
+    // A's log isn't open while it is only tested, so the line is in the engine's.
+    let log = wait_for_log(
+        &e.dir.path().join("engine.log"),
+        r"(?s)\[error\] Unhandled panic on thread accountTest: .*tern_test_panic in account.test",
+    );
+    assert!(!log.contains("[critical]"), "{log}");
+    e.shutdown();
+}
+
+fn relayed(c: &mut Client, scopes: Value) {
+    c.call(
+        method::HELLO,
+        json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+                "scopes": scopes, "device": { "id": "d1", "name": "Test browser" } }),
+    )
+    .unwrap();
+}
+
+/// A relayed connection is a remote device, so a detached engine's socket keeps its parent
+/// methods from it, admin scope or not.
+#[test]
+fn a_detached_engine_refuses_parent_methods_on_relayed_connections() {
+    let e = Detached::start(&[]);
+    assert_eq!(
+        add_on(&mut e.hello(), account(B)).unwrap()["state"],
+        "running"
+    );
+    for scopes in [json!([]), json!(["admin"])] {
+        let mut r = e.connect();
+        relayed(&mut r, scopes.clone());
+        let calls = [
+            (
+                method::ACCOUNT_ADD,
+                json!({ "account": account(A), "identity": null }),
+            ),
+            (method::ACCOUNT_REMOVE, json!({ "accountId": B })),
+            (method::ACCOUNT_TEST, json!({ "account": account(A) })),
+            (method::ACCOUNT_RESET, json!({ "accountId": B })),
+            (method::ENGINE_RESET_DATABASE, json!({})),
+            (method::ENGINE_SET_LOG_LEVEL, json!({ "verboseUntil": 0 })),
+            (method::ENGINE_SHUTDOWN, json!({})),
+            (
+                method::CREDENTIALS_IMPORT,
+                json!({ "accounts": [], "secrets": {} }),
+            ),
+        ];
+        for (name, params) in calls {
+            let refused = r.call(name, params).unwrap_err();
+            assert_eq!(
+                refused.code(),
+                Some(code::FORBIDDEN_RELAYED),
+                "{name} with {scopes}: {refused:?}"
+            );
+        }
+    }
+    let list = e.hello().call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(states(&list), running(&[B]));
+    e.shutdown();
+}
+
+/// A relayed connection sees each account's public fields only, in `account.list` and in
+/// `account.changed`.
+#[test]
+fn relayed_connections_get_public_account_fields_only() {
+    let mut e = Serve::start();
+    let mut r = Client::connect(&e.socket).unwrap();
+    r.set_read_timeout(Some(WAIT)).unwrap();
+    relayed(&mut r, json!(["admin"]));
+    r.subscribe(&SubscribeParams::default()).unwrap();
+    let mut local = e.hello();
+    local.subscribe(&SubscribeParams::default()).unwrap();
+
+    let mut full = account(A);
+    full["settings"]["container_folder"] = json!("Private");
+    full["settings"]["refresh_client_id"] = json!("cid");
+    full["internalNote"] = json!("x");
+    e.parent.add(full);
+    let public_keys = |account: &Value| {
+        for key in account.as_object().unwrap().keys() {
+            assert!(
+                [
+                    "id",
+                    "name",
+                    "emailAddress",
+                    "provider",
+                    "label",
+                    "aliases",
+                    "defaultAlias",
+                    "color",
+                    "settings"
+                ]
+                .contains(&key.as_str()),
+                "{key} in {account}"
+            );
+        }
+        for key in account["settings"].as_object().unwrap().keys() {
+            assert!(
+                [
+                    "imap_host",
+                    "imap_port",
+                    "imap_username",
+                    "imap_security",
+                    "smtp_host",
+                    "smtp_port",
+                    "smtp_username",
+                    "smtp_security"
+                ]
+                .contains(&key.as_str()),
+                "{key} in {account}"
+            );
+        }
+        assert_eq!(account["settings"]["imap_host"], "127.0.0.1");
+    };
+    let changed = next_matching(&mut r, |v| v["method"] == method::ACCOUNT_CHANGED);
+    public_keys(&changed["params"]["account"]);
+    let list = r.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    public_keys(&list["accounts"][0]["account"]);
+    let status = r.call(method::ENGINE_STATUS, Value::Null).unwrap();
+    public_keys(&status["accounts"][0]["account"]);
+
+    let changed = next_matching(&mut local, |v| v["method"] == method::ACCOUNT_CHANGED);
+    assert_eq!(changed["params"]["account"]["internalNote"], "x");
+    assert_eq!(
+        changed["params"]["account"]["settings"]["container_folder"],
+        "Private"
+    );
+    assert!(changed["params"]["account"]["settings"]
+        .get("imap_password")
+        .is_none());
+    e.stop();
+}
+
+/// An IMAP server that refuses every LOGIN; the number of LOGINs it got.
+fn refusing_imap_server() -> (u16, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let logins = std::sync::Arc::new(AtomicUsize::new(0));
+    let seen = logins.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let seen = seen.clone();
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let _ = stream.write_all(b"* OK [CAPABILITY IMAP4rev1] ready\r\n");
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                        return;
+                    }
+                    let mut words = line.split_whitespace();
+                    let tag = words.next().unwrap_or("*").to_owned();
+                    let command = words.next().unwrap_or("").to_ascii_uppercase();
+                    let reply = match command.as_str() {
+                        "CAPABILITY" => format!("* CAPABILITY IMAP4rev1\r\n{tag} OK done\r\n"),
+                        "LOGIN" | "AUTHENTICATE" => {
+                            seen.fetch_add(1, Ordering::SeqCst);
+                            format!("{tag} NO [AUTHENTICATIONFAILED] Invalid credentials\r\n")
+                        }
+                        "LOGOUT" => {
+                            let _ = write!(stream, "* BYE\r\n{tag} OK done\r\n");
+                            return;
+                        }
+                        _ => format!("{tag} OK done\r\n"),
+                    };
+                    if stream.write_all(reply.as_bytes()).is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    (port, logins)
+}
+
+/// Refused credentials stop the account with `authFailed` and no retry, whatever the restart
+/// delay; only `account.add` runs it again.
+#[test]
+fn an_auth_failure_stops_the_account_until_it_is_added_again() {
+    use std::sync::atomic::Ordering;
+    let (port, logins) = refusing_imap_server();
+    let mut e = Serve::start_with(true, &[("TERN_ENGINE_RESTART_DELAY_MS", "100".to_owned())]);
+    let mut refused = account(A);
+    refused["settings"]["imap_port"] = json!(port);
+    let mut sub = e.hello();
+    sub.subscribe(&SubscribeParams::default()).unwrap();
+    e.parent.add(refused.clone());
+    let stopped = next_matching(&mut sub, |v| is_state(v, A, "stopped"));
+    assert_eq!(stopped["params"]["authFailed"], true, "{stopped}");
+    assert!(stopped["params"].get("retryAt").is_none(), "{stopped}");
+    assert_eq!(stopped["params"]["error"]["key"], "ErrorAuthentication");
+    let after_stop = logins.load(Ordering::SeqCst);
+    assert!(after_stop >= 1);
+
+    // Retries would have come every 100 ms or so.
+    std::thread::sleep(Duration::from_millis(1500));
+    assert_eq!(logins.load(Ordering::SeqCst), after_stop);
+    let list = e.hello().call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(states(&list), [(A.to_owned(), "stopped".to_owned())]);
+    assert_eq!(list["accounts"][0]["authFailed"], true, "{list}");
+
+    e.parent.add(refused);
+    let stopped = next_matching(&mut sub, |v| is_state(v, A, "stopped"));
+    assert_eq!(stopped["params"]["authFailed"], true, "{stopped}");
+    assert!(logins.load(Ordering::SeqCst) > after_stop);
+    e.stop();
 }

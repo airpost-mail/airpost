@@ -610,9 +610,24 @@ pub trait Accounts: Send + Sync {
     }
     /// A parent method made on the socket of a local connection: `Some` when this engine
     /// takes it there (a detached `serve`).
-    fn socket_parent_call(&self, _req: &RpcRequest) -> Option<Reply> {
+    fn socket_parent_call(&self, _req: &RpcRequest) -> Option<SocketParentCall> {
         None
     }
+}
+
+/// A job for a worker lane: the lane, the account it logs for, and the work.
+pub type SocketJob = (
+    &'static Lane,
+    Option<Arc<str>>,
+    Box<dyn FnOnce() -> Reply + Send>,
+);
+
+/// How a detached engine answers a parent method on its socket.
+pub enum SocketParentCall {
+    Now(Reply),
+    /// Run on the lane's workers and answered when done, out of order with the
+    /// connection's later requests.
+    Later(SocketJob),
 }
 
 pub fn unknown_account(account_id: &str) -> ErrorObject {
@@ -1344,11 +1359,18 @@ impl Connection {
             }
             name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
                 if self.relay.is_none() {
-                    if let Some(r) = self.session.server.accounts.socket_parent_call(&req) {
-                        return req.id.map(|id| match r {
-                            Ok(v) => Response::ok(Some(id), v),
-                            Err(e) => Response::err(Some(id), e),
-                        });
+                    match self.session.server.accounts.socket_parent_call(&req) {
+                        Some(SocketParentCall::Now(r)) => {
+                            return req.id.map(|id| match r {
+                                Ok(v) => Response::ok(Some(id), v),
+                                Err(e) => Response::err(Some(id), e),
+                            });
+                        }
+                        Some(SocketParentCall::Later((lane, account, work))) => {
+                            self.answer_later_for(lane, account, req.id, work);
+                            return None;
+                        }
+                        None => {}
                     }
                 }
                 Err(ErrorObject::new(
@@ -1385,10 +1407,21 @@ impl Connection {
         id: Option<ms_ipc::Id>,
         work: Box<dyn FnOnce() -> Reply + Send>,
     ) {
+        self.answer_later_for(lane, None, id, work);
+    }
+
+    /// [`Connection::answer_later`] for a job that logs to `account`'s log.
+    fn answer_later_for(
+        &self,
+        lane: &'static Lane,
+        account: Option<Arc<str>>,
+        id: Option<ms_ipc::Id>,
+        work: Box<dyn FnOnce() -> Reply + Send>,
+    ) {
         let conn = self.id;
         let outbox = self.outbox.clone();
         let hub = self.session.server.hub.clone();
-        lane.submit(None, work, move |result| {
+        lane.submit(account, work, move |result| {
             let Some(id) = id else {
                 return;
             };
