@@ -123,6 +123,15 @@ MAILSYNC_TRANSPORT=serve python3 -m pytest test           # quick tier on one se
 MAILSYNC_TRANSPORT=serve python3 -m pytest test --all
 ```
 
+### Clients of the engine
+
+`test_cli.py` (the `tern` CLI), `test_mcp.py` (tern-mcp) and `test_gateway.py` (tern-gateway,
+with a stdlib WebSocket client playing the browser) run their client against an engine on
+the fake IMAP server, whatever the transport (the gateway's engine is always `serve`). The
+binaries come from `TERN_BIN`, `TERN_MCP_BIN` and `TERN_GATEWAY_BIN`, else the newer of
+`target/release/` and `target/debug/`; without one the module skips, unless `CI` or
+`REQUIRE_TERN` (`REQUIRE_TERN_MCP` for tern-mcp) is set.
+
 ### Several accounts
 
 A scenario can hold more accounts than its own (`multi-account-*`). They share its config
