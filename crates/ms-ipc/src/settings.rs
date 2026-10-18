@@ -65,6 +65,16 @@ pub const SETTINGS_KEYS: &[(&str, SettingKind)] = &[
     ("core.integrations.translation", SettingKind::Object),
     ("core.integrations.grammar", SettingKind::Object),
     ("core.integrations.enrichment", SettingKind::Object),
+    // The AI settings (docs/ai-plan.md A4), never a key: the providers
+    // (`[{id, kind, name?, url?, model, contextTokens?, maxOutputTokens?}]`), the features
+    // (`{summary|reply|triage: {enabled, provider?}}`), the account ids opted in, the limits
+    // (`{triagePerHour?, dailyTokens?: {<providerId>: n}}`) and "Include email addresses".
+    // A relayed connection may read them but never write them (`policy`).
+    ("core.ai.providers", SettingKind::Array),
+    ("core.ai.features", SettingKind::Object),
+    ("core.ai.accounts", SettingKind::Array),
+    ("core.ai.limits", SettingKind::Object),
+    ("core.ai.includeAddresses", SettingKind::Bool),
 ];
 
 pub fn setting_kind(key: &str) -> Option<SettingKind> {

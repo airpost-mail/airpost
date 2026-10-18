@@ -258,6 +258,10 @@ pub mod feature {
     /// the restart policy (`retryAt`, `authFailed`), `credentials.import`,
     /// `account.changed`, and `credentials`, `build` and `detached` in `hello`.
     pub const ACCOUNTS: &str = "accounts";
+    /// Triage (docs/ai-plan.md section 4): the per-account triage of new inbox mail,
+    /// `ai.triage.run`, `ai.triage.list`, `ai.triage.progress`, `capabilities.ai.triage`, and
+    /// the `core.ai.*` settings keys.
+    pub const AI_TRIAGE: &str = "ai-triage";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`

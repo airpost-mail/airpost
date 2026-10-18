@@ -153,9 +153,20 @@ pub const RELAYED_SETTINGS_KEYS: &[&str] = &[
     "defaultSignatures",
 ];
 
+/// Settings no relayed device may write, admin scope or not: the AI providers would make the
+/// engine send mail to any URL a remote device names, and the switches would opt accounts in
+/// (docs/ai-plan.md section 3, as for the `config` and `settings` params).
+pub const LOCAL_ONLY_SETTINGS_PREFIX: &str = "core.ai.";
+
 /// Whether a relayed device with `scopes` may write every key of `values` (the
 /// `settings.set` params' `values`).
 pub fn relayed_settings_allowed(values: &Map<String, Value>, scopes: &[String]) -> bool {
+    if values
+        .keys()
+        .any(|k| k.starts_with(LOCAL_ONLY_SETTINGS_PREFIX))
+    {
+        return false;
+    }
     is_admin(scopes)
         || values
             .keys()
@@ -423,6 +434,13 @@ mod tests {
         assert!(relayed_request_allowed("settings.set", &undo, &[]));
         assert!(!relayed_request_allowed("settings.set", &json!({}), &[]));
         assert!(relayed_request_allowed("settings.get", &json!({}), &[]));
+        for key in ["core.ai.providers", "core.ai.accounts", "core.ai.features"] {
+            let p = set(json!({ key: [] }));
+            assert!(
+                !relayed_request_allowed("settings.set", &p, &admin),
+                "{key}"
+            );
+        }
         let task = json!({"task": {"__cls": "GetManyRFC2822Task"}});
         assert!(!relayed_request_allowed("task.queue", &task, &[]));
         assert!(!relayed_request_allowed("secrets.set", &json!({}), &[]));

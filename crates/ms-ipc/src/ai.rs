@@ -157,6 +157,68 @@ impl std::fmt::Debug for AiDeltaParams {
     }
 }
 
+/// `ai.triage.run`: the threads to triage, by id or as the inbox threads of the last
+/// `sinceDays` days; at most [`AI_TRIAGE_RUN_MAX`] either way. The provider is the one the
+/// engine keeps for triage unless the call names one (`provider`) or, from a local client,
+/// carries one with its key (`config`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageRunParams {
+    pub account_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_ids: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since_days: Option<u32>,
+    #[serde(flatten)]
+    pub provider: AiProviderParams,
+}
+
+/// The most threads one `ai.triage.run` queues.
+pub const AI_TRIAGE_RUN_MAX: usize = 200;
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageRunResult {
+    /// Named by `ai.triage.progress` and `ai.cancel {jobId}`.
+    pub job_id: String,
+    /// How many threads the job holds.
+    pub queued: usize,
+}
+
+/// `ai.triage.progress`, to the connection that called `ai.triage.run`: `done` of `total`
+/// threads handled, triaged or skipped. The last one has `done == total`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageProgressParams {
+    pub job_id: String,
+    pub done: usize,
+    pub total: usize,
+}
+
+/// `ai.triage.list`: the opted-in accounts' inbox threads with a triage result, newest
+/// first. `category` is one of the triage categories; `needs-reply` also takes threads whose
+/// result says `needsReply` under another category.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageListParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_ids: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// At most [`READ_MAX_LIMIT`](crate::READ_MAX_LIMIT).
+    pub limit: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<usize>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTriageListResult {
+    pub thread_ids: Vec<String>,
+    /// Every match, not just this page.
+    pub total: usize,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AiUsageParams {
     /// 30 when absent.
@@ -213,6 +275,29 @@ mod tests {
                 .unwrap();
         assert_eq!(p.provider.provider.as_deref(), Some("p"));
         assert!(serde_json::from_value::<AiSummarizeParams>(json!({"accountId": "a1"})).is_err());
+    }
+
+    #[test]
+    fn triage_shapes() {
+        let p: AiTriageRunParams =
+            serde_json::from_value(json!({"accountId": "a1", "sinceDays": 7})).unwrap();
+        assert_eq!((p.since_days, p.thread_ids), (Some(7), None));
+        assert!(p.provider.config.is_none());
+        let r = AiTriageRunResult {
+            job_id: "j".into(),
+            queued: 3,
+        };
+        assert_eq!(
+            serde_json::to_value(r).unwrap(),
+            json!({"jobId": "j", "queued": 3})
+        );
+        let l: AiTriageListParams =
+            serde_json::from_value(json!({"category": "needs-reply", "limit": 50})).unwrap();
+        assert_eq!((l.limit, l.offset, l.account_ids), (50, None, None));
+        assert_eq!(
+            serde_json::to_value(AiTriageListResult::default()).unwrap(),
+            json!({"threadIds": [], "total": 0})
+        );
     }
 
     #[test]

@@ -36,6 +36,13 @@ pub mod capability_reason {
     pub const MISSING_URL: &str = "missing-url";
     /// Only a Tern server offers it, and none is connected.
     pub const NEEDS_TERN_SERVER: &str = "needs-tern-server";
+    /// AI triage: the provider needs an API key and the engine holds none yet (keys go with
+    /// each request until desktop-client-plan stage 11; Ollama needs none).
+    pub const NEEDS_ENGINE_KEY: &str = "needs-engine-key";
+    /// AI triage: the provider is rate limiting; triage waits and resumes by itself.
+    pub const RATE_LIMITED: &str = "rate-limited";
+    /// AI triage: the provider's quota or the daily token cap is used up.
+    pub const QUOTA_EXCEEDED: &str = "quota-exceeded";
 }
 
 /// [`Capability::credentials`]: the client sends the provider's key with each request (in
