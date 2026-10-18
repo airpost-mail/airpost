@@ -16,6 +16,14 @@ import {
 import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
 import { ChangeSet } from './changes';
+import {
+  THREAD_SNOOZE,
+  chooseUnsubscribe,
+  parseMailto,
+  snoozeTasks,
+  unsnoozeTasks,
+  unsubscribeSendTask,
+} from './mail-actions';
 import { runQuery } from './query';
 import { MockStore } from './store';
 
@@ -24,7 +32,19 @@ export const MOCK_FEATURES: readonly string[] = [
   EngineFeature.Query,
   EngineFeature.SearchGrammar,
   EngineFeature.Files,
+  EngineFeature.Snooze,
+  EngineFeature.Unsubscribe,
 ];
+
+/** Methods an engine has only when it announces the feature. */
+const METHOD_FEATURE: Partial<Record<RpcMethodName, string>> = {
+  query: EngineFeature.Query,
+  'threads.snooze': EngineFeature.Snooze,
+  'threads.unsnooze': EngineFeature.Snooze,
+  'messages.unsubscribe': EngineFeature.Unsubscribe,
+};
+
+const UNSUBSCRIBE_METHODS: readonly string[] = ['one-click', 'mailto', 'web'];
 
 export interface MockEngineOptions {
   /** `hello.features`; `[]` stands in for an engine without `query`. */
@@ -157,7 +177,8 @@ export class MockEngine implements EngineClient {
     }
     await this.delay();
     const handler = this.handlers[method] as ((p: unknown) => RpcResult<M>) | undefined;
-    if (!handler || (method === 'query' && !this.announced.includes(EngineFeature.Query))) {
+    const needs = METHOD_FEATURE[method];
+    if (!handler || (needs && !this.announced.includes(needs))) {
       throw new RpcError({
         code: RpcErrorCode.MethodNotFound,
         message: `unknown method ${method}`,
@@ -295,7 +316,7 @@ export class MockEngine implements EngineClient {
       return [...s.messages.values()].find((m) => m.draft && m.hMsgId === task.headerMessageId);
     }
     if (task.__cls === 'SyncbackMetadataTask') {
-      return task.modelClassName === 'Thread'
+      return task.modelClassName.toLowerCase() === 'thread'
         ? s.threads.get(task.modelId)
         : s.messages.get(task.modelId);
     }
@@ -337,6 +358,63 @@ export class MockEngine implements EngineClient {
         } as Delta);
       }, ms),
     );
+  }
+
+  /** Queues `planned` in order and returns their ids. */
+  private queueAll(accountId: string, planned: TaskJSON[]): { taskIds: string[] } {
+    return { taskIds: planned.map((t) => this.queueTask(accountId, t).id) };
+  }
+
+  /**
+   * Brings a snoozed thread back at `until` if its snooze is still that one, as the
+   * engine's expiration executor does.
+   */
+  private watchSnooze(accountId: string, threadIds: string[], until: number) {
+    for (const id of threadIds) {
+      const key = `snooze:${id}`;
+      clearTimeout(this.expiryTimers.get(key));
+      const ms = Math.min(Math.max(0, until * 1000 - Date.now()), 2 ** 31 - 1);
+      this.expiryTimers.set(
+        key,
+        setTimeout(() => {
+          this.expiryTimers.delete(key);
+          const t = this.store.threads.get(id);
+          const entry = t?.metadata?.find((m) => m.pluginId === THREAD_SNOOZE);
+          const exp = (entry?.value as { expiration?: unknown } | null)?.expiration;
+          if (!t || exp !== until) return;
+          this.queueAll(accountId, unsnoozeTasks(this.store, accountId, [id]));
+        }, ms),
+      );
+    }
+  }
+
+  private unsubscribe(p: RpcMethods['messages.unsubscribe']['params']) {
+    const accountId = this.requireAccount(p.accountId);
+    if (p.method !== undefined && !UNSUBSCRIBE_METHODS.includes(p.method)) {
+      throw new RpcError({
+        code: RpcErrorCode.InvalidParams,
+        message: 'invalid params: method must be one of one-click, mailto and web',
+      });
+    }
+    const m = this.store.messages.get(p.messageId);
+    if (!m || m.aid !== accountId) {
+      throw new RpcError({ code: RpcErrorCode.NotFound, message: `no message ${p.messageId}` });
+    }
+    const chosen = chooseUnsubscribe(m.hListUnsub, m.hListUnsubPost, p.method);
+    if (!chosen) {
+      throw new RpcError({
+        code: RpcErrorCode.NotFound,
+        message: `message ${m.id} has no ${p.method ?? 'unsubscribe link'} in a List-Unsubscribe header`,
+      });
+    }
+    const { method, url } = chosen;
+    if (method !== 'mailto') return { method, ok: true, url };
+    try {
+      const task = unsubscribeSendTask(this.store.account(accountId)!, m, parseMailto(url));
+      return { method, ok: true, url, taskId: this.queueTask(accountId, task).id };
+    } catch (e) {
+      return { method, ok: false, url, error: (e as Error).message };
+    }
   }
 
   private buildHandlers(): Handlers {
@@ -492,6 +570,17 @@ export class MockEngine implements EngineClient {
           account: redactAccount(a),
         })),
       }),
+      'threads.snooze': (p) => {
+        const accountId = this.requireAccount(p.accountId);
+        const result = this.queueAll(accountId, snoozeTasks(s, accountId, p.threadIds, p.until));
+        this.watchSnooze(accountId, p.threadIds, p.until);
+        return result;
+      },
+      'threads.unsnooze': (p) => {
+        const accountId = this.requireAccount(p.accountId);
+        return this.queueAll(accountId, unsnoozeTasks(s, accountId, p.threadIds));
+      },
+      'messages.unsubscribe': (p) => this.unsubscribe(p),
       'integrations.translate': () => notImplemented('integrations.translate'),
       'integrations.grammar': () => notImplemented('integrations.grammar'),
       'integrations.enrich': () => notImplemented('integrations.enrich'),

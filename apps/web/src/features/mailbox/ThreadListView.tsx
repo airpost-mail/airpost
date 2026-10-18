@@ -123,9 +123,9 @@ export function ThreadListView({ accountId, folderId }: { accountId: string; fol
   };
   const removing = (fn: (ts: ThreadJSON[]) => void) => () => removeThreads(fn, targets());
   useEffect(() =>
-    registerListRemover((action, ts) =>
+    registerListRemover((remove, ts) =>
       removeThreads(
-        actions[action],
+        remove,
         ts.map((t) => byId.get(t.id) ?? t),
       ),
     ),

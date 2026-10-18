@@ -113,6 +113,10 @@ export const EngineFeature = {
   SearchGrammar: 'search-grammar',
   /** `files.*` (DCP stage 16): the gateway's file routes work. */
   Files: 'files',
+  /** `threads.snooze` and `threads.unsnooze` (DCP stage 15). */
+  Snooze: 'snooze',
+  /** `messages.unsubscribe` (DCP stage 15). */
+  Unsubscribe: 'unsubscribe',
 } as const;
 
 /** ms-ipc `EngineStatusResult`. */
@@ -318,6 +322,54 @@ export interface QueryResult<T = unknown> {
   nextCursor?: string | null;
 }
 
+// Mail actions, as in crates/ms-ipc/src/mail.rs.
+
+/**
+ * `threads.snooze`: the threads move to Snoozed and get the `thread-snooze` metadata that
+ * brings them back at `until` (unix seconds, in the future), as the desktop's snooze does.
+ */
+export interface ThreadsSnoozeParams {
+  accountId: string;
+  threadIds: string[];
+  until: number;
+}
+
+/** `threads.unsnooze`: the snooze cleared, and what is still in Snoozed moved to the inbox. */
+export interface ThreadsUnsnoozeParams {
+  accountId: string;
+  threadIds: string[];
+}
+
+/** The tasks queued, the move first; their local phases have run. */
+export interface ThreadsSnoozeResult {
+  taskIds: string[];
+}
+
+export type UnsubscribeMethod = 'one-click' | 'mailto' | 'web';
+
+/**
+ * `messages.unsubscribe`: acts on the message's `List-Unsubscribe` header. Without `method`
+ * the engine picks one-click when offered, else mailto, else web; a method the header
+ * doesn't offer, or no header, is `NotFound`. Links found only in the body are the client's.
+ */
+export interface MessagesUnsubscribeParams {
+  accountId: string;
+  messageId: string;
+  method?: UnsubscribeMethod;
+}
+
+/**
+ * one-click: `ok` when the list's server answered 2xx (the engine made the POST). mailto:
+ * `ok` when the message is queued (`taskId`). web: always `ok`; the client opens `url`.
+ */
+export interface MessagesUnsubscribeResult {
+  method: UnsubscribeMethod;
+  ok: boolean;
+  url?: string;
+  error?: string;
+  taskId?: string;
+}
+
 export interface AccountTestResult {
   ok: boolean;
   error?: string;
@@ -352,6 +404,15 @@ export interface RpcMethods {
   'contacts.search': { params: ContactsSearchParams; result: ContactsSearchResult };
   /** Only on engines with `EngineFeature.Query`. */
   query: { params: QueryParams; result: QueryResult };
+
+  /** Only on engines with `EngineFeature.Snooze`. */
+  'threads.snooze': { params: ThreadsSnoozeParams; result: ThreadsSnoozeResult };
+  'threads.unsnooze': { params: ThreadsUnsnoozeParams; result: ThreadsSnoozeResult };
+  /** Only on engines with `EngineFeature.Unsubscribe`. */
+  'messages.unsubscribe': {
+    params: MessagesUnsubscribeParams;
+    result: MessagesUnsubscribeResult;
+  };
 
   // Phase C.
   'account.add': {

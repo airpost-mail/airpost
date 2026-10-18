@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-router';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   EngineProvider,
@@ -38,8 +38,9 @@ function Composers() {
 async function setup(
   pick: (t: ThreadJSON) => boolean,
   before?: (engine: MockEngine, target: ThreadJSON) => Promise<void>,
+  opts: { features?: string[] } = {},
 ) {
-  const engine = new MockEngine({ latency: 0 });
+  const engine = new MockEngine({ latency: 0, features: opts.features });
   await engine.connect();
   const { threads: items } = await engine.call('threads.list', {
     accountId: G,
@@ -84,7 +85,7 @@ async function setup(
       </EngineProvider>
     </QueryClientProvider>,
   );
-  return { target, queued };
+  return { target, queued, engine };
 }
 
 const messageCount = (t: ThreadJSON) =>
@@ -119,7 +120,10 @@ describe('ThreadReaderView', () => {
     await setup((t) => t.unread === 0 && messageCount(t) >= 2);
     const articles = await screen.findAllByRole('article');
     expect(articles).toHaveLength(1);
-    const collapsed = screen.getAllByRole('button', { expanded: false });
+    // Menu triggers (Snooze) are collapsed buttons too.
+    const collapsed = screen
+      .getAllByRole('button', { expanded: false })
+      .filter((b) => !b.hasAttribute('aria-haspopup'));
     await user.click(collapsed[0]);
     expect(screen.getAllByRole('article')).toHaveLength(2);
   });
@@ -160,5 +164,65 @@ describe('ThreadReaderView', () => {
     expect(await within(region).findByText('Half-written reply')).toBeInTheDocument();
     // Shown as the composer, not also as a message in the list above it.
     expect(screen.queryAllByText('Half-written reply')).toHaveLength(1);
+  });
+
+  const inInbox = (t: ThreadJSON) => t.unread === 0 && t.labels.some((l) => l.role === 'inbox');
+
+  it('snoozes through the engine from the menu', async () => {
+    const user = userEvent.setup();
+    const { target, queued } = await setup(inInbox);
+    await screen.findAllByRole('article');
+    await user.click(screen.getByRole('button', { name: 'Snooze' }));
+    await user.click(await screen.findByRole('menuitem', { name: /^Tomorrow/ }));
+    await waitFor(() =>
+      expect(
+        queued.some(
+          (t) =>
+            t.__cls === 'ChangeLabelsTask' &&
+            t.threadIds.includes(target.id) &&
+            t.labelsToAdd.some((l) => l.role === 'snoozed'),
+        ),
+      ).toBe(true),
+    );
+    const meta = queued.find((t) => t.__cls === 'SyncbackMetadataTask' && t.modelId === target.id);
+    expect(meta).toMatchObject({ pluginId: 'thread-snooze', modelClassName: 'thread' });
+  });
+
+  it('has no snooze or unsubscribe on an engine without them', async () => {
+    await setup(
+      inInbox,
+      async (engine, target) => {
+        const last = engine.store.threadMessages(target.id).at(-1)!;
+        last.hListUnsub = '<https://lists.example/u>';
+      },
+      { features: ['query', 'files'] },
+    );
+    await screen.findAllByRole('article');
+    expect(screen.queryByRole('button', { name: 'Snooze' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Unsubscribe' })).toBeNull();
+  });
+
+  it('unsubscribes through the engine', async () => {
+    const user = userEvent.setup();
+    const { engine, target } = await setup(inInbox, async (engine, target) => {
+      const last = engine.store.threadMessages(target.id).at(-1)!;
+      last.hListUnsub = '<https://lists.example/u/9>';
+      last.hListUnsubPost = 'List-Unsubscribe=One-Click';
+    });
+    const call = vi.spyOn(engine, 'call');
+    await user.click(await screen.findByRole('button', { name: 'Unsubscribe' }));
+    const last = engine.store.threadMessages(target.id).at(-1)!;
+    await waitFor(() =>
+      expect(call).toHaveBeenCalledWith('messages.unsubscribe', {
+        accountId: G,
+        messageId: last.id,
+      }),
+    );
+    const r = call.mock.results[call.mock.calls.findIndex((c) => c[0] === 'messages.unsubscribe')];
+    await expect(r!.value).resolves.toEqual({
+      method: 'one-click',
+      ok: true,
+      url: 'https://lists.example/u/9',
+    });
   });
 });

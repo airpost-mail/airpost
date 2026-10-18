@@ -2,6 +2,7 @@ import { Forward, PenLine, Reply, ReplyAll } from 'lucide-react';
 import { useCallback } from 'react';
 import { MessageBody } from '@/components/email';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   contactDisplayName,
@@ -16,6 +17,7 @@ import { ActionButton } from '../ActionButton';
 import { AttachmentList } from './AttachmentList';
 import { listedAttachments } from './attachments';
 import { compose } from './compose';
+import { useUnsubscribe } from './unsubscribe';
 
 function Initials({ contact }: { contact?: ContactRef }) {
   return (
@@ -46,6 +48,7 @@ export function MessageItem({
   own: ReadonlySet<string>;
 }) {
   const engine = useEngine();
+  const unsubscribe = useUnsubscribe(m);
   const from = m.from[0];
   const resolveCid = useCallback(
     (cid: string) => {
@@ -105,6 +108,17 @@ export function MessageItem({
             </span>
           )}
         </button>
+        {unsubscribe.available && (
+          <Button
+            variant="outline"
+            size="xs"
+            disabled={unsubscribe.busy}
+            onClick={() => void unsubscribe.run()}
+            className="shrink-0 text-muted-foreground"
+          >
+            Unsubscribe
+          </Button>
+        )}
         <time
           dateTime={new Date(m.date * 1000).toISOString()}
           className="mt-0.5 shrink-0 font-mono text-2xs text-muted-foreground tabular"

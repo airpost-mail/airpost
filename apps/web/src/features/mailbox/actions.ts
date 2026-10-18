@@ -7,6 +7,9 @@ import { toast } from 'sonner';
 import {
   categoryDisplayName,
   engineKeys,
+  ensureConnected,
+  RpcError,
+  useEngine,
   isGmailAccount,
   tasks,
   threadInCategory,
@@ -20,6 +23,7 @@ import {
   type TaskJSON,
   type ThreadJSON,
 } from '@/engine';
+import { formatSnooze } from './snooze';
 
 const isFolder = (c: CategoryJSON): c is FolderJSON => c.__cls === 'Folder';
 const isLabel = (c: CategoryJSON): c is LabelJSON => c.__cls === 'Label';
@@ -45,11 +49,19 @@ export interface ThreadActions {
   /** Adds the label, or removes it when every thread already has it. */
   toggleLabel(threads: ThreadJSON[], label: LabelJSON): void;
   removeLabel(threads: ThreadJSON[], label: LabelJSON): void;
+  /**
+   * The engine's `threads.snooze`: the move to Snoozed and the metadata that brings the
+   * threads back, in one call. Only on engines with `EngineFeature.Snooze`.
+   */
+  snooze(threads: ThreadJSON[], until: Date): void;
+  /** `threads.unsnooze`: back to the inbox now, the snooze cleared. */
+  unsnooze(threads: ThreadJSON[]): void;
 }
 
 export function useThreadActions(): ThreadActions {
   const qc = useQueryClient();
   const { mutate } = useQueueTask();
+  const engine = useEngine();
 
   return useMemo(() => {
     const account = (aid: string) =>
@@ -84,6 +96,27 @@ export function useThreadActions(): ThreadActions {
       }
       planned.forEach(queue);
       if (done) toast(done);
+    };
+
+    /** One engine call per account; the moves arrive as deltas. */
+    const perAccountCall = (
+      threads: ThreadJSON[],
+      run: (aid: string, ids: string[]) => Promise<unknown>,
+      what: string,
+      done: string,
+    ) => {
+      if (threads.length === 0) return;
+      void ensureConnected(engine)
+        .then(() => Promise.all([...byAccount(threads)].map(([aid, ts]) => run(aid, ids(ts)))))
+        .then(
+          () => toast(done),
+          (err: unknown) =>
+            toast.error(
+              err instanceof RpcError
+                ? `Couldn't ${what}: ${err.message}`
+                : "Couldn't reach the engine. Nothing was changed.",
+            ),
+        );
     };
 
     const toFolder = (aid: string, ts: ThreadJSON[], folder: FolderJSON) =>
@@ -203,7 +236,30 @@ export function useThreadActions(): ThreadActions {
         perAccount(threads, (aid, ts) => [
           tasks.changeLabels({ accountId: aid, threadIds: ids(ts), labelsToRemove: [label] }),
         ]),
+
+      snooze: (threads, until) =>
+        perAccountCall(
+          threads,
+          (accountId, threadIds) =>
+            engine.call('threads.snooze', {
+              accountId,
+              threadIds,
+              until: Math.floor(until.getTime() / 1000),
+            }),
+          'snooze',
+          `Snoozed until ${formatSnooze(until)}`,
+        ),
+
+      unsnooze: (threads) =>
+        perAccountCall(
+          threads,
+          (accountId, threadIds) => engine.call('threads.unsnooze', { accountId, threadIds }),
+          'unsnooze',
+          threads.length === 1
+            ? 'Back in the inbox'
+            : `${threads.length} threads back in the inbox`,
+        ),
     };
     return actions;
-  }, [qc, mutate]);
+  }, [qc, mutate, engine]);
 }

@@ -323,10 +323,12 @@ function sendDraft(store: MockStore, task: SendDraftTaskJSON, changes: ChangeSet
 }
 
 function applyMetadata(store: MockStore, task: SyncbackMetadataTaskJSON, changes: ChangeSet) {
+  // The desktop and the engine send the class lowercased; older web code capitalised it.
+  const cls = task.modelClassName.toLowerCase();
   const model =
-    task.modelClassName === 'Thread'
+    cls === 'thread'
       ? store.threads.get(task.modelId)
-      : task.modelClassName === 'Message'
+      : cls === 'message'
         ? store.messages.get(task.modelId)
         : undefined;
   if (!model) return;

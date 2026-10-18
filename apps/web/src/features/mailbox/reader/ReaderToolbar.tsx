@@ -12,12 +12,16 @@ import {
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { ActionButton } from '../ActionButton';
+import { SnoozeMenu } from './SnoozeMenu';
 
 export interface ReaderToolbarProps {
   onBack: () => void;
   onArchive: () => void;
   onTrash: () => void;
   onSpam: () => void;
+  /** Set when the engine has `threads.snooze`. */
+  onSnooze?: (at: Date) => void;
+  onUnsnooze?: () => void;
   onMarkUnread: () => void;
   onStar: () => void;
   starred: boolean;
@@ -40,6 +44,7 @@ export function ReaderToolbar(p: ReaderToolbarProps) {
       <ActionButton icon={Archive} label="Archive" keys="e" onClick={p.onArchive} />
       <ActionButton icon={Trash2} label="Trash" keys="#" onClick={p.onTrash} />
       <ActionButton icon={OctagonAlert} label="Spam" keys="!" onClick={p.onSpam} />
+      {p.onSnooze && <SnoozeMenu onSnooze={p.onSnooze} onUnsnooze={p.onUnsnooze} />}
       <Separator orientation="vertical" className="mx-1 h-4" />
       <ActionButton icon={Mail} label="Mark unread" keys="shift+u" onClick={p.onMarkUnread} />
       <ActionButton

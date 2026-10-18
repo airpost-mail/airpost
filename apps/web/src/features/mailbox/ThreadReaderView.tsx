@@ -3,10 +3,13 @@ import { useEffect, useMemo } from 'react';
 import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  EngineFeature,
   isGmailAccount,
+  threadHasRole,
   useAccount,
   useAccounts,
   useCategories,
+  useEngineFeatures,
   useMessages,
   useThread,
   type LabelJSON,
@@ -66,6 +69,7 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
   const account = useAccount(accountId);
   const { all, labels } = useCategories(accountId);
   const actions = useThreadActions();
+  const canSnooze = !!useEngineFeatures()?.has(EngineFeature.Snooze);
   const navigate = useNavigate();
   const router = useRouter();
   const route = useParams({ strict: false });
@@ -145,6 +149,16 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
         onArchive={() => removeThreads('archive', [thread], actions)}
         onTrash={() => removeThreads('trash', [thread], actions)}
         onSpam={() => removeThreads('spam', [thread], actions)}
+        onSnooze={
+          canSnooze
+            ? (at) => removeThreads((ts) => actions.snooze(ts, at), [thread], actions)
+            : undefined
+        }
+        onUnsnooze={
+          canSnooze && threadHasRole(thread, 'snoozed')
+            ? () => actions.unsnooze([thread])
+            : undefined
+        }
         onMarkUnread={() => {
           actions.setUnread([thread], true);
           back();

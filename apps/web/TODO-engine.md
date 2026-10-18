@@ -38,6 +38,18 @@ grammar and date subset (`src/engine/mock/search.ts`, tested against the engine'
 
 ## Tasks
 
+Done with DCP 15 (no markers existed): snooze and unsubscribe go through the engine when it
+announces `snooze` and `unsubscribe` (`EngineFeature.Snooze`, `EngineFeature.Unsubscribe`).
+The reader's snooze menu (`z`, the desktop's presets or a picked time, "Unsnooze now" in
+Snoozed) calls `threads.snooze` / `threads.unsnooze`, which queue the move and the
+`thread-snooze` metadata and leave the return to the engine's expiration executor; rows move
+on the deltas, not optimistically. The Unsubscribe button shows on messages whose
+List-Unsubscribe header has an http(s) or mailto URI and calls `messages.unsubscribe`: the
+engine makes the one-click POST or sends the mailto message itself, and a web link comes back
+for a toast's Open button (a click, so popup blockers allow it). Links found only in the body
+aren't looked for, as on the desktop. Without the features neither control shows. The mock
+does both (`src/engine/mock/mail-actions.ts`), including the return when a snooze comes due.
+
 - `src/engine/mock/apply-task.ts:147`: RSVP and contact tasks in the mock. DCP 18.
 - `src/features/composer/useComposerSession.ts:260`: undo-send surviving a closed tab. DCP 4
   (send-later metadata fired by the executor), then DCP 13 (`draft.send {delayMs}`).
