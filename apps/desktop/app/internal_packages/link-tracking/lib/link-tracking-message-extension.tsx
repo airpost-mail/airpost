@@ -1,11 +1,21 @@
 import React from 'react';
-import { MessageViewExtension, Actions } from 'mailspring-exports';
+import { MessageViewExtension, Actions, Message } from 'mailspring-exports';
+import type { MessageBody } from '../../../src/message-frame/message-frame-bridge';
 import LinkTrackingMessagePopover from './link-tracking-message-popover';
 import { PLUGIN_ID } from './link-tracking-constants';
 import { LinkTrackingMetadata } from './types';
 
+const DotStyle =
+  'margin-bottom: 0.75em; margin-left: 1px; margin-right: 1px; vertical-align: text-bottom; width: 6px;';
+
 export default class LinkTrackingMessageExtension extends MessageViewExtension {
-  static renderedMessageBodyIntoDocument({ document, message, iframe }) {
+  static async renderedMessageBodyIntoDocument({
+    body,
+    message,
+  }: {
+    body: MessageBody;
+    message: Message;
+  }) {
     const metadata: LinkTrackingMetadata = message.metadataForPluginId(PLUGIN_ID);
     if (!metadata || (metadata.links || []).length === 0) {
       return;
@@ -17,57 +27,31 @@ export default class LinkTrackingMessageExtension extends MessageViewExtension {
       links[link.redirect_url] = link;
     }
 
-    const trackedLinksWalker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: (node) => {
-        if (node.nodeName === 'A' && links[node.getAttribute('href')]) {
-          return NodeFilter.FILTER_ACCEPT;
-        }
-        return NodeFilter.FILTER_SKIP;
-      },
-    });
+    for (const anchor of await body.querySelectorAll('a[href]')) {
+      const link = links[anchor.attributes.href];
+      if (!link) continue;
+      const originalHref = link.url;
+      const clicked = link.click_count > 0;
 
-    while (trackedLinksWalker.nextNode()) {
-      const node = trackedLinksWalker.currentNode;
-      const nodeHref = node.getAttribute('href');
-      const originalHref = links[nodeHref].url;
-
-      const dotNode = document.createElement('img');
-      dotNode.className = 'link-tracking-dot';
-      dotNode.style =
-        'margin-bottom: 0.75em; margin-left: 1px; margin-right: 1px; vertical-align: text-bottom; width: 6px;';
-      if (links[nodeHref].click_count > 0) {
-        dotNode.title = `${links[nodeHref].click_count} click${
-          links[nodeHref].click_count === 1 ? '' : 's'
-        } (${originalHref})`;
-        dotNode.src = 'mailspring://link-tracking/assets/ic-tracking-visited@2x.png';
-        dotNode.style =
-          'margin-bottom: 0.75em; margin-left: 1px; margin-right: 1px; vertical-align: text-bottom; width: 6px; cursor: pointer;';
-        dotNode.onmousedown = () => {
-          const dotRect = dotNode.getBoundingClientRect();
-          const iframeRect = iframe.getBoundingClientRect();
-          const rect = {
-            top: dotRect.top + iframeRect.top,
-            bottom: dotRect.bottom + iframeRect.top,
-            left: dotRect.left + iframeRect.left,
-            right: dotRect.right + iframeRect.left,
-            width: dotRect.width,
-            height: dotRect.height,
-          };
+      await body.setAttributes(anchor.ref, { href: originalHref, title: originalHref });
+      const dot = await body.insertElement(anchor.ref, 'afterend', 'img', {
+        class: 'link-tracking-dot',
+        style: `${DotStyle}${clicked ? ' cursor: pointer;' : ''}`,
+        title: clicked
+          ? `${link.click_count} click${link.click_count === 1 ? '' : 's'} (${originalHref})`
+          : `This link has not been clicked (${originalHref})`,
+        src: clicked
+          ? 'mailspring://link-tracking/assets/ic-tracking-visited@2x.png'
+          : 'mailspring://link-tracking/assets/ic-tracking-unvisited@2x.png',
+      });
+      if (clicked) {
+        await body.addEventListener(dot, 'mousedown', ({ rect }) => {
           Actions.openPopover(
-            <LinkTrackingMessagePopover message={message} linkMetadata={links[nodeHref]} />,
-            {
-              originRect: rect,
-              direction: 'down',
-            }
+            <LinkTrackingMessagePopover message={message} linkMetadata={link} />,
+            { originRect: rect, direction: 'down' }
           );
-        };
-      } else {
-        dotNode.title = `This link has not been clicked (${originalHref})`;
-        dotNode.src = 'mailspring://link-tracking/assets/ic-tracking-unvisited@2x.png';
+        });
       }
-      node.href = originalHref;
-      node.title = originalHref;
-      node.parentNode.insertBefore(dotNode, node.nextSibling);
     }
   }
 }

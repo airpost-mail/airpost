@@ -13,6 +13,8 @@ import path from 'path';
 //   * <config-dir>/packages
 //   * RESOURCE_PATH/node_modules
 //
+const FontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
+
 export default class MailspringProtocolHandler {
   loadPaths: string[] = [];
 
@@ -56,7 +58,11 @@ export default class MailspringProtocolHandler {
       }
 
       if (filePath) {
-        return new Response(fs.readFileSync(filePath), { status: 200 });
+        // Fonts load in CORS mode, and the message frame (src/message-frame) is cross-origin.
+        const headers = FontExtensions.includes(path.extname(filePath).toLowerCase())
+          ? { 'Access-Control-Allow-Origin': '*' }
+          : undefined;
+        return new Response(fs.readFileSync(filePath), { status: 200, headers });
       } else {
         return new Response('Not Found', { status: 404 });
       }

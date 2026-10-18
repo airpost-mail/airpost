@@ -365,7 +365,11 @@ export default class MailspringWindow extends EventEmitter {
     });
 
     this.browserWindow.webContents.on('will-frame-navigate', (event) => {
-      if (shouldBlockFrameNavigation(event)) {
+      const initiatorUrl =
+        event.initiator && !event.initiator.isDestroyed() ? event.initiator.url : null;
+      if (
+        shouldBlockFrameNavigation({ url: event.url, isMainFrame: event.isMainFrame, initiatorUrl })
+      ) {
         event.preventDefault();
       }
     });

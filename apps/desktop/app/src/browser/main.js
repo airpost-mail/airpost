@@ -349,6 +349,15 @@ const start = () => {
       privileges: {
         secure: true,
       }
+    },
+    {
+      // The sandboxed frame message bodies render in (src/message-frame). Standard, so the
+      // frame has an origin of its own and runs in its own sandboxed renderer process.
+      scheme: 'tern-message',
+      privileges: {
+        standard: true,
+        secure: true,
+      }
     }
   ])
 
@@ -493,8 +502,9 @@ const start = () => {
     // or removed. Both come from AppContentSecurityPolicy.
     const { AppContentSecurityPolicy } = require('../content-security-policy');
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-      if (details.url.startsWith('devtools://')) {
-        return callback(details);
+      // The message frame sends its own, stricter policy.
+      if (details.url.startsWith('devtools://') || details.url.startsWith('tern-message:')) {
+        return callback({});
       }
       callback({
         responseHeaders: {

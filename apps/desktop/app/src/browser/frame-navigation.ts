@@ -1,16 +1,25 @@
+import { isMessageFrameURL } from '../message-frame/message-frame-protocol';
+
 /**
  * Whether a navigation in a Tern window should be cancelled. The window itself never
- * navigates, and message frames are written in place into about:blank, so a subframe
- * navigating anywhere else comes from message content: a form, a meta refresh or a link
- * EventedIFrame didn't catch.
+ * navigates. A subframe may stay on about:blank (frames written in place) or load the
+ * message frame page when the app window asks for it; anything else, and any navigation a
+ * message frame starts itself (a meta refresh to the page variant that allows remote
+ * images, say), comes from message content.
  */
 export function shouldBlockFrameNavigation({
   url,
   isMainFrame,
+  initiatorUrl,
 }: {
   url: string;
   isMainFrame: boolean;
+  initiatorUrl?: string | null;
 }) {
   if (isMainFrame) return true;
-  return url !== 'about:blank' && url !== 'about:srcdoc';
+  if (url === 'about:blank' || url === 'about:srcdoc') return false;
+  if (isMessageFrameURL(url)) {
+    return !initiatorUrl || initiatorUrl.startsWith('tern-message:');
+  }
+  return true;
 }

@@ -17,6 +17,7 @@ import {
   AllLanguages,
 } from './service';
 import { Menu, ButtonDropdown, RetinaImg } from 'mailspring-component-kit';
+import { messageFrameContent } from '../../../src/message-frame/message-frame-bridge';
 
 interface TranslateMessageHeaderProps {
   message: Message;
@@ -145,9 +146,12 @@ export class TranslateMessageHeader extends React.Component<
     const el = ReactDOM.findDOMNode(this) as Element;
     const messageEl = el && el.closest('.message-item-area');
     const iframeEl = messageEl && messageEl.querySelector('iframe');
-    if (!iframeEl || !iframeEl.contentDocument?.body || !this.props.message.body) return;
+    if (!iframeEl || !this.props.message.body) return;
+    // The message frame is cross-origin; it sends its text.
+    const content = await messageFrameContent(iframeEl);
+    if (!content || this._detectionStarted || !this._mounted) return;
 
-    let text = iframeEl.contentDocument.body.innerText;
+    let text = content.text;
     if (text.length > 1000) text = text.slice(0, 1000);
     if (!text) return;
 

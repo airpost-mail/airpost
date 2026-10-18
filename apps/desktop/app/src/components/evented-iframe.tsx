@@ -16,50 +16,7 @@ import { ipcRenderer } from 'electron';
 import { FilesScheme, resolveFilesSchemeURL } from '../files-scheme';
 import { markFileFromInternet } from '../attachment-safety';
 import { ExternalFetch } from '../external-fetch';
-
-export interface FormSubmissionTarget {
-  url: string;
-  method: 'get' | 'post';
-}
-
-/**
- * Where a form in a message would have gone: the action URL with the fields in its query
- * for GET, the bare action URL for POST. Null unless the action is an absolute http(s) URL.
- * Reads the attributes so a missing or relative action isn't resolved against about:blank.
- */
-export function formSubmissionTarget(
-  form: HTMLFormElement,
-  submitter?: HTMLElement | null
-): FormSubmissionTarget | null {
-  if (!form || typeof form.getAttribute !== 'function') {
-    return null;
-  }
-  const action = (submitter && submitter.getAttribute('formaction')) || form.getAttribute('action');
-  const rawMethod =
-    (submitter && submitter.getAttribute('formmethod')) || form.getAttribute('method');
-  const method = (rawMethod || 'get').toLowerCase() === 'post' ? 'post' : 'get';
-
-  let target: URL;
-  try {
-    target = new URL((action || '').trim());
-  } catch {
-    return null;
-  }
-  if (target.protocol !== 'https:' && target.protocol !== 'http:') {
-    return null;
-  }
-
-  if (method === 'get') {
-    const FrameFormData = (form.ownerDocument.defaultView as any)?.FormData || FormData;
-    const data = new FrameFormData(form, submitter || undefined);
-    const query = new URLSearchParams();
-    for (const [key, value] of data.entries()) {
-      if (typeof value === 'string') query.append(key, value);
-    }
-    target.search = query.toString();
-  }
-  return { url: target.toString(), method };
-}
+import { FormSubmissionTarget, formSubmissionTarget } from '../message-frame/form-submission';
 
 // The bytes behind an image src in a message, for Save Image.
 async function imageBytes(src: string): Promise<Buffer> {
@@ -108,6 +65,29 @@ export async function copyImageToClipboard(src: string) {
   canvas.height = img.naturalHeight;
   canvas.getContext('2d').drawImage(img, 0, 0);
   ipcRenderer.send('write-image-to-clipboard', canvas.toDataURL('image/png'));
+}
+
+/**
+ * Asks before a form from a message opens in the browser. Tern never submits forms inside
+ * messages; a POST form's page opens without its fields.
+ */
+export function confirmFormSubmission({ url, method }: FormSubmissionTarget) {
+  const { dialog } = require('@electron/remote');
+  const response = dialog.showMessageBoxSync(AppEnv.getCurrentWindow(), {
+    type: 'question',
+    buttons: [localized('Open in Browser'), localized('Cancel')],
+    defaultId: 1,
+    cancelId: 1,
+    message: localized('Open this form in your browser?'),
+    detail:
+      method === 'post'
+        ? localized(
+            "Tern doesn't submit forms inside messages. Your browser will open %@ without the form's contents.",
+            url
+          )
+        : localized("Tern doesn't submit forms inside messages. Your browser will open %@.", url),
+  });
+  return response === 0;
 }
 
 type EventedIFrameProps = {
@@ -340,23 +320,8 @@ export class EventedIFrame extends React.Component<
     AppEnv.windowEventHandler.openLink({ href: submission.url });
   };
 
-  _confirmFormSubmission({ url, method }: FormSubmissionTarget) {
-    const { dialog } = require('@electron/remote');
-    const response = dialog.showMessageBoxSync(AppEnv.getCurrentWindow(), {
-      type: 'question',
-      buttons: [localized('Open in Browser'), localized('Cancel')],
-      defaultId: 1,
-      cancelId: 1,
-      message: localized('Open this form in your browser?'),
-      detail:
-        method === 'post'
-          ? localized(
-              "Tern doesn't submit forms inside messages. Your browser will open %@ without the form's contents.",
-              url
-            )
-          : localized("Tern doesn't submit forms inside messages. Your browser will open %@.", url),
-    });
-    return response === 0;
+  _confirmFormSubmission(submission: FormSubmissionTarget) {
+    return confirmFormSubmission(submission);
   }
 
   _isBlacklistedHref(href: string) {
@@ -415,153 +380,165 @@ export class EventedIFrame extends React.Component<
   };
 
   _onIFrameContextualMenu = (event: MouseEvent) => {
-    // Build a standard-looking contextual menu with options like "Copy Link",
-    // "Copy Image" and "Search Google for 'Bla'"
     event.preventDefault();
 
-    const { shell } = require('electron');
-    const { Menu, MenuItem, clipboard } = require('@electron/remote');
-    const menu = new Menu();
-
-    // Menu actions for links
     const linkTarget = this._getContainingTarget(event, { with: 'href' });
-    if (linkTarget) {
-      const href = linkTarget.getAttribute('href');
-      if (href.startsWith('mailto')) {
-        menu.append(
-          new MenuItem({
-            label: localized('Compose New Message'),
-            click() {
-              AppEnv.windowEventHandler.openLink({ href });
-            },
-          })
-        );
-        menu.append(
-          new MenuItem({
-            label: localized('Copy Email Address'),
-            click() {
-              clipboard.writeText(href.split('mailto:').pop());
-            },
-          })
-        );
-      } else {
-        menu.append(
-          new MenuItem({
-            label: localized('Open Link'),
-            click() {
-              AppEnv.windowEventHandler.openLink({ href });
-            },
-          })
-        );
-        menu.append(
-          new MenuItem({
-            label: localized('Copy Link Address'),
-            click() {
-              clipboard.writeText(href);
-            },
-          })
-        );
-      }
-      menu.append(new MenuItem({ type: 'separator' }));
-    }
-
-    // Menu actions for images
     const imageTarget = this._getContainingTarget(event, { with: 'src' });
-    if (imageTarget) {
-      const src = imageTarget.getAttribute('src');
-      const srcFilename = path.basename(src);
-      menu.append(
-        new MenuItem({
-          label: localized('Save Image') + '...',
-          click() {
-            AppEnv.showSaveDialog(
-              { defaultPath: srcFilename },
-              function (path: string | undefined) {
-                if (!path) {
-                  return;
-                }
-                imageBytes(src)
-                  .then((buffer) => {
-                    fs.writeFile(path, buffer, async (err) => {
-                      if (err) {
-                        console.error(`Save Image failed: ${err}`);
-                        return;
-                      }
-                      await markFileFromInternet(path);
-                      require('@electron/remote').shell.showItemInFolder(path);
-                    });
-                  })
-                  .catch((err) => console.error(`Save Image failed: ${err}`));
-              }
-            );
-          },
-        })
-      );
-      menu.append(
-        new MenuItem({
-          label: localized('Copy Image'),
-          click() {
-            copyImageToClipboard(src).catch((err) => console.error(`Copy Image failed: ${err}`));
-          },
-        })
-      );
-      menu.append(new MenuItem({ type: 'separator' }));
-    }
 
-    // Menu actions for text
     let text = '';
     const selection = (
       ReactDOM.findDOMNode(this) as HTMLIFrameElement
     ).contentDocument.getSelection();
     if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      text = range.toString();
+      text = selection.getRangeAt(0).toString();
     }
     if (!text || text.length === 0) {
       text = (linkTarget != null ? linkTarget : (event.target as HTMLElement)).innerText;
     }
-    text = text.trim();
 
-    if (text.length > 0) {
-      let textPreview;
-      if (text.length > 45) {
-        textPreview = text.substr(0, 42) + '...';
-      } else {
-        textPreview = text;
-      }
-      menu.append(
-        new MenuItem({
-          label: localized('Copy'),
-          click() {
-            clipboard.writeText(text);
-          },
-        })
-      );
-      menu.append(
-        new MenuItem({
-          label: localized(`Search Google for '%@'`, textPreview),
-          click() {
-            shell.openExternal(`https://www.google.com/search?q=${encodeURIComponent(text)}`);
-          },
-        })
-      );
-      if (process.platform === 'darwin') {
-        menu.append(
-          new MenuItem({
-            label: localized(`Look Up “%@”`, textPreview),
-            click() {
-              AppEnv.getCurrentWindow().showDefinitionForSelection();
-            },
-          })
-        );
-      }
-    }
-
-    if (process.platform === 'darwin') {
-      menu.append(new MenuItem({ type: 'separator' }));
-    }
-    // Services menu appears here automatically
-
-    menu.popup({});
+    showFrameContextMenu({
+      href: linkTarget ? linkTarget.getAttribute('href') : null,
+      src: imageTarget ? imageTarget.getAttribute('src') : null,
+      text: text || '',
+    });
   };
+}
+
+/**
+ * The context menu for a link, an image or text in a message body: Open and Copy Link,
+ * Save and Copy Image, Copy, Search Google and Look Up. Message frames are cross-origin, so
+ * they send these three values instead of their DOM.
+ */
+export function showFrameContextMenu(contents: {
+  href: string | null;
+  src: string | null;
+  text: string;
+}) {
+  const { href, src } = contents;
+  const { shell } = require('electron');
+  const { Menu, MenuItem, clipboard } = require('@electron/remote');
+  const menu = new Menu();
+
+  // Menu actions for links
+  if (href) {
+    if (href.startsWith('mailto')) {
+      menu.append(
+        new MenuItem({
+          label: localized('Compose New Message'),
+          click() {
+            AppEnv.windowEventHandler.openLink({ href });
+          },
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: localized('Copy Email Address'),
+          click() {
+            clipboard.writeText(href.split('mailto:').pop());
+          },
+        })
+      );
+    } else {
+      menu.append(
+        new MenuItem({
+          label: localized('Open Link'),
+          click() {
+            AppEnv.windowEventHandler.openLink({ href });
+          },
+        })
+      );
+      menu.append(
+        new MenuItem({
+          label: localized('Copy Link Address'),
+          click() {
+            clipboard.writeText(href);
+          },
+        })
+      );
+    }
+    menu.append(new MenuItem({ type: 'separator' }));
+  }
+
+  // Menu actions for images
+  if (src) {
+    const srcFilename = path.basename(src);
+    menu.append(
+      new MenuItem({
+        label: localized('Save Image') + '...',
+        click() {
+          AppEnv.showSaveDialog({ defaultPath: srcFilename }, function (path: string | undefined) {
+            if (!path) {
+              return;
+            }
+            imageBytes(src)
+              .then((buffer) => {
+                fs.writeFile(path, buffer, async (err) => {
+                  if (err) {
+                    console.error(`Save Image failed: ${err}`);
+                    return;
+                  }
+                  await markFileFromInternet(path);
+                  require('@electron/remote').shell.showItemInFolder(path);
+                });
+              })
+              .catch((err) => console.error(`Save Image failed: ${err}`));
+          });
+        },
+      })
+    );
+    menu.append(
+      new MenuItem({
+        label: localized('Copy Image'),
+        click() {
+          copyImageToClipboard(src).catch((err) => console.error(`Copy Image failed: ${err}`));
+        },
+      })
+    );
+    menu.append(new MenuItem({ type: 'separator' }));
+  }
+
+  // Menu actions for text
+  const text = (contents.text || '').trim();
+
+  if (text.length > 0) {
+    let textPreview;
+    if (text.length > 45) {
+      textPreview = text.substr(0, 42) + '...';
+    } else {
+      textPreview = text;
+    }
+    menu.append(
+      new MenuItem({
+        label: localized('Copy'),
+        click() {
+          clipboard.writeText(text);
+        },
+      })
+    );
+    menu.append(
+      new MenuItem({
+        label: localized(`Search Google for '%@'`, textPreview),
+        click() {
+          shell.openExternal(`https://www.google.com/search?q=${encodeURIComponent(text)}`);
+        },
+      })
+    );
+    if (process.platform === 'darwin') {
+      menu.append(
+        new MenuItem({
+          label: localized(`Look Up “%@”`, textPreview),
+          click() {
+            AppEnv.getCurrentWindow().showDefinitionForSelection();
+          },
+        })
+      );
+    }
+  }
+
+  if (process.platform === 'darwin') {
+    menu.append(new MenuItem({ type: 'separator' }));
+  }
+  // Services menu appears here automatically
+
+  menu.popup({});
 }

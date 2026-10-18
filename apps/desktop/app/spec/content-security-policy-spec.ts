@@ -83,7 +83,8 @@ describe('Content-Security-Policy', function () {
       const d = directives(AppContentSecurityPolicy);
       expect(d['script-src']).toEqual(["'self'"]);
       expect(d['default-src']).not.toContain('*');
-      expect(d['frame-src']).toEqual(["'none'"]);
+      // Only the sandboxed message frame (src/message-frame).
+      expect(d['frame-src']).toEqual(['tern-message://frame']);
       expect(d['object-src']).toEqual(["'none'"]);
       for (const source of d['connect-src']) {
         expect(['*', 'https:', 'http:', 'wss:', 'ws:', 'data:', 'blob:']).not.toContain(source);

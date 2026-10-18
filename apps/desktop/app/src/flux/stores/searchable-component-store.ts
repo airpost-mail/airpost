@@ -6,6 +6,19 @@ import { MAX_MATCHES, CHAR_THRESHOLD } from '../../searchable-components/search-
 import FocusedContentStore from './focused-content-store';
 import { Thread } from '../models/thread';
 
+/**
+ * A search region whose document the store can't read: a cross-origin message frame, which
+ * highlights matches itself and reports their boxes relative to `element`.
+ */
+export interface RemoteSearchRegion {
+  element: HTMLElement;
+  matches: { top: number; left: number; height: number; renderIndex: number }[];
+}
+
+function isRemoteRegion(region: HTMLElement | RemoteSearchRegion): region is RemoteSearchRegion {
+  return !!region && !(region instanceof Node) && 'element' in region;
+}
+
 class SearchableComponentStore extends MailspringStore {
   currentMatch = null;
   matches = [];
@@ -16,7 +29,7 @@ class SearchableComponentStore extends MailspringStore {
   // even activated. Empty string means we're active but just not
   // searching anything.
   searchTerm = null;
-  searchRegions: { [key: string]: HTMLElement } = {};
+  searchRegions: { [key: string]: HTMLElement | RemoteSearchRegion } = {};
 
   _lastThread?: Thread;
 
@@ -38,15 +51,10 @@ class SearchableComponentStore extends MailspringStore {
   }
 
   getCurrentRegionIndex(regionId: string) {
-    let regionOffset = null;
-    if (
-      regionId &&
-      this.currentMatch &&
-      this.currentMatch.node.getAttribute('data-region-id') === regionId
-    ) {
-      regionOffset = +this.currentMatch.node.getAttribute('data-render-index');
+    if (regionId && this.currentMatch && this.currentMatch.regionId === regionId) {
+      return this.currentMatch.renderIndex;
     }
-    return regionOffset;
+    return null;
   }
 
   getCurrentSearchData() {
@@ -93,10 +101,28 @@ class SearchableComponentStore extends MailspringStore {
     const searchNodes = [];
 
     if (this.searchTerm && this.searchTerm.length >= CHAR_THRESHOLD) {
-      Object.values(this.searchRegions).forEach((node) => {
+      Object.entries(this.searchRegions).forEach(([regionId, region]) => {
         if (this.matches.length >= MAX_MATCHES) {
           return;
         }
+        if (isRemoteRegion(region)) {
+          if (!region.element.isConnected) return;
+          searchNodes.push(region.element);
+          const rect = region.element.getBoundingClientRect();
+          for (const match of region.matches) {
+            this.matches.push({
+              node: null,
+              regionId,
+              renderIndex: match.renderIndex,
+              top: match.top + rect.top,
+              left: match.left + rect.left,
+              height: match.height,
+            });
+            if (this.matches.length >= MAX_MATCHES) break;
+          }
+          return;
+        }
+        const node = region;
         let refNode;
         let topOffset = 0;
         let leftOffset = 0;
@@ -123,6 +149,8 @@ class SearchableComponentStore extends MailspringStore {
           }
           this.matches.push({
             node: matches[i],
+            regionId: matches[i].getAttribute('data-region-id'),
+            renderIndex: +matches[i].getAttribute('data-render-index'),
             top: rect.top + topOffset,
             left: rect.left + leftOffset,
             height: rect.height,
@@ -197,7 +225,7 @@ class SearchableComponentStore extends MailspringStore {
   }
 
   _scrollIntoView() {
-    if (!this.currentMatch || !this.currentMatch.node || !this.scrollAncestor) {
+    if (!this.currentMatch || !this.scrollAncestor) {
       return;
     }
 
@@ -220,7 +248,7 @@ class SearchableComponentStore extends MailspringStore {
     }
   };
 
-  registerSearchRegion(regionId: string, domNode: HTMLElement) {
+  registerSearchRegion(regionId: string, domNode: HTMLElement | RemoteSearchRegion) {
     this.searchRegions[regionId] = domNode;
     this._recalculateMatches();
   }

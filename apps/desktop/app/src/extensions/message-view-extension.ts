@@ -1,5 +1,6 @@
 import { Message } from '../flux/models/message';
 import { File } from '../flux/models/file';
+import type { MessageBody } from '../message-frame/message-frame-bridge';
 
 /*
 Public: To create MessageViewExtension that customize message viewing, you
@@ -43,11 +44,24 @@ export class MessageViewExtension {
   }
 
   /*
-  Public: Modify the rendered message body using the DOM.
-  Runs after messages goes through `formatMessageBody` and is placed
-  into the DOM.
+  Public: Modify the rendered message body. Runs after the message goes through
+  `formatMessageBody` and is rendered, again on every re-render.
+
+  Since plugin API 1.27 the body renders in a cross-origin, sandboxed frame in its own
+  process, so there is no `document`. `body` (a {MessageBody}) finds elements, sets
+  attributes, inserts elements and listens for clicks inside it; its calls return promises
+  and reject once the message renders again. `iframe` is the frame element in the app window.
+  Return a promise to have its rejection reported.
   */
-  static renderedMessageBodyIntoDocument({ document, message, iframe }) {}
+  static renderedMessageBodyIntoDocument({
+    body,
+    message,
+    iframe,
+  }: {
+    body: MessageBody;
+    message: Message;
+    iframe: HTMLIFrameElement;
+  }): void | Promise<void> {}
 
   /*
   Public: Filter the list of displayed attachments.

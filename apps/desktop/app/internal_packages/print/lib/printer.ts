@@ -1,32 +1,31 @@
 import { AccountStore, Actions, Thread } from 'mailspring-exports';
-import { removeDarkening } from '@tern/email-dark';
+import {
+  messageFrameBridgeFor,
+  messageFrameContent,
+} from '../../../src/message-frame/message-frame-bridge';
 import PrintWindow from './print-window';
 
 class Printer {
   public unsub = Actions.printThread.listen(this._printThread);
 
-  _printThread(thread: Thread, htmlContent: string) {
+  async _printThread(thread: Thread, htmlContent: string) {
     if (!thread) throw new Error('Printing: No thread active!');
     const account = AccountStore.accountForId(thread.accountId);
 
     // Get the <mailspring-styles> tag present in the document
     const styleTag = document.getElementsByTagName('managed-styles')[0];
-    // These iframes should correspond to the message iframes when a thread is
-    // focused
-    const iframes = document.getElementsByTagName('iframe');
-    // Remote images print only if every message shown allows them (email-frame.tsx).
+    // The message frames of the focused thread (email-frame.tsx).
+    const iframes = Array.from(document.getElementsByTagName('iframe')).filter((iframe) =>
+      messageFrameBridgeFor(iframe)
+    );
+    // Remote images print only if every message shown allows them.
     const remoteImages =
       iframes.length > 0 &&
-      [].slice
-        .call(iframes)
-        .every((iframe) => iframe.getAttribute('data-remote-images') === 'allowed');
-    // Grab the html inside the iframes, without the dark rendering of the email colours:
-    // paper gets the sender's colours.
-    const messagesHtml = [].slice.call(iframes).map((iframe) => {
-      const root = iframe.contentDocument.documentElement.cloneNode(true) as HTMLElement;
-      removeDarkening(root);
-      return root.innerHTML;
-    });
+      iframes.every((iframe) => iframe.getAttribute('data-remote-images') === 'allowed');
+    // The frames are cross-origin, so each one sends its HTML, without the dark rendering of
+    // the email colours: paper gets the sender's colours.
+    const contents = await Promise.all(iframes.map((iframe) => messageFrameContent(iframe)));
+    const messagesHtml = contents.filter(Boolean).map((content) => content.html);
 
     const win = new PrintWindow({
       subject: thread.subject,

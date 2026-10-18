@@ -1,4 +1,5 @@
 import { FilesScheme } from './files-scheme';
+import { MessageFrameOrigin, MessageFrameScriptURL } from './message-frame/message-frame-protocol';
 
 // The app's policy. main.js sends it as a response header and every static/*.html page
 // carries the same string in its <meta> tag; spec/content-security-policy-spec.ts fails if
@@ -25,8 +26,9 @@ export const AppContentSecurityPolicy =
     `img-src * data: mailspring: file: ${FilesScheme}:`,
     'font-src * data: mailspring:',
     `connect-src ${ConnectSources.join(' ')}`,
-    // Message bodies render in src-less about:blank frames, which frame-src doesn't govern.
-    "frame-src 'none'",
+    // Message bodies render in the sandboxed message frame (src/message-frame). Other
+    // frames are src-less about:blank ones, which frame-src doesn't govern.
+    `frame-src ${MessageFrameOrigin}`,
     "object-src 'none'",
     'media-src mailspring:',
     "manifest-src 'none'",
@@ -37,10 +39,11 @@ function remoteSources(remoteImages: boolean) {
 }
 
 /**
- * The policy written first into every document that shows a message body (the reading pane
- * iframe, the clipped-message and show-original windows). Remote images and fonts load only
- * when `remoteImages` is set for that message. Message documents are about:blank children
- * of the app window, so the app policy above applies too and must allow at least this much.
+ * The policy of every document that shows a message body (the reading pane's message frame,
+ * the clipped-message and show-original windows). Remote images and fonts load only when
+ * `remoteImages` is set for that message. The clipped and show-original documents are
+ * about:blank children of an app window, so the app policy above applies to them too and
+ * must allow at least this much.
  */
 export function messageContentSecurityPolicy({ remoteImages }: { remoteImages: boolean }) {
   const remote = remoteSources(remoteImages);
@@ -50,6 +53,18 @@ export function messageContentSecurityPolicy({ remoteImages }: { remoteImages: b
     `img-src data: mailspring: ${FilesScheme}:${remote}`,
     `font-src data: mailspring:${remote}`,
     "form-action 'none'",
+  ].join('; ');
+}
+
+/**
+ * The message frame's policy: the message policy plus the frame's own script, and nothing
+ * that could change where the frame's relative URLs point.
+ */
+export function messageFrameContentSecurityPolicy({ remoteImages }: { remoteImages: boolean }) {
+  return [
+    messageContentSecurityPolicy({ remoteImages }),
+    `script-src ${MessageFrameScriptURL}`,
+    "base-uri 'none'",
   ].join('; ');
 }
 

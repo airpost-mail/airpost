@@ -167,6 +167,11 @@ export const InflatesDraftClientId: InflatesDraftClientId;
 export type ExtensionRegistry = typeof import('../registries/extension-registry');
 export const ExtensionRegistry: ExtensionRegistry;
 export * from '../extensions/message-view-extension';
+export type {
+  MessageBody,
+  MessageBodyElement,
+  MessageBodyRect,
+} from '../message-frame/message-frame-bridge';
 export * from '../extensions/composer-extension';
 
 // 3rd party libraries

@@ -33,6 +33,7 @@ import { DefaultClientHelper } from '../default-client-helper';
 import { developerToolsAvailable } from '../developer-tools';
 import MailspringProtocolHandler from './mailspring-protocol-handler';
 import { registerFilesProtocol } from './files-protocol-handler';
+import { registerMessageFrameProtocol } from './message-frame-protocol-handler';
 import { registerExternalFetchIPC } from './external-fetch-ipc';
 import { registerAttachmentSafetyIPC } from './attachment-safety-ipc';
 import ConfigPersistenceManager, { registerConfigIPC } from './config-persistence-manager';
@@ -114,6 +115,7 @@ export default class Application extends EventEmitter {
       safeMode,
     });
     registerFilesProtocol(configDirPath);
+    registerMessageFrameProtocol(resourcePath);
 
     // Dev and spec runs are Electron.app, whose bundle icon is Electron's; packaged builds use tern.icns.
     if (process.platform === 'darwin' && (devMode || specMode)) {
