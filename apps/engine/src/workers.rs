@@ -78,6 +78,8 @@ struct State {
     queue: VecDeque<Job>,
     threads: usize,
     idle: usize,
+    /// Threads running a job.
+    busy: usize,
 }
 
 pub struct Lane {
@@ -120,7 +122,9 @@ impl Lane {
     ) {
         let mut guard = self.lock();
         let state = guard.get_or_insert_with(State::default);
-        if state.queue.len() >= self.max_queued {
+        // Queued jobs that a free thread (idle or about to start) will take aren't waiting.
+        let free = self.max_threads.saturating_sub(state.busy);
+        if state.queue.len() >= self.max_queued + free {
             drop(guard);
             answer(Err(busy(self)));
             return;
@@ -141,7 +145,9 @@ impl Lane {
     }
 
     fn run(&'static self) {
-        while let Some(job) = self.next_job() {
+        let mut finished = false;
+        while let Some(job) = self.next_job(finished) {
+            finished = true;
             ms_core::log::set_thread_account(job.account);
             let result = if self.contained {
                 catch_unwind(AssertUnwindSafe(job.work)).unwrap_or_else(|_| {
@@ -159,12 +165,18 @@ impl Lane {
     }
 
     /// The next job, or `None` once this thread has waited [`IDLE`] for one; the thread then
-    /// ends.
-    fn next_job(&self) -> Option<Job> {
+    /// ends. `finished` says the thread just finished a job.
+    fn next_job(&self, finished: bool) -> Option<Job> {
         let mut guard = self.lock();
+        if finished {
+            if let Some(state) = guard.as_mut() {
+                state.busy -= 1;
+            }
+        }
         loop {
             let state = guard.get_or_insert_with(State::default);
             if let Some(job) = state.queue.pop_front() {
+                state.busy += 1;
                 return Some(job);
             }
             state.idle += 1;
