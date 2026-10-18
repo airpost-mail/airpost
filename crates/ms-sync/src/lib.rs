@@ -97,11 +97,12 @@ impl WorkerContext {
     }
 }
 
-/// The `catch (SyncException &)` arm of the worker loops: a non-retryable error stops the
-/// account and returns false; otherwise it reports a connection error when offline, logs
-/// `--sleeping` and returns true, and the caller sleeps.
+/// The `catch (SyncException &)` arm of the worker loops: an error that isn't transient
+/// ([`ms_core::Error::is_transient`]) stops the account and returns false; otherwise it
+/// reports a connection error when offline, logs `--sleeping` and returns true, and the
+/// caller sleeps.
 pub(crate) fn report_worker_error(ctx: &WorkerContext, e: &ms_core::Error) -> bool {
-    if !e.is_retryable() {
+    if !e.is_transient() {
         ctx.fail_with(e);
         return false;
     }

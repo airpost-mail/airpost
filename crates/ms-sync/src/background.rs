@@ -264,6 +264,7 @@ impl Background {
     /// straight away.
     fn sync_now(&mut self) -> Result<bool> {
         let mut sync_again_immediately = false;
+        let mut cleaned = false;
 
         // A message orphaned before this instant has had every folder this pass covers in
         // full scanned since. Taken before any scan so the foreground worker's orphans get
@@ -631,6 +632,7 @@ impl Background {
             if synced_min_uid <= 1 && self.w.now() - last_cleanup > CACHE_CLEANUP_INTERVAL {
                 self.w.clean_message_cache(folder)?;
                 set_ls(folder, ls::LAST_CLEANUP, self.w.now());
+                cleaned = true;
             }
 
             set_ls(folder, ls::BUSY, more_to_do);
@@ -640,6 +642,11 @@ impl Background {
             // every Folder save is a delta the client re-renders.
             self.w.store.save_folder_status(folder, &initial)?;
             self.record_coverage(&mut bound, folder, covered, synced_min_uid < walk_start_uid);
+        }
+
+        if cleaned {
+            // The cleanup freed pages, and an hourly pass is a quiet moment for the WAL.
+            self.w.store.compact();
         }
 
         if profile.late_sent_copies {

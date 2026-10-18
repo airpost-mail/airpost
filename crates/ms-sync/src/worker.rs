@@ -181,6 +181,54 @@ impl SyncWorker {
         self.session.profile().mailbox_model == ms_providers::MailboxModelKind::GmailLabels
     }
 
+    /// Inserts or updates the message a fetch returned. A panic while processing it (a
+    /// parser bug on hostile input) quarantines its UID in this folder (TD45): it is skipped
+    /// from then on instead of stopping the account at every pass. `None` for a skipped UID.
+    pub fn ingest(
+        &self,
+        remote_msg: &ms_imap::ImapMessage,
+        folder: &Folder,
+        sync_data_timestamp: i64,
+    ) -> Result<Option<Message>> {
+        let uid = remote_msg.uid;
+        let key = quarantine_key(folder);
+        let quarantined = self.store.get_key_value(&key)?.unwrap_or_default();
+        if parse_uids(&quarantined).contains(&uid) {
+            return Ok(None);
+        }
+        if self.store.in_transaction() {
+            return self
+                .processor()
+                .insert_fallback_to_update_message(remote_msg, folder, sync_data_timestamp)
+                .map(Some);
+        }
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.processor().insert_fallback_to_update_message(
+                remote_msg,
+                folder,
+                sync_data_timestamp,
+            )
+        }));
+        match outcome {
+            Ok(r) => r.map(Some),
+            Err(_) => {
+                self.store.abandon_after_panic();
+                error!(
+                    "- {} UID {uid}: processing the message panicked; it is skipped from now on",
+                    folder.path()
+                );
+                let mut uids = parse_uids(&quarantined);
+                uids.push(uid);
+                if uids.len() > MAX_QUARANTINED_UIDS {
+                    uids.drain(..uids.len() - MAX_QUARANTINED_UIDS);
+                }
+                self.store
+                    .save_key_value(&key, &serde_json::to_string(&uids).unwrap_or_default())?;
+                Ok(None)
+            }
+        }
+    }
+
     pub fn processor(&self) -> MailProcessor<'_> {
         let mut p = MailProcessor::new(&self.ctx.account, &self.store)
             .with_config_dir(&self.ctx.config_dir);
@@ -350,12 +398,8 @@ impl SyncWorker {
 
             if !same {
                 if heavy_initial_request {
-                    let m = self.processor().insert_fallback_to_update_message(
-                        remote_msg,
-                        folder,
-                        sync_data_timestamp,
-                    )?;
-                    if let Some(s) = synced.as_deref_mut() {
+                    let m = self.ingest(remote_msg, folder, sync_data_timestamp)?;
+                    if let (Some(s), Some(m)) = (synced.as_deref_mut(), m) {
                         s.push((m, uid));
                     }
                 } else {
@@ -398,12 +442,8 @@ impl SyncWorker {
                 )
                 .map_err(|e| e.into_sync("syncFolderUIDRange - fetchMessagesByUID (heavy)"))?;
             for remote_msg in heavy.messages.iter().rev() {
-                let m = self.processor().insert_fallback_to_update_message(
-                    remote_msg,
-                    folder,
-                    sync_data_timestamp,
-                )?;
-                if let Some(s) = synced.as_deref_mut() {
+                let m = self.ingest(remote_msg, folder, sync_data_timestamp)?;
+                if let (Some(s), Some(m)) = (synced.as_deref_mut(), m) {
                     s.push((m, remote_msg.uid));
                 }
             }
@@ -506,8 +546,7 @@ impl SyncWorker {
             result.vanished.len().unwrap_or(u64::MAX)
         );
         for m in &result.modified_or_added {
-            self.processor()
-                .insert_fallback_to_update_message(m, folder, sync_data_timestamp)?;
+            self.ingest(m, folder, sync_data_timestamp)?;
         }
         self.delete_vanished_uids(folder, &result.vanished, "FETCH CHANGEDSINCE")?;
         // An unrelated expunge can arrive untagged while this FETCH is in flight.
@@ -747,6 +786,20 @@ impl SyncWorker {
     }
 }
 
+/// UIDs quarantined per folder, the newest kept.
+const MAX_QUARANTINED_UIDS: usize = 1000;
+
+/// The `_State` key listing a folder's quarantined UIDs (JSON array). Keyed by UIDVALIDITY
+/// too, so a reset UID space starts with none.
+fn quarantine_key(folder: &Folder) -> String {
+    let validity = ls_u32(folder.local_status(), ls::UIDVALIDITY);
+    format!("quarantine-{}-{validity}", folder.id())
+}
+
+fn parse_uids(text: &str) -> Vec<u32> {
+    serde_json::from_str(text).unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -770,3 +823,4 @@ mod tests {
         assert_eq!(ls_u32(f.local_status(), ls::LAST_DEEP), 0);
     }
 }
+

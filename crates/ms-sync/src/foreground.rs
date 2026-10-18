@@ -7,12 +7,12 @@
 //! Derived from Mailspring-Sync `MailSync/SyncWorker.cpp` and the worker loop in
 //! `MailSync/main.cpp`, Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use ms_core::constants::{ls, WORKER_SLEEP};
+use ms_core::constants::{ls, TASK_NEXT_ATTEMPT_KEY, WORKER_SLEEP};
 use ms_core::{logmsg, Error, ErrorCode, Result, SyncError};
 use ms_imap::{IdleInterrupt, ImapSession};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
@@ -140,10 +140,10 @@ struct Foreground {
     /// The last IDLE ended in an error: its connection is gone with the VANISHED it had,
     /// so the inbox is re-selected before the CHANGEDSINCE fetch (`idleExitedWithError`).
     idle_exited_with_error: bool,
-    /// Sends put back for when their server is reachable again (TD33), skipped until
-    /// `retry_at`. The account stays online meanwhile: its IMAP side works.
-    deferred: HashSet<String>,
-    retry_at: Option<Instant>,
+    /// Tasks put back with the time they run again: sends whose server can't be reached
+    /// (TD33) and remote phases that hit a retryable error (TD43, their `_nextAttemptAt`).
+    /// The account stays online meanwhile: its IMAP side works.
+    deferred: HashMap<String, Instant>,
 }
 
 impl Foreground {
@@ -151,8 +151,7 @@ impl Foreground {
         Ok(Foreground {
             w: SyncWorker::new(ctx)?,
             idle_exited_with_error: false,
-            deferred: HashSet::new(),
-            retry_at: None,
+            deferred: HashMap::new(),
         })
     }
 
@@ -216,10 +215,11 @@ impl Foreground {
             .foreground
             .retry_deferred
             .swap(false, Ordering::SeqCst);
-        if retry_now || self.retry_at.is_some_and(|at| at <= Instant::now()) {
+        let now = Instant::now();
+        if retry_now {
             self.deferred.clear();
-            self.retry_at = None;
         }
+        self.deferred.retain(|_, at| *at > now);
         let w = &mut self.w;
         let mut runner = w.ctx.tasks.remote_runner(&w.store, &w.ctx);
         runner.cleanup_old_tasks_at_runtime()?;
@@ -230,28 +230,23 @@ impl Foreground {
                 break;
             }
             for mut task in tasks {
-                if self.deferred.contains(task.id()) {
+                if self.deferred.contains_key(task.id()) {
                     continue;
                 }
                 match runner.perform_remote(&mut task, &mut w.session) {
                     Err(Error::Sync(_)) => {
-                        self.deferred.insert(task.id().to_owned());
-                        if self.retry_at.is_none() {
-                            info!(
-                                "-- Trying deferred sends again in {}s",
-                                DEFERRED_RETRY.as_secs()
-                            );
-                            self.retry_at = Some(Instant::now() + DEFERRED_RETRY);
-                        }
+                        let wait = next_attempt_in(&task.data, w.store.now());
+                        info!("-- Trying task {} again in {}s", task.id(), wait.as_secs());
+                        self.deferred
+                            .insert(task.id().to_owned(), Instant::now() + wait);
                     }
                     other => other?,
                 }
             }
         }
-        if self.deferred.is_empty() {
-            self.retry_at = None;
-        }
-        w.ctx.foreground.wake_at(self.retry_at);
+        w.ctx
+            .foreground
+            .wake_at(self.deferred.values().min().copied());
         Ok(())
     }
 
@@ -392,6 +387,18 @@ impl Foreground {
 }
 
 /// Tasks in `remote` with a rowid above `after_rowid`, which is advanced past them.
+/// How long a put-back task waits: until its `_nextAttemptAt` (Unix seconds, `now` being
+/// the store's clock), else [`DEFERRED_RETRY`].
+fn next_attempt_in(data: &serde_json::Value, now: i64) -> Duration {
+    match data
+        .get(TASK_NEXT_ATTEMPT_KEY)
+        .and_then(serde_json::Value::as_i64)
+    {
+        Some(at) => Duration::from_secs(u64::try_from(at - now).unwrap_or(0).max(1)),
+        None => DEFERRED_RETRY,
+    }
+}
+
 fn remote_tasks_after(store: &Store, account_id: &str, after_rowid: &mut i64) -> Result<Vec<Task>> {
     let mut stmt = store.conn().prepare_cached(
         "SELECT rowid, data FROM Task WHERE accountId = ? AND status = 'remote' AND rowid > ?",

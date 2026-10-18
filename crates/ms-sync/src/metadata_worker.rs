@@ -37,7 +37,7 @@ pub fn run_metadata_worker(ctx: WorkerContext) {
     while !ctx.is_stopping() {
         match worker.pull_until(&|| ctx.is_stopping()) {
             Ok(()) => backoff_step = 0,
-            Err(e) if e.is_retryable() => {
+            Err(e) if e.is_transient() => {
                 let secs = BACKOFF_SECONDS[backoff_step];
                 info!("Will retry in {secs} sec.");
                 ctx.sleep_until_wake_or(secs);
