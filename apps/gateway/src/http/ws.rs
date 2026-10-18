@@ -79,7 +79,7 @@ const HELLO_WAIT: Duration = Duration::from_secs(10);
 /// Bytes queued for the browser past which the gateway stops reading the engine; at twice
 /// this it stops reading the browser too, whose refused requests are answered here.
 const OUT_QUEUE_BYTES: usize = 256 << 10;
-/// How long the close frame may take; the browser may be gone.
+/// How long the close handshake may take; the browser may be gone.
 const CLOSE_WAIT: Duration = Duration::from_secs(5);
 
 type Close = (u16, &'static str);
@@ -128,7 +128,18 @@ pub async fn upgrade(
                 code,
                 reason: reason.into(),
             };
-            let _ = tokio::time::timeout(CLOSE_WAIT, tx.send(Message::Close(Some(frame)))).await;
+            // Then read until the browser's close: dropping the socket on bytes it still
+            // sends would reset the connection and discard what it hadn't read yet.
+            let _ = tokio::time::timeout(CLOSE_WAIT, async {
+                if tx.send(Message::Close(Some(frame))).await.is_ok() {
+                    while let Some(Ok(m)) = rx.next().await {
+                        if matches!(m, Message::Close(_)) {
+                            break;
+                        }
+                    }
+                }
+            })
+            .await;
         })
 }
 
@@ -195,6 +206,10 @@ async fn relay_inner(
     let mut fell_behind = false;
     // Set when the engine connection ended; the queue drains to the browser first.
     let mut engine_ended: Option<Close> = None;
+    // Cleared when a write to the engine fails. The engine shuts its socket after
+    // `disconnect`, so the read side, which may be paused behind a full queue, still has
+    // to reach EOF to say whether this tab fell behind (4008) or the engine went (4502).
+    let mut engine_writable = true;
     loop {
         if let Some(close) = engine_ended {
             if out.idle() {
@@ -248,9 +263,11 @@ async fn relay_inner(
                     return Err((close::LIMITED, "too many frames"));
                 }
                 if let Some(line) = checked(text.as_str(), &device.scopes, &mut out)? {
-                    w.write_all(&line)
-                        .await
-                        .map_err(|_| (close::ENGINE_UNAVAILABLE, "the engine connection ended"))?;
+                    // Once the engine has gone a request is dropped: the close that follows
+                    // the drain tells the browser to re-read.
+                    if engine_ended.is_none() && engine_writable {
+                        engine_writable = w.write_all(&line).await.is_ok();
+                    }
                 }
             }
             _ = pings.tick() => out.ping(),

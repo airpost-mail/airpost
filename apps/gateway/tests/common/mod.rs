@@ -66,13 +66,16 @@ pub async fn fake_engine(listener: UnixListener, events: mpsc::UnboundedSender<E
 
 /// One engine connection. `ai.summarize {streamId, count, pad}` sends `count` deltas in one
 /// write and then the reply (with the full text only when `pad` is 0); with `hold: true` it
-/// sends a delta every 10 ms until the connection ends. `ai.triage.run {count}` replies with
-/// a job id, then sends `count` progress notifications.
+/// sends a delta every 10 ms until the connection ends; with `drop: true` it sends the deltas,
+/// then `disconnect` in place of the reply, and closes the connection, as the engine does with
+/// a subscriber that fell behind. `ai.triage.run {count}` replies with a job id, then sends
+/// `count` progress notifications.
 async fn connection(n: usize, stream: UnixStream, events: mpsc::UnboundedSender<Event>) {
     let (r, mut w) = stream.into_split();
     let mut lines = BufReader::new(r).lines();
     let mut held: Option<(String, usize)> = None;
     let mut tick = tokio::time::interval(Duration::from_millis(10));
+    let mut dropping = false;
     loop {
         let out = tokio::select! {
             l = lines.next_line() => {
@@ -94,6 +97,13 @@ async fn connection(n: usize, stream: UnixStream, events: mpsc::UnboundedSender<
                     "ai.summarize" if p["hold"] == true => {
                         held = Some((stream, 0));
                         Vec::new()
+                    }
+                    "ai.summarize" if p["drop"] == true => {
+                        dropping = true;
+                        let mut out: Vec<u8> =
+                            (0..count).flat_map(|i| delta(&stream, i, pad)).collect();
+                        out.extend(notify("disconnect", json!({ "reason": "fell behind" })));
+                        out
                     }
                     "ai.summarize" => {
                         // Off the runtime: a big burst takes a while to build in a debug build.
@@ -133,7 +143,7 @@ async fn connection(n: usize, stream: UnixStream, events: mpsc::UnboundedSender<
                 delta(stream, *i - 1, 0)
             }
         };
-        if w.write_all(&out).await.is_err() {
+        if w.write_all(&out).await.is_err() || dropping {
             break;
         }
     }

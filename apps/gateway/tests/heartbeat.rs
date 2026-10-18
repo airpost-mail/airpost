@@ -5,7 +5,9 @@
 //! browser that stops answering pings is closed with 1001 within `interval + timeout` and its
 //! engine connection closes with it (which cancels its AI streams, docs/ai-plan.md A7); one
 //! that answers, or keeps sending, stays open; and a slow reader working through a burst of
-//! `ai.delta` isn't taken for dead while its ping waits behind the backlog.
+//! `ai.delta` isn't taken for dead while its ping waits behind the backlog. When the engine
+//! drops a slow reader, what was queued for it still arrives, then a close with 4008, even if
+//! the tab sends requests while the queue drains.
 
 #![cfg(unix)]
 
@@ -14,7 +16,7 @@ mod common;
 use std::time::Duration;
 
 use common::{delta_text, Event, Setup, WAIT};
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use ms_ipc::policy;
 use serde_json::{json, Value};
 use tern_gateway::config::Heartbeat;
@@ -274,4 +276,63 @@ async fn a_slow_reader_under_a_burst_is_not_taken_for_dead() {
     );
     s.drain();
     assert!(!s.log.iter().any(closed(n)), "the engine connection closed");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_dropped_slow_reader_gets_its_backlog_then_4008() {
+    let mut s = Setup::start().await;
+    let cookie = s
+        .pair(!policy::relayed_method_allowed("ai.summarize", &[]))
+        .await;
+    let (mut ws, n) = s.ws(&cookie, "dropped").await;
+    const COUNT: usize = 5000;
+    const PAD: usize = 1000;
+    let params = json!({ "accountId": "acc", "threadId": "t1", "streamId": "s",
+                         "count": COUNT, "pad": PAD, "drop": true });
+    ws.send(2, "ai.summarize", params).await;
+
+    // Read slowly, and send a request every 100 deltas: some go out after the engine closed
+    // its end, while the gateway still drains the backlog.
+    let mut i = 0;
+    let mut id = 10;
+    let mut sent_after_close = 0;
+    let mut disconnect = false;
+    let code = loop {
+        let m = tokio::time::timeout(WAIT, ws.0.next())
+            .await
+            .expect("a message");
+        let t = match m {
+            Some(Ok(Message::Text(t))) => t,
+            Some(Ok(Message::Ping(_) | Message::Pong(_))) => continue,
+            Some(Ok(Message::Close(Some(f)))) => break u16::from(f.code),
+            other => panic!("after {i} deltas: {other:?}"),
+        };
+        let v: Value = serde_json::from_str(&t).unwrap();
+        assert!(!disconnect, "a frame after disconnect: {v}");
+        if v["method"] == "disconnect" {
+            disconnect = true;
+            continue;
+        }
+        assert_eq!(v["method"], "ai.delta", "{v}");
+        assert_eq!(v["params"]["text"], delta_text(i, PAD));
+        i += 1;
+        if i % 100 == 0 {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            s.drain();
+            if s.log.iter().any(closed(n)) {
+                sent_after_close += 1;
+            }
+            // A relay that gave up early has closed the socket: the close code says so.
+            let req = json!({ "jsonrpc": "2.0", "id": id, "method": "engine.status" });
+            let _ = ws.0.send(Message::Text(req.to_string().into())).await;
+            id += 1;
+        }
+    };
+    assert_eq!(i, COUNT);
+    assert!(disconnect, "no disconnect before the close");
+    assert!(
+        sent_after_close >= 1,
+        "no request went out after the engine closed"
+    );
+    assert_eq!(code, close::FELL_BEHIND);
 }
