@@ -569,7 +569,8 @@ impl<'a> Tokenizer<'a> {
             return None;
         }
         p += 1;
-        let end = (p + n).min(self.buf.len());
+        // The length is the server's: a huge one must not overflow.
+        let end = p.saturating_add(n).min(self.buf.len());
         self.pos = end;
         Some(self.buf[p..end].to_vec())
     }
@@ -584,6 +585,14 @@ mod tests {
             Response::Untagged(u) => u,
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn a_literal_length_near_usize_max_does_not_panic() {
+        let raw = format!("* 1 FETCH (UID 4 BODY[] {{{}}}\r\nabc)\r\n", usize::MAX);
+        let _ = parse_response(raw.as_bytes());
+        let raw = format!("* 1 FETCH (UID 4 BODY[] {{{}}}\r\nabc)\r\n", usize::MAX - 2);
+        let _ = parse_response(raw.as_bytes());
     }
 
     fn tokens(raw: &str) -> Vec<Token> {

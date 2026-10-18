@@ -25,6 +25,13 @@ mod types;
 pub use session::Session;
 pub use types::*;
 
+/// Parses one server response and drops the result: the entry point of the `imap_response`
+/// fuzz target (`fuzz/`), which can't reach the private parser otherwise.
+#[doc(hidden)]
+pub fn fuzz_parse_response(raw: &[u8]) {
+    let _ = parser::parse_response(raw);
+}
+
 use ms_core::{MailError, MessageFlags, UidSet};
 use ms_providers::ServerProfile;
 
