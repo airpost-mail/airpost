@@ -1,5 +1,6 @@
 // Prepares an HTML body for the sandboxed frame. The sandbox (no allow-scripts) and the CSP
 // do the real work; this only removes what they cannot stop and rewrites cid: references.
+import { GATEWAY_BASE } from '@/engine/mode';
 
 const REMOTE_RE =
   /\b(?:src|background|poster|srcset)\s*=\s*["']?\s*(?:https?:)?\/\/|url\(\s*["']?\s*(?:https?:)?\/\//i;
@@ -9,13 +10,14 @@ export function hasRemoteContent(html: string): boolean {
 }
 
 /**
- * CSP for the frame document. Remote images are opt-in per message; `'self'` lets inline
- * parts load from the gateway's file route (`cid:` rewritten, docs/web-gateway-plan.md 2.5).
- * The frame is same-origin (`allow-same-origin`), so `'self'` is the app's origin and the
- * pairing cookie goes along.
+ * CSP for the frame document. Remote images are opt-in per message. Inline parts load from
+ * the gateway's file route (`cid:` rewritten, docs/web-gateway-plan.md 2.5), and only from
+ * there: the frame is same-origin (`allow-same-origin`), so the pairing cookie goes along
+ * and `'self'` would let a message's `<img>` hit any gateway GET.
  */
 export function frameCsp(allowRemoteImages: boolean): string {
-  const img = allowRemoteImages ? "'self' data: blob: https: http:" : "'self' data: blob:";
+  const files = `${location.origin}${GATEWAY_BASE}/files/`;
+  const img = allowRemoteImages ? `${files} data: blob: https: http:` : `${files} data: blob:`;
   return [
     "default-src 'none'",
     `img-src ${img}`,
