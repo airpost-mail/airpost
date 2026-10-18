@@ -18,6 +18,14 @@ pub fn line(s: &str) {
     }
 }
 
+/// [`line`] without the newline, for text that streams in.
+pub fn text(s: &str) {
+    let mut out = std::io::stdout().lock();
+    if write!(out, "{s}").and_then(|()| out.flush()).is_err() {
+        std::process::exit(0);
+    }
+}
+
 /// One JSON document (or NDJSON record) on stdout.
 pub fn json(v: &Value) {
     line(&v.to_string());

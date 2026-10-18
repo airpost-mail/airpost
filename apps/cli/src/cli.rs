@@ -139,6 +139,12 @@ pub enum Command {
         #[command(subcommand)]
         command: SettingsCommand,
     },
+    /// AI summaries, triage and token usage, through the provider set up in Tern's
+    /// Preferences > AI.
+    Ai {
+        #[command(subcommand)]
+        command: AiCommand,
+    },
     /// Send one raw JSON-RPC request and print its result.
     Rpc {
         /// e.g. engine.status, threads.list.
@@ -162,6 +168,34 @@ pub enum SettingsCommand {
         key: String,
         #[arg(allow_hyphen_values = true)]
         value: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum AiCommand {
+    /// Summarize a thread, printing the text as the model writes it.
+    Summarize {
+        #[arg(value_name = "THREAD_ID")]
+        thread: String,
+        /// Ask the model again instead of printing the cached summary.
+        #[arg(long)]
+        refresh: bool,
+    },
+    /// Triage inbox threads (needs-reply, important, ...) and wait until they are done. The
+    /// engine finishes the job if this is interrupted.
+    Triage {
+        /// Inbox threads from this far back: 7d, 2w, or days (default 7d).
+        #[arg(long, value_name = "AGE", conflicts_with = "threads")]
+        since: Option<String>,
+        /// These threads instead of the inbox.
+        #[arg(value_name = "THREAD_ID")]
+        threads: Vec<String>,
+    },
+    /// Tokens used per day, provider and feature.
+    Usage {
+        /// How many days back (default 30).
+        #[arg(long)]
+        days: Option<u32>,
     },
 }
 
@@ -298,6 +332,31 @@ mod tests {
         );
         assert!(parse(&["settings", "get"]).is_ok());
         assert!(parse(&["settings", "set", "signatures"]).is_err());
+    }
+
+    #[test]
+    fn ai_shapes() {
+        let cli = parse(&["ai", "summarize", "t1", "--refresh"]).unwrap();
+        let Command::Ai {
+            command: AiCommand::Summarize { thread, refresh },
+        } = cli.command
+        else {
+            panic!("ai summarize")
+        };
+        assert_eq!((thread.as_str(), refresh), ("t1", true));
+        let cli = parse(&["ai", "triage", "--since", "2w"]).unwrap();
+        let Command::Ai {
+            command: AiCommand::Triage { since, threads },
+        } = cli.command
+        else {
+            panic!("ai triage")
+        };
+        assert_eq!(since.as_deref(), Some("2w"));
+        assert!(threads.is_empty());
+        assert!(parse(&["ai", "triage", "t1", "t2"]).is_ok());
+        assert!(parse(&["ai", "triage", "--since", "3d", "t1"]).is_err());
+        assert!(parse(&["ai", "summarize"]).is_err());
+        assert!(parse(&["ai", "usage", "--days", "7"]).is_ok());
     }
 
     #[test]

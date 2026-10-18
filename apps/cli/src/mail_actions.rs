@@ -72,7 +72,7 @@ pub fn parse_until<Tz: TimeZone>(s: &str, now: DateTime<Tz>) -> Option<DateTime<
 
 /// The accounts holding each id, in the order first seen, found with `get` (`threads.get` or
 /// `messages.get`).
-fn by_account(
+pub(crate) fn by_account(
     engines: &mut [Engine],
     targets: &[Target],
     ids: &[String],
@@ -121,7 +121,7 @@ fn by_account(
     Ok(groups)
 }
 
-fn require(engines: &[Engine], t: &Target, feature: &str, what: &str) -> Result<()> {
+pub(crate) fn require(engines: &[Engine], t: &Target, feature: &str, what: &str) -> Result<()> {
     if engines[t.engine].has_feature(feature) {
         Ok(())
     } else {
