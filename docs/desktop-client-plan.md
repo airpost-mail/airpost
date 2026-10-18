@@ -1736,3 +1736,78 @@ No engine or desktop code changed. Still open for the web: signatures and templa
 devices can't set `signatures` or `templates`), `integrations.*` for devices without admin
 (3.6), and undo-send surviving a closed tab (stage 13). A browser run against a `serve`
 engine and the gateway on the fake mail servers passed (`apps/web/e2e/`).
+
+2026-10-18, stage 11 delivered, branch `roadmap/client-next` (not merged). Engine: new
+`crates/ms-secrets` (one keyset item: macOS Keychain service "Tern Engine", Linux Secret
+Service, or `secrets.enc` sealed with AES-256-GCM from `TERN_ENGINE_KEY_FILE` or
+`$CREDENTIALS_DIRECTORY/tern-engine-key`; no plaintext backend; a stored keyset that can't be
+read is an error, never an empty one). `serve` keeps `<config>/accounts.json` (non-secret JSON,
+0600) and starts every registered account itself; `account.add` registers the account (secrets
+it carries replace the stored ones, missing ones come from the store; `stored` in the result),
+rotated refresh tokens of registered accounts go to the store instead of stdout,
+`account.remove` unregisters and deletes the secrets, `account.changed` announces a stored
+account's JSON. Restart policy in `apps/engine/src/restart.rs`: auth failures (classified in the
+engine) stop the account with `authFailed` until the next `account.add`; otherwise a retry after
+5 s doubling to 5 min (`retryAt`), and 5 stops in 5 minutes give up. `credentials.import`
+(stdin only) maps `<email>-imap|smtp|refresh-token` to every account with that email,
+`integration-<p>-key` to `integration:<p>` and keeps `tern-server-token`. `hello` and
+`engine.status` carry `build` (`sha256:` of the executable), `credentials {store, accounts,
+error?}`, `detached`, and Feature `accounts`. `serve --detached` has no parent channel: local
+non-relayed connections take the parent methods except `credentials.import`, and
+`engine.shutdown` answers, then exits. `serve` runs `migrate` itself. A running account added
+with other settings or secrets restarts with them; added unchanged it answers ACCOUNT_EXISTS.
+Folded in: TD43, TD44, TD45, TD46 and the engine half of TD12 (see `docs/tech-debt.md`).
+Desktop: before the first `account.add` to an engine with `accounts`, the supervisor imports
+every config.json account the engine lacks and every account KeyManager still has secrets for
+(secrets from `credentials`, else from `credentialsBeforeEngine`), then
+`KeyManager.moveAccountSecretsToEngine` keeps the blob as `credentialsBeforeEngine` (first time
+only), drops the accounts' keys from `credentials` and sets `credentialsMovedToEngine`; an
+account.add the engine `stored` drops that account's copy. `account.add` then goes without
+secrets. EngineClient on such an engine leaves stopped accounts with `retryAt` to the engine,
+treats one without as given up (with `authFailed`), never sends `account.remove` to restart or
+reset an account, and removes accounts the engine has that config.json doesn't list. At launch
+`detachedEngineToReuse` joins a detached engine with the bundled build and protocol once the
+credentials moved; any other detached engine gets `engine.shutdown` on its socket and launch
+waits for it as before. Dev runs (unpackaged, and `make desktop`) set `TERN_ENGINE_KEY_FILE` to
+`<config>/engine-dev.key`; the harness sets a temp key file. Checks: `cargo test` of mailsync,
+ms-secrets, ms-ipc, ms-core, ms-store, ms-sync, ms-tasks, ms-imap, tern-client; clippy and fmt;
+harness quick tier on serve (142 passed, 4 skipped) and stdio (134 passed, 12 skipped) with debug
+binaries; desktop lint, typecheck and the engine, mailsync-process, key-manager, oauth-revocation
+and account-error specs (180 passing). New tests: `credentials_import_maps_a_keyset_with_duplicate_emails`,
+`a_rotated_token_is_stored_and_used_after_a_restart`, scenario
+`oauth-rotated-token-survives-restart`, `registered_accounts_start_with_the_next_engine_until_forgotten`,
+`a_stopped_account_is_retried_until_it_fails_too_often`,
+`a_detached_engine_migrates_and_takes_parent_methods_on_the_socket`, and desktop specs for the
+import, the downgrade with `credentialsBeforeEngine`, a refused import, joining a detached engine,
+and an older detached engine at launch.
+
+Decisions taken, to confirm: debug engines default to the file store keyed by
+`<config>/engine-dev.key` (release builds use the OS store unless `TERN_ENGINE_KEY_FILE`,
+`$CREDENTIALS_DIRECTORY` or `TERN_ENGINE_SECRET_STORE` say otherwise). `serve` binds its socket
+before `migrate`, so a second engine can't start beside it, and accepts connections only after.
+`account.remove` always unregisters and deletes the secrets (no `forget` flag); `account.reset`
+and `engine.resetDatabase` keep the registration (listed stopped until added again). The
+restart delay base can be set with `TERN_ENGINE_RESTART_DELAY_MS` in every build (the harness
+sets 10 minutes). Autostarted accounts use the identity of the latest `account.add` (none until
+a client adds one). config.json `accounts` stays the list the desktop runs and `AccountStore`
+stays on config.json: switching it to `account.list`/`account.changed` waits for stage 12, when
+onboarding and account edits go through the engine. Integration keys stay in KeyManager too
+(copied into the engine, read from KeyManager until stage 12). Once the secrets moved, windows
+reading an account's secrets (OAuth revocation, the reconnect form) get them from
+`credentialsBeforeEngine`. A downgraded build finds only the integration keys and asks to sign
+in again; the next upgrade imports what it changed. The desktop's own `migrate` run stays (for
+its error dialog) except when it joins a detached engine. The engine.json `detached` flag
+marks a detached engine; an earlier non-detached engine is left to exit on its own.
+
+Open: the Linux Secret Service backend compiles only on Linux and was not built here (CI's
+Linux `cargo test --workspace` builds it and runs the file store tests). Keychain and Secret
+Service tests run only with `TERN_TEST_KEYCHAIN=1` (not run). `tern engine start` and the launchd/systemd units
+aren't written. Account ids are still the desktop's (`idForAccount` in Rust is stage 12), and
+removing an account added after the move doesn't revoke its Google grant (the engine does that
+from stage 12). If a joined detached engine's socket drops, the supervisor spawns its own engine,
+which may find the socket in use until the detached one exits. A detached engine that refuses
+`hello` (another protocol) can't be asked to stop; launch then waits 40 s and migrates anyway.
+The fuzz job hasn't run, and no scenario injects a message that panics. Nothing for tern-web.
+Trial pending (not run): migrate the trial profile, restart the app, check both accounts sync;
+run `serve --detached` with the desktop closed and check mail still syncs; update the app with
+the detached engine running.

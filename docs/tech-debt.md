@@ -418,6 +418,12 @@ loads from `file://`, so `script-src 'self'` matches any local file, including a
 
 ### TD12. Mail in fixed `/tmp` names; engine files at default umask
 
+Engine half done (roadmap/client-next, stage 11, 5b1974bb3). The engine sets its umask to 077
+at start (`platform::restrict_umask`), so the database, logs, attachments, `accounts.json` and
+`secrets.enc` are created 0600 in 0700 directories, and `serve` makes its config directory 0700
+(`platform::uds::restrict_dir`, which also drops group and other bits from an existing one).
+The desktop half (`/tmp` names) is open.
+
 Verified. On Linux `app.getPath('temp')` is `/tmp`. These are written with `writeFileSync`
 defaults (0644 under the usual umask) at predictable names and never removed:
 `print.html` and `print.messages.js`, which the print window loads as a `<script>`
@@ -1062,6 +1068,14 @@ indexes an unspaced CJK run as one token, so only its prefix matches.
 
 ### TD43. Transient task errors revert the user's action (before stages 11 and 14)
 
+Done (roadmap/client-next, stage 11, 9899c06d1, 825d791ed). `ms-tasks` retries the remote
+phase of ChangeUnread/Starred/Folder/Labels, SyncbackCategory, DestroyCategory and
+ExpungeAllInFolder after a retryable error: the task stays `remote` with `_remoteAttempts` and
+`_nextAttemptAt` in its data, 5 s doubling to 5 min, up to 8 attempts, then fails as before. A
+move being retried keeps its optimistic placement and its `_sa` hold, and flag changes don't
+rescan until the last attempt. The foreground worker skips a task until its next attempt.
+Scenario `flag-change-retried-after-connection-drop`.
+
 Verified; the flag-revert via rescan is inferred. Only `Error::Database` leaves a task queued
 (`crates/ms-tasks/src/lib.rs:287-290`, `:353-379`); any other error, retryable or not, marks it
 complete with the error. Moves abandon the optimistic placement and flag changes rescan folders
@@ -1081,6 +1095,11 @@ retries" rule, kept on purpose (`engine-port-plan.md:423`).
 
 ### TD44. Any non-SyncError stops the account for good (before or with stage 11)
 
+Done (roadmap/client-next, stage 11, 0b6095890, 825d791ed). `Error::is_transient` (retryable
+SyncErrors, SQLite BUSY/LOCKED/IOERR/FULL, io errors) keeps the worker loops going with their
+backoff; only other errors stop the account, and `serve`'s restart policy (5 s doubling to 5 min,
+5 stops in 5 minutes gives up, auth failures wait for the client) restarts it.
+
 Verified. `is_retryable` is true only for a `SyncError` with `retryable` set
 (`crates/ms-core/src/error.rs:353-355`). A Database error (`SQLITE_BUSY` after the 60 s busy
 timeout, disk full, I/O error) or a serde or io error calls `ctx.fail`
@@ -1095,6 +1114,14 @@ restarted it.
 - Size: ~80 Rust plus a test that injects BUSY.
 
 ### TD45. No fuzzing of untrusted-input parsers (before stage 11)
+
+Done (roadmap/client-next, stage 11, 375b3ad63, 825d791ed, 6fed85590). `fuzz/` has
+cargo-fuzz targets for the IMAP response parser, `parse_message`, rfc2047, HTML flatten, iCal and
+vCard, run nightly for 5 minutes each (`.github/workflows/fuzz.yml`; not run locally, no nightly
+toolchain here). The literal length uses saturating arithmetic. A message whose processing
+panics is quarantined (`quarantine-<folderId>-<uidvalidity>` in `_State`, up to 1000 UIDs) and
+skipped, so the account keeps syncing; this works in `serve`, where account threads run under
+`catch_unwind`. No harness scenario injects such a message yet.
 
 Inferred: no concrete panic found. The IMAP parser and envelope code
 (`crates/ms-imap/src/parser.rs`, `envelope.rs`), MIME (`crates/ms-mime/src/mime.rs`, `header.rs`,
@@ -1113,6 +1140,12 @@ the account (`crates/ms-sync/src/runtime.rs:201`, `apps/engine/src/modes.rs:225-
 - Size: 2–3 days for targets and CI; ~150 Rust for quarantine.
 
 ### TD46. Monthly blocking VACUUM, WAL never truncated (stage 11)
+
+Done (roadmap/client-next, stage 11, 2a1024ebd). No monthly VACUUM; a new database is created
+with `auto_vacuum = INCREMENTAL`, every connection sets `journal_size_limit` to 64 MB, and
+after an hourly cleanup that deleted rows the engine runs `incremental_vacuum(2048)` and
+`wal_checkpoint(TRUNCATE)`; `reset_account` does the same instead of a VACUUM. Existing databases
+are not converted (that needs one full VACUUM); they still get the WAL truncation.
 
 Verified; WAL growth inferred. Every 30 days `migrate` runs a full VACUUM before the app starts
 (`crates/ms-store/src/migrate.rs:82-95`), needing twice the database size free, and
