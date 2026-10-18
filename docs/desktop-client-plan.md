@@ -1087,7 +1087,8 @@ sample service, quit the desktop, see it act.
 Open items:
 - Drafts whose From never went through the composer (created by tern-mcp, CLI or web) and
   whose address matches no account: the engine fails them with an error; whether the
-  executor should instead move them to the matching account (stage 4).
+  executor should instead move them to the matching account (stage 4: it fails them, with
+  `error` on the send-later metadata; to confirm).
 - The supported subset of natural-language date terms (stage 9), from the desktop's spec
   cases.
 - Where `draft.send`'s `bodies` are stored during the undo window (stage 13).
@@ -1366,3 +1367,80 @@ than on a body-fetch signal; no `tern files` command (`tern rpc` reaches the met
 uploads never attached to a sent message stay, File row and bytes; leftover `files/.tmp`
 parts after a crash aren't swept; the desktop still reads paths itself. Trial pending:
 `get_attachment` for a file not yet downloaded (covered on the fake server by `test_mcp.py`).
+2026-10-18, stage 4 (expiration executor), branch `roadmap/client-next`: delivered, not merged.
+TD32 first: `--mode reset`, `account.reset` and `engine.resetDatabase` keep every message's and
+thread's plugin metadata in `DetatchedPluginMetadata` under the Message-ID keys `import-legacy`
+uses (`crates/ms-store/src/metadata_stash.rs`; reset no longer deletes that table), and the
+resync attaches it again. Engine: `crates/ms-sync/src/expiration_executor.rs`, run by the
+`metadataExpiration` thread in `serve` only (the context carries the settings store there);
+feature `expiration-executor`. Due `send-later` on a draft: unless `clientFinalize` or an
+`actionKey` other than `send`/`send-and-archive`, the expiration is cleared, the draft finalised
+(`finalise_draft`: From must be the account's address or an alias, inline files the body no
+longer references are dropped, zero-width spaces stripped from plaintext, no per-recipient
+bodies) and a `SendDraftTask` queued, then for `send-and-archive` the archive task of
+`tasksForArchiving`; on a message that is no longer a draft the row is cleared. A draft missing
+its body, plaintext flag or a file on disk gets a body fetch and another look after 1, 2, 4 and
+8 minutes, then `{expiration: null, error}`; a From that isn't the account's gets the same
+error. `thread-snooze`: expiration cleared; if the thread is still in Snoozed, Gmail swaps the
+Snoozed label for the inbox's, other providers move it to the inbox with `sourceFolderIds` of
+Snoozed; then the resurfacing message, or with `core.notifications.unsnoozeToTop` false a
+`ChangeUnreadTask` when nothing in the thread is unread. `send-reminders`: `Thread::before_save`
+records the `lastReplyTimestamp` baseline (with `shouldNotify: false`) on any reminder with an
+expiration and none, and clears the reminder (`{}`) once `lastMessageReceivedTimestamp` moves, so
+the promotion of `thread:send-reminders` at send gets its baseline from the same hook; when due,
+`shouldNotify: true`, expiration cleared, resurfacing message in reply to `sentHeaderMessageId`.
+Resurfacing message: from `{account.name or email} via Tern` to the account itself, the
+thread's subject, In-Reply-To the given Message-ID or the thread's newest non-draft message,
+body from `resurfacing.snoozeBody` / `resurfacing.reminderBody` or the English fallback, sent as
+a silent `SendDraftTask`. Metadata changes go through `SyncbackMetadataTask`'s local phase; every
+other plugin's rows (and declined ones) are emitted as before. TD33: sends the engine queues carry
+`retryWhenOnline`; a retryable SMTP error before the server accepted the message puts the task
+back in `remote` (for up to 24 h after the first, `_offlineSince`), the foreground round goes on
+with the other tasks and the worker sleeps on that error (offline shown); SMTP connection errors
+on other sends are now marked retryable in their error JSON. Desktop: with `expiration-executor`
+the send-later handler acts on `clientFinalize` rows only and the snooze and reminder
+expiration/database handlers are off (the reminder focus handler stays);
+`SendActionsStore.needsClientFinalize` marks undo-send and send-later-button rows (an action
+outside `send`/`send-and-archive`, a composer extension with its own `applyTransformsForSending`,
+or the built-in tracking extensions when they would transform the draft); the draft list shows a
+send-later `error`; `SendDraftTask.onError` only logs for silent tasks; `src/resurfacing.ts`
+builds both bodies (the snooze one's broken markup fixed) for the window and for the settings
+mirror, which writes them in the configured language (`intl.localizerFor`) to an engine with the
+executor after each sync and when `core.intl.language` changes. tern-mcp's `schedule_send` says
+the engine sends when the engine has the executor, the desktop otherwise. Harness:
+`client.settings`, `server.smtp_stop`/`smtp_start`, `transports:` (the two `metadata-expiration-*`
+scenarios and `reset-keeps-plugin-metadata` now run on stdio and socket only); serve scenarios
+`expiration-send-later` (two sent once, a `clientFinalize` one emitted), `expiration-undo-send`
+(window closed with the engine running; engine quit inside the window, sent after the next
+start), `expiration-send-later-header-only` (slow; empty body row, fetched, sent once with its
+attachment), `expiration-snooze` (IMAP, two snoozes one due, resurfaced and hidden),
+`expiration-snooze-gmail` (labels, unsnooze-to-top off, marked unread), `expiration-send-reminders`
+(reply clears one, the other reminds), `expiration-send-offline`, `expiration-reset-keeps-snooze`.
+Rust tests: executor cases in `crates/ms-tasks/tests/tasks.rs` (send, decline, From, waits, body
+arrives, non-draft, IMAP and Gmail unsnooze, unread, left Snoozed, reminders, offline deferral,
+scan), `reminder_update`, `finalise_draft`, the stash. Specs: send-later, snooze, reminders,
+`needsClientFinalize`, resurfacing texts and silent `onError`, the mirror's resurfacing writes.
+Decisions taken, to confirm: the executor runs in `serve` only (per-account `sync` keeps emitting
+deltas); a From matching no account fails the send with `error` on the metadata instead of moving
+the draft; the incomplete-draft waits are kept in memory, not written to the row, so an engine
+restart starts them again; the reminder baseline and clear run in `Thread::before_save` rather than
+`after_save` (one save instead of two), which also covers promotion in `send.rs`; the built-in
+tracking extensions count as transforms only when they would change the draft
+(`needsPerRecipientBodies`); the resurfacing texts are written only to engines with
+`expiration-executor`, not mirrored into config.json, and the reminder string is new in
+`lang/en.json` (other languages fall back to English until translated); an engine send stays
+queued for 24 h of failures, then fails like any send; Send and Archive on a draft with no thread
+archives nothing, as the desktop does. Open: tern-web: `apps/web` send-later-runner should stop
+sending when the engine announces `expiration-executor` (not ours); the desktop's file-deleting
+Rebuild fallback and failed-`migrate` rebuild still lose local-only metadata (TD32); stage 13:
+"Queued, sends when online" on the draft and the retry for composer sends (TD33), `draft.send`
+reusing `finalise_draft`; stage 17: claims (T22) and engine-side tracking transforms, until then
+tracked scheduled drafts stay `clientFinalize`; metadata the engine writes in `before_save`
+(baselines, reply clears) isn't pushed to a metadata backend, only the executor's own
+`SyncbackMetadataTask`s are; the harness doesn't cover IMAP with unsnooze-to-top off, Gmail with it
+on, or Send and Archive (the ms-tasks tests do); a missing attachment file can't be staged in the
+harness, so `expiration-send-later-header-only` covers the empty body only. Trial pending: schedule
+a send two minutes out, close the window and keep the engine, see it arrive once; snooze a thread
+and set a reminder by hand and see both come back with no window open; once with the UI in a
+language other than English, check the resurfacing text.
+

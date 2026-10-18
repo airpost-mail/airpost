@@ -745,6 +745,11 @@ With `HttpMetadataBackend` configured, the cursor reset does replay from the bac
   harness scenario: snooze, reset, resync, unsnooze fires.
 - Size: ~300–400 Rust plus scenario. Before stage 4 makes the engine the only owner of
   snooze and send-later state.
+- Status (2026-10-18, `roadmap/client-next`): fixed for `--mode reset`, `account.reset` and
+  `engine.resetDatabase` (`crates/ms-store/src/metadata_stash.rs`; scenarios
+  `reset-keeps-plugin-metadata`, `expiration-reset-keeps-snooze`). Still open: the desktop's
+  file-deleting fallbacks (Rebuild after the engine stopped, the failed-`migrate` rebuild at
+  launch) delete the database without the stash.
 
 ### TD33. No outbox; failed silent sends pop a composer (silent fix now; queue in stages 4 and 13)
 
@@ -759,6 +764,12 @@ composer for a draft the user never wrote.
 - Fix: now, `onError` only logs for silent tasks (~10 TS). In stages 4 and 13: on
   `SyncError.offline`/`retryable`, keep the send queued until the account reconnects and show
   "Queued, sends when online" on the draft (~400 Rust, ~100 TS). Shares the retry design with TD43.
+- Status (2026-10-18, stage 4): `onError` logs and returns for silent tasks. Sends the engine
+  starts itself (`retryWhenOnline`: scheduled sends, undo send, resurfacing messages) go back to
+  `remote` on a retryable SMTP error before the server accepted them, for up to a day after the
+  first one, and run again after the worker's sleep or a wake (`expiration-send-offline`). Open
+  for stage 13: the same for sends from the composer (`draft.send`), and the "Queued, sends when
+  online" state on the draft.
 
 ### TD34. Message bodies render inside the Node-enabled renderer (before stage 5)
 
