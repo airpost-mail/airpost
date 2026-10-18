@@ -746,6 +746,17 @@ lets a manifest install a launchd or systemd unit. Packages record no source or 
   `tern service install`. Record install source and hash in Preferences > Plugins (TD30).
 - Size: ~200 TS plus docs. Before stage 2 sets `PLUGIN_API_VERSION` and the `tern` block.
 
+Done in part (roadmap/client-next, stage 5). `src/engine-api.ts` says plugins are fully trusted
+code and that the check below is no security boundary. `Engine.request` finds the calling package
+from the call's stack (the first frame outside `src/`, matched to a loaded package's directory)
+and refuses a T13 local-only method (`account.*` writes, `secrets.*`, `credentials.*`,
+`server.*`, `engine.logs.tail`, `engine.setLogLevel`, `engine.resetDatabase`,
+`engine.shutdown`) unless the package's `tern.engineMethods` lists it and the user allowed it.
+The user is asked on the first call, not at install (no install step reads the manifest yet); a yes
+is kept in `core.plugins.engineMethodApprovals`, a no for the session. The app's own code and
+bundled packages are never asked. Still open: showing the binary and unit before
+`tern service install` (stage 19), and recording install source and hash (TD30).
+
 ### TD30. Plugins can't be disabled from the UI; dead and placeholder plugins (stage 2)
 
 Verified. Preferences has no Plugins tab (`internal_packages/preferences/lib/main.tsx:14-55`).

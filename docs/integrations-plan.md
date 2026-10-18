@@ -177,9 +177,11 @@ take up to 30 s.
   `errorMessage(err, providerName)` gives the short user message per key. The desktop adds
   `engine-unavailable` and `unknown` to the crate's keys.
 - Transport: `Integrations.setTransport({available, send(method, params)})`. The default is
-  `UnavailableTransport` (`available: false`, every call fails with `engine-unavailable`), marked
-  `TODO(engine)`; while it is in place the store reports no integration feature as available.
-  The engine wiring sets a socket transport once `integrations.*` exists (phase C).
+  `UnavailableTransport` (`available: false`, every call fails with `engine-unavailable`); while
+  it is in place the store reports no integration feature as available. Since stage 5 every
+  window sets one over its engine connection (`src/engine-api.ts`), available while the engine
+  lists the `integrations` feature; `-32010` becomes the error in `data`, `-32012` (busy)
+  `rate-limited`, a dropped connection `engine-unavailable`.
 - `preferences/lib/tabs/preferences-integrations.tsx`: the tab of section 2, order 3.
 - `translation`: `requestTranslation` calls `integrations.translate` with `format: "html"` and
   returns `translatedText`; `isTranslationAvailable()` and the composer button's tooltip read
@@ -197,8 +199,8 @@ take up to 30 s.
 
 ## 6. Open
 
-- The engine transport (`TODO(engine)` in `src/integrations.ts`); the Test button's host and
-  usage output is untested against the real `integrations.test`.
+- The Test button's host and usage output is untested against a real provider through
+  `integrations.test` (the engine transport landed in stage 5, `src/engine-api.ts`).
 - Moving keys from the desktop keyset to the engine (with the engine owning credentials
   generally), after which `config` in section 4 drops the key.
 - DeepL marks `/v2/languages` deprecated for `/v3/languages` (no sunset date yet).

@@ -1585,3 +1585,70 @@ tests with a local HTTP server, `apps/engine/tests/mail_actions.rs`, the harness
 web tests, the desktop spec. Open: the snooze move is built twice (here and in the
 executor); one-click on a release build has only the unit and debug-binary tests (no public
 https test server); trial pending: one-click unsubscribe on a test list.
+
+2026-10-18, stage 5 (integrations on serve, `Engine` export) with TD34 first and TD29 folded in,
+branch `roadmap/client-next`: delivered, not merged. TD34: message bodies render in
+`tern-message://frame/message.html`, served by main with the message CSP as header and meta, in an
+iframe sandboxed `allow-scripts allow-forms` without `allow-same-origin`, so Chromium runs it as a
+sandboxed out-of-process frame with no Node. A postMessage bridge
+(`src/message-frame/`) carries height, find-in-thread matches, link clicks, forms, keys, mouse and
+the context menu; `renderedMessageBodyIntoDocument` gets `body` (`MessageBody`: query,
+setAttributes, insertElement, rect, click and mousedown listeners) instead of the document, and
+link tracking, print and translation detection use it or `messageFrameContent`. Engine:
+`apps/engine` gains ms-integrations; `integrations_api.rs` answers `integrations.translate |
+detect | languages | grammar | enrich | test` per integrations-plan section 4 (bad params
+`-32602`, a provider failure `-32010` with the serialized error as `data`). They run on
+`workers.rs`, named lanes with bounded threads and queues that replace the per-call threads of
+`files.get` and stage 10's parent calls: integrations 8 threads / 64 queued, files 32 / 512,
+accountTest 8 / 32, accountReset 4 / 32, engineMaintenance 1 / 16; a full lane answers `-32012`
+(`ENGINE_BUSY`). `hello` and `engine.status` carry `capabilities` (features `integrations` and
+`capabilities`), recomputed from the settings store under its lock when a `core.integrations.*`
+key changes, with `capabilities.changed` to every subscriber when they differ. Desktop: `Engine`
+in mailspring-exports (`request`, `subscribe`, `features`, `has`, `capabilities`, `connected`,
+`onDidChange`); every window sets `Integrations.setTransport` on its connection
+(`wireIntegrationsTransport`), available while the engine lists `integrations`; `CapabilityStore`
+reads the engine's capabilities and still checks the key through the KeyManager facade, which
+the request still sends; `core.integrations.<kind>` is mirrored into the engine store;
+`PLUGIN_API_VERSION` is 1.27.0. TD29: `src/engine-api.ts` says plugins are fully trusted code;
+`Engine.request` finds the calling package from the stack and refuses a T13 local-only method
+unless `tern.engineMethods` lists it and the user allowed it. Checks: engine
+`tests/integrations.rs` against ms-integrations' mock server (provider calls and error mapping,
+out-of-order answer behind a slow provider, capabilities and `capabilities.changed`, relayed
+refusal), unit tests for the lanes, the capabilities and the params, ms-ipc round-trip and policy
+tests, `tests/serve.rs`, `files.rs` and `socket.rs`; the harness quick tier on serve with the
+debug build (137 passed, 4 skipped); fmt, clippy and `cargo deny check licenses` on the touched
+crates; desktop lint, typecheck and the affected specs (`engine-api-spec` and the
+message-frame, capability, integrations, translation, preferences, engine connection, settings
+and package-manager specs, 374 passing over three runs).
+
+Decisions taken, to confirm: the frame is a custom scheme with a mini CommonJS bundler for its
+runtime (TypeScript transpiled when the page is asked for in dev), and `MessageBody` is the whole
+body API extensions get; reading `document` in the hook throws and is warned once per extension.
+`capabilities` is `{integrations: {translation, grammar, enrichment}, server: {readReceipts,
+linkTracking, threadSharing, activitySharing, metadataSync}}` with entries `{available,
+provider?, credentials?, reason?}`, reasons `not-set-up`, `missing-url`, `needs-tern-server`;
+`credentials: "request"` means the client sends the key and checks it has one; groups an older
+client doesn't know (`ai`) are kept as they came. The provider settings move into the engine's
+settings store so it can compute them. `capabilities.changed` also goes to the connection whose
+`settings.set` caused it. `integrations.*` are local-only (a relayed device needs admin), with no
+extra rule on `config.url`. Integrations are offered on `serve`'s socket only, not on the parent's
+stdin or in `sync --socket`. `-32012` for a full lane, which the desktop reports as
+`rate-limited`. The files and account-test/reset lanes are contained: a panic there answers
+`-32603` instead of aborting (files used to abort); engine maintenance now runs one call at a time.
+TD29 asks on the first call, not at install (no install step reads the manifest yet), keeps a yes
+in `core.plugins.engineMethodApprovals` and a no for the session, and never asks for the app's
+code or bundled packages. `Engine.subscribe` gets the window connection's notifications except
+deltas (DatabaseStore has those), filtered by method and `accountId`. 1.27.0 is a minor bump
+although `renderedMessageBodyIntoDocument` no longer gets `document`.
+
+Open: tern-web: the gateway and `apps/web` don't relay `integrations.*` to non-admin devices
+(local-only), and the web client should read `capabilities` from `hello` and
+`capabilities.changed`; relaying them safely needs the engine to use its own saved config and
+keys (3.6) instead of the URL in the request. tern-ai: `capabilities.ai` can go in as another
+group (ms-ipc `Capabilities.other` keeps it today), and `ai.*` can run on a new lane in
+`workers.rs`; `-32011` is left free. Preferences > Integrations still keeps keys in the keyset
+until `accounts` (3.6). No way yet to see or revoke engine-method approvals (Preferences > Plugins,
+TD30). The Test button is untested against a real provider. TD34 leaves the clipped,
+show-original, print and quick-preview windows and the composer's quoted body as Node-enabled
+documents. Trial pending (not run): translate a message with LibreTranslate in a popout; grammar
+check a draft in a composer window.
