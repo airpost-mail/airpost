@@ -210,24 +210,31 @@ fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        // Bound first so that with port 0 the public URL (and so the Host and Origin checks
-        // and `pair`'s link) names the port the system picked.
+        let config_for = |bind: SocketAddr| {
+            Config::new(ConfigInput {
+                bind,
+                public_url: args.public_url.as_deref(),
+                insecure_public_url: args.insecure_public_url,
+                allow_origins: &args.allow_origin,
+                trusted_proxies: &args.trusted_proxies,
+                web_root: args.web_root.clone(),
+                config_dir: config_dir.clone(),
+            })
+        };
+        // Validated before anything binds, so a refused config never listens, even briefly.
+        let checked = config_for(args.bind)?;
+        // The control socket before the TCP port, so a second gateway on this profile says so
+        // rather than failing on the port.
+        let control_path = control::socket_path(&checked.state_dir);
+        let control_listener = control::bind(&control_path)?;
+        // With port 0 the public URL (and so the Host and Origin checks and `pair`'s link)
+        // must name the port the system picked, so the final config is built after the bind.
         let listener = tokio::net::TcpListener::bind(args.bind).await?;
-        let config = Config::new(ConfigInput {
-            bind: listener.local_addr()?,
-            public_url: args.public_url.as_deref(),
-            insecure_public_url: args.insecure_public_url,
-            allow_origins: &args.allow_origin,
-            trusted_proxies: &args.trusted_proxies,
-            web_root: args.web_root,
-            config_dir,
-        })?;
+        let config = config_for(listener.local_addr()?)?;
         if !config.public.https && !config.public.is_loopback() {
             tracing::warn!("serving over plain http: device cookies travel unencrypted");
         }
         let state = AppState::new(config)?;
-        let control_path = control::socket_path(state.devices().dir());
-        let control_listener = control::bind(&control_path)?;
         let server = Server::with_listener(listener, state.clone());
         let public_url = state.config().public.as_header();
         let running_path = state.devices().dir().join("gateway.json");
