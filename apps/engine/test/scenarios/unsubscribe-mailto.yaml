@@ -1,0 +1,56 @@
+name: unsubscribe-mailto
+description: >
+  `messages.unsubscribe` on serve. A list message whose List-Unsubscribe header offers a
+  mailto and a web link, without one-click: the engine sends the mailto message itself, from
+  the account, to the list's address with the URI's subject, once over SMTP with a Sent copy.
+  A message with only a web link gets the link back for the client to open and nothing is
+  sent; asking for one-click where the header has none is refused.
+source: "docs/desktop-client-plan.md 3.3 messages.unsubscribe; list-unsubscribe unsubscribe-service.ts getBestUnsubscribeOption; RFC 2369, RFC 6068"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+setup:
+  - server.append:
+      mailbox: INBOX
+      messages:
+        message_id: "<list-1@lists.example.net>"
+        subject: "Weekly news"
+        extra_headers: {List-Unsubscribe: "<mailto:leave@lists.example.net?subject=unsubscribe%20me>, <https://lists.example.net/u/1>"}
+  - server.append:
+      mailbox: INBOX
+      messages:
+        message_id: "<list-2@lists.example.net>"
+        subject: "Offers"
+        extra_headers: {List-Unsubscribe: "<https://lists.example.net/u/2?t=x>"}
+steps:
+  - wait: quiescent
+  - client.rpc:
+      method: messages.unsubscribe
+      params: {message: {header_message_ids: ["list-1@lists.example.net"]}}
+      expect: {method: mailto, ok: true, taskId: {present: true}, url: "mailto:leave@lists.example.net?subject=unsubscribe%20me"}
+  - client.rpc:
+      method: messages.unsubscribe
+      params: {message: {header_message_ids: ["list-2@lists.example.net"]}}
+      expect: {method: web, ok: true, url: "https://lists.example.net/u/2?t=x"}
+  - client.rpc:
+      method: messages.unsubscribe
+      params: {message: {header_message_ids: ["list-1@lists.example.net"]}, method: one-click}
+      expect_error: -32004
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 1
+      match: [{status: complete, error: null}]
+  smtp:
+    count: 1
+    messages:
+      - {recipients: ["leave@lists.example.net"], headers: {From: {re: "test@example.test"}, Subject: "unsubscribe me"}}
+  server_counts: {INBOX: 3, Sent: 1}
+  db_matches_server: {}
+  running: true

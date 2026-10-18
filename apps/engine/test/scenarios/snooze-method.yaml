@@ -1,0 +1,51 @@
+name: snooze-method
+description: >
+  `threads.snooze` and `threads.unsnooze` on serve, as the CLI, tern-mcp and the web call
+  them. Two inbox threads are snoozed for an hour, in one call each: the engine moves the
+  inbox copies to Snoozed and writes the thread-snooze metadata the desktop writes, which the
+  expiration executor fires (expiration-snooze). One is unsnoozed by hand, which moves it
+  back and clears its snooze without resurfacing it. A snooze in the past is refused.
+source: "docs/desktop-client-plan.md 3.3 threads.snooze; snooze-store.ts _onSnoozeThreads; snooze-utils.ts moveThreads"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+  "[Mailspring]/Snoozed": {}
+setup:
+  - server.append: {mailbox: INBOX, messages: {message_id: "<snz-1@example.test>", subject: "Soon"}}
+  - server.append: {mailbox: INBOX, messages: {message_id: "<snz-2@example.test>", subject: "Later"}}
+steps:
+  - wait: quiescent
+  - client.rpc:
+      method: threads.snooze
+      params: {threads: {header_message_ids: ["snz-1@example.test"]}, until: 1000}
+      expect_error: -32602
+  - client.rpc:
+      method: threads.snooze
+      params: {threads: {header_message_ids: ["snz-1@example.test"]}, until: {now_plus: 3600}}
+      expect: {taskIds: {present: true}}
+  - client.rpc:
+      method: threads.snooze
+      params: {threads: {header_message_ids: ["snz-2@example.test"]}, until: {now_plus: 3600}}
+  - wait: {models: {Task: {where: {__cls: ChangeFolderTask, status: complete}, count: 2}}, timeout: 60}
+  - wait: {counts: {INBOX: 1, "[Mailspring]/Snoozed": 2}, timeout: 30}
+  - client.rpc:
+      method: threads.unsnooze
+      params: {threads: {header_message_ids: ["snz-2@example.test"]}}
+  - wait: {models: {Task: {where: {__cls: ChangeFolderTask, status: complete}, count: 3}}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  models:
+    Task:
+      where: {__cls: SyncbackMetadataTask}
+      count: 3
+      match: [{status: complete, error: null}]
+  smtp: {count: 0}
+  server_counts: {INBOX: 2, "[Mailspring]/Snoozed": 1}
+  metadata:
+    - {threads: {header_message_ids: ["snz-1@example.test"]}, plugin: thread-snooze, expiration: true}
+    - {threads: {header_message_ids: ["snz-2@example.test"]}, plugin: thread-snooze, expiration: false}
+  db_matches_server: {}
+  running: true

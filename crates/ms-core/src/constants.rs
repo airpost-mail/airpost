@@ -287,6 +287,8 @@ pub mod thread {
     pub const SIGNALS: &str = "signals";
     /// `--socket`: answers one `files.get` once its download has written the file.
     pub const FILES: &str = "files";
+    /// `--socket`: makes one `messages.unsubscribe` one-click POST.
+    pub const UNSUBSCRIBE: &str = "unsubscribe";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
     /// `serve`: runs one `account.test` for the parent.

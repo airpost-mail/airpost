@@ -151,6 +151,16 @@ impl ReadApi {
         self.store()?.file(account_id, id).map_err(internal)
     }
 
+    /// The Message JSON, for `messages.unsubscribe`.
+    pub fn message(&mut self, account_id: &str, id: &str) -> Result<Option<Value>, ErrorObject> {
+        self.store()?.message(account_id, id).map_err(internal)
+    }
+
+    /// Whether the message's body has been fetched.
+    pub fn has_body(&mut self, id: &str) -> Result<bool, ErrorObject> {
+        Ok(self.store()?.message_body(id).map_err(internal)?.is_some())
+    }
+
     /// Answers a method [`is_read_method`] accepts.
     pub fn call(&mut self, req: &RpcRequest) -> Reply {
         match req.method.as_str() {

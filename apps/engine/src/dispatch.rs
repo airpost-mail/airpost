@@ -17,8 +17,10 @@ use std::time::Duration;
 use ms_core::constants::{thread, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
 use ms_core::SyncError;
 use ms_ipc::{code, ErrorObject};
+use ms_net::unsubscribe::Mailto;
 use ms_store::{File, Model, Task};
 use ms_sync::{AccountFailure, WorkerContext};
+use ms_tasks::mail_actions::{self, ActionError};
 use ms_tasks::TaskProcessor;
 use serde_json::{json, Value};
 
@@ -36,6 +38,20 @@ pub enum Request {
     SyncCalendar,
     /// `files.put`: saves the File JSON (its bytes are already on disk) and answers with it.
     SaveFile(Value),
+    /// `threads.snooze`: answers with [`ms_ipc::ThreadsSnoozeResult`].
+    Snooze {
+        thread_ids: Vec<String>,
+        until: i64,
+    },
+    /// `threads.unsnooze`: answers with [`ms_ipc::ThreadsSnoozeResult`].
+    Unsnooze {
+        thread_ids: Vec<String>,
+    },
+    /// `messages.unsubscribe` by mail: queues the message and answers `{taskId}`.
+    UnsubscribeMailto {
+        message_id: String,
+        mailto: Mailto,
+    },
     /// stdin only.
     TestCrash,
     /// stdin only.
@@ -47,6 +63,13 @@ pub enum Request {
 
 /// A method's result, or the error to answer with.
 pub type Reply = Result<Value, ErrorObject>;
+
+/// A reply now, or one another thread works out later, out of order with the connection's
+/// later requests (T21).
+pub enum Deferred {
+    Now(Reply),
+    Later(Box<dyn FnOnce() -> Reply + Send>),
+}
 
 pub struct Command {
     pub request: Request,
@@ -100,6 +123,15 @@ fn fail_on_task_error(ctx: &WorkerContext, e: &ms_core::Error) -> ErrorObject {
     .with_data(e.to_json())
 }
 
+fn action_error(e: ActionError) -> ErrorObject {
+    match e {
+        ActionError::NotFound(why) | ActionError::Unavailable(why) => {
+            ErrorObject::new(code::NOT_FOUND, why)
+        }
+        ActionError::Database(e) => internal(e),
+    }
+}
+
 fn internal(e: ms_core::Error) -> ErrorObject {
     ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
 }
@@ -143,6 +175,35 @@ impl Dispatcher<'_> {
                 self.tasks.store.save(&mut file).map_err(internal)?;
                 Ok(file.data)
             }
+            Request::Snooze { thread_ids, until } => {
+                let tasks = mail_actions::snooze_tasks(
+                    self.tasks.store,
+                    self.ctx.account.id(),
+                    &thread_ids,
+                    until,
+                );
+                self.queue_all(tasks)
+            }
+            Request::Unsnooze { thread_ids } => {
+                let tasks = mail_actions::unsnooze_tasks(
+                    self.tasks.store,
+                    self.ctx.account.id(),
+                    &thread_ids,
+                );
+                self.queue_all(tasks)
+            }
+            Request::UnsubscribeMailto { message_id, mailto } => {
+                let task = mail_actions::unsubscribe_send_task(
+                    self.tasks.store,
+                    &self.ctx.account,
+                    &message_id,
+                    &mailto,
+                )
+                .map_err(action_error)?;
+                let id = task.id().to_owned();
+                self.queue_task(task.data)?;
+                Ok(json!({ "taskId": id }))
+            }
             Request::TestCrash => {
                 let e = SyncError::fatal("test", "triggered via cin");
                 self.ctx
@@ -152,6 +213,17 @@ impl Dispatcher<'_> {
             Request::TestSegfault => platform::raise_segfault(),
             Request::TestPanic => panic!("triggered via test.panic"),
         }
+    }
+
+    /// Queues `tasks` in order, stopping at the first whose local phase fails, and answers
+    /// with their ids.
+    fn queue_all(&self, tasks: Result<Vec<Task>, ActionError>) -> Reply {
+        let mut ids = Vec::new();
+        for task in tasks.map_err(action_error)? {
+            ids.push(task.id().to_owned());
+            self.queue_task(task.data)?;
+        }
+        Ok(json!({ "taskIds": ids }))
     }
 
     /// Runs the local phase and answers with the task as it left it; a failed local phase

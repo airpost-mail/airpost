@@ -35,15 +35,15 @@ use ms_ipc::{
     EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams,
     LogsTailResult, MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response,
     SettingsGetParams, SettingsValues, SubscribeParams, SyncWakeParams, TaskCancelParams,
-    TaskQueueParams, LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES,
-    PROTOCOL_VERSION,
+    TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES,
+    LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
-use crate::dispatch::{Command, Reply, Request};
-use crate::files::{is_files_method, FilesReply};
+use crate::dispatch::{Command, Deferred, Reply, Request};
+use crate::files::is_files_method;
 use crate::platform;
 use crate::read_api::{is_read_method, ReadApi};
 use crate::settings::Settings;
@@ -774,6 +774,31 @@ impl Session {
             method::BODIES_FETCH => req
                 .params_as::<BodiesFetchParams>()
                 .and_then(|p| self.dispatch(&p.account_id, Request::NeedBodies(p.ids))),
+            method::THREADS_SNOOZE => req.params_as::<ThreadsSnoozeParams>().and_then(|p| {
+                accounts.check(&p.account_id)?;
+                if p.until <= ms_core::Clock::now(&ms_core::SystemClock) {
+                    return Err(ErrorObject::new(
+                        code::INVALID_PARAMS,
+                        "invalid params: until must be in the future",
+                    ));
+                }
+                self.dispatch(
+                    &p.account_id,
+                    Request::Snooze {
+                        thread_ids: p.thread_ids,
+                        until: p.until,
+                    },
+                )
+            }),
+            method::THREADS_UNSNOOZE => req.params_as::<ThreadsUnsnoozeParams>().and_then(|p| {
+                accounts.check(&p.account_id)?;
+                self.dispatch(
+                    &p.account_id,
+                    Request::Unsnooze {
+                        thread_ids: p.thread_ids,
+                    },
+                )
+            }),
             method::CALENDAR_SYNC => req
                 .params_as::<CalendarSyncParams>()
                 .and_then(|p| self.dispatch(&p.account_id, Request::SyncCalendar)),
@@ -834,10 +859,7 @@ impl Session {
 
     /// Hands `request` to the account's `main` thread and waits for its result.
     pub(crate) fn dispatch(&self, account_id: &str, request: Request) -> Reply {
-        let commands = self.server.accounts.commands(account_id)?;
-        let rx = send(&commands, request)?;
-        rx.recv()
-            .unwrap_or_else(|_| Err(stopped_before_answering()))
+        dispatch_on(&self.server, account_id, request)
     }
 
     /// `sync.wake` without an account: every running account, in parallel.
@@ -856,6 +878,14 @@ impl Session {
     }
 }
 
+/// [`Session::dispatch`] from any thread.
+pub(crate) fn dispatch_on(server: &Server, account_id: &str, request: Request) -> Reply {
+    let commands = server.accounts.commands(account_id)?;
+    let rx = send(&commands, request)?;
+    rx.recv()
+        .unwrap_or_else(|_| Err(stopped_before_answering()))
+}
+
 /// `hello.features` and `engine.status.features`.
 fn features(server: &Server) -> Vec<String> {
     let mut out: Vec<String> = [
@@ -868,6 +898,8 @@ fn features(server: &Server) -> Vec<String> {
         feature::QUERY,
         feature::SEARCH_GRAMMAR,
         feature::FILES,
+        feature::SNOOZE,
+        feature::UNSUBSCRIBE,
     ]
     .map(str::to_owned)
     .to_vec();
@@ -1111,9 +1143,16 @@ impl Connection {
                 return None;
             }
             name if is_files_method(name) => match self.session.files_call(&req) {
-                FilesReply::Now(r) => r,
-                FilesReply::Later(work) => {
-                    self.answer_later(req.id, work);
+                Deferred::Now(r) => r,
+                Deferred::Later(work) => {
+                    self.answer_later(thread::FILES, req.id, work);
+                    return None;
+                }
+            },
+            method::MESSAGES_UNSUBSCRIBE => match self.session.unsubscribe_call(&req) {
+                Deferred::Now(r) => r,
+                Deferred::Later(work) => {
+                    self.answer_later(thread::UNSUBSCRIBE, req.id, work);
                     return None;
                 }
             },
@@ -1140,13 +1179,18 @@ impl Connection {
         })
     }
 
-    /// Runs `work` on a `files` thread and queues its answer then, out of order with this
-    /// connection's later requests (T21).
-    fn answer_later(&self, id: Option<ms_ipc::Id>, work: Box<dyn FnOnce() -> Reply + Send>) {
+    /// Runs `work` on a thread named `name` and queues its answer then, out of order with
+    /// this connection's later requests (T21).
+    fn answer_later(
+        &self,
+        name: &'static str,
+        id: Option<ms_ipc::Id>,
+        work: Box<dyn FnOnce() -> Reply + Send>,
+    ) {
         let conn = self.id;
         let outbox = self.outbox.clone();
         let hub = self.session.server.hub.clone();
-        crate::modes::spawn(thread::FILES, move || {
+        crate::modes::spawn(name, move || {
             let result = work();
             let Some(id) = id else {
                 return;

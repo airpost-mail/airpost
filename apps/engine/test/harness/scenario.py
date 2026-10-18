@@ -34,6 +34,7 @@ import yaml
 from . import db as dbmod
 from . import invariants
 from . import mailgen
+from . import pim
 from .assertions import TRACKED_FLAGS, compare_placements, placement_changes
 from .mailsync import MailsyncError, MailsyncProcess, account_json, default_transport, describe_exit
 from .scenario_backend import BackendMixin
@@ -954,7 +955,40 @@ class ScenarioRun(PimMixin, BackendMixin):
         if op == "need_bodies":
             self.ms.need_bodies(self._resolve_messages(arg["messages"]))
             return
+        if op == "rpc":
+            return self._client_rpc(arg)
         raise ScenarioFailure(f"unknown client op {op!r}")
+
+    def _client_rpc(self, arg: dict):
+        """{method, params, expect?, expect_error?}: one socket request for the account.
+        `accountId` is filled in; in params `threads: {selector}` becomes `threadIds`,
+        `message: {selector}` the one `messageId`, and `{now_plus: s}` epoch seconds. `expect`
+        checks keys of the result (values as in `models` waits), `expect_error` the error code."""
+        params = pim.resolve_now(dict(arg.get("params") or {}))
+        params.setdefault("accountId", self.ms.account["id"])
+        if "threads" in params:
+            params["threadIds"] = self._resolve_threads(params.pop("threads"))
+        if "message" in params:
+            ids = self._resolve_messages(params.pop("message"))
+            if len(ids) != 1:
+                raise ScenarioFailure(f"client.rpc message: needs exactly one message, got {ids}")
+            params["messageId"] = ids[0]
+        try:
+            result = self.ms.rpc_call(arg["method"], params)
+        except MailsyncError as e:
+            got = (getattr(e, "rpc_error", None) or {}).get("code")
+            if "expect_error" in arg and got == arg["expect_error"]:
+                self._note(f"{arg['method']} refused as expected: {e}")
+                return None
+            raise ScenarioFailure(f"{arg['method']} failed: {e}")
+        self._note(f"{arg['method']} -> {json.dumps(result)}")
+        if "expect_error" in arg:
+            raise ScenarioFailure(f"{arg['method']} answered {result}, expected error {arg['expect_error']}")
+        for key, want in (arg.get("expect") or {}).items():
+            have = isinstance(result, dict) and key in result
+            if not pim.value_matches(have, result.get(key) if have else None, want):
+                raise ScenarioFailure(f"{arg['method']} result {key} = {result.get(key) if have else '(absent)'}, expected {want}")
+        return result
 
     def _stored_draft(self, header_message_id: str) -> dict:
         """{stored: <Message-ID>}: the draft as the engine stores it, with its body, which is

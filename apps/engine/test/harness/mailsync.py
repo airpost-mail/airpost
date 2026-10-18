@@ -1036,6 +1036,15 @@ class MailsyncProcess:
         self.send({"type": "queue-task", "task": task})
         return task["id"]
 
+    def rpc_call(self, method: str, params: dict, timeout: float = SERVE_ACCOUNT_TIMEOUT):
+        """One socket request and its result (socket and serve); an error raises MailsyncError
+        with `rpc_error`."""
+        if self.transport == "serve":
+            return self.engine.rpc.call(method, params, timeout)
+        if self.transport == "socket":
+            return self._rpc.call(method, params, timeout)
+        raise MailsyncError(f"{method} needs the socket; this scenario runs on {self.transport}")
+
     def set_settings(self, values: dict) -> dict:
         """serve: `settings.set`, as the desktop's settings mirror writes the engine's store."""
         if self.transport != "serve":

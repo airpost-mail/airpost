@@ -20,12 +20,13 @@ use ms_ipc::{
 };
 use ms_store::{File, Model};
 
-use crate::dispatch::{Reply, Request};
+use crate::dispatch::{Deferred, Reply, Request};
 use crate::socket::Session;
 
-/// How long `files.get` waits for a body fetch to write the file. Debug builds read
+/// How long `files.get` waits for a body fetch to write the file, and `messages.unsubscribe`
+/// for the body that carries the header. Debug builds read
 /// `MAILSYNC_FILES_WAIT_MS` so the tests needn't wait it out.
-fn download_wait() -> Duration {
+pub(crate) fn download_wait() -> Duration {
     const DEFAULT: Duration = Duration::from_secs(30);
     if cfg!(debug_assertions) {
         if let Some(ms) = std::env::var("MAILSYNC_FILES_WAIT_MS")
@@ -52,12 +53,6 @@ pub fn is_files_method(name: &str) -> bool {
         name,
         method::FILES_GET | method::FILES_READ | method::FILES_PUT
     )
-}
-
-/// A reply now, or one a `files` thread works out later.
-pub enum FilesReply {
-    Now(Reply),
-    Later(Box<dyn FnOnce() -> Reply + Send>),
 }
 
 fn files_root(config_dir: &Path) -> PathBuf {
@@ -119,26 +114,26 @@ impl Session {
     }
 
     /// Answers one of the [`is_files_method`] methods.
-    pub fn files_call(&mut self, req: &RpcRequest) -> FilesReply {
+    pub fn files_call(&mut self, req: &RpcRequest) -> Deferred {
         match req.method.as_str() {
             method::FILES_GET => match req.params_as().and_then(|p| self.files_get(p)) {
                 Ok(r) => r,
-                Err(e) => FilesReply::Now(Err(e)),
+                Err(e) => Deferred::Now(Err(e)),
             },
-            method::FILES_READ => FilesReply::Now(req.params_as().and_then(|p| self.files_read(p))),
-            _ => FilesReply::Now(req.params_as().and_then(|p| self.files_put(p))),
+            method::FILES_READ => Deferred::Now(req.params_as().and_then(|p| self.files_read(p))),
+            _ => Deferred::Now(req.params_as().and_then(|p| self.files_put(p))),
         }
     }
 
-    fn files_get(&mut self, p: FilesGetParams) -> Result<FilesReply, ErrorObject> {
+    fn files_get(&mut self, p: FilesGetParams) -> Result<Deferred, ErrorObject> {
         let file = self.lookup_file(&p.account_id, &p.file_id)?;
         let root = files_root(&self.server.config_dir);
         if let Some(path) = file.find_in(&root) {
-            return Ok(FilesReply::Now(result(&file, Some(&path))));
+            return Ok(Deferred::Now(result(&file, Some(&path))));
         }
         // An upload whose bytes are gone has no body to fetch them from.
         if file.message_id().is_empty() {
-            return Ok(FilesReply::Now(result(&file, None)));
+            return Ok(Deferred::Now(result(&file, None)));
         }
         if WAITING.fetch_add(1, Ordering::SeqCst) >= MAX_WAITING {
             WAITING.fetch_sub(1, Ordering::SeqCst);
@@ -153,7 +148,7 @@ impl Session {
             WAITING.fetch_sub(1, Ordering::SeqCst);
             return Err(e);
         }
-        Ok(FilesReply::Later(Box::new(move || wait_for(file, root))))
+        Ok(Deferred::Later(Box::new(move || wait_for(file, root))))
     }
 
     fn files_read(&mut self, p: FilesReadParams) -> Reply {

@@ -234,6 +234,7 @@ Steps:
 | `wait: {people_requests: [...], timeout: s}` | until the fake People API has seen those requests, as `expect: people_requests` |
 | `server.smtp_stop` / `server.smtp_start` | the SMTP server goes away (connections refused) and comes back on the same port (`expiration-send-offline`) |
 | `client.settings: {values: {key: value}}` | `settings.set` on the engine's settings store, as the desktop's settings mirror writes it (serve only) |
+| `client.rpc: {method, params, expect?, expect_error?}` | one socket request for the account (socket and serve): `accountId` filled in, `threads: {selector}` in params becomes `threadIds`, `message: {selector}` the one `messageId`, `{now_plus: s}` epoch seconds; `expect` checks result keys as `models` waits do, `expect_error` the JSON-RPC error code; `as:` keeps the result |
 | `reset_account: {}` | Preferences > Reset Cache: `account.reset` and `account.add` on serve, `--mode reset` between two processes on stdio and socket; then waits for a pass that began after it (`reset-keeps-plugin-metadata`) |
 | `server.smtp_hold` / `server.smtp_release` | queue self-addressed SMTP deliveries, then deliver them, so the INBOX copy of a sent message arrives after the Sent copy; `smtp_release` takes `at:` like any server step (`rules-ready-inbox-copy-first`) |
 | `hold_engine: true` on a `server.*` step | SIGSTOP the engine while the step runs and SIGCONT after, so a slow server change (a 2300-message APPEND to Cyrus) lands as one batch rather than being split by a pass that wakes from the 120 s sleep halfway (`heavy-fetch-truncation-backlog`) |
@@ -536,6 +537,8 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | connection-dropped-during-idle | reconnect after the server drops connections | fake, dovecot |
 | connection-dropped-during-command | a connection closed without BYE mid-command reads as offline, and the retry reconnects | fake, dovecot, cyrus |
 | send-draft | SendDraftTask over SMTP, Sent copy, self-addressed delivery | fake (+smtp) |
+| snooze-method | serve: `threads.snooze` moves to Snoozed with the thread-snooze metadata, `threads.unsnooze` moves back and clears it, a past `until` refused | fake (+smtp) |
+| unsubscribe-mailto | serve: `messages.unsubscribe` sends a mailto unsubscribe once (Sent copy), returns a web link unsent, refuses a method the header lacks | fake (+smtp) |
 | gmail-labels | All Mail + X-GM-LABELS views, webmail archive/label/star, trash task | fake |
 | remote-move-destination-scanned-first | placements: move seen "present in B" before "gone from A"; never deleted/re-created | fake ×2, dovecot |
 | trash-message-with-two-placements | placements: trash from Inbox takes the Sent copy too; a plain archive does not | fake ×2, dovecot |

@@ -24,6 +24,8 @@ mod settings;
 #[cfg(unix)]
 mod socket;
 mod stdin_loop;
+#[cfg(unix)]
+mod unsubscribe;
 
 use std::process::ExitCode;
 
