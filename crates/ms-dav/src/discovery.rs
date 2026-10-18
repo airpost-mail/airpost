@@ -216,10 +216,23 @@ pub fn txt_context_path(strings: &[String]) -> Option<String> {
         .map(String::from)
 }
 
+/// The budget for the MX lookup of account discovery, which the user waits on
+/// (docs/tech-debt.md TD47).
+pub const MX_TIMEOUT: Duration = Duration::from_secs(5);
+
 impl DnsResolver {
     fn run<T: Send>(
         &self,
         name: &str,
+        f: impl AsyncFnOnce(&TokioResolver) -> std::result::Result<T, NetError> + Send,
+    ) -> Result<Option<T>> {
+        self.run_within(name, DNS_TIMEOUT, f)
+    }
+
+    fn run_within<T: Send>(
+        &self,
+        name: &str,
+        timeout: Duration,
         f: impl AsyncFnOnce(&TokioResolver) -> std::result::Result<T, NetError> + Send,
     ) -> Result<Option<T>> {
         let outcome = crate::runtime::outside_runtime(|| {
@@ -229,7 +242,7 @@ impl DnsResolver {
                 .map_err(ms_core::Error::from)?;
             Ok::<_, ms_core::Error>(rt.block_on(async {
                 let resolver = TokioResolver::builder_tokio()?.build()?;
-                match tokio::time::timeout(DNS_TIMEOUT, f(&resolver)).await {
+                match tokio::time::timeout(timeout, f(&resolver)).await {
                     Ok(r) => r,
                     Err(_) => Err(NetError::Timeout),
                 }
@@ -262,6 +275,32 @@ impl DnsResolver {
                 .collect::<Vec<_>>())
         })?;
         Ok(records.unwrap_or_default())
+    }
+
+    /// The domain's MX hosts, lowercased and without the trailing dot, most preferred first;
+    /// empty when there are none or the lookup failed within [`MX_TIMEOUT`].
+    pub fn mx(&self, domain: &str) -> Vec<String> {
+        let name = format!("{}.", domain.trim_end_matches('.'));
+        let records = self.run_within(&name, MX_TIMEOUT, async |r| {
+            let lookup = r.mx_lookup(name.as_str()).await?;
+            let mut hosts: Vec<(u16, String)> = lookup
+                .answers()
+                .iter()
+                .filter_map(|rec| match &rec.data {
+                    RData::MX(mx) => Some((
+                        mx.preference,
+                        mx.exchange
+                            .to_utf8()
+                            .trim_end_matches('.')
+                            .to_ascii_lowercase(),
+                    )),
+                    _ => None,
+                })
+                .collect();
+            hosts.sort();
+            Ok(hosts.into_iter().map(|(_, h)| h).collect::<Vec<_>>())
+        });
+        records.ok().flatten().unwrap_or_default()
     }
 
     pub fn txt(&self, name: &str) -> Result<Vec<String>> {
