@@ -39,6 +39,8 @@ interface PanelProps {
 
 interface PanelState {
   suggestions: AiSuggestion[];
+  /** Whether the user asked for suggestions; nothing is sent before (the host shows first). */
+  requested: boolean;
   loading: boolean;
   instruction: string;
   writing: boolean;
@@ -52,9 +54,9 @@ function providerName() {
 }
 
 /**
- * Up to 3 one-line suggestions and a field for what to say. Picking one streams a full reply
- * into the preview; when it is complete it goes into the body above the quoted text in one
- * change. Nothing is sent.
+ * Where the thread goes, a Get Suggestions button for up to 3 one-line suggestions, and a field
+ * for what to say. Picking one streams a full reply into the preview; when it is complete it goes
+ * into the body above the quoted text in one change. Nothing is sent.
  */
 export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelState> {
   static displayName = 'ReplySuggestionsPanel';
@@ -65,7 +67,8 @@ export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelStat
 
   state: PanelState = {
     suggestions: [],
-    loading: true,
+    requested: false,
+    loading: false,
     instruction: '',
     writing: false,
     preview: '',
@@ -74,7 +77,6 @@ export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelStat
 
   componentDidMount() {
     this._mounted = true;
-    this._loadSuggestions();
   }
 
   componentWillUnmount() {
@@ -83,8 +85,9 @@ export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelStat
     if (this._draftCall) this._draftCall.cancel();
   }
 
-  _loadSuggestions() {
+  _loadSuggestions = () => {
     const { draft } = this.props;
+    this.setState({ requested: true, loading: true, error: '' });
     const call = suggestReplies(draft.accountId, draft.threadId, 3);
     this._suggestCall = call;
     return call.promise.then(
@@ -98,13 +101,13 @@ export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelStat
         this.setState({ loading: false, error: errorMessage(err, providerName()) });
       }
     );
-  }
+  };
 
   _write(options: { suggestion?: string; instruction?: string }) {
     const { draft, session } = this.props;
     if (this._draftCall) this._draftCall.cancel();
     if (this._suggestCall) this._suggestCall.cancel();
-    this.setState({ writing: true, preview: '', error: '', loading: false });
+    this.setState({ writing: true, preview: '', error: '', loading: false, requested: true });
     let streamed = '';
     const call = draftReply(draft.accountId, draft.threadId, {
       ...options,
@@ -151,10 +154,16 @@ export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelStat
   };
 
   render() {
-    const { suggestions, loading, instruction, writing, preview, error } = this.state;
+    const { suggestions, requested, loading, instruction, writing, preview, error } = this.state;
     const provider = AI.providerFor(AI.readSettings(), 'reply');
     return (
       <div className="ai-reply-suggestions">
+        <div className="ai-reply-source">{destinationNote(provider)}</div>
+        {!requested && !writing && (
+          <button className="btn ai-reply-get" onClick={this._loadSuggestions}>
+            {localized('Get Suggestions')}
+          </button>
+        )}
         {loading && <div className="ai-reply-status">{localized('Thinking of replies…')}</div>}
         {!writing && suggestions.length > 0 && (
           <ul className="ai-reply-list">
@@ -200,7 +209,6 @@ export class ReplySuggestionsPanel extends React.Component<PanelProps, PanelStat
           </button>
         )}
         {error && <div className="ai-reply-error">{error}</div>}
-        <div className="ai-reply-source">{destinationNote(provider)}</div>
       </div>
     );
   }
@@ -241,7 +249,9 @@ const SuggestReplyButtonInner: React.FC<ButtonProps> = ({ draft, session }) => {
     );
   };
 
-  const title = reason || localized('Suggest a reply');
+  const where = destinationNote(AI.providerFor(AI.readSettings(), 'reply'));
+  const title =
+    reason || (where ? localized('Suggest a reply (%@)', where) : localized('Suggest a reply'));
   return (
     <button
       ref={buttonRef}

@@ -149,6 +149,34 @@ describe('Preferences > AI', () => {
     renderer.unmount();
   });
 
+  it("removes the saved key when the provider's server changes", async () => {
+    keys['integration-ai-openai-key'] = SYNTHETIC_KEY;
+    const sent = fakeEngine({
+      'ai.test': () => ({ host: '192.168.1.20', model: 'm', local: true, latencyMs: 7 }),
+    });
+    const renderer = await render();
+    await act(async () => {
+      byId(renderer, 'ai-add-provider').props.onChange({ target: { value: 'openai' } });
+      await settle();
+    });
+    // Same server, written out: the key stays.
+    await type(renderer, 'ai-provider-openai-url', 'https://api.openai.com/v1/');
+    expect(keys['integration-ai-openai-key']).toBe(SYNTHETIC_KEY);
+
+    await type(renderer, 'ai-provider-openai-url', 'http://192.168.1.20:1234/v1');
+    expect(keys['integration-ai-openai-key']).toBeUndefined();
+    expect(AppEnv.config.get('core.ai').providers[0].url).toBe('http://192.168.1.20:1234/v1');
+    expect(textOf(renderer)).toContain('The server changed, so the saved API key was removed.');
+    expect(textOf(renderer)).toContain('Sent to 192.168.1.20 (your network)');
+
+    await act(async () => {
+      await button(renderer, 'Test').props.onClick();
+    });
+    expect(sent[0].params.config.apiKey).toBeUndefined();
+    expect(textOf(renderer)).toContain('m answered from 192.168.1.20 in 7 ms.');
+    renderer.unmount();
+  });
+
   it('removes a provider with its key and its place in the features', async () => {
     keys['integration-ai-anthropic-key'] = SYNTHETIC_KEY;
     fakeEngine({});

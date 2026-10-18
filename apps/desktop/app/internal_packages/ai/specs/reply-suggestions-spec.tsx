@@ -3,7 +3,8 @@
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { ReplySuggestionsPanel, isReplyDraft } from '../lib/reply-suggestions';
+import { ReplySuggestionsPanel, SuggestReplyButton, isReplyDraft } from '../lib/reply-suggestions';
+import { CapabilityStore } from 'mailspring-exports';
 import { ACCOUNT_ID, SYNTHETIC_KEY, fakeEngine, fakeKeyset, setUpAi, settle } from './fake-engine';
 
 const QUOTE = '<blockquote class="gmail_quote"><p>Lunch?</p></blockquote>';
@@ -38,6 +39,15 @@ async function render(session, onInserted = () => {}) {
   return renderer;
 }
 
+async function getSuggestions(renderer: TestRenderer.ReactTestRenderer) {
+  await act(async () => {
+    renderer.root
+      .find((n) => n.type === 'button' && n.props.children === 'Get Suggestions')
+      .props.onClick();
+    await settle();
+  });
+}
+
 describe('Reply suggestions', () => {
   beforeEach(() => {
     fakeKeyset({ 'integration-ai-anthropic-key': SYNTHETIC_KEY });
@@ -47,6 +57,34 @@ describe('Reply suggestions', () => {
   it('is only for replies', () => {
     expect(isReplyDraft(draft)).toBe(true);
     expect(isReplyDraft({ ...draft, replyToHeaderMessageId: null })).toBe(false);
+  });
+
+  it('names the host and sends nothing until asked', async () => {
+    const sent = fakeEngine({ 'ai.suggestReplies': () => SUGGESTIONS });
+    const { session } = fakeSession();
+    const renderer = await render(session);
+    expect(sent).toEqual([]);
+    const source = renderer.root.find((n) => n.props.className === 'ai-reply-source');
+    expect(source.props.children).toBe('Sent to api.anthropic.com');
+    await getSuggestions(renderer);
+    expect(sent.map((s) => s.method)).toEqual(['ai.suggestReplies']);
+    renderer.unmount();
+  });
+
+  it("names the host in the Suggest button's title", async () => {
+    fakeEngine({});
+    spyOn(CapabilityStore, 'get').andReturn({ available: true, source: 'ai' });
+    const { session } = fakeSession();
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(
+        <SuggestReplyButton draft={draft as any} session={session as any} />
+      );
+    });
+    const suggest = renderer.root.find((n) => n.type === 'button');
+    expect(suggest.props.title).toBe('Suggest a reply (Sent to api.anthropic.com)');
+    expect(suggest.props['aria-label']).toBe(suggest.props.title);
+    renderer.unmount();
   });
 
   it('shows up to 3 suggestions and streams the picked one into the body once', async () => {
@@ -63,6 +101,7 @@ describe('Reply suggestions', () => {
     const { added, session } = fakeSession();
     const onInserted = jasmine.createSpy('onInserted');
     const renderer = await render(session, onInserted);
+    await getSuggestions(renderer);
     const picks = renderer.root.findAll((n) => n.props.className === 'btn ai-reply-suggestion');
     expect(picks.map((p) => p.props.children)).toEqual(['Accept', 'Decline', 'Later']);
     expect(sent[0].params.count).toBe(3);
@@ -105,7 +144,8 @@ describe('Reply suggestions', () => {
         .find((n) => n.type === 'button' && n.props.children === 'Write')
         .props.onClick();
     });
-    expect(sent[1].params.instruction).toBe("say I'll call Tuesday");
+    expect(sent.map((s) => s.method)).toEqual(['ai.draftReply']);
+    expect(sent[0].params.instruction).toBe("say I'll call Tuesday");
     expect(added.length).toBe(1);
     expect(added[0].body).toContain('I&#39;ll call you Tuesday.');
     renderer.unmount();
@@ -115,6 +155,7 @@ describe('Reply suggestions', () => {
     const sent = fakeEngine({ 'ai.suggestReplies': () => new Promise(() => {}) });
     const { session } = fakeSession();
     const renderer = await render(session);
+    await getSuggestions(renderer);
     renderer.unmount();
     expect(sent.map((s) => s.method)).toEqual(['ai.suggestReplies', 'ai.cancel']);
     expect(sent[1].params.streamId).toBe(sent[0].params.streamId);

@@ -35,6 +35,15 @@ function urlPlaceholder(kind: AiProviderKind) {
   return AI.KINDS[kind].defaultUrl;
 }
 
+/** Scheme, host and port of the provider's base URL: where its key is sent. */
+function serverOf(provider: AiProvider) {
+  try {
+    return new URL(AI.baseUrl(provider)).origin;
+  } catch (err) {
+    return '';
+  }
+}
+
 interface ProviderProps {
   provider: AiProvider;
   onChange: (provider: AiProvider) => void;
@@ -45,6 +54,8 @@ interface ProviderState {
   draft: AiProvider;
   keyInput: string;
   hasKey: boolean;
+  /** Why the saved key went away, shown until a key is saved again. */
+  keyNotice: string;
   models: AiModelInfo[];
   loadingModels: boolean;
   modelsError: string;
@@ -65,6 +76,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
       draft: props.provider,
       keyInput: '',
       hasKey: false,
+      keyNotice: '',
       models: [],
       loadingModels: false,
       modelsError: '',
@@ -106,10 +118,31 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
       this.setState({ draft: { ...this.state.draft, [field]: value }, testResult: null });
     };
 
-  _onCommit = () => {
+  _onCommit = async () => {
     const { draft } = this.state;
+    const previous = this.props.provider;
     const next: AiProvider = { ...draft, model: (draft.model || '').trim() };
-    if (JSON.stringify(next) !== JSON.stringify(this.props.provider)) this.props.onChange(next);
+    if (JSON.stringify(next) === JSON.stringify(previous)) return;
+    // The saved key was given for the old server; it must not go to a new one.
+    if (serverOf(next) !== serverOf(previous)) {
+      const name = AI.keyName(previous.id);
+      let saved = true;
+      try {
+        saved = !!(await KeyManager.getPassword(name));
+      } catch (err) {
+        // Unreadable: remove it anyway.
+      }
+      if (saved) {
+        await KeyManager.deletePassword(name);
+        if (this._mounted) {
+          this.setState({
+            hasKey: false,
+            keyNotice: localized('The server changed, so the saved API key was removed.'),
+          });
+        }
+      }
+    }
+    this.props.onChange(next);
   };
 
   _onPickModel = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -131,7 +164,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     if (!value) return;
     await KeyManager.replacePassword(AI.keyName(this.props.provider.id), value);
     if (this._mounted && this.state.keyInput.trim() === value) {
-      this.setState({ keyInput: '', hasKey: true });
+      this.setState({ keyInput: '', hasKey: true, keyNotice: '' });
     }
   };
 
@@ -166,9 +199,10 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     let testResult: ProviderState['testResult'];
     try {
       const report = await testProvider(this.state.draft, this.state.keyInput);
+      // The engine's `local` covers private addresses too; "this computer" is loopback only.
       testResult = {
         ok: true,
-        message: report.local
+        message: AI.isLoopback(this.state.draft)
           ? localized(
               '%1$@ answered on this computer in %2$@ ms.',
               report.model,
@@ -213,7 +247,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
   }
 
   _renderKey() {
-    const { hasKey, keyInput, draft } = this.state;
+    const { hasKey, keyInput, keyNotice, draft } = this.state;
     let placeholder = AI.keyRequired(draft) ? localized('Required') : localized('Optional');
     if (hasKey) placeholder = localized('Saved. Type a new key to replace it.');
     return (
@@ -239,6 +273,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
             {localized('Forget Key')}
           </button>
         )}
+        {keyNotice && <span className="ai-key-notice">{keyNotice}</span>}
       </div>
     );
   }
@@ -555,7 +590,7 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
             <tr>
               <td>{localized('Reply suggestions')}</td>
               <td>{localized('The same, plus what you ask for and your name')}</td>
-              <td>{localized('When you click Suggest or pick a suggestion')}</td>
+              <td>{localized('When you click Get Suggestions or Write, or pick a suggestion')}</td>
             </tr>
           </tbody>
         </table>

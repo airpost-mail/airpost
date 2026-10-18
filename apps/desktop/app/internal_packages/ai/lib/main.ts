@@ -6,10 +6,11 @@
 
 /* eslint global-require: 0 */
 import { localized, ComponentRegistry, PreferencesUIStore } from 'mailspring-exports';
-import { ThreadSummary } from './thread-summary';
+import { ThreadSummary, watchSummaries } from './thread-summary';
 import { SuggestReplyButton } from './reply-suggestions';
 
 let preferencesTab = null;
+let stopWatchingSummaries: (() => void) | null = null;
 
 export function activate() {
   preferencesTab = new PreferencesUIStore.TabItem({
@@ -20,11 +21,14 @@ export function activate() {
   });
   PreferencesUIStore.registerPreferencesTab(preferencesTab);
   ComponentRegistry.register(ThreadSummary, { role: 'MessageListHeaders' });
+  stopWatchingSummaries = watchSummaries();
   ComponentRegistry.register(SuggestReplyButton, { role: 'Composer:ActionButton' });
 }
 
 export function deactivate() {
   ComponentRegistry.unregister(ThreadSummary);
+  if (stopWatchingSummaries) stopWatchingSummaries();
+  stopWatchingSummaries = null;
   ComponentRegistry.unregister(SuggestReplyButton);
   if (preferencesTab) PreferencesUIStore.unregisterPreferencesTab(preferencesTab.tabId);
   preferencesTab = null;

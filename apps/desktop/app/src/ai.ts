@@ -187,6 +187,17 @@ export function isLocal(provider: AiProvider) {
   return false;
 }
 
+/** Loopback only: a model on this computer. A private address is another machine on the network. */
+export function isLoopback(provider: AiProvider) {
+  const host = hostOf(provider).toLowerCase().replace(/\.$/, '');
+  if (!host) return false;
+  if (host === 'localhost' || host.endsWith('.localhost') || host === '::1') return true;
+  // URL writes ::ffff:127.0.0.1 as ::ffff:7f00:1.
+  if (/^::ffff:7f[0-9a-f]{2}:/.test(host)) return true;
+  const v4 = /^(\d+)\.\d+\.\d+\.\d+$/.exec(host);
+  return !!v4 && Number(v4[1]) === 127;
+}
+
 /** Whether the engine refuses a call without a key: Anthropic, and OpenAI's own API. */
 export function keyRequired(provider: AiProvider) {
   if (provider.kind === 'anthropic') return true;
@@ -256,6 +267,7 @@ const AI = {
   baseUrl,
   hostOf,
   isLocal,
+  isLoopback,
   keyRequired,
   missingSetting,
   providerConfig,

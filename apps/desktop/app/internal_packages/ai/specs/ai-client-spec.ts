@@ -3,6 +3,7 @@
 
 import { Engine, KeyManager } from 'mailspring-exports';
 import {
+  destinationNote,
   draftReply,
   errorMessage,
   listModels,
@@ -119,6 +120,36 @@ describe('ai.* calls', () => {
     );
   });
 
+  it("doesn't blame the provider or the engine's support for local failures", async () => {
+    setUpAi();
+    fakeEngine({
+      'ai.summarize': () => {
+        throw Object.assign(new Error('The sync engine connection closed'), { code: null });
+      },
+      'ai.draftReply': () => {
+        throw Object.assign(new Error('busy'), { code: -32012 });
+      },
+    });
+    const dropped = await rejection(summarize(ACCOUNT_ID, 't1').promise);
+    expect(dropped.key).toBe('engine-disconnected');
+    expect(errorMessage(dropped, 'Anthropic')).toBe('The sync engine disconnected. Try again.');
+
+    const busy = await rejection(draftReply(ACCOUNT_ID, 't1', { instruction: 'x' }).promise);
+    expect(busy.key).toBe('engine-busy');
+    expect(errorMessage(busy, 'Anthropic')).toBe(
+      'Tern is busy with other AI requests. Try again in a moment.'
+    );
+
+    (KeyManager.getPassword as any).andCallFake(async () => {
+      throw new Error('The keychain is locked');
+    });
+    const locked = await rejection(summarize(ACCOUNT_ID, 't1').promise);
+    expect(locked.key).toBe('keyset');
+    expect(errorMessage(locked, 'Anthropic')).toBe(
+      'Could not read the saved API key: The keychain is locked'
+    );
+  });
+
   it('passes the instruction or the picked suggestion to ai.draftReply', async () => {
     setUpAi();
     const sent = fakeEngine({ 'ai.draftReply': () => ({ text: 'Hi', model: 'm' }) });
@@ -146,6 +177,19 @@ describe('ai.* calls', () => {
     expect(err.key).toBe('cancelled');
     expect(sent.map((s) => s.method)).toEqual(['ai.summarize', 'ai.cancel']);
     expect(sent[1].params).toEqual({ streamId: call.streamId });
+  });
+
+  it('says "this computer" for loopback only and names a host on the network', () => {
+    const at = (url: string) => destinationNote({ id: 'o', kind: 'openai', url, model: 'm' });
+    expect(at('http://127.0.0.1:1234/v1')).toBe('Runs on this computer (OpenAI-compatible)');
+    expect(at('http://localhost:1234/v1')).toBe('Runs on this computer (OpenAI-compatible)');
+    expect(at('http://[::1]:1234/v1')).toBe('Runs on this computer (OpenAI-compatible)');
+    expect(at('http://192.168.1.20:1234/v1')).toBe('Sent to 192.168.1.20 (your network)');
+    expect(at('http://10.0.0.5/v1')).toBe('Sent to 10.0.0.5 (your network)');
+    expect(at('https://openrouter.ai/api/v1')).toBe('Sent to openrouter.ai');
+    expect(destinationNote({ id: 'ollama', kind: 'ollama', model: 'llama3' })).toBe(
+      'Runs on this computer (Ollama)'
+    );
   });
 
   it('lists models and tests with the typed key over the saved one', async () => {

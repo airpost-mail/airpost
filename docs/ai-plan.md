@@ -375,3 +375,17 @@ suggestions panel.
 
 Open after AI3: the usage chart in Preferences > AI waits for persisted usage (AI4); triage UI is
 AI4; per-account and per-feature availability is still the desktop's own check until stage 3.
+
+AI3 review fixes: the reply goes in before the first top-level element that is or holds a
+signature, `.gmail_quote_attribution`, `.gmail_quote` or any blockquote (found with DOMParser, so
+the composer's serialized body works too), and in plain text above the whole attribution line
+(soft-wrapped lines included) past the blank line DraftFactory leaves before the quote. The Suggest
+popover names the host and sends nothing until Get Suggestions, Write or a pick; the Suggest
+button's title and the text next to Summarize name it too. "Runs on this computer" is loopback
+only (`AI.isLoopback`); a private address reads "Sent to 192.168.1.20 (your network)", in the
+Test result too. Changing a provider's server (scheme, host or port) deletes its saved key.
+Errors: a dropped connection is `engine-disconnected`, -32012 is `engine-busy` (no provider
+named), a keyset read failure is `keyset`; `engine-unavailable` only when the engine doesn't serve
+`ai.*`. The window's remembered summaries go when summaries are turned off, the account is opted
+out or removed, or `account.state` says `removed` (account.reset does that); resetDatabase
+relaunches the app.

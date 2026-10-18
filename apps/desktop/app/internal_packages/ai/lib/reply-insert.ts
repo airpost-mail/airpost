@@ -7,13 +7,10 @@ body change so a single undo takes it out again. The model's text is plain: it i
 parsed as HTML (docs/ai-plan.md A6).
 */
 
-// Where the quote or the signature starts in an HTML reply.
-const HTML_MARKERS = [
-  '<signature',
-  '<div class="gmail_quote_attribution"',
-  '<blockquote class="gmail_quote"',
-  '<div class="gmail_quote"',
-];
+// Where the quote or the signature starts in an HTML reply, by element: the composer's serializer
+// drops the blockquote's class and may put `dir` before `class`, so string prefixes don't hold.
+// Any blockquote counts, as in the composer's own hasBlockquote.
+const QUOTE_SELECTOR = 'signature, .gmail_quote_attribution, .gmail_quote, blockquote';
 
 export function escapeHTML(text: string) {
   return text
@@ -48,31 +45,52 @@ function isBlankHTML(html: string) {
   );
 }
 
+/** The body split before its first top-level node that is or holds the quote or the signature. */
+function splitHTML(body: string) {
+  // A DOMParser document is inert: nothing in the quoted mail loads or runs.
+  const doc = new DOMParser().parseFromString(body, 'text/html');
+  const nodes = Array.from(doc.body.childNodes);
+  let index = nodes.findIndex(
+    (n) =>
+      n.nodeType === Node.ELEMENT_NODE &&
+      ((n as Element).matches(QUOTE_SELECTOR) || !!(n as Element).querySelector(QUOTE_SELECTOR))
+  );
+  if (index === -1) index = nodes.length;
+  const before = doc.createElement('div');
+  for (const n of nodes.slice(0, index)) before.appendChild(n);
+  return { before: before.innerHTML, after: doc.body.innerHTML };
+}
+
 export function insertIntoHTML(body: string, text: string) {
-  let insertion = body.length;
-  for (const marker of HTML_MARKERS) {
-    const i = body.indexOf(marker);
-    if (i !== -1) insertion = Math.min(insertion, i);
-  }
-  const before = body.slice(0, insertion);
-  const after = body.slice(insertion);
+  const { before, after } = splitHTML(body);
   const reply = plainTextToHTML(text);
   const kept = isBlankHTML(before) ? '' : `${before}<div><br/></div>`;
   return `${kept}${reply}<div><br/></div>${after}`;
 }
 
-/** The start of the quote in a plain text reply: the line before the first `>` line. */
+const isBlank = (line: string) => line.replace(/\u200B/g, '').trim() === '';
+
+/**
+ * The start of the quote in a plain text reply: the attribution line above the first `>` line.
+ * DraftFactory leaves a blank line between them, and wrapPlaintext may have soft-wrapped the
+ * attribution into lines that start with a zero-width space (SOFT_NEWLINE).
+ */
 function plainQuoteStart(body: string) {
   const lines = body.split('\n');
+  const starts: number[] = [];
   let offset = 0;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith('>')) {
-      if (i > 0 && lines[i - 1].trim() !== '') return offset - lines[i - 1].length - 1;
-      return offset;
-    }
-    offset += lines[i].length + 1;
+  for (const line of lines) {
+    starts.push(offset);
+    offset += line.length + 1;
   }
-  return body.length;
+  const quote = lines.findIndex((line) => line.startsWith('>'));
+  if (quote === -1) return body.length;
+  let i = quote;
+  while (i > 0 && isBlank(lines[i - 1])) i--;
+  if (i === 0) return starts[quote];
+  i--;
+  while (i > 0 && lines[i].startsWith('\u200B')) i--;
+  return starts[i];
 }
 
 export function insertIntoPlainText(body: string, text: string) {

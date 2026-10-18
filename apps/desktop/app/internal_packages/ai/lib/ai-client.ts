@@ -25,7 +25,11 @@ const AI_FAILED = -32011;
 const ENGINE_BUSY = -32012;
 const ENGINE_FEATURE = 'ai';
 
-/** crates/ms-ai error keys, plus the desktop's own `engine-unavailable`. */
+/**
+ * crates/ms-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
+ * ai.*), `engine-disconnected` (the connection dropped), `engine-busy` (the engine's AI lane is
+ * full, -32012) and `keyset` (the saved key could not be read).
+ */
 export type AiErrorKey =
   | 'not-configured'
   | 'not-enabled'
@@ -40,6 +44,9 @@ export type AiErrorKey =
   | 'cancelled'
   | 'unsupported'
   | 'engine-unavailable'
+  | 'engine-disconnected'
+  | 'engine-busy'
+  | 'keyset'
   | 'unknown';
 
 const KNOWN_KEYS: AiErrorKey[] = [
@@ -56,6 +63,9 @@ const KNOWN_KEYS: AiErrorKey[] = [
   'cancelled',
   'unsupported',
   'engine-unavailable',
+  'engine-disconnected',
+  'engine-busy',
+  'keyset',
 ];
 
 export class AiError extends Error {
@@ -92,10 +102,11 @@ export function toAiError(err: unknown): AiError {
     return new AiError({ ...e, key: KNOWN_KEYS.includes(e.key) ? e.key : 'unknown' });
   }
   if (e && e.code === ENGINE_BUSY) {
-    return new AiError({ key: 'rate-limited', message: e.message, retryable: true });
+    return new AiError({ key: 'engine-busy', message: e.message, retryable: true });
   }
-  if (e && (e.code === null || e.code === undefined) && !(err instanceof TypeError)) {
-    return new AiError({ key: 'engine-unavailable', message: e.message });
+  // EngineConnectionError: the request was sent but the connection closed before the reply.
+  if (e && e.code === null) {
+    return new AiError({ key: 'engine-disconnected', message: e.message, retryable: true });
   }
   return new AiError({ key: 'unknown', message: e && e.message ? e.message : String(err) });
 }
@@ -141,6 +152,12 @@ export function errorMessage(err: unknown, providerName?: string): string {
       return localized("This thread can't be sent to a model.");
     case 'engine-unavailable':
       return localized('Waiting for engine support.');
+    case 'engine-disconnected':
+      return localized('The sync engine disconnected. Try again.');
+    case 'engine-busy':
+      return localized('Tern is busy with other AI requests. Try again in a moment.');
+    case 'keyset':
+      return localized('Could not read the saved API key: %@', e.message);
     default:
       return localized('Something went wrong with %@.', name);
   }
@@ -171,7 +188,14 @@ function requireEngine() {
 
 /** The config for `provider`: the typed key when given, else the saved one. */
 export async function configFor(provider: AiProvider, typedKey?: string) {
-  const key = (typedKey || '').trim() || (await KeyManager.getPassword(AI.keyName(provider.id)));
+  let key = (typedKey || '').trim();
+  if (!key) {
+    try {
+      key = await KeyManager.getPassword(AI.keyName(provider.id));
+    } catch (err) {
+      throw new AiError({ key: 'keyset', message: (err && err.message) || String(err) });
+    }
+  }
   return AI.providerConfig(provider, key);
 }
 
@@ -298,11 +322,16 @@ export async function testProvider(provider: AiProvider, typedKey?: string) {
   }
 }
 
-/** "Sent to api.anthropic.com", or "Runs on this computer (Ollama)" for a local model. */
+/**
+ * "Sent to api.anthropic.com", "Sent to 192.168.1.20 (your network)" for a private address, or
+ * "Runs on this computer (Ollama)" for loopback only.
+ */
 export function destinationNote(provider: AiProvider | null) {
   if (!provider) return '';
-  if (AI.isLocal(provider)) {
+  if (AI.isLoopback(provider)) {
     return localized('Runs on this computer (%@)', AI.providerName(provider));
   }
-  return localized('Sent to %@', AI.hostOf(provider) || AI.providerName(provider));
+  const host = AI.hostOf(provider) || AI.providerName(provider);
+  if (AI.isLocal(provider)) return localized('Sent to %@ (your network)', host);
+  return localized('Sent to %@', host);
 }

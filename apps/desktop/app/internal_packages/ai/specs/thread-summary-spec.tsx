@@ -3,8 +3,15 @@
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { CapabilityStore, Message, Thread } from 'mailspring-exports';
-import { ThreadSummary, forgetSummaries, worthSummarizing } from '../lib/thread-summary';
+import { AccountStore, CapabilityStore, Engine, Message, Thread } from 'mailspring-exports';
+import {
+  ThreadSummary,
+  forgetSummaries,
+  rememberedSummary,
+  summaryKey,
+  watchSummaries,
+  worthSummarizing,
+} from '../lib/thread-summary';
 import {
   ACCOUNT_ID,
   SYNTHETIC_KEY,
@@ -109,6 +116,64 @@ describe('The thread summary', () => {
     expect(textOf(again)).toContain('Fresh.');
     expect(sent.length).toBe(2);
     again.unmount();
+  });
+
+  it('names the host next to the Summarize button', async () => {
+    setUpAi();
+    fakeEngine({});
+    const renderer = await render();
+    const source = renderer.root.find((n) => n.props.className === 'ai-summary-source');
+    expect(source.props.children).toBe('Sent to api.anthropic.com');
+    renderer.unmount();
+  });
+
+  describe('forgetting summaries', () => {
+    let stop: () => void;
+    const key = summaryKey(thread, messages);
+
+    async function summarizeOnce() {
+      fakeEngine({ 'ai.summarize': () => ({ text: 'Kept.', model: 'm' }) });
+      const renderer = await render();
+      await act(async () => {
+        await button(renderer, 'Summarize').props.onClick();
+      });
+      renderer.unmount();
+      expect(rememberedSummary(key)).toEqual({ text: 'Kept.', model: 'm' });
+    }
+
+    beforeEach(() => {
+      setUpAi();
+      stop = watchSummaries();
+    });
+
+    afterEach(() => stop());
+
+    it('when the account is opted out of AI', async () => {
+      await summarizeOnce();
+      setUpAi({ accounts: ['another-account'] });
+      expect(rememberedSummary(key)).toBe(null);
+    });
+
+    it('when summaries are turned off', async () => {
+      await summarizeOnce();
+      setUpAi({ features: { summary: { enabled: false, provider: 'anthropic' } } });
+      expect(rememberedSummary(key)).toBe(null);
+    });
+
+    it('when the account is removed', async () => {
+      await summarizeOnce();
+      spyOn(AccountStore, 'accounts').andReturn([]);
+      AccountStore.trigger();
+      expect(rememberedSummary(key)).toBe(null);
+    });
+
+    it('when the engine takes the account out, as account.reset does', async () => {
+      await summarizeOnce();
+      Engine.events.notification('account.state', { accountId: 'other', state: 'removed' });
+      expect(rememberedSummary(key)).not.toBe(null);
+      Engine.events.notification('account.state', { accountId: ACCOUNT_ID, state: 'removed' });
+      expect(rememberedSummary(key)).toBe(null);
+    });
   });
 
   it('shows the error in the card', async () => {
