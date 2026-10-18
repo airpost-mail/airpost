@@ -884,12 +884,31 @@ fn reset_database_starts_over_and_sessions_reopen_it() {
     // The session's read connection is open on the old file.
     c.call(method::TASKS_GET, json!({ "accountId": A, "id": "t-a" }))
         .unwrap();
+    // Metadata waiting for its message is carried into the new database (TD32).
+    let db = e.dir.path().join("edgehill.db");
+    rusqlite::Connection::open(&db)
+        .unwrap()
+        .execute(
+            "INSERT INTO DetatchedPluginMetadata (objectId, objectType, accountId, pluginId, value, version) \
+             VALUES ('<kept@x>', 'Message', ?, 'send-later', '{\"expiration\":1}', 2)",
+            [A],
+        )
+        .unwrap();
 
     let result = e
         .parent
         .call(method::ENGINE_RESET_DATABASE, Value::Null)
         .unwrap();
     assert_eq!(result, json!({ "removed": [A, B] }));
+    let kept: i64 = rusqlite::Connection::open(&db)
+        .unwrap()
+        .query_row(
+            "SELECT version FROM DetatchedPluginMetadata WHERE objectId = '<kept@x>'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(kept, 2);
     let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
     assert_eq!(states(&status), running(&[]));
     assert_eq!(e.discovery()["accounts"], json!([]));

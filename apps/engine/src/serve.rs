@@ -656,8 +656,9 @@ impl Engine {
     }
 
     /// `engine.resetDatabase`: stops and forgets every account, deletes the database and
-    /// creates an empty one. Socket sessions reopen it on their next read. Runs on its own
-    /// thread.
+    /// creates an empty one, carrying the plugin metadata over by Message-ID
+    /// ([`ms_store::metadata_stash`]). Socket sessions reopen it on their next read. Runs on
+    /// its own thread.
     fn reset_database(&self) -> Reply {
         if self.resetting_database.swap(true, Ordering::SeqCst) {
             return Err(ErrorObject::new(
@@ -674,6 +675,13 @@ impl Engine {
             if stragglers {
                 std::thread::sleep(Duration::from_millis(ACCOUNT_RESET_STRAGGLER_WAIT_MS));
             }
+            // A database that can't be read (often why it is being rebuilt) loses its
+            // metadata; the rebuild goes ahead.
+            let kept =
+                ms_store::metadata_stash::collect_database(&self.config_dir).unwrap_or_else(|e| {
+                    warn!("-X Could not keep the plugin metadata of the old database: {e}");
+                    Vec::new()
+                });
             for suffix in ["", "-wal", "-shm"] {
                 let path = self.config_dir.join(format!("{DATABASE_FILE}{suffix}"));
                 match std::fs::remove_file(&path) {
@@ -693,7 +701,14 @@ impl Engine {
                 &mut std::io::sink(),
             )
             .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, format!("migrate failed: {e}")))?;
-            info!("Database reset; {} accounts removed", ids.len());
+            if let Err(e) = ms_store::metadata_stash::save_database(&self.config_dir, &kept) {
+                warn!("-X Could not keep the plugin metadata of the old database: {e}");
+            }
+            info!(
+                "Database reset; {} accounts removed, {} plugin metadata values kept",
+                ids.len(),
+                kept.len()
+            );
             serde_json::to_value(ResetDatabaseResult { removed: ids })
                 .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e.to_string()))
         })();
