@@ -114,7 +114,7 @@ Notifications, added to the routing table of desktop-client-plan 3.1:
 | Notification | Filter | Backlog | Dedup |
 |---|---|---|---|
 | `ai.delta {streamId, text}` | the connection that sent `streamId` | no | in order; the final reply has the full text |
-| `ai.triage.progress {jobId, done, total}` | the connection that called `ai.triage.run` | no | `jobId` |
+| `ai.triage.progress {jobId, done, total, stopped?}` | the connection that called `ai.triage.run` | no | `jobId`; the last one has `done == total` or `stopped: true` |
 
 Errors: `-32602` for params that don't deserialize (and for a `streamId` already streaming on
 the connection); an `AiError` is engine code `-32011` "AI request failed" with the serialized
@@ -148,8 +148,13 @@ integrations) and `triage` is absent until AI4. `ms_ipc::Capability` gained `loc
 - **Trigger.** An engine thread (`thread::AI`, spawned through `WorkerContext::spawn` per
   account) takes `mail.new` events for opted-in accounts into a bounded queue (1000), and
   `ai.triage.run` jobs. One request in flight per provider; a `rate-limited` or
-  `quota-exceeded` error pauses the queue until `retryAfter` (or 15 minutes) and sets the
-  capability reason. Default limit 200 threads per account per hour.
+  `quota-exceeded` error pauses the queue until `retryAfter` (or 15 minutes; clamped to 1 s
+  to 24 h) and sets the capability reason; the daily token cap holds it until midnight or
+  until the cap is raised. Default limit 200 threads per account per hour. The switches and
+  the provider are read again before every request, so turning triage off or changing its
+  provider applies to queued work and running jobs within a second. A job that ends early
+  (cancelled, account stopped, triage turned off, provider gone) sends a last progress with
+  `stopped: true`.
 - **Input.** The thread's latest inbound message in full (budgeted) and the subjects and
   senders of the rest, so the cost per mail stays small.
 - **Result.** Thread metadata under plugin id `tern-ai-triage`, value `{category, needsReply,
@@ -161,7 +166,9 @@ integrations) and `triage` is absent until AI4. `ms_ipc::Capability` gained `loc
   `source: "user"` and is never overwritten.
 - **`ai.triage.list`** reads opted-in accounts' inbox threads with that metadata
   (`json_extract` over the Thread's metadata, newest first) so a "Needs reply" view works on
-  today's read API without stage 7's `query`.
+  today's read API without stage 7's `query`. A needs-reply value lapses once the user sent
+  mail on the thread after the last mail came in (or, for `source: "user"`, after its `at`);
+  the desktop chip follows the same rule.
 - Backfill is manual: "Triage inbox" in the desktop runs `ai.triage.run {sinceDays: 7}`
   (capped at 200 threads), with progress.
 
@@ -448,3 +455,21 @@ yet, so that is the next step, together with dropping the per-request key;
 the usage chart in Preferences > AI is not built (`ai.usage` and `tern ai usage` have the data);
 `core.ai.limits` has no UI; AI5 (web) waits for tern-web's relay of `ai.delta` and
 `ai.triage.progress`.
+
+2026-10-18, AI4 review fixes: `Retry-After` is clamped to 1 s to 24 h (0 no longer loops, a
+huge value no longer panics the worker); the daily cap is no longer a gate pause but read from
+the settings on each try, so raising it resumes triage within a second and the capability
+follows; the cap is checked again under the provider's in-flight lock; the switches and the
+provider are read again before every request (A5), and a job or new-mail item uses the
+provider the store names then (a local client's `config` stays the job's); `ai.cancel {jobId}`
+wakes a worker waiting on a pause or the hourly limit; every job ends with `done == total` or
+`stopped: true` (`Feed::close` reports the running and queued jobs), which `tern ai triage`
+reports as an error and the desktop's "Triage inbox" as "Stopped before the end."; the
+desktop also stops on the engine's `gone`, cancels a job stopped before `ai.triage.run`
+answered and drops its listener when Preferences closes. Triage and `Bodies::LatestInbound`
+treat the account's aliases as its own (`Account::own_addresses`, shared with ms-sync).
+`settings.set` refuses a `core.ai.providers` entry with `apiKey`, and `StoredAi` drops one
+stored earlier. `tern ai summarize` strips control characters from model text. "Needs reply"
+drops threads the user answered (store filter and chip); the chip has no right-click menu
+(the thread list's own opened as well), and the view's threads can be moved, archived and
+trashed again.
