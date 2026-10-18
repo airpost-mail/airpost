@@ -13,6 +13,7 @@ import { DatabaseChangeRecord } from './stores/database-change-record';
 import DatabaseObjectRegistry from '../registries/database-object-registry';
 import { EngineConnection } from '../engine-connection';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../engine-events';
+import { wireIntegrationsTransport } from '../engine-api';
 import { LogsTailParams, LogsTailResult, Method, THREAD_COUNTS_CLASS } from '../engine-protocol';
 import { AccountEvent, EngineStatus, SupervisorChannel } from '../supervisor-channels';
 import * as Actions from './actions';
@@ -113,19 +114,22 @@ export function applyDeltas(msgs: string[], { mainWindow }: { mainWindow: boolea
   }
 }
 
-// The window's EngineEvents follows its connection: the features of each hello and requests on
-// it until the connection drops, and the mail.new notifications.
+// The window's EngineEvents follows its connection: the features and capabilities of each hello
+// and requests on it until the connection drops, and the notifications.
 export function feedEngineEvents(
   connection: EngineConnection,
   events: EngineEventsType = EngineEvents
 ) {
   connection.on('connected', (hello) =>
-    events.connected((hello && hello.features) || [], (method, params) =>
-      connection.request(method, params)
+    events.connected(
+      (hello && hello.features) || [],
+      (method, params) => connection.request(method, params),
+      (hello && hello.capabilities) || null
     )
   );
   connection.on('disconnected', () => events.gone());
   connection.on('mail-new', (params) => events.mailNew(params));
+  connection.on('notification', ({ method, params }) => events.notification(method, params));
 }
 
 // Runs task success / error handlers if the task is now complete.
@@ -161,6 +165,7 @@ export default class MailsyncBridge {
     if (AppEnv.inSpecMode()) return;
     this._mainWindow = AppEnv.isMainWindow();
     this._connection = this._createConnection();
+    wireIntegrationsTransport();
 
     AppEnv.onReadyToUnload(this._onReadyToUnload);
     if (!this._mainWindow) return;

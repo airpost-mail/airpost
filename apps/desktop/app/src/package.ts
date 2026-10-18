@@ -118,6 +118,12 @@ export default class Package {
     return !!this.json.isDefault;
   }
 
+  /** `tern.engineMethods`: the local-only engine methods the plugin calls (src/engine-api.ts). */
+  engineMethods(): string[] {
+    const list = this.json.tern?.engineMethods;
+    return Array.isArray(list) ? list.filter((m) => typeof m === 'string') : [];
+  }
+
   getStylesheetsPath() {
     return path.join(this.directory, 'styles');
   }

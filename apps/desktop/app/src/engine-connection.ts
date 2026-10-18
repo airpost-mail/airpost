@@ -86,7 +86,9 @@ export function processStateDeltas(accounts: AccountStatus[]) {
 
 /*
 Emits 'deltas' (string[]), 'connected' (HelloResult) as hello's answer is read (before the
-deltas after it), 'mail-new' (MailNewParams) after the deltas read with it, and 'disconnected'.
+deltas after it), 'mail-new' (MailNewParams) after the deltas read with it, 'notification'
+({method, params}) for the other notifications but disconnect and account.state, after those,
+and 'disconnected'.
 */
 export class EngineConnection extends EventEmitter {
   clientName: string;
@@ -305,12 +307,20 @@ export class EngineConnection extends EventEmitter {
       inBuffer = lines.pop();
       const deltas: string[] = [];
       const mailNew: MailNewParams[] = [];
+      const notes: Array<{ method: string; params: unknown }> = [];
       let drop = false;
       for (const line of lines) {
-        drop = this._onLine(line, deltas, mailNew) || drop;
+        drop = this._onLine(line, deltas, mailNew, notes) || drop;
       }
       if (deltas.length) this.emit('deltas', deltas);
       for (const params of mailNew) this.emit('mail-new', params);
+      for (const note of notes) {
+        try {
+          this.emit('notification', note);
+        } catch (err) {
+          console.error(`A sync engine 'notification' listener failed: ${err}`);
+        }
+      }
       if (drop) this._dropped(socket);
     });
     socket.on('error', (err: Error) => {
@@ -320,9 +330,14 @@ export class EngineConnection extends EventEmitter {
     socket.on('close', () => this._dropped(socket));
   }
 
-  // Adds a delta to `deltas` or a mail.new to `mailNew`, settles a request, or returns true
-  // when the engine dropped us.
-  _onLine(line: string, deltas: string[], mailNew: MailNewParams[] = []): boolean {
+  // Adds a delta to `deltas`, a mail.new to `mailNew` or another notification to `notes`,
+  // settles a request, or returns true when the engine dropped us.
+  _onLine(
+    line: string,
+    deltas: string[],
+    mailNew: MailNewParams[] = [],
+    notes: Array<{ method: string; params: unknown }> = []
+  ): boolean {
     if (!line) return false;
     const params = deltaParamsText(line);
     if (params !== null) {
@@ -349,6 +364,11 @@ export class EngineConnection extends EventEmitter {
       console.warn(`Sync engine dropped the connection: ${reason}`);
       return true;
     }
+    // account.state is the supervisor's; it reaches windows as Status.
+    if (typeof msg.method === 'string' && msg.method !== Method.AccountState) {
+      if (msg.id === undefined) notes.push({ method: msg.method, params: msg.params });
+      return false;
+    }
     if (msg.method === undefined && msg.id !== undefined && msg.id !== null) {
       const response = msg as RpcResponse;
       const pending = this._requests.get(response.id);
@@ -362,7 +382,6 @@ export class EngineConnection extends EventEmitter {
         pending.resolve(response.result);
       }
     }
-    // account.state is the supervisor's; it reaches windows as Status.
     return false;
   }
 

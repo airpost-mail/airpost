@@ -247,6 +247,16 @@ export type KeyManager = typeof import('../key-manager').default;
 export const KeyManager: KeyManager;
 export type Integrations = typeof import('../integrations').default;
 export const Integrations: Integrations;
+export type Engine = typeof import('../engine-api').default;
+export const Engine: Engine;
+export type {
+  CallerPackage,
+  Disposable as EngineDisposable,
+  EngineRequestRefused,
+  EngineSubscribeFilter,
+} from '../engine-api';
+export type { EngineNotification } from '../engine-events';
+export type { EngineCapabilities, EngineCapability } from '../engine-protocol';
 export type {
   IntegrationKind,
   IntegrationProvider,

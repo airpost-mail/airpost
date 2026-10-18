@@ -2,10 +2,17 @@
 // Local features always are; integration features when the user set up a provider in
 // Preferences > Integrations and the engine can call it; server features need a Tern server,
 // which there is no way to connect yet.
+//
+// The connected engine decides (its `capabilities`, from hello and capabilities.changed): the
+// provider settings are mirrored into its settings store. Keys still go with each request, read
+// from the keyset (KeyManager), so the store checks here that the provider's key is saved. Without
+// an engine that reports capabilities it decides from config alone, as before.
 
 import { useEffect, useState } from 'react';
 import MailspringStore from 'mailspring-store';
 import { localized } from '../../intl';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine-events';
+import { CapabilityReason, EngineCapability } from '../../engine-protocol';
 import {
   Integrations,
   IntegrationKind,
@@ -55,6 +62,14 @@ const SERVER: CapabilityFeature[] = [
   'activity-sharing',
   'metadata-sync',
 ];
+// The engine's names for them (ms-ipc `server_feature`).
+const ENGINE_SERVER_FEATURE: { [feature: string]: string } = {
+  'read-receipts': 'readReceipts',
+  'link-tracking': 'linkTracking',
+  'thread-sharing': 'threadSharing',
+  'activity-sharing': 'activitySharing',
+  'metadata-sync': 'metadataSync',
+};
 
 export const ALL_FEATURES: CapabilityFeature[] = [
   ...LOCAL,
@@ -98,6 +113,8 @@ export class CapabilityStoreClass extends MailspringStore {
   private _keyReadGeneration = 0;
   private _disposables: Array<() => void> = [];
   keySource: KeySource = null;
+  /** The window's engine connection; swappable for specs. */
+  engineEvents: EngineEventsType = EngineEvents;
 
   constructor({ autoStart = true }: { autoStart?: boolean } = {}) {
     super();
@@ -114,10 +131,14 @@ export class CapabilityStoreClass extends MailspringStore {
     // KeyManager keeps the whole keyset encrypted under this config key, so this fires for a
     // key saved in any window.
     const keyset = AppEnv.config.onDidChange('credentials', () => this._refreshKeys());
+    const events = this.engineEvents;
+    const onCapabilities = () => this.trigger();
+    events.on('capabilities', onCapabilities);
     this._disposables = [
       () => settings.dispose(),
       () => keyset.dispose(),
       Integrations.onTransportChange(() => this.trigger()),
+      () => events.removeListener('capabilities', onCapabilities),
     ];
     this._refreshKeys();
   }
@@ -136,33 +157,46 @@ export class CapabilityStoreClass extends MailspringStore {
     if (LOCAL.includes(feature)) {
       return { available: true, source: 'local' };
     }
+    const engine = this.engineEvents.capabilities;
     if (SERVER.includes(feature)) {
-      return { available: false, source: 'server', reason: localized('Needs a Tern server') };
+      const reported = engine && engine.server && engine.server[ENGINE_SERVER_FEATURE[feature]];
+      if (reported && reported.available) return { available: true, source: 'server' };
+      const reason = reported ? engineReason(reported, undefined) : serverReason();
+      return { available: false, source: 'server', reason };
     }
     const kind = INTEGRATION[feature];
     if (!kind) {
       return { available: false, source: 'local', reason: localized('Unknown feature') };
     }
     const settings = readSettings(kind);
-    const provider = settings.provider || undefined;
+    const reported = engine && engine.integrations && engine.integrations[kind];
+    const provider =
+      (reported && isProvider(reported.provider) && reported.provider) ||
+      settings.provider ||
+      undefined;
     const unavailable = (reason: string): Capability => ({
       available: false,
       source: 'integration',
       reason,
       provider,
     });
+    if (reported && !reported.available) {
+      return unavailable(engineReason(reported, provider));
+    }
     if (!settings.enabled) {
       return unavailable(localized('Set up a provider in Preferences > Integrations'));
     }
     const missing = missingSetting(settings, !!this._hasKey[settings.provider]);
     const name = PROVIDERS[settings.provider].name;
+    // The key goes with each request unless the engine says it holds the keys itself.
+    const keysFromUs = !reported || reported.credentials === 'request';
     if (missing === 'url') {
       return unavailable(localized('Add the %@ URL in Preferences > Integrations', name));
     }
-    if (missing === 'key') {
+    if (missing === 'key' && keysFromUs) {
       return unavailable(localized('Add your %@ API key in Preferences > Integrations', name));
     }
-    if (missing === 'username') {
+    if (missing === 'username' && keysFromUs) {
       return unavailable(localized('Add your %@ username in Preferences > Integrations', name));
     }
     if (!Integrations.isAvailable()) {
@@ -214,6 +248,30 @@ export class CapabilityStoreClass extends MailspringStore {
       this._hasKey = next;
       if (changed) this.trigger();
     })();
+  }
+}
+
+function isProvider(p: unknown): p is IntegrationProvider {
+  return typeof p === 'string' && p in PROVIDERS;
+}
+
+function serverReason() {
+  return localized('Needs a Tern server');
+}
+
+// The words for an engine's reason; one this client doesn't know reads as unavailable.
+function engineReason(capability: EngineCapability, provider: IntegrationProvider | undefined) {
+  switch (capability.reason) {
+    case CapabilityReason.NotSetUp:
+      return localized('Set up a provider in Preferences > Integrations');
+    case CapabilityReason.MissingUrl:
+      return provider
+        ? localized('Add the %@ URL in Preferences > Integrations', PROVIDERS[provider].name)
+        : localized('Set up a provider in Preferences > Integrations');
+    case CapabilityReason.NeedsTernServer:
+      return serverReason();
+    default:
+      return localized('Not available from the sync engine');
   }
 }
 

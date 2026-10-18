@@ -41,6 +41,10 @@ export const ENGINE_SETTINGS_KEYS = [
   'core.composing.html',
   'signatures',
   'defaultSignatures',
+  // Provider settings without keys; the engine's capabilities follow them.
+  'core.integrations.translation',
+  'core.integrations.grammar',
+  'core.integrations.enrichment',
 ];
 
 // The config key of the UI language; a change rewrites the resurfacing texts.

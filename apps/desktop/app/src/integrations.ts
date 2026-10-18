@@ -354,8 +354,8 @@ export interface IntegrationsTransport {
   send(method: IntegrationMethod, params: object): Promise<unknown>;
 }
 
-// TODO(engine): replace with a transport over the engine socket once the integrations.*
-// methods land (docs/integrations-plan.md, sections 4 and 5).
+// The transport until a window wires its engine connection (engine-api.ts
+// wireIntegrationsTransport), and in specs.
 export const UnavailableTransport: IntegrationsTransport = {
   available: false,
   send: async () => {

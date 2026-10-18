@@ -8,10 +8,12 @@ MailsyncBridge feeds it from the window's EngineConnection; until the first hell
 mode) `features` is null and every `has()` is false.
 
 Events: 'connected' (features) after each hello, 'gone' when the connection drops,
-'thread-counts' ({type, rows}) for each ThreadCounts delta, 'mail-new' (MailNewParams).
+'capabilities' (EngineCapabilities | null) when hello or capabilities.changed brings new ones,
+'thread-counts' ({type, rows}) for each ThreadCounts delta, 'mail-new' (MailNewParams), and
+'notification' ({method, params}) for every notification but deltas, mail.new included.
 */
 import { EventEmitter } from 'events';
-import type { MailNewParams, ThreadCountsRow } from './engine-protocol';
+import { EngineCapabilities, MailNewParams, Method, ThreadCountsRow } from './engine-protocol';
 
 type Requester = (method: string, params: unknown) => Promise<unknown>;
 
@@ -20,8 +22,16 @@ export interface ThreadCountsDelta {
   rows: ThreadCountsRow[];
 }
 
+export interface EngineNotification {
+  method: string;
+  params: any;
+}
+
 export class EngineEvents extends EventEmitter {
   features: Set<string> | null = null;
+  // From the last hello or capabilities.changed; null while disconnected or from an engine
+  // without Feature.Capabilities.
+  capabilities: EngineCapabilities | null = null;
   _request: Requester | null = null;
 
   has(feature: string) {
@@ -35,17 +45,30 @@ export class EngineEvents extends EventEmitter {
 
   // Bridge side.
 
-  connected(features: string[], request: Requester) {
+  connected(features: string[], request: Requester, capabilities: EngineCapabilities = null) {
     this.features = new Set(features);
     this._request = request;
+    this.capabilities = capabilities || null;
     this.emit('connected', this.features);
+    this.emit('capabilities', this.capabilities);
   }
 
   gone() {
     if (!this.features && !this._request) return;
     this.features = null;
     this._request = null;
+    const hadCapabilities = !!this.capabilities;
+    this.capabilities = null;
     this.emit('gone');
+    if (hadCapabilities) this.emit('capabilities', null);
+  }
+
+  notification(method: string, params: any) {
+    if (method === Method.CapabilitiesChanged && params && typeof params === 'object') {
+      this.capabilities = params as EngineCapabilities;
+      this.emit('capabilities', this.capabilities);
+    }
+    this.emit('notification', { method, params } as EngineNotification);
   }
 
   threadCounts(delta: ThreadCountsDelta) {
@@ -54,6 +77,7 @@ export class EngineEvents extends EventEmitter {
 
   mailNew(params: MailNewParams) {
     this.emit('mail-new', params);
+    this.emit('notification', { method: Method.MailNew, params } as EngineNotification);
   }
 }
 

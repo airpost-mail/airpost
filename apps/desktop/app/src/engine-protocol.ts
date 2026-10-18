@@ -68,6 +68,14 @@ export const Method = {
   ThreadsSnooze: 'threads.snooze',
   ThreadsUnsnooze: 'threads.unsnooze',
   MessagesUnsubscribe: 'messages.unsubscribe',
+  // Provider calls (Feature.Integrations), answered out of order; the params carry the
+  // provider config, key included (docs/integrations-plan.md section 4).
+  IntegrationsTranslate: 'integrations.translate',
+  IntegrationsDetect: 'integrations.detect',
+  IntegrationsLanguages: 'integrations.languages',
+  IntegrationsGrammar: 'integrations.grammar',
+  IntegrationsEnrich: 'integrations.enrich',
+  IntegrationsTest: 'integrations.test',
   // `serve` mode's stdin only: the account JSON carries credentials.
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
@@ -85,6 +93,8 @@ export const Method = {
   AccountState: 'account.state',
   MailNew: 'mail.new',
   SettingsChanged: 'settings.changed',
+  // The whole new `capabilities` (Feature.Capabilities), to every subscriber.
+  CapabilitiesChanged: 'capabilities.changed',
 } as const;
 
 // What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
@@ -103,6 +113,9 @@ export const Feature = {
   Snooze: 'snooze',
   // `messages.unsubscribe`: the engine makes the one-click POST or sends the mailto message.
   Unsubscribe: 'unsubscribe',
+  Integrations: 'integrations',
+  // `capabilities` in hello and engine.status, and capabilities.changed.
+  Capabilities: 'capabilities',
 } as const;
 
 export const ErrorCode = {
@@ -124,6 +137,13 @@ export const ErrorCode = {
   AccountExists: -32006,
   // A parent-only method on the socket, or `subscribe` on stdin.
   WrongChannel: -32007,
+  // A relayed connection asked for a method its scopes don't allow.
+  ForbiddenRelayed: -32008,
+  TooManyConnections: -32009,
+  // A provider call failed; `data` is the IntegrationError `{key, message, retryable, ...}`.
+  IntegrationFailed: -32010,
+  // The workers for this kind of call are busy and their queue is full; try again later.
+  EngineBusy: -32012,
 } as const;
 
 // `serve`'s exit code when another engine is listening on its socket, typically the previous
@@ -164,7 +184,33 @@ export interface HelloResult {
   pid: number;
   accounts: AccountInfo[];
   features?: string[];
+  capabilities?: EngineCapabilities;
 }
+
+// One entry of `capabilities` (ms-ipc `Capability`). `reason` is one of CapabilityReason, or one
+// a newer engine adds.
+export interface EngineCapability {
+  available: boolean;
+  provider?: string;
+  // 'request': the client sends the provider's key with each call, so it checks for one.
+  credentials?: 'request' | string;
+  reason?: string;
+}
+
+// What the engine can do for its clients now. `integrations` by kind (translation, grammar,
+// enrichment), `server` by feature (readReceipts, linkTracking, threadSharing, activitySharing,
+// metadataSync); newer engines add groups (`ai`).
+export interface EngineCapabilities {
+  integrations?: { [kind: string]: EngineCapability };
+  server?: { [feature: string]: EngineCapability };
+  [group: string]: { [name: string]: EngineCapability } | undefined;
+}
+
+export const CapabilityReason = {
+  NotSetUp: 'not-set-up',
+  MissingUrl: 'missing-url',
+  NeedsTernServer: 'needs-tern-server',
+} as const;
 
 export interface CategoryCounts {
   unread: number;
@@ -262,6 +308,8 @@ export interface EngineStatusResult {
   pid: number;
   uptimeSecs: number;
   accounts: AccountStatus[];
+  features?: string[];
+  capabilities?: EngineCapabilities;
 }
 
 // Today's stdout delta object plus the account it came from.

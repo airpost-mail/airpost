@@ -75,6 +75,17 @@ describe('PackageManager engines check', function () {
 
   it('exports the plugin API version', () => {
     expect(apiVersion).toBe(PLUGIN_API_VERSION);
-    expect(apiVersion).toBe('1.26.0');
+    expect(apiVersion).toBe('1.27.0');
+  });
+
+  it('reads tern.engineMethods, keeping only strings', () => {
+    writePackage('declares', { tern: { engineMethods: ['account.test', 7, 'secrets.set'] } });
+    const pkg = new Package(path.join(resourcePath, 'spec', 'fixtures', 'packages', 'declares'));
+    expect(pkg.engineMethods()).toEqual(['account.test', 'secrets.set']);
+    writePackage('declares-nothing', { tern: { engineMethods: 'account.test' } });
+    const none = new Package(
+      path.join(resourcePath, 'spec', 'fixtures', 'packages', 'declares-nothing')
+    );
+    expect(none.engineMethods()).toEqual([]);
   });
 });
