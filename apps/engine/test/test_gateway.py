@@ -49,6 +49,7 @@ SCENARIO = {
 }
 
 WAIT = 30.0
+SECRET_MARKER = "pytest-secret-7f3c9a"   # sent as a secrets.set value; must never reach the log
 
 
 def gateway_binary() -> Path:
@@ -251,6 +252,7 @@ class Gateway:
         self.proc: Optional[subprocess.Popen] = None
         self.port = 0
         self.codes: list = []   # every pairing code minted, for the log check
+        self.tokens: list = []  # every device token issued, for the log check
 
     @property
     def origin(self) -> str:
@@ -292,6 +294,13 @@ class Gateway:
         assert r.returncode == 0, f"tern-gateway {' '.join(args)}: {r.returncode}\n{r.stdout}\n{r.stderr}"
         return r.stdout
 
+    def serve_refused(self, *args) -> str:
+        """Runs a second `serve` on this profile that must exit with an error; its stderr."""
+        r = subprocess.run([self.bin, "--config-dir", str(self.config_dir), "serve", *args],
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=WAIT, env=self.env)
+        assert r.returncode != 0, f"a second serve {args} started:\n{r.stderr}"
+        return r.stderr
+
     def http(self, method: str, path: str, body: bytes = b"", headers: Optional[dict] = None):
         """(status, lowercased headers, body)."""
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=WAIT)
@@ -323,6 +332,7 @@ class Gateway:
             again = self.http("POST", "/gateway/v1/pair", body, {"Origin": self.origin})
             assert again[0] == 401, again
         self.codes.append(code)
+        self.tokens.append(set_cookie.split(";")[0].split("=", 1)[1])
         return set_cookie.split(";")[0], json.loads(out)["device"]
 
     def ws(self, cookie: Optional[str], origin: Optional[str] = "self") -> Ws:
@@ -378,6 +388,12 @@ def test_gateway_end_to_end(setup):
     assert gw.ws(None).wait_closed() == 4401
     assert gw.ws("tern_device=not-a-token").wait_closed() == 4401
     cookie, device = gw.pair(reuse=True)
+
+    # -- a second serve on the profile: config refused before any bind, then the control socket
+    # checked before the TCP port --------------------------------------------------------------
+    assert "public_url" in gw.serve_refused("--bind", "0.0.0.0:0")
+    assert "another gateway is running" in gw.serve_refused("--bind", f"127.0.0.1:{gw.port}")
+    assert gw.http("GET", "/healthz")[0] == 200
     assert device["scopes"] == [] and device["name"] == "pytest browser"
     assert gw.ws(cookie, origin=None).wait_closed() == 4403
     assert gw.ws(cookie, origin="http://evil.example").wait_closed() == 4403
@@ -438,7 +454,7 @@ def test_gateway_end_to_end(setup):
 
     # -- refusals: never reach the engine ------------------------------------------------------
     refused = {
-        "secrets.set": {"accountId": account_id, "secrets": {}},
+        "secrets.set": {"name": "integration:pytest", "value": SECRET_MARKER},
         "files.get": {"accountId": account_id, "fileId": att["id"]},
         "files.put": {"accountId": account_id, "name": "x", "path": "/etc/passwd"},
         "engine.shutdown": {},
@@ -531,6 +547,8 @@ def test_gateway_end_to_end(setup):
     # -- the log: no secrets, codes, tokens or params ---------------------------------------------
     log = gw.log()
     assert "tern-gateway serving" in log
-    for secret in [cookie.split("=", 1)[1], admin_cookie.split("=", 1)[1], *gw.codes]:
+    assert len(gw.tokens) == 3 and len(gw.codes) == 3
+    for secret in [*gw.tokens, *gw.codes, SECRET_MARKER]:
         assert secret not in log, f"the gateway log holds a secret: {secret[:4]}..."
-    assert "/etc/passwd" not in log and "notes one.txt" not in log
+    # The upload name reaches the gateway URL-encoded, so check that form too.
+    assert "/etc/passwd" not in log and "notes one" not in log and "notes%20one" not in log
