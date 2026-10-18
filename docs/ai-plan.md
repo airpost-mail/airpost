@@ -26,7 +26,7 @@ desktop / tern / web (via gateway) ──socket──▶ engine ── ai_api.rs
 ```
 
 - `crates/ms-ai`: reqwest (rustls on ring), serde, thiserror, tracing, the same stack as
-  `ms-integrations`, but reqwest's async client on a private current-thread tokio runtime
+  `ms-integrations`, but reqwest's async client on a private one-worker tokio runtime
   that callers block on, so `ai.cancel` can drop a request that is still waiting for its
   first token. Depends on `ms-integrations` for `Secret`, its URL redaction, the TTL cache
   and the transport-error mapping, nothing else. No store access: callers pass a `MailContext` (below).
@@ -91,6 +91,11 @@ ai.triage(&ProviderConfig, &MailContext)                    -> Result<Triage>
 All take `accountId`; the engine checks the account is opted in and the feature is on
 before it reads any mail. `config` is the provider config with key until stages 3 and 11,
 then omitted (the engine uses its stored config; `provider` picks a configured one by id).
+Until stage 3 has the `ai.*` settings keys, the thread methods also take `settings`
+(`ms_ipc::AiSettings`): `{accounts: [accountId], features: {summary, reply, triage}, includeAddresses?}`,
+each feature `true` or `{enabled: true, …}`, from the desktop's `core.ai.*`. Without it, or
+with the account or feature missing, the call is `not-enabled`; a `provider` id alone is
+`not-configured`, since the engine keeps no providers yet.
 
 | Method | Params | Result |
 |---|---|---|
@@ -111,13 +116,17 @@ Notifications, added to the routing table of desktop-client-plan 3.1:
 | `ai.delta {streamId, text}` | the connection that sent `streamId` | no | in order; the final reply has the full text |
 | `ai.triage.progress {jobId, done, total}` | the connection that called `ai.triage.run` | no | `jobId` |
 
-Errors: `-32602` for params that don't deserialize; an `AiError` is engine code `-32011` "AI
-request failed" with the serialized error as `data`. All `ai.*` methods are slow (T21) and run
-on stage 5's worker pool.
+Errors: `-32602` for params that don't deserialize (and for a `streamId` already streaming on
+the connection); an `AiError` is engine code `-32011` "AI request failed" with the serialized
+error as `data`. Unknown accounts and threads are `-32001` and `-32004`, a thread with nothing
+that may be sent (drafts, Spam, Trash, encrypted mail only) is `unsupported`. The model calls
+run on the `ai` worker lane (8 threads, 32 queued; `-32012` past that); `ai.cancel` and
+`ai.usage` are answered at once, in order. `ai.delta` needs no `subscribe`.
 
 **Relay policy** (`crates/ms-ipc/src/policy.rs`): every `ai.*` method is `Open` except that a
-relayed connection may never pass `config`, only `provider`. Otherwise a remote device could
-make the engine send requests, and mail, to any URL, including hosts on the user's LAN.
+relayed connection may never pass `config` (nor the interim `settings`, which would let it opt
+accounts in), only `provider`, admin scope or not. Otherwise a remote device could make the
+engine send requests, and mail, to any URL, including hosts on the user's LAN.
 Both rules go in `ms_ipc::policy::relayed_request_allowed` (the method classes and the
 `config` refusal), which the gateway and the engine both enforce, not only in the engine's
 socket code. Until then `ai.*` are unknown names, so `LocalOnly` (admin devices only).
@@ -129,7 +138,10 @@ order, and closing a tab closes that connection, which cancels the provider requ
 **Features and capabilities.** `hello.features` gains `ai`. Stage 5's `capabilities` gains
 `ai: {summary, reply, triage}`, each `{available, provider?, local?, reason?}`, with the
 reasons of integrations-plan section 1 ("Set up a model in Preferences > AI", "Turn on AI
-for this account", "Waiting for engine support").
+for this account", "Waiting for engine support"). While the client sends config, key and
+switches with each call, the engine can't judge them, so `summary` and `reply` are
+`{available: true, credentials: "request"}` (the client applies its own settings, as for
+integrations) and `triage` is absent until AI4. `ms_ipc::Capability` gained `local`.
 
 ## 4. Triage
 
@@ -292,3 +304,36 @@ model-list bodies are size-capped; `RenderedContext` and `Triage` redact `Debug`
 of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (131 passed, 1
 skipped). Rust only, so no desktop or web gate. Open: nothing in the engine calls `ms-ai`
 yet; the `ai.*` methods, keychain secrets and relay policy come in AI2.
+
+2026-10-18, AI2 on `roadmap/ai`: `apps/engine/src/ai_api.rs` serves `ai.models`, `ai.test`,
+`ai.summarize`, `ai.suggestReplies`, `ai.draftReply`, `ai.cancel` and `ai.usage` on `serve`'s
+socket (not `sync --socket` or the parent's stdin, like integrations). Thread calls check the
+account (opted in through the per-request `settings`) and the feature, then read the
+`MailContext` on the connection's reader thread from its read-only database connection:
+drafts, hidden messages, messages whose every copy is in Spam or Trash, and S/MIME, PGP/MIME
+or inline PGP messages left out; bodies flattened without cited blockquotes, then `>` lines,
+the attribution line before them and anything after an Outlook "Original Message" separator
+dropped; the snippet when a body isn't fetched; bodies read newest first up to 8 characters
+per token of the window; dates in the engine's local zone; the owner from the account's name
+and address. The model call runs on the new `ai` lane with a sink that sends `ai.delta` to
+that connection's queue ahead of the response; each call's `CancelToken` is registered with
+its connection, cancelled by `ai.cancel {streamId}` and by the connection closing.
+`ai.suggestReplies` is cancellable too (`Ai::suggest_replies_until`). ms-ai's runtime now
+has one worker thread (named `ai`, so a panic there is contained): on a current-thread
+runtime nothing ran hyper's connection tasks between calls, so a cancelled request's socket
+stayed open and the provider kept generating. `ai.usage` counts in memory per day, provider
+and feature (90 days; the file is AI4). The caches are cleared on `account.reset` and
+`engine.resetDatabase`. ms-ipc: the `ai.*` method names (triage included), `feature::AI`,
+`code::AI_FAILED`, the params types, `Capabilities.ai`, `Capability.local`, and the relay
+policy (all `ai.*` `Open`, `config` and `settings` refused on relayed connections, admin or
+not; tern-web's gateway tests pass unchanged). Tests: `apps/engine/tests/ai_api.rs` against
+the fake provider (opt-in and feature checks before any read or request, privacy of what is
+sent, `ai.delta` order and routing, the cache, suggestions, drafts, models, test, `ai.cancel`,
+a dropped connection cancelling the provider request, relayed refusals), unit tests for the
+quote stripping, encryption checks, streams and usage, and the ms-ipc policy.
+
+Open after AI2: the engine trusts the request's `settings` until stage 3 adds the `ai.*` keys
+(tern-client), and has no stored providers until then and no keys until stage 11, so relayed
+devices get `not-enabled` / `not-configured`; `capabilities.ai` can only say "served" until
+then. Usage isn't persisted (AI4).
+
