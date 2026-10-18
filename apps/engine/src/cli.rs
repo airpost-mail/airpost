@@ -48,6 +48,9 @@ pub struct Options {
     /// other users.
     pub identity: Option<String>,
     pub orphan: bool,
+    /// `--detached`, serve mode: no parent channel and no stdin lifeline; the socket takes
+    /// the parent methods from local connections.
+    pub detached: bool,
     pub verbose: bool,
     /// `--socket <path>`: sync mode serves the socket protocol there instead of writing
     /// deltas to stdout (docs/engine-protocol-plan.md section 2); serve mode listens there
@@ -71,6 +74,7 @@ pub fn usage() -> String {
      \x20 --account, -a  \tRequired: Account JSON with credentials.\n\
      \x20 --mode, -m  \tRequired: sync, serve, test, reset, migrate, install-check or import-legacy.\n\
      \x20 --orphan, -o  \tOptional: allow the process to run without a parent bound to stdin.\n\
+     \x20 --detached  \tOptional, serve mode: run without a parent; the socket takes the parent's methods.\n\
      \x20 --verbose, -v  \tOptional: log all IMAP and SMTP traffic for debugging purposes.\n\
      \x20 --socket  \tOptional, sync and serve modes: serve the engine protocol on this Unix socket path.\n"
         .to_owned()
@@ -90,7 +94,7 @@ fn parse_with_env(args: &[String], config_dir: Option<PathBuf>) -> Parsed {
     let mut account = None;
     let mut identity = None;
     let mut socket = None;
-    let (mut orphan, mut verbose, mut help) = (false, false, false);
+    let (mut orphan, mut verbose, mut help, mut detached) = (false, false, false, false);
 
     let mut i = 0;
     while i < args.len() {
@@ -117,6 +121,7 @@ fn parse_with_env(args: &[String], config_dir: Option<PathBuf>) -> Parsed {
             "--account" | "-a" => account = value(&mut i),
             "--identity" | "-i" => identity = value(&mut i),
             "--orphan" | "-o" => orphan = true,
+            "--detached" => detached = true,
             "--verbose" | "-v" => verbose = true,
             "--socket" => socket = value(&mut i).map(PathBuf::from),
             // Unknown options and stray values (`--info <email>`) are ignored.
@@ -138,6 +143,7 @@ fn parse_with_env(args: &[String], config_dir: Option<PathBuf>) -> Parsed {
         account,
         identity,
         orphan,
+        detached,
         verbose,
         socket,
         config_dir,

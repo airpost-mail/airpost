@@ -91,6 +91,9 @@ SOCKET_PROTOCOL = 1
 # The engine's TASK_REJECTED: the task's local phase failed. The Task delta carries the same
 # error, as on stdio, so it is an outcome rather than a transport problem.
 RPC_TASK_REJECTED = -32002
+RPC_ACCOUNT_EXISTS = -32006
+# The Account JSON settings that are secrets (KeyManager, the engine's registry).
+SECRET_SETTINGS = ("imap_password", "smtp_password", "refresh_token")
 # The stdin commands the socket transport sends as requests; anything else goes over stdin.
 STDIN_TO_METHOD = {
     "wake-workers": "sync.wake",
@@ -323,6 +326,11 @@ class ServeEngine:
         self.stderr_path = stderr_path
         self.proc: Optional[subprocess.Popen] = None
         self.handles: dict = {}        # accountId -> the MailsyncProcess it was last added for
+        # Lines for accounts the engine started from accounts.json before their handle was
+        # added, replayed to it then.
+        self._registered: set = set()
+        self._early: dict = {}
+        self._route_lock = threading.RLock()
         self.errors: list = []         # engine-wide transport problems; every handle reports them
         self.stdout_noise: list = []
         self._t0 = 0.0
@@ -351,10 +359,21 @@ class ServeEngine:
         self._sock = sock
         self._spawn(self._read_socket)
         hello = self.rpc.call("hello", {"protocol": SOCKET_PROTOCOL, "client": "tern-harness"}, timeout)
-        if hello.get("protocol") != SOCKET_PROTOCOL or hello.get("accounts"):
-            raise MailsyncError(f"unexpected hello result from a fresh serve engine: {hello}")
+        # An engine restarted on the same config dir starts the accounts it registered.
+        registered = {a.get("id") for a in self.registered_accounts()}
+        self._registered = registered
+        unexpected = [a for a in hello.get("accounts") or [] if a.get("accountId") not in registered]
+        if hello.get("protocol") != SOCKET_PROTOCOL or unexpected:
+            raise MailsyncError(f"unexpected hello result from a serve engine: {hello}")
         self.rpc.call("subscribe", {"accounts": None, "classes": None}, timeout)
         return self
+
+    def registered_accounts(self) -> list:
+        """The non-secret Account JSON in the config dir's accounts.json."""
+        try:
+            return json.loads((self.config_dir / "accounts.json").read_text()).get("accounts") or []
+        except (OSError, ValueError):
+            return []
 
     def _spawn(self, target):
         t = threading.Thread(target=target, daemon=True)
@@ -390,9 +409,21 @@ class ServeEngine:
         """`account.add` for `handle`, which from then on gets that account's deltas and
         states. Answers once the account runs (or stopped while starting)."""
         aid = handle.account["id"]
-        self.handles[aid] = handle
-        result = self.parent.call("account.add", {"account": handle.account, "identity": handle.identity},
-                                  SERVE_ACCOUNT_TIMEOUT)
+        with self._route_lock:
+            self.handles[aid] = handle
+            for line in self._early.pop(aid, []):
+                self._on_socket_line(line)
+        try:
+            result = self.parent.call("account.add", {"account": handle.account, "identity": handle.identity},
+                                      SERVE_ACCOUNT_TIMEOUT)
+        except MailsyncError as e:
+            # Registered on an earlier engine, the account was started by this one already.
+            err = getattr(e, "rpc_error", None) or {}
+            if err.get("code") != RPC_ACCOUNT_EXISTS or "already" not in str(err.get("message")):
+                raise
+            listed = self.rpc.call("account.list", {}, SERVE_ACCOUNT_TIMEOUT).get("accounts") or []
+            mine = next((a for a in listed if a.get("accountId") == aid), {})
+            result = {"accountId": aid, "state": mine.get("state"), "error": mine.get("error"), "autostarted": True}
         handle._on_account_state({"accountId": aid, "state": result.get("state"), "error": result.get("error")},
                                  from_reply=True)
         return result
@@ -465,7 +496,11 @@ class ServeEngine:
         params = msg.get("params") or {}
         if method in ("delta", "account.state"):
             aid = params.get("accountId")
-            handle = self.handles.get(aid)
+            with self._route_lock:
+                handle = self.handles.get(aid)
+                if handle is None and aid in self._registered:
+                    self._early.setdefault(aid, []).append(line)
+                    return
             if handle is None:
                 self._error(f"{method} for an account never added ({aid!r}): {line[:200]!r}")
             elif method == "account.state":
@@ -485,11 +520,21 @@ class ServeEngine:
                     handle._transport_error(f"{d['modelClass']} delta for {aid} carries models of {sorted(strays)}")
                 handle._record_delta(handle.elapsed(), d)
         elif method == "mail.new":
-            handle = self.handles.get(params.get("accountId"))
+            with self._route_lock:
+                handle = self.handles.get(params.get("accountId"))
+                if handle is None and params.get("accountId") in self._registered:
+                    self._early.setdefault(params.get("accountId"), []).append(line)
+                    return
             if handle is None:
                 self._error(f"mail.new for an account never added: {line[:200]!r}")
             else:
                 handle._record_mail_new(handle.elapsed(), params)
+        elif method == "account.changed":
+            # The registry's non-secret Account JSON: a secret here would reach every client.
+            settings = (params.get("account") or {}).get("settings") or {}
+            leaked = sorted(k for k in SECRET_SETTINGS if k in settings)
+            if leaked:
+                self._error(f"account.changed carries {', '.join(leaked)}")
         elif method == "disconnect":
             self._error(f"engine sent disconnect: {params}")
         elif "id" in msg:
@@ -632,6 +677,9 @@ class MailsyncProcess:
             # null it exits immediately. The variable must still be set or main() bails.
             IDENTITY_SERVER="http://127.0.0.1:9/unreachable",
         )
+        # Never the OS keychain (conftest sets one key file for every case; run.py doesn't).
+        env.setdefault("TERN_ENGINE_KEY_FILE", str(self.work_dir / "engine.key"))
+        env.setdefault("TERN_ENGINE_RESTART_DELAY_MS", "600000")
         env.update(self.extra_env)
         return env
 

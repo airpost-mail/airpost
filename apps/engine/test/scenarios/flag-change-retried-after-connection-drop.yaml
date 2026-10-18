@@ -1,0 +1,28 @@
+name: flag-change-retried-after-connection-drop
+description: >
+  The foreground connection drops while a mark-read's UID STORE is in flight, as on a
+  Wi-Fi flap. The error is retryable, so the task stays queued and runs again after its
+  backoff instead of completing with the error and rescanning the flag back (TD43): the
+  message stays read locally throughout, the second attempt sets \Seen on the server, and
+  the task completes without an error.
+source: "docs/tech-debt.md TD43; crates/ms-tasks/src/lib.rs perform_remote_task, messages.rs perform_remote_change_on_messages"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 6}
+steps:
+  - wait: quiescent
+  - server.drop_connections: {at: {hook: before_command, session: foreground, command: "^UID STORE"}}
+  - client.task: {__cls: ChangeUnreadTask, messages: {mailbox: INBOX, uids: [3]}, unread: false}
+    as: read
+  - wait: {log: "attempt 1 of 8, next in 5s", timeout: 60}
+  # No quiescence wait: the background worker lost its connection too and sleeps 120 s.
+  - wait: {task: read, timeout: 90}
+expect:
+  log_absent: ["\\[critical\\]", "Changing status to `complete`.*retryable"]
+  models:
+    Task:
+      where: {__cls: ChangeUnreadTask}
+      match: [{status: complete, error: {not: true}}]
+  db_matches_server: {}
+  running: true

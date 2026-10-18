@@ -22,6 +22,10 @@ mod platform;
 #[cfg(unix)]
 mod read_api;
 #[cfg(unix)]
+mod registry;
+#[cfg(unix)]
+mod restart;
+#[cfg(unix)]
 mod serve;
 #[cfg(unix)]
 mod settings;
@@ -49,6 +53,8 @@ fn main() -> ExitCode {
             return code(EXIT_PATH_CHECK);
         }
     }
+
+    platform::restrict_umask();
 
     // reqwest and lettre are built without a default provider (aws-lc is not
     // GPL-compatible); ring is installed process-wide before any TLS client exists.

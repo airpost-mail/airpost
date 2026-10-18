@@ -1,0 +1,33 @@
+name: oauth-rotated-token-survives-restart
+description: >
+  A Gmail account on OAuth only. The fake token endpoint rotates the refresh token on the
+  first grant and revokes the old one, so the next engine must refresh with the rotated
+  token or get invalid_grant. serve keeps the rotated token in its secret store (no
+  ProcessAccountSecretsUpdated on stdout) and starts the registered account itself after a
+  restart; the harness's account.add then finds it running. Contacts sync again after the
+  restart without a 400 from the token endpoint.
+source: "docs/desktop-client-plan.md 3.6 (registry, rotated tokens persisted) and stage 11 tests"
+transports: [serve]
+servers:
+  - {fake: gmail, people: true, people_options: {rotate_refresh_token: true}}
+mailboxes:
+  INBOX: {messages: 2}
+people:
+  contacts:
+    - {count: 3}
+steps:
+  - wait: {log: "Stored the rotated refresh token", timeout: 60}
+  - wait: {log: "Calendar sync pass 1, with contacts", timeout: 60}
+  - wait: {quiescent: true}
+  - restart: {}
+  - wait: {log: "Calendar sync pass 1, with contacts", count: 2, timeout: 60}
+  - wait: {quiescent: true}
+expect:
+  models:
+    Contact: {where: {s: gpeople}, count: 3}
+  people_requests:
+    - {method: POST, path: "^/token$", min: 2}
+    - {status: 400, count: 0}
+    - {status: 401, count: 0}
+  log_absent: ["\\[critical\\]", "invalid_grant"]
+  running: true

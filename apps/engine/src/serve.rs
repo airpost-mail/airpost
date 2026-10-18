@@ -21,7 +21,7 @@
 //! exited; the engine never restarts it, the client may add it again. Engine-wide threads
 //! (stdin, socket, signals) still abort the process on a panic.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -35,10 +35,11 @@ use ms_core::constants::{
 };
 use ms_core::Account;
 use ms_ipc::{
-    account_state, code, method, AccountAddParams, AccountAddResult, AccountIdParams,
-    AccountRemoveResult, AccountResetParams, AccountStateParams, AccountStatus, AccountTestParams,
-    ErrorObject, Request as RpcRequest, ResetDatabaseParams, ResetDatabaseResult, Response,
-    SetLogLevelParams, SetLogLevelResult, MAX_LINE_BYTES,
+    account_state, code, method, AccountAddParams, AccountAddResult, AccountChangedParams,
+    AccountIdParams, AccountRemoveParams, AccountRemoveResult, AccountResetParams,
+    AccountStateParams, AccountStatus, AccountTestParams, CredentialsImportParams,
+    CredentialsStatus, ErrorObject, Request as RpcRequest, ResetDatabaseParams,
+    ResetDatabaseResult, Response, SetLogLevelParams, SetLogLevelResult, MAX_LINE_BYTES,
 };
 use ms_store::{DeltaSink, DeltaStream};
 use ms_sync::{AccountFailure, AccountRuntime, WorkerContext};
@@ -48,6 +49,8 @@ use tracing::{info, warn};
 use crate::cli::Options;
 use crate::dispatch::{self, Command, Reply, Request};
 use crate::output::{one_shot_error, write_stdout};
+use crate::registry::{self, Registry as Registered};
+use crate::restart::{self, Decision, History};
 use crate::socket::{self, Accounts, Hub, Server, Session};
 use crate::workers::{self, Lane};
 
@@ -58,18 +61,28 @@ pub fn run(opts: &Options) -> i32 {
         .socket
         .clone()
         .unwrap_or_else(|| default_socket(&opts.config_dir));
+    if let Err(e) = crate::platform::uds::restrict_dir(&opts.config_dir) {
+        one_shot_error(&format!("Setup Failed: {e}"));
+        return EXIT_FAILURE;
+    }
     if let Err(e) = ms_core::log::init_file(&opts.config_dir.join(ENGINE_LOG_FILE)) {
         one_shot_error(&format!("Setup Failed: {e}"));
         return EXIT_FAILURE;
     }
     crate::modes::install_panic_hook(true);
     info!("------------- Starting the engine (serve) ---------------");
+    // Hashed while the database migrates, for `hello.build`.
+    crate::modes::spawn(thread::BUILD_ID, || {
+        socket::build_id();
+    });
 
     let fail = |message: String| {
         tracing::error!("-X {message}");
         one_shot_error(&message);
         EXIT_FAILURE
     };
+    // Bound before migrating, so a second engine on this config directory stops here and
+    // only one migrates; nothing is accepted until the database is current.
     let listener = match crate::platform::uds::bind(&socket_path) {
         Ok(l) => l,
         Err(e) if e.in_use => {
@@ -79,7 +92,20 @@ pub fn run(opts: &Options) -> i32 {
         Err(e) => return fail(e.message),
     };
     crate::platform::remove_on_exit(socket_path.clone());
-    match socket::write_engine_discovery(&opts.config_dir, &socket_path, &[]) {
+    let mut progress = Vec::new();
+    let migrated =
+        ms_store::migrate::migrate(&opts.config_dir, &ms_core::SystemClock, &mut progress);
+    let progress = String::from_utf8_lossy(&progress);
+    if !progress.trim().is_empty() {
+        info!(
+            "Migrate: {}",
+            progress.split_whitespace().collect::<Vec<_>>().join(" ")
+        );
+    }
+    if let Err(e) = migrated {
+        return fail(format!("migrate failed: {e}"));
+    }
+    match socket::write_engine_discovery(&opts.config_dir, &socket_path, &[], opts.detached) {
         Ok(path) => crate::platform::remove_on_exit(path),
         Err(e) => return fail(format!("Could not write the discovery file: {e}")),
     }
@@ -93,9 +119,15 @@ pub fn run(opts: &Options) -> i32 {
     let engine = Arc::new_cyclic(|me| Engine {
         config_dir: opts.config_dir.clone(),
         socket: socket_path.clone(),
+        detached: opts.detached,
         verbose_until: AtomicI64::new(if opts.verbose { i64::MAX } else { 0 }),
         hub: hub.clone(),
         registry: Mutex::new(Registry::default()),
+        registered: Registered::open(&opts.config_dir),
+        identity: Mutex::new(Value::Null),
+        unstarted: Mutex::new(HashMap::new()),
+        restarts: Mutex::new(HashMap::new()),
+        restart_delay: restart::base_delay(),
         changed: Condvar::new(),
         resetting: Mutex::new(HashSet::new()),
         resetting_database: AtomicBool::new(false),
@@ -117,10 +149,17 @@ pub fn run(opts: &Options) -> i32 {
         ms_core::logmsg::socket_listening(&socket_path.to_string_lossy())
     );
 
-    let orphan = opts.orphan;
-    crate::modes::spawn(thread::STDIN, move || {
-        parent_loop(engine, Session::new(server), orphan)
-    });
+    let starting = engine.clone();
+    crate::modes::spawn(thread::ACCOUNT_RESTART, move || starting.start_registered());
+
+    if opts.detached {
+        info!("Detached: no parent channel; engine.shutdown or a signal stops the engine");
+    } else {
+        let orphan = opts.orphan;
+        crate::modes::spawn(thread::STDIN, move || {
+            parent_loop(engine, Session::new(server), orphan)
+        });
+    }
     // The stdin thread, `engine.shutdown` or a signal ends the process.
     loop {
         std::thread::park();
@@ -144,6 +183,10 @@ struct Slot {
     stopping: bool,
     /// `account.remove` or `engine.shutdown` is stopping it.
     removing: bool,
+    /// Stopped: when the restart policy starts it again (Unix ms), or `None` when it won't.
+    retry_at: Option<i64>,
+    /// Stopped because the server refused its credentials; only `account.add` restarts it.
+    auth_failed: bool,
 }
 
 #[derive(Default)]
@@ -177,11 +220,23 @@ impl Registry {
 pub struct Engine {
     config_dir: PathBuf,
     socket: PathBuf,
+    /// `--detached`: no parent channel, so the socket takes the parent methods.
+    detached: bool,
     /// Unix milliseconds: accounts started before then log protocol traffic
     /// (`engine.setLogLevel`; `--verbose` sets it to forever).
     verbose_until: AtomicI64,
     hub: Arc<Hub>,
     registry: Mutex<Registry>,
+    /// `accounts.json` and the secret store.
+    registered: Registered,
+    /// The identity line of the latest `account.add`, for the accounts the engine starts
+    /// itself.
+    identity: Mutex<Value>,
+    /// Registered accounts that could not be started, with the error `account.list` shows.
+    unstarted: Mutex<HashMap<String, Value>>,
+    /// Each account's recent stops, for the restart policy; `account.add` clears them.
+    restarts: Mutex<HashMap<String, History>>,
+    restart_delay: Duration,
     /// Notified on every state change, for `account.add` and `account.remove` waiting on
     /// one.
     changed: Condvar,
@@ -198,8 +253,11 @@ pub struct Engine {
 }
 
 impl Accounts for Engine {
+    /// The running and stopped accounts, then the registered ones not started, each with
+    /// its non-secret JSON.
     fn statuses(&self) -> Vec<AccountStatus> {
-        self.lock()
+        let mut out: Vec<AccountStatus> = self
+            .lock()
             .slots
             .iter()
             .map(|s| AccountStatus {
@@ -208,23 +266,87 @@ impl Accounts for Engine {
                 state: s.state.to_owned(),
                 connection_error: s.deltas.connection_error(),
                 error: s.error.clone(),
-                account: Some(ms_ipc::policy::public_account_json(s.account.as_json())),
+                account: Some(registry::strip_secrets(s.account.as_json())),
+                retry_at: s.retry_at,
+                auth_failed: s.auth_failed,
             })
-            .collect()
+            .collect();
+        let unstarted = self.unstarted_lock().clone();
+        for account in self.registered.accounts() {
+            let id = registry::account_id(&account)
+                .unwrap_or_default()
+                .to_owned();
+            if out.iter().any(|s| s.account_id == id) {
+                continue;
+            }
+            out.push(AccountStatus {
+                email: account
+                    .get("emailAddress")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                state: account_state::STOPPED.to_owned(),
+                error: unstarted.get(&id).cloned(),
+                account_id: id,
+                account: Some(account),
+                ..Default::default()
+            });
+        }
+        out
+    }
+
+    fn credentials(&self) -> Option<CredentialsStatus> {
+        Some(self.registered.status())
+    }
+
+    fn detached(&self) -> bool {
+        self.detached
+    }
+
+    fn socket_parent_call(&self, req: &RpcRequest) -> Option<Reply> {
+        if !self.detached {
+            return None;
+        }
+        Some(match req.method.as_str() {
+            method::CREDENTIALS_IMPORT => Err(ErrorObject::new(
+                code::WRONG_CHANNEL,
+                "credentials.import is only accepted on the engine's stdin",
+            )),
+            method::ENGINE_SHUTDOWN => {
+                let me = self.weak();
+                crate::modes::spawn(thread::ENGINE_MAINTENANCE, move || {
+                    if let Some(engine) = me.upgrade() {
+                        engine.shutdown();
+                    }
+                    // Lets the connection's writer send the answer.
+                    std::thread::sleep(Duration::from_millis(SHUTDOWN_FLUSH_MS));
+                    crate::platform::exit_now(EXIT_OK);
+                });
+                Ok(json!({}))
+            }
+            _ => self.parent_call(req),
+        })
     }
 
     fn check(&self, account_id: &str) -> Result<(), ErrorObject> {
-        match self.lock().get(account_id) {
-            Some(_) => Ok(()),
-            None => Err(socket::unknown_account(account_id)),
+        if self.lock().get(account_id).is_some() || self.registered.contains(account_id) {
+            return Ok(());
         }
+        Err(socket::unknown_account(account_id))
     }
 
     fn commands(&self, account_id: &str) -> Result<Sender<Command>, ErrorObject> {
         let reg = self.lock();
-        let slot = reg
-            .get(account_id)
-            .ok_or_else(|| socket::unknown_account(account_id))?;
+        let Some(slot) = reg.get(account_id) else {
+            if self.registered.contains(account_id) {
+                return Err(ErrorObject::new(
+                    code::ACCOUNT_STOPPED,
+                    format!("account {account_id} is not running"),
+                )
+                .with_data(json!({ "state": account_state::STOPPED })));
+            }
+            return Err(socket::unknown_account(account_id));
+        };
         let commands = (!slot.removing)
             .then(|| slot.runtime.as_ref().and_then(|r| r.commands()))
             .flatten();
@@ -320,37 +442,160 @@ impl Engine {
     }
 
     fn notify_state(&self, id: &str, state: &str, error: Option<Value>) {
-        self.hub.account_state(&AccountStateParams {
+        self.notify(AccountStateParams {
             account_id: id.to_owned(),
             state: state.to_owned(),
             error,
+            ..Default::default()
         });
+    }
+
+    fn notify(&self, params: AccountStateParams) {
+        self.hub.account_state(&params);
         self.changed.notify_all();
     }
 
     fn write_discovery(&self, reg: &Registry) {
-        if let Err(e) = socket::write_engine_discovery(&self.config_dir, &self.socket, &reg.ids()) {
+        let written = socket::write_engine_discovery(
+            &self.config_dir,
+            &self.socket,
+            &reg.ids(),
+            self.detached,
+        );
+        if let Err(e) = written {
             warn!("-X Could not update the discovery file: {e}");
         }
     }
 
+    fn unstarted_lock(&self) -> MutexGuard<'_, HashMap<String, Value>> {
+        self.unstarted.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn restarts_lock(&self) -> MutexGuard<'_, HashMap<String, History>> {
+        self.restarts.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn identity_lock(&self) -> MutexGuard<'_, Value> {
+        self.identity.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// `account.changed` for a registered account whose JSON changed.
+    fn announce(&self, account: &Value) {
+        if let Some(id) = registry::account_id(account) {
+            self.hub.account_changed(&AccountChangedParams {
+                account_id: id.to_owned(),
+                account: account.clone(),
+            });
+        }
+    }
+
+    /// Starts every registered account, at engine start.
+    fn start_registered(&self) {
+        let accounts = self.registered.accounts();
+        if accounts.is_empty() {
+            return;
+        }
+        info!("Starting {} registered accounts", accounts.len());
+        let identity = self.identity_lock().clone();
+        for account in accounts {
+            let id = registry::account_id(&account)
+                .unwrap_or_default()
+                .to_owned();
+            if self.lock().get(&id).is_some() {
+                continue;
+            }
+            let full = self
+                .registered
+                .with_secrets(account)
+                .map_err(|e| format!("the account's secrets can't be read: {e}"))
+                .and_then(|json| parse_account(json).map_err(|e| e.message));
+            let outcome = full.and_then(|a| {
+                self.start(a, identity.clone())
+                    .map(|_| ())
+                    .map_err(|e| e.message)
+            });
+            if let Err(message) = outcome {
+                warn!("-X Could not start registered account {id}: {message}");
+                let error = json!({
+                    "what": ms_core::error::SYNC_ERROR_WHAT,
+                    "key": "ErrorAccountNotStarted",
+                    "debuginfo": message,
+                    "retryable": false,
+                    "offline": false,
+                });
+                if self.lock().get(&id).is_none() {
+                    self.unstarted_lock().insert(id.clone(), error.clone());
+                    self.notify_state(&id, account_state::STOPPED, Some(error));
+                }
+            }
+        }
+    }
+
+    /// `credentials.import` (stdin only): registers the accounts and stores their secrets
+    /// without starting them; the client adds them next.
+    fn import(&self, req: &RpcRequest) -> Reply {
+        let p: CredentialsImportParams = req.params_as()?;
+        let result = self.registered.import(p);
+        for id in &result.imported {
+            if let Some(account) = self.registered.get(id) {
+                self.announce(&account);
+            }
+        }
+        serde_json::to_value(result)
+            .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e.to_string()))
+    }
+
     /// `account.add`: starts the account and answers once its `main` thread is up (or the
     /// account failed to start, or [`ACCOUNT_START_WAIT_MS`] passed).
+    ///
+    /// The account is registered: the secrets it carries are stored, the ones it lacks come
+    /// from the store, and the engine starts it itself from then on. `stored` is false when
+    /// the store refused, and the account then runs only until the engine stops. A running
+    /// account added with another identity restarts with it.
     fn add(&self, req: &RpcRequest) -> Reply {
         let p: AccountAddParams = req.params_as()?;
-        let account = parse_account(p.account)?;
-        if self.resetting_database.load(Ordering::SeqCst)
-            || self.resetting_lock().contains(account.id())
-        {
+        let mut json = p.account;
+        if registry::account_id(&json).is_some() {
+            match self.registered.with_secrets(json.clone()) {
+                Ok(full) => json = full,
+                Err(e) => warn!("-X Could not read the stored secrets: {e}"),
+            }
+        }
+        let account = parse_account(json)?;
+        let id = account.id().to_owned();
+        if self.resetting_database.load(Ordering::SeqCst) || self.resetting_lock().contains(&id) {
             return Err(ErrorObject::new(
                 code::ACCOUNT_EXISTS,
-                format!(
-                    "account {} is being reset; add it again later",
-                    account.id()
-                ),
+                format!("account {id} is being reset; add it again later"),
             ));
         }
-        self.start(account, p.identity)
+        let stored = match self.registered.register(account.as_json()) {
+            Ok((public, changed)) => {
+                if changed {
+                    self.announce(&public);
+                }
+                true
+            }
+            Err(e) => {
+                warn!("-X Account {id} is not registered: {e}");
+                false
+            }
+        };
+        self.restarts_lock().remove(&id);
+        self.unstarted_lock().remove(&id);
+        if !p.identity.is_null() {
+            *self.identity_lock() = p.identity.clone();
+        }
+        let running_with_other_identity = self.lock().get(&id).is_some_and(|s| {
+            s.state != account_state::STOPPED && !s.removing && s.identity != p.identity
+        });
+        if running_with_other_identity && !p.identity.is_null() {
+            info!("Restarting account {id} with a new identity");
+            self.remove_account(&id, false)?;
+        }
+        let mut result = self.start(account, p.identity)?;
+        result["stored"] = json!(stored);
+        Ok(result)
     }
 
     fn resetting_lock(&self) -> MutexGuard<'_, HashSet<String>> {
@@ -413,6 +658,8 @@ impl Engine {
             runtime: None,
             stopping: false,
             removing: false,
+            retry_at: None,
+            auth_failed: false,
         };
         match reg.get_mut(&id) {
             Some(old) => *old = slot,
@@ -451,6 +698,7 @@ impl Engine {
             account_id: id,
             state: state.to_owned(),
             error,
+            stored: false,
         })
         .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e.to_string()))
     }
@@ -473,8 +721,26 @@ impl Engine {
         let metadata =
             crate::modes::metadata_backend(&self.config_dir, &account, identity, &deltas);
         let for_tokens = deltas.clone();
+        let weak = self.weak();
+        // A registered account's rotated token goes to the store; any other account's to
+        // the parent, as before the engine kept secrets.
         let tokens = ms_net::TokenManager::new(Some(Box::new(move |a: &Account| {
-            for_tokens.send_updated_secrets(a)
+            let stored = weak.upgrade().map(|engine| {
+                engine
+                    .registered
+                    .store_refresh_token(a.id(), a.refresh_token())
+            });
+            match stored {
+                Some(Ok(true)) => info!("Stored the rotated refresh token of {}", a.id()),
+                Some(Err(e)) => {
+                    warn!(
+                        "-X Could not store the rotated refresh token of {}: {e}",
+                        a.id()
+                    );
+                    for_tokens.send_updated_secrets(a)
+                }
+                _ => for_tokens.send_updated_secrets(a),
+            }
         })));
         let weak = self.weak();
         let on_failure = move |failure: &AccountFailure| {
@@ -547,39 +813,136 @@ impl Engine {
     }
 
     /// The `accountStop` thread is done: the account's threads exited or were left after
-    /// the timeout.
+    /// the timeout. The restart policy ([`restart`]) decides whether it starts again.
     fn stopped(&self, id: &str, generation: u64) {
         let mut reg = self.lock();
         let Some(slot) = reg.current(id, generation) else {
             return;
         };
         slot.stopping = false;
-        slot.runtime = None;
+        // The restart uses the secrets the account last had, a rotated token included.
+        if let Some(rt) = slot.runtime.take() {
+            let current = rt
+                .context()
+                .tokens
+                .account_with_current_secrets(&slot.account);
+            slot.account = Arc::new(current);
+        }
         // A thread left running past the timeout must not publish for the account any more.
         slot.deltas.close();
         let error = slot.error.clone();
-        let removing = slot.removing;
-        if !removing {
-            info!("Account {id} stopped");
-            self.notify_state(id, account_state::STOPPED, error);
-        } else {
+        if slot.removing {
             self.changed.notify_all();
+            drop(reg);
+            ms_core::log::flush();
+            return;
         }
+        let decision = self
+            .restarts_lock()
+            .entry(id.to_owned())
+            .or_default()
+            .record(error.as_ref(), Instant::now(), self.restart_delay);
+        let delay = match decision {
+            Decision::AuthFailed => {
+                slot.auth_failed = true;
+                info!("Account {id} stopped: the server refused its credentials");
+                None
+            }
+            Decision::GiveUp => {
+                info!(
+                    "Account {id} stopped {} times in {} minutes; not restarting it",
+                    restart::CRASH_LIMIT,
+                    restart::CRASH_WINDOW.as_secs() / 60
+                );
+                None
+            }
+            Decision::RetryIn(delay) => {
+                info!(
+                    "Account {id} stopped; restarting it in {}s",
+                    delay.as_secs_f32()
+                );
+                Some(delay)
+            }
+        };
+        slot.retry_at = delay.map(|d| now_ms() + i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
+        self.notify(AccountStateParams {
+            account_id: id.to_owned(),
+            state: account_state::STOPPED.to_owned(),
+            error,
+            retry_at: slot.retry_at,
+            auth_failed: slot.auth_failed,
+        });
         drop(reg);
         ms_core::log::flush();
+        if let Some(delay) = delay {
+            let weak = self.weak();
+            let id = id.to_owned();
+            crate::modes::spawn(thread::ACCOUNT_RESTART, move || {
+                std::thread::sleep(delay);
+                if let Some(engine) = weak.upgrade() {
+                    engine.restart(&id, generation);
+                }
+            });
+        }
+    }
+
+    /// The restart policy's retry: starts the account again unless something else did (or
+    /// removed it) meanwhile.
+    fn restart(&self, id: &str, generation: u64) {
+        let reg = self.lock();
+        let Some(slot) = reg.get(id).filter(|s| {
+            s.generation == generation
+                && s.state == account_state::STOPPED
+                && !s.removing
+                && !s.stopping
+                && s.retry_at.is_some()
+        }) else {
+            return;
+        };
+        let (account, identity) = ((*slot.account).clone(), slot.identity.clone());
+        drop(reg);
+        let _scope = AccountScope::enter(id);
+        info!("Restarting account {id}");
+        if let Err(e) = self.start(account, identity) {
+            warn!("-X Could not restart account {id}: {}", e.message);
+        }
     }
 
     /// `account.remove`: stops the account, forgets it and sends `removed`. Its database rows
     /// stay; `--mode reset` deletes them. The result lists the account's threads still
     /// running after the stop timeout (`stillRunning`), which may still write to the
     /// database: a client about to reset the account should wait and retry.
+    ///
+    /// A registered account is unregistered and its secrets deleted, whether it ran or not.
     fn remove(&self, req: &RpcRequest) -> Reply {
-        let p: AccountIdParams = req.params_as()?;
-        removed_result(self.remove_account(&p.account_id)?)
+        let p: AccountRemoveParams = req.params_as()?;
+        let id = p.account_id;
+        let running = self.lock().get(&id).is_some();
+        if !running && !self.registered.contains(&id) {
+            return Err(socket::unknown_account(&id));
+        }
+        self.restarts_lock().remove(&id);
+        self.unstarted_lock().remove(&id);
+        if running {
+            return removed_result(self.remove_account(&id, true)?);
+        }
+        self.forget_registered(&id)
+            .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))?;
+        self.notify_state(&id, account_state::REMOVED, None);
+        removed_result(Vec::new())
     }
 
-    /// Stops the account and forgets it; returns its threads still running.
-    fn remove_account(&self, id: &str) -> Result<Vec<String>, ErrorObject> {
+    fn forget_registered(&self, id: &str) -> Result<(), String> {
+        if self.registered.forget(id)? {
+            info!("Account {id} unregistered; its secrets are deleted");
+        }
+        Ok(())
+    }
+
+    /// Stops the account and drops its slot, and with `forget` unregisters it; returns its
+    /// threads still running. `account.reset` and `engine.resetDatabase` keep it registered,
+    /// listed as stopped until the client adds it again.
+    fn remove_account(&self, id: &str, forget: bool) -> Result<Vec<String>, ErrorObject> {
         let id = id.to_owned();
         let mut reg = self.lock();
         let slot = reg
@@ -609,6 +972,11 @@ impl Engine {
         }
         deltas.close();
 
+        if forget {
+            if let Err(e) = self.forget_registered(&id) {
+                warn!("-X Account {id} stopped but could not be unregistered: {e}");
+            }
+        }
         let mut reg = self.lock();
         reg.slots.retain(|s| s.account.id() != id);
         self.write_discovery(&reg);
@@ -640,7 +1008,7 @@ impl Engine {
         }
         let outcome = (|| {
             if self.lock().get(id).is_some() {
-                let still_running = self.remove_account(id)?;
+                let still_running = self.remove_account(id, false)?;
                 if !still_running.is_empty() {
                     info!(
                         "Waiting for {} of account {id} before resetting it",
@@ -678,7 +1046,7 @@ impl Engine {
             let ids = self.lock().ids();
             let mut stragglers = false;
             for id in &ids {
-                stragglers |= !self.remove_account(id)?.is_empty();
+                stragglers |= !self.remove_account(id, false)?.is_empty();
             }
             if stragglers {
                 std::thread::sleep(Duration::from_millis(ACCOUNT_RESET_STRAGGLER_WAIT_MS));
@@ -749,7 +1117,7 @@ impl Engine {
         let mut restarted = Vec::new();
         for (account, identity) in running {
             let id = account.id().to_owned();
-            self.remove_account(&id)?;
+            self.remove_account(&id, false)?;
             self.start(account, identity)?;
             restarted.push(id);
         }
@@ -812,6 +1180,37 @@ impl Engine {
         rx.recv().unwrap_or_else(|_| Ok(json!({})))
     }
 }
+
+impl Engine {
+    /// A parent method on a detached engine's socket, answered on the connection's thread.
+    fn parent_call(&self, req: &RpcRequest) -> Reply {
+        match req.method.as_str() {
+            method::ACCOUNT_ADD => self.add(req),
+            method::ACCOUNT_REMOVE => self.remove(req),
+            method::ACCOUNT_TEST => req
+                .params_as::<AccountTestParams>()
+                .and_then(|p| parse_account(p.account))
+                .and_then(|a| self.test_account(&a)),
+            method::ACCOUNT_RESET => req
+                .params_as::<AccountResetParams>()
+                .and_then(|p| self.reset_account(&p.account_id, p.keep_metadata)),
+            method::ENGINE_RESET_DATABASE => req
+                .params_as::<ResetDatabaseParams>()
+                .and_then(|p| self.reset_database(p.keep_metadata)),
+            method::ENGINE_SET_LOG_LEVEL => self.set_log_level(req),
+            method::TEST_CRASH | method::TEST_PANIC if cfg!(debug_assertions) => {
+                self.test_failure(req)
+            }
+            other => Err(ErrorObject::new(
+                code::METHOD_NOT_FOUND,
+                format!("unknown method {other}"),
+            )),
+        }
+    }
+}
+
+/// How long a detached engine waits after answering `engine.shutdown` before it exits.
+const SHUTDOWN_FLUSH_MS: u64 = 300;
 
 fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -978,6 +1377,7 @@ fn handle_parent(engine: &Engine, session: &mut Session, req: &RpcRequest) -> Re
     match req.method.as_str() {
         method::ACCOUNT_ADD => engine.add(req),
         method::ACCOUNT_REMOVE => engine.remove(req),
+        method::CREDENTIALS_IMPORT => engine.import(req),
         method::TEST_CRASH | method::TEST_PANIC if cfg!(debug_assertions) => {
             engine.test_failure(req)
         }

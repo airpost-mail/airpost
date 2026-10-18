@@ -2,8 +2,9 @@ name: google-people-initial-sync
 description: >
   A Gmail account with 432 Google contacts in two user groups. The engine authenticates
   with OAuth only (refresh token, no password): the fake token endpoint rotates the refresh
-  token on the first grant, which the engine must hand to the client as a
-  ProcessAccountSecretsUpdated delta or the account breaks at the next launch. The
+  token on the first grant, which the engine must keep (serve: in its secret store; sync:
+  handed to the client as a ProcessAccountSecretsUpdated delta) or the account breaks at
+  the next launch. The
   calContacts thread then lists connections in pages of 400 asking for a sync token, lists
   the contact groups, and fetches each user group's members. Every person becomes one
   `gpeople` Contact keyed by its resourceName, system groups are skipped, user groups
@@ -21,7 +22,7 @@ people:
     - {name: "Alice Archer", email: alice@example.org, groups: [Climbing]}
     - {name: "Bob Baker", email: bob@example.org, groups: [Climbing, Book Club]}
 steps:
-  - wait: {delta: {class: ProcessAccountSecretsUpdated, where: {settings.refresh_token: {re: "rotated"}}}, timeout: 60}
+  - wait: {log: "Saving updated XOAuth2 refresh token", timeout: 60}
   - wait: quiescent
   - wait: {log: "Calendar sync pass 1, with contacts", timeout: 60}
   - wait: {models: {Contact: {where: {s: gpeople}, count: 432}, ContactGroup: {count: 2}}, timeout: 120}

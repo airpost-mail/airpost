@@ -16,7 +16,7 @@
 //! (section 2), and so do `account.add` and `account.remove`.
 
 use std::collections::{HashSet, VecDeque};
-use std::io::{BufReader, ErrorKind, Write};
+use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::Shutdown;
 use std::ops::ControlFlow;
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -31,13 +31,14 @@ use ms_core::constants::{
 };
 use ms_core::Account;
 use ms_ipc::{
-    account_state, code, feature, method, policy, AccountInfo, AccountListResult,
-    AccountStateParams, AccountStatus, AiDeltaParams, BodiesFetchParams, CalendarSyncParams,
-    Capabilities, DisconnectParams, EngineStatusResult, ErrorObject, FrameError, HelloParams,
-    HelloResult, LogsTailParams, LogsTailResult, MailNewParams, Notification, RelayDevice,
-    Request as RpcRequest, Response, SettingsGetParams, SettingsValues, SubscribeParams,
-    SyncWakeParams, TaskCancelParams, TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams,
-    LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    account_state, code, feature, method, policy, AccountChangedParams, AccountInfo,
+    AccountListResult, AccountStateParams, AccountStatus, AiDeltaParams, BodiesFetchParams,
+    CalendarSyncParams, Capabilities, CredentialsStatus, DisconnectParams, EngineStatusResult,
+    ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams, LogsTailResult,
+    MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response, SettingsGetParams,
+    SettingsValues, SubscribeParams, SyncWakeParams, TaskCancelParams, TaskQueueParams,
+    ThreadsSnoozeParams, ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES, LOGS_TAIL_MAX_BYTES,
+    MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
@@ -101,10 +102,42 @@ pub fn write_engine_discovery(
     config_dir: &Path,
     socket: &Path,
     accounts: &[String],
+    detached: bool,
 ) -> std::io::Result<PathBuf> {
     write_discovery_file(config_dir, ENGINE_DISCOVERY_NAME, socket, |body| {
         body.insert("accounts".into(), json!(accounts));
+        if detached {
+            body.insert("detached".into(), json!(true));
+        }
     })
+}
+
+/// `sha256:<hex>` of the running executable, so a client can tell whether an engine it
+/// finds running is the build it bundles. Hashed once; `None` when the file can't be read.
+pub fn build_id() -> Option<String> {
+    static BUILD: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    BUILD
+        .get_or_init(|| {
+            let exe = std::env::current_exe().ok()?;
+            let mut file = std::fs::File::open(exe).ok()?;
+            let mut ctx = ring::digest::Context::new(&ring::digest::SHA256);
+            let mut buf = vec![0u8; 1 << 16];
+            loop {
+                let n = file.read(&mut buf).ok()?;
+                if n == 0 {
+                    break;
+                }
+                ctx.update(&buf[..n]);
+            }
+            let hex: String = ctx
+                .finish()
+                .as_ref()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect();
+            Some(format!("sha256:{hex}"))
+        })
+        .clone()
 }
 
 /// `run/<name>.json` of a `serve` engine.
@@ -424,6 +457,39 @@ impl Hub {
         });
     }
 
+    /// Sends `account.changed` to the subscribers of the account (docs/desktop-client-plan.md
+    /// 3.1), with the fields a remote device may see on a relayed one. Nothing is kept for a
+    /// later subscriber, which calls `account.list`.
+    pub fn account_changed(&self, params: &AccountChangedParams) {
+        let line = |account: Value| -> Arc<[u8]> {
+            let n = Notification::new(
+                method::ACCOUNT_CHANGED,
+                serde_json::to_value(AccountChangedParams {
+                    account_id: params.account_id.clone(),
+                    account,
+                })
+                .unwrap_or(Value::Null),
+            );
+            ms_ipc::encode(&n).into()
+        };
+        let local = line(params.account.clone());
+        let public = line(policy::public_account_json(&params.account));
+        self.lock().subscribers.retain(|s| {
+            if !s.wants_account(&params.account_id) {
+                return !s.outbox.is_closed();
+            }
+            let note = if s.relayed { &public } else { &local };
+            match s.outbox.push(note.clone()) {
+                Ok(()) => true,
+                Err(PushError::Closed) => false,
+                Err(PushError::Full) => {
+                    drop_slow(s.conn, &s.outbox);
+                    false
+                }
+            }
+        });
+    }
+
     /// Sends `capabilities.changed` to every subscriber, the connection whose change caused
     /// it included; nothing is kept for a later one, which reads `hello`.
     fn capabilities_changed(&self, capabilities: &Capabilities) {
@@ -534,6 +600,19 @@ pub trait Accounts: Send + Sync {
     /// Whether the parent-only methods (`account.add`, ...) exist, so the socket refuses
     /// them rather than not knowing them.
     fn has_parent_channel(&self) -> bool;
+    /// The registry and secret store (`serve`), for `hello.credentials`.
+    fn credentials(&self) -> Option<CredentialsStatus> {
+        None
+    }
+    /// `serve --detached`, which has no parent channel.
+    fn detached(&self) -> bool {
+        false
+    }
+    /// A parent method made on the socket of a local connection: `Some` when this engine
+    /// takes it there (a detached `serve`).
+    fn socket_parent_call(&self, _req: &RpcRequest) -> Option<Reply> {
+        None
+    }
 }
 
 pub fn unknown_account(account_id: &str) -> ErrorObject {
@@ -558,7 +637,8 @@ impl Accounts for SingleAccount {
             state: account_state::RUNNING.to_owned(),
             connection_error: self.deltas.connection_error(),
             error: None,
-            account: Some(policy::public_account_json(self.account.as_json())),
+            account: Some(crate::registry::strip_secrets(self.account.as_json())),
+            ..Default::default()
         }]
     }
 
@@ -859,8 +939,11 @@ impl Session {
                 email: a.email,
                 state: a.state,
                 error: a.error,
+                retry_at: a.retry_at,
+                auth_failed: a.auth_failed,
             })
             .collect();
+        let engine = &self.server.accounts;
         to_value(serde_json::to_value(HelloResult {
             protocol: PROTOCOL_VERSION,
             engine: env!("CARGO_PKG_VERSION").to_owned(),
@@ -868,6 +951,9 @@ impl Session {
             accounts,
             features: features(&self.server),
             capabilities: capabilities(&self.server),
+            build: build_id(),
+            detached: engine.detached(),
+            credentials: engine.credentials(),
         }))
     }
 
@@ -880,6 +966,9 @@ impl Session {
             accounts: self.server.accounts.statuses(),
             features: features(&self.server),
             capabilities: capabilities(&self.server),
+            build: build_id(),
+            detached: self.server.accounts.detached(),
+            credentials: self.server.accounts.credentials(),
         }))
         .unwrap_or(Value::Null)
     }
@@ -930,6 +1019,9 @@ fn features(server: &Server) -> Vec<String> {
     ]
     .map(str::to_owned)
     .to_vec();
+    if server.accounts.credentials().is_some() {
+        out.push(feature::ACCOUNTS.to_owned());
+    }
     if server.settings.is_some() {
         out.push(feature::SETTINGS.to_owned());
         // The settings store is serve's, and so is the executor that reads it, the
@@ -1026,7 +1118,7 @@ fn send(
 /// `engine.logs.tail`: the end of `mailsync-<accountId>.log` or `engine.log`. The account
 /// need not be held, so a removed account's log can still be read.
 fn logs_tail(config_dir: &Path, p: &LogsTailParams) -> Reply {
-    use std::io::{Read, Seek, SeekFrom};
+    use std::io::{Seek, SeekFrom};
     let path = match &p.account_id {
         Some(id) => {
             // The id becomes part of a file name.
@@ -1073,12 +1165,26 @@ fn logs_tail(config_dir: &Path, p: &LogsTailParams) -> Reply {
     }))
 }
 
+/// `account.list` and `engine.status` for a relayed connection: each account's JSON cut to
+/// the fields a remote device may see.
+fn public_accounts(method_name: &str, mut v: Value) -> Value {
+    if matches!(method_name, method::ACCOUNT_LIST | method::ENGINE_STATUS) {
+        for a in v["accounts"].as_array_mut().into_iter().flatten() {
+            if let Some(account) = a.get_mut("account") {
+                *account = policy::public_account_json(account);
+            }
+        }
+    }
+    v
+}
+
 /// The methods only `serve` mode's parent channel takes.
 pub fn is_parent_method(name: &str) -> bool {
     matches!(
         name,
         method::ACCOUNT_ADD
             | method::ACCOUNT_REMOVE
+            | method::CREDENTIALS_IMPORT
             | method::ACCOUNT_TEST
             | method::ACCOUNT_RESET
             | method::ENGINE_RESET_DATABASE
@@ -1237,6 +1343,14 @@ impl Connection {
                 }
             }
             name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
+                if self.relay.is_none() {
+                    if let Some(r) = self.session.server.accounts.socket_parent_call(&req) {
+                        return req.id.map(|id| match r {
+                            Ok(v) => Response::ok(Some(id), v),
+                            Err(e) => Response::err(Some(id), e),
+                        });
+                    }
+                }
                 Err(ErrorObject::new(
                     code::WRONG_CHANNEL,
                     format!(
@@ -1253,6 +1367,10 @@ impl Connection {
             }),
         };
         let id = req.id?;
+        let result = match result {
+            Ok(v) if self.relay.is_some() => Ok(public_accounts(&req.method, v)),
+            other => other,
+        };
         Some(match result {
             Ok(v) => Response::ok(Some(id), v),
             Err(e) => Response::err(Some(id), e),

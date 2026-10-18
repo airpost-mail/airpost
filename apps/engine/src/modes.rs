@@ -250,6 +250,8 @@ fn is_engine_thread(name: &str) -> bool {
         thread::SOCKET_WRITER,
         thread::SIGNALS,
         thread::ACCOUNT_STOP,
+        thread::ACCOUNT_RESTART,
+        thread::BUILD_ID,
         thread::ENGINE_MAINTENANCE,
     ]
     .contains(&name)

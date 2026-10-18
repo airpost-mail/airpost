@@ -1,8 +1,10 @@
 import faulthandler
 import json
 import os
+import secrets
 import signal
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,23 @@ faulthandler.register(signal.SIGUSR1, all_threads=True)
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+
+
+def _engine_key_file() -> str:
+    """A key file for the engine's sealed secret store, so no engine a test starts (release
+    builds default to the OS keychain) ever reads or writes a keychain item."""
+    d = tempfile.mkdtemp(prefix="tern-test-key-")
+    path = os.path.join(d, "engine.key")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(secrets.token_hex(32) + "\n")
+    return path
+
+
+os.environ.setdefault("TERN_ENGINE_KEY_FILE", _engine_key_file())
+# A stopped serve account is retried after this; far enough out that scenarios see each stop
+# as it is. Cases about the restart policy set their own.
+os.environ.setdefault("TERN_ENGINE_RESTART_DELAY_MS", "600000")
 
 # Per-case wall time (setup + call + teardown) from the last `--record-durations` run, keyed
 # by node id relative to this directory. It orders the run longest first; a case missing

@@ -133,6 +133,29 @@ impl Serve {
             .unwrap()
             .status;
         assert!(status.success());
+        let (s, hello) = Serve::spawn_in(dir, explicit_socket, env);
+        assert_eq!(hello["accounts"], json!([]));
+        s
+    }
+
+    /// Stops this engine with `engine.shutdown` and starts another on the same config
+    /// directory; returns it and its `hello`.
+    fn restart(mut self, env: &[(&str, String)]) -> (Self, Value) {
+        self.parent
+            .call(method::ENGINE_SHUTDOWN, json!({}))
+            .unwrap();
+        assert_eq!(self.child.wait().unwrap().code(), Some(0));
+        assert_eq!(self.stderr(), "");
+        let explicit = !self.socket.ends_with("run/engine.sock");
+        let dir = std::mem::replace(&mut self.dir, tempfile::tempdir().unwrap());
+        Serve::spawn_in(dir, explicit, env)
+    }
+
+    fn spawn_in(
+        dir: tempfile::TempDir,
+        explicit_socket: bool,
+        env: &[(&str, String)],
+    ) -> (Self, Value) {
         let socket = if explicit_socket {
             dir.path().join("s").join("e.sock")
         } else {
@@ -177,8 +200,7 @@ impl Serve {
             .parent
             .call(method::HELLO, json!({ "protocol": 1, "client": "parent" }))
             .unwrap();
-        assert_eq!(hello["accounts"], json!([]));
-        s
+        (s, hello)
     }
 
     fn log(&self, id: &str) -> PathBuf {
@@ -275,7 +297,10 @@ fn two_accounts_listed_routed_and_logged_apart() {
     .unwrap();
 
     let added = e.parent.add(account(A));
-    assert_eq!(added, json!({ "accountId": A, "state": "running" }));
+    assert_eq!(
+        added,
+        json!({ "accountId": A, "state": "running", "stored": true })
+    );
     assert_eq!(e.parent.add(account(B))["state"], "running");
     // The subscriber is told, whatever its class filter.
     for id in [A, B] {
@@ -513,9 +538,14 @@ fn remove_stops_one_account_and_keeps_the_other() {
     e.stop();
 }
 
+/// Retries far enough out that the tests below see each stop as it is.
+fn no_retry() -> (&'static str, String) {
+    ("TERN_ENGINE_RESTART_DELAY_MS", "600000".to_owned())
+}
+
 #[test]
 fn a_failure_stops_only_its_account() {
-    let mut e = Serve::start();
+    let mut e = Serve::start_with(true, &[no_retry()]);
     e.parent.add(account(A));
     e.parent.add(account(B));
     let mut sub = e.hello();
@@ -527,6 +557,7 @@ fn a_failure_stops_only_its_account() {
         .unwrap();
     let stopped = next_matching(&mut sub, |v| is_state(v, A, "stopped"));
     assert_eq!(stopped["params"]["error"]["key"], "test", "{stopped}");
+    assert!(stopped["params"]["retryAt"].as_i64().is_some(), "{stopped}");
 
     let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
     assert_eq!(
@@ -570,7 +601,7 @@ fn a_failure_stops_only_its_account() {
         r"\[main\] \[error\] Unhandled panic on thread main: .*test\.panic",
     );
 
-    // Restarting is the client's call.
+    // account.add restarts it before the retry would.
     assert_eq!(e.parent.add(account(A))["state"], "running");
     let queued = c
         .call(
@@ -584,10 +615,13 @@ fn a_failure_stops_only_its_account() {
     e.stop();
 }
 
-/// A one-request HTTP server answering the OAuth refresh with a rotated refresh token.
-fn token_server() -> String {
+/// An HTTP server answering every OAuth refresh with a rotated refresh token; the request
+/// bodies it got.
+fn token_server() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
+    let bodies = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = bodies.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else { return };
@@ -608,6 +642,9 @@ fn token_server() -> String {
             }
             let mut body = vec![0; len];
             let _ = reader.read_exact(&mut body);
+            seen.lock()
+                .unwrap()
+                .push(String::from_utf8_lossy(&body).into_owned());
             let reply =
                 r#"{"access_token":"at","expires_in":3600,"refresh_token":"rotated-s3cret"}"#;
             let _ = write!(
@@ -618,24 +655,37 @@ fn token_server() -> String {
             );
         }
     });
-    format!("http://{addr}/token")
+    (format!("http://{addr}/token"), bodies)
 }
 
-#[test]
-fn secrets_go_to_stdout_only() {
-    let url = token_server();
-    let mut e = Serve::start_with(true, &[("MAILSYNC_GOOGLE_TOKEN_URL", url)]);
-    let mut sub = e.hello();
-    sub.subscribe(&SubscribeParams::default()).unwrap();
-
-    let mut oauth = account(A);
+fn oauth_account(id: &str) -> Value {
+    let mut oauth = account(id);
     oauth["provider"] = json!("gmail");
     let settings = oauth["settings"].as_object_mut().unwrap();
     settings.remove("imap_password");
     settings.remove("smtp_password");
     settings.insert("refresh_token".into(), json!("old"));
     settings.insert("refresh_client_id".into(), json!("cid"));
-    e.parent.add(oauth);
+    oauth
+}
+
+/// Without a secret store the account isn't registered, and its rotated token goes to the
+/// parent on stdout, never to a socket subscriber.
+#[test]
+fn secrets_go_to_stdout_only() {
+    let (url, _) = token_server();
+    let mut e = Serve::start_with(
+        true,
+        &[
+            ("MAILSYNC_GOOGLE_TOKEN_URL", url),
+            ("TERN_ENGINE_SECRET_STORE", "none".to_owned()),
+        ],
+    );
+    let mut sub = e.hello();
+    sub.subscribe(&SubscribeParams::default()).unwrap();
+
+    let added = e.parent.add(oauth_account(A));
+    assert_eq!(added["stored"], false, "{added}");
 
     // The background worker refreshes before connecting.
     let deadline = Instant::now() + WAIT;
@@ -856,7 +906,14 @@ fn account_reset_forgets_the_account_and_deletes_its_rows() {
     );
     next_matching(&mut sub, |v| is_state(v, A, "removed"));
     let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
-    assert_eq!(states(&status), running(&[B]));
+    // Still registered, so listed as stopped until it is added again.
+    assert_eq!(
+        states(&status),
+        [
+            (B.to_owned(), "running".to_owned()),
+            (A.to_owned(), "stopped".to_owned())
+        ]
+    );
 
     // Added again, A starts empty; B kept its rows.
     assert_eq!(e.parent.add(account(A))["state"], "running");
@@ -927,7 +984,8 @@ fn reset_database_starts_over_and_sessions_reopen_it() {
         .unwrap();
     assert_eq!(kept, 2);
     let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
-    assert_eq!(states(&status), running(&[]));
+    let stopped = |id: &str| (id.to_owned(), "stopped".to_owned());
+    assert_eq!(states(&status), [stopped(A), stopped(B)]);
     assert_eq!(e.discovery()["accounts"], json!([]));
     assert!(e.dir.path().join("edgehill.db").exists());
 
@@ -1143,4 +1201,257 @@ fn relayed_settings_writes_are_limited() {
     let got = e.hello().call(method::SETTINGS_GET, json!({})).unwrap();
     assert_eq!(got["values"], json!({ "core.sending.undoSend": 0 }));
     e.stop();
+}
+
+fn file_mode(path: &Path) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+}
+
+#[test]
+fn registered_accounts_start_with_the_next_engine_until_forgotten() {
+    let mut e = Serve::start_with(true, &[no_retry()]);
+    let mut secret = account(A);
+    secret["settings"]["imap_password"] = json!("imap-s3cret");
+    let added = e.parent.add(secret);
+    assert_eq!(added["stored"], true, "{added}");
+    let accounts = e.dir.path().join("accounts.json");
+    let text = std::fs::read_to_string(&accounts).unwrap();
+    assert!(text.contains(A) && !text.contains("s3cret"), "{text}");
+    assert_eq!(file_mode(&accounts), 0o600);
+    let sealed = std::fs::read(e.dir.path().join("secrets.enc")).unwrap();
+    assert!(!String::from_utf8_lossy(&sealed).contains("s3cret"));
+    assert_eq!(file_mode(&e.dir.path().join("secrets.enc")), 0o600);
+    assert_eq!(file_mode(e.dir.path()), 0o700);
+
+    let (mut e, hello) = e.restart(&[no_retry()]);
+    assert_eq!(hello["accounts"][0]["accountId"], A, "{hello}");
+    assert_eq!(hello["credentials"]["store"], "file", "{hello}");
+    assert_eq!(hello["credentials"]["accounts"], 1, "{hello}");
+    assert!(hello["features"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("accounts")));
+    assert!(hello["build"].as_str().unwrap().starts_with("sha256:"));
+    let mut c = e.hello();
+    let deadline = Instant::now() + WAIT;
+    let list = loop {
+        let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+        if list["accounts"][0]["state"] == "running" {
+            break list;
+        }
+        assert!(Instant::now() < deadline, "{list}");
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    let json = &list["accounts"][0]["account"];
+    assert_eq!(json["settings"]["imap_host"], "127.0.0.1", "{list}");
+    assert!(!list.to_string().contains("s3cret"), "{list}");
+    // The client adding it again finds it running.
+    let again = e
+        .parent
+        .call(
+            method::ACCOUNT_ADD,
+            json!({ "account": account(A), "identity": null }),
+        )
+        .unwrap_err();
+    assert_eq!(again.code, code::ACCOUNT_EXISTS);
+
+    let mut sub = e.hello();
+    sub.subscribe(&SubscribeParams::default()).unwrap();
+    e.parent
+        .call(method::ACCOUNT_REMOVE, json!({ "accountId": A }))
+        .unwrap();
+    next_matching(&mut sub, |v| is_state(v, A, "removed"));
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(list["accounts"], json!([]));
+
+    let (e, hello) = e.restart(&[]);
+    assert_eq!(hello["accounts"], json!([]));
+    assert_eq!(hello["credentials"]["accounts"], 0);
+    e.stop();
+}
+
+#[test]
+fn credentials_import_maps_a_keyset_with_duplicate_emails() {
+    let mut e = Serve::start();
+    let bare = |id: &str| {
+        let mut a = account(id);
+        a["emailAddress"] = json!("same@example.com");
+        let settings = a["settings"].as_object_mut().unwrap();
+        settings.remove("imap_password");
+        settings.remove("smtp_password");
+        a
+    };
+    let mut c = e.hello();
+    let refused = c
+        .call(
+            method::CREDENTIALS_IMPORT,
+            json!({ "accounts": [], "secrets": {} }),
+        )
+        .unwrap_err();
+    let ClientError::Rpc(obj) = &refused else {
+        panic!("{refused:?}")
+    };
+    assert_eq!(obj.code, code::WRONG_CHANNEL);
+
+    let mut other = bare("e-no-keys");
+    other["emailAddress"] = json!("other@example.com");
+    let result = e
+        .parent
+        .call(
+            method::CREDENTIALS_IMPORT,
+            json!({
+                "accounts": [bare(A), bare(B), other],
+                "secrets": {
+                    "same@example.com-imap": "pw", "same@example.com-smtp": "pw",
+                    "integration-deepl-key": "k", "tern-server-token": "t"
+                }
+            }),
+        )
+        .unwrap();
+    assert_eq!(result["imported"], json!([A, B]), "{result}");
+    assert_eq!(result["failed"][0]["accountId"], "e-no-keys", "{result}");
+    assert_eq!(
+        result["secrets"],
+        json!(["integration:deepl", "tern-server-token"])
+    );
+    // Imported, not started: the client adds them, without their secrets.
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(
+        states(&list),
+        [
+            (A.to_owned(), "stopped".to_owned()),
+            (B.to_owned(), "stopped".to_owned())
+        ]
+    );
+    assert_eq!(e.parent.add(bare(A))["state"], "running");
+    assert_eq!(e.parent.add(bare(B))["state"], "running");
+    e.stop();
+}
+
+#[test]
+fn a_stopped_account_is_retried_until_it_fails_too_often() {
+    let mut e = Serve::start_with(true, &[("TERN_ENGINE_RESTART_DELAY_MS", "100".to_owned())]);
+    e.parent.add(account(A));
+    let mut sub = e.hello();
+    sub.subscribe(&SubscribeParams::default()).unwrap();
+    for n in 1..=5 {
+        e.parent
+            .call(method::TEST_CRASH, json!({ "accountId": A }))
+            .unwrap();
+        let stopped = next_matching(&mut sub, |v| is_state(v, A, "stopped"));
+        if n < 5 {
+            assert!(stopped["params"]["retryAt"].is_i64(), "{stopped}");
+            next_matching(&mut sub, |v| is_state(v, A, "running"));
+        } else {
+            assert!(stopped["params"].get("retryAt").is_none(), "{stopped}");
+            assert!(stopped["params"].get("authFailed").is_none(), "{stopped}");
+        }
+    }
+    std::thread::sleep(Duration::from_millis(500));
+    let mut c = e.hello();
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(states(&list), [(A.to_owned(), "stopped".to_owned())]);
+    // account.add clears the history.
+    assert_eq!(e.parent.add(account(A))["state"], "running");
+    e.stop();
+}
+
+#[test]
+fn a_rotated_token_is_stored_and_used_after_a_restart() {
+    let (url, bodies) = token_server();
+    let env = [("MAILSYNC_GOOGLE_TOKEN_URL", url), no_retry()];
+    let mut e = Serve::start_with(true, &env);
+    let added = e.parent.add(oauth_account(A));
+    assert_eq!(added["stored"], true, "{added}");
+    wait_for_log(&e.log(A), "Stored the rotated refresh token");
+    assert!(e
+        .parent
+        .notes
+        .iter()
+        .all(|n| n["params"]["modelClass"] != "ProcessAccountSecretsUpdated"));
+
+    let (mut e, _) = e.restart(&env);
+    let deadline = Instant::now() + WAIT;
+    while !bodies
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|b| b.contains("refresh_token=rotated-s3cret"))
+    {
+        assert!(Instant::now() < deadline, "{:?}", bodies.lock().unwrap());
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    e.parent.call(method::ENGINE_STATUS, json!({})).unwrap();
+    assert!(e
+        .parent
+        .notes
+        .iter()
+        .all(|n| n["params"]["modelClass"] != "ProcessAccountSecretsUpdated"));
+    e.stop();
+}
+
+#[test]
+fn a_detached_engine_migrates_and_takes_parent_methods_on_the_socket() {
+    let dir = tempfile::tempdir().unwrap();
+    let socket = dir.path().join("s").join("e.sock");
+    // No `--mode migrate` first: serve migrates.
+    let mut child = mailsync(dir.path())
+        .args(["--mode", "serve", "--detached", "--socket"])
+        .arg(&socket)
+        .stdin(Stdio::null())
+        .spawn()
+        .unwrap();
+    let discovery = dir.path().join("run").join("engine.json");
+    let deadline = Instant::now() + WAIT;
+    while !discovery.exists() {
+        assert!(Instant::now() < deadline, "no discovery file");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let d: Value = serde_json::from_slice(&std::fs::read(&discovery).unwrap()).unwrap();
+    assert_eq!(d["detached"], true, "{d}");
+    let mut c = Client::connect(&socket).unwrap();
+    c.set_read_timeout(Some(WAIT)).unwrap();
+    let hello = c.hello("serve-test/1").unwrap();
+    assert!(hello.detached, "{hello:?}");
+
+    let added = c
+        .call(
+            method::ACCOUNT_ADD,
+            json!({ "account": account(A), "identity": null }),
+        )
+        .unwrap();
+    assert_eq!(added["state"], "running", "{added}");
+    let refused = c
+        .call(
+            method::CREDENTIALS_IMPORT,
+            json!({ "accounts": [], "secrets": {} }),
+        )
+        .unwrap_err();
+    let ClientError::Rpc(obj) = &refused else {
+        panic!("{refused:?}")
+    };
+    assert_eq!(obj.code, code::WRONG_CHANNEL);
+    assert_eq!(
+        c.call(method::ENGINE_SHUTDOWN, json!({})).unwrap(),
+        json!({})
+    );
+    let deadline = Instant::now() + WAIT;
+    let status = loop {
+        if let Some(s) = child.try_wait().unwrap() {
+            break s;
+        }
+        assert!(Instant::now() < deadline, "did not exit");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert_eq!(status.code(), Some(0));
+    let mut stderr = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr)
+        .unwrap();
+    assert_eq!(stderr, "");
+    assert!(!discovery.exists());
 }

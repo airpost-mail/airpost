@@ -15,6 +15,16 @@ pub fn raise_segfault() -> ! {
     std::process::abort()
 }
 
+/// Makes every file and directory the engine creates private to its user (TD12): the
+/// database, logs, attachments and sockets hold mail.
+pub fn restrict_umask() {
+    #[cfg(unix)]
+    // SAFETY: umask only changes this process's file mode mask.
+    unsafe {
+        libc::umask(0o077);
+    }
+}
+
 /// Exits without running destructors or flushing deltas, as `std::exit(141)` did. Files
 /// registered with [`remove_on_exit`] are removed first.
 pub fn exit_now(code: i32) -> ! {
@@ -156,6 +166,17 @@ pub mod uds {
             .recursive(true)
             .mode(0o700)
             .create(dir)
+    }
+
+    /// Creates `dir` as [`create_private_dir`] does and closes an existing one to group and
+    /// others: everything the engine keeps in it is the user's mail.
+    pub fn restrict_dir(dir: &Path) -> io::Result<()> {
+        create_private_dir(dir)?;
+        let mode = fs::metadata(dir)?.permissions().mode();
+        if mode & 0o077 != 0 {
+            fs::set_permissions(dir, fs::Permissions::from_mode(mode & 0o700))?;
+        }
+        Ok(())
     }
 
     /// Writes `bytes` to `path` as a `0600` file, replacing it atomically.
