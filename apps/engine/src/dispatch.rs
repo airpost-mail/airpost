@@ -128,8 +128,8 @@ impl Dispatcher<'_> {
                 self.ctx.background_mark_all.store(true, Ordering::SeqCst);
                 self.ctx.wake_workers();
                 // The network may have changed while asleep; don't leave IDLE hanging on a
-                // dead connection.
-                self.ctx.foreground.interrupt();
+                // dead connection, and try the sends deferred while it was down.
+                self.ctx.foreground.retry_deferred();
                 Ok(json!({}))
             }
             Request::NeedBodies(ids) => {

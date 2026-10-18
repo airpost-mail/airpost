@@ -36,9 +36,9 @@ use ms_core::constants::{
 use ms_core::Account;
 use ms_ipc::{
     account_state, code, method, AccountAddParams, AccountAddResult, AccountIdParams,
-    AccountRemoveResult, AccountStateParams, AccountStatus, AccountTestParams, ErrorObject,
-    Request as RpcRequest, ResetDatabaseResult, Response, SetLogLevelParams, SetLogLevelResult,
-    MAX_LINE_BYTES,
+    AccountRemoveResult, AccountResetParams, AccountStateParams, AccountStatus, AccountTestParams,
+    ErrorObject, Request as RpcRequest, ResetDatabaseParams, ResetDatabaseResult, Response,
+    SetLogLevelParams, SetLogLevelResult, MAX_LINE_BYTES,
 };
 use ms_store::{DeltaSink, DeltaStream};
 use ms_sync::{AccountFailure, AccountRuntime, WorkerContext};
@@ -624,9 +624,10 @@ impl Engine {
         Ok(crate::modes::test_auth::result(account))
     }
 
-    /// `account.reset`: forgets the account if the engine holds it, then deletes its rows.
-    /// The client adds it again. Runs on its own thread.
-    fn reset_account(&self, id: &str) -> Reply {
+    /// `account.reset`: forgets the account if the engine holds it, then deletes its rows,
+    /// keeping its plugin metadata for the resync when `keep_metadata`. The client adds it
+    /// again (or, when removing it, doesn't). Runs on its own thread.
+    fn reset_account(&self, id: &str, keep_metadata: bool) -> Reply {
         {
             let mut resetting = self.resetting_lock();
             if !resetting.insert(id.to_owned()) {
@@ -649,7 +650,7 @@ impl Engine {
             }
             let sink = ms_store::DeltaStream::new(Box::new(std::io::sink()));
             ms_store::Store::open(&self.config_dir, sink)
-                .and_then(|store| store.reset_for_account(id))
+                .and_then(|store| store.reset_for_account(id, keep_metadata))
                 .map_err(|e| {
                     ErrorObject::new(code::INTERNAL_ERROR, format!("reset failed: {e}"))
                 })?;
@@ -662,9 +663,9 @@ impl Engine {
 
     /// `engine.resetDatabase`: stops and forgets every account, deletes the database and
     /// creates an empty one, carrying the plugin metadata over by Message-ID
-    /// ([`ms_store::metadata_stash`]). Socket sessions reopen it on their next read. Runs on
-    /// its own thread.
-    fn reset_database(&self) -> Reply {
+    /// ([`ms_store::metadata_stash`]) when `keep_metadata`. Socket sessions reopen it on their
+    /// next read. Runs on its own thread.
+    fn reset_database(&self, keep_metadata: bool) -> Reply {
         if self.resetting_database.swap(true, Ordering::SeqCst) {
             return Err(ErrorObject::new(
                 code::INTERNAL_ERROR,
@@ -682,11 +683,14 @@ impl Engine {
             }
             // A database that can't be read (often why it is being rebuilt) loses its
             // metadata; the rebuild goes ahead.
-            let kept =
+            let kept = if keep_metadata {
                 ms_store::metadata_stash::collect_database(&self.config_dir).unwrap_or_else(|e| {
                     warn!("-X Could not keep the plugin metadata of the old database: {e}");
                     Vec::new()
-                });
+                })
+            } else {
+                Vec::new()
+            };
             for suffix in ["", "-wal", "-shm"] {
                 let path = self.config_dir.join(format!("{DATABASE_FILE}{suffix}"));
                 match std::fs::remove_file(&path) {
@@ -933,22 +937,28 @@ fn spawn_parent_call(engine: Arc<Engine>, req: RpcRequest) {
             )
         }
         method::ACCOUNT_RESET => {
-            let id = match req.params_as::<AccountIdParams>() {
-                Ok(p) => p.account_id,
+            let p = match req.params_as::<AccountResetParams>() {
+                Ok(p) => p,
                 Err(e) => return answer(Err(e)),
             };
-            let for_work = id.clone();
+            let id = p.account_id.clone();
             (
                 thread::ACCOUNT_RESET,
                 Some(id),
-                Box::new(move |e| e.reset_account(&for_work)),
+                Box::new(move |e| e.reset_account(&p.account_id, p.keep_metadata)),
             )
         }
-        method::ENGINE_RESET_DATABASE => (
-            thread::ENGINE_MAINTENANCE,
-            None,
-            Box::new(|e| e.reset_database()),
-        ),
+        method::ENGINE_RESET_DATABASE => {
+            let p = match req.params_as::<ResetDatabaseParams>() {
+                Ok(p) => p,
+                Err(e) => return answer(Err(e)),
+            };
+            (
+                thread::ENGINE_MAINTENANCE,
+                None,
+                Box::new(move |e| e.reset_database(p.keep_metadata)),
+            )
+        }
         _ => {
             let params = req.clone();
             (

@@ -44,7 +44,7 @@ pub fn run(opts: Options) -> i32 {
     if opts.mode == Mode::Reset {
         return run_single(|| {
             let store = ms_store::Store::open(&opts.config_dir, ms_store::DeltaStream::stdout())?;
-            store.reset_for_account(account.id())
+            store.reset_for_account(account.id(), true)
         });
     }
 
