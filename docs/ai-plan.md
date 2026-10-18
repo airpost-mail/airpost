@@ -277,3 +277,8 @@ accepted requests that fail, are cut or are cancelled; cache hits carry no usage
 http only to local hosts; addresses hidden in bodies, subjects and file names; forged
 `--- Message` and header lines escaped (prompts v2); answers, stream lines and error and
 model-list bodies are size-capped; `RenderedContext` and `Triage` redact `Debug`.
+
+2026-10-18, AI1 gated and merged: fmt, clippy, workspace tests, `cargo deny`, release build
+of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (131 passed, 1
+skipped). Rust only, so no desktop or web gate. Open: nothing in the engine calls `ms-ai`
+yet; the `ai.*` methods, keychain secrets and relay policy come in AI2.
