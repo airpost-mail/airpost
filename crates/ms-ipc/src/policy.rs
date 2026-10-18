@@ -187,12 +187,16 @@ pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) ->
         method::FILES_PUT => params
             .as_object()
             .is_some_and(|p| p.get("path").is_none_or(Value::is_null)),
-        // Positional params are refused for the same reason.
-        ai if ai.starts_with("ai.") => params.as_object().is_some_and(|p| {
-            AI_LOCAL_PARAMS
-                .iter()
-                .all(|k| p.get(*k).is_none_or(Value::is_null))
-        }),
+        // Positional params are refused for the same reason. Absent params read as `{}`,
+        // as `Request::params_as` reads them.
+        ai if ai.starts_with("ai.") => {
+            params.is_null()
+                || params.as_object().is_some_and(|p| {
+                    AI_LOCAL_PARAMS
+                        .iter()
+                        .all(|k| p.get(*k).is_none_or(Value::is_null))
+                })
+        }
         _ => true,
     }
 }
@@ -369,6 +373,7 @@ mod tests {
                 &json!({"streamId": "s"}),
                 scopes
             ));
+            assert!(relayed_request_allowed("ai.usage", &Value::Null, scopes));
         }
     }
 

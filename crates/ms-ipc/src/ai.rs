@@ -17,12 +17,22 @@ pub mod ai_feature {
 
 /// Which provider a call uses: `config`, the whole provider config with its key (local
 /// clients, until the engine holds the keys), or `provider`, the id of one the engine keeps.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+/// Its `Debug` hides `config`, which holds the key.
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct AiProviderParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+}
+
+impl std::fmt::Debug for AiProviderParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AiProviderParams")
+            .field("config", &self.config.as_ref().map(|_| "<redacted>"))
+            .field("provider", &self.provider)
+            .finish()
+    }
 }
 
 /// The AI switches a local client sends with each call until the engine keeps them
@@ -83,6 +93,10 @@ pub struct AiSuggestRepliesParams {
     /// 3 when absent, at most 3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<usize>,
+    /// Chosen by the client so `ai.cancel` can stop the call. Suggestions don't stream: no
+    /// `ai.delta` carries it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stream_id: Option<String>,
     #[serde(flatten)]
     pub provider: AiProviderParams,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -199,5 +213,22 @@ mod tests {
                 .unwrap();
         assert_eq!(p.provider.provider.as_deref(), Some("p"));
         assert!(serde_json::from_value::<AiSummarizeParams>(json!({"accountId": "a1"})).is_err());
+    }
+
+    #[test]
+    fn debug_hides_the_provider_config() {
+        let config = json!({"id": "p", "kind": "openai", "apiKey": "sk-secret",
+                            "url": "https://user:pw@example.com/v1"});
+        let summarize: AiSummarizeParams = serde_json::from_value(json!({
+            "accountId": "a1", "threadId": "t1", "config": config,
+        }))
+        .unwrap();
+        let suggest: AiSuggestRepliesParams = serde_json::from_value(json!({
+            "accountId": "a1", "threadId": "t1", "config": config,
+        }))
+        .unwrap();
+        let d = format!("{summarize:?} {suggest:?} {:?}", summarize.provider);
+        assert!(!d.contains("sk-secret") && !d.contains("pw@"), "{d}");
+        assert!(d.contains("<redacted>"), "{d}");
     }
 }
