@@ -60,10 +60,33 @@ impl Account {
         if !missing.is_empty() {
             return Err(format!("Account is missing required fields:{missing}"));
         }
-        for key in ["imap_security", "smtp_security"] {
-            Security::from_setting(key, self.settings().get(key))?;
+        for proto in ["imap", "smtp"] {
+            let key = format!("{proto}_security");
+            if Security::from_setting(&key, self.settings().get(&key))? == Security::Clear
+                && !self.cleartext_confirmed(proto)
+            {
+                return Err(format!(
+                    "Account has {key} \"none\" for {} without {proto}_allow_cleartext set to that host (confirm sending the password unencrypted)",
+                    Value::from(self.setting_str(&format!("{proto}_host")))
+                ));
+            }
         }
         Ok(())
+    }
+
+    /// `"none"` sends the password in clear, so a remote host needs the user's confirmation:
+    /// `<proto>_allow_cleartext` holds the host it was given for, and stops counting once the
+    /// host changes. Loopback hosts (Proton Bridge on 127.0.0.1) never leave the machine.
+    /// Accounts onboarded before the confirmation existed store `"none"` without it, often
+    /// because discovery picked it, and are refused until the user confirms again.
+    fn cleartext_confirmed(&self, proto: &str) -> bool {
+        let norm = |h: &str| h.trim().to_ascii_lowercase();
+        let host = norm(self.setting_str(&format!("{proto}_host")));
+        if ["127.0.0.1", "localhost", "::1", "[::1]"].contains(&host.as_str()) {
+            return true;
+        }
+        let consent = self.setting_str(&format!("{proto}_allow_cleartext"));
+        !host.is_empty() && norm(consent) == host
     }
 
     /// `""` when every required field is there, otherwise the name of what is missing.
@@ -201,8 +224,9 @@ impl Account {
         self.setting_str("imap_password")
     }
 
-    /// [`Account::validate`] refuses an invalid value; an unvalidated account falls back to
-    /// TLS, so it fails the handshake instead of sending in clear.
+    /// [`Account::validate`] refuses an invalid value and an unconfirmed `"none"`; an
+    /// unvalidated account falls back to TLS, so it fails the handshake instead of sending
+    /// in clear.
     pub fn imap_security(&self) -> Security {
         self.security("imap_security")
     }
@@ -233,7 +257,13 @@ impl Account {
     }
 
     fn security(&self, key: &str) -> Security {
-        Security::from_setting(key, self.settings().get(key)).unwrap_or(Security::Tls)
+        match Security::from_setting(key, self.settings().get(key)) {
+            Ok(Security::Clear) if !self.cleartext_confirmed(key.trim_end_matches("_security")) => {
+                Security::Tls
+            }
+            Ok(s) => s,
+            Err(_) => Security::Tls,
+        }
     }
 
     pub fn smtp_allow_insecure_ssl(&self) -> bool {
@@ -406,6 +436,53 @@ mod tests {
                 assert_eq!(sec, Security::Tls, "{key} {bad:?}");
             }
         }
+    }
+
+    #[test]
+    fn cleartext_needs_confirmation_for_a_remote_host() {
+        let with = |settings: Value| {
+            let mut v = harness_account();
+            let s = v["settings"].as_object_mut().unwrap();
+            for (k, val) in settings.as_object().unwrap() {
+                s.insert(k.clone(), val.clone());
+            }
+            Account::from_json(v).unwrap()
+        };
+        // Loopback needs nothing.
+        for host in ["127.0.0.1", "localhost", "::1", " LocalHost "] {
+            let a = with(json!({"imap_host": host}));
+            assert_eq!(a.validate(), Ok(()), "{host}");
+            assert_eq!(a.imap_security(), Security::Clear);
+        }
+        // A remote host without the confirmation, with a stale boolean, or with one given
+        // for another host: refused, and the accessor fails closed.
+        for consent in [
+            None,
+            Some(json!(true)),
+            Some(json!("")),
+            Some(json!("imap.other.example")),
+        ] {
+            let mut s = json!({"imap_host": "imap.example.com"});
+            if let Some(c) = &consent {
+                s["imap_allow_cleartext"] = c.clone();
+            }
+            let a = with(s);
+            let err = a.validate().unwrap_err();
+            assert!(
+                err.starts_with("Account has imap_security \"none\" for \"imap.example.com\""),
+                "{consent:?}: {err}"
+            );
+            assert_eq!(a.imap_security(), Security::Tls, "{consent:?}");
+        }
+        let a = with(
+            json!({"imap_host": "imap.example.com", "imap_allow_cleartext": "IMAP.example.com"}),
+        );
+        assert_eq!(a.validate(), Ok(()));
+        assert_eq!(a.imap_security(), Security::Clear);
+        // SMTP the same way.
+        let a = with(json!({"smtp_host": "smtp.example.com", "smtp_security": "none"}));
+        assert!(a.validate().unwrap_err().contains("smtp_allow_cleartext"));
+        assert_eq!(a.smtp_security(), Security::Tls);
     }
 
     #[test]

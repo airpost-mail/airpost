@@ -186,6 +186,12 @@ def account_json(
         settings["refresh_token"] = oauth["refresh_token"]
         settings["refresh_client_id"] = oauth["refresh_client_id"]
     settings.update(extra_settings or {})
+    # Onboarding records the "send password unencrypted" confirmation as the host it was
+    # given for; the engine refuses `none` for a non-loopback host (an /etc/hosts alias)
+    # without it.
+    for proto in ("imap", "smtp"):
+        if settings.get(f"{proto}_security") == "none":
+            settings.setdefault(f"{proto}_allow_cleartext", settings.get(f"{proto}_host"))
     return {
         "id": account_id,
         "__cls": "Account",
