@@ -189,8 +189,14 @@ impl Engine {
         &mut self,
         values: serde_json::Map<String, Value>,
     ) -> Result<(), EngineError> {
-        self.call_as::<Value>(method::SETTINGS_SET, to_params(&SettingsValues { values }))
-            .map(drop)
+        self.call_as::<Value>(
+            method::SETTINGS_SET,
+            to_params(&SettingsValues {
+                values,
+                ..Default::default()
+            }),
+        )
+        .map(drop)
     }
 }
 

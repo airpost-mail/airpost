@@ -72,7 +72,8 @@ pub fn set(ctx: &Ctx, engines: &mut [Engine], key: &str, value: &str) -> Result<
         engine,
         method::SETTINGS_SET,
         json!(SettingsValues {
-            values: values.clone()
+            values: values.clone(),
+            ..Default::default()
         }),
     )?;
     if ctx.json {
