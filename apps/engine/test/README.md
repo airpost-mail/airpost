@@ -196,6 +196,7 @@ The other services are populated the same way, before mailsync starts:
 | `import_legacy: true` | run `--mode import-legacy` between migrate and sync, as the client does on every launch (also `restart: {import_legacy: true}`) |
 | `slow: true` / `slow: {kind[:profile]: true}` | the case is in the slow tier (see "Tiers") |
 | `backend: {}` / `backend: {user: email, identity: null \| {field: value}}` | start the Tern server for this run (see "The Tern server" below); the engine gets the `engine` device's identity on every launch, `null` with `identity: null`, or that identity with the given fields replaced (`backend-identity-invalid`) |
+| `transports: [stdio, socket, serve]` | run the case only on these transports (`MAILSYNC_TRANSPORT`), e.g. what only `serve` does, such as the expiration executor; ignored with `binary:` |
 | `xfail: reason` / `skip: reason` | the whole scenario waits on an engine feature: failures are reported as XFAIL (a pass as XPASS), or the case is skipped |
 
 Steps:
@@ -227,6 +228,9 @@ Steps:
 | `wait: {delta: {class, type, where, count, since}, timeout: s}` | until that many models arrived on deltas of that class and type (e.g. `metadata-expiration`, `ProcessAccountSecretsUpdated`); a delta without models (`ProcessIdentityRefreshNeeded`) counts once |
 | `wait: {metadata: [...], timeout: s}`, `wait: {backend_metadata: [...], timeout: s}` | until the engine's (or the server's) metadata matches, as the expectations of the same name |
 | `wait: {people_requests: [...], timeout: s}` | until the fake People API has seen those requests, as `expect: people_requests` |
+| `server.smtp_stop` / `server.smtp_start` | the SMTP server goes away (connections refused) and comes back on the same port (`expiration-send-offline`) |
+| `client.settings: {values: {key: value}}` | `settings.set` on the engine's settings store, as the desktop's settings mirror writes it (serve only) |
+| `reset_account: {}` | Preferences > Reset Cache: `account.reset` and `account.add` on serve, `--mode reset` between two processes on stdio and socket; then waits for a pass that began after it (`reset-keeps-plugin-metadata`) |
 | `server.smtp_hold` / `server.smtp_release` | queue self-addressed SMTP deliveries, then deliver them, so the INBOX copy of a sent message arrives after the Sent copy; `smtp_release` takes `at:` like any server step (`rules-ready-inbox-copy-first`) |
 | `hold_engine: true` on a `server.*` step | SIGSTOP the engine while the step runs and SIGCONT after, so a slow server change (a 2300-message APPEND to Cyrus) lands as one batch rather than being split by a pass that wakes from the 120 s sleep halfway (`heavy-fetch-truncation-backlog`) |
 | `account: <name>` on any step | run it against that account of `accounts:` (`a` is the scenario's own); see "Several accounts" |

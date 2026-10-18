@@ -1,0 +1,66 @@
+name: expiration-snooze
+description: >
+  serve unsnoozes by itself, with no client attached to act on the delta. Two threads are
+  snoozed in one batch, one due in 20 s and one in an hour. When the first comes due the
+  engine clears its snooze, moves the thread from Snoozed back to the inbox, and resurfaces
+  it with a message from the account to itself, named "<name> via Tern" so every client
+  hides it (Message.isHidden), which the server delivers back into INBOX. The other thread
+  stays snoozed, and no metadata-expiration delta reaches the client.
+source: "docs/desktop-client-plan.md 3.3; snooze-store.ts _onMetadataExpired; snooze-utils.ts moveThreads; DraftFactory.createDraftForResurfacing"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 2}
+  "[Mailspring]/Snoozed": {}
+setup:
+  - server.append: {mailbox: "[Mailspring]/Snoozed", messages: {message_id: "<snoozed-1@example.test>", subject: "Back soon"}}
+  - server.append: {mailbox: "[Mailspring]/Snoozed", messages: {message_id: "<snoozed-2@example.test>", subject: "Back later"}}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {header_message_ids: ["snoozed-1@example.test"]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 20}, snoozeCategoryId: null}
+    as: snooze1
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {header_message_ids: ["snoozed-2@example.test"]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 3600}, snoozeCategoryId: null}
+    as: snooze2
+  - wait: {task: snooze2, timeout: 30}
+  - wait: {models: {Task: {where: {__cls: ChangeFolderTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  tasks:
+    snooze1: {status: complete, error: null}
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 1
+      match: [{status: complete, silent: true, error: null}]
+  smtp:
+    count: 1
+    messages:
+      - {recipients: ["test@example.test"], headers: {From: {re: "via Tern"}, Subject: "Back soon", In-Reply-To: "<snoozed-1@example.test>"}}
+  server_counts: {INBOX: 4, "[Mailspring]/Snoozed": 1}
+  metadata:
+    - {threads: {header_message_ids: ["snoozed-1@example.test"]}, plugin: thread-snooze, expiration: false}
+    - {threads: {header_message_ids: ["snoozed-2@example.test"]}, plugin: thread-snooze, expiration: true}
+  metadata_expiration:
+    - {threads: {header_message_ids: ["snoozed-1@example.test", "snoozed-2@example.test"]}, count: 0}
+  sql:
+    # The resurfacing message is in the snoozed thread and hidden.
+    - db: main
+      query: >
+        SELECT count(*) FROM Message m JOIN Message s ON s.threadId = m.threadId
+        WHERE s.headerMessageId = 'snoozed-1@example.test' AND m.id != s.id AND m.draft = 0
+        AND json_extract(m.data, '$.from[0].name') LIKE '%via Tern'
+        AND json_extract(m.data, '$.from[0].email') = json_extract(m.data, '$.to[0].email')
+      equals: 1
+  db_matches_server: {}
+  running: true

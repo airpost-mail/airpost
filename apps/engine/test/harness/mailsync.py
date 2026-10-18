@@ -994,6 +994,12 @@ class MailsyncProcess:
         self.send({"type": "queue-task", "task": task})
         return task["id"]
 
+    def set_settings(self, values: dict) -> dict:
+        """serve: `settings.set`, as the desktop's settings mirror writes the engine's store."""
+        if self.transport != "serve":
+            raise MailsyncError("settings.set is serve-only")
+        return self.engine.rpc.call("settings.set", {"values": values}, SERVE_ACCOUNT_TIMEOUT)
+
     def need_bodies(self, message_ids: Iterable[str]):
         self.send({"type": "need-bodies", "ids": list(message_ids)})
 

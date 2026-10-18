@@ -870,6 +870,12 @@ class ScenarioRun(PimMixin, BackendMixin):
             self._smtp().hold()
         elif op == "smtp_release":
             self._note(f"released {self._smtp().release()} held SMTP deliveries")
+        elif op == "smtp_stop":
+            # Connections to the SMTP port are refused until smtp_start, as with a server
+            # that can't be reached.
+            self._smtp().stop()
+        elif op == "smtp_start":
+            self._smtp().start()
         else:
             raise ScenarioFailure(f"unknown server op {op!r}")
 
@@ -916,6 +922,11 @@ class ScenarioRun(PimMixin, BackendMixin):
             return task_id
         if op == "undo_task":
             return self._undo_task(arg)
+        if op == "settings":
+            # {values}: the engine-owned settings (serve), e.g. the localized resurfacing texts.
+            result = self.ms.set_settings(dict(arg.get("values", arg)))
+            self._note(f"settings set: {json.dumps(result)}")
+            return result
         if op == "need_bodies":
             self.ms.need_bodies(self._resolve_messages(arg["messages"]))
             return
@@ -1323,7 +1334,10 @@ class ScenarioRun(PimMixin, BackendMixin):
             if "recipients" in want and sorted(m.recipients) != sorted(want["recipients"]):
                 out.append(f"SMTP message {i} recipients {m.recipients} != {want['recipients']}")
             for h, v in (want.get("headers") or {}).items():
-                if m.header(h) != v:
+                if isinstance(v, dict) and "re" in v:   # {re: pattern}: searched in the header
+                    if not re.search(v["re"], m.header(h) or ""):
+                        out.append(f"SMTP message {i} header {h} = {m.header(h)!r}, expected /{v['re']}/")
+                elif m.header(h) != v:
                     out.append(f"SMTP message {i} header {h} = {m.header(h)!r}, expected {v!r}")
             if "attachments" in want:
                 # {filename: content}: the parts with that filename and their decoded bytes.

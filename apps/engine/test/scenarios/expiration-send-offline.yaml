@@ -1,0 +1,62 @@
+name: expiration-send-offline
+description: >
+  A scheduled send comes due while the SMTP server can't be reached. A send the engine
+  started itself has no window to report a failure to, so instead of failing once it goes
+  back to the queue and the account reports itself offline; when the server is back (here a
+  Sync Mail ends the worker's sleep) it goes out, once.
+source: "docs/tech-debt.md TD33; docs/desktop-client-plan.md 3.3"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "offline-1@example.test"
+        subject: "Sent when online"
+        body: "<p>eventually</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Someone", email: "someone@example.org"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - server.smtp_stop: {}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["offline-1@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 5}, actionKey: send}
+    as: schedule
+  - wait: {log: "Send deferred until the account is online", timeout: 60}
+  - assert:
+      models:
+        Task:
+          where: {__cls: SendDraftTask}
+          count: 1
+          match: [{status: remote, error: null}]
+  - server.smtp_start: {}
+  - client.wake: {}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp:
+    count: 1
+    messages:
+      - {recipients: ["someone@example.org"], headers: {Message-ID: "<offline-1@example.test>"}}
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 1
+      match: [{status: complete, error: null}]
+  server_counts: {Sent: 1}
+  running: true

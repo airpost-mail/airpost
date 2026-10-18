@@ -1,0 +1,57 @@
+name: expiration-send-later-header-only
+description: >
+  A draft with an attachment, scheduled on another device, whose body this engine doesn't
+  have when it comes due (its one prefetch attempt failed, which leaves the body row empty
+  and is not retried). serve doesn't send what it has: it asks for the body, looks again a
+  minute later, and then sends the draft once, attachment included.
+source: "docs/desktop-client-plan.md 3.3 (incomplete-draft wait)"
+transports: [serve]
+slow: true
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+  Drafts: {special_use: "\\Drafts"}
+setup:
+  - server.append:
+      mailbox: Drafts
+      flags: ["\\Draft", "\\Seen"]
+      messages:
+        message_id: "<header-only-1@example.test>"
+        subject: "Scheduled elsewhere"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Someone <someone@example.org>"
+        attachment: ["plan.txt", "the plan"]
+steps:
+  - wait: quiescent
+  - restart:
+      before:
+        # What a failed prefetch leaves: an empty body row and no plaintext flag.
+        - db.sql:
+            - "UPDATE MessageBody SET value = NULL WHERE id IN (SELECT id FROM Message WHERE headerMessageId = 'header-only-1@example.test')"
+            - "UPDATE Message SET data = json_remove(data, '$.plaintext') WHERE headerMessageId = 'header-only-1@example.test'"
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["header-only-1@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 5}, actionKey: send}
+    as: schedule
+  - wait: {task: schedule, timeout: 30}
+  - wait: {log: "lacks its body", timeout: 60}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 120}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp:
+    count: 1
+    messages:
+      - {recipients: ["someone@example.org"], headers: {Message-ID: "<header-only-1@example.test>"}, attachments: {"plan.txt": "the plan"}}
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 1
+      match: [{status: complete, error: null}]
+  metadata_expiration:
+    - {messages: {header_message_ids: ["header-only-1@example.test"]}, count: 0}
+  server_counts: {Drafts: 0, Sent: 1}
+  running: true

@@ -1,0 +1,70 @@
+name: expiration-undo-send
+description: >
+  Undo send writes send-later metadata (`isUndoSend`) due when the undo window closes, and
+  serve sends the draft itself then, so closing the window inside the undo period still
+  sends it. The first draft's window closes with the engine running: it goes out once. The
+  second's engine is quit inside the window and started again after it closed: the new
+  process sends it after its start delay, once.
+source: "docs/desktop-client-plan.md 3.3; draft-store.ts _onSendDraft (undo send); send-later/lib/main.ts"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 2}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: &draft
+        hMsgId: "undo-1@example.test"
+        subject: "Undo window closed"
+        body: "<p>sent after the window</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Someone", email: "someone@example.org"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {<<: *draft, hMsgId: "undo-2@example.test", subject: "Engine quit inside the window"}
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["undo-1@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 5}, isUndoSend: true, actionKey: send}
+    as: undo1
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 60}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["undo-2@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 5}, isUndoSend: true, actionKey: send}
+    as: undo2
+  - wait: {task: undo2, timeout: 30}
+  - mark: undo2
+  - restart:
+      wait: false
+      before:
+        - wait: {until: undo2, plus: 8}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 2}}, timeout: 90}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp:
+    count: 2
+    messages:
+      - {headers: {Message-ID: "<undo-1@example.test>"}}
+      - {headers: {Message-ID: "<undo-2@example.test>"}}
+  metadata:
+    - {messages: {header_message_ids: ["undo-1@example.test", "undo-2@example.test"]}, plugin: send-later, expiration: false}
+  metadata_expiration:
+    - {messages: {header_message_ids: ["undo-1@example.test", "undo-2@example.test"]}, count: 0}
+  server_counts: {Sent: 2}
+  running: true

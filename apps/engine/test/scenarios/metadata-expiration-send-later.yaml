@@ -7,6 +7,8 @@ description: >
   the client send it. It keeps re-sending until the client clears the metadata; a message
   with metadata but no expiration is never sent.
 source: "MetadataExpirationWorker.cpp; MailModel::afterSave; client send-later plugin"
+# serve acts on the due rows itself (expiration-*.yaml); sync mode emits them.
+transports: [stdio, socket]
 servers:
   - {fake: dovecot}
 mailboxes:

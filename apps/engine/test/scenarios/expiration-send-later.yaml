@@ -1,0 +1,91 @@
+name: expiration-send-later
+description: >
+  serve sends a scheduled draft by itself, with no client attached. Three local drafts get
+  send-later metadata due in 20 s: two plain ones and one the client marked clientFinalize
+  (its send needs the client's own transforms). At the time the engine clears the first
+  two's expiration and sends each exactly once; the third is left alone and arrives as a
+  metadata-expiration delta, as before, for the client to send. (Send and Archive, which
+  needs a reply's thread, is covered by the ms-tasks executor tests.)
+source: "docs/desktop-client-plan.md 3.3, T9; send-later/lib/main.ts; send-and-archive-extension.ts"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 2}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: &draft
+        hMsgId: "later-1@example.test"
+        subject: "Scheduled"
+        body: "<p>later</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Someone", email: "someone@example.org"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {<<: *draft, hMsgId: "later-2@example.test", subject: "Scheduled too"}
+    as: save2
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {<<: *draft, hMsgId: "later-3@example.test", subject: "Finalized by the client"}
+    as: save3
+  - wait: {task: save3, timeout: 60}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["later-1@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 20}, actionKey: send}
+    as: schedule1
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["later-2@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 20}}
+    as: schedule2
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["later-3@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 20}, actionKey: send, clientFinalize: true}
+    as: schedule3
+  - wait: {task: schedule3, timeout: 30}
+  - mark: scheduled
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 2}}, timeout: 90}
+  - wait: {delta: {class: Message, type: metadata-expiration, count: 1}, timeout: 60}
+  - mark: sent
+  # A second scan (15 s after one that emitted, then 1 s) must not send again.
+  - wait: {until: sent, plus: 18}
+  - sync: pass
+expect:
+  smtp:
+    count: 2
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 2
+      match:
+        - {status: complete, error: null, draft.hMsgId: "later-1@example.test"}
+        - {status: complete, error: null, draft.hMsgId: "later-2@example.test"}
+    Message:
+      where: {headerMessageId: "later-3@example.test"}
+      count: 1
+      match: [{draft: true}]
+  tasks:
+    schedule1: {status: complete, error: null}
+  metadata:
+    - {messages: {header_message_ids: ["later-1@example.test"]}, plugin: send-later, expiration: false}
+    - {messages: {header_message_ids: ["later-3@example.test"]}, plugin: send-later, expiration: true}
+  metadata_expiration:
+    - {messages: {header_message_ids: ["later-1@example.test", "later-2@example.test"]}, count: 0}
+    - {messages: {header_message_ids: ["later-3@example.test"]}, plugin: send-later, count: {min: 1}}
+  server_counts: {Sent: 2}
+  running: true

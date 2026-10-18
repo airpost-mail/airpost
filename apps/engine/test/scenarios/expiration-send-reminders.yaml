@@ -1,0 +1,76 @@
+name: expiration-send-reminders
+description: >
+  The user replies on two threads with "remind me if no one replies" (send-reminders
+  metadata on the draft, `thread:` prefix, promoted to the thread on send). serve records
+  the reply baseline when the thread is saved. Someone answers the second thread before the
+  reminder is due: that save clears its reminder. When the first comes due with no answer,
+  the engine sets shouldNotify, clears the expiration and resurfaces the thread with a
+  hidden message to the account itself, in reply to the user's message.
+source: "docs/desktop-client-plan.md 3.3; send-reminders-store.ts _onDatabaseChanged; send-reminders-utils.ts"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {}
+setup:
+  - server.append: {mailbox: INBOX, messages: {message_id: "<rem-1@example.test>", subject: "Question one"}}
+  - server.append: {mailbox: INBOX, messages: {message_id: "<rem-2@example.test>", subject: "Question two"}}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SendDraftTask
+      draft: &reply
+        hMsgId: "rem-sent-1@example.test"
+        subject: "Re: Question one"
+        body: "<p>Any news?</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Someone", email: "someone@example.org"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: "rem-1@example.test"
+        fwdMsgId: ""
+        metadata:
+          - {pluginId: "thread:send-reminders", v: 1, value: {expiration: {now_plus: 45}, sentHeaderMessageId: "rem-sent-1@example.test"}}
+      perRecipientBodies: null
+    as: send1
+  - client.task:
+      __cls: SendDraftTask
+      draft:
+        <<: *reply
+        hMsgId: "rem-sent-2@example.test"
+        subject: "Re: Question two"
+        rthMsgId: "rem-2@example.test"
+        metadata:
+          - {pluginId: "thread:send-reminders", v: 1, value: {expiration: {now_plus: 45}, sentHeaderMessageId: "rem-sent-2@example.test"}}
+      perRecipientBodies: null
+    as: send2
+  - wait: {task: send2, timeout: 60}
+  - wait: {quiescent: true}
+  - assert:
+      metadata:
+        - {threads: {header_message_ids: ["rem-1@example.test", "rem-2@example.test"]}, plugin: send-reminders, value: {shouldNotify: false}, expiration: true}
+  # The answer on the second thread arrives before the reminder is due.
+  - server.append: {mailbox: INBOX, messages: {message_id: "<rem-answer-2@example.test>", subject: "Re: Question two", in_reply_to: "<rem-sent-2@example.test>", references: ["<rem-2@example.test>", "<rem-sent-2@example.test>"]}}
+  - sync: pass
+  - assert:
+      metadata:
+        - {threads: {header_message_ids: ["rem-2@example.test"]}, plugin: send-reminders, absent: true}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 3}}, timeout: 90}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp:
+    count: 3
+    messages:
+      - {headers: {Message-ID: "<rem-sent-1@example.test>"}}
+      - {headers: {Message-ID: "<rem-sent-2@example.test>"}}
+      - {recipients: ["test@example.test"], headers: {From: {re: "via Tern"}, In-Reply-To: "<rem-sent-1@example.test>", Subject: "Question one"}}
+  metadata:
+    - {threads: {header_message_ids: ["rem-1@example.test"]}, plugin: send-reminders, value: {shouldNotify: true}, expiration: false}
+    - {threads: {header_message_ids: ["rem-2@example.test"]}, plugin: send-reminders, absent: true}
+  metadata_expiration:
+    - {threads: {header_message_ids: ["rem-1@example.test", "rem-2@example.test"]}, count: 0}
+  running: true

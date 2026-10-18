@@ -1,0 +1,44 @@
+name: expiration-reset-keeps-snooze
+description: >
+  serve's half of reset-keeps-plugin-metadata: the user snoozes a thread, then resets the
+  account (Preferences > Reset Cache). The reset keeps the snooze by Message-ID, the resync
+  attaches it to the new thread, and when it comes due the engine unsnoozes that thread
+  itself: back to the inbox, resurfaced once.
+source: "docs/tech-debt.md TD32; docs/desktop-client-plan.md 3.3"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+  "[Mailspring]/Snoozed": {}
+setup:
+  - server.append: {mailbox: "[Mailspring]/Snoozed", messages: {message_id: "<reset-snoozed-1@example.test>", subject: "Snoozed before the reset"}}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {header_message_ids: ["reset-snoozed-1@example.test"]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 45}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - reset_account: {}
+  - assert:
+      metadata:
+        - {threads: {header_message_ids: ["reset-snoozed-1@example.test"]}, plugin: thread-snooze, expiration: true}
+  - wait: {models: {Task: {where: {__cls: ChangeFolderTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp:
+    count: 1
+    messages:
+      - {recipients: ["test@example.test"], headers: {From: {re: "via Tern"}, In-Reply-To: "<reset-snoozed-1@example.test>"}}
+  server_counts: {INBOX: 3, "[Mailspring]/Snoozed": 0}
+  metadata:
+    - {threads: {header_message_ids: ["reset-snoozed-1@example.test"]}, plugin: thread-snooze, expiration: false}
+  metadata_expiration:
+    - {threads: {header_message_ids: ["reset-snoozed-1@example.test"]}, count: 0}
+  db_matches_server: {}
+  running: true

@@ -7,6 +7,8 @@ description: >
   unsnooze it. Nothing is sent early, other threads are never sent, and once the client
   clears the metadata (value {}) no further expiration deltas arrive.
 source: "MetadataExpirationWorker.cpp (15 s start delay, expiration <= now, re-emit until cleared); MailModel::afterSave (ModelPluginMetadata); client thread-snooze plugin"
+# serve acts on the due rows itself (expiration-*.yaml); sync mode emits them.
+transports: [stdio, socket]
 servers:
   - {fake: dovecot}
 mailboxes:

@@ -1,0 +1,47 @@
+name: expiration-snooze-gmail
+description: >
+  serve unsnoozes a Gmail thread by itself, with "unsnooze to top" turned off in the
+  engine's settings. On Gmail, Snoozed and the inbox are labels: the engine swaps the
+  Snoozed label for the inbox's (ChangeLabelsTask) and, instead of sending a resurfacing
+  message, marks the thread unread. Nothing goes out over SMTP and no metadata-expiration
+  delta reaches the client.
+source: "docs/desktop-client-plan.md 3.3; snooze-utils.ts moveThreads (Gmail labels); snooze-store.ts unsnoozeToTop"
+transports: [serve]
+servers:
+  - {fake: gmail, smtp: true, smtp_sent_copy: "[Gmail]/Sent Mail"}
+mailboxes:
+  INBOX: {messages: 2}
+  "[Mailspring]/Snoozed": {}
+setup:
+  - server.append: {mailbox: "[Mailspring]/Snoozed", messages: {message_id: "<gsnoozed-1@example.test>", subject: "Back soon"}}
+steps:
+  - wait: quiescent
+  - client.settings: {values: {core.notifications.unsnoozeToTop: false}}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {header_message_ids: ["gsnoozed-1@example.test"]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 20}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - wait: {models: {Task: {where: {__cls: ChangeLabelsTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {models: {Task: {where: {__cls: ChangeUnreadTask, status: complete}, count: 1}}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 0
+    Message:
+      where: {headerMessageId: "gsnoozed-1@example.test"}
+      count: 1
+      # Only the inbox label is left (X-GM-LABELS).
+      match: [{unread: true, labels: ["\\Inbox"]}]
+  smtp: {count: 0}
+  metadata:
+    - {threads: {header_message_ids: ["gsnoozed-1@example.test"]}, plugin: thread-snooze, expiration: false}
+  metadata_expiration:
+    - {threads: {header_message_ids: ["gsnoozed-1@example.test"]}, count: 0}
+  db_matches_server: {labels: true}
+  running: true
