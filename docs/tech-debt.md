@@ -149,9 +149,17 @@ only `isFromMe`, remote images that match a tracker rule or are hidden (`display
 (BSD-3-Clause, 468 regexes over 320 vendors, credited in NOTICE.md) plus the old list's uncovered
 entries; Mailspring read receipts are stripped whoever's they are. `core.reading.autoloadImages`
 defaults to `false` (explicit `true` kept, per-sender allowlist unchanged), and the new
-`core.reading.loadGravatar` (off) gates `ContactProfilePhoto`'s Gravatar lookup. Not covered: CSS
-`background-image` trackers and class-based hiding (the message CSP still blocks those when images
-are off), and the signature editor's user-chosen Gravatar photo.
+`core.reading.loadGravatar` (off) gates `ContactProfilePhoto`'s Gravatar lookup. Review fixes
+(b0442b65a): rules run on each `src`/`srcset` URL of `<img>`, `<source>` and `<input type=image>`
+(first 2 KB, `.+` capped at 256), not the whole tag, so crafted attributes can't hang the renderer;
+anything but cid:/data:/app schemes counts as remote; opacity:0, max-width/height and negative
+sizes count as hidden. New drafts use only vendor rules, so path rules like `/open.gif` don't
+remove forwarded images. With autoload off the composer shows uneditable blocks without remote
+image URLs (the user's signature images excepted); the sent HTML keeps them. Not covered: CSS
+`background-image` and `background=` trackers, class-based, off-screen, 2x2 and CSS-escaped
+hiding (the message CSP still blocks all of these when images are off), and the signature
+editor's user-chosen Gravatar photo. The per-sender allowlist keys on the unauthenticated From
+address; checking Authentication-Results needs headers the desktop doesn't have.
 
 Verified. `core.reading.autoloadImages` defaults to `true` (`src/config-schema.ts:146-150`). The
 `remove-tracking-pixels` plugin applies its 25-entry, circa-2017 list (Sidekick, RelateIQ, Banana
