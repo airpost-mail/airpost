@@ -17,7 +17,7 @@ use std::time::Duration;
 use ms_core::constants::{thread, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
 use ms_core::SyncError;
 use ms_ipc::{code, ErrorObject};
-use ms_store::{Model, Task};
+use ms_store::{File, Model, Task};
 use ms_sync::{AccountFailure, WorkerContext};
 use ms_tasks::TaskProcessor;
 use serde_json::{json, Value};
@@ -34,6 +34,8 @@ pub enum Request {
     WakeWorkers,
     NeedBodies(Vec<String>),
     SyncCalendar,
+    /// `files.put`: saves the File JSON (its bytes are already on disk) and answers with it.
+    SaveFile(Value),
     /// stdin only.
     TestCrash,
     /// stdin only.
@@ -98,6 +100,10 @@ fn fail_on_task_error(ctx: &WorkerContext, e: &ms_core::Error) -> ErrorObject {
     .with_data(e.to_json())
 }
 
+fn internal(e: ms_core::Error) -> ErrorObject {
+    ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
+}
+
 struct Dispatcher<'a> {
     ctx: &'a WorkerContext,
     tasks: &'a TaskProcessor<'a>,
@@ -132,6 +138,11 @@ impl Dispatcher<'_> {
                 Ok(json!({}))
             }
             Request::SyncCalendar => Ok(json!({ "started": self.sync_calendar() })),
+            Request::SaveFile(json) => {
+                let mut file = File::from_json(json).map_err(internal)?;
+                self.tasks.store.save(&mut file).map_err(internal)?;
+                Ok(file.data)
+            }
             Request::TestCrash => {
                 let e = SyncError::fatal("test", "triggered via cin");
                 self.ctx

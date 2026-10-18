@@ -10,6 +10,8 @@
 
 mod cli;
 mod dispatch;
+#[cfg(unix)]
+mod files;
 mod modes;
 mod output;
 mod platform;

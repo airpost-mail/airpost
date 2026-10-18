@@ -43,6 +43,7 @@ use serde_json::{json, Value};
 use tracing::{info, warn};
 
 use crate::dispatch::{Command, Reply, Request};
+use crate::files::{is_files_method, FilesReply};
 use crate::platform;
 use crate::read_api::{is_read_method, ReadApi};
 use crate::settings::Settings;
@@ -727,7 +728,7 @@ fn write_line(mut stream: &UnixStream, mut line: &[u8], outbox: &Outbox) -> bool
 /// read-only database connection.
 pub struct Session {
     pub server: Arc<Server>,
-    reads: ReadApi,
+    pub(crate) reads: ReadApi,
 }
 
 impl Session {
@@ -832,7 +833,7 @@ impl Session {
     }
 
     /// Hands `request` to the account's `main` thread and waits for its result.
-    fn dispatch(&self, account_id: &str, request: Request) -> Reply {
+    pub(crate) fn dispatch(&self, account_id: &str, request: Request) -> Reply {
         let commands = self.server.accounts.commands(account_id)?;
         let rx = send(&commands, request)?;
         rx.recv()
@@ -865,6 +866,7 @@ fn features(server: &Server) -> Vec<String> {
         feature::MAIL_NEW,
         feature::RELAYED,
         feature::QUERY,
+        feature::FILES,
     ]
     .map(str::to_owned)
     .to_vec();
@@ -1105,6 +1107,13 @@ impl Connection {
                 });
                 return None;
             }
+            name if is_files_method(name) => match self.session.files_call(&req) {
+                FilesReply::Now(r) => r,
+                FilesReply::Later(work) => {
+                    self.answer_later(req.id, work);
+                    return None;
+                }
+            },
             name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
                 Err(ErrorObject::new(
                     code::WRONG_CHANNEL,
@@ -1126,6 +1135,28 @@ impl Connection {
             Ok(v) => Response::ok(Some(id), v),
             Err(e) => Response::err(Some(id), e),
         })
+    }
+
+    /// Runs `work` on a `files` thread and queues its answer then, out of order with this
+    /// connection's later requests (T21).
+    fn answer_later(&self, id: Option<ms_ipc::Id>, work: Box<dyn FnOnce() -> Reply + Send>) {
+        let conn = self.id;
+        let outbox = self.outbox.clone();
+        let hub = self.session.server.hub.clone();
+        crate::modes::spawn(thread::FILES, move || {
+            let result = work();
+            let Some(id) = id else {
+                return;
+            };
+            let response = match result {
+                Ok(v) => Response::ok(Some(id), v),
+                Err(e) => Response::err(Some(id), e),
+            };
+            if let Err(PushError::Full) = outbox.push(ms_ipc::encode(&response).into()) {
+                drop_slow(conn, &outbox);
+                hub.unsubscribe(conn);
+            }
+        });
     }
 
     fn on_first_hello(&mut self, req: &RpcRequest) {

@@ -137,6 +137,11 @@ impl ReadApi {
         }
     }
 
+    /// The File row, for `files.*`.
+    pub fn file(&mut self, account_id: &str, id: &str) -> Result<Option<Value>, ErrorObject> {
+        self.store()?.file(account_id, id).map_err(internal)
+    }
+
     /// Answers a method [`is_read_method`] accepts.
     pub fn call(&mut self, req: &RpcRequest) -> Reply {
         match req.method.as_str() {
