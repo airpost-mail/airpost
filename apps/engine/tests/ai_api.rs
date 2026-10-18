@@ -33,6 +33,7 @@ fn account() -> Value {
         "id": ACCOUNT_ID,
         "name": "Bo Chen",
         "emailAddress": "bo@example.com",
+        "aliases": ["Bo at work <bo@work.example>"],
         "provider": "imap",
         "settings": {
             "imap_host": "127.0.0.1", "imap_port": 1, "imap_username": "me",
@@ -129,6 +130,7 @@ fn seed(config: &Path) {
     .unwrap();
     insert_thread(&c, "t-spam", "Prize");
     insert_thread(&c, "t-pgp", "Keys");
+    insert_thread(&c, "t-alias", "Invoice");
     let ann = ("Ann Lee", "ann@acme.io");
     let bo = ("Bo Chen", "bo@example.com");
     let dee = ("Dee SECRET", "dee@spam.example");
@@ -225,13 +227,38 @@ fn seed(config: &Path) {
     for m in rows {
         insert_message(&c, m);
     }
+    // Bo answers from an alias after Ann's question.
+    insert_message(
+        &c,
+        Msg {
+            id: "a1",
+            thread: "t-alias",
+            date: base,
+            from: ann,
+            folder: "f-inbox",
+            body: "<p>Did the invoice arrive?</p>",
+            extra: json!({}),
+        },
+    );
+    insert_message(
+        &c,
+        Msg {
+            id: "a2",
+            thread: "t-alias",
+            date: base + 10,
+            from: ("Bo at work", "Bo@Work.example"),
+            folder: "f-inbox",
+            body: "<p>ALIAS REPLY</p>",
+            extra: json!({}),
+        },
+    );
 }
 
 struct Serve {
     _dir: tempfile::TempDir,
     socket: PathBuf,
     child: Child,
-    _stdin: ChildStdin,
+    stdin: ChildStdin,
 }
 
 impl Serve {
@@ -277,8 +304,14 @@ impl Serve {
             _dir: dir,
             socket,
             child,
-            _stdin: stdin,
+            stdin,
         }
+    }
+
+    /// Sends `method` on the parent's stdin; its answer is not read.
+    fn parent(&mut self, method: &str, params: Value) {
+        let line = json!({"jsonrpc": "2.0", "id": 99, "method": method, "params": params});
+        writeln!(self.stdin, "{line}").unwrap();
     }
 
     fn client(&self) -> Client {
@@ -884,8 +917,8 @@ fn wait_for_triage(c: &mut Client, thread: &str) -> Value {
     }
 }
 
-/// Sends `ai.triage.run` and reads its answer and progress until `done == total`, keeping
-/// the `capabilities.changed` that came meanwhile.
+/// Sends `ai.triage.run` and reads its answer and progress until `done == total` or
+/// `stopped`, keeping the `capabilities.changed` that came meanwhile.
 fn run_job_seeing(c: &mut Client, params: Value) -> (Value, Vec<Value>, Vec<Value>) {
     let req = Request::new(ms_ipc::Id::Num(9001), method::AI_TRIAGE_RUN, params);
     c.send_raw(&ms_ipc::encode(&req)).unwrap();
@@ -899,7 +932,7 @@ fn run_job_seeing(c: &mut Client, params: Value) -> (Value, Vec<Value>, Vec<Valu
                 answer = Some(r.into_result().unwrap());
             }
             Message::Notification(n) if n.method == method::AI_TRIAGE_PROGRESS => {
-                let done = n.params["done"] == n.params["total"];
+                let done = n.params["done"] == n.params["total"] || n.params["stopped"] == true;
                 progress.push(n.params);
                 if done {
                     return (answer.expect("answered"), progress, capabilities);
@@ -931,6 +964,13 @@ fn stored_settings_serve_calls_without_config() {
         ai_key(c.call(method::AI_SUMMARIZE, bare.clone())),
         "not-enabled"
     );
+    // Keys never go to the settings file.
+    let keyed = json!({"core.ai.providers": [{"id": "k", "kind": "openai", "model": "m",
+                                              "apiKey": SECRET}]});
+    let err = c
+        .call(method::SETTINGS_SET, json!({ "values": keyed }))
+        .unwrap_err();
+    assert_eq!(err.code(), Some(code::INVALID_PARAMS));
     store_settings(
         &mut c,
         stored(
@@ -1176,4 +1216,248 @@ fn triage_jobs_are_cancelled_by_their_connection() {
     c.call(method::AI_CANCEL, json!({"jobId": job})).unwrap();
     assert!(server.saw_abort(Duration::from_secs(5)));
     assert!(triage_value(&mut c, "t1").is_none());
+}
+
+/// What `watch_job` hands on: the client, the job id, and the notification's method and
+/// params (`capabilities.ai.triage` for `capabilities.changed`). True ends the watch.
+type Seen<'a> = dyn FnMut(&mut Client, &str, &str, &Value) -> bool + 'a;
+
+/// Sends `ai.triage.run` on `c` and reads until its answer, then hands each later
+/// `ai.triage.progress` and `capabilities.changed` to `seen` until it returns true. Answers
+/// to requests sent meanwhile with `send_raw` are skipped.
+fn watch_job(c: &mut Client, params: Value, seen: &mut Seen<'_>) -> String {
+    let req = Request::new(ms_ipc::Id::Num(9002), method::AI_TRIAGE_RUN, params);
+    c.send_raw(&ms_ipc::encode(&req)).unwrap();
+    let mut job = None;
+    loop {
+        match c.read_message().unwrap() {
+            Message::Response(r) if r.id == req.id => {
+                job = Some(
+                    r.into_result().unwrap()["jobId"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned(),
+                );
+            }
+            Message::Notification(n)
+                if n.method == method::AI_TRIAGE_PROGRESS
+                    || n.method == method::CAPABILITIES_CHANGED =>
+            {
+                let params = if n.method == method::CAPABILITIES_CHANGED {
+                    n.params["ai"]["triage"].clone()
+                } else {
+                    n.params
+                };
+                let id = job.clone().expect("answered before any notification");
+                if seen(c, &id, &n.method, &params) {
+                    return id;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn send_cancel(c: &mut Client, job: &str) {
+    let req = Request::new(
+        ms_ipc::Id::Num(9003),
+        method::AI_CANCEL,
+        json!({ "jobId": job }),
+    );
+    c.send_raw(&ms_ipc::encode(&req)).unwrap();
+}
+
+#[test]
+fn triage_waits_for_the_daily_cap_until_it_is_raised() {
+    let e = Serve::start();
+    let server = ollama(&[TRIAGE_ANSWER]);
+    let mut c = e.client();
+    c.call(method::SUBSCRIBE, json!({})).unwrap();
+    let mut values = stored(
+        &server,
+        json!({"triage": {"enabled": true, "provider": "local"}}),
+    );
+    values["core.ai.limits"] = json!({"dailyTokens": {"local": 1}});
+    store_settings(&mut c, values);
+    let mut other = e.client();
+    let mut reasons = Vec::new();
+    let mut last = Value::Null;
+    watch_job(
+        &mut c,
+        json!({"accountId": ACCOUNT_ID, "threadIds": ["t1", "t-pgp"]}),
+        &mut |_, _, method, params| {
+            if method == method::CAPABILITIES_CHANGED {
+                reasons.push(params["reason"].clone());
+                if params["reason"] == "quota-exceeded" && server.count() == 1 {
+                    // The first answer used the cap: the second thread waits, until the cap
+                    // is raised.
+                    std::thread::sleep(Duration::from_millis(300));
+                    assert_eq!(server.count(), 1);
+                    store_settings(
+                        &mut other,
+                        json!({"core.ai.limits": {"dailyTokens": {"local": 1_000_000}}}),
+                    );
+                }
+                return false;
+            }
+            last = params.clone();
+            params["done"] == 2 || params["stopped"] == true
+        },
+    );
+    assert_eq!(last["done"], 2, "{last}");
+    assert!(last.get("stopped").is_none(), "{last}");
+    assert_eq!(server.count(), 2);
+    assert!(reasons.contains(&json!("quota-exceeded")), "{reasons:?}");
+    let hello = c.call(method::HELLO, json!({"protocol": 1})).unwrap();
+    assert_eq!(hello["capabilities"]["ai"]["triage"]["available"], true);
+}
+
+#[test]
+fn a_quota_answer_pauses_triage_and_a_cancel_ends_the_job_at_once() {
+    let e = Serve::start();
+    let server = MockServer::start(|_| Reply::json(402, json!({"error": "no credit"})));
+    let mut c = e.client();
+    c.call(method::SUBSCRIBE, json!({})).unwrap();
+    store_settings(
+        &mut c,
+        stored(
+            &server,
+            json!({"triage": {"enabled": true, "provider": "local"}}),
+        ),
+    );
+    let mut cancelled = None;
+    let mut last = Value::Null;
+    let job = watch_job(
+        &mut c,
+        json!({"accountId": ACCOUNT_ID, "threadIds": ["t1"]}),
+        &mut |c, job, method, params| {
+            if method == method::CAPABILITIES_CHANGED {
+                if params["reason"] == "quota-exceeded" && cancelled.is_none() {
+                    cancelled = Some(Instant::now());
+                    send_cancel(c, job);
+                }
+                return false;
+            }
+            last = params.clone();
+            params["stopped"] == true || params["done"] == params["total"]
+        },
+    );
+    let waited = cancelled.expect("paused").elapsed();
+    assert!(waited < Duration::from_secs(1), "{waited:?}");
+    assert_eq!(
+        last,
+        json!({"jobId": job, "done": 0, "total": 1, "stopped": true})
+    );
+    assert_eq!(server.count(), 1);
+    // The 15-minute default still holds the provider.
+    let hello = c.call(method::HELLO, json!({"protocol": 1})).unwrap();
+    assert_eq!(
+        hello["capabilities"]["ai"]["triage"]["reason"],
+        "quota-exceeded"
+    );
+}
+
+#[test]
+fn turning_triage_off_ends_a_waiting_job() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    let e = Serve::start();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counted = calls.clone();
+    let server = MockServer::start(move |_| {
+        if counted.fetch_add(1, Ordering::SeqCst) == 0 {
+            Reply::json(429, json!({"error": "slow down"})).header("Retry-After", "60")
+        } else {
+            stream_reply(ProviderKind::Ollama, &[TRIAGE_ANSWER])
+        }
+    });
+    let mut c = e.client();
+    c.call(method::SUBSCRIBE, json!({})).unwrap();
+    let features = json!({"triage": {"enabled": true, "provider": "local"}});
+    store_settings(&mut c, stored(&server, features));
+    let mut other = e.client();
+    let mut turned_off = None;
+    let mut last = Value::Null;
+    watch_job(
+        &mut c,
+        json!({"accountId": ACCOUNT_ID, "threadIds": ["t1", "t-pgp"]}),
+        &mut |_, _, method, params| {
+            if method == method::CAPABILITIES_CHANGED {
+                if params["reason"] == "rate-limited" && turned_off.is_none() {
+                    turned_off = Some(Instant::now());
+                    store_settings(
+                        &mut other,
+                        json!({"core.ai.features": {"triage": {"enabled": false}}}),
+                    );
+                }
+                return false;
+            }
+            last = params.clone();
+            params["stopped"] == true || params["done"] == params["total"]
+        },
+    );
+    let waited = turned_off.expect("paused").elapsed();
+    assert!(waited < Duration::from_secs(5), "{waited:?}");
+    assert_eq!(last["stopped"], true, "{last}");
+    assert_eq!(last["done"], 0, "{last}");
+    assert_eq!(server.count(), 1);
+}
+
+#[test]
+fn an_account_stopping_ends_its_job() {
+    let mut e = Serve::start();
+    let server = slow_ollama(Duration::from_secs(3));
+    let mut c = e.client();
+    store_settings(
+        &mut c,
+        stored(
+            &server,
+            json!({"triage": {"enabled": true, "provider": "local"}}),
+        ),
+    );
+    let r = c
+        .call(
+            method::AI_TRIAGE_RUN,
+            json!({"accountId": ACCOUNT_ID, "threadIds": ["t1", "t-pgp"]}),
+        )
+        .unwrap();
+    let job = r["jobId"].as_str().unwrap().to_owned();
+    let deadline = Instant::now() + WAIT;
+    while server.count() == 0 {
+        assert!(Instant::now() < deadline, "the job never asked");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    e.parent(method::ACCOUNT_REMOVE, json!({ "accountId": ACCOUNT_ID }));
+    let progress = loop {
+        let n = c.next_notification().unwrap();
+        if n.method == method::AI_TRIAGE_PROGRESS {
+            break n.params;
+        }
+    };
+    assert_eq!(
+        progress,
+        json!({"jobId": job, "done": 0, "total": 2, "stopped": true})
+    );
+}
+
+#[test]
+fn triage_judges_the_latest_message_not_from_an_alias() {
+    let e = Serve::start();
+    let server = ollama(&[TRIAGE_ANSWER]);
+    let mut c = e.client();
+    store_settings(
+        &mut c,
+        stored(
+            &server,
+            json!({"triage": {"enabled": true, "provider": "local"}}),
+        ),
+    );
+    run_job(
+        &mut c,
+        json!({"accountId": ACCOUNT_ID, "threadIds": ["t-alias"]}),
+    );
+    assert_eq!(wait_for_triage(&mut c, "t-alias")["messageId"], "a1");
+    let sent = server.last().json().to_string();
+    assert!(sent.contains("Did the invoice arrive?"), "{sent}");
+    assert!(!sent.contains("ALIAS REPLY"), "{sent}");
 }

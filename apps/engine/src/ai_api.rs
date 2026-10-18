@@ -149,8 +149,18 @@ impl StoredAi {
         let [providers, features, accounts, limits, include] = KEYS.map(get);
         let limits = limits.unwrap_or(Value::Null);
         StoredAi {
+            // `settings.set` refuses a provider with a key; one stored before that is used
+            // without it.
             providers: match providers {
-                Some(Value::Array(list)) => list,
+                Some(Value::Array(list)) => list
+                    .into_iter()
+                    .map(|mut p| {
+                        if let Some(p) = p.as_object_mut() {
+                            p.remove("apiKey");
+                        }
+                        p
+                    })
+                    .collect(),
                 _ => Vec::new(),
             },
             switches: AiSettings {
@@ -532,9 +542,15 @@ pub(crate) fn owner(statuses: Vec<AccountStatus>, account_id: &str) -> Person {
 pub(crate) enum Bodies<'a> {
     /// Newest first until this many characters; older messages go with `body_omitted`.
     NewestFirst(usize),
-    /// Only the newest message not from `owner` (an address), the one triage judges; the
-    /// others go with their headers alone (docs/ai-plan.md section 4).
-    LatestInbound { owner: &'a str },
+    /// Only the newest message not from one of `owners` (the account's address and its
+    /// aliases'), the one triage judges; the others go with their headers alone
+    /// (docs/ai-plan.md section 4).
+    LatestInbound { owners: &'a [String] },
+}
+
+/// Whether `address` is one of `owners`.
+pub(crate) fn is_own(owners: &[String], address: &str) -> bool {
+    owners.iter().any(|o| o.eq_ignore_ascii_case(address))
 }
 
 /// The thread as the model may see it (docs/ai-plan.md section 5): drafts, hidden
@@ -591,9 +607,9 @@ pub(crate) fn mail_context(
             .is_some_and(|b| !b.trim().is_empty());
         let take = match bodies {
             Bodies::NewestFirst(_) => left > 0,
-            Bodies::LatestInbound { owner } => {
+            Bodies::LatestInbound { owners } => {
                 let from = m["from"][0]["email"].as_str().unwrap_or("");
-                let inbound = !inbound_seen && !from.eq_ignore_ascii_case(owner);
+                let inbound = !inbound_seen && !is_own(owners, from);
                 inbound_seen |= inbound;
                 inbound
             }
@@ -1288,6 +1304,13 @@ mod tests {
         };
         assert_eq!(reason(on("ollama")), None);
         assert_eq!(reason(on("anthropic")).as_deref(), Some("needs-engine-key"));
+        // A key stored before settings.set refused one is not used, nor shown.
+        let mut keyed = on("anthropic");
+        keyed["core.ai.providers"][0]["apiKey"] = json!("sk-stored");
+        assert_eq!(reason(keyed.clone()).as_deref(), Some("needs-engine-key"));
+        let s = stored(keyed);
+        assert!(s.provider("cap-p").unwrap().unwrap().api_key.is_none());
+        assert!(!format!("{s:?}").contains("sk-stored"));
         let caps = capabilities(&stored(on("ollama")));
         let triage = &caps[ai_feature::TRIAGE];
         assert_eq!(

@@ -12,14 +12,19 @@
 //!   with the stored provider; one that needs a key waits for the engine to hold keys
 //!   (desktop-client-plan stage 11), so new mail is triaged by keyless providers only.
 //! - One request in flight per provider across accounts; at most `core.ai.limits.triagePerHour`
-//!   (200) per account per hour; a `rate-limited` or `quota-exceeded` answer, or the daily
-//!   token cap, pauses every account on that provider until `retryAfter` (15 minutes without
-//!   one) and turns `capabilities.ai.triage` unavailable meanwhile.
+//!   (200) per account per hour; a `rate-limited` or `quota-exceeded` answer pauses every
+//!   account on that provider until `retryAfter` (15 minutes without one; 1 s to 24 h), and
+//!   the daily token cap holds them until midnight or until the cap is raised.
+//!   `capabilities.ai.triage` is unavailable meanwhile.
+//! - The switches and the provider are read again before each request, so a thread that
+//!   waited goes to the provider triage uses then, or nowhere once triage is off for the
+//!   account.
+//! - A job's last `ai.triage.progress` has `done == total`, or `stopped` when it ended early.
 //! - A value the user set (`source: "user"`) is never replaced; a thread already triaged for
 //!   its latest inbound message with this prompt version is not asked about again.
 
 use std::collections::VecDeque;
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use ms_ai::{AiError, CancelToken, Category, Person, ProviderConfig, TriageAnswer, PROMPT_VERSION};
@@ -37,7 +42,7 @@ use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
 use crate::ai_api::{
-    self, check_daily_cap, check_switches, failed, internal, invalid, mail_context,
+    self, check_daily_cap, check_switches, failed, internal, invalid, is_own, mail_context,
     resolve_provider, Bodies, StoredAi,
 };
 use crate::dispatch::Reply;
@@ -50,9 +55,16 @@ pub const QUEUE_LIMIT: usize = 1000;
 const JOBS_LIMIT: usize = 8;
 /// How long a `rate-limited` or `quota-exceeded` answer without `Retry-After` pauses triage.
 const DEFAULT_PAUSE: Duration = Duration::from_secs(15 * 60);
+/// The bounds of a provider's `Retry-After`: 0 would have triage ask again at once, and a
+/// huge value would overflow the deadline. The daily cap runs to midnight, under a day.
+const MIN_PAUSE: Duration = Duration::from_secs(1);
+const MAX_PAUSE: Duration = Duration::from_secs(24 * 3600);
 const HOUR: Duration = Duration::from_secs(3600);
 /// How often a waiting worker looks at the account's stop flag.
 const STOP_POLL: Duration = Duration::from_millis(500);
+/// How long a worker waits on a pause, the daily cap or the hourly limit before it reads the
+/// settings again: a cap raised or triage turned off meanwhile applies within this.
+const RECHECK: Duration = Duration::from_secs(1);
 /// `ai.triage.run` without `threadIds` or `sinceDays`.
 const DEFAULT_SINCE_DAYS: u32 = 7;
 /// What a value set by the user carries (`source`), which triage never replaces.
@@ -63,13 +75,44 @@ const USER_SOURCE: &str = "user";
 /// The progress callback of a job: `ai.triage.progress` to the connection that started it.
 pub type Progress = Box<dyn Fn(&AiTriageProgressParams) + Send + Sync>;
 
-/// One `ai.triage.run`: its threads, the provider it resolved and its progress callback.
+/// The provider triage asks, looked up again before each request.
+enum Source {
+    /// The one the triage feature names (new mail, and `ai.triage.run` without a provider).
+    Feature,
+    /// The stored provider `ai.triage.run` named (`provider`).
+    Stored(String),
+    /// The config a local client sent with `ai.triage.run`.
+    Given(ProviderConfig),
+}
+
+impl Source {
+    /// The provider as the store has it now; `None` once it is gone or can't run.
+    fn config(&self, stored: &StoredAi) -> Option<ProviderConfig> {
+        let config = match self {
+            Source::Given(config) => return Some(config.clone()),
+            Source::Stored(id) => stored.provider(id)?.ok()?,
+            Source::Feature => resolve_provider(
+                &AiProviderParams::default(),
+                Some(ai_feature::TRIAGE),
+                stored,
+            )
+            .ok()?,
+        };
+        config.check().is_ok().then_some(config)
+    }
+}
+
+/// One `ai.triage.run`: its threads, its provider and its progress callback.
 pub struct Job {
     id: String,
     thread_ids: Vec<String>,
-    config: ProviderConfig,
+    source: Source,
     token: CancelToken,
     progress: Progress,
+    /// Woken by a cancel, so a worker waiting on the job's behalf sees it at once.
+    feed: Weak<Feed>,
+    /// Threads done so far, and whether the last progress went out.
+    reported: Mutex<(usize, bool)>,
 }
 
 impl Job {
@@ -81,13 +124,35 @@ impl Job {
     /// is dropped.
     pub fn cancel(&self) {
         self.token.cancel();
+        if let Some(feed) = self.feed.upgrade() {
+            feed.changed.notify_all();
+        }
     }
 
     fn report(&self, done: usize) {
+        self.send(Some(done));
+    }
+
+    /// The job ended before its last thread: one last progress with `stopped`, unless the
+    /// last one went out already.
+    fn stop(&self) {
+        self.send(None);
+    }
+
+    fn send(&self, done: Option<usize>) {
+        let mut reported = self.reported.lock().unwrap_or_else(|e| e.into_inner());
+        if reported.1 {
+            return;
+        }
+        let total = self.thread_ids.len();
+        let stopped = done.is_none();
+        let done = done.unwrap_or(reported.0);
+        *reported = (done, stopped || done >= total);
         (self.progress)(&AiTriageProgressParams {
             job_id: self.id.clone(),
             done,
-            total: self.thread_ids.len(),
+            total,
+            stopped,
         });
     }
 }
@@ -156,19 +221,26 @@ impl Feed {
         })
     }
 
-    /// The account stopped: the worker returns, the request in flight is dropped and
-    /// [`Feed::find`] no longer names the feed.
+    /// The account stopped: the worker returns, the request in flight is dropped, the jobs
+    /// running and queued end with a `stopped` progress and [`Feed::find`] no longer names
+    /// the feed.
     pub fn close(self: &Arc<Self>) {
-        {
+        let jobs: Vec<Arc<Job>> = {
             let mut st = self.lock();
             st.closed = true;
-            st.items.clear();
-            if let Some(job) = &st.running {
-                job.cancel();
-            }
-        }
+            let queued = st.items.drain(..).filter_map(|item| match item {
+                Item::Job(job) => Some(job),
+                Item::New { .. } => None,
+            });
+            let queued: Vec<Arc<Job>> = queued.collect();
+            st.running.take().into_iter().chain(queued).collect()
+        };
         self.cancel.cancel();
         self.changed.notify_all();
+        for job in jobs {
+            job.cancel();
+            job.stop();
+        }
         FEEDS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -367,6 +439,7 @@ pub fn start(ctx: &WorkerContext, feed: Arc<Feed>) {
             store: None,
             reads: None,
             recent: VecDeque::new(),
+            capped: None,
         }
         .run()
     }) {
@@ -378,8 +451,18 @@ pub fn start(ctx: &WorkerContext, feed: Arc<Feed>) {
 #[derive(Debug, PartialEq, Eq)]
 enum Flow {
     Next,
-    /// The account is stopping or the job was cancelled.
+    /// The account is stopping, or the job was cancelled or can't go on.
     Stop,
+}
+
+/// What [`Worker::gates`] found.
+enum Gates {
+    /// The request may go.
+    Open,
+    /// It waited; the caller reads the settings again and asks once more.
+    Waited,
+    /// The account is stopping or the job was cancelled.
+    Stopping,
 }
 
 struct Worker {
@@ -391,6 +474,8 @@ struct Worker {
     reads: Option<ReadStore>,
     /// When this account's triage requests in the last hour went out.
     recent: VecDeque<Instant>,
+    /// The provider whose daily cap holds this account's triage, while it does.
+    capped: Option<String>,
 }
 
 impl Worker {
@@ -416,39 +501,22 @@ impl Worker {
     }
 
     fn new_mail(&mut self, thread_id: &str) -> Flow {
-        let stored = self.stored();
-        if check_switches(stored.switches(), self.account_id(), ai_feature::TRIAGE).is_err() {
-            return Flow::Next;
-        }
-        let Ok(config) = resolve_provider(
-            &AiProviderParams::default(),
-            Some(ai_feature::TRIAGE),
-            &stored,
-        ) else {
-            return Flow::Next;
-        };
-        if config.check().is_err() {
-            return Flow::Next;
-        }
         let token = self.feed.cancel.clone();
-        self.triage(thread_id, &config, &token)
+        self.triage(thread_id, &Source::Feature, &token, Flow::Next)
     }
 
     fn job(&mut self, job: &Arc<Job>) -> Flow {
-        let stored = self.stored();
-        let enabled =
-            check_switches(stored.switches(), self.account_id(), ai_feature::TRIAGE).is_ok();
-        if !enabled || job.thread_ids.is_empty() {
-            job.report(job.thread_ids.len());
-            return Flow::Next;
-        }
         for (i, thread_id) in job.thread_ids.iter().enumerate() {
             if job.token.is_cancelled()
-                || self.triage(thread_id, &job.config, &job.token) == Flow::Stop
+                || self.triage(thread_id, &job.source, &job.token, Flow::Stop) == Flow::Stop
             {
+                job.stop();
                 return Flow::Stop;
             }
             job.report(i + 1);
+        }
+        if job.thread_ids.is_empty() {
+            job.report(0);
         }
         Flow::Next
     }
@@ -466,26 +534,38 @@ impl Worker {
         self.reads.as_ref()
     }
 
-    /// Triages `thread_id` with `config`, waiting out the provider's pause and the hourly
-    /// limit first.
-    fn triage(&mut self, thread_id: &str, config: &ProviderConfig, token: &CancelToken) -> Flow {
+    /// Triages `thread_id` on the provider `source` names, once the provider's pause, its
+    /// daily cap and the account's hourly limit let it. The switches and the provider are
+    /// read again after every wait (A5); `off` is the flow once triage is off for the
+    /// account or the provider is gone.
+    fn triage(&mut self, thread_id: &str, source: &Source, token: &CancelToken, off: Flow) -> Flow {
         loop {
-            if self.wait_for_gates(&config.id) {
+            if token.is_cancelled() {
                 return Flow::Stop;
             }
             let stored = self.stored();
+            if check_switches(stored.switches(), self.account_id(), ai_feature::TRIAGE).is_err() {
+                return off;
+            }
+            let Some(config) = source.config(&stored) else {
+                return off;
+            };
+            match self.gates(&config.id, &stored, token) {
+                Gates::Open => {}
+                Gates::Waited => continue,
+                Gates::Stopping => return Flow::Stop,
+            }
             let Some((context, latest)) = self.context(thread_id, &stored) else {
                 return Flow::Next;
             };
-            if let Err(e) = check_daily_cap(&config.id, stored.daily_tokens(&config.id)) {
-                self.pause(&config.id, &e);
-                continue;
-            }
             let answer = {
                 let gate = gate(&config.id);
                 let _in_flight = gate.in_flight.lock().unwrap_or_else(|e| e.into_inner());
-                // Another account's answer may have paused the provider meanwhile.
-                if paused(&config.id).is_some() {
+                // Another account's answer may have paused the provider or used up its daily
+                // cap meanwhile; the next round waits it out.
+                if paused(&config.id).is_some()
+                    || check_daily_cap(&config.id, stored.daily_tokens(&config.id)).is_err()
+                {
                     continue;
                 }
                 self.recent.push_back(Instant::now());
@@ -496,12 +576,12 @@ impl Worker {
                         return Flow::Stop;
                     }
                 };
-                ai.triage_until(config, &context, Some(token))
+                ai.triage_until(&config, &context, Some(token))
             };
             return match answer {
                 Ok(answer) => self.save(thread_id, &latest, &answer),
                 Err(e @ (AiError::RateLimited { .. } | AiError::QuotaExceeded { .. })) => {
-                    self.pause(&config.id, &e);
+                    pause(&config.id, &e);
                     continue;
                 }
                 Err(AiError::Cancelled) => Flow::Stop,
@@ -522,7 +602,7 @@ impl Worker {
         stored: &StoredAi,
     ) -> Option<(ms_ai::MailContext, String)> {
         let account = self.ctx.account.clone();
-        let owner = account.email_address().to_owned();
+        let owners: Vec<String> = account.own_addresses().map(str::to_owned).collect();
         let reads = self.reads()?;
         let thread = reads.thread(account.id(), thread_id).ok()??;
         let existing = metadata_value(&thread, AI_TRIAGE_PLUGIN);
@@ -533,14 +613,14 @@ impl Worker {
             reads,
             account.id(),
             thread_id,
-            Bodies::LatestInbound { owner: &owner },
+            Bodies::LatestInbound { owners: &owners },
         )
         .ok()?;
         let latest = context
             .messages
             .iter()
             .rev()
-            .find(|m| !m.from.address.eq_ignore_ascii_case(&owner))?
+            .find(|m| !is_own(&owners, &m.from.address))?
             .id
             .clone();
         let current = existing.is_some_and(|v| {
@@ -551,67 +631,80 @@ impl Worker {
             return None;
         }
         let name = account.as_json()["name"].as_str().unwrap_or("").to_owned();
-        context.owner = Person::new(name, owner);
+        context.owner = Person::new(name, account.email_address().to_owned());
         context.include_addresses = stored.switches().include_addresses;
         Some((context, latest))
     }
 
-    /// Waits out the provider's pause, then this account's hourly limit. True when the
-    /// account is stopping.
-    fn wait_for_gates(&mut self, provider_id: &str) -> bool {
-        let ctx = self.ctx.clone();
-        let stopping = || ctx.is_stopping();
-        loop {
-            let g = gate(provider_id);
-            let until = g
-                .pause
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .map(|p| p.0);
-            match until {
-                Some(until) if until > Instant::now() => {
-                    if self.feed.wait_until(until, &stopping) {
-                        return true;
-                    }
-                }
-                Some(_) => {
-                    let mut pause = g.pause.lock().unwrap_or_else(|e| e.into_inner());
-                    if pause.is_some_and(|(until, _)| until <= Instant::now()) {
-                        *pause = None;
-                        drop(pause);
-                        info!("{}", ms_core::logmsg::ai_triage_resumed());
-                        capabilities_changed();
-                    }
-                }
-                None => break,
-            }
-        }
-        let per_hour = self.stored().triage_per_hour().max(1) as usize;
-        loop {
-            while self.recent.front().is_some_and(|t| t.elapsed() >= HOUR) {
-                self.recent.pop_front();
-            }
-            if self.recent.len() < per_hour {
-                return false;
-            }
-            let until = self.recent[0] + HOUR;
-            if self.feed.wait_until(until, &stopping) {
-                return true;
-            }
-        }
-    }
-
-    fn pause(&self, provider_id: &str, e: &AiError) {
-        let wait = e.retry_after().unwrap_or(DEFAULT_PAUSE);
-        *gate(provider_id)
+    /// Whether a request to `provider_id` may go: not while the provider is paused or used
+    /// its daily cap, nor past this account's hourly limit. One wait lasts [`RECHECK`] at
+    /// most.
+    fn gates(&mut self, provider_id: &str, stored: &StoredAi, token: &CancelToken) -> Gates {
+        let g = gate(provider_id);
+        let until = g
             .pause
             .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some((Instant::now() + wait, e.key()));
-        warn!(
-            "{}",
-            ms_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
-        );
-        capabilities_changed();
+            .unwrap_or_else(|e| e.into_inner())
+            .map(|p| p.0);
+        match until {
+            Some(until) if until > Instant::now() => return self.wait(until, token),
+            Some(_) => {
+                let mut pause = g.pause.lock().unwrap_or_else(|e| e.into_inner());
+                if pause.is_some_and(|(until, _)| until <= Instant::now()) {
+                    *pause = None;
+                    drop(pause);
+                    info!("{}", ms_core::logmsg::ai_triage_resumed());
+                    capabilities_changed();
+                }
+            }
+            None => {}
+        }
+        // Not a pause of the gate: the cap is read from the settings each time, so raising
+        // it lets triage go on at once.
+        let held = self.capped.as_deref() == Some(provider_id);
+        match check_daily_cap(provider_id, stored.daily_tokens(provider_id)) {
+            Err(e) => {
+                if !held {
+                    self.capped = Some(provider_id.to_owned());
+                    let wait = e.retry_after().unwrap_or_default();
+                    warn!(
+                        "{}",
+                        ms_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
+                    );
+                    capabilities_changed();
+                }
+                return self.wait(Instant::now() + RECHECK, token);
+            }
+            Ok(()) if held => {
+                self.capped = None;
+                info!("{}", ms_core::logmsg::ai_triage_resumed());
+                capabilities_changed();
+            }
+            Ok(()) => {}
+        }
+        while self.recent.front().is_some_and(|t| t.elapsed() >= HOUR) {
+            self.recent.pop_front();
+        }
+        let per_hour = stored.triage_per_hour().max(1) as usize;
+        if self.recent.len() >= per_hour {
+            let until = self.recent[0] + HOUR;
+            return self.wait(until, token);
+        }
+        Gates::Open
+    }
+
+    /// Sleeps until `until`, [`RECHECK`] at most.
+    fn wait(&self, until: Instant, token: &CancelToken) -> Gates {
+        let ctx = &self.ctx;
+        let stopping = || ctx.is_stopping() || token.is_cancelled();
+        if self
+            .feed
+            .wait_until(until.min(Instant::now() + RECHECK), &stopping)
+        {
+            Gates::Stopping
+        } else {
+            Gates::Waited
+        }
     }
 
     /// Stores the answer as the thread's `tern-ai-triage` value, unless the user set one
@@ -671,6 +764,28 @@ fn is_users(value: &Value) -> bool {
     value["source"].as_str() == Some(USER_SOURCE)
 }
 
+/// A `rate-limited` or `quota-exceeded` answer pauses every account on the provider.
+fn pause(provider_id: &str, e: &AiError) {
+    let wait = pause_for(e);
+    *gate(provider_id)
+        .pause
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some((Instant::now() + wait, e.key()));
+    warn!(
+        "{}",
+        ms_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
+    );
+    capabilities_changed();
+}
+
+/// The provider's `Retry-After` within [`MIN_PAUSE`] and [`MAX_PAUSE`], [`DEFAULT_PAUSE`]
+/// without one.
+fn pause_for(e: &AiError) -> Duration {
+    e.retry_after()
+        .unwrap_or(DEFAULT_PAUSE)
+        .clamp(MIN_PAUSE, MAX_PAUSE)
+}
+
 // -- Socket methods -------------------------------------------------------------------------
 
 /// `ai.triage.run`: checks the account and provider, picks the threads and queues the job
@@ -688,6 +803,11 @@ pub fn run(
     check_switches(stored.switches(), &p.account_id, ai_feature::TRIAGE)?;
     let config = resolve_provider(&p.provider, Some(ai_feature::TRIAGE), stored)?;
     config.check().map_err(failed)?;
+    let source = match (&p.provider.config, &p.provider.provider) {
+        (Some(c), _) if !c.is_null() => Source::Given(config),
+        (_, Some(id)) => Source::Stored(id.clone()),
+        _ => Source::Feature,
+    };
     let thread_ids = match p.thread_ids {
         Some(ids) => {
             let mut unique: Vec<String> = Vec::new();
@@ -719,9 +839,11 @@ pub fn run(
     let job = Arc::new(Job {
         id: uuid::Uuid::new_v4().to_string(),
         thread_ids,
-        config,
+        source,
         token: CancelToken::new(),
         progress,
+        feed: Arc::downgrade(&feed),
+        reported: Mutex::new((0, false)),
     });
     let value = serde_json::to_value(AiTriageRunResult {
         job_id: job.id.clone(),
@@ -816,19 +938,26 @@ mod tests {
         assert!(feed.cancel.is_cancelled());
     }
 
+    type Sent = Arc<Mutex<Vec<AiTriageProgressParams>>>;
+
+    fn job_on(feed: &Arc<Feed>, id: &str, threads: usize, sent: &Sent) -> Arc<Job> {
+        let sent = sent.clone();
+        Arc::new(Job {
+            id: id.to_owned(),
+            thread_ids: (0..threads).map(|i| format!("t{i}")).collect(),
+            source: Source::Feature,
+            token: CancelToken::new(),
+            progress: Box::new(move |p| sent.lock().unwrap().push(p.clone())),
+            feed: Arc::downgrade(feed),
+            reported: Mutex::new((0, false)),
+        })
+    }
+
     #[test]
     fn jobs_are_bounded_and_cancelled_with_the_feed() {
         let feed = Feed::register("jobs-test");
-        let job = |id: &str| {
-            Arc::new(Job {
-                id: id.to_owned(),
-                thread_ids: vec!["t".into()],
-                config: serde_json::from_value(json!({"id": "p", "kind": "ollama", "model": "m"}))
-                    .unwrap(),
-                token: CancelToken::new(),
-                progress: Box::new(|_| {}),
-            })
-        };
+        let sent = Sent::default();
+        let job = |id: &str| job_on(&feed, id, 1, &sent);
         for i in 0..JOBS_LIMIT {
             feed.push_job(job(&format!("j{i}")), || {}).unwrap();
         }
@@ -846,6 +975,87 @@ mod tests {
             feed.push_job(job("late"), || {}).unwrap_err().code,
             code::ACCOUNT_STOPPED
         );
+    }
+
+    #[test]
+    fn a_closing_feed_ends_its_jobs_with_a_stopped_progress() {
+        let feed = Feed::register("stop-test");
+        let sent = Sent::default();
+        feed.push_job(job_on(&feed, "running", 3, &sent), || {})
+            .unwrap();
+        feed.push_job(job_on(&feed, "queued", 2, &sent), || {})
+            .unwrap();
+        let Some(Item::Job(running)) = feed.next(&|| false) else {
+            panic!("a job")
+        };
+        running.report(1);
+        feed.close();
+        // The worker's own reports come too late.
+        running.report(2);
+        running.stop();
+        let progress = |id: &str, done, total, stopped| AiTriageProgressParams {
+            job_id: id.into(),
+            done,
+            total,
+            stopped,
+        };
+        assert_eq!(
+            *sent.lock().unwrap(),
+            [
+                progress("running", 1, 3, false),
+                progress("running", 1, 3, true),
+                progress("queued", 0, 2, true),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_finished_job_sends_no_stopped_progress() {
+        let feed = Feed::register("finish-test");
+        let sent = Sent::default();
+        let job = job_on(&feed, "j", 1, &sent);
+        job.report(1);
+        job.stop();
+        assert_eq!(sent.lock().unwrap().len(), 1);
+        assert!(!sent.lock().unwrap()[0].stopped);
+        feed.close();
+    }
+
+    #[test]
+    fn a_cancel_wakes_a_waiting_worker() {
+        let feed = Feed::register("wake-test");
+        let job = job_on(&feed, "j", 1, &Sent::default());
+        let cancelling = job.clone();
+        let canceller = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            cancelling.cancel();
+        });
+        let started = Instant::now();
+        let token = job.token.clone();
+        assert!(feed.wait_until(started + Duration::from_secs(10), &|| token.is_cancelled()));
+        assert!(started.elapsed() < STOP_POLL, "{:?}", started.elapsed());
+        canceller.join().unwrap();
+        feed.close();
+    }
+
+    #[test]
+    fn retry_after_is_clamped() {
+        let limited = |retry_after| AiError::RateLimited { retry_after };
+        assert_eq!(pause_for(&limited(Some(Duration::ZERO))), MIN_PAUSE);
+        assert_eq!(pause_for(&limited(Some(Duration::MAX))), MAX_PAUSE);
+        assert_eq!(
+            pause_for(&limited(Some(Duration::from_secs(30)))),
+            Duration::from_secs(30)
+        );
+        assert_eq!(pause_for(&limited(None)), DEFAULT_PAUSE);
+        let quota = AiError::QuotaExceeded {
+            status: Some(402),
+            retry_after: None,
+        };
+        assert_eq!(pause_for(&quota), DEFAULT_PAUSE);
+        // A deadline far off doesn't overflow.
+        pause("clamp-test", &limited(Some(Duration::MAX)));
+        assert_eq!(paused("clamp-test"), Some("rate-limited"));
     }
 
     #[test]
