@@ -9,17 +9,33 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ms_ipc::SearchParams;
 
-/// The local IANA zone: `TZ` when set (a zoneinfo path is read from its `zoneinfo/` part),
-/// else the system's. `None` when neither is known; the engine then reads dates in UTC.
+/// The local IANA zone: `TZ` when it names one (a zoneinfo path is read from its
+/// `zoneinfo/` part), else the system's. A POSIX `TZ` rule such as `UTC0` or
+/// `EST5EDT,M3.2.0,M11.1.0` isn't a name the engine reads, so the system's zone is used.
+/// `None` when neither is known; the engine then reads dates in UTC.
 pub fn local_time_zone() -> Option<String> {
-    if let Some(tz) = std::env::var("TZ").ok().filter(|t| !t.is_empty()) {
-        let tz = tz.trim_start_matches(':');
-        let name = tz.rsplit_once("zoneinfo/").map_or(tz, |(_, n)| n);
-        if !name.starts_with('/') && !name.is_empty() {
-            return Some(name.to_owned());
-        }
-    }
-    iana_time_zone::get_timezone().ok()
+    std::env::var("TZ")
+        .ok()
+        .and_then(|tz| zone_from_tz(&tz))
+        .or_else(|| iana_time_zone::get_timezone().ok())
+}
+
+/// The IANA name in a `TZ` value, if it looks like one: `Area/City` (`Etc/GMT+5` too) or
+/// a name of letters only (`UTC`, `GMT`).
+fn zone_from_tz(tz: &str) -> Option<String> {
+    let tz = tz.trim_start_matches(':');
+    let name = tz.rsplit_once("zoneinfo/").map_or(tz, |(_, n)| n);
+    let iana_chars = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '+'));
+    let looks_iana = if name.contains('/') {
+        !name.starts_with('/')
+            && !name.ends_with('/')
+            && name.starts_with(|c: char| c.is_ascii_alphabetic())
+    } else {
+        name.chars().all(|c| c.is_ascii_alphabetic())
+    };
+    (!name.is_empty() && iana_chars && looks_iana).then(|| name.to_owned())
 }
 
 /// Now, in unix seconds.
@@ -52,5 +68,23 @@ mod tests {
         let v = serde_json::to_value(&p).unwrap();
         assert_eq!(v["query"], "from:ann");
         assert!(v.get("accountId").is_none());
+    }
+
+    #[test]
+    fn tz_names_and_rules() {
+        for (tz, name) in [
+            ("Europe/Lisbon", Some("Europe/Lisbon")),
+            (":America/New_York", Some("America/New_York")),
+            ("/usr/share/zoneinfo/Asia/Tokyo", Some("Asia/Tokyo")),
+            ("Etc/GMT+5", Some("Etc/GMT+5")),
+            ("UTC", Some("UTC")),
+            ("", None),
+            ("/etc/localtime", None),
+            ("UTC0", None),
+            ("EST5EDT,M3.2.0,M11.1.0", None),
+            ("<+03>-3", None),
+        ] {
+            assert_eq!(zone_from_tz(tz).as_deref(), name, "{tz:?}");
+        }
     }
 }
