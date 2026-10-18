@@ -39,7 +39,8 @@ export class FakeEngine {
   // account.add responses held back by account id, when set.
   holdAdds = new Set<string>();
   heldAdds: (() => void)[] = [];
-  // The next account.add result by account id, instead of `running`.
+  // The next account.add result by account id, instead of `running` (and `stored` once
+  // keepsAccounts() was called).
   addResults: { [id: string]: any } = {};
   exitOnShutdown = true;
   // False stands in for an engine that could not bind and never reads stdin.
@@ -178,7 +179,14 @@ export class FakeEngine {
         return this.answerList ? respond({ accounts: [] }) : null;
       case 'account.add': {
         const id = req.params.account.id;
-        const result = this.addResults[id] || { accountId: id, state: 'running' };
+        // An engine that keeps the accounts stores the secrets the add carries.
+        const hello = this.socketResults.hello;
+        const keeps = !!hello && (hello.features || []).includes('accounts');
+        const result = this.addResults[id] || {
+          accountId: id,
+          state: 'running',
+          ...(keeps ? { stored: true } : {}),
+        };
         delete this.addResults[id];
         const send = () => respond(result);
         if (this.holdAdds.has(id)) {

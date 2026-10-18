@@ -216,11 +216,28 @@ describe('the serve engine client', function () {
     expect(fake.stdinOf('account.remove')).toEqual([]);
   });
 
-  it('removes an account the engine started that the app no longer lists', async function () {
-    fake.keepsAccounts(['a1', 'a2', 'gone']);
+  it('removes only the accounts the app deleted from an engine that has others', async function () {
+    fake.keepsAccounts(['a1', 'a2', 'other', 'gone']);
+    let deleted = ['gone'];
+    const removed: string[] = [];
+    host.removedAccounts = () => deleted;
+    host.onAccountRemoved = (id) => {
+      removed.push(id);
+      deleted = deleted.filter((d) => d !== id);
+    };
     await started();
-    await until('the remove', () => fake.stdinOf('account.remove').length === 1);
-    expect(fake.stdinOf('account.remove')[0].params).toEqual({ accountId: 'gone' });
+    await until('the remove', () => removed.length === 1);
+    expect(fake.stdinOf('account.remove').map((r) => r.params)).toEqual([{ accountId: 'gone' }]);
+    expect(removed).toEqual(['gone']);
+
+    // A later delete while the engine runs goes the usual way and is acknowledged too.
+    accounts = [{ id: 'a1' }];
+    deleted = ['a2'];
+    await client.ensure();
+    await until('the second remove', () => removed.length === 2);
+    await client.ensure();
+    await tick();
+    expect(fake.stdinOf('account.remove').map((r) => r.params.accountId)).toEqual(['gone', 'a2']);
   });
 
   it('keeps an account reset with account.reset registered', async function () {

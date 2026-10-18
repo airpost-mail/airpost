@@ -17,8 +17,10 @@ it restarts a stopped account on its own, so a `stopped` with `retryAt` keeps th
 only tells the host the account is down; one without `retryAt` is the engine giving up (or,
 with `authFailed`, the server refusing the credentials), and the account isn't added again
 until "Try Again" or new settings. account.remove there unregisters the account and deletes
-its secrets, so it is sent only for accounts the host no longer lists, never to restart one,
-and accounts the engine registered that the host doesn't list are removed once it says hello.
+its secrets, so it is sent only for accounts the host deleted, never to restart one. An
+account the engine has that the host doesn't list is left alone: another client (`tern account
+add`, the web) may have added it. Only the ids the host says it deleted (`removedAccounts`, kept
+across launches for a delete made while the engine was down) are removed once it says hello.
 */
 import type { EngineServeProcess, MailsyncProcessExit, ResetOptions } from './mailsync-process';
 import {
@@ -28,7 +30,6 @@ import {
   ErrorCode,
   EXIT_SOCKET_IN_USE,
   Feature,
-  HelloResult,
   SyncErrorJSON,
 } from './engine-protocol';
 
@@ -136,6 +137,10 @@ export interface EngineAccount {
   id: string;
 }
 
+// config.json: the ids of accounts deleted in the app that an engine with Feature.Accounts may
+// still have registered, until its account.remove answers.
+export const CONFIG_ACCOUNTS_TO_REMOVE_KEY = 'accountsToRemoveFromEngine';
+
 // The account JSON with its secrets, as account.add takes it.
 export interface AccountJSON extends CrashKeyJSON {
   [key: string]: any;
@@ -159,6 +164,10 @@ export interface EngineClientHost {
   onAccountsChanged?(): void;
   // account.add answered that the engine's secret store took the account's secrets.
   onAccountStored?(accountId: string): void;
+  // Accounts the host deleted that the engine may still have registered.
+  removedAccounts?(): string[];
+  // The engine no longer has one of those: account.remove answered, or it didn't know it.
+  onAccountRemoved?(accountId: string): void;
 }
 
 interface Entry {
@@ -188,6 +197,8 @@ export class EngineClient {
   // Accounts being reset or relaunched, which ensure() leaves alone.
   held = new Map<string, number>();
   removals = new Map<string, Removal>();
+  // removedAccounts() whose account.remove is out.
+  _removingDeleted = new Set<string>();
   _greetings = new WeakMap<EngineServeProcess, Promise<void>>();
   // Engines in a row that exited because the socket was in use.
   inUseExits = 0;
@@ -217,6 +228,7 @@ export class EngineClient {
         this._remove(id);
       }
     }
+    this._removeDeleted(this.engine);
     const missing = wanted.filter((a) => !this.entries.has(a.id) && !this.held.has(a.id));
     return missing.length ? this._add(missing, { force: false }) : Promise.resolve();
   }
@@ -358,20 +370,43 @@ export class EngineClient {
     this.host.onAccountExited(accountId);
   }
 
-  // Removes the accounts a registry engine started that the host doesn't list, as when one
-  // was deleted while the engine was down.
-  _reconcile(engine: EngineServeProcess, hello: HelloResult) {
-    if (this.engine !== engine || !this.registry()) return;
+  // Sends account.remove for the accounts the host deleted that a registry engine may still
+  // have, as when one was deleted while the engine was down or while a reset held it. Accounts
+  // it has for any other reason stay.
+  _removeDeleted(engine: EngineServeProcess) {
+    if (!engine || this.engine !== engine || !this.registry() || !this.host.removedAccounts) {
+      return;
+    }
     const wanted = new Set(this.host.accounts().map((a) => a.id));
-    for (const { accountId } of hello.accounts || []) {
-      if (wanted.has(accountId) || this.entries.has(accountId) || this.held.has(accountId)) {
+    for (const accountId of this.host.removedAccounts()) {
+      if (
+        wanted.has(accountId) ||
+        this.entries.has(accountId) ||
+        this.held.has(accountId) ||
+        this._removingDeleted.has(accountId)
+      ) {
         continue;
       }
-      console.log(`Removing account ${accountId}: the engine has it but the app doesn't`);
-      engine.removeAccount(accountId).catch((err) => {
-        if (!err.engineExited) console.warn(`account.remove ${accountId} failed: ${err.message}`);
-      });
+      this._removingDeleted.add(accountId);
+      console.log(`Removing account ${accountId} from the engine: it was deleted in the app`);
+      engine
+        .removeAccount(accountId)
+        .then(
+          () => this._deletedGone(accountId),
+          (err) => {
+            if (err.code === ErrorCode.UnknownAccount) {
+              this._deletedGone(accountId);
+            } else if (!err.engineExited) {
+              console.warn(`account.remove ${accountId} failed: ${err.message}`);
+            }
+          }
+        )
+        .finally(() => this._removingDeleted.delete(accountId));
     }
+  }
+
+  _deletedGone(accountId: string) {
+    if (this.host.onAccountRemoved) this.host.onAccountRemoved(accountId);
   }
 
   _changed() {
@@ -411,7 +446,7 @@ export class EngineClient {
         engine.once('close', () => resolve());
       })
     );
-    engine.on('hello', (hello: HelloResult) => this._reconcile(engine, hello));
+    engine.on('hello', () => this._removeDeleted(engine));
     engine.on('close', (exit: MailsyncProcessExit) => this._onEngineClose(engine, exit));
     try {
       engine.serve();
@@ -582,9 +617,14 @@ export class EngineClient {
     const engine = this.engine;
     const removed = engine
       ? engine.removeAccount(accountId).then(
-          (result) => (result && result.stillRunning) || [],
+          (result) => {
+            this._deletedGone(accountId);
+            return (result && result.stillRunning) || [];
+          },
           (err) => {
-            if (!err.engineExited && err.code !== ErrorCode.UnknownAccount) {
+            if (err.code === ErrorCode.UnknownAccount) {
+              this._deletedGone(accountId);
+            } else if (!err.engineExited) {
               console.warn(`account.remove ${accountId} failed: ${err.message}`);
             }
             return [] as string[];

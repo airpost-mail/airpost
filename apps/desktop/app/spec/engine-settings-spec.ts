@@ -21,9 +21,11 @@ import { resurfacingBodies } from '../src/resurfacing';
 import { EngineServeProcess } from '../src/mailsync-process';
 import { FakeEngine, until } from './fake-serve-engine';
 
-// The supervisor reads only `accounts` and the log level from the main process's Config.
+// The supervisor reads only `accounts`, the deleted ones and the log level from the main
+// process's Config.
 const noAccounts: SupervisorConfig = {
   get: () => undefined,
+  set: () => {},
   onDidChange: () => ({ dispose() {} }),
 };
 

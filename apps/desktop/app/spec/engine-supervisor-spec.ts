@@ -478,6 +478,8 @@ describe('the engine supervisor', function () {
         secrets: [],
       };
       await started();
+      // account.add answered `stored` for both; the copies stay until the move completes.
+      for (let i = 0; i < 20; i++) await tick();
 
       expect(config.values.credentialsMovedToEngine).toBe(undefined);
       expect(addedPasswords()).toEqual([
@@ -485,12 +487,42 @@ describe('the engine supervisor', function () {
         ['a2', 'pw-a2'],
       ]);
       expect(keys()['a1@example.com-imap']).toBe('pw-a1');
+      expect(keys()['a2@example.com-imap']).toBe('pw-a2');
+    });
+
+    it('moves the secrets even with an account that has none to move', async function () {
+      config.values.accounts = [configAccount('a1'), configAccount('a2'), configAccount('a4')];
+      fake.keepsAccounts([]);
+      supervisor.start();
+      await until('the adds', () => fake.stdinOf('account.add').length === 3);
+
+      const [imported] = fake.stdinOf('credentials.import');
+      expect(imported.params.accounts.map((a) => a.id)).toEqual(['a1', 'a2']);
+      expect(config.values.credentialsMovedToEngine).toBe(true);
+    });
+
+    it('remembers an account deleted while no engine runs and removes it from the next', async function () {
+      config.values.credentialsMovedToEngine = true;
+      config.values.credentials = Buffer.from('{}');
+      config.values.accountsToRemoveFromEngine = ['gone'];
+      fake.keepsAccounts(['a1', 'a2', 'other', 'gone']);
+      await started();
+      await until('the remove', () => fake.stdinOf('account.remove').length === 1);
+      expect(fake.stdinOf('account.remove')[0].params).toEqual({ accountId: 'gone' });
+      await until('the list emptied', () => config.values.accountsToRemoveFromEngine.length === 0);
+
+      config.set('accounts', [configAccount('a1')]);
+      expect(config.values.accountsToRemoveFromEngine).toEqual(['a2']);
+      await until('the second remove', () => fake.stdinOf('account.remove').length === 2);
+      await until('the list emptied', () => config.values.accountsToRemoveFromEngine.length === 0);
+      expect(fake.stdinOf('account.remove').map((r) => r.params.accountId)).toEqual(['gone', 'a2']);
     });
 
     it('joins a detached engine on its socket and leaves it running', async function () {
       config.values.credentialsMovedToEngine = true;
       config.values.credentials = Buffer.from('{}');
-      fake.keepsAccounts(['a1', 'a2'], { detached: true });
+      // `other` was added by another client (`tern account add`, the web).
+      fake.keepsAccounts(['a1', 'a2', 'other'], { detached: true });
       fake.socketResults['account.add'] = { state: 'running' };
       const joined = new EngineSupervisor({
         configDirPath: dir,
@@ -511,6 +543,8 @@ describe('the engine supervisor', function () {
       expect(fake.stdin).toEqual([]);
       expect(fake.socketOf('account.add').map((r) => r.params.account.id)).toEqual(['a1', 'a2']);
       expect(fake.socketOf('credentials.import')).toEqual([]);
+      for (let i = 0; i < 20; i++) await tick();
+      expect(fake.socketOf('account.remove')).toEqual([]);
       await joined.shutdown();
       expect(fake.socketOf('engine.shutdown')).toEqual([]);
     });

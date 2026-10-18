@@ -10,6 +10,9 @@ import { Account } from '../models/account';
 import { Thread } from '../models/thread';
 import { Contact } from '../models/contact';
 import * as Utils from '../models/utils';
+import EngineEvents, { EngineNotification } from '../../engine-events';
+import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../engine-client';
+import { AccountChangedParams, AccountListResult, Feature, Method } from '../../engine-protocol';
 
 const configAccountsKey = 'accounts';
 const configVersionKey = 'accountsVersion';
@@ -17,25 +20,44 @@ const configСontainerFolderDefaultKey = 'containerFolderDefault';
 
 export type IAliasSet = Array<Contact & { isAlias?: boolean }>;
 
+// The account fields this app keeps for itself rather than take from the engine's copy.
+const LOCAL_ACCOUNT_FIELDS = ['syncState', 'syncError', 'sync_error'];
+
 /*
 Public: The AccountStore listens to changes to the available accounts in
 the database and exposes the currently active Account via {::current}
 
+The accounts come from config.json. In the main window, an engine that keeps the accounts
+(Feature.Accounts) adds to them: after each hello the accounts in its account.list that
+config.json lacks (another client added them: `tern account add`, the web) join the list,
+and account.changed brings an account's new fields. config.json stays the copy this app
+edits, so account.list doesn't overwrite an account it already has: the engine's copy is the
+one last added, which may be older. Accounts deleted here stay out (accountsToRemoveFromEngine).
+
 Section: Stores
 */
-class _AccountStore extends MailspringStore {
+export class _AccountStore extends MailspringStore {
   private _version: number;
+  private _engine: typeof EngineEvents;
   private _accounts: Account[];
   private _containerFolderDefault: string;
   private _caches: { [key: string]: any };
+  // Deleted in this window, for an account.list answered before the engine removed them.
+  private _removedIds = new Set<string>();
 
-  constructor() {
+  constructor(engine: typeof EngineEvents = EngineEvents) {
     super();
+    this._engine = engine;
     this._loadAccounts();
     this.listenTo(Actions.removeAccount, this._onRemoveAccount);
     this.listenTo(Actions.updateAccount, this._onUpdateAccount);
     this.listenTo(Actions.reorderAccount, this._onReorderAccount);
     this.listenTo(Actions.updateContainerFolderDefault, this._onUpdateContainerFolderDefault);
+    if (AppEnv.isMainWindow()) {
+      engine.on('connected', this._onEngineConnected);
+      engine.on('notification', this._onEngineNotification);
+      if (engine.has(Feature.Accounts)) this._onEngineConnected();
+    }
 
     AppEnv.config.onDidChange(configVersionKey, async (change) => {
       // If we already have this version of the accounts config, it means we
@@ -95,6 +117,65 @@ class _AccountStore extends MailspringStore {
     }
 
     this._trigger();
+  };
+
+  _onEngineConnected = () => {
+    if (!this._engine.has(Feature.Accounts)) return;
+    this._engine.request<AccountListResult>(Method.AccountList, {}).then(
+      (result) => {
+        const jsons = ((result && result.accounts) || []).map((a) => a.account);
+        this._takeEngineAccounts(jsons, { update: false });
+      },
+      (err) => console.warn(`account.list failed; showing the accounts in config.json: ${err}`)
+    );
+  };
+
+  _onEngineNotification = ({ method, params }: EngineNotification) => {
+    if (method !== Method.AccountChanged || !this._engine.has(Feature.Accounts)) return;
+    const { account } = (params || {}) as AccountChangedParams;
+    this._takeEngineAccounts([account], { update: true });
+  };
+
+  // Adds the engine's accounts this list lacks and, with `update`, applies the engine's fields
+  // to the ones it has. Saves (and so tells the supervisor) only when something changed.
+  _takeEngineAccounts = (jsons: Array<Record<string, any>>, { update }: { update: boolean }) => {
+    const removed = new Set<string>(AppEnv.config.get(CONFIG_ACCOUNTS_TO_REMOVE_KEY) || []);
+    let changed = false;
+    for (const json of jsons) {
+      if (!json || !json.id || !json.emailAddress) continue;
+      if (removed.has(json.id) || this._removedIds.has(json.id)) continue;
+      const idx = this._accounts.findIndex((a) => a.id === json.id);
+      if (idx === -1) {
+        // Two accounts with one address would be dropped at the next load.
+        if (this._accounts.some((a) => a.emailAddress === json.emailAddress)) continue;
+        this._accounts.push(new Account({}).fromJSON(json));
+        changed = true;
+        continue;
+      }
+      if (!update) continue;
+      const current = this._accounts[idx].toJSON();
+      const next = { ...current, settings: { ...(current.settings || {}) } };
+      let differs = false;
+      for (const [key, value] of Object.entries(json)) {
+        if (LOCAL_ACCOUNT_FIELDS.includes(key)) continue;
+        if (key === 'settings' && value && typeof value === 'object') {
+          for (const [k, v] of Object.entries(value)) {
+            if (JSON.stringify(next.settings[k]) === JSON.stringify(v)) continue;
+            next.settings[k] = v;
+            differs = true;
+          }
+        } else if (JSON.stringify(next[key]) !== JSON.stringify(value)) {
+          next[key] = value;
+          differs = true;
+        }
+      }
+      if (!differs) continue;
+      this._accounts[idx] = new Account({}).fromJSON(next);
+      changed = true;
+    }
+    if (!changed) return;
+    this._caches = {};
+    this._save();
   };
 
   _enforceAccountsValidity = () => {
@@ -183,6 +264,7 @@ class _AccountStore extends MailspringStore {
     if (!account) return;
 
     this._caches = {};
+    this._removedIds.add(id);
 
     // Started before anything below clears the keychain entry it needs to read.
     const revocation = revokeOAuthGrant(account);
@@ -243,6 +325,7 @@ class _AccountStore extends MailspringStore {
     // send the account JSON and cloud token to the KeyManager,
     // which gives us back a version with no secrets.
     const cleanAccount = await KeyManager.extractAndStoreAccountSecrets(account);
+    this._removedIds.delete(cleanAccount.id);
 
     this._loadAccounts();
 

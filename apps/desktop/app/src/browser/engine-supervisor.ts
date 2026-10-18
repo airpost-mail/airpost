@@ -22,15 +22,22 @@ plan). Before the first account.add to it, the supervisor sends `credentials.imp
 config.json account the engine hasn't registered, and with every account KeyManager still has
 secrets for (new ones from onboarding or a reconnect, or from a downgraded build); once the
 engine has them all, KeyManager drops the accounts' secrets (moveAccountSecretsToEngine) and
-account.add goes without them. An account.add whose secrets the engine stored drops that
-account's copy too: the engine keeps its rotated tokens, so the copy would go stale. config.json `accounts` stays the list of accounts the desktop
-runs. A `serve --detached` engine found at launch with the bundled build is joined instead
+account.add goes without them. After that, an account.add whose secrets the engine stored drops
+that account's copy too: the engine keeps its rotated tokens, so the copy would go stale.
+config.json `accounts` stays the list of accounts the desktop runs; the accounts deleted from it
+are kept under accountsToRemoveFromEngine until the engine's account.remove answers, and the
+engine's other accounts are left alone (AccountStore lists them). A `serve --detached` engine found at launch with the bundled build is joined instead
 of spawned (detachedEngineToReuse); it can't take `credentials.import`, so it is reused only
 once the credentials moved.
 */
 import fs from 'fs';
 import path from 'path';
-import { AccountJSON, EngineAccount, EngineClient } from '../engine-client';
+import {
+  AccountJSON,
+  CONFIG_ACCOUNTS_TO_REMOVE_KEY,
+  EngineAccount,
+  EngineClient,
+} from '../engine-client';
 import net from 'net';
 import {
   engineBinaryPath,
@@ -66,6 +73,7 @@ const MAX_PENDING_EVENTS = 500;
 
 export interface SupervisorConfig {
   get(keyPath: string): any;
+  set(keyPath: string, value: unknown): void;
   onDidChange(keyPath: string, callback: (event: unknown) => void): { dispose(): void };
 }
 
@@ -107,6 +115,8 @@ export class EngineSupervisor {
   _statusQueued = false;
   _configSubscriptions: Array<{ dispose(): void }> = [];
   _attachTo: string | null = null;
+  // The account ids config.json listed at the last change, to tell which ones were deleted.
+  _listedIds = new Set<string>();
   // Settles once the engine's hello was handled by _prepareCredentials, or it closed.
   _credentialsReady = new WeakMap<EngineServeProcess, Promise<void>>();
 
@@ -130,13 +140,19 @@ export class EngineSupervisor {
         }),
       onAccountsChanged: () => this._statusChanged(),
       onAccountStored: (accountId) => this._dropStoredSecrets(accountId),
+      removedAccounts: () => this.removedAccounts(),
+      onAccountRemoved: (accountId) => this._forgetRemoved(accountId),
     });
   }
 
   start() {
     const { config } = this.options;
+    this._listedIds = new Set(this.accounts().map((a) => a.id));
     this._configSubscriptions = [
-      config.onDidChange('accounts', () => this.ensure()),
+      config.onDidChange('accounts', () => {
+        this._noteRemovedAccounts();
+        this.ensure();
+      }),
       config.onDidChange(VERBOSE_UNTIL_KEY, () => this._applyLogLevel()),
     ];
     this.ensure();
@@ -165,6 +181,38 @@ export class EngineSupervisor {
       result.push(json);
     }
     return result;
+  }
+
+  // Accounts deleted in the app that the engine may still have registered.
+  removedAccounts(): string[] {
+    const listed = new Set(this.accounts().map((a) => a.id));
+    return this._removedList().filter((id) => !listed.has(id));
+  }
+
+  _removedList(): string[] {
+    const list = this.options.config.get(CONFIG_ACCOUNTS_TO_REMOVE_KEY);
+    return Array.isArray(list) ? list.filter((id) => typeof id === 'string' && id) : [];
+  }
+
+  // Kept in config.json, so a delete made while no engine runs reaches the next one.
+  _noteRemovedAccounts() {
+    const now = new Set(this.accounts().map((a) => a.id));
+    const gone = [...this._listedIds].filter((id) => !now.has(id));
+    this._listedIds = now;
+    const before = this._removedList();
+    const next = [...new Set([...before, ...gone])].filter((id) => !now.has(id));
+    if (next.length !== before.length || next.some((id, i) => id !== before[i])) {
+      this.options.config.set(CONFIG_ACCOUNTS_TO_REMOVE_KEY, next);
+    }
+  }
+
+  _forgetRemoved(accountId: string) {
+    const before = this._removedList();
+    if (!before.includes(accountId)) return;
+    this.options.config.set(
+      CONFIG_ACCOUNTS_TO_REMOVE_KEY,
+      before.filter((id) => id !== accountId)
+    );
   }
 
   status(): EngineStatus {
@@ -313,11 +361,13 @@ export class EngineSupervisor {
   }
 
   // The engine stored the secrets account.add carried (a new or signed-in-again account), and
-  // keeps the rotated tokens from now on, so KeyManager's copy would only go stale.
+  // keeps the rotated tokens from now on, so KeyManager's copy would only go stale. Only once
+  // the move is done: before it, credentialsBeforeEngine doesn't exist yet, and the copy is
+  // what a downgrade and the windows (reconnect, OAuth revocation) read.
   _dropStoredSecrets(accountId: string) {
     const json = this.accounts().find((a) => a.id === accountId);
-    if (!json) return;
     const { keyManager } = this.options;
+    if (!json || !keyManager.credentialsMovedToEngine()) return;
     keyManager
       .hasAccountSecrets(json.emailAddress)
       .then((has) => has && keyManager.deleteAccountSecrets(json))
@@ -342,6 +392,14 @@ export class EngineSupervisor {
       const own = await keyManager.hasAccountSecrets(json.emailAddress, keys);
       if (registered.has(json.id) && !own) continue;
       if (!own && !earlier) earlier = await keyManager.keysBeforeEngine();
+      // An account with no secrets anywhere needs a reconnect, moved or not; the engine would
+      // refuse it and keep the move from ever completing.
+      if (!own && !(await keyManager.hasAccountSecrets(json.emailAddress, earlier))) {
+        console.warn(
+          `Account ${json.id} has no secrets to move to the engine; it needs a reconnect`
+        );
+        continue;
+      }
       accounts.push(await keyManager.insertAccountSecrets(json, own ? keys : earlier));
     }
     const secrets: CredentialsImportParams['secrets'] = {};
