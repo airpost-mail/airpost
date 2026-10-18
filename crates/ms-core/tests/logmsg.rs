@@ -144,6 +144,10 @@ fn foreground_and_tasks() {
         r"Removing the draft of a send interrupted after SMTP",
         &removing_draft_of_interrupted_send("sent-1@example.test"),
     );
+    assert_matches(
+        r"Send deferred until the account is online",
+        &send_deferred_until_online("sent-1@example.test", "ErrorConnection"),
+    );
 }
 
 #[test]

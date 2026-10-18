@@ -220,6 +220,11 @@ pub fn removing_draft_of_interrupted_send(header_message_id: &str) -> String {
     format!("- Removing the draft of a send interrupted after SMTP: {header_message_id}")
 }
 
+/// expiration-send-offline: `Send deferred until the account is online`.
+pub fn send_deferred_until_online(header_message_id: &str, error: &str) -> String {
+    format!("-- Send deferred until the account is online: {header_message_id} ({error})")
+}
+
 // -- Process (main.cpp) ----------------------------------------------------------------------
 
 /// The first line of every sync process's log.

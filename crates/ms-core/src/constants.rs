@@ -163,6 +163,15 @@ pub const METADATA_EXPIRATION_MIN_DELAY_IDLE: i64 = 5;
 pub const METADATA_EXPIRATION_CHUNK: usize = 100;
 pub const METADATA_EXPIRATION_EMIT_DELAY_MS: u64 = 500;
 
+/// The expiration executor's waits for a scheduled draft that lacks its body, its plaintext
+/// flag or an attachment (docs/desktop-client-plan.md 3.3): seconds until each next look,
+/// with a body fetch queued before each; after the last one the send fails.
+pub const EXECUTOR_INCOMPLETE_DRAFT_WAITS: [i64; 4] = [60, 120, 240, 480];
+
+/// How long a send the engine started itself stays queued while its SMTP server can't be
+/// reached, in seconds (docs/tech-debt.md TD33); after that it fails as any send does.
+pub const ENGINE_SEND_OFFLINE_RETRY_WINDOW: i64 = 24 * 60 * 60;
+
 /// Finished tasks kept, and how far past it pruning waits (`cleanupOldTasksAtRuntime`).
 pub const TASK_KEEP_FINISHED: usize = 100;
 pub const TASK_PRUNE_SLOP: usize = 10;
