@@ -75,3 +75,10 @@ the cookie then travels unencrypted.
 
 Health: `GET /healthz`, or `tern-gateway healthcheck` where there is no curl. It reports the
 gateway, not the engine; `/gateway/v1/session` reports the engine to a paired browser.
+
+Attachments: `GET /gateway/v1/files/<accountId>/<fileId>` downloads one through the
+engine's `files.get` (which fetches it from the mail server first when needed), always as an
+attachment in a CSP sandbox, with `?inline=1` honoured only for PNG, JPEG, GIF and WebP
+recognised from the bytes. `POST /gateway/v1/files/<accountId>?name=<name>` takes up to
+25 MiB, streamed to `<dir>/gateway/incoming/`, hands it to `files.put` and deletes it. A
+proxy in front must allow bodies that large (nginx: `client_max_body_size 26m;`).
