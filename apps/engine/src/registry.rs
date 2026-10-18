@@ -19,6 +19,8 @@ use serde_json::{json, Map, Value};
 use tracing::{info, warn};
 
 pub const ACCOUNTS_FILE: &str = "accounts.json";
+/// The Tern server of `server.set`; its token is the secret `tern-server-token`.
+pub const SERVER_FILE: &str = "server.json";
 /// The key file debug builds use when the environment names no store.
 pub const DEV_KEY_FILE: &str = "engine-dev.key";
 
@@ -101,6 +103,14 @@ impl Registry {
         self.lock().clone()
     }
 
+    /// The registered accounts' ids, in their order.
+    pub fn ids(&self) -> Vec<String> {
+        self.lock()
+            .iter()
+            .filter_map(|a| account_id(a).map(str::to_owned))
+            .collect()
+    }
+
     pub fn get(&self, id: &str) -> Option<Value> {
         self.lock()
             .iter()
@@ -174,9 +184,96 @@ impl Registry {
                 })
                 .map_err(|e| e.to_string())?;
         }
-        let public = strip_secrets(account);
+        let public = stored_form(account);
         let changed = self.upsert(&id, public.clone())?;
         Ok((public, changed))
+    }
+
+    /// Replaces a registered account's JSON with `public` (secrets left out), deleting its
+    /// stored secrets when they were for other servers ([`same_servers`]). Returns whether
+    /// they were deleted.
+    pub fn update(&self, id: &str, public: &Value) -> Result<bool, String> {
+        let public = stored_form(public);
+        let Some(before) = self.get(id) else {
+            return Err(format!("unknown account {id}"));
+        };
+        let moved = !same_servers(&before, &public);
+        if moved {
+            self.store()?
+                .delete_prefix(&names::account_prefix(id))
+                .map_err(|e| e.to_string())?;
+        }
+        self.upsert(id, public)?;
+        Ok(moved)
+    }
+
+    /// Puts the named accounts first, in that order; the others follow as they were.
+    pub fn reorder(&self, ids: &[String]) -> Result<(), String> {
+        let mut accounts = self.lock();
+        let mut next: Vec<Value> = ids
+            .iter()
+            .filter_map(|id| accounts.iter().find(|a| account_id(a) == Some(id)).cloned())
+            .collect();
+        for a in accounts.iter() {
+            if !account_id(a).is_some_and(|id| ids.iter().any(|i| i == id)) {
+                next.push(a.clone());
+            }
+        }
+        if next == *accounts {
+            return Ok(());
+        }
+        save_accounts(&self.config_dir.join(ACCOUNTS_FILE), &next)?;
+        *accounts = next;
+        Ok(())
+    }
+
+    /// A secret that isn't an account's, for the engine's own use (integration keys, the
+    /// Tern server token). Never sent to a client.
+    pub fn secret(&self, name: &str) -> Result<Option<String>, String> {
+        self.store()?.get(name).map_err(|e| e.to_string())
+    }
+
+    pub fn set_secret(&self, name: &str, value: &str) -> Result<(), String> {
+        self.store()?.set(name, value).map_err(|e| e.to_string())
+    }
+
+    pub fn delete_secret(&self, name: &str) -> Result<(), String> {
+        self.store()?.delete(name).map_err(|e| e.to_string())
+    }
+
+    pub fn has_secrets(&self, names: &[String]) -> Result<BTreeMap<String, bool>, String> {
+        self.store()?
+            .has(names.iter().map(String::as_str))
+            .map_err(|e| e.to_string())
+    }
+
+    /// The Tern server `server.set` stored, `{url, userId, serverId}`.
+    pub fn server(&self) -> Option<Value> {
+        let bytes = std::fs::read(self.config_dir.join(SERVER_FILE)).ok()?;
+        serde_json::from_slice::<Value>(&bytes)
+            .ok()
+            .filter(Value::is_object)
+    }
+
+    pub fn set_server(&self, server: &Value) -> Result<(), String> {
+        let text = serde_json::to_vec_pretty(server).map_err(|e| e.to_string())?;
+        let path = self.config_dir.join(SERVER_FILE);
+        crate::platform::uds::write_private_file(&path, &text)
+            .map_err(|e| format!("writing {}: {e}", path.display()))
+    }
+
+    /// Forgets the server and deletes its token.
+    pub fn clear_server(&self) -> Result<(), String> {
+        match std::fs::remove_file(self.config_dir.join(SERVER_FILE)) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.to_string()),
+            _ => {}
+        }
+        if let Ok(store) = self.store() {
+            store
+                .delete(names::TERN_SERVER_TOKEN)
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
     }
 
     fn upsert(&self, id: &str, public: Value) -> Result<bool, String> {
@@ -370,6 +467,90 @@ pub fn strip_secrets(account: &Value) -> Value {
     }
     out
 }
+
+/// Fields of the desktop's Account JSON that record its own view of the account's sync,
+/// not the account: they are neither stored nor compared.
+const CLIENT_STATE_FIELDS: [&str; 3] = ["syncState", "syncError", "sync_error"];
+
+/// `account` as the registry keeps it: no secrets and no [`CLIENT_STATE_FIELDS`].
+pub fn stored_form(account: &Value) -> Value {
+    let mut out = strip_secrets(account);
+    if let Some(fields) = out.as_object_mut() {
+        for key in CLIENT_STATE_FIELDS {
+            fields.remove(key);
+        }
+    }
+    out
+}
+
+/// `account` with `patch` applied: its top-level fields replace the account's, and the keys
+/// of its `settings` object replace the account's settings (null removes one). `id` and the
+/// secrets can't be patched.
+pub fn patched(account: &Value, patch: &Value) -> Result<Value, String> {
+    let Some(patch) = patch.as_object() else {
+        return Err("the patch must be an object".into());
+    };
+    let mut out = account.clone();
+    let fields = out.as_object_mut().ok_or("the account is not an object")?;
+    for (key, value) in patch {
+        match key.as_str() {
+            "id" => {
+                if value.as_str() != fields.get("id").and_then(Value::as_str) {
+                    return Err("an account's id can't change".into());
+                }
+            }
+            "settings" => {
+                let changes = value.as_object().ok_or("settings must be an object")?;
+                let settings = fields
+                    .entry("settings")
+                    .or_insert_with(|| json!({}))
+                    .as_object_mut()
+                    .ok_or("the account's settings are not an object")?;
+                for (k, v) in changes {
+                    if SECRET_SETTINGS.iter().any(|(s, _)| s == k) {
+                        return Err(format!("{k} is a secret: use account.setSecrets"));
+                    }
+                    if v.is_null() {
+                        settings.remove(k);
+                    } else {
+                        settings.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+            _ if value.is_null() => {
+                fields.remove(key);
+            }
+            _ => {
+                fields.insert(key.clone(), value.clone());
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Whether a secret name may be written with `secrets.set` / `secrets.delete`: lowercase
+/// words and dashes, optionally `:` and an id (`integration:deepl`, `ai:openai-1`,
+/// `tern-server-token`), at most 128 bytes. An account's secrets go through `account.*`, so
+/// the rule that changing its servers clears them can't be side-stepped.
+pub fn writable_secret_name(name: &str) -> bool {
+    let (kind, id) = name.split_once(':').unwrap_or((name, ""));
+    let word = |s: &str| {
+        !s.is_empty()
+            && s.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+    };
+    name.len() <= 128
+        && word(kind)
+        && kind != "account"
+        && (!name.contains(':')
+            || (!id.is_empty()
+                && id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))))
+}
+
+/// The most a secret value may hold.
+pub const MAX_SECRET_BYTES: usize = 64 * 1024;
 
 /// The accounts in `accounts.json`. A file that can't be read is set aside, so the next
 /// write doesn't replace what may still be recovered from it.

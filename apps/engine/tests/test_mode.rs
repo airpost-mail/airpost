@@ -505,7 +505,12 @@ fn serve_account_test_matches_the_mode() {
     assert_eq!(lines.len(), 1, "{lines:?}");
     assert_eq!(keys(&serve), keys(&mode.result));
     assert_eq!(serve["error"], Value::Null);
-    assert_eq!(serve["account"], acct);
+    // Secrets are never read back (T13).
+    let mut public = acct.clone();
+    for k in ["imap_password", "smtp_password", "refresh_token"] {
+        public["settings"].as_object_mut().unwrap().remove(k);
+    }
+    assert_eq!(serve["account"], public);
 
     let bad = account(imap.port, smtp.port, json!({"imap_password": "wrong"}));
     let mode = run_test_mode(dir.path(), &bad, &[]);
@@ -517,7 +522,7 @@ fn serve_account_test_matches_the_mode() {
 
 #[cfg(unix)]
 #[test]
-fn serve_account_test_returns_a_rotated_token_in_the_result_only() {
+fn serve_account_test_never_returns_a_rotated_token() {
     let dir = tempfile::tempdir().unwrap();
     let imap = imap_server(&["INBOX"]);
     let smtp = smtp_server(true);
@@ -538,7 +543,7 @@ fn serve_account_test_returns_a_rotated_token_in_the_result_only() {
         &[("MAILSYNC_GOOGLE_TOKEN_URL", url.as_str())],
     );
     assert_eq!(result["error"], Value::Null, "{result}");
-    assert_eq!(result["account"]["settings"]["refresh_token"], "rt-2");
+    assert!(!result.to_string().contains("rt-"), "{result}");
     // No ProcessAccountSecretsUpdated delta: stdout carries only the response.
     assert_eq!(lines.len(), 1, "{lines:?}");
 }

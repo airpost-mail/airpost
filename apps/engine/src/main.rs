@@ -9,6 +9,8 @@
 //! GPL-3.0. See NOTICE.md.
 
 #[cfg(unix)]
+mod accounts_api;
+#[cfg(unix)]
 mod ai_api;
 #[cfg(unix)]
 mod ai_triage;

@@ -60,8 +60,9 @@ pub fn run(account: &Account) -> i32 {
     }
 }
 
-/// `account.test` in `serve` mode: the same object, returned. A rotated refresh token is in
-/// the result's `account`, since `serve`'s stdout carries only responses.
+/// `account.test` in `serve` mode: the same object, returned. The result's `account` holds
+/// the secrets, a rotated refresh token included, for `account.add {test}`; `account.test`
+/// strips them before answering (T13).
 pub fn result(account: &Account) -> Value {
     evaluate(account, &TokenManager::new(None)).0
 }

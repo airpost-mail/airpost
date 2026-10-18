@@ -37,6 +37,8 @@ pub static FILES: Lane = Lane::new(thread::FILES, 32, 512, true);
 /// caps those at 16 and 8 engine-wide, so every call gets a thread at once.
 pub static UNSUBSCRIBE: Lane = Lane::new(thread::UNSUBSCRIBE, 24, 8, true);
 pub static ACCOUNT_TEST: Lane = Lane::new(thread::ACCOUNT_TEST, 8, 32, true);
+/// Discovery (a 5 s MX lookup, autoconfig fetches), OAuth sign-ins and tested adds.
+pub static ACCOUNT_SETUP: Lane = Lane::new(thread::ACCOUNT_SETUP, 8, 32, true);
 pub static ACCOUNT_RESET: Lane = Lane::new(thread::ACCOUNT_RESET, 4, 32, true);
 /// `engine.resetDatabase` and `engine.setLogLevel`, one at a time. Not contained: they
 /// stop and restart every account, and a panic halfway leaves the engine in no known state.
@@ -48,6 +50,7 @@ const CONTAINED: &[&Lane] = &[
     &FILES,
     &UNSUBSCRIBE,
     &ACCOUNT_TEST,
+    &ACCOUNT_SETUP,
     &ACCOUNT_RESET,
 ];
 

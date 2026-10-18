@@ -6,18 +6,21 @@
 //! The engine starts with no account, binds `--socket` (default
 //! `$CONFIG_DIR_PATH/run/engine.sock`) and keeps `run/engine.json` listing the accounts it
 //! holds. The parent's pipes are the control channel: stdin takes JSON-RPC requests, the
-//! socket's envelope, for `account.add`, `account.remove`, `account.test`, `account.reset`,
-//! `engine.resetDatabase`, `engine.setLogLevel` and `engine.shutdown` plus every socket
-//! method; stdout carries their responses and the accounts' secrets deltas (`delta`
-//! notifications) and nothing else. Credentials therefore never touch the socket, which
-//! refuses those methods. stdin is read only once the socket is bound, so the parent's first
-//! response marks the engine ready. The slow parent methods (test, reset, resetDatabase,
-//! setLogLevel) run on their own threads and answer when done, so responses can come out of
-//! order. Closed stdin still exits 141 after 30 s.
+//! socket's envelope, for `engine.resetDatabase`, `engine.setLogLevel`, `engine.shutdown`
+//! and `credentials.import` plus every socket method; stdout carries their responses and the
+//! accounts' secrets deltas (`delta` notifications) and nothing else. stdin is read only once
+//! the socket is bound, so the parent's first response marks the engine ready. The slow
+//! methods run on worker lanes and answer when done, so responses can come out of order.
+//! Closed stdin still exits 141 after 30 s.
 //!
-//! `--detached` has no parent channel: local, non-relayed socket connections take the parent
-//! methods but `credentials.import`, the slow ones on the same worker lanes, and nothing secret
-//! goes to stdout, which is then a terminal or a service log.
+//! The account methods (`account.add`, `.test`, `.oauth.*`, `.setSecrets`, `.update`,
+//! `.remove`, ..., `secrets.*`, `server.*`; docs/desktop-client-plan.md 3.6) are taken on
+//! stdin and on the socket alike: secrets go client to engine and are never read back
+//! (T13). A relayed connection makes them only with the admin scope (ms-ipc's `policy`).
+//!
+//! `--detached` has no parent channel: local, non-relayed socket connections also take the
+//! engine methods but `credentials.import`, the slow ones on the same worker lanes, and
+//! nothing secret goes to stdout, which is then a terminal or a service log.
 //!
 //! Each account runs in its own [`AccountRuntime`] with its own `DeltaStream` into the
 //! shared hub, `main` thread and log file. A failure on one of its threads stops that
@@ -40,16 +43,21 @@ use ms_core::constants::{
 use ms_core::Account;
 use ms_ipc::{
     account_state, code, method, AccountAddParams, AccountAddResult, AccountChangedParams,
-    AccountIdParams, AccountRemoveParams, AccountRemoveResult, AccountResetParams,
-    AccountStateParams, AccountStatus, AccountTestParams, CredentialsImportParams,
-    CredentialsStatus, ErrorObject, Request as RpcRequest, ResetDatabaseParams,
-    ResetDatabaseResult, Response, SetLogLevelParams, SetLogLevelResult, MAX_LINE_BYTES,
+    AccountDiscoverParams, AccountIdParams, AccountRemoveParams, AccountRemoveResult,
+    AccountReorderParams, AccountResetParams, AccountSetSecretsParams, AccountStateParams,
+    AccountStatus, AccountTestParams, AccountUpdateParams, AccountUpdateResult,
+    CredentialsImportParams, CredentialsStatus, ErrorObject, OAuthBeginParams, OAuthCompleteParams,
+    OAuthCompleteResult, Request as RpcRequest, ResetDatabaseParams, ResetDatabaseResult, Response,
+    SecretsDeleteParams, SecretsHasParams, SecretsSetParams, ServerSetParams, SetLogLevelParams,
+    SetLogLevelResult, ACCOUNT_DISPLAY_FIELDS, MAX_LINE_BYTES,
 };
+use ms_net::TernServer;
 use ms_store::{DeltaSink, DeltaStream};
 use ms_sync::{AccountFailure, AccountRuntime, WorkerContext};
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
+use crate::accounts_api;
 use crate::cli::Options;
 use crate::dispatch::{self, Command, Reply, Request};
 use crate::output::{one_shot_error, write_stdout};
@@ -137,6 +145,7 @@ pub fn run(opts: &Options) -> i32 {
         resetting_database: AtomicBool::new(false),
         database: database.clone(),
         settings: settings.clone(),
+        oauth: accounts_api::OAuthSessions::default(),
         me: me.clone(),
     });
     let server = Arc::new(Server {
@@ -261,6 +270,8 @@ pub struct Engine {
     database: socket::DatabaseGeneration,
     /// The settings store, which the accounts' expiration executors read.
     settings: Arc<crate::settings::Settings>,
+    /// OAuth sign-ins between `account.oauth.begin` and `complete`.
+    oauth: accounts_api::OAuthSessions,
     /// The engine itself, for the callbacks an account's threads make.
     me: Weak<Engine>,
 }
@@ -305,6 +316,14 @@ impl Accounts for Engine {
                 ..Default::default()
             });
         }
+        // In the registry's order (`account.reorder`); unregistered ones last.
+        let order = self.registered.ids();
+        out.sort_by_key(|s| {
+            order
+                .iter()
+                .position(|id| *id == s.account_id)
+                .unwrap_or(usize::MAX)
+        });
         out
     }
 
@@ -395,6 +414,27 @@ impl Accounts for Engine {
 
     fn has_parent_channel(&self) -> bool {
         true
+    }
+
+    fn secret(&self, name: &str) -> Option<String> {
+        self.registered
+            .secret(name)
+            .map_err(|e| warn!("-X Could not read secret {name}: {e}"))
+            .ok()
+            .flatten()
+    }
+
+    fn account_call(&self, req: &RpcRequest) -> Option<SocketParentCall> {
+        if !socket::is_account_method(&req.method) {
+            return None;
+        }
+        Some(match self.me.upgrade() {
+            Some(engine) => account_call(engine, req),
+            None => SocketParentCall::Now(Err(ErrorObject::new(
+                code::INTERNAL_ERROR,
+                "the engine is stopping",
+            ))),
+        })
     }
 }
 
@@ -530,7 +570,7 @@ impl Engine {
             return;
         }
         info!("Starting {} registered accounts", accounts.len());
-        let identity = self.identity_lock().clone();
+        let identity = self.default_identity();
         for account in accounts {
             let id = registry::account_id(&account)
                 .unwrap_or_default()
@@ -589,9 +629,29 @@ impl Engine {
     /// the store refused, and the account then runs only until the engine stops. A running
     /// account added with another identity, other settings or other secrets restarts with
     /// them; added as it runs, it answers ACCOUNT_EXISTS.
+    ///
+    /// `secrets` go into the account's settings first. An account without an id gets the
+    /// desktop's ([`accounts_api::prepare_new_account`]). With `test` it is tested first and
+    /// a failure answers [`code::ACCOUNT_TEST_FAILED`] without storing anything. A null
+    /// identity means the latest one, or else the Tern server of `server.set`.
     fn add(&self, req: &RpcRequest) -> Reply {
         let p: AccountAddParams = req.params_as()?;
         let mut json = p.account;
+        if let Some(secrets) = &p.secrets {
+            if !json.get("settings").is_some_and(Value::is_object) {
+                return Err(invalid("Invalid Account JSON: settings must be an object"));
+            }
+            secrets.apply_to(&mut json);
+        }
+        self.add_account(json, p.identity, p.test, false)
+    }
+
+    /// `account.add`'s work. `renew` restarts a running account even when nothing changed
+    /// (a reconnect that got the same credentials back).
+    fn add_account(&self, mut json: Value, identity: Value, test: bool, renew: bool) -> Reply {
+        if registry::account_id(&json).is_none() {
+            accounts_api::prepare_new_account(&mut json);
+        }
         let sent_secrets = registry::has_secrets(&json);
         match self.registered.with_secrets_for_same_servers(json.clone()) {
             Ok((_, true)) if !sent_secrets => {
@@ -603,13 +663,27 @@ impl Engine {
             Ok((full, _)) => json = full,
             Err(e) => warn!("-X Could not read the stored secrets: {e}"),
         }
-        let account = parse_account(json)?;
+        let mut account = parse_account(json)?;
         let id = account.id().to_owned();
         if self.resetting_database.load(Ordering::SeqCst) || self.resetting_lock().contains(&id) {
             return Err(ErrorObject::new(
                 code::ACCOUNT_EXISTS,
                 format!("account {id} is being reset; add it again later"),
             ));
+        }
+        if test {
+            let result = self.test_account(&account)?;
+            if !accounts_api::test_passed(&result) {
+                return Err(accounts_api::test_failed(result));
+            }
+            // The test may have rotated the refresh token.
+            if let Some(tested) = result
+                .get("account")
+                .filter(|a| a.is_object())
+                .and_then(|a| Account::from_json(a.clone()).ok())
+            {
+                account = tested;
+            }
         }
         let stored = match self.registered.register(account.as_json()) {
             Ok((public, changed)) => {
@@ -625,13 +699,16 @@ impl Engine {
         };
         self.restarts_lock().remove(&id);
         self.unstarted_lock().remove(&id);
-        if !p.identity.is_null() {
-            *self.identity_lock() = p.identity.clone();
-        }
+        let identity = if identity.is_null() {
+            self.default_identity()
+        } else {
+            *self.identity_lock() = identity.clone();
+            identity
+        };
         let changed = self.lock().get(&id).and_then(|s| {
             if s.state == account_state::STOPPED || s.removing {
                 None
-            } else if !p.identity.is_null() && s.identity != p.identity {
+            } else if !identity.is_null() && s.identity != identity {
                 Some("a new identity")
             } else if registry::strip_secrets(s.account.as_json())
                 != registry::strip_secrets(account.as_json())
@@ -642,6 +719,8 @@ impl Engine {
                     != registry::secrets_of(account.as_json())
             {
                 Some("new credentials")
+            } else if renew {
+                Some("renewed credentials")
             } else {
                 None
             }
@@ -650,7 +729,7 @@ impl Engine {
             info!("Restarting account {id} with {what}");
             self.remove_account(&id, false)?;
         }
-        let mut result = self.start(account, p.identity)?;
+        let mut result = self.start(account, identity)?;
         result["stored"] = json!(stored);
         Ok(result)
     }
@@ -986,6 +1065,10 @@ impl Engine {
     /// database: a client about to reset the account should wait and retry.
     ///
     /// A registered account is unregistered and its secrets deleted, whether it ran or not.
+    ///
+    /// `revoke` then drops a Google account's OAuth grant ([`accounts_api::revoke`]) and
+    /// `deleteData` its rows, as `account.reset` without metadata does; both run on a worker
+    /// lane.
     fn remove(&self, req: &RpcRequest) -> Reply {
         let p: AccountRemoveParams = req.params_as()?;
         let id = p.account_id;
@@ -993,15 +1076,50 @@ impl Engine {
         if !running && !self.registered.contains(&id) {
             return Err(socket::unknown_account(&id));
         }
+        let grant = p.revoke.then(|| self.grant_of(&id)).flatten();
         self.restarts_lock().remove(&id);
         self.unstarted_lock().remove(&id);
-        if running {
-            return removed_result(self.remove_account(&id, true)?);
+        let still_running = if running {
+            self.remove_account(&id, true)?
+        } else {
+            self.forget_registered(&id)
+                .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))?;
+            self.notify_state(&id, account_state::REMOVED, None);
+            Vec::new()
+        };
+        if let Some((provider, token)) = grant {
+            accounts_api::revoke(&provider, &token);
         }
-        self.forget_registered(&id)
-            .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))?;
-        self.notify_state(&id, account_state::REMOVED, None);
-        removed_result(Vec::new())
+        if p.delete_data {
+            if !still_running.is_empty() {
+                std::thread::sleep(Duration::from_millis(ACCOUNT_RESET_STRAGGLER_WAIT_MS));
+            }
+            self.reset_account(&id, false)?;
+        }
+        removed_result(still_running)
+    }
+
+    /// The provider and refresh token of an account, its rotated token included.
+    fn grant_of(&self, id: &str) -> Option<(String, String)> {
+        let running = self.lock().get(id).map(|s| match &s.runtime {
+            Some(rt) => rt
+                .context()
+                .tokens
+                .account_with_current_secrets(&s.account)
+                .to_json(),
+            None => s.account.as_json().clone(),
+        });
+        let json = running.or_else(|| {
+            self.registered
+                .get(id)
+                .and_then(|a| self.registered.with_secrets(a).ok())
+        })?;
+        let token = json
+            .pointer("/settings/refresh_token")
+            .and_then(Value::as_str)
+            .filter(|t| !t.is_empty())?;
+        let provider = json.get("provider").and_then(Value::as_str)?;
+        Some((provider.to_owned(), token.to_owned()))
     }
 
     fn forget_registered(&self, id: &str) -> Result<(), String> {
@@ -1061,8 +1179,9 @@ impl Engine {
         Ok(still_running)
     }
 
-    /// `account.test`: `--mode test`'s checks and result, for an account the engine need not
-    /// hold. Runs on its own thread.
+    /// `--mode test`'s checks and result, for an account the engine need not hold. The
+    /// result's `account` carries the secrets (a rotated token): `account.test` strips them
+    /// ([`tested_publicly`]). Runs on a worker lane.
     fn test_account(&self, account: &Account) -> Reply {
         info!("Testing account {}", account.id());
         // Debug builds: the test fails as a bug in it would (serve tests).
@@ -1182,26 +1301,7 @@ impl Engine {
     fn set_log_level(&self, req: &RpcRequest) -> Reply {
         let p: SetLogLevelParams = req.params_as()?;
         self.verbose_until.store(p.verbose_until, Ordering::SeqCst);
-        let running: Vec<(Account, Value)> = self
-            .lock()
-            .slots
-            .iter()
-            .filter(|s| !s.removing && !s.stopping && s.state != account_state::STOPPED)
-            .map(|s| {
-                let account = match &s.runtime {
-                    Some(rt) => rt.context().tokens.account_with_current_secrets(&s.account),
-                    None => (*s.account).clone(),
-                };
-                (account, s.identity.clone())
-            })
-            .collect();
-        let mut restarted = Vec::new();
-        for (account, identity) in running {
-            let id = account.id().to_owned();
-            self.remove_account(&id, false)?;
-            self.start(account, identity)?;
-            restarted.push(id);
-        }
+        let restarted = self.restart_running(None)?;
         info!(
             "Verbose logging {}; {} accounts restarted",
             if p.verbose_until > now_ms() {
@@ -1213,6 +1313,35 @@ impl Engine {
         );
         serde_json::to_value(SetLogLevelResult { restarted })
             .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e.to_string()))
+    }
+
+    /// Restarts the running accounts with their current secrets, and with `identity` in
+    /// place of their own when given; returns their ids.
+    fn restart_running(&self, identity: Option<Value>) -> Result<Vec<String>, ErrorObject> {
+        let running: Vec<(Account, Value)> = self
+            .lock()
+            .slots
+            .iter()
+            .filter(|s| !s.removing && !s.stopping && s.state != account_state::STOPPED)
+            .map(|s| {
+                let account = match &s.runtime {
+                    Some(rt) => rt.context().tokens.account_with_current_secrets(&s.account),
+                    None => (*s.account).clone(),
+                };
+                (
+                    account,
+                    identity.clone().unwrap_or_else(|| s.identity.clone()),
+                )
+            })
+            .collect();
+        let mut restarted = Vec::new();
+        for (account, identity) in running {
+            let id = account.id().to_owned();
+            self.remove_account(&id, false)?;
+            self.start(account, identity)?;
+            restarted.push(id);
+        }
+        Ok(restarted)
     }
 
     /// `engine.shutdown`: stops every account and flushes what they buffered. The caller
@@ -1267,8 +1396,6 @@ impl Engine {
     /// thread; the slow ones go to [`slow_parent_job`]'s lanes, as on stdin.
     fn parent_call(&self, req: &RpcRequest) -> Reply {
         match req.method.as_str() {
-            method::ACCOUNT_ADD => self.add(req),
-            method::ACCOUNT_REMOVE => self.remove(req),
             method::TEST_CRASH | method::TEST_PANIC if cfg!(debug_assertions) => {
                 self.test_failure(req)
             }
@@ -1277,6 +1404,459 @@ impl Engine {
                 format!("unknown method {other}"),
             )),
         }
+    }
+}
+
+// -- Account setup (docs/desktop-client-plan.md 3.6) ----------------------------------------
+
+/// Where an account method runs: answered now, on the caller's thread, or on a worker lane
+/// when it reaches a server or waits on the store (tests, sign-ins, revocation, deletions,
+/// restarts of every account).
+fn account_call(engine: Arc<Engine>, req: &RpcRequest) -> SocketParentCall {
+    match account_job(engine, req) {
+        Ok(call) => call,
+        Err(e) => SocketParentCall::Now(Err(e)),
+    }
+}
+
+fn account_job(engine: Arc<Engine>, req: &RpcRequest) -> Result<SocketParentCall, ErrorObject> {
+    use SocketParentCall::{Later, Now};
+    let flag = |name: &str| req.params.get(name) == Some(&json!(true));
+    let named = |req: &RpcRequest| -> Option<Arc<str>> {
+        req.params
+            .get("accountId")
+            .and_then(Value::as_str)
+            .map(Into::into)
+    };
+    let later =
+        |lane: &'static workers::Lane,
+         account: Option<Arc<str>>,
+         work: Box<dyn FnOnce() -> Reply + Send>| { Ok(Later((lane, account, work))) };
+    let req = req.clone();
+    match req.method.as_str() {
+        method::ACCOUNT_DISCOVER => {
+            let p: AccountDiscoverParams = req.params_as()?;
+            later(
+                &workers::ACCOUNT_SETUP,
+                None,
+                Box::new(move || accounts_api::discover(&p)),
+            )
+        }
+        method::ACCOUNT_OAUTH_BEGIN => Ok(Now(engine.oauth_begin(&req))),
+        method::ACCOUNT_OAUTH_COMPLETE => {
+            let p: OAuthCompleteParams = req.params_as()?;
+            later(
+                &workers::ACCOUNT_SETUP,
+                None,
+                Box::new(move || engine.oauth_complete(&p)),
+            )
+        }
+        method::ACCOUNT_ADD if flag("test") => {
+            let account = req
+                .params
+                .pointer("/account/id")
+                .and_then(Value::as_str)
+                .map(Into::into);
+            later(
+                &workers::ACCOUNT_SETUP,
+                account,
+                Box::new(move || engine.add(&req)),
+            )
+        }
+        method::ACCOUNT_ADD => Ok(Now(engine.add(&req))),
+        method::ACCOUNT_SET_SECRETS if flag("test") => {
+            let account = named(&req);
+            later(
+                &workers::ACCOUNT_SETUP,
+                account,
+                Box::new(move || engine.set_secrets(&req)),
+            )
+        }
+        method::ACCOUNT_SET_SECRETS => Ok(Now(engine.set_secrets(&req))),
+        method::ACCOUNT_UPDATE => Ok(Now(engine.update(&req))),
+        method::ACCOUNT_REORDER => Ok(Now(engine.reorder(&req))),
+        method::ACCOUNT_REMOVE if flag("revoke") || flag("deleteData") => {
+            let account = named(&req);
+            later(
+                &workers::ACCOUNT_RESET,
+                account,
+                Box::new(move || engine.remove(&req)),
+            )
+        }
+        method::ACCOUNT_REMOVE => Ok(Now(engine.remove(&req))),
+        method::ACCOUNT_TEST => {
+            let p: AccountTestParams = req.params_as()?;
+            let mut json = p.account;
+            if let Some(secrets) = &p.secrets {
+                secrets.apply_to(&mut json);
+            }
+            if registry::account_id(&json).is_none() {
+                accounts_api::prepare_new_account(&mut json);
+            }
+            let account = parse_account(json)?;
+            let id = account.id().into();
+            later(
+                &workers::ACCOUNT_TEST,
+                Some(id),
+                Box::new(move || engine.test_account(&account).map(tested_publicly)),
+            )
+        }
+        method::ACCOUNT_RESET => {
+            let p = req.params_as::<AccountResetParams>()?;
+            let id = p.account_id.as_str().into();
+            later(
+                &workers::ACCOUNT_RESET,
+                Some(id),
+                Box::new(move || engine.reset_account(&p.account_id, p.keep_metadata)),
+            )
+        }
+        method::SECRETS_SET => Ok(Now(engine.secrets_set(&req))),
+        method::SECRETS_DELETE => Ok(Now(engine.secrets_delete(&req))),
+        method::SECRETS_HAS => Ok(Now(engine.secrets_has(&req))),
+        method::SERVER_SET | method::SERVER_CLEAR => later(
+            &workers::ENGINE_MAINTENANCE,
+            None,
+            Box::new(move || engine.server_call(&req)),
+        ),
+        other => Err(ErrorObject::new(
+            code::METHOD_NOT_FOUND,
+            format!("unknown method {other}"),
+        )),
+    }
+}
+
+/// `account.test`'s result without the secrets of its `account`.
+fn tested_publicly(mut result: Value) -> Value {
+    if let Some(account) = result.get_mut("account").filter(|a| a.is_object()) {
+        *account = registry::strip_secrets(account);
+    }
+    result
+}
+
+fn internal(e: impl std::fmt::Display) -> ErrorObject {
+    ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
+}
+
+/// Not started until the client sends its credentials again.
+fn needs_credentials_error(message: &str) -> Value {
+    json!({
+        "what": ms_core::error::SYNC_ERROR_WHAT,
+        "key": "ErrorAccountNotStarted",
+        "debuginfo": message,
+        "retryable": false,
+        "offline": false,
+    })
+}
+
+/// The most names `secrets.has` takes.
+const MAX_SECRET_NAMES: usize = 256;
+
+impl Engine {
+    /// The identity for an account added without one: the latest `account.add` gave, or
+    /// else the Tern server of `server.set` with its token, or none.
+    fn default_identity(&self) -> Value {
+        let explicit = self.identity_lock().clone();
+        if !explicit.is_null() {
+            return explicit;
+        }
+        self.server_identity()
+    }
+
+    fn server_identity(&self) -> Value {
+        let Some(server) = self.registered.server() else {
+            return Value::Null;
+        };
+        let token = match self.registered.secret(ms_secrets::names::TERN_SERVER_TOKEN) {
+            Ok(Some(t)) => t,
+            Ok(None) => {
+                warn!(
+                    "-X A Tern server is set but its token isn't stored; syncing metadata locally"
+                );
+                return Value::Null;
+            }
+            Err(e) => {
+                warn!("-X The Tern server's token can't be read: {e}");
+                return Value::Null;
+            }
+        };
+        let field = |k: &str| {
+            server
+                .get(k)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned()
+        };
+        TernServer {
+            url: field("url"),
+            token,
+            user_id: field("userId"),
+            server_id: field("serverId"),
+        }
+        .to_json()
+    }
+
+    /// `account.oauth.begin`. A reconnect names a registered account of the same provider.
+    fn oauth_begin(&self, req: &RpcRequest) -> Reply {
+        let p: OAuthBeginParams = req.params_as()?;
+        if let Some(id) = &p.account_id {
+            let registered = self
+                .registered
+                .get(id)
+                .ok_or_else(|| socket::unknown_account(id))?;
+            if registered.get("provider").and_then(Value::as_str) != Some(p.provider.as_str()) {
+                return Err(invalid(format!(
+                    "invalid params: account {id} is not a {} account",
+                    p.provider
+                )));
+            }
+        }
+        serde_json::to_value(self.oauth.begin(&p)?).map_err(internal)
+    }
+
+    /// `account.oauth.complete`: exchanges the code, reads the profile, fills in the servers
+    /// and adds the account as `account.add {test}` would. A reconnect keeps the account's
+    /// id and settings and replaces only its grant.
+    fn oauth_complete(&self, p: &OAuthCompleteParams) -> Reply {
+        let session = self.oauth.take(p)?;
+        let signed_in = accounts_api::sign_in(&session, &p.code)?;
+        let address = |v: &Value| {
+            v.get("emailAddress")
+                .and_then(Value::as_str)
+                .map(str::to_lowercase)
+        };
+        let json = match &session.account_id {
+            Some(id) => {
+                let mut registered = self
+                    .registered
+                    .get(id)
+                    .ok_or_else(|| socket::unknown_account(id))?;
+                if address(&registered) != address(&signed_in) {
+                    return Err(ErrorObject::new(
+                        code::OAUTH_FAILED,
+                        format!(
+                            "You signed in as {}, not as the account's {}",
+                            address(&signed_in).unwrap_or_default(),
+                            address(&registered).unwrap_or_default()
+                        ),
+                    )
+                    .with_data(json!({ "key": "wrong-account" })));
+                }
+                if let Some(settings) = registered
+                    .get_mut("settings")
+                    .and_then(Value::as_object_mut)
+                {
+                    for k in ["refresh_client_id", "refresh_token"] {
+                        if let Some(v) = signed_in.pointer(&format!("/settings/{k}")) {
+                            settings.insert(k.to_owned(), v.clone());
+                        }
+                    }
+                }
+                registered
+            }
+            None => accounts_api::with_discovered_servers(
+                signed_in,
+                session.container_folder.as_deref(),
+            ),
+        };
+        let fallback = registry::stored_form(&json);
+        let added: AccountAddResult = serde_json::from_value(self.add_account(
+            json,
+            Value::Null,
+            p.test.unwrap_or(true),
+            session.account_id.is_some(),
+        )?)
+        .map_err(internal)?;
+        let account = self.registered.get(&added.account_id).unwrap_or(fallback);
+        serde_json::to_value(OAuthCompleteResult { account, added }).map_err(internal)
+    }
+
+    /// `account.setSecrets`: stores new credentials (the others stay) and restarts the
+    /// account with them, testing them first with `test`.
+    fn set_secrets(&self, req: &RpcRequest) -> Reply {
+        let p: AccountSetSecretsParams = req.params_as()?;
+        if p.secrets.entries().is_empty() {
+            return Err(invalid("invalid params: secrets names none"));
+        }
+        let mut json = self
+            .registered
+            .get(&p.account_id)
+            .ok_or_else(|| socket::unknown_account(&p.account_id))?;
+        p.secrets.apply_to(&mut json);
+        let identity = self
+            .lock()
+            .get(&p.account_id)
+            .map(|s| s.identity.clone())
+            .unwrap_or(Value::Null);
+        self.add_account(json, identity, p.test, true)
+    }
+
+    /// `account.update`: patches the registered account. A change of where it connects
+    /// deletes its secrets and stops it until `account.setSecrets`; another change but how
+    /// it is shown restarts it.
+    fn update(&self, req: &RpcRequest) -> Reply {
+        let p: AccountUpdateParams = req.params_as()?;
+        let id = p.account_id;
+        let before = self
+            .registered
+            .get(&id)
+            .ok_or_else(|| socket::unknown_account(&id))?;
+        let after = registry::patched(&before, &p.patch)
+            .map(|a| registry::stored_form(&a))
+            .map_err(|e| invalid(format!("invalid params: {e}")))?;
+        // Checked as an account whatever secrets it holds: they aren't in `after`.
+        let mut probe = after.clone();
+        if let Some(settings) = probe.get_mut("settings").and_then(Value::as_object_mut) {
+            for k in ["imap_password", "smtp_password", "refresh_token"] {
+                settings.entry(k).or_insert_with(|| json!("-"));
+            }
+        }
+        parse_account(probe)?;
+        let result = |secrets_cleared, restarted| {
+            serde_json::to_value(AccountUpdateResult {
+                account: after.clone(),
+                secrets_cleared,
+                restarted,
+            })
+            .map_err(internal)
+        };
+        if after == before {
+            return result(false, false);
+        }
+        let cleared = self.registered.update(&id, &after).map_err(internal)?;
+        self.announce(&after);
+        let shown_only = {
+            let hide = |v: &Value| {
+                let mut v = v.clone();
+                if let Some(fields) = v.as_object_mut() {
+                    for k in ACCOUNT_DISPLAY_FIELDS {
+                        fields.remove(*k);
+                    }
+                }
+                v
+            };
+            hide(&before) == hide(&after)
+        };
+        let slot = self.lock().get(&id).map(|s| s.identity.clone());
+        if cleared {
+            info!("Account {id} moved to other servers; its secrets are deleted");
+            if slot.is_some() {
+                self.remove_account(&id, false)?;
+            }
+            let error = needs_credentials_error(
+                "the account's servers changed: send its credentials again (account.setSecrets)",
+            );
+            self.unstarted_lock().insert(id.clone(), error.clone());
+            self.notify_state(&id, account_state::STOPPED, Some(error));
+            return result(true, false);
+        }
+        let Some(identity) = slot else {
+            return result(false, false);
+        };
+        if shown_only {
+            let mut reg = self.lock();
+            if let Some(s) = reg.get_mut(&id) {
+                let patched = registry::patched(s.account.as_json(), &p.patch)
+                    .ok()
+                    .and_then(|j| Account::from_json(j).ok());
+                if let Some(a) = patched {
+                    s.account = Arc::new(a);
+                }
+            }
+            return result(false, false);
+        }
+        info!("Restarting account {id} with new settings");
+        let full = self
+            .registered
+            .with_secrets(after.clone())
+            .map_err(internal)?;
+        let account = parse_account(full)?;
+        self.restarts_lock().remove(&id);
+        self.remove_account(&id, false)?;
+        self.start(account, identity)?;
+        result(false, true)
+    }
+
+    /// `account.reorder`.
+    fn reorder(&self, req: &RpcRequest) -> Reply {
+        let p: AccountReorderParams = req.params_as()?;
+        self.registered.reorder(&p.ids).map_err(internal)?;
+        Ok(json!({}))
+    }
+
+    /// `secrets.set`: a secret that isn't an account's (`integration:<provider>`,
+    /// `tern-server-token`, ...). Accounts started after a `tern-server-token` change use it;
+    /// `server.set` restarts the running ones.
+    fn secrets_set(&self, req: &RpcRequest) -> Reply {
+        let p: SecretsSetParams = req.params_as()?;
+        if !registry::writable_secret_name(&p.name) {
+            return Err(invalid(format!(
+                "invalid params: {:?} is not a secret name secrets.set writes",
+                p.name
+            )));
+        }
+        if p.value.is_empty() || p.value.len() > registry::MAX_SECRET_BYTES {
+            return Err(invalid(format!(
+                "invalid params: the value must hold 1 to {} bytes",
+                registry::MAX_SECRET_BYTES
+            )));
+        }
+        self.registered
+            .set_secret(&p.name, &p.value)
+            .map_err(internal)?;
+        info!("Secret {} stored", p.name);
+        Ok(json!({}))
+    }
+
+    fn secrets_delete(&self, req: &RpcRequest) -> Reply {
+        let p: SecretsDeleteParams = req.params_as()?;
+        if !registry::writable_secret_name(&p.name) {
+            return Err(invalid(format!(
+                "invalid params: {:?} is not a secret name secrets.delete deletes",
+                p.name
+            )));
+        }
+        self.registered.delete_secret(&p.name).map_err(internal)?;
+        info!("Secret {} deleted", p.name);
+        Ok(json!({}))
+    }
+
+    /// `secrets.has`: whether each name holds a value; any name, an account's included.
+    fn secrets_has(&self, req: &RpcRequest) -> Reply {
+        let p: SecretsHasParams = req.params_as()?;
+        if p.names.len() > MAX_SECRET_NAMES || p.names.iter().any(|n| n.len() > 256) {
+            return Err(invalid(format!(
+                "invalid params: at most {MAX_SECRET_NAMES} names of up to 256 bytes"
+            )));
+        }
+        let found = self.registered.has_secrets(&p.names).map_err(internal)?;
+        serde_json::to_value(found).map_err(internal)
+    }
+
+    /// `server.set` / `server.clear`: the Tern server the accounts sync metadata with. The
+    /// running accounts restart with it (or with none).
+    fn server_call(&self, req: &RpcRequest) -> Reply {
+        if req.method == method::SERVER_SET {
+            let p: ServerSetParams = req.params_as()?;
+            let probe = TernServer {
+                url: p.url.clone(),
+                token: "token".into(),
+                user_id: p.user_id.clone(),
+                server_id: p.server_id.clone(),
+            };
+            TernServer::from_json(&probe.to_json())
+                .map_err(|e| invalid(format!("invalid params: {}: {}", e.field, e.reason)))?;
+            self.registered
+                .set_server(&json!({"url": p.url, "userId": p.user_id, "serverId": p.server_id}))
+                .map_err(internal)?;
+            info!("Tern server set to {}", probe.host());
+        } else {
+            self.registered.clear_server().map_err(internal)?;
+            info!("Tern server cleared; metadata syncs locally");
+        }
+        // The server replaces the identity clients passed to account.add.
+        *self.identity_lock() = Value::Null;
+        let restarted = self.restart_running(Some(self.server_identity()))?;
+        Ok(json!({ "restarted": restarted }))
     }
 }
 
@@ -1350,6 +1930,24 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
             }
             crate::platform::exit_now(EXIT_OK);
         }
+        if socket::is_account_method(&req.method) {
+            let request_id = req.id.clone();
+            let answer = move |result: Reply| {
+                if let Some(id) = request_id {
+                    respond(&match result {
+                        Ok(v) => Response::ok(Some(id), v),
+                        Err(e) => Response::err(Some(id), e),
+                    });
+                }
+            };
+            match account_call(engine.clone(), &req) {
+                SocketParentCall::Now(r) => answer(r),
+                SocketParentCall::Later((lane, account, work)) => {
+                    lane.submit(account, work, answer)
+                }
+            }
+            continue;
+        }
         if is_slow_parent_method(&req.method) {
             let request_id = req.id.clone();
             let answer = move |result: Reply| {
@@ -1379,40 +1977,15 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
 fn is_slow_parent_method(name: &str) -> bool {
     matches!(
         name,
-        method::ACCOUNT_TEST
-            | method::ACCOUNT_RESET
-            | method::ENGINE_RESET_DATABASE
-            | method::ENGINE_SET_LOG_LEVEL
+        method::ENGINE_RESET_DATABASE | method::ENGINE_SET_LOG_LEVEL
     )
 }
 
-/// A slow parent method's job for its lane's workers ([`crate::workers`]), which answer when
-/// done, on stdin or on a detached engine's socket. The account methods' jobs carry the
-/// account's id, so they log to its log, and their lanes are contained: a panic is answered
-/// as an error instead of ending the process. The engine-wide ones run one at a time and
-/// abort on a panic, as the stdin thread would.
+/// A slow engine method's job for its lane's workers ([`crate::workers`]), which answer
+/// when done, on stdin or on a detached engine's socket. They run one at a time and abort on
+/// a panic, as the stdin thread would.
 fn slow_parent_job(engine: Arc<Engine>, req: &RpcRequest) -> Result<SocketJob, ErrorObject> {
     Ok(match req.method.as_str() {
-        method::ACCOUNT_TEST => {
-            let account = req
-                .params_as::<AccountTestParams>()
-                .and_then(|p| parse_account(p.account))?;
-            let id = account.id().into();
-            (
-                &workers::ACCOUNT_TEST,
-                Some(id),
-                Box::new(move || engine.test_account(&account)),
-            )
-        }
-        method::ACCOUNT_RESET => {
-            let p = req.params_as::<AccountResetParams>()?;
-            let id = p.account_id.as_str().into();
-            (
-                &workers::ACCOUNT_RESET,
-                Some(id),
-                Box::new(move || engine.reset_account(&p.account_id, p.keep_metadata)),
-            )
-        }
         method::ENGINE_RESET_DATABASE => {
             let p = req.params_as::<ResetDatabaseParams>()?;
             (
@@ -1438,8 +2011,6 @@ fn respond(response: &Response) {
 
 fn handle_parent(engine: &Engine, session: &mut Session, req: &RpcRequest) -> Reply {
     match req.method.as_str() {
-        method::ACCOUNT_ADD => engine.add(req),
-        method::ACCOUNT_REMOVE => engine.remove(req),
         method::CREDENTIALS_IMPORT => engine.import(req),
         method::TEST_CRASH | method::TEST_PANIC if cfg!(debug_assertions) => {
             engine.test_failure(req)

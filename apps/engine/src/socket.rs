@@ -613,6 +613,16 @@ pub trait Accounts: Send + Sync {
     fn socket_parent_call(&self, _req: &RpcRequest) -> Option<SocketParentCall> {
         None
     }
+    /// An account method ([`is_account_method`]): `Some` when this engine takes them
+    /// (`serve`, on any connection the relay policy lets through).
+    fn account_call(&self, _req: &RpcRequest) -> Option<SocketParentCall> {
+        None
+    }
+    /// A stored secret that isn't an account's (`integration:<provider>`), for the engine's
+    /// own calls; never sent to a client.
+    fn secret(&self, _name: &str) -> Option<String> {
+        None
+    }
 }
 
 /// A job for a worker lane: the lane, the account it logs for, and the work.
@@ -622,7 +632,7 @@ pub type SocketJob = (
     Box<dyn FnOnce() -> Reply + Send>,
 );
 
-/// How a detached engine answers a parent method on its socket.
+/// How the engine answers a parent or account method on its socket.
 pub enum SocketParentCall {
     Now(Reply),
     /// Run on the lane's workers and answered when done, out of order with the
@@ -1036,6 +1046,7 @@ fn features(server: &Server) -> Vec<String> {
     .to_vec();
     if server.accounts.credentials().is_some() {
         out.push(feature::ACCOUNTS.to_owned());
+        out.push(feature::ACCOUNT_SETUP.to_owned());
     }
     if server.settings.is_some() {
         out.push(feature::SETTINGS.to_owned());
@@ -1213,15 +1224,34 @@ fn public_accounts(method_name: &str, mut v: Value) -> Value {
     v
 }
 
-/// The methods only `serve` mode's parent channel takes.
+/// `serve`'s account methods (docs/desktop-client-plan.md 3.6), on stdin and the socket.
+pub fn is_account_method(name: &str) -> bool {
+    matches!(
+        name,
+        method::ACCOUNT_DISCOVER
+            | method::ACCOUNT_OAUTH_BEGIN
+            | method::ACCOUNT_OAUTH_COMPLETE
+            | method::ACCOUNT_ADD
+            | method::ACCOUNT_TEST
+            | method::ACCOUNT_SET_SECRETS
+            | method::ACCOUNT_UPDATE
+            | method::ACCOUNT_REORDER
+            | method::ACCOUNT_REMOVE
+            | method::ACCOUNT_RESET
+            | method::SECRETS_SET
+            | method::SECRETS_DELETE
+            | method::SECRETS_HAS
+            | method::SERVER_SET
+            | method::SERVER_CLEAR
+    )
+}
+
+/// The methods only `serve` mode's parent channel takes (and a detached engine's socket,
+/// `credentials.import` aside).
 pub fn is_parent_method(name: &str) -> bool {
     matches!(
         name,
-        method::ACCOUNT_ADD
-            | method::ACCOUNT_REMOVE
-            | method::CREDENTIALS_IMPORT
-            | method::ACCOUNT_TEST
-            | method::ACCOUNT_RESET
+        method::CREDENTIALS_IMPORT
             | method::ENGINE_RESET_DATABASE
             | method::ENGINE_SET_LOG_LEVEL
             | method::ENGINE_SHUTDOWN
@@ -1360,10 +1390,14 @@ impl Connection {
             // serve's, beside the settings that decide their capabilities.
             name if is_integrations_method(name) && self.session.server.settings.is_some() => {
                 let id = req.id.clone();
+                let accounts = self.session.server.accounts.clone();
                 self.answer_later(
                     &workers::INTEGRATIONS,
                     id,
-                    Box::new(move || integrations_api::call(&req)),
+                    Box::new(move || {
+                        let req = integrations_api::with_stored_key(req, |n| accounts.secret(n));
+                        integrations_api::call(&req)
+                    }),
                 );
                 return None;
             }
@@ -1392,6 +1426,19 @@ impl Connection {
                     Err(e) => Err(e),
                 }
             }
+            name if is_account_method(name) => {
+                match self.session.server.accounts.account_call(&req) {
+                    Some(SocketParentCall::Now(r)) => r,
+                    Some(SocketParentCall::Later((lane, account, work))) => {
+                        self.answer_later_for(lane, account, req.id, work);
+                        return None;
+                    }
+                    None => Err(ErrorObject::new(
+                        code::METHOD_NOT_FOUND,
+                        format!("{name} is served by serve mode's engine only"),
+                    )),
+                }
+            }
             name if is_parent_method(name) && self.session.server.accounts.has_parent_channel() => {
                 if self.relay.is_none() {
                     match self.session.server.accounts.socket_parent_call(&req) {
@@ -1412,7 +1459,7 @@ impl Connection {
                     code::WRONG_CHANNEL,
                     format!(
                         "{name} is only accepted on the engine's stdin, from the process that \
-                         started it: account credentials never go over the socket"
+                         started it"
                     ),
                 ))
             }

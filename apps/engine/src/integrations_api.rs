@@ -3,8 +3,8 @@
 
 //! The `integrations.*` methods on `serve`'s socket (docs/integrations-plan.md section 4),
 //! over [`ms_integrations`], and the engine's `capabilities` (docs/desktop-client-plan.md
-//! 3.1). Each call carries its provider `config`, key included, until the engine owns the
-//! credentials (3.6); nothing here keeps or logs it. The socket runs the calls on the
+//! 3.1). Each call carries its provider `config`; a key it lacks comes from the secret
+//! store (`integration:<provider>`, [`with_stored_key`]). Nothing here keeps or logs it. The socket runs the calls on the
 //! integrations workers ([`crate::workers::INTEGRATIONS`]), since one can take up to 30 s.
 
 use std::sync::{Arc, Mutex};
@@ -86,6 +86,30 @@ fn integrations() -> Result<Arc<Integrations>, ErrorObject> {
     let ix = Arc::new(Integrations::new().map_err(failed)?);
     *shared = Some(ix.clone());
     Ok(ix)
+}
+
+/// `req` with a `config` that names a provider but no `apiKey` given the key stored under
+/// `integration:<provider>` (`secrets.set`), when there is one. LanguageTool's key goes
+/// with a username, so it is filled in only beside one.
+pub fn with_stored_key(mut req: RpcRequest, secret: impl Fn(&str) -> Option<String>) -> RpcRequest {
+    let Some(config) = req.params.get_mut("config").and_then(Value::as_object_mut) else {
+        return req;
+    };
+    let blank = |v: Option<&Value>| {
+        v.and_then(Value::as_str)
+            .is_none_or(|s| s.trim().is_empty())
+    };
+    let Some(provider) = config.get("provider").and_then(Value::as_str) else {
+        return req;
+    };
+    if !blank(config.get("apiKey")) || (provider == "languagetool" && blank(config.get("username")))
+    {
+        return req;
+    }
+    if let Some(key) = secret(&ms_secrets::names::integration(provider)) {
+        config.insert("apiKey".into(), Value::String(key));
+    }
+    req
 }
 
 /// Answers one `integrations.*` request. Blocking: run it on a worker.
@@ -218,6 +242,36 @@ mod tests {
 
     fn caps(settings: Value) -> Value {
         serde_json::to_value(capabilities(settings.as_object().unwrap())).unwrap()
+    }
+
+    #[test]
+    fn stored_keys_fill_missing_ones() {
+        let req = |config: Value| {
+            RpcRequest::new(1, method::INTEGRATIONS_TEST, json!({ "config": config }))
+        };
+        let store = |n: &str| (n == "integration:deepl").then(|| "stored".to_owned());
+        let filled = |config: Value| with_stored_key(req(config), store).params["config"].clone();
+        assert_eq!(filled(json!({"provider": "deepl"}))["apiKey"], "stored");
+        assert_eq!(
+            filled(json!({"provider": "deepl", "apiKey": " "}))["apiKey"],
+            "stored"
+        );
+        assert_eq!(
+            filled(json!({"provider": "deepl", "apiKey": "mine"}))["apiKey"],
+            "mine"
+        );
+        assert_eq!(
+            filled(json!({"provider": "libretranslate"})).get("apiKey"),
+            None
+        );
+        let lt = |n: &str| (n == "integration:languagetool").then(|| "k".to_owned());
+        let no_user = with_stored_key(req(json!({"provider": "languagetool"})), lt);
+        assert_eq!(no_user.params["config"].get("apiKey"), None);
+        let user = with_stored_key(
+            req(json!({"provider": "languagetool", "username": "u"})),
+            lt,
+        );
+        assert_eq!(user.params["config"]["apiKey"], "k");
     }
 
     #[test]

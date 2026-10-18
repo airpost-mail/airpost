@@ -392,15 +392,16 @@ fn two_accounts_listed_routed_and_logged_apart() {
     assert_eq!(seen["t-a"], A);
     assert_eq!(seen["t-b"], B);
 
-    // Credentials only come in on stdin.
-    for m in [
-        method::ACCOUNT_ADD,
-        method::ACCOUNT_REMOVE,
-        method::ENGINE_SHUTDOWN,
-    ] {
-        let p = json!({ "account": account("e0-other"), "accountId": A });
-        assert_eq!(c.call(m, p).unwrap_err().code(), Some(code::WRONG_CHANNEL));
-    }
+    // The engine methods only come in on stdin; the account methods on the socket too.
+    let p = json!({ "account": account("e0-other"), "accountId": A });
+    assert_eq!(
+        c.call(method::ENGINE_SHUTDOWN, p).unwrap_err().code(),
+        Some(code::WRONG_CHANNEL)
+    );
+    let unknown = c
+        .call(method::ACCOUNT_REMOVE, json!({ "accountId": "e0-none" }))
+        .unwrap_err();
+    assert_eq!(unknown.code(), Some(code::UNKNOWN_ACCOUNT));
     assert_eq!(
         e.parent
             .call(method::SUBSCRIBE, json!({}))
@@ -863,21 +864,21 @@ fn account_test_on_stdin_runs_beside_other_calls() {
     assert_eq!(result["account"], Value::Null);
     assert!(result["log"].is_string());
 
-    // Refused: an account the engine cannot read, and the socket.
+    // Refused: an account the engine cannot read, and the engine methods on the socket,
+    // which takes the account ones.
     let bad = e
         .parent
         .call(method::ACCOUNT_TEST, json!({ "account": { "id": "x" } }))
         .unwrap_err();
     assert_eq!(bad.code, code::INVALID_PARAMS);
     let mut c = e.hello();
-    for m in [
-        method::ACCOUNT_TEST,
-        method::ACCOUNT_RESET,
-        method::ENGINE_RESET_DATABASE,
-        method::ENGINE_SET_LOG_LEVEL,
-    ] {
+    for m in [method::ENGINE_RESET_DATABASE, method::ENGINE_SET_LOG_LEVEL] {
         let err = c.call(m, json!({})).unwrap_err();
         assert_eq!(err.code(), Some(code::WRONG_CHANNEL), "{m}");
+    }
+    for m in [method::ACCOUNT_TEST, method::ACCOUNT_RESET] {
+        let err = c.call(m, json!({})).unwrap_err();
+        assert_eq!(err.code(), Some(code::INVALID_PARAMS), "{m}");
     }
     e.stop();
 }
@@ -906,12 +907,12 @@ fn account_reset_forgets_the_account_and_deletes_its_rows() {
     );
     next_matching(&mut sub, |v| is_state(v, A, "removed"));
     let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
-    // Still registered, so listed as stopped until it is added again.
+    // Still registered, so listed as stopped until it is added again, in its place.
     assert_eq!(
         states(&status),
         [
-            (B.to_owned(), "running".to_owned()),
-            (A.to_owned(), "stopped".to_owned())
+            (A.to_owned(), "stopped".to_owned()),
+            (B.to_owned(), "running".to_owned())
         ]
     );
 
@@ -1659,43 +1660,103 @@ fn relayed(c: &mut Client, scopes: Value) {
     .unwrap();
 }
 
-/// A relayed connection is a remote device, so a detached engine's socket keeps its parent
-/// methods from it, admin scope or not.
+/// A relayed connection is a remote device: it makes none of the local-only methods (T13)
+/// without the admin scope, and none of the engine's, admin scope or not.
 #[test]
-fn a_detached_engine_refuses_parent_methods_on_relayed_connections() {
+fn a_relayed_connection_is_refused_every_local_only_method() {
     let e = Detached::start(&[]);
     assert_eq!(
         add_on(&mut e.hello(), account(B)).unwrap()["state"],
         "running"
     );
-    for scopes in [json!([]), json!(["admin"])] {
-        let mut r = e.connect();
-        relayed(&mut r, scopes.clone());
-        let calls = [
-            (
-                method::ACCOUNT_ADD,
-                json!({ "account": account(A), "identity": null }),
-            ),
-            (method::ACCOUNT_REMOVE, json!({ "accountId": B })),
-            (method::ACCOUNT_TEST, json!({ "account": account(A) })),
-            (method::ACCOUNT_RESET, json!({ "accountId": B })),
-            (method::ENGINE_RESET_DATABASE, json!({})),
-            (method::ENGINE_SET_LOG_LEVEL, json!({ "verboseUntil": 0 })),
-            (method::ENGINE_SHUTDOWN, json!({})),
-            (
-                method::CREDENTIALS_IMPORT,
-                json!({ "accounts": [], "secrets": {} }),
-            ),
-        ];
-        for (name, params) in calls {
-            let refused = r.call(name, params).unwrap_err();
-            assert_eq!(
-                refused.code(),
-                Some(code::FORBIDDEN_RELAYED),
-                "{name} with {scopes}: {refused:?}"
-            );
-        }
+    let local_only = [
+        (
+            method::ACCOUNT_ADD,
+            json!({ "account": account(A), "identity": null }),
+        ),
+        (method::ACCOUNT_REMOVE, json!({ "accountId": B })),
+        (method::ACCOUNT_TEST, json!({ "account": account(A) })),
+        (method::ACCOUNT_RESET, json!({ "accountId": B })),
+        (method::ACCOUNT_OAUTH_BEGIN, json!({ "provider": "gmail" })),
+        (
+            method::ACCOUNT_OAUTH_COMPLETE,
+            json!({ "sessionId": "s", "code": "c", "state": "s" }),
+        ),
+        (
+            method::ACCOUNT_SET_SECRETS,
+            json!({ "accountId": B, "secrets": { "imap_password": "p" } }),
+        ),
+        (
+            method::ACCOUNT_UPDATE,
+            json!({ "accountId": B, "patch": { "settings": { "imap_host": "elsewhere.test" } } }),
+        ),
+        (
+            method::SECRETS_SET,
+            json!({ "name": "integration:deepl", "value": "k" }),
+        ),
+        (
+            method::SECRETS_DELETE,
+            json!({ "name": "integration:deepl" }),
+        ),
+        (
+            method::SECRETS_HAS,
+            json!({ "names": ["integration:deepl"] }),
+        ),
+        (
+            method::SERVER_SET,
+            json!({ "url": "https://tern.test", "userId": "u", "serverId": "s" }),
+        ),
+        (method::SERVER_CLEAR, json!({})),
+        (method::ENGINE_LOGS_TAIL, json!({ "bytes": 10 })),
+    ];
+    let engine_only = [
+        (method::ENGINE_RESET_DATABASE, json!({})),
+        (method::ENGINE_SET_LOG_LEVEL, json!({ "verboseUntil": 0 })),
+        (method::ENGINE_SHUTDOWN, json!({})),
+        (
+            method::CREDENTIALS_IMPORT,
+            json!({ "accounts": [], "secrets": {} }),
+        ),
+    ];
+    let mut r = e.connect();
+    relayed(&mut r, json!([]));
+    for (name, params) in local_only.iter().chain(&engine_only) {
+        let refused = r.call(name, params.clone()).unwrap_err();
+        assert_eq!(
+            refused.code(),
+            Some(code::FORBIDDEN_RELAYED),
+            "{name}: {refused:?}"
+        );
     }
+    // What a device without the admin scope may still do: discovery, the order and how an
+    // account is shown.
+    let shown = r
+        .call(
+            method::ACCOUNT_UPDATE,
+            json!({ "accountId": B, "patch": { "label": "Work" } }),
+        )
+        .unwrap();
+    assert_eq!(shown["account"]["label"], "Work", "{shown}");
+    r.call(method::ACCOUNT_REORDER, json!({ "ids": [B] }))
+        .unwrap();
+
+    let mut admin = e.connect();
+    relayed(&mut admin, json!(["admin"]));
+    for (name, params) in &engine_only {
+        let refused = admin.call(name, params.clone()).unwrap_err();
+        assert_eq!(refused.code(), Some(code::FORBIDDEN_RELAYED), "{name}");
+    }
+    let has = admin
+        .call(
+            method::SECRETS_HAS,
+            json!({ "names": ["integration:deepl"] }),
+        )
+        .unwrap();
+    assert_eq!(has, json!({ "integration:deepl": false }));
+    let unknown = admin
+        .call(method::ACCOUNT_REMOVE, json!({ "accountId": "e0-none" }))
+        .unwrap_err();
+    assert_eq!(unknown.code(), Some(code::UNKNOWN_ACCOUNT));
     let list = e.hello().call(method::ACCOUNT_LIST, Value::Null).unwrap();
     assert_eq!(states(&list), running(&[B]));
     e.shutdown();
@@ -1848,4 +1909,365 @@ fn an_auth_failure_stops_the_account_until_it_is_added_again() {
     assert_eq!(stopped["params"]["authFailed"], true, "{stopped}");
     assert!(logins.load(Ordering::SeqCst) > after_stop);
     e.stop();
+}
+
+// -- Account setup (stage 12) --------------------------------------------------------------
+
+/// A mock OAuth provider and Tern endpoints: `POST /token` answers tokens, `GET /userinfo`
+/// a Google profile, `POST /revoke` 200. Records each request as `METHOD PATH`, its
+/// `Authorization` header and its body.
+fn oauth_provider() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let record = seen.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut request_line = String::new();
+            let _ = reader.read_line(&mut request_line);
+            let (mut len, mut auth) = (0, String::new());
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                    break;
+                }
+                let lower = line.to_ascii_lowercase();
+                if let Some(v) = lower.strip_prefix("content-length:") {
+                    len = v.trim().parse().unwrap_or(0);
+                }
+                if lower.starts_with("authorization:") {
+                    auth = line.trim().to_owned();
+                }
+            }
+            let mut body = vec![0; len];
+            let _ = reader.read_exact(&mut body);
+            let target: Vec<&str> = request_line.split_whitespace().take(2).collect();
+            let target = target.join(" ");
+            record.lock().unwrap().push(format!(
+                "{target}\n{auth}\n{}",
+                String::from_utf8_lossy(&body)
+            ));
+            let reply = if target.ends_with("/token") {
+                r#"{"access_token":"at","expires_in":3600,"refresh_token":"rt-s3cret"}"#
+            } else if target.ends_with("/userinfo") {
+                r#"{"email":"ben@tern.test","name":"Ben"}"#
+            } else {
+                "{}"
+            };
+            let _ = write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\
+                 Connection: close\r\n\r\n{reply}",
+                reply.len()
+            );
+        }
+    });
+    (format!("http://{addr}"), seen)
+}
+
+/// What `TERN_TEST_DISCOVERY` makes discovery return: servers that refuse connections.
+fn discovered_settings() -> Value {
+    json!({
+        "imap_host": "127.0.0.1", "imap_port": 1, "imap_username": "ben@tern.test",
+        "imap_security": "none",
+        "smtp_host": "127.0.0.1", "smtp_port": 1, "smtp_username": "ben@tern.test",
+        "smtp_security": "none",
+        "imap_allow_insecure_ssl": false, "smtp_allow_insecure_ssl": false,
+    })
+}
+
+fn is_account_id(id: &str) -> bool {
+    id.len() == 8 && id.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+#[test]
+fn oauth_sign_in_against_a_mock_provider() {
+    let (root, seen) = oauth_provider();
+    let e = Detached::start(&[
+        ("MAILSYNC_GOOGLE_TOKEN_URL", format!("{root}/token")),
+        ("MAILSYNC_GOOGLE_USERINFO_URL", format!("{root}/userinfo")),
+        ("MAILSYNC_GOOGLE_REVOKE_URL", format!("{root}/revoke")),
+        ("TERN_TEST_DISCOVERY", discovered_settings().to_string()),
+        ("MS_GMAIL_CLIENT_ID", "tern-test-client".to_owned()),
+        ("MS_GMAIL_CLIENT_SECRET", "test-client-secret".to_owned()),
+        no_retry(),
+    ]);
+    let mut c = e.hello();
+    assert!(c
+        .call(method::HELLO, json!({ "protocol": 1, "client": "t" }))
+        .unwrap()["features"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("account-setup")));
+
+    let found = c
+        .call(
+            method::ACCOUNT_DISCOVER,
+            json!({ "email": "ben@tern.test" }),
+        )
+        .unwrap();
+    assert_eq!(
+        found["account"]["settings"]["imap_host"], "127.0.0.1",
+        "{found}"
+    );
+    let bad = c
+        .call(method::ACCOUNT_DISCOVER, json!({ "email": "ben@10.0.0.1" }))
+        .unwrap_err();
+    assert_eq!(bad.code(), Some(code::INVALID_PARAMS));
+
+    let begun = c
+        .call(
+            method::ACCOUNT_OAUTH_BEGIN,
+            json!({ "provider": "gmail", "redirectPort": 4567 }),
+        )
+        .unwrap();
+    assert_eq!(begun["redirectUri"], "http://127.0.0.1:4567");
+    let url = begun["authUrl"].as_str().unwrap();
+    let state = begun["state"].as_str().unwrap();
+    for part in [
+        "client_id=tern-test-client".to_owned(),
+        format!("state={state}"),
+        "code_challenge_method=S256".to_owned(),
+        "redirect_uri=http%3A%2F%2F127.0.0.1%3A4567".to_owned(),
+    ] {
+        assert!(url.contains(&part), "{part} in {url}");
+    }
+    assert!(!url.contains("test-client-secret"), "{url}");
+    let session = begun["sessionId"].clone();
+    let complete = |state: &str| json!({ "sessionId": session, "code": "the-code", "state": state, "test": false });
+    let wrong = c
+        .call(method::ACCOUNT_OAUTH_COMPLETE, complete("forged"))
+        .unwrap_err();
+    assert_eq!(wrong.code(), Some(code::INVALID_PARAMS), "{wrong:?}");
+
+    let done = c
+        .call(method::ACCOUNT_OAUTH_COMPLETE, complete(state))
+        .unwrap();
+    assert!(!done.to_string().contains("s3cret"), "{done}");
+    let id = done["accountId"].as_str().unwrap().to_owned();
+    assert!(is_account_id(&id), "{done}");
+    assert_eq!(done["state"], "running", "{done}");
+    assert_eq!(done["stored"], true);
+    assert_eq!(done["account"]["emailAddress"], "ben@tern.test");
+    assert_eq!(done["account"]["name"], "Ben");
+    assert_eq!(
+        done["account"]["settings"]["refresh_client_id"],
+        "tern-test-client"
+    );
+    let again = c
+        .call(method::ACCOUNT_OAUTH_COMPLETE, complete(state))
+        .unwrap_err();
+    assert_eq!(again.code(), Some(code::INVALID_PARAMS), "used once");
+
+    let requests = seen.lock().unwrap().clone();
+    let exchange = requests
+        .iter()
+        .find(|r| r.contains("grant_type=authorization_code"))
+        .expect("the code exchange");
+    assert!(exchange.starts_with("POST /token"), "{exchange}");
+    for part in [
+        "code=the-code",
+        "client_id=tern-test-client",
+        "client_secret=test-client-secret",
+        "code_verifier=",
+        "redirect_uri=http%3A%2F%2F127.0.0.1%3A4567",
+    ] {
+        assert!(exchange.contains(part), "{part} in {exchange}");
+    }
+    let profile = requests
+        .iter()
+        .find(|r| r.starts_with("GET /userinfo"))
+        .expect("the profile request");
+    assert!(profile.contains("Bearer at"), "{profile}");
+
+    let has = c
+        .call(
+            method::SECRETS_HAS,
+            json!({ "names": [format!("account:{id}:refresh-token")] }),
+        )
+        .unwrap();
+    assert_eq!(has[format!("account:{id}:refresh-token")], true, "{has}");
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert!(!list.to_string().contains("s3cret"), "{list}");
+
+    // A reconnect must sign in to the same mailbox.
+    let mut other = e.hello();
+    let renew = other
+        .call(
+            method::ACCOUNT_OAUTH_BEGIN,
+            json!({ "provider": "gmail", "accountId": id, "redirectPort": 4567 }),
+        )
+        .unwrap();
+    let renewed = other
+        .call(
+            method::ACCOUNT_OAUTH_COMPLETE,
+            json!({ "sessionId": renew["sessionId"], "code": "c2",
+                    "state": renew["state"], "test": false }),
+        )
+        .unwrap();
+    assert_eq!(renewed["accountId"], id.as_str());
+
+    let removed = c
+        .call(
+            method::ACCOUNT_REMOVE,
+            json!({ "accountId": id, "revoke": true, "deleteData": true }),
+        )
+        .unwrap();
+    assert_eq!(removed, json!({ "stillRunning": [] }), "{removed}");
+    let revoked = seen.lock().unwrap().clone();
+    let revoke = revoked
+        .iter()
+        .find(|r| r.starts_with("POST /revoke"))
+        .expect("the revocation");
+    assert!(revoke.contains("token=rt-s3cret"), "{revoke}");
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(states(&list), running(&[]));
+    e.shutdown();
+}
+
+#[test]
+fn accounts_secrets_and_the_server_are_edited_on_the_socket() {
+    let e = Detached::start(&[no_retry()]);
+    let mut c = e.hello();
+    let mut sub = e.hello();
+    sub.subscribe(&SubscribeParams::default()).unwrap();
+    assert_eq!(add_on(&mut c, account(A)).unwrap()["stored"], true);
+    assert_eq!(add_on(&mut c, account(B)).unwrap()["stored"], true);
+
+    // Secrets: written, never read back.
+    let key = json!({ "names": ["integration:deepl"] });
+    c.call(
+        method::SECRETS_SET,
+        json!({ "name": "integration:deepl", "value": "k3y" }),
+    )
+    .unwrap();
+    assert_eq!(
+        c.call(method::SECRETS_HAS, key.clone()).unwrap(),
+        json!({ "integration:deepl": true })
+    );
+    for name in [format!("account:{A}:imap"), "Bad Name".to_owned()] {
+        let refused = c
+            .call(method::SECRETS_SET, json!({ "name": name, "value": "x" }))
+            .unwrap_err();
+        assert_eq!(refused.code(), Some(code::INVALID_PARAMS), "{name}");
+    }
+    c.call(
+        method::SECRETS_DELETE,
+        json!({ "name": "integration:deepl" }),
+    )
+    .unwrap();
+    assert_eq!(
+        c.call(method::SECRETS_HAS, key).unwrap(),
+        json!({ "integration:deepl": false })
+    );
+
+    // How it is shown: no restart.
+    let shown = c
+        .call(
+            method::ACCOUNT_UPDATE,
+            json!({ "accountId": A, "patch": { "label": "Work" } }),
+        )
+        .unwrap();
+    assert_eq!(shown["account"]["label"], "Work");
+    assert_eq!(shown.get("restarted"), None, "{shown}");
+    let refused = c
+        .call(
+            method::ACCOUNT_UPDATE,
+            json!({ "accountId": A, "patch": { "settings": { "imap_password": "p" } } }),
+        )
+        .unwrap_err();
+    assert_eq!(refused.code(), Some(code::INVALID_PARAMS));
+
+    // Where it connects: its secrets go and it stops until it gets new ones.
+    let moved = c
+        .call(
+            method::ACCOUNT_UPDATE,
+            json!({ "accountId": A, "patch": { "settings": { "imap_port": 2 } } }),
+        )
+        .unwrap();
+    assert_eq!(moved["secretsCleared"], true, "{moved}");
+    let imap = format!("account:{A}:imap");
+    let has = c
+        .call(method::SECRETS_HAS, json!({ "names": [imap] }))
+        .unwrap();
+    assert_eq!(has[&imap], false);
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(
+        states(&list),
+        [
+            (A.to_owned(), "stopped".to_owned()),
+            (B.to_owned(), "running".to_owned())
+        ]
+    );
+    let set = c
+        .call(
+            method::ACCOUNT_SET_SECRETS,
+            json!({ "accountId": A,
+                    "secrets": { "imap_password": "n3w", "smtp_password": "n3w" } }),
+        )
+        .unwrap();
+    assert_eq!(set["state"], "running", "{set}");
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert!(!list.to_string().contains("n3w"));
+    assert_eq!(list["accounts"][0]["account"]["settings"]["imap_port"], 2);
+
+    // Order.
+    c.call(method::ACCOUNT_REORDER, json!({ "ids": [B] }))
+        .unwrap();
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(states(&list), running(&[B, A]));
+
+    // A new account without an id gets the desktop's, its secrets beside it; a failing test
+    // stores nothing.
+    let mut bare = account("unused");
+    bare.as_object_mut().unwrap().remove("id");
+    bare["emailAddress"] = json!("new@example.com");
+    let settings = bare["settings"].as_object_mut().unwrap();
+    settings.remove("imap_password");
+    settings.remove("smtp_password");
+    let tested = c
+        .call(
+            method::ACCOUNT_ADD,
+            json!({ "account": bare,
+                    "secrets": { "imap_password": "pw", "smtp_password": "pw" },
+                    "test": true }),
+        )
+        .unwrap_err();
+    assert_eq!(tested.code(), Some(code::ACCOUNT_TEST_FAILED), "{tested:?}");
+    let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
+    assert_eq!(list["accounts"].as_array().unwrap().len(), 2);
+    let added = c
+        .call(
+            method::ACCOUNT_ADD,
+            json!({ "account": bare,
+                    "secrets": { "imap_password": "pw", "smtp_password": "pw" } }),
+        )
+        .unwrap();
+    assert!(
+        is_account_id(added["accountId"].as_str().unwrap()),
+        "{added}"
+    );
+
+    // The Tern server.
+    let bad = c
+        .call(
+            method::SERVER_SET,
+            json!({ "url": "ftp://tern.test", "userId": "u", "serverId": "s" }),
+        )
+        .unwrap_err();
+    assert_eq!(bad.code(), Some(code::INVALID_PARAMS));
+    let set = c
+        .call(
+            method::SERVER_SET,
+            json!({ "url": "https://tern.test", "userId": "u", "serverId": "s" }),
+        )
+        .unwrap();
+    assert_eq!(set["restarted"].as_array().unwrap().len(), 3, "{set}");
+    let server = e.dir.path().join("server.json");
+    assert_eq!(file_mode(&server), 0o600);
+    c.call(method::SERVER_CLEAR, json!({})).unwrap();
+    assert!(!server.exists());
+    e.shutdown();
 }
