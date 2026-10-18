@@ -221,6 +221,19 @@ probed: one without STARTTLS now fails onboarding's connection test, and the use
 account is now refused with the error above until the user picks a security again (no
 migration). The stage 12 rules are in `docs/desktop-client-plan.md` under stage 12.
 
+Review fixes (roadmap/security, cce371ecf, 57b8ec13f, 860e40e0f). Lowercase `none` stored before this fix was
+often discovery's pick, not the user's (the 135 provider entries, templates with a port and no
+security, the 143/25 port switch), so the engine now refuses `none` for a non-loopback host
+unless `settings.<proto>_allow_cleartext` holds that host (`Account has imap_security "none"
+for "<host>" without imap_allow_cleartext …`); the accessors fall back to TLS the same way.
+Such an account stops on launch and goes to Reconnect, where an `imap` account gets the
+checkbox and a provider account is rediscovered (now STARTTLS). The confirmation stores the
+host it was given for, so changing the host asks again (a bare `true` doesn't count). On
+Reconnect, a stored `"None"`, empty or missing security is replaced with what discovery picks
+for the port, so the menu shows what the account holds. The web client's account form asks the
+same way (`account-draft.ts`). Harness: `account-security-refused` adds a remote-host `none`
+with a bare `true`; `account_json` stores the host consent for its `none` accounts.
+
 Verified. Typing port 143 sets IMAP security to `none`, port 25 does the same for SMTP
 (`internal_packages/onboarding/lib/page-account-settings-imap.tsx:90-98`). Discovery picks `none`
 for any IMAP port other than 993 and any SMTP port other than 465/587 (`onboarding-helpers.ts:185`,
@@ -235,7 +248,7 @@ greets with no TLS. The UI shows no warning.
   account JSON with a bad value. Stage 12 ports discovery into `ms-providers` and would copy the
   table and defaults as-is.
 - Fix: engine accepts only an explicit `"none"` as `Clear` and rejects unknown values with an
-  error (existing accounts that meant `none` already store it). UI: port 143 defaults to STARTTLS,
+  error (existing `none` values weren't always the user's choice; see the review fixes above). UI: port 143 defaults to STARTTLS,
   and saving `none` needs a "send password unencrypted" checkbox, except for `127.0.0.1` (Proton
   Bridge). Data: move the 135 entries to STARTTLS where the host supports it, drop the rest.
 - Size: ~20 Rust, ~60 TS and a data pass, ~1 day. Before stage 12, so the cleaned table is what

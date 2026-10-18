@@ -996,10 +996,13 @@ deletes SQLite after 10. 10 to 12 move credentials, which is the prerequisite fo
   empty or missing at `account.add`/`account.test` (`Account::validate`). `account.discover`
   never returns `none`: ports 143 and 25 mean STARTTLS, an autoconfig `plain` server is tried
   with STARTTLS, unknown ports default to STARTTLS. Saving `none` needs an explicit "Send
-  password unencrypted" checkbox (`settings.<imap|smtp>_allow_cleartext`), except for
-  `127.0.0.1`, `localhost` and `::1` (Proton Bridge). `ms-providers` ports the cleaned
-  `mailspring-provider-settings.json`, which has no `none` entry; the desktop rules are in
-  `internal_packages/onboarding/lib/connection-security.ts`.
+  password unencrypted" checkbox, stored as the host it was given for
+  (`settings.<imap|smtp>_allow_cleartext: "<host>"`), except for `127.0.0.1`, `localhost`
+  and `::1` (Proton Bridge); the engine refuses `none` for any other host unless that key
+  matches the host, so every client (desktop, web, CLI) has to ask. `ms-providers` ports the
+  cleaned `mailspring-provider-settings.json`, which has no `none` entry; the desktop rules
+  are in `internal_packages/onboarding/lib/connection-security.ts` (copied in
+  `apps/web/src/features/settings/accounts/account-draft.ts`).
 - Tests: id derivation vectors; OAuth against a mock provider; discovery tables (no `none`
   anywhere); a relayed connection refused on every local-only method.
 - Trial: add an IMAP account and one OAuth account (not the user's production accounts),
