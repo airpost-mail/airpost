@@ -5,6 +5,7 @@ import { ShortcutKeys } from '@/components/ShortcutKeys';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAccounts, type MessageJSON } from '@/engine';
+import { SuggestReply } from '@/features/ai';
 import { useCapability } from '@/features/settings';
 import { cn } from '@/lib/utils';
 import { AttachmentList } from './AttachmentList';
@@ -282,6 +283,9 @@ export function ComposerForm({
             </TooltipTrigger>
             <TooltipContent>Attach files</TooltipContent>
           </Tooltip>
+          {draft.threadId && draft.replyToHeaderMessageId && !draft.forwardedHeaderMessageId && (
+            <SuggestReply accountId={draft.accountId} threadId={draft.threadId} editor={editor} />
+          )}
           {templates && (
             <TemplatesMenu
               current={{ subject: draft.subject, body: draft.body }}

@@ -20,6 +20,7 @@ import {
   openComposer,
   useComposerWindows,
 } from '@/features/composer';
+import { ThreadAi } from '@/features/ai';
 import { useShortcut } from '@/lib/shortcuts';
 import { useThreadActions } from './actions';
 import { LabelChip } from './LabelChip';
@@ -192,6 +193,7 @@ export function ThreadReaderView({ accountId, threadId }: { accountId: string; t
                 ))}
               </div>
             )}
+            <ThreadAi thread={thread} messages={messages} />
           </header>
           {messages ? (
             <MessageList

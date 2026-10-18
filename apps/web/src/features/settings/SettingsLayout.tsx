@@ -7,6 +7,7 @@ import {
   PenLine,
   Plug,
   SlidersHorizontal,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -19,6 +20,7 @@ interface NavItem {
     | '/settings/signatures'
     | '/settings/shortcuts'
     | '/settings/integrations'
+    | '/settings/ai'
     | '/settings/capabilities';
   label: string;
   icon: LucideIcon;
@@ -30,6 +32,7 @@ const NAV: NavItem[] = [
   { to: '/settings/signatures', label: 'Signatures', icon: PenLine },
   { to: '/settings/shortcuts', label: 'Shortcuts', icon: Keyboard },
   { to: '/settings/integrations', label: 'Integrations', icon: Plug },
+  { to: '/settings/ai', label: 'AI', icon: Sparkles },
   { to: '/settings/capabilities', label: 'Capabilities', icon: Layers },
 ];
 

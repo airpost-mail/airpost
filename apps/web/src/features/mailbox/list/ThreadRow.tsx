@@ -3,6 +3,7 @@ import { Paperclip, Star } from 'lucide-react';
 import { memo, type MouseEvent } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { CategoryJSON, ThreadJSON } from '@/engine';
+import { TriageChip } from '@/features/ai';
 import { formatListDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { LabelChip } from '../LabelChip';
@@ -125,6 +126,7 @@ export const ThreadRow = memo(function ThreadRow({
       </Link>
 
       <span className="relative z-10 flex shrink-0 items-center gap-2">
+        <TriageChip thread={t} />
         {t.attachmentCount > 0 && (
           <Paperclip className="size-3.5 text-muted-foreground" aria-label="Has attachments" />
         )}

@@ -31,7 +31,8 @@ export function createEngineClient(opts: CreateEngineOptions = {}): EngineClient
   if (engineMode() === 'gateway') {
     return new WsEngineClient({ url: gatewayWsUrl(), classes: [...RENDERED_CLASSES], ...opts });
   }
-  return new MockEngine({ incomingEveryMs: import.meta.env.MODE === 'test' ? null : 90_000 });
+  const test = import.meta.env.MODE === 'test';
+  return new MockEngine({ incomingEveryMs: test ? null : 90_000, aiDemo: !test });
 }
 
 /** Resolves when a Task delta reports the task complete or cancelled. */

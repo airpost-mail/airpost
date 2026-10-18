@@ -56,6 +56,8 @@ export const RpcErrorCode = {
   NotAllowedRelayed: -32008,
   /** `integrations.*`: the provider failed; the message says how, `data` is the error. */
   IntegrationFailed: -32010,
+  /** `ai.*`: the model call failed; `data` is the serialized `AiErrorJSON`. */
+  AiFailed: -32011,
   /** A worker lane of the engine is full; try again later. */
   EngineBusy: -32012,
 } as const;
@@ -114,6 +116,8 @@ export interface EngineCapability {
   provider?: string;
   /** `request`: the client sends the key with each call. */
   credentials?: string;
+  /** `capabilities.ai`: the provider is on a loopback or private address. */
+  local?: boolean;
   /** Why it's unavailable: `not-set-up`, `missing-url`, `needs-tern-server`, … */
   reason?: string;
 }
@@ -167,6 +171,10 @@ export const EngineFeature = {
   Capabilities: 'capabilities',
   /** `integrations.*` on the engine (DCP stage 5). */
   Integrations: 'integrations',
+  /** `ai.*` except triage (docs/ai-plan.md section 3). */
+  Ai: 'ai',
+  /** `ai.triage.*`, the triage worker and the `core.ai.*` settings (docs/ai-plan.md 4). */
+  AiTriage: 'ai-triage',
 } as const;
 
 /** ms-ipc `EngineStatusResult`. */
@@ -449,6 +457,121 @@ export interface IntegrationTestReport {
   usage?: { used: number; limit?: number };
 }
 
+// `ai.*` (docs/ai-plan.md section 3, crates/ms-ipc/src/ai.rs). A relayed connection may
+// name a stored provider (`provider`) but never send `config` or `settings`, so the web
+// leaves both out and the engine uses its `core.ai.*` settings.
+
+/** `ai.models` and `ai.test`: a provider the engine keeps, by id. */
+export interface AiProviderParams {
+  provider?: string;
+}
+
+export interface AiThreadParams extends AiProviderParams {
+  accountId: string;
+  threadId: string;
+  /** Chosen by the client; `ai.delta` and `ai.cancel` name it. */
+  streamId?: string;
+}
+
+export interface AiSummarizeParams extends AiThreadParams {
+  refresh?: boolean;
+}
+
+/** `streamId` is for `ai.cancel` only: suggestions send no `ai.delta`. */
+export interface AiSuggestRepliesParams extends AiThreadParams {
+  count?: number;
+}
+
+export interface AiDraftReplyParams extends AiThreadParams {
+  instruction?: string;
+  suggestion?: string;
+}
+
+export interface AiTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** A summary or a draft: plain text, never rendered as HTML. */
+export interface AiCompletion {
+  text: string;
+  model: string;
+  cached?: boolean;
+  usage?: AiTokenUsage;
+}
+
+export interface AiSuggestion {
+  label: string;
+  text: string;
+}
+
+export interface AiModelInfo {
+  id: string;
+  name: string;
+  contextTokens?: number;
+}
+
+export interface AiTestReport {
+  host: string;
+  model: string;
+  local: boolean;
+  latencyMs: number;
+}
+
+export interface AiTriageRunParams extends AiProviderParams {
+  accountId: string;
+  threadIds?: string[];
+  sinceDays?: number;
+}
+
+export interface AiTriageRunResult {
+  jobId: string;
+  queued: number;
+}
+
+export interface AiTriageListParams {
+  accountIds?: string[];
+  category?: string;
+  limit: number;
+  offset?: number;
+}
+
+export interface AiTriageListResult {
+  threadIds: string[];
+  total: number;
+}
+
+export interface AiUsageRow {
+  day: string;
+  provider: string;
+  feature: string;
+  inputTokens: number;
+  outputTokens: number;
+  requests: number;
+}
+
+/** The `data` of an `AiFailed` error (ms-ai `AiError`). */
+export interface AiErrorJSON {
+  key: string;
+  message: string;
+  retryable: boolean;
+  status?: number;
+  /** Seconds. */
+  retryAfter?: number;
+}
+
+export interface AiDeltaParams {
+  streamId: string;
+  text: string;
+}
+
+export interface AiTriageProgressParams {
+  jobId: string;
+  done: number;
+  total: number;
+  stopped?: boolean;
+}
+
 export interface RpcMethods {
   hello: { params: HelloParams; result: HelloResult };
   subscribe: {
@@ -505,6 +628,17 @@ export interface RpcMethods {
   'integrations.grammar': { params: IntegrationParams; result: unknown };
   'integrations.enrich': { params: IntegrationParams; result: unknown };
   'integrations.test': { params: IntegrationParams; result: IntegrationTestReport };
+
+  // With `EngineFeature.Ai`; the triage methods with `EngineFeature.AiTriage`.
+  'ai.models': { params: AiProviderParams; result: AiModelInfo[] };
+  'ai.test': { params: AiProviderParams; result: AiTestReport };
+  'ai.summarize': { params: AiSummarizeParams; result: AiCompletion };
+  'ai.suggestReplies': { params: AiSuggestRepliesParams; result: AiSuggestion[] };
+  'ai.draftReply': { params: AiDraftReplyParams; result: AiCompletion };
+  'ai.cancel': { params: { streamId?: string; jobId?: string }; result: EmptyResult };
+  'ai.usage': { params: { days?: number }; result: AiUsageRow[] };
+  'ai.triage.run': { params: AiTriageRunParams; result: AiTriageRunResult };
+  'ai.triage.list': { params: AiTriageListParams; result: AiTriageListResult };
 }
 
 export type RpcMethodName = keyof RpcMethods;
@@ -527,6 +661,10 @@ export interface RpcNotifications {
   /** Another connection's change; never the caller's own (DCP stage 3). */
   'settings.changed': { values: SettingsValues };
   'capabilities.changed': EngineCapabilities;
+  /** The next piece of a streamed answer, to the connection that chose `streamId` only. */
+  'ai.delta': AiDeltaParams;
+  /** To the connection that called `ai.triage.run`. */
+  'ai.triage.progress': AiTriageProgressParams;
 }
 
 export type EngineNotification = {

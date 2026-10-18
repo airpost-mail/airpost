@@ -29,6 +29,7 @@ import {
 } from './mail-actions';
 import { runQuery } from './query';
 import { MockStore } from './store';
+import { MockAi } from '@/features/ai/mock';
 
 /** The desktop's send-later plugin id, which undo send also writes. */
 const SEND_LATER = 'send-later';
@@ -42,6 +43,8 @@ export const MOCK_FEATURES: readonly string[] = [
   EngineFeature.Unsubscribe,
   EngineFeature.Settings,
   EngineFeature.Capabilities,
+  EngineFeature.Ai,
+  EngineFeature.AiTriage,
 ];
 
 /**
@@ -63,6 +66,11 @@ const SETTING_KINDS: Record<string, 'count' | 'string' | 'bool' | 'object' | 'ar
   'core.integrations.translation': 'object',
   'core.integrations.grammar': 'object',
   'core.integrations.enrichment': 'object',
+  'core.ai.providers': 'array',
+  'core.ai.features': 'object',
+  'core.ai.accounts': 'array',
+  'core.ai.includeAddresses': 'bool',
+  'core.ai.limits': 'object',
 };
 const RELAYED_SETTINGS_KEYS = [
   'core.sending.undoSend',
@@ -110,6 +118,15 @@ const METHOD_FEATURE: Partial<Record<RpcMethodName, string>> = {
   'messages.unsubscribe': EngineFeature.Unsubscribe,
   'settings.get': EngineFeature.Settings,
   'settings.set': EngineFeature.Settings,
+  'ai.models': EngineFeature.Ai,
+  'ai.test': EngineFeature.Ai,
+  'ai.summarize': EngineFeature.Ai,
+  'ai.suggestReplies': EngineFeature.Ai,
+  'ai.draftReply': EngineFeature.Ai,
+  'ai.cancel': EngineFeature.Ai,
+  'ai.usage': EngineFeature.Ai,
+  'ai.triage.run': EngineFeature.AiTriage,
+  'ai.triage.list': EngineFeature.AiTriage,
 };
 
 const UNSUBSCRIBE_METHODS: readonly string[] = ['one-click', 'mailto', 'web'];
@@ -123,10 +140,12 @@ export interface MockEngineOptions {
   now?: number;
   /** Deliver a scripted incoming thread every N ms; null to disable. */
   incomingEveryMs?: number | null;
+  /** A local model set up for every account and the inboxes triaged (`npm run dev`). */
+  aiDemo?: boolean;
 }
 
 type Handlers = {
-  [M in RpcMethodName]: (params: RpcMethods[M]['params']) => RpcResult<M>;
+  [M in RpcMethodName]: (params: RpcMethods[M]['params']) => RpcResult<M> | Promise<RpcResult<M>>;
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -197,6 +216,7 @@ export class MockEngine implements EngineClient {
   private readonly uploads = new Map<string, { accountId: string; blob: Blob }>();
   /** The engine's settings store. */
   readonly settings = new Map<string, unknown>();
+  private readonly ai: MockAi;
 
   constructor(opts: MockEngineOptions = {}) {
     const l = opts.latency ?? [40, 140];
@@ -204,6 +224,17 @@ export class MockEngine implements EngineClient {
     this.incomingEveryMs = opts.incomingEveryMs ?? null;
     this.announced = opts.features ?? MOCK_FEATURES;
     this.store = new MockStore(opts.now ?? nowSeconds());
+    this.ai = new MockAi({
+      store: this.store,
+      settings: this.settings,
+      send: (n) => {
+        if (this._state === 'open') for (const l of this.notificationListeners) l(n);
+      },
+      queueTask: (accountId, task) => void this.queueTask(accountId, task),
+      requireAccount: (id) => this.requireAccount(id),
+      wait: (scale) => this.delay(scale),
+    });
+    if (opts.aiDemo) this.ai.seedDemo();
     this.handlers = this.buildHandlers();
   }
 
@@ -222,7 +253,7 @@ export class MockEngine implements EngineClient {
   async connect(): Promise<HelloResult> {
     this.setState('connecting');
     await this.delay();
-    const hello = this.handlers.hello({ protocol: PROTOCOL_VERSION, client: 'tern-web' });
+    const hello = await this.handlers.hello({ protocol: PROTOCOL_VERSION, client: 'tern-web' });
     this._features = new Set(hello.features);
     this.setState('open');
     this.subscribed = { accounts: null, classes: null };
@@ -246,7 +277,8 @@ export class MockEngine implements EngineClient {
       throw new RpcError({ code: RpcErrorCode.InternalError, message: 'engine is not connected' });
     }
     await this.delay();
-    const handler = this.handlers[method] as ((p: unknown) => RpcResult<M>) | undefined;
+    const handler = this.handlers[method] as
+      ((p: unknown) => RpcResult<M> | Promise<RpcResult<M>>) | undefined;
     const needs = METHOD_FEATURE[method];
     if (!handler || (needs && !this.announced.includes(needs))) {
       throw new RpcError({
@@ -256,7 +288,7 @@ export class MockEngine implements EngineClient {
     }
     checkParams(method, args[0], this.announced);
     // Results cross a (pretend) wire: never hand out references into the store.
-    return structuredClone(handler(args[0]));
+    return structuredClone(await handler(args[0]));
   }
 
   onNotification(listener: (n: EngineNotification) => void): Unsubscribe {
@@ -326,6 +358,7 @@ export class MockEngine implements EngineClient {
     const changes = this.store.deliverIncoming(nowSeconds(), accountId);
     if (!changes) return false;
     this.emit(changes);
+    this.ai.newMail(changes.toDeltas());
     return true;
   }
 
@@ -728,6 +761,7 @@ export class MockEngine implements EngineClient {
       'integrations.grammar': () => notImplemented('integrations.grammar'),
       'integrations.enrich': () => notImplemented('integrations.enrich'),
       'integrations.test': (p) => mockIntegrationTest(p),
+      ...this.ai.handlers(),
     };
   }
 }

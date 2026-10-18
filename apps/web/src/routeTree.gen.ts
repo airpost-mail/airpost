@@ -13,10 +13,12 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as PairRouteImport } from './routes/pair'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppCalendarRouteImport } from './routes/_app/calendar'
+import { Route as AppNeedsReplyRouteImport } from './routes/_app/needs-reply'
 import { Route as AppSearchRouteImport } from './routes/_app/search'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppAccountIdFolderIdRouteImport } from './routes/_app/$accountId/$folderId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsAiRouteImport } from './routes/_app/settings/ai'
 import { Route as AppSettingsCapabilitiesRouteImport } from './routes/_app/settings/capabilities'
 import { Route as AppSettingsIntegrationsRouteImport } from './routes/_app/settings/integrations'
 import { Route as AppSettingsShortcutsRouteImport } from './routes/_app/settings/shortcuts'
@@ -45,6 +47,11 @@ const AppCalendarRoute = AppCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AppRoute,
 } as any)
+const AppNeedsReplyRoute = AppNeedsReplyRouteImport.update({
+  id: '/needs-reply',
+  path: '/needs-reply',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSearchRoute = AppSearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -63,6 +70,11 @@ const AppAccountIdFolderIdRoute = AppAccountIdFolderIdRouteImport.update({
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsAiRoute = AppSettingsAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
   getParentRoute: () => AppSettingsRoute,
 } as any)
 const AppSettingsCapabilitiesRoute = AppSettingsCapabilitiesRouteImport.update({
@@ -113,9 +125,11 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/pair': typeof PairRoute
   '/calendar': typeof AppCalendarRoute
+  '/needs-reply': typeof AppNeedsReplyRoute
   '/search': typeof AppSearchRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/$accountId/$folderId': typeof AppAccountIdFolderIdRouteWithChildren
+  '/settings/ai': typeof AppSettingsAiRoute
   '/settings/capabilities': typeof AppSettingsCapabilitiesRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
   '/settings/shortcuts': typeof AppSettingsShortcutsRoute
@@ -129,8 +143,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/pair': typeof PairRoute
   '/calendar': typeof AppCalendarRoute
+  '/needs-reply': typeof AppNeedsReplyRoute
   '/search': typeof AppSearchRoute
   '/': typeof AppIndexRoute
+  '/settings/ai': typeof AppSettingsAiRoute
   '/settings/capabilities': typeof AppSettingsCapabilitiesRoute
   '/settings/integrations': typeof AppSettingsIntegrationsRoute
   '/settings/shortcuts': typeof AppSettingsShortcutsRoute
@@ -146,10 +162,12 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/pair': typeof PairRoute
   '/_app/calendar': typeof AppCalendarRoute
+  '/_app/needs-reply': typeof AppNeedsReplyRoute
   '/_app/search': typeof AppSearchRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/': typeof AppIndexRoute
   '/_app/$accountId/$folderId': typeof AppAccountIdFolderIdRouteWithChildren
+  '/_app/settings/ai': typeof AppSettingsAiRoute
   '/_app/settings/capabilities': typeof AppSettingsCapabilitiesRoute
   '/_app/settings/integrations': typeof AppSettingsIntegrationsRoute
   '/_app/settings/shortcuts': typeof AppSettingsShortcutsRoute
@@ -166,9 +184,11 @@ export interface FileRouteTypes {
     | '/'
     | '/pair'
     | '/calendar'
+    | '/needs-reply'
     | '/search'
     | '/settings'
     | '/$accountId/$folderId'
+    | '/settings/ai'
     | '/settings/capabilities'
     | '/settings/integrations'
     | '/settings/shortcuts'
@@ -182,8 +202,10 @@ export interface FileRouteTypes {
   to:
     | '/pair'
     | '/calendar'
+    | '/needs-reply'
     | '/search'
     | '/'
+    | '/settings/ai'
     | '/settings/capabilities'
     | '/settings/integrations'
     | '/settings/shortcuts'
@@ -198,10 +220,12 @@ export interface FileRouteTypes {
     | '/_app'
     | '/pair'
     | '/_app/calendar'
+    | '/_app/needs-reply'
     | '/_app/search'
     | '/_app/settings'
     | '/_app/'
     | '/_app/$accountId/$folderId'
+    | '/_app/settings/ai'
     | '/_app/settings/capabilities'
     | '/_app/settings/integrations'
     | '/_app/settings/shortcuts'
@@ -248,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCalendarRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/needs-reply': {
+      id: '/_app/needs-reply'
+      path: '/needs-reply'
+      fullPath: '/needs-reply'
+      preLoaderRoute: typeof AppNeedsReplyRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/search': {
       id: '/_app/search'
       path: '/search'
@@ -274,6 +305,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/settings/'
       preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/ai': {
+      id: '/_app/settings/ai'
+      path: '/ai'
+      fullPath: '/settings/ai'
+      preLoaderRoute: typeof AppSettingsAiRouteImport
       parentRoute: typeof AppSettingsRoute
     }
     '/_app/settings/capabilities': {
@@ -336,6 +374,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppSettingsRouteChildren {
+  AppSettingsAiRoute: typeof AppSettingsAiRoute
   AppSettingsCapabilitiesRoute: typeof AppSettingsCapabilitiesRoute
   AppSettingsIntegrationsRoute: typeof AppSettingsIntegrationsRoute
   AppSettingsShortcutsRoute: typeof AppSettingsShortcutsRoute
@@ -346,6 +385,7 @@ interface AppSettingsRouteChildren {
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsAiRoute: AppSettingsAiRoute,
   AppSettingsCapabilitiesRoute: AppSettingsCapabilitiesRoute,
   AppSettingsIntegrationsRoute: AppSettingsIntegrationsRoute,
   AppSettingsShortcutsRoute: AppSettingsShortcutsRoute,
@@ -374,6 +414,7 @@ const AppAccountIdFolderIdRouteWithChildren =
 
 interface AppRouteChildren {
   AppCalendarRoute: typeof AppCalendarRoute
+  AppNeedsReplyRoute: typeof AppNeedsReplyRoute
   AppSearchRoute: typeof AppSearchRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
@@ -382,6 +423,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppCalendarRoute: AppCalendarRoute,
+  AppNeedsReplyRoute: AppNeedsReplyRoute,
   AppSearchRoute: AppSearchRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,

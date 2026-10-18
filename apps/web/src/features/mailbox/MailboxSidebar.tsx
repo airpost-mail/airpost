@@ -3,6 +3,7 @@ import { CalendarDays } from 'lucide-react';
 import { useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CategoryRole } from '@/engine';
+import { NeedsReplyLink } from '@/features/ai';
 import { useShortcut } from '@/lib/shortcuts';
 import { setLastAccount, useLastAccount } from './last-account';
 import { isUnifiedRole, STARRED_VIEW_ID, UNIFIED_ACCOUNT_ID } from './mailbox';
@@ -83,6 +84,7 @@ export function MailboxSidebar() {
           <CalendarDays className="size-4 text-muted-foreground" />
           Calendar
         </Link>
+        <NeedsReplyLink />
       </nav>
     </div>
   );

@@ -119,6 +119,19 @@ async function fileError(res: Response, fallback: string): Promise<FileRequestEr
 
 const CLIENT_NAME = 'tern-web/0.1.0';
 
+/**
+ * Calls that wait on a model: the engine gives a provider up to 120 s (docs/ai-plan.md 2),
+ * after a wait for a free AI worker.
+ */
+const LONG_CALL_MS = 150_000;
+const LONG_CALLS: ReadonlySet<string> = new Set([
+  'ai.models',
+  'ai.test',
+  'ai.summarize',
+  'ai.suggestReplies',
+  'ai.draftReply',
+]);
+
 export class WsEngineClient implements EngineClient {
   readonly kind = 'ws' as const;
   private ws: WebSocket | null = null;
@@ -383,11 +396,14 @@ export class WsEngineClient implements EngineClient {
     const id = this.nextId++;
     const req: RpcRequest = { jsonrpc: '2.0', id, method };
     if (params !== undefined) req.params = params;
+    const timeoutMs = LONG_CALLS.has(method)
+      ? Math.max(this.opts.timeoutMs, LONG_CALL_MS)
+      : this.opts.timeoutMs;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new RpcError({ code: RpcErrorCode.InternalError, message: `${method} timed out` }));
-      }, this.opts.timeoutMs);
+      }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       ws.send(JSON.stringify(req));
     });
