@@ -49,7 +49,11 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::COUNTS_GET
         | method::TASKS_LIST
         | method::METADATA_LIST
-        | method::ACCOUNT_LIST => MethodClass::Open,
+        | method::ACCOUNT_LIST
+        // A relayed device can already read and send mail, so the settings (signatures, rules)
+        // give it nothing more.
+        | method::SETTINGS_GET
+        | method::SETTINGS_SET => MethodClass::Open,
         method::ACCOUNT_ADD
         | method::ACCOUNT_REMOVE
         | method::ACCOUNT_TEST
@@ -157,6 +161,7 @@ mod tests {
         assert_eq!(method_class("Threads.List"), MethodClass::LocalOnly);
         let admin = vec![SCOPE_ADMIN.to_owned()];
         assert!(relayed_method_allowed("threads.list", &[]));
+        assert!(relayed_method_allowed("settings.set", &[]));
         assert!(!relayed_method_allowed("secrets.set", &[]));
         assert!(relayed_method_allowed("secrets.set", &admin));
         assert!(!relayed_method_allowed("account.add", &admin));

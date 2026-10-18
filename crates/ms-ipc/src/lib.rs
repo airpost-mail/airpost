@@ -17,6 +17,7 @@ mod frame;
 mod methods;
 pub mod policy;
 mod read;
+mod settings;
 
 pub use client::{Client, ClientError, Notifications};
 pub use envelope::{
@@ -26,6 +27,7 @@ pub use envelope::{
 pub use frame::{encode, read_frame, write_frame, FrameError};
 pub use methods::*;
 pub use read::*;
+pub use settings::*;
 
 /// The protocol version a `hello` names. Additive changes (a new method, a new optional
 /// field) keep it; a breaking change bumps it.
@@ -95,6 +97,12 @@ pub mod method {
     pub const ENGINE_SET_LOG_LEVEL: &str = "engine.setLogLevel";
     /// The end of an account's log, or of the engine's own log.
     pub const ENGINE_LOGS_TAIL: &str = "engine.logs.tail";
+    /// The stored engine-owned settings ([`feature::SETTINGS`](crate::feature::SETTINGS)),
+    /// params [`SettingsGetParams`](crate::SettingsGetParams), result
+    /// [`SettingsValues`](crate::SettingsValues).
+    pub const SETTINGS_GET: &str = "settings.get";
+    /// Stores settings, params [`SettingsValues`](crate::SettingsValues), result `{}`.
+    pub const SETTINGS_SET: &str = "settings.set";
     /// `serve` mode, the parent's stdin only, debug builds only: stop one account as a
     /// fatal error would (`test-crash` on stdin in `sync` mode).
     pub const TEST_CRASH: &str = "test.crash";
@@ -111,6 +119,11 @@ pub mod method {
     /// Notification: new mail, `params` = [`MailNewParams`](crate::MailNewParams). Filtered by
     /// account only, never held for a later subscriber ([`feature::MAIL_NEW`](crate::feature::MAIL_NEW)).
     pub const MAIL_NEW: &str = "mail.new";
+    /// Notification: settings another connection (or the parent) changed, `params` =
+    /// [`SettingsValues`](crate::SettingsValues) with the new values, null for a cleared key.
+    /// Sent to every subscribed connection whatever its filter, never held for a later
+    /// subscriber: a client calls `settings.get` after `subscribe`.
+    pub const SETTINGS_CHANGED: &str = "settings.changed";
 }
 
 /// The names in `hello.features` and `engine.status.features`
@@ -131,6 +144,8 @@ pub mod feature {
     /// connections. `tern-gateway` refuses to relay to an engine without it, which would
     /// ignore the field.
     pub const RELAYED: &str = "relayed";
+    /// `settings.get`, `settings.set` and `settings.changed`.
+    pub const SETTINGS: &str = "settings";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
