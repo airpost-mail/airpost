@@ -2099,3 +2099,20 @@ Open from the review (low), not fixed:
   review fixes above (every Google client an account may be bound to is kept).
 
 Trial pending (not run): as listed above.
+
+Stage 12 gate, attempt 1 of this run, 2026-10-18. The branch was already on main (23e70a578,
+AI4 and triage), so the rebase was a no-op and needed no conflict work. Gate green:
+`cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`,
+`cargo test --workspace --locked` (1180 tests), `cargo deny check`, the release build of
+mailsync, tern, tern-mcp and tern-gateway, and the harness quick tier on serve with the release
+binaries (147 passed, 4 skipped; `test_gateway.py` and `test_cli.py` ran against the release
+gateway and CLI). Desktop: lint and typecheck pass; the onboarding (20), preferences (41) and
+notifications (29) package specs and the app specs for the OAuth receiver, integrations, engine
+supervisor, client, connection, events, settings and API, account store, capability store, OAuth
+revocation and mailsync process (150) pass. This is the first run of the review fixes above
+through cargo and the specs; none needed changes. No new deviations or decisions; the decisions
+and open items in the entries above stand, and this review left no further low findings.
+Merged to main by fast-forward.
+
+Trial pending (not run): add an IMAP account and an OAuth account (not the production
+accounts), reconnect one, remove one, and save an integration key.
