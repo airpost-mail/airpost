@@ -16,11 +16,14 @@
 //!
 //! What differs from `Query.sql()`, on purpose:
 //! - `accounts` adds `accountId IN (…)`; `null` reads every account in the database, as the
-//!   desktop's own SQLite reads do.
+//!   desktop's own SQLite reads do. The thread list's subselect also keeps only the rows of
+//!   those accounts' folders and labels, so its LIMIT and OFFSET count their threads.
 //! - `search` with `grammar: true` is refused until the engine parses the search grammar.
 //! - Booleans compared with `=`/`!=` against `true`/`false` mean "non-zero"/"zero", as
 //!   `AttributeBoolean.equal` sends them; `Thread.unread` and `starred` are counts.
-//! - `cursor` pages by key instead of `offset` (T5); the desktop never sends one.
+//! - `cursor` pages by key instead of `offset` (T5); the desktop never sends one. A cursor
+//!   query's subselect returns each thread once, so a page isn't cut short by a thread in
+//!   two of the listed categories.
 //! - The subselect plan keeps the joined-data join that `Query.sql()` leaves out of it.
 
 use std::collections::BTreeMap;
@@ -220,6 +223,8 @@ pub fn allowlist() -> &'static Allowlist {
 
 /// Attributes the desktop declares queryable that have no column in the engine's schema.
 const UNSTORED: &[(&str, &str)] = &[("Event", "status")];
+
+const THREAD_CATEGORY: &str = "ThreadCategory";
 
 /// The FTS table `.search(text)` matches against, for the classes that have one.
 fn search_table(class: &str) -> Option<&'static str> {
@@ -833,9 +838,12 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
             let orders_ok = orders
                 .iter()
                 .all(|(c, _)| on_join(c) || (c == "id" && cursor.is_some()));
+            // `accounts` can only be narrowed inside the subselect on ThreadCategory (below);
+            // on other join tables the inner LIMIT would count other accounts' rows.
+            let accounts_ok = q.accounts.is_none() || join_table == THREAD_CATEGORY;
             // Note: duplicate rows from overlapping categories collapse in the subselect, so
             // a distinct cursor query reads through the join to keep its page size exact.
-            (matchers_ok && orders_ok && !(cursor.is_some() && distinct))
+            (matchers_ok && orders_ok && accounts_ok && !(cursor.is_some() && distinct))
                 .then(|| join_table.clone())
         }
         _ => None,
@@ -913,8 +921,22 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
     match &subselect {
         Some(jt) => {
             let inner_tables = Tables::JoinTable(jt);
+            // A cursor page counts threads, so the subselect must not return one twice: it
+            // can unless its only collection matcher is top level with one value, as each
+            // (thread, value) pair is one row. Every row of a thread carries the same order
+            // keys, so deduping on `id` keeps the order.
+            let one_row_per_id = nodes.iter().any(|n| {
+                matches!(n, Node::Leaf(l) if l.alias.is_some()
+                    && (l.op == Op::Contains
+                        || l.value.as_array().is_some_and(|v| v.len() == 1)))
+            });
             let mut inner = Sql::default();
-            inner.push(&format!("SELECT `id` FROM {} WHERE ", quoted(jt)));
+            inner.push(if cursor.is_some() && !one_row_per_id {
+                "SELECT DISTINCT `id` FROM "
+            } else {
+                "SELECT `id` FROM "
+            });
+            inner.push(&format!("{} WHERE ", quoted(jt)));
             let mut first = true;
             for n in &nodes {
                 if !first {
@@ -929,6 +951,22 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
                 }
                 inner.append(after_cursor(&orders, values, inner_tables)?);
             }
+            if let Some(accounts) = &q.accounts {
+                // A thread's categories are its own account's, so keeping the rows of the
+                // accounts' folders and labels keeps exactly the accounts' threads, before
+                // the LIMIT and OFFSET count them.
+                let json: Vec<Value> = accounts.iter().cloned().map(Value::String).collect();
+                let values: Vec<SqlValue> = accounts.iter().cloned().map(SqlValue::Text).collect();
+                inner
+                    .push(&format!(
+                        " AND {}.`value` IN (SELECT `id` FROM `Folder` WHERE `accountId` IN ",
+                        quoted(jt)
+                    ))
+                    .bind_list(values.clone(), &json)
+                    .push(" UNION ALL SELECT `id` FROM `Label` WHERE `accountId` IN ")
+                    .bind_list(values, &json)
+                    .push(")");
+            }
             order_sql(&mut inner, inner_tables);
             limit_sql(&mut inner);
             sql.push(&format!(" WHERE {quoted_table}.`id` IN ("))
@@ -940,8 +978,7 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
             }
             order_sql(&mut sql, main);
             if cursor.is_some() {
-                // Overlapping categories can't add rows here: distinct cursor queries don't
-                // take this plan.
+                // The subselect returns each thread once (above), so this is the page.
                 sql.push(" LIMIT ")
                     .bind(SqlValue::Integer(page_limit.unwrap_or(-1)));
             }

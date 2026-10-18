@@ -739,6 +739,26 @@ fn thread_list_plan_matches_the_desktop() {
             assert!(!ours.contains("SCAN Thread"), "{name}:\n{ours}");
         }
     }
+    // The web's lists, by cursor and per account, keep that plan: the deduped subselect and
+    // the account narrowing don't scan Thread or ThreadCategory.
+    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    for accounts in [Value::Null, json!(["a2"])] {
+        let q: ModelQuery = serde_json::from_value(json!({
+            "class": "Thread", "accounts": accounts,
+            "where": [{"attr": "categories", "op": "containsAny", "value": ["f-a1-inbox", "f-a2-inbox"]},
+                      {"attr": "inAllMail", "op": "=", "value": true}],
+            "order": [{"attr": "lastMessageReceivedTimestamp", "dir": "desc"}],
+            "limit": 50, "cursor": "[1700000000,\"t09\"]",
+        }))
+        .unwrap();
+        let c = compile(&q).unwrap();
+        let ours = plan(&conn, &c.sql, &c.params);
+        assert!(
+            ours.contains("SEARCH ThreadCategory USING"),
+            "{accounts}:\n{ours}"
+        );
+        assert!(!ours.contains("SCAN Thread"), "{accounts}:\n{ours}");
+    }
 }
 
 #[test]
@@ -801,7 +821,7 @@ fn accounts_and_cursor_pages() {
         ids
     };
     let unified = all(Value::Null, json!(["f-a1-inbox", "f-a2-inbox"]));
-    // The account filter applies after the category subselect.
+    // The account filter narrows the category subselect.
     let only_a2 = all(json!(["a2"]), json!(["f-a1-inbox", "f-a2-inbox"]));
     assert_eq!(
         only_a2,
@@ -863,6 +883,121 @@ fn accounts_and_cursor_pages() {
         .map(Result::unwrap)
         .collect();
     assert_eq!(paged, want);
+}
+
+/// Threads in more than one listed category, and categories of accounts the query doesn't
+/// read, still give full pages by cursor and by offset on the thread list's subselect.
+#[test]
+fn overlapping_categories_and_accounts_page_fully() {
+    let dir = tempfile::tempdir().unwrap();
+    build(dir.path());
+    let store = ReadStore::open(dir.path()).unwrap();
+    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let rows = |v: Value| {
+        let q: ModelQuery = serde_json::from_value(v).unwrap();
+        match store.model_query(&q).unwrap() {
+            QueryOutput::Rows { rows, next_cursor } => (
+                rows.iter()
+                    .map(|r| r["id"].as_str().unwrap().to_owned())
+                    .collect::<Vec<_>>(),
+                next_cursor,
+            ),
+            other => panic!("{other:?}"),
+        }
+    };
+    let base = |accounts: Value, cats: &[&str]| {
+        json!({
+            "class": "Thread", "accounts": accounts,
+            "where": [{"attr": "categories", "op": "containsAny", "value": cats},
+                      {"attr": "inAllMail", "op": "=", "value": true}],
+        })
+    };
+    let by_cursor = |q: Value, limit: i64| {
+        let mut cursor = String::new();
+        let mut paged = Vec::new();
+        loop {
+            let mut q = q.clone();
+            q["limit"] = json!(limit);
+            q["cursor"] = json!(cursor);
+            let (ids, next) = rows(q);
+            paged.extend(ids);
+            match next.expect("a cursor query answers nextCursor") {
+                Some(c) => cursor = c,
+                None => return paged,
+            }
+        }
+    };
+    let by_offset = |q: Value, limit: i64| {
+        let mut paged = Vec::new();
+        loop {
+            let mut q = q.clone();
+            q["limit"] = json!(limit);
+            q["offset"] = json!(paged.len());
+            let (ids, _) = rows(q);
+            let done = (ids.len() as i64) < limit;
+            paged.extend(ids);
+            if done {
+                return paged;
+            }
+        }
+    };
+    let want = |accounts: &[&str], cats: &[&str]| -> Vec<String> {
+        let list = |v: &[&str]| {
+            v.iter()
+                .map(|s| format!("'{s}'"))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let account_clause = if accounts.is_empty() {
+            String::new()
+        } else {
+            format!(" AND accountId IN ({})", list(accounts))
+        };
+        conn.prepare(&format!(
+            "SELECT id FROM Thread WHERE inAllMail != 0 AND id IN \
+             (SELECT id FROM ThreadCategory WHERE value IN ({})){account_clause} \
+             ORDER BY lastMessageReceivedTimestamp DESC",
+            list(cats)
+        ))
+        .unwrap()
+        .query_map(params![], |r| r.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
+    };
+
+    // Threads 5, 11, 17 and 23 are in both a1's inbox and work folders.
+    let overlap = ["f-a1-inbox", "f-a1-work"];
+    let expected = want(&[], &overlap);
+    assert!(expected.len() > 4);
+    for limit in [1, 2, 3, 4] {
+        assert_eq!(
+            by_cursor(base(Value::Null, &overlap), limit),
+            expected,
+            "limit {limit}"
+        );
+    }
+
+    // a2 only, listing categories of both accounts, a1's first in the order.
+    let both = ["f-a1-inbox", "f-a1-work", "f-a2-inbox", "l-a2-travel"];
+    let expected = want(&["a2"], &both);
+    assert!(expected.len() > 4);
+    for limit in [1, 2, 3, 4] {
+        assert_eq!(
+            by_cursor(base(json!(["a2"]), &both), limit),
+            expected,
+            "cursor, limit {limit}"
+        );
+        // Offset pages follow the desktop's subselect, which can repeat a thread on two
+        // pages or cut a page short when its categories overlap; with one category per
+        // thread in a2 here the offset pages are exact.
+        let a2_disjoint = ["f-a1-inbox", "f-a2-inbox"];
+        assert_eq!(
+            by_offset(base(json!(["a2"]), &a2_disjoint), limit),
+            want(&["a2"], &a2_disjoint),
+            "offset, limit {limit}"
+        );
+    }
 }
 
 /// Every allowlisted column and table exists in the schema, except the one the desktop
