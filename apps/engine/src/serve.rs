@@ -551,10 +551,12 @@ impl Engine {
     /// The account is registered: the secrets it carries are stored, the ones it lacks come
     /// from the store, and the engine starts it itself from then on. `stored` is false when
     /// the store refused, and the account then runs only until the engine stops. A running
-    /// account added with another identity restarts with it.
+    /// account added with another identity, other settings or other secrets restarts with
+    /// them; added as it runs, it answers ACCOUNT_EXISTS.
     fn add(&self, req: &RpcRequest) -> Reply {
         let p: AccountAddParams = req.params_as()?;
         let mut json = p.account;
+        let sent_secrets = registry::has_secrets(&json);
         if registry::account_id(&json).is_some() {
             match self.registered.with_secrets(json.clone()) {
                 Ok(full) => json = full,
@@ -586,11 +588,26 @@ impl Engine {
         if !p.identity.is_null() {
             *self.identity_lock() = p.identity.clone();
         }
-        let running_with_other_identity = self.lock().get(&id).is_some_and(|s| {
-            s.state != account_state::STOPPED && !s.removing && s.identity != p.identity
+        let changed = self.lock().get(&id).and_then(|s| {
+            if s.state == account_state::STOPPED || s.removing {
+                None
+            } else if !p.identity.is_null() && s.identity != p.identity {
+                Some("a new identity")
+            } else if registry::strip_secrets(s.account.as_json())
+                != registry::strip_secrets(account.as_json())
+            {
+                Some("new settings")
+            } else if sent_secrets
+                && registry::secrets_of(s.account.as_json())
+                    != registry::secrets_of(account.as_json())
+            {
+                Some("new credentials")
+            } else {
+                None
+            }
         });
-        if running_with_other_identity && !p.identity.is_null() {
-            info!("Restarting account {id} with a new identity");
+        if let Some(what) = changed {
+            info!("Restarting account {id} with {what}");
             self.remove_account(&id, false)?;
         }
         let mut result = self.start(account, p.identity)?;

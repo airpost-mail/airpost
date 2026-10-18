@@ -413,8 +413,14 @@ class ServeEngine:
             self.handles[aid] = handle
             for line in self._early.pop(aid, []):
                 self._on_socket_line(line)
+        account = handle.account
+        if aid in self._registered:
+            # As the desktop does once the engine stored them: the engine's secrets may be
+            # newer (a rotated refresh token) than the ones the scenario started with.
+            account = dict(account, settings={k: v for k, v in (account.get("settings") or {}).items()
+                                              if k not in SECRET_SETTINGS})
         try:
-            result = self.parent.call("account.add", {"account": handle.account, "identity": handle.identity},
+            result = self.parent.call("account.add", {"account": account, "identity": handle.identity},
                                       SERVE_ACCOUNT_TIMEOUT)
         except MailsyncError as e:
             # Registered on an earlier engine, the account was started by this one already.

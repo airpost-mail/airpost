@@ -823,4 +823,3 @@ mod tests {
         assert_eq!(ls_u32(f.local_status(), ls::LAST_DEEP), 0);
     }
 }
-

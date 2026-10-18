@@ -294,6 +294,21 @@ fn setting_str<'a>(account: &'a Value, key: &str) -> Option<&'a str> {
         .filter(|s| !s.is_empty())
 }
 
+/// Whether `account` carries any secret setting.
+pub fn has_secrets(account: &Value) -> bool {
+    SECRET_SETTINGS
+        .iter()
+        .any(|(k, _)| setting_str(account, k).is_some())
+}
+
+/// The secret settings `account` carries; an empty one counts as absent.
+pub fn secrets_of(account: &Value) -> Vec<Option<&str>> {
+    SECRET_SETTINGS
+        .iter()
+        .map(|(k, _)| setting_str(account, k))
+        .collect()
+}
+
 /// `account` without its secret settings.
 pub fn strip_secrets(account: &Value) -> Value {
     let mut out = account.clone();

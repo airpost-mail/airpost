@@ -1213,7 +1213,7 @@ fn registered_accounts_start_with_the_next_engine_until_forgotten() {
     let mut e = Serve::start_with(true, &[no_retry()]);
     let mut secret = account(A);
     secret["settings"]["imap_password"] = json!("imap-s3cret");
-    let added = e.parent.add(secret);
+    let added = e.parent.add(secret.clone());
     assert_eq!(added["stored"], true, "{added}");
     let accounts = e.dir.path().join("accounts.json");
     let text = std::fs::read_to_string(&accounts).unwrap();
@@ -1246,15 +1246,32 @@ fn registered_accounts_start_with_the_next_engine_until_forgotten() {
     let json = &list["accounts"][0]["account"];
     assert_eq!(json["settings"]["imap_host"], "127.0.0.1", "{list}");
     assert!(!list.to_string().contains("s3cret"), "{list}");
-    // The client adding it again finds it running.
-    let again = e
+    // The client adding it again, with its secrets or without, finds it running.
+    let mut bare = secret.clone();
+    for k in ["imap_password", "smtp_password"] {
+        bare["settings"].as_object_mut().unwrap().remove(k);
+    }
+    for again in [secret.clone(), bare] {
+        let again = e
+            .parent
+            .call(
+                method::ACCOUNT_ADD,
+                json!({ "account": again, "identity": null }),
+            )
+            .unwrap_err();
+        assert_eq!(again.code, code::ACCOUNT_EXISTS);
+    }
+    // Added with other settings, it restarts with them.
+    let mut changed = secret.clone();
+    changed["label"] = json!("Work");
+    let restarted = e
         .parent
         .call(
             method::ACCOUNT_ADD,
-            json!({ "account": account(A), "identity": null }),
+            json!({ "account": changed, "identity": null }),
         )
-        .unwrap_err();
-    assert_eq!(again.code, code::ACCOUNT_EXISTS);
+        .unwrap();
+    assert_eq!(restarted["accountId"], A, "{restarted}");
 
     let mut sub = e.hello();
     sub.subscribe(&SubscribeParams::default()).unwrap();
