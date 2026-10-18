@@ -480,3 +480,20 @@ skipped, `test_ai.py`'s 3 among them); desktop lint and typecheck clean, the ai 
 and those of the modules it touches (settings mirror, package manager, account sidebar,
 capability packages; 114) pass. No web changes. Open as after AI4: the engine reading
 `integration:ai-<id>` from the secret store, the usage chart, a UI for `core.ai.limits`, AI5.
+
+2026-10-18, AI5 on `roadmap/ai`: web, in `apps/web/src/features/ai`. Calls carry no `config` or
+`settings` (a relayed connection may not), so the engine's stored `core.ai.*` providers and
+switches apply; the settings are read-only on the web. The thread summary card, Suggest in the
+composer (inserted above the signature and typed text), the triage chip on thread rows, "Needs
+reply" in the sidebar (over `ai.triage.list`, skipping removed accounts) and Settings > AI
+(read-only providers and switches, 30 days of usage). No "Triage inbox" on the web yet; the mock
+serves `ai.triage.run`. Streamed calls collect `ai.delta` by streamId; the model calls
+get a 150 s timeout in `ws.ts`. Remembered summaries go on account reset or a provider change;
+mapped IPv6 loopback counts as local. The mock engine serves `ai.*` (demo outside tests).
+Tests: 4 vitest files in `features/ai/test`.
+
+2026-10-18, AI5 gated and merged: fmt, clippy, workspace tests, `cargo deny`, release build of
+mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (147 passed, 4 skipped);
+web lint, typecheck, tests (378) and build clean. Web only, so no desktop gate. Open as after
+AI4: the engine reading `integration:ai-<id>` from the secret store, the usage chart on the
+desktop, a UI for `core.ai.limits`; on the web, "Triage inbox".
