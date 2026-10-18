@@ -942,8 +942,8 @@ export class EngineServeProcess extends MailsyncProcess {
     return this._parentCall<CredentialsImportResult>(Method.CredentialsImport, params);
   }
 
-  // Deletes the account's local data so it syncs from scratch. The engine forgets the
-  // account; the caller adds it again. `keepMetadata: false` (removing the account) deletes
+  // Deletes the account's local data so it syncs from scratch. The engine starts a
+  // registered account again itself; the caller's account.add then answers AccountExists. `keepMetadata: false` (removing the account) deletes
   // its plugin metadata too instead of keeping it for the resync.
   resetAccount(accountId: string, { keepMetadata = true }: ResetOptions = {}) {
     return this._parentCall(

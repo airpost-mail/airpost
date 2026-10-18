@@ -37,6 +37,13 @@ export function reconnectingAccountId(account: Account) {
   return account && account.id && AccountStore.accountForId(account.id) ? account.id : undefined;
 }
 
+// The user's default container folder for a new account, as IMAP accounts get it
+// (onboarding-helpers.ts). "Mailspring" is the engine's own default.
+export function oauthContainerFolder() {
+  const folder = AccountStore.containerFolderDefaultGetter();
+  return folder && folder !== 'Mailspring' ? folder : undefined;
+}
+
 export default class OAuthSignInPage extends React.Component<
   OAuthSignInPageProps,
   OAuthSignInPageState
@@ -78,6 +85,7 @@ export default class OAuthSignInPage extends React.Component<
         provider,
         accountId,
         sharedMailbox: sharedMailbox || undefined,
+        containerFolder: accountId ? undefined : oauthContainerFolder(),
       });
       this._begun = begun;
       if (!this._mounted) {
