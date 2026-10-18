@@ -345,3 +345,33 @@ then. Usage isn't persisted (AI4).
 2026-10-18, AI2 gated and merged: fmt, clippy, workspace tests, `cargo deny`, release build
 of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (141 passed, 4
 skipped). Rust only, so no desktop or web gate. Open as above.
+
+2026-10-18, AI3 on `roadmap/ai`: desktop. `src/ai.ts` (exported as `AI`, plugin API 1.28.0)
+reads and writes `core.ai` (`providers`, `features` with a provider id each, `accounts`,
+`includeAddresses`), builds ms-ai's provider config with the key from the keyset
+(`integration-ai-<id>-key`) and the interim `settings`; it mirrors ms-ai's base URL, host,
+`local` and key-required rules. `core.ai` is not mirrored to the engine's settings store
+(stage 3's `ai.*` keys). CapabilityStore has `ai-summary` and `ai-reply` (source `ai`, with
+`host` and `local`): "Set up a model in Preferences > AI" without a provider or model, "Add your
+… API key" for Anthropic or OpenAI's own API without a saved key, "Waiting for engine support"
+without `hello.features` `ai`, and the engine's word when it reports a feature unavailable.
+`internal_packages/ai`: `ai-client.ts` makes the calls through `Engine.request`, checks the
+switches before reading the key, collects `ai.delta` for its own streamId through
+`Engine.subscribe`, maps `-32011` data to `AiError` and short messages, and cancels with
+`ai.cancel`. Preferences > AI (tab after Integrations): providers with name, URL, key (Save Key,
+Forget Key; Test and Load Models use the typed key without saving it), model from `ai.models`
+or typed, context window, Test and Remove (which deletes the key); per feature a switch and a
+provider; the account opt-in list; Include email addresses; the privacy table. The summary is a
+`MessageListHeaders` component for threads of 2 or more sent messages or one of 4000+ characters:
+Summarize, the card streaming as plain text (`white-space: pre-wrap`, no HTML), model and "Sent to
+host" / "Runs on this computer", Stop, Regenerate (`refresh`), Close; the window remembers the
+last 100 summaries by thread and newest message, so reopening a thread shows it without a call.
+Suggest is a `Composer:ActionButton` on replies: a popover with up to 3 suggestions and an
+instruction field; the draft streams into a preview and, when complete, goes into the body above
+the quote and the signature (blank leading lines replaced, typed text kept) as one body change,
+escaped. Closing the card, the thread or the popover cancels the call. Specs (36) with a mocked
+`Engine.request`: the client, the capabilities, Preferences > AI, insertion, the card and the
+suggestions panel.
+
+Open after AI3: the usage chart in Preferences > AI waits for persisted usage (AI4); triage UI is
+AI4; per-account and per-feature availability is still the desktop's own check until stage 3.
