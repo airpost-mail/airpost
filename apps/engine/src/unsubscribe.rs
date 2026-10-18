@@ -13,7 +13,7 @@
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use ms_ipc::{
@@ -32,6 +32,41 @@ const POLL: Duration = Duration::from_millis(100);
 /// Calls waiting for a body at once, engine-wide.
 const MAX_WAITING: usize = 16;
 static WAITING: AtomicUsize = AtomicUsize::new(0);
+/// One-click POSTs running at once, engine-wide: each holds a thread for up to the lookup
+/// plus the POST's timeout.
+const MAX_POSTING: usize = 8;
+/// The messages whose one-click POST is running.
+static POSTING: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// A running one-click POST's place in [`POSTING`], given back on drop.
+struct Posting(String);
+
+impl Posting {
+    fn start(message_id: &str) -> Result<Posting, ErrorObject> {
+        let mut running = POSTING.lock().unwrap_or_else(PoisonError::into_inner);
+        if running.iter().any(|m| m == message_id) {
+            return Err(internal(format!(
+                "a one-click unsubscribe for message {message_id} is already running"
+            )));
+        }
+        if running.len() >= MAX_POSTING {
+            return Err(internal(
+                "too many one-click unsubscribes are running; try again shortly",
+            ));
+        }
+        running.push(message_id.to_owned());
+        Ok(Posting(message_id.to_owned()))
+    }
+}
+
+impl Drop for Posting {
+    fn drop(&mut self) {
+        let mut running = POSTING.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(i) = running.iter().position(|m| *m == self.0) {
+            running.swap_remove(i);
+        }
+    }
+}
 
 /// Debug builds read `MAILSYNC_UNSUBSCRIBE_ALLOW_LOCAL=1` so tests can POST to a local
 /// plain-http server.
@@ -115,7 +150,13 @@ impl Session {
         let chosen = call.choose(&headers)?;
         Ok(match chosen.0 {
             // The POST may take seconds.
-            Method::OneClick => Deferred::Later(Box::new(move || call.act(chosen))),
+            Method::OneClick => {
+                let posting = Posting::start(&call.message_id)?;
+                Deferred::Later(Box::new(move || {
+                    let _posting = posting;
+                    call.act(chosen)
+                }))
+            }
             _ => Deferred::Now(call.act(chosen)),
         })
     }
@@ -166,6 +207,10 @@ impl Call {
             let headers = self.wait_for_body(self.server.config_dir.clone())?;
             drop(slot);
             let chosen = self.choose(&headers)?;
+            let _posting = match chosen.0 {
+                Method::OneClick => Some(Posting::start(&self.message_id)?),
+                _ => None,
+            };
             self.act(chosen)
         })))
     }
@@ -226,5 +271,30 @@ impl Call {
             error: done.err(),
         };
         serde_json::to_value(result).map_err(internal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn one_click_posts_are_capped_and_one_per_message() {
+        let ids: Vec<String> = (0..MAX_POSTING).map(|i| format!("cap-test-{i}")).collect();
+        let held: Vec<Posting> = ids.iter().map(|id| Posting::start(id).unwrap()).collect();
+        assert!(Posting::start("cap-test-more")
+            .err()
+            .unwrap()
+            .message
+            .contains("too many"));
+        drop(held);
+        let first = Posting::start("cap-test-0").unwrap();
+        assert!(Posting::start("cap-test-0")
+            .err()
+            .unwrap()
+            .message
+            .contains("already running"));
+        drop(first);
+        Posting::start("cap-test-0").unwrap();
     }
 }

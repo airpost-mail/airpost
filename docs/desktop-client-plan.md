@@ -1569,7 +1569,8 @@ an account without a Snoozed folder is `NOT_FOUND`. `messages.unsubscribe {accou
 messageId, method?}` (feature `unsubscribe`, `ms_net::unsubscribe`) picks one-click, else
 mailto, else web, as the desktop does; one-click is an RFC 8058 POST from an `unsubscribe`
 thread (T21) only to an https host whose every address is public, pinned to the checked
-addresses, no redirects, 10 s connect and 30 s total; mailto (at most 5 recipients, subject
+addresses, never through an environment proxy, no redirects, 10 s connect and 30 s total, at
+most 8 running engine-wide and one per message; URIs with control characters are dropped; mailto (at most 5 recipients, subject
 control characters dropped, body up to 16 KiB, "unsubscribe" when empty) becomes a plain-text
 `SendDraftTask` from the address or alias the list wrote to; web returns `url`. A message
 whose body (and so header) isn't fetched yet is fetched and waited for as `files.get` does.
