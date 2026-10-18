@@ -102,7 +102,7 @@ with the account or feature missing, the call is `not-enabled`; a `provider` id 
 | `ai.models` | `config` \| `provider` | `[ModelInfo {id, name, contextTokens?}]` |
 | `ai.test` | `config` \| `provider` | `{host, model, local, latencyMs}` |
 | `ai.summarize` | `accountId`, `threadId`, `streamId?`, `refresh?` | `{text, model, cached, usage?}` |
-| `ai.suggestReplies` | `accountId`, `threadId`, `count?` (default 3) | `[{label, text}]` (short one-liners) |
+| `ai.suggestReplies` | `accountId`, `threadId`, `count?` (default 3), `streamId?` (for `ai.cancel` only; no `ai.delta`) | `[{label, text}]` (short one-liners) |
 | `ai.draftReply` | `accountId`, `threadId`, `instruction?`, `suggestion?`, `streamId?` | `{text, model, usage?}` (plain text; the composer converts) |
 | `ai.triage.run` | `accountId`, `threadIds?` \| `sinceDays?` | `{jobId, queued}` |
 | `ai.triage.list` | `accountIds?`, `category?`, `limit`, `offset?` | `{threadIds, total}` |
@@ -314,11 +314,14 @@ drafts, hidden messages, messages whose every copy is in Spam or Trash, and S/MI
 or inline PGP messages left out; bodies flattened without cited blockquotes, then `>` lines,
 the attribution line before them and anything after an Outlook "Original Message" separator
 dropped; the snippet when a body isn't fetched; bodies read newest first up to 8 characters
-per token of the window; dates in the engine's local zone; the owner from the account's name
-and address. The model call runs on the new `ai` lane with a sink that sends `ai.delta` to
+per token of the window, counted without signatures, older ones sent with `body_omitted` so the
+model is told; every body checked for inline PGP whatever the budget; participants taken from
+the messages kept, not the thread's list (which has every draft's and Spam message's people);
+dates in the engine's local zone; the owner from the account's name and address. The model call runs on the new `ai` lane with a sink that sends `ai.delta` to
 that connection's queue ahead of the response; each call's `CancelToken` is registered with
 its connection, cancelled by `ai.cancel {streamId}` and by the connection closing.
-`ai.suggestReplies` is cancellable too (`Ai::suggest_replies_until`). ms-ai's runtime now
+`ai.suggestReplies` is cancellable too (`Ai::suggest_replies_until`), by its optional
+`streamId` (no `ai.delta`). ms-ai's runtime now
 has one worker thread (named `ai`, so a panic there is contained): on a current-thread
 runtime nothing ran hyper's connection tasks between calls, so a cancelled request's socket
 stayed open and the provider kept generating. `ai.usage` counts in memory per day, provider
@@ -326,7 +329,8 @@ and feature (90 days; the file is AI4). The caches are cleared on `account.reset
 `engine.resetDatabase`. ms-ipc: the `ai.*` method names (triage included), `feature::AI`,
 `code::AI_FAILED`, the params types, `Capabilities.ai`, `Capability.local`, and the relay
 policy (all `ai.*` `Open`, `config` and `settings` refused on relayed connections, admin or
-not; tern-web's gateway tests pass unchanged). Tests: `apps/engine/tests/ai_api.rs` against
+not, absent params allowed; tern-web's gateway tests pass unchanged); `AiProviderParams`
+redacts `config` in `Debug`. Tests: `apps/engine/tests/ai_api.rs` against
 the fake provider (opt-in and feature checks before any read or request, privacy of what is
 sent, `ai.delta` order and routing, the cache, suggestions, drafts, models, test, `ai.cancel`,
 a dropped connection cancelling the provider request, relayed refusals), unit tests for the
