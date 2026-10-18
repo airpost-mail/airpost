@@ -15,6 +15,7 @@ import {
   type RpcResult,
   type SettingsValues,
 } from '../rpc';
+import * as tasks from '../tasks';
 import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
 import { ChangeSet } from './changes';
@@ -28,6 +29,9 @@ import {
 } from './mail-actions';
 import { runQuery } from './query';
 import { MockStore } from './store';
+
+/** The desktop's send-later plugin id, which undo send also writes. */
+const SEND_LATER = 'send-later';
 
 /** What the mock announces in `hello.features` unless told otherwise. */
 export const MOCK_FEATURES: readonly string[] = [
@@ -433,6 +437,7 @@ export class MockEngine implements EngineClient {
         const s = this.store;
         const now = model.__cls === 'Thread' ? s.threads.get(model.id) : s.messages.get(model.id);
         if (!now || expiration(now) > nowSeconds()) return;
+        if (now.__cls === 'Message' && this.executeSendLater(now)) return;
         this.notify({
           accountId: now.aid,
           modelClass: now.__cls,
@@ -441,6 +446,32 @@ export class MockEngine implements EngineClient {
         } as Delta);
       }, ms),
     );
+  }
+
+  /**
+   * With `expiration-executor` announced, a due `send-later` row is the engine's: cleared,
+   * then the draft sent (crates/ms-sync/src/expiration_executor.rs). Returns whether it was
+   * one.
+   */
+  private executeSendLater(m: MessageJSON): boolean {
+    if (!this.announced.includes(EngineFeature.ExpirationExecutor)) return false;
+    const entry = m.metadata?.find((x) => x.pluginId === SEND_LATER);
+    const exp = (entry?.value as { expiration?: unknown } | null)?.expiration;
+    if (typeof exp !== 'number' || exp > nowSeconds()) return false;
+    const cleared = tasks.syncbackMetadata({
+      accountId: m.aid,
+      pluginId: SEND_LATER,
+      modelId: m.id,
+      modelClassName: 'Message',
+      modelHeaderMessageId: m.hMsgId,
+      value: { expiration: null },
+    });
+    this.queueTask(m.aid, cleared);
+    if (!m.draft) return true;
+    const draft = this.store.messages.get(m.id) ?? m;
+    const body = this.store.body(m.id) ?? '';
+    this.queueTask(m.aid, tasks.sendDraft({ ...this.store.wire(draft), body }));
+    return true;
   }
 
   /** Queues `planned` in order and returns their ids. */

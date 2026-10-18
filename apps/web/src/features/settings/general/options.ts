@@ -18,6 +18,17 @@ export const UNDO_SEND_DELAYS: Choice<number>[] = [
   { value: 60000, label: '60 seconds' },
 ];
 
+/**
+ * The choices plus `current` when it is none of them: the engine takes any whole number of
+ * ms (set from the CLI or another client), and the select would show nothing for it.
+ */
+export function undoSendChoices(current: number): Choice<number>[] {
+  if (UNDO_SEND_DELAYS.some((c) => c.value === current)) return UNDO_SEND_DELAYS;
+  const s = current / 1000;
+  const label = `${Number.isInteger(s) ? s : s.toFixed(1).replace(/\.0$/, '')} second${s === 1 ? '' : 's'}`;
+  return [...UNDO_SEND_DELAYS, { value: current, label }].sort((a, b) => a.value - b.value);
+}
+
 export const READING_PANES: Choice<ReadingPanePosition>[] = [
   { value: 'right', label: 'Right' },
   { value: 'bottom', label: 'Below' },

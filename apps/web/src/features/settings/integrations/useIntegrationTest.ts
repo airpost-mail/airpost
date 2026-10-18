@@ -29,6 +29,10 @@ function failure(err: unknown): string {
     const why = err.message.replace(/^Integration failed:\s*/, '');
     return why ? why[0]!.toUpperCase() + why.slice(1) : 'The provider rejected the settings.';
   }
+  // `integrations.*` are local-only (ms-ipc policy): only an admin device gets through.
+  if (err instanceof RpcError && err.code === RpcErrorCode.NotAllowedRelayed) {
+    return 'Testing providers from the web needs an admin device.';
+  }
   return engineErrorMessage(err);
 }
 

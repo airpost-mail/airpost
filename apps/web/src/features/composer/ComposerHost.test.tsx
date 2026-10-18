@@ -3,7 +3,9 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from 'sonner';
 import {
+  EngineFeature,
   ensureConnected,
   EngineProvider,
   MOCK_ACCOUNT_IDS,
@@ -14,6 +16,7 @@ import {
 } from '@/engine';
 import { setPreferences } from '@/lib/preferences';
 import { installShortcuts, resetShortcuts } from '@/lib/shortcuts';
+import { MOCK_FEATURES } from '@/engine/mock/engine';
 import { ComposerHost } from './ComposerHost';
 import { formatContact } from './recipients';
 import { openComposer, resetComposers } from './store';
@@ -21,8 +24,8 @@ import { openComposer, resetComposers } from './store';
 const G = MOCK_ACCOUNT_IDS.gmail;
 const I = MOCK_ACCOUNT_IDS.imap;
 
-function setup() {
-  const engine = new MockEngine({ incomingEveryMs: null });
+function setup(opts: { features?: readonly string[] } = {}) {
+  const engine = new MockEngine({ incomingEveryMs: null, features: opts.features });
   const queued: TaskJSON[] = [];
   const call = engine.call.bind(engine);
   vi.spyOn(engine, 'call').mockImplementation(((method: string, params: unknown) => {
@@ -36,6 +39,7 @@ function setup() {
       <EngineProvider client={engine}>
         <TooltipProvider>
           <ComposerHost />
+          <Toaster />
         </TooltipProvider>
       </EngineProvider>
     </QueryClientProvider>,
@@ -125,6 +129,79 @@ describe('ComposerHost', () => {
     await waitFor(() => expect(ofClass(queued, 'SendDraftTask')).toHaveLength(1));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), {
       timeout: 3000,
+    });
+  });
+
+  describe('undo send on an engine with expiration-executor', () => {
+    const features = [...MOCK_FEATURES, EngineFeature.ExpirationExecutor];
+    const sendLater = (t: TaskJSON) =>
+      t.__cls === 'SyncbackDraftTask'
+        ? t.draft.metadata?.find((m) => m.pluginId === 'send-later')?.value
+        : undefined;
+
+    async function sendNew(user: ReturnType<typeof userEvent.setup>) {
+      act(
+        () =>
+          void openComposer({
+            mode: 'new',
+            accountId: G,
+            subject: 'Hi',
+            to: [{ email: 'b@x.io' }],
+          }),
+      );
+      const win = await screen.findByRole('dialog', { name: 'New message' });
+      await user.click(await within(win).findByRole('button', { name: /^Send$/ }));
+    }
+
+    it('saves send-later metadata and leaves the send to the engine', async () => {
+      setPreferences({ undoSendMs: 1000 });
+      const { engine, queued, user } = setup({ features });
+      const sent: TaskJSON[] = [];
+      engine.onNotification((n) => {
+        if (n.method !== 'delta' || n.params.modelClass !== 'Task') return;
+        for (const t of n.params.modelJSONs as TaskJSON[])
+          if (t.__cls === 'SendDraftTask') sent.push(t);
+      });
+      const before = Math.floor(Date.now() / 1000);
+      await sendNew(user);
+      await waitFor(() => expect(queued.some((t) => sendLater(t))).toBe(true));
+      const value = queued.map(sendLater).find(Boolean) as {
+        expiration: number;
+        isUndoSend: boolean;
+      };
+      expect(value.isUndoSend).toBe(true);
+      expect(value.expiration).toBeGreaterThanOrEqual(before + 1);
+      // The client queues no send; the (mock) engine's executor does.
+      await waitFor(() => expect(sent.length).toBeGreaterThan(0), { timeout: 4000 });
+      expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), {
+        timeout: 3000,
+      });
+    });
+
+    it('Undo clears the expiration and nothing is sent', async () => {
+      setPreferences({ undoSendMs: 1500 });
+      const { engine, queued, user } = setup({ features });
+      const sent: TaskJSON[] = [];
+      engine.onNotification((n) => {
+        if (n.method !== 'delta' || n.params.modelClass !== 'Task') return;
+        for (const t of n.params.modelJSONs as TaskJSON[])
+          if (t.__cls === 'SendDraftTask') sent.push(t);
+      });
+      await sendNew(user);
+      // fireEvent: sonner's pointer handlers need setPointerCapture, which jsdom lacks.
+      fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+      await waitFor(() =>
+        expect(
+          ofClass(queued, 'SyncbackMetadataTask').map(
+            (t) => t.__cls === 'SyncbackMetadataTask' && t.value,
+          ),
+        ).toEqual([{ expiration: null, isUndoSend: true }]),
+      );
+      expect(await screen.findByRole('dialog', { name: 'New message' })).toBeVisible();
+      await new Promise((r) => setTimeout(r, 2500));
+      expect(sent).toHaveLength(0);
+      expect(ofClass(queued, 'SendDraftTask')).toHaveLength(0);
     });
   });
 

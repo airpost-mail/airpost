@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
+  EngineFeature,
   generateId,
   tasks,
   useEngine,
@@ -22,7 +23,7 @@ import {
   type DraftState,
 } from './draft';
 import { DraftSaver } from './draft-saver';
-import { queueTask } from './engine-calls';
+import { queueTask, watchEngineSend } from './engine-calls';
 import { isBlankHtml } from './html';
 import type { Identity } from './identities';
 import { dedupeContacts, type ParsedRecipients } from './recipients';
@@ -48,6 +49,9 @@ export interface RecipientFieldHandle {
 
 /** Most providers reject messages above 25 MB once encoded. */
 const ATTACHMENT_WARN_BYTES = 25 * 1024 * 1024;
+
+/** How long past the undo delay to follow the engine's send before handing it off. */
+const ENGINE_SEND_WAIT_MS = 60_000;
 
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -238,9 +242,7 @@ export function useComposerSession(args: {
         id: toastId,
         duration: 8000,
       });
-      handOff(false);
-      setBusy(false);
-      focusComposer(windowKey);
+      reopen();
     }
   };
 
@@ -257,14 +259,18 @@ export function useComposerSession(args: {
     setBusy(true);
     handOff(true);
     const delayMs = getUndoSendMs();
-    // TODO(engine): undo-send is a client-side delay. If the tab closes inside it the draft
-    // stays saved but unsent. DCP stage 13's `draft.send {delayMs}` makes it the engine's.
     if (delayMs <= 0) {
       setComposerHidden(windowKey, true);
       void deliver(d, toast.loading('Sending…'));
       return;
     }
     setComposerHidden(windowKey, true);
+    if (client.features?.has(EngineFeature.ExpirationExecutor)) {
+      sendByEngine(d, delayMs);
+      return;
+    }
+    // An engine without `expiration-executor` leaves undo send to this tab: if it closes
+    // inside the delay the draft stays saved but unsent.
     // Saved first so an undo finds the text even if this composer unmounted meanwhile (an
     // inline reply whose thread was left reopens as its saved draft).
     const saved = autosave
@@ -278,14 +284,107 @@ export function useComposerSession(args: {
         label: 'Undo',
         onClick: () => {
           clearTimeout(timer);
-          handOff(false);
-          setBusy(false);
-          focusComposer(windowKey);
+          reopen();
           toast.dismiss(id);
         },
       },
     });
     timer = setTimeout(() => void saved.then(() => deliver(d, id)), delayMs);
+  };
+
+  const reopen = () => {
+    handOff(false);
+    setBusy(false);
+    focusComposer(windowKey);
+  };
+
+  /**
+   * Undo send as the desktop does it (DCP 3.3): the draft is saved with `send-later`
+   * `{expiration, isUndoSend}` and the engine's executor sends it when that comes due, so the
+   * send survives this tab closing. Undo clears the expiration first. The expiration is this
+   * browser's clock, so a clock far off the engine's shortens or stretches the wait.
+   */
+  const sendByEngine = (d: DraftState, delayMs: number) => {
+    const queued = setMetadata(d, SEND_LATER_PLUGIN_ID, {
+      expiration: Math.ceil((Date.now() + delayMs) / 1000),
+      isUndoSend: true,
+    });
+    const watch = watchEngineSend(client, d, delayMs + ENGINE_SEND_WAIT_MS);
+    const saved = autosave.cancel().then(async () => {
+      await prepareFiles(queued);
+      await saver.save(queued);
+    });
+    let undone = false;
+    let timer: ReturnType<typeof setTimeout> | undefined = undefined;
+    const fail = (reason: string, toastId: string | number) => {
+      watch.stop();
+      clearTimeout(timer);
+      toast.error(`Couldn't send: ${reason}`, { id: toastId, action: undefined, duration: 8000 });
+      reopen();
+    };
+    const id = toast('Sending…', {
+      duration: delayMs,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          undone = true;
+          watch.stop();
+          clearTimeout(timer);
+          toast.dismiss(id);
+          const cleared = setMetadata(queued, SEND_LATER_PLUGIN_ID, {
+            expiration: null,
+            isUndoSend: true,
+          });
+          // Later autosaves carry the cleared row rather than the one that sends.
+          setDraft((cur) => ({ ...cur, metadata: cleared.metadata }));
+          void saved
+            .then(() =>
+              queueTask(
+                client,
+                tasks.syncbackMetadata({
+                  accountId: d.accountId,
+                  pluginId: SEND_LATER_PLUGIN_ID,
+                  modelId: d.id,
+                  modelClassName: 'Message',
+                  modelHeaderMessageId: d.headerMessageId,
+                  value: { expiration: null, isUndoSend: true },
+                }),
+              ),
+            )
+            .catch(() => undefined);
+          reopen();
+        },
+      },
+    });
+    saved.catch((err: unknown) => {
+      if (!undone) fail(errorText(err), id);
+    });
+    timer = setTimeout(
+      () => toast.loading('Sending…', { id, action: undefined, duration: Infinity }),
+      delayMs,
+    );
+    void watch.done.then((o) => {
+      if (undone) return;
+      clearTimeout(timer);
+      if (o.kind === 'failed') return fail(o.reason, id);
+      if (o.kind === 'timeout') {
+        toast(
+          'Still sending. The engine keeps trying; the message stays in Drafts until it goes.',
+          {
+            id,
+            action: undefined,
+            duration: 8000,
+          },
+        );
+        closeComposer(windowKey);
+        return;
+      }
+      if (o.task.error)
+        return fail(o.task.error.debuginfo ?? o.task.error.key ?? 'Unknown error', id);
+      if (o.task.status === 'cancelled') return fail('The send was cancelled.', id);
+      toast.success('Sent', { id, duration: 3000 });
+      closeComposer(windowKey);
+    });
   };
 
   const scheduleSend = async (at: Date, pending: PendingRecipients) => {
@@ -299,7 +398,8 @@ export function useComposerSession(args: {
     await autosave.cancel();
     try {
       await prepareFiles(d);
-      // The engine fires a metadata-expiration delta at `at`; useSendLaterRunner sends it.
+      // An engine with `expiration-executor` sends it at `at` itself; for older engines the
+      // metadata-expiration delta reaches useSendLaterRunner, which sends it.
       await queueTask(client, tasks.syncbackDraft(draftToMessage(d)));
       closeComposer(windowKey);
       toast.success(`Scheduled for ${formatSendLater(at)}`);

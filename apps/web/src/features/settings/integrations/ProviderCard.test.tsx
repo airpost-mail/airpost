@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RpcError, RpcErrorCode } from '@/engine';
 import { renderWithEngine } from '../test-utils';
 import { ProviderCard } from './ProviderCard';
 import { providerDef } from './providers';
@@ -47,6 +48,22 @@ describe('ProviderCard', () => {
     await user.click(screen.getByRole('button', { name: 'Test' }));
     expect(
       await screen.findByText('The server URL is not a valid http(s) URL'),
+    ).toBeInTheDocument();
+  });
+
+  it('says a device without admin can’t test providers', async () => {
+    const { engine } = renderWithEngine(<ProviderCard def={providerDef('pdl')} />);
+    vi.spyOn(engine, 'call').mockRejectedValue(
+      new RpcError({
+        code: RpcErrorCode.NotAllowedRelayed,
+        message: 'not allowed for a relayed client',
+      }),
+    );
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/API key/), 'pdl-key');
+    await user.click(screen.getByRole('button', { name: 'Test' }));
+    expect(
+      await screen.findByText('Testing providers from the web needs an admin device.'),
     ).toBeInTheDocument();
   });
 });

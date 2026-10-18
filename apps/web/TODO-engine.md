@@ -53,11 +53,14 @@ does both (`src/engine/mock/mail-actions.ts`), including the return when a snooz
 Done with DCP 4 (marker removed): with `expiration-executor` (`EngineFeature.ExpirationExecutor`)
 the engine sends due send-later drafts itself and the web's runner stays out of the way, so
 a scheduled send goes out with no tab open (and, until DCP 11, while the desktop runs the
-engine). Engines without the feature keep the runner.
+engine). Engines without the feature keep the runner. Undo send uses the same path, as the
+desktop does: Send saves the draft with send-later `{expiration: now + delay, isUndoSend:
+true}` and follows the executor's SendDraftTask for the toast, Undo clears it with
+`{expiration: null, isUndoSend: true}`, so a send survives the tab closing inside the delay.
+Without the feature the delay stays a timer in the tab. The mock runs the executor's
+send-later half when told to announce the feature.
 
 - `src/engine/mock/apply-task.ts:147`: RSVP and contact tasks in the mock. DCP 18.
-- `src/features/composer/useComposerSession.ts:260`: undo-send surviving a closed tab. DCP 13
-  (`draft.send {delayMs}`). The delay itself is the engine's setting now (Preferences).
 
 ## Accounts
 

@@ -10,7 +10,7 @@ import { ChoiceSelect } from '../components/ChoiceSelect';
 import { engineErrorMessage } from '../engine-call';
 import { SettingRow, SettingsSection } from '../components/SettingsSection';
 import { SettingsPage } from '../components/SettingsPage';
-import { MARK_READ_DELAYS, READING_PANES, UNDO_SEND_DELAYS } from './options';
+import { MARK_READ_DELAYS, READING_PANES, undoSendChoices } from './options';
 import { SessionSection } from './SessionSection';
 
 export function GeneralSettings() {
@@ -117,7 +117,7 @@ export function GeneralSettings() {
           <ChoiceSelect
             id="pref-undo-send"
             value={undoSend.ms}
-            choices={UNDO_SEND_DELAYS}
+            choices={undoSendChoices(undoSend.ms)}
             onChange={setUndoSend}
           />
         </SettingRow>
