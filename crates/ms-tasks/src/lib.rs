@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use ms_core::constants::{ls, SENT_COPY_CLEANUP_WINDOW};
+use ms_core::constants::{ls, SENT_COPY_CLEANUP_WINDOW, TASK_NEXT_ATTEMPT_KEY as NEXT_ATTEMPT_KEY};
 use ms_core::{logmsg, Account, Error, Result, SyncError, UidSet};
 use ms_imap::ImapSession;
 use ms_net::{LocalOnly, MetadataBackend, MetadataPush, TokenManager};
@@ -22,7 +22,7 @@ use ms_store::model::{json_i64, json_str};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
 use ms_sync::mail_processor::{MailProcessor, UnplacedMessages};
 use ms_sync::{RemoteTaskRunner, TaskRunnerFactory, WorkerContext};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tracing::{error, info};
 
 mod contacts;
@@ -267,6 +267,7 @@ impl<'a> TaskProcessor<'a> {
         let class = task.class().to_owned();
         let id = task.id().to_owned();
         info!("[{id}] Running {class} performRemote:");
+        let may_retry = may_retry(&class, &task.data);
 
         let result = (|| -> Result<()> {
             if task.account_id() != self.account.id() {
@@ -276,7 +277,7 @@ impl<'a> TaskProcessor<'a> {
                 task.set_status("cancelled");
                 return Ok(());
             }
-            self.perform_remote_by_class(&class, task, session)?;
+            self.perform_remote_by_class(&class, task, session, may_retry)?;
             // A long-running task (GetManyRFC2822Task) can see a cancel request while it
             // runs and stop early; the check above only covers cancels before it starts.
             if task.should_cancel() {
@@ -293,6 +294,11 @@ impl<'a> TaskProcessor<'a> {
                 self.store.save(task)?;
                 return Err(e);
             }
+            if may_retry && e.is_retryable() {
+                self.retry_later(task, &e);
+                self.store.save(task)?;
+                return Err(e);
+            }
             self.fail(task, e)?;
         }
         self.store.save(task)
@@ -303,33 +309,21 @@ impl<'a> TaskProcessor<'a> {
         class: &str,
         task: &mut Task,
         session: &mut dyn ImapSession,
+        may_retry: bool,
     ) -> Result<()> {
         let account_id = task.account_id().to_owned();
+        let on_messages: Option<(bool, messages::RemoteChange)> = match class {
+            "ChangeUnreadTask" => Some((false, messages::apply_unread_in_imap_folder)),
+            "ChangeStarredTask" => Some((false, messages::apply_starred_in_imap_folder)),
+            "ChangeFolderTask" => Some((true, messages::apply_folder_move_in_imap_folder)),
+            "ChangeLabelsTask" => Some((false, messages::apply_label_change_in_imap_folder)),
+            _ => None,
+        };
+        if let Some((is_move, apply)) = on_messages {
+            return self
+                .perform_remote_change_on_messages(&task.data, session, is_move, apply, may_retry);
+        }
         match class {
-            "ChangeUnreadTask" => self.perform_remote_change_on_messages(
-                &task.data,
-                session,
-                false,
-                messages::apply_unread_in_imap_folder,
-            ),
-            "ChangeStarredTask" => self.perform_remote_change_on_messages(
-                &task.data,
-                session,
-                false,
-                messages::apply_starred_in_imap_folder,
-            ),
-            "ChangeFolderTask" => self.perform_remote_change_on_messages(
-                &task.data,
-                session,
-                true,
-                messages::apply_folder_move_in_imap_folder,
-            ),
-            "ChangeLabelsTask" => self.perform_remote_change_on_messages(
-                &task.data,
-                session,
-                false,
-                messages::apply_label_change_in_imap_folder,
-            ),
             // Drafts are not synced back to the server.
             "SyncbackDraftTask" | "ChangeRoleMappingTask" => Ok(()),
             "DestroyDraftTask" => self.perform_remote_destroy_draft(&task.data, session),
@@ -356,6 +350,20 @@ impl<'a> TaskProcessor<'a> {
                 Ok(())
             }
         }
+    }
+
+    /// Leaves a task whose remote phase hit a retryable error in `remote` for another
+    /// attempt after a backoff (TD43): the user's change stays applied locally meanwhile.
+    fn retry_later(&self, task: &mut Task, e: &Error) {
+        let attempts = remote_attempts(&task.data) + 1;
+        let delay = retry_delay(attempts);
+        info!(
+            "[{}] -- Failed with a retryable error ({e}); attempt {attempts} of {MAX_REMOTE_ATTEMPTS}, next in {delay}s",
+            task.id()
+        );
+        task.data[REMOTE_ATTEMPTS_KEY] = json!(attempts);
+        task.data[NEXT_ATTEMPT_KEY] = json!(self.store.now() + delay);
+        task.set_status("remote");
     }
 
     /// Ends a task that failed as `complete` with its error JSON. A database error is not
@@ -589,6 +597,40 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
 /// The factory the bin hands to the workers.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Tasks;
+
+/// The classes whose remote phase can run again after a partial failure without doing
+/// anything twice: flags, labels and moves are set to a target state, and category and
+/// expunge tasks name what they act on (TD43). `SendDraftTask` has its own deferral.
+const RETRIED_CLASSES: [&str; 7] = [
+    "ChangeUnreadTask",
+    "ChangeStarredTask",
+    "ChangeFolderTask",
+    "ChangeLabelsTask",
+    "SyncbackCategoryTask",
+    "DestroyCategoryTask",
+    "ExpungeAllInFolderTask",
+];
+/// Attempts before a retried task fails for good.
+pub const MAX_REMOTE_ATTEMPTS: u64 = 8;
+/// Task data: remote attempts that failed with a retryable error so far.
+pub const REMOTE_ATTEMPTS_KEY: &str = "_remoteAttempts";
+
+fn remote_attempts(data: &Value) -> u64 {
+    data.get(REMOTE_ATTEMPTS_KEY)
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+}
+
+/// Whether a retryable failure of this attempt leaves the task for another.
+fn may_retry(class: &str, data: &Value) -> bool {
+    RETRIED_CLASSES.contains(&class) && remote_attempts(data) + 1 < MAX_REMOTE_ATTEMPTS
+}
+
+/// Seconds before attempt `attempts + 1`: 5 s doubling to 5 minutes.
+fn retry_delay(attempts: u64) -> i64 {
+    let doublings = u32::try_from(attempts.saturating_sub(1)).unwrap_or(u32::MAX);
+    5i64.saturating_mul(2i64.saturating_pow(doublings)).min(300)
+}
 
 impl TaskRunnerFactory for Tasks {
     fn remote_runner<'a>(

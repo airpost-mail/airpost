@@ -562,6 +562,7 @@ impl TaskProcessor<'_> {
         session: &mut dyn ImapSession,
         is_move: bool,
         apply: RemoteChange,
+        may_retry: bool,
     ) -> Result<()> {
         let store = self.store;
         let account_id = self.account.id();
@@ -627,6 +628,9 @@ impl TaskProcessor<'_> {
         }
 
         let failed = failure.is_some();
+        // The task runs again (TD43): what reached the server is recorded, the rest keeps its
+        // optimistic state and the hold on the message's changes.
+        let retrying = may_retry && failure.as_ref().is_some_and(Error::is_retryable);
         store.transaction("performRemoteChangeOnMessages", |s| {
             let mut client_visible_change = false;
             let mut displaced_ids = Vec::new();
@@ -636,6 +640,9 @@ impl TaskProcessor<'_> {
                 let rows = s.placements_for_message(safe.id())?;
                 let safe_id = safe.id().to_owned();
                 for item in items.iter().filter(|i| i.message_id == safe_id) {
+                    if retrying && !item.moved && !item.dest_folder_id.is_empty() {
+                        continue;
+                    }
                     if failed && !item.moved && !item.dest_folder_id.is_empty() {
                         s.abandon_placement_move(
                             &mut safe,
@@ -654,6 +661,10 @@ impl TaskProcessor<'_> {
                 }
                 if client_visible_state(&safe) != before {
                     client_visible_change = true;
+                }
+                if retrying {
+                    s.save(&mut safe)?;
+                    continue;
                 }
                 let suc = safe.sync_unsaved_changes() - 1;
                 safe.set_sync_unsaved_changes(suc);
@@ -683,7 +694,7 @@ impl TaskProcessor<'_> {
         })?;
 
         if let Some(e) = failure {
-            if !is_move {
+            if !is_move && !retrying {
                 rescan_folders_for_flags(store, account_id, by_folder.keys())?;
             }
             return Err(e);
