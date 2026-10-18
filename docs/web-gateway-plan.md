@@ -493,5 +493,11 @@ Open:
   without `query` keep the old paths. The mock implements `query` and has calendar fixtures;
   `MockEngine({features: []})` stands in for an older engine.
 - Open: the row's message count and senders (`senders.ts`) need fields on Thread JSON, which
-  no DCP stage has; recurring events show as stored (one master), expansion is DCP 18; a
-  `query` without `limit` is unbounded, as on the desktop, including for relayed devices.
+  no DCP stage has; recurring events show as stored (one master), expansion is DCP 18.
+- Review fixes: cursor pages on the thread list subselect are full when a thread is in two
+  listed categories (the subselect dedupes by id), and `accounts` narrows the subselect to
+  those accounts' folders and labels, so neither cursor nor offset pages skip or stop early.
+  A relayed `query` defaults to and is capped at 500 rows or ids (`READ_MAX_LIMIT`, as the
+  other relayed reads; counts unbounded); local clients keep the desktop's unbounded reads,
+  and the web's event range reads 500. The cache drops a thread that left all mail from
+  role-less folder and label lists too.
