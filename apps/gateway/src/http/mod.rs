@@ -328,10 +328,15 @@ fn rate_limit_key(ip: IpAddr) -> IpAddr {
 /// The app's CSP. Email bodies render in a sandboxed srcdoc frame with its own, stricter
 /// CSP; a srcdoc frame also inherits this one, so remote and gateway images (rewritten
 /// `cid:` parts) must pass both.
+///
+/// CSP host sources can't spell an IPv6 literal (Chrome drops `ws://[::1]:5180` with a
+/// console error), so those origins get no `ws:` entry; `'self'` covers the page's own
+/// WebSocket in current browsers.
 fn app_csp(config: &Config) -> String {
     let ws: Vec<String> = config
         .allowed_origins
         .iter()
+        .filter(|o| !o.host.starts_with('['))
         .map(|o| format!("{}://{}", if o.https { "wss" } else { "ws" }, o.host))
         .collect();
     [
@@ -592,6 +597,28 @@ mod tests {
         let mut h = HeaderMap::new();
         h.append(COOKIE, HeaderValue::from_static("tern_device="));
         assert_eq!(cookie(&h, "tern_device"), None);
+    }
+
+    #[test]
+    fn csp_has_no_ipv6_literal_sources() {
+        let config = Config::new(crate::config::ConfigInput {
+            bind: "127.0.0.1:5180".parse().unwrap(),
+            public_url: None,
+            insecure_public_url: false,
+            allow_origins: &[],
+            trusted_proxies: &[],
+            web_root: None,
+            config_dir: "/tmp/x".into(),
+        })
+        .unwrap();
+        let csp = app_csp(&config);
+        let connect = csp
+            .split("; ")
+            .find(|d| d.starts_with("connect-src"))
+            .unwrap();
+        assert!(connect.contains("ws://127.0.0.1:5180"), "{connect}");
+        assert!(connect.contains("ws://localhost:5180"), "{connect}");
+        assert!(!connect.contains('['), "{connect}");
     }
 
     #[test]
