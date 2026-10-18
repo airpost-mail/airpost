@@ -118,6 +118,13 @@ on stage 5's worker pool.
 **Relay policy** (`crates/ms-ipc/src/policy.rs`): every `ai.*` method is `Open` except that a
 relayed connection may never pass `config`, only `provider`. Otherwise a remote device could
 make the engine send requests, and mail, to any URL, including hosts on the user's LAN.
+Both rules go in `ms_ipc::policy::relayed_request_allowed` (the method classes and the
+`config` refusal), which the gateway and the engine both enforce, not only in the engine's
+socket code. Until then `ai.*` are unknown names, so `LocalOnly` (admin devices only).
+`apps/gateway/tests/notifications.rs` (tern-web, main b9f6b53e5) is switched to assert the
+`config` refusal once `ai.*` are `Open`. The gateway already routes `ai.delta` and
+`ai.triage.progress` only to the WebSocket whose engine connection started the request, in
+order, and closing a tab closes that connection, which cancels the provider request (A7).
 
 **Features and capabilities.** `hello.features` gains `ai`. Stage 5's `capabilities` gains
 `ai: {summary, reply, triage}`, each `{available, provider?, local?, reason?}`, with the
@@ -193,6 +200,9 @@ for this account", "Waiting for engine support").
 **Web** (`apps/web/src/features/ai`): the same summary card, Suggest in the reply composer
 and triage chips and "Needs reply" list. Settings shows the configured providers and
 switches read-only, because keys and provider URLs are local-only (section 3).
+`WsEngineClient` (`apps/web/src/engine/ws.ts`) times calls out after 30 s, which is less than
+the engine's 120 s AI deadline. Streamed `ai.*` calls pass a longer per-call timeout, which
+is part of the minimal wiring.
 
 **CLI**: `tern ai summarize <thread>` (streams to stdout), `tern ai triage [--since 7d]`,
 `tern ai usage`.
