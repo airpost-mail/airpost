@@ -13,8 +13,9 @@ use std::time::Duration;
 use ms_ipc::{
     code, feature, method, Client, ClientError, CountsGetParams, CountsGetResult, FilesGetParams,
     FilesGetResult, FilesPutParams, FilesPutResult, FilesReadParams, FilesReadResult, HelloResult,
-    MetadataListParams, MetadataListResult, QueryParams, QueryResult, SettingsGetParams,
-    SettingsValues, TasksListParams, TasksListResult, PROTOCOL_VERSION,
+    MessagesUnsubscribeParams, MessagesUnsubscribeResult, MetadataListParams, MetadataListResult,
+    QueryParams, QueryResult, SettingsGetParams, SettingsValues, TasksListParams, TasksListResult,
+    ThreadsSnoozeParams, ThreadsSnoozeResult, ThreadsUnsnoozeParams, PROTOCOL_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -232,6 +233,58 @@ impl Engine {
     pub fn files_put(&mut self, params: &FilesPutParams) -> Result<FilesPutResult, EngineError> {
         self.call_as(method::FILES_PUT, to_params(params))
     }
+
+    /// `threads.snooze` ([`feature::SNOOZE`](ms_ipc::feature::SNOOZE)): the threads move to
+    /// Snoozed until `until` (Unix seconds).
+    pub fn threads_snooze(
+        &mut self,
+        account_id: &str,
+        thread_ids: &[String],
+        until: i64,
+    ) -> Result<ThreadsSnoozeResult, EngineError> {
+        self.call_as(
+            method::THREADS_SNOOZE,
+            to_params(&ThreadsSnoozeParams {
+                account_id: account_id.to_owned(),
+                thread_ids: thread_ids.to_vec(),
+                until,
+            }),
+        )
+    }
+
+    /// `threads.unsnooze`: the snooze ends now.
+    pub fn threads_unsnooze(
+        &mut self,
+        account_id: &str,
+        thread_ids: &[String],
+    ) -> Result<ThreadsSnoozeResult, EngineError> {
+        self.call_as(
+            method::THREADS_UNSNOOZE,
+            to_params(&ThreadsUnsnoozeParams {
+                account_id: account_id.to_owned(),
+                thread_ids: thread_ids.to_vec(),
+            }),
+        )
+    }
+
+    /// `messages.unsubscribe` ([`feature::UNSUBSCRIBE`](ms_ipc::feature::UNSUBSCRIBE)).
+    /// `method` is one of [`ms_ipc::unsubscribe_method`], or the engine's choice. A `web`
+    /// result is a link for the caller to open.
+    pub fn messages_unsubscribe(
+        &mut self,
+        account_id: &str,
+        message_id: &str,
+        method_name: Option<&str>,
+    ) -> Result<MessagesUnsubscribeResult, EngineError> {
+        self.call_as(
+            method::MESSAGES_UNSUBSCRIBE,
+            to_params(&MessagesUnsubscribeParams {
+                account_id: account_id.to_owned(),
+                message_id: message_id.to_owned(),
+                method: method_name.map(str::to_owned),
+            }),
+        )
+    }
 }
 
 fn to_params(p: &impl serde::Serialize) -> Value {
@@ -437,6 +490,33 @@ mod tests {
             })
             .unwrap();
         assert_eq!((r.rows.len(), r.next_cursor), (1, Some(None)));
+    }
+
+    #[test]
+    fn mail_action_calls() {
+        let replies = [
+            r#"{"jsonrpc":"2.0","id":1,"result":{"taskIds":["t1","t2"]}}"#,
+            r#"{"jsonrpc":"2.0","id":2,"result":{"taskIds":["t3"]}}"#,
+            r#"{"jsonrpc":"2.0","id":3,"result":{"method":"web","ok":true,"url":"https://x.test/u"}}"#,
+        ];
+        let mut e = engine(
+            &[("a1", "a@x.test")],
+            &[ms_ipc::feature::SNOOZE, ms_ipc::feature::UNSUBSCRIBE],
+            &format!("{}\n", replies.join("\n")),
+        );
+        let ids = vec!["th1".to_owned()];
+        assert_eq!(
+            e.threads_snooze("a1", &ids, 2_000_000_000)
+                .unwrap()
+                .task_ids,
+            ["t1", "t2"]
+        );
+        assert_eq!(e.threads_unsnooze("a1", &ids).unwrap().task_ids, ["t3"]);
+        let r = e.messages_unsubscribe("a1", "m1", Some("web")).unwrap();
+        assert_eq!(
+            (r.method.as_str(), r.ok, r.url.as_deref()),
+            ("web", true, Some("https://x.test/u"))
+        );
     }
 
     #[test]
