@@ -1,7 +1,8 @@
 // Answers "is feature X available, and from where" (docs/integrations-plan.md, section 1).
 // Local features always are; integration features when the user set up a provider in
-// Preferences > Integrations and the engine can call it; server features need a Tern server,
-// which there is no way to connect yet.
+// Preferences > Integrations and the engine can call it; AI features when a model is set up in
+// Preferences > AI and the engine serves `ai.*` (docs/ai-plan.md section 3); server features need
+// a Tern server, which there is no way to connect yet.
 //
 // The connected engine decides (its `capabilities`, from hello and capabilities.changed): the
 // provider settings are mirrored into its settings store. Keys still go with each request, read
@@ -12,7 +13,8 @@ import { useEffect, useState } from 'react';
 import MailspringStore from 'mailspring-store';
 import { localized } from '../../intl';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine-events';
-import { CapabilityReason, EngineCapability } from '../../engine-protocol';
+import { CapabilityReason, EngineCapability, Feature } from '../../engine-protocol';
+import AI, { AiFeature } from '../../ai';
 import {
   Integrations,
   IntegrationKind,
@@ -23,7 +25,7 @@ import {
   readSettings,
 } from '../../integrations';
 
-export type CapabilitySource = 'local' | 'integration' | 'server';
+export type CapabilitySource = 'local' | 'integration' | 'ai' | 'server';
 
 export type CapabilityFeature =
   | 'snooze'
@@ -34,6 +36,8 @@ export type CapabilityFeature =
   | 'translation'
   | 'grammar-check'
   | 'contact-enrichment'
+  | 'ai-summary'
+  | 'ai-reply'
   | 'read-receipts'
   | 'link-tracking'
   | 'thread-sharing'
@@ -47,6 +51,9 @@ export interface Capability {
   reason?: string;
   /** For integration features, the chosen provider. */
   provider?: IntegrationProvider;
+  /** For AI features: the host the model runs on, and whether it is on this computer or network. */
+  host?: string;
+  local?: boolean;
 }
 
 const LOCAL: CapabilityFeature[] = ['snooze', 'send-later', 'reminders', 'templates', 'insights'];
@@ -54,6 +61,10 @@ const INTEGRATION: { [feature: string]: IntegrationKind } = {
   translation: 'translation',
   'grammar-check': 'grammar',
   'contact-enrichment': 'enrichment',
+};
+const AI_FEATURE: { [feature: string]: AiFeature } = {
+  'ai-summary': 'summary',
+  'ai-reply': 'reply',
 };
 const SERVER: CapabilityFeature[] = [
   'read-receipts',
@@ -74,6 +85,7 @@ const ENGINE_SERVER_FEATURE: { [feature: string]: string } = {
 export const ALL_FEATURES: CapabilityFeature[] = [
   ...LOCAL,
   ...(Object.keys(INTEGRATION) as CapabilityFeature[]),
+  ...(Object.keys(AI_FEATURE) as CapabilityFeature[]),
   ...SERVER,
 ];
 
@@ -87,6 +99,10 @@ function featureLabel(feature: CapabilityFeature) {
       return localized('Grammar check');
     case 'contact-enrichment':
       return localized('Contact info');
+    case 'ai-summary':
+      return localized('Summaries');
+    case 'ai-reply':
+      return localized('Reply suggestions');
     case 'read-receipts':
       return localized('Open tracking');
     case 'link-tracking':
@@ -128,6 +144,10 @@ export class CapabilityStoreClass extends MailspringStore {
       this.trigger();
       this._refreshKeys();
     });
+    const aiSettings = AppEnv.config.onDidChange(AI.CONFIG_KEY, () => {
+      this.trigger();
+      this._refreshKeys();
+    });
     // KeyManager keeps the whole keyset encrypted under this config key, so this fires for a
     // key saved in any window.
     const keyset = AppEnv.config.onDidChange('credentials', () => this._refreshKeys());
@@ -136,6 +156,7 @@ export class CapabilityStoreClass extends MailspringStore {
     events.on('capabilities', onCapabilities);
     this._disposables = [
       () => settings.dispose(),
+      () => aiSettings.dispose(),
       () => keyset.dispose(),
       Integrations.onTransportChange(() => this.trigger()),
       () => events.removeListener('capabilities', onCapabilities),
@@ -164,6 +185,7 @@ export class CapabilityStoreClass extends MailspringStore {
       const reason = reported ? engineReason(reported, undefined) : serverReason();
       return { available: false, source: 'server', reason };
     }
+    if (AI_FEATURE[feature]) return this._ai(AI_FEATURE[feature]);
     const kind = INTEGRATION[feature];
     if (!kind) {
       return { available: false, source: 'local', reason: localized('Unknown feature') };
@@ -205,6 +227,38 @@ export class CapabilityStoreClass extends MailspringStore {
     return { available: true, source: 'integration', provider };
   }
 
+  private _ai(feature: AiFeature): Capability {
+    const engine = this.engineEvents.capabilities;
+    const reported = engine && engine.ai && engine.ai[feature];
+    const settings = AI.readSettings();
+    const provider = AI.providerFor(settings, feature);
+    const where = provider ? { host: AI.hostOf(provider), local: AI.isLocal(provider) } : {};
+    const unavailable = (reason: string): Capability => ({
+      available: false,
+      source: 'ai',
+      reason,
+      ...where,
+    });
+    if (reported && !reported.available) {
+      return unavailable(aiEngineReason(reported));
+    }
+    const hasKey = !!(provider && this._hasKey[aiKeyEntry(provider.id)]);
+    const missing = AI.missingSetting(settings, feature, hasKey);
+    const keysFromUs = !reported || reported.credentials === 'request';
+    if (missing === 'disabled' || missing === 'provider' || missing === 'model') {
+      return unavailable(localized('Set up a model in Preferences > AI'));
+    }
+    if (missing === 'key' && keysFromUs) {
+      return unavailable(
+        localized('Add your %@ API key in Preferences > AI', AI.providerName(provider))
+      );
+    }
+    if (!this.engineEvents.has(Feature.Ai)) {
+      return unavailable(localized('Waiting for engine support'));
+    }
+    return { available: true, source: 'ai', ...where };
+  }
+
   isAvailable(feature: CapabilityFeature) {
     return this.get(feature).available;
   }
@@ -232,15 +286,24 @@ export class CapabilityStoreClass extends MailspringStore {
     const generation = ++this._keyReadGeneration;
     const providers = KINDS.map((kind) => readSettings(kind))
       .filter((s) => s.enabled && s.provider)
-      .map((s) => s.provider);
+      .map((s) => s.provider as string);
+    const ai = AI.readSettings();
+    const aiProviders = AI.AI_FEATURES.filter((f) => ai.features[f].enabled)
+      .map((f) => AI.providerFor(ai, f))
+      .filter(Boolean)
+      .map((p) => p.id);
 
     this._keyRead = (async () => {
       const next: { [provider: string]: boolean } = {};
-      for (const provider of providers) {
+      const names = [
+        ...providers.map((p) => ({ entry: p, name: keyName(p as IntegrationProvider) })),
+        ...[...new Set(aiProviders)].map((id) => ({ entry: aiKeyEntry(id), name: AI.keyName(id) })),
+      ];
+      for (const { entry, name } of names) {
         try {
-          next[provider] = !!((await this._keys().getPassword(keyName(provider))) || '').trim();
+          next[entry] = !!((await this._keys().getPassword(name)) || '').trim();
         } catch (err) {
-          next[provider] = false;
+          next[entry] = false;
         }
       }
       if (generation !== this._keyReadGeneration) return;
@@ -253,6 +316,22 @@ export class CapabilityStoreClass extends MailspringStore {
 
 function isProvider(p: unknown): p is IntegrationProvider {
   return typeof p === 'string' && p in PROVIDERS;
+}
+
+// AI providers' entries in _hasKey, apart from the integration providers'.
+function aiKeyEntry(providerId: string) {
+  return `ai:${providerId}`;
+}
+
+function aiEngineReason(capability: EngineCapability) {
+  switch (capability.reason) {
+    case CapabilityReason.NotSetUp:
+      return localized('Set up a model in Preferences > AI');
+    case 'not-enabled':
+      return localized('Turn on AI for this account');
+    default:
+      return localized('Not available from the sync engine');
+  }
 }
 
 function serverReason() {

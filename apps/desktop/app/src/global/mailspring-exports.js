@@ -209,6 +209,7 @@ lazyLoad(`EmlUtils`, 'services/eml-utils');
 lazyLoad(`MboxUtils`, 'services/mbox-utils');
 lazyLoad(`KeyManager`, 'key-manager');
 lazyLoad(`Integrations`, 'integrations');
+lazyLoad(`AI`, 'ai');
 lazyLoad(`Engine`, 'engine-api');
 lazyLoad(`SoundRegistry`, 'registries/sound-registry');
 lazyLoad(`MailRulesTemplates`, 'mail-rules-templates');

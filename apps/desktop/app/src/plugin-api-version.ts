@@ -6,5 +6,7 @@
  * 1.27.0: `Engine` (src/engine-api.ts) and `tern.engineMethods`;
  * MessageViewExtension.renderedMessageBodyIntoDocument gets `body` (MessageBody) instead of the
  * document, which is in a cross-origin frame now.
+ *
+ * 1.28.0: `AI` (src/ai.ts), the AI settings, and the `ai-summary` and `ai-reply` capabilities.
  */
-export const PLUGIN_API_VERSION = '1.27.0';
+export const PLUGIN_API_VERSION = '1.28.0';

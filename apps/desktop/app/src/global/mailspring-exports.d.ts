@@ -256,7 +256,26 @@ export type {
   EngineSubscribeFilter,
 } from '../engine-api';
 export type { EngineNotification } from '../engine-events';
-export type { EngineCapabilities, EngineCapability } from '../engine-protocol';
+export type {
+  EngineCapabilities,
+  EngineCapability,
+  AiModelInfo,
+  AiTestReport,
+  AiTokenUsage,
+  AiCompletion,
+  AiSuggestion,
+  AiDeltaParams,
+} from '../engine-protocol';
+export type AI = typeof import('../ai').default;
+export const AI: AI;
+export type {
+  AiProvider,
+  AiProviderKind,
+  AiProviderConfig,
+  AiFeature,
+  AiFeatureSettings,
+  AiSettings,
+} from '../ai';
 export type {
   IntegrationKind,
   IntegrationProvider,

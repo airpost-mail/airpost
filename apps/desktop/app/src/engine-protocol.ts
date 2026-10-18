@@ -76,6 +76,16 @@ export const Method = {
   IntegrationsGrammar: 'integrations.grammar',
   IntegrationsEnrich: 'integrations.enrich',
   IntegrationsTest: 'integrations.test',
+  // Model calls (Feature.Ai), answered out of order (docs/ai-plan.md section 3). Until the
+  // engine keeps the AI settings, the params carry the provider config with its key and the
+  // switches (`settings`).
+  AiModels: 'ai.models',
+  AiTest: 'ai.test',
+  AiSummarize: 'ai.summarize',
+  AiSuggestReplies: 'ai.suggestReplies',
+  AiDraftReply: 'ai.draftReply',
+  AiCancel: 'ai.cancel',
+  AiUsage: 'ai.usage',
   // `serve` mode's stdin only: the account JSON carries credentials.
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
@@ -95,6 +105,8 @@ export const Method = {
   SettingsChanged: 'settings.changed',
   // The whole new `capabilities` (Feature.Capabilities), to every subscriber.
   CapabilitiesChanged: 'capabilities.changed',
+  // `{streamId, text}`, only to the connection that sent `streamId`, ahead of the reply.
+  AiDelta: 'ai.delta',
 } as const;
 
 // What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
@@ -116,6 +128,8 @@ export const Feature = {
   Integrations: 'integrations',
   // `capabilities` in hello and engine.status, and capabilities.changed.
   Capabilities: 'capabilities',
+  // The `ai.*` methods but triage, `ai.delta`, and `capabilities.ai`.
+  Ai: 'ai',
 } as const;
 
 export const ErrorCode = {
@@ -142,6 +156,9 @@ export const ErrorCode = {
   TooManyConnections: -32009,
   // A provider call failed; `data` is the IntegrationError `{key, message, retryable, ...}`.
   IntegrationFailed: -32010,
+  // A model call failed, or the account or feature is off; `data` is the AiError
+  // `{key, message, retryable, status?, retryAfter?}`.
+  AiFailed: -32011,
   // The workers for this kind of call are busy and their queue is full; try again later.
   EngineBusy: -32012,
 } as const;
@@ -195,14 +212,17 @@ export interface EngineCapability {
   // 'request': the client sends the provider's key with each call, so it checks for one.
   credentials?: 'request' | string;
   reason?: string;
+  // AI features: the model runs on this computer or network.
+  local?: boolean;
 }
 
 // What the engine can do for its clients now. `integrations` by kind (translation, grammar,
 // enrichment), `server` by feature (readReceipts, linkTracking, threadSharing, activitySharing,
-// metadataSync); newer engines add groups (`ai`).
+// metadataSync), `ai` by feature (summary, reply, triage); newer engines add groups.
 export interface EngineCapabilities {
   integrations?: { [kind: string]: EngineCapability };
   server?: { [feature: string]: EngineCapability };
+  ai?: { [feature: string]: EngineCapability };
   [group: string]: { [name: string]: EngineCapability } | undefined;
 }
 
@@ -468,4 +488,43 @@ export interface MessagesUnsubscribeResult {
   url?: string;
   error?: string;
   taskId?: string;
+}
+
+// `ai.*` results (crates/ms-ai, docs/ai-plan.md section 3).
+
+export interface AiModelInfo {
+  id: string;
+  name: string;
+  contextTokens?: number;
+}
+
+export interface AiTestReport {
+  host: string;
+  model: string;
+  local: boolean;
+  latencyMs: number;
+}
+
+export interface AiTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  estimated?: boolean;
+}
+
+// `ai.summarize` and `ai.draftReply`; `cached` only on summaries.
+export interface AiCompletion {
+  text: string;
+  model: string;
+  cached?: boolean;
+  usage?: AiTokenUsage;
+}
+
+export interface AiSuggestion {
+  label: string;
+  text: string;
+}
+
+export interface AiDeltaParams {
+  streamId: string;
+  text: string;
 }
