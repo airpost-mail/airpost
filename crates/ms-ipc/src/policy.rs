@@ -147,6 +147,31 @@ pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) ->
     }
 }
 
+/// Bounds a relayed `query`: rows and ids default to and stop at
+/// [`READ_MAX_LIMIT`](crate::READ_MAX_LIMIT), as every other relayed read does, so one
+/// request can't load a whole mailbox into the engine and one reply line. Counts and
+/// params that aren't an object, or whose limit isn't a non-negative integer, pass as they
+/// are for the engine to answer or refuse. Local clients keep the desktop's unbounded
+/// reads.
+pub fn cap_relayed_query(params: &mut Value) {
+    let Some(p) = params.as_object_mut() else {
+        return;
+    };
+    if p.get("count").and_then(Value::as_bool) == Some(true) {
+        return;
+    }
+    let max = crate::READ_MAX_LIMIT as u64;
+    match p.get("limit") {
+        None | Some(Value::Null) => {
+            p.insert("limit".into(), max.into());
+        }
+        Some(Value::Number(n)) if n.as_u64().is_some_and(|l| l > max) => {
+            p.insert("limit".into(), max.into());
+        }
+        Some(_) => {}
+    }
+}
+
 const ACCOUNT_FIELDS: &[&str] = &[
     "id",
     "name",
@@ -191,6 +216,41 @@ pub fn public_account_json(account: &Value) -> Value {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn relayed_query_is_capped() {
+        let capped = |mut v: Value| {
+            cap_relayed_query(&mut v);
+            v
+        };
+        let max = crate::READ_MAX_LIMIT;
+        assert_eq!(
+            capped(json!({"class": "Message", "include": ["body"]}))["limit"],
+            max
+        );
+        assert_eq!(
+            capped(json!({"class": "Thread", "limit": null}))["limit"],
+            max
+        );
+        assert_eq!(
+            capped(json!({"class": "Thread", "limit": 100_000}))["limit"],
+            max
+        );
+        assert_eq!(
+            capped(json!({"class": "Thread", "idsOnly": true}))["limit"],
+            max
+        );
+        assert_eq!(capped(json!({"class": "Thread", "limit": 20}))["limit"], 20);
+        assert_eq!(capped(json!({"class": "Thread", "limit": -1}))["limit"], -1);
+        assert_eq!(
+            capped(json!({"class": "Thread", "limit": "x"}))["limit"],
+            "x"
+        );
+        assert!(capped(json!({"class": "Thread", "count": true}))
+            .get("limit")
+            .is_none());
+        assert_eq!(capped(json!(null)), json!(null));
+    }
 
     #[test]
     fn classes() {
