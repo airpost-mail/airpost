@@ -2,6 +2,7 @@ import {
   discoveredSecurity,
   isLoopbackHost,
   needsCleartextConsent,
+  repairStoredSecurity,
   securityForPort,
 } from '../lib/connection-security';
 import MailspringProviderSettings from '../lib/mailspring-provider-settings.json';
@@ -40,8 +41,13 @@ describe('connection security', function connectionSecuritySpecs() {
   it('asks for consent for none on a remote host until it is given', () => {
     const settings: Record<string, any> = { imap_security: 'none', imap_host: 'imap.example.com' };
     expect(needsCleartextConsent(settings, 'imap')).toBe(true);
-    settings.imap_allow_cleartext = true;
+    settings.imap_allow_cleartext = ' IMAP.example.com ';
     expect(needsCleartextConsent(settings, 'imap')).toBe(false);
+    // Given for another host, or a bare boolean: not consent for this one.
+    settings.imap_host = 'imap.other.example';
+    expect(needsCleartextConsent(settings, 'imap')).toBe(true);
+    settings.imap_allow_cleartext = true;
+    expect(needsCleartextConsent(settings, 'imap')).toBe(true);
 
     expect(needsCleartextConsent({ smtp_security: 'none', smtp_host: '127.0.0.1' }, 'smtp')).toBe(
       false
@@ -49,6 +55,30 @@ describe('connection security', function connectionSecuritySpecs() {
     expect(
       needsCleartextConsent({ smtp_security: 'STARTTLS', smtp_host: 'smtp.example.com' }, 'smtp')
     ).toBe(false);
+  });
+
+  it('repairs a stored security the engine refuses, keeping valid ones', () => {
+    const settings: Record<string, any> = {
+      imap_security: 'None',
+      imap_port: 143,
+      smtp_security: '',
+      smtp_port: 465,
+    };
+    expect(repairStoredSecurity(settings)).toBe(true);
+    expect(settings.imap_security).toEqual('STARTTLS');
+    expect(settings.smtp_security).toEqual('SSL / TLS');
+
+    const valid = { imap_security: 'none', imap_port: 143, smtp_security: 'STARTTLS' };
+    expect(repairStoredSecurity(valid)).toBe(false);
+    expect(valid.imap_security).toEqual('none');
+    const missing: Record<string, any> = { imap_port: 993, smtp_port: 2525 };
+    repairStoredSecurity(missing);
+    expect(missing).toEqual({
+      imap_port: 993,
+      imap_security: 'SSL / TLS',
+      smtp_port: 2525,
+      smtp_security: 'STARTTLS',
+    });
   });
 
   it('ships no provider entry with cleartext', () => {

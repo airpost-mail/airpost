@@ -85,10 +85,31 @@ describe('AccountIMAPSettingsForm', function imapSettingsFormSpecs() {
       expect(result.errorFieldNames).toEqual(['imap_allow_cleartext']);
       expect(result.errorMessage).toBeTruthy();
 
-      account.settings.imap_allow_cleartext = true;
+      account.settings.imap_allow_cleartext = 'imap.example.com';
       result = AccountIMAPSettingsForm.validateAccount(account);
       expect(result.errorFieldNames).toEqual([]);
       expect(result.populated).toBe(true);
+    });
+
+    it('asks again when the host changes', () => {
+      const account = accountWith({
+        imap_security: 'none',
+        imap_host: 'imap.other-isp.example',
+        imap_allow_cleartext: 'imap.example.com',
+      });
+      expect(AccountIMAPSettingsForm.validateAccount(account).errorFieldNames).toEqual([
+        'imap_allow_cleartext',
+      ]);
+      const box = render(account).querySelector(
+        '[id="settings.imap_allow_cleartext"]'
+      ) as HTMLInputElement;
+      expect(box.checked).toBe(false);
+
+      // A bare `true` from before the confirmation named its host doesn't count either.
+      (account.settings as any).imap_allow_cleartext = true;
+      expect(AccountIMAPSettingsForm.validateAccount(account).errorFieldNames).toEqual([
+        'imap_allow_cleartext',
+      ]);
     });
 
     it('gates SMTP the same way', () => {
@@ -124,7 +145,12 @@ describe('AccountIMAPSettingsForm', function imapSettingsFormSpecs() {
       expect(box).not.toBe(null);
       expect(box.checked).toBe(false);
       Simulate.change(box, { target: { id: box.id, type: 'checkbox', checked: true } } as any);
-      expect(onFieldChange.calls[0].args[0].target.checked).toBe(true);
+      expect(onFieldChange.calls[0].args[0].target).toEqual({
+        id: 'settings.smtp_allow_cleartext',
+        value: 'smtp.example.com',
+      });
+      Simulate.change(box, { target: { id: box.id, type: 'checkbox', checked: false } } as any);
+      expect(onFieldChange.calls[1].args[0].target.value).toBe(false);
     });
   });
 });

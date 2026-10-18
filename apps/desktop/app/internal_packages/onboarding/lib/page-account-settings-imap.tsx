@@ -6,6 +6,7 @@ import FormField from './form-field';
 import {
   MailProtocol,
   cleartextConsentKey,
+  hasCleartextConsent,
   isLoopbackHost,
   needsCleartextConsent,
   securityForPort,
@@ -210,9 +211,16 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
               type="checkbox"
               id={`settings.${consentKey}`}
               disabled={submitting}
-              checked={settings[consentKey] === true}
+              checked={hasCleartextConsent(settings, protocol)}
               onKeyPress={onFieldKeyPress}
-              onChange={onFieldChange}
+              onChange={(e) =>
+                onFieldChange({
+                  target: {
+                    id: e.target.id,
+                    value: e.target.checked ? `${settings[`${protocol}_host`]}`.trim() : false,
+                  },
+                })
+              }
             />
             <label htmlFor={`settings.${consentKey}`} className="checkbox">
               {localized('Send password unencrypted')}

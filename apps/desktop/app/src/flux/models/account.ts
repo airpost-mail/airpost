@@ -100,15 +100,16 @@ export class Account extends ModelWithMetadata {
     imap_password: string;
     imap_allow_insecure_ssl: boolean;
     imap_security: 'SSL / TLS' | 'STARTTLS' | 'none';
-    // The user confirmed `none` for a remote host on the onboarding settings page.
-    imap_allow_cleartext?: boolean;
+    // The host the user confirmed `none` for on the onboarding settings page; the engine
+    // refuses `none` for a remote host unless this matches imap_host.
+    imap_allow_cleartext?: string | false;
     smtp_host: string;
     smtp_port: number;
     smtp_username: string;
     smtp_password: string;
     smtp_allow_insecure_ssl: boolean;
     smtp_security: 'SSL / TLS' | 'STARTTLS' | 'none';
-    smtp_allow_cleartext?: boolean;
+    smtp_allow_cleartext?: string | false;
     refresh_token: string;
     container_folder: string;
   };

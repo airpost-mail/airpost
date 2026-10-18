@@ -3,6 +3,7 @@ import { ipcRenderer } from 'electron';
 import MailspringStore from 'mailspring-store';
 
 import * as OnboardingActions from './onboarding-actions';
+import { repairStoredSecurity } from './connection-security';
 
 class OnboardingStore extends MailspringStore {
   _account: Account;
@@ -27,6 +28,9 @@ class OnboardingStore extends MailspringStore {
       // Used when re-adding an account after re-connecting, take the user back
       // to the best page with the most details
       this._account = new Account({}).fromJSON(existingAccountJSON);
+      // Older autoconfig stored "None", which the engine refuses and the security menu
+      // can't show.
+      if (this._account.settings) repairStoredSecurity(this._account.settings);
       if (this._account.provider === 'gmail') {
         this._pageStack = ['account-choose', 'account-settings-gmail'];
       } else if (this._account.provider === 'office365') {

@@ -40,11 +40,41 @@ export function cleartextConsentKey(protocol: MailProtocol) {
   return `${protocol}_allow_cleartext`;
 }
 
+const normHost = (host: unknown) => `${host || ''}`.trim().toLowerCase();
+
+/**
+ * True when the user confirmed `none` for the host `protocol` points at now. The
+ * confirmation stores that host (the engine checks the same), so it doesn't carry over
+ * to another server.
+ */
+export function hasCleartextConsent(settings: Record<string, any>, protocol: MailProtocol) {
+  const consent = settings[cleartextConsentKey(protocol)];
+  const host = normHost(settings[`${protocol}_host`]);
+  return typeof consent === 'string' && host !== '' && normHost(consent) === host;
+}
+
 /** True when `protocol` is set to `none` for a remote host and the user hasn't confirmed it. */
 export function needsCleartextConsent(settings: Record<string, any>, protocol: MailProtocol) {
   return (
     settings[`${protocol}_security`] === 'none' &&
     !isLoopbackHost(settings[`${protocol}_host`]) &&
-    settings[cleartextConsentKey(protocol)] !== true
+    !hasCleartextConsent(settings, protocol)
   );
+}
+
+/**
+ * Replaces a stored security the engine refuses (`"None"` from Mailspring's autoconfig, an
+ * empty or missing one) with what discovery would pick for the port, so the settings form
+ * shows the value it holds. Returns whether anything changed.
+ */
+export function repairStoredSecurity(settings: Record<string, any>) {
+  let changed = false;
+  for (const protocol of ['imap', 'smtp'] as MailProtocol[]) {
+    const key = `${protocol}_security`;
+    if (!['SSL / TLS', 'STARTTLS', 'none'].includes(settings[key])) {
+      settings[key] = discoveredSecurity(protocol, undefined, Number(settings[`${protocol}_port`]));
+      changed = true;
+    }
+  }
+  return changed;
 }
