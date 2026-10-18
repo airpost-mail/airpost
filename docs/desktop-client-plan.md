@@ -1856,3 +1856,74 @@ AccountStore.
 Open: the review asked for WRONG_CHANNEL on relayed parent methods; the engine answers
 FORBIDDEN_RELAYED there (the relay policy refuses them first), and the test checks that. Trial
 pending (not run), as above.
+
+2026-10-18, stage 11 gate (attempt 1), branch `roadmap/client-next`: not merged. Rebased on main
+(the AI2 work). Conflicts: `feature::AI` and `feature::ACCOUNTS` in `crates/ms-ipc` (both kept),
+`ms-ai` beside `ms-secrets` and `ring` in `apps/engine/Cargo.toml`, and the `ms_ipc` imports in
+`apps/engine/src/socket.rs` (union). Gate: fmt, clippy, `cargo test --workspace` (green), release
+build of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve with the release
+binaries (144 passed, 4 skipped), desktop lint, typecheck and the engine, engine-supervisor,
+key-manager, account-store, mailsync-process, oauth-revocation and account-error specs (118
+passing). `cargo deny check` fails on advisories: RUSTSEC-2026-0370, -0371 and -0372 mark
+`zvariant`, `zbus_names` and `zvariant_derive` unmaintained (folded into zbus 6). They come in
+only through `secret-service` 5.2 (ms-secrets' Linux backend), which is the latest release and
+still on zbus 5; main has no zbus and passes. Not fixed here: ignoring the three advisories in
+`deny.toml` (unmaintained, no vulnerability, until secret-service moves to zbus 6) needs the
+user's go; the alternative is a Linux backend without `secret-service` (the file store only, or
+D-Bus calls of our own).
+
+Open, low findings from the stage 11 review:
+- `account.add` (`apps/engine/src/serve.rs`) compares, stores and broadcasts the whole Account
+  JSON minus the three secrets, including desktop state such as `syncState` and `syncError`
+  that AccountStore writes to config.json. When those drift from accounts.json (after any
+  error), the next launch restarts the autostarted account as having new settings, and
+  `syncError` (exit text) is persisted in accounts.json and sent to every local subscriber in
+  `account.changed`.
+- `compact()` (`crates/ms-store/src/schema.rs`) runs `wal_checkpoint(TRUNCATE)` with the 60 s
+  busy timeout. TRUNCATE blocks new writers while it waits for readers on old snapshots; in
+  `serve` every account and socket session shares one database, so one long reader can stall
+  all accounts' writes for up to 60 s on each hourly cleanup.
+- `registry::forget()` unregisters the account even when the store can't be opened, so the
+  secrets stay and a later add with the same id picks them up; and when forget fails inside
+  `remove_account(forget=true)`, the slot is dropped and `removed` sent but accounts.json keeps
+  the entry, so the deleted account autostarts at the next engine start.
+- `start_registered` (`serve.rs`) races `account.remove`: it iterates a snapshot of
+  accounts.json while the stdin loop runs (EngineClient's `_reconcile` sends `account.remove`
+  right after hello). An account removed between `with_secrets` and `start()` still starts,
+  unregistered, and syncs until the next launch; one removed earlier gets a spurious `stopped`
+  and an unstarted entry.
+- The `method::ACCOUNT_REMOVE` and `feature::ACCOUNTS` docs in `crates/ms-ipc/src/lib.rs`
+  describe `account.remove {forget}`; `AccountRemoveParams` has no such field and
+  `account.remove` always unregisters and deletes the secrets. Other clients (tern-web, CLI)
+  read these docs as the protocol.
+- Store selection isn't tied to the config directory: a release engine (or one started without
+  `TERN_ENGINE_KEY_FILE`) on a profile whose secrets are in `secrets.enc` picks the keychain,
+  finds no item, treats it as an empty keyset and fails to start every registered account; an
+  `account.add` then writes a second, diverging keyset, and `hello.credentials` shows no error.
+- The fuzz crate (`fuzz/Cargo.toml`) is its own workspace and only the nightly fuzz job builds
+  it; the targets have never been compiled here (no nightly toolchain).
+- `detachedEngineToReuse` (`engine-supervisor.ts`) joins a detached engine with the bundled
+  build without checking `hello.credentials`. If its store is unusable (`credentials.store`
+  absent or `credentials.error` set, e.g. a launchd engine that can't open the keychain, or
+  another `TERN_ENGINE_KEY_FILE`), its accounts can't start, and the joined desktop skips
+  `_prepareCredentials`, so nothing re-imports from `credentialsBeforeEngine`.
+- Older engine after the move: once `credentialsMovedToEngine` is set, an engine without
+  Feature.Accounts (older or overridden binary) goes through `insertAccountSecrets` with
+  `credentials`, which no longer holds account secrets, so `account.add` carries no passwords
+  and every account fails.
+- `credentialsBeforeEngine` (`key-manager.ts`) is written only the first time. After a
+  downgrade where the user signs in again, the next upgrade imports the new secrets and drops
+  them from `credentials`, but the backup keeps the old ones: `accountSecretsForWindows` hands
+  the reconnect form and OAuth revocation stale values, and a second downgrade restores stale
+  passwords.
+- Section 6's "What breaks for third-party plugins" table has no stage 11 row: after the move
+  the renderer KeyManager facade (`getKeyHash`/`getPassword`) no longer returns account
+  passwords or refresh tokens.
+- Section 5 says that after the migration stage the Mailspring keychain migration feeds
+  `credentials.import` directly. It still writes the Tern safeStorage keyset first, which the
+  supervisor imports and copies into `credentialsBeforeEngine`, leaving a second encrypted copy
+  of the Mailspring passwords in config.json.
+
+Trial pending (not run): migrate the trial profile, restart the app, check both accounts sync;
+run `serve --detached` with the desktop closed and check mail still syncs; update the app with
+the detached engine running.
