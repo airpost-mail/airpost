@@ -710,8 +710,8 @@ impl Engine {
                 None
             } else if !identity.is_null() && s.identity != identity {
                 Some("a new identity")
-            } else if registry::strip_secrets(s.account.as_json())
-                != registry::strip_secrets(account.as_json())
+            } else if registry::stored_form(s.account.as_json())
+                != registry::stored_form(account.as_json())
             {
                 Some("new settings")
             } else if sent_secrets
