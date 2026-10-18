@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 pub use tern_client::{AccountRef, EngineError, Engines};
 
@@ -18,6 +18,9 @@ pub trait Backend {
         -> Result<Value, EngineError>;
     /// Whether the engine holding `account_id` lists `feature` in `hello.features`.
     fn has_feature(&self, account_id: &str, feature: &str) -> bool;
+    /// The stored values of `keys` from the engine that keeps the settings, or `None` when
+    /// no engine does (they are then only in the desktop's `config.json`).
+    fn settings(&mut self, keys: &[&str]) -> Option<Map<String, Value>>;
 }
 
 /// Connects to every live engine under `config_dir`. `client_name` goes in `hello`.
@@ -57,6 +60,18 @@ impl Backend for Engines {
             .iter()
             .find(|e| e.holds(account_id))
             .is_some_and(|e| e.has_feature(feature))
+    }
+
+    fn settings(&mut self, keys: &[&str]) -> Option<Map<String, Value>> {
+        let engine = self.settings_engine()?;
+        let keys = keys.iter().map(|k| (*k).to_owned()).collect();
+        // An engine that fails the call keeps nothing tern-mcp can use.
+        Some(
+            engine
+                .settings_get(Some(keys))
+                .map(|v| v.values)
+                .unwrap_or_default(),
+        )
     }
 }
 

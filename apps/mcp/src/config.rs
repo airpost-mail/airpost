@@ -3,7 +3,8 @@
 
 //! The profile directory and what tern-mcp reads from the desktop's `config.json`: the
 //! accounts' display fields (name, provider, aliases, auto-cc), the default sending
-//! account, and the `core.mcp.*` keys used while there is no `mcp.json`. Credentials in
+//! account when no engine keeps the settings (`settings.get`, docs/desktop-client-plan.md
+//! 3.4), and the `core.mcp.*` keys used while there is no `mcp.json`. Credentials in
 //! `config.json` are never read.
 
 use std::path::Path;

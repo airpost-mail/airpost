@@ -206,14 +206,28 @@ fn now_secs() -> i64 {
 
 // ── Drafts ──────────────────────────────────────────────────────────────────
 
-/// `DraftFactory._accountForNewDraft` without a UI: the desktop's default sending
-/// account when it is running, else the first running account.
-fn account_for_new_draft(ctx: &Ctx<'_>) -> Result<AccountRef, ToolError> {
+const DEFAULT_SEND_ACCOUNT: &str = "core.sending.defaultAccountIdForSend";
+
+/// `core.sending.defaultAccountIdForSend`: from the engine's settings when an engine keeps
+/// them, which then hold it for every client (unset means none), else from `config.json`.
+fn default_send_account(ctx: &mut Ctx<'_>) -> Option<String> {
+    match ctx.backend.settings(&[DEFAULT_SEND_ACCOUNT]) {
+        Some(values) => values
+            .get(DEFAULT_SEND_ACCOUNT)
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        None => ctx.desktop.default_send_account(),
+    }
+}
+
+/// `DraftFactory._accountForNewDraft` without a UI: the default sending account when it is
+/// running, else the first running account.
+fn account_for_new_draft(ctx: &mut Ctx<'_>) -> Result<AccountRef, ToolError> {
     let all = ctx.backend.accounts();
     if all.is_empty() {
         return Err(failed(ctx.no_engine.clone()));
     }
-    let default = ctx.desktop.default_send_account();
+    let default = default_send_account(ctx);
     Ok(default
         .and_then(|d| all.iter().find(|a| a.account_id == d).cloned())
         .unwrap_or_else(|| all[0].clone()))

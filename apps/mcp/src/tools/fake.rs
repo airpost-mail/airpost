@@ -28,6 +28,8 @@ pub struct Fake {
     /// What `hello.features` would list. `tasks.list` and `metadata.list` answer only when
     /// their feature is here, as an older engine doesn't know them.
     pub features: Vec<String>,
+    /// The engine's settings store, answered when `features` has `settings`.
+    pub settings: serde_json::Map<String, Value>,
 }
 
 fn not_found(what: &str) -> EngineError {
@@ -82,6 +84,19 @@ impl Backend for Fake {
 
     fn has_feature(&self, _account_id: &str, feature: &str) -> bool {
         self.features.iter().any(|f| f == feature)
+    }
+
+    fn settings(&mut self, keys: &[&str]) -> Option<serde_json::Map<String, Value>> {
+        if !self.features.iter().any(|f| f == ms_ipc::feature::SETTINGS) {
+            return None;
+        }
+        Some(
+            self.settings
+                .iter()
+                .filter(|(k, _)| keys.contains(&k.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        )
     }
 
     fn call(&mut self, account: &str, method: &str, params: Value) -> Result<Value, EngineError> {

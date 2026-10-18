@@ -395,6 +395,30 @@ fn create_draft_then_find_it_by_header_message_id() {
     assert_eq!(o["id"], out["id"]);
 }
 
+/// The default sending account comes from the engine's settings when it keeps them, and an
+/// unset key there means none, whatever `config.json` says.
+#[test]
+fn new_drafts_use_the_engine_default_sending_account() {
+    let draft_account = |f: &mut Fake| {
+        let out = json_of(&run(
+            f,
+            &rw(),
+            "create_draft",
+            json!({"to": [{"email": "bob@y.test"}], "subject": "Hi", "body": "<p>x</p>"}),
+        ));
+        out["accountId"].as_str().unwrap().to_owned()
+    };
+    let mut f = fake();
+    f.accounts.push(Fake::account("a2", "two@x.test"));
+    assert_eq!(draft_account(&mut f), "a1");
+    f.features.push(ms_ipc::feature::SETTINGS.into());
+    f.settings
+        .insert("core.sending.defaultAccountIdForSend".into(), json!("a2"));
+    assert_eq!(draft_account(&mut f), "a2");
+    f.settings.clear();
+    assert_eq!(draft_account(&mut f), "a1");
+}
+
 #[test]
 fn messages_are_marked_as_drafts_or_not() {
     let mut f = fake();
