@@ -470,7 +470,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
 
 - **SecretStore** (new `crates/ms-secrets`): macOS Keychain generic password, service "Tern
   Engine" (`security-framework` is already in `Cargo.lock`); Linux Secret Service (the
-  `secret-service` crate, MIT/Apache); fallback AES-256-GCM file `secrets.enc` (`ring`)
+  `dbus-secret-service` crate, MIT/Apache, with libdbus linked statically); fallback AES-256-GCM file `secrets.enc` (`ring`)
   keyed from `$CREDENTIALS_DIRECTORY` or `TERN_ENGINE_KEY_FILE` (0600). Refuses plaintext.
   Windows DPAPI later. One item holding the keyset. Names `account:<id>:imap|smtp|
   refresh-token`, `integration:<provider>`, `tern-server-token`. ~600 Rust.
@@ -1871,6 +1871,21 @@ still on zbus 5; main has no zbus and passes. Not fixed here: ignoring the three
 `deny.toml` (unmaintained, no vulnerability, until secret-service moves to zbus 6) needs the
 user's go; the alternative is a Linux backend without `secret-service` (the file store only, or
 D-Bus calls of our own).
+
+2026-10-18, stage 11 gate fix, branch `roadmap/client-next`: ms-secrets' Linux backend uses
+`dbus-secret-service` 4.1 (libdbus through the `dbus` crate, features `crypto-rust` and
+`vendored`) instead of `secret-service`, so zbus and the three advisories are gone and `deny.toml`
+is unchanged. The API is the same blocking one (`SecretService::connect(EncryptionType::Dh)`,
+`search_items`, `get_default_collection`, `create_item`), so `secret_service.rs` only changed its
+imports. `vendored` builds libdbus from the crate's copy and links it statically: no dbus headers
+or pkg-config on the build machine, no libdbus needed at run time (headless servers and slim
+containers). libdbus is AFL-2.1 or GPL-2.0-or-later, used under the GPL; NOTICE.md says so, since
+cargo-about lists `libdbus-sys` as MIT/Apache only. Checks: `cargo deny check` and
+`cargo deny --manifest-path apps/backend/Cargo.toml check` pass, ms-secrets clippy and tests on
+macOS, third-party-notices.sh for the engine. Decision taken, to confirm: libdbus static
+(`vendored`) rather than linked from the system. Open: the Linux backend wasn't compiled here
+(macOS, no Linux C toolchain); CI's Linux jobs build it, including the vendored libdbus on the
+ubuntu-22.04 x64 and arm release runners.
 
 Open, low findings from the stage 11 review:
 - `account.add` (`apps/engine/src/serve.rs`) compares, stores and broadcasts the whole Account
