@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ms_ipc::{
-    code, method, Client, ClientError, CountsGetParams, CountsGetResult, HelloResult,
-    MetadataListParams, MetadataListResult, TasksListParams, TasksListResult, PROTOCOL_VERSION,
+    code, feature, method, Client, ClientError, CountsGetParams, CountsGetResult, HelloResult,
+    MetadataListParams, MetadataListResult, SettingsGetParams, SettingsValues, TasksListParams,
+    TasksListResult, PROTOCOL_VERSION,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -174,6 +175,23 @@ impl Engine {
     ) -> Result<MetadataListResult, EngineError> {
         self.call_as(method::METADATA_LIST, to_params(params))
     }
+
+    /// `settings.get` of `keys` (every stored key when `None`).
+    pub fn settings_get(
+        &mut self,
+        keys: Option<Vec<String>>,
+    ) -> Result<SettingsValues, EngineError> {
+        self.call_as(method::SETTINGS_GET, to_params(&SettingsGetParams { keys }))
+    }
+
+    /// `settings.set`; null clears a key.
+    pub fn settings_set(
+        &mut self,
+        values: serde_json::Map<String, Value>,
+    ) -> Result<(), EngineError> {
+        self.call_as::<Value>(method::SETTINGS_SET, to_params(&SettingsValues { values }))
+            .map(drop)
+    }
 }
 
 fn to_params(p: &impl serde::Serialize) -> Value {
@@ -242,6 +260,14 @@ impl Engines {
             }
         }
         out
+    }
+
+    /// The engine that keeps the settings: the first one announcing
+    /// [`feature::SETTINGS`], which only a `serve` engine does.
+    pub fn settings_engine(&mut self) -> Option<&mut Engine> {
+        self.engines
+            .iter_mut()
+            .find(|e| e.has_feature(feature::SETTINGS))
     }
 
     /// The engine holding `account_id`.
