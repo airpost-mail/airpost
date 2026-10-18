@@ -25,9 +25,11 @@ desktop / tern / web (via gateway) ──socket──▶ engine ── ai_api.rs
                                                  └─ triage worker on new inbox mail
 ```
 
-- `crates/ms-ai`: blocking reqwest (rustls on ring), serde, sha2, thiserror, tracing, the same
-  stack as `ms-integrations`; depends on `ms-integrations` for `Secret` and its URL redaction,
-  nothing else. No store access: callers pass a `MailContext` (below).
+- `crates/ms-ai`: reqwest (rustls on ring), serde, thiserror, tracing, the same stack as
+  `ms-integrations`, but reqwest's async client on a private current-thread tokio runtime
+  that callers block on, so `ai.cancel` can drop a request that is still waiting for its
+  first token. Depends on `ms-integrations` for `Secret`, its URL redaction, the TTL cache
+  and the transport-error mapping, nothing else. No store access: callers pass a `MailContext` (below).
 - `apps/engine/src/ai_api.rs`: method routing, context building from the read-only Store,
   account and feature checks, the stream registry, the triage worker, usage counters.
 - tern-mcp gets no generation tools (the MCP client is already a model); it can read triage
@@ -67,7 +69,8 @@ ai.triage(&ProviderConfig, &MailContext)                    -> Result<Triage>
   `needs-reply`, `important`, `newsletter`, `notification`, `promotion`, `other`;
   `needsReply: bool`; `reason` (one short sentence). Anything else is `other` with
   `reason: null`. OpenAI-compatible and Ollama use their JSON response formats; Anthropic
-  gets the schema in the prompt and a prefilled `{`.
+  gets the schema in the prompt and as structured output (`output_config.format`), because
+  current Claude models reject a prefilled assistant turn with a 400.
 - **Errors**: one `AiError`, serialized like `IntegrationError` (`{key, message, retryable,
   status?, retryAfter?}`), with keys `not-configured`, `not-enabled` (account or feature
   off), `auth`, `rate-limited`, `quota-exceeded`, `offline`, `bad-request`,
@@ -247,3 +250,14 @@ What other sessions need to know (shapes from their plans, not built here):
 
 2026-10-18: draft written; the user took all of section 10's recommendations (6 as amended
 there). Stages run as one background workflow.
+
+2026-10-18, AI1 done on `roadmap/ai`: `crates/ms-ai` with the three wire formats, streaming
+into a `Sink` with `CancelToken`, `MailContext` and its budget, prompts v1, triage and
+suggestion parsing with fallbacks, `AiError`, the summary and suggestion caches, timeouts
+and one retry for non-streamed calls. `ms-integrations` now exports `RedactedUrl`, its
+cache and its HTTP error helpers for it. Tests run a fake provider in all three formats.
+Decided while building: usage reaches the engine through `Options::usage_observer` (one
+`UsageRecord` per request) so the method results keep the shapes of section 2; when
+`contextTokens` / `maxOutputTokens` are unset, cloud providers default to 16384 / 4096
+and Ollama to 8192 / 1024; OpenAI's own host gets `max_completion_tokens`, other
+compatible servers `max_tokens`.
