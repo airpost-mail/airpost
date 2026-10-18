@@ -234,3 +234,17 @@ fn socket_lines() {
         &socket_connection_dropped(3, "its queue passed 10 bytes"),
     );
 }
+
+#[test]
+fn ai_triage_lines() {
+    // apps/engine/test/test_ai.py.
+    assert_matches(
+        r"^- AI triage stored for thread \S+$",
+        &ai_triage_stored("t:abc"),
+    );
+    assert_matches(
+        r"^-X AI triage paused for \d+ s: rate-limited$",
+        &ai_triage_paused(2, "rate-limited"),
+    );
+    assert_matches(r"^AI triage resumed$", ai_triage_resumed());
+}

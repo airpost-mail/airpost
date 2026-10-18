@@ -291,6 +291,27 @@ pub fn message_without_date(folder_path: &str, uid: u32) -> String {
     format!("- Message {folder_path}:{uid} has no date; its id is based on its location")
 }
 
+// -- AI triage (apps/engine/src/ai_triage.rs) -------------------------------------------
+
+/// A thread's triage result was stored. test_ai.py `ai_triage_new_mail` waits for
+/// `^- AI triage stored for thread \S+$`. Never the category or the reason.
+pub fn ai_triage_stored(thread_id: &str) -> String {
+    format!("- AI triage stored for thread {thread_id}")
+}
+
+/// The provider answered `rate-limited` or `quota-exceeded`: the account's triage queue
+/// waits. test_ai.py `ai_triage_rate_limit_pause` waits for
+/// `^-X AI triage paused for \d+ s: rate-limited$`.
+pub fn ai_triage_paused(secs: u64, key: &str) -> String {
+    format!("-X AI triage paused for {secs} s: {key}")
+}
+
+/// The pause is over and the queue runs again. test_ai.py `ai_triage_rate_limit_pause`
+/// waits for `^AI triage resumed$`.
+pub fn ai_triage_resumed() -> &'static str {
+    "AI triage resumed"
+}
+
 // Patterns the scenarios assert are absent and that no engine line produces on purpose:
 // `UNIQUE constraint` and `no such (table|column)` (SQLite error text that would reach the
 // log through a failure), `Unsafe Login` (Coremail's refusal), `count is not falling` (no

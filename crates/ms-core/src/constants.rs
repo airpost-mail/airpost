@@ -187,6 +187,10 @@ pub const RULES_READY_HAS_BODY: i64 = 1;
 pub const RULES_READY_EMITTED: i64 = 2;
 
 pub const CONTACT_SOURCE_MAIL: &str = "mail";
+
+/// The plugin id of AI triage results on threads (docs/ai-plan.md section 4). Local to each
+/// device: the metadata backends never send it to a Tern server.
+pub const AI_TRIAGE_PLUGIN: &str = "tern-ai-triage";
 pub const CONTACT_MAX_REFS: i64 = 100_000;
 /// A message to more than this many addresses creates no contacts.
 pub const CONTACT_MAX_RECIPIENTS: usize = 25;
@@ -296,6 +300,8 @@ pub mod thread {
     pub const INTEGRATIONS: &str = "integrations";
     /// `serve`: the workers running `ai.*` model calls.
     pub const AI: &str = "ai";
+    /// `serve`: one per account, triaging its new inbox mail and `ai.triage.run` jobs.
+    pub const AI_TRIAGE: &str = "aiTriage";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
     /// `serve`: starts the registered accounts at engine start, and restarts a stopped one
