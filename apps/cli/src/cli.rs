@@ -106,12 +106,35 @@ pub enum Command {
         #[arg(long, short = 'n', default_value_t = 20)]
         lines: usize,
     },
+    /// Read and change the settings the engine keeps for every client (undo send, the default
+    /// sending account, signatures, ...).
+    Settings {
+        #[command(subcommand)]
+        command: SettingsCommand,
+    },
     /// Send one raw JSON-RPC request and print its result.
     Rpc {
         /// e.g. engine.status, threads.list.
         method: String,
         /// The params object; `accountId` picks the engine when several run.
         params: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum SettingsCommand {
+    /// The stored values, of these keys or of every key. A key without a value is left out:
+    /// each client uses its own default.
+    Get {
+        #[arg(value_name = "KEY")]
+        keys: Vec<String>,
+    },
+    /// Store a value: JSON (`15000`, `true`, `{...}`), else the text as a string. `null`
+    /// clears the key.
+    Set {
+        key: String,
+        #[arg(allow_hyphen_values = true)]
+        value: String,
     },
 }
 
@@ -231,6 +254,23 @@ mod tests {
             2
         );
         assert!(parse(&["threads", "--all", "-n", "10", "--role", "inbox"]).is_ok());
+    }
+
+    #[test]
+    fn settings_shapes() {
+        let cli = parse(&["settings", "set", "core.sending.undoSend", "-1"]).unwrap();
+        let Command::Settings {
+            command: SettingsCommand::Set { key, value },
+        } = cli.command
+        else {
+            panic!("settings set")
+        };
+        assert_eq!(
+            (key.as_str(), value.as_str()),
+            ("core.sending.undoSend", "-1")
+        );
+        assert!(parse(&["settings", "get"]).is_ok());
+        assert!(parse(&["settings", "set", "signatures"]).is_err());
     }
 
     #[test]

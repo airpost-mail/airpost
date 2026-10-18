@@ -9,7 +9,7 @@ use ms_ipc::{code, ClientError};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::cli::{CalendarCommand, Cli, Command, TaskCommand};
+use crate::cli::{CalendarCommand, Cli, Command, SettingsCommand, TaskCommand};
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
 use crate::output::Style;
@@ -77,6 +77,12 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Calendar {
             command: CalendarCommand::Sync,
         } => crate::status::calendar_sync(&ctx, &mut engines),
+        Command::Settings { command } => match command {
+            SettingsCommand::Get { keys } => crate::settings::get(&ctx, &mut engines, keys),
+            SettingsCommand::Set { key, value } => {
+                crate::settings::set(&ctx, &mut engines, &key, &value)
+            }
+        },
         Command::Rpc { method, params } => {
             crate::status::rpc(&ctx, &mut engines, &method, params.as_deref())
         }

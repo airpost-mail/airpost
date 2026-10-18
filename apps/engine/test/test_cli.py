@@ -246,6 +246,25 @@ def test_cli_end_to_end(engine, tmp_path):
     assert "no task no-such-task" in r.stderr
     tern.run("task", "queue", '{"starred": true}', expect=2)
 
+    # Settings live in the serve engine only (docs/desktop-client-plan.md 3.4).
+    if engine.ms.transport == "serve":
+        assert tern.json("settings", "get") == {"values": {}}
+        assert tern.json("settings", "set", "core.sending.undoSend", "15000") == {
+            "values": {"core.sending.undoSend": 15000}}
+        tern.run("settings", "set", "resurfacing.snoozeBody", "Back on top")
+        assert tern.json("settings", "get", "core.sending.undoSend") == {"values": {"core.sending.undoSend": 15000}}
+        text = tern.run("settings", "get", json_out=False).stdout.splitlines()
+        assert text == ["core.sending.undoSend = 15000", 'resurfacing.snoozeBody = "Back on top"']
+        assert json.loads((engine.ms.config_dir / "settings.json").read_text())["core.sending.undoSend"] == 15000
+        tern.run("settings", "set", "core.sending.undoSend", "null")
+        assert "core.sending.undoSend" not in tern.json("settings", "get")["values"]
+        r = tern.run("settings", "set", "core.sending.undoSend", "soon", expect=2)
+        assert "core.sending.undoSend must be" in r.stderr
+        tern.run("settings", "get", "core.themes", expect=2)
+    else:
+        r = tern.run("settings", "get", expect=1)
+        assert "doesn't keep settings" in r.stderr
+
     log = tern.run("logs", account_id, "-n", "5", json_out=False).stdout.splitlines()
     assert len(log) == 5
     log = tern.run("logs", email, "-n", "3").stdout.splitlines()

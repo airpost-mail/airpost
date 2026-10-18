@@ -14,6 +14,7 @@ mod logs;
 mod output;
 mod platform;
 mod read;
+mod settings;
 mod status;
 mod tasks;
 mod watch;
