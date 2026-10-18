@@ -16,7 +16,7 @@
 //! `ai.cancel {streamId}` and the connection closing cancel it, which drops the provider
 //! request.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use chrono::{Local, TimeZone};
@@ -118,7 +118,8 @@ enum Job {
 }
 
 impl Prepared {
-    /// The client's `streamId`, which `ai.delta` and `ai.cancel` name.
+    /// The client's `streamId`, which `ai.delta` and `ai.cancel` name (suggestions send no
+    /// `ai.delta`).
     pub fn stream_id(&self) -> Option<&str> {
         self.stream_id.as_deref()
     }
@@ -182,6 +183,7 @@ pub fn prepare(
         }
         method::AI_SUGGEST_REPLIES => {
             let p: AiSuggestRepliesParams = req.params_as()?;
+            let stream_id = checked_stream_id(p.stream_id)?;
             let thread = ThreadCall::check(
                 accounts,
                 &p.account_id,
@@ -195,7 +197,10 @@ pub fn prepare(
                 Some(count) => ReplyOpts { count },
                 None => ReplyOpts::default(),
             };
-            Ok(now(Job::Suggest(thread.config, context, opts)))
+            Ok(Prepared {
+                stream_id,
+                job: Job::Suggest(thread.config, context, opts),
+            })
         }
         method::AI_DRAFT_REPLY => {
             let p: AiDraftReplyParams = req.params_as()?;
@@ -331,7 +336,7 @@ fn owner(statuses: Vec<AccountStatus>, account_id: &str) -> Person {
 /// The thread as the model may see it (docs/ai-plan.md section 5): drafts, hidden
 /// messages, messages only in Spam or Trash and encrypted ones left out; bodies as plain
 /// text without quoted replies, read newest first until `body_chars`, older messages
-/// with their headers only.
+/// with their headers and `body_omitted`; the participants of the messages kept.
 fn mail_context(
     store: &ReadStore,
     account_id: &str,
@@ -357,33 +362,53 @@ fn mail_context(
         messages.push(m);
     }
 
+    // Every body is read for the inline-PGP check, budget or not, so what is left out
+    // doesn't depend on the budget; only those within it are turned into text.
     let mut left = body_chars;
+    let mut kept: Vec<&Value> = Vec::with_capacity(messages.len());
     let mut out: Vec<ContextMessage> = Vec::with_capacity(messages.len());
     for m in messages.iter().rev() {
         let id = m["id"].as_str().unwrap_or("").to_owned();
+        let stored = store.message_body(&id).map_err(internal)?;
+        let snippet = m["snippet"].as_str();
+        let armored = match &stored {
+            Some(stored) => is_pgp_armored(stored),
+            None => snippet.is_some_and(is_pgp_armored),
+        };
+        if armored {
+            continue;
+        }
+        let has_text = stored
+            .as_deref()
+            .or(snippet)
+            .is_some_and(|b| !b.trim().is_empty());
+        let body_omitted = left == 0 && has_text;
         let body = if left > 0 {
-            match store.message_body(&id).map_err(internal)? {
-                Some(stored) if is_pgp_armored(&stored) => continue,
+            match stored {
                 Some(stored) => Some(body_text(&stored, m["plaintext"] == json!(true))),
-                None => m["snippet"].as_str().map(str::to_owned),
+                None => snippet.map(str::to_owned),
             }
             .filter(|b| !b.trim().is_empty())
         } else {
             None
         };
+        // Counted as ms-ai sends it, without the signature.
         if let Some(b) = &body {
-            left = left.saturating_sub(b.chars().count());
+            left = left.saturating_sub(ms_ai::strip_signature(b).chars().count());
         }
+        kept.push(m);
         out.push(ContextMessage {
             id,
             date: format_date(m["date"].as_i64().unwrap_or(0)),
             from: m["from"].get(0).map(person).unwrap_or_default(),
             subject: m["subject"].as_str().map(str::to_owned),
             body,
+            body_omitted,
             attachments: attachments(m),
         });
     }
     out.reverse();
+    kept.reverse();
     if out.is_empty() {
         return Err(failed(AiError::Unsupported {
             what: "a thread with only drafts, Spam, Trash or encrypted mail",
@@ -391,13 +416,33 @@ fn mail_context(
     }
     Ok(MailContext {
         subject: thread["subject"].as_str().unwrap_or("").to_owned(),
-        participants: thread["participants"]
-            .as_array()
-            .map(|a| a.iter().map(person).collect())
-            .unwrap_or_default(),
+        participants: participants(&kept),
         messages: out,
         ..MailContext::default()
     })
+}
+
+/// The senders and recipients of the messages sent, oldest first. Not the thread's own
+/// list: the store adds the people of every message to it, drafts and Spam included.
+fn participants(messages: &[&Value]) -> Vec<Person> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for m in messages {
+        for field in ["from", "to", "cc"] {
+            for contact in m[field].as_array().into_iter().flatten() {
+                let p = person(contact);
+                let key = if p.address.is_empty() {
+                    p.name.clone()
+                } else {
+                    p.address.to_lowercase()
+                };
+                if !key.is_empty() && seen.insert(key) {
+                    out.push(p);
+                }
+            }
+        }
+    }
+    out
 }
 
 fn person(contact: &Value) -> Person {
@@ -448,9 +493,9 @@ fn has_encrypted_part(m: &Value) -> bool {
     })
 }
 
-/// Inline PGP.
+/// Inline PGP. A snippet may hold only the start of the armor line.
 fn is_pgp_armored(body: &str) -> bool {
-    body.contains("-----BEGIN PGP MESSAGE-----")
+    body.contains("-----BEGIN PGP MESSAGE")
 }
 
 /// Visible files only: inline images carry a `contentId`.

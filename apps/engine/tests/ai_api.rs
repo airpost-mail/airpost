@@ -14,7 +14,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use common::{ollama_stream, stream_reply, MockServer, Reply, NDJSON};
+use common::{
+    anthropic_stream, ollama_stream, openai_stream, stream_reply, MockServer, Reply, ALL_KINDS,
+    KEY, NDJSON, SSE,
+};
 use ms_ai::ProviderKind;
 use ms_ipc::{code, feature, method, Client, ClientError, Message, Request};
 use rusqlite::{params, Connection};
@@ -60,10 +63,15 @@ fn insert_folder(c: &Connection, id: &str, role: &str) {
     .unwrap();
 }
 
+/// The participants as the store keeps them: everyone on any message, drafts and Spam
+/// included.
 fn insert_thread(c: &Connection, id: &str, subject: &str) {
     let data = json!({"id": id, "aid": ACCOUNT_ID, "__cls": "Thread", "v": 1, "subject": subject,
         "participants": [{"name": "Ann Lee", "email": "ann@acme.io"},
-                         {"name": "Bo Chen", "email": "bo@example.com"}]});
+                         {"name": "Bo Chen", "email": "bo@example.com"},
+                         {"name": "Cy SECRET", "email": "cy@draft.example"},
+                         {"name": "Dee SECRET", "email": "dee@spam.example"},
+                         {"name": "Eve SECRET", "email": "eve@pgp.example"}]});
     c.execute(
         "INSERT INTO Thread (id, accountId, version, data, subject, lastMessageTimestamp, \
          lastMessageReceivedTimestamp) VALUES (?, ?, 1, ?, ?, 0, 0)",
@@ -103,8 +111,10 @@ fn insert_message(c: &Connection, m: Msg<'_>) {
     .unwrap();
 }
 
-/// `t1` holds what may be sent and, marked SECRET, what never is: a draft, a message only
-/// in Spam, an S/MIME one and quoted text. `t-spam` is all Spam.
+/// `t1` holds what may be sent and, marked SECRET, what never is: a draft to someone new, a
+/// message only in Spam, an S/MIME one and quoted text. `t-spam` is all Spam. `t-pgp` has,
+/// oldest first, an inline-PGP message, one longer than a small window's read cap and a
+/// short one with a longer signature.
 fn seed(config: &Path) {
     let c = Connection::open(config.join("edgehill.db")).unwrap();
     insert_folder(&c, "f-inbox", "inbox");
@@ -112,8 +122,13 @@ fn seed(config: &Path) {
     insert_folder(&c, "f-drafts", "drafts");
     insert_thread(&c, "t1", "Lunch");
     insert_thread(&c, "t-spam", "Prize");
+    insert_thread(&c, "t-pgp", "Keys");
     let ann = ("Ann Lee", "ann@acme.io");
     let bo = ("Bo Chen", "bo@example.com");
+    let dee = ("Dee SECRET", "dee@spam.example");
+    let eve = ("Eve SECRET", "eve@pgp.example");
+    let older = "Older words. ".repeat(700);
+    let newest = format!("Newest note.\n-- \n{}", "Legal text. ".repeat(800));
     let base = 1_760_000_000;
     let rows = [
         Msg {
@@ -132,13 +147,14 @@ fn seed(config: &Path) {
             from: bo,
             folder: "f-drafts",
             body: "<p>DRAFT SECRET</p>",
-            extra: json!({"draft": true}),
+            extra: json!({"draft": true,
+                "to": [{"name": "Cy SECRET", "email": "cy@draft.example"}]}),
         },
         Msg {
             id: "m3",
             thread: "t1",
             date: base + 20,
-            from: ann,
+            from: dee,
             folder: "f-spam",
             body: "<p>SPAM SECRET</p>",
             extra: json!({}),
@@ -171,6 +187,33 @@ fn seed(config: &Path) {
             folder: "f-spam",
             body: "<p>You won</p>",
             extra: json!({}),
+        },
+        Msg {
+            id: "p1",
+            thread: "t-pgp",
+            date: base,
+            from: eve,
+            folder: "f-inbox",
+            body: "-----BEGIN PGP MESSAGE-----\nSECRET\n-----END PGP MESSAGE-----",
+            extra: json!({"plaintext": true, "snippet": "-----BEGIN PGP MESSAGE----- SECRET"}),
+        },
+        Msg {
+            id: "p2",
+            thread: "t-pgp",
+            date: base + 10,
+            from: bo,
+            folder: "f-inbox",
+            body: &older,
+            extra: json!({"plaintext": true}),
+        },
+        Msg {
+            id: "p3",
+            thread: "t-pgp",
+            date: base + 20,
+            from: ann,
+            folder: "f-inbox",
+            body: &newest,
+            extra: json!({"plaintext": true}),
         },
     ];
     for m in rows {
@@ -251,6 +294,16 @@ fn config(server: &MockServer) -> Value {
     json!({"id": "local", "kind": "ollama", "url": server.url(), "model": "m-1"})
 }
 
+/// A config of `kind` pointing at `server`, with a key (Anthropic always needs one).
+fn config_of(kind: ProviderKind, server: &MockServer) -> Value {
+    let (name, url) = match kind {
+        ProviderKind::OpenAi => ("openai", format!("{}/v1", server.url())),
+        ProviderKind::Anthropic => ("anthropic", server.url()),
+        ProviderKind::Ollama => ("ollama", server.url()),
+    };
+    json!({"id": "local", "kind": name, "url": url, "apiKey": KEY, "model": "m-1"})
+}
+
 fn settings() -> Value {
     json!({"accounts": [ACCOUNT_ID], "features": {"summary": true, "reply": {"enabled": true}}})
 }
@@ -265,6 +318,11 @@ fn thread_params(server: &MockServer, extra: Value) -> Value {
 }
 
 fn ollama(texts: &[&str]) -> MockServer {
+    provider(ProviderKind::Ollama, texts)
+}
+
+/// Streams `texts` in `kind`'s wire format; Ollama's model list too.
+fn provider(kind: ProviderKind, texts: &[&str]) -> MockServer {
     let texts: Vec<String> = texts.iter().map(|t| (*t).to_owned()).collect();
     MockServer::start(move |req| match req.path() {
         "/api/tags" => Reply::json(
@@ -273,17 +331,27 @@ fn ollama(texts: &[&str]) -> MockServer {
         ),
         _ => {
             let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
-            stream_reply(ProviderKind::Ollama, &texts)
+            stream_reply(kind, &texts)
         }
     })
 }
 
 /// 50 chunks 40 ms apart, the first after `first`.
 fn slow_ollama(first: Duration) -> MockServer {
+    slow_stream(ProviderKind::Ollama, first)
+}
+
+/// [`slow_ollama`] in `kind`'s wire format.
+fn slow_stream(kind: ProviderKind, first: Duration) -> MockServer {
     let texts: Vec<String> = (0..50).map(|i| format!("w{i} ")).collect();
     let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
-    let chunks = ollama_stream("m-1", &texts, Some((100, 10)));
-    let reply = Reply::stream(NDJSON, chunks, Duration::from_millis(40)).first_chunk_after(first);
+    let (content_type, chunks) = match kind {
+        ProviderKind::OpenAi => (SSE, openai_stream("m-1", &texts, Some((100, 10)))),
+        ProviderKind::Anthropic => (SSE, anthropic_stream("m-1", &texts, (100, 10))),
+        ProviderKind::Ollama => (NDJSON, ollama_stream("m-1", &texts, Some((100, 10)))),
+    };
+    let reply =
+        Reply::stream(content_type, chunks, Duration::from_millis(40)).first_chunk_after(first);
     MockServer::start(move |_| reply.clone())
 }
 
@@ -395,12 +463,18 @@ fn opt_in_and_feature_switches_are_checked_first() {
 }
 
 /// The text streams as `ai.delta` to the calling connection only, in order, ahead of the
-/// response with the whole text; what the provider gets leaves out drafts, Spam,
-/// encrypted mail, quoted text and addresses.
+/// response with the whole text, in each provider's wire format; what the provider gets
+/// leaves out drafts, Spam, encrypted mail, their people, quoted text and addresses.
 #[test]
 fn summarize_streams_to_the_caller_only() {
+    for kind in ALL_KINDS {
+        summarize_streams_to_the_caller_only_with(kind);
+    }
+}
+
+fn summarize_streams_to_the_caller_only_with(kind: ProviderKind) {
     let e = Serve::start();
-    let server = ollama(&["Ann asks ", "about lunch ", "on Friday."]);
+    let server = provider(kind, &["Ann asks ", "about lunch ", "on Friday."]);
     let mut c = e.client();
     let mut other = e.client();
     other.call(method::SUBSCRIBE, json!({})).unwrap();
@@ -408,10 +482,17 @@ fn summarize_streams_to_the_caller_only() {
     let req = Request::new(
         7,
         method::AI_SUMMARIZE,
-        thread_params(&server, json!({"streamId": "s1"})),
+        thread_params(
+            &server,
+            json!({"streamId": "s1", "config": config_of(kind, &server)}),
+        ),
     );
     let (texts, res) = stream(&mut c, req, "s1");
-    assert_eq!(texts, ["Ann asks ", "about lunch ", "on Friday."]);
+    assert_eq!(
+        texts,
+        ["Ann asks ", "about lunch ", "on Friday."],
+        "{kind:?}"
+    );
     let result = res.result.unwrap();
     assert_eq!(result["text"], "Ann asks about lunch on Friday.");
     assert_eq!(result["model"], "m-1");
@@ -436,13 +517,18 @@ fn summarize_streams_to_the_caller_only() {
     );
     let body = server.last().json();
     assert_eq!(body["model"], "m-1");
-    assert_eq!(body["options"]["num_ctx"], 8192);
+    if kind == ProviderKind::Ollama {
+        assert_eq!(body["options"]["num_ctx"], 8192);
+    }
 
     // Cached: the whole text at once, nothing streamed.
     let req = Request::new(
         8,
         method::AI_SUMMARIZE,
-        thread_params(&server, json!({"streamId": "s2"})),
+        thread_params(
+            &server,
+            json!({"streamId": "s2", "config": config_of(kind, &server)}),
+        ),
     );
     let (texts, res) = stream(&mut c, req, "s2");
     assert!(texts.is_empty());
@@ -463,9 +549,40 @@ fn summarize_streams_to_the_caller_only() {
     }
 
     let usage = c.call(method::AI_USAGE, json!({})).unwrap();
+    assert_eq!(usage.as_array().unwrap().len(), 1, "{usage}");
     assert_eq!(usage[0]["provider"], "local");
     assert_eq!(usage[0]["feature"], "summary");
     assert_eq!(usage[0]["requests"], 1);
+    assert_eq!(usage[0]["inputTokens"], 100, "{kind:?}");
+    assert_eq!(usage[0]["outputTokens"], 10, "{kind:?}");
+}
+
+/// The read cap counts bodies without their signatures, and an inline-PGP message stays
+/// out once the cap is spent.
+#[test]
+fn encrypted_mail_stays_out_past_the_read_cap() {
+    let e = Serve::start();
+    let server = ollama(&["ok"]);
+    let mut c = e.client();
+    let mut config = config(&server);
+    // A read cap of 8000 characters: the newest signature is longer, the older body too.
+    config["contextTokens"] = json!(1000);
+    c.call(
+        method::AI_SUMMARIZE,
+        thread_params(&server, json!({"threadId": "t-pgp", "config": config})),
+    )
+    .unwrap();
+    let sent = server.last().body;
+    assert!(!sent.contains(SECRET), "{sent}");
+    assert!(
+        sent.contains("Message 1 of 2") && !sent.contains("of 3"),
+        "{sent}"
+    );
+    assert!(
+        sent.contains("Newest note.") && !sent.contains("Legal text"),
+        "{sent}"
+    );
+    assert!(sent.contains("Older words."), "{sent}");
 }
 
 #[test]
@@ -539,16 +656,26 @@ fn models_and_test() {
     );
 }
 
-/// `ai.cancel` is answered at once and stops the provider request mid-stream.
+/// `ai.cancel` is answered at once and stops the provider request mid-stream, in each
+/// provider's wire format.
 #[test]
 fn cancel_stops_the_stream() {
+    for kind in ALL_KINDS {
+        cancel_stops_the_stream_with(kind);
+    }
+}
+
+fn cancel_stops_the_stream_with(kind: ProviderKind) {
     let e = Serve::start();
-    let server = slow_ollama(Duration::from_millis(40));
+    let server = slow_stream(kind, Duration::from_millis(40));
     let mut c = e.client();
     let req = Request::new(
         5,
         method::AI_SUMMARIZE,
-        thread_params(&server, json!({"streamId": "s1"})),
+        thread_params(
+            &server,
+            json!({"streamId": "s1", "config": config_of(kind, &server)}),
+        ),
     );
     c.send_raw(&ms_ipc::encode(&req)).unwrap();
     // The same streamId can't start twice while it streams.
@@ -591,7 +718,44 @@ fn cancel_stops_the_stream() {
     let e5 = by_id(5).error.unwrap();
     assert_eq!(e5.code, code::AI_FAILED);
     assert_eq!(e5.data.unwrap()["key"], "cancelled");
-    assert!(deltas < 50, "{deltas}");
+    assert!(deltas < 50, "{kind:?}: {deltas}");
+    assert!(server.saw_abort(Duration::from_secs(5)), "{kind:?}");
+}
+
+/// Suggestions send no `ai.delta`, but their `streamId` lets `ai.cancel` stop them.
+#[test]
+fn cancel_stops_suggestions_by_stream_id() {
+    let e = Serve::start();
+    let server = slow_ollama(Duration::from_secs(2));
+    let mut c = e.client();
+    let req = Request::new(
+        5,
+        method::AI_SUGGEST_REPLIES,
+        thread_params(&server, json!({"streamId": "r1"})),
+    );
+    c.send_raw(&ms_ipc::encode(&req)).unwrap();
+    let start = Instant::now();
+    while server.count() == 0 {
+        assert!(start.elapsed() < WAIT, "the provider got no request");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let cancel = Request::new(6, method::AI_CANCEL, json!({"streamId": "r1"}));
+    c.send_raw(&ms_ipc::encode(&cancel)).unwrap();
+    let mut answers = Vec::new();
+    while answers.len() < 2 {
+        match c.read_message().unwrap() {
+            Message::Notification(n) => assert_ne!(n.method, method::AI_DELTA),
+            Message::Response(r) => answers.push(r),
+            _ => {}
+        }
+    }
+    let suggest = answers
+        .iter()
+        .find(|r| r.id == Some(ms_ipc::Id::Num(5)))
+        .unwrap();
+    let err = suggest.error.clone().unwrap();
+    assert_eq!(err.code, code::AI_FAILED);
+    assert_eq!(err.data.unwrap()["key"], "cancelled");
     assert!(server.saw_abort(Duration::from_secs(5)));
 }
 
@@ -656,6 +820,8 @@ fn relayed_connections_may_not_pass_config_or_settings() {
             "not-enabled"
         );
         c.call(method::AI_CANCEL, json!({"streamId": "s"})).unwrap();
+        // Absent params read as `{}`.
+        c.call(method::AI_USAGE, Value::Null).unwrap();
     }
     assert_eq!(server.count(), 0);
 }
