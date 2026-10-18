@@ -216,13 +216,14 @@ pub fn unsubscribe(
     if ctx.json {
         output::json(&serde_json::to_value(&r).unwrap_or(Value::Null));
     }
-    let url = r.url.clone().unwrap_or_default();
+    // The URI comes from the list's mail: no control characters reach the terminal.
+    let url = output::one_line(r.url.as_deref().unwrap_or_default());
     if !r.ok {
         return Err(CliError::failed(format!(
             "{}: unsubscribing by {} failed: {}",
             t.email,
-            r.method,
-            r.error.unwrap_or_default()
+            output::one_line(&r.method),
+            output::one_line(r.error.as_deref().unwrap_or_default())
         )));
     }
     if !ctx.json {
