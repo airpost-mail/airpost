@@ -15,6 +15,16 @@ export { EngineProvider } from './provider';
 export { MockEngine } from './mock/engine';
 export { MOCK_ACCOUNT_IDS } from './mock/fixtures';
 export { engineKeys } from './keys';
+export {
+  engineHasSettings,
+  getEngineCapabilities,
+  getEngineSetting,
+  resetEngineState,
+  setEngineSettings,
+  SettingKey,
+  useEngineCapabilities,
+  useEngineSetting,
+} from './settings';
 export * from './hooks';
 export * from './model';
 export * as tasks from './tasks';

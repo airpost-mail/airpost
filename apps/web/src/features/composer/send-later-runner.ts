@@ -1,10 +1,10 @@
 // Sends scheduled drafts when the engine reports their `send-later` metadata expired, as the
-// desktop's send-later plugin does (handleMetadataExpiration): clear the metadata, then send.
-// TODO(engine): this only runs while a tab is open. DCP stage 4's expiration executor sends
-// due drafts itself (gate this on `expiration-executor`); with no desktop running, that also
-// needs stage 11's detached engine.
+// desktop's send-later plugin did (handleMetadataExpiration): clear the metadata, then send.
+// Only for an engine without `expiration-executor` (DCP stage 4), which sends due drafts
+// itself, tab or no tab; this runner then stays out of the way so nothing goes twice.
 import { toast } from 'sonner';
 import {
+  EngineFeature,
   ensureConnected,
   nowSeconds,
   RpcError,
@@ -80,6 +80,7 @@ export function useSendLaterRunner() {
   useDeltas(
     (d) => {
       if (d.type !== 'metadata-expiration') return;
+      if (client.features?.has(EngineFeature.ExpirationExecutor)) return;
       for (const m of d.modelJSONs as MessageJSON[]) {
         if (!expiredSendLater(m)) continue;
         void exclusive(`tern-send-later:${m.id}`, () => sendExpired(client, m)).catch(() =>

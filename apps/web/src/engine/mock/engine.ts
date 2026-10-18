@@ -8,10 +8,12 @@ import {
   type EngineNotification,
   type HelloResult,
   type IntegrationParams,
+  type IntegrationTestReport,
   type RpcMethodName,
   type RpcMethods,
   type RpcParamsArg,
   type RpcResult,
+  type SettingsValues,
 } from '../rpc';
 import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
@@ -34,7 +36,67 @@ export const MOCK_FEATURES: readonly string[] = [
   EngineFeature.Files,
   EngineFeature.Snooze,
   EngineFeature.Unsubscribe,
+  EngineFeature.Settings,
+  EngineFeature.Capabilities,
 ];
+
+/**
+ * ms-ipc `SETTINGS_KEYS` with the JSON type each takes, and the ones a device without the
+ * admin scope may set (`RELAYED_SETTINGS_KEYS`); the mock always plays such a device.
+ */
+const SETTING_KINDS: Record<string, 'count' | 'string' | 'bool' | 'object' | 'array'> = {
+  'core.sending.undoSend': 'count',
+  'core.sending.defaultAccountIdForSend': 'string',
+  'core.notifications.unsnoozeToTop': 'bool',
+  'core.composing.html': 'bool',
+  signatures: 'object',
+  defaultSignatures: 'object',
+  templates: 'array',
+  mailRules: 'array',
+  mailRulesAutoSince: 'count',
+  'resurfacing.snoozeBody': 'string',
+  'resurfacing.reminderBody': 'string',
+  'core.integrations.translation': 'object',
+  'core.integrations.grammar': 'object',
+  'core.integrations.enrichment': 'object',
+};
+const RELAYED_SETTINGS_KEYS = [
+  'core.sending.undoSend',
+  'core.sending.defaultAccountIdForSend',
+  'core.notifications.unsnoozeToTop',
+  'core.composing.html',
+  'defaultSignatures',
+];
+
+function settingAccepts(kind: string, v: unknown): boolean {
+  switch (kind) {
+    case 'count':
+      return typeof v === 'number' && Number.isInteger(v) && v >= 0;
+    case 'string':
+      return typeof v === 'string';
+    case 'bool':
+      return typeof v === 'boolean';
+    case 'array':
+      return Array.isArray(v);
+    default:
+      return typeof v === 'object' && v !== null && !Array.isArray(v);
+  }
+}
+
+/** What `hello.capabilities` says with nothing set up and no Tern server. */
+const MOCK_CAPABILITIES = {
+  integrations: Object.fromEntries(
+    ['translation', 'grammar', 'enrichment'].map((k) => [
+      k,
+      { available: false, reason: 'not-set-up' },
+    ]),
+  ),
+  server: Object.fromEntries(
+    ['readReceipts', 'linkTracking', 'threadSharing', 'activitySharing', 'metadataSync'].map(
+      (k) => [k, { available: false, reason: 'needs-tern-server' }],
+    ),
+  ),
+};
 
 /** Methods an engine has only when it announces the feature. */
 const METHOD_FEATURE: Partial<Record<RpcMethodName, string>> = {
@@ -42,6 +104,8 @@ const METHOD_FEATURE: Partial<Record<RpcMethodName, string>> = {
   'threads.snooze': EngineFeature.Snooze,
   'threads.unsnooze': EngineFeature.Snooze,
   'messages.unsubscribe': EngineFeature.Unsubscribe,
+  'settings.get': EngineFeature.Settings,
+  'settings.set': EngineFeature.Settings,
 };
 
 const UNSUBSCRIBE_METHODS: readonly string[] = ['one-click', 'mailto', 'web'];
@@ -127,6 +191,8 @@ export class MockEngine implements EngineClient {
   private _features: ReadonlySet<string> | null = null;
   /** `uploadFile`'s bytes and the account they went to, by File id. */
   private readonly uploads = new Map<string, { accountId: string; blob: Blob }>();
+  /** The engine's settings store. */
+  readonly settings = new Map<string, unknown>();
 
   constructor(opts: MockEngineOptions = {}) {
     const l = opts.latency ?? [40, 140];
@@ -232,6 +298,23 @@ export class MockEngine implements EngineClient {
     const upload = this.uploads.get(file.id);
     if (upload && upload.accountId !== file.aid)
       throw new Error(`${file.filename} isn't available.`);
+  }
+
+  /**
+   * A settings change another connection made (the desktop's): stored, and
+   * `settings.changed` sent to this one. For tests and the dev console.
+   */
+  changeSettings(values: SettingsValues) {
+    for (const [k, v] of Object.entries(values)) {
+      if (v === null) this.settings.delete(k);
+      else this.settings.set(k, v);
+    }
+    if (!this.subscribed) return;
+    const n: EngineNotification = {
+      method: 'settings.changed',
+      params: { values: structuredClone(values) },
+    };
+    for (const l of this.notificationListeners) l(n);
   }
 
   /** Delivers the next scripted incoming thread. Exposed for tests and the dev console. */
@@ -440,6 +523,9 @@ export class MockEngine implements EngineClient {
           pid: 0,
           accounts: accountsSummary(),
           features: [...this.announced],
+          ...(this.announced.includes(EngineFeature.Capabilities)
+            ? { capabilities: structuredClone(MOCK_CAPABILITIES) }
+            : {}),
         };
       },
       subscribe: (p) => {
@@ -581,6 +667,32 @@ export class MockEngine implements EngineClient {
         return this.queueAll(accountId, unsnoozeTasks(s, accountId, p.threadIds));
       },
       'messages.unsubscribe': (p) => this.unsubscribe(p),
+      'settings.get': (p) => ({
+        values: Object.fromEntries(
+          [...this.settings].filter(([k]) => !p?.keys || p.keys.includes(k)),
+        ),
+        storeId: 'mock-store',
+      }),
+      'settings.set': (p) => {
+        const values = p?.values ?? {};
+        for (const [k, v] of Object.entries(values)) {
+          const kind = SETTING_KINDS[k];
+          if (!kind) throw invalidParams(`${JSON.stringify(k)} is not a setting the engine keeps`);
+          if (v !== null && !settingAccepts(kind, v))
+            throw invalidParams(`${k} has the wrong type`);
+          if (!RELAYED_SETTINGS_KEYS.includes(k)) {
+            throw new RpcError({
+              code: RpcErrorCode.NotAllowedRelayed,
+              message: `settings.set ${k} needs the admin scope`,
+            });
+          }
+        }
+        for (const [k, v] of Object.entries(values)) {
+          if (v === null) this.settings.delete(k);
+          else this.settings.set(k, v);
+        }
+        return {};
+      },
       'integrations.translate': () => notImplemented('integrations.translate'),
       'integrations.grammar': () => notImplemented('integrations.grammar'),
       'integrations.enrich': () => notImplemented('integrations.enrich'),
@@ -617,19 +729,45 @@ export function redactAccount(a: AccountJSON): Partial<AccountJSON> {
   };
 }
 
-/** Checks the settings look complete; the real test calls the provider. */
-function mockIntegrationTest(p: IntegrationParams): { ok: boolean; error?: string } {
-  if (typeof p.provider !== 'string' || !p.provider) return { ok: false, error: 'No provider' };
-  if (typeof p.url === 'string' && !/^https?:\/\//.test(p.url)) {
-    return { ok: false, error: 'The URL must start with http:// or https://' };
+const DEFAULT_HOSTS: Record<string, string> = {
+  deepl: 'api-free.deepl.com',
+  languagetool: 'api.languagetool.org',
+  peopledatalabs: 'api.peopledatalabs.com',
+};
+
+/**
+ * Checks the settings look complete, failing as ms-integrations does (`-32010` "Integration
+ * failed: …"); the real test calls the provider.
+ */
+function mockIntegrationTest(p: IntegrationParams): IntegrationTestReport {
+  const c = p?.config;
+  const failed = (why: string) =>
+    new RpcError({ code: RpcErrorCode.IntegrationFailed, message: `Integration failed: ${why}` });
+  if (!c || !['libretranslate', 'deepl', 'languagetool', 'peopledatalabs'].includes(c.provider)) {
+    throw invalidParams('config needs a provider');
   }
-  if ((p.provider === 'deepl' || p.provider === 'pdl') && !p.apiKey)
-    return { ok: false, error: 'An API key is required' };
-  return { ok: true };
+  // Required by the engine's config types: a missing one doesn't deserialize.
+  if ((c.provider === 'deepl' || c.provider === 'peopledatalabs') && !c.apiKey)
+    throw invalidParams('missing field `apiKey`');
+  if (c.provider === 'libretranslate' && !c.url) throw invalidParams('missing field `url`');
+  if (c.url) {
+    try {
+      const u = new URL(c.url);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error();
+      return { host: u.host };
+    } catch {
+      throw failed('the server URL is not a valid http(s) URL');
+    }
+  }
+  return { host: DEFAULT_HOSTS[c.provider]! };
 }
 
 function notImplemented(method: string): never {
-  // TODO(engine): translate, grammar and enrich are served by the integrations crate on
-  // `serve` with DCP stage 5; nothing to mock until their results are fixed.
+  // The engine serves translate, grammar and enrich (DCP stage 5); no web view calls them
+  // yet, so the mock has nothing to answer with.
   throw new RpcError({ code: RpcErrorCode.MethodNotFound, message: `${method} is not available` });
+}
+
+function invalidParams(message: string): RpcError {
+  return new RpcError({ code: RpcErrorCode.InvalidParams, message: `invalid params: ${message}` });
 }

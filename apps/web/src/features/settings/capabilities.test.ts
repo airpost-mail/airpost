@@ -4,6 +4,7 @@ import {
   CAPABILITIES,
   CAPABILITY_NAMES,
   resolveCapability,
+  serverStateFrom,
   useCapability,
   type CapabilityContext,
 } from './capabilities';
@@ -92,6 +93,30 @@ describe('resolveCapability', () => {
     saveProvider('libretranslate', { url: '' });
     setProviderEnabled('libretranslate', true);
     expect(resolveCapability('translation', ctx()).available).toBe(false);
+  });
+});
+
+describe('server capabilities from the engine', () => {
+  it('follows the engine’s capabilities.server entry by entry', () => {
+    const server = serverStateFrom({
+      server: {
+        readReceipts: { available: true },
+        linkTracking: { available: false, reason: 'needs-tern-server' },
+      },
+    });
+    const c = { integrations: getIntegrations(), server };
+    expect(resolveCapability('read-receipts', c)).toMatchObject({ available: true, reason: 'ok' });
+    expect(resolveCapability('link-tracking', c)).toMatchObject({
+      available: false,
+      reason: 'needs-server',
+    });
+    // Not in the engine's list: unavailable.
+    expect(resolveCapability('sharing', c).available).toBe(false);
+  });
+
+  it('has no server without the engine’s capabilities', () => {
+    expect(serverStateFrom(null)).toEqual({ connected: false });
+    expect(serverStateFrom({ integrations: {} })).toEqual({ connected: false });
   });
 });
 

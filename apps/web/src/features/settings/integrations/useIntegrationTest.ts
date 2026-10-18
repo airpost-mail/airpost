@@ -1,19 +1,35 @@
 import { useMutation } from '@tanstack/react-query';
-import { useEngine } from '@/engine';
+import { RpcError, RpcErrorCode, useEngine, type IntegrationConfig } from '@/engine';
 import { callEngine, engineErrorMessage } from '../engine-call';
-import type { FieldKey, ProviderId } from './providers';
+import { providerDef, type FieldKey, type ProviderId } from './providers';
 import { providerParams } from './store';
 
-export type TestOutcome = { ok: true } | { ok: false; error: string };
+export type TestOutcome = { ok: true; host: string } | { ok: false; error: string };
 
-function readResult(result: unknown): TestOutcome {
-  // TODO(engine): `integrations.test`'s result shape comes with DCP stage 5; accept
-  // {ok, error} or any non-error reply as success.
-  if (result && typeof result === 'object' && 'ok' in result && result.ok === false) {
-    const error = 'error' in result && typeof result.error === 'string' ? result.error : '';
-    return { ok: false, error: error || 'The provider rejected the settings.' };
+/** The engine's provider names (ms-integrations `ProviderConfig`). */
+const ENGINE_PROVIDER: Record<ProviderId, IntegrationConfig['provider']> = {
+  libretranslate: 'libretranslate',
+  deepl: 'deepl',
+  languagetool: 'languagetool',
+  pdl: 'peopledatalabs',
+};
+
+/** The saved settings overlaid by unsaved edits, as `integrations.*` take them. */
+export function integrationConfig(
+  id: ProviderId,
+  draft: Partial<Record<FieldKey, string>> = {},
+): IntegrationConfig {
+  const { provider: _, ...fields } = providerParams(id, draft);
+  return { ...fields, provider: ENGINE_PROVIDER[id] };
+}
+
+function failure(err: unknown): string {
+  // -32010 "Integration failed: <why>": the why is the part for the person.
+  if (err instanceof RpcError && err.code === RpcErrorCode.IntegrationFailed) {
+    const why = err.message.replace(/^Integration failed:\s*/, '');
+    return why ? why[0]!.toUpperCase() + why.slice(1) : 'The provider rejected the settings.';
   }
-  return { ok: true };
+  return engineErrorMessage(err);
 }
 
 /** Runs `integrations.test` with the saved settings overlaid by unsaved edits. */
@@ -21,10 +37,15 @@ export function useIntegrationTest(id: ProviderId) {
   const client = useEngine();
   return useMutation<TestOutcome, never, Partial<Record<FieldKey, string>>>({
     mutationFn: async (draft) => {
+      const config = integrationConfig(id, draft);
+      // The engine refuses a config without them as invalid params.
+      const missing = providerDef(id).fields.find((f) => f.required && !config[f.key]);
+      if (missing) return { ok: false, error: `Enter the ${missing.label} first.` };
       try {
-        return readResult(await callEngine(client, 'integrations.test', providerParams(id, draft)));
+        const report = await callEngine(client, 'integrations.test', { config });
+        return { ok: true, host: report.host };
       } catch (err) {
-        return { ok: false, error: engineErrorMessage(err) };
+        return { ok: false, error: failure(err) };
       }
     },
   });

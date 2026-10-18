@@ -54,6 +54,10 @@ export const RpcErrorCode = {
   WrongChannel: -32007,
   /** The gateway or engine refused a method on a relayed connection (plan G6). */
   NotAllowedRelayed: -32008,
+  /** `integrations.*`: the provider failed; the message says how, `data` is the error. */
+  IntegrationFailed: -32010,
+  /** A worker lane of the engine is full; try again later. */
+  EngineBusy: -32012,
 } as const;
 
 export class RpcError extends Error {
@@ -100,6 +104,41 @@ export interface HelloResult {
   accounts: EngineAccountSummary[];
   /** What this engine has beyond protocol 1 (ms-ipc `feature`); absent on older engines. */
   features?: string[];
+  /** With `EngineFeature.Capabilities`; `capabilities.changed` carries later values. */
+  capabilities?: EngineCapabilities;
+}
+
+/** One entry of `capabilities` (ms-ipc `Capability`, DCP 3.1). */
+export interface EngineCapability {
+  available: boolean;
+  provider?: string;
+  /** `request`: the client sends the key with each call. */
+  credentials?: string;
+  /** Why it's unavailable: `not-set-up`, `missing-url`, `needs-tern-server`, … */
+  reason?: string;
+}
+
+/**
+ * `hello.capabilities` and `capabilities.changed` (ms-ipc `Capabilities`): the integrations
+ * by kind (`translation`, `grammar`, `enrichment`) and the Tern server's features
+ * (`readReceipts`, `linkTracking`, `threadSharing`, `activitySharing`, `metadataSync`).
+ * Groups a newer engine adds are kept as they came.
+ */
+export interface EngineCapabilities {
+  integrations?: Record<string, EngineCapability>;
+  server?: Record<string, EngineCapability>;
+  [group: string]: Record<string, EngineCapability> | undefined;
+}
+
+/**
+ * Engine settings (DCP stage 3) by config key path, e.g. `core.sending.undoSend`. A key with
+ * no stored value is absent; in `settings.set` and `settings.changed` null clears one.
+ */
+export type SettingsValues = Record<string, unknown>;
+
+export interface SettingsGetResult {
+  values: SettingsValues;
+  storeId?: string;
 }
 
 /** `hello.features` the web acts on. */
@@ -117,6 +156,17 @@ export const EngineFeature = {
   Snooze: 'snooze',
   /** `messages.unsubscribe` (DCP stage 15). */
   Unsubscribe: 'unsubscribe',
+  /**
+   * `settings.get`, `settings.set` and `settings.changed` (DCP stage 3). A device without
+   * the admin scope may set only the keys in ms-ipc `RELAYED_SETTINGS_KEYS`.
+   */
+  Settings: 'settings',
+  /** The engine sends due send-later drafts and returns snoozed threads (DCP stage 4). */
+  ExpirationExecutor: 'expiration-executor',
+  /** `hello.capabilities` and `capabilities.changed` (DCP stage 5). */
+  Capabilities: 'capabilities',
+  /** `integrations.*` on the engine (DCP stage 5). */
+  Integrations: 'integrations',
 } as const;
 
 /** ms-ipc `EngineStatusResult`. */
@@ -376,9 +426,27 @@ export interface AccountTestResult {
   log?: string;
 }
 
+/**
+ * An integration provider with its settings, key included (docs/integrations-plan.md 3-4,
+ * ms-integrations `ProviderConfig`).
+ */
+export interface IntegrationConfig {
+  provider: 'libretranslate' | 'deepl' | 'languagetool' | 'peopledatalabs';
+  url?: string;
+  apiKey?: string;
+  username?: string;
+}
+
+/** `integrations.*` params: the provider's config and the request's own fields. */
 export interface IntegrationParams {
-  provider?: string;
+  config: IntegrationConfig;
   [key: string]: unknown;
+}
+
+/** `integrations.test`: the host that answered, and DeepL's characters used. */
+export interface IntegrationTestReport {
+  host: string;
+  usage?: { used: number; limit?: number };
 }
 
 export interface RpcMethods {
@@ -426,12 +494,17 @@ export interface RpcMethods {
 
   'account.list': { params: undefined; result: AccountListResult };
 
-  // TODO(engine): integrations params and results come with DCP stage 5
-  // (docs/integrations-plan.md section 4).
+  /** Only on engines with `EngineFeature.Settings`. */
+  'settings.get': { params: { keys?: string[] }; result: SettingsGetResult };
+  'settings.set': { params: { values: SettingsValues }; result: EmptyResult };
+
+  // With `EngineFeature.Integrations` (DCP stage 5), local-only: a relayed device needs the
+  // admin scope. The web calls only `integrations.test`; the other results are typed when a
+  // view uses them (docs/integrations-plan.md section 4).
   'integrations.translate': { params: IntegrationParams; result: unknown };
   'integrations.grammar': { params: IntegrationParams; result: unknown };
   'integrations.enrich': { params: IntegrationParams; result: unknown };
-  'integrations.test': { params: IntegrationParams; result: unknown };
+  'integrations.test': { params: IntegrationParams; result: IntegrationTestReport };
 }
 
 export type RpcMethodName = keyof RpcMethods;
@@ -451,6 +524,9 @@ export interface AccountStateParams {
 export interface RpcNotifications {
   delta: Delta;
   'account.state': AccountStateParams;
+  /** Another connection's change; never the caller's own (DCP stage 3). */
+  'settings.changed': { values: SettingsValues };
+  'capabilities.changed': EngineCapabilities;
 }
 
 export type EngineNotification = {

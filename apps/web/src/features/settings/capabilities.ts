@@ -1,6 +1,12 @@
 // One answer to "is feature X available, and from where". Features ask here instead of
 // checking settings themselves; a connected Tern server later only adds the server source.
 import { useMemo, useSyncExternalStore } from 'react';
+import {
+  getEngineCapabilities,
+  useEngineCapabilities,
+  type EngineCapabilities,
+  type EngineCapability,
+} from '@/engine';
 import { PROVIDERS, type IntegrationKind, type ProviderId } from './integrations/providers';
 import {
   getIntegrations,
@@ -31,6 +37,8 @@ interface CapabilityDef {
   source: CapabilitySource;
   /** For integration capabilities: which providers can serve it. */
   integration?: IntegrationKind;
+  /** For server capabilities: the entry of the engine's `capabilities.server`. */
+  serverFeature?: string;
 }
 
 export const CAPABILITIES: Record<CapabilityName, CapabilityDef> = {
@@ -81,21 +89,25 @@ export const CAPABILITIES: Record<CapabilityName, CapabilityDef> = {
     title: 'Read receipts',
     description: 'See when a recipient opens your message.',
     source: 'server',
+    serverFeature: 'readReceipts',
   },
   'link-tracking': {
     title: 'Link tracking',
     description: 'See when a recipient clicks a link you sent.',
     source: 'server',
+    serverFeature: 'linkTracking',
   },
   sharing: {
     title: 'Sharing',
     description: 'Share a thread with a link.',
     source: 'server',
+    serverFeature: 'threadSharing',
   },
   'metadata-sync': {
     title: 'Sync across devices',
     description: 'Snoozes, reminders and tracking state on every device.',
     source: 'server',
+    serverFeature: 'metadataSync',
   },
 };
 
@@ -116,6 +128,8 @@ export interface Capability {
 
 export interface ServerState {
   connected: boolean;
+  /** The engine's `capabilities.server` (DCP stage 5); absent from an engine without it. */
+  features?: Record<string, EngineCapability>;
 }
 
 export interface CapabilityContext {
@@ -123,10 +137,18 @@ export interface CapabilityContext {
   server: ServerState;
 }
 
-// TODO(engine): the server source comes from the engine's `capabilities` (DCP stage 5,
-// docs/web-gateway-plan.md 1.7). Until the engine reports a connected Tern server, there is
-// none.
+/** No Tern server: what an engine without `capabilities` amounts to. */
 export const NO_SERVER: ServerState = { connected: false };
+
+/**
+ * The Tern server as the engine reports it (docs/web-gateway-plan.md 1.7): the engine holds
+ * the server connection (G8), and its `capabilities.server` says which features it gives.
+ */
+export function serverStateFrom(caps: EngineCapabilities | null): ServerState {
+  const features = caps?.server;
+  if (!features) return NO_SERVER;
+  return { connected: Object.values(features).some((f) => f.available), features };
+}
 
 export function resolveCapability(name: CapabilityName, ctx: CapabilityContext): Capability {
   const def = CAPABILITIES[name];
@@ -134,10 +156,13 @@ export function resolveCapability(name: CapabilityName, ctx: CapabilityContext):
   switch (def.source) {
     case 'local':
       return { ...base, available: true, reason: 'ok' };
-    case 'server':
-      return ctx.server.connected
+    case 'server': {
+      const entry = def.serverFeature ? ctx.server.features?.[def.serverFeature] : undefined;
+      const available = ctx.server.features ? !!entry?.available : ctx.server.connected;
+      return available
         ? { ...base, available: true, reason: 'ok' }
         : { ...base, available: false, reason: 'needs-server' };
+    }
     case 'integration': {
       const provider = PROVIDERS.find(
         (p) =>
@@ -154,7 +179,8 @@ export function resolveCapability(name: CapabilityName, ctx: CapabilityContext):
 
 function useCapabilityContext(): CapabilityContext {
   const integrations = useSyncExternalStore(subscribeIntegrations, getIntegrations);
-  return useMemo(() => ({ integrations, server: NO_SERVER }), [integrations]);
+  const caps = useEngineCapabilities();
+  return useMemo(() => ({ integrations, server: serverStateFrom(caps) }), [integrations, caps]);
 }
 
 /** Whether a feature is available, and from which source. Re-renders when settings change. */
@@ -170,5 +196,8 @@ export function useCapabilities(): Capability[] {
 
 /** Non-hook form, for code outside React (e.g. task builders). */
 export function getCapability(name: CapabilityName): Capability {
-  return resolveCapability(name, { integrations: getIntegrations(), server: NO_SERVER });
+  return resolveCapability(name, {
+    integrations: getIntegrations(),
+    server: serverStateFrom(getEngineCapabilities()),
+  });
 }

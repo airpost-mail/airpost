@@ -10,7 +10,7 @@ import {
   type ContactRef,
   type MessageJSON,
 } from '@/engine';
-import { getPreferences } from '@/lib/preferences';
+import { getUndoSendMs } from '@/lib/undo-send';
 import type { AutosaveStatus } from './autosave';
 import {
   allRecipients,
@@ -256,10 +256,9 @@ export function useComposerSession(args: {
     }
     setBusy(true);
     handOff(true);
-    const delayMs = getPreferences().undoSendMs;
+    const delayMs = getUndoSendMs();
     // TODO(engine): undo-send is a client-side delay. If the tab closes inside it the draft
-    // stays saved but unsent. With DCP stage 4's executor the web writes send-later
-    // `{expiration, isUndoSend}` metadata instead; stage 13's `draft.send {delayMs}` later.
+    // stays saved but unsent. DCP stage 13's `draft.send {delayMs}` makes it the engine's.
     if (delayMs <= 0) {
       setComposerHidden(windowKey, true);
       void deliver(d, toast.loading('Sending…'));

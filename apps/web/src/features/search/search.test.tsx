@@ -120,6 +120,13 @@ describe('search page', () => {
     expect(screen.getByText(/isn't a date the search understands/)).toBeInTheDocument();
   });
 
+  it('shows the engine’s message for text with no words or filters', async () => {
+    // The client's own reading finds nothing in it; the engine refuses it.
+    renderAt(`/search?q=${encodeURIComponent('from:(')}`);
+    expect(await screen.findByText('Can’t read that search')).toBeInTheDocument();
+    expect(screen.queryByText('Find anything')).not.toBeInTheDocument();
+  });
+
   it('asks for company when only dates are given to an engine without the grammar', async () => {
     renderAt('/search?q=after%3A7d', [EngineFeature.Query]);
     expect(await screen.findByText('Almost there')).toBeInTheDocument();

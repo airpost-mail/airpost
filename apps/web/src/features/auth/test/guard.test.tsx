@@ -141,4 +141,18 @@ describe('PairView', () => {
     expect(window.location.hash).toBe('');
     expect(screen.getByText('Check the name, then pair.')).toBeInTheDocument();
   });
+
+  it('takes a code from a link opened in a tab already on /pair', async () => {
+    await signOut();
+    window.history.replaceState(null, '', '/pair');
+    renderApp('/pair');
+    expect(await screen.findByLabelText('Pairing code')).toHaveValue('');
+    act(() => {
+      window.history.replaceState(null, '', '/pair#WXYZ-2345-67AB');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(await screen.findByLabelText('Pairing code')).toHaveValue('WXYZ-2345-67AB');
+    expect(window.location.hash).toBe('');
+    expect(screen.getByText('Check the name, then pair.')).toBeInTheDocument();
+  });
 });

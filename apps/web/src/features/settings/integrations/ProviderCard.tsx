@@ -150,7 +150,7 @@ function TestResult({
   if (!outcome) return null;
   return outcome.ok ? (
     <span className="flex items-center gap-1.5 text-xs text-success" role="status">
-      <CircleCheck className="size-3.5" /> Connected
+      <CircleCheck className="size-3.5" /> Connected to {outcome.host}
     </span>
   ) : (
     <span

@@ -13,9 +13,9 @@ import { gatewayTransport, getSignOutNotice, pair } from './session';
 export function PairView({ redirectTo }: { redirectTo?: string }) {
   const navigate = useNavigate();
   const mock = gatewayTransport.kind === 'mock';
-  // A `/pair#<code>` link: read the code once, then take it out of the address bar and
-  // history (the effect below).
-  const [linked] = useState(() => codeFromHash(window.location.hash));
+  // A `/pair#<code>` link: read the code, then take it out of the address bar and history
+  // (the effect below). A link opened in a tab already on /pair only changes the fragment.
+  const [linked, setLinked] = useState(() => codeFromHash(window.location.hash));
   const fromLink = linked !== null;
   const [code, setCode] = useState(linked ? formatPairingCode(linked) : '');
   const [deviceName, setDeviceName] = useState(defaultDeviceName);
@@ -24,8 +24,21 @@ export function PairView({ redirectTo }: { redirectTo?: string }) {
   const [notice] = useState(getSignOutNotice);
 
   useEffect(() => {
-    if (!window.location.hash) return;
-    history.replaceState(history.state, '', window.location.pathname + window.location.search);
+    const strip = () => {
+      if (!window.location.hash) return;
+      history.replaceState(history.state, '', window.location.pathname + window.location.search);
+    };
+    strip();
+    const onHashChange = () => {
+      const next = codeFromHash(window.location.hash);
+      strip();
+      if (!next) return;
+      setLinked(next);
+      setCode(formatPairingCode(next));
+      setError(null);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
   const submit = async (e: FormEvent) => {

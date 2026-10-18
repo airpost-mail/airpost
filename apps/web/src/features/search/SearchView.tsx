@@ -221,7 +221,8 @@ function Results({
     enabled: () => !!openThread,
   });
 
-  if (isEmptySearch(parsed)) {
+  // With the grammar the engine reads whatever was typed, and says what it can't read.
+  if (!engineQuery && isEmptySearch(parsed)) {
     return (
       <EmptyState
         title="Find anything"

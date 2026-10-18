@@ -2,8 +2,12 @@ import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { toast } from 'sonner';
+import { setEngineSettings, SettingKey, useEngine } from '@/engine';
 import { setPreferences, usePreferences, type Density } from '@/lib/preferences';
+import { useUndoSendMs } from '@/lib/undo-send';
 import { ChoiceSelect } from '../components/ChoiceSelect';
+import { engineErrorMessage } from '../engine-call';
 import { SettingRow, SettingsSection } from '../components/SettingsSection';
 import { SettingsPage } from '../components/SettingsPage';
 import { MARK_READ_DELAYS, READING_PANES, UNDO_SEND_DELAYS } from './options';
@@ -12,9 +16,20 @@ import { SessionSection } from './SessionSection';
 export function GeneralSettings() {
   const prefs = usePreferences();
   const { theme, setTheme } = useTheme();
+  const client = useEngine();
+  const undoSend = useUndoSendMs();
 
-  // TODO(engine): these preferences stay in this browser in v1; `core.sending.undoSend`
-  // moves to engine settings with DCP stage 3 (docs/web-gateway-plan.md section 4).
+  // UI preferences stay in this browser in v1 (docs/web-gateway-plan.md 8, answer 8). The
+  // undo-send delay is the engine's when it keeps settings, shared with the desktop; this
+  // browser's copy stays the fallback for an engine without them.
+  const setUndoSend = (ms: number) => {
+    setPreferences({ undoSendMs: ms });
+    if (!undoSend.inEngine) return;
+    setEngineSettings(client, { [SettingKey.UndoSend]: ms }).catch((err: unknown) =>
+      toast.error(`Couldn't save the undo-send delay: ${engineErrorMessage(err)}`),
+    );
+  };
+
   return (
     <SettingsPage title="General" description="Saved in this browser.">
       <SettingsSection title="Appearance">
@@ -93,13 +108,17 @@ export function GeneralSettings() {
         <SettingRow
           label="Undo send"
           htmlFor="pref-undo-send"
-          description="Hold a sent message this long so you can take it back."
+          description={
+            undoSend.inEngine
+              ? 'Hold a sent message this long so you can take it back. Saved in the engine, so the desktop uses it too.'
+              : 'Hold a sent message this long so you can take it back.'
+          }
         >
           <ChoiceSelect
             id="pref-undo-send"
-            value={prefs.undoSendMs}
+            value={undoSend.ms}
             choices={UNDO_SEND_DELAYS}
-            onChange={(undoSendMs) => setPreferences({ undoSendMs })}
+            onChange={setUndoSend}
           />
         </SettingRow>
       </SettingsSection>

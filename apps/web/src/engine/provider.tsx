@@ -7,6 +7,7 @@ import { EngineContext } from './context';
 import { seedProcessState } from './hooks';
 import { engineKeys, EVERY_ACCOUNT } from './keys';
 import type { AccountRunState, AccountStateParams } from './rpc';
+import { applyCapabilitiesChanged, applySettingsChanged, loadEngineState } from './settings';
 
 /** What an account shows; refetched when the engine restarts it (a reset, or a re-add). */
 function invalidateAccount(qc: QueryClient, accountId: string) {
@@ -44,11 +45,23 @@ export function EngineProvider({
     const off = client.onNotification((n) => {
       if (n.method === 'delta') applyDelta(queryClient, n.params);
       else if (n.method === 'account.state') onAccountState(n.params);
+      else if (n.method === 'settings.changed') applySettingsChanged(n.params.values);
+      else if (n.method === 'capabilities.changed') applyCapabilitiesChanged(n.params);
     });
     const seed = () =>
       ensureConnected(client)
-        .then(() => seedProcessState(queryClient, client))
-        .catch((err: unknown) => console.error('engine connect failed', err));
+        .then((hello) =>
+          Promise.all([
+            seedProcessState(queryClient, client),
+            loadEngineState(client, hello).catch((err: unknown) =>
+              console.warn('engine settings unavailable', err),
+            ),
+          ]),
+        )
+        .catch((err: unknown) => {
+          // An unpaired browser is sent to /pair; that's not a failure worth logging.
+          if (client.problem !== 'unpaired') console.error('engine connect failed', err);
+        });
     // Deltas sent while the connection was down are lost, so after a reconnect every query
     // re-reads (engine-protocol-plan 1.4). The first open has nothing stale to refetch.
     let opened = false;
