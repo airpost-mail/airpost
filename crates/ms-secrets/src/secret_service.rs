@@ -35,7 +35,7 @@ impl SecretServiceBackend {
         ])
     }
 
-    fn connect() -> Result<SecretService<'static>> {
+    fn connect<'a>() -> Result<SecretService<'a>> {
         SecretService::connect(EncryptionType::Dh)
             .map_err(|e| Error::Unavailable(format!("Secret Service: {e}")))
     }
