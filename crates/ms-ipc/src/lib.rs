@@ -164,6 +164,11 @@ pub mod feature {
     /// `files.get`, `files.read`, `files.put`, and GetMessageRFC2822Task's file-id mode (no
     /// `filepath`: the export becomes the File `fileId`, set by the local phase).
     pub const FILES: &str = "files";
+    /// The engine acts on due `send-later`, `thread-snooze` and `send-reminders` metadata
+    /// itself (docs/desktop-client-plan.md 3.3); only `send-later` rows marked
+    /// `clientFinalize`, and other plugins' rows, still come as `metadata-expiration` deltas
+    /// for a client to act on.
+    pub const EXPIRATION_EXECUTOR: &str = "expiration-executor";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
