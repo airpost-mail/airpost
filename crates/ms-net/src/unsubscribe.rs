@@ -8,7 +8,8 @@
 //!
 //! The one-click URI comes from mail anyone can send, and the engine may run on a server, so
 //! the POST goes only to hosts whose every address is public, connects to the address it
-//! checked, and follows no redirect.
+//! checked (directly, never through a proxy from the environment, which would look the host up
+//! again), and follows no redirect.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::time::Duration;
@@ -56,7 +57,8 @@ impl Method {
 }
 
 /// The URIs of a `List-Unsubscribe` value: each inside `<…>`, in header order, http(s) and
-/// mailto only (`parseListUnsubscribeHeader`).
+/// mailto only (`parseListUnsubscribeHeader`). A URI with a control character is dropped: the
+/// header is stored as received, and the URI goes back to clients that may print it.
 pub fn header_uris(header: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut rest = header;
@@ -66,10 +68,10 @@ pub fn header_uris(header: &str) -> Vec<String> {
         // Folded headers may leave whitespace inside the brackets (RFC 2369 section 2).
         let uri: String = after[..end].split_whitespace().collect();
         let lower = uri.to_ascii_lowercase();
-        if lower.starts_with("https://")
-            || lower.starts_with("http://")
-            || lower.starts_with("mailto:")
-        {
+        let scheme = ["https://", "http://", "mailto:"]
+            .iter()
+            .any(|p| lower.starts_with(p));
+        if scheme && !uri.chars().any(char::is_control) {
             out.push(uri);
         }
         rest = &after[end + 1..];
@@ -246,18 +248,33 @@ fn is_public_v6(a: Ipv6Addr) -> bool {
         return is_public_v4(v4);
     }
     let s = a.segments();
-    // NAT64 (64:ff9b::/96) embeds an IPv4 address.
+    let v4 = |hi: u16, lo: u16| {
+        let [x, y] = [hi.to_be_bytes(), lo.to_be_bytes()];
+        Ipv4Addr::new(x[0], x[1], y[0], y[1])
+    };
+    // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) embed an IPv4 address.
     if s[..6] == [0x64, 0xff9b, 0, 0, 0, 0] {
-        let [x, y] = [s[6].to_be_bytes(), s[7].to_be_bytes()];
-        return is_public_v4(Ipv4Addr::new(x[0], x[1], y[0], y[1]));
+        return is_public_v4(v4(s[6], s[7]));
+    }
+    if s[0] == 0x2002 {
+        return is_public_v4(v4(s[1], s[2]));
     }
     !(a.is_loopback()
         || a.is_unspecified()
         || a.is_multicast()
         || (s[0] & 0xfe00) == 0xfc00
-        || (s[0] & 0xffc0) == 0xfe80
+        // Link-local fe80::/10 and the deprecated site-local fec0::/10.
+        || (s[0] & 0xff80) == 0xfe80
         || (s[0] == 0x2001 && s[1] == 0x0db8)
-        || s[..6] == [0, 0, 0, 0, 0, 0])
+        // Teredo (2001::/32) tunnels to an IPv4 address.
+        || (s[0] == 0x2001 && s[1] == 0)
+        // Local-use NAT64 (64:ff9b:1::/48).
+        || s[..3] == [0x64, 0xff9b, 1]
+        // Discard-only (100::/64).
+        || s[..4] == [0x100, 0, 0, 0]
+        // IPv4-compatible (::/96) and IPv4-translated (::ffff:0:0/96).
+        || s[..6] == [0, 0, 0, 0, 0, 0]
+        || s[..6] == [0, 0, 0, 0, 0xffff, 0])
 }
 
 /// RFC 8058 one-click: a POST of [`ONE_CLICK_BODY`] to `url`, without cookies or other
@@ -294,6 +311,7 @@ pub fn one_click(url: &str, allow_local: bool) -> Result<(), String> {
         .connect_timeout(CONNECT_TIMEOUT)
         .timeout(POST_TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
+        .no_proxy()
         .tls_backend_rustls();
     if host.parse::<IpAddr>().is_err() {
         // Connect to the addresses checked above, not to a second lookup's.
@@ -355,6 +373,13 @@ mod tests {
             ["HTTP://a.example/u", "https://b.example/long"]
         );
         assert!(header_uris("no brackets").is_empty());
+        // A URI carrying a terminal escape (here an OSC 8 hyperlink) is dropped.
+        assert_eq!(
+            header_uris(
+                "<https://a.example/\x1b]8;;https://evil.example\x1b\\x>, <https://b.example/u\u{9b}2J>, <https://c.example/u>"
+            ),
+            ["https://c.example/u"]
+        );
         assert!(header_uris("<https://unterminated").is_empty());
     }
 
@@ -445,6 +470,8 @@ mod tests {
             "93.184.216.34",
             "2606:2800:220:1:248:1893:25c8:1946",
             "64:ff9b::5db8:d822",
+            "2002:5db8:d822::1",
+            "2003::1",
         ] {
             assert!(is_public(ip.parse().unwrap()), "{ip}");
         }
@@ -471,6 +498,17 @@ mod tests {
             "::ffff:10.0.0.1",
             "64:ff9b::a00:1",
             "::7f00:1",
+            "2002:7f00:1::",
+            "2002:a00:1::1",
+            "2002:c0a8:101::1",
+            "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+            "2001::1",
+            "::ffff:0:7f00:1",
+            "::ffff:0:a00:1",
+            "fec0::1",
+            "feff::1",
+            "100::1",
+            "64:ff9b:1::5db8:d822",
         ] {
             assert!(!is_public(ip.parse().unwrap()), "{ip}");
         }
