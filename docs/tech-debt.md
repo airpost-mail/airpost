@@ -78,6 +78,23 @@ These are cheap, independent of the plan's stages, or block something the plan d
 
 ### TD1. Attachments open with no quarantine or Mark-of-the-Web
 
+Done (roadmap/security, df38be698). `extra.plist` sets `LSFileQuarantineEnabled`. The new
+`src/attachment-safety.ts` tags a file as downloaded, with `/usr/bin/xattr -w com.apple.quarantine
+0081;<hex epoch>;Tern;<uuid>` via `execFile` on macOS (an existing attribute is kept, so an
+approved file isn't re-checked) and a `Zone.Identifier` stream (`ZoneId=3`) on Windows. It runs
+on the attachment before `shell.openPath`, on the copy after Save / Save All and after Save Image
+from a message, and on the source at drag start. A failure is logged and doesn't stop the open.
+Opening a file whose last extension (case-insensitive, trailing dots/spaces and bidi/zero-width
+characters ignored, so `invoice.pdf.exe` and `invoice<U+202E>fdp.exe` count) is on the
+platform's denylist asks first through a main-process dialog (`attachment-safety:confirm-open`,
+Cancel by default); a decoy extension is named in the prompt. Save-as now resolves when the write
+finishes and reports write errors. Not done: the drag-out drop target is a fresh copy Chromium
+writes from the `DownloadURL`, so on Windows it likely has no Zone.Identifier, and on macOS it
+relies on the main process's `LSFileQuarantineEnabled` (untested); switching to
+`webContents.startDrag` would let the OS copy carry the source's tag. Helper processes have their
+own Info.plist without the key, so renderer writes outside these paths aren't quarantined.
+Deferred to stage 16: the engine setting the xattr when it writes `files/`.
+
 Verified. Double-clicking an attachment calls `shell.openPath` on the raw file
 (`src/flux/stores/attachment-store.ts:168-175`) with no prompt or extension check. Save-as is a
 plain stream copy (`:177-184`) and drag-out sets `DownloadURL` from the raw `file://` path
