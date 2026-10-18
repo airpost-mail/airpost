@@ -143,6 +143,16 @@ http:` and never checks the setting (`src/quickpreview/index.ts:25-33`).
 
 ### TD3. Remote images on by default; trackers stripped only from your own mail; Gravatar always
 
+Done (roadmap/security, ca461e035). `remove-tracking-pixels` now strips, from all mail and not
+only `isFromMe`, remote images that match a tracker rule or are hidden (`display:none`,
+`visibility:hidden`, `hidden`, zero-sized or 1x1). The rules are MailTrackerBlocker's
+(BSD-3-Clause, 468 regexes over 320 vendors, credited in NOTICE.md) plus the old list's uncovered
+entries; Mailspring read receipts are stripped whoever's they are. `core.reading.autoloadImages`
+defaults to `false` (explicit `true` kept, per-sender allowlist unchanged), and the new
+`core.reading.loadGravatar` (off) gates `ContactProfilePhoto`'s Gravatar lookup. Not covered: CSS
+`background-image` trackers and class-based hiding (the message CSP still blocks those when images
+are off), and the signature editor's user-chosen Gravatar photo.
+
 Verified. `core.reading.autoloadImages` defaults to `true` (`src/config-schema.ts:146-150`). The
 `remove-tracking-pixels` plugin applies its 25-entry, circa-2017 list (Sidekick, RelateIQ, Banana
 Tag, LaunchBit, Mandrill; `internal_packages/remove-tracking-pixels/lib/main.ts:9-135`) only when
