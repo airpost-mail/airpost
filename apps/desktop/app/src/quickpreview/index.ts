@@ -4,6 +4,7 @@ import { File } from 'mailspring-exports';
 import { ipcRenderer } from 'electron';
 import { developerToolsAvailable } from '../developer-tools';
 import { quickPreviewContentSecurityPolicy } from '../content-security-policy';
+import { isFileURLWithin } from '../file-url-guard';
 
 // Generate token via IPC to ensure it's stored in the main process
 async function generatePreviewToken(previewPath: string): Promise<string> {
@@ -24,7 +25,16 @@ const QuickPreviewPartition = 'quickpreview';
 // Both windows share the partition and so one listener. Thumbnails never load remote
 // images; the preview window does when "load images automatically" is on. Attachments carry
 // no sender here, so the per-sender allowlist doesn't apply.
+//
+// 'self' in the policy matches every file: URL, so file: requests are also limited to the
+// bundled preview code and downloaded attachments. That keeps attachment content (markdown
+// or docx with <img src="//host/share/x">) off UNC paths, which Windows opens over SMB.
 function applyQuickPreviewCSP(session: Electron.Session) {
+  const fileRoots = [filesRoot, path.join(AppEnv.getConfigDirPath(), 'files')];
+  session.webRequest.onBeforeRequest((details, callback) => {
+    const isFile = /^file:/i.test(details.url);
+    callback({ cancel: isFile && !isFileURLWithin(details.url, fileRoots) });
+  });
   session.webRequest.onHeadersReceived((details, callback) => {
     const remoteImages =
       details.webContentsId === quickPreviewWebContentsId &&

@@ -12,6 +12,7 @@ import url from 'url';
 import _ from 'underscore';
 import path from 'path';
 import fs from 'fs';
+import { ipcRenderer } from 'electron';
 import { FilesScheme, resolveFilesSchemeURL } from '../files-scheme';
 import { ExternalFetch } from '../external-fetch';
 
@@ -77,6 +78,35 @@ async function imageBytes(src: string): Promise<Buffer> {
   const response = await ExternalFetch.fetch(src);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return Buffer.from(await response.arrayBuffer());
+}
+
+const ImageMimeTypes = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+};
+
+// Copy Image. The bytes are re-read and drawn from a data: URL because a tern-file: or remote
+// image is cross-origin to the app document and would taint the canvas.
+export async function copyImageToClipboard(src: string) {
+  const buffer = await imageBytes(src);
+  const ext = path.extname(src.split(/[?#]/)[0]).toLowerCase();
+  const mime = ImageMimeTypes[ext] || 'image/png';
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('the image could not be decoded'));
+    img.src = `data:${mime};base64,${buffer.toString('base64')}`;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.getContext('2d').drawImage(img, 0, 0);
+  ipcRenderer.send('write-image-to-clipboard', canvas.toDataURL('image/png'));
 }
 
 type EventedIFrameProps = {
@@ -388,7 +418,7 @@ export class EventedIFrame extends React.Component<
     // "Copy Image" and "Search Google for 'Bla'"
     event.preventDefault();
 
-    const { shell, ipcRenderer } = require('electron');
+    const { shell } = require('electron');
     const { Menu, MenuItem, clipboard } = require('@electron/remote');
     const menu = new Menu();
 
@@ -465,20 +495,7 @@ export class EventedIFrame extends React.Component<
         new MenuItem({
           label: localized('Copy Image'),
           click() {
-            const img = new Image();
-            img.addEventListener(
-              'load',
-              function () {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                canvas.getContext('2d').drawImage(imageTarget as HTMLImageElement, 0, 0);
-                const imageDataURL = canvas.toDataURL('image/png');
-                ipcRenderer.send('write-image-to-clipboard', imageDataURL);
-              },
-              false
-            );
-            img.src = src;
+            copyImageToClipboard(src).catch((err) => console.error(`Copy Image failed: ${err}`));
           },
         })
       );

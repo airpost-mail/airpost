@@ -12,6 +12,7 @@ import {
   File,
 } from 'mailspring-exports';
 import { webUtils } from 'electron';
+import path from 'path';
 import {
   DropZone,
   RetinaImg,
@@ -30,6 +31,7 @@ import { ActionBarPlugins } from './action-bar-plugins';
 import { AttachmentsArea } from './attachments-area';
 import { QuotedTextControl } from './quoted-text-control';
 import Fields from './fields';
+import { FilesScheme, resolveFilesSchemeURL } from '../../../src/files-scheme';
 
 const { hasBlockquote, hasNonTrailingBlockquote, hideQuotedTextByDefault } =
   ComposerSupport.BaseBlockPlugins;
@@ -47,6 +49,32 @@ interface ComposerViewState {
   isDropping: boolean;
   attachingThreadCount: number;
 }
+
+// The disk path behind a drag from inside the app: an attachment chip or an image in a message.
+export function nonNativeFilePathForDrop(dataTransfer: DataTransfer): string | null {
+  if (dataTransfer.types.includes('text/mailspring-file-url')) {
+    const downloadURL = dataTransfer.getData('text/mailspring-file-url');
+    const downloadFilePath = downloadURL.split('file://')[1];
+    if (downloadFilePath) {
+      return downloadFilePath;
+    }
+  }
+
+  // Accept drops of images from within the app
+  if (dataTransfer.types.includes('text/uri-list')) {
+    const uri = dataTransfer.getData('text/uri-list');
+    if (uri.indexOf('file://') === 0) {
+      return decodeURI(uri.split('file://')[1]);
+    }
+    // Inline images in a message are tern-file: URLs (src/files-scheme.ts).
+    if (uri.startsWith(`${FilesScheme}:`)) {
+      const first = uri.split(/\r?\n/)[0].trim();
+      return resolveFilesSchemeURL(path.join(AppEnv.getConfigDirPath(), 'files'), first);
+    }
+  }
+  return null;
+}
+
 // The ComposerView is a unique React component because it (currently) is a
 // singleton. Normally, the React way to do things would be to re-render the
 // Composer with new props.
@@ -292,22 +320,7 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
   };
 
   _nonNativeFilePathForDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    if (event.dataTransfer.types.includes('text/mailspring-file-url')) {
-      const downloadURL = event.dataTransfer.getData('text/mailspring-file-url');
-      const downloadFilePath = downloadURL.split('file://')[1];
-      if (downloadFilePath) {
-        return downloadFilePath;
-      }
-    }
-
-    // Accept drops of images from within the app
-    if (event.dataTransfer.types.includes('text/uri-list')) {
-      const uri = event.dataTransfer.getData('text/uri-list');
-      if (uri.indexOf('file://') === 0) {
-        return decodeURI(uri.split('file://')[1]);
-      }
-    }
-    return null;
+    return nonNativeFilePathForDrop(event.dataTransfer);
   };
 
   _onDrop = (event: React.DragEvent<HTMLDivElement>) => {

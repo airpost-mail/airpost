@@ -9,8 +9,9 @@ import AutoloadImagesExtension from '../lib/autoload-images-extension';
 import AutoloadImagesStore from '../lib/autoload-images-store';
 
 const IMAGE_BODY = '<p>Hi</p><img src="https://tracker.example.com/open.gif">';
-// Forms the regex misses; the CSP blocks them anyway, but no banner shows for them.
 const CSS_ONLY_BODY = '<div style="background:#fff url(https://tracker.example.com/p.png)"></div>';
+// Not blocked by the message CSP, so no banner.
+const INLINE_ONLY_BODY = '<img src="cid:logo@x"><img src="data:image/png;base64,AAA">';
 
 describe('AutoloadImages', function () {
   let autoload: boolean;
@@ -65,12 +66,18 @@ describe('AutoloadImages', function () {
     expect(MessageBodyProcessor.resetCache).toHaveBeenCalled();
   });
 
-  it('no longer rewrites the body; the banner only shows when the regex finds images', () => {
+  it('no longer rewrites the body', () => {
     expect((AutoloadImagesExtension as any).formatMessageBody({ message })).toBe(undefined);
     expect(message.body).toEqual(IMAGE_BODY);
+  });
+
+  it('shows the banner for remote CSS images and not for inline or data: images', () => {
     message.body = CSS_ONLY_BODY;
+    expect(AutoloadImagesStore.shouldBlockImagesIn(message)).toBe(true);
+    message.body = '<div style="background-image: image-set(\'https://t.example/a.png\' 1x)">';
+    expect(AutoloadImagesStore.shouldBlockImagesIn(message)).toBe(true);
+    message.body = INLINE_ONLY_BODY;
     expect(AutoloadImagesStore.shouldBlockImagesIn(message)).toBe(false);
-    expect(AutoloadImagesExtension.allowsRemoteImages({ message })).toBe(false);
   });
 
   it('decides the policy MessageBodyProcessor hands the message frame', async () => {

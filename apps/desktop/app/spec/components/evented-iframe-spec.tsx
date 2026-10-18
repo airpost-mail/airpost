@@ -1,7 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
-const EventedIFrame = require('../../src/components/evented-iframe').EventedIFrame;
+import fs from 'fs';
+import path from 'path';
+import { ipcRenderer } from 'electron';
+const { EventedIFrame, copyImageToClipboard } = require('../../src/components/evented-iframe');
+
+const PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNikAQAACIAHF/uBd8AAAAASUVORK5CYII=';
 
 describe('EventedIFrame', () =>
   describe('link clicking behavior', function () {
@@ -175,5 +181,44 @@ describe('EventedIFrame form submission', function () {
     }
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventedIFrame Copy Image', function () {
+  const dir = () => path.join(AppEnv.getConfigDirPath(), 'files', 'zz', 'zz', 'copy-image-spec');
+
+  beforeEach(() => {
+    fs.mkdirSync(dir(), { recursive: true });
+    fs.writeFileSync(path.join(dir(), 'logo.png'), Buffer.from(PNG_BASE64, 'base64'));
+    spyOn(ipcRenderer, 'send');
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir(), { recursive: true, force: true });
+  });
+
+  // A tern-file: image is cross-origin to the app document and taints a canvas it is drawn on.
+  for (const [label, src] of [
+    ['an inline tern-file: image', 'tern-file:///zz/zz/copy-image-spec/logo.png'],
+    ['a data: image', `data:image/png;base64,${PNG_BASE64}`],
+  ]) {
+    it(`copies ${label} as PNG`, async () => {
+      await copyImageToClipboard(src);
+      expect(ipcRenderer.send).toHaveBeenCalled();
+      const [channel, dataURL] = (ipcRenderer.send as jasmine.Spy).calls[0].args;
+      expect(channel).toEqual('write-image-to-clipboard');
+      expect(dataURL).toMatch(/^data:image\/png;base64,/);
+    });
+  }
+
+  it('copies nothing for a tern-file: URL outside the files directory', async () => {
+    let error = null;
+    try {
+      await copyImageToClipboard('tern-file:///zz/zz/copy-image-spec/../../../../secret.png');
+    } catch (err) {
+      error = err;
+    }
+    expect(error).not.toBe(null);
+    expect(ipcRenderer.send).not.toHaveBeenCalled();
   });
 });

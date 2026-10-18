@@ -55,11 +55,16 @@ async function violationsFor(policy: string, body: string) {
 
 describe('Content-Security-Policy', function () {
   describe('the app policy', () => {
-    it('is the same string in static/index.html and the response header', () => {
-      const html = fs.readFileSync(path.join(resourcePath(), 'static', 'index.html'), 'utf8');
-      const match = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/);
-      expect(match).not.toBe(null);
-      expect(match[1]).toEqual(AppContentSecurityPolicy);
+    it('is the same string in every static page and the response header', () => {
+      const staticDir = path.join(resourcePath(), 'static');
+      const pages = fs.readdirSync(staticDir).filter((name) => name.endsWith('.html'));
+      expect(pages).toContain('index.html');
+      for (const page of pages) {
+        const html = fs.readFileSync(path.join(staticDir, page), 'utf8');
+        const match = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/);
+        if (page === 'index.html') expect(match).not.toBe(null);
+        if (match) expect(`${page}: ${match[1]}`).toEqual(`${page}: ${AppContentSecurityPolicy}`);
+      }
 
       // main.js sends the constant rather than a copy of it.
       const main = fs.readFileSync(path.join(resourcePath(), 'src', 'browser', 'main.js'), 'utf8');

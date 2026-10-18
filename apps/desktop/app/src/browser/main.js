@@ -438,6 +438,14 @@ const start = () => {
     app.removeListener('open-file', onOpenFileBeforeReady);
     app.removeListener('open-url', onOpenUrlBeforeReady);
 
+    // No window may reach file://host/... (a UNC path on Windows), which the app CSP's `*`,
+    // `file:` and 'self' all allow from a file: document. Message HTML also renders in the
+    // main window (the quoted body in the composer), where no per-message CSP applies.
+    const { isHostedFileURL } = require('../file-url-guard');
+    session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+      callback({ cancel: isHostedFileURL(details.url) });
+    });
+
     // Remove the Origin header for Microsoft OAuth requests. Native fetch in Electron
     // adds an Origin header which causes AADSTS90023 errors because Microsoft treats
     // it as a cross-origin request requiring SPA client-type registration. Desktop apps

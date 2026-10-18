@@ -23,18 +23,14 @@ class AutoloadImagesStore extends MailspringStore {
   }
 
   // The regexes only decide whether to show the "images blocked" banner. Blocking itself is
-  // the message document's CSP (src/content-security-policy.ts), which also covers the CSS
-  // and font forms these miss.
+  // the message document's CSP (src/content-security-policy.ts), and "Show Images" lifts it
+  // only for http(s) URLs, so that is all these count (cid: and data: images load either
+  // way). Matches an http(s) URL right after
+  // - src= / background= / srcset= / poster= ... (quoted or not)
+  // - url( or image-set( anywhere in CSS, quoted or not
+  // - @import "..." / @import '...'
   getImagesRegexp = () => {
-    // Matches:
-    // - src='....'
-    // - background="...."
-    // - background: url(....)
-    // - background: url(""...."")
-    // - @import url(....)
-    // - @import "...." / @import '....' (string form, no url())
-    // - any later url() in a comma-separated CSS value
-    return /((?:src|background|placeholder|icon|poster|srcset)\s*=\s*['"]?(?=[cid:|\w*://])|(?::|,|@import)\s*url\(['"]?|@import\s+['"])+([^"')]*)/gi;
+    return /(?:\b(?:src|background|placeholder|icon|poster|srcset)\s*=\s*['"]?\s*|\b(?:url|image-set)\(\s*['"]?\s*|@import\s+['"]\s*)https?:/i;
   };
 
   getLinkTagRegexp = () => {

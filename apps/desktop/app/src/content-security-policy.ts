@@ -1,7 +1,8 @@
 import { FilesScheme } from './files-scheme';
 
-// The app's policy. main.js sends it as a response header and static/index.html carries the
-// same string in its <meta> tag; spec/content-security-policy-spec.ts fails if they drift.
+// The app's policy. main.js sends it as a response header and every static/*.html page
+// carries the same string in its <meta> tag; spec/content-security-policy-spec.ts fails if
+// they drift.
 //
 // connect-src lists the hosts the renderer fetches itself. Requests to hosts that depend on
 // user data (autoconfig, one-click unsubscribe, saving a remote image) go through

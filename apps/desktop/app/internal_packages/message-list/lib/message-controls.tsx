@@ -202,14 +202,23 @@ export default class MessageControls extends React.Component<MessageControlsProp
 
     // Shown as escaped text in a page carrying the message CSP, rather than loading the raw
     // file and leaving Chromium to guess whether it is HTML.
-    const htmlPath = `${filepath}.html`;
+    // Not `${id}.html`: the clipped-message window (message-item-body.tsx) writes that.
+    const htmlPath = `${filepath}.rfc822.html`;
     const csp = contentSecurityPolicyMetaTag(messageContentSecurityPolicy({ remoteImages: false }));
-    fs.writeFileSync(
-      htmlPath,
-      `<!DOCTYPE html>${csp}<meta charset="UTF-8">` +
-        `<pre style="white-space: pre-wrap; word-wrap: break-word; margin: 8px;">` +
-        `${escapeHTML(fs.readFileSync(filepath, 'utf8'))}</pre>`
-    );
+    try {
+      const raw = await fs.promises.readFile(filepath, 'utf8');
+      await fs.promises.writeFile(
+        htmlPath,
+        `<!DOCTYPE html>${csp}<meta charset="UTF-8">` +
+          `<pre style="white-space: pre-wrap; word-wrap: break-word; margin: 8px;">` +
+          `${escapeHTML(raw)}</pre>`
+      );
+    } catch {
+      AppEnv.showErrorDialog(
+        localized('Could not retrieve the original message. Please try again.')
+      );
+      return;
+    }
 
     const { BrowserWindow } = require('@electron/remote');
     const win = new BrowserWindow({
