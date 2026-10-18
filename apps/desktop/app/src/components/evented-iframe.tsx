@@ -14,6 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import { ipcRenderer } from 'electron';
 import { FilesScheme, resolveFilesSchemeURL } from '../files-scheme';
+import { markFileFromInternet } from '../attachment-safety';
 import { ExternalFetch } from '../external-fetch';
 
 export interface FormSubmissionTarget {
@@ -481,7 +482,12 @@ export class EventedIFrame extends React.Component<
                 }
                 imageBytes(src)
                   .then((buffer) => {
-                    fs.writeFile(path, buffer, () => {
+                    fs.writeFile(path, buffer, async (err) => {
+                      if (err) {
+                        console.error(`Save Image failed: ${err}`);
+                        return;
+                      }
+                      await markFileFromInternet(path);
                       require('@electron/remote').shell.showItemInFolder(path);
                     });
                   })

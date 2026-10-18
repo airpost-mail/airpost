@@ -9,6 +9,7 @@ import { File } from '../models/file';
 import * as Utils from '../models/utils';
 import { localized } from '../../intl';
 import { filesSchemeURL } from '../../files-scheme';
+import { confirmOpeningFile, markFileFromInternet } from '../../attachment-safety';
 import {
   generatePreview,
   canPossiblyPreviewExtension,
@@ -174,20 +175,30 @@ class AttachmentStore extends MailspringStore {
 
   _fetchAndOpen = (file: File) => {
     return this._prepareAndResolveFilePath(file)
-      .then((filePath) => shell.openPath(filePath))
+      .then(async (filePath) => {
+        // The engine writes files/ itself, so the plist's LSFileQuarantineEnabled doesn't cover it.
+        await markFileFromInternet(filePath);
+        if (await confirmOpeningFile(filePath)) {
+          await shell.openPath(filePath);
+        }
+      })
       .catch(this._catchFSErrors)
       .catch((error) => {
         this._presentError({ file, error });
       });
   };
 
+  // Copies an attachment out of files/ and marks the copy as downloaded (renderer writes
+  // aren't covered by the main bundle's LSFileQuarantineEnabled).
   _writeToExternalPath = (filePath, savePath) => {
     return new Promise<void>((resolve, reject) => {
       const stream = fs.createReadStream(filePath);
-      stream.pipe(fs.createWriteStream(savePath));
+      const out = fs.createWriteStream(savePath);
       stream.on('error', (err) => reject(err));
-      stream.on('end', () => resolve());
-    });
+      out.on('error', (err) => reject(err));
+      out.on('finish', () => resolve());
+      stream.pipe(out);
+    }).then(() => markFileFromInternet(savePath).then(() => {}));
   };
 
   _fetchAndSave = (file: File) => {

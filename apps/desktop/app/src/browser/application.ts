@@ -33,6 +33,7 @@ import { developerToolsAvailable } from '../developer-tools';
 import MailspringProtocolHandler from './mailspring-protocol-handler';
 import { registerFilesProtocol } from './files-protocol-handler';
 import { registerExternalFetchIPC } from './external-fetch-ipc';
+import { registerAttachmentSafetyIPC } from './attachment-safety-ipc';
 import ConfigPersistenceManager, { registerConfigIPC } from './config-persistence-manager';
 import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from './engine-settings';
 import moveToApplications from './move-to-applications';
@@ -1003,6 +1004,7 @@ export default class Application extends EventEmitter {
     registerQuickpreviewIPCHandlers(ipcMain);
     registerNotificationIPCHandlers(ipcMain);
     registerExternalFetchIPC(ipcMain);
+    registerAttachmentSafetyIPC(ipcMain);
   }
 
   sendCalendarSync(accountId?: string) {

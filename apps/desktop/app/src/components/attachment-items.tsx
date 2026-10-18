@@ -9,6 +9,7 @@ import { RetinaImg } from './retina-img';
 import { Flexbox } from './flexbox';
 import { Spinner } from './spinner';
 import { localized } from '../intl';
+import { markFileFromInternet } from '../attachment-safety';
 
 const defaultProps = {
   draggable: true,
@@ -140,6 +141,9 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
   _onDragStart = (event: React.DragEvent<HTMLDivElement>) => {
     const { contentType, filePath } = this.props;
     if (fs.existsSync(filePath)) {
+      // Tags the source. The drop target is a fresh download written by the main process, so on
+      // macOS LSFileQuarantineEnabled should cover it; untested, see TD1 in docs/tech-debt.md.
+      markFileFromInternet(filePath);
       // Note: From trial and error, it appears that the second param /MUST/ be the
       // same as the last component of the filePath URL, or the download fails.
       const downloadURL = `${contentType}:${path.basename(filePath)}:file://${filePath}`;
