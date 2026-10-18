@@ -1546,7 +1546,8 @@ to paris` is three words; the desktop threw and fell back to a plain search); qu
 never keywords; a word glued to `:` (`http://x.test`) stays one word; unknown `is:`/`has:`
 values, a stray `)`, empty parentheses and a trailing `AND`/`OR`/`NOT` are errors; `after:`
 includes its day (`>=` the day's start) and `before:` excludes it, where the desktop compared
-with chrono-node's noon and a strict `>`; English month and weekday names only. `QueryError`
+with chrono-node's noon and a strict `>`; a query has at most 200 tokens (the parser
+recurses per token on a socket reader's stack); English month and weekday names only. `QueryError`
 lost its `Unsupported` variant, so `query` no longer answers `data.unsupported`. Open: the
 desktop half (`Query.searchText`, the printer for `structuredSearch`, deleting the local
 backend) is tern-client's; `search` keeps its `lastMessageTimestamp` order and has no cursor;
