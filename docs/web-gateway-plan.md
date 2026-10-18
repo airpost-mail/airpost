@@ -584,7 +584,12 @@ Open:
   implements the same grammar and date subset (checked against the engine's test cases) and
   announces the feature; `MockEngine({features: ['query']})` stands in for an older engine,
   whose `search` takes plain words only. The search `TODO(engine)` markers are gone.
-- Open: the search chips re-serialize the query (words first, then operators), which can move
-  terms across an `OR`; the chips model has no `OR`/`NOT`/parentheses. `search` has no
-  paging; a client that needs more than 500 results pages `query` with the grammar.
+- With the grammar the filter chips edit the typed text in place (`editSearchQuery`): a
+  filter is appended (the text parenthesized when it has a top-level `NOT`), and a chip comes
+  off only when it is a top-level AND operand; chips inside an `OR`, `NOT` or parentheses
+  have no remove button and their toggles are disabled. The palette keeps its last results
+  while the query is half typed (open quote or parenthesis, bare `from:`, trailing operator)
+  and shows the engine's message for a query it refuses.
+- Open: `search` has no paging; a client that needs more than 500 results pages `query` with
+  the grammar.
 

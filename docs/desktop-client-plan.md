@@ -1543,11 +1543,14 @@ dates in two zones there, in the unit tests (Lisbon, Tokyo, Auckland, Honolulu, 
 gap) and in `tests/read_api.rs` on the socket; `test_cli.py` and `test_mcp.py` on the fake IMAP
 server. Deviations from the desktop: a field keyword is a field only when a `:` follows (`trip
 to paris` is three words; the desktop threw and fell back to a plain search); quoted tokens are
-never keywords; a word glued to `:` (`http://x.test`) stays one word; unknown `is:`/`has:`
+never keywords; a word glued to `:` (`http://x.test`, `subject:re:hello`) stays one word; a term with no
+letters or digits (`-`, a stray `:`, `""`) is an error rather than an empty match; unknown `is:`/`has:`
 values, a stray `)`, empty parentheses and a trailing `AND`/`OR`/`NOT` are errors; `after:`
 includes its day (`>=` the day's start) and `before:` excludes it, where the desktop compared
 with chrono-node's noon and a strict `>`; a query has at most 200 tokens (the parser
-recurses per token on a socket reader's stack); English month and weekday names only. `QueryError`
+recurses per token on a socket reader's stack), and its FTS part is written with runs of
+AND/OR flat and nests at most 30 deep (FTS5's parser stack overflows at 34); `search.tz` is
+checked only when a date term needs it; English month and weekday names only. `QueryError`
 lost its `Unsupported` variant, so `query` no longer answers `data.unsupported`. Open: the
 desktop half (`Query.searchText`, the printer for `structuredSearch`, deleting the local
 backend) is tern-client's; `search` keeps its `lastMessageTimestamp` order and has no cursor;
