@@ -159,9 +159,10 @@ pub mod method {
     /// object, with any rotated refresh token in its `account` on stdin only. Where
     /// `account.add` is taken; answered out of order.
     pub const ACCOUNT_TEST: &str = "account.test";
-    /// `serve` mode: stop and forget the account if the engine holds it, then delete its
-    /// rows from the database (`--mode reset`). The client adds it again to resync. Where
-    /// `account.add` is taken; answered out of order.
+    /// `serve` mode: stop the account if the engine holds it, delete its rows from the
+    /// database (`--mode reset`) and start it again from the registry to resync (a client
+    /// that adds it again gets ACCOUNT_EXISTS). Where `account.add` is taken; answered out of
+    /// order.
     pub const ACCOUNT_RESET: &str = "account.reset";
     /// `serve` mode, the parent's stdin only: stop and forget every account, delete the
     /// database and create an empty one. The client adds the accounts again.
