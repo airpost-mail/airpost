@@ -420,9 +420,11 @@ impl<'a> TaskProcessor<'a> {
     }
 
     /// Hands the change to the metadata backend. With the local-only backend there is
-    /// nothing remote, as when the C++ ran without an identity (plan D3).
+    /// nothing remote, as when the C++ ran without an identity (plan D3), and neither is
+    /// there for a local-only plugin (`ms_net::LOCAL_ONLY_PLUGINS`), whose value is not logged.
     fn perform_remote_syncback_metadata(&self, data: &Value) -> Result<()> {
-        if self.metadata.is_local_only() {
+        if self.metadata.is_local_only() || ms_net::is_local_only_plugin(json_str(data, "pluginId"))
+        {
             return Ok(());
         }
         let model_id = get_str(at(data, "modelId"))?;

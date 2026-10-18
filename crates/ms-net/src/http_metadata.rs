@@ -40,7 +40,7 @@ use serde_json::Value;
 use tracing::{error, info, warn};
 
 use crate::http::{check_status, transport_error, HttpClient, CONNECT_TIMEOUT};
-use crate::metadata::{MetadataBackend, MetadataDelta, MetadataPush};
+use crate::metadata::{is_local_only_plugin, MetadataBackend, MetadataDelta, MetadataPush};
 use crate::outbox::Outbox;
 
 /// What the client is told when the backend has gone dormant after a 401/403.
@@ -288,6 +288,9 @@ fn platform() -> &'static str {
 
 impl MetadataBackend for HttpMetadataBackend {
     fn push(&self, push: &MetadataPush) -> Result<()> {
+        if is_local_only_plugin(&push.plugin_id) {
+            return Ok(());
+        }
         if self.is_dormant() {
             return self.queue(push, "token rejected");
         }
@@ -345,11 +348,16 @@ impl MetadataBackend for HttpMetadataBackend {
     }
 
     fn rebind(&self, local: &[MetadataPush]) -> Result<()> {
+        let local: Vec<MetadataPush> = local
+            .iter()
+            .filter(|p| !is_local_only_plugin(&p.plugin_id))
+            .cloned()
+            .collect();
         info!(
             "Metadata binding changed: replaying from 0 and backfilling {} local values.",
             local.len()
         );
-        self.outbox.rebind(&self.account_id, local)
+        self.outbox.rebind(&self.account_id, &local)
     }
 
     fn drain_outbox(&self) -> Result<()> {
@@ -463,7 +471,10 @@ impl MetadataBackend for HttpMetadataBackend {
             }
             match serde_json::from_slice::<StreamLine>(text) {
                 Ok(StreamLine::Metadata { attributes, cursor }) => {
-                    sink(self.record_from_stream(attributes));
+                    // Never pushed from a device; a server that holds one got it elsewhere.
+                    if !is_local_only_plugin(&attributes.plugin_id) {
+                        sink(self.record_from_stream(attributes));
+                    }
                     sink(MetadataDelta::Cursor(cursor.clone()));
                     last = cursor;
                 }

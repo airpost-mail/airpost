@@ -19,8 +19,18 @@
 //! | `DAVWorker` `POST /api/resolve-dav-hosts` (DNS SRV through the server) | ms-dav resolves SRV records locally |
 //! | `install-check` `GET <IDENTITY_SERVER>/ping` | the bin probes a TLS host with `HttpClient::probe` |
 
+use ms_core::constants::AI_TRIAGE_PLUGIN;
 use ms_core::{Metadata, Result};
 use serde_json::Value;
+
+/// Plugin ids that stay on the device: no backend pushes, backfills or applies them. AI
+/// triage results are mail content a model read (docs/ai-plan.md A5); each device triages
+/// its own mail.
+pub const LOCAL_ONLY_PLUGINS: &[&str] = &[AI_TRIAGE_PLUGIN];
+
+pub fn is_local_only_plugin(plugin_id: &str) -> bool {
+    LOCAL_ONLY_PLUGINS.contains(&plugin_id)
+}
 
 /// One `SyncbackMetadataTask` remote phase.
 #[derive(Clone, Debug, PartialEq)]
@@ -58,7 +68,8 @@ pub enum MetadataDelta {
     IdentityRefreshNeeded,
 }
 
-/// Shared by the foreground (push) and metadata (pull) threads.
+/// Shared by the foreground (push) and metadata (pull) threads. Implementations never send
+/// [`LOCAL_ONLY_PLUGINS`] to a server nor deliver them from one.
 pub trait MetadataBackend: Send + Sync {
     fn push(&self, push: &MetadataPush) -> Result<()>;
 
@@ -159,5 +170,11 @@ mod tests {
             .unwrap();
         assert_eq!((cursor.as_str(), delivered), ("42", 0));
         assert_eq!(backend.pull(None, &|| false, &mut |_| {}).unwrap(), "0");
+    }
+
+    #[test]
+    fn triage_results_are_local_only() {
+        assert!(is_local_only_plugin("tern-ai-triage"));
+        assert!(!is_local_only_plugin("thread-snooze"));
     }
 }

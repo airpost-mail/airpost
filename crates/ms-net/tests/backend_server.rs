@@ -485,6 +485,40 @@ fn backfill_keeps_server_values_and_adds_missing_ones() {
     assert_eq!(rows[1].object_id, "c1");
 }
 
+/// AI triage results stay on the device (docs/ai-plan.md section 4): neither a push nor a
+/// rebind's backfill sends them.
+#[test]
+fn triage_metadata_never_reaches_the_server() {
+    let dir = tempfile::tempdir().unwrap();
+    let b = Backend::start(dir.path(), "127.0.0.1:0".parse().unwrap());
+    let user = b.user("ada@example.com");
+    let laptop = device(b.server_object(&user, &b.token(&user)));
+    let triage =
+        json!({"category": "needs-reply", "needsReply": true, "reason": "asks a question"});
+    laptop
+        .backend
+        .push(&push("Thread", "t:1", "tern-ai-triage", triage.clone(), 1))
+        .unwrap();
+    laptop
+        .backend
+        .rebind(&[
+            push("Thread", "t:2", "tern-ai-triage", triage, 1),
+            push(
+                "Thread",
+                "t:3",
+                "thread-snooze",
+                json!({"expiration": 5}),
+                1,
+            ),
+        ])
+        .unwrap();
+    assert_eq!(laptop.backend.outbox().len(AID).unwrap(), 1);
+    laptop.backend.drain_outbox().unwrap();
+    let rows = b.rows(&user);
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0].object_id, "t:3");
+}
+
 #[test]
 fn binding_follows_the_server_after_a_restore() {
     let dir = tempfile::tempdir().unwrap();
