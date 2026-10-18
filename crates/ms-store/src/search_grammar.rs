@@ -350,8 +350,24 @@ fn parse_and(text: &str) -> Parsed<'_> {
     ))
 }
 
+/// Tokens a query may have.
+pub const MAX_TOKENS: usize = 200;
+
 /// Parses query text (`SearchQueryParser.parse`).
 pub fn parse(text: &str) -> Result<Expr, GrammarError> {
+    // The parser and the compiler recurse once per token, on a socket reader's stack.
+    let mut rest = text;
+    for _ in 0..MAX_TOKENS {
+        match next_token(rest)? {
+            (Some(_), r) => rest = r,
+            (None, _) => break,
+        }
+    }
+    if next_token(rest)?.0.is_some() {
+        return err(format!(
+            "the search is too long: at most {MAX_TOKENS} words, operators and parentheses"
+        ));
+    }
     let (exp, rest) = parse_and(text)?;
     let Some(exp) = exp else {
         return err("the search has nothing to look for");
@@ -692,6 +708,28 @@ mod tests {
         ] {
             assert!(parse(q).is_err(), "{q:?} parsed as {:?}", parse(q));
         }
+        let long = vec!["a"; MAX_TOKENS].join(" ");
+        assert!(parse(&long).is_ok());
+        assert!(parse(&format!("{long} b"))
+            .unwrap_err()
+            .0
+            .contains("too long"));
+        assert!(parse(&"(".repeat(100_000))
+            .unwrap_err()
+            .0
+            .contains("too long"));
+        // The deepest tree that parses still compiles on a socket reader's stack (the
+        // default 2 MiB), in a debug build.
+        let deep = format!("{}a{}", "(".repeat(99), ")".repeat(99));
+        let compiled = std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(move || thread_condition(&deep, &DateContext::utc(None)).map(|w| w.params.len()))
+            .unwrap()
+            .join()
+            .unwrap();
+        assert_eq!(compiled, Ok(1));
+        let ors = vec!["a"; MAX_TOKENS / 2].join(" OR ");
+        assert!(parse(&ors).is_ok());
     }
 
     #[test]
