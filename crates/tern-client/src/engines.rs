@@ -200,7 +200,7 @@ impl Engine {
     }
 
     /// `query` ([`feature::QUERY`](ms_ipc::feature::QUERY)). `accounts: None` reads every
-    /// account this engine holds.
+    /// account in the engine's database, with no check against the accounts it holds.
     pub fn query(&mut self, params: &QueryParams) -> Result<QueryResult, EngineError> {
         self.call_as(method::QUERY, to_params(params))
     }
