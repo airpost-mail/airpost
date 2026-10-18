@@ -8,7 +8,8 @@ import {
   type QueryParams,
   type QueryResult,
 } from '../rpc';
-import type { ModelJSON } from '../types';
+import type { ModelJSON, ThreadJSON } from '../types';
+import { grammarMatcher } from './search';
 import type { MockStore } from './store';
 
 type Value = string | number | boolean | null | undefined;
@@ -273,17 +274,22 @@ export function runQuery(
   s: MockStore,
   p: QueryParams,
   checkAccount: (id: string) => void,
+  opts: { grammar: boolean },
 ): QueryResult {
   if (typeof p !== 'object' || p === null) invalid('params must be an object');
   for (const k of Object.keys(p)) if (!KEYS.has(k)) invalid(`unknown field \`${k}\``);
   const def = CLASSES[p.class];
   if (!def) invalid(`no class "${p.class}"`);
-  if (p.search?.grammar) {
+  // An engine without the grammar refuses `grammar: true` as one before stage 9 did.
+  if (p.search?.grammar && !opts.grammar) {
     throw new RpcError({
       code: RpcErrorCode.InvalidParams,
-      message: 'unsupported: the search grammar arrives with desktop-client-plan stage 9',
+      message: 'unsupported: search.grammar is not supported by this engine yet',
       data: { unsupported: 'search-grammar' },
     });
+  }
+  if (p.search?.grammar && p.class !== 'Thread') {
+    invalid(`the search grammar finds threads; search ${p.class} with grammar: false`);
   }
   for (const a of p.accounts ?? []) checkAccount(a);
 
@@ -294,8 +300,14 @@ export function runQuery(
   }
   const where = p.where ?? [];
   for (const n of Array.isArray(where) ? where : [where]) preds.push(matcher(def, p.class, n));
-  const search = p.search?.text.trim();
-  if (search) preds.push(searchPred(def, p.class, s, search));
+  if (p.search?.grammar) {
+    const match = grammarMatcher(p.search.text, p.search.tz, p.search.now);
+    preds.push((m) => match(s.searchable(m as ThreadJSON)));
+  } else if (p.search) {
+    const search = p.search.text.trim();
+    if (!search) invalid('search.text has nothing to match');
+    preds.push(searchPred(def, p.class, s, search));
+  }
 
   let rows = def.rows(s).filter((m) => preds.every((f) => f(m)));
   if (p.count) return { rows: [], count: rows.length };

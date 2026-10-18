@@ -511,17 +511,48 @@ export interface SearchHits extends SearchResult {
   truncated: boolean;
 }
 
+/** Whether the engine reads the search grammar, so `useSearch` can take it as typed. */
+export function useSearchGrammar(): boolean {
+  return useEngineFeatures()?.has(EngineFeature.SearchGrammar) ?? false;
+}
+
+/** The zone and clock the engine reads a grammar query's dates in. */
+export function searchClock(): { tz: string; now: number } {
+  return {
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    now: Math.floor(Date.now() / 1000),
+  };
+}
+
 export function useSearch(q: SearchQuery | null, opts: { limit?: number } = {}) {
   const client = useEngine();
   const qc = useQueryClient();
   const query = q?.query.trim() ?? '';
   const limit = opts.limit ?? PAGE_SIZE;
+  const grammar = !!q?.grammar;
   return useQuery({
-    queryKey: engineKeys.search({ query, accountId: q?.accountId, limit }),
+    queryKey: engineKeys.search({
+      query,
+      accountId: q?.accountId,
+      grammar: grammar || undefined,
+      limit,
+    }),
     queryFn: async (): Promise<SearchHits> => {
-      // TODO(engine): `search` takes one accountId; searching every account means one call
-      // per account, merged and cut to `limit` here, with no paging. `search` gains
-      // `accounts` with DCP stage 9.
+      if (grammar) {
+        // One read across accounts; one row past the limit says whether there are more.
+        const r = await call(client, () =>
+          client.call('search', {
+            accountId: q?.accountId,
+            query,
+            limit: limit + 1,
+            grammar: true,
+            ...searchClock(),
+          }),
+        );
+        return { threads: r.threads.slice(0, limit), truncated: r.threads.length > limit };
+      }
+      // An engine without the grammar takes one accountId: one call per account, merged
+      // and cut to `limit` here.
       const ids = await targetAccounts(qc, client, q?.accountId);
       const results = await Promise.all(
         ids.map((accountId) =>
@@ -537,6 +568,11 @@ export function useSearch(q: SearchQuery | null, opts: { limit?: number } = {}) 
     enabled: query.length > 0,
     placeholderData: (prev) => prev,
   });
+}
+
+/** The engine refused the params: for a grammar search, text that doesn't parse. */
+export function isInvalidParams(err: unknown): err is RpcError {
+  return err instanceof RpcError && err.code === RpcErrorCode.InvalidParams;
 }
 
 export function useContacts(query: string, opts: { accountId?: string; limit?: number } = {}) {

@@ -31,12 +31,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Kbd } from '@/components/ui/kbd';
-import { useAccounts, useSearch, type AccountJSON, type ThreadJSON } from '@/engine';
+import {
+  useAccounts,
+  useSearch,
+  useSearchGrammar,
+  type AccountJSON,
+  type ThreadJSON,
+} from '@/engine';
 import { formatListDate } from '@/lib/format';
 import { useShortcut, useShortcutScope } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 import { filterCommands } from './palette';
-import { parseSearchQuery, toEngineQuery } from './query';
+import { toEngineQuery } from './query';
 import { addRecentSearch } from './recent';
 import { setCommandPaletteOpen, useCommandPaletteOpen } from './store';
 import { threadSender } from './thread-sender';
@@ -129,8 +135,11 @@ function PaletteBody({
   const commands = usePaletteCommands();
   const matches = filterCommands(commands, query);
   const debounced = useDebounced(query.trim(), 120);
-  const engineQuery = debounced.length >= 2 ? toEngineQuery(parseSearchQuery(debounced)) : '';
-  const mail = useSearch(engineQuery ? { query: engineQuery } : null, { limit: MAIL_LIMIT });
+  const grammar = useSearchGrammar();
+  const engineQuery = debounced.length >= 2 ? toEngineQuery(debounced, grammar) : '';
+  const mail = useSearch(engineQuery ? { query: engineQuery, grammar } : null, {
+    limit: MAIL_LIMIT,
+  });
   const { data: accounts = [] } = useAccounts();
   const trimmed = query.trim();
 

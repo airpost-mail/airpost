@@ -40,8 +40,13 @@ export interface EventRange {
 
 export interface SearchQuery {
   query: string;
-  /** Omit to search every account (the client fans out; see `useSearch`). */
+  /** Omit to search every account. */
   accountId?: string;
+  /**
+   * `query` is in the search grammar, for an engine with `EngineFeature.SearchGrammar`
+   * (`useSearchGrammar`); otherwise plain words.
+   */
+  grammar?: boolean;
 }
 
 /** Normalised so `{a, b: undefined}` and `{a}` share one cache entry. */

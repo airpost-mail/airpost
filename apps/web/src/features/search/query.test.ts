@@ -166,8 +166,14 @@ describe('dates', () => {
 });
 
 describe('toEngineQuery', () => {
-  it('drops date bounds and keeps everything else', () => {
-    expect(toEngineQuery(parseSearchQuery('invoice after:7d from:"Ana Lima" before:today'))).toBe(
+  const q = ' (invoice OR receipt) after:7d from:"Ana Lima" before:today ';
+
+  it('sends the query as typed to an engine with the grammar', () => {
+    expect(toEngineQuery(q, true)).toBe(q.trim());
+  });
+
+  it('drops date bounds for an engine without the grammar', () => {
+    expect(toEngineQuery('invoice after:7d from:"Ana Lima" before:today', false)).toBe(
       'invoice from:"Ana Lima"',
     );
   });

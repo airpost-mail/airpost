@@ -1,16 +1,11 @@
 // In-memory stand-in for the engine's SQLite store: models, thread recomputation from
 // messages (Thread::apply_message_attribute_changes in ms-store), and the read API.
-import {
-  categoryDisplayName,
-  compareMessages,
-  compareThreads,
-  sortsAfter,
-  threadInCategory,
-} from '../model';
+import { compareMessages, compareThreads, sortsAfter, threadInCategory } from '../model';
 import {
   RpcError,
   RpcErrorCode,
   type CategoryCount,
+  type ContactsSearchParams,
   type ContactsSearchResult,
   type MessagesGetParams,
   type MessagesGetResult,
@@ -40,7 +35,7 @@ import { PlacementFlags } from '../types';
 import { ChangeSet } from './changes';
 import { buildFixtures, FixtureBuilder, incoming, xgmName, type MockBody } from './fixtures';
 import type { ThreadScript } from './fixtures/scripts';
-import { parseQuery } from './search';
+import { grammarMatcher, plainMatcher, type Searchable } from './search';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
@@ -351,51 +346,42 @@ export class MockStore {
     return { message, body: p.body ? this.body(m.id) : null, files: message.files };
   }
 
-  search(p: SearchParams): SearchResult {
-    const q = parseQuery(p.query);
-    const has = (hay: string | undefined, needle: string) => !!hay?.toLowerCase().includes(needle);
-    const contactMatch = (cs: ContactRef[], needle: string) =>
-      cs.some((c) => has(c.email, needle) || has(c.name, needle));
-
-    const list = [...this.threads.values()].filter((t) => {
-      if (t.aid !== p.accountId) return false;
-      const msgs = this.threadMessages(t.id);
-      const cats = [...t.folders, ...t.labels].filter((c) => c._refs > 0);
-      for (const term of q.text) {
-        const hit =
-          has(t.subject, term) ||
-          contactMatch(t.participants, term) ||
-          msgs.some((m) => has(m.snippet, term) || has(this.bodies.get(m.id)?.body, term)) ||
-          msgs.some((m) => m.files.some((f) => has(f.filename, term)));
-        if (!hit) return false;
-      }
-      if (q.from.some((f) => !msgs.some((m) => contactMatch(m.from, f)))) return false;
-      if (q.to.some((f) => !msgs.some((m) => contactMatch([...m.to, ...m.cc], f)))) return false;
-      if (q.subject.some((s) => !has(t.subject, s))) return false;
-      for (const flag of q.is) {
-        if (flag === 'unread' && t.unread === 0) return false;
-        if (flag === 'read' && t.unread > 0) return false;
-        if (flag === 'starred' && t.starred === 0) return false;
-      }
-      for (const where of q.in) {
-        if (!cats.some((c) => c.role === where || categoryDisplayName(c).toLowerCase() === where)) {
-          return false;
-        }
-      }
-      if (q.has.includes('attachment') && t.attachmentCount === 0) return false;
-      return true;
-    });
-    // A query with no terms matches nothing, as in ms-store search_threads.
-    if (Object.values(q).every((v) => v.length === 0)) return { threads: [] };
+  /** A thread's `ThreadSearch` row and flags, as `search` matches them. */
+  searchable(t: ThreadJSON): Searchable {
+    const msgs = this.threadMessages(t.id);
+    const people = (cs: ContactRef[]) => cs.flatMap((c) => [c.email, c.name ?? '']).join(' ');
     return {
-      threads: list
+      columns: {
+        subject: t.subject,
+        from: msgs.map((m) => people(m.from)).join(' '),
+        to: msgs.map((m) => people([...m.to, ...m.cc, ...m.bcc])).join(' '),
+        categories: [...t.folders, ...t.labels]
+          .filter((c) => c._refs > 0)
+          .map((c) => c.role || c.path)
+          .join(' '),
+        body: msgs.map((m) => `${m.snippet ?? ''} ${this.bodies.get(m.id)?.body ?? ''}`).join(' '),
+      },
+      unread: t.unread,
+      starred: t.starred,
+      attachmentCount: t.attachmentCount,
+      lmrt: t.lmrt,
+    };
+  }
+
+  /** `search` over `accounts`, which the caller has checked. */
+  search(p: SearchParams, accounts: string[]): SearchResult {
+    const match = p.grammar ? grammarMatcher(p.query, p.tz, p.now) : plainMatcher(p.query);
+    const inScope = new Set(accounts);
+    return {
+      threads: [...this.threads.values()]
+        .filter((t) => inScope.has(t.aid) && match(this.searchable(t)))
         .sort(compareThreads)
         .slice(0, clamp(p.limit))
         .map((t) => structuredClone(t)),
     };
   }
 
-  searchContacts(p: SearchParams): ContactsSearchResult {
+  searchContacts(p: ContactsSearchParams): ContactsSearchResult {
     const terms = p.query.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (terms.length === 0) return { contacts: [] };
     const words = (c: ContactJSON) => `${c.email} ${c.name}`.toLowerCase().split(/[\s@.]+/);

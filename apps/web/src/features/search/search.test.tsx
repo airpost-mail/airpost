@@ -12,7 +12,7 @@ import {
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { EngineProvider, MockEngine } from '@/engine';
+import { EngineFeature, EngineProvider, MockEngine } from '@/engine';
 import { installShortcuts, resetShortcuts } from '@/lib/shortcuts';
 import { CommandPalette } from './CommandPalette';
 import { validateSearchRouteSearch } from './params';
@@ -28,8 +28,8 @@ afterEach(() => {
   act(() => setCommandPaletteOpen(false));
 });
 
-function renderAt(url: string) {
-  const engine = new MockEngine({ latency: 0 });
+function renderAt(url: string, features?: string[]) {
+  const engine = new MockEngine({ latency: 0, features });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute({
     component: () => (
@@ -88,8 +88,26 @@ describe('search page', () => {
     expect(router.state.location.pathname).toBe('/search');
   });
 
-  it('asks for company when only dates are given', async () => {
+  it('lets the engine read the grammar, dates included', async () => {
+    renderAt(`/search?q=${encodeURIComponent('(invoice OR kickoff) after:30d NOT in:trash')}`);
+    const list = await screen.findByRole('list', { name: 'Search results' });
+    expect(await within(list).findAllByText(/Invoice|kickoff/i)).not.toHaveLength(0);
+  });
+
+  it('searches by date alone', async () => {
     renderAt('/search?q=after%3A7d');
+    expect(await screen.findByRole('list', { name: 'Search results' })).toBeInTheDocument();
+    expect(screen.queryByText('Almost there')).not.toBeInTheDocument();
+  });
+
+  it('says what the engine couldn’t read', async () => {
+    renderAt(`/search?q=${encodeURIComponent('after:someday invoice')}`);
+    expect(await screen.findByText('Can’t read that search')).toBeInTheDocument();
+    expect(screen.getByText(/isn't a date the search understands/)).toBeInTheDocument();
+  });
+
+  it('asks for company when only dates are given to an engine without the grammar', async () => {
+    renderAt('/search?q=after%3A7d', [EngineFeature.Query]);
     expect(await screen.findByText('Almost there')).toBeInTheDocument();
   });
 

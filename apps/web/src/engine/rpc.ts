@@ -104,8 +104,13 @@ export interface HelloResult {
 
 /** `hello.features` the web acts on. */
 export const EngineFeature = {
-  /** `query`, with plain search only (DCP stage 7). */
+  /** `query` (DCP stage 7). */
   Query: 'query',
+  /**
+   * The search grammar (DCP stage 9) in `search {grammar: true, tz, now}` and
+   * `query.search`, and `search {accounts}`.
+   */
+  SearchGrammar: 'search-grammar',
   /** `files.*` (DCP stage 16): the gateway's file routes work. */
   Files: 'files',
 } as const;
@@ -209,10 +214,24 @@ export interface MessagesGetResult {
 }
 
 /**
- * `search` and `contacts.search`. The query is plain text: each whitespace-separated term
- * must match and nothing is read as syntax. Contact terms match word prefixes.
+ * `search`. Without `grammar` the query is plain text: each whitespace-separated term must
+ * match and nothing is read as syntax. With `grammar: true` (`EngineFeature.SearchGrammar`)
+ * it is the search bar's grammar, dates read in `tz` (IANA; UTC when absent) and counted back
+ * from `now` (unix seconds); text that doesn't parse is `InvalidParams`. The threads are
+ * `accountId`'s, `accounts`' (`SearchGrammar`), or with neither every account's.
  */
 export interface SearchParams {
+  accountId?: string;
+  accounts?: string[] | null;
+  query: string;
+  limit?: number;
+  grammar?: boolean;
+  tz?: string;
+  now?: number;
+}
+
+/** `contacts.search`: plain text, each term matching a word prefix. */
+export interface ContactsSearchParams {
   accountId: string;
   query: string;
   limit?: number;
@@ -275,8 +294,8 @@ export interface QueryParams<C extends QueryClass = QueryClass> {
   class: C;
   accounts?: string[] | null;
   where?: MatcherJSON | MatcherJSON[] | null;
-  /** `grammar: true` is refused until DCP stage 9. */
-  search?: { text: string; grammar: false } | null;
+  /** `grammar: true` (Thread only) needs `EngineFeature.SearchGrammar`; see `SearchParams`. */
+  search?: { text: string; grammar: boolean; tz?: string; now?: number } | null;
   order?: { attr: string; dir: 'asc' | 'desc' }[];
   limit?: number | null;
   offset?: number | null;
@@ -330,7 +349,7 @@ export interface RpcMethods {
   'threads.get': { params: ThreadsGetParams; result: ThreadsGetResult };
   'messages.get': { params: MessagesGetParams; result: MessagesGetResult };
   search: { params: SearchParams; result: SearchResult };
-  'contacts.search': { params: SearchParams; result: ContactsSearchResult };
+  'contacts.search': { params: ContactsSearchParams; result: ContactsSearchResult };
   /** Only on engines with `EngineFeature.Query`. */
   query: { params: QueryParams; result: QueryResult };
 

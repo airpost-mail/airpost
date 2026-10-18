@@ -21,26 +21,33 @@ sorts by last received or, in Sent, last sent (`order`), and pages the unified v
 and event reads with a read-only agenda, and calendar fixtures in the mock. Engines without
 `query` keep the old paths (per-account merge, client-side flag filters).
 
+Done in step W7 (DCP 9, markers removed): with `EngineFeature.SearchGrammar` the search page
+and the palette send the query as typed (`search {grammar: true, tz, now}`), so the engine
+reads `from:`, `in:`, `is:`, `has:attachment`, `AND`/`OR`/`NOT`, parentheses and
+`before:`/`after:` in the browser's zone, and searches every account in one call (no
+`accountId`, one row past the limit for "more"). A query the engine can't read shows its
+message. Engines without the feature keep the old path (plain words per account, dates
+applied by the client, "Almost there" for dates alone). The mock implements the engine's
+grammar and date subset (`src/engine/mock/search.ts`, tested against the engine's cases);
+`MockEngine({features: ['query']})` stands in for an engine without it.
+
 - `src/features/mailbox/list/senders.ts:3`: message count and per-message senders on Thread
   JSON. No DCP stage yet (a full Message `query` per list page is the wrong cost).
-- `src/engine/hooks.ts:522`: `search` across accounts. DCP 9.
-- `src/features/search/query.ts:172`, `src/engine/mock/search.ts:3`,
-  `src/features/search/SearchView.tsx:225`: search operators and dates. DCP 9.
 - `src/features/calendar/CalendarView.tsx:3`: creating, editing and answering events, and
   recurrence expansion. DCP 18.
 
 ## Tasks
 
 - `src/engine/mock/apply-task.ts:147`: RSVP and contact tasks in the mock. DCP 18.
-- `src/features/composer/useComposerSession.ts:246`: undo-send surviving a closed tab. DCP 4
+- `src/features/composer/useComposerSession.ts:260`: undo-send surviving a closed tab. DCP 4
   (send-later metadata fired by the executor), then DCP 13 (`draft.send {delayMs}`).
 - `src/features/composer/send-later-runner.ts:3`: sending with no tab open. DCP 4 executor
   (gate the runner on `expiration-executor`); with no desktop running, DCP 11.
 
 ## Accounts
 
-- `src/engine/mock/engine.ts:427`: `account.add` from the web. DCP 11/12, admin scope.
-- `src/engine/mock/engine.ts:444`: `account.test` on the socket. DCP 12, admin scope.
+- `src/engine/mock/engine.ts:456`: `account.add` from the web. DCP 11/12, admin scope.
+- `src/engine/mock/engine.ts:473`: `account.test` on the socket. DCP 12, admin scope.
 - `src/features/settings/accounts/actions.ts:30`: `account.test {accountId}` with stored
   credentials. DCP 12.
 - `src/features/settings/accounts/actions.ts:47`: `account.reset` on the socket. DCP 12, admin
@@ -64,7 +71,7 @@ and the mock; nothing in the web asks for a raw message yet.
 
 ## Integrations
 
-- `src/engine/rpc.ts:349`, `src/engine/mock/engine.ts:514`: translate, grammar and enrich
+- `src/engine/rpc.ts:368`, `src/engine/mock/engine.ts:543`: translate, grammar and enrich
   shapes. DCP 5.
 - `src/features/settings/integrations/useIntegrationTest.ts:10`: `integrations.test` result.
   DCP 5.

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { EngineNotification } from '../rpc';
+import type { EngineNotification, SearchParams } from '../rpc';
 import { RpcError, RpcErrorCode } from '../rpc';
 import * as tasks from '../tasks';
 import type { Delta, LabelJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
@@ -295,22 +295,62 @@ describe('MockEngine', () => {
     expect(removed?.modelJSONs.map((t) => (t as ThreadJSON).id)).toContain(d.threadId);
   });
 
-  it('search understands free text and operators', async () => {
+  it('search reads plain words without the grammar', async () => {
     const lisbon = await engine.call('search', { accountId: G, query: 'lisbon' });
     expect(lisbon.threads.some((t) => t.subject === 'Lisbon in May?')).toBe(true);
-    const fromJonas = await engine.call('search', {
-      accountId: I,
-      query: 'from:jonas has:attachment',
-    });
-    expect(fromJonas.threads.length).toBeGreaterThan(0);
-    expect(fromJonas.threads.every((t) => t.attachmentCount > 0)).toBe(true);
-    const unread = await engine.call('search', { accountId: G, query: 'is:unread in:spam' });
-    expect(unread.threads.every((t) => t.unread > 0)).toBe(true);
+    // No operators: `is:unread` is two words, which no thread has in a row.
+    const literal = await engine.call('search', { accountId: G, query: 'is:unread' });
+    expect(literal.threads).toEqual([]);
   });
 
-  it('search and contacts.search require an account', async () => {
-    const err = await engine.call('search', { query: 'x' } as never).catch((e: unknown) => e);
+  it('search reads the grammar across accounts', async () => {
+    const grammar = (query: string, extra: Partial<SearchParams> = {}) =>
+      engine.call('search', { query, grammar: true, tz: 'UTC', now: NOW, ...extra });
+    const fromJonas = await grammar('from:jonas has:attachment');
+    expect(fromJonas.threads.length).toBeGreaterThan(0);
+    expect(fromJonas.threads.every((t) => t.attachmentCount > 0)).toBe(true);
+    const unread = await grammar('is:unread in:spam', { accountId: G });
+    expect(unread.threads.length).toBeGreaterThan(0);
+    expect(unread.threads.every((t) => t.unread > 0 && t.aid === G)).toBe(true);
+    // No account named: every account's threads, in one list.
+    const everywhere = await grammar('lisbon OR jonas');
+    expect(new Set(everywhere.threads.map((t) => t.aid))).toEqual(new Set([G, I]));
+    const notLisbon = await grammar('(lisbon OR jonas) NOT lisbon');
+    expect(notLisbon.threads.some((t) => t.subject === 'Lisbon in May?')).toBe(false);
+    expect(notLisbon.threads.length).toBeGreaterThan(0);
+    // Dates against the request's clock: everything is before tomorrow, nothing after it.
+    const all = await grammar('in:inbox', { accounts: [G] });
+    const old = await grammar('in:inbox before:today', { accounts: [G] });
+    const recent = await grammar('in:inbox after:7d', { accounts: [G] });
+    expect(
+      old.threads.length +
+        (await grammar('in:inbox after:today', { accounts: [G] })).threads.length,
+    ).toBe(all.threads.length);
+    expect(recent.threads.every((t) => t.lmrt >= NOW - 8 * 86_400)).toBe(true);
+    const refused: [string, Partial<SearchParams>][] = [
+      ['(lisbon', {}],
+      ['after:someday', {}],
+      ['after:yesterday', { now: undefined }],
+      ['x', { tz: 'Mars/Base' }],
+      ['x', { accountId: G, accounts: [G] }],
+    ];
+    for (const [query, extra] of refused) {
+      const err = await grammar(query, extra).catch((e: unknown) => e);
+      expect((err as RpcError).code, query).toBe(RpcErrorCode.InvalidParams);
+    }
+  });
+
+  it('search needs an account on an engine without the grammar', async () => {
+    const old = new MockEngine({ latency: 0, now: NOW, features: ['query'] });
+    await old.connect();
+    const err = await old.call('search', { query: 'x' }).catch((e: unknown) => e);
     expect((err as RpcError).code).toBe(RpcErrorCode.InvalidParams);
+    const grammar = await old
+      .call('search', { accountId: G, query: 'x', grammar: true })
+      .catch((e: unknown) => e);
+    expect((grammar as RpcError).code).toBe(RpcErrorCode.InvalidParams);
+    const contacts = await engine.call('contacts.search', { query: 'x' } as never).catch((e) => e);
+    expect((contacts as RpcError).code).toBe(RpcErrorCode.InvalidParams);
   });
 
   it('contacts.search matches names and emails by prefix', async () => {

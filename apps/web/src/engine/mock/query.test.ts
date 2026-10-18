@@ -172,16 +172,48 @@ describe('MockEngine query', () => {
     expect(idsOnly.ids).toContain(m.id);
   });
 
+  it('searches threads in the grammar, dates in the request zone', async () => {
+    const r = await engine.call('query', {
+      class: 'Thread',
+      accounts: [G],
+      search: { text: 'is:unread OR is:starred', grammar: true },
+    });
+    const rows = r.rows as ThreadJSON[];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((t) => t.aid === G && (t.unread > 0 || t.starred > 0))).toBe(true);
+    const day = async (tz: string) =>
+      (
+        await engine.call('query', {
+          class: 'Thread',
+          search: { text: 'after:today', grammar: true, tz, now: NOW },
+          count: true,
+        })
+      ).count;
+    // NOW is 2026-05-28 20:26 UTC: already the 29th in Auckland, so less of the mail is
+    // from today there.
+    expect(await day('Pacific/Auckland')).toBeLessThanOrEqual((await day('America/Los_Angeles'))!);
+  });
+
   it('refuses what the engine refuses', async () => {
     const bad = async (p: unknown) =>
       engine.call('query', p as QueryParams).then(
         () => null,
         (e: { code: number; data?: unknown }) => e,
       );
+    const old = new MockEngine({ latency: 0, now: NOW, features: ['query'] });
+    await old.connect();
     expect(
-      await bad({ class: 'Thread', search: { text: 'from:ann', grammar: true } }),
+      await old
+        .call('query', { class: 'Thread', search: { text: 'from:ann', grammar: true } })
+        .then(
+          () => null,
+          (e: { code: number; data?: unknown }) => e,
+        ),
     ).toMatchObject({ code: RpcErrorCode.InvalidParams, data: { unsupported: 'search-grammar' } });
     for (const p of [
+      { class: 'Contact', search: { text: 'ann', grammar: true } },
+      { class: 'Thread', search: { text: '(ann', grammar: true } },
+      { class: 'Thread', search: { text: '  ', grammar: false } },
       { class: 'Account' },
       { class: 'Thread', wher: [] },
       { class: 'Thread', where: { attr: 'snippet', op: '=', value: 'x' } },

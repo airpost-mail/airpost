@@ -1,5 +1,6 @@
-// The search bar grammar: free text plus `field:value` operators, as in the desktop's
-// SearchQueryParser (without its AND/OR/parentheses). Values with spaces are quoted.
+// The search bar's view of the query: free text plus `field:value` operators, for chips,
+// filters and suggestions. The engine parses the full grammar (AND/OR/NOT, parentheses)
+// itself when it has `search-grammar`; values with spaces are quoted.
 import {
   format,
   isValid,
@@ -165,14 +166,13 @@ export function inDateRange(unixSeconds: number, range: DateRange): boolean {
 }
 
 /**
- * The query string sent to the engine's `search` method. Date bounds are applied by the
- * client for now.
+ * The text for the engine's `search`. An engine with the search grammar takes the query as
+ * typed, dates included. An older one reads plain words, so it gets the words and the
+ * operators without the dates, which the client then applies (`dateRange`).
  */
-export function toEngineQuery(q: ParsedSearch): string {
-  // TODO(engine): `search` is plain text: ms-store quotes every term for FTS5, so from:,
-  // to:, subject:, in:, is: and has: are matched as literal words and before:/after: can't
-  // be expressed at all. Only the mock understands the operators sent here. The engine
-  // gets the desktop grammar with DCP stage 9.
+export function toEngineQuery(input: string, grammar: boolean): string {
+  if (grammar) return input.trim();
+  const q = parseSearchQuery(input);
   return serializeSearchQuery({
     terms: q.terms,
     tokens: q.tokens.filter((t) => t.field !== 'before' && t.field !== 'after'),

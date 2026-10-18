@@ -20,7 +20,11 @@ import { runQuery } from './query';
 import { MockStore } from './store';
 
 /** What the mock announces in `hello.features` unless told otherwise. */
-export const MOCK_FEATURES: readonly string[] = [EngineFeature.Query, EngineFeature.Files];
+export const MOCK_FEATURES: readonly string[] = [
+  EngineFeature.Query,
+  EngineFeature.SearchGrammar,
+  EngineFeature.Files,
+];
 
 export interface MockEngineOptions {
   /** `hello.features`; `[]` stands in for an engine without `query`. */
@@ -54,8 +58,12 @@ const READ_PARAMS: Partial<Record<RpcMethodName, readonly string[]>> = {
   'contacts.search': ['accountId', 'query', 'limit'],
 };
 
-function checkParams(method: RpcMethodName, params: unknown) {
-  const allowed = READ_PARAMS[method];
+/** `search` on an engine with `EngineFeature.SearchGrammar`: `accountId` is optional. */
+const GRAMMAR_SEARCH_PARAMS = ['accountId', 'accounts', 'query', 'limit', 'grammar', 'tz', 'now'];
+
+function checkParams(method: RpcMethodName, params: unknown, features: readonly string[]) {
+  const grammarSearch = method === 'search' && features.includes(EngineFeature.SearchGrammar);
+  const allowed = grammarSearch ? GRAMMAR_SEARCH_PARAMS : READ_PARAMS[method];
   if (!allowed) return;
   if (typeof params !== 'object' || params === null) {
     throw new RpcError({ code: RpcErrorCode.InvalidParams, message: 'invalid params' });
@@ -68,7 +76,12 @@ function checkParams(method: RpcMethodName, params: unknown) {
       });
     }
   }
-  if (typeof (params as { accountId?: unknown }).accountId !== 'string') {
+  const accountId = (params as { accountId?: unknown }).accountId;
+  if (
+    grammarSearch
+      ? accountId !== undefined && typeof accountId !== 'string'
+      : typeof accountId !== 'string'
+  ) {
     throw new RpcError({
       code: RpcErrorCode.InvalidParams,
       message: 'invalid params: missing field `accountId`',
@@ -150,7 +163,7 @@ export class MockEngine implements EngineClient {
         message: `unknown method ${method}`,
       });
     }
-    checkParams(method, args[0]);
+    checkParams(method, args[0], this.announced);
     // Results cross a (pretend) wire: never hand out references into the store.
     return structuredClone(handler(args[0]));
   }
@@ -419,14 +432,26 @@ export class MockEngine implements EngineClient {
         return s.getMessage(p);
       },
       search: (p) => {
-        this.requireAccount(p.accountId);
-        return s.search(p);
+        if (p.accountId !== undefined && p.accounts) {
+          throw new RpcError({
+            code: RpcErrorCode.InvalidParams,
+            message: 'invalid params: accountId and accounts exclude each other',
+          });
+        }
+        const accounts =
+          p.accountId !== undefined
+            ? [this.requireAccount(p.accountId)]
+            : (p.accounts ?? [...s.accounts.keys()]).map((a) => this.requireAccount(a));
+        return s.search(p, accounts);
       },
       'contacts.search': (p) => {
         this.requireAccount(p.accountId);
         return s.searchContacts(p);
       },
-      query: (p) => runQuery(s, p, (id) => this.requireAccount(id)),
+      query: (p) =>
+        runQuery(s, p, (id) => this.requireAccount(id), {
+          grammar: this.announced.includes(EngineFeature.SearchGrammar),
+        }),
       'account.add': (p) => {
         // TODO(engine): `account.add` from the web is DCP stages 11/12 with the admin scope.
         // The mock accepts the account but has no mail for it.

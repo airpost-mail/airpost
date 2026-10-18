@@ -4,7 +4,14 @@ import { EmptyState } from '@/components/EmptyState';
 import { MailPanes } from '@/components/MailPanes';
 import { ShortcutKeys } from '@/components/ShortcutKeys';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAccounts, useSearch, type AccountJSON, type ThreadJSON } from '@/engine';
+import {
+  isInvalidParams,
+  useAccounts,
+  useSearch,
+  useSearchGrammar,
+  type AccountJSON,
+  type ThreadJSON,
+} from '@/engine';
 import { ReaderEmpty, ThreadReaderView } from '@/features/mailbox';
 import { useShortcut } from '@/lib/shortcuts';
 import {
@@ -38,18 +45,20 @@ export function SearchView({
 }) {
   const navigate = useNavigate();
   const parsed = useMemo(() => parseSearchQuery(query), [query]);
-  const engineQuery = toEngineQuery(parsed);
-  const range = useMemo(() => dateRange(parsed), [parsed]);
+  const grammar = useSearchGrammar();
+  const engineQuery = toEngineQuery(query, grammar);
   const { data: accounts = [] } = useAccounts();
-  const search = useSearch(engineQuery ? { query: engineQuery, accountId } : null, {
+  const search = useSearch(engineQuery ? { query: engineQuery, accountId, grammar } : null, {
     limit: RESULT_LIMIT,
   });
 
-  const threads = useMemo(
-    () =>
-      engineQuery ? (search.data?.threads ?? []).filter((t) => inDateRange(t.lmt, range)) : [],
-    [engineQuery, search.data, range],
-  );
+  // An engine without the grammar can't read dates: they are applied here.
+  const range = useMemo(() => (grammar ? null : dateRange(parsed)), [grammar, parsed]);
+  const threads = useMemo(() => {
+    if (!engineQuery) return [];
+    const found = search.data?.threads ?? [];
+    return range ? found.filter((t) => inDateRange(t.lmt, range)) : found;
+  }, [engineQuery, search.data, range]);
 
   const setParsed = (next: ParsedSearch) =>
     void navigate({
@@ -222,11 +231,19 @@ function Results({
     );
   }
   if (!engineQuery) {
-    // TODO(engine): drop this once `search` takes before:/after: (DCP stage 9).
+    // Only an engine without the grammar, which gets no dates: nothing is left to send.
     return (
       <EmptyState
         title="Almost there"
         description="Dates narrow a search. Add a word or another filter to go with them."
+      />
+    );
+  }
+  if (isInvalidParams(error)) {
+    return (
+      <EmptyState
+        title="Can’t read that search"
+        description={error.message.replace(/^invalid params: (search: )?/, '')}
       />
     );
   }
