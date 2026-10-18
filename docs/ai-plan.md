@@ -389,3 +389,9 @@ named), a keyset read failure is `keyset`; `engine-unavailable` only when the en
 `ai.*`. The window's remembered summaries go when summaries are turned off, the account is opted
 out or removed, or `account.state` says `removed` (account.reset does that); resetDatabase
 relaunches the app.
+
+2026-10-18, AI3 gated and merged: fmt, clippy, workspace tests, `cargo deny`, release build
+of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (141 passed, 4
+skipped); desktop lint and typecheck clean, the ai package's specs (50) and the specs of the
+modules it touches (engine client and events, CapabilityStore, package manager, the other
+capability and engine-using packages) pass. No web changes. Open as above.
