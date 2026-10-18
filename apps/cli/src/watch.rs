@@ -351,9 +351,11 @@ mod tests {
                     email: format!("{account}@x.test"),
                     state: "running".into(),
                     error: None,
+                    ..Default::default()
                 }],
                 features: Vec::new(),
                 capabilities: None,
+                ..Default::default()
             },
             client: Client::from_streams(
                 Box::new(std::io::Cursor::new(input.into_bytes())),

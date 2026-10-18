@@ -414,10 +414,12 @@ mod tests {
                         email: (*email).into(),
                         state: "running".into(),
                         error: None,
+                        ..Default::default()
                     })
                     .collect(),
                 features: features.iter().map(|f| (*f).to_owned()).collect(),
                 capabilities: None,
+                ..Default::default()
             },
             client: Client::from_streams(
                 Box::new(std::io::Cursor::new(input.as_bytes().to_vec())),

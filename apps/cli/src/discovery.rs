@@ -149,10 +149,12 @@ mod tests {
                         email: (*email).into(),
                         state: "running".into(),
                         error: None,
+                        ..Default::default()
                     })
                     .collect(),
                 features: Vec::new(),
                 capabilities: None,
+                ..Default::default()
             },
             client: Client::from_streams(Box::new(std::io::empty()), Box::new(std::io::sink())),
         }
@@ -189,6 +191,7 @@ mod tests {
             email: "Me@Example.test".into(),
             state: "running".into(),
             error: None,
+            ..Default::default()
         };
         assert!(matches(&a, "abc"));
         assert!(matches(&a, "me@example.test"));

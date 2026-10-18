@@ -32,7 +32,7 @@ pub struct RelayDevice {
     pub name: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct HelloResult {
     pub protocol: u32,
     /// The engine's version.
@@ -48,9 +48,34 @@ pub struct HelloResult {
     /// `capabilities.changed` carries later values.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<crate::Capabilities>,
+    /// The binary's identity ([`feature::ACCOUNTS`](crate::feature::ACCOUNTS)): `sha256:`
+    /// and the hex SHA-256 of the executable the engine was started from, so a client can
+    /// tell an engine from another build from the one it bundles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
+    /// `serve --detached`: no parent channel; the parent methods are taken on the socket.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub detached: bool,
+    /// The secret store and how many accounts are registered ([`feature::ACCOUNTS`](crate::feature::ACCOUNTS)).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credentials: Option<CredentialsStatus>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// `hello.credentials` and `engine.status.credentials`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CredentialsStatus {
+    /// `keychain`, `secret-service` or `file`; absent when no store can be used, and then
+    /// `error` says why.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store: Option<String>,
+    /// The accounts in `accounts.json`.
+    pub accounts: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
     pub account_id: String,
@@ -60,6 +85,12 @@ pub struct AccountInfo {
     /// The `SyncError` JSON that stopped the account, when `state` is `stopped`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
+    /// As in [`AccountStateParams::retry_at`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_at: Option<i64>,
+    /// As in [`AccountStateParams::auth_failed`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub auth_failed: bool,
 }
 
 /// `null` (or absent) means every account, or every model class.
@@ -114,7 +145,7 @@ pub struct CalendarSyncResult {
     pub started: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineStatusResult {
     pub protocol: u32,
@@ -129,9 +160,18 @@ pub struct EngineStatusResult {
     /// As in [`HelloResult::capabilities`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<crate::Capabilities>,
+    /// As in [`HelloResult::build`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
+    /// As in [`HelloResult::detached`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub detached: bool,
+    /// As in [`HelloResult::credentials`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credentials: Option<CredentialsStatus>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStatus {
     pub account_id: String,
@@ -142,8 +182,15 @@ pub struct AccountStatus {
     /// The `SyncError` JSON that stopped the account, when `state` is `stopped`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
-    /// The account's settings without credentials, from
-    /// [`public_account_json`](crate::policy::public_account_json). `account.list` only.
+    /// As in [`AccountStateParams::retry_at`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_at: Option<i64>,
+    /// As in [`AccountStateParams::auth_failed`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub auth_failed: bool,
+    /// The account JSON without its secrets: on a local connection everything but the
+    /// passwords and refresh token; on a relayed one only the fields
+    /// [`public_account_json`](crate::policy::public_account_json) lists.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account: Option<Value>,
 }
@@ -175,6 +222,62 @@ pub struct AccountAddResult {
     pub state: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
+    /// The account and its secrets are in the engine's registry and secret store, so the
+    /// client need not keep them ([`feature::ACCOUNTS`](crate::feature::ACCOUNTS)). False
+    /// when no secret store could take them: the engine runs the account until it exits.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub stored: bool,
+}
+
+/// `account.remove` params.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountRemoveParams {
+    pub account_id: String,
+}
+
+/// `credentials.import` params: accounts and secrets a client stored until now. An
+/// account's secrets come from its own `settings` (`imap_password`, `smtp_password`,
+/// `refresh_token`), else from `secrets` under the client's email-keyed names
+/// (`<email>-imap`, `<email>-smtp`, `<email>-refresh-token`), which go to every account with
+/// that email. `integration-<provider>-key` and `tern-server-token` in `secrets` are stored
+/// as `integration:<provider>` and `tern-server-token`; other names are ignored.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct CredentialsImportParams {
+    #[serde(default)]
+    pub accounts: Vec<Value>,
+    #[serde(default)]
+    pub secrets: std::collections::BTreeMap<String, String>,
+}
+
+/// `credentials.import` result. The imported accounts are registered, not started: the
+/// client adds them (`account.add` without secrets) as it would have.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CredentialsImportResult {
+    pub imported: Vec<String>,
+    pub failed: Vec<ImportFailure>,
+    /// The secret names stored besides the accounts' (`integration:deepl`, ...).
+    #[serde(default)]
+    pub secrets: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportFailure {
+    /// Empty when the JSON had none.
+    pub account_id: String,
+    pub email: String,
+    pub error: String,
+}
+
+/// `account.changed` params.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountChangedParams {
+    pub account_id: String,
+    /// As [`AccountStatus::account`].
+    pub account: Value,
 }
 
 /// `account.remove` result.
@@ -281,7 +384,7 @@ pub struct LogsTailResult {
 }
 
 /// `account.state` notification params.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStateParams {
     pub account_id: String,
@@ -290,6 +393,14 @@ pub struct AccountStateParams {
     /// The `SyncError` JSON, with `stopped`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<Value>,
+    /// With `stopped`: when the engine starts the account again (Unix milliseconds). Absent
+    /// once it gave up (too many failures in a row) or the credentials were refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_at: Option<i64>,
+    /// With `stopped`: the server refused the credentials. The engine doesn't retry; new
+    /// credentials (`account.add`) do.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub auth_failed: bool,
 }
 
 /// The result of methods that return nothing: `{}`.
@@ -393,7 +504,9 @@ mod tests {
                 connection_error: false,
                 error: None,
                 account: None,
+                ..Default::default()
             }],
+            ..Default::default()
         };
         let v = serde_json::to_value(&s).unwrap();
         assert_eq!(v["uptimeSecs"], 3);
@@ -408,6 +521,7 @@ mod tests {
             account_id: "a".into(),
             state: crate::account_state::STOPPED.into(),
             error: Some(json!({"key": "x"})),
+            ..Default::default()
         };
         assert_eq!(
             serde_json::to_value(&n).unwrap(),

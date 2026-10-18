@@ -66,7 +66,8 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::ACCOUNT_RESET
         | method::ENGINE_RESET_DATABASE
         | method::ENGINE_SET_LOG_LEVEL
-        | method::ENGINE_SHUTDOWN => MethodClass::ParentOnly,
+        | method::ENGINE_SHUTDOWN
+        | method::CREDENTIALS_IMPORT => MethodClass::ParentOnly,
         method::TEST_CRASH | method::TEST_PANIC => MethodClass::Debug,
         // Paths on the engine's machine; browsers use the gateway's file routes.
         method::FILES_GET | method::FILES_READ | method::FILES_PUT => MethodClass::LocalOnly,

@@ -103,14 +103,24 @@ pub mod method {
     pub const MESSAGES_UNSUBSCRIBE: &str = "messages.unsubscribe";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
-    /// `serve` mode, the parent's stdin only: start syncing an account.
+    /// `serve` mode, the parent's stdin only (the socket too on a `--detached` engine):
+    /// register an account, store its secrets and start syncing it.
     pub const ACCOUNT_ADD: &str = "account.add";
-    /// `serve` mode, the parent's stdin only: stop an account and forget it. Its database
-    /// rows stay.
+    /// `serve` mode, the parent's stdin only (the socket too on a `--detached` engine): stop
+    /// an account; with `forget`, also drop it from the registry and delete its secrets.
+    /// Its database rows stay.
     pub const ACCOUNT_REMOVE: &str = "account.remove";
-    /// `serve` mode, the parent's stdin only: stop every account, remove the socket files
-    /// and exit 0.
+    /// `serve` mode, the parent's stdin only (the socket too on a `--detached` engine): stop
+    /// every account, remove the socket files and exit 0.
     pub const ENGINE_SHUTDOWN: &str = "engine.shutdown";
+    /// `serve` mode, the parent's stdin only: register accounts and store secrets a client
+    /// held until now (docs/desktop-client-plan.md section 5), params
+    /// [`CredentialsImportParams`](crate::CredentialsImportParams).
+    pub const CREDENTIALS_IMPORT: &str = "credentials.import";
+    /// Notification: an account's registered JSON changed, `params` =
+    /// [`AccountChangedParams`](crate::AccountChangedParams). Filtered by account, never held
+    /// for a later subscriber: a client calls `account.list` after `subscribe`.
+    pub const ACCOUNT_CHANGED: &str = "account.changed";
     /// `serve` mode, the parent's stdin only: check an account's IMAP and SMTP settings,
     /// as `--mode test` does. The result is that mode's JSON object, with any rotated
     /// refresh token in its `account`.
@@ -242,6 +252,12 @@ pub mod feature {
     pub const CAPABILITIES: &str = "capabilities";
     /// The `ai.*` methods but triage, `ai.delta`, and `capabilities.ai`.
     pub const AI: &str = "ai";
+    /// The engine owns the accounts (docs/desktop-client-plan.md 3.6): the registry
+    /// (`accounts.json`) and secret store behind `account.add` and `account.remove
+    /// {forget}`, accounts started at launch, rotated tokens stored instead of sent,
+    /// the restart policy (`retryAt`, `authFailed`), `credentials.import`,
+    /// `account.changed`, and `credentials`, `build` and `detached` in `hello`.
+    pub const ACCOUNTS: &str = "accounts";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
