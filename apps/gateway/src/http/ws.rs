@@ -9,9 +9,14 @@
 //! `hello` for the device. After that each browser frame is parsed, checked against ms-ipc's
 //! `policy` and re-encoded before it is written to the engine: the engine frames by newline,
 //! and valid JSON may hold raw newlines between tokens, so the browser's bytes are never
-//! forwarded as they are. Engine lines go to the browser unchanged. A slow browser stops
-//! the engine reads (each send is awaited), so the engine's own slow-subscriber drop
-//! applies and the gateway buffers no more than the WebSocket's write buffer.
+//! forwarded as they are. Engine lines go to the browser unchanged and in order, with no
+//! notification filter of the gateway's own: what the engine sends one connection only
+//! (`ai.delta`, `ai.triage.progress`) reaches this WebSocket alone, and the frame limit
+//! counts browser frames only, so a burst of them can't trip it. The engine connection
+//! ends with the relay, which is how the engine cancels what a closed tab started
+//! (docs/ai-plan.md A7). A slow browser stops the engine reads (each send is awaited), so
+//! the engine's own slow-subscriber drop applies and the gateway buffers no more than the
+//! WebSocket's write buffer.
 
 use std::num::NonZeroU32;
 use std::time::Duration;
