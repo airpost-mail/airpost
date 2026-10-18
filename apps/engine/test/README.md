@@ -132,6 +132,11 @@ binaries come from `TERN_BIN`, `TERN_MCP_BIN` and `TERN_GATEWAY_BIN`, else the n
 `target/release/` and `target/debug/`; without one the module skips, unless `CI` or
 `REQUIRE_TERN` (`REQUIRE_TERN_MCP` for tern-mcp) is set.
 
+`test_ai.py` runs AI triage on a `serve` engine with `harness/servers/ai.py`, a fake Ollama,
+as the provider in the engine's `core.ai.*` settings: `ai_triage_new_mail`,
+`ai_triage_rate_limit_pause` (429 with Retry-After), and `tern ai` when a `tern` binary is
+built.
+
 ### Several accounts
 
 A scenario can hold more accounts than its own (`multi-account-*`). They share its config

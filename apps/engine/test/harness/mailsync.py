@@ -333,6 +333,7 @@ class ServeEngine:
         self._route_lock = threading.RLock()
         self.errors: list = []         # engine-wide transport problems; every handle reports them
         self.stdout_noise: list = []
+        self.capabilities: list = []   # capabilities.changed params, in order
         self._t0 = 0.0
         self._threads: list = []
         self._stdin_lock = threading.Lock()
@@ -541,6 +542,9 @@ class ServeEngine:
             leaked = sorted(k for k in SECRET_SETTINGS if k in settings)
             if leaked:
                 self._error(f"account.changed carries {', '.join(leaked)}")
+        elif method == "capabilities.changed":
+            # Engine-wide: an AI provider's pause, a settings change (docs/ai-plan.md 5).
+            self.capabilities.append(params)
         elif method == "disconnect":
             self._error(f"engine sent disconnect: {params}")
         elif "id" in msg:
