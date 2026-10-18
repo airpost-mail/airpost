@@ -437,9 +437,10 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
 
 ### 3.4 Settings and rules
 
-- **`settings.get {keys?}`** → `{values}`, **`settings.set {values}`**, notification
+- **`settings.get {keys?}`** → `{values, storeId?}`, **`settings.set {values}`**, notification
   **`settings.changed {values}`**. Stored by the engine at `<config>/settings.json`, written
-  atomically. Keys: `core.sending.undoSend`, `core.sending.defaultAccountIdForSend`,
+  atomically. `storeId` is new whenever the engine starts the store from nothing (no file, or
+  a corrupt one set aside), so a client that copied its values in once copies them again. Keys: `core.sending.undoSend`, `core.sending.defaultAccountIdForSend`,
   `core.notifications.unsnoozeToTop`, `core.composing.html`, `signatures`,
   `defaultSignatures`, `templates`, `mailRules`, `mailRulesAutoSince`,
   `resurfacing.snoozeBody`, `resurfacing.reminderBody`. ~400 Rust. D C M W. On the desktop
@@ -1238,34 +1239,56 @@ an unknown key or a wrong kind is refused with nothing stored. `settings.changed
 subscribed connection whatever its filter, except the one that made the change; the parent's
 changes reach everyone; nothing is held for a later subscriber. Each connection gets its
 `settings.*` answers and other connections' notifications in the order the store applied them
-(the answer is queued under the store's lock). Both methods are open to relayed connections.
+(the answer is queued under the store's lock). `settings.get` also returns `storeId`, a random
+id kept in the file as `$storeId` and made anew when the store starts without one (no file, or a
+corrupt one moved to `settings.json.bad`); a file that exists but can't be read (or can't be
+moved aside) makes `settings.get` as well as `settings.set` fail with INTERNAL_ERROR. Relayed
+connections may call both, but without the admin scope `settings.set` takes only the keys in
+`ms_ipc::policy::RELAYED_SETTINGS_KEYS` (the undo-send delay, default sender, unsnooze-to-top,
+HTML composing, default signatures), checked by the engine with `relayed_request_allowed`.
 `tern settings get [key…]` and `tern settings set <key> <json|text>`. tern-mcp takes the default
 sending account from `settings.get` when an engine keeps settings (unset there means none), else
 from `config.json`. Desktop: `src/browser/engine-settings.ts` mirrors the six keys the desktop
 holds today (`core.sending.undoSend`, `core.sending.defaultAccountIdForSend`,
 `core.notifications.unsnoozeToTop`, `core.composing.html`, `signatures`, `defaultSignatures`)
-over the supervisor's connection: one-time push of config.json's values (flag
-`engineSettingsPushed` in config.json), then pending local writes, then `settings.get` with the
-engine winning; local writes go to `settings.set` one key at a time; `settings.changed` is
+over the supervisor's connection: `settings.get` first; a store whose `storeId` differs from
+`engineSettingsStore` in config.json gets config.json's values copied in (one set per key), and
+the id is saved once every copy is answered; a key whose copy the engine refused is listed in
+`engineSettingsKept` and kept in config.json until the engine has a value; then pending local
+writes, and the engine wins for the rest; a failing `settings.get` leaves config.json alone; local writes go to `settings.set` one key at a time; `settings.changed` is
 applied to config.json and every window; config.json keeps every key. Launch waits up to 3 s for
 the first sync before opening windows. TD35's stage-3 part: Config's initial read and writes use
 `ConfigChannel` (`sendSync`) instead of `@electron/remote`; `.eslintrc` bans `@electron/remote`
 imports and requires outside a 56-file allowlist. Tests: `settings.rs` unit tests, the serve
 round trip and notification test, the CLI harness test (serve: get/set/clear, socket: refused),
 tern-mcp's default-account test, `engine-settings-spec.ts` against the fake serve engine
-(push once then engine wins, a window's synchronous boot read, forwarding and notifications, a
+(push once then engine wins, a new empty store with a new id gets config.json again, a
+failing `settings.get` keeps config.json, a refused copy kept across launches, a window's
+synchronous boot read, forwarding and notifications, a
 local write kept over an earlier notification, an engine without `settings` left on
-config.json); full desktop suite passes.
+config.json), `preferences-signatures-spec` (the preview is sanitized), the serve test of a
+relayed device refused `signatures` but allowed `core.sending.undoSend`, and the policy unit
+test; full desktop suite passes. Review fixes: the signature preview in Preferences renders
+through `SanitizeTransformer` (the composer already sanitized uneditable blocks); `tern
+settings get --json` prints `{values}` only. The review fixes were checked with the affected
+specs and harness tests; the full desktop suite reruns at the gate.
 Decisions taken, to confirm: `templates` is an array and the desktop doesn't mirror it (its
 templates are files in `<config>/templates`); `mailRules`/`mailRulesAutoSince` wait for stage 14
 and `resurfacing.*` for stage 4; settings live in `serve` only (no store in per-account `sync`);
-the first push wins over values already in the engine, after that the engine wins, so a lost or
-corrupt `settings.json` (moved to `settings.json.bad`) clears those keys in the desktop too;
-settings methods are open to relayed devices. Deviation: the C++ engine is gone (stage 10), so
+config.json's values win when they are copied into a store, after that the engine wins; a lost
+or corrupt `settings.json` gives a new store id, so the desktop copies its values again instead
+of clearing them (other clients' values in the lost file stay in `settings.json.bad`); relayed
+devices without the admin scope can't set `signatures`, `templates`, `mailRules`,
+`mailRulesAutoSince` or `resurfacing.*` (HTML the desktop renders with Node, or rules acting on
+mail), while `settings.get` stays open. Deviation: the C++ engine is gone (stage 10), so
 "a C++ engine run still sees the keys" is covered by the spec of an engine without `settings`
 and by config.json being written in every case. Open: aliases and auto-cc in tern-mcp still come
 from config.json (accounts are engine-owned from stage 11); writes made while the engine is down
 are pushed on its next start only within the same app run; tern-web: the web client's
-signatures in browser storage should move to `settings` (not ours). Trial pending: change the
+signatures in browser storage should move to `settings` (not ours), which for a device without
+the admin scope needs the web's signature HTML treated as untrusted first and `signatures`
+added to `RELAYED_SETTINGS_KEYS`; `apps/gateway/src/http/ws.rs` should switch to
+`policy::relayed_request_allowed` so it refuses those `settings.set` calls itself (the engine
+refuses them today). Trial pending: change the
 undo-send delay in Preferences and see it in `tern settings get`; change it with
 `tern settings set core.sending.undoSend 15000` and see the composer pick it up.
