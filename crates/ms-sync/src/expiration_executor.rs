@@ -535,8 +535,8 @@ pub fn finalise_draft(
     if from.is_empty() {
         return Err("This draft has no From address.".into());
     }
-    if !account_addresses(account)
-        .iter()
+    if !account
+        .own_addresses()
         .any(|a| a.eq_ignore_ascii_case(&from))
     {
         return Err(format!(
@@ -583,21 +583,6 @@ fn kept_files(draft: &Message, body: &str) -> Vec<Value> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-/// The account's address and its aliases' (`"Name <email>"` or a bare address).
-fn account_addresses(account: &Account) -> Vec<String> {
-    let mut out = vec![account.email_address().trim().to_owned()];
-    if let Some(aliases) = account.as_json().get("aliases").and_then(Value::as_array) {
-        for alias in aliases.iter().filter_map(Value::as_str) {
-            let email = match (alias.rfind('<'), alias.rfind('>')) {
-                (Some(lo), Some(hi)) if lo < hi => &alias[lo + 1..hi],
-                _ => alias,
-            };
-            out.push(email.trim().to_owned());
-        }
-    }
-    out
 }
 
 fn has_role(categories: &Value, role: &str) -> bool {

@@ -181,6 +181,20 @@ impl Account {
         self.str_at("emailAddress")
     }
 
+    /// The account's address and its aliases' (`Name <email>` or a bare address), trimmed.
+    pub fn own_addresses(&self) -> impl Iterator<Item = &str> {
+        let aliases = self.data["aliases"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(|a| match (a.rfind('<'), a.rfind('>')) {
+                (Some(l), Some(r)) if l < r => a[l + 1..r].trim(),
+                _ => a.trim(),
+            });
+        std::iter::once(self.email_address().trim()).chain(aliases)
+    }
+
     /// Seconds the background worker waits before its first pass, staggered by the first
     /// character of the id so many accounts do not open the database at once. Ids starting
     /// with c-f (the harness uses `c0ffee-harness`) start immediately.

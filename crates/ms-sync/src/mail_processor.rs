@@ -278,24 +278,15 @@ impl<'a> MailProcessor<'a> {
             return Ok(false);
         }
         let from = msg.from()[0]["email"].as_str().unwrap_or("");
-        if !from.is_empty() && self.own_addresses().any(|a| a.eq_ignore_ascii_case(from)) {
+        if !from.is_empty()
+            && self
+                .account
+                .own_addresses()
+                .any(|a| a.eq_ignore_ascii_case(from))
+        {
             return Ok(false);
         }
         msg.is_in_inbox(s)
-    }
-
-    /// The account's address and its aliases (`Name <email>` or a bare address).
-    fn own_addresses(&self) -> impl Iterator<Item = &str> {
-        let aliases = self.account.as_json()["aliases"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .map(|a| match (a.rfind('<'), a.rfind('>')) {
-                (Some(l), Some(r)) if l < r => a[l + 1..r].trim(),
-                _ => a.trim(),
-            });
-        std::iter::once(self.account.email_address()).chain(aliases)
     }
 
     /// Records the copy at (folder, uid) on a message that already exists and returns the
