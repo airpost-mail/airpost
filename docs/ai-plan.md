@@ -1,10 +1,10 @@
 # AI providers: summaries, reply suggestions, triage
 
-Draft, 2026-10-18 (tern-ai). Bring-your-own-key cloud models and local models through Ollama,
-used for thread summaries, reply suggestions and inbox triage. Nothing implemented yet; the
-questions in section 10 are open. Desktop paths are relative to `apps/desktop/app/`.
+2026-10-18 (tern-ai). Bring-your-own-key cloud models and local models through Ollama,
+used for thread summaries, reply suggestions and inbox triage. Section 10's recommendations
+were agreed with the user on 2026-10-18. Desktop paths are relative to `apps/desktop/app/`.
 
-## 0. Decisions (proposed)
+## 0. Decisions
 
 | # | Decision |
 |---|---|
@@ -224,7 +224,7 @@ What other sessions need to know (shapes from their plans, not built here):
 - tern-web: relay `ai.delta` and `ai.triage.progress` to the device that started them;
   stage 7's allowlist doesn't need triage, since `ai.triage.list` covers the view.
 
-## 10. Questions
+## 10. Questions (answered 2026-10-18: all recommendations taken)
 
 1. **One provider, or one per feature?** Recommend: a list of configured providers and a
    choice per feature, so triage can run on Ollama while replies use a cloud model.
@@ -237,11 +237,13 @@ What other sessions need to know (shapes from their plans, not built here):
    version.
 5. **Preferences placement.** Recommend a new "AI" tab, leaving MCP's "AI assistants" in
    Integrations where you put it.
-6. **Web stage AI5.** Recommend tern-ai builds it in `apps/web/src/features/ai` after tern-web
-   lands the relay of the two notifications, as long as tern-web agrees.
+6. **Web stage AI5.** tern-ai builds it in `apps/web/src/features/ai`, only after tern-web's
+   notification relay is on main, and changes nothing else in `apps/web` beyond the minimal
+   wiring (route, settings entry, engine method types).
 7. **Persisting summaries.** Recommend memory only for now; persist later if regenerating
    costs too much.
 
 ## Status
 
-2026-10-18: draft written, waiting for answers to section 10.
+2026-10-18: draft written; the user took all of section 10's recommendations (6 as amended
+there). Stages run as one background workflow.
