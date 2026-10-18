@@ -265,6 +265,10 @@ export type {
   AiCompletion,
   AiSuggestion,
   AiDeltaParams,
+  AiTriageRunResult,
+  AiTriageProgressParams,
+  AiTriageListResult,
+  AiUsageRow,
 } from '../engine-protocol';
 export type AI = typeof import('../ai').default;
 export const AI: AI;

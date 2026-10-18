@@ -47,6 +47,13 @@ export const ENGINE_SETTINGS_KEYS = [
   'core.integrations.translation',
   'core.integrations.grammar',
   'core.integrations.enrichment',
+  // The AI providers (without keys), switches and opted-in accounts (src/ai.ts); background
+  // triage reads them from the engine's store. `core.ai.limits` has no UI yet.
+  'core.ai.providers',
+  'core.ai.features',
+  'core.ai.accounts',
+  'core.ai.includeAddresses',
+  'core.ai.limits',
 ];
 
 // Mirrored only with an engine whose hello lists the feature.
@@ -54,6 +61,11 @@ const KEY_FEATURES: { [key: string]: string } = {
   'core.integrations.translation': Feature.Integrations,
   'core.integrations.grammar': Feature.Integrations,
   'core.integrations.enrichment': Feature.Integrations,
+  'core.ai.providers': Feature.AiTriage,
+  'core.ai.features': Feature.AiTriage,
+  'core.ai.accounts': Feature.AiTriage,
+  'core.ai.includeAddresses': Feature.AiTriage,
+  'core.ai.limits': Feature.AiTriage,
 };
 
 // The keys a store named in STORE_KEY got when COPIED_KEY didn't exist yet (before stage 5).

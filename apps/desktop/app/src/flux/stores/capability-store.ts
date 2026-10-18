@@ -38,6 +38,7 @@ export type CapabilityFeature =
   | 'contact-enrichment'
   | 'ai-summary'
   | 'ai-reply'
+  | 'ai-triage'
   | 'read-receipts'
   | 'link-tracking'
   | 'thread-sharing'
@@ -65,6 +66,7 @@ const INTEGRATION: { [feature: string]: IntegrationKind } = {
 const AI_FEATURE: { [feature: string]: AiFeature } = {
   'ai-summary': 'summary',
   'ai-reply': 'reply',
+  'ai-triage': 'triage',
 };
 const SERVER: CapabilityFeature[] = [
   'read-receipts',
@@ -103,6 +105,8 @@ function featureLabel(feature: CapabilityFeature) {
       return localized('Summaries');
     case 'ai-reply':
       return localized('Reply suggestions');
+    case 'ai-triage':
+      return localized('Inbox triage');
     case 'read-receipts':
       return localized('Open tracking');
     case 'link-tracking':
@@ -253,7 +257,8 @@ export class CapabilityStoreClass extends MailspringStore {
         localized('Add your %@ API key in Preferences > AI', AI.providerName(provider))
       );
     }
-    if (!this.engineEvents.has(Feature.Ai)) {
+    // Triage runs in the engine's own worker, which needs the triage methods and settings keys.
+    if (!this.engineEvents.has(feature === 'triage' ? Feature.AiTriage : Feature.Ai)) {
       return unavailable(localized('Waiting for engine support'));
     }
     return { available: true, source: 'ai', ...where };
@@ -329,6 +334,14 @@ function aiEngineReason(capability: EngineCapability) {
       return localized('Set up a model in Preferences > AI');
     case 'not-enabled':
       return localized('Turn on AI for this account');
+    case CapabilityReason.NeedsEngineKey:
+      return localized(
+        'Background triage needs a model without an API key, such as Ollama, for now'
+      );
+    case CapabilityReason.RateLimited:
+      return localized('The model provider is limiting requests; triage goes on by itself');
+    case CapabilityReason.QuotaExceeded:
+      return localized('The token quota or the daily limit is used up; triage goes on later');
     default:
       return localized('Not available from the sync engine');
   }

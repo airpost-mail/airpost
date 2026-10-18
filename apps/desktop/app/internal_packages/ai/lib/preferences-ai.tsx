@@ -13,8 +13,10 @@ import {
   AiProvider,
   AiProviderKind,
   AiSettings,
+  Engine,
 } from 'mailspring-exports';
-import { destinationNote, errorMessage, listModels, testProvider } from './ai-client';
+import { destinationNote, errorMessage, isCancelled, listModels, testProvider } from './ai-client';
+import { TRIAGE_ENGINE_FEATURE, TriageRun, triageInbox } from './triage';
 
 // Preferences > AI (docs/ai-plan.md section 7). Settings go to config under core.ai; API keys only
 // to the keyset as integration-ai-<id>-key, and are never shown again once saved.
@@ -24,10 +26,11 @@ const KIND_ORDER: AiProviderKind[] = ['anthropic', 'openai', 'ollama'];
 const FEATURES: {
   feature: AiFeature;
   label: () => string;
-  capability: 'ai-summary' | 'ai-reply';
+  capability: 'ai-summary' | 'ai-reply' | 'ai-triage';
 }[] = [
   { feature: 'summary', label: () => localized('Thread summaries'), capability: 'ai-summary' },
   { feature: 'reply', label: () => localized('Reply suggestions'), capability: 'ai-reply' },
+  { feature: 'triage', label: () => localized('Inbox triage'), capability: 'ai-triage' },
 ];
 
 function urlPlaceholder(kind: AiProviderKind) {
@@ -348,8 +351,17 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
   }
 }
 
+interface TriageProgress {
+  done: number;
+  total: number;
+  running: boolean;
+  error?: string;
+}
+
 interface State {
   settings: AiSettings;
+  /** "Triage inbox" by account id. */
+  triage: { [accountId: string]: TriageProgress };
 }
 
 export default class PreferencesAI extends React.Component<Record<string, unknown>, State> {
@@ -357,7 +369,9 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
 
   _unlisten: Array<() => void> = [];
 
-  state: State = { settings: AI.readSettings() };
+  state: State = { settings: AI.readSettings(), triage: {} };
+
+  _runs = new Map<string, TriageRun>();
 
   componentDidMount() {
     const config = AppEnv.config.onDidChange(AI.CONFIG_KEY, () =>
@@ -372,7 +386,54 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
 
   componentWillUnmount() {
     for (const unlisten of this._unlisten) unlisten();
+    // A job runs on in the engine; only its progress stops showing.
+    this._runs.clear();
   }
+
+  _setTriage(accountId: string, next: (current: TriageProgress) => TriageProgress) {
+    if (!this._runs.has(accountId)) return;
+    this.setState(({ triage }) => ({
+      triage: {
+        ...triage,
+        [accountId]: next(triage[accountId] || { done: 0, total: 0, running: true }),
+      },
+    }));
+  }
+
+  _onTriageInbox = (accountId: string) => {
+    const run = triageInbox(accountId, (done, total) =>
+      this._setTriage(accountId, () => ({ done, total, running: done < total }))
+    );
+    this._runs.set(accountId, run);
+    this._setTriage(accountId, () => ({ done: 0, total: 0, running: true }));
+    run.started.then(
+      ({ queued }) =>
+        this._setTriage(accountId, (p) => ({
+          ...p,
+          total: queued,
+          running: p.running && queued > 0,
+        })),
+      () => {}
+    );
+    const end = (error?: string) => {
+      this._setTriage(accountId, (p) => ({
+        ...p,
+        done: error === undefined ? p.total : p.done,
+        running: false,
+        error,
+      }));
+      this._runs.delete(accountId);
+    };
+    run.finished.then(
+      () => end(),
+      (err) => end(isCancelled(err) ? '' : errorMessage(err))
+    );
+  };
+
+  _onStopTriage = (accountId: string) => {
+    const run = this._runs.get(accountId);
+    if (run) run.cancel();
+  };
 
   _save(settings: AiSettings) {
     AI.writeSettings(settings);
@@ -525,6 +586,52 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
     );
   }
 
+  _renderTriage() {
+    const { settings, triage } = this.state;
+    if (!settings.features.triage.enabled || !Engine.has(TRIAGE_ENGINE_FEATURE)) return null;
+    const accounts = AccountStore.accounts().filter((a) => settings.accounts.includes(a.id));
+    return (
+      <section className="ai-section ai-triage">
+        <h6>{localized('Triage')}</h6>
+        <p>
+          {localized(
+            'New mail in the inbox of the accounts below is sorted as it arrives. Threads that need a reply or look important get a chip in the list; click it to change the category.'
+          )}
+        </p>
+        {accounts.map((account) => {
+          const progress = triage[account.id];
+          return (
+            <div key={account.id} className="item ai-field ai-triage-account">
+              <label>{account.emailAddress}</label>
+              {progress && progress.running ? (
+                <button className="btn" onClick={() => this._onStopTriage(account.id)}>
+                  {localized('Stop')}
+                </button>
+              ) : (
+                <button className="btn" onClick={() => this._onTriageInbox(account.id)}>
+                  {localized('Triage inbox')}
+                </button>
+              )}
+              {progress && (
+                <span className="ai-triage-progress">
+                  {progress.error ||
+                    (progress.running
+                      ? localized('%1$@ of %2$@', `${progress.done}`, `${progress.total}`)
+                      : localized('%@ threads triaged', `${progress.done}`))}
+                </span>
+              )}
+            </div>
+          );
+        })}
+        <p className="ai-hint">
+          {localized(
+            'Triage inbox sorts the inbox threads of the last 7 days. Your own changes are kept.'
+          )}
+        </p>
+      </section>
+    );
+  }
+
   _renderAccounts() {
     const { settings } = this.state;
     const accounts = AccountStore.accounts();
@@ -592,11 +699,20 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
               <td>{localized('The same, plus what you ask for and your name')}</td>
               <td>{localized('When you click Get Suggestions or Write, or pick a suggestion')}</td>
             </tr>
+            <tr>
+              <td>{localized('Inbox triage')}</td>
+              <td>
+                {localized(
+                  "The subject, sender names and the plain text of the thread's newest message you received"
+                )}
+              </td>
+              <td>{localized('When new mail arrives in the inbox, or you click Triage inbox')}</td>
+            </tr>
           </tbody>
         </table>
         <p className="ai-hint">
           {localized(
-            'Mail goes from this computer to the model you chose, and nowhere else. Attachments are never sent, only their file names. Spam, Trash, drafts and encrypted messages are always left out. Summaries are kept in memory only.'
+            'Mail goes from this computer to the model you chose, and nowhere else. Attachments are never sent, only their file names. Spam, Trash, drafts and encrypted messages are always left out. Summaries are kept in memory only, and triage results on this computer only.'
           )}
         </p>
       </section>
@@ -608,12 +724,13 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
       <div className="container-ai">
         <p className="ai-intro">
           {localized(
-            'Tern can summarize threads and suggest replies with a model you choose. Nothing is sent until you turn on a feature and an account. API keys are stored encrypted, like your account passwords.'
+            'Tern can summarize threads, suggest replies and sort new mail with a model you choose. Nothing is sent until you turn on a feature and an account. API keys are stored encrypted, like your account passwords.'
           )}
         </p>
         {this._renderProviders()}
         {this._renderFeatures()}
         {this._renderAccounts()}
+        {this._renderTriage()}
         {this._renderPrivacy()}
       </div>
     );

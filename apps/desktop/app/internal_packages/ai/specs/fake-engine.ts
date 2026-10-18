@@ -17,9 +17,12 @@ type Answer = (params: any, emitDelta: (text: string) => void) => unknown | Prom
  * Engine.request mocked: `answers` by method; each streamed answer can send `ai.delta`
  * notifications for the call's streamId before it resolves, as the engine does.
  */
-export function fakeEngine(answers: { [method: string]: Answer }, { hasAi = true } = {}) {
+export function fakeEngine(
+  answers: { [method: string]: Answer },
+  { hasAi = true, features = ['ai'] }: { hasAi?: boolean; features?: string[] } = {}
+) {
   const sent: Sent[] = [];
-  spyOn(Engine, 'has').andCallFake((feature: string) => hasAi && feature === 'ai');
+  spyOn(Engine, 'has').andCallFake((feature: string) => hasAi && features.includes(feature));
   spyOn(Engine, 'request').andCallFake(async (method: string, params: any) => {
     sent.push({ method, params });
     const answer = answers[method];

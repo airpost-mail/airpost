@@ -8,5 +8,7 @@
  * document, which is in a cross-origin frame now.
  *
  * 1.28.0: `AI` (src/ai.ts), the AI settings, and the `ai-summary` and `ai-reply` capabilities.
+ *
+ * 1.29.0: the `ai-triage` capability and the `ai.triage.*` types.
  */
-export const PLUGIN_API_VERSION = '1.28.0';
+export const PLUGIN_API_VERSION = '1.29.0';

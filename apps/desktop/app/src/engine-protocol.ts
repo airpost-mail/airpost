@@ -86,6 +86,9 @@ export const Method = {
   AiDraftReply: 'ai.draftReply',
   AiCancel: 'ai.cancel',
   AiUsage: 'ai.usage',
+  // Feature.AiTriage: start a triage job, and the opted-in accounts' triaged inbox threads.
+  AiTriageRun: 'ai.triage.run',
+  AiTriageList: 'ai.triage.list',
   // `serve` mode's stdin only: the account JSON carries credentials.
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
@@ -110,6 +113,8 @@ export const Method = {
   CapabilitiesChanged: 'capabilities.changed',
   // `{streamId, text}`, only to the connection that sent `streamId`, ahead of the reply.
   AiDelta: 'ai.delta',
+  // `{jobId, done, total}`, only to the connection that called ai.triage.run.
+  AiTriageProgress: 'ai.triage.progress',
 } as const;
 
 // What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
@@ -137,6 +142,8 @@ export const Feature = {
   Capabilities: 'capabilities',
   // The `ai.*` methods but triage, `ai.delta`, and `capabilities.ai`.
   Ai: 'ai',
+  // `ai.triage.*`, `capabilities.ai.triage`, and the `core.ai.*` settings keys.
+  AiTriage: 'ai-triage',
 } as const;
 
 export const ErrorCode = {
@@ -253,6 +260,10 @@ export const CapabilityReason = {
   NotSetUp: 'not-set-up',
   MissingUrl: 'missing-url',
   NeedsTernServer: 'needs-tern-server',
+  // AI triage in the background: the provider needs a key the engine doesn't hold yet.
+  NeedsEngineKey: 'needs-engine-key',
+  RateLimited: 'rate-limited',
+  QuotaExceeded: 'quota-exceeded',
 } as const;
 
 export interface CategoryCounts {
@@ -581,4 +592,30 @@ export interface AiSuggestion {
 export interface AiDeltaParams {
   streamId: string;
   text: string;
+}
+
+export interface AiTriageRunResult {
+  jobId: string;
+  queued: number;
+}
+
+export interface AiTriageProgressParams {
+  jobId: string;
+  done: number;
+  total: number;
+}
+
+export interface AiTriageListResult {
+  threadIds: string[];
+  total: number;
+}
+
+// One `ai.usage` row, newest day first.
+export interface AiUsageRow {
+  day: string;
+  provider: string;
+  feature: string;
+  inputTokens: number;
+  outputTokens: number;
+  requests: number;
 }

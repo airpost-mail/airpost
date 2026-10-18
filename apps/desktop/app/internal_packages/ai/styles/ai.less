@@ -221,3 +221,29 @@
     }
   }
 }
+
+.ai-triage-chip {
+  cursor: pointer;
+}
+
+.ai-triage {
+  .ai-triage-account {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    label {
+      min-width: 220px;
+    }
+  }
+  .ai-triage-progress {
+    font-size: @font-size-smaller;
+    color: @text-color-subtle;
+  }
+}
+
+.ai-triage-menu .ai-triage-reason {
+  display: block;
+  max-width: 280px;
+  white-space: normal;
+  color: @text-color-subtle;
+}

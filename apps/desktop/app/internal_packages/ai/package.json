@@ -6,7 +6,7 @@
   "isOptional": true,
 
   "title": "AI",
-  "description": "Summarize threads and suggest replies with a model you choose: a cloud API with your own key, or a local model.",
+  "description": "Summarize threads, suggest replies and sort new mail with a model you choose: a cloud API with your own key, or a local model.",
 
   "license": "GPL-3.0-only",
   "private": true,

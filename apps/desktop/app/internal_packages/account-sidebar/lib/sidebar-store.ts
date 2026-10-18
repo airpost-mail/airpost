@@ -10,6 +10,7 @@ import {
   FocusedPerspectiveStore,
   CategoryStore,
   LabelColorStore,
+  ExtensionRegistry,
 } from 'mailspring-exports';
 
 import SidebarSection from './sidebar-section';
@@ -71,6 +72,8 @@ class SidebarStore extends MailspringStore {
     this.listenTo(ThreadCountsStore, this._updateSections);
     this.listenTo(CategoryStore, this._updateSections);
     this.listenTo(LabelColorStore, this._updateSections);
+    // An extension registered again because its items changed (the AI package's "Needs reply").
+    this.listenTo(ExtensionRegistry.AccountSidebar, this._updateSections);
 
     this.configSubscription = AppEnv.config.onDidChange(
       'core.workspace.showUnreadForAllCategories',

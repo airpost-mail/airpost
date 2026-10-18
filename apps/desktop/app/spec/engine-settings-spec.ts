@@ -161,7 +161,9 @@ describe('the engine-owned settings in the main process', function () {
     ]);
     expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
     expect(manager.get('core.sending.undoSend')).toBe(30000);
-    expect([...configOnDisk()[COPIED_KEY]].sort()).toEqual([...ENGINE_SETTINGS_KEYS].sort());
+    // Not the core.ai.* keys: this engine doesn't list ai-triage.
+    const mirrored = ENGINE_SETTINGS_KEYS.filter((key) => !key.startsWith('core.ai.'));
+    expect([...configOnDisk()[COPIED_KEY]].sort()).toEqual(mirrored.sort());
     supervisor.client.engine._closeSocket();
 
     // Copied now: the engine wins for it too.
@@ -208,6 +210,30 @@ describe('the engine-owned settings in the main process', function () {
     expect(fake.settings['core.integrations.translation']).toEqual(TRANSLATION);
     expect(fake.settings['core.integrations.grammar']).toEqual(GRAMMAR);
     expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
+  });
+
+  it('mirrors the AI settings with an engine that triages', async function () {
+    const PROVIDERS = [{ id: 'ollama', kind: 'ollama', model: 'llama3' }];
+    const FEATURES = { triage: { enabled: true, provider: 'ollama' } };
+    fake.settings = { 'core.ai.limits': { triagePerHour: 50 } };
+    fake.settingsFeatures = ['settings', 'ai-triage'];
+    writeConfig({
+      [STORE_KEY]: 'store-1',
+      [COPIED_KEY]: ['core.sending.undoSend'],
+      core: { ai: { providers: PROVIDERS, features: FEATURES, accounts: ['a1'] } },
+    });
+    await launch();
+    await until('the copy', () => fake.settings['core.ai.accounts'] !== undefined);
+    expect(fake.settings['core.ai.providers']).toEqual(PROVIDERS);
+    expect(fake.settings['core.ai.features']).toEqual(FEATURES);
+    expect(fake.settings['core.ai.accounts']).toEqual(['a1']);
+    // A key config.json has no value for comes from the engine.
+    expect(manager.get('core.ai.limits')).toEqual({ triagePerHour: 50 });
+
+    // Saving Preferences > AI writes the whole core.ai object; each key goes to the engine.
+    manager.setRawValue('core.ai', { ...manager.get('core.ai'), accounts: ['a1', 'a2'] }, null);
+    await until('the set', () => (fake.settings['core.ai.accounts'] || []).length === 2);
+    expect(fake.settings['core.ai.limits']).toEqual({ triagePerHour: 50 });
   });
 
   it('keeps config.json when the engine cannot read its settings', async function () {

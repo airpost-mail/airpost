@@ -3,10 +3,11 @@
 
 /*
 The desktop's AI settings (docs/ai-plan.md A3, A4): the model providers, which one each feature
-uses, the feature switches, the accounts opted in and "Include email addresses". Until the engine
-keeps them (stage 3's `ai.*` settings keys) they live in config under `core.ai.*` and go with each
-`ai.*` request, with the provider's key read from the keyset (KeyManager) as
-`integration-ai-<providerId>-key`. Keys are never in config and never logged.
+uses, the feature switches, the accounts opted in and "Include email addresses". They live in
+config under `core.ai.*`, which the main process mirrors into the engine's settings store
+(engine-settings.ts) when the engine lists `ai-triage`. They still go with each `ai.*` request,
+with the provider's key read from the keyset (KeyManager) as `integration-ai-<providerId>-key`,
+until the engine holds the keys (stage 11). Keys are never in config and never logged.
 
 The requests themselves are made by internal_packages/ai through the Engine export; this module
 is shared with the CapabilityStore, which needs the settings to say whether a feature is set up.
@@ -106,12 +107,16 @@ export function readSettings(): AiSettings {
 }
 
 export function writeSettings(settings: AiSettings) {
-  AppEnv.config.set(CONFIG_KEY, {
+  const raw = (AppEnv.config.get(CONFIG_KEY) || {}) as any;
+  const next: any = {
     providers: settings.providers.map((p) => readProvider(p)).filter(Boolean),
     features: settings.features,
     accounts: [...new Set(settings.accounts)],
     includeAddresses: !!settings.includeAddresses,
-  });
+  };
+  // The engine's triage limits (`core.ai.limits`, set with `tern settings set`) have no form here.
+  if (raw.limits !== undefined) next.limits = raw.limits;
+  AppEnv.config.set(CONFIG_KEY, next);
 }
 
 /** A new provider id, unique among `providers`. Ids name keys, so they stay plain. */
