@@ -121,6 +121,9 @@ pub async fn upgrade(
                 Ok((device, _slot)) => {
                     let out = relay(&state, &device, &mut tx, &mut rx).await;
                     tracing::info!(device = %device.id, code = out.0, "websocket closed");
+                    if out.0 == close::ENGINE_UNAVAILABLE {
+                        state.engine_lost().await;
+                    }
                     out
                 }
             };
@@ -137,6 +140,11 @@ pub async fn upgrade(
                             break;
                         }
                     }
+                } else {
+                    // The browser closed first: tungstenite has queued the echo of its close
+                    // frame and refuses ours (SendAfterClosing). A flush sends the echo, so
+                    // the browser sees a clean close rather than 1006.
+                    let _ = tx.flush().await;
                 }
             })
             .await;

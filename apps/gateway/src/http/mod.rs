@@ -140,6 +140,10 @@ impl AppState {
         self.0.probe.get(&self.0.config.config_dir).await
     }
 
+    async fn engine_lost(&self) {
+        self.0.probe.invalidate().await;
+    }
+
     /// Re-reads `devices.json`; open WebSockets of devices that are gone then close.
     pub fn reload(&self) -> Result<(), DevicesError> {
         let snap = self.0.devices.snapshot(now_ms())?;
@@ -531,12 +535,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub async fn bind(state: AppState) -> std::io::Result<Server> {
-        let listener = TcpListener::bind(state.config().bind).await?;
-        Ok(Server { listener, state })
-    }
-
-    /// For tests, which bind first to learn the port the public URL names.
+    /// On a listener bound already, so the config can name the port it got.
     pub fn with_listener(listener: TcpListener, state: AppState) -> Server {
         Server { listener, state }
     }

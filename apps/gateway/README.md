@@ -15,7 +15,8 @@ desktop quits, the engine stops and browsers show "The engine isn't running".
     target/release/tern-gateway serve --web-root apps/web/dist
     target/release/tern-gateway pair            # prints a code and a /pair#… link
 
-Open the link on this machine (default `http://127.0.0.1:5180`). Without `--config-dir` (or
+Open the link on this machine (default `http://127.0.0.1:5180`; with `--bind 127.0.0.1:0`
+the system picks the port, which the link and `<profile>/gateway/gateway.json` name). Without `--config-dir` (or
 `TERN_CONFIG_DIR`) the gateway uses the desktop's profile, like `tern`.
 
 Web client development: run the gateway with `--allow-origin http://localhost:5173` and

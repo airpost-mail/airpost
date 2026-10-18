@@ -181,4 +181,10 @@ impl ProbeCache {
         *slot = Some((Instant::now(), info.clone()));
         info
     }
+
+    /// Forgets the last probe, so the next `/session` after a relay lost the engine says
+    /// so instead of repeating "up" for the rest of the TTL.
+    pub async fn invalidate(&self) {
+        *self.0.lock().await = None;
+    }
 }

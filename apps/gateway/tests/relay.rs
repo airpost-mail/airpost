@@ -349,17 +349,22 @@ async fn revoke_and_engine_exit_close_the_socket() {
     let cookie = s.pair().await;
     let mut ws = s.ws(&cookie).await;
     ws.hello().await;
+    let up = s
+        .http("GET", "/gateway/v1/session", &[("Cookie", &cookie)], "")
+        .await;
+    assert!(up.contains(r#""state":"up""#), "{up}");
     s.engine.child.kill().unwrap();
     s.engine.child.wait().unwrap();
     assert_eq!(ws.close_code().await, close::ENGINE_UNAVAILABLE);
-
-    // With the engine gone a new socket closes at once, and /session says so.
-    let mut ws = s.ws(&cookie).await;
-    assert_eq!(ws.close_code().await, close::ENGINE_UNAVAILABLE);
-    let session = s
+    // /session says so at once, not after the probe cache's TTL.
+    let down = s
         .http("GET", "/gateway/v1/session", &[("Cookie", &cookie)], "")
         .await;
-    assert!(session.contains(r#""state":"down""#), "{session}");
+    assert!(down.contains(r#""state":"down""#), "{down}");
+
+    // With the engine gone a new socket closes at once.
+    let mut ws = s.ws(&cookie).await;
+    assert_eq!(ws.close_code().await, close::ENGINE_UNAVAILABLE);
 }
 
 /// A raw HTTP/1.1 exchange: status code, lowercased headers and the body bytes.
@@ -623,4 +628,19 @@ async fn file_routes() {
         )
         .await;
     assert_eq!(refused["error"]["code"], -32008);
+}
+
+/// A browser that closes gets the close frame back (RFC 6455 5.5.1), so its `onclose` says
+/// 1000 and `wasClean`, not 1006.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_close_from_the_browser_is_answered() {
+    let Some(s) = Setup::start().await else {
+        return;
+    };
+    let cookie = s.pair().await;
+    let mut ws = s.ws(&cookie).await;
+    ws.hello().await;
+    ws.0.close(None).await.unwrap();
+    let got = tokio::time::timeout(WAIT, ws.0.next()).await.unwrap();
+    assert!(matches!(got, Some(Ok(Message::Close(_)))), "{got:?}");
 }

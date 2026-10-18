@@ -7,7 +7,8 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
-use clap::{Args, Parser, Subcommand};
+use clap::parser::ValueSource;
+use clap::{Args, CommandFactory, FromArgMatches, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, ConfigInput};
@@ -21,8 +22,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 #[command(
     name = "tern-gateway",
     version,
-    about = "Authenticated remote access to a Tern engine for the web client",
-    args_conflicts_with_subcommands = true
+    about = "Authenticated remote access to a Tern engine for the web client"
 )]
 pub struct Cli {
     /// The engine's profile directory (default: the desktop's); the gateway keeps its state
@@ -129,6 +129,40 @@ fn parse_ttl(s: &str) -> std::result::Result<i64, String> {
     Ok(ms)
 }
 
+impl Cli {
+    /// Parses argv, exiting on an error as `Parser::parse` does.
+    pub fn from_env() -> Cli {
+        Cli::try_from_args(std::env::args_os()).unwrap_or_else(|e| e.exit())
+    }
+
+    /// Like `Parser::try_parse_from`, and refuses the serve options before a subcommand
+    /// (`tern-gateway --bind X pair`), which that subcommand would ignore. clap's
+    /// `args_conflicts_with_subcommands` would do that but also refuses the global
+    /// `--config-dir` there, the form `tern --config-dir X <cmd>` uses.
+    pub fn try_from_args<I, T>(args: I) -> std::result::Result<Cli, clap::Error>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        let mut cmd = Cli::command();
+        let matches = cmd.try_get_matches_from_mut(args)?;
+        if let Some(sub) = matches.subcommand_name() {
+            let misplaced = cmd.get_arguments().find(|a| {
+                !a.is_global_set()
+                    && matches.value_source(a.get_id().as_str()) == Some(ValueSource::CommandLine)
+            });
+            if let Some(arg) = misplaced {
+                let name = arg.get_long().unwrap_or(arg.get_id().as_str());
+                return Err(cmd.error(
+                    clap::error::ErrorKind::ArgumentConflict,
+                    format!("--{name} is a serve option; it can't be used with `{sub}`"),
+                ));
+            }
+        }
+        Cli::from_arg_matches(&matches).map_err(|e| e.format(&mut cmd))
+    }
+}
+
 pub fn init_logging() {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
@@ -172,26 +206,29 @@ pub fn run(cli: Cli) -> Result<()> {
 }
 
 fn serve(args: ServeArgs, config_dir: PathBuf) -> Result<()> {
-    let config = Config::new(ConfigInput {
-        bind: args.bind,
-        public_url: args.public_url.as_deref(),
-        insecure_public_url: args.insecure_public_url,
-        allow_origins: &args.allow_origin,
-        trusted_proxies: &args.trusted_proxies,
-        web_root: args.web_root,
-        config_dir,
-    })?;
-    if !config.public.https && !config.public.is_loopback() {
-        tracing::warn!("serving over plain http: device cookies travel unencrypted");
-    }
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     runtime.block_on(async move {
+        // Bound first so that with port 0 the public URL (and so the Host and Origin checks
+        // and `pair`'s link) names the port the system picked.
+        let listener = tokio::net::TcpListener::bind(args.bind).await?;
+        let config = Config::new(ConfigInput {
+            bind: listener.local_addr()?,
+            public_url: args.public_url.as_deref(),
+            insecure_public_url: args.insecure_public_url,
+            allow_origins: &args.allow_origin,
+            trusted_proxies: &args.trusted_proxies,
+            web_root: args.web_root,
+            config_dir,
+        })?;
+        if !config.public.https && !config.public.is_loopback() {
+            tracing::warn!("serving over plain http: device cookies travel unencrypted");
+        }
         let state = AppState::new(config)?;
         let control_path = control::socket_path(state.devices().dir());
         let control_listener = control::bind(&control_path)?;
-        let server = Server::bind(state.clone()).await?;
+        let server = Server::with_listener(listener, state.clone());
         let public_url = state.config().public.as_header();
         let running_path = state.devices().dir().join("gateway.json");
         std::fs::write(
@@ -348,6 +385,62 @@ fn day(ms: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn config_dir_goes_before_or_after_the_subcommand() {
+        for args in [
+            &["tern-gateway", "--config-dir", "/p", "pair"][..],
+            &["tern-gateway", "pair", "--config-dir", "/p"],
+            &[
+                "tern-gateway",
+                "--config-dir",
+                "/p",
+                "serve",
+                "--bind",
+                "127.0.0.1:1",
+            ],
+            &[
+                "tern-gateway",
+                "--config-dir",
+                "/p",
+                "--bind",
+                "127.0.0.1:1",
+            ],
+            &["tern-gateway", "--config-dir", "/p", "devices", "list"],
+        ] {
+            let cli = Cli::try_from_args(args).unwrap_or_else(|e| panic!("{args:?}: {e}"));
+            assert_eq!(cli.config_dir.as_deref(), Some(Path::new("/p")), "{args:?}");
+        }
+        let cli = Cli::try_from_args(["tern-gateway", "--bind", "127.0.0.1:7"]).unwrap();
+        assert!(cli.command.is_none());
+        assert_eq!(cli.serve.bind.port(), 7);
+        let Some(Command::Serve(args)) =
+            Cli::try_from_args(["tern-gateway", "serve", "--bind", "127.0.0.1:8"])
+                .unwrap()
+                .command
+        else {
+            panic!("expected serve");
+        };
+        assert_eq!(args.bind.port(), 8);
+    }
+
+    #[test]
+    fn serve_options_before_a_subcommand_are_refused() {
+        for args in [
+            &["tern-gateway", "--bind", "127.0.0.1:1", "pair"][..],
+            &["tern-gateway", "--web-root", "/w", "serve"],
+            &["tern-gateway", "--insecure-public-url", "devices", "list"],
+        ] {
+            let err = Cli::try_from_args(args)
+                .err()
+                .unwrap_or_else(|| panic!("{args:?} parsed"));
+            assert_eq!(
+                err.kind(),
+                clap::error::ErrorKind::ArgumentConflict,
+                "{args:?}"
+            );
+        }
+    }
 
     #[test]
     fn ttls() {
