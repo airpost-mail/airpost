@@ -1341,3 +1341,28 @@ sites aren't captured; no CLI command (`tern rpc query '<json>'` works) and no t
 change, whose search post-filters go with stage 9's grammar. Open: the parity suite has not
 run against a copy of the trial database; the capture covers the call sites with fixture ids,
 not every runtime variation.
+
+2026-10-18, stage 16 (files), branch `roadmap/web-ready`: delivered, not merged. Engine
+(`apps/engine/src/files.rs`, socket only, feature `files`, all three `LocalOnly`):
+`files.get {accountId, fileId}` → `{path?, size, contentType, downloaded, filename}`; for a
+File not on disk it sends `bodies.fetch` for its message and answers from a `files` thread
+once the file appears or after 30 s with `downloaded: false` (at most 64 waiting, engine-wide),
+out of order with the connection's later requests (T21). `files.read {accountId, fileId,
+offset, len}` → `{data, offset, size, eof}`, base64, at most 4 MiB a call, `NOT_FOUND` for a
+file not downloaded. `files.put {accountId, name, contentType?, data | path}` → `{fileId,
+file}`: a new 40-character lowercase id, the bytes copied into the files directory, and a File
+row saved on the account's main thread (so `files.get` and the gateway serve uploads and the
+attachments of a reopened draft); refused with `path` on relayed connections. Body fetches,
+uploads and exports write each file under `files/.tmp` and rename it into place, so a waiting
+`files.get` never sees half a file. GetMessageRFC2822Task without `filepath` is file-id mode:
+the local phase sets `fileId` (a client's value is replaced, so an export can't overwrite
+another file), the remote phase saves the message as File `<subject>.eml`
+(`message/rfc822`). `tern-client` has `files_get`, `files_read`, `files_put`; tern-mcp's
+`get_attachment` and `resources/read` use `files.get` when the engine has `files` (its
+poll stays for older engines). Deviations: `files.put` returns the File JSON as well as
+`fileId`, and `files.get` the `filename`; `files.read` and `files.put` are answered in order
+(local disk only); the engine waits by looking at the files directory every 100 ms rather
+than on a body-fetch signal; no `tern files` command (`tern rpc` reaches the methods). Open:
+uploads never attached to a sent message stay, File row and bytes; leftover `files/.tmp`
+parts after a crash aren't swept; the desktop still reads paths itself. Trial pending:
+`get_attachment` for a file not yet downloaded (covered on the fake server by `test_mcp.py`).

@@ -501,3 +501,37 @@ Open:
   other relayed reads; counts unbounded); local clients keep the desktop's unbounded reads,
   and the web's event range reads 500. The cache drops a thread that left all mail from
   role-less folder and label lists too.
+
+2026-10-18, W5 (DCP 16 files), branch `roadmap/web-ready`, not merged:
+- Engine: `files.get`, `files.read`, `files.put` and GetMessageRFC2822Task's file-id mode
+  (see DCP Status), feature `files`; the three stay `LocalOnly`, and `files.put {path}` is
+  refused on any relayed connection, admin or not. A relayed device without admin may queue
+  GetMessageRFC2822Task without a `filepath`; the engine picks the `fileId`.
+- Gateway: `GET|HEAD /gateway/v1/files/{accountId}/{fileId}` calls `files.get` on a
+  connection of its own (a fresh local connection per request rather than one shared one),
+  checks the canonical path is a file under `<config>/files`, and serves it through
+  tower-http's `ServeFile` (Range, HEAD, conditional requests) as `application/octet-stream`
+  with `Content-Disposition: attachment` (RFC 6266 `filename*`) and `Content-Security-Policy:
+  sandbox`; `?inline=1` serves inline only PNG, JPEG, GIF and WebP sniffed from the first
+  bytes, with the gateway's `Content-Type`. `POST /gateway/v1/files/{accountId}?name=` streams
+  the body (25 MiB cap, declared or counted, 413 past it) to `<config>/gateway/incoming/`
+  (0700/0600), calls `files.put` by path and deletes the file on every outcome; at most 8
+  uploads at once; leftovers older than a day are swept at start and in housekeeping. The
+  WebSocket policy check is `policy::relayed_request_allowed` now (the DCP stage 3 open item).
+- Web: download links and `cid:` images (`?inline=1`) on the file routes when the engine
+  announces `files`; the reader frame's CSP gains `img-src 'self'` (the app's CSP already had
+  it); the composer uploads each picked file at once, shows it uploading or failed, saves and
+  sends only uploaded ones, and before SendDraftTask or scheduling calls `HEAD` on every
+  attachment's route so the engine has a forwarded original's files. The mock keeps uploads'
+  bytes and assigns an export's `fileId`.
+- Tests: `apps/engine/tests/files.rs`, the file-id export in `ms-tasks/tests/tasks.rs`, the
+  policy unit tests, `apps/gateway/tests/relay.rs` `file_routes` against a `serve` engine
+  (upload, download, inline sniffing with a lying label, Range, HEAD, 404/401/403/400, 413
+  declared and streamed, temp files gone, `files.get` refused over the WebSocket), unit tests
+  for sniffing and `Content-Disposition`, `test_mcp.py`'s `get_attachment` on the fake IMAP
+  server, and vitest for the client file calls, the mock and the composer upload flow.
+- Open: the per-device upload quota (1 GiB not yet attached) isn't built, and uploads removed
+  from a draft or never sent stay in `<config>/files` with their File rows; nothing in the web
+  asks for a raw message yet (the task type and mock are ready); still no browser run; a File
+  uploaded under one account and sent from another (the composer's From changed) downloads
+  only under the first account's route.
