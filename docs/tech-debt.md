@@ -268,6 +268,15 @@ folder and `appData` are refused. Entries that can't be deleted are listed and t
 anyway. Not done: an "Import from Mailspring again?" choice. The supervisor and `engine.shutdown`
 named under Size already exist, so nothing waits on stages 6 or 10.
 
+Review fixes (roadmap/security, a5d05e112). Reset only empties a dir carrying `.tern-profile`
+(`src/browser/profile-marker.ts`), which `main.js` writes for the default dir and for a
+`--config-dir-path` it created or found empty; an existing custom dir from before this can't be
+reset. Paths are compared after `realpath`, case-folded on macOS and Windows, and the dir may not
+equal or contain home or `appData`. Windows' `lockfile` is kept, and Chromium storage that fails to
+delete after `clearStorageData` is logged, not listed. From the confirm on, `WindowManager` opens
+no windows and `QuitGate` defers launches (Dock, second instance, mailto:) into the relaunch, for
+the database reset too.
+
 Verified, except the engine-still-running part, which is inferred from the code path.
 `internal_packages/preferences/lib/tabs/preferences-general.tsx:29-49` asks only "Are you sure?",
 then runs `fs.rm(configDir, {recursive})` from the renderer and relaunches. Nothing tells main or
@@ -611,6 +620,8 @@ the main frame of a `MailspringWindow` on a `file:` URL; dev mode logs each deni
 Tern's own notifications come from main and need no permission, so `notifications` is there for
 plugins. `--js-flags=--harmony` is gone (no staged-feature APIs in the tree, TS targets es2024).
 The autoplay switch stays: new-mail sounds play through an `Audio` element with no user gesture.
+Review fix (a5d05e112): the main frame of the bundled pdf.js viewer in quick preview also gets
+`fullscreen` (Presentation Mode) and `clipboard-sanitized-write` (select-all copy).
 
 Verified. No `setPermissionRequestHandler` or `setPermissionCheckHandler` on the default,
 `quickpreview` or `in-memory-only` sessions, so Electron grants media, geolocation, clipboard-read
