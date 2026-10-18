@@ -11,6 +11,14 @@ rules per account: an `account.state` `stopped` counts as that account's crash a
 again, until CrashTracker's cutoff. An engine exit counts as an engine crash and respawns it
 with every account. Nothing here touches AppEnv or the stores, so the spec drives it with a
 fake engine.
+
+An engine with Feature.Accounts keeps the accounts itself (docs/desktop-client-plan.md 3.6):
+it restarts a stopped account on its own, so a `stopped` with `retryAt` keeps the entry and
+only tells the host the account is down; one without `retryAt` is the engine giving up (or,
+with `authFailed`, the server refusing the credentials), and the account isn't added again
+until "Try Again" or new settings. account.remove there unregisters the account and deletes
+its secrets, so it is sent only for accounts the host no longer lists, never to restart one,
+and accounts the engine registered that the host doesn't list are removed once it says hello.
 */
 import type { EngineServeProcess, MailsyncProcessExit, ResetOptions } from './mailsync-process';
 import {
@@ -19,6 +27,8 @@ import {
   AccountStateParams,
   ErrorCode,
   EXIT_SOCKET_IN_USE,
+  Feature,
+  HelloResult,
   SyncErrorJSON,
 } from './engine-protocol';
 
@@ -94,6 +104,11 @@ export class CrashTracker {
     }
   }
 
+  // The engine stopped retrying the account itself (Feature.Accounts).
+  markTooManyFailures(fullAccountJSON: CrashKeyJSON) {
+    this._tooManyFailures[this._keyFor(fullAccountJSON)] = true;
+  }
+
   tooManyFailures(fullAccountJSON: CrashKeyJSON) {
     const key = this._keyFor(fullAccountJSON);
     return this._tooManyFailures[key];
@@ -142,6 +157,8 @@ export interface EngineClientHost {
   // `entries` or `held` changed: an account is being added, was added, is being removed or
   // is gone, or a reset holds it.
   onAccountsChanged?(): void;
+  // account.add answered that the engine's secret store took the account's secrets.
+  onAccountStored?(accountId: string): void;
 }
 
 interface Entry {
@@ -150,6 +167,8 @@ interface Entry {
   // Commands sent before account.add answered, in order; null once it has.
   pending: Array<{ type?: string; [key: string]: any }> | null;
   removal: Promise<string[]> | null;
+  // Stopped, and the engine starts it again at `retryAt` (Feature.Accounts).
+  retrying?: boolean;
 }
 
 // The last account.remove of an account the engine no longer runs, for a reset that comes
@@ -169,6 +188,7 @@ export class EngineClient {
   // Accounts being reset or relaunched, which ensure() leaves alone.
   held = new Map<string, number>();
   removals = new Map<string, Removal>();
+  _greetings = new WeakMap<EngineServeProcess, Promise<void>>();
   // Engines in a row that exited because the socket was in use.
   inUseExits = 0;
   crashes = new CrashTracker();
@@ -212,7 +232,13 @@ export class EngineClient {
     }
     this._hold(account.id);
     try {
-      await this._remove(account.id);
+      await this._greeted();
+      if (this.registry()) {
+        // account.add starts a stopped account (and answers AccountExists for a running one).
+        this._forget(account.id);
+      } else {
+        await this._remove(account.id);
+      }
       await this._add([account], { force: true });
     } finally {
       this._release(account.id);
@@ -225,6 +251,13 @@ export class EngineClient {
   async resetCache<T>(accountId: string, reset: () => Promise<T>): Promise<T> {
     this._hold(accountId);
     try {
+      await this._greeted();
+      if (this.registry()) {
+        // account.reset stops the account itself and keeps it registered; the entry goes
+        // first, so its account.state isn't taken for the engine giving up on it.
+        this._forget(accountId);
+        return await reset();
+      }
       // ensure() may have removed it already, as when the account is deleted.
       const earlier = !this.entries.has(accountId) && this.removals.get(accountId);
       const stillRunning = await (earlier ? earlier.done : this._remove(accountId));
@@ -306,7 +339,40 @@ export class EngineClient {
     return engine ? engine.shutdown() : Promise.resolve();
   }
 
+  // Whether the engine keeps the accounts and restarts them itself (Feature.Accounts).
+  registry() {
+    return !!this.engine && (this.engine.features || []).includes(Feature.Accounts);
+  }
+
   // Private
+
+  // Resolves once the engine said hello, so registry() is known, or closed.
+  _greeted(): Promise<void> {
+    return (this.engine && this._greetings.get(this.engine)) || Promise.resolve();
+  }
+
+  // Drops the entry of an account the engine no longer runs, without account.remove.
+  _forget(accountId: string) {
+    if (!this.entries.delete(accountId)) return;
+    this._changed();
+    this.host.onAccountExited(accountId);
+  }
+
+  // Removes the accounts a registry engine started that the host doesn't list, as when one
+  // was deleted while the engine was down.
+  _reconcile(engine: EngineServeProcess, hello: HelloResult) {
+    if (this.engine !== engine || !this.registry()) return;
+    const wanted = new Set(this.host.accounts().map((a) => a.id));
+    for (const { accountId } of hello.accounts || []) {
+      if (wanted.has(accountId) || this.entries.has(accountId) || this.held.has(accountId)) {
+        continue;
+      }
+      console.log(`Removing account ${accountId}: the engine has it but the app doesn't`);
+      engine.removeAccount(accountId).catch((err) => {
+        if (!err.engineExited) console.warn(`account.remove ${accountId} failed: ${err.message}`);
+      });
+    }
+  }
 
   _changed() {
     if (this.host.onAccountsChanged) this.host.onAccountsChanged();
@@ -338,6 +404,14 @@ export class EngineClient {
     engine.on('ready', () => {
       if (this.engine === engine) this.inUseExits = 0;
     });
+    this._greetings.set(
+      engine,
+      new Promise((resolve) => {
+        engine.once('hello', () => resolve());
+        engine.once('close', () => resolve());
+      })
+    );
+    engine.on('hello', (hello: HelloResult) => this._reconcile(engine, hello));
     engine.on('close', (exit: MailsyncProcessExit) => this._onEngineClose(engine, exit));
     try {
       engine.serve();
@@ -397,7 +471,12 @@ export class EngineClient {
   // hub keeps its backlog for one subscriber); a later one finds the entry gone.
   _added(accountId: string, entry: Entry, result?: AccountAddResult) {
     if (this.entries.get(accountId) !== entry || entry.state !== 'adding') return;
-    if (result && result.state === AccountState.Stopped) {
+    if (result && result.stored && this.host.onAccountStored) this.host.onAccountStored(accountId);
+    if (result && result.state === AccountState.Stopped && this.registry()) {
+      // The engine's restart policy has it; its account.state says when.
+      entry.retrying = true;
+      this.host.onAccountExited(accountId);
+    } else if (result && result.state === AccountState.Stopped) {
       this._stopped(accountId, entry, this._stoppedError(result.error));
       return;
     }
@@ -423,10 +502,47 @@ export class EngineClient {
     this._stopped(accountId, entry, new Error(`${err && err.message}`));
   }
 
-  _onAccountState({ accountId, state, error }: AccountStateParams) {
+  _onAccountState({ accountId, state, error, retryAt, authFailed }: AccountStateParams) {
     const entry = this.entries.get(accountId);
-    if (!entry || entry.state === 'removing' || state !== AccountState.Stopped) return;
+    if (!entry || entry.state === 'removing') return;
+    if (this.registry()) {
+      this._onRegistryState(accountId, entry, { state, error, retryAt, authFailed });
+      return;
+    }
+    if (state !== AccountState.Stopped) return;
     this._stopped(accountId, entry, this._stoppedError(error));
+  }
+
+  // An account.state from an engine that restarts its accounts itself.
+  _onRegistryState(
+    accountId: string,
+    entry: Entry,
+    { state, error, retryAt, authFailed }: Omit<AccountStateParams, 'accountId'>
+  ) {
+    if (state === AccountState.Running && entry.retrying) {
+      entry.retrying = false;
+      if (entry.json) this.host.onAccountLaunched(entry.json);
+      return;
+    }
+    if (state !== AccountState.Stopped) return;
+    if (retryAt) {
+      if (!entry.retrying) {
+        entry.retrying = true;
+        this.host.onAccountExited(accountId);
+      }
+      return;
+    }
+    this.entries.delete(accountId);
+    this._changed();
+    if (!entry.retrying) this.host.onAccountExited(accountId);
+    if (!entry.json) return;
+    const exit: MailsyncProcessExit = {
+      code: null,
+      error: this._stoppedError(error),
+      signal: null,
+    };
+    this.crashes.markTooManyFailures(entry.json);
+    this.host.onTooManyFailures(accountId, exit, !!authFailed);
   }
 
   // The `error` of the MailsyncProcessExit a stopped account is recorded with: its text is the

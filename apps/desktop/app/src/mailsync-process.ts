@@ -4,6 +4,7 @@
 Warning! This file is imported from the main process as well as the renderer process
 */
 import { spawn, ChildProcess } from 'child_process';
+import crypto from 'crypto';
 import { StringDecoder } from 'string_decoder';
 import path from 'path';
 import { EventEmitter } from 'events';
@@ -13,9 +14,12 @@ import { localized } from './intl';
 import { developerToolsAvailable } from './developer-tools';
 import {
   AccountAddResult,
+  AccountChangedParams,
   AccountRemoveResult,
   AccountStateParams,
   AccountTestResult,
+  CredentialsImportParams,
+  CredentialsImportResult,
   DisconnectParams,
   HelloParams,
   HelloResult,
@@ -140,6 +144,27 @@ export function lastJSONResponse(stdout: string): any | null {
 // The Rust engine, unpacked from the asar by build/build.js.
 export function engineBinaryPath(resourcePath: string) {
   return path.join(resourcePath, 'mailsync-rs').replace('app.asar', 'app.asar.unpacked');
+}
+
+// Unpackaged runs (`make desktop`, `npm start`, specs) keep the engine's secrets in a file
+// keyed by this, not the keychain: an unsigned engine rebuilt every day would make the
+// keychain ask each time (docs/desktop-client-plan.md section 5, Signing).
+export const DEV_ENGINE_KEY_FILE = 'engine-dev.key';
+
+export function devEngineKeyFile(configDirPath: string, resourcePath: string) {
+  if (resourcePath.includes('app.asar')) return null;
+  return path.join(configDirPath, DEV_ENGINE_KEY_FILE);
+}
+
+// `hello.build` of an engine running this binary: `sha256:<hex>` of the file.
+export function engineBuildId(binaryPath: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(binaryPath);
+    stream.on('error', () => resolve(null));
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => resolve(`sha256:${hash.digest('hex')}`));
+  });
 }
 
 /*
@@ -318,6 +343,8 @@ export class MailsyncProcess extends EventEmitter {
       GMAIL_CLIENT_ID: GMAIL_CLIENT_ID,
       GMAIL_CLIENT_SECRET: GMAIL_CLIENT_SECRET,
     });
+    const devKeyFile = devEngineKeyFile(this.configDirPath, this.resourcePath);
+    if (devKeyFile && !env.TERN_ENGINE_KEY_FILE) env.TERN_ENGINE_KEY_FILE = devKeyFile;
     const args = [`--mode`, mode];
     if (this.verbose) {
       args.push('--verbose');
@@ -555,6 +582,10 @@ export class MailsyncProcess extends EventEmitter {
       this.emit('mail-new', msg.params as MailNewParams);
       return null;
     }
+    if (msg.method === Method.AccountChanged) {
+      this.emit('account-changed', msg.params as AccountChangedParams);
+      return null;
+    }
     if (msg.method === Method.SettingsChanged) {
       this.emit('settings-changed', msg.params as SettingsValues);
       return null;
@@ -676,11 +707,19 @@ export class EngineServeProcess extends MailsyncProcess {
   _closed = false;
   _shutdownTimer = null;
   _startupError: string = null;
+  // Joined a detached engine (attach()) rather than spawned one.
+  _attached = false;
+  // When set, serve() joins the detached engine on this socket instead of spawning one.
+  attachTo: string | null = null;
   // The secrets of every account added, redacted from what the engine reports. Kept after a
   // remove, since a late error may still carry them.
   _secretValues = new Set<string>();
 
   serve() {
+    if (this.attachTo) {
+      this.attach(this.attachTo);
+      return;
+    }
     const location = serveSocketPath(this.configDirPath);
     if (!location) {
       throw new Error('No socket path short enough for the sync engine');
@@ -831,7 +870,38 @@ export class EngineServeProcess extends MailsyncProcess {
     console.warn(`Sync engine wrote an unexpected line: ${this._stripSecrets(line)}`);
   }
 
+  /*
+  Joins a `serve --detached` engine found at run/engine.json instead of spawning one: the
+  parent methods go over the socket, which a detached engine takes them on, and 'close' comes
+  when the connection ends. Shutting down leaves the engine running. Credentials can't be
+  imported this way (`credentials.import` is stdin only).
+  */
+  attach(socketPath: string) {
+    this._attached = true;
+    this._socketPath = socketPath;
+    this._socketQueue = [];
+    const finish = (exit: MailsyncProcessExit) => {
+      if (this._closed) return;
+      this._closed = true;
+      this._closeSocket();
+      this.emit('close', exit);
+    };
+    this.once('hello', () => this.emit('ready'));
+    this._connectSocket(socketPath, (error) => {
+      if (!this._killed) console.warn(`Detached sync engine connection failed: ${error}`);
+      finish({ code: this._killed ? 0 : -2, error: this._killed ? null : error, signal: null });
+    });
+  }
+
   _parentCall<R = unknown>(method: string, params: unknown): Promise<R> {
+    if (this._attached) {
+      if (this._closed) {
+        return Promise.reject(
+          new EngineRequestError('The sync engine is not connected', { engineExited: true })
+        );
+      }
+      return this.request<R>(method, params);
+    }
     if (this._closed || !this._proc || !this._proc.stdin) {
       return Promise.reject(
         new EngineRequestError('The sync engine is not running', { engineExited: true })
@@ -864,8 +934,19 @@ export class EngineServeProcess extends MailsyncProcess {
     return this._parentCall<AccountAddResult>(Method.AccountAdd, { account, identity });
   }
 
+  // On an engine with Feature.Accounts this also unregisters the account and deletes its
+  // stored secrets.
   removeAccount(accountId: string) {
     return this._parentCall<AccountRemoveResult>(Method.AccountRemove, { accountId });
+  }
+
+  // Moves accounts and the keyset into the engine (stdin only). Registers without starting.
+  importCredentials(params: CredentialsImportParams) {
+    for (const account of params.accounts) this._rememberSecrets(account);
+    for (const v of Object.values(params.secrets)) {
+      if (typeof v === 'string' && v.length > 0) this._secretValues.add(v);
+    }
+    return this._parentCall<CredentialsImportResult>(Method.CredentialsImport, params);
   }
 
   // Checks an account's IMAP and SMTP settings without adding it. The result is
@@ -924,6 +1005,16 @@ export class EngineServeProcess extends MailsyncProcess {
   // Asks the engine to stop every account and exit, and kills it if that takes longer than
   // `graceMs`. Resolves once it has exited.
   shutdown(graceMs = ENGINE_SHUTDOWN_GRACE_MS) {
+    if (this._attached) {
+      // The detached engine keeps running; only this connection ends.
+      if (this._closed) return Promise.resolve();
+      this._killed = true;
+      const closed = new Promise<void>((resolve) => this.once('close', () => resolve()));
+      this._closeSocket();
+      this._closed = true;
+      this.emit('close', { code: 0, signal: null });
+      return closed;
+    }
     if (this._closed || !this._proc) return Promise.resolve();
     this._killed = true;
     const closed = new Promise<void>((resolve) => this.once('close', () => resolve()));

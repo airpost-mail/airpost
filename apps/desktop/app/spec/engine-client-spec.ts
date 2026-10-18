@@ -181,6 +181,58 @@ describe('the serve engine client', function () {
     expect(fake.stdinOf('account.remove')).toEqual([]);
   });
 
+  it('leaves a stopped account to an engine that restarts it, until it gives up', async function () {
+    fake.keepsAccounts([]);
+    const launched: string[] = [];
+    host.onAccountLaunched = (json) => launched.push(json.id);
+    await started();
+    expect(launched).toEqual(['a1', 'a2']);
+    const error = { key: 'ErrorConnection', debuginfo: 'refused', retryable: true };
+
+    fake.notify('account.state', { accountId: 'a1', state: 'stopped', error, retryAt: 1 });
+    await until('the exit', () => exited.includes('a1'));
+    fake.notify('account.state', { accountId: 'a1', state: 'running' });
+    await until('the relaunch', () => launched.length === 3);
+    expect(fake.stdinOf('account.add').length).toBe(2);
+
+    const auth = { key: 'ErrorAuthentication', debuginfo: 'bad password', retryable: false };
+    fake.notify('account.state', {
+      accountId: 'a1',
+      state: 'stopped',
+      error: auth,
+      authFailed: true,
+    });
+    await until('the cutoff', () => failures.length === 1);
+    expect(failures[0].accountId).toBe('a1');
+    expect(failures[0].authFailure).toBe(true);
+    expect(failures[0].exit.error.syncError).toEqual(auth);
+    expect(client.send('a1', { type: 'wake-workers' })).toBe(false);
+    await client.ensure();
+    expect(fake.stdinOf('account.add').length).toBe(2);
+
+    // "Try Again" adds it without account.remove, which would delete its stored secrets.
+    await client.forceRelaunch({ id: 'a1' });
+    await until('the forced add', () => fake.stdinOf('account.add').length === 3);
+    expect(fake.stdinOf('account.remove')).toEqual([]);
+  });
+
+  it('removes an account the engine started that the app no longer lists', async function () {
+    fake.keepsAccounts(['a1', 'a2', 'gone']);
+    await started();
+    await until('the remove', () => fake.stdinOf('account.remove').length === 1);
+    expect(fake.stdinOf('account.remove')[0].params).toEqual({ accountId: 'gone' });
+  });
+
+  it('keeps an account reset with account.reset registered', async function () {
+    fake.keepsAccounts([]);
+    await started();
+    await client.resetCache('a1', () => client.engine.resetAccount('a1', {}));
+    expect(fake.stdinOf('account.reset').length).toBe(1);
+    expect(fake.stdinOf('account.remove')).toEqual([]);
+    await client.ensure();
+    await until('the add back', () => fake.stdinOf('account.add').length === 3);
+  });
+
   it('removes a running account before a forced relaunch', async function () {
     await started();
     await client.forceRelaunch({ id: 'a2' });

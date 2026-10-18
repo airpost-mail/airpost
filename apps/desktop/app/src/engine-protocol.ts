@@ -94,6 +94,8 @@ export const Method = {
   EngineResetDatabase: 'engine.resetDatabase',
   EngineSetLogLevel: 'engine.setLogLevel',
   EngineShutdown: 'engine.shutdown',
+  // stdin only: the accounts and keyset KeyManager held, moved into the engine (stage 11).
+  CredentialsImport: 'credentials.import',
   // `serve` mode's stdin, debug builds only.
   TestCrash: 'test.crash',
   TestPanic: 'test.panic',
@@ -101,6 +103,7 @@ export const Method = {
   Delta: 'delta',
   Disconnect: 'disconnect',
   AccountState: 'account.state',
+  AccountChanged: 'account.changed',
   MailNew: 'mail.new',
   SettingsChanged: 'settings.changed',
   // The whole new `capabilities` (Feature.Capabilities), to every subscriber.
@@ -112,6 +115,10 @@ export const Method = {
 // What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
 // an older engine without `features` has none.
 export const Feature = {
+  // The engine keeps the account registry and the secrets (accounts.json, its secret store),
+  // starts registered accounts itself and restarts stopped ones (docs/desktop-client-plan.md
+  // 3.6); `credentials.import` moves KeyManager's keyset into it.
+  Accounts: 'accounts',
   Counts: 'counts',
   TasksList: 'tasks-list',
   MetadataList: 'metadata-list',
@@ -184,6 +191,17 @@ export interface AccountInfo {
   email: string;
   state: string;
   error?: SyncErrorJSON;
+  // Stopped: when the engine starts it again (ms since the epoch); absent when it won't.
+  retryAt?: number;
+  // Stopped because the server refused its credentials.
+  authFailed?: boolean;
+}
+
+// `hello.credentials`: the engine's secret store and how many accounts it has registered.
+export interface CredentialsStatus {
+  store?: 'keychain' | 'secret-service' | 'file' | string;
+  accounts: number;
+  error?: string;
 }
 
 // The engine's SyncError JSON, as `account.state` and the status methods carry it.
@@ -202,6 +220,11 @@ export interface HelloResult {
   accounts: AccountInfo[];
   features?: string[];
   capabilities?: EngineCapabilities;
+  // `sha256:<hex>` of the engine's executable, to compare with the bundled one.
+  build?: string;
+  // `serve --detached`: no parent channel; the socket takes the parent methods.
+  detached?: boolean;
+  credentials?: CredentialsStatus;
 }
 
 // One entry of `capabilities` (ms-ipc `Capability`). `reason` is one of CapabilityReason, or one
@@ -320,6 +343,10 @@ export interface AccountStatus {
   state: string;
   connectionError: boolean;
   error?: SyncErrorJSON;
+  // The non-secret Account JSON (fewer fields on a relayed connection).
+  account?: Record<string, any>;
+  retryAt?: number;
+  authFailed?: boolean;
 }
 
 export interface EngineStatusResult {
@@ -354,6 +381,23 @@ export interface AccountAddResult {
   accountId: string;
   state: string;
   error?: SyncErrorJSON;
+  // The engine's secret store took the account's secrets; it starts the account itself from
+  // now on.
+  stored?: boolean;
+}
+
+// `credentials.import`: accounts (with or without their secrets in `settings`) and the keyset,
+// whose `<email>-imap|smtp|refresh-token` entries go to every account with that email and
+// whose `integration-<provider>-key` and `tern-server-token` are stored too.
+export interface CredentialsImportParams {
+  accounts: Array<Record<string, any>>;
+  secrets: { [name: string]: string };
+}
+
+export interface CredentialsImportResult {
+  imported: string[];
+  failed: Array<{ accountId: string; email: string; error: string }>;
+  secrets: string[];
 }
 
 // The account's threads still running after the engine's stop timeout. They may still write
@@ -403,6 +447,16 @@ export interface AccountStateParams {
   accountId: string;
   state: 'starting' | 'running' | 'stopped' | 'removed' | string;
   error?: SyncErrorJSON;
+  // Stopped: when the engine's restart policy starts it again; absent when it won't.
+  retryAt?: number;
+  // Stopped because the server refused its credentials; only account.add restarts it.
+  authFailed?: boolean;
+}
+
+// `account.changed`: a registered account's non-secret JSON after the engine stored it.
+export interface AccountChangedParams {
+  accountId: string;
+  account: Record<string, any>;
 }
 
 export interface DisconnectParams {

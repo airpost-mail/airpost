@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import {
+  detachedEngineToReuse,
   EngineSupervisor,
   SupervisorConfig,
   SupervisorTarget,
@@ -12,7 +13,7 @@ import {
 } from '../src/browser/engine-supervisor';
 import { KeyManager, secureStorage } from '../src/browser/key-manager';
 import { EngineConnection } from '../src/engine-connection';
-import { EngineServeProcess } from '../src/mailsync-process';
+import { engineBuildId, EngineServeProcess } from '../src/mailsync-process';
 import { EngineStatus, SupervisorChannel } from '../src/supervisor-channels';
 import { FakeEngine, tick, until } from './fake-serve-engine';
 
@@ -384,6 +385,172 @@ describe('the engine supervisor', function () {
     await tick();
     expect(fake.spawns.length).toBe(1);
     expect(lastStatus().socketPath).toBe(null);
+  });
+
+  describe('with an engine that keeps the accounts', function () {
+    const keys = () => JSON.parse(config.values.credentials.toString());
+    const addedPasswords = () =>
+      fake
+        .stdinOf('account.add')
+        .map((r) => [r.params.account.id, r.params.account.settings.imap_password]);
+
+    it('imports the accounts with their secrets before adding them, then drops them from KeyManager', async function () {
+      config.values.credentials = Buffer.from(
+        JSON.stringify({
+          'a1@example.com-imap': 'pw-a1',
+          'a2@example.com-imap': 'pw-a2',
+          'integration-deepl-key': 'k',
+        })
+      );
+      fake.keepsAccounts([]);
+      await started();
+
+      const methods = fake.stdin.map((r) => r.method);
+      expect(methods.filter((m) => m === 'credentials.import').length).toBe(1);
+      expect(methods.indexOf('credentials.import')).toBeLessThan(methods.indexOf('account.add'));
+      const [imported] = fake.stdinOf('credentials.import');
+      expect(imported.params.accounts.map((a) => [a.id, a.settings.imap_password])).toEqual([
+        ['a1', 'pw-a1'],
+        ['a2', 'pw-a2'],
+      ]);
+      expect(imported.params.secrets).toEqual({ 'integration-deepl-key': 'k' });
+      expect(addedPasswords()).toEqual([
+        ['a1', undefined],
+        ['a2', undefined],
+      ]);
+      expect(fake.socketText).not.toContain('pw-a1');
+      expect(config.values.credentialsMovedToEngine).toBe(true);
+      expect(keys()).toEqual({ 'integration-deepl-key': 'k' });
+      const before = JSON.parse(config.values.credentialsBeforeEngine.toString());
+      expect(before['a1@example.com-imap']).toBe('pw-a1');
+    });
+
+    it('imports what a downgraded build added, from the keyset kept before the move', async function () {
+      config.values.credentialsMovedToEngine = true;
+      config.values.credentialsBeforeEngine = Buffer.from(
+        JSON.stringify({
+          'a1@example.com-imap': 'old-a1',
+          'a2@example.com-imap': 'old-a2',
+          'a3@example.com-imap': 'pw-a3',
+        })
+      );
+      // The older build signed a2 in again and added a3, which the engine never saw.
+      config.values.credentials = Buffer.from(JSON.stringify({ 'a2@example.com-imap': 'new-a2' }));
+      config.values.accounts = [configAccount('a1'), configAccount('a2'), configAccount('a3')];
+      fake.keepsAccounts(['a1', 'a2']);
+      supervisor.start();
+      await until('the adds', () => fake.stdinOf('account.add').length === 3);
+
+      const [imported] = fake.stdinOf('credentials.import');
+      expect(imported.params.accounts.map((a) => [a.id, a.settings.imap_password])).toEqual([
+        ['a2', 'new-a2'],
+        ['a3', 'pw-a3'],
+      ]);
+      expect(imported.params.secrets).toEqual({});
+      expect(addedPasswords().every(([, pw]) => pw === undefined)).toBe(true);
+      expect(keys()).toEqual({});
+    });
+
+    it('drops the secrets of an account the engine stored on account.add', async function () {
+      fake.keepsAccounts(['a1', 'a2']);
+      config.values.credentialsMovedToEngine = true;
+      config.values.credentials = Buffer.from('{}');
+      await started();
+      expect(fake.stdinOf('credentials.import')).toEqual([]);
+
+      // Onboarding stores a new account's secrets, then AccountStore saves it.
+      await keyManager.extractAndStoreAccountSecrets({
+        ...configAccount('a3'),
+        settings: { imap_password: 'pw-a3' },
+      });
+      fake.addResults.a3 = { accountId: 'a3', state: 'running', stored: true };
+      config.set('accounts', [configAccount('a1'), configAccount('a2'), configAccount('a3')]);
+      await until('the add', () => fake.stdinOf('account.add').length === 3);
+      expect(fake.stdinOf('account.add')[2].params.account.settings.imap_password).toBe('pw-a3');
+      await until('the dropped copy', () => !keys()['a3@example.com-imap']);
+    });
+
+    it('leaves the secrets in KeyManager while the engine refuses an account', async function () {
+      fake.keepsAccounts([]);
+      fake.importResult = {
+        imported: ['a1'],
+        failed: [{ accountId: 'a2', email: 'a2@example.com', error: 'no imap_password' }],
+        secrets: [],
+      };
+      await started();
+
+      expect(config.values.credentialsMovedToEngine).toBe(undefined);
+      expect(addedPasswords()).toEqual([
+        ['a1', 'pw-a1'],
+        ['a2', 'pw-a2'],
+      ]);
+      expect(keys()['a1@example.com-imap']).toBe('pw-a1');
+    });
+
+    it('joins a detached engine on its socket and leaves it running', async function () {
+      config.values.credentialsMovedToEngine = true;
+      config.values.credentials = Buffer.from('{}');
+      fake.keepsAccounts(['a1', 'a2'], { detached: true });
+      fake.socketResults['account.add'] = { state: 'running' };
+      const joined = new EngineSupervisor({
+        configDirPath: dir,
+        resourcePath: dir,
+        config,
+        keyManager,
+        attachTo: fake.socketPath,
+        broadcast: (_channel, status: EngineStatus) => statuses.push(status),
+      });
+      joined.start();
+      await until('the adds', () => fake.socketOf('account.add').length === 2);
+      await until(
+        'the ready engine',
+        () => !!lastStatus() && lastStatus().socketPath === fake.socketPath
+      );
+
+      expect(fake.spawns).toEqual([]);
+      expect(fake.stdin).toEqual([]);
+      expect(fake.socketOf('account.add').map((r) => r.params.account.id)).toEqual(['a1', 'a2']);
+      expect(fake.socketOf('credentials.import')).toEqual([]);
+      await joined.shutdown();
+      expect(fake.socketOf('engine.shutdown')).toEqual([]);
+    });
+
+    it('reuses a detached engine running the bundled build and stops any other', async function () {
+      const binary = path.join(dir, 'mailsync-rs');
+      fs.writeFileSync(binary, 'the bundled engine');
+      const build = await engineBuildId(binary);
+      const child = spawn('/bin/sleep', ['30']);
+      const discovery = (extra: any) =>
+        fs.writeFileSync(
+          path.join(dir, 'run', 'engine.json'),
+          JSON.stringify({ pid: child.pid, socket: fake.socketPath, protocol: 1, ...extra })
+        );
+      try {
+        discovery({ detached: true });
+        fake.keepsAccounts([], { build, detached: true });
+        expect(await detachedEngineToReuse(dir, dir, { canReuse: true })).toBe(fake.socketPath);
+        expect(fake.socketOf('engine.shutdown')).toEqual([]);
+
+        // Credentials still in the app: the bundled engine has to import them on its stdin.
+        expect(await detachedEngineToReuse(dir, dir, { canReuse: false })).toBe(null);
+        expect(fake.socketOf('engine.shutdown').length).toBe(1);
+
+        // An older engine left running across an update.
+        fake.keepsAccounts([], { build: 'sha256:older', detached: true });
+        expect(await detachedEngineToReuse(dir, dir, { canReuse: true })).toBe(null);
+        expect(fake.socketOf('engine.shutdown').length).toBe(2);
+        fake.keepsAccounts([], { build, detached: true, protocol: 2 });
+        expect(await detachedEngineToReuse(dir, dir, { canReuse: true })).toBe(null);
+        expect(fake.socketOf('engine.shutdown').length).toBe(3);
+
+        // An engine an earlier app run spawned exits on its own once its stdin closed.
+        discovery({});
+        expect(await detachedEngineToReuse(dir, dir, { canReuse: true })).toBe(null);
+        expect(fake.socketOf('hello').length).toBe(7);
+      } finally {
+        child.kill();
+      }
+    });
   });
 
   it('starts the engine without accounts, so onboarding has one', async function () {

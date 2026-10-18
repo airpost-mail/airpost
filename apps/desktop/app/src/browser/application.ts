@@ -55,12 +55,13 @@ import {
   profileResetDetail,
   resetProfileDirectory,
 } from './profile-reset';
-import { KeyManager, registerKeyManagerIPC } from './key-manager';
+import { credentialsMovedToEngine, KeyManager, registerKeyManagerIPC } from './key-manager';
 import {
   EngineSupervisor,
   QuitGate,
   registerEngineSupervisorIPC,
   waitForEarlierEngine,
+  detachedEngineToReuse,
 } from './engine-supervisor';
 
 // The application's singleton class.
@@ -87,6 +88,7 @@ export default class Application extends EventEmitter {
   windowsTaskbarManager?: WindowsTaskbarManager;
   keyManager: KeyManager;
   engineSupervisor: EngineSupervisor | null = null;
+  _attachTo: string | null = null;
   quitGate = new QuitGate();
 
   _sourceWindows: { [taskId: string]: BrowserWindow } = {};
@@ -123,9 +125,18 @@ export default class Application extends EventEmitter {
     }
 
     try {
-      await waitForEarlierEngine(configDirPath);
-      const mailsync = new MailsyncProcess(options);
-      await mailsync.migrate();
+      // A detached engine with the bundled build is joined, and has migrated the database
+      // itself; any other is asked to stop first.
+      this._attachTo = specMode
+        ? null
+        : await detachedEngineToReuse(configDirPath, resourcePath, {
+            canReuse: credentialsMovedToEngine(configDirPath),
+          });
+      if (!this._attachTo) {
+        await waitForEarlierEngine(configDirPath);
+        const mailsync = new MailsyncProcess(options);
+        await mailsync.migrate();
+      }
     } catch (err) {
       let message = null;
       let buttons = [localized('Quit')];
@@ -252,6 +263,7 @@ export default class Application extends EventEmitter {
         config: this.config,
         keyManager: this.keyManager,
         settings,
+        attachTo: this._attachTo,
         broadcast: (channel, payload) => {
           for (const win of BrowserWindow.getAllWindows()) {
             if (!win.isDestroyed()) win.webContents.send(channel, payload);

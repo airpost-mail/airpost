@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { localized } from '../intl';
 import {
   canMigrate as canMigrateFromMailspring,
@@ -47,6 +49,30 @@ const TERN_OWNS_KEY = 'tern';
 
 // The Mailspring blob, kept when it could not be migrated, so nothing copied over is destroyed.
 const configUnmigratedCredentialsKey = 'credentialsFromMailspring';
+
+// Set once the accounts' secrets moved into the engine (credentials.import, stage 11). The blob
+// as it was then is kept under credentialsBeforeEngine for one release, so a downgrade and
+// the next upgrade find the passwords; `credentials` keeps only what isn't an account's
+// (integration keys, which the desktop still reads).
+export const configCredentialsMovedKey = 'credentialsMovedToEngine';
+export const configCredentialsBeforeEngineKey = 'credentialsBeforeEngine';
+
+// The flag as config.json has it on disk, for launch before Config is loaded.
+export function credentialsMovedToEngine(configDirPath: string) {
+  try {
+    const json = JSON.parse(fs.readFileSync(path.join(configDirPath, 'config.json')).toString());
+    return !!(json && json['*'] && json['*'][configCredentialsMovedKey]);
+  } catch (err) {
+    return false;
+  }
+}
+
+// `<email>-imap`, `<email>-smtp`, `<email>-refresh-token`.
+const ACCOUNT_SECRET_KEY = /-(imap|smtp|refresh-token)$/;
+
+export function isAccountSecretKey(name: string) {
+  return ACCOUNT_SECRET_KEY.test(name);
+}
 
 // safeStorage is a main-process module; specs run in a renderer and replace every method here.
 const safeStorage = () => require('electron').safeStorage;
@@ -134,6 +160,56 @@ export class KeyManager {
       ...(await this.accountSecrets(account.emailAddress, keys)),
     };
     return next as AccountSecretsJSON;
+  }
+
+  // Whether the keyset of this account has any secret.
+  async hasAccountSecrets(emailAddress: string, keys: KeySet = null) {
+    const secrets = await this.accountSecrets(emailAddress, keys);
+    return Object.values(secrets).some((v) => typeof v === 'string' && v.length > 0);
+  }
+
+  // What windows read (OAuth revocation, the reconnect form): once the secrets moved to the
+  // engine, a migrated account's come from the keyset kept from before the move.
+  async accountSecretsForWindows(emailAddress: string): Promise<AccountSecrets> {
+    const secrets = await this.accountSecrets(emailAddress);
+    if (!this.credentialsMovedToEngine() || Object.values(secrets).some(Boolean)) return secrets;
+    return this.accountSecrets(emailAddress, await this.keysBeforeEngine());
+  }
+
+  credentialsMovedToEngine() {
+    return !!this.config.get(configCredentialsMovedKey);
+  }
+
+  // The keyset as it was when it moved into the engine; {} when there is none or it can't be
+  // read.
+  async keysBeforeEngine(): Promise<KeySet> {
+    const blob = this.config.get(configCredentialsBeforeEngineKey);
+    if (!blob || blob === 'null') return {} as KeySet;
+    try {
+      const { result } = await secureStorage.decrypt(Buffer.from(blob, 'utf-8'));
+      return JSON.parse(result) as KeySet;
+    } catch (err) {
+      console.warn('Tern could not read the passwords kept from before the engine stored them.');
+      return {} as KeySet;
+    }
+  }
+
+  // After credentials.import took every account: keeps the blob as credentialsBeforeEngine
+  // (the first time) and drops the accounts' secrets from `credentials`.
+  moveAccountSecretsToEngine(): Promise<void> {
+    const run = this._writes.then(async () => {
+      const keys = await this._getKeyHash();
+      if (!this.config.get(configCredentialsBeforeEngineKey)) {
+        this.config.set(configCredentialsBeforeEngineKey, this.config.get(configCredentialsKey));
+      }
+      for (const name of Object.keys(keys)) {
+        if (isAccountSecretKey(name)) delete keys[name];
+      }
+      await this._writeKeyHash(keys);
+      this.config.set(configCredentialsMovedKey, true);
+    });
+    this._writes = run.catch(() => {});
+    return run;
   }
 
   async replacePassword(keyName: string, newVal: string) {
@@ -407,7 +483,7 @@ showed a dialog for them.
 export function registerKeyManagerIPC(ipcMain: Electron.IpcMain, keyManager: KeyManager) {
   const methods: { [method in KeyManagerMethod]: (...args: any[]) => Promise<any> } = {
     getKeyHash: () => keyManager._getKeyHash(),
-    accountSecrets: (emailAddress: string) => keyManager.accountSecrets(emailAddress),
+    accountSecrets: (emailAddress: string) => keyManager.accountSecretsForWindows(emailAddress),
     storeAccountSecrets: async (account: AccountSecretsJSON) => {
       await keyManager.extractAndStoreAccountSecrets(account);
     },

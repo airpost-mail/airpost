@@ -424,6 +424,61 @@ describe('KeyManager in the main process', function () {
     });
   });
 
+  describe('moving the account secrets to the engine', function () {
+    beforeEach(function () {
+      this.config[CREDENTIALS_KEY] = Buffer.from(
+        JSON.stringify({
+          'me@example.com-imap': 'pw',
+          'me@example.com-refresh-token': 'rt',
+          'integration-deepl-key': 'k',
+        })
+      ).toJSON();
+      this.config[KEY_OWNER_KEY] = 'tern';
+      spyOn(secureStorage, 'decrypt').andCallFake((blob: Buffer) =>
+        Promise.resolve({ result: blob.toString(), shouldReEncrypt: false })
+      );
+    });
+
+    it("keeps the keyset as it was and drops only the accounts' secrets", async function () {
+      expect(KeyManager.credentialsMovedToEngine()).toBe(false);
+      expect(await KeyManager.hasAccountSecrets('me@example.com')).toBe(true);
+      await KeyManager.moveAccountSecretsToEngine();
+
+      expect(KeyManager.credentialsMovedToEngine()).toBe(true);
+      expect(await KeyManager._getKeyHash()).toEqual({ 'integration-deepl-key': 'k' });
+      expect(await KeyManager.hasAccountSecrets('me@example.com')).toBe(false);
+      const before = await KeyManager.keysBeforeEngine();
+      expect(before['me@example.com-imap']).toBe('pw');
+
+      // A later move (after a downgrade added secrets again) keeps the first copy.
+      await KeyManager.replacePassword('me@example.com-imap', 'newer');
+      await KeyManager.moveAccountSecretsToEngine();
+      expect((await KeyManager.keysBeforeEngine())['me@example.com-imap']).toBe('pw');
+      expect(await KeyManager._getKeyHash()).toEqual({ 'integration-deepl-key': 'k' });
+    });
+
+    it('answers the windows from the kept keyset once the secrets moved', async function () {
+      await KeyManager.moveAccountSecretsToEngine();
+      expect(await KeyManager.accountSecrets('me@example.com')).toEqual({
+        imap_password: undefined,
+        smtp_password: undefined,
+        refresh_token: undefined,
+      });
+      expect(await KeyManager.accountSecretsForWindows('me@example.com')).toEqual({
+        imap_password: 'pw',
+        smtp_password: undefined,
+        refresh_token: 'rt',
+      });
+    });
+
+    it('reads an unreadable kept keyset as empty', async function () {
+      this.config.credentialsBeforeEngine = 'garbage';
+      (secureStorage.decrypt as any).andCallFake(() => Promise.reject(new Error('no')));
+      spyOn(console, 'warn');
+      expect(await KeyManager.keysBeforeEngine()).toEqual({});
+    });
+  });
+
   describe('for the windows', function () {
     beforeEach(function () {
       this.config[CREDENTIALS_KEY] = Buffer.from('{"a-imap":"secret"}').toJSON();

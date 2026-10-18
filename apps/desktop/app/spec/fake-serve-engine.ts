@@ -44,6 +44,8 @@ export class FakeEngine {
   exitOnShutdown = true;
   // False stands in for an engine that could not bind and never reads stdin.
   answerList = true;
+  // The credentials.import result, instead of every account imported.
+  importResult: any = null;
   // The account.test result, instead of a passed test that echoes the account.
   testResult: any = null;
   // Socket results by method, instead of `{}`, and errors, instead of a result.
@@ -196,6 +198,14 @@ export class FakeEngine {
             error_service: 'smtp',
           }
         );
+      case 'credentials.import':
+        return respond(
+          this.importResult || {
+            imported: req.params.accounts.map((a: any) => a.id),
+            failed: [],
+            secrets: Object.keys(req.params.secrets),
+          }
+        );
       case 'account.reset':
         return respond({});
       case 'engine.resetDatabase':
@@ -208,6 +218,23 @@ export class FakeEngine {
       default:
         return respond(null, { code: -32601, message: `unknown method ${req.method}` });
     }
+  }
+
+  // Answers hello as an engine that keeps the accounts (Feature.Accounts) and has `registered`.
+  keepsAccounts(registered: string[] = [], extra: any = {}) {
+    this.socketResults.hello = {
+      protocol: 1,
+      engine: 'fake',
+      pid: 1,
+      accounts: registered.map((id) => ({
+        accountId: id,
+        email: `${id}@example.com`,
+        state: 'stopped',
+      })),
+      features: ['accounts'],
+      credentials: { store: 'file', accounts: registered.length },
+      ...extra,
+    };
   }
 
   // The requests of one method on stdin, in order.

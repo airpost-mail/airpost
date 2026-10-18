@@ -16,13 +16,38 @@ first subscriber's backlog to the windows and still brings it every `account.sta
 `settings.changed`; it also carries the engine-owned settings (src/browser/engine-settings.ts). Account
 events (launched, exited, too many failures) go to the main window, which updates AccountStore
 and OnlineStatusStore; it acks them, and those not acked are handed to its next renderer.
+
+An engine with Feature.Accounts keeps the accounts and their secrets itself (section 5 of the
+plan). Before the first account.add to it, the supervisor sends `credentials.import` with every
+config.json account the engine hasn't registered, and with every account KeyManager still has
+secrets for (new ones from onboarding or a reconnect, or from a downgraded build); once the
+engine has them all, KeyManager drops the accounts' secrets (moveAccountSecretsToEngine) and
+account.add goes without them. An account.add whose secrets the engine stored drops that
+account's copy too: the engine keeps its rotated tokens, so the copy would go stale. config.json `accounts` stays the list of accounts the desktop
+runs. A `serve --detached` engine found at launch with the bundled build is joined instead
+of spawned (detachedEngineToReuse); it can't take `credentials.import`, so it is reused only
+once the credentials moved.
 */
 import fs from 'fs';
 import path from 'path';
 import { AccountJSON, EngineAccount, EngineClient } from '../engine-client';
-import { EngineServeProcess, MailsyncProcessExit, ResetOptions } from '../mailsync-process';
-import { AccountSecretsJSON, KeyManager } from './key-manager';
-import { SettingsValues } from '../engine-protocol';
+import net from 'net';
+import {
+  engineBinaryPath,
+  engineBuildId,
+  EngineServeProcess,
+  MailsyncProcessExit,
+  ResetOptions,
+} from '../mailsync-process';
+import { AccountSecretsJSON, isAccountSecretKey, KeyManager, KeySet } from './key-manager';
+import {
+  CredentialsImportParams,
+  Feature,
+  HelloResult,
+  Method,
+  PROTOCOL_VERSION,
+  SettingsValues,
+} from '../engine-protocol';
 import type { EngineSettingsMirror } from './engine-settings';
 import {
   AccountEvent,
@@ -58,6 +83,8 @@ export interface EngineSupervisorOptions {
   broadcast: (channel: string, payload: unknown) => void;
   // Gets each engine once its socket is greeted, and the settings it announces as changed.
   settings?: Pick<EngineSettingsMirror, 'attach' | 'detach' | 'engineChanged'>;
+  // The socket of a detached engine to join instead of spawning the first one.
+  attachTo?: string | null;
 }
 
 type PendingEvent = AccountEvent & { seq: number };
@@ -79,9 +106,13 @@ export class EngineSupervisor {
   _ensureQueued = false;
   _statusQueued = false;
   _configSubscriptions: Array<{ dispose(): void }> = [];
+  _attachTo: string | null = null;
+  // Settles once the engine's hello was handled by _prepareCredentials, or it closed.
+  _credentialsReady = new WeakMap<EngineServeProcess, Promise<void>>();
 
   constructor(options: EngineSupervisorOptions) {
     this.options = options;
+    this._attachTo = options.attachTo || null;
     this.client = new EngineClient({
       createEngine: () => this._createEngine(),
       accounts: () => this.accounts(),
@@ -98,6 +129,7 @@ export class EngineSupervisor {
           exit: serializeExit(exit),
         }),
       onAccountsChanged: () => this._statusChanged(),
+      onAccountStored: (accountId) => this._dropStoredSecrets(accountId),
     });
   }
 
@@ -222,7 +254,18 @@ export class EngineSupervisor {
   _createEngine() {
     const engine = new EngineServeProcess(this._processOptions());
     engine.subscription = { accounts: null, classes: [] };
+    // Only the first engine joins a detached one; after that the supervisor spawns its own.
+    engine.attachTo = this._attachTo;
+    this._attachTo = null;
     const generation = ++this._generation;
+    let credentialsSettled: () => void;
+    this._credentialsReady.set(engine, new Promise((resolve) => (credentialsSettled = resolve)));
+    engine.once('hello', (hello: HelloResult) => {
+      this._prepareCredentials(engine, hello)
+        .catch((err) => console.error(`Could not move the account secrets to the engine: ${err}`))
+        .then(() => credentialsSettled());
+    });
+    engine.once('close', () => credentialsSettled());
     engine.on('ready', () => {
       if (this.client.engine !== engine) return;
       this._readyEngine = engine;
@@ -246,17 +289,77 @@ export class EngineSupervisor {
     return engine;
   }
 
+  // The accounts as account.add takes them. An engine that keeps the secrets gets those
+  // KeyManager still has (an account added or reconnected this run) and fills in the rest.
   async _accountJSONs(accounts: EngineAccount[]): Promise<AccountJSON[]> {
     const { keyManager } = this.options;
+    const { engine } = this.client;
+    const ready = engine && this._credentialsReady.get(engine);
+    if (ready) await ready;
+    const registry = this.client.registry();
     const byId = new Map(this.accounts().map((json) => [json.id, json]));
     const keys = await keyManager._getKeyHash();
     const result: AccountJSON[] = [];
     for (const { id } of accounts) {
       const json = byId.get(id);
-      if (json)
+      if (!json) continue;
+      if (registry && !(await keyManager.hasAccountSecrets(json.emailAddress, keys))) {
+        result.push(json as unknown as AccountJSON);
+      } else {
         result.push((await keyManager.insertAccountSecrets(json, keys)) as unknown as AccountJSON);
+      }
     }
     return result;
+  }
+
+  // The engine stored the secrets account.add carried (a new or signed-in-again account), and
+  // keeps the rotated tokens from now on, so KeyManager's copy would only go stale.
+  _dropStoredSecrets(accountId: string) {
+    const json = this.accounts().find((a) => a.id === accountId);
+    if (!json) return;
+    const { keyManager } = this.options;
+    keyManager
+      .hasAccountSecrets(json.emailAddress)
+      .then((has) => has && keyManager.deleteAccountSecrets(json))
+      .catch((err) => console.warn(`Could not drop the secrets the engine stored: ${err}`));
+  }
+
+  /*
+  Migration steps 2-5 (plan section 5): imports the accounts the engine lacks, with the secrets
+  KeyManager has for them, falling back to the keyset kept from before the move (a downgraded
+  build may have added accounts, and re-signed-in ones have newer secrets in `credentials`).
+  Once every account is in the engine, KeyManager drops the accounts' secrets.
+  */
+  async _prepareCredentials(engine: EngineServeProcess, hello: HelloResult) {
+    if (engine._attached || !(hello.features || []).includes(Feature.Accounts)) return;
+    const { keyManager } = this.options;
+    const keys = await keyManager._getKeyHash();
+    const moved = keyManager.credentialsMovedToEngine();
+    const registered = new Set((hello.accounts || []).map((a) => a.accountId));
+    let earlier: KeySet = null;
+    const accounts: CredentialsImportParams['accounts'] = [];
+    for (const json of this.accounts()) {
+      const own = await keyManager.hasAccountSecrets(json.emailAddress, keys);
+      if (registered.has(json.id) && !own) continue;
+      if (!own && !earlier) earlier = await keyManager.keysBeforeEngine();
+      accounts.push(await keyManager.insertAccountSecrets(json, own ? keys : earlier));
+    }
+    const secrets: CredentialsImportParams['secrets'] = {};
+    if (!moved) {
+      for (const [name, value] of Object.entries(keys)) {
+        if (!isAccountSecretKey(name) && typeof value === 'string' && value) secrets[name] = value;
+      }
+    }
+    const leftover = Object.keys(keys).some((name) => isAccountSecretKey(name) && keys[name]);
+    if (!accounts.length && !Object.keys(secrets).length && moved && !leftover) return;
+    if (accounts.length || Object.keys(secrets).length) {
+      const result = await engine.importCredentials({ accounts, secrets });
+      for (const { accountId, email, error } of result.failed || []) {
+        console.warn(`The engine did not take account ${accountId} (${email}): ${error}`);
+      }
+      if ((result.failed || []).length) return;
+    }
+    await keyManager.moveAccountSecretsToEngine();
   }
 
   // serve's stdout carries only the accounts' rotated secrets.
@@ -415,6 +518,141 @@ export async function waitForEarlierEngine(
   }
   console.warn(`The sync engine of an earlier run (pid ${pid}) is still running; migrating anyway`);
   return false;
+}
+
+interface EngineDiscovery {
+  pid: number;
+  socket: string;
+  protocol?: number;
+  detached?: boolean;
+}
+
+function readEngineDiscovery(configDirPath: string): EngineDiscovery | null {
+  try {
+    const file = path.join(configDirPath, 'run', 'engine.json');
+    const json = JSON.parse(fs.readFileSync(file).toString());
+    const { pid, socket } = json;
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return null;
+    if (typeof socket !== 'string' || !socket) return null;
+    return json as EngineDiscovery;
+  } catch (err) {
+    return null;
+  }
+}
+
+const PROBE_TIMEOUT_MS = 5000;
+
+/*
+Opens a connection to an engine socket, sends `calls` in order after a hello and resolves with
+each answer (the hello's first) once all have come, or rejects when the connection ends or
+`timeoutMs` passes first.
+*/
+export function engineSocketExchange(
+  socketPath: string,
+  calls: Array<[string, unknown]>,
+  timeoutMs = PROBE_TIMEOUT_MS
+): Promise<Array<{ result?: any; error?: { code: number; message: string } }>> {
+  return new Promise((resolve, reject) => {
+    const all: Array<[string, unknown]> = [
+      [Method.Hello, { protocol: PROTOCOL_VERSION, client: 'tern-desktop/launch' }],
+      ...calls,
+    ];
+    const answers = new Array(all.length);
+    let left = all.length;
+    let buffer = '';
+    const socket = net.createConnection(socketPath);
+    const done = (err: Error | null) => {
+      clearTimeout(timer);
+      socket.removeAllListeners();
+      socket.on('error', () => {});
+      socket.destroy();
+      if (err) reject(err);
+      else resolve(answers);
+    };
+    const timer = setTimeout(() => done(new Error('the engine did not answer')), timeoutMs);
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk: string) => {
+      buffer += chunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        let msg = null;
+        try {
+          msg = JSON.parse(line);
+        } catch (err) {
+          continue;
+        }
+        if (msg.method !== undefined || !Number.isInteger(msg.id)) continue;
+        if (msg.id < 1 || msg.id > all.length || answers[msg.id - 1]) continue;
+        answers[msg.id - 1] = { result: msg.result, error: msg.error };
+        if (--left === 0) {
+          done(null);
+          return;
+        }
+      }
+    });
+    socket.on('error', (err) => done(err));
+    socket.on('close', () => done(new Error('the engine closed the connection')));
+    socket.write(
+      all
+        .map(([method, params], i) => JSON.stringify({ jsonrpc: '2.0', id: i + 1, method, params }))
+        .join('\n') + '\n'
+    );
+  });
+}
+
+/*
+The socket of a `serve --detached` engine (run/engine.json) the launch can join instead of
+spawning its own: one that runs the bundled build and protocol, keeps the accounts, and only
+once `canReuse` (the credentials moved into the engine; a joined engine can't take
+`credentials.import`). Any other detached engine is asked to stop (engine.shutdown on its
+socket), so waitForEarlierEngine then waits for it to exit and the bundled one starts. Null
+when there is none to join. An earlier engine that isn't detached is left to
+waitForEarlierEngine: it exits once its parent's stdin closed.
+*/
+export async function detachedEngineToReuse(
+  configDirPath: string,
+  resourcePath: string,
+  { canReuse, timeoutMs = PROBE_TIMEOUT_MS }: { canReuse: boolean; timeoutMs?: number }
+): Promise<string | null> {
+  const found = readEngineDiscovery(configDirPath);
+  if (!found || !found.detached || !pidAlive(found.pid)) return null;
+  let hello: HelloResult = null;
+  try {
+    const [answer] = await engineSocketExchange(found.socket, [], timeoutMs);
+    hello = answer.result || null;
+    if (!hello) {
+      console.warn(
+        `The detached sync engine refused hello: ${answer.error && answer.error.message}`
+      );
+    }
+  } catch (err) {
+    console.warn(`Could not reach the detached sync engine (pid ${found.pid}): ${err.message}`);
+    return null;
+  }
+  const bundled = await engineBuildId(engineBinaryPath(resourcePath));
+  let reason: string = null;
+  if (!hello) reason = 'it refused hello';
+  else if (hello.protocol !== PROTOCOL_VERSION) reason = `it speaks protocol ${hello.protocol}`;
+  else if (!hello.build || hello.build !== bundled) reason = 'it runs another build';
+  else if (!(hello.features || []).includes(Feature.Accounts)) reason = 'it keeps no accounts';
+  else if (!canReuse) reason = 'the credentials are still in the app';
+  if (!reason) {
+    console.log(`Joining the detached sync engine (pid ${found.pid})`);
+    return found.socket;
+  }
+  console.log(`Stopping the detached sync engine (pid ${found.pid}): ${reason}`);
+  try {
+    const [, stop] = await engineSocketExchange(
+      found.socket,
+      [[Method.EngineShutdown, {}]],
+      timeoutMs
+    );
+    if (stop.error) console.warn(`The detached sync engine refused to stop: ${stop.error.message}`);
+  } catch (err) {
+    // It may exit before answering.
+  }
+  return null;
 }
 
 /*
