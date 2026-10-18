@@ -28,8 +28,9 @@ mod reply;
 mod triage;
 mod wire;
 
+use std::collections::HashSet;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use ms_integrations::{CacheKey, KeyBuilder, TtlCache};
@@ -52,20 +53,23 @@ pub use triage::{Category, Triage};
 
 use cancel::Discard;
 use config::Target;
-use http::{ChatOutput, Http, Timeouts};
+use http::{ChatFailure, ChatOutput, Http, Timeouts};
 use wire::ChatRequest;
 
 /// Room left for the request's framing (roles, separators) on top of the estimated prompt.
 const PROMPT_MARGIN_TOKENS: usize = 64;
 /// The thread always gets at least this much, even when a small window is mostly output.
 const MIN_CONTEXT_TOKENS: usize = 256;
+/// The output limit is lowered to fit the window, but never below this.
+const MIN_OUTPUT_TOKENS: usize = 128;
 /// Enough for a one-word answer after a reasoning model's thinking.
 const TEST_MAX_OUTPUT_TOKENS: u32 = 128;
 /// The Anthropic model list is paged; more pages than this would be a provider bug.
 const MAX_MODEL_PAGES: usize = 10;
 
-/// Called once per completed provider request with its token counts; the engine keeps
-/// the `ai.usage` counters with it.
+/// Called once per provider request the provider accepted, with its token counts: also
+/// for one that failed, was cut or was cancelled after that (estimated where the provider
+/// sent no usage). The engine keeps the `ai.usage` counters with it.
 pub type UsageObserver = Arc<dyn Fn(&UsageRecord) + Send + Sync>;
 
 /// Timeouts, cache bounds and the usage hook. [`Options::default`] is what the engine uses.
@@ -263,6 +267,9 @@ pub struct Ai {
     options: Options,
     summaries: TtlCache<Completion>,
     suggestions: TtlCache<Vec<Suggestion>>,
+    /// Base URLs of OpenAI-compatible servers that refused JSON mode (LM Studio accepts
+    /// only `json_schema` or `text`); their JSON requests go without `response_format`.
+    no_json_mode: Mutex<HashSet<String>>,
 }
 
 impl fmt::Debug for Ai {
@@ -292,6 +299,7 @@ impl Ai {
             http: Http::new(options.connect_timeout)?,
             summaries: TtlCache::new(options.max_cached_summaries),
             suggestions: TtlCache::new(options.max_cached_suggestions),
+            no_json_mode: Mutex::default(),
             options,
         })
     }
@@ -333,9 +341,7 @@ impl Ai {
             json_schema: None,
         };
         let started = Instant::now();
-        let out = self
-            .http
-            .chat(&target, Feature::Test, &req, &mut Discard, self.timeouts())?;
+        let out = self.chat(config, &target, Feature::Test, &req, &mut Discard)?;
         let latency_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let generated = self.finish(config, &target, Feature::Test, &req, out);
         Ok(TestReport {
@@ -348,7 +354,8 @@ impl Ai {
 
     /// A short summary of the thread, streamed into `sink`. Cached for
     /// [`Options::summary_ttl`] by provider, model, prompt version and thread content;
-    /// a cached summary is returned whole with `cached: true` and nothing streamed.
+    /// a cached summary is returned whole with `cached: true`, no usage (it cost nothing)
+    /// and nothing streamed.
     pub fn summarize(
         &self,
         config: &ProviderConfig,
@@ -361,6 +368,7 @@ impl Ai {
         if !opts.refresh {
             if let Some(mut hit) = self.summaries.get(&key) {
                 hit.cached = true;
+                hit.usage = None;
                 return Ok(hit);
             }
         }
@@ -463,6 +471,8 @@ impl Ai {
     }
 
     /// Budgets the context into the model's window, sends the request and records usage.
+    /// The output limit is lowered when the window couldn't hold it, the prompt and
+    /// [`MIN_CONTEXT_TOKENS`] of thread.
     #[allow(clippy::too_many_arguments)]
     fn generate(
         &self,
@@ -477,26 +487,64 @@ impl Ai {
     ) -> Result<Generated> {
         let system = prompt::system(&context.owner_name());
         let reserved = estimate_tokens(&system) + estimate_tokens(&task) + PROMPT_MARGIN_TOKENS;
-        let budget = (target.context_tokens as usize)
-            .saturating_sub(target.max_output_tokens as usize)
+        let window = target.context_tokens as usize;
+        let max_output = (target.max_output_tokens as usize)
+            .min(window.saturating_sub(reserved + MIN_CONTEXT_TOKENS))
+            .max(MIN_OUTPUT_TOKENS);
+        let budget = window
+            .saturating_sub(max_output)
             .saturating_sub(reserved)
             .max(MIN_CONTEXT_TOKENS);
         let rendered = context.render(budget);
-        let req = ChatRequest {
+        let json_mode = json_schema.is_some()
+            && !(target.kind == ProviderKind::OpenAi
+                && self.no_json_mode.lock().unwrap().contains(&target.base));
+        let mut req = ChatRequest {
             system,
             user: format!("{}\n\n{task}", rendered.text),
-            max_output_tokens: target.max_output_tokens,
-            json_schema,
+            max_output_tokens: u32::try_from(max_output).unwrap_or(u32::MAX),
+            json_schema: json_schema.filter(|_| json_mode),
         };
-        let timeouts = self.timeouts();
-        let out = match self.http.chat(target, feature, &req, sink, timeouts) {
+        let out = match self.chat(config, target, feature, &req, sink) {
+            Err(e) if refused_json_mode(target, &req, &e) => {
+                self.no_json_mode
+                    .lock()
+                    .unwrap()
+                    .insert(target.base.clone());
+                // The prompt asks for JSON too, and both parsers find it in plain text.
+                req.json_schema = None;
+                self.chat(config, target, feature, &req, sink)
+            }
+            other => other,
+        };
+        let out = match out {
             Err(e) if retry && matches!(e, AiError::Offline { .. } | AiError::Provider { .. }) => {
                 std::thread::sleep(self.options.retry_delay);
-                self.http.chat(target, feature, &req, sink, timeouts)?
+                self.chat(config, target, feature, &req, sink)?
             }
             other => other?,
         };
         Ok(self.finish(config, target, feature, &req, out))
+    }
+
+    /// One provider request; usage is recorded for an accepted request that then failed.
+    fn chat(
+        &self,
+        config: &ProviderConfig,
+        target: &Target,
+        feature: Feature,
+        req: &ChatRequest,
+        sink: &mut dyn Sink,
+    ) -> Result<ChatOutput> {
+        match self.http.chat(target, feature, req, sink, self.timeouts()) {
+            Ok(out) => Ok(out),
+            Err(ChatFailure { error, partial }) => {
+                if let Some(out) = partial {
+                    self.finish(config, target, feature, req, out);
+                }
+                Err(error)
+            }
+        }
     }
 
     fn finish(
@@ -536,6 +584,21 @@ impl Ai {
             usage,
         }
     }
+}
+
+/// A compatible server's 400 for `response_format: json_object`.
+fn refused_json_mode(target: &Target, req: &ChatRequest, e: &AiError) -> bool {
+    let AiError::BadRequest {
+        status: Some(400),
+        message,
+    } = e
+    else {
+        return false;
+    };
+    let message = message.to_ascii_lowercase();
+    target.kind == ProviderKind::OpenAi
+        && req.json_schema.is_some()
+        && (message.contains("response_format") || message.contains("json_object"))
 }
 
 fn completion(g: Generated) -> Result<Completion> {

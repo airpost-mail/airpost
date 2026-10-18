@@ -24,6 +24,7 @@ pub const OLLAMA_CONTEXT_TOKENS: u32 = 8192;
 /// The input budget for cloud models when `contextTokens` is unset. Their windows are far
 /// larger; this bounds what one request costs.
 pub const CLOUD_CONTEXT_TOKENS: u32 = 16384;
+/// The default output limits, lowered to a quarter of `contextTokens` when that is small.
 pub const OLLAMA_MAX_OUTPUT_TOKENS: u32 = 1024;
 /// Higher than the answers need: reasoning models spend output tokens thinking, and only
 /// generated tokens are billed.
@@ -162,19 +163,33 @@ impl ProviderConfig {
             })
     }
 
+    /// `maxOutputTokens`, else the kind's default capped at a quarter of the window, so a
+    /// small local window keeps room for the thread. Each request lowers it further when
+    /// the prompt needs the room.
     pub fn max_output_tokens(&self) -> u32 {
         self.max_output_tokens
             .filter(|&n| n > 0)
-            .unwrap_or(match self.kind {
-                ProviderKind::Ollama => OLLAMA_MAX_OUTPUT_TOKENS,
-                _ => CLOUD_MAX_OUTPUT_TOKENS,
+            .unwrap_or_else(|| {
+                let default = match self.kind {
+                    ProviderKind::Ollama => OLLAMA_MAX_OUTPUT_TOKENS,
+                    _ => CLOUD_MAX_OUTPUT_TOKENS,
+                };
+                default.min(self.context_tokens() / 4)
             })
     }
 
     /// Checks the settings a call needs. Anthropic always needs a key, OpenAI's own API
-    /// does (a compatible server may not), Ollama doesn't.
+    /// does (a compatible server may not), Ollama doesn't. Plain http is only for a server
+    /// on this computer or network: mail and keys go nowhere else in clear text.
     pub(crate) fn target(&self, need_model: bool) -> Result<Target> {
         let base = self.base_url()?;
+        let url =
+            Url::parse(&base).map_err(|_| AiError::bad_request("the provider URL is not valid"))?;
+        if url.scheme() == "http" && !is_local_url(&url) && !is_private_name(&url) {
+            return Err(AiError::bad_request(
+                "use https for a provider that isn't on this computer or network",
+            ));
+        }
         let key = self
             .api_key
             .as_ref()
@@ -216,6 +231,23 @@ fn is_local_url(url: &Url) -> bool {
     }
     let name = host.trim_end_matches('.').to_ascii_lowercase();
     name == "localhost" || name.ends_with(".localhost")
+}
+
+/// A name that public DNS never resolves: one label (`gpu`), or under `.local` (mDNS),
+/// `.lan`, `.home.arpa` or `.internal`. Such a host is on the user's own network, so plain
+/// http is allowed; [`ProviderConfig::is_local`] still doesn't claim it.
+fn is_private_name(url: &Url) -> bool {
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    if host.starts_with('[') || host.parse::<IpAddr>().is_ok() {
+        return false;
+    }
+    let name = host.trim_end_matches('.').to_ascii_lowercase();
+    !name.contains('.')
+        || [".local", ".lan", ".home.arpa", ".internal"]
+            .iter()
+            .any(|suffix| name.ends_with(suffix))
 }
 
 fn is_local_ip(ip: IpAddr) -> bool {
@@ -344,6 +376,41 @@ mod tests {
     }
 
     #[test]
+    fn plain_http_only_nearby() {
+        let check = |url: &str| {
+            let mut c = config(ProviderKind::OpenAi, Some(url));
+            c.api_key = Some("sk-secret".into());
+            c.target(true).err().map(|e| e.key())
+        };
+        for remote in [
+            "http://8.8.8.8/v1",
+            "http://api.anthropic.com",
+            "http://llm.example.org/v1",
+            "http://[2001:4860::8888]/v1",
+        ] {
+            assert_eq!(check(remote), Some("bad-request"), "{remote}");
+        }
+        for nearby in [
+            "https://llm.example.org/v1",
+            "http://127.0.0.1:1234/v1",
+            "http://localhost:8000/v1",
+            "http://192.168.1.20/v1",
+            "http://[fd12::1]/v1",
+            "http://gpu:8000/v1",
+            "http://gpu.local:8000/v1",
+            "http://ollama.lan/v1",
+            "http://box.home.arpa/v1",
+        ] {
+            assert_eq!(check(nearby), None, "{nearby}");
+        }
+        let e = config(ProviderKind::Anthropic, Some("http://api.anthropic.com"))
+            .target(false)
+            .err()
+            .unwrap();
+        assert!(e.to_string().contains("use https"), "{e}");
+    }
+
+    #[test]
     fn defaults_per_kind() {
         let ollama = config(ProviderKind::Ollama, None);
         assert_eq!(ollama.context_tokens(), OLLAMA_CONTEXT_TOKENS);
@@ -354,6 +421,12 @@ mod tests {
         assert_eq!(cloud.context_tokens(), CLOUD_CONTEXT_TOKENS);
         cloud.context_tokens = Some(200_000);
         assert_eq!(cloud.context_tokens(), 200_000);
+        assert_eq!(cloud.max_output_tokens(), CLOUD_MAX_OUTPUT_TOKENS);
+        // A small window keeps three quarters for the thread.
+        cloud.context_tokens = Some(4096);
+        assert_eq!(cloud.max_output_tokens(), 1024);
+        cloud.max_output_tokens = Some(3000);
+        assert_eq!(cloud.max_output_tokens(), 3000);
     }
 
     #[test]

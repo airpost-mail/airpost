@@ -356,6 +356,8 @@ fn summaries_are_cached_until_refresh_or_change() {
         )
         .unwrap();
     assert!(cached.cached && cached.text == first.text);
+    assert!(first.usage.is_some());
+    assert_eq!(cached.usage, None, "a cache hit cost nothing");
     assert!(deltas.is_empty());
     assert_eq!(server.count(), 1);
 
@@ -407,13 +409,7 @@ fn long_threads_fit_the_budget() {
     let mut config = config(ProviderKind::Ollama, &server);
     config.context_tokens = Some(2048);
     config.max_output_tokens = Some(256);
-    let mut long = thread();
-    for i in 0..20 {
-        let mut m = long.messages[0].clone();
-        m.id = format!("x{i}");
-        m.body = Some(format!("{i} {}", "word ".repeat(400)));
-        long.messages.push(m);
-    }
+    let long = long_thread();
     ai().summarize(
         &config,
         &long,
@@ -427,6 +423,108 @@ fn long_threads_fit_the_budget() {
     assert!(tokens + 256 <= 2048, "{tokens} tokens");
     assert!(user.contains("left out to fit"));
     assert!(user.contains("Message 22 of 22"));
+}
+
+fn long_thread() -> ms_ai::MailContext {
+    let mut long = thread();
+    for i in 0..20 {
+        let mut m = long.messages[0].clone();
+        m.id = format!("x{i}");
+        m.body = Some(format!("{i} {}", "word ".repeat(400)));
+        long.messages.push(m);
+    }
+    long
+}
+
+#[test]
+fn small_windows_lower_the_output_limit() {
+    for kind in ALL_KINDS {
+        let server = MockServer::start(move |_| stream_reply(kind, &["ok"]));
+        let ai = ai();
+        let mut config = config(kind, &server);
+        config.context_tokens = Some(4096);
+        for (max_output, expected) in [(None, Some(1024)), (Some(4096), None)] {
+            config.max_output_tokens = max_output;
+            ai.summarize(
+                &config,
+                &long_thread(),
+                &SummaryOpts { refresh: true },
+                &mut collect(&mut Vec::new()),
+            )
+            .unwrap();
+            let body = server.last().json();
+            let limit = match kind {
+                ProviderKind::Ollama => {
+                    assert_eq!(body["options"]["num_ctx"], 4096);
+                    &body["options"]["num_predict"]
+                }
+                _ => &body["max_tokens"],
+            };
+            let limit = limit.as_u64().unwrap() as usize;
+            if let Some(expected) = expected {
+                assert_eq!(limit, expected, "{kind:?}");
+            }
+            let (system, user) = prompts(kind, &body);
+            let prompt = ms_ai::estimate_tokens(&system) + ms_ai::estimate_tokens(&user);
+            assert!(
+                limit + prompt <= 4096,
+                "{kind:?} {max_output:?}: {limit} out + {prompt} in"
+            );
+            // The default leaves the thread three quarters; an explicit limit is cut to
+            // leave it the minimum.
+            let room = if expected.is_some() { 2500 } else { 256 };
+            assert!(prompt > room, "{kind:?} {max_output:?}: {prompt} in");
+        }
+    }
+}
+
+#[test]
+fn json_mode_is_dropped_for_servers_that_refuse_it() {
+    let server = MockServer::start(|req| {
+        if req.body.contains("response_format") {
+            // LM Studio's answer to `json_object`.
+            Reply::json(
+                400,
+                json!({"error": "'response_format.type' must be 'json_schema' or 'text'"}),
+            )
+        } else if req.body.contains("Classify") {
+            stream_reply(
+                ProviderKind::OpenAi,
+                &[r#"{"category":"important","needsReply":false,"reason":"x"}"#],
+            )
+        } else {
+            stream_reply(
+                ProviderKind::OpenAi,
+                &[r#"{"suggestions":[{"label":"Yes","text":"Yes."}]}"#],
+            )
+        }
+    });
+    let ai = ai();
+    let config = config(ProviderKind::OpenAi, &server);
+    let triage = ai.triage(&config, &thread()).unwrap();
+    assert_eq!(triage.category, Category::Important);
+    let requests = server.requests();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[0].json().get("response_format").is_some());
+    assert!(requests[1].json().get("response_format").is_none());
+
+    // Remembered for the server: no second refusal.
+    let got = ai
+        .suggest_replies(&config, &thread(), &ReplyOpts::default())
+        .unwrap();
+    assert_eq!(got[0].label, "Yes");
+    assert_eq!(server.count(), 3);
+    assert!(server.last().json().get("response_format").is_none());
+
+    // Any other 400 is still an error.
+    let server = MockServer::start(|_| {
+        Reply::json(400, json!({"error": {"message": "temperature is invalid"}}))
+    });
+    let e = ai
+        .triage(&common::config(ProviderKind::OpenAi, &server), &thread())
+        .unwrap_err();
+    assert_eq!(e.key(), "bad-request");
+    assert_eq!(server.count(), 1);
 }
 
 #[test]

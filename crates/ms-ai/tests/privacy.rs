@@ -13,7 +13,7 @@ use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 
 use common::*;
-use ms_ai::{Ai, DraftOpts, ProviderConfig, ProviderKind, SummaryOpts};
+use ms_ai::{Ai, Category, DraftOpts, ProviderConfig, ProviderKind, SummaryOpts, Triage};
 use serde_json::json;
 use tracing::field::{Field, Visit};
 use tracing_subscriber::layer::{Context, SubscriberExt};
@@ -128,7 +128,16 @@ fn debug_output_redacts() {
         suggestion: Some(ANSWER.into()),
     };
     let ai = Ai::new().unwrap();
+    let rendered = context.render(4000);
+    assert!(rendered.text.contains(BODY));
+    let triage = Triage {
+        category: Category::Important,
+        needs_reply: false,
+        reason: Some(ANSWER.into()),
+    };
     for (what, text) in [
+        ("rendered", format!("{rendered:?}")),
+        ("triage", format!("{triage:?}")),
         ("config", format!("{config:?}")),
         ("context", format!("{context:?}")),
         ("messages", format!("{:?}", context.messages)),

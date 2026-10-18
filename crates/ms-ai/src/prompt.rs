@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use crate::triage::Category;
 
-pub const PROMPT_VERSION: u32 = 1;
+pub const PROMPT_VERSION: u32 = 2;
 
 /// The output of [`Ai::suggest_replies`](crate::Ai::suggest_replies) is capped here.
 pub const MAX_SUGGESTIONS: usize = 5;

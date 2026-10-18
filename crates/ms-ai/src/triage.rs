@@ -3,6 +3,8 @@
 
 //! [`Triage`]: the fixed vocabulary a triage answer is validated against.
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -50,13 +52,24 @@ impl Category {
     }
 }
 
-/// Serializes as `{category, needsReply, reason}` with `reason` null when absent.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+/// Serializes as `{category, needsReply, reason}` with `reason` null when absent. `Debug`
+/// leaves out the reason, which is model output.
+#[derive(Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Triage {
     pub category: Category,
     pub needs_reply: bool,
     pub reason: Option<String>,
+}
+
+impl fmt::Debug for Triage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Triage")
+            .field("category", &self.category)
+            .field("needs_reply", &self.needs_reply)
+            .field("reason", &self.reason.is_some())
+            .finish()
+    }
 }
 
 impl Triage {

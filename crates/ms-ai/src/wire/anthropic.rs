@@ -43,8 +43,9 @@ fn headers(builder: RequestBuilder, target: &Target) -> RequestBuilder {
         .header("anthropic-version", VERSION)
 }
 
-/// One SSE `data` payload. Thinking blocks (on by default on current models) arrive as
-/// `thinking_delta` and are skipped; only `text_delta` is answer text.
+/// One SSE `data` payload. Thinking (on by default on current models) arrives as
+/// `thinking_delta`, `signature_delta` or a `redacted_thinking` block and counts only as
+/// [`Event::Progress`]; only `text_delta` is answer text.
 pub(super) fn decode(data: &str, out: &mut Vec<Event>) {
     let Ok(v) = serde_json::from_str::<Value>(data) else {
         return;
@@ -59,12 +60,24 @@ pub(super) fn decode(data: &str, out: &mut Vec<Event>) {
                 out.push(Event::InputTokens(n));
             }
         }
+        "content_block_start" => {
+            if matches!(
+                v["content_block"]["type"].as_str(),
+                Some("thinking" | "redacted_thinking")
+            ) {
+                out.push(Event::Progress);
+            }
+        }
         "content_block_delta" => {
             let delta = &v["delta"];
-            if delta["type"] == "text_delta" {
-                if let Some(text) = delta["text"].as_str().filter(|t| !t.is_empty()) {
-                    out.push(Event::Text(text.to_owned()));
+            match delta["type"].as_str() {
+                Some("text_delta") => {
+                    if let Some(text) = delta["text"].as_str().filter(|t| !t.is_empty()) {
+                        out.push(Event::Text(text.to_owned()));
+                    }
                 }
+                Some("thinking_delta" | "signature_delta") => out.push(Event::Progress),
+                _ => {}
             }
         }
         "message_delta" => {

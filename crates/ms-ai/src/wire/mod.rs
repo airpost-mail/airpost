@@ -8,6 +8,7 @@ mod anthropic;
 mod ollama;
 mod openai;
 
+use std::fmt;
 use std::time::Duration;
 
 use reqwest::{Client, RequestBuilder, Url};
@@ -27,9 +28,12 @@ pub(crate) struct ChatRequest {
 }
 
 /// What a decoded stream line or event carries.
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub(crate) enum Event {
     Text(String),
+    /// The model is reasoning (thinking or reasoning deltas): it has started, but has no
+    /// answer text yet. The reasoning itself is dropped.
+    Progress,
     /// The model that answered, when the provider says (it may resolve an alias).
     Model(String),
     InputTokens(u64),
@@ -39,6 +43,21 @@ pub(crate) enum Event {
     /// The provider's end-of-stream marker.
     Done,
     Failed(AiError),
+}
+
+impl fmt::Debug for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Event::Text(text) => write!(f, "Text({} chars)", text.chars().count()),
+            Event::Progress => f.write_str("Progress"),
+            Event::Model(model) => f.debug_tuple("Model").field(model).finish(),
+            Event::InputTokens(n) => f.debug_tuple("InputTokens").field(n).finish(),
+            Event::OutputTokens(n) => f.debug_tuple("OutputTokens").field(n).finish(),
+            Event::Finished => f.write_str("Finished"),
+            Event::Done => f.write_str("Done"),
+            Event::Failed(e) => f.debug_tuple("Failed").field(e).finish(),
+        }
+    }
 }
 
 pub(crate) fn chat_request(
@@ -84,6 +103,10 @@ pub(crate) fn url(base: &str, path: &str, query: &[(&str, &str)]) -> Result<Url>
     Ok(url)
 }
 
+/// The longest stream line, and the longest SSE event, a provider may send. Real ones are a
+/// few KiB; past this the stream fails instead of buffering without bound.
+const MAX_LINE_BYTES: usize = 1 << 20;
+
 /// Turns response bytes into [`Event`]s: server-sent events for OpenAI and Anthropic,
 /// newline-delimited JSON for Ollama. Bytes are split on `\n` before decoding, so a UTF-8
 /// sequence split across chunks arrives whole.
@@ -108,6 +131,13 @@ impl Decoder {
             let raw: Vec<u8> = self.pending.drain(..=i).collect();
             let line = String::from_utf8_lossy(&raw);
             self.line(line.trim_end_matches(['\n', '\r']), out);
+        }
+        if self.pending.len() > MAX_LINE_BYTES || self.data.len() > MAX_LINE_BYTES {
+            self.pending = Vec::new();
+            self.data = String::new();
+            out.push(Event::Failed(AiError::provider(
+                "the provider sent a stream line that is too long",
+            )));
         }
     }
 
@@ -168,10 +198,13 @@ pub(crate) fn classify(status: Option<u16>, retry_after: Option<Duration>, body:
     let message = ms_integrations::provider_message(body);
     let lower = message.to_lowercase();
 
-    let quota = code == "insufficient_quota"
+    // Out of credit for good. A bare "quota" isn't enough: Gemini words its per-minute
+    // limits as "Resource has been exhausted (e.g. check quota)".
+    let billing = code == "insufficient_quota"
         || code.contains("billing")
-        || lower.contains("quota")
-        || lower.contains("credit balance");
+        || lower.contains("billing")
+        || lower.contains("credit");
+    let quota = billing || lower.contains("quota");
     let context = code == "context_length_exceeded"
         || code == "request_too_large"
         || CONTEXT_PHRASES.iter().any(|p| lower.contains(p));
@@ -181,7 +214,9 @@ pub(crate) fn classify(status: Option<u16>, retry_after: Option<Duration>, body:
 
     let status_code = match status {
         Some(s) => s,
-        None => return classify_stream_error(&code, message, quota, context, model_missing),
+        None => {
+            return classify_stream_error(&code, message, billing, quota, context, model_missing)
+        }
     };
     let status = Some(status_code);
     match status_code {
@@ -192,9 +227,9 @@ pub(crate) fn classify(status: Option<u16>, retry_after: Option<Duration>, body:
             status,
             retry_after: None,
         },
-        429 if quota => AiError::QuotaExceeded {
+        429 if billing => AiError::QuotaExceeded {
             status,
-            retry_after: None,
+            retry_after,
         },
         429 => AiError::RateLimited { retry_after },
         413 => AiError::ContextTooLong { status, message },
@@ -223,17 +258,18 @@ pub(crate) fn classify(status: Option<u16>, retry_after: Option<Duration>, body:
 fn classify_stream_error(
     code: &str,
     message: String,
+    billing: bool,
     quota: bool,
     context: bool,
     model_missing: bool,
 ) -> AiError {
-    if code.contains("rate_limit") {
-        AiError::RateLimited { retry_after: None }
-    } else if quota {
+    if billing {
         AiError::QuotaExceeded {
             status: None,
             retry_after: None,
         }
+    } else if code.contains("rate_limit") || quota {
+        AiError::RateLimited { retry_after: None }
     } else if context {
         AiError::ContextTooLong {
             status: None,
@@ -374,6 +410,60 @@ mod tests {
         assert_eq!(key(302, ""), "bad-request");
         let e = classify(Some(429), Some(Duration::from_secs(9)), "");
         assert_eq!(e.retry_after(), Some(Duration::from_secs(9)));
+    }
+
+    #[test]
+    fn quota_wording_without_billing_is_a_rate_limit() {
+        let after = Some(Duration::from_secs(20));
+        let gemini = r#"[{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}]"#;
+        let e = classify(Some(429), after, gemini);
+        assert_eq!(e, AiError::RateLimited { retry_after: after });
+        let e = classify(
+            Some(429),
+            after,
+            r#"{"error":{"message":"Quota exceeded for metric: requests per minute"}}"#,
+        );
+        assert_eq!(e, AiError::RateLimited { retry_after: after });
+        let e = classify(
+            Some(429),
+            after,
+            r#"{"error":{"code":"insufficient_quota","message":"check your plan and billing details"}}"#,
+        );
+        assert_eq!(
+            e,
+            AiError::QuotaExceeded {
+                status: Some(429),
+                retry_after: after
+            }
+        );
+        assert_eq!(
+            classify(
+                None,
+                None,
+                r#"{"error":{"message":"quota exhausted, slow down"}}"#
+            )
+            .key(),
+            "rate-limited"
+        );
+    }
+
+    #[test]
+    fn overlong_lines_fail() {
+        let mut d = Decoder::new(ProviderKind::Ollama);
+        let mut out = Vec::new();
+        let chunk = vec![b'x'; 64 * 1024];
+        for _ in 0..(MAX_LINE_BYTES / chunk.len() + 1) {
+            d.feed(&chunk, &mut out);
+        }
+        assert_eq!(out.len(), 1);
+        assert!(matches!(&out[0], Event::Failed(e) if e.to_string().contains("too long")));
+        assert!(d.pending.capacity() <= chunk.len());
+    }
+
+    #[test]
+    fn text_is_not_in_debug() {
+        let d = format!("{:?}", Event::Text("secret plans".into()));
+        assert_eq!(d, "Text(12 chars)");
     }
 
     #[test]

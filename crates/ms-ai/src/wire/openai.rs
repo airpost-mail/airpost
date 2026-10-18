@@ -67,10 +67,19 @@ pub(super) fn decode(data: &str, out: &mut Vec<Event>) {
         out.push(Event::Model(model.to_owned()));
     }
     if let Some(choice) = v["choices"].get(0) {
-        if let Some(text) = choice["delta"]["content"].as_str() {
+        let delta = &choice["delta"];
+        if let Some(text) = delta["content"].as_str() {
             if !text.is_empty() {
                 out.push(Event::Text(text.to_owned()));
             }
+        }
+        // Reasoning models on compatible servers stream their reasoning first:
+        // `reasoning_content` (DeepSeek, vLLM, llama.cpp) or `reasoning` (OpenRouter).
+        let reasoning = ["reasoning_content", "reasoning"]
+            .iter()
+            .any(|k| delta[*k].as_str().is_some_and(|t| !t.is_empty()));
+        if reasoning {
+            out.push(Event::Progress);
         }
         if choice["finish_reason"].is_string() {
             out.push(Event::Finished);

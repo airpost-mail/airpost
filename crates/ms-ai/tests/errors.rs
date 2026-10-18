@@ -8,11 +8,14 @@ mod common;
 
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use common::*;
-use ms_ai::{Ai, AiError, CancelToken, Options, ProviderKind, ReplyOpts, Sink, SummaryOpts};
+use ms_ai::{
+    Ai, AiError, CancelToken, Feature, Options, ProviderKind, ReplyOpts, Sink, SummaryOpts,
+    UsageRecord,
+};
 use serde_json::json;
 
 fn ai() -> Ai {
@@ -117,6 +120,33 @@ fn retry_after_is_carried() {
             serde_json::to_value(&e).unwrap(),
             json!({"key": "rate-limited", "message": "the provider is rate limiting requests", "retryable": true, "retryAfter": 17})
         );
+
+        // A per-minute limit worded as a quota (Gemini) is still a rate limit.
+        let e = summarize(
+            kind,
+            Reply::json(
+                429,
+                json!({"error": {"code": 429, "message": "Resource has been exhausted (e.g. check quota).", "status": "RESOURCE_EXHAUSTED"}}),
+            )
+            .header("Retry-After", "30"),
+        );
+        assert_eq!(
+            e,
+            AiError::RateLimited {
+                retry_after: Some(Duration::from_secs(30))
+            },
+            "{kind:?}"
+        );
+        let e = summarize(
+            kind,
+            Reply::json(
+                429,
+                json!({"error": {"code": "insufficient_quota", "message": "check your plan and billing details"}}),
+            )
+            .header("Retry-After", "60"),
+        );
+        assert_eq!(e.key(), "quota-exceeded");
+        assert_eq!(e.retry_after(), Some(Duration::from_secs(60)));
     }
 }
 
@@ -358,6 +388,237 @@ fn slow_tokens_after_the_first_use_the_total_limit() {
         summarize_with(&ai, ProviderKind::OpenAi, &server).unwrap(),
         "abcd"
     );
+}
+
+/// A stream that reasons for about two seconds before it answers "Done.": every chunk
+/// before the answer comes 400 ms after the last.
+fn thinking_reply(kind: ProviderKind) -> Reply {
+    let gap = Duration::from_millis(400);
+    let (content_type, chunks): (&str, Vec<(Duration, String)>) = match kind {
+        ProviderKind::OpenAi => {
+            let mut full = openai_stream("m-1", &["Done."], Some((100, 10)));
+            let thinking = (0..5).map(|_| {
+                sse_data(&json!({"model": "m-1", "choices": [{"index": 0,
+                    "delta": {"reasoning_content": "hmm "}, "finish_reason": null}]}))
+            });
+            full.splice(1..1, thinking);
+            (SSE, timed(full, gap, 1..6))
+        }
+        ProviderKind::Anthropic => {
+            let mut full = anthropic_stream("m-1", &["Done."], (100, 10));
+            let thinking = (0..4).map(|_| {
+                sse_event(
+                    "content_block_delta",
+                    &json!({"type": "content_block_delta", "index": 0,
+                        "delta": {"type": "thinking_delta", "thinking": "hmm "}}),
+                )
+            });
+            full.splice(3..3, thinking);
+            (SSE, timed(full, gap, 1..7))
+        }
+        ProviderKind::Ollama => {
+            let mut full = ollama_stream("m-1", &["Done."], Some((100, 10)));
+            let thinking = (0..5).map(|_| {
+                format!(
+                    "{}\n",
+                    json!({"model": "m-1", "message": {"role": "assistant", "content": "",
+                        "thinking": "hmm "}, "done": false})
+                )
+            });
+            full.splice(0..0, thinking);
+            (NDJSON, timed(full, gap, 0..5))
+        }
+    };
+    Reply {
+        status: 200,
+        headers: vec![("Content-Type".into(), content_type.into())],
+        body: common::Body::Stream { chunks, cut: false },
+        delay: Duration::ZERO,
+    }
+}
+
+/// `chunks` with `gap` before each one in `slow`, none before the rest.
+fn timed(
+    chunks: Vec<String>,
+    gap: Duration,
+    slow: std::ops::Range<usize>,
+) -> Vec<(Duration, String)> {
+    chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, c)| {
+            (
+                if slow.contains(&i) {
+                    gap
+                } else {
+                    Duration::ZERO
+                },
+                c,
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn reasoning_counts_as_the_first_token() {
+    for kind in ALL_KINDS {
+        let reply = thinking_reply(kind);
+        let server = MockServer::start(move |_| reply.clone());
+        let ai = timeouts(Duration::from_secs(1), Duration::from_secs(10));
+        let started = Instant::now();
+        let text = summarize_with(&ai, kind, &server);
+        assert_eq!(text.as_deref(), Ok("Done."), "{kind:?}");
+        assert!(started.elapsed() >= Duration::from_secs(2), "{kind:?}");
+    }
+    // Keep-alives are not progress.
+    let pings: Vec<String> = (0..6)
+        .map(|_| sse_event("ping", &json!({"type": "ping"})))
+        .collect();
+    let server =
+        MockServer::start(move |_| Reply::stream(SSE, pings.clone(), Duration::from_millis(200)));
+    let ai = timeouts(Duration::from_millis(500), Duration::from_secs(10));
+    let e = summarize_with(&ai, ProviderKind::Anthropic, &server).unwrap_err();
+    assert_eq!(
+        e,
+        AiError::Offline {
+            reason: "the model did not start answering in time"
+        }
+    );
+}
+
+#[test]
+fn overlong_answers_fail() {
+    let texts: Vec<String> = (0..40).map(|_| "x".repeat(100)).collect();
+    let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+    let reply = stream_reply(ProviderKind::OpenAi, &texts);
+    let server = MockServer::start(move |_| reply.clone());
+    let mut c = config(ProviderKind::OpenAi, &server);
+    // 128 tokens at most 2 KiB.
+    c.max_output_tokens = Some(128);
+    let e = ai()
+        .draft_reply(
+            &c,
+            &thread(),
+            &Default::default(),
+            &mut collect(&mut Vec::new()),
+        )
+        .unwrap_err();
+    assert_eq!(e.key(), "provider-error");
+    assert!(e.to_string().contains("too long"), "{e}");
+}
+
+#[test]
+fn oversized_bodies_are_not_read_whole() {
+    let huge = format!("{{\"data\": [{}]}}", "{\"id\": \"m\"},".repeat(800_000));
+    let server = MockServer::start(move |_| Reply::text(200, &huge));
+    let mut c = config(ProviderKind::OpenAi, &server);
+    c.model = String::new();
+    let e = ai().models(&c).unwrap_err();
+    assert_eq!(e.key(), "provider-error");
+    assert!(e.to_string().contains("too large"), "{e}");
+
+    // A huge error body is still classified from its start.
+    let body = format!(
+        "{{\"error\": {{\"message\": \"Invalid API key\"}}}}{}",
+        " ".repeat(4 << 20)
+    );
+    let server = MockServer::start(move |_| Reply::text(401, &body));
+    c.url = Some(format!("{}/v1", server.url()));
+    assert_eq!(ai().models(&c).unwrap_err().key(), "auth");
+}
+
+#[test]
+fn plain_http_to_remote_hosts_is_refused() {
+    let server = MockServer::start(|_| stream_reply(ProviderKind::OpenAi, &["x"]));
+    let mut c = config(ProviderKind::OpenAi, &server);
+    c.url = Some("http://8.8.8.8/v1".into());
+    let started = Instant::now();
+    let e = ai()
+        .summarize(
+            &c,
+            &thread(),
+            &SummaryOpts::default(),
+            &mut collect(&mut Vec::new()),
+        )
+        .unwrap_err();
+    assert_eq!(e.key(), "bad-request");
+    assert!(e.to_string().contains("use https"), "{e}");
+    assert_eq!(ai().models(&c).unwrap_err().key(), "bad-request");
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "nothing was sent"
+    );
+    assert_eq!(server.count(), 0);
+}
+
+fn observed() -> (Ai, Arc<Mutex<Vec<UsageRecord>>>) {
+    let seen: Arc<Mutex<Vec<UsageRecord>>> = Arc::default();
+    let sink = seen.clone();
+    let ai = Ai::with_options(Options {
+        retry_delay: Duration::from_millis(10),
+        usage_observer: Some(Arc::new(move |r: &UsageRecord| {
+            sink.lock().unwrap().push(r.clone())
+        })),
+        ..Options::default()
+    })
+    .unwrap();
+    (ai, seen)
+}
+
+#[test]
+fn failed_streams_still_count_usage() {
+    // Cancelled after two deltas: the input tokens came in message_start.
+    let reply = slow_stream(ProviderKind::Anthropic);
+    let server = MockServer::start(move |_| reply.clone());
+    let (ai, seen) = observed();
+    let mut sink = StopAfter { after: 2, seen: 0 };
+    let e = ai
+        .draft_reply(
+            &config(ProviderKind::Anthropic, &server),
+            &thread(),
+            &Default::default(),
+            &mut sink,
+        )
+        .unwrap_err();
+    assert_eq!(e, AiError::Cancelled);
+    {
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].feature, Feature::Reply);
+        let usage = seen[0].usage;
+        assert_eq!(usage.input_tokens, 100);
+        assert!(usage.estimated && usage.output_tokens >= 1, "{usage:?}");
+    }
+
+    // Cut mid-stream, nothing reported: both counts estimated.
+    let full = stream_reply(ProviderKind::OpenAi, &["one ", "two ", "three"]);
+    let server = MockServer::start(move |_| full.clone().cut_after(3));
+    let (ai, seen) = observed();
+    summarize_with(&ai, ProviderKind::OpenAi, &server).unwrap_err();
+    {
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].usage.estimated && seen[0].usage.input_tokens > 50);
+    }
+
+    // A refused request bills nothing; the retried triage counts once.
+    let calls = Arc::new(AtomicUsize::new(0));
+    let n = calls.clone();
+    let server = MockServer::start(move |_| {
+        if n.fetch_add(1, Ordering::SeqCst) == 0 {
+            Reply::json(500, json!({"error": "boom"}))
+        } else {
+            stream_reply(
+                ProviderKind::OpenAi,
+                &[r#"{"category":"other","needsReply":false,"reason":"x"}"#],
+            )
+        }
+    });
+    let (ai, seen) = observed();
+    ai.triage(&config(ProviderKind::OpenAi, &server), &thread())
+        .unwrap();
+    assert_eq!(server.count(), 2);
+    assert_eq!(seen.lock().unwrap().len(), 1);
 }
 
 #[test]

@@ -49,7 +49,7 @@ fn auth(builder: RequestBuilder, target: &Target) -> RequestBuilder {
 
 /// One NDJSON line: `{model, message: {content}, done: false}` per chunk, then
 /// `{done: true, prompt_eval_count, eval_count}`, or `{error}`. `message.thinking` (reasoning
-/// models) is skipped.
+/// models) counts only as [`Event::Progress`].
 pub(super) fn decode(line: &str, out: &mut Vec<Event>) {
     let Ok(v) = serde_json::from_str::<Value>(line) else {
         return;
@@ -63,6 +63,12 @@ pub(super) fn decode(line: &str, out: &mut Vec<Event>) {
     }
     if let Some(text) = v["message"]["content"].as_str().filter(|t| !t.is_empty()) {
         out.push(Event::Text(text.to_owned()));
+    }
+    if v["message"]["thinking"]
+        .as_str()
+        .is_some_and(|t| !t.is_empty())
+    {
+        out.push(Event::Progress);
     }
     if v["done"].as_bool() == Some(true) {
         if let Some(n) = v["prompt_eval_count"].as_u64() {
