@@ -29,8 +29,8 @@ use std::time::Duration;
 
 pub use config::{
     DeepLConfig, LanguageToolConfig, LibreTranslateConfig, PeopleDataLabsConfig, ProviderConfig,
-    TranslationProvider, DEEPL_FREE_URL, DEEPL_PRO_URL, LANGUAGETOOL_PREMIUM_URL, LANGUAGETOOL_URL,
-    PEOPLE_DATA_LABS_URL,
+    RedactedUrl, TranslationProvider, DEEPL_FREE_URL, DEEPL_PRO_URL, LANGUAGETOOL_PREMIUM_URL,
+    LANGUAGETOOL_URL, PEOPLE_DATA_LABS_URL,
 };
 pub use enrich::{
     Company, CompanyCategory, CompanyMetrics, ContactProfile, Employment, Handle, Person,
@@ -40,7 +40,11 @@ pub use grammar::{GrammarCheck, GrammarError, GrammarRequest};
 pub use secret::Secret;
 pub use translate::{DetectedLanguage, TextFormat, TranslateRequest, Translation};
 
-use cache::TtlCache;
+/// Shared with `ms-ai`, which calls model providers on the same HTTP stack and caches the
+/// same way.
+pub use cache::{CacheKey, KeyBuilder, TtlCache};
+pub use http::{ensure_crypto_provider, provider_message, transport_error};
+
 use http::Http;
 use serde::Serialize;
 

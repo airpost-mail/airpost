@@ -11,11 +11,11 @@ use std::time::{Duration, Instant};
 
 use sha2::{Digest, Sha256};
 
-pub(crate) type CacheKey = [u8; 32];
+pub type CacheKey = [u8; 32];
 
 /// Builds a [`CacheKey`] from parts. Each part is length-prefixed, so `("ab", "c")` and
 /// `("a", "bc")` differ.
-pub(crate) struct KeyBuilder(Sha256);
+pub struct KeyBuilder(Sha256);
 
 impl KeyBuilder {
     pub fn new(kind: &str) -> Self {
@@ -44,7 +44,7 @@ struct Inner<V> {
     next: u64,
 }
 
-pub(crate) struct TtlCache<V> {
+pub struct TtlCache<V> {
     inner: Mutex<Inner<V>>,
     max_entries: usize,
 }
@@ -104,6 +104,10 @@ impl<V: Clone> TtlCache<V> {
 
     pub fn len(&self) -> usize {
         self.lock().entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn clear(&self) {

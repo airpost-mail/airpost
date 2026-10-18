@@ -198,7 +198,7 @@ fn base_url(url: &str, what: &'static str) -> Result<String> {
 
 /// A URL setting for `Debug`: userinfo (a proxy's basic auth) becomes `***`, and anything
 /// but an http(s) URL is not shown, since it may be credentials pasted without a scheme.
-struct RedactedUrl<'a>(&'a str);
+pub struct RedactedUrl<'a>(pub &'a str);
 
 impl fmt::Debug for RedactedUrl<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -97,7 +97,7 @@ pub(crate) fn url(base: &str, path: &str, query: &[(&str, &str)]) -> Result<Url>
 
 /// reqwest panics when building a rustls client with no process-wide provider. The engine
 /// installs ring at startup; this covers tests and callers that run before it.
-fn ensure_crypto_provider() {
+pub fn ensure_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }
@@ -109,7 +109,7 @@ fn parse_retry_after(value: &str) -> Option<Duration> {
 }
 
 /// The failure class only: reqwest's own message includes the URL.
-fn transport_error(err: &reqwest::Error) -> IntegrationError {
+pub fn transport_error(err: &reqwest::Error) -> IntegrationError {
     if err.is_builder() {
         return IntegrationError::bad_request("the provider URL is not valid");
     }
@@ -190,7 +190,7 @@ pub(crate) fn status_error(reply: &Reply) -> IntegrationError {
 
 /// The provider's own error text: `error`, `message` or `error.message` of a JSON body,
 /// else the first line of a text one; truncated.
-pub(crate) fn provider_message(body: &str) -> String {
+pub fn provider_message(body: &str) -> String {
     let from_json = serde_json::from_str::<Value>(body).ok().and_then(|v| {
         [&v["error"], &v["message"], &v["error"]["message"]]
             .into_iter()
