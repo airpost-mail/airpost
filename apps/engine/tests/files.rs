@@ -353,6 +353,15 @@ fn relayed_rules() {
         ),
         forbidden
     );
+    // Positional params fill `path` as well; they're refused too.
+    assert_eq!(
+        error_code(
+            &mut admin,
+            method::FILES_PUT,
+            json!([ACCOUNT_ID, "x", null, null, src])
+        ),
+        forbidden
+    );
     let put: FilesPutResult = admin
         .call_as(
             method::FILES_PUT,
