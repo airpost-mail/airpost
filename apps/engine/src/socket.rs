@@ -866,6 +866,7 @@ fn features(server: &Server) -> Vec<String> {
         feature::MAIL_NEW,
         feature::RELAYED,
         feature::QUERY,
+        feature::SEARCH_GRAMMAR,
         feature::FILES,
     ]
     .map(str::to_owned)

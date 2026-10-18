@@ -11,17 +11,19 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use ms_ipc::{
-    code, method, CategoriesListParams, CategoryCounts, ContactsSearchResult, CountsGetParams,
-    CountsGetResult, ErrorObject, FoldersListResult, LabelsListResult, MessagesGetParams,
-    MessagesGetResult, MetadataListParams, MetadataListResult, QueryResult, Request as RpcRequest,
-    SearchParams, SearchResult, TasksGetParams, TasksGetResult, TasksListParams, TasksListResult,
-    ThreadsGetParams, ThreadsGetResult, ThreadsListParams, ThreadsListResult, READ_DEFAULT_LIMIT,
+    code, method, CategoriesListParams, CategoryCounts, ContactsSearchParams, ContactsSearchResult,
+    CountsGetParams, CountsGetResult, ErrorObject, FoldersListResult, LabelsListResult,
+    MessagesGetParams, MessagesGetResult, MetadataListParams, MetadataListResult, QueryResult,
+    Request as RpcRequest, SearchParams, SearchResult, TasksGetParams, TasksGetResult,
+    TasksListParams, TasksListResult, ThreadsGetParams, ThreadsGetResult, ThreadsListParams,
+    ThreadsListResult, READ_DEFAULT_LIMIT,
 };
 use ms_store::model_query::{ModelQuery, QueryError, QueryOutput};
 use ms_store::read::{
     Category, CategoryTable, Cursor, InCategory, MetadataFilter, MetadataObject, ReadStore,
-    TaskFilter,
+    TaskFilter, ThreadSearch,
 };
+use ms_store::search_dates::DateContext;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -65,6 +67,13 @@ fn not_found(what: &str, id: &str) -> ErrorObject {
 
 fn invalid(why: &str) -> ErrorObject {
     ErrorObject::new(code::INVALID_PARAMS, format!("invalid params: {why}"))
+}
+
+fn query_error(e: QueryError) -> ErrorObject {
+    match e {
+        QueryError::Invalid(why) => invalid(&why),
+        QueryError::Database(e) => internal(e),
+    }
 }
 
 fn to_reply(v: impl Serialize) -> Reply {
@@ -203,21 +212,9 @@ impl ReadApi {
                     files,
                 })
             }
-            method::SEARCH => {
-                let p: SearchParams = req.params_as()?;
-                self.check_account(&p.account_id)?;
-                let threads = self
-                    .store()?
-                    .search_threads(
-                        &p.account_id,
-                        &p.query,
-                        p.limit.unwrap_or(READ_DEFAULT_LIMIT),
-                    )
-                    .map_err(internal)?;
-                to_reply(SearchResult { threads })
-            }
+            method::SEARCH => self.search(req.params_as()?),
             method::CONTACTS_SEARCH => {
-                let p: SearchParams = req.params_as()?;
+                let p: ContactsSearchParams = req.params_as()?;
                 self.check_account(&p.account_id)?;
                 let contacts = self
                     .store()?
@@ -283,6 +280,31 @@ impl ReadApi {
         }
     }
 
+    /// `search`: `accountId`, `accounts` (each held by the engine) or every account.
+    fn search(&mut self, p: SearchParams) -> Reply {
+        let accounts = match (p.account_id, p.accounts) {
+            (Some(_), Some(_)) => return Err(invalid("accountId and accounts exclude each other")),
+            (Some(a), None) => self.resolve_accounts(Some(vec![a]))?,
+            (None, named) => self.resolve_accounts(named)?,
+        };
+        let dates;
+        let search = if p.grammar {
+            dates = DateContext::new(p.tz.as_deref(), p.now)
+                .map_err(|e| invalid(&format!("search: {e}")))?;
+            ThreadSearch::Grammar {
+                text: &p.query,
+                dates,
+            }
+        } else {
+            ThreadSearch::Plain(&p.query)
+        };
+        let threads = self
+            .store()?
+            .search_threads(&accounts, &search, p.limit.unwrap_or(READ_DEFAULT_LIMIT))
+            .map_err(query_error)?;
+        to_reply(SearchResult { threads })
+    }
+
     /// `query`: the params are a [`ModelQuery`], parsed strictly so a misspelt key is an
     /// error rather than a silently wider read. `accounts: null` reads every account in the
     /// database. A relayed connection's rows are capped first (`policy::cap_relayed_query`).
@@ -292,14 +314,7 @@ impl ReadApi {
                 self.check_account(a)?;
             }
         }
-        let out = self.store()?.model_query(&q).map_err(|e| match e {
-            QueryError::Invalid(why) => invalid(&why),
-            QueryError::Unsupported(why) => {
-                ErrorObject::new(code::INVALID_PARAMS, format!("unsupported: {why}"))
-                    .with_data(serde_json::json!({"unsupported": "search-grammar"}))
-            }
-            QueryError::Database(e) => internal(e),
-        })?;
+        let out = self.store()?.model_query(&q).map_err(query_error)?;
         to_reply(match out {
             QueryOutput::Rows { rows, next_cursor } => QueryResult {
                 rows,

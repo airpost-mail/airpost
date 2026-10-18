@@ -737,6 +737,86 @@ fn search_quotes_user_text() {
     e.stop();
 }
 
+#[test]
+fn search_grammar_and_accounts() {
+    let e = Engine::start();
+    let mut c = e.hello();
+    let mut search = |p: Value| -> Result<Vec<String>, Option<i64>> {
+        c.call_as::<ms_ipc::SearchResult>(method::SEARCH, p)
+            .map(|r| ids(&r.threads))
+            .map_err(|e| e.code())
+    };
+    let grammar = |q: &str| json!({"query": q, "grammar": true});
+    // No accountId: every account the engine holds, which isn't `OTHER`.
+    assert_eq!(
+        search(json!({"query": "quarterly"})),
+        Ok(vec!["t:001".into()])
+    );
+    assert_eq!(
+        search(json!({"query": "quarterly", "accounts": [ACCOUNT_ID]})),
+        Ok(vec!["t:001".into()])
+    );
+    assert_eq!(
+        search(json!({"query": "quarterly", "accounts": [OTHER]})),
+        Err(Some(code::UNKNOWN_ACCOUNT))
+    );
+    assert_eq!(
+        search(json!({"query": "x", "accountId": ACCOUNT_ID, "accounts": [ACCOUNT_ID]})),
+        Err(Some(code::INVALID_PARAMS))
+    );
+    // The grammar: operators, fields and dates.
+    assert_eq!(
+        search(grammar("quarterly OR hello")),
+        Ok(vec!["t:002".into(), "t:001".into()])
+    );
+    assert_eq!(
+        search(grammar("subject:quarterly")),
+        Ok(vec!["t:001".into()])
+    );
+    assert_eq!(
+        search(grammar("body:numbers")),
+        Ok(vec![]),
+        "body: is a word"
+    );
+    assert_eq!(search(grammar("numbers NOT quarterly")), Ok(vec![]));
+    assert_eq!(
+        search(grammar("(quarterly OR hello) NOT minus")),
+        Ok(vec!["t:001".into()])
+    );
+    // t:001 and t:002 last received at BASE_TS (2020-09-13 12:26:40 UTC).
+    let mut dated = |q: &str, tz: &str| -> Vec<String> {
+        search(json!({"query": q, "grammar": true, "tz": tz, "now": BASE_TS + 86_400}))
+            .unwrap_or_else(|e| panic!("{q}: {e:?}"))
+    };
+    assert_eq!(
+        dated("quarterly after:2020-09-13", "UTC"),
+        ["t:001"],
+        "after: includes its day"
+    );
+    assert!(dated("quarterly before:2020-09-13", "UTC").is_empty());
+    assert_eq!(dated("quarterly before:today", "UTC"), ["t:001"]);
+    assert!(dated("quarterly after:today", "UTC").is_empty());
+    assert_eq!(dated("quarterly after:yesterday", "UTC"), ["t:001"]);
+    // In Auckland (UTC+12) BASE_TS is already the 14th.
+    assert!(dated("quarterly before:2020-09-14", "Pacific/Auckland").is_empty());
+    assert_eq!(dated("quarterly before:2020-09-14", "UTC"), ["t:001"]);
+    for (q, extra) in [
+        ("after:someday", json!({})),
+        ("after:yesterday", json!({"now": null})),
+        ("x", json!({"tz": "Mars/Base"})),
+        ("(x", json!({})),
+        ("is:weird", json!({})),
+        ("", json!({})),
+    ] {
+        let mut p = grammar(q);
+        for (k, v) in extra.as_object().unwrap() {
+            p[k] = v.clone();
+        }
+        assert_eq!(search(p.clone()), Err(Some(code::INVALID_PARAMS)), "{p}");
+    }
+    e.stop();
+}
+
 /// A task's local phase waiting on the write lock holds the main thread; reads on another
 /// connection still answer.
 #[test]
@@ -786,6 +866,7 @@ fn hello_and_status_announce_the_features() {
         feature::MESSAGE_HIDDEN,
         feature::MAIL_NEW,
         feature::QUERY,
+        feature::SEARCH_GRAMMAR,
     ] {
         assert!(
             hello.features.iter().any(|x| x == f),
@@ -987,17 +1068,23 @@ fn query_threads_contacts_and_refusals() {
         (&Value::Null, &json!(false))
     );
 
-    let grammar = c
-        .call(
-            method::QUERY,
-            json!({"class": "Thread", "search": {"text": "from:ann", "grammar": true}}),
-        )
-        .unwrap_err();
-    assert_eq!(grammar.code(), Some(code::INVALID_PARAMS));
-    let ms_ipc::ClientError::Rpc(obj) = &grammar else {
-        panic!("{grammar:?}")
-    };
-    assert_eq!(obj.data, Some(json!({"unsupported": "search-grammar"})));
+    let r = query(
+        &mut c,
+        json!({"class": "Thread", "accounts": [ACCOUNT_ID],
+               "search": {"text": "quarterly OR hello", "grammar": true}}),
+    );
+    assert_eq!(ids(&r.rows), ["t:001", "t:002"]);
+    for bad in [
+        json!({"class": "Thread", "search": {"text": "after:someday", "grammar": true}}),
+        json!({"class": "Thread", "search": {"text": "(x", "grammar": true}}),
+        json!({"class": "Contact", "search": {"text": "ann", "grammar": true}}),
+    ] {
+        assert_eq!(
+            error_code(&mut c, method::QUERY, bad.clone()),
+            Some(code::INVALID_PARAMS),
+            "{bad}"
+        );
+    }
     for bad in [
         json!({"class": "Account"}),
         json!({"class": "Thread", "wher": []}),
