@@ -5,9 +5,9 @@
 // a Tern server, which there is no way to connect yet.
 //
 // The connected engine decides (its `capabilities`, from hello and capabilities.changed): the
-// provider settings are mirrored into its settings store. Keys still go with each request, read
-// from the keyset (KeyManager), so the store checks here that the provider's key is saved. Without
-// an engine that reports capabilities it decides from config alone, as before.
+// provider settings are mirrored into its settings store. Keys are in the engine's secret store
+// or, from before, the keyset (KeyManager); the store checks here that the provider's key is
+// saved in one. Without an engine that reports capabilities it decides from config alone.
 
 import { useEffect, useState } from 'react';
 import MailspringStore from 'mailspring-store';
@@ -309,6 +309,9 @@ export class CapabilityStoreClass extends MailspringStore {
           next[entry] = !!((await this._keys().getPassword(name)) || '').trim();
         } catch (err) {
           next[entry] = false;
+        }
+        if (!next[entry] && isProvider(entry)) {
+          next[entry] = await Integrations.hasEngineKey(entry);
         }
       }
       if (generation !== this._keyReadGeneration) return;

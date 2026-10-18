@@ -1,6 +1,6 @@
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
-import { AccountStore, Account, Actions, KeyManager } from 'mailspring-exports';
+import { AccountStore, Account, Actions } from 'mailspring-exports';
 import { ipcRenderer } from 'electron';
 import AccountErrorNotification from '../lib/items/account-error-notif';
 
@@ -33,7 +33,6 @@ describe('AccountErrorNotif', function AccountErrorNotifTests() {
 
     it('allows the user to reconnect the account', () => {
       const { container } = render(<AccountErrorNotification />);
-      spyOn(KeyManager, 'insertAccountSecrets').andCallFake((acct) => acct);
       spyOn(ipcRenderer, 'send');
       fireEvent.click(container.querySelector('#action-1'));
 
@@ -42,7 +41,7 @@ describe('AccountErrorNotif', function AccountErrorNotifTests() {
       });
       runs(() => {
         expect(ipcRenderer.send).toHaveBeenCalledWith('command', 'application:add-account', {
-          existingAccountJSON: AccountStore.accounts()[0],
+          reconnectAccountId: AccountStore.accounts()[0].id,
         });
       });
     });

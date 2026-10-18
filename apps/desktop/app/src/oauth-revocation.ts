@@ -7,6 +7,9 @@ const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 const REVOKE_TIMEOUT_MS = 5000;
 
 /**
+ * The fallback for an engine without account setup, whose account.remove {revoke} does
+ * the same in the engine.
+ *
  * Asks Google to drop the OAuth grant backing `account`, so the refresh token
  * Mailspring destroys locally when an account is disconnected does not stay valid
  * at the provider.
@@ -14,7 +17,7 @@ const REVOKE_TIMEOUT_MS = 5000;
  * Revocation is grant-scoped, not token-scoped: Google withdraws the application's
  * authorization for that user and every token issued under it, which is why the
  * endpoint takes a token and no client id. All Mailspring installs present the same
- * client (GMAIL_CLIENT_ID in onboarding-constants.ts), so Google holds one grant per
+ * client (the engine's Gmail client, crates/ms-providers), so Google holds one grant per
  * user rather than one per install — disconnecting an account on one machine also
  * signs that account out of Mailspring on the user's other machines, where refreshes
  * then fail with invalid_grant. That cost is accepted on purpose: Google offers no

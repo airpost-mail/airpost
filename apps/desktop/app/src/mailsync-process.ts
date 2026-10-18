@@ -17,7 +17,6 @@ import {
   AccountChangedParams,
   AccountRemoveResult,
   AccountStateParams,
-  AccountTestResult,
   CredentialsImportParams,
   CredentialsImportResult,
   DisconnectParams,
@@ -38,11 +37,6 @@ import {
   SubscribeParams,
   deltaParamsText,
 } from './engine-protocol';
-
-import {
-  GMAIL_CLIENT_ID,
-  GMAIL_CLIENT_SECRET,
-} from '../internal_packages/onboarding/lib/onboarding-constants';
 
 // account.reset / engine.resetDatabase: whether plugin metadata (send-later, snoozes,
 // reminders) survives. Removing an account passes false, so an account added again with the
@@ -338,10 +332,9 @@ export class MailsyncProcess extends EventEmitter {
     // genuine environment variables, not properties a prototype-pollution bug
     // elsewhere in the process could have added to Object.prototype. See
     // GHSA-gjr7-3mj2-cr54.
+    // The OAuth clients are the engine's own (MS_GMAIL_CLIENT_ID and the like override them).
     const env = Object.assign(Object.create(null), process.env, {
       CONFIG_DIR_PATH: this.configDirPath,
-      GMAIL_CLIENT_ID: GMAIL_CLIENT_ID,
-      GMAIL_CLIENT_SECRET: GMAIL_CLIENT_SECRET,
     });
     const devKeyFile = devEngineKeyFile(this.configDirPath, this.resourcePath);
     if (devKeyFile && !env.TERN_ENGINE_KEY_FILE) env.TERN_ENGINE_KEY_FILE = devKeyFile;
@@ -947,15 +940,6 @@ export class EngineServeProcess extends MailsyncProcess {
       if (typeof v === 'string' && v.length > 0) this._secretValues.add(v);
     }
     return this._parentCall<CredentialsImportResult>(Method.CredentialsImport, params);
-  }
-
-  // Checks an account's IMAP and SMTP settings without adding it. The result is
-  // `--mode test`'s object with its log redacted; errorFromEngineResult turns a failed one
-  // into the Error onboarding shows.
-  async testAccount(account: { settings?: Record<string, unknown> }) {
-    this._rememberSecrets(account);
-    const result = await this._parentCall<AccountTestResult>(Method.AccountTest, { account });
-    return { ...result, log: this._stripSecrets(result.log) };
   }
 
   // Deletes the account's local data so it syncs from scratch. The engine forgets the

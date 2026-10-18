@@ -13,7 +13,8 @@ import {
 import { McpSection } from './mcp/mcp-section';
 
 // Preferences > Integrations (docs/integrations-plan.md, section 2). Settings go to config under
-// core.integrations.<kind>; API keys only to the keyset, and are never shown again once saved.
+// core.integrations.<kind>; API keys to the engine's secret store (the keyset for an engine
+// without account setup), and are never shown again once saved.
 
 const FEATURE_FOR_KIND: { [kind in IntegrationKind]: CapabilityFeature } = {
   translation: 'translation',
@@ -121,18 +122,16 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     if (!provider) {
       this.setState({ hasKey: false });
       const keys = await Promise.all(
-        Integrations.PROVIDERS_FOR_KIND[this.props.kind].map((p) =>
-          KeyManager.getPassword(Integrations.keyName(p))
-        )
+        Integrations.PROVIDERS_FOR_KIND[this.props.kind].map((p) => Integrations.hasKey(p))
       );
       if (this._mounted && !this.state.settings.provider) {
-        this.setState({ hasLeftoverKey: keys.some((k) => !!(k || '').trim()) });
+        this.setState({ hasLeftoverKey: keys.some((k) => k) });
       }
       return;
     }
-    const key = await KeyManager.getPassword(Integrations.keyName(provider));
+    const hasKey = await Integrations.hasKey(provider);
     if (this._mounted && provider === this.state.settings.provider) {
-      this.setState({ hasKey: !!(key || '').trim(), hasLeftoverKey: false });
+      this.setState({ hasKey, hasLeftoverKey: false });
     }
   }
 
@@ -176,7 +175,7 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     const { provider } = this.state.settings;
     const value = this.state.keyInput.trim();
     if (!provider || !value) return;
-    await KeyManager.replacePassword(Integrations.keyName(provider), value);
+    await Integrations.saveKey(provider, value);
     if (this._mounted && this.state.keyInput.trim() === value) {
       this.setState({ keyInput: '', hasKey: true });
     }
@@ -186,7 +185,7 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     const { provider } = this.state.settings;
     if (!provider) return;
     this._formGeneration++;
-    await KeyManager.deletePassword(Integrations.keyName(provider));
+    await Integrations.deleteKey(provider);
     if (this._mounted) this.setState({ keyInput: '', hasKey: false, testResult: null });
   };
 
@@ -195,9 +194,7 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
   _onRemove = async () => {
     this._formGeneration++;
     await Promise.all(
-      Integrations.PROVIDERS_FOR_KIND[this.props.kind].map((p) =>
-        KeyManager.deletePassword(Integrations.keyName(p))
-      )
+      Integrations.PROVIDERS_FOR_KIND[this.props.kind].map((p) => Integrations.deleteKey(p))
     );
     AppEnv.config.set(`core.integrations.${this.props.kind}`, {});
     if (this._mounted) {
@@ -249,7 +246,8 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
   async _formConfig(): Promise<ProviderConfig | null> {
     const { settings, keyInput } = this.state;
     const typed = keyInput.trim();
-    // Only read the keyset when the engine can take the request.
+    // Only read the keyset when the engine can take the request. Without a key the engine
+    // uses the one it keeps.
     const key =
       typed ||
       (Integrations.isAvailable() && settings.provider

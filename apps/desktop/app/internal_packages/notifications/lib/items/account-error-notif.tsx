@@ -1,6 +1,6 @@
 import { shell, ipcRenderer } from 'electron';
 import React from 'react';
-import { localized, Account, AccountStore, Actions, KeyManager } from 'mailspring-exports';
+import { localized, Account, AccountStore, Actions } from 'mailspring-exports';
 import { Notification } from 'mailspring-component-kit';
 
 export default class AccountErrorNotification extends React.Component<
@@ -49,10 +49,8 @@ export default class AccountErrorNotification extends React.Component<
     shell.openExternal(url);
   };
 
-  _onReconnect = async (account: Account) => {
-    ipcRenderer.send('command', 'application:add-account', {
-      existingAccountJSON: await KeyManager.insertAccountSecrets(account),
-    });
+  _onReconnect = (account: Account) => {
+    ipcRenderer.send('command', 'application:add-account', { reconnectAccountId: account.id });
   };
 
   _onOpenAccountPreferences = () => {

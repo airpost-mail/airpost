@@ -1,71 +1,22 @@
 import { shell } from 'electron';
 import React from 'react';
-import { localized, localizedReactFragment, Account } from 'mailspring-exports';
+import { localized, localizedReactFragment, Account, AccountStore } from 'mailspring-exports';
 import { CopyButton, RetinaImg } from 'mailspring-component-kit';
-import crypto from 'crypto';
-import http from 'http';
-import url from 'url';
 
 import FormErrorMessage from './form-error-message';
-import { LOCAL_SERVER_HOST, LOCAL_SERVER_PORT, getLatestOAuthState } from './onboarding-constants';
 import AccountProviders from './account-providers';
+import { accountFromSignIn } from './onboarding-helpers';
+import * as EngineAccounts from '../../../src/engine-accounts';
+import { OAuthBeginResult } from '../../../src/engine-protocol';
 
-/**
- * Read a parameter from a redirect URL's query string, ignoring the path so the
- * same listener serves Google (root) and Microsoft (`/desktop`) redirects.
- * Uses decodeURIComponent instead of querystring.parse to preserve `+` as
- * a literal character (RFC 3986) rather than decoding it as a space
- * (application/x-www-form-urlencoded).
- */
-function extractQueryParam(requestUrl: string, param: string): string | null {
-  const rawQuery = url.parse(requestUrl).query || '';
-  const match = rawQuery.match(new RegExp(`(?:^|&)${param}=([^&]*)`));
-  if (!match) return null;
-  try {
-    return decodeURIComponent(match[1]);
-  } catch {
-    return null;
-  }
-}
-
-export function extractOAuthCodeFromUrl(requestUrl: string): string | null {
-  return extractQueryParam(requestUrl, 'code');
-}
-
-export function extractOAuthStateFromUrl(requestUrl: string): string | null {
-  return extractQueryParam(requestUrl, 'state');
-}
-
-/**
- * The `state` value is carried alongside PKCE as defense in depth (RFC 6749 §10.12).
- * A callback whose state is absent or does not match the value on the most recently
- * built authorization URL aborts the sign-in rather than exchanging the code.
- */
-export function oauthStateIsValid(
-  received: string | null,
-  expected: string | null = getLatestOAuthState()
-): boolean {
-  if (!received || !expected) return false;
-  const receivedBuffer = Buffer.from(received, 'utf8');
-  const expectedBuffer = Buffer.from(expected, 'utf8');
-  if (receivedBuffer.length !== expectedBuffer.length) return false;
-  return crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
-}
-
-// Shown in the browser tab the provider redirected to, once the code has reached the app.
-function oauthFinishedPage() {
-  const title = localized('Signed in');
-  const message = localized('You can close this window and return to the app.');
-  return (
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head>` +
-    `<body style="font-family: sans-serif; text-align: center; margin-top: 80px;">` +
-    `${message}</body></html>`
-  );
-}
-
+// The sign-in runs through the engine (`account.oauth.begin`/`complete`), which keeps the
+// PKCE verifier, the `state` and the client secret; the main process receives the browser's
+// redirect on 127.0.0.1 (src/browser/oauth-receiver.ts).
 interface OAuthSignInPageProps {
-  providerAuthPageUrl: string;
-  buildAccountFromAuthResponse: (rep: any) => Account | Promise<Account>;
+  provider: 'gmail' | 'office365' | 'outlook';
+  // Reconnect: the account the sign-in renews.
+  accountId?: string;
+  sharedMailbox?: string;
   onSuccess: (account: Account) => void;
   onTryAgain: () => void;
   providerConfig: (typeof AccountProviders)[0];
@@ -75,9 +26,15 @@ interface OAuthSignInPageProps {
 
 interface OAuthSignInPageState {
   authStage: string;
+  authUrl: string | null;
   showAlternative: boolean;
   errorMessage?: string;
   errorLog?: string;
+}
+
+// The account being reconnected, when the onboarding window was opened for one.
+export function reconnectingAccountId(account: Account) {
+  return account && account.id && AccountStore.accountForId(account.id) ? account.id : undefined;
 }
 
 export default class OAuthSignInPage extends React.Component<
@@ -86,64 +43,73 @@ export default class OAuthSignInPage extends React.Component<
 > {
   static displayName = 'OAuthSignInPage';
 
-  _server?: http.Server;
   _startTimer: NodeJS.Timeout;
   _warnTimer: NodeJS.Timeout;
   _mounted = false;
+  _begun: OAuthBeginResult | null = null;
 
   state: OAuthSignInPageState = {
     authStage: 'initial',
+    authUrl: null,
     showAlternative: false,
   };
 
   componentDidMount() {
-    // Show the "Sign in to ..." prompt for a moment before bouncing
-    // to URL. (400msec animation + 200msec to read)
     this._mounted = true;
-    this._startTimer = setTimeout(() => {
-      if (!this._mounted) return;
-      shell.openExternal(this.props.providerAuthPageUrl);
-    }, 600);
     this._warnTimer = setTimeout(() => {
       if (!this._mounted) return;
       this.setState({ showAlternative: true });
     }, 1500);
-
-    // launch a web server
-    this._server = http.createServer((request, response) => {
-      if (!this._mounted) return;
-      const code = extractOAuthCodeFromUrl(request.url);
-      if (!code) {
-        response.end('Unknown Request');
-        return;
-      }
-      if (!oauthStateIsValid(extractOAuthStateFromUrl(request.url))) {
-        this._onStateMismatch();
-        response.writeHead(400);
-        response.end('Invalid State');
-        return;
-      }
-      this._onReceivedCode(code);
-      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end(oauthFinishedPage());
-    });
-    this._server.once('error', (err) => {
-      AppEnv.showErrorDialog({
-        title: localized('Unable to Start Local Server'),
-        message: localized(
-          `To listen for the Gmail Oauth response, Tern needs to start a webserver on port ${LOCAL_SERVER_PORT}. Please go back and try linking your account again. If this error persists, use the IMAP/SMTP option with a Gmail App Password.\n\n%@`,
-          err
-        ),
-      });
-    });
-    this._server.listen(LOCAL_SERVER_PORT, LOCAL_SERVER_HOST);
+    this._signIn();
   }
 
   componentWillUnmount() {
     this._mounted = false;
     if (this._startTimer) clearTimeout(this._startTimer);
     if (this._warnTimer) clearTimeout(this._warnTimer);
-    if (this._server) this._server.close();
+    EngineAccounts.cancelOAuth(this._begun);
+  }
+
+  async _signIn() {
+    const mountedAt = Date.now();
+    try {
+      const { provider, accountId, sharedMailbox } = this.props;
+      const { begun, redirect } = await EngineAccounts.beginOAuth({
+        provider,
+        accountId,
+        sharedMailbox: sharedMailbox || undefined,
+      });
+      this._begun = begun;
+      if (!this._mounted) {
+        EngineAccounts.cancelOAuth(begun);
+        return;
+      }
+      this.setState({ authUrl: begun.authUrl });
+      // Show the "Sign in to ..." prompt for a moment before bouncing to the browser
+      // (400 ms animation + 200 ms to read).
+      this._startTimer = setTimeout(
+        () => {
+          if (this._mounted) shell.openExternal(begun.authUrl);
+        },
+        Math.max(0, 600 - (Date.now() - mountedAt))
+      );
+      const received = await redirect;
+      if (!this._mounted) return;
+      AppEnv.focus();
+      this.setState({ authStage: 'buildingAccount' });
+      const added = await EngineAccounts.completeOAuth(begun, received);
+      if (!this._mounted) return;
+      const account = accountFromSignIn(added.account);
+      this.setState({ authStage: 'accountSuccess' });
+      setTimeout(() => {
+        if (!this._mounted) return;
+        this.props.onSuccess(account);
+      }, 400);
+    } catch (err) {
+      if (!this._mounted || err.cancelled) return;
+      AppEnv.focus();
+      this._onError(err);
+    }
   }
 
   _onError(err) {
@@ -162,40 +128,6 @@ export default class OAuthSignInPage extends React.Component<
     if (!isNetworkError && !err.isUserError) {
       AppEnv.reportError(err);
     }
-  }
-
-  _onStateMismatch() {
-    AppEnv.focus();
-    // A callback for an authorization URL built before the current one (e.g. a sign-in
-    // tab left open from an earlier visit to this page) lands here, so this is shown
-    // to the user rather than reported to Sentry.
-    const err: any = new Error(
-      localized(
-        'The sign-in response did not match this sign-in attempt. Please go back and try again.'
-      )
-    );
-    err.isUserError = true;
-    this._onError(err);
-  }
-
-  async _onReceivedCode(code) {
-    if (!this._mounted) return;
-    AppEnv.focus();
-    this.setState({ authStage: 'buildingAccount' });
-    let account = null;
-    try {
-      account = await this.props.buildAccountFromAuthResponse(code);
-    } catch (err) {
-      if (!this._mounted) return;
-      this._onError(err);
-      return;
-    }
-    if (!this._mounted) return;
-    this.setState({ authStage: 'accountSuccess' });
-    setTimeout(() => {
-      if (!this._mounted) return;
-      this.props.onSuccess(account);
-    }, 400);
   }
 
   _renderHeader() {
@@ -251,13 +183,8 @@ export default class OAuthSignInPage extends React.Component<
           <div style={{ marginTop: 40 }}>
             {localized(`Page didn't open? Paste this URL into your browser:`)}
           </div>
-          <input
-            type="url"
-            className="url-copy-target"
-            value={this.props.providerAuthPageUrl}
-            readOnly
-          />
-          <CopyButton className="copy-to-clipboard" text={this.props.providerAuthPageUrl} />
+          <input type="url" className="url-copy-target" value={this.state.authUrl || ''} readOnly />
+          <CopyButton className="copy-to-clipboard" text={this.state.authUrl || ''} />
         </div>
       </div>
     );

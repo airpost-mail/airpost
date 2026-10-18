@@ -1,217 +1,142 @@
-import dns from 'dns';
 import { Account, AccountStore } from 'mailspring-exports';
-import { expandAccountWithCommonSettings } from '../lib/onboarding-helpers';
-import { ExternalFetch } from '../../../src/external-fetch';
-
-const AUTOCONFIG_IMAP_HOST = 'imap.autoconfig.example';
-const AUTOCONFIG_SMTP_HOST = 'smtp.autoconfig.example';
-
-function autoconfigXML(domain: string, imapSocket = 'SSL', smtpSocket = 'STARTTLS') {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<clientConfig version="1.1">
-  <emailProvider id="${domain}">
-    <domain>${domain}</domain>
-    <displayName>${domain}</displayName>
-    <incomingServer type="imap">
-      <hostname>${AUTOCONFIG_IMAP_HOST}</hostname>
-      <port>993</port>
-      <socketType>${imapSocket}</socketType>
-      <username>%EMAILADDRESS%</username>
-      <authentication>password-cleartext</authentication>
-    </incomingServer>
-    <outgoingServer type="smtp">
-      <hostname>${AUTOCONFIG_SMTP_HOST}</hostname>
-      <port>587</port>
-      <socketType>${smtpSocket}</socketType>
-      <username>%EMAILADDRESS%</username>
-      <authentication>password-cleartext</authentication>
-    </outgoingServer>
-  </emailProvider>
-</clientConfig>`;
-}
-
-// Responds to the two URLs TryThunderbirdAutoconfig probes for the domains listed in
-// `servingDomains`, and 404s everything else.
-function stubAutoconfig(servingDomains: string[], sockets: [string, string] = ['SSL', 'STARTTLS']) {
-  spyOn(ExternalFetch, 'fetch').andCallFake((url: string) => {
-    const domain = servingDomains.find(
-      (d) => url === `https://autoconfig.${d}/mail/config-v1.1.xml`
-    );
-    if (domain) {
-      const xml = autoconfigXML(domain, ...sockets);
-      return Promise.resolve({ ok: true, text: () => Promise.resolve(xml) });
-    }
-    return Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' });
-  });
-}
+import EngineEvents from '../../../src/engine-events';
+import { ErrorCode, Feature } from '../../../src/engine-protocol';
+import {
+  expandAccountWithCommonSettings,
+  finalizeAndValidateAccount,
+} from '../lib/onboarding-helpers';
 
 function accountFor(emailAddress: string, provider = 'imap', settings = {}) {
   return new Account({ name: 'Test', emailAddress, provider, settings } as any);
 }
 
-describe('expandAccountWithCommonSettings', function onboardingHelpersTests() {
-  let resolveMxSpy: jasmine.Spy;
+// The engine's answers by method; each call is recorded.
+function fakeEngine(answers: { [method: string]: (params: any) => any }) {
+  const calls: Array<{ method: string; params: any }> = [];
+  EngineEvents.features = new Set([Feature.AccountSetup]);
+  spyOn(EngineEvents, 'request').andCallFake((method: string, params: any) => {
+    calls.push({ method, params: JSON.parse(JSON.stringify(params)) });
+    const answer = answers[method];
+    if (!answer) return Promise.reject(new Error(`unexpected ${method}`));
+    try {
+      return Promise.resolve(answer(params));
+    } catch (err) {
+      return Promise.reject(err);
+    }
+  });
+  return calls;
+}
 
+const DISCOVERED = {
+  imap_host: 'imap.example.com',
+  imap_port: 993,
+  imap_security: 'SSL / TLS',
+  imap_username: 'user@example.com',
+  smtp_host: 'smtp.example.com',
+  smtp_port: 465,
+  smtp_security: 'SSL / TLS',
+  smtp_username: 'user@example.com',
+  container_folder: '',
+};
+
+describe('onboarding through the engine', function onboardingHelpersTests() {
   beforeEach(() => {
-    // The MX lookup only feeds the Mailcore table's mx-match rules, and it is a real
-    // network call - stub it so specs don't depend on DNS.
-    resolveMxSpy = spyOn(dns, 'resolveMx');
-    resolveMxSpy.andCallFake((domain, callback) => callback(new Error('ENOTFOUND')));
     spyOn(AccountStore, 'containerFolderDefaultGetter').andReturn('');
   });
 
-  it('uses the Proton template for a proton.me address', async () => {
-    stubAutoconfig([]);
-    const account = await expandAccountWithCommonSettings(accountFor('user@proton.me'));
-
-    // Proton Bridge listens on localhost, and Proton only allows nested folders inside
-    // its Folders/ namespace.
-    expect(account.settings.imap_host).toEqual('127.0.0.1');
-    expect(account.settings.imap_port).toEqual(1143);
-    expect(account.settings.smtp_host).toEqual('127.0.0.1');
-    expect(account.settings.container_folder).toEqual('Folders');
+  afterEach(() => {
+    EngineEvents.features = null;
   });
 
-  it('uses the Proton template for a protonmail.com address', async () => {
-    stubAutoconfig([]);
-    const account = await expandAccountWithCommonSettings(accountFor('user@protonmail.com'));
-
-    expect(account.settings.imap_host).toEqual('127.0.0.1');
-    expect(account.settings.container_folder).toEqual('Folders');
-  });
-
-  it('keeps the template container_folder when the domain also serves autoconfig', async () => {
-    stubAutoconfig(['proton.me']);
-    const account = await expandAccountWithCommonSettings(accountFor('user@proton.me'));
-
-    // Autoconfig supplies connection settings, but it has no concept of a container
-    // folder, so that key still comes from the Mailspring provider table.
-    expect(account.settings.imap_host).toEqual(AUTOCONFIG_IMAP_HOST);
-    expect(account.settings.smtp_host).toEqual(AUTOCONFIG_SMTP_HOST);
-    expect(account.settings.container_folder).toEqual('Folders');
-  });
-
-  it('leaves container_folder empty for an autoconfig domain with no template entry', async () => {
-    stubAutoconfig(['autoconfig-only.example']);
+  it('takes the servers from account.discover, keeping what the user typed', async () => {
+    const calls = fakeEngine({
+      'account.discover': () => ({ account: { settings: DISCOVERED }, source: 'fallback' }),
+    });
     const account = await expandAccountWithCommonSettings(
-      accountFor('user@autoconfig-only.example')
+      accountFor('user@example.com', 'imap', { imap_password: 'pw', imap_host: 'bridge.local' })
     );
-
-    expect(account.settings.imap_host).toEqual(AUTOCONFIG_IMAP_HOST);
-    expect(account.settings.imap_security).toEqual('SSL / TLS');
-    expect(account.settings.smtp_host).toEqual(AUTOCONFIG_SMTP_HOST);
-    expect(account.settings.smtp_security).toEqual('STARTTLS');
-    expect(account.settings.container_folder).toEqual('');
-  });
-
-  it('picks STARTTLS on the standard ports for a provider that used to ship none', async () => {
-    stubAutoconfig([]);
-    const account = await expandAccountWithCommonSettings(accountFor('user@terra.es'));
-
-    expect(account.settings.imap_host).toEqual('imap4.terra.es');
-    expect(account.settings.imap_port).toEqual(143);
-    expect(account.settings.imap_security).toEqual('STARTTLS');
-    expect(account.settings.smtp_port).toEqual(587);
-    expect(account.settings.smtp_security).toEqual('STARTTLS');
-  });
-
-  it('tries STARTTLS when autoconfig says plain', async () => {
-    stubAutoconfig(['plain-autoconfig.example'], ['plain', 'plain']);
-    const account = await expandAccountWithCommonSettings(
-      accountFor('user@plain-autoconfig.example')
-    );
-
-    expect(account.settings.imap_host).toEqual(AUTOCONFIG_IMAP_HOST);
-    expect(account.settings.imap_security).toEqual('STARTTLS');
-    expect(account.settings.smtp_security).toEqual('STARTTLS');
-  });
-
-  it('falls back to imap./smtp. for a domain with no template and no autoconfig', async () => {
-    stubAutoconfig([]);
-    const account = await expandAccountWithCommonSettings(accountFor('user@plain-imap.example'));
-
-    expect(account.settings.imap_host).toEqual('imap.plain-imap.example');
-    expect(account.settings.imap_port).toEqual(993);
-    expect(account.settings.imap_security).toEqual('SSL / TLS');
-    expect(account.settings.smtp_host).toEqual('smtp.plain-imap.example');
-    expect(account.settings.smtp_port).toEqual(465);
-    expect(account.settings.container_folder).toEqual('');
-  });
-
-  it('keeps user-entered settings ahead of the autoconfig and template defaults', async () => {
-    stubAutoconfig(['proton.me']);
-    const account = await expandAccountWithCommonSettings(
-      accountFor('user@proton.me', 'imap', {
-        imap_host: 'bridge.local',
-        container_folder: 'Custom',
-      })
-    );
-
+    expect(calls[0]).toEqual({
+      method: 'account.discover',
+      params: { email: 'user@example.com', provider: 'imap' },
+    });
     expect(account.settings.imap_host).toEqual('bridge.local');
-    expect(account.settings.container_folder).toEqual('Custom');
+    expect(account.settings.smtp_host).toEqual('smtp.example.com');
+    expect(account.settings.smtp_password).toEqual('pw');
   });
 
-  it('uses the Mailcore template for gmail without consulting autoconfig', async () => {
-    stubAutoconfig(['gmail.com']);
-    const account = await expandAccountWithCommonSettings(accountFor('user@gmail.com', 'gmail'));
-
-    expect(account.settings.imap_host).toEqual('imap.gmail.com');
-    expect(account.settings.smtp_host).toEqual('smtp.gmail.com');
-    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
-  });
-
-  it('uses Google servers for a domain whose MX record is smtp.google.com', async () => {
-    resolveMxSpy.andCallFake((domain, callback) =>
-      callback(null, [{ exchange: 'SMTP.GOOGLE.COM', priority: 1 }])
-    );
-    stubAutoconfig(['workspace.example']);
-    const account = await expandAccountWithCommonSettings(accountFor('user@workspace.example'));
-
-    expect(account.settings.imap_host).toEqual('imap.gmail.com');
-    expect(account.settings.smtp_host).toEqual('smtp.gmail.com');
-    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
-  });
-
-  it('does not download autoconfig for an account added with Google sign-in', async () => {
-    stubAutoconfig(['workspace.example']);
-    const account = await expandAccountWithCommonSettings(
-      accountFor('user@workspace.example', 'gmail')
-    );
-
-    expect(account.settings.imap_host).toEqual('imap.gmail.com');
-    expect(account.settings.imap_port).toEqual(993);
-    expect(account.settings.smtp_host).toEqual('smtp.gmail.com');
-    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
-  });
-
-  it('does not download autoconfig for an account added with Microsoft sign-in', async () => {
-    stubAutoconfig(['contoso.example']);
-    const account = await expandAccountWithCommonSettings(
-      accountFor('user@contoso.example', 'office365')
-    );
-
-    expect(account.settings.imap_host).toEqual('outlook.office365.com');
-    expect(account.settings.smtp_host).toEqual('smtp.office365.com');
-    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
-  });
-
-  it('uses the account type preset when the domain is not in either table', async () => {
-    stubAutoconfig([]);
-    const account = await expandAccountWithCommonSettings(
-      accountFor('user@unknown-domain.example', 'yahoo')
-    );
-
-    expect(account.settings.imap_host).toEqual('imap.mail.yahoo.com');
-    expect(account.settings.smtp_host).toEqual('smtp.mail.yahoo.com');
-  });
-
-  it('applies the configured container folder default when the template has none', async () => {
+  it('applies the container folder default when discovery has none', async () => {
     (AccountStore.containerFolderDefaultGetter as jasmine.Spy).andReturn('Mail');
-    stubAutoconfig(['autoconfig-only.example']);
-    const account = await expandAccountWithCommonSettings(
-      accountFor('user@autoconfig-only.example')
-    );
-
+    fakeEngine({
+      'account.discover': () => ({ account: { settings: DISCOVERED }, source: 'fallback' }),
+    });
+    const account = await expandAccountWithCommonSettings(accountFor('user@example.com'));
     expect(account.settings.container_folder).toEqual('Mail');
+  });
+
+  it('adds a new account with its secrets apart and takes the engine id', async () => {
+    const calls = fakeEngine({
+      'account.add': () => ({ accountId: '6c210fa1', state: 'running', stored: true }),
+    });
+    const account = accountFor('user@example.com', 'imap', {
+      ...DISCOVERED,
+      imap_password: 'pw',
+      smtp_password: 'pw',
+    });
+    const added = await finalizeAndValidateAccount(account);
+    expect(calls.length).toEqual(1);
+    const { method, params } = calls[0];
+    expect(method).toEqual('account.add');
+    expect(params.test).toBe(true);
+    expect(params.secrets).toEqual({ imap_password: 'pw', smtp_password: 'pw' });
+    expect(params.account.settings.imap_password).toBeUndefined();
+    expect(params.account.id).toBeUndefined();
+    expect(added.id).toEqual('6c210fa1');
+    expect(added.settings.imap_password).toBeUndefined();
+  });
+
+  it('shows a failed test as the engine described it', async () => {
+    fakeEngine({
+      'account.add': () => {
+        const err: any = new Error('Account test failed (imap): ErrorAuthentication');
+        err.code = ErrorCode.AccountTestFailed;
+        err.data = { error: 'ErrorAuthentication', error_service: 'imap', log: 'A1 NO' };
+        throw err;
+      },
+    });
+    let error = null;
+    try {
+      await finalizeAndValidateAccount(
+        accountFor('user@example.com', 'imap', { ...DISCOVERED, imap_password: 'bad' })
+      );
+    } catch (err) {
+      error = err;
+    }
+    expect(error.message).toContain('(IMAP)');
+    expect(error.rawLog).toEqual('A1 NO');
+  });
+
+  it('reconnects an account it has: tested, updated, new secrets', async () => {
+    const existing = accountFor('user@example.com', 'imap', DISCOVERED);
+    existing.id = 'acct1';
+    spyOn(AccountStore, 'accountForId').andCallFake((id) => (id === 'acct1' ? existing : null));
+    const calls = fakeEngine({
+      'account.test': () => ({ error: null, log: '' }),
+      'account.update': () => ({ account: {}, secretsCleared: true }),
+      'account.setSecrets': () => ({ accountId: 'acct1', state: 'running' }),
+    });
+    const changed = existing.clone();
+    changed.settings.imap_host = 'imap2.example.com';
+    changed.settings.imap_password = 'n3w';
+    const added = await finalizeAndValidateAccount(changed);
+    expect(calls.map((c) => c.method)).toEqual([
+      'account.test',
+      'account.update',
+      'account.setSecrets',
+    ]);
+    expect(calls[1].params.accountId).toEqual('acct1');
+    expect(calls[1].params.patch.settings.imap_host).toEqual('imap2.example.com');
+    expect(calls[1].params.patch.settings.imap_password).toBeUndefined();
+    expect(calls[2].params).toEqual({ accountId: 'acct1', secrets: { imap_password: 'n3w' } });
+    expect(added.id).toEqual('acct1');
   });
 });

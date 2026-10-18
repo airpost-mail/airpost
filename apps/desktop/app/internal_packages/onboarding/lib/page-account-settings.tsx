@@ -1,5 +1,5 @@
 import React from 'react';
-import { localized, Account, RegExpUtils } from 'mailspring-exports';
+import { localized, Account, AccountStore, RegExpUtils } from 'mailspring-exports';
 
 import * as OnboardingActions from './onboarding-actions';
 import CreatePageForForm from './decorators/create-page-for-form';
@@ -71,12 +71,15 @@ class AccountBasicSettingsForm extends React.Component<AccountBasicSettingsFormP
   async submit() {
     // create a new account with expanded settings and just the three fields
     const {
+      id,
       name,
       emailAddress,
       provider,
       settings: { imap_password },
     } = this.props.account;
     let account = new Account({ name, emailAddress, provider, settings: { imap_password } });
+    // A reconnect keeps the account's id.
+    if (id && AccountStore.accountForId(id)) account.id = id;
     account = await expandAccountWithCommonSettings(account);
     OnboardingActions.setAccount(account);
 

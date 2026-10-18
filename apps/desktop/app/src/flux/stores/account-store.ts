@@ -5,6 +5,7 @@ import _ from 'underscore';
 import MailspringStore from 'mailspring-store';
 import KeyManager from '../../key-manager';
 import { revokeOAuthGrant } from '../../oauth-revocation';
+import * as EngineAccounts from '../../engine-accounts';
 import * as Actions from '../actions';
 import { Account } from '../models/account';
 import { Thread } from '../models/thread';
@@ -12,7 +13,13 @@ import { Contact } from '../models/contact';
 import * as Utils from '../models/utils';
 import EngineEvents, { EngineNotification } from '../../engine-events';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../engine-client';
-import { AccountChangedParams, AccountListResult, Feature, Method } from '../../engine-protocol';
+import {
+  AccountChangedParams,
+  AccountListResult,
+  ErrorCode,
+  Feature,
+  Method,
+} from '../../engine-protocol';
 
 const configAccountsKey = 'accounts';
 const configVersionKey = 'accountsVersion';
@@ -251,7 +258,28 @@ export class _AccountStore extends MailspringStore {
     this._caches = {};
     this._accounts[idx] = account;
     this._save();
+    this._updateInEngine(account, updated);
   };
+
+  // The registry keeps what the user edits (name, aliases, settings); the engine answers with
+  // account.changed. The sync state is this app's own.
+  _updateInEngine(account: Account, updated: Partial<Account>) {
+    if (!EngineAccounts.accountSetupAvailable()) return;
+    const json = account.toJSON();
+    const patch: Record<string, any> = {};
+    for (const key of Object.keys(updated)) {
+      if (LOCAL_ACCOUNT_FIELDS.includes(key) || key === 'id' || !(key in json)) continue;
+      patch[key] = json[key];
+    }
+    if (patch.settings) {
+      patch.settings = { ...patch.settings };
+      for (const key of EngineAccounts.SECRET_SETTINGS) delete patch.settings[key];
+    }
+    if (!Object.keys(patch).length) return;
+    EngineAccounts.updateAccount(account.id, patch).catch((err) =>
+      console.warn(`account.update ${account.id} failed: ${err && err.message}`)
+    );
+  }
 
   /**
    * When an account is removed from Mailspring, the AccountStore
@@ -266,8 +294,13 @@ export class _AccountStore extends MailspringStore {
     this._caches = {};
     this._removedIds.add(id);
 
-    // Started before anything below clears the keychain entry it needs to read.
-    const revocation = revokeOAuthGrant(account);
+    // An engine with account setup stops the account, revokes its Google grant and deletes
+    // its rows and secrets itself (account.remove {revoke, deleteData}); that runs before
+    // config.json lets go of the account, since the supervisor's own account.remove would
+    // delete the token the revocation needs.
+    const removedByEngine = await this._removeFromEngine(account);
+    // Otherwise started before anything below clears the keychain entry it needs to read.
+    const revocation = removedByEngine ? Promise.resolve() : revokeOAuthGrant(account);
 
     const remainingAccounts = this._accounts.filter((a) => a !== account);
     // This action is called before saving because we need to unfocus the
@@ -291,6 +324,8 @@ export class _AccountStore extends MailspringStore {
       await KeyManager.deleteAccountSecrets(account);
       const ipc = require('electron').ipcRenderer;
       ipc.send('command', 'application:reset-database', { keepMetadata: false });
+    } else if (removedByEngine) {
+      KeyManager.deleteAccountSecrets(account);
     } else {
       // Clear the cached data for the account and reset secrets once that has completed
       AppEnv.mailsyncBridge
@@ -302,6 +337,18 @@ export class _AccountStore extends MailspringStore {
     }
   };
 
+  async _removeFromEngine(account: Account) {
+    if (!EngineAccounts.accountSetupAvailable()) return false;
+    try {
+      await EngineAccounts.removeAccount(account.id);
+      return true;
+    } catch (err) {
+      if (err && err.code === ErrorCode.UnknownAccount) return false;
+      console.warn(`The engine could not remove account ${account.id}: ${err && err.message}`);
+      return false;
+    }
+  }
+
   _onReorderAccount = (id: string, newIdx: number) => {
     const existingIdx = this._accounts.findIndex((a) => a.id === id);
     if (existingIdx === -1) return;
@@ -310,6 +357,11 @@ export class _AccountStore extends MailspringStore {
     this._accounts.splice(existingIdx, 1);
     this._accounts.splice(newIdx, 0, account);
     this._save();
+    if (EngineAccounts.accountSetupAvailable()) {
+      EngineAccounts.reorderAccounts(this.accountIds()).catch((err) =>
+        console.warn(`account.reorder failed: ${err && err.message}`)
+      );
+    }
   };
 
   _onUpdateContainerFolderDefault = (containerFolderDefault: string) => {

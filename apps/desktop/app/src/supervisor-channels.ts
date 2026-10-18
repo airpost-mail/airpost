@@ -42,17 +42,24 @@ export const SupervisorChannel = {
   ForceRelaunch: 'engine-supervisor:force-relaunch',
   // invoke {accountId} -> {error?: string}
   ResetCache: 'engine-supervisor:reset-cache',
-  // invoke {account} (with secrets) -> AccountTestReply. Onboarding's settings check.
-  TestAccount: 'engine-supervisor:test-account',
   // invoke -> {error?: string}. Removes every account and empties the database; the caller
   // relaunches.
   ResetDatabase: 'engine-supervisor:reset-database',
 } as const;
 
-// `account.test`'s result (a failed test is a result with `error`), or why the engine could not
-// run it.
-export interface AccountTestReply {
-  result?: { account: Record<string, any> | null; error: string | null; [key: string]: any };
+// The OAuth redirect receiver in the main process (browser/oauth-receiver.ts).
+export const OAuthReceiverChannel = {
+  // invoke {port, state} -> OAuthRedirect, once the browser comes back (or it fails).
+  Receive: 'oauth-receiver:receive',
+  // invoke (state): ends the sign-in a window waits for.
+  Cancel: 'oauth-receiver:cancel',
+} as const;
+
+// `code` and `state` of the redirect, or why there is none: `listen: <code>`, `denied:
+// <provider error>`, `timeout`, `cancelled`, `superseded`.
+export interface OAuthRedirect {
+  code?: string;
+  state?: string;
   error?: string;
 }
 

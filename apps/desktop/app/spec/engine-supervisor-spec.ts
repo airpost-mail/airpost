@@ -334,28 +334,6 @@ describe('the engine supervisor', function () {
     ]);
   });
 
-  it('tests an account on stdin for onboarding, with its secrets redacted after', async function () {
-    config.values.accounts = [];
-    supervisor.start();
-    await until('the engine', () => fake.spawns.length === 1);
-    const account = {
-      id: 'n1',
-      emailAddress: 'n1@example.com',
-      settings: { imap_password: 'pw-n1' },
-    };
-    fake.testResult = {
-      account: null,
-      error: 'ErrorAuthentication',
-      error_service: 'imap',
-      log: 'LOGIN n1 pw-n1\nNO',
-    };
-    const result = await supervisor.testAccount(account);
-    expect(fake.stdinOf('account.test').map((r) => r.params)).toEqual([{ account }]);
-    expect(result.error).toBe('ErrorAuthentication');
-    expect(result.log).toBe('LOGIN n1 *********\nNO');
-    expect(fake.socket.some((r) => JSON.stringify(r).includes('pw-n1'))).toBe(false);
-  });
-
   it('passes a verbose logging change to the running engine', async function () {
     await started();
     const until30 = Date.now() + 30 * 60 * 1000;

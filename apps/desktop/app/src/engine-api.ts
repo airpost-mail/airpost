@@ -38,6 +38,8 @@ const LOCAL_ONLY_METHODS = [
   'account.add',
   'account.test',
   'account.setSecrets',
+  'account.oauth.begin',
+  'account.oauth.complete',
   'account.update',
   'account.remove',
   'account.reset',

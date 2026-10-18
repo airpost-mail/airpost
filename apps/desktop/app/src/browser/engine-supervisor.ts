@@ -58,7 +58,6 @@ import {
 import type { EngineSettingsMirror } from './engine-settings';
 import {
   AccountEvent,
-  AccountTestReply,
   EngineAccountRoute,
   EngineStatus,
   SupervisorChannel,
@@ -255,11 +254,6 @@ export class EngineSupervisor {
     return this.client.resetCache(accountId, () =>
       this.client.withEngine((engine) => engine.resetAccount(accountId, options))
     );
-  }
-
-  // `account` carries its secrets: onboarding tests settings it has not saved yet.
-  testAccount(account: AccountSecretsJSON) {
-    return this.client.withEngine((engine) => engine.testAccount(account));
   }
 
   resetDatabase(options: ResetOptions = {}) {
@@ -518,16 +512,6 @@ export function registerEngineSupervisorIPC(
   );
   ipcMain.handle(SupervisorChannel.ResetDatabase, (_event, options?: ResetOptions) =>
     reply(() => supervisor.resetDatabase(options))
-  );
-  ipcMain.handle(
-    SupervisorChannel.TestAccount,
-    async (_event, account: AccountSecretsJSON): Promise<AccountTestReply> => {
-      try {
-        return { result: await supervisor.testAccount(account) };
-      } catch (err) {
-        return { error: (err && err.message) || `${err}` };
-      }
-    }
   );
 }
 

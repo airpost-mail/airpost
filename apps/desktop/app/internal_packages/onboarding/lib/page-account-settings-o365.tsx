@@ -2,9 +2,8 @@ import React from 'react';
 
 import { Account, localized, localizedReactFragment, RegExpUtils } from 'mailspring-exports';
 import { RetinaImg } from 'mailspring-component-kit';
-import { buildO365AccountFromAuthResponse, buildO365AuthURL } from './onboarding-helpers';
 
-import OAuthSignInPage from './oauth-signin-page';
+import OAuthSignInPage, { reconnectingAccountId } from './oauth-signin-page';
 import FormErrorMessage from './form-error-message';
 import * as OnboardingActions from './onboarding-actions';
 import AccountProviders from './account-providers';
@@ -21,8 +20,6 @@ export default class AccountSettingsPageO365 extends React.Component<
   AccountSettingsPageO365State
 > {
   static displayName = 'AccountSettingsPageO365';
-
-  _authUrl = buildO365AuthURL();
 
   state: AccountSettingsPageO365State = {
     sharedMailbox: '',
@@ -159,12 +156,13 @@ export default class AccountSettingsPageO365 extends React.Component<
 
     return (
       <OAuthSignInPage
+        // A new shared mailbox is a new sign-in.
+        key={sharedMailbox}
         serviceName="Office 365"
-        providerAuthPageUrl={this._authUrl}
+        provider="office365"
+        accountId={sharedMailbox ? undefined : reconnectingAccountId(this.props.account)}
+        sharedMailbox={sharedMailbox || undefined}
         providerConfig={providerConfig}
-        buildAccountFromAuthResponse={(code) =>
-          buildO365AccountFromAuthResponse(code, sharedMailbox || undefined)
-        }
         onSuccess={this.onSuccess}
         onTryAgain={goBack}
       >

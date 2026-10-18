@@ -89,11 +89,24 @@ export const Method = {
   // Feature.AiTriage: start a triage job, and the opted-in accounts' triaged inbox threads.
   AiTriageRun: 'ai.triage.run',
   AiTriageList: 'ai.triage.list',
-  // `serve` mode's stdin only: the account JSON carries credentials.
+  // Account setup (Feature.AccountSetup), on stdin and the socket alike: secrets go in
+  // `secrets` or `settings` and never come back (docs/desktop-client-plan.md 3.6).
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
   AccountTest: 'account.test',
   AccountReset: 'account.reset',
+  AccountDiscover: 'account.discover',
+  AccountOAuthBegin: 'account.oauth.begin',
+  AccountOAuthComplete: 'account.oauth.complete',
+  AccountSetSecrets: 'account.setSecrets',
+  AccountUpdate: 'account.update',
+  AccountReorder: 'account.reorder',
+  SecretsSet: 'secrets.set',
+  SecretsDelete: 'secrets.delete',
+  SecretsHas: 'secrets.has',
+  ServerSet: 'server.set',
+  ServerClear: 'server.clear',
+  // `serve` mode's stdin only (a detached engine's socket too).
   EngineResetDatabase: 'engine.resetDatabase',
   EngineSetLogLevel: 'engine.setLogLevel',
   EngineShutdown: 'engine.shutdown',
@@ -124,6 +137,10 @@ export const Feature = {
   // starts registered accounts itself and restarts stopped ones (docs/desktop-client-plan.md
   // 3.6); `credentials.import` moves KeyManager's keyset into it.
   Accounts: 'accounts',
+  // Account setup on the socket: account.discover, account.oauth.*, account.add/test with
+  // `secrets`, account.setSecrets/update/reorder, account.remove {revoke, deleteData},
+  // secrets.* and server.*.
+  AccountSetup: 'account-setup',
   Counts: 'counts',
   TasksList: 'tasks-list',
   MetadataList: 'metadata-list',
@@ -175,6 +192,11 @@ export const ErrorCode = {
   AiFailed: -32011,
   // The workers for this kind of call are busy and their queue is full; try again later.
   EngineBusy: -32012,
+  // `account.add {test}` (or setSecrets, oauth.complete): the test failed; `data` is the
+  // AccountTestResult.
+  AccountTestFailed: -32013,
+  // The OAuth exchange or profile request failed; `data` is `{key, offline?}`.
+  OAuthFailed: -32014,
 } as const;
 
 // `serve`'s exit code when another engine is listening on its socket, typically the previous
@@ -426,6 +448,48 @@ export interface AccountTestResult {
   error_advice?: string;
   error_offline?: boolean;
   log: string;
+}
+
+// An account's secrets, under the settings keys they replace. Write-only.
+export interface AccountSecrets {
+  imap_password?: string;
+  smtp_password?: string;
+  refresh_token?: string;
+}
+
+export interface AccountDiscoverResult {
+  // {emailAddress, provider, settings}: servers, ports, usernames, security (never `none`),
+  // `*_allow_insecure_ssl` and `container_folder`. An empty `imap_host`: nothing found.
+  account: Record<string, any>;
+  source: 'matcher' | 'autoconfig' | 'provider-table' | 'fallback';
+  template?: string;
+}
+
+export interface OAuthBeginParams {
+  provider: 'gmail' | 'office365' | 'outlook';
+  sharedMailbox?: string;
+  redirectPort?: number;
+  // Reconnect: the account the sign-in renews.
+  accountId?: string;
+  containerFolder?: string;
+}
+
+export interface OAuthBeginResult {
+  sessionId: string;
+  authUrl: string;
+  redirectUri: string;
+  state: string;
+}
+
+export interface OAuthCompleteResult extends AccountAddResult {
+  // The account's JSON without secrets.
+  account: Record<string, any>;
+}
+
+export interface AccountUpdateResult {
+  account: Record<string, any>;
+  secretsCleared?: boolean;
+  restarted?: boolean;
 }
 
 export interface ResetDatabaseResult {

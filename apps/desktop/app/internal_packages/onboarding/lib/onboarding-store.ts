@@ -18,16 +18,20 @@ class OnboardingStore extends MailspringStore {
     this.listenTo(OnboardingActions.chooseAccountProvider, this._onChooseAccountProvider);
     this.listenTo(OnboardingActions.finishAndAddAccount, this._onFinishAndAddAccount);
 
-    const { existingAccountJSON, addingAccount } = AppEnv.getWindowProps();
+    const { existingAccountJSON, reconnectAccountId, addingAccount } = AppEnv.getWindowProps();
 
     const hasAccounts = AccountStore.accounts().length > 0;
 
     this._account = new Account({ name: '', emailAddress: '', settings: {} });
 
-    if (existingAccountJSON) {
+    // Reconnect names the account; the engine holds its secrets, so the user gives new ones.
+    const reconnecting = reconnectAccountId && AccountStore.accountForId(reconnectAccountId);
+    const existing = reconnecting ? reconnecting.toJSON() : existingAccountJSON;
+
+    if (existing) {
       // Used when re-adding an account after re-connecting, take the user back
       // to the best page with the most details
-      this._account = new Account({}).fromJSON(existingAccountJSON);
+      this._account = new Account({}).fromJSON(existing);
       // Older autoconfig stored "None", which the engine refuses and the security menu
       // can't show.
       if (this._account.settings) repairStoredSecurity(this._account.settings);

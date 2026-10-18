@@ -3,13 +3,7 @@ import fs from 'fs';
 import React, { Component } from 'react';
 import { shell, ipcRenderer } from 'electron';
 import { EditableList } from 'mailspring-component-kit';
-import {
-  localized,
-  RegExpUtils,
-  KeyManager,
-  Account,
-  AccountAutoaddress,
-} from 'mailspring-exports';
+import { localized, RegExpUtils, Account, AccountAutoaddress } from 'mailspring-exports';
 import { developerToolsAvailable } from '../../../../src/developer-tools';
 
 interface AutoaddressControlProps {
@@ -158,9 +152,10 @@ class PreferencesAccountDetails extends Component<
     this._setStateAndSave({ defaultAlias });
   };
 
-  _onReconnect = async () => {
+  // The engine keeps the secrets: onboarding asks for new ones (account.setSecrets).
+  _onReconnect = () => {
     ipcRenderer.send('command', 'application:add-account', {
-      existingAccountJSON: await KeyManager.insertAccountSecrets(this.state.account),
+      reconnectAccountId: this.state.account.id,
     });
   };
 

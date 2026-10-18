@@ -63,6 +63,7 @@ import {
   waitForEarlierEngine,
   detachedEngineToReuse,
 } from './engine-supervisor';
+import { registerOAuthReceiverIPC } from './oauth-receiver';
 
 // The application's singleton class.
 //
@@ -272,6 +273,7 @@ export default class Application extends EventEmitter {
       });
     }
     registerEngineSupervisorIPC(ipcMain, this.engineSupervisor);
+    registerOAuthReceiverIPC(ipcMain);
     if (this.engineSupervisor) this.engineSupervisor.start();
   }
 
@@ -577,18 +579,26 @@ export default class Application extends EventEmitter {
       win.browserWindow.inspectElement(x, y);
     });
 
-    this.on('application:add-account', ({ existingAccountJSON, o365SharedMailbox } = {}) => {
-      const onboarding = this.windowManager.get(WindowManager.ONBOARDING_WINDOW);
-      if (onboarding) {
-        onboarding.show();
-        onboarding.focus();
-      } else {
-        this.windowManager.ensureWindow(WindowManager.ONBOARDING_WINDOW, {
-          windowProps: { addingAccount: true, existingAccountJSON, o365SharedMailbox },
-          title: localized('Add Account'),
-        });
+    this.on(
+      'application:add-account',
+      ({ existingAccountJSON, reconnectAccountId, o365SharedMailbox } = {}) => {
+        const onboarding = this.windowManager.get(WindowManager.ONBOARDING_WINDOW);
+        if (onboarding) {
+          onboarding.show();
+          onboarding.focus();
+        } else {
+          this.windowManager.ensureWindow(WindowManager.ONBOARDING_WINDOW, {
+            windowProps: {
+              addingAccount: true,
+              existingAccountJSON,
+              reconnectAccountId,
+              o365SharedMailbox,
+            },
+            title: localized('Add Account'),
+          });
+        }
       }
-    });
+    );
 
     this.on('application:new-message', () => {
       const main = this.windowManager.get(WindowManager.MAIN_WINDOW);

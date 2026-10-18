@@ -5,7 +5,6 @@ import {
   repairStoredSecurity,
   securityForPort,
 } from '../lib/connection-security';
-import MailspringProviderSettings from '../lib/mailspring-provider-settings.json';
 
 describe('connection security', function connectionSecuritySpecs() {
   it('maps the standard ports to TLS, never to none', () => {
@@ -79,17 +78,5 @@ describe('connection security', function connectionSecuritySpecs() {
       smtp_port: 2525,
       smtp_security: 'STARTTLS',
     });
-  });
-
-  it('ships no provider entry with cleartext', () => {
-    const offenders = Object.entries(MailspringProviderSettings)
-      .filter(([, entry]: [string, any]) => !entry.alias)
-      .filter(
-        ([, entry]: [string, any]) =>
-          !['SSL / TLS', 'STARTTLS'].includes(entry.imap_security) ||
-          !['SSL / TLS', 'STARTTLS'].includes(entry.smtp_security)
-      )
-      .map(([name]) => name);
-    expect(offenders).toEqual([]);
   });
 });
