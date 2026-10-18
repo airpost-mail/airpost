@@ -2,6 +2,8 @@ import {
   parseListUnsubscribeHeader,
   supportsOneClick,
   getBestUnsubscribeOption,
+  engineUnsubscribes,
+  performEngineUnsubscribe,
   UnsubscribeOption,
 } from '../lib/unsubscribe-service';
 
@@ -267,5 +269,71 @@ describe('getBestUnsubscribeOption', function () {
       const result = getBestUnsubscribeOption([mailtoOption, mailtoOption2], false);
       expect(result?.option).toBe(mailtoOption);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// performEngineUnsubscribe
+// ---------------------------------------------------------------------------
+
+describe('performEngineUnsubscribe', function () {
+  const message = { accountId: 'a1', id: 'm1' };
+  const fakeEngine = (reply: () => Promise<unknown>, features = ['unsubscribe']) => {
+    const calls: [string, unknown][] = [];
+    return {
+      calls,
+      has: (f: string) => features.includes(f),
+      request<R>(method: string, params: unknown): Promise<R> {
+        calls.push([method, params]);
+        return reply() as Promise<R>;
+      },
+    };
+  };
+
+  it('is used only when the engine announces unsubscribe', () => {
+    expect(engineUnsubscribes(fakeEngine(() => Promise.resolve({})))).toBe(true);
+    expect(engineUnsubscribes(fakeEngine(() => Promise.resolve({}), []))).toBe(false);
+  });
+
+  it('asks the engine and reports a one-click result', async () => {
+    const engine = fakeEngine(() =>
+      Promise.resolve({ method: 'one-click', ok: true, url: 'https://x.example/u' })
+    );
+    const opened: string[] = [];
+    const r = await performEngineUnsubscribe(message, engine, (u) => opened.push(u));
+    expect(engine.calls).toEqual([['messages.unsubscribe', { accountId: 'a1', messageId: 'm1' }]]);
+    expect(r).toEqual({ success: true, error: undefined, method: 'one-click' });
+    expect(opened).toEqual([]);
+  });
+
+  it('opens a web link the engine hands back', async () => {
+    const engine = fakeEngine(() =>
+      Promise.resolve({ method: 'web', ok: true, url: 'https://x.example/page' })
+    );
+    const opened: string[] = [];
+    const r = await performEngineUnsubscribe(message, engine, (u) => opened.push(u));
+    expect(r.success).toBe(true);
+    expect(opened).toEqual(['https://x.example/page']);
+  });
+
+  it('reports failures and engine errors', async () => {
+    const failed = await performEngineUnsubscribe(
+      message,
+      fakeEngine(() =>
+        Promise.resolve({ method: 'one-click', ok: false, error: 'the server answered 503' })
+      ),
+      () => {}
+    );
+    expect(failed).toEqual({
+      success: false,
+      error: 'the server answered 503',
+      method: 'one-click',
+    });
+    const refused = await performEngineUnsubscribe(
+      message,
+      fakeEngine(() => Promise.reject({ code: -32004, message: 'no unsubscribe link' })),
+      () => {}
+    );
+    expect(refused).toEqual({ success: false, error: 'no unsubscribe link' });
   });
 });

@@ -1,4 +1,11 @@
 import { ExternalFetch } from '../../../src/external-fetch';
+import EngineEvents from '../../../src/engine-events';
+import {
+  Feature,
+  Method,
+  MessagesUnsubscribeParams,
+  MessagesUnsubscribeResult,
+} from '../../../src/engine-protocol';
 
 const { shell } = require('electron');
 
@@ -202,4 +209,40 @@ export function getBestUnsubscribeOption(
   }
 
   return null;
+}
+
+/** The part of EngineEvents the engine path uses, so specs can pass a fake. */
+export interface UnsubscribeEngine {
+  has(feature: string): boolean;
+  request<R>(method: string, params: unknown): Promise<R>;
+}
+
+/** Whether the header-based methods go through the engine's `messages.unsubscribe`. */
+export function engineUnsubscribes(engine: UnsubscribeEngine = EngineEvents): boolean {
+  return engine.has(Feature.Unsubscribe);
+}
+
+/**
+ * Unsubscribes by the message's List-Unsubscribe header through the engine: it makes the
+ * one-click POST or sends the mailto message itself (without the composer), and hands a web
+ * link back, which opens in the browser here. Links found only in the body stay with
+ * `performWebUnsubscribe`.
+ */
+export async function performEngineUnsubscribe(
+  message: { accountId: string; id: string },
+  engine: UnsubscribeEngine = EngineEvents,
+  openWeb: (url: string) => void = performWebUnsubscribe
+): Promise<UnsubscribeResult & { method?: string }> {
+  const params: MessagesUnsubscribeParams = { accountId: message.accountId, messageId: message.id };
+  try {
+    const r = await engine.request<MessagesUnsubscribeResult>(Method.MessagesUnsubscribe, params);
+    if (r.ok && r.method === 'web' && r.url) openWeb(r.url);
+    return { success: r.ok, error: r.ok ? undefined : r.error, method: r.method };
+  } catch (err) {
+    return {
+      success: false,
+      // EngineConnectionError, or anything with a message.
+      error: (err as { message?: string })?.message || String(err),
+    };
+  }
 }

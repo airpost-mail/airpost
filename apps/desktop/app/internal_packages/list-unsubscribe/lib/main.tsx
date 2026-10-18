@@ -164,7 +164,13 @@ const UnsubscribeHeaderContainer: React.FunctionComponent<{ message: Message }> 
     return null;
   }
 
-  return <UnsubscribeHeader option={info.option} method={info.method} />;
+  return (
+    <UnsubscribeHeader
+      option={info.option}
+      method={info.method}
+      message={{ accountId: message.accountId, id: message.id }}
+    />
+  );
 };
 
 UnsubscribeHeaderContainer.displayName = 'UnsubscribeContainer';

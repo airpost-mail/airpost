@@ -8,6 +8,8 @@ import {
   performOneClickUnsubscribe,
   performMailtoUnsubscribe,
   performWebUnsubscribe,
+  engineUnsubscribes,
+  performEngineUnsubscribe,
 } from './unsubscribe-service';
 
 type UnsubscribeMethod = 'one-click' | 'mailto' | 'web' | 'body-link';
@@ -17,6 +19,8 @@ interface UnsubscribeHeaderProps {
   option: UnsubscribeOption;
   /** The method to use for unsubscribing */
   method: UnsubscribeMethod;
+  /** The message, for `messages.unsubscribe` when the engine has it. */
+  message?: { accountId: string; id: string };
 }
 
 type UnsubscribeState = 'idle' | 'loading' | 'success' | 'error';
@@ -32,6 +36,8 @@ interface UnsubscribeHeaderState {
  * Supports multiple unsubscribe methods:
  * - one-click: RFC 8058 HTTP POST (shows loading/success/error states)
  * - mailto: Opens composer with pre-filled unsubscribe email
+ * With an engine that has `messages.unsubscribe`, the header methods go through it: it POSTs
+ * or sends the mailto message itself and returns web links to open.
  * - web/body-link: Opens URL in browser
  */
 export class UnsubscribeHeader extends React.Component<
@@ -67,7 +73,12 @@ export class UnsubscribeHeader extends React.Component<
       return;
     }
 
-    const { option, method } = this.props;
+    const { option, method, message } = this.props;
+
+    if (message && method !== 'body-link' && engineUnsubscribes()) {
+      await this._performEngine(message);
+      return;
+    }
 
     switch (method) {
       case 'one-click':
@@ -96,6 +107,18 @@ export class UnsubscribeHeader extends React.Component<
       this.setState({ state: 'success' });
     } else {
       this.setState({ state: 'error', errorMessage: result.error });
+    }
+  }
+
+  private async _performEngine(message: { accountId: string; id: string }) {
+    this.setState({ state: 'loading', errorMessage: undefined });
+    const result = await performEngineUnsubscribe(message);
+    if (!this._mounted) return;
+    if (!result.success) {
+      this.setState({ state: 'error', errorMessage: result.error });
+    } else {
+      // A web link opened in the browser; the list isn't done with us until the page is.
+      this.setState({ state: result.method === 'web' ? 'idle' : 'success' });
     }
   }
 

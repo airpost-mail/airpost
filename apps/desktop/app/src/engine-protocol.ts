@@ -64,6 +64,10 @@ export const Method = {
   // The engine-owned settings (Feature.Settings).
   SettingsGet: 'settings.get',
   SettingsSet: 'settings.set',
+  // Mail actions (Feature.Snooze, Feature.Unsubscribe).
+  ThreadsSnooze: 'threads.snooze',
+  ThreadsUnsnooze: 'threads.unsnooze',
+  MessagesUnsubscribe: 'messages.unsubscribe',
   // `serve` mode's stdin only: the account JSON carries credentials.
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
@@ -95,6 +99,10 @@ export const Feature = {
   // The engine acts on due send-later, thread-snooze and send-reminders metadata itself; only
   // send-later rows marked `clientFinalize` still need a window (docs/desktop-client-plan.md 3.3).
   ExpirationExecutor: 'expiration-executor',
+  // `threads.snooze` and `threads.unsnooze`.
+  Snooze: 'snooze',
+  // `messages.unsubscribe`: the engine makes the one-click POST or sends the mailto message.
+  Unsubscribe: 'unsubscribe',
 } as const;
 
 export const ErrorCode = {
@@ -394,4 +402,22 @@ export function deltaParamsText(line: string): string | null {
     return line.slice(DELTA_PREFIX.length, -1);
   }
   return null;
+}
+
+// `messages.unsubscribe` (ms-ipc `MessagesUnsubscribeParams`/`Result`). Without `method` the
+// engine picks one-click, else mailto, else web; a web link comes back for the client to open.
+export type UnsubscribeMethod = 'one-click' | 'mailto' | 'web';
+
+export interface MessagesUnsubscribeParams {
+  accountId: string;
+  messageId: string;
+  method?: UnsubscribeMethod;
+}
+
+export interface MessagesUnsubscribeResult {
+  method: UnsubscribeMethod;
+  ok: boolean;
+  url?: string;
+  error?: string;
+  taskId?: string;
 }
