@@ -81,6 +81,89 @@ pub async fn probe(config_dir: &Path) -> EngineInfo {
     }
 }
 
+/// Why [`call`] has no result.
+#[derive(Debug)]
+pub enum CallError {
+    /// No engine, or it didn't answer in time.
+    Down,
+    /// The engine lacks the feature the call needs.
+    TooOld,
+    /// The engine answered with an error.
+    Rpc(ms_ipc::ErrorObject),
+}
+
+/// Calls `method` on a connection of its own, as a local client: the gateway's file routes,
+/// which may not go through a browser's relayed connection (`files.*` are local-only).
+/// Answers that come before the response (there are none without `subscribe`) are skipped.
+pub async fn call(
+    config_dir: &Path,
+    needs: &str,
+    method: &str,
+    params: serde_json::Value,
+    timeout: Duration,
+) -> Result<serde_json::Value, CallError> {
+    let socket = find(config_dir).ok_or(CallError::Down)?;
+    let exchange = async {
+        let stream = UnixStream::connect(&socket)
+            .await
+            .map_err(|_| CallError::Down)?;
+        let (r, mut w) = stream.into_split();
+        let mut lines = BufReader::new(r);
+        let send = |id: i64, method: &str, params: serde_json::Value| {
+            ms_ipc::encode(&Request::new(id, method, params))
+        };
+        let hello = send(
+            1,
+            method::HELLO,
+            json!({ "protocol": PROTOCOL_VERSION, "client": concat!("tern-gateway/", env!("CARGO_PKG_VERSION"), " (files)") }),
+        );
+        w.write_all(&hello).await.map_err(|_| CallError::Down)?;
+        let hello: HelloResult = read_result(&mut lines, 1)
+            .await?
+            .and_then(|v| serde_json::from_value(v).ok())
+            .ok_or(CallError::Down)?;
+        if !hello.features.iter().any(|f| f == needs) {
+            return Err(CallError::TooOld);
+        }
+        w.write_all(&send(2, method, params))
+            .await
+            .map_err(|_| CallError::Down)?;
+        read_result(&mut lines, 2).await?.ok_or(CallError::Down)
+    };
+    tokio::time::timeout(timeout, exchange)
+        .await
+        .map_err(|_| CallError::Down)?
+}
+
+/// The result of the response with `id`; `Ok(None)` when the connection ends first.
+async fn read_result(
+    lines: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
+    id: i64,
+) -> Result<Option<serde_json::Value>, CallError> {
+    let mut line = Vec::new();
+    loop {
+        line.clear();
+        let n = (&mut *lines)
+            .take(ms_ipc::MAX_LINE_BYTES as u64 + 1)
+            .read_until(b'\n', &mut line)
+            .await
+            .map_err(|_| CallError::Down)?;
+        if n == 0 {
+            return Ok(None);
+        }
+        let Ok(res) = serde_json::from_slice::<Response>(&line) else {
+            continue;
+        };
+        if res.id != Some(ms_ipc::Id::Num(id)) {
+            continue;
+        }
+        return match (res.result, res.error) {
+            (_, Some(e)) => Err(CallError::Rpc(e)),
+            (r, None) => Ok(r),
+        };
+    }
+}
+
 /// [`probe`] results, reused for [`PROBE_TTL`] so a page polling `/session` doesn't open an
 /// engine connection per request.
 #[derive(Default)]

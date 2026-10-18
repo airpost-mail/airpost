@@ -16,9 +16,9 @@ path = "src/main.rs"
 ms-ipc.workspace = true
 tern-client.workspace = true
 futures.workspace = true
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "tower-log", "ws"] }
-tokio = { workspace = true, features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time", "io-util"] }
-tower = { version = "0.5", default-features = false }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "tower-log", "ws"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time", "io-util", "fs"] }
+tower = { version = "0.5", default-features = false, features = ["util"] }
 tower-http = { version = "0.7", features = ["trace", "fs"] }
 governor = "0.10"
 rand.workspace = true

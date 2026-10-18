@@ -361,3 +361,262 @@ async fn revoke_and_engine_exit_close_the_socket() {
         .await;
     assert!(session.contains(r#""state":"down""#), "{session}");
 }
+
+/// A raw HTTP/1.1 exchange: status code, lowercased headers and the body bytes.
+struct Reply {
+    status: u16,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+}
+
+impl Reply {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
+    }
+}
+
+impl Setup {
+    async fn raw(&self, head: String, body: Vec<u8>) -> Reply {
+        let mut s = TcpStream::connect(self.addr).await.unwrap();
+        let (mut r, mut w) = s.split();
+        let write = async {
+            // The server may answer and close before it reads the whole body.
+            let _ = w.write_all(head.as_bytes()).await;
+            let _ = w.write_all(&body).await;
+        };
+        let mut out = Vec::new();
+        let (_, read) = tokio::join!(write, r.read_to_end(&mut out));
+        read.unwrap();
+        let split = out.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+        let text = String::from_utf8_lossy(&out[..split]).into_owned();
+        let mut lines = text.lines();
+        let status = lines
+            .next()
+            .unwrap()
+            .split(' ')
+            .nth(1)
+            .unwrap()
+            .parse()
+            .unwrap();
+        let headers = lines
+            .filter_map(|l| l.split_once(": "))
+            .map(|(k, v)| (k.to_ascii_lowercase(), v.to_owned()))
+            .collect();
+        Reply {
+            status,
+            headers,
+            body: out[split + 4..].to_vec(),
+        }
+    }
+
+    async fn request(
+        &self,
+        method: &str,
+        path: &str,
+        headers: &[(&str, &str)],
+        body: &[u8],
+    ) -> Reply {
+        let mut head = format!(
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nContent-Length: {}\r\n",
+            self.addr,
+            body.len()
+        );
+        for (k, v) in headers {
+            head += &format!("{k}: {v}\r\n");
+        }
+        head += "\r\n";
+        self.raw(head, body.to_vec()).await
+    }
+
+    async fn upload(&self, cookie: &str, name: &str, content_type: &str, body: &[u8]) -> Reply {
+        let origin = self.origin();
+        self.request(
+            "POST",
+            &format!("/gateway/v1/files/{ACCOUNT_ID}?name={name}"),
+            &[
+                ("Cookie", cookie),
+                ("Origin", &origin),
+                ("Content-Type", content_type),
+            ],
+            body,
+        )
+        .await
+    }
+}
+
+/// docs/web-gateway-plan.md 2.5: uploads become Files through `files.put`, downloads are
+/// attachments in a sandbox, and only sniffed raster images are served inline.
+#[tokio::test(flavor = "multi_thread")]
+async fn file_routes() {
+    let Some(s) = Setup::start().await else {
+        return;
+    };
+    let cookie = s.pair().await;
+    let png: Vec<u8> = [b"\x89PNG\r\n\x1a\n".as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8]].concat();
+
+    // The sender's type is ignored: an svg label on PNG bytes.
+    let up = s
+        .upload(&cookie, "pixel%20one.png", "image/svg+xml", &png)
+        .await;
+    assert_eq!(up.status, 200, "{}", String::from_utf8_lossy(&up.body));
+    let put: Value = serde_json::from_slice(&up.body).unwrap();
+    let id = put["fileId"].as_str().unwrap().to_owned();
+    assert_eq!(put["file"]["filename"], "pixel one.png");
+    assert_eq!(put["file"]["size"], png.len());
+    let incoming = s._dir.path().join("gateway").join("incoming");
+    assert_eq!(
+        std::fs::read_dir(&incoming).unwrap().count(),
+        0,
+        "temp files removed"
+    );
+
+    let url = format!("/gateway/v1/files/{ACCOUNT_ID}/{id}");
+    let got = s.request("GET", &url, &[("Cookie", &cookie)], b"").await;
+    assert_eq!(got.status, 200);
+    assert_eq!(got.body, png);
+    assert_eq!(got.header("content-type"), Some("application/octet-stream"));
+    assert_eq!(got.header("content-security-policy"), Some("sandbox"));
+    assert_eq!(got.header("x-content-type-options"), Some("nosniff"));
+    assert!(got
+        .header("content-disposition")
+        .unwrap()
+        .starts_with("attachment; filename=\"pixel one.png\""));
+
+    let inline = s
+        .request(
+            "GET",
+            &format!("{url}?inline=1"),
+            &[("Cookie", &cookie)],
+            b"",
+        )
+        .await;
+    assert_eq!(inline.header("content-type"), Some("image/png"));
+    assert!(inline
+        .header("content-disposition")
+        .unwrap()
+        .starts_with("inline;"));
+
+    let range = s
+        .request(
+            "GET",
+            &url,
+            &[("Cookie", &cookie), ("Range", "bytes=2-5")],
+            b"",
+        )
+        .await;
+    assert_eq!(range.status, 206);
+    assert_eq!(range.body, &png[2..6]);
+
+    let head = s.request("HEAD", &url, &[("Cookie", &cookie)], b"").await;
+    assert_eq!(head.status, 200);
+    assert_eq!(head.header("content-length"), Some("16"));
+    assert!(head.body.is_empty());
+
+    // HTML labelled as PNG is still an attachment.
+    let up = s
+        .upload(&cookie, "x.png", "image/png", b"<html><script>x</script>")
+        .await;
+    let html_id = serde_json::from_slice::<Value>(&up.body).unwrap()["fileId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let html = s
+        .request(
+            "GET",
+            &format!("/gateway/v1/files/{ACCOUNT_ID}/{html_id}?inline=1"),
+            &[("Cookie", &cookie)],
+            b"",
+        )
+        .await;
+    assert_eq!(
+        html.header("content-type"),
+        Some("application/octet-stream")
+    );
+    assert!(html
+        .header("content-disposition")
+        .unwrap()
+        .starts_with("attachment;"));
+
+    // Refusals.
+    let missing = s
+        .request(
+            "GET",
+            &format!("/gateway/v1/files/{ACCOUNT_ID}/nope"),
+            &[("Cookie", &cookie)],
+            b"",
+        )
+        .await;
+    assert_eq!(missing.status, 404);
+    let other = s
+        .request(
+            "GET",
+            &format!("/gateway/v1/files/other/{id}"),
+            &[("Cookie", &cookie)],
+            b"",
+        )
+        .await;
+    assert_eq!(other.status, 404);
+    assert_eq!(s.request("GET", &url, &[], b"").await.status, 401);
+    let no_origin = s
+        .request(
+            "POST",
+            &format!("/gateway/v1/files/{ACCOUNT_ID}?name=a"),
+            &[("Cookie", &cookie)],
+            b"x",
+        )
+        .await;
+    assert_eq!(no_origin.status, 403);
+    assert_eq!(s.upload(&cookie, "", "text/plain", b"x").await.status, 400);
+
+    // Over the cap, declared or streamed.
+    let origin = s.origin();
+    let declared = s
+        .raw(
+            format!(
+                "POST /gateway/v1/files/{ACCOUNT_ID}?name=big HTTP/1.1\r\nHost: {}\r\n\
+                 Connection: close\r\nCookie: {cookie}\r\nOrigin: {origin}\r\n\
+                 Content-Length: {}\r\n\r\n",
+                s.addr,
+                (25 << 20) + 1
+            ),
+            Vec::new(),
+        )
+        .await;
+    assert_eq!(declared.status, 413);
+    let big = vec![0u8; (25 << 20) + 1];
+    let mut chunked = format!("{:x}\r\n", big.len()).into_bytes();
+    chunked.extend_from_slice(&big);
+    chunked.extend_from_slice(b"\r\n0\r\n\r\n");
+    let streamed = s
+        .raw(
+            format!(
+                "POST /gateway/v1/files/{ACCOUNT_ID}?name=big HTTP/1.1\r\nHost: {}\r\n\
+                 Connection: close\r\nCookie: {cookie}\r\nOrigin: {origin}\r\n\
+                 Transfer-Encoding: chunked\r\n\r\n",
+                s.addr
+            ),
+            chunked,
+        )
+        .await;
+    assert_eq!(streamed.status, 413);
+    assert_eq!(
+        std::fs::read_dir(&incoming).unwrap().count(),
+        0,
+        "temp files removed"
+    );
+
+    // A browser's relayed connection can't call files.* itself.
+    let mut ws = s.ws(&cookie).await;
+    ws.hello().await;
+    let refused = ws
+        .call(
+            2,
+            "files.get",
+            json!({ "accountId": ACCOUNT_ID, "fileId": id }),
+        )
+        .await;
+    assert_eq!(refused["error"]["code"], -32008);
+}

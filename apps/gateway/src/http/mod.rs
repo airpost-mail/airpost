@@ -4,6 +4,7 @@
 //! The HTTP server: state, the device extractor, the Host/Origin guard, headers and routes
 //! (docs/web-gateway-plan.md 2.2).
 
+mod files;
 mod session;
 mod ws;
 
@@ -73,7 +74,11 @@ struct Inner {
     probe: ProbeCache,
     /// Set when the server stops, so open WebSockets close with 1001.
     shutdown: watch::Sender<bool>,
+    uploads: Arc<tokio::sync::Semaphore>,
 }
+
+/// Uploads streaming at once, gateway-wide: each holds up to 25 MiB on disk.
+const MAX_UPLOADS: usize = 8;
 
 #[derive(Default)]
 struct Sockets {
@@ -87,6 +92,7 @@ impl AppState {
         let snapshot = devices.snapshot(now_ms())?;
         let per_minute = |n: u32| Quota::per_minute(NonZeroU32::new(n).expect("non-zero"));
         let csp = HeaderValue::from_str(&app_csp(&config)).expect("ascii CSP");
+        files::sweep_incoming(&config.state_dir);
         Ok(AppState(Arc::new(Inner {
             devices,
             snapshot: RwLock::new(Arc::new(snapshot)),
@@ -101,6 +107,7 @@ impl AppState {
             csp,
             probe: ProbeCache::default(),
             shutdown: watch::channel(false).0,
+            uploads: Arc::new(tokio::sync::Semaphore::new(MAX_UPLOADS)),
             config,
         })))
     }
@@ -119,6 +126,10 @@ impl AppState {
 
     pub fn generation(&self) -> watch::Receiver<u64> {
         self.0.generation.subscribe()
+    }
+
+    fn upload_permit(&self) -> Option<tokio::sync::OwnedSemaphorePermit> {
+        self.0.uploads.clone().try_acquire_owned().ok()
     }
 
     fn shutdown(&self) -> watch::Receiver<bool> {
@@ -258,6 +269,8 @@ impl AppState {
         }
         self.0.pair_by_ip.retain_recent();
         self.0.upgrades.retain_recent();
+        let dir = self.0.config.state_dir.clone();
+        let _ = tokio::task::spawn_blocking(move || files::sweep_incoming(&dir)).await;
     }
 }
 
@@ -338,8 +351,13 @@ pub enum ApiError {
     BadRequest(&'static str),
     Unpaired,
     Forbidden(&'static str),
-    RateLimited { retry_after_secs: u64 },
+    RateLimited {
+        retry_after_secs: u64,
+    },
     NotFound,
+    TooLarge(&'static str),
+    /// The engine is down, too old, or couldn't produce the file.
+    Unavailable(&'static str),
     Internal,
 }
 
@@ -373,6 +391,8 @@ impl IntoResponse for ApiError {
                 "Too many attempts. Wait a minute.",
             ),
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not-found", "Not found."),
+            ApiError::TooLarge(m) => (StatusCode::PAYLOAD_TOO_LARGE, "too-large", m),
+            ApiError::Unavailable(m) => (StatusCode::SERVICE_UNAVAILABLE, "unavailable", m),
             ApiError::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal",
@@ -484,6 +504,11 @@ pub fn router(state: AppState) -> Router {
         .route("/gateway/v1/pair", post(session::pair))
         .route("/gateway/v1/unpair", post(session::unpair))
         .route(WS_PATH, get(ws::upgrade))
+        .route(
+            "/gateway/v1/files/{account_id}/{file_id}",
+            get(files::download),
+        )
+        .route("/gateway/v1/files/{account_id}", post(files::upload))
         .route(HEALTH_PATH, get(healthz))
         .route("/gateway/{*rest}", any(api_not_found));
     let app = match &state.config().web_root {

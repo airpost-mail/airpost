@@ -301,13 +301,7 @@ async fn checked(text: &str, scopes: &[String], tx: &mut Tx) -> Result<Option<Ve
     if req.method == method::HELLO {
         return Err((close::PROTOCOL, "hello was already sent"));
     }
-    let allowed = policy::relayed_method_allowed(&req.method, scopes)
-        && (req.method != method::TASK_QUEUE
-            || req
-                .params
-                .get("task")
-                .is_some_and(|t| policy::relayed_task_allowed(t, scopes)));
-    if !allowed {
+    if !policy::relayed_request_allowed(&req.method, &req.params, scopes) {
         tracing::info!(method = %log_name(&req.method), "refused a relayed request");
         if req.id.is_some() {
             let e = ErrorObject::new(
