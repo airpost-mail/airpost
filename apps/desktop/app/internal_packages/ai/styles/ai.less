@@ -1,0 +1,206 @@
+@import 'ui-variables';
+
+// Model output is plain text: line breaks kept, nothing parsed.
+.ai-summary-text,
+.ai-reply-preview {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  user-select: text;
+}
+
+.ai-thread-summary {
+  margin: 0 0 10px 0;
+
+  .ai-summarize-button {
+    margin-left: 0;
+  }
+}
+
+.ai-summary-card {
+  border: 1px solid @border-color-divider;
+  border-radius: @border-radius-base;
+  background: @background-secondary;
+  padding: 10px 14px;
+
+  .ai-summary-title {
+    font-weight: @font-weight-semi-bold;
+    margin-bottom: 4px;
+  }
+  .ai-summary-error {
+    color: @color-error;
+  }
+  .ai-summary-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+
+    .ai-summary-source {
+      flex: 1;
+      font-size: @font-size-smaller;
+      color: @text-color-very-subtle;
+    }
+    .btn {
+      margin: 0;
+    }
+  }
+}
+
+.ai-reply-suggestions {
+  width: 360px;
+  padding: 10px;
+
+  .ai-reply-list {
+    list-style: none;
+    margin: 0 0 8px 0;
+    padding: 0;
+
+    li {
+      margin-bottom: 4px;
+    }
+    .ai-reply-suggestion {
+      width: 100%;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+  .ai-reply-instruction {
+    display: flex;
+    gap: 6px;
+
+    input {
+      flex: 1;
+      min-width: 0;
+    }
+    .btn {
+      margin: 0;
+    }
+  }
+  .ai-reply-preview {
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 8px 0;
+    padding: 6px;
+    border: 1px solid @border-color-divider;
+    border-radius: @border-radius-base;
+  }
+  .ai-reply-status,
+  .ai-reply-source {
+    font-size: @font-size-smaller;
+    color: @text-color-very-subtle;
+    margin-top: 6px;
+  }
+  .ai-reply-error {
+    color: @color-error;
+    margin-top: 6px;
+  }
+}
+
+.container-ai {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+
+  .ai-intro {
+    margin-top: 0;
+  }
+
+  .ai-section {
+    padding-bottom: 20px;
+    border-bottom: 1px solid @border-color-divider;
+    margin-bottom: 10px;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .ai-provider {
+    padding: 8px 0 12px 0;
+
+    h6 .ai-provider-kind {
+      margin-left: 8px;
+      font-weight: normal;
+      color: @text-color-very-subtle;
+    }
+  }
+
+  .ai-field {
+    display: flex;
+    align-items: center;
+
+    > label {
+      width: 140px;
+      flex-shrink: 0;
+    }
+    input[type='checkbox'] + label {
+      width: auto;
+      flex: 1;
+    }
+    input[type='text'],
+    input[type='url'],
+    input[type='password'] {
+      flex: 1;
+      min-width: 0;
+    }
+    input[type='number'] {
+      width: 100px;
+    }
+    .ai-field-unit {
+      margin-left: 6px;
+    }
+    select {
+      margin: 0;
+    }
+    .btn {
+      margin-left: 8px;
+    }
+  }
+
+  .ai-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .btn {
+      margin: 0;
+    }
+  }
+
+  .ai-test-result {
+    font-size: @font-size-smaller;
+    &.ok {
+      color: @color-success;
+    }
+    &.failed {
+      color: @color-error;
+    }
+  }
+
+  .ai-status,
+  .ai-privacy,
+  .ai-hint {
+    margin: 6px 0 0 0;
+  }
+
+  .ai-hint {
+    color: @text-color-subtle;
+    font-size: @font-size-smaller;
+  }
+
+  .ai-privacy-table table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: 4px 8px 4px 0;
+      border-bottom: 1px solid @border-color-divider;
+    }
+  }
+}

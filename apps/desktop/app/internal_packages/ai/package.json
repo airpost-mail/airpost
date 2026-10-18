@@ -1,0 +1,21 @@
+{
+  "name": "ai",
+  "version": "0.1.0",
+  "main": "./lib/main",
+
+  "isOptional": true,
+
+  "title": "AI",
+  "description": "Summarize threads and suggest replies with a model you choose: a cloud API with your own key, or a local model.",
+
+  "license": "GPL-3.0-only",
+  "private": true,
+  "engines": {
+    "mailspring": "*"
+  },
+  "windowTypes": {
+    "default": true,
+    "composer": true,
+    "thread-popout": true
+  }
+}
