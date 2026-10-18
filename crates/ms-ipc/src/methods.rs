@@ -187,6 +187,37 @@ pub struct AccountIdParams {
     pub account_id: String,
 }
 
+/// `account.reset` params. `keepMetadata` (default true) keeps the account's plugin metadata
+/// for the resync; a client removing the account passes false so it goes with the rest.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountResetParams {
+    pub account_id: String,
+    #[serde(default = "keep_metadata_default")]
+    pub keep_metadata: bool,
+}
+
+/// `engine.resetDatabase` params, all optional. `keepMetadata` (default true) carries the
+/// plugin metadata into the new database; false when the last account was removed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetDatabaseParams {
+    #[serde(default = "keep_metadata_default")]
+    pub keep_metadata: bool,
+}
+
+impl Default for ResetDatabaseParams {
+    fn default() -> Self {
+        ResetDatabaseParams {
+            keep_metadata: true,
+        }
+    }
+}
+
+fn keep_metadata_default() -> bool {
+    true
+}
+
 /// `account.test` params. The account JSON carries credentials, which is why the method is
 /// only accepted on the parent's stdin.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -309,6 +340,21 @@ mod tests {
             serde_json::to_value(&n).unwrap(),
             json!({"accountId": "a", "threadId": "t", "messageId": "m"})
         );
+    }
+
+    #[test]
+    fn resets_keep_metadata_unless_asked_not_to() {
+        let p: AccountResetParams = serde_json::from_value(json!({"accountId": "a"})).unwrap();
+        assert!(p.keep_metadata);
+        let p: AccountResetParams =
+            serde_json::from_value(json!({"accountId": "a", "keepMetadata": false})).unwrap();
+        assert!(!p.keep_metadata);
+        let p: ResetDatabaseParams = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(p, ResetDatabaseParams::default());
+        assert!(p.keep_metadata);
+        let p: ResetDatabaseParams =
+            serde_json::from_value(json!({"keepMetadata": false})).unwrap();
+        assert!(!p.keep_metadata);
     }
 
     #[test]
