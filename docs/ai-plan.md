@@ -50,7 +50,9 @@ ai.triage(&ProviderConfig, &MailContext)                    -> Result<Triage>
 - **`ProviderConfig`** `{id, kind: "openai"|"anthropic"|"ollama", url?, apiKey?: Secret,
   model, contextTokens?, maxOutputTokens?}`. Default URLs: `https://api.openai.com/v1`,
   `https://api.anthropic.com`, `http://127.0.0.1:11434`. `local: bool` is derived (loopback or
-  a private address in `url`) and drives the privacy note.
+  a private address in `url`) and drives the privacy note. Plain `http://` is refused unless
+  the host is local or a private name (one label, `.local`, `.lan`, `.home.arpa`,
+  `.internal`).
 - **Wire**: OpenAI SSE `data:` lines to `[DONE]`, `stream_options.include_usage`; Anthropic
   SSE `content_block_delta` / `message_delta` with `anthropic-version: 2023-06-01`; Ollama
   NDJSON with `options.num_ctx` set to `contextTokens` (default 8192). `models()` uses
@@ -59,9 +61,13 @@ ai.triage(&ProviderConfig, &MailContext)                    -> Result<Triage>
   `includeAddresses`), messages oldest first with date, sender name, and plain-text body
   with quoted replies dropped (`ms_mime::flatten_html_with` without blockquotes) and
   everything after a `-- ` signature line cut, plus the
-  account owner's name so "you" is resolved. The builder fits a token budget (4 chars per
-  token estimate, `contextTokens` minus output and prompt): the newest messages whole, older
-  ones cut from the middle, and a note to the model when something was left out.
+  account owner's name so "you" is resolved. Without `includeAddresses`, addresses in
+  bodies, subjects and file names become the person's name or `[address]`; body lines that
+  would read as the block's own headers are escaped. The builder fits a token budget (4
+  chars per token for Latin, Greek and Cyrillic, 1 per char for other scripts;
+  `contextTokens` minus output and prompt, the output limit lowered to fit a small window):
+  the newest messages whole, older ones cut from the middle, and a note to the model when
+  something was left out.
 - **Prompts** live in the crate as versioned constants (`PROMPT_VERSION` is part of cache
   keys). Mail text goes in a delimited data block, with the instruction that it is content
   to describe, not instructions to follow. Output language follows the thread.
@@ -261,3 +267,13 @@ Decided while building: usage reaches the engine through `Options::usage_observe
 `contextTokens` / `maxOutputTokens` are unset, cloud providers default to 16384 / 4096
 and Ollama to 8192 / 1024; OpenAI's own host gets `max_completion_tokens`, other
 compatible servers `max_tokens`.
+
+2026-10-18, AI1 review fixes: thinking and reasoning deltas meet the first-token deadline;
+the default output limit is at most a quarter of `contextTokens` and every request lowers
+it to fit the window; non-Latin scripts count a token per character; JSON mode is dropped
+(and remembered per server) after a 400 naming `response_format` (LM Studio); a 429 is
+`quota-exceeded` only for billing or credit, and keeps `Retry-After`; usage is recorded for
+accepted requests that fail, are cut or are cancelled; cache hits carry no usage; plain
+http only to local hosts; addresses hidden in bodies, subjects and file names; forged
+`--- Message` and header lines escaped (prompts v2); answers, stream lines and error and
+model-list bodies are size-capped; `RenderedContext` and `Triage` redact `Debug`.
