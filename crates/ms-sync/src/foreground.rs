@@ -10,7 +10,7 @@
 use std::sync::{Condvar, Mutex};
 
 use ms_core::constants::{ls, WORKER_SLEEP};
-use ms_core::{logmsg, ErrorCode, Result, SyncError};
+use ms_core::{logmsg, Error, ErrorCode, Result, SyncError};
 use ms_imap::{IdleInterrupt, ImapSession};
 use ms_store::{Folder, Message, Model, Query, Store, Task};
 use tracing::{error, info, warn};
@@ -170,13 +170,21 @@ impl Foreground {
         let mut runner = w.ctx.tasks.remote_runner(&w.store, &w.ctx);
         runner.cleanup_old_tasks_at_runtime()?;
         let mut after_rowid: i64 = -1;
+        // A task put back for when the account is online again (a deferred send): the
+        // others still run, then the worker sleeps on its error and tries again.
+        let mut deferred: Option<Error> = None;
         loop {
             let tasks = remote_tasks_after(&w.store, w.ctx.account.id(), &mut after_rowid)?;
             if tasks.is_empty() {
-                return Ok(());
+                return deferred.map_or(Ok(()), Err);
             }
             for mut task in tasks {
-                runner.perform_remote(&mut task, &mut w.session)?;
+                match runner.perform_remote(&mut task, &mut w.session) {
+                    Err(e @ Error::Sync(_)) => {
+                        deferred.get_or_insert(e);
+                    }
+                    other => other?,
+                }
             }
         }
     }

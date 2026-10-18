@@ -3,7 +3,9 @@
 
 //! The `metadataExpiration` thread: emits `metadata-expiration` deltas when snoozes,
 //! send-later and reminders come due. The client acts on the delta (unsnoozes, sends) and
-//! clears the metadata; until it does, every scan sends the model again.
+//! clears the metadata; until it does, every scan sends the model again. In `serve` the
+//! [`Executor`] acts on the built-in plugins' rows first and only the rows it leaves are
+//! emitted.
 //!
 //! Derived from Mailspring-Sync `MailSync/MetadataExpirationWorker.cpp` (Copyright © 2017
 //! Foundry 376, GPL-3.0). See NOTICE.md.
@@ -25,6 +27,7 @@ use ms_core::{Clock, Result};
 use ms_store::{DeltaItem, DeltaStream, Query, Store};
 use tracing::{error, info};
 
+use crate::expiration_executor::{Executor, Outcome};
 use crate::WorkerContext;
 
 /// The thread body (`MetadataExpirationWorker::run`). Returns when the account stops.
@@ -38,12 +41,32 @@ pub fn run_metadata_expiration(ctx: WorkerContext) {
         Ok(s) => s,
         Err(e) => return ctx.fail_with(&e),
     };
-    let worker = MetadataExpirationWorker::new(
+    let mut worker = MetadataExpirationWorker::new(
         ctx.account.id(),
         &store,
         ctx.deltas.clone(),
         ctx.clock.clone(),
     );
+    if let Some(settings) = ctx.settings.clone() {
+        let queue_ctx = ctx.clone();
+        let fetch_ctx = ctx.clone();
+        let store_ref = &store;
+        worker = worker.with_executor(Executor::new(
+            ctx.account.clone(),
+            &store,
+            &ctx.config_dir,
+            settings,
+            Box::new(move |task| {
+                queue_ctx.tasks.perform_local(store_ref, &queue_ctx, task)?;
+                queue_ctx.foreground.interrupt();
+                Ok(())
+            }),
+            Box::new(move |ids| {
+                fetch_ctx.foreground.queue_bodies(ids);
+                fetch_ctx.foreground.interrupt();
+            }),
+        ));
+    }
     while !ctx.is_stopping() {
         let next = match worker.scan() {
             Ok(next) => next,
@@ -67,6 +90,7 @@ pub struct MetadataExpirationWorker<'a> {
     deltas: Arc<DeltaStream>,
     clock: Arc<dyn Clock>,
     chunk_pause: Duration,
+    executor: Option<Executor<'a>>,
 }
 
 impl<'a> MetadataExpirationWorker<'a> {
@@ -82,7 +106,14 @@ impl<'a> MetadataExpirationWorker<'a> {
             deltas,
             clock,
             chunk_pause: Duration::from_secs(1),
+            executor: None,
         }
+    }
+
+    /// Acts on the built-in plugins' due rows instead of emitting them (`serve`).
+    pub fn with_executor(mut self, executor: Executor<'a>) -> Self {
+        self.executor = Some(executor);
+        self
     }
 
     /// The pause between chunks of 100 models of one class (1 s).
@@ -92,13 +123,26 @@ impl<'a> MetadataExpirationWorker<'a> {
     }
 
     /// Emits a `metadata-expiration` delta for every model with metadata expiring at or
-    /// before now, and returns the epoch second to wake at next: the next future
-    /// expiration, else two hours on, and never sooner than 15 s after emitting (the client
-    /// needs a moment to clear what it was sent) or 5 s otherwise (the undo-send window).
+    /// before now that the executor (if any) left to the client, and returns the epoch
+    /// second to wake at next: the next future expiration or executor look, else two hours
+    /// on, and never sooner than 15 s after emitting (the client needs a moment to clear what
+    /// it was sent) or 5 s otherwise (the undo-send window).
     pub fn scan(&self) -> Result<i64> {
         info!("Scanning for expired metadata");
         let now = self.clock.now();
-        let due = self.due_by_class(now)?;
+        let mut waits: Option<i64> = None;
+        let mut due: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (class, id, plugin_id) in self.due_rows(now)? {
+            let outcome = match &self.executor {
+                Some(executor) => executor.handle(&class, &id, &plugin_id, now)?,
+                None => Outcome::Declined,
+            };
+            match outcome {
+                Outcome::Done => {}
+                Outcome::Declined => due.entry(class).or_default().push(id),
+                Outcome::Waiting(at) => waits = Some(waits.map_or(at, |w| w.min(at))),
+            }
+        }
         for (class, ids) in &due {
             let chunks: Vec<&[String]> = ids.chunks(METADATA_EXPIRATION_CHUNK).collect();
             for (i, chunk) in chunks.iter().enumerate() {
@@ -112,6 +156,9 @@ impl<'a> MetadataExpirationWorker<'a> {
         let mut next = self
             .next_expiration_after(now)?
             .unwrap_or(now + METADATA_EXPIRATION_IDLE);
+        if let Some(at) = waits {
+            next = next.min(at);
+        }
         let min_delay = if due.is_empty() {
             METADATA_EXPIRATION_MIN_DELAY_IDLE
         } else {
@@ -122,19 +169,16 @@ impl<'a> MetadataExpirationWorker<'a> {
         Ok(next)
     }
 
-    /// Model ids with due metadata, by `objectType`. An id appears once per due plugin; the
-    /// `IN` lookup collapses repeats within a chunk.
-    fn due_by_class(&self, now: i64) -> Result<BTreeMap<String, Vec<String>>> {
+    /// `(objectType, id, pluginId)` of each due row. An id appears once per due plugin; the
+    /// `IN` lookup of an emitted chunk collapses repeats.
+    fn due_rows(&self, now: i64) -> Result<Vec<(String, String, String)>> {
         let mut stmt = self.store.conn().prepare_cached(
-            "SELECT objectType, id FROM ModelPluginMetadata WHERE accountId = ? AND expiration <= ?",
+            "SELECT objectType, id, value FROM ModelPluginMetadata WHERE accountId = ? AND expiration <= ? ORDER BY expiration ASC",
         )?;
-        let mut rows = stmt.query(rusqlite::params![self.account_id, now])?;
-        let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
-        while let Some(row) = rows.next()? {
-            let class: String = row.get(0)?;
-            out.entry(class).or_default().push(row.get(1)?);
-        }
-        Ok(out)
+        let rows = stmt.query_map(rusqlite::params![self.account_id, now], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     fn emit_chunk(&self, class: &str, ids: &[String]) -> Result<()> {

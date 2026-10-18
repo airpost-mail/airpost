@@ -14,7 +14,11 @@ use crate::WorkerContext;
 pub trait RemoteTaskRunner {
     /// Prunes finished tasks beyond the last 100 (`cleanupOldTasksAtRuntime`).
     fn cleanup_old_tasks_at_runtime(&mut self) -> Result<()>;
-    /// Runs a task's remote phase and saves its final status (`performRemote`).
+    /// Runs a task's remote phase and saves its final status (`performRemote`). A database
+    /// error is returned with the task left as it was. A `SyncError` means the task was put
+    /// back in `remote` to run again once the account is back online (a send the engine
+    /// started, docs/tech-debt.md TD33); the caller goes on with the other tasks and then
+    /// sleeps on that error like any retryable one.
     fn perform_remote(&mut self, task: &mut Task, session: &mut dyn ImapSession) -> Result<()>;
     /// Background pass hook for Sent-role folders (`removeLateSentCopies`).
     fn remove_late_sent_copies(
@@ -31,4 +35,13 @@ pub trait TaskRunnerFactory: Send + Sync {
         store: &'a Store,
         ctx: &WorkerContext,
     ) -> Box<dyn RemoteTaskRunner + 'a>;
+
+    /// Saves a task the engine queues itself and runs its local phase on the calling
+    /// thread's store, as `task.queue` does on the account's `main` thread (`performLocal`).
+    /// The caller wakes the foreground worker for the remote phase.
+    fn perform_local(&self, _store: &Store, _ctx: &WorkerContext, _task: &mut Task) -> Result<()> {
+        Err(ms_core::Error::other(
+            "this engine runs no local task phases",
+        ))
+    }
 }

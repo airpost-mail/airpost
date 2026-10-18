@@ -13,6 +13,7 @@
 pub mod background;
 pub mod cal_contacts;
 pub mod dav;
+pub mod expiration_executor;
 pub mod foreground;
 pub mod google_contacts;
 pub mod mail_processor;
@@ -32,6 +33,7 @@ use ms_core::{Account, Clock};
 use ms_net::{MetadataBackend, TokenManager};
 use ms_store::DeltaStream;
 
+pub use expiration_executor::EngineSettings;
 pub use foreground::ForegroundControl;
 pub use mailbox_model::MailboxModel;
 pub use runtime::{AccountFailure, AccountRuntime, FailureHandler};
@@ -59,6 +61,10 @@ pub struct WorkerContext {
     pub wake: Arc<WakeSignal>,
     /// The account's stop flag, failure handler and threads ([`runtime`]).
     pub control: Arc<runtime::AccountControl>,
+    /// `serve`'s settings store. With it the expiration thread runs the expiration executor
+    /// ([`expiration_executor`]); without it (`sync` mode) it only emits
+    /// `metadata-expiration` deltas.
+    pub settings: Option<Arc<dyn EngineSettings>>,
 }
 
 impl WorkerContext {
@@ -86,6 +92,7 @@ impl WorkerContext {
             tasks,
             wake: Arc::new(WakeSignal::new()),
             control,
+            settings: None,
         }
     }
 }
