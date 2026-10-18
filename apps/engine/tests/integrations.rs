@@ -287,3 +287,48 @@ fn relayed_connections_without_admin_may_not_call_integrations() {
         .unwrap_err();
     assert_eq!(err.code(), Some(code::FORBIDDEN_RELAYED));
 }
+
+/// A stored key goes only to the url the settings name for its provider: a caller that
+/// names another host gets no key from the store (T13: secrets are write-only).
+#[test]
+fn a_stored_key_goes_only_to_the_stored_url() {
+    let e = Serve::start();
+    let evil = libretranslate();
+    let mine = libretranslate();
+    let mut c = e.client();
+    for provider in ["deepl", "libretranslate"] {
+        c.call(
+            method::SECRETS_SET,
+            json!({"name": format!("integration:{provider}"), "value": "st0red"}),
+        )
+        .unwrap();
+    }
+    c.call(
+        method::SETTINGS_SET,
+        json!({"values": {"core.integrations.translation":
+            {"provider": "libretranslate", "enabled": true, "url": mine.url()}}}),
+    )
+    .unwrap();
+
+    for provider in ["deepl", "libretranslate"] {
+        let _ = c.call(
+            method::INTEGRATIONS_TEST,
+            json!({"config": {"provider": provider, "url": evil.url()}}),
+        );
+    }
+    for r in evil.requests() {
+        let seen = format!("{} {:?} {}", r.target, r.headers, r.body);
+        assert!(!seen.contains("st0red"), "{seen}");
+    }
+
+    c.call(
+        method::INTEGRATIONS_TEST,
+        json!({"config": {"provider": "libretranslate", "url": mine.url()}}),
+    )
+    .unwrap();
+    assert!(
+        mine.requests().iter().any(|r| r.body.contains("st0red")),
+        "{:?}",
+        mine.requests()
+    );
+}

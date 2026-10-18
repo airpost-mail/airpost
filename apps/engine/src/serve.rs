@@ -1130,8 +1130,8 @@ impl Engine {
     }
 
     /// Stops the account and drops its slot, and with `forget` unregisters it; returns its
-    /// threads still running. `account.reset` and `engine.resetDatabase` keep it registered,
-    /// listed as stopped until the client adds it again.
+    /// threads still running. `account.reset` and `engine.resetDatabase` keep it registered:
+    /// the reset starts it again, the database reset leaves it until the client adds it.
     fn remove_account(&self, id: &str, forget: bool) -> Result<Vec<String>, ErrorObject> {
         let id = id.to_owned();
         let mut reg = self.lock();
@@ -1193,9 +1193,11 @@ impl Engine {
         Ok(crate::modes::test_auth::result(account))
     }
 
-    /// `account.reset`: forgets the account if the engine holds it, then deletes its rows,
-    /// keeping its plugin metadata for the resync when `keep_metadata`. The client adds it
-    /// again (or, when removing it, doesn't). Runs on its own thread.
+    /// `account.reset`: stops the account if the engine holds it, deletes its rows, keeping
+    /// its plugin metadata for the resync when `keep_metadata`, and starts it again from the
+    /// registry with the identity it had, so a socket client's reset leaves it syncing. An
+    /// account the engine didn't hold (or `account.remove`'s, already unregistered) stays
+    /// stopped. A client that adds it again gets ACCOUNT_EXISTS. Runs on its own thread.
     fn reset_account(&self, id: &str, keep_metadata: bool) -> Reply {
         {
             let mut resetting = self.resetting_lock();
@@ -1206,8 +1208,9 @@ impl Engine {
                 ));
             }
         }
-        let outcome = (|| {
-            if self.lock().get(id).is_some() {
+        let outcome: Result<Option<Value>, ErrorObject> = (|| {
+            let held = self.lock().get(id).map(|s| s.identity.clone());
+            if held.is_some() {
                 let still_running = self.remove_account(id, false)?;
                 if !still_running.is_empty() {
                     info!(
@@ -1225,10 +1228,33 @@ impl Engine {
                 })?;
             crate::ai_api::clear_cache();
             info!("Account {id} reset");
-            Ok(json!({}))
+            Ok(held)
         })();
         self.resetting_lock().remove(id);
-        outcome
+        if let Ok(Some(identity)) = &outcome {
+            self.restart_reset(id, identity.clone());
+        }
+        outcome.map(|_| json!({}))
+    }
+
+    /// Starts a reset account again from the registry. A failure leaves it stopped, as
+    /// before the restart was the engine's.
+    fn restart_reset(&self, id: &str, identity: Value) {
+        let Some(public) = self.registered.get(id) else {
+            return;
+        };
+        let started = self
+            .registered
+            .with_secrets(public)
+            .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))
+            .and_then(parse_account)
+            .and_then(|account| self.start(account, identity));
+        if let Err(e) = started {
+            warn!(
+                "-X Account {id} was reset but could not be started again: {}",
+                e.message
+            );
+        }
     }
 
     /// `engine.resetDatabase`: stops and forgets every account, deletes the database and
@@ -1845,9 +1871,18 @@ impl Engine {
             };
             TernServer::from_json(&probe.to_json())
                 .map_err(|e| invalid(format!("invalid params: {}: {}", e.field, e.reason)))?;
-            self.registered
-                .set_server(&json!({"url": p.url, "userId": p.user_id, "serverId": p.server_id}))
-                .map_err(internal)?;
+            let next = json!({"url": p.url, "userId": p.user_id, "serverId": p.server_id});
+            // The token was given for the stored server: another one doesn't get it, as an
+            // account's secrets go when its host changes (section 5). The client sends it
+            // again with `secrets.set`. A token stored before any server (credentials.import)
+            // is kept.
+            let moved = self.registered.server().is_some_and(|prev| prev != next);
+            self.registered.set_server(&next).map_err(internal)?;
+            if moved {
+                self.registered
+                    .delete_secret(ms_secrets::names::TERN_SERVER_TOKEN)
+                    .map_err(internal)?;
+            }
             info!("Tern server set to {}", probe.host());
         } else {
             self.registered.clear_server().map_err(internal)?;

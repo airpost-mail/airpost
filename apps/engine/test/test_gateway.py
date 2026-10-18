@@ -505,7 +505,10 @@ def test_gateway_end_to_end(setup):
     assert aws.hello()["gateway"]["scopes"] == ["admin"]
     files_get = aws.call("files.get", {"accountId": account_id, "fileId": att["id"]})
     assert "error" not in files_get, files_get
-    for method, params in [("engine.shutdown", {}), ("account.add", {"account": run.ms.account, "identity": None}),
+    # account.* and secrets.* are local-only (stage 12): an admin device may call them.
+    has = aws.call("secrets.has", {"names": ["integration:deepl"]})
+    assert has.get("result") == {"integration:deepl": False}, has
+    for method, params in [("engine.shutdown", {}), ("credentials.import", {"accounts": [], "secrets": {}}),
                            ("files.put", {"accountId": account_id, "name": "x", "path": "/etc/passwd"})]:
         assert aws.call(method, params)["error"]["code"] == -32008, method
     aws.close()

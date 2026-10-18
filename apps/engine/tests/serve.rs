@@ -884,7 +884,7 @@ fn account_test_on_stdin_runs_beside_other_calls() {
 }
 
 #[test]
-fn account_reset_forgets_the_account_and_deletes_its_rows() {
+fn account_reset_restarts_the_account_without_its_rows() {
     let mut e = Serve::start();
     e.parent.add(account(A));
     e.parent.add(account(B));
@@ -899,25 +899,29 @@ fn account_reset_forgets_the_account_and_deletes_its_rows() {
         .unwrap();
     }
 
+    // On the socket, as the CLI or a detached engine's desktop sends it: the engine starts
+    // the account again itself.
     assert_eq!(
-        e.parent
-            .call(method::ACCOUNT_RESET, json!({ "accountId": A }))
+        c.call(method::ACCOUNT_RESET, json!({ "accountId": A }))
             .unwrap(),
         json!({})
     );
     next_matching(&mut sub, |v| is_state(v, A, "removed"));
-    let status = c.call(method::ENGINE_STATUS, Value::Null).unwrap();
-    // Still registered, so listed as stopped until it is added again, in its place.
-    assert_eq!(
-        states(&status),
-        [
-            (A.to_owned(), "stopped".to_owned()),
-            (B.to_owned(), "running".to_owned())
-        ]
-    );
+    next_matching(&mut sub, |v| is_state(v, A, "running"));
+    let mut listed = states(&c.call(method::ENGINE_STATUS, Value::Null).unwrap());
+    listed.sort();
+    assert_eq!(listed, running(&[A, B]));
+    // A client that adds it again finds it running.
+    let again = e
+        .parent
+        .call(
+            method::ACCOUNT_ADD,
+            json!({ "account": account(A), "identity": null }),
+        )
+        .unwrap_err();
+    assert_eq!(again.code, code::ACCOUNT_EXISTS);
 
-    // Added again, A starts empty; B kept its rows.
-    assert_eq!(e.parent.add(account(A))["state"], "running");
+    // A starts empty; B kept its rows.
     let gone = c
         .call(method::TASKS_GET, json!({ "accountId": A, "id": "t-a" }))
         .unwrap_err();
@@ -927,7 +931,8 @@ fn account_reset_forgets_the_account_and_deletes_its_rows() {
         .unwrap();
     assert_eq!(kept["task"]["id"], "t-b");
 
-    // An account the engine doesn't hold (removed earlier) is reset all the same.
+    // An account the engine doesn't hold (removed earlier) is reset all the same, and stays
+    // stopped.
     e.parent
         .call(method::ACCOUNT_REMOVE, json!({ "accountId": B }))
         .unwrap();
@@ -937,6 +942,8 @@ fn account_reset_forgets_the_account_and_deletes_its_rows() {
             .unwrap(),
         json!({})
     );
+    let listed = states(&c.call(method::ENGINE_STATUS, Value::Null).unwrap());
+    assert_eq!(listed, running(&[A]));
     assert_eq!(e.parent.add(account(B))["state"], "running");
     let gone = c
         .call(method::TASKS_GET, json!({ "accountId": B, "id": "t-b" }))
@@ -2265,6 +2272,28 @@ fn accounts_secrets_and_the_server_are_edited_on_the_socket() {
         )
         .unwrap();
     assert_eq!(set["restarted"].as_array().unwrap().len(), 3, "{set}");
+    // Its token stays with it: the same server keeps it, another one doesn't get it.
+    let token = json!({ "names": ["tern-server-token"] });
+    c.call(
+        method::SECRETS_SET,
+        json!({ "name": "tern-server-token", "value": "t0ken" }),
+    )
+    .unwrap();
+    let a = json!({ "url": "https://tern.test", "userId": "u", "serverId": "s" });
+    c.call(method::SERVER_SET, a).unwrap();
+    assert_eq!(
+        c.call(method::SECRETS_HAS, token.clone()).unwrap(),
+        json!({ "tern-server-token": true })
+    );
+    c.call(
+        method::SERVER_SET,
+        json!({ "url": "https://elsewhere.test", "userId": "u", "serverId": "s" }),
+    )
+    .unwrap();
+    assert_eq!(
+        c.call(method::SECRETS_HAS, token).unwrap(),
+        json!({ "tern-server-token": false })
+    );
     let server = e.dir.path().join("server.json");
     assert_eq!(file_mode(&server), 0o600);
     c.call(method::SERVER_CLEAR, json!({})).unwrap();

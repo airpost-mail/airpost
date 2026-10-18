@@ -716,8 +716,8 @@ class ScenarioRun(PimMixin, BackendMixin):
             self.ms.wait_quiescent(timeout=float(arg.get("timeout", 180)), ignore_busy=self.ignore_busy)
 
     def _reset_account(self, arg: dict):
-        """What Preferences' Reset Cache does: `account.reset` on serve (the engine forgets the
-        account and deletes its rows) and `account.add` again; on stdio and socket the
+        """What Preferences' Reset Cache does: `account.reset` on serve (the engine stops the
+        account, deletes its rows and starts it again) and `account.add`, which finds it running; on stdio and socket the
         account's process stops, `--mode reset` runs and the process starts again. Then waits
         for a sync pass that began after it, and quiescence. `keep_metadata: false` (serve only)
         is what removing the account does: its plugin metadata goes too; adding it again then

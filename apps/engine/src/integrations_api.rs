@@ -91,8 +91,15 @@ fn integrations() -> Result<Arc<Integrations>, ErrorObject> {
 
 /// `req` with a `config` that names a provider but no `apiKey` given the key stored under
 /// `integration:<provider>` (`secrets.set`), when there is one. LanguageTool's key goes
-/// with a username, so it is filled in only beside one.
-pub fn with_stored_key(mut req: RpcRequest, secret: impl Fn(&str) -> Option<String>) -> RpcRequest {
+/// with a username, so it is filled in only beside one. The key goes only to the provider's
+/// default endpoint (no `url`) or to the `url` the stored settings name for that provider
+/// (`core.integrations.<kind>`): a caller that names another host must bring its own key,
+/// or `integrations.*` would read out a write-only secret.
+pub fn with_stored_key(
+    mut req: RpcRequest,
+    settings: &Map<String, Value>,
+    secret: impl Fn(&str) -> Option<String>,
+) -> RpcRequest {
     let Some(config) = req.params.get_mut("config").and_then(Value::as_object_mut) else {
         return req;
     };
@@ -107,10 +114,36 @@ pub fn with_stored_key(mut req: RpcRequest, secret: impl Fn(&str) -> Option<Stri
     {
         return req;
     }
+    if !blank(config.get("url")) && !is_stored_url(settings, provider, config.get("url")) {
+        return req;
+    }
     if let Some(key) = secret(&ms_secrets::names::integration(provider)) {
         config.insert("apiKey".into(), Value::String(key));
     }
     req
+}
+
+/// Whether `url` is the one the stored settings give `provider`.
+fn is_stored_url(settings: &Map<String, Value>, provider: &str, url: Option<&Value>) -> bool {
+    let norm = |v: Option<&Value>| {
+        v.and_then(Value::as_str)
+            .map(|u| u.trim().trim_end_matches('/').to_owned())
+            .filter(|u| !u.is_empty())
+    };
+    let Some(url) = norm(url) else {
+        return false;
+    };
+    let Some((kind, _)) = KINDS.iter().find(|(_, ps)| ps.contains(&provider)) else {
+        return false;
+    };
+    let Some(stored) = settings
+        .get(&format!("core.integrations.{kind}"))
+        .and_then(Value::as_object)
+    else {
+        return false;
+    };
+    stored.get("provider").and_then(Value::as_str) == Some(provider)
+        && norm(stored.get("url")).as_deref() == Some(url.as_str())
 }
 
 /// Answers one `integrations.*` request. Blocking: run it on a worker.
@@ -250,8 +283,10 @@ mod tests {
         let req = |config: Value| {
             RpcRequest::new(1, method::INTEGRATIONS_TEST, json!({ "config": config }))
         };
+        let none = Map::new();
         let store = |n: &str| (n == "integration:deepl").then(|| "stored".to_owned());
-        let filled = |config: Value| with_stored_key(req(config), store).params["config"].clone();
+        let filled =
+            |config: Value| with_stored_key(req(config), &none, store).params["config"].clone();
         assert_eq!(filled(json!({"provider": "deepl"}))["apiKey"], "stored");
         assert_eq!(
             filled(json!({"provider": "deepl", "apiKey": " "}))["apiKey"],
@@ -266,13 +301,65 @@ mod tests {
             None
         );
         let lt = |n: &str| (n == "integration:languagetool").then(|| "k".to_owned());
-        let no_user = with_stored_key(req(json!({"provider": "languagetool"})), lt);
+        let no_user = with_stored_key(req(json!({"provider": "languagetool"})), &none, lt);
         assert_eq!(no_user.params["config"].get("apiKey"), None);
         let user = with_stored_key(
             req(json!({"provider": "languagetool", "username": "u"})),
+            &none,
             lt,
         );
         assert_eq!(user.params["config"]["apiKey"], "k");
+    }
+
+    #[test]
+    fn stored_keys_go_only_to_the_stored_url() {
+        let req = |config: Value| {
+            RpcRequest::new(1, method::INTEGRATIONS_TEST, json!({ "config": config }))
+        };
+        let store = |_: &str| Some("stored".to_owned());
+        let settings = json!({
+            "core.integrations.translation": {"provider": "libretranslate", "enabled": true, "url": "https://lt.example/"},
+            "core.integrations.grammar": {"provider": "languagetool", "enabled": true, "username": "u"},
+        });
+        let settings = settings.as_object().unwrap();
+        let key = |config: Value| {
+            with_stored_key(req(config), settings, store).params["config"]
+                .get("apiKey")
+                .cloned()
+        };
+        // A foreign host gets no key, whatever the provider.
+        let evil = "http://evil.example";
+        assert_eq!(key(json!({"provider": "deepl", "url": evil})), None);
+        assert_eq!(
+            key(json!({"provider": "libretranslate", "url": evil})),
+            None
+        );
+        assert_eq!(
+            key(json!({"provider": "languagetool", "username": "u", "url": evil})),
+            None
+        );
+        assert_eq!(
+            key(json!({"provider": "peopledatalabs", "url": evil})),
+            None
+        );
+        // Nor does the stored url under another provider.
+        assert_eq!(
+            key(json!({"provider": "deepl", "url": "https://lt.example"})),
+            None
+        );
+        // The stored url, trimmed, and the default endpoint do.
+        assert_eq!(
+            key(json!({"provider": "libretranslate", "url": " https://lt.example "})),
+            Some(json!("stored"))
+        );
+        assert_eq!(
+            key(json!({"provider": "deepl", "url": ""})),
+            Some(json!("stored"))
+        );
+        assert_eq!(
+            key(json!({"provider": "peopledatalabs"})),
+            Some(json!("stored"))
+        );
     }
 
     #[test]

@@ -1391,11 +1391,19 @@ impl Connection {
             name if is_integrations_method(name) && self.session.server.settings.is_some() => {
                 let id = req.id.clone();
                 let accounts = self.session.server.accounts.clone();
+                let store = self.session.server.settings.clone();
                 self.answer_later(
                     &workers::INTEGRATIONS,
                     id,
                     Box::new(move || {
-                        let req = integrations_api::with_stored_key(req, |n| accounts.secret(n));
+                        // Unreadable settings name no url, so the key goes to defaults only.
+                        let settings = store
+                            .as_ref()
+                            .map(|s| s.lock().get(None).unwrap_or_default())
+                            .unwrap_or_default();
+                        let req = integrations_api::with_stored_key(req, &settings, |n| {
+                            accounts.secret(n)
+                        });
                         integrations_api::call(&req)
                     }),
                 );
