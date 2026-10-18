@@ -11,6 +11,7 @@ This document provides a comprehensive overview of the Mailspring plugin system 
 - [Extension Points & Registries](#extension-points--registries)
 - [User Plugin Installation](#user-plugin-installation)
 - [Theme System](#theme-system)
+- [Trust Model](#trust-model)
 - [Current Limitations](#current-limitations)
 - [Developer Resources](#developer-resources)
 
@@ -97,7 +98,11 @@ my-plugin/
   "syncInit": false,
   "isHiddenOnPluginsPage": false,
 
-  "theme": false
+  "theme": false,
+
+  "tern": {
+    "engineMethods": ["engine.logs.tail"]
+  }
 }
 ```
 
@@ -108,7 +113,7 @@ my-plugin/
 | `name` | Yes | Package identifier (kebab-case) |
 | `version` | Yes | Semantic version |
 | `main` | Yes* | Entry point path (required for non-theme plugins) |
-| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `app/src/plugin-api-version.ts`, 1.26.0). `*` matches any |
+| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `app/src/plugin-api-version.ts`, 1.27.0). `*` matches any |
 | `displayName` | No | Human-readable name for UI |
 | `description` | No | Plugin description |
 | `windowTypes` | No | Which window types load this plugin |
@@ -116,6 +121,7 @@ my-plugin/
 | `isDefault` | No | If true, enabled by default |
 | `syncInit` | No | If true, loads immediately during startup |
 | `theme` | No | Set to `"ui"` for theme plugins |
+| `tern.engineMethods` | No | The local-only engine methods the plugin calls through `Engine.request` (see [Engine](#engine)) |
 
 ### Window Types
 
@@ -342,9 +348,14 @@ class MyMessageExtension extends MessageViewExtension {
     message.body = processHTML(message.body);
   }
 
-  // Manipulate DOM after rendering
-  static renderedMessageBodyIntoDocument({ document, message, iframe }) {
-    // Post-process rendered content
+  // Work on the rendered body. Since plugin API 1.27.0 the body renders in a sandboxed,
+  // cross-origin frame, so there is no `document`: `body` (a MessageBody) does the DOM work.
+  static async renderedMessageBodyIntoDocument({ body, message, iframe }) {
+    const links = await body.querySelectorAll('a[href^="https://tracker.example"]');
+    for (const link of links) {
+      await body.setAttributes(link.ref, { title: 'Tracked link' });
+      await body.insertElement(link.ref, 'afterend', 'span', { class: 'tracked' }, ' (tracked)');
+    }
   }
 
   // Filter which attachments to display
@@ -353,6 +364,59 @@ class MyMessageExtension extends MessageViewExtension {
   }
 }
 ```
+
+`MessageBody` (`app/src/message-frame/message-frame-bridge.ts`):
+
+| Method | Does |
+|--------|------|
+| `querySelectorAll(selector)` | Elements matching a CSS selector: `{ref, tagName, attributes, text}` |
+| `setAttributes(ref, attributes)` | Sets attributes (`null` removes one); event handler attributes are refused |
+| `insertElement(ref, position, tagName, attributes?, text?)` | Adds an element and returns its ref; scripts, frames, forms, styles and document-level elements are refused |
+| `getBoundingClientRect(ref)` | The element's box in app window coordinates, for popovers |
+| `addEventListener(ref, 'click' \| 'mousedown', cb)` | Calls `cb({rect})` when the element is clicked |
+
+Every call returns a promise. Refs are valid until the message renders again; calls after that
+reject. Reading `document` in this hook throws, and the app warns once per extension. This is a
+breaking change for plugins written against 1.26.0 that read `document`, although 1.27.0 is a
+minor version.
+
+### Engine
+
+`Engine` (in `mailspring-exports`, `app/src/engine-api.ts`) is the plugin API's way to the sync
+engine. Each window has its own connection to the engine; requests made while it is down reject.
+
+| Member | Does |
+|--------|------|
+| `Engine.request(method, params)` | Calls a socket method on the window's connection (reads, `query`, `metadata.list`, `integrations.*`) and resolves with the result, or rejects with the engine's error (`code`, `message`, `data`) |
+| `Engine.subscribe(filter, cb)` | Calls `cb` for each notification on the connection except deltas (use `DatabaseStore.listen` for those). `filter` is `{methods?, accounts?}`; returns a disposable |
+| `Engine.features` / `Engine.has(feature)` | The features the engine's `hello` listed; gate on these, not on versions |
+| `Engine.capabilities` | What the engine can do now, e.g. `capabilities.integrations.translation.available`; null while disconnected or from an older engine |
+| `Engine.connected` | Whether the window's connection is up |
+| `Engine.onDidChange(cb)` | Calls `cb` when the engine connects, goes away or its capabilities change; returns a disposable |
+
+```typescript
+import { Engine } from 'mailspring-exports';
+
+let sub;
+
+export function activate() {
+  sub = Engine.subscribe({ methods: ['mail.new'] }, ({ params }) => {
+    console.log('new mail in', params.accountId);
+  });
+}
+
+export function deactivate() {
+  sub.dispose();
+}
+```
+
+`hello` and `subscribe` belong to the window's connection and are refused by `Engine.request`.
+The local-only methods (accounts, secrets, credentials, `server.*`, `engine.logs.tail`,
+`engine.setLogLevel`, `engine.resetDatabase`, `engine.shutdown`) are refused unless the
+plugin's package.json lists the method in `tern.engineMethods` and the user allowed it: the
+first call asks, a yes is kept in `core.plugins.engineMethodApprovals`, a no lasts until the
+app restarts. The calling plugin is found from the call's stack; a call from code outside the
+app that belongs to no installed package is refused.
 
 ### Other Registries
 
@@ -425,6 +489,16 @@ Located in `internal_packages/theme-picker/`:
 - `ui-darkside`
 - `ui-taiga`
 - `ui-less-is-more`
+
+---
+
+## Trust Model
+
+Plugins are fully trusted code. They run in the app's windows with Node and can reach
+everything the app can: files, the network, the engine socket, the user's mail. Nothing in the
+plugin API is a security boundary. The `tern.engineMethods` check and its prompt only keep a
+plugin from calling a method that writes accounts or secrets or touches the engine by accident
+or without the user knowing (docs/tech-debt.md TD29). Install only plugins you trust.
 
 ---
 

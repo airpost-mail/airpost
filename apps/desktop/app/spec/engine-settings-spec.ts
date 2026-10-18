@@ -8,6 +8,8 @@ import ConfigPersistenceManager, {
 } from '../src/browser/config-persistence-manager';
 import { EngineSupervisor, SupervisorConfig } from '../src/browser/engine-supervisor';
 import {
+  COPIED_KEY,
+  ENGINE_SETTINGS_KEYS,
   EngineSettingsMirror,
   KEPT_KEY,
   STORE_KEY,
@@ -139,6 +141,71 @@ describe('the engine-owned settings in the main process', function () {
       signatures: { s1: SIGNATURE },
     });
     await until('the store id', () => configOnDisk()[STORE_KEY] === 'store-2');
+  });
+
+  it('copies a key mirrored since the store was copied, and takes the engine for the rest', async function () {
+    const TRANSLATION = { provider: 'deepl', url: 'https://api.example.test' };
+    fake.settings = { 'core.sending.undoSend': 30000 };
+    fake.settingsFeatures = ['settings', 'integrations'];
+    // A store copied by a build that didn't mirror the integrations yet: no COPIED_KEY.
+    writeConfig({
+      [STORE_KEY]: 'store-1',
+      core: { sending: { undoSend: 15000 }, integrations: { translation: TRANSLATION } },
+    });
+    await launch();
+    await until('the copied keys', () => Array.isArray(configOnDisk()[COPIED_KEY]));
+    expect(fake.socketOf('settings.set').map((r) => r.params)).toEqual([
+      { values: { 'core.integrations.translation': TRANSLATION } },
+    ]);
+    expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
+    expect(manager.get('core.sending.undoSend')).toBe(30000);
+    expect([...configOnDisk()[COPIED_KEY]].sort()).toEqual([...ENGINE_SETTINGS_KEYS].sort());
+    supervisor.client.engine._closeSocket();
+
+    // Copied now: the engine wins for it too.
+    delete fake.settings['core.integrations.translation'];
+    fake.socket = [];
+    await launch();
+    expect(settingsCalls().map((r) => r.method)).toEqual(['settings.get']);
+    expect(manager.get('core.integrations.translation')).toBeUndefined();
+  });
+
+  it('leaves the integration keys alone with an engine that does not mirror them', async function () {
+    const TRANSLATION = { provider: 'deepl', url: 'https://api.example.test' };
+    fake.settings = {};
+    writeConfig({
+      [STORE_KEY]: 'store-1',
+      core: { integrations: { translation: TRANSLATION } },
+    });
+    await launch();
+    expect(settingsCalls().map((r) => r.method)).toEqual(['settings.get']);
+    expect(fake.socketOf('settings.get')[0].params.keys).not.toContain(
+      'core.integrations.translation'
+    );
+    expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
+
+    // A local write stays in config.json and isn't sent.
+    const GRAMMAR = { provider: 'languagetool' };
+    manager.setRawValue('core.integrations.grammar', GRAMMAR, null);
+    manager.setRawValue('core.sending.undoSend', 5000, null);
+    await until('the set', () => fake.socketOf('settings.set').length > 0);
+    expect(fake.socketOf('settings.set').map((r) => Object.keys(r.params.values))).toEqual([
+      ['core.sending.undoSend'],
+    ]);
+    expect(configOnDisk().core.integrations).toEqual({
+      translation: TRANSLATION,
+      grammar: GRAMMAR,
+    });
+    supervisor.client.engine._closeSocket();
+
+    // The next engine that mirrors them gets both.
+    fake.settingsFeatures = ['settings', 'integrations'];
+    fake.socket = [];
+    await launch();
+    await until('the copy', () => fake.settings['core.integrations.grammar'] !== undefined);
+    expect(fake.settings['core.integrations.translation']).toEqual(TRANSLATION);
+    expect(fake.settings['core.integrations.grammar']).toEqual(GRAMMAR);
+    expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
   });
 
   it('keeps config.json when the engine cannot read its settings', async function () {

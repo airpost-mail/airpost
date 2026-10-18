@@ -268,6 +268,13 @@ describe('Engine.request and local-only methods (TD29)', function () {
     });
   });
 
+  it('refuses hello and subscribe, which belong to the window connection', async () => {
+    caller = null;
+    expect(await outcome('subscribe')).toBe('refused');
+    expect(await outcome('hello')).toBe('refused');
+    expect(sent).toEqual([]);
+  });
+
   it('never asks for the app or a bundled package', async () => {
     caller = { name: 'preferences', bundled: true, engineMethods: [] };
     expect(await outcome('secrets.set')).toBe('sent');
@@ -298,6 +305,42 @@ describe('Engine.request and local-only methods (TD29)', function () {
       engineMethods: ['secrets.set'],
     });
     expect(callerPackageFromStack(stack(`${bundled}/lib/main.js`)).bundled).toBe(true);
-    expect(callerPackageFromStack(stack('/somewhere/else.js'))).toBe(null);
+    // Outside the app and in no package: an unknown caller, with no local-only methods.
+    expect(callerPackageFromStack(stack('/somewhere/else.js'))).toEqual({
+      name: '/somewhere/else.js',
+      bundled: false,
+      engineMethods: [],
+    });
+    // The app's other files are the app.
+    expect(callerPackageFromStack(stack(path.join(resourcePath, 'static', 'x.js')))).toBe(null);
+  });
+
+  it('finds a symlinked package, through app helpers and odd paths', () => {
+    const resourcePath = AppEnv.getLoadSettings().resourcePath;
+    const root = fs.realpathSync(fs.mkdtempSync('/tmp/tern-spec-engine-api-'));
+    try {
+      const real = path.join(root, 'checkout (dev)', 'third');
+      fs.mkdirSync(real, { recursive: true });
+      const link = path.join(root, 'packages-third');
+      fs.symlinkSync(real, link);
+      spyOn(AppEnv.packages, 'getAvailablePackages').andReturn([
+        { name: 'third', directory: link, engineMethods: () => [] },
+      ] as any);
+      // V8 reports the realpath, here with parentheses, called through an app dependency.
+      const s = [
+        'Error',
+        `    at EngineAPI.request (${path.join(resourcePath, 'src', 'engine-api.ts')}:10:5)`,
+        `    at later (${path.join(resourcePath, 'node_modules', 'underscore', 'underscore.js')}:1:2)`,
+        `    at Object.run (${real}/lib/main.js:3:9)`,
+      ].join('\n');
+      expect(stackPaths(s)[2]).toBe(`${real}/lib/main.js`);
+      expect(callerPackageFromStack(s)).toEqual({
+        name: 'third',
+        bundled: false,
+        engineMethods: [],
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

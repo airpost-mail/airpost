@@ -1,5 +1,12 @@
 # Mailspring Changelog
 
+## Unreleased (Tern)
+
+Plugin API 1.27.0:
+
+- New `Engine` export (`request`, `subscribe`, `features`, `has`, `capabilities`, `connected`, `onDidChange`) and the `tern.engineMethods` manifest field. See PLUGIN_SYSTEM_ARCHITECTURE.md.
+- Breaking for plugins that read `document`: message bodies render in a sandboxed cross-origin frame, so `MessageViewExtension.renderedMessageBodyIntoDocument` gets `body` (a `MessageBody`) instead, and reading `document` throws. Plugins with `engines.mailspring` `^1.26.0` still load.
+
 ## 1.26.0 (10/1/2026)
 
 This is a major sync reliability release - The sync engine now tracks every folder a message lives in, rather than forcing each message into a single folder. This permanently fixes mail "flickering" between folders or disappearing from the Inbox when the same message exists in two places — a long-standing issue for iCloud users, self-addressed mail that lands in both Inbox and Sent, Exchange's duplicate Sent copies, and ProtonMail labels. (#2891) This refactor was enabled by a huge new suite of automated mailsync tests that run against real Dovecot, Cyrus in Docker and fake problematic IMAP servers.

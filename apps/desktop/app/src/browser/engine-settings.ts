@@ -10,7 +10,8 @@ synchronously and never talk to the store.
 - On each engine whose hello lists `settings`: `settings.get`, which also names the store. A
   store config.json's values were never copied into (a first launch, or a store the engine
   started anew after losing or setting aside settings.json) gets them, one `settings.set` per
-  key; then the keys written while no engine took them are pushed; and the engine wins for the
+  key, and so does a key mirrored since the store was copied (COPIED_KEY lists the keys it got);
+  then the keys written while no engine took them are pushed; and the engine wins for the
   rest: its values replace config.json's, and a key it has no value for is cleared. A key whose
   copy the engine refused is kept in config.json instead (KEPT_KEY) until the engine has a value.
   When `settings.get` fails, config.json is left as it is.
@@ -22,7 +23,8 @@ synchronously and never talk to the store.
   when the language changes; config.json has no copy of them.
 
 config.json keeps every key either way, so an engine without `settings` (or a downgrade) still
-finds them. The engine answers a connection in the order its store applied the changes, so a
+finds them. A key that needs a feature (KEY_FEATURES) is left out entirely with an engine that
+doesn't list it, so an older engine that refuses or doesn't know the key never clears it. The engine answers a connection in the order its store applied the changes, so a
 `settings.changed` or `settings.get` answer for a key with a `settings.set` still unanswered was
 applied before that set, and is skipped: the local write wins.
 */
@@ -47,12 +49,39 @@ export const ENGINE_SETTINGS_KEYS = [
   'core.integrations.enrichment',
 ];
 
+// Mirrored only with an engine whose hello lists the feature.
+const KEY_FEATURES: { [key: string]: string } = {
+  'core.integrations.translation': Feature.Integrations,
+  'core.integrations.grammar': Feature.Integrations,
+  'core.integrations.enrichment': Feature.Integrations,
+};
+
+// The keys a store named in STORE_KEY got when COPIED_KEY didn't exist yet (before stage 5).
+const FIRST_COPIED_KEYS = [
+  'core.sending.undoSend',
+  'core.sending.defaultAccountIdForSend',
+  'core.notifications.unsnoozeToTop',
+  'core.composing.html',
+  'signatures',
+  'defaultSignatures',
+];
+
+// The keys mirrored with `engine`.
+export function mirroredKeys(engine: SettingsEngine) {
+  const features = engine.features || [];
+  return ENGINE_SETTINGS_KEYS.filter(
+    (key) => !KEY_FEATURES[key] || features.includes(KEY_FEATURES[key])
+  );
+}
+
 // The config key of the UI language; a change rewrites the resurfacing texts.
 export const LANGUAGE_KEY = 'core.intl.language';
 const RESURFACING_KEYS = [SNOOZE_BODY_KEY, REMINDER_BODY_KEY];
 
 // The id (settings.get's `storeId`) of the engine store config.json's values were copied into.
 export const STORE_KEY = 'engineSettingsStore';
+// The keys config.json's values were copied for into that store.
+export const COPIED_KEY = 'engineSettingsCopiedKeys';
 // Engine-owned keys config.json keeps although the store has no value: the copy was refused.
 export const KEPT_KEY = 'engineSettingsKept';
 // The store of an engine that names none.
@@ -128,9 +157,15 @@ export class EngineSettingsMirror {
   }
 
   // ConfigPersistenceManager stored a local write that changed these engine-owned keys.
+  // A key the engine doesn't mirror stays unsent, for an engine that does.
   localChanged(keys: string[]) {
     for (const key of keys) this._unsent.add(key);
-    if (this.engine) this._sendKeys(this.engine, keys);
+    if (!this.engine) return;
+    const mirrored = mirroredKeys(this.engine);
+    this._sendKeys(
+      this.engine,
+      keys.filter((key) => mirrored.includes(key))
+    );
   }
 
   // The UI language changed: the engine's resurfacing messages follow it.
@@ -141,31 +176,40 @@ export class EngineSettingsMirror {
   // settings.changed: another client's change.
   engineChanged(engine: SettingsEngine, { values }: SettingsValues) {
     if (engine !== this.engine || !values) return;
-    this._apply(values, Object.keys(values));
+    const mirrored = mirroredKeys(engine);
+    this._apply(
+      values,
+      Object.keys(values).filter((key) => mirrored.includes(key))
+    );
   }
 
   async _sync(engine: SettingsEngine) {
     try {
+      const mirrored = mirroredKeys(engine);
       const { values, storeId } = await engine.request<SettingsValues>(Method.SettingsGet, {
-        keys: [...ENGINE_SETTINGS_KEYS, ...RESURFACING_KEYS],
+        keys: [...mirrored, ...RESURFACING_KEYS],
       });
       if (this.engine !== engine) return;
       this._writeResurfacing(engine, values || {});
       const store = storeId || UNNAMED_STORE;
-      const copy = store !== this.host.get(STORE_KEY);
-      const keys = ENGINE_SETTINGS_KEYS.filter(
-        (key) => this._unsent.has(key) || (copy && this.host.get(key) !== undefined)
+      const sameStore = store === this.host.get(STORE_KEY);
+      const copied = sameStore ? this._copied() : [];
+      const toCopy = mirrored.filter((key) => !copied.includes(key));
+      const keys = mirrored.filter(
+        (key) => this._unsent.has(key) || (toCopy.includes(key) && this.host.get(key) !== undefined)
       );
       const sent = this._sendKeys(engine, keys);
       // The keys just sent are in flight, so _apply leaves them.
-      this._apply(values || {}, ENGINE_SETTINGS_KEYS);
-      if (!copy) return;
+      this._apply(values || {}, mirrored);
+      if (!toCopy.length) return;
       const outcomes = await sent;
       if (this.engine !== engine || outcomes.includes('exited')) return;
-      const refused = keys.filter((_key, i) => outcomes[i] === 'refused');
+      const refused = keys.filter((key, i) => outcomes[i] === 'refused' && toCopy.includes(key));
+      const kept = [...(sameStore ? this._kept() : []), ...refused];
       this.host.applyEngineValues({
         [STORE_KEY]: store,
-        [KEPT_KEY]: refused.length ? refused : undefined,
+        [COPIED_KEY]: [...copied, ...toCopy],
+        [KEPT_KEY]: kept.length ? _.uniq(kept) : undefined,
       });
     } catch (err) {
       console.warn(`Could not read the engine's settings: ${err.message}`);
@@ -184,6 +228,11 @@ export class EngineSettingsMirror {
     engine.request(Method.SettingsSet, { values }).catch((err) => {
       if (!err.engineExited) console.warn(`Could not write the resurfacing texts: ${err.message}`);
     });
+  }
+
+  _copied(): string[] {
+    const copied = this.host.get(COPIED_KEY);
+    return Array.isArray(copied) ? copied : FIRST_COPIED_KEYS;
   }
 
   _kept(): string[] {

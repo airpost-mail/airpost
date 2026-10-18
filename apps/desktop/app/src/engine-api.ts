@@ -14,8 +14,11 @@ from calling a method that writes accounts or secrets or touches the engine itse
 class of T13) by accident or without the user knowing: such a call is refused unless the plugin's
 package.json lists the method in `tern.engineMethods` and the user allowed it once. The calling
 package is found from the call's stack, so a request made from the app's own code (src/) or a
-bundled package is never asked about.
+bundled package is never asked about; one from code outside the app that belongs to no package
+is refused. `hello` and `subscribe` belong to the window's connection and are refused for
+everyone: a second `subscribe` would replace the app's own subscription.
 */
+import fs from 'fs';
 import path from 'path';
 import { localized } from './intl';
 import EngineEvents, {
@@ -44,6 +47,9 @@ const LOCAL_ONLY_METHODS = [
   'engine.shutdown',
 ];
 const LOCAL_ONLY_PREFIXES = ['secrets.', 'credentials.', 'server.'];
+
+// The window connection's own; Engine.subscribe filters its notifications instead.
+const CONNECTION_METHODS = ['hello', 'subscribe'];
 
 export function isLocalOnlyMethod(method: string) {
   return (
@@ -86,8 +92,8 @@ export interface Disposable {
 }
 
 // Source paths in a V8 stack, `at fn (/path/file.js:1:2)` or `at /path/file.js:1:2`, with or
-// without file://.
-const FRAME_PATH = /(?:\(|at )(?:file:\/\/)?((?:\/|[A-Za-z]:[\\/])[^():\n]*?):\d+:\d+\)?\s*$/;
+// without file://. The path may hold parentheses and colons; the last `:line:column` ends it.
+const FRAME_PATH = /^at (?:.*? \()?(?:file:\/\/)?((?:\/|[A-Za-z]:[\\/]).*?):\d+:\d+\)?$/;
 
 export function stackPaths(stack: string): string[] {
   const paths: string[] = [];
@@ -103,20 +109,43 @@ const within = (file: string, dir: string) => {
   return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
 };
 
-/** The package the first frame outside the app's src/ belongs to, or null for the app itself. */
+// `dir` as given and resolved: stack paths are realpaths, package directories may be symlinks.
+function dirForms(dir: string) {
+  try {
+    const real = fs.realpathSync(dir);
+    return real === dir ? [dir] : [dir, real];
+  } catch (err) {
+    return [dir];
+  }
+}
+
+const withinAny = (file: string, dirs: string[]) => dirs.some((dir) => within(file, dir));
+
+/**
+ * The package the first frame outside the app's src/ and node_modules belongs to, or null for
+ * the app itself. A frame outside the app that is in no package is an unknown caller, which
+ * gets no local-only method.
+ */
 export function callerPackageFromStack(stack: string): CallerPackage | null {
   const resourcePath = AppEnv.getLoadSettings().resourcePath;
-  const src = path.join(resourcePath, 'src');
-  const packages = AppEnv.packages ? AppEnv.packages.getAvailablePackages() : [];
+  const app = dirForms(resourcePath);
+  const passThrough = app.flatMap((dir) => [path.join(dir, 'src'), path.join(dir, 'node_modules')]);
+  const packages = (AppEnv.packages ? AppEnv.packages.getAvailablePackages() : []).map((pkg) => ({
+    pkg,
+    dirs: dirForms(pkg.directory),
+  }));
   for (const file of stackPaths(stack)) {
-    if (within(file, src)) continue;
-    const pkg = packages.find((p) => within(file, p.directory));
-    if (!pkg) return null;
-    return {
-      name: pkg.name,
-      bundled: within(pkg.directory, resourcePath),
-      engineMethods: pkg.engineMethods(),
-    };
+    if (withinAny(file, passThrough)) continue;
+    const found = packages.find(({ dirs }) => withinAny(file, dirs));
+    if (found) {
+      return {
+        name: found.pkg.name,
+        bundled: found.dirs.some((dir) => withinAny(dir, app)),
+        engineMethods: found.pkg.engineMethods(),
+      };
+    }
+    if (withinAny(file, app)) return null;
+    return { name: file, bundled: false, engineMethods: [] };
   }
   return null;
 }
@@ -169,9 +198,19 @@ export class EngineAPI {
 
   /**
    * Calls `method` on the window's engine connection. Rejects with the engine's error (`code`,
-   * `message`, `data`), or EngineRequestRefused for a local-only method the plugin may not call.
+   * `message`, `data`), or EngineRequestRefused for `hello`, `subscribe` or a local-only method
+   * the plugin may not call.
    */
   request<R = unknown>(method: string, params: unknown = {}): Promise<R> {
+    if (CONNECTION_METHODS.includes(method)) {
+      return Promise.reject(
+        new EngineRequestRefused(
+          `${method} belongs to the window's connection; use Engine.subscribe for notifications`,
+          method,
+          null
+        )
+      );
+    }
     try {
       this._checkCaller(method, new Error().stack);
     } catch (err) {
