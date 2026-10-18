@@ -66,10 +66,16 @@ pub struct TokenManager {
 
 impl TokenManager {
     /// Uses the system clock, [`Endpoints::from_env`] and the `GMAIL_CLIENT_ID` /
-    /// `GMAIL_CLIENT_SECRET` pair from the environment.
+    /// `GMAIL_CLIENT_SECRET` pair from the environment, else the Google client the engine
+    /// signs in with ([`OAuthProvider::client_from_env`]).
     pub fn new(on_rotate: Option<RotateCallback>) -> Self {
         let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-        let gmail_client = env(ENV_GMAIL_CLIENT_ID).zip(env(ENV_GMAIL_CLIENT_SECRET));
+        let gmail_client = env(ENV_GMAIL_CLIENT_ID)
+            .zip(env(ENV_GMAIL_CLIENT_SECRET))
+            .or_else(|| {
+                let client = OAuthProvider::Google.client_from_env();
+                client.secret.map(|secret| (client.id, secret))
+            });
         TokenManager {
             accounts: Mutex::new(HashMap::new()),
             on_rotate,
