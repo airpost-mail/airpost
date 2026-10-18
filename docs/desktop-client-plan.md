@@ -1970,3 +1970,71 @@ Nothing for tern-web.
 Trial pending (not run): migrate the trial profile, restart the app, check both accounts sync;
 run `serve --detached` with the desktop closed and check mail still syncs; update the app with
 the detached engine running.
+
+2026-10-18, stage 12 delivered (onboarding through the engine), branch `roadmap/client-next`,
+not merged. Engine: `account.discover` (the provider tables in `crates/ms-providers`, then MX
+with a 5 s bound, then Thunderbird autoconfig over https), `account.oauth.begin` and
+`account.oauth.complete` (the engine keeps the PKCE verifier, the state and the client secret,
+exchanges the code and reads Google userinfo or Graph /me), `account.add` and `account.test` on
+the socket, `account.setSecrets`, `account.update` (a host or username change deletes the stored
+secrets), `account.reorder`, `account.remove {revoke, deleteData}`, `secrets.set`,
+`secrets.delete` and `secrets.has` (no get), `server.set` and `server.clear`. The account methods
+and `secrets.*`/`server.*` are local-only; the engine methods stay parent-only. New account ids
+come from `ms_core::ids::account_id`, byte for byte `idForAccount`, tested with vectors from the
+JS. Integration requests without an `apiKey` get the one stored as `integration:<provider>`.
+OAuth client ids come from `MS_GMAIL_CLIENT_ID`, `MS_GMAIL_CLIENT_SECRET` and `MS_O365_CLIENT_ID`
+at run time, else the same variables at build time, else the current ids as defaults; the
+desktop no longer passes `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET` to the engine. Desktop:
+onboarding, reconnect and remove go through the window's own connection
+(`app/src/engine-accounts.ts`); the redirect receiver runs in main on 127.0.0.1
+(`app/src/browser/oauth-receiver.ts`); integration keys go through `secrets.set` (a keyset copy
+is moved over on the next save and still read for an engine without account setup); the
+supervisor's `testAccount` and the onboarding OAuth code with the client secret are gone. CLI:
+`tern account add` for IMAP (discovery, flags, `--password-stdin` or a no-echo prompt) and for
+Gmail, Office 365 and Outlook with a loopback receiver. TD47: one copy of the presets
+(`crates/ms-providers`; the desktop's `mailcore-provider-settings.json`,
+`mailspring-provider-settings.json` and `onboarding-constants.ts` deleted), dead entries removed,
+the MX lookup bounded to 5 s. TD4 holds: discovery never yields `none`, the CLI takes only
+`tls` and `starttls`, and the engine still refuses cleartext to a remote host without
+`*_allow_cleartext`. Tests: the id vectors, OAuth against a mock provider
+(`oauth_sign_in_against_a_mock_provider`), the discovery tables (including the desktop specs'
+cases), a relayed connection refused on every local-only method
+(`a_relayed_connection_is_refused_every_local_only_method`), socket edits of accounts, secrets
+and the server, the CLI end to end against the harness's fake servers, and desktop specs for
+onboarding, the receiver and the integration keys. Checks: fmt and clippy on mailsync, tern,
+ms-ipc, ms-providers and ms-core; desktop lint and typecheck; the onboarding, notifications,
+preferences and translation package specs and the app specs for the receiver, integrations,
+engine supervisor, client, connection, events, settings and API, account store, capability store
+and OAuth revocation, all passing. No release build: the disk had 3.5 GB free.
+
+Decision taken, to confirm:
+- `account.test` never returns secrets, on stdin as well as the socket (a rotated refresh token
+  stays in the engine).
+- `account.add` decides "already there, unchanged" on the stored form (no secrets, no
+  `syncState`/`syncError`), so client sync state doesn't restart a running account.
+- `account.discover` is open to relayed devices, as the plan has it, but refuses IP-literal
+  domains and follows autoconfig only over https, redirects included.
+- The account and secrets methods are local-only (an admin relayed device may call them); the
+  engine methods stay parent-only.
+- OAuth client ids: run-time env, then build-time env, then the current ids.
+- `TERN_TEST_DISCOVERY` overrides discovery in debug builds only, for the tests.
+- An OAuth reconnect keeps the account's id and settings and must sign in to the same address.
+- `server.set` restarts the running accounts with the new identity and clears an explicit one;
+  the token goes in with `secrets.set` first.
+- Reconnect asks for the credentials again, since the engine never returns them.
+- Remove calls `account.remove {revoke, deleteData}` on the window's connection before
+  config.json lets go of the account; the JS revocation stays only for an engine without
+  account setup.
+- Integration keys: a save moves a keyset copy into the engine; key presence is checked in both;
+  a save or delete bumps `core.integrations.keysChangedAt` so every window's CapabilityStore
+  re-reads.
+- Discovery order: provider table, MX, autoconfig. Dead presets removed, `mobileme` renamed
+  `icloud`, POP-only entries kept, ISPDB not regenerated.
+
+Open: the Microsoft redirect URI names `localhost` (as registered) while both receivers bind
+127.0.0.1, so a system that resolves `localhost` only to ::1 won't reach them. The o365 shared
+mailbox window opened from Preferences reconnects the existing account if the user skips the
+shared mailbox form. tern-web: `apps/web` still has its own presets (`presets.ts`,
+`account-draft.ts`) and should move its onboarding to `account.discover`/`account.oauth.*`.
+Trial pending (not run): add an IMAP account and an OAuth account (not the production
+accounts), reconnect one, remove one, and save an integration key.
