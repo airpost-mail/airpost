@@ -27,7 +27,8 @@ const IDLE: Duration = Duration::from_secs(30);
 
 /// Provider HTTP calls, each up to 30 s (ms-integrations' timeout).
 pub static INTEGRATIONS: Lane = Lane::new(thread::INTEGRATIONS, 8, 64, true);
-/// `files.get` waiting for a download; a message's inline images come together.
+/// `files.get` waiting for a download; a message's inline images come together. A call
+/// queued here is still answered within its wait: the deadline starts when it arrives.
 pub static FILES: Lane = Lane::new(thread::FILES, 32, 512, true);
 /// `messages.unsubscribe` waiting for a body or making a one-click POST; `unsubscribe.rs`
 /// caps those at 16 and 8 engine-wide, so every call gets a thread at once.

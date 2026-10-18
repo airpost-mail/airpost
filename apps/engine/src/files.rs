@@ -82,8 +82,9 @@ fn result(file: &File, path: Option<&Path>) -> Reply {
     })
 }
 
-/// Waits for `file` to appear under `root`, then answers.
-fn wait_for(file: File, root: PathBuf) -> Reply {
+/// Waits for `file` to appear under `root` until `deadline`, then answers. The deadline is
+/// taken when the call arrives, so time spent queued for a `files` thread counts against it.
+fn wait_for(file: File, root: PathBuf, deadline: Instant) -> Reply {
     struct Slot;
     impl Drop for Slot {
         fn drop(&mut self) {
@@ -91,7 +92,6 @@ fn wait_for(file: File, root: PathBuf) -> Reply {
         }
     }
     let _slot = Slot;
-    let deadline = Instant::now() + download_wait();
     loop {
         if let Some(path) = file.find_in(&root) {
             return result(&file, Some(&path));
@@ -148,7 +148,10 @@ impl Session {
             WAITING.fetch_sub(1, Ordering::SeqCst);
             return Err(e);
         }
-        Ok(Deferred::Later(Box::new(move || wait_for(file, root))))
+        let deadline = Instant::now() + download_wait();
+        Ok(Deferred::Later(Box::new(move || {
+            wait_for(file, root, deadline)
+        })))
     }
 
     fn files_read(&mut self, p: FilesReadParams) -> Reply {
@@ -241,6 +244,17 @@ fn valid_content_type(t: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_call_queued_past_its_deadline_answers_at_once() {
+        let root = std::env::temp_dir().join("tern-files-wait-test-none");
+        let file = File::create_local("f1", "a1", "m1", "a.png", "image/png", 3);
+        WAITING.fetch_add(1, Ordering::SeqCst);
+        let started = Instant::now();
+        let reply = wait_for(file, root, started - Duration::from_secs(1)).unwrap();
+        assert!(started.elapsed() < POLL);
+        assert_eq!(reply["downloaded"], false);
+    }
 
     #[test]
     fn content_types() {
