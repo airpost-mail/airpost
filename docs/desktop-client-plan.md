@@ -1230,7 +1230,7 @@ gate. Order and rough sizes:
 Trial checks on `~/tern-trial` are left to the user; each stage lists its trial steps as
 pending.
 
-2026-10-18, stage 3 (settings store), branch `roadmap/client-next`: delivered, not merged.
+2026-10-18, stage 3 (settings store), branch `roadmap/client-next`: delivered and merged.
 Engine: `settings.get {keys?}` → `{values}`, `settings.set {values}` (null clears a key) and
 `settings.changed {values}` on `serve` only (`apps/engine/src/settings.rs`), feature `settings`;
 `<config>/settings.json` is one flat object keyed by config key path, rewritten through a
@@ -1292,3 +1292,27 @@ added to `RELAYED_SETTINGS_KEYS`; `apps/gateway/src/http/ws.rs` should switch to
 refuses them today). Trial pending: change the
 undo-send delay in Preferences and see it in `tern settings get`; change it with
 `tern settings set core.sending.undoSend 15000` and see the composer pick it up.
+
+Gate (2026-10-18, rebased on 1c81e4dd2): fmt, clippy, `cargo test --workspace`, `cargo deny`,
+release builds of mailsync, tern, tern-mcp and tern-gateway, the serve harness quick tier on the
+release binaries (131 passed, 1 skipped), desktop lint and typecheck, full desktop suite (2962
+passing). Open from the review (low): tern-mcp's `Engines::settings` turns a failed
+`settings.get` into an empty map (`unwrap_or_default` in `apps/mcp/src/discovery.rs`), and
+`account_for_new_draft` (`write.rs`) reads an unset key as "no default" and skips config.json, so
+a transient engine error, or a store that hasn't had the desktop's first copy yet, puts a new
+draft on the first account instead of config.json's default sender; `settings.set` has no size
+limit on a value below the 64 MiB frame limit and is open to relayed devices without the admin
+scope for the plain keys, so a remote device can store large values that are rewritten to
+`settings.json`, sent to every subscriber, copied into config.json and pushed to every window;
+serve tests are missing for several 3.1 routing rules of `settings.changed` (an `accounts`
+filter, a connection that never subscribed gets nothing, no backlog for a later subscriber, a
+relayed connection calling `settings.get`/`set`), for writes refused when `settings.json` is
+unreadable, and for `sync` mode having neither the feature nor the methods (METHOD_NOT_FOUND);
+`tern settings get|set` checks keys and kinds against the CLI's own `ms_ipc::SETTINGS_KEYS`, so
+a CLI older than the engine refuses keys a newer engine takes (clients should gate on features,
+not versions); `resetSettingsForSchemaChange` in `config.ts` reads with `GetRaw` and writes with
+`SetAll` in two `sendSync` calls, so a `settings.changed` applied in between is overwritten and
+`ConfigPersistenceManager.setSettings` then sends the stale value to `settings.set`, reverting
+another client's change; the `@electron/remote` ban only covers what `lint:check` globs
+(`app/src/**/*.{ts,tsx}`, `app/internal_packages/**/*.{ts,tsx}`), so `.js` files in `app/src`
+and `app/spec` aren't checked. Trial steps above still pending.
