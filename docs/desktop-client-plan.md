@@ -1466,3 +1466,44 @@ are retried every 2 minutes and on `wake-workers`; the MCP list puts failed send
 stale `error` next to a new expiration is not shown. Trial pending: remove and re-add a test
 account that had a snoozed thread and see the snooze gone.
 
+
+2026-10-18, stage 4 gate and merge, branch `roadmap/client-next`: merged to main. Rebased on
+main after stages 7 and 16 (tern-web) landed; the executor and SendDraftTask now use stage 16's
+`File::find_in` instead of this branch's `File::find_on_disk` (same lookup), and the
+`expiration-executor` feature sits next to `files`. Gate green: fmt, clippy, `cargo test
+--workspace`, `cargo deny`, release build of mailsync, tern, tern-mcp and tern-gateway, the
+harness quick tier on serve with the release binaries, desktop lint, typecheck and the full spec
+suite. Open, from the review (low): the send-later clear and the queued `SendDraftTask` are two
+`perform_local` calls, not one transaction, so a crash or database error between them leaves a
+draft with no expiration and no send, with nothing saying why; an engine-queued send that fails
+for good (rejected recipient, auth, the 24 h offline window) writes no `error` to the send-later
+metadata, so only an open desktop window sees it and a headless or web client can't; SMTP
+Connection/Parse errors are now retryable and engine sends retry them for 24 h, including a
+connection dropped after the DATA terminator but before the 250 reply, so a message the server
+already accepted can be delivered again on each retry; the executor's in-memory `waiting`
+entries aren't reset when a waiting draft is rescheduled or its send-later cleared, so a
+rescheduled draft resumes from the old count (fewer than the 1/2/4/8 min looks) and cancelled
+drafts' entries stay for the life of the thread; `Thread::before_save` writes the reminder
+baseline and reply clear through `upsert_metadata(.., None)`, which bumps the version without a
+`SyncbackMetadataTask`, so with `HttpMetadataBackend` the backend never sees it and another
+device's update at the same version is then ignored (`current >= v`), losing that reminder
+change; the harness covers snooze on IMAP with unsnooze-to-top on and Gmail with it off only,
+and no Send and Archive (ms-tasks unit tests only); `needsClientFinalize` only counts an
+`applyTransformsForSending` that is an own property of the registered extension, so a
+third-party extension inheriting it from its own base class isn't marked `clientFinalize` and
+the engine sends without the transform (T9); TD32's Rebuild after a failed `migrate`
+(`application.ts`) and the `_resetDatabaseAndRelaunch` fallbacks with no supervisor or a failed
+`resetDatabase` still call `_deleteDatabase` and lose local-only snoozes and scheduled sends; no
+spec covers `_onSendDraft` writing `clientFinalize` on undo-send rows, `SendLaterButton` writing
+it, or `SendLaterStatus` rendering `error` (only `needsClientFinalize` is specced);
+`PLUGIN_API_VERSION` stays 1.26.0 though `metadata-expiration` is no longer delivered for the
+built-in ids and `SendActionsStore.needsClientFinalize` is new (section 6 wants a minor bump),
+and nothing tells third-party plugins writing send-later metadata to set `clientFinalize` when
+they finalise themselves; the reminder sentence and `Not sent: %@` are only in `lang/en.json`,
+so a non-English UI sends an English reminder body until translated (0.1 item 25) and the draft
+list shows the engine's English error reason. tern-web: `apps/web`'s send-later runner should
+stop when the engine announces `expiration-executor`. Trial pending (not run): schedule a send
+two minutes out, close the window with the engine running, see it arrive once; undo-send with
+the window closed inside the window; snooze a thread and set a reminder and see both come back
+with no window open; with the UI in another language, check the resurfacing text; remove and
+re-add a test account that had a snoozed thread and see the snooze gone.
