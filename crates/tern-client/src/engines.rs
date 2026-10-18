@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use ms_ipc::{
-    code, feature, method, Client, ClientError, CountsGetParams, CountsGetResult, HelloResult,
+    code, feature, method, Client, ClientError, CountsGetParams, CountsGetResult, FilesGetParams,
+    FilesGetResult, FilesPutParams, FilesPutResult, FilesReadParams, FilesReadResult, HelloResult,
     MetadataListParams, MetadataListResult, QueryParams, QueryResult, SettingsGetParams,
     SettingsValues, TasksListParams, TasksListResult, PROTOCOL_VERSION,
 };
@@ -203,6 +204,33 @@ impl Engine {
     /// account in the engine's database, with no check against the accounts it holds.
     pub fn query(&mut self, params: &QueryParams) -> Result<QueryResult, EngineError> {
         self.call_as(method::QUERY, to_params(params))
+    }
+
+    /// `files.get` ([`feature::FILES`](ms_ipc::feature::FILES)): the file, downloaded first
+    /// when it isn't on disk. Takes as long as the download, up to the engine's wait.
+    pub fn files_get(
+        &mut self,
+        account_id: &str,
+        file_id: &str,
+    ) -> Result<FilesGetResult, EngineError> {
+        self.call_as(
+            method::FILES_GET,
+            to_params(&FilesGetParams {
+                account_id: account_id.to_owned(),
+                file_id: file_id.to_owned(),
+            }),
+        )
+    }
+
+    /// `files.read`: one chunk of a downloaded file.
+    pub fn files_read(&mut self, params: &FilesReadParams) -> Result<FilesReadResult, EngineError> {
+        self.call_as(method::FILES_READ, to_params(params))
+    }
+
+    /// `files.put`: a new File for a draft, from `data` (base64) or a `path` the engine
+    /// copies.
+    pub fn files_put(&mut self, params: &FilesPutParams) -> Result<FilesPutResult, EngineError> {
+        self.call_as(method::FILES_PUT, to_params(params))
     }
 }
 
