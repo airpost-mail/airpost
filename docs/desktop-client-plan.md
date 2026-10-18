@@ -1519,3 +1519,36 @@ two minutes out, close the window with the engine running, see it arrive once; u
 the window closed inside the window; snooze a thread and set a reminder and see both come back
 with no window open; with the UI in another language, check the resurfacing text; remove and
 re-add a test account that had a snoozed thread and see the snooze gone.
+
+2026-10-18, stage 9 (search grammar), engine, CLI and tern-mcp halves, branch
+`roadmap/web-ready`: delivered, not merged. `crates/ms-store/src/search_grammar.rs` ports
+`SearchQueryParser`, the AST and `LocalSearchQueryBackend` (match-compatible subtrees become one
+`ThreadSearch MATCH`, bound rather than inlined; `is:`, `has:attachment` and dates go on
+`Thread` columns as the desktop wrote them); `search_dates.rs` resolves date terms to the start
+of the named day in the request's `tz` (IANA, UTC when absent), counting back from its `now`:
+ISO dates and months, month names with or without day and year, weekday names, `today`,
+`yesterday`, `N days|weeks|months|years ago`, `Nd`/`Nw`/`Nm`/`Ny` (the web's presets) and
+`last week|month|year`; names without a year and weekdays are the latest on or before today. A
+term outside that, or a relative one without `now`, is `INVALID_PARAMS`. `query.search
+{grammar: true}` works on Thread (other classes refuse it); `search` takes `grammar`, `tz`,
+`now` and `accounts` (feature `search-grammar`). `tern search` sends the query as typed with the
+local zone and clock, one call per engine across its accounts, and exits 2 on a query the engine
+refuses; tern-mcp's `search_mail` passes the query through and keeps only the access policy
+filter (its own parser stays for engines without the feature). Tests: the parser spec cases as
+Rust tests; `apps/desktop/app/spec/search-query-capture-spec.ts` writes
+`crates/ms-store/tests/fixtures/search_queries.json` (AST and desktop WHERE for 68 queries),
+and `tests/search_grammar_parity.rs` checks the engine builds the same AST (or fails where the
+desktop fails) and finds the same threads for each date-free query on a fixture database;
+dates in two zones there, in the unit tests (Lisbon, Tokyo, Auckland, Honolulu, Santiago's DST
+gap) and in `tests/read_api.rs` on the socket; `test_cli.py` and `test_mcp.py` on the fake IMAP
+server. Deviations from the desktop: a field keyword is a field only when a `:` follows (`trip
+to paris` is three words; the desktop threw and fell back to a plain search); quoted tokens are
+never keywords; a word glued to `:` (`http://x.test`) stays one word; unknown `is:`/`has:`
+values, a stray `)`, empty parentheses and a trailing `AND`/`OR`/`NOT` are errors; `after:`
+includes its day (`>=` the day's start) and `before:` excludes it, where the desktop compared
+with chrono-node's noon and a strict `>`; English month and weekday names only. `QueryError`
+lost its `Unsupported` variant, so `query` no longer answers `data.unsupported`. Open: the
+desktop half (`Query.searchText`, the printer for `structuredSearch`, deleting the local
+backend) is tern-client's; `search` keeps its `lastMessageTimestamp` order and has no cursor;
+`IMAPSearchQueryBackend` is still later.
+

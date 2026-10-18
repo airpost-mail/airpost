@@ -152,11 +152,14 @@ Changes from the plugin:
 `tasks.list` (the `tasks-list` feature), the send check before editing a draft sees every queued
 `SendDraftTask`, including the desktop's; without it, only the sends this session queued.
 
-`search_mail` supports plain terms and quoted phrases with `in:`,
-`is:unread|read|starred|unstarred`, `has:attachment`, `before:` and `after:`/`since:`
-(absolute dates). `OR`, `NOT`, negation, parentheses and relative dates are refused with an
-error, and field filters like `from:` are passed to the engine's search as terms rather than
-enforced.
+`search_mail` hands the query to the engine's search grammar (the `search-grammar` feature):
+words and quoted phrases, `from:`, `to:`, `subject:`, `in:`, `is:unread|read|starred|unstarred`,
+`has:attachment`, `before:` and `after:`/`since:` (dates such as `2026-05-31`, `yesterday`,
+`"3 days ago"`, `2w`, read in the local time zone), `AND`, `OR`, `NOT` and parentheses. tern-mcp
+only applies the access policy to the results; a query the engine can't read is an error with
+the engine's reason. On an engine without the grammar, tern-mcp parses a subset itself: plain
+terms with `in:`, `is:`, `has:attachment` and absolute dates, refusing `OR`, `NOT`,
+parentheses and relative dates, and passing `from:`-style values to the search as terms.
 
 ## The desktop
 

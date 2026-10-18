@@ -569,3 +569,22 @@ Open:
   per-call timeout is shorter than the engine's 120 s AI deadline, so AI5 needs a longer
   timeout for streamed `ai.*` calls. The web has no `ai.*` types yet; tern-ai adds them with
   AI5 (ai-plan question 6).
+
+2026-10-18, W7 (DCP 9 search grammar), branch `roadmap/web-ready`, not merged:
+- Engine: the desktop's grammar in `ms-store` (`search_grammar.rs`, `search_dates.rs`), used
+  by `query.search {grammar: true}` (Thread only) and by `search {grammar: true, tz, now}`;
+  `search` also takes `accounts`, or neither it nor `accountId` for every account the engine
+  holds. Feature `search-grammar`. Dates resolve in the request's `tz` (UTC when absent) and
+  count back from its `now`; a date outside the subset, or text that doesn't parse, is
+  `-32602` with a message for the person who typed it. Details and deviations in DCP Status.
+- Web: with `search-grammar` the search page and the palette send the query as typed, with
+  the browser's zone and clock, in one `search` call across accounts (`limit + 1` tells
+  "more"); client-side date filtering and the "dates need company" state only remain for an
+  engine without the feature, and a query the engine refuses shows its message. The mock
+  implements the same grammar and date subset (checked against the engine's test cases) and
+  announces the feature; `MockEngine({features: ['query']})` stands in for an older engine,
+  whose `search` takes plain words only. The search `TODO(engine)` markers are gone.
+- Open: the search chips re-serialize the query (words first, then operators), which can move
+  terms across an `OR`; the chips model has no `OR`/`NOT`/parentheses. `search` has no
+  paging; a client that needs more than 500 results pages `query` with the grammar.
+
