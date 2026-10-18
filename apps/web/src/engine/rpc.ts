@@ -98,7 +98,15 @@ export interface HelloResult {
   engine: string;
   pid: number;
   accounts: EngineAccountSummary[];
+  /** What this engine has beyond protocol 1 (ms-ipc `feature`); absent on older engines. */
+  features?: string[];
 }
+
+/** `hello.features` the web acts on. */
+export const EngineFeature = {
+  /** `query`, with plain search only (DCP stage 7). */
+  Query: 'query',
+} as const;
 
 /** ms-ipc `EngineStatusResult`. */
 export interface EngineStatus {
@@ -218,6 +226,77 @@ export interface ContactsSearchResult {
   contacts: ContactJSON[];
 }
 
+/** `query` operators (desktop `src/flux/attributes/matcher.ts`). */
+export type QueryOp =
+  | '='
+  | '!='
+  | '<'
+  | '>'
+  | '<='
+  | '>='
+  | 'in'
+  | 'not in'
+  | 'contains'
+  | 'containsAny'
+  | 'startsWith'
+  | 'like';
+
+/** A matcher in `query.where`: attributes are the desktop model keys, not the JSON keys. */
+export type MatcherJSON =
+  | { attr: string; op: QueryOp; value: unknown }
+  | { and: MatcherJSON[] }
+  | { or: MatcherJSON[] }
+  | { not: MatcherJSON[] };
+
+/** The classes `query` reads. */
+export type QueryClass =
+  | 'Thread'
+  | 'Message'
+  | 'Folder'
+  | 'Label'
+  | 'Contact'
+  | 'ContactGroup'
+  | 'ContactBook'
+  | 'Event'
+  | 'Calendar'
+  | 'Task'
+  | 'File';
+
+/**
+ * `query` (DCP 3.2, crates/ms-ipc `QueryParams`): the JSON form of the desktop's ModelQuery.
+ * `accounts` null or absent reads every account. `where` as a list means all must match. An
+ * empty `order` is the class's natural order. `cursor` pages by keyset: `''` for the first
+ * page, then the previous page's `nextCursor`. No limit applies when `limit` is absent.
+ * Unknown keys are refused.
+ */
+export interface QueryParams<C extends QueryClass = QueryClass> {
+  class: C;
+  accounts?: string[] | null;
+  where?: MatcherJSON | MatcherJSON[] | null;
+  /** `grammar: true` is refused until DCP stage 9. */
+  search?: { text: string; grammar: false } | null;
+  order?: { attr: string; dir: 'asc' | 'desc' }[];
+  limit?: number | null;
+  offset?: number | null;
+  cursor?: string | null;
+  distinct?: boolean;
+  /** Joined data, `body` on Message. */
+  include?: string[];
+  idsOnly?: boolean;
+  count?: boolean;
+}
+
+/**
+ * `rows` always (empty for `idsOnly` and `count`); `ids` for `idsOnly`, `count` for `count`,
+ * `nextCursor` for a cursor query (null after the last page).
+ */
+export interface QueryResult<T = unknown> {
+  rows: T[];
+  ids?: string[];
+  count?: number;
+  nextCursor?: string | null;
+}
+
 export interface AccountTestResult {
   ok: boolean;
   error?: string;
@@ -250,6 +329,8 @@ export interface RpcMethods {
   'messages.get': { params: MessagesGetParams; result: MessagesGetResult };
   search: { params: SearchParams; result: SearchResult };
   'contacts.search': { params: SearchParams; result: ContactsSearchResult };
+  /** Only on engines with `EngineFeature.Query`. */
+  query: { params: QueryParams; result: QueryResult };
 
   // Phase C.
   'account.add': {

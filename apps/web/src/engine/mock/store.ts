@@ -23,10 +23,12 @@ import {
 } from '../rpc';
 import type {
   AccountJSON,
+  CalendarJSON,
   CategoryJSON,
   CategoryRole,
   ContactJSON,
   ContactRef,
+  EventJSON,
   FolderJSON,
   LabelJSON,
   MessageJSON,
@@ -71,6 +73,8 @@ export class MockStore {
   readonly messages = new Map<string, MessageJSON>();
   readonly threads = new Map<string, ThreadJSON>();
   readonly contacts = new Map<string, ContactJSON>();
+  readonly calendars = new Map<string, CalendarJSON>();
+  readonly events = new Map<string, EventJSON>();
   readonly tasks = new Map<string, TaskJSON>();
   readonly bodies: Map<string, MockBody>;
   readonly loadedBodies: Set<string>;
@@ -83,6 +87,8 @@ export class MockStore {
     for (const c of f.categories) this.categories.set(c.id, c);
     for (const m of f.messages) this.messages.set(m.id, m);
     for (const c of f.contacts) this.contacts.set(c.id, c);
+    for (const c of f.calendars) this.calendars.set(c.id, c);
+    for (const e of f.events) this.events.set(e.id, e);
     this.bodies = f.bodies;
     this.loadedBodies = f.loadedBodies;
     this.incomingBuilder = new FixtureBuilder(f.categories, 900);

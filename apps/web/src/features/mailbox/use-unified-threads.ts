@@ -1,4 +1,5 @@
-// One thread list merged from several accounts. The engine pages per account, so each
+// One thread list merged from several accounts, for engines without `query` (which page
+// unified lists themselves, see `useMailbox`). `threads.list` pages per account, so each
 // account's list is cached on its own (under its `threadLists` prefix, so deltas reach it)
 // and the merge only shows threads down to the oldest point every account has loaded.
 import { useQueries, useQueryClient, type InfiniteData } from '@tanstack/react-query';
@@ -17,8 +18,6 @@ import {
 type Pages = InfiniteData<ThreadsListResult, string | null>;
 
 const PAGE_SIZE = 50;
-// TODO(engine): threads.list takes one accountId; DCP stage 7's `query` with
-// `accounts: null` lets the engine page the unified views itself.
 
 /** Distinct from `useThreads`' key (plain query vs infinite query), same delta prefix. */
 const unifiedKey = (q: ThreadQuery) => [...engineKeys.threadList(q), 'unified'] as const;

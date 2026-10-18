@@ -1,6 +1,13 @@
 import type { ShortcutDef, ShortcutGroup } from '@/lib/shortcuts';
 
-const ORDER: ShortcutGroup[] = ['Navigation', 'Thread', 'Compose', 'Search', 'Application'];
+const ORDER: ShortcutGroup[] = [
+  'Navigation',
+  'Thread',
+  'Compose',
+  'Calendar',
+  'Search',
+  'Application',
+];
 
 /** Groups the registry, listing each description once (several views may bind the same). */
 export function groupShortcuts(list: ShortcutDef[], filter = ''): [ShortcutGroup, ShortcutDef[]][] {

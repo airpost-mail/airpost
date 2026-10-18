@@ -1,14 +1,17 @@
 import type {
   AccountJSON,
+  CalendarJSON,
   CategoryJSON,
   CategoryRole,
   ContactJSON,
   ContactRef,
+  EventJSON,
   FileJSON,
   LabelJSON,
   MessageJSON,
 } from '../../types';
 import { PlacementFlags } from '../../types';
+import { buildCalendars } from './calendar';
 import { ME_GMAIL, ME_IMAP, people } from './people';
 import { incoming, scripts, type Place, type ThreadScript, type Who } from './scripts';
 
@@ -29,6 +32,8 @@ export interface Fixtures {
   /** Message ids whose bodies the engine has "downloaded". */
   loadedBodies: Set<string>;
   contacts: ContactJSON[];
+  calendars: CalendarJSON[];
+  events: EventJSON[];
 }
 
 const accounts: Record<AccountKey, AccountJSON> = {
@@ -338,6 +343,7 @@ export function buildFixtures(now: number): Fixtures {
     bodies: builder.bodies,
     loadedBodies: builder.loadedBodies,
     contacts: buildContacts(builder.messages),
+    ...buildCalendars(now, MOCK_ACCOUNT_IDS),
   };
 }
 

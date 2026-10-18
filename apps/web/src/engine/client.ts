@@ -32,6 +32,11 @@ export interface EngineClient {
   readonly state: ConnectionState;
   /** Null while connected, or when the client doesn't know. */
   readonly problem: ConnectionProblem | null;
+  /**
+   * `hello.features` of the last handshake, kept across reconnects; null before the first.
+   * Listeners of `onStateChange` see it set by the time the state is `open`.
+   */
+  readonly features: ReadonlySet<string> | null;
 
   /** Opens the connection, sends `hello` and `subscribe`. Resolves with the hello result. */
   connect(): Promise<HelloResult>;

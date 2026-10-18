@@ -14,17 +14,20 @@ the expunge/category tasks without a local phase are documented, not engine work
 
 ## Read API
 
-- `src/engine/hooks.ts:243`: starred and unread filters. DCP 7 (`query` `where`).
-- `src/engine/model.ts:104`: a sort key on thread lists. DCP 7 (`query` `order`).
-- `src/features/mailbox/use-unified-threads.ts:20`: unified paging. DCP 7 (`accounts: null`).
-- `src/features/mailbox/list/senders.ts:3`: message count and per-message senders. DCP 7
-  (a message summary `include`).
-- `src/engine/hooks.ts:440`: `search` across accounts. DCP 9.
-- `src/engine/hooks.ts:468`: `contacts.search` across accounts. DCP 7 (`query` on Contact).
+Done in step W6 (DCP 7, markers removed): thread lists read with `query` behind
+`hello.features` (`EngineFeature.Query`), so the engine filters Starred and unread (`where`),
+sorts by last received or, in Sent, last sent (`order`), and pages the unified views itself
+(`accounts: null`); contact autocomplete across accounts in one `query` on Contact; calendar
+and event reads with a read-only agenda, and calendar fixtures in the mock. Engines without
+`query` keep the old paths (per-account merge, client-side flag filters).
+
+- `src/features/mailbox/list/senders.ts:3`: message count and per-message senders on Thread
+  JSON. No DCP stage yet (a full Message `query` per list page is the wrong cost).
+- `src/engine/hooks.ts:527`: `search` across accounts. DCP 9.
 - `src/features/search/query.ts:172`, `src/engine/mock/search.ts:3`,
   `src/features/search/SearchView.tsx:225`: search operators and dates. DCP 9.
-- `src/engine/cache.ts:244`: calendars, events and contact groups. Reads DCP 7, writes DCP 18.
-- `src/engine/mock/engine.ts:346`: calendar fixtures for the mock (web-only, with the views).
+- `src/features/calendar/CalendarView.tsx:3`: creating, editing and answering events, and
+  recurrence expansion. DCP 18.
 
 ## Tasks
 
@@ -37,8 +40,8 @@ the expunge/category tasks without a local phase are documented, not engine work
 
 ## Accounts
 
-- `src/engine/mock/engine.ts:385`: `account.add` from the web. DCP 11/12, admin scope.
-- `src/engine/mock/engine.ts:402`: `account.test` on the socket. DCP 12, admin scope.
+- `src/engine/mock/engine.ts:402`: `account.add` from the web. DCP 11/12, admin scope.
+- `src/engine/mock/engine.ts:419`: `account.test` on the socket. DCP 12, admin scope.
 - `src/features/settings/accounts/actions.ts:30`: `account.test {accountId}` with stored
   credentials. DCP 12.
 - `src/features/settings/accounts/actions.ts:47`: `account.reset` on the socket. DCP 12, admin
@@ -51,7 +54,7 @@ the expunge/category tasks without a local phase are documented, not engine work
 
 ## Attachments
 
-- `src/engine/client.ts:49`, `src/engine/ws.ts:186`,
+- `src/engine/client.ts:54`, `src/engine/ws.ts:191`,
   `src/features/mailbox/reader/AttachmentList.tsx:30`: downloads. DCP 16 `files.get` + GW
   route (W5).
 - `src/features/composer/useComposerSession.ts:132`: uploads. DCP 16 `files.put` + GW route
@@ -61,7 +64,7 @@ the expunge/category tasks without a local phase are documented, not engine work
 
 ## Integrations
 
-- `src/engine/rpc.ts:266`, `src/engine/mock/engine.ts:471`: translate, grammar and enrich
+- `src/engine/rpc.ts:347`, `src/engine/mock/engine.ts:489`: translate, grammar and enrich
   shapes. DCP 5.
 - `src/features/settings/integrations/useIntegrationTest.ts:10`: `integrations.test` result.
   DCP 5.

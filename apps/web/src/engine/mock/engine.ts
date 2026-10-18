@@ -1,6 +1,7 @@
 import type { ConnectionState, EngineClient, Unsubscribe } from '../client';
 import { nowSeconds } from '../model';
 import {
+  EngineFeature,
   PROTOCOL_VERSION,
   RpcError,
   RpcErrorCode,
@@ -15,9 +16,15 @@ import {
 import type { AccountJSON, Delta, FileJSON, MessageJSON, TaskJSON, ThreadJSON } from '../types';
 import { applyTask } from './apply-task';
 import { ChangeSet } from './changes';
+import { runQuery } from './query';
 import { MockStore } from './store';
 
+/** What the mock announces in `hello.features` unless told otherwise. */
+export const MOCK_FEATURES: readonly string[] = [EngineFeature.Query];
+
 export interface MockEngineOptions {
+  /** `hello.features`; `[]` stands in for an engine without `query`. */
+  features?: readonly string[];
   /** Artificial latency per call in ms, as a fixed value or a [min, max] range. */
   latency?: number | [number, number];
   /** Reference time for fixtures, unix seconds. */
@@ -83,11 +90,14 @@ export class MockEngine implements EngineClient {
   private readonly startedAt = Date.now();
   private readonly expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly handlers: Handlers;
+  private readonly announced: readonly string[];
+  private _features: ReadonlySet<string> | null = null;
 
   constructor(opts: MockEngineOptions = {}) {
     const l = opts.latency ?? [40, 140];
     this.latency = typeof l === 'number' ? [l, l] : l;
     this.incomingEveryMs = opts.incomingEveryMs ?? null;
+    this.announced = opts.features ?? MOCK_FEATURES;
     this.store = new MockStore(opts.now ?? nowSeconds());
     this.handlers = this.buildHandlers();
   }
@@ -98,13 +108,18 @@ export class MockEngine implements EngineClient {
 
   readonly problem = null;
 
+  get features() {
+    return this._features;
+  }
+
   retryNow() {}
 
   async connect(): Promise<HelloResult> {
     this.setState('connecting');
     await this.delay();
-    this.setState('open');
     const hello = this.handlers.hello({ protocol: PROTOCOL_VERSION, client: 'tern-web' });
+    this._features = new Set(hello.features);
+    this.setState('open');
     this.subscribed = { accounts: null, classes: null };
     if (this.incomingEveryMs) {
       this.incomingTimer = setInterval(() => this.deliverIncoming(), this.incomingEveryMs);
@@ -127,7 +142,7 @@ export class MockEngine implements EngineClient {
     }
     await this.delay();
     const handler = this.handlers[method] as ((p: unknown) => RpcResult<M>) | undefined;
-    if (!handler) {
+    if (!handler || (method === 'query' && !this.announced.includes(EngineFeature.Query))) {
       throw new RpcError({
         code: RpcErrorCode.MethodNotFound,
         message: `unknown method ${method}`,
@@ -304,6 +319,7 @@ export class MockEngine implements EngineClient {
           engine: '0.0.0-mock',
           pid: 0,
           accounts: accountsSummary(),
+          features: [...this.announced],
         };
       },
       subscribe: (p) => {
@@ -343,7 +359,7 @@ export class MockEngine implements EngineClient {
       },
       'calendar.sync': (p) => {
         this.requireAccount(p.accountId);
-        // TODO(engine): no calendar fixtures yet; calendar views wait for DCP stage 7.
+        // The fixtures are all there is; nothing to fetch.
         return { started: false };
       },
       'engine.status': () => ({
@@ -381,6 +397,7 @@ export class MockEngine implements EngineClient {
         this.requireAccount(p.accountId);
         return s.searchContacts(p);
       },
+      query: (p) => runQuery(s, p, (id) => this.requireAccount(id)),
       'account.add': (p) => {
         // TODO(engine): `account.add` from the web is DCP stages 11/12 with the admin scope.
         // The mock accepts the account but has no mail for it.

@@ -11,13 +11,22 @@ import { applyDelta, type ServerIdentityState, type ThreadPages } from './cache'
 import type { ConnectionProblem, ConnectionState, EngineClient } from './client';
 import { ensureConnected } from './connect';
 import { useEngine } from './context';
-import { engineKeys, type SearchQuery, type ThreadQuery } from './keys';
-import { compareThreads, sortCategories } from './model';
+import {
+  engineKeys,
+  EVERY_ACCOUNT,
+  type EventRange,
+  type SearchQuery,
+  type ThreadQuery,
+} from './keys';
+import { compareThreads, sortCategories, THREAD_SORT_ATTR, type ThreadSort } from './model';
 import { optimisticThreads } from './optimistic';
 import {
+  EngineFeature,
   RpcError,
   RpcErrorCode,
   type AccountListEntry,
+  type MatcherJSON,
+  type QueryParams,
   type CategoryCount,
   type SearchResult,
   type ThreadsGetResult,
@@ -26,9 +35,11 @@ import {
 } from './rpc';
 import type {
   AccountJSON,
+  CalendarJSON,
   CategoryJSON,
   ContactJSON,
   Delta,
+  EventJSON,
   MessageJSON,
   ModelClass,
   ProcessStateJSON,
@@ -37,7 +48,7 @@ import type {
 } from './types';
 
 export { useEngine } from './context';
-export type { SearchQuery, ThreadQuery } from './keys';
+export { EVERY_ACCOUNT, type EventRange, type SearchQuery, type ThreadQuery } from './keys';
 
 const PAGE_SIZE = 50;
 const CONTACTS_LIMIT = 10;
@@ -51,6 +62,15 @@ async function call<T>(client: EngineClient, fn: () => Promise<T>): Promise<T> {
 
 function isNotFound(err: unknown): boolean {
   return err instanceof RpcError && err.code === RpcErrorCode.NotFound;
+}
+
+/** The engine's `hello.features`; null until the first handshake. */
+export function useEngineFeatures(): ReadonlySet<string> | null {
+  const client = useEngine();
+  return useSyncExternalStore(
+    (cb) => client.onStateChange(cb),
+    () => client.features,
+  );
 }
 
 export function useConnectionState(): ConnectionState {
@@ -218,36 +238,101 @@ export function useCategories(accountId: string | undefined) {
 }
 
 /** The thread list query for a folder or label. */
-export function threadQueryFor(category: Pick<CategoryJSON, 'aid' | 'id' | '__cls'>): ThreadQuery {
+export function threadQueryFor(
+  category: Pick<CategoryJSON, 'aid' | 'id' | '__cls' | 'role'>,
+): ThreadQuery {
+  const categoryRole = category.role;
   return category.__cls === 'Label'
-    ? { accountId: category.aid, labelId: category.id }
-    : { accountId: category.aid, folderId: category.id };
+    ? { accountId: category.aid, labelId: category.id, categoryRole }
+    : { accountId: category.aid, folderId: category.id, categoryRole };
+}
+
+/** A page of a thread list, and the key it is sorted by (the cache inserts by it). */
+export interface ThreadPage extends ThreadsListResult {
+  sort?: ThreadSort;
+}
+
+/** Spam and trash list threads outside all mail (ms-store `threads()`, the desktop's perspectives). */
+export function listsOutsideAllMail(q: ThreadQuery): boolean {
+  const role = q.categoryRole ?? q.role;
+  return role === 'spam' || role === 'trash';
+}
+
+/** The sort of a thread list read with `query`: Sent by last sent, the rest by last received. */
+export function threadSortFor(q: ThreadQuery): Exclude<ThreadSort, 'lmt'> {
+  return (q.categoryRole ?? q.role) === 'sent' ? 'lmst' : 'lmrt';
 }
 
 /**
- * One page of a thread list. A client-side filter (`starred`) reads pages of the account's
- * whole list until it has `limit` matches or the list ends, and pages on from where it
- * stopped reading.
+ * The `query` for a page of a thread list, as the desktop's mailbox perspectives build it:
+ * the categories, `inAllMail` outside spam and trash, the flags, newest first. Null for a
+ * list by `role` alone, which only `threads.list` resolves.
+ */
+export function threadListQuery(
+  q: ThreadQuery,
+  limit: number,
+  cursor: string | null,
+): QueryParams<'Thread'> | null {
+  const one = q.folderId ?? q.labelId;
+  const categories = q.categoryIds ?? (one ? [one] : null);
+  if (q.role && !categories) return null;
+  const where: MatcherJSON[] = [];
+  if (categories) where.push({ attr: 'categories', op: 'containsAny', value: categories });
+  if (!listsOutsideAllMail(q)) where.push({ attr: 'inAllMail', op: '=', value: true });
+  if (q.starred !== undefined) where.push({ attr: 'starred', op: '=', value: q.starred });
+  if (q.unread !== undefined) where.push({ attr: 'unread', op: '=', value: q.unread });
+  return {
+    class: 'Thread',
+    accounts: q.accountId === EVERY_ACCOUNT ? null : [q.accountId],
+    where,
+    order: [{ attr: THREAD_SORT_ATTR[threadSortFor(q)], dir: 'desc' }],
+    limit,
+    cursor: cursor ?? '',
+  };
+}
+
+export function hasQuery(client: EngineClient): boolean {
+  return client.features?.has(EngineFeature.Query) ?? false;
+}
+
+/**
+ * One page of a thread list. With the engine's `query` the engine filters and pages it.
+ * Without it, a flag filter (`starred`, `unread`) reads pages of the account's whole list
+ * until it has `limit` matches or the list ends, and pages on from where it stopped reading.
  */
 export async function fetchThreadPage(
   client: EngineClient,
   query: ThreadQuery,
   limit: number,
   before: string | null,
-): Promise<ThreadsListResult> {
-  const { starred, ...rest } = query;
+): Promise<ThreadPage> {
+  await ensureConnected(client);
+  const viaQuery = hasQuery(client) ? threadListQuery(query, limit, before) : null;
+  if (viaQuery) {
+    const r = await client.call('query', viaQuery);
+    return {
+      threads: r.rows as ThreadJSON[],
+      next: r.nextCursor ?? null,
+      sort: threadSortFor(query),
+    };
+  }
+  const { starred, unread, categoryRole: _role, categoryIds, ...rest } = query;
+  if (query.accountId === EVERY_ACCOUNT || categoryIds) {
+    throw new Error('A thread list across accounts needs an engine with `query`.');
+  }
   const params = (cursor: string | null): ThreadsListParams =>
     cursor ? { ...rest, limit, before: cursor } : { ...rest, limit };
-  await ensureConnected(client);
-  if (starred === undefined) return client.call('threads.list', params(before));
-  // TODO(engine): threads.list has no flag filters (starred, unread), so Starred reads the
-  // whole account and filters here. DCP stage 7's `query` with a `where` on `starred` lets
-  // the engine page it.
+  if (starred === undefined && unread === undefined) {
+    return client.call('threads.list', params(before));
+  }
+  const keep = (t: ThreadJSON) =>
+    (starred === undefined || t.starred > 0 === starred) &&
+    (unread === undefined || t.unread > 0 === unread);
   const threads: ThreadJSON[] = [];
   let next = before;
   for (let i = 0; i < FILTER_ROUNDS; i++) {
     const page = await client.call('threads.list', params(next));
-    threads.push(...page.threads.filter((t) => t.starred > 0 === starred));
+    threads.push(...page.threads.filter(keep));
     next = page.next;
     if (!next || threads.length >= limit) break;
   }
@@ -261,7 +346,7 @@ export function useThreads(query: ThreadQuery | null, opts: { pageSize?: number 
     queryKey: query ? engineKeys.threadList(query) : ['engine', 'threads', '', {}],
     queryFn: ({ pageParam }) => fetchThreadPage(client, query!, limit, pageParam),
     initialPageParam: null as string | null,
-    getNextPageParam: (last: ThreadsListResult) => last.next,
+    getNextPageParam: (last: ThreadPage) => last.next,
     enabled: !!query,
   });
   const threads = useMemo(() => result.data?.pages.flatMap((p) => p.threads) ?? [], [result.data]);
@@ -271,11 +356,13 @@ export function useThreads(query: ThreadQuery | null, opts: { pageSize?: number 
 function findCachedThread(qc: QueryClient, accountId: string, id: string): ThreadJSON | undefined {
   const single = qc.getQueryData<ThreadJSON | null>(engineKeys.thread(accountId, id));
   if (single) return single;
-  for (const [, data] of qc.getQueriesData<ThreadPages>({
-    queryKey: engineKeys.threadLists(accountId),
-  })) {
-    const hit = data?.pages.flatMap((p) => p.threads).find((t) => t.id === id);
-    if (hit) return hit;
+  for (const key of [engineKeys.threadLists(accountId), engineKeys.threadLists(EVERY_ACCOUNT)]) {
+    for (const [, data] of qc.getQueriesData<ThreadPages>({ queryKey: key })) {
+      const hit = data?.pages
+        .flatMap((p) => p.threads)
+        .find((t) => t.id === id && t.aid === accountId);
+      if (hit) return hit;
+    }
   }
   for (const [, result] of qc.getQueriesData<SearchResult>({
     queryKey: engineKeys.searchAll(),
@@ -465,19 +552,29 @@ export function useContacts(query: string, opts: { accountId?: string; limit?: n
   return useQuery({
     queryKey: engineKeys.contacts({ query: q, accountId: opts.accountId, limit }),
     queryFn: async (): Promise<ContactJSON[]> => {
-      // TODO(engine): `contacts.search` takes one accountId; autocomplete across accounts
-      // calls each one and merges by reference count here. DCP stage 7's `query` on Contact
-      // with `accounts: null` replaces it.
-      const ids = await targetAccounts(qc, client, opts.accountId);
-      const results = await Promise.all(
-        ids.map((accountId) =>
-          call(client, () => client.call('contacts.search', { accountId, query: q, limit })),
-        ),
-      );
+      await ensureConnected(client);
+      let contacts: ContactJSON[];
+      if (hasQuery(client)) {
+        // One read across accounts; twice the limit leaves room for the same address in
+        // several accounts.
+        const r = await client.call('query', {
+          class: 'Contact',
+          accounts: opts.accountId ? [opts.accountId] : null,
+          search: { text: q, grammar: false },
+          where: [{ attr: 'hidden', op: '=', value: false }],
+          order: [{ attr: 'refs', dir: 'desc' }],
+          limit: limit * 2,
+        });
+        contacts = r.rows as ContactJSON[];
+      } else {
+        const ids = await targetAccounts(qc, client, opts.accountId);
+        const results = await Promise.all(
+          ids.map((accountId) => client.call('contacts.search', { accountId, query: q, limit })),
+        );
+        contacts = results.flatMap((r) => r.contacts).sort((a, b) => b.refs - a.refs);
+      }
       const seen = new Set<string>();
-      return results
-        .flatMap((r) => r.contacts)
-        .sort((a, b) => b.refs - a.refs)
+      return contacts
         .filter((c) => {
           const email = c.email.toLowerCase();
           return seen.has(email) ? false : (seen.add(email), true);
@@ -485,6 +582,55 @@ export function useContacts(query: string, opts: { accountId?: string; limit?: n
         .slice(0, limit);
     },
     enabled: q.length > 0,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** Every account's calendars; null when the engine has no `query` to read them with. */
+export function useCalendars() {
+  const client = useEngine();
+  return useQuery({
+    queryKey: engineKeys.calendars(),
+    queryFn: async (): Promise<CalendarJSON[] | null> => {
+      await ensureConnected(client);
+      if (!hasQuery(client)) return null;
+      const r = await client.call('query', { class: 'Calendar' });
+      return (r.rows as CalendarJSON[]).sort(
+        (a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name),
+      );
+    },
+    staleTime: Infinity,
+  });
+}
+
+/** The most events one range reads. */
+const EVENTS_LIMIT = 1000;
+
+/**
+ * Events overlapping the range in the given calendars, by start. Recurring events come as
+ * stored, a master plus its exceptions: the engine expands them with DCP stage 18.
+ */
+export function useEvents(range: EventRange | null) {
+  const client = useEngine();
+  return useQuery({
+    queryKey: range ? engineKeys.events(range) : engineKeys.eventsAll(),
+    queryFn: async (): Promise<EventJSON[]> => {
+      const { start, end, calendarIds } = range!;
+      if (calendarIds.length === 0) return [];
+      await ensureConnected(client);
+      const r = await client.call('query', {
+        class: 'Event',
+        where: [
+          { attr: 'calendarId', op: 'in', value: calendarIds },
+          { attr: 'recurrenceEnd', op: '>', value: start },
+          { attr: 'recurrenceStart', op: '<', value: end },
+        ],
+        order: [{ attr: 'recurrenceStart', dir: 'asc' }],
+        limit: EVENTS_LIMIT,
+      });
+      return (r.rows as EventJSON[]).filter((e) => e.status !== 'CANCELLED');
+    },
+    enabled: !!range && hasQuery(client),
     placeholderData: (prev) => prev,
   });
 }
@@ -528,6 +674,7 @@ export function useQueueTask() {
     },
     onError: (_err, task) => {
       void qc.invalidateQueries({ queryKey: engineKeys.threadLists(task.aid) });
+      void qc.invalidateQueries({ queryKey: engineKeys.threadLists(EVERY_ACCOUNT) });
       void qc.invalidateQueries({ queryKey: ['engine', 'thread', task.aid] });
     },
   });

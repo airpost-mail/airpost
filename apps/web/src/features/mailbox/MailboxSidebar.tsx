@@ -1,4 +1,5 @@
-import { useNavigate, useParams } from '@tanstack/react-router';
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
+import { CalendarDays } from 'lucide-react';
 import { useEffect } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CategoryRole } from '@/engine';
@@ -58,6 +59,10 @@ export function MailboxSidebar() {
   useShortcut('g s', () => go('starred'), { ...nav, description: 'Go to starred' });
   useShortcut('g d', () => go('drafts'), { ...nav, description: 'Go to drafts' });
   useShortcut('g a', () => go('all'), { ...nav, description: 'Go to all mail' });
+  useShortcut('g c', () => void navigate({ to: '/calendar' }), {
+    ...nav,
+    description: 'Go to calendar',
+  });
 
   const active = accounts.find((a) => a.account.id === current);
   return (
@@ -70,6 +75,15 @@ export function MailboxSidebar() {
           active && <AccountNav key={active.account.id} data={active} />
         )}
       </ScrollArea>
+      <nav aria-label="Apps" className="border-t p-2">
+        <Link
+          to="/calendar"
+          className="flex h-7 items-center gap-2 rounded-md px-2 text-sm text-sidebar-foreground transition-colors duration-(--duration-fast) hover:bg-sidebar-accent data-[status=active]:bg-sidebar-accent data-[status=active]:font-medium"
+        >
+          <CalendarDays className="size-4 text-muted-foreground" />
+          Calendar
+        </Link>
+      </nav>
     </div>
   );
 }

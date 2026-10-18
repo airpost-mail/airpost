@@ -103,6 +103,7 @@ export class WsEngineClient implements EngineClient {
   private readonly notificationListeners = new Set<(n: EngineNotification) => void>();
   private readonly stateListeners = new Set<(s: ConnectionState) => void>();
   private hello: HelloResult | null = null;
+  private _features: ReadonlySet<string> | null = null;
   /** Bumped by close(); a loop from an older generation stops at its next step. */
   private generation = 0;
   private looping = false;
@@ -132,6 +133,10 @@ export class WsEngineClient implements EngineClient {
 
   get problem() {
     return this._problem;
+  }
+
+  get features() {
+    return this._features;
   }
 
   connect(): Promise<HelloResult> {
@@ -272,6 +277,7 @@ export class WsEngineClient implements EngineClient {
             if (this.ws !== ws) return;
             opened = true;
             this.hello = hello;
+            this._features = new Set(hello.features ?? []);
             this.openedAt = Date.now();
             this.setProblem(null);
             this.setState('open');

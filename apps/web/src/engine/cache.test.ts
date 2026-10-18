@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { applyDelta, upsertThreadInPages, type ThreadPages } from './cache';
-import { engineKeys, type ThreadQuery } from './keys';
+import { engineKeys, EVERY_ACCOUNT, type ThreadQuery } from './keys';
 import { optimisticThreads } from './optimistic';
 import type { FoldersListResult } from './rpc';
 import * as tasks from './tasks';
@@ -117,6 +117,58 @@ describe('upsertThreadInPages', () => {
     const next = upsertThreadInPages(data, thread('x', 300), q)!;
     expect(next.pages[0].threads.map((t) => t.id)).toEqual(['a', 'b']);
     expect(next.pages[1].threads.map((t) => t.id)).toEqual(['x', 'c']);
+  });
+});
+
+describe('query-backed lists', () => {
+  it('insert by the sort the page was read with', () => {
+    // b was received last but a's last message is newer (a sent reply).
+    const a = thread('a', 500, { lmrt: 100, lmst: 500 });
+    const b = thread('b', 200, { lmrt: 200, lmst: 0 });
+    const byReceived = { ...pages([[a], false]) };
+    byReceived.pages[0].sort = 'lmrt';
+    expect(upsertThreadInPages(byReceived, b, q)!.pages[0].threads.map((t) => t.id)).toEqual([
+      'b',
+      'a',
+    ]);
+    expect(
+      upsertThreadInPages(pages([[a], false]), b, q)!.pages[0].threads.map((t) => t.id),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('keep the lists across accounts in step, by category and flags', () => {
+    const qc = new QueryClient();
+    const unified: ThreadQuery = {
+      accountId: EVERY_ACCOUNT,
+      categoryIds: ['inbox', 'other-inbox'],
+      categoryRole: 'inbox',
+    };
+    const starred: ThreadQuery = { accountId: EVERY_ACCOUNT, starred: true };
+    qc.setQueryData(engineKeys.threadList(unified), pages([[thread('a', 300)], false]));
+    qc.setQueryData(engineKeys.threadList(starred), pages([[], false]));
+    const other = {
+      ...thread('o', 400, { starred: 1 }),
+      aid: 'other',
+      folders: [{ ...inbox, id: 'other-inbox', aid: 'other' }],
+    };
+    applyDelta(qc, {
+      accountId: 'other',
+      modelClass: 'Thread',
+      type: 'persist',
+      modelJSONs: [other],
+    });
+    const ids = (k: ThreadQuery) =>
+      qc.getQueryData<ThreadPages>(engineKeys.threadList(k))!.pages[0].threads.map((t) => t.id);
+    expect(ids(unified)).toEqual(['o', 'a']);
+    expect(ids(starred)).toEqual(['o']);
+    // Out of all mail (trashed) leaves the inbox list.
+    applyDelta(qc, {
+      accountId: A,
+      modelClass: 'Thread',
+      type: 'persist',
+      modelJSONs: [thread('a', 300, { inAllMail: false })],
+    });
+    expect(ids(unified)).toEqual(['o']);
   });
 });
 

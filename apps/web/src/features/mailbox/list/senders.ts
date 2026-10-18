@@ -2,7 +2,8 @@ import { contactDisplayName, type ContactRef, type ThreadJSON } from '@/engine';
 
 // TODO(engine): Thread JSON carries no message count and no per-message senders, so the
 // row guesses the count from category refs and names participants rather than senders.
-// A message summary `include` on DCP stage 7's `query` fixes both.
+// `query` could read each page's messages, but that is a full Message read per list page
+// for two fields; a count and senders on Thread JSON is the fix, and no DCP stage has it.
 /** Messages in the thread, from its category refs. */
 export function messageCount(t: ThreadJSON): number {
   return Math.max(1, ...[...t.folders, ...t.labels].map((r) => r._refs));

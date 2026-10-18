@@ -5,7 +5,7 @@ import type { EngineClient } from './client';
 import { ensureConnected } from './connect';
 import { EngineContext } from './context';
 import { seedProcessState } from './hooks';
-import { engineKeys } from './keys';
+import { engineKeys, EVERY_ACCOUNT } from './keys';
 import type { AccountRunState, AccountStateParams } from './rpc';
 
 /** What an account shows; refetched when the engine restarts it (a reset, or a re-add). */
@@ -14,6 +14,7 @@ function invalidateAccount(qc: QueryClient, accountId: string) {
     engineKeys.folders(accountId),
     engineKeys.labels(accountId),
     engineKeys.threadLists(accountId),
+    engineKeys.threadLists(EVERY_ACCOUNT),
     engineKeys.messagesAll(accountId),
   ]) {
     void qc.invalidateQueries({ queryKey: key });

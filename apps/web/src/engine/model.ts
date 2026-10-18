@@ -98,20 +98,32 @@ export function threadHasRole(thread: ThreadJSON, role: CategoryRole): boolean {
 }
 
 /**
- * Thread list order, as the engine pages `threads.list`: newest `lmt` (lastMessageTimestamp)
- * first, id descending as the tiebreak.
+ * The timestamp a thread list sorts by, newest first with the id descending as the tiebreak:
+ * `lmt` (last message) for `threads.list`, and with `query` the desktop's perspectives,
+ * `lmrt` (last received) for most lists and `lmst` (last sent) for Sent.
  */
-// TODO(engine): `threads.list` has no sort key, so lists can't order by last received
-// (`lmrt`) or last sent (`lmst`) as the desktop's Inbox and Sent perspectives do. DCP
-// stage 7's `query` takes an `order`.
-export function compareThreads(a: ThreadJSON, b: ThreadJSON): number {
-  if (a.lmt !== b.lmt) return b.lmt - a.lmt;
+export type ThreadSort = 'lmt' | 'lmrt' | 'lmst';
+
+/** The ModelQuery attribute of a `query` sort key (`lmt` isn't queryable). */
+export const THREAD_SORT_ATTR: Record<Exclude<ThreadSort, 'lmt'>, string> = {
+  lmrt: 'lastMessageReceivedTimestamp',
+  lmst: 'lastMessageSentTimestamp',
+};
+
+export function compareThreads(a: ThreadJSON, b: ThreadJSON, sort: ThreadSort = 'lmt'): number {
+  if (a[sort] !== b[sort]) return b[sort] - a[sort];
   return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
 }
 
 /** True when `thread` sorts strictly after `last` in thread list order. */
-export function sortsAfter(thread: ThreadJSON, last: Pick<ThreadJSON, 'lmt' | 'id'>): boolean {
-  if (thread.lmt !== last.lmt) return thread.lmt < last.lmt;
+export function sortsAfter(
+  thread: ThreadJSON,
+  last: Pick<ThreadJSON, 'id'> & Partial<Pick<ThreadJSON, ThreadSort>>,
+  sort: ThreadSort = 'lmt',
+): boolean {
+  const a = thread[sort];
+  const b = last[sort] ?? 0;
+  if (a !== b) return a < b;
   return thread.id < last.id;
 }
 

@@ -6,7 +6,8 @@
 // layouts (`#`, `?`, `!`) is matched by the character, so write `#`, not `shift+3`.
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 
-export type ShortcutGroup = 'Navigation' | 'Thread' | 'Compose' | 'Search' | 'Application';
+export type ShortcutGroup =
+  'Navigation' | 'Thread' | 'Compose' | 'Calendar' | 'Search' | 'Application';
 
 export interface ShortcutDef {
   /** One binding or several alternatives, e.g. `['j', 'down']`. */

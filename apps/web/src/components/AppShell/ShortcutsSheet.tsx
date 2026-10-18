@@ -13,7 +13,14 @@ import {
   type ShortcutGroup,
 } from '@/lib/shortcuts';
 
-const ORDER: ShortcutGroup[] = ['Navigation', 'Thread', 'Compose', 'Search', 'Application'];
+const ORDER: ShortcutGroup[] = [
+  'Navigation',
+  'Thread',
+  'Compose',
+  'Calendar',
+  'Search',
+  'Application',
+];
 
 export function ShortcutsSheet({
   open,

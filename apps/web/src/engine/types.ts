@@ -141,6 +141,17 @@ export interface EventJSON extends ModelJSON {
   re: number;
 }
 
+/** ms-store `Calendar` (CalDAV collection). */
+export interface CalendarJSON extends ModelJSON {
+  __cls: 'Calendar';
+  name: string;
+  /** `#rrggbb`, lower case. */
+  color?: string;
+  description?: string;
+  read_only?: boolean;
+  order?: number;
+}
+
 export interface MessageJSON extends ModelJSON, WithMetadata {
   __cls: 'Message';
   subject: string;
@@ -386,6 +397,7 @@ export type AnyModelJSON =
   | AccountJSON
   | FileJSON
   | EventJSON
+  | CalendarJSON
   | TaskJSON;
 
 export interface ModelJSONByClass {
@@ -400,7 +412,7 @@ export interface ModelJSONByClass {
   Task: TaskJSON;
   ContactGroup: ModelJSON;
   ContactBook: ModelJSON;
-  Calendar: ModelJSON;
+  Calendar: CalendarJSON;
   ProcessState: ProcessStateJSON;
   ProcessIdentityRefreshNeeded: never;
 }

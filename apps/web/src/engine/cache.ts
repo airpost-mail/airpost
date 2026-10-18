@@ -1,8 +1,14 @@
 // Applies delta notifications to the TanStack Query cache, so views update without
 // refetching. This plays the role of the desktop's DatabaseStore change records.
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
-import { engineKeys, type ThreadQuery } from './keys';
-import { compareMessages, compareThreads, threadHasRole, threadInCategory } from './model';
+import { engineKeys, EVERY_ACCOUNT, type ThreadQuery } from './keys';
+import {
+  compareMessages,
+  compareThreads,
+  threadHasRole,
+  threadInCategory,
+  type ThreadSort,
+} from './model';
 import type { FoldersListResult, LabelsListResult, SearchResult, ThreadsListResult } from './rpc';
 import type {
   AccountJSON,
@@ -14,16 +20,22 @@ import type {
   ThreadJSON,
 } from './types';
 
-export type ThreadPages = InfiniteData<ThreadsListResult, string | null>;
+/** `sort` is the key the page is ordered by (`threads.list`: `lmt`). */
+export type ThreadPages = InfiniteData<ThreadsListResult & { sort?: ThreadSort }, string | null>;
 
 const MAX_TASKS = 100;
 
 export function matchesThreadQuery(t: ThreadJSON, q: ThreadQuery): boolean {
-  if (t.aid !== q.accountId) return false;
+  if (q.accountId !== EVERY_ACCOUNT && t.aid !== q.accountId) return false;
   if (q.folderId && !threadInCategory(t, q.folderId)) return false;
   if (q.labelId && !threadInCategory(t, q.labelId)) return false;
+  if (q.categoryIds && !q.categoryIds.some((id) => threadInCategory(t, id))) return false;
   if (q.role && !threadHasRole(t, q.role)) return false;
   if (q.starred !== undefined && t.starred > 0 !== q.starred) return false;
+  if (q.unread !== undefined && t.unread > 0 !== q.unread) return false;
+  // Lists outside spam and trash hold threads in all mail (when the list's role is known).
+  const role = q.categoryRole ?? q.role;
+  if (role !== undefined && role !== 'spam' && role !== 'trash' && !t.inAllMail) return false;
   return true;
 }
 
@@ -42,14 +54,16 @@ function removeThread(data: ThreadPages, id: string): ThreadPages {
  * has more pages is left out: the next page fetch will include it.
  */
 function insertThread(data: ThreadPages, thread: ThreadJSON): ThreadPages {
+  const sort = data.pages[0]?.sort ?? 'lmt';
+  const compare = (a: ThreadJSON, b: ThreadJSON) => compareThreads(a, b, sort);
   const pages = [...data.pages];
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
     const last = page.threads[page.threads.length - 1];
     const isLast = i === pages.length - 1;
-    if (last && compareThreads(thread, last) > 0 && !isLast) continue;
-    if (isLast && page.next && last && compareThreads(thread, last) > 0) return data;
-    const threads = [...page.threads, thread].sort(compareThreads);
+    if (last && compare(thread, last) > 0 && !isLast) continue;
+    if (isLast && page.next && last && compare(thread, last) > 0) return data;
+    const threads = [...page.threads, thread].sort(compare);
     pages[i] = { ...page, threads };
     return { ...data, pages };
   }
@@ -97,7 +111,11 @@ function invalidateCounts(qc: QueryClient, accountId: string) {
 }
 
 function applyThreads(qc: QueryClient, d: Delta<'Thread'>) {
-  const lists = qc.getQueryCache().findAll({ queryKey: engineKeys.threadLists(d.accountId) });
+  const cache = qc.getQueryCache();
+  const lists = [
+    ...cache.findAll({ queryKey: engineKeys.threadLists(d.accountId) }),
+    ...cache.findAll({ queryKey: engineKeys.threadLists(EVERY_ACCOUNT) }),
+  ];
   const persist = d.type === 'persist';
   for (const thread of d.modelJSONs) {
     for (const query of lists) {
@@ -213,6 +231,8 @@ export const RENDERED_CLASSES = [
   'Task',
   'ProcessState',
   'Contact',
+  'Calendar',
+  'Event',
   'ProcessIdentityRefreshNeeded',
 ] as const;
 
@@ -240,9 +260,12 @@ export function applyDelta(qc: QueryClient, delta: Delta) {
       return void qc.setQueryData<ServerIdentityState>(engineKeys.serverIdentity(), {
         refreshNeeded: true,
       });
+    case 'Calendar':
+      return void qc.invalidateQueries({ queryKey: engineKeys.calendars() });
+    case 'Event':
+      return void qc.invalidateQueries({ queryKey: engineKeys.eventsAll() });
     default:
-      // TODO(engine): calendars, events and contact groups have no views yet; their reads
-      // come with DCP stage 7's `query`, writes with stage 18.
+      // Contact groups and books have no views.
       return;
   }
 }

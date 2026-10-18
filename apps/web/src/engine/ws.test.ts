@@ -56,7 +56,7 @@ class FakeSocket {
   }
 }
 
-const HELLO = { protocol: 1, engine: '0.1.0', pid: 7, accounts: [] };
+const HELLO = { protocol: 1, engine: '0.1.0', pid: 7, accounts: [], features: ['query'] };
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
 function setup(opts: Partial<WsEngineClientOptions> = {}) {
@@ -132,6 +132,7 @@ describe('WsEngineClient', () => {
     });
     expect(t.client.state).toBe('open');
     expect(t.client.problem).toBeNull();
+    expect([...(t.client.features ?? [])]).toEqual(['query']);
   });
 
   it('reconnects on the backoff schedule and resets it after 30 s connected', async () => {
@@ -177,6 +178,17 @@ describe('WsEngineClient', () => {
     expect(s.sent.map((m) => m.method)).toEqual(['hello', 'subscribe']);
     expect(states.filter((x) => x === 'open')).toHaveLength(2);
     expect(t.health).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the last features while reconnecting', async () => {
+    const t = setup();
+    expect(t.client.features).toBeNull();
+    void t.client.connect();
+    await t.handshake();
+    t.current().drop(CloseCode.ServiceRestart);
+    await flush();
+    expect(t.client.state).not.toBe('open');
+    expect(t.client.features?.has('query')).toBe(true);
   });
 
   it('stops and reports unpaired on close 4401', async () => {
