@@ -230,9 +230,12 @@ impl<'a> TaskProcessor<'a> {
             | "SendDraftTask"
             | "SendFeatureUsageEventTask"
             | "ExpungeAllInFolderTask"
-            | "GetMessageRFC2822Task"
             | "GetManyRFC2822Task"
             | "EventRSVPTask" => Ok(()),
+            "GetMessageRFC2822Task" => {
+                export::assign_export_file_id(data);
+                Ok(())
+            }
             other => {
                 error!("{}", unsure_how_to_process(other));
                 Ok(())

@@ -11,7 +11,7 @@
 //! deleted, the provider's Sent copy is looked for (or ours appended), and that copy is
 //! ingested with the local MIME as its body so the client sees the sent message at once.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use ms_core::constants::{ls, FILES_DIR, SENT_COPY_CLEANUP_WINDOW};
@@ -63,29 +63,6 @@ fn body(plaintext: bool, text: String) -> OutgoingBody {
         OutgoingBody::Text(text)
     } else {
         OutgoingBody::Html(text)
-    }
-}
-
-/// The draft attachment on disk. The client writes it at `File::client_path_in`;
-/// `MailUtils::pathForFile` (`safeFilename`) is checked next, then the file's directory
-/// if it holds exactly one file, for a name the client's rule has since changed.
-fn attachment_path(root: &Path, file: &File) -> Option<PathBuf> {
-    let client = file.client_path_in(root);
-    if client.is_file() {
-        return Some(client);
-    }
-    let dir = file.dir_in(root);
-    let cpp = dir.join(file.safe_filename());
-    if cpp.is_file() {
-        return Some(cpp);
-    }
-    let mut files = std::fs::read_dir(&dir)
-        .ok()?
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.is_file());
-    match (files.next(), files.next()) {
-        (Some(only), None) => Some(only),
-        _ => None,
     }
 }
 
@@ -159,7 +136,8 @@ impl TaskProcessor<'_> {
                     ),
                 ))
             };
-            let path = attachment_path(&root, &file)
+            let path = file
+                .find_in(&root)
                 .ok_or_else(|| unreadable("not found in the files directory".into()))?;
             let data = std::fs::read(&path).map_err(|e| unreadable(e.to_string()))?;
             out.push(OutgoingAttachment {

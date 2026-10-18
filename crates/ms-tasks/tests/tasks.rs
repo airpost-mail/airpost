@@ -16,7 +16,7 @@ use ms_imap::{
     ImapSession, ListedFolder, Namespace, SelectInfo, StoreOp, SyncResult, UidMapping,
 };
 use ms_providers::ServerProfile;
-use ms_store::{DeltaStream, Folder, Message, Model, Query, Store, Task};
+use ms_store::{DeltaStream, File, Folder, Message, Model, Query, Store, Task};
 use ms_sync::mail_processor::{id_for_message, MailProcessor};
 use ms_sync::RemoteTaskRunner;
 use ms_tasks::{Mailer, TaskProcessor};
@@ -1113,6 +1113,47 @@ fn get_many_rfc2822_exports_the_folder() {
     names.sort();
     assert_eq!(names[0], "00000 - Subject 1 - 2020-09-13.eml");
     assert_eq!(names.len(), 3);
+}
+
+#[test]
+fn get_message_rfc2822_saves_a_file_without_a_filepath() {
+    let mut e = env(&[]);
+    let inbox = e.folder("INBOX", "inbox");
+    let id = e.deliver(&inbox, 1, MessageFlags::SEEN);
+    // The engine picks the id; one the client sends is replaced.
+    let mut task = e.queue(
+        "GetMessageRFC2822Task",
+        json!({"messageId": id, "fileId": "victim-file"}),
+    );
+    let file_id = task.data["fileId"].as_str().unwrap().to_owned();
+    assert_ne!(file_id, "victim-file");
+    assert_eq!(file_id.len(), 40);
+    e.remote(&mut task);
+    assert_eq!(task.status(), "complete", "{}", task.data);
+    let file = e
+        .store
+        .find::<File>(&Query::new().equal("id", &file_id))
+        .unwrap()
+        .unwrap();
+    assert_eq!(file.filename(), "Subject 1.eml");
+    assert_eq!(file.content_type(), "message/rfc822");
+    assert_eq!(file.message_id(), id);
+    let path = file.find_in(&e._dir.path().join("files")).unwrap();
+    let bytes = std::fs::read(path).unwrap();
+    assert_eq!(file.size() as usize, bytes.len());
+    assert!(String::from_utf8_lossy(&bytes).contains("Subject: Subject 1"));
+
+    // With a filepath it writes there and makes no File.
+    let out = tempfile::tempdir().unwrap();
+    let target = out.path().join("one.eml");
+    let mut task = e.queue(
+        "GetMessageRFC2822Task",
+        json!({"messageId": id, "filepath": target.to_str().unwrap()}),
+    );
+    assert!(task.data.get("fileId").is_none());
+    e.remote(&mut task);
+    assert_eq!(task.status(), "complete", "{}", task.data);
+    assert!(target.is_file());
 }
 
 // -- Send ---------------------------------------------------------------------------------

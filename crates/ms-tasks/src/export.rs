@@ -10,9 +10,10 @@
 use std::path::Path;
 use std::time::{Duration, UNIX_EPOCH};
 
+use ms_core::constants::FILES_DIR;
 use ms_core::{ErrorCode, Result, SyncError};
 use ms_imap::ImapSession;
-use ms_store::{Message, Model, Query, Task};
+use ms_store::{File, Message, Model, Query, Task};
 use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
@@ -80,6 +81,23 @@ pub fn sanitize_eml_filename(subject: &str, date: i64, index: i64) -> String {
     format!("{index:05} - {safe} - {day}.eml")
 }
 
+/// Whether a GetMessageRFC2822Task is in file-id mode: no `filepath` (absent, null or ""),
+/// so the engine saves the message as a File in its files directory and the client reads it
+/// with `files.get` (docs/desktop-client-plan.md 3.2).
+pub(crate) fn exports_to_file_id(data: &Value) -> bool {
+    data.get("filepath")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
+}
+
+/// The local phase of a GetMessageRFC2822Task in file-id mode: a new `fileId`, chosen here
+/// and never by the client, so an export can't overwrite another file's bytes.
+pub(crate) fn assign_export_file_id(data: &mut Value) {
+    if exports_to_file_id(data) {
+        data["fileId"] = json!(ms_core::ids::local_file_id());
+    }
+}
+
 impl TaskProcessor<'_> {
     pub(crate) fn perform_remote_get_message_rfc2822(
         &self,
@@ -87,7 +105,6 @@ impl TaskProcessor<'_> {
         session: &mut dyn ImapSession,
     ) -> Result<()> {
         let id = get_str(at(data, "messageId"))?;
-        let filepath = get_str(at(data, "filepath"))?;
         let Some(msg) = self.store.find::<Message>(&Query::new().equal("id", &id))? else {
             return Err(
                 SyncError::fatal("not-found", "Message not found for RFC2822 fetch").into(),
@@ -128,8 +145,48 @@ impl TaskProcessor<'_> {
             )
             .into());
         };
-        write_eml(Path::new(&filepath), &bytes, msg.date());
-        Ok(())
+        if !exports_to_file_id(data) {
+            let filepath = get_str(at(data, "filepath"))?;
+            write_eml(Path::new(&filepath), &bytes, msg.date());
+            return Ok(());
+        }
+        self.save_export_file(data, &msg, &bytes)
+    }
+
+    /// File-id mode: the message's bytes as the File `data.fileId`, named after its subject.
+    fn save_export_file(&self, data: &Value, msg: &Message, bytes: &[u8]) -> Result<()> {
+        let file_id = get_str(at(data, "fileId"))?;
+        let Some(config_dir) = &self.config_dir else {
+            return Err(
+                SyncError::fatal("no-files-dir", "The engine has no files directory").into(),
+            );
+        };
+        let subject = msg.subject();
+        let stem = if subject.trim().is_empty() {
+            "message"
+        } else {
+            subject
+        };
+        let file = File::create_local(
+            &file_id,
+            self.account.id(),
+            msg.id(),
+            &format!(
+                "{}.eml",
+                stem.chars().take(80).collect::<String>().trim_end()
+            ),
+            "message/rfc822",
+            bytes.len() as u64,
+        );
+        file.write_in(&config_dir.join(FILES_DIR), bytes)
+            .map_err(|e| {
+                SyncError::fatal(
+                    "file-write-failed",
+                    format!("Could not save the message: {e}"),
+                )
+            })?;
+        let mut file = file;
+        self.store.save(&mut file)
     }
 
     /// Exports every message with a copy in the folder, in UID order, 50 per chunk. After
