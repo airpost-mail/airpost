@@ -60,6 +60,11 @@ nginx needs the upgrade headers and the original `Host`, which the gateway check
         proxy_read_timeout 1h;
     }
 
+The gateway pings every WebSocket every 30 s and closes one that has sent nothing for 45 s
+(a sleeping laptop, a dropped network), which also ends that tab's engine connection and
+any AI stream it started. The traffic keeps idle WebSockets inside a proxy's read timeout;
+nginx's default of 60 s is enough, so `proxy_read_timeout` above is only a margin.
+
 A plain-http public URL on another host is refused unless `--insecure-public-url` is given;
 the cookie then travels unencrypted.
 
@@ -80,5 +85,7 @@ Attachments: `GET /gateway/v1/files/<accountId>/<fileId>` downloads one through 
 engine's `files.get` (which fetches it from the mail server first when needed), always as an
 attachment in a CSP sandbox, with `?inline=1` honoured only for PNG, JPEG, GIF and WebP
 recognised from the bytes. `POST /gateway/v1/files/<accountId>?name=<name>` takes up to
-25 MiB, streamed to `<dir>/gateway/incoming/`, hands it to `files.put` and deletes it. A
-proxy in front must allow bodies that large (nginx: `client_max_body_size 26m;`).
+25 MiB, streamed to `<dir>/gateway/incoming/`, hands it to `files.put` and deletes it; a
+larger one gets 413 (a chunked body is read to its end first, for up to 5 s, so the client
+sees the answer). A proxy in front must allow bodies that large (nginx:
+`client_max_body_size 26m;`).

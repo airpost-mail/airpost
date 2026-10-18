@@ -6,6 +6,7 @@
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -166,6 +167,25 @@ pub struct Config {
     pub config_dir: PathBuf,
     /// `<config_dir>/gateway`.
     pub state_dir: PathBuf,
+    /// WebSocket pings. Not a setting: tests shorten it.
+    pub heartbeat: Heartbeat,
+}
+
+/// The gateway pings each browser WebSocket every `interval` and closes it when nothing has
+/// come from the browser for `interval + timeout` (docs/web-gateway-plan.md 2.4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Heartbeat {
+    pub interval: Duration,
+    pub timeout: Duration,
+}
+
+impl Default for Heartbeat {
+    fn default() -> Self {
+        Heartbeat {
+            interval: Duration::from_secs(30),
+            timeout: Duration::from_secs(15),
+        }
+    }
 }
 
 pub struct ConfigInput<'a> {
@@ -229,6 +249,7 @@ impl Config {
             web_root: input.web_root,
             state_dir: input.config_dir.join("gateway"),
             config_dir: input.config_dir,
+            heartbeat: Heartbeat::default(),
         })
     }
 
