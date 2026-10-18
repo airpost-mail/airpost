@@ -32,6 +32,7 @@ mod export;
 mod folders;
 mod imap_ops;
 mod json;
+pub mod mail_actions;
 mod mailer;
 mod messages;
 mod rsvp;

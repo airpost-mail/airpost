@@ -2401,3 +2401,209 @@ fn expiration_scan_runs_the_executor_on_due_rows_only() {
     assert_eq!(moves[0].data["threadIds"], json!([a.id()]));
     assert!(e.metadata_of::<Thread>(b.id(), "thread-snooze")["expiration"].is_number());
 }
+
+// -- threads.snooze, threads.unsnooze, messages.unsubscribe by mail ------------------------
+
+mod mail_actions {
+    use super::*;
+    use ms_tasks::mail_actions::{
+        snooze_tasks, unsnooze_tasks, unsubscribe_send_task, ActionError,
+    };
+
+    fn run_local(e: &Env, tasks: Vec<Task>) -> Vec<Task> {
+        tasks
+            .into_iter()
+            .map(|mut t| {
+                e.processor().perform_local(&mut t).unwrap();
+                assert!(t.data["error"].is_null(), "{}", t.data);
+                t
+            })
+            .collect()
+    }
+
+    #[test]
+    fn snooze_moves_the_inbox_copy_and_unsnooze_brings_it_back() {
+        let mut e = env(&["MOVE", "UIDPLUS"]);
+        e.mail_folders();
+        let snoozed = e.folder("Snoozed", "snoozed");
+        let inbox = e
+            .store
+            .find::<Folder>(&Query::new().equal("role", "inbox"))
+            .unwrap()
+            .unwrap();
+        let a = e.deliver(&inbox, 20, MessageFlags::SEEN);
+        let b = e.deliver(&inbox, 21, MessageFlags::SEEN);
+        let (ta, tb) = (e.thread_of(&a), e.thread_of(&b));
+        let ids = vec![ta.id().to_owned(), tb.id().to_owned(), ta.id().to_owned()];
+
+        let tasks = snooze_tasks(&e.store, ACCOUNT, &ids, T0 + 3600).unwrap();
+        let classes: Vec<&str> = tasks.iter().map(Task::class).collect();
+        assert_eq!(
+            classes,
+            [
+                "ChangeFolderTask",
+                "SyncbackMetadataTask",
+                "SyncbackMetadataTask"
+            ]
+        );
+        assert_eq!(tasks[0].data["folder"]["id"], snoozed.id());
+        assert_eq!(tasks[0].data["sourceFolderIds"], json!([inbox.id()]));
+        assert_eq!(tasks[0].data["threadIds"], json!([ta.id(), tb.id()]));
+        assert_eq!(tasks[0].data["canBeUndone"], true);
+        let mut tasks = run_local(&e, tasks);
+        e.remote(&mut tasks[0]);
+        for t in [&ta, &tb] {
+            let value = e.metadata_of::<Thread>(t.id(), "thread-snooze");
+            assert_eq!(value["expiration"], T0 + 3600);
+        }
+        assert_eq!(e.copies(&a)[0].0, "Snoozed");
+        e.assert_invariants();
+
+        // Only the thread still in Snoozed moves back; both lose the snooze.
+        let ta = e.thread_of(&a);
+        let c = e.deliver(&inbox, 25, MessageFlags::SEEN);
+        let moved_out = e.thread_of(&c);
+        let ids = vec![ta.id().to_owned(), moved_out.id().to_owned()];
+        let tasks = unsnooze_tasks(&e.store, ACCOUNT, &ids).unwrap();
+        let classes: Vec<&str> = tasks.iter().map(Task::class).collect();
+        assert_eq!(
+            classes,
+            [
+                "ChangeFolderTask",
+                "SyncbackMetadataTask",
+                "SyncbackMetadataTask"
+            ]
+        );
+        assert_eq!(tasks[0].data["threadIds"], json!([ta.id()]));
+        assert_eq!(tasks[0].data["folder"]["id"], inbox.id());
+        assert_eq!(tasks[0].data["sourceFolderIds"], json!([snoozed.id()]));
+        assert_eq!(tasks[0].data["canBeUndone"], false);
+        let mut tasks = run_local(&e, tasks);
+        e.remote(&mut tasks[0]);
+        assert_eq!(e.copies(&a)[0].0, "INBOX");
+        for t in [&ta, &moved_out] {
+            assert!(e.metadata_of::<Thread>(t.id(), "thread-snooze")["expiration"].is_null());
+        }
+        e.assert_invariants();
+    }
+
+    #[test]
+    fn gmail_swaps_labels() {
+        let mut e = env(&["MOVE", "UIDPLUS"]);
+        let all = e.folder("[Gmail]/All Mail", "all");
+        let label = |path: &str, role: &str| {
+            let mut l = ms_store::Label::new(&ms_core::ids::folder_id(ACCOUNT, path), ACCOUNT, 0);
+            l.set_path(path);
+            l.set_role(role);
+            l
+        };
+        let mut inbox = label("INBOX", "inbox");
+        let mut snoozed = label("[Mailspring]/Snoozed", "snoozed");
+        e.store.save(&mut inbox).unwrap();
+        e.store.save(&mut snoozed).unwrap();
+        let id = e.deliver(&all, 22, MessageFlags::SEEN);
+        let mut thread = e.thread_of(&id);
+        let ids = vec![thread.id().to_owned()];
+        let tasks = snooze_tasks(&e.store, ACCOUNT, &ids, T0 + 60).unwrap();
+        assert_eq!(tasks[0].class(), "ChangeLabelsTask");
+        assert_eq!(tasks[0].data["labelsToAdd"][0]["id"], snoozed.id());
+        assert_eq!(tasks[0].data["labelsToRemove"][0]["id"], inbox.id());
+
+        thread.data["labels"] = json!([snoozed.to_json()]);
+        e.store.save(&mut thread).unwrap();
+        let tasks = unsnooze_tasks(&e.store, ACCOUNT, &ids).unwrap();
+        assert_eq!(tasks[0].class(), "ChangeLabelsTask");
+        assert_eq!(tasks[0].data["labelsToAdd"][0]["id"], inbox.id());
+        assert_eq!(tasks[0].data["labelsToRemove"][0]["id"], snoozed.id());
+    }
+
+    #[test]
+    fn refusals() {
+        let mut e = env(&["MOVE", "UIDPLUS"]);
+        e.mail_folders();
+        let inbox = e
+            .store
+            .find::<Folder>(&Query::new().equal("role", "inbox"))
+            .unwrap()
+            .unwrap();
+        let id = e.deliver(&inbox, 23, MessageFlags::SEEN);
+        let thread = e.thread_of(&id).id().to_owned();
+        // No Snoozed folder yet.
+        let r = snooze_tasks(&e.store, ACCOUNT, std::slice::from_ref(&thread), T0 + 60);
+        assert!(matches!(r, Err(ActionError::Unavailable(_))), "{r:?}");
+        e.folder("Snoozed", "snoozed");
+        let r = snooze_tasks(&e.store, ACCOUNT, &[thread.clone(), "nope".into()], T0 + 60);
+        assert!(
+            matches!(r, Err(ActionError::NotFound(ref s)) if s.contains("nope")),
+            "{r:?}"
+        );
+        let r = snooze_tasks(&e.store, "other", std::slice::from_ref(&thread), T0 + 60);
+        assert!(matches!(r, Err(ActionError::NotFound(_))), "{r:?}");
+        assert!(matches!(
+            snooze_tasks(&e.store, ACCOUNT, &[], T0),
+            Err(ActionError::NotFound(_))
+        ));
+        // A thread that isn't snoozed only has its (absent) snooze cleared.
+        let tasks = unsnooze_tasks(&e.store, ACCOUNT, std::slice::from_ref(&thread)).unwrap();
+        let classes: Vec<&str> = tasks.iter().map(Task::class).collect();
+        assert_eq!(classes, ["SyncbackMetadataTask"]);
+    }
+
+    #[test]
+    fn unsubscribe_mail_goes_from_the_address_the_list_wrote_to() {
+        let mut e = env(&["MOVE", "UIDPLUS"]);
+        e.mail_folders();
+        let inbox = e
+            .store
+            .find::<Folder>(&Query::new().equal("role", "inbox"))
+            .unwrap()
+            .unwrap();
+        let id = e.deliver(&inbox, 24, MessageFlags::SEEN);
+        let mut message = e.message(&id).unwrap();
+        message.data["to"] = json!([{"name": "", "email": "Lists@Example.com"}]);
+        e.store.save(&mut message).unwrap();
+        let account = Account::from_json(json!({
+            "id": ACCOUNT, "provider": "imap", "emailAddress": "me@example.com", "name": "Me",
+            "aliases": ["Lists Me <lists@example.com>", "other@example.com"], "settings": {},
+        }))
+        .unwrap();
+        let mailto =
+            ms_net::unsubscribe::parse_mailto("mailto:leave@lists.example.net?subject=remove%20me")
+                .unwrap();
+        let task = unsubscribe_send_task(&e.store, &account, &id, &mailto).unwrap();
+        assert_eq!(task.class(), "SendDraftTask");
+        let draft = &task.data["draft"];
+        assert_eq!(
+            draft["from"],
+            json!([{"name": "Lists Me", "email": "lists@example.com"}])
+        );
+        assert_eq!(draft["to"][0]["email"], "leave@lists.example.net");
+        assert_eq!(draft["subject"], "remove me");
+        assert_eq!(draft["body"], "unsubscribe");
+        assert!(draft["hMsgId"].as_str().unwrap().ends_with("@example.com"));
+        assert_eq!(task.data["retryWhenOnline"], true);
+
+        let mut task = run_local(&e, vec![task]).remove(0);
+        e.remote(&mut task);
+        assert!(task.data["error"].is_null(), "{}", task.data);
+        let wire = e.imap.outbox.submissions()[0].text();
+        for h in [
+            "From: \"Lists Me\" <lists@example.com>",
+            "To: <leave@lists.example.net>",
+            "Subject: remove me",
+            "text/plain",
+        ] {
+            assert!(wire.contains(h), "{h} missing from\n{wire}");
+        }
+
+        // Mail to the account's own address goes from it; an unknown message is refused.
+        message.data["to"] = json!([{"name": "", "email": "someone@else.example"}]);
+        e.store.save(&mut message).unwrap();
+        let task = unsubscribe_send_task(&e.store, &account, &id, &mailto).unwrap();
+        assert_eq!(task.data["draft"]["from"][0]["email"], "me@example.com");
+        assert!(matches!(
+            unsubscribe_send_task(&e.store, &account, "missing", &mailto),
+            Err(ActionError::NotFound(_))
+        ));
+    }
+}
