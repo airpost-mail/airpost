@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 const EventedIFrame = require('../../src/components/evented-iframe').EventedIFrame;
 
@@ -83,3 +84,96 @@ describe('EventedIFrame', () =>
       }
     });
   }));
+
+describe('EventedIFrame form submission', function () {
+  let container: HTMLDivElement;
+  let frame: any;
+  let doc: Document;
+  let openLinkSpy: jasmine.Spy;
+  let confirmSpy: jasmine.Spy;
+  let oldOpenLink;
+
+  const writeForm = (html: string) => {
+    doc = (ReactDOM.findDOMNode(frame) as HTMLIFrameElement).contentDocument;
+    doc.open();
+    doc.write(`<!DOCTYPE html><body>${html}</body>`);
+    doc.close();
+    frame.didReplaceDocument();
+    advanceClock(); // EventedIFrame attaches its listeners in a _.defer
+  };
+
+  beforeEach(function () {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    frame = ReactDOM.render(<EventedIFrame sandbox="allow-forms allow-same-origin" />, container);
+    oldOpenLink = AppEnv.windowEventHandler.openLink;
+    openLinkSpy = jasmine.createSpy('openLink');
+    AppEnv.windowEventHandler.openLink = openLinkSpy;
+    confirmSpy = spyOn(frame, '_confirmFormSubmission').andReturn(true);
+  });
+
+  afterEach(function () {
+    AppEnv.windowEventHandler.openLink = oldOpenLink;
+    ReactDOM.unmountComponentAtNode(container);
+    container.remove();
+  });
+
+  it('opens a GET form in the browser with its fields after confirming, never in the frame', async () => {
+    writeForm(`
+      <form id="f" action="https://rsvp.example.com/answer" method="get">
+        <input name="name" value="Ann Lee">
+        <input type="radio" name="answer" value="yes" checked>
+        <input type="radio" name="answer" value="no">
+        <button id="go" type="submit">Send</button>
+      </form>`);
+    (doc.getElementById('f') as HTMLFormElement).requestSubmit(doc.getElementById('go'));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(confirmSpy.calls[0].args[0]).toEqual({
+      url: 'https://rsvp.example.com/answer?name=Ann+Lee&answer=yes',
+      method: 'get',
+    });
+    expect(openLinkSpy).toHaveBeenCalledWith({
+      href: 'https://rsvp.example.com/answer?name=Ann+Lee&answer=yes',
+    });
+
+    await new Promise((resolve) => (window as any).originalSetTimeout(resolve, 200));
+    const current = (ReactDOM.findDOMNode(frame) as HTMLIFrameElement).contentDocument;
+    expect(current.getElementById('f')).not.toBe(null);
+  });
+
+  it('opens a POST form without its fields, honouring formaction on the button', () => {
+    writeForm(`
+      <form id="f" action="https://login.example.com/form" method="post">
+        <input name="password" value="hunter2">
+        <button id="go" formaction="https://phish.example.net/collect">Sign in</button>
+      </form>`);
+    (doc.getElementById('f') as HTMLFormElement).requestSubmit(doc.getElementById('go'));
+
+    expect(confirmSpy.calls[0].args[0]).toEqual({
+      url: 'https://phish.example.net/collect',
+      method: 'post',
+    });
+    expect(openLinkSpy).toHaveBeenCalledWith({ href: 'https://phish.example.net/collect' });
+  });
+
+  it('opens nothing when the user declines', () => {
+    confirmSpy.andReturn(false);
+    writeForm(`<form id="f" action="https://example.com/x"><input name="q" value="1"></form>`);
+    (doc.getElementById('f') as HTMLFormElement).requestSubmit();
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+
+  it('drops forms whose action is not an absolute http(s) URL', () => {
+    writeForm(`
+      <form id="relative" action="/submit"><input name="q" value="1"></form>
+      <form id="none"><input name="q" value="1"></form>
+      <form id="file" action="file:///etc/passwd"><input name="q" value="1"></form>`);
+    for (const id of ['relative', 'none', 'file']) {
+      (doc.getElementById(id) as HTMLFormElement).requestSubmit();
+    }
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+});

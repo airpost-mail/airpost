@@ -14,6 +14,12 @@ class Printer {
     // These iframes should correspond to the message iframes when a thread is
     // focused
     const iframes = document.getElementsByTagName('iframe');
+    // Remote images print only if every message shown allows them (email-frame.tsx).
+    const remoteImages =
+      iframes.length > 0 &&
+      [].slice
+        .call(iframes)
+        .every((iframe) => iframe.getAttribute('data-remote-images') === 'allowed');
     // Grab the html inside the iframes, without the dark rendering of the email colours:
     // paper gets the sender's colours.
     const messagesHtml = [].slice.call(iframes).map((iframe) => {
@@ -32,6 +38,7 @@ class Printer {
       styleTags: styleTag.innerHTML,
       htmlContent,
       printMessages: JSON.stringify(messagesHtml),
+      remoteImages,
     });
     win.load();
   }

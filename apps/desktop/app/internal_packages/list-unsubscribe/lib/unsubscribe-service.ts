@@ -1,3 +1,5 @@
+import { ExternalFetch } from '../../../src/external-fetch';
+
 const { shell } = require('electron');
 
 /**
@@ -89,14 +91,14 @@ export async function performOneClickUnsubscribe(url: string): Promise<Unsubscri
   }
 
   try {
-    const response = await fetch(url, {
+    // The sender's host isn't in the window CSP, so this runs in the main process, which
+    // never sends credentials (RFC 8058).
+    const response = await ExternalFetch.fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: 'List-Unsubscribe=One-Click',
-      // Don't send credentials per RFC 8058
-      credentials: 'omit',
       // Don't follow redirects per RFC 8058 recommendation
       redirect: 'error',
     });

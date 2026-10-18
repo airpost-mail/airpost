@@ -13,6 +13,10 @@ import {
 import { InjectedComponentSet, RetinaImg } from 'mailspring-component-kit';
 
 import EmailFrame from './email-frame';
+import {
+  contentSecurityPolicyMetaTag,
+  messageContentSecurityPolicy,
+} from '../../../src/content-security-policy';
 import { BrowserWindow } from '@electron/remote';
 import { developerToolsAvailable } from '../../../src/developer-tools';
 
@@ -49,6 +53,7 @@ interface MessageItemBodyProps {
 interface MessageItemBodyState {
   processedBody: string;
   clipped: boolean;
+  remoteImages: boolean;
   showQuotedText: boolean;
 }
 
@@ -70,6 +75,7 @@ export default class MessageItemBody extends React.Component<
       showQuotedText: props.message.isForwarded(),
       processedBody: cached ? cached.body : null,
       clipped: cached ? cached.clipped : false,
+      remoteImages: cached ? cached.remoteImages : false,
     };
   }
 
@@ -99,7 +105,8 @@ export default class MessageItemBody extends React.Component<
     }
   }
 
-  _onBodyProcessed = ({ body, clipped }) => this.setState({ processedBody: body, clipped });
+  _onBodyProcessed = ({ body, clipped, remoteImages }) =>
+    this.setState({ processedBody: body, clipped, remoteImages });
 
   _onToggleQuotedText = () => {
     this.setState({
@@ -115,12 +122,13 @@ export default class MessageItemBody extends React.Component<
     );
     // The full body gets the same sanitizing and formatting as the reading pane; only the
     // length clip is skipped.
-    const { body } = await MessageBodyProcessor.processUnclipped(message);
+    const { body, remoteImages } = await MessageBodyProcessor.processUnclipped(message);
     const html = message.plaintext
       ? `<div style="white-space: pre-wrap">${escapeHTML(body)}</div>`
       : this._mergeBodyWithFiles(body);
+    const csp = contentSecurityPolicyMetaTag(messageContentSecurityPolicy({ remoteImages }));
     // The charset tag keeps non-ASCII text from rendering garbled
-    fs.writeFileSync(filepath, `<meta charset="UTF-8">\n${html}`);
+    fs.writeFileSync(filepath, `${csp}\n<meta charset="UTF-8">\n${html}`);
     const win = new BrowserWindow({
       title: `${message.subject}`,
       width: 800,
@@ -156,9 +164,9 @@ export default class MessageItemBody extends React.Component<
           merged = merged.replace(inlineImgRegexp, () => SpinnerImg);
         } else {
           merged = merged.replace(inlineImgRegexp, (match) => {
-            const filePath = AttachmentStore.pathForFile(file);
-            if (!filePath) return match;
-            return match.replace(`cid:${file.contentId}`, `file://${filePath}`);
+            const fileURL = AttachmentStore.fileSchemeURLForFile(file);
+            if (!fileURL) return match;
+            return match.replace(`cid:${file.contentId}`, () => fileURL);
           });
         }
       });
@@ -181,6 +189,7 @@ export default class MessageItemBody extends React.Component<
           showQuotedText={showQuotedText}
           content={this._mergeBodyWithFiles(processedBody)}
           message={message}
+          remoteImages={this.state.remoteImages}
         />
       );
     }

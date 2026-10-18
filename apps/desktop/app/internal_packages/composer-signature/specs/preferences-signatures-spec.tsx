@@ -87,4 +87,34 @@ describe('PreferencesSignatures', function preferencesSignatures() {
       expect(Actions.upsertSignature).toHaveBeenCalled();
     });
   });
+
+  describe('the preview', () => {
+    const HOSTILE = {
+      id: '3',
+      title: 'hostile',
+      body:
+        '<b id="kept">Ann</b><img src="x" onerror="window.__sigXSS = true">' +
+        '<script>window.__sigXSS = true</script><a href="javascript:alert(1)">link</a>',
+    };
+
+    beforeEach(() => {
+      (window as any).__sigXSS = false;
+      spyOn(SignatureStore, 'getSignatures').andReturn({ ...SIGNATURES, '3': HOSTILE });
+      spyOn(SignatureStore, 'selectedSignature').andReturn(HOSTILE);
+      spyOn(SignatureStore, 'getDefaults').andReturn(DEFAULTS);
+      this.component = makeComponent();
+    });
+
+    it('renders the signature through SanitizeTransformer', () => {
+      const preview = ReactTestUtils.scryRenderedDOMComponentsWithClass(
+        this.component,
+        'preview'
+      ).find((el) => el.tagName === 'DIV' && el.parentElement.classList.contains('section'));
+      expect(preview.querySelector('#kept').textContent).toBe('Ann');
+      expect(preview.innerHTML).not.toContain('onerror');
+      expect(preview.innerHTML).not.toContain('<script');
+      expect(preview.innerHTML).not.toContain('javascript:');
+      expect((window as any).__sigXSS).toBe(false);
+    });
+  });
 });

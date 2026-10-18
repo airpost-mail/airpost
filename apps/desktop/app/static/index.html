@@ -3,7 +3,8 @@
 <head>
   <title>Tern</title>
 
-  <meta http-equiv="Content-Security-Policy" content="default-src * mailspring:; script-src 'self' chrome-extension://react-developer-tools; style-src * 'unsafe-inline' mailspring:; img-src * data: mailspring: file:; object-src none; media-src mailspring:; manifest-src none;">
+  <!-- Must equal AppContentSecurityPolicy in src/content-security-policy.ts (checked by a spec). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' mailspring:; script-src 'self'; style-src * 'unsafe-inline' mailspring:; img-src * data: mailspring: file: tern-file:; font-src * data: mailspring:; connect-src 'self' mailspring: https://www.googleapis.com https://oauth2.googleapis.com https://login.microsoftonline.com https://graph.microsoft.com https://api.github.com; frame-src 'none'; object-src 'none'; media-src mailspring:; manifest-src 'none';">
 
   <script src="index.js"></script>
 </head>

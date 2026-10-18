@@ -34,6 +34,15 @@ export class MessageViewExtension {
   static formatMessageBody({ message }: { message: Message }) {}
 
   /*
+  Public: Whether the message may load remote images and fonts. Return true to allow,
+  false to block, or undefined to leave it to other extensions. The message document's
+  Content-Security-Policy enforces the answer, so rewriting the body isn't needed to block.
+  */
+  static allowsRemoteImages({ message }: { message: Message }): boolean | undefined {
+    return undefined;
+  }
+
+  /*
   Public: Modify the rendered message body using the DOM.
   Runs after messages goes through `formatMessageBody` and is placed
   into the DOM.

@@ -12,6 +12,72 @@ import url from 'url';
 import _ from 'underscore';
 import path from 'path';
 import fs from 'fs';
+import { FilesScheme, resolveFilesSchemeURL } from '../files-scheme';
+import { ExternalFetch } from '../external-fetch';
+
+export interface FormSubmissionTarget {
+  url: string;
+  method: 'get' | 'post';
+}
+
+/**
+ * Where a form in a message would have gone: the action URL with the fields in its query
+ * for GET, the bare action URL for POST. Null unless the action is an absolute http(s) URL.
+ * Reads the attributes so a missing or relative action isn't resolved against about:blank.
+ */
+export function formSubmissionTarget(
+  form: HTMLFormElement,
+  submitter?: HTMLElement | null
+): FormSubmissionTarget | null {
+  if (!form || typeof form.getAttribute !== 'function') {
+    return null;
+  }
+  const action = (submitter && submitter.getAttribute('formaction')) || form.getAttribute('action');
+  const rawMethod =
+    (submitter && submitter.getAttribute('formmethod')) || form.getAttribute('method');
+  const method = (rawMethod || 'get').toLowerCase() === 'post' ? 'post' : 'get';
+
+  let target: URL;
+  try {
+    target = new URL((action || '').trim());
+  } catch {
+    return null;
+  }
+  if (target.protocol !== 'https:' && target.protocol !== 'http:') {
+    return null;
+  }
+
+  if (method === 'get') {
+    const FrameFormData = (form.ownerDocument.defaultView as any)?.FormData || FormData;
+    const data = new FrameFormData(form, submitter || undefined);
+    const query = new URLSearchParams();
+    for (const [key, value] of data.entries()) {
+      if (typeof value === 'string') query.append(key, value);
+    }
+    target.search = query.toString();
+  }
+  return { url: target.toString(), method };
+}
+
+// The bytes behind an image src in a message, for Save Image.
+async function imageBytes(src: string): Promise<Buffer> {
+  if (src.startsWith('data:')) {
+    const comma = src.indexOf(',');
+    const meta = src.slice(5, comma);
+    const payload = src.slice(comma + 1);
+    return meta.endsWith(';base64')
+      ? Buffer.from(payload, 'base64')
+      : Buffer.from(decodeURIComponent(payload));
+  }
+  if (src.startsWith(`${FilesScheme}:`)) {
+    const filePath = resolveFilesSchemeURL(path.join(AppEnv.getConfigDirPath(), 'files'), src);
+    if (!filePath) throw new Error('not an attachment');
+    return fs.promises.readFile(filePath);
+  }
+  const response = await ExternalFetch.fetch(src);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return Buffer.from(await response.arrayBuffer());
+}
 
 type EventedIFrameProps = {
   searchable?: boolean;
@@ -132,6 +198,7 @@ export class EventedIFrame extends React.Component<
       return;
     }
     doc.removeEventListener('click', this._onIFrameClick);
+    doc.removeEventListener('submit', this._onIFrameSubmit, true);
     doc.removeEventListener('keydown', this._onIFrameKeyEvent);
     doc.removeEventListener('keypress', this._onIFrameKeyEvent);
     doc.removeEventListener('keyup', this._onIFrameKeyEvent);
@@ -150,6 +217,7 @@ export class EventedIFrame extends React.Component<
     const doc = node.contentDocument;
     _.defer(() => {
       doc.addEventListener('click', this._onIFrameClick);
+      doc.addEventListener('submit', this._onIFrameSubmit, true);
       doc.addEventListener('keydown', this._onIFrameKeyEvent);
       doc.addEventListener('keypress', this._onIFrameKeyEvent);
       doc.addEventListener('keyup', this._onIFrameKeyEvent);
@@ -225,6 +293,40 @@ export class EventedIFrame extends React.Component<
       AppEnv.windowEventHandler.openLink({ href: rawHref, metaKey: e.metaKey });
     }
   };
+
+  // Forms in mail never submit in the frame, where the response would load inside Tern
+  // (a fake "sign in again" page, say). After a confirm, a GET form opens with its fields in
+  // the browser through the same path as links; a POST form's page opens without its fields.
+  // The message CSP's form-action 'none' and MailspringWindow's will-frame-navigate guard
+  // stop the submission too if this listener isn't attached yet.
+  _onIFrameSubmit = (e: SubmitEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const submission = formSubmissionTarget(e.target as HTMLFormElement, e.submitter);
+    if (!submission || !this._confirmFormSubmission(submission)) {
+      return;
+    }
+    AppEnv.windowEventHandler.openLink({ href: submission.url });
+  };
+
+  _confirmFormSubmission({ url, method }: FormSubmissionTarget) {
+    const { dialog } = require('@electron/remote');
+    const response = dialog.showMessageBoxSync(AppEnv.getCurrentWindow(), {
+      type: 'question',
+      buttons: [localized('Open in Browser'), localized('Cancel')],
+      defaultId: 1,
+      cancelId: 1,
+      message: localized('Open this form in your browser?'),
+      detail:
+        method === 'post'
+          ? localized(
+              "Tern doesn't submit forms inside messages. Your browser will open %@ without the form's contents.",
+              url
+            )
+          : localized("Tern doesn't submit forms inside messages. Your browser will open %@.", url),
+    });
+    return response === 0;
+  }
 
   _isBlacklistedHref(href: string) {
     return new RegExp(/^file:/i).test(href);
@@ -347,16 +449,13 @@ export class EventedIFrame extends React.Component<
                 if (!path) {
                   return;
                 }
-                const oReq = new XMLHttpRequest();
-                oReq.open('GET', src, true);
-                oReq.responseType = 'arraybuffer';
-                oReq.onload = function () {
-                  const buffer = Buffer.from(new Uint8Array(oReq.response));
-                  fs.writeFile(path, buffer, (err) => {
-                    require('@electron/remote').shell.showItemInFolder(path);
-                  });
-                };
-                oReq.send();
+                imageBytes(src)
+                  .then((buffer) => {
+                    fs.writeFile(path, buffer, () => {
+                      require('@electron/remote').shell.showItemInFolder(path);
+                    });
+                  })
+                  .catch((err) => console.error(`Save Image failed: ${err}`));
               }
             );
           },

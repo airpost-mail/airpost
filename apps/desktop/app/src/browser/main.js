@@ -336,6 +336,13 @@ const start = () => {
         supportFetchAPI: true,
         corsEnabled: true,
       }
+    },
+    {
+      // Downloaded attachments shown in message bodies (src/files-scheme.ts).
+      scheme: 'tern-file',
+      privileges: {
+        secure: true,
+      }
     }
   ])
 
@@ -453,9 +460,9 @@ const start = () => {
       callback({ requestHeaders: details.requestHeaders });
     });
 
-    // Block remote JS execution in a second way in case our <meta> tag approach
-    // is compromised somehow https://www.electronjs.org/docs/tutorial/security
-    // This CSP string should match the one in app/static/index.html
+    // The CSP also travels as a header in case the <meta> tag in static/index.html is missing
+    // or removed. Both come from AppContentSecurityPolicy.
+    const { AppContentSecurityPolicy } = require('../content-security-policy');
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       if (details.url.startsWith('devtools://')) {
         return callback(details);
@@ -463,9 +470,7 @@ const start = () => {
       callback({
         responseHeaders: {
           ...details.responseHeaders,
-          'Content-Security-Policy': [
-            "default-src * mailspring:; script-src 'self' 'unsafe-inline' chrome-extension://react-developer-tools; style-src * 'unsafe-inline' mailspring:; img-src * data: mailspring: file:; object-src none; media-src mailspring:; manifest-src none;",
-          ],
+          'Content-Security-Policy': [AppContentSecurityPolicy],
         },
       });
     });

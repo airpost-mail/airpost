@@ -101,6 +101,10 @@ xdescribe('MessageItem', function () {
       }
       return null;
     });
+    spyOn(AttachmentStore, 'fileSchemeURLForFile').andCallFake(function (f) {
+      const filePath = AttachmentStore.pathForFile(f);
+      return filePath ? `tern-file://${filePath}` : null;
+    });
     spyOn(MessageBodyProcessor, '_addToCache').andCallFake(function () {});
 
     this.downloads = {
@@ -191,7 +195,7 @@ Hello world!\
             ReactTestUtils.findRenderedComponentWithType(this.component, EmailFrameStub)
               .props as any
           ).content;
-          expect(body.indexOf('alt="A" src="file:///fake/path-inline.png"')).toEqual(
+          expect(body.indexOf('alt="A" src="tern-file:///fake/path-inline.png"')).toEqual(
             this.message.body.indexOf('alt="A"')
           );
         });

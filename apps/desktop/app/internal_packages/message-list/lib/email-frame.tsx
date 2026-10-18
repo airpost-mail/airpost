@@ -10,6 +10,10 @@ import {
   Autolink,
 } from 'mailspring-exports';
 import { applyColorScheme, darkenDocument, RGBA } from '@tern/email-dark';
+import {
+  contentSecurityPolicyMetaTag,
+  messageContentSecurityPolicy,
+} from '../../../src/content-security-policy';
 import { adjustImages } from './adjust-images';
 import EmailFrameStylesStore from './email-frame-styles-store';
 import { prepareEmailColors } from './email-color-detection';
@@ -24,6 +28,8 @@ interface EmailFrameProps {
   content: string;
   showQuotedText: boolean;
   message: Message;
+  // Whether this message may load remote images and fonts (MessageBodyProcessor decides).
+  remoteImages?: boolean;
 }
 
 export default class EmailFrame extends React.Component<EmailFrameProps> {
@@ -52,13 +58,14 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
   }
 
   shouldComponentUpdate(nextProps: EmailFrameProps) {
-    const { content, showQuotedText, message } = this.props;
+    const { content, showQuotedText, message, remoteImages } = this.props;
     const nextMessage = nextProps.message;
 
     return (
       (message ? message.id : '') !== (nextMessage ? nextMessage.id : '') ||
       content !== nextProps.content ||
       showQuotedText !== nextProps.showQuotedText ||
+      !!remoteImages !== !!nextProps.remoteImages ||
       !Utils.isEqualReact(
         message && message.pluginMetadata,
         nextMessage && nextMessage.pluginMetadata
@@ -137,11 +144,18 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
       });
     }
 
+    // The policy must be the document's first element. A document keeps every policy it has
+    // seen across doc.open(), so a change in remoteImages remounts the iframe (see render).
+    const csp = contentSecurityPolicyMetaTag(
+      messageContentSecurityPolicy({ remoteImages: !!this.props.remoteImages })
+    );
+
     doc.open();
 
     if (message.plaintext) {
       doc.write(
         `<!DOCTYPE html>` +
+          csp +
           `<style>${themeStyles}</style>` +
           `<div id='inbox-plain-wrapper' class="${process.platform}"></div>`
       );
@@ -153,6 +167,7 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
     } else {
       doc.write(
         `<!DOCTYPE html>` +
+          csp +
           `<style>${themeStyles || ''}</style>` +
           `<div id='inbox-html-wrapper' class="${process.platform}">${content}</div>`
       );
@@ -265,6 +280,8 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
         }}
       >
         <EventedIFrame
+          key={this.props.remoteImages ? 'remote-images' : 'no-remote-images'}
+          data-remote-images={this.props.remoteImages ? 'allowed' : 'blocked'}
           searchable
           sandbox="allow-forms allow-same-origin"
           seamless={true}

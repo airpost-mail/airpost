@@ -6,6 +6,7 @@ import { ipcRenderer } from 'electron';
 import { Account, AccountStore, localized } from 'mailspring-exports';
 import { errorFromEngineResult, stripSecretKeys } from '../../../src/mailsync-process';
 import { AccountTestReply, SupervisorChannel } from '../../../src/supervisor-channels';
+import { ExternalFetch } from '../../../src/external-fetch';
 import MailspringProviderSettings from './mailspring-provider-settings.json';
 import MailcoreProviderSettings from './mailcore-provider-settings.json';
 import dns from 'dns';
@@ -570,7 +571,8 @@ async function TryThunderbirdAutoconfig(
 
 async function getThunderbirdAutoconfig(url: string) {
   try {
-    const response = await fetch(url);
+    // The domain comes from the address being added, so it can't be in the window CSP.
+    const response = await ExternalFetch.fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }

@@ -8,6 +8,8 @@ interface ProcessorResult {
   key: string;
   body: string;
   clipped: boolean;
+  // Whether the message may load remote images and fonts. The message CSP enforces it.
+  remoteImages: boolean;
 }
 
 class MessageBodyProcessor {
@@ -83,8 +85,12 @@ class MessageBodyProcessor {
     // run the processor
     const output = await this.retrieve(updatedMessage);
 
-    // only trigger if the body has really changed
-    if (!oldCacheRecord || output.body !== oldCacheRecord.body) {
+    // only trigger if the body or its remote-image allowance has really changed
+    if (
+      !oldCacheRecord ||
+      output.body !== oldCacheRecord.body ||
+      output.remoteImages !== oldCacheRecord.remoteImages
+    ) {
       for (const subscription of subscriptions) {
         subscription.callback(output);
         subscription.message = updatedMessage;
@@ -152,9 +158,33 @@ class MessageBodyProcessor {
     return message.id;
   }
 
+  /**
+   * Whether `message` may load remote images and fonts: yes if any MessageView extension's
+   * `allowsRemoteImages` says so, no if one answers and none says yes, and the
+   * core.reading.autoloadImages setting if none answers (message-autoload-images disabled).
+   */
+  remoteImagesAllowed(message: Message) {
+    let answered = false;
+    for (const extension of MessageStore.extensions()) {
+      if (typeof extension.allowsRemoteImages !== 'function') continue;
+      let allowed: boolean | undefined;
+      try {
+        allowed = extension.allowsRemoteImages({ message });
+      } catch (err) {
+        AppEnv.reportError(err);
+        continue;
+      }
+      if (allowed === undefined) continue;
+      if (allowed) return true;
+      answered = true;
+    }
+    return answered ? false : !!AppEnv.config.get('core.reading.autoloadImages');
+  }
+
   async _process(message: Message, { clip = true }: { clip?: boolean } = {}) {
+    const remoteImages = this.remoteImagesAllowed(message);
     if (typeof message.body !== 'string') {
-      return { body: '', clipped: false };
+      return { body: '', clipped: false, remoteImages };
     }
 
     let body = message.body;
@@ -170,7 +200,7 @@ class MessageBodyProcessor {
     // because it destroys them. But this means that we need to be careful not to
     // "splat" them directly into the DOM! (Instead use innerText to assign).
     if (message.plaintext) {
-      return { body, clipped };
+      return { body, clipped, remoteImages };
     }
 
     // Sanitizing <script> tags, etc. isn't necessary because we use CORS rules
@@ -197,15 +227,18 @@ class MessageBodyProcessor {
       }
     }
 
-    return { body, clipped };
+    return { body, clipped, remoteImages };
   }
 
-  _addToCache(key: string, { body, clipped }: { body: string; clipped: boolean }) {
+  _addToCache(
+    key: string,
+    { body, clipped, remoteImages }: { body: string; clipped: boolean; remoteImages: boolean }
+  ) {
     if (this._recentlyProcessedA.length > 50) {
       const removed = this._recentlyProcessedA.pop();
       delete this._recentlyProcessedD[removed.key];
     }
-    const item = { key, body, clipped };
+    const item = { key, body, clipped, remoteImages };
     this._recentlyProcessedA.unshift(item);
     this._recentlyProcessedD[key] = item;
   }

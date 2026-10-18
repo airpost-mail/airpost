@@ -1,6 +1,7 @@
 import dns from 'dns';
 import { Account, AccountStore } from 'mailspring-exports';
 import { expandAccountWithCommonSettings } from '../lib/onboarding-helpers';
+import { ExternalFetch } from '../../../src/external-fetch';
 
 const AUTOCONFIG_IMAP_HOST = 'imap.autoconfig.example';
 const AUTOCONFIG_SMTP_HOST = 'smtp.autoconfig.example';
@@ -32,7 +33,7 @@ function autoconfigXML(domain: string) {
 // Responds to the two URLs TryThunderbirdAutoconfig probes for the domains listed in
 // `servingDomains`, and 404s everything else.
 function stubAutoconfig(servingDomains: string[]) {
-  spyOn(window as any, 'fetch').andCallFake((url: string) => {
+  spyOn(ExternalFetch, 'fetch').andCallFake((url: string) => {
     const domain = servingDomains.find(
       (d) => url === `https://autoconfig.${d}/mail/config-v1.1.xml`
     );
@@ -133,7 +134,7 @@ describe('expandAccountWithCommonSettings', function onboardingHelpersTests() {
 
     expect(account.settings.imap_host).toEqual('imap.gmail.com');
     expect(account.settings.smtp_host).toEqual('smtp.gmail.com');
-    expect(window.fetch).not.toHaveBeenCalled();
+    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
   });
 
   it('uses Google servers for a domain whose MX record is smtp.google.com', async () => {
@@ -145,7 +146,7 @@ describe('expandAccountWithCommonSettings', function onboardingHelpersTests() {
 
     expect(account.settings.imap_host).toEqual('imap.gmail.com');
     expect(account.settings.smtp_host).toEqual('smtp.gmail.com');
-    expect(window.fetch).not.toHaveBeenCalled();
+    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
   });
 
   it('does not download autoconfig for an account added with Google sign-in', async () => {
@@ -157,7 +158,7 @@ describe('expandAccountWithCommonSettings', function onboardingHelpersTests() {
     expect(account.settings.imap_host).toEqual('imap.gmail.com');
     expect(account.settings.imap_port).toEqual(993);
     expect(account.settings.smtp_host).toEqual('smtp.gmail.com');
-    expect(window.fetch).not.toHaveBeenCalled();
+    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
   });
 
   it('does not download autoconfig for an account added with Microsoft sign-in', async () => {
@@ -168,7 +169,7 @@ describe('expandAccountWithCommonSettings', function onboardingHelpersTests() {
 
     expect(account.settings.imap_host).toEqual('outlook.office365.com');
     expect(account.settings.smtp_host).toEqual('smtp.office365.com');
-    expect(window.fetch).not.toHaveBeenCalled();
+    expect(ExternalFetch.fetch).not.toHaveBeenCalled();
   });
 
   it('uses the account type preset when the domain is not in either table', async () => {

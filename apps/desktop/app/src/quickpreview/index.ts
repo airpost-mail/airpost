@@ -3,6 +3,7 @@ import path from 'path';
 import { File } from 'mailspring-exports';
 import { ipcRenderer } from 'electron';
 import { developerToolsAvailable } from '../developer-tools';
+import { quickPreviewContentSecurityPolicy } from '../content-security-policy';
 
 // Generate token via IPC to ensure it's stored in the main process
 async function generatePreviewToken(previewPath: string): Promise<string> {
@@ -20,19 +21,25 @@ function cleanupPreviewToken(token: string): void {
 // session, and the default session's listener (main.js) injects the app-wide CSP.
 const QuickPreviewPartition = 'quickpreview';
 
-// Content Security Policy for quickpreview windows
-// Restricts script execution while allowing external images
-const QuickPreviewCSP = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'", // unsafe-inline needed for inline script in renderer.html
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https: http:", // Allow external images
-  "object-src 'none'",
-  "frame-src 'none'",
-  "base-uri 'self'",
-].join('; ');
+// Both windows share the partition and so one listener. Thumbnails never load remote
+// images; the preview window does when "load images automatically" is on. Attachments carry
+// no sender here, so the per-sender allowlist doesn't apply.
+function applyQuickPreviewCSP(session: Electron.Session) {
+  session.webRequest.onHeadersReceived((details, callback) => {
+    const remoteImages =
+      details.webContentsId === quickPreviewWebContentsId &&
+      !!AppEnv.config.get('core.reading.autoloadImages');
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [quickPreviewContentSecurityPolicy({ remoteImages })],
+      },
+    });
+  });
+}
 
 let quickPreviewWindow = null;
+let quickPreviewWebContentsId: number | null = null;
 let captureWindow = null;
 let captureWindowInUse = false;
 const captureQueue = [];
@@ -246,18 +253,12 @@ export function displayQuickPreviewWindow(filePath: string) {
       },
     });
 
-    // Apply Content Security Policy to the quickpreview partition only
-    quickPreviewWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-      callback({
-        responseHeaders: {
-          ...details.responseHeaders,
-          'Content-Security-Policy': [QuickPreviewCSP],
-        },
-      });
-    });
+    quickPreviewWebContentsId = quickPreviewWindow.webContents.id;
+    applyQuickPreviewCSP(quickPreviewWindow.webContents.session);
 
     quickPreviewWindow.once('closed', () => {
       quickPreviewWindow = null;
+      quickPreviewWebContentsId = null;
     });
     quickPreviewWindow.setMenu(
       require('@electron/remote').Menu.buildFromTemplate(PreviewWindowMenuTemplate)
@@ -346,15 +347,7 @@ function _createCaptureWindow() {
     },
   });
 
-  // Apply Content Security Policy to the quickpreview partition only
-  win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [QuickPreviewCSP],
-      },
-    });
-  });
+  applyQuickPreviewCSP(win.webContents.session);
 
   win.webContents.on('render-process-gone', (event, details) => {
     console.warn(`Thumbnail generation webcontents crashed (reason: ${details.reason}).`);

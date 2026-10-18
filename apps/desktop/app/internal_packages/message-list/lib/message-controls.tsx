@@ -13,7 +13,12 @@ import {
   ComponentRegistry,
 } from 'mailspring-exports';
 import { RetinaImg, ButtonDropdown, Menu } from 'mailspring-component-kit';
+import { escapeHTML } from 'underscore.string';
 import { developerToolsAvailable } from '../../../src/developer-tools';
+import {
+  contentSecurityPolicyMetaTag,
+  messageContentSecurityPolicy,
+} from '../../../src/content-security-policy';
 import { OriginalColors, darkeningApplies, themeBackgroundAt } from './email-render-mode';
 
 interface MessageControlsProps {
@@ -187,12 +192,24 @@ export default class MessageControls extends React.Component<MessageControlsProp
     // The task can reach "complete" status even when it failed remotely (eg.
     // the message could not be fetched from the server), in which case the
     // file is never written. Verify it exists before trying to display it.
-    if (!require('fs').existsSync(filepath)) {
+    const fs = require('fs');
+    if (!fs.existsSync(filepath)) {
       AppEnv.showErrorDialog(
         localized('Could not retrieve the original message. Please try again.')
       );
       return;
     }
+
+    // Shown as escaped text in a page carrying the message CSP, rather than loading the raw
+    // file and leaving Chromium to guess whether it is HTML.
+    const htmlPath = `${filepath}.html`;
+    const csp = contentSecurityPolicyMetaTag(messageContentSecurityPolicy({ remoteImages: false }));
+    fs.writeFileSync(
+      htmlPath,
+      `<!DOCTYPE html>${csp}<meta charset="UTF-8">` +
+        `<pre style="white-space: pre-wrap; word-wrap: break-word; margin: 8px;">` +
+        `${escapeHTML(fs.readFileSync(filepath, 'utf8'))}</pre>`
+    );
 
     const { BrowserWindow } = require('@electron/remote');
     const win = new BrowserWindow({
@@ -205,7 +222,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
         devTools: developerToolsAvailable(),
       },
     });
-    win.loadURL(`file://${filepath}`).catch((err: Error) => {
+    win.loadURL(`file://${htmlPath}`).catch((err: Error) => {
       console.error('Show Original window failed to load:', err);
     });
   };

@@ -22,6 +22,9 @@ class AutoloadImagesStore extends MailspringStore {
     });
   }
 
+  // The regexes only decide whether to show the "images blocked" banner. Blocking itself is
+  // the message document's CSP (src/content-security-policy.ts), which also covers the CSS
+  // and font forms these miss.
   getImagesRegexp = () => {
     // Matches:
     // - src='....'
@@ -40,23 +43,25 @@ class AutoloadImagesStore extends MailspringStore {
     return /<link\s+[^>]+>/gi;
   };
 
-  shouldBlockImagesIn = (message: Message) => {
+  remoteImagesAllowed = (message: Message) => {
     const spam = CategoryStore.getSpamCategory(message.accountId);
     const inSpam = !!spam && message.folderIds().includes(spam.id);
 
     if (AppEnv.config.get('core.reading.autoloadImages') && !inSpam) {
-      return false;
+      return true;
     }
     if (this._whitelistEmails[Utils.toEquivalentEmailForm(message.fromContact().email)]) {
-      return false;
+      return true;
     }
-    if (this._whitelistMessageIds[message.id]) {
-      return false;
-    }
+    return !!this._whitelistMessageIds[message.id];
+  };
 
-    const containsImages = this.getImagesRegexp().test(message.body);
-    const containsLinkTags = this.getLinkTagRegexp().test(message.body);
-    return containsImages || containsLinkTags;
+  shouldBlockImagesIn = (message: Message) => {
+    if (this.remoteImagesAllowed(message)) {
+      return false;
+    }
+    const body = message.body || '';
+    return this.getImagesRegexp().test(body) || this.getLinkTagRegexp().test(body);
   };
 
   _loadWhitelist = () => {
@@ -78,6 +83,8 @@ class AutoloadImagesStore extends MailspringStore {
           .forEach((email) => {
             this._whitelistEmails[Utils.toEquivalentEmailForm(email)] = true;
           });
+        // Bodies processed before the list loaded were given the blocking policy.
+        MessageBodyProcessor.resetCache();
         this.trigger();
       });
     });

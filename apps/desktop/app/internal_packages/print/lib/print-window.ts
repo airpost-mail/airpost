@@ -5,6 +5,10 @@ import { pathToFileURL } from 'url';
 import { localized } from 'mailspring-exports';
 import { escapeHTML } from 'underscore.string';
 import { developerToolsAvailable } from '../../../src/developer-tools';
+import {
+  contentSecurityPolicyMetaTag,
+  printContentSecurityPolicy,
+} from '../../../src/content-security-policy';
 
 const { app, BrowserWindow, dialog } = require('@electron/remote');
 
@@ -12,7 +16,15 @@ export default class PrintWindow {
   browserWin: Electron.BrowserWindow;
   tmpFile: string;
 
-  constructor({ subject, account, participants, styleTags, htmlContent, printMessages }) {
+  constructor({
+    subject,
+    account,
+    participants,
+    styleTags,
+    htmlContent,
+    printMessages,
+    remoteImages,
+  }) {
     // This script will create the print prompt when loaded. We can also call
     // print directly from this process, but inside print.js we can make sure to
     // call window.print() after we've cleaned up the dom for printing
@@ -34,7 +46,7 @@ export default class PrintWindow {
       <!DOCTYPE html>
       <html>
         <head>
-          <meta http-equiv="Content-Security-Policy" content="default-src * mailspring:; frame-src 'none'; script-src 'self' chrome-extension://react-developer-tools; style-src * 'unsafe-inline' mailspring:; img-src * data: mailspring: file:; object-src none; media-src none; manifest-src none;">
+          ${contentSecurityPolicyMetaTag(printContentSecurityPolicy({ remoteImages }))}
           <meta charset="utf-8">
           ${styleTags}
           <link rel="stylesheet" type="text/css" href="${pathToFileURL(stylesPath).href}">

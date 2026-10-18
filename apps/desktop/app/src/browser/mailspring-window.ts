@@ -11,6 +11,7 @@ import {
   attemptEarlyRendererCrashRecovery,
   isPrimaryWindow,
 } from './hardware-acceleration-recovery';
+import { shouldBlockFrameNavigation } from './frame-navigation';
 
 let WindowIconPath = null;
 let idNum = 0;
@@ -361,6 +362,12 @@ export default class MailspringWindow extends EventEmitter {
 
     this.browserWindow.webContents.on('will-navigate', (event, url) => {
       event.preventDefault();
+    });
+
+    this.browserWindow.webContents.on('will-frame-navigate', (event) => {
+      if (shouldBlockFrameNavigation(event)) {
+        event.preventDefault();
+      }
     });
 
     this.browserWindow.webContents.setWindowOpenHandler(({ url, frameName, disposition }) => {
