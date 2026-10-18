@@ -692,3 +692,55 @@ merged:
   (a refused config never listens, a second gateway says "another gateway is running"); the
   log check covers every token minted, a `secrets.set` value and the encoded upload name; the
   CI harness job builds tern-mcp and sets `TERN_MCP_BIN`.
+
+2026-10-18, browser run (section 6, web) and the switch to the engine's settings,
+capabilities and executor, branch `roadmap/web-ready`, not merged:
+- `apps/web/e2e/`: `stack.py` starts the harness's fake IMAP and SMTP servers with two seeded
+  accounts (alice with an attachment, an inline `cid:` PNG, a mailto and a web
+  List-Unsubscribe, a 60-day-old message; bob with his own thread), a `serve` engine on a
+  fresh `/tmp` profile, and `tern-gateway serve --bind 127.0.0.1:0` with
+  `TERN_GATEWAY_WEB_ROOT` on a gateway-mode build, plus a loopback control server (SMTP log,
+  IMAP flags, settings, pairing codes, engine kill and start, new mail). `npm run e2e` runs
+  `web.spec.ts` in headless Chromium (`@playwright/test`, Apache-2.0, dev dependency only;
+  not in CI), about 30 s with the build and stack, and stops everything it started.
+- Passed, against the real engine and gateway: pairing from the `/pair#code` link (fragment
+  gone from history); per-account and unified inboxes; opening a four-message thread marks it
+  `\Seen` on the server; search `from:carol has:attachment`, `from:carol before:"30 days
+  ago"`, `after:yesterday (lighthouse OR garden)` across both accounts, and the engine's
+  message for `from:(`; starring (`\Flagged` on the server, unified Starred) and archiving
+  (moved to Archive on the server); downloading the PDF (bytes match) and the inline image
+  loading from the file route (`naturalWidth` 24); the undo-send delay set in Preferences
+  lands in the engine's `settings.json`, and one set over another connection shows in the open
+  page; composing to bob with a CSV uploaded and sending (the fake SMTP server got it with the
+  same bytes, and it synced into bob's inbox); Unsubscribe over mailto (the engine sent the
+  message to the list address) and a web link (toast with Open); snoozing until tomorrow
+  (moved to `Mailspring/Snoozed` on the server, listed in Snoozed); Sign out (`/session` 401)
+  and pairing again from a new link in the same tab; SIGKILL of the engine ("The engine isn't
+  running" once the client checks `/session`), a new engine, reconnect, and new mail arriving
+  through it. Nothing failed in the last runs. The only console errors are the expected 401s
+  before pairing and Chromium's "Blocked script execution in about:srcdoc", which appears
+  only where the test itself evaluates in the sandboxed reader frame.
+- Bugs found and fixed: the gateway's CSP listed `ws://[::1]:<port>`, which Chrome rejects as
+  an invalid source on every page load (IPv6 literals now get no `ws:` entry; `'self'`
+  covers the page's WebSocket); the search page showed "Find anything" for text the client's
+  own reading finds nothing in (`from:(`) instead of the engine's message; a `/pair#code`
+  link opened in a tab already on `/pair` only changed the fragment, so the code wasn't
+  filled in (PairView now listens for `hashchange`); `integrations.test` sent flat params
+  (`{provider, apiKey}`, `pdl`) that the engine refuses with `-32602` (now `{config}` with
+  the engine's provider names, `TestReport.host` shown, the `-32010` reason shown, required
+  fields checked first); an unpaired browser logged "engine connect failed" as an error.
+- Switched to the engine (each behind its `hello.features`, the old path kept): the undo-send
+  delay is `core.sending.undoSend` (DCP 3; `src/engine/settings.ts` reads it on connect,
+  follows `settings.changed`, writes with `settings.set` and takes a refused write back);
+  the Tern server's capabilities come from `capabilities.server` in `hello` and
+  `capabilities.changed` (DCP 5); the send-later runner stands down for an engine with
+  `expiration-executor` (DCP 4). The mock keeps a settings store (refusing the keys a
+  non-admin device can't set) and announces `settings` and `capabilities`, not
+  `expiration-executor`, so dev keeps the runner. `TODO-engine.md` regenerated: 14 markers.
+- Open: undo-send is still a client-side delay (DCP 13 `draft.send {delayMs}`); signatures
+  and templates stay in the browser, since a device without admin can't set `signatures` or
+  `templates`; `integrations.*` stay local-only, so only admin devices can test or use
+  providers from the web; the web shows the engine's `Mailspring` container folder (parent of
+  `Mailspring/Snoozed`) under Folders; the run covers neither an admin device, scheduled sends,
+  reply and forward, nor more than one tab. Screenshots of the last run are in its `/tmp` work
+  dir (`shots/`), outside git.

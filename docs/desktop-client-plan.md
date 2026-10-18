@@ -1725,3 +1725,14 @@ installed later under the same name inherits the user's yes for account and secr
 Trial pending (not run): translate a message with LibreTranslate in a popout; grammar check a
 draft in a composer window; open messages with images, links, forms and find-in-thread in the
 sandboxed frame; one-click unsubscribe on a test list now that it runs on a lane.
+
+2026-10-18, tern-web: the web halves of stages 3, 4 and 5 named in their open items, branch
+`roadmap/web-ready`, not merged (details in `docs/web-gateway-plan.md` Status). `apps/web`
+takes the undo-send delay from `settings` (`settings.get` on connect, `settings.changed`,
+`settings.set`, a refused write taken back), the Tern server's capabilities from
+`hello.capabilities` and `capabilities.changed`, and stops its send-later runner when the
+engine lists `expiration-executor`; `integrations.test` now sends the 3.7 `{config}` shape.
+No engine or desktop code changed. Still open for the web: signatures and templates (relayed
+devices can't set `signatures` or `templates`), `integrations.*` for devices without admin
+(3.6), and undo-send surviving a closed tab (stage 13). A browser run against a `serve`
+engine and the gateway on the fake mail servers passed (`apps/web/e2e/`).
