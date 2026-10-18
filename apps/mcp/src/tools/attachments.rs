@@ -3,8 +3,9 @@
 
 //! `get_attachment` and the `attachment://{messageId}/{fileId}` resource. The engine saves
 //! attachments under `<config-dir>/files/` when it fetches a message's body, at the path
-//! `AttachmentStore.pathForFile` computes; these read them from there, asking for the body
-//! first when the file isn't on disk yet.
+//! `AttachmentStore.pathForFile` computes; these read them from there. An engine with
+//! `files` finds the file and downloads it first with `files.get`; for an older one these
+//! ask for the body and poll the directory.
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -235,8 +236,12 @@ pub(super) fn get_attachment(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             "Attachment '{file_id}' has an unsafe filename and cannot be resolved on disk"
         )));
     }
-    let mut path = path_on_disk(ctx.config_dir, &file);
-    if path.is_none() {
+    let mut path = if ctx.backend.has_feature(&aid, ms_ipc::feature::FILES) {
+        engine_path(ctx, &aid, &file_id)?
+    } else {
+        path_on_disk(ctx.config_dir, &file)
+    };
+    if path.is_none() && !ctx.backend.has_feature(&aid, ms_ipc::feature::FILES) {
         let r = ctx.call(
             &aid,
             ms_ipc::method::MESSAGES_GET,
@@ -313,6 +318,21 @@ pub(super) fn get_attachment(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     Ok(o)
 }
 
+/// Where `files.get` says the file is, downloading it first; None when it couldn't be.
+fn engine_path(
+    ctx: &mut Ctx<'_>,
+    account: &str,
+    file_id: &str,
+) -> Result<Option<PathBuf>, ToolError> {
+    let got: ms_ipc::FilesGetResult = serde_json::from_value(ctx.call(
+        account,
+        ms_ipc::method::FILES_GET,
+        json!({ "fileId": file_id }),
+    )?)
+    .map_err(|e| failed(format!("Unexpected files.get answer: {e}")))?;
+    Ok(got.path.filter(|_| got.downloaded).map(PathBuf::from))
+}
+
 /// `resources/read` of an attachment URI: `(contents, accountId)`. The attachment must be
 /// on disk already (get_attachment downloads it).
 pub fn read_attachment_resource(
@@ -334,7 +354,13 @@ pub fn read_attachment_resource(
             "Message '{message_id}' has no attachment with id '{file_id}'"
         ))
     })?;
-    let path = path_on_disk(ctx.config_dir, &file).ok_or_else(|| {
+    let aid = account.account_id.clone();
+    let path = if ctx.backend.has_feature(&aid, ms_ipc::feature::FILES) {
+        engine_path(ctx, &aid, &file_id)?
+    } else {
+        path_on_disk(ctx.config_dir, &file)
+    };
+    let path = path.ok_or_else(|| {
         failed(format!(
             "Attachment '{}' has not been downloaded — call the get_attachment tool first.",
             file_display_name(&file)
