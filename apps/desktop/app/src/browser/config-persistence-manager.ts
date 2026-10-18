@@ -3,13 +3,23 @@ import fs from 'fs';
 import { BrowserWindow, dialog, app } from 'electron';
 import { atomicWriteFileSync } from '../fs-utils';
 import { localized } from '../intl';
+import { ConfigChannel, ConfigReply } from '../config-channels';
+import {
+  ENGINE_SETTINGS_KEYS,
+  EngineSettingsMirror,
+  SettingsHost,
+  touchesKey,
+} from './engine-settings';
 
 let _ = require('underscore');
 _ = Object.assign(_, require('../config-utils'));
 
 const RETRY_SAVES = 3;
 
-export default class ConfigPersistenceManager {
+// Tells the main process's Config and every window but the one that made the change.
+type ChangeListener = (settings: object, sourceWebcontentsId?: number) => void;
+
+export default class ConfigPersistenceManager implements SettingsHost {
   userWantsToPreserveErrors = false;
   saveRetries = 0;
   settings = {};
@@ -17,10 +27,22 @@ export default class ConfigPersistenceManager {
   configFilePath: string;
   resourcePath: string;
   lastSaveTimestamp?: number;
+  // Set by the application when a `serve` engine is supervised (src/browser/engine-settings.ts).
+  engineSettings: EngineSettingsMirror | null = null;
+  onChange: ChangeListener;
 
-  constructor({ configDirPath, resourcePath }: { configDirPath: string; resourcePath: string }) {
+  constructor({
+    configDirPath,
+    resourcePath,
+    onChange = notifyConfigAndWindows,
+  }: {
+    configDirPath: string;
+    resourcePath: string;
+    onChange?: ChangeListener;
+  }) {
     this.configDirPath = configDirPath;
     this.resourcePath = resourcePath;
+    this.onChange = onChange;
 
     this.configFilePath = path.join(this.configDirPath, 'config.json');
 
@@ -164,7 +186,9 @@ export default class ConfigPersistenceManager {
   };
 
   setSettings = (value, sourceWebcontentsId) => {
-    this.settings = value;
+    this._forwardEngineKeys(null, () => {
+      this.settings = value;
+    });
     this.emitChangeEvent({ sourceWebcontentsId });
     this.save();
   };
@@ -173,18 +197,70 @@ export default class ConfigPersistenceManager {
     if (!keyPath) {
       throw new Error('keyPath must not be false-y!');
     }
-    _.setValueForKeyPath(this.settings, keyPath, value);
+    this._forwardEngineKeys(keyPath, () => {
+      _.setValueForKeyPath(this.settings, keyPath, value);
+    });
     this.emitChangeEvent({ sourceWebcontentsId });
     this.save();
   };
 
-  emitChangeEvent = ({ sourceWebcontentsId }: { sourceWebcontentsId?: number } = {}) => {
-    global.application.config.updateSettings(this.settings);
+  get = (keyPath: string) => _.valueForKeyPath(this.settings, keyPath);
 
-    BrowserWindow.getAllWindows().forEach((win) => {
-      if (win.webContents && win.webContents.id !== sourceWebcontentsId) {
-        win.webContents.send('on-config-reloaded', this.settings);
-      }
-    });
+  // Values from the engine's settings store: every window gets them, the engine doesn't.
+  applyEngineValues = (changes: { [keyPath: string]: unknown }) => {
+    for (const keyPath of Object.keys(changes)) {
+      _.setValueForKeyPath(this.settings, keyPath, changes[keyPath]);
+    }
+    this.emitChangeEvent();
+    this.save();
   };
+
+  // Runs `write`, then hands the engine-owned keys whose value it changed to the mirror.
+  _forwardEngineKeys(keyPath: string | null, write: () => void) {
+    const keys = this.engineSettings
+      ? ENGINE_SETTINGS_KEYS.filter((key) => touchesKey(keyPath, key))
+      : [];
+    const before = keys.map((key) => JSON.stringify(this.get(key)));
+    write();
+    const changed = keys.filter((key, i) => JSON.stringify(this.get(key)) !== before[i]);
+    if (changed.length) this.engineSettings.localChanged(changed);
+  }
+
+  emitChangeEvent = ({ sourceWebcontentsId }: { sourceWebcontentsId?: number } = {}) => {
+    this.onChange(this.settings, sourceWebcontentsId);
+  };
+}
+
+function notifyConfigAndWindows(settings: object, sourceWebcontentsId?: number) {
+  global.application.config.updateSettings(settings);
+
+  BrowserWindow.getAllWindows().forEach((win) => {
+    if (win.webContents && win.webContents.id !== sourceWebcontentsId) {
+      win.webContents.send(ConfigChannel.Reloaded, settings);
+    }
+  });
+}
+
+// Every reply is set, whatever happens: a sendSync without one blocks its window for good.
+function replyTo(event: Electron.IpcMainEvent, work: () => string | void) {
+  try {
+    const value = work();
+    event.returnValue = (value === undefined ? {} : { value }) as ConfigReply;
+  } catch (err) {
+    event.returnValue = { error: (err && err.message) || `${err}` } as ConfigReply;
+  }
+}
+
+// The windows' Config reads and writes config.json through these (src/config-channels.ts).
+export function registerConfigIPC(
+  ipcMain: Pick<Electron.IpcMain, 'on'>,
+  manager: ConfigPersistenceManager
+) {
+  ipcMain.on(ConfigChannel.GetRaw, (event) => replyTo(event, () => manager.getRawValuesString()));
+  ipcMain.on(ConfigChannel.SetRaw, (event, keyPath: string, value: unknown) =>
+    replyTo(event, () => manager.setRawValue(keyPath, value, event.sender.id))
+  );
+  ipcMain.on(ConfigChannel.SetAll, (event, settings: object) =>
+    replyTo(event, () => manager.setSettings(settings, event.sender.id))
+  );
 }

@@ -20,6 +20,7 @@ import {
   HelloParams,
   HelloResult,
   MailNewParams,
+  SettingsValues,
   MAX_LINE_BYTES,
   Method,
   PROTOCOL_VERSION,
@@ -547,6 +548,10 @@ export class MailsyncProcess extends EventEmitter {
       this.emit('mail-new', msg.params as MailNewParams);
       return null;
     }
+    if (msg.method === Method.SettingsChanged) {
+      this.emit('settings-changed', msg.params as SettingsValues);
+      return null;
+    }
     if (msg.method === Method.Disconnect) {
       const { reason } = (msg.params || {}) as DisconnectParams;
       console.warn(`Sync engine dropped the connection: ${reason}`);
@@ -652,8 +657,8 @@ goes over the socket, connected once the first stdin response shows the engine h
 
 Emits 'ready' once the engine has bound its socket, 'hello' (HelloResult) once the socket is
 greeted, 'deltas' (delta params as JSON text, the shape the bridge reads), 'account-state'
-(AccountStateParams), 'mail-new' (MailNewParams), and 'close' (MailsyncProcessExit) once, when
-the engine exits or its socket fails.
+(AccountStateParams), 'mail-new' (MailNewParams), 'settings-changed' (SettingsValues), and
+'close' (MailsyncProcessExit) once, when the engine exits or its socket fails.
 */
 export class EngineServeProcess extends MailsyncProcess {
   _parentRequests = new Map<

@@ -62,7 +62,25 @@
     "@typescript-eslint/array-type": 0,
     "@typescript-eslint/explicit-module-boundary-types": 0,
     "@typescript-eslint/no-empty-function": 0,
-    "@typescript-eslint/ban-types": "warn"
+    "@typescript-eslint/ban-types": "warn",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@electron/remote",
+            "message": "@electron/remote is a sync IPC round trip into any main-process object (docs/tech-debt.md TD35); add a typed ipcRenderer channel instead."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='require'][arguments.0.value='@electron/remote']",
+        "message": "@electron/remote is a sync IPC round trip into any main-process object (docs/tech-debt.md TD35); add a typed ipcRenderer channel instead."
+      }
+    ]
   },
   "settings": {
     "import/core-modules": [
@@ -72,5 +90,71 @@
       "mailspring-store",
       "mailspring-observables"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "app/internal_packages/account-sidebar/lib/components/account-switcher.tsx",
+        "app/internal_packages/account-sidebar/lib/sidebar-item.ts",
+        "app/internal_packages/composer-signature/lib/preferences-signatures.tsx",
+        "app/internal_packages/composer-templates/lib/preferences-templates.tsx",
+        "app/internal_packages/composer-templates/lib/template-store.ts",
+        "app/internal_packages/composer/lib/composer-view.tsx",
+        "app/internal_packages/contacts/lib/ContactList.tsx",
+        "app/internal_packages/contacts/lib/ContactListContextMenu.ts",
+        "app/internal_packages/contacts/lib/GoogleSupport.ts",
+        "app/internal_packages/contacts/lib/main.tsx",
+        "app/internal_packages/contacts/lib/VCFImportExport.ts",
+        "app/internal_packages/list-unsubscribe/lib/unsubscribe-service.ts",
+        "app/internal_packages/main-calendar/lib/core/calendar-event-context-menu.ts",
+        "app/internal_packages/main-calendar/lib/core/calendar-rsvp.ts",
+        "app/internal_packages/main-calendar/lib/core/event-attendees-input.tsx",
+        "app/internal_packages/main-calendar/lib/core/mailspring-calendar.tsx",
+        "app/internal_packages/main-calendar/lib/core/recurring-event-dialog.ts",
+        "app/internal_packages/message-list/lib/message-controls.tsx",
+        "app/internal_packages/message-list/lib/message-item-body.tsx",
+        "app/internal_packages/message-list/lib/message-list.tsx",
+        "app/internal_packages/message-list/lib/message-participants.tsx",
+        "app/internal_packages/notifications/lib/items/default-client-notif.tsx",
+        "app/internal_packages/notifications/lib/items/update-notification.tsx",
+        "app/internal_packages/notifications/specs/update-notification-spec.tsx",
+        "app/internal_packages/onboarding/lib/decorators/create-page-for-form.tsx",
+        "app/internal_packages/preferences/lib/tabs/language-section.tsx",
+        "app/internal_packages/preferences/lib/tabs/mcp/tern-mcp.ts",
+        "app/internal_packages/preferences/lib/tabs/preferences-account-details.tsx",
+        "app/internal_packages/preferences/lib/tabs/preferences-appearance.tsx",
+        "app/internal_packages/preferences/lib/tabs/preferences-general.tsx",
+        "app/internal_packages/preferences/lib/tabs/preferences-keymaps.tsx",
+        "app/internal_packages/print/lib/print-window.ts",
+        "app/internal_packages/system-tray/lib/system-tray-icon-store.ts",
+        "app/internal_packages/thread-list/lib/thread-list-context-menu.ts",
+        "app/internal_packages/translation/lib/message-header.tsx",
+        "app/src/app-env.ts",
+        "app/src/browser/auxiliary-window-guard.ts",
+        "app/src/browser/mailspring-window.ts",
+        "app/src/components/attachment-items.tsx",
+        "app/src/components/composer-editor/grammar-check-plugins.tsx",
+        "app/src/components/evented-iframe.tsx",
+        "app/src/components/outline-view-item.tsx",
+        "app/src/components/participants-text-field.tsx",
+        "app/src/components/tokenizing-text-field.tsx",
+        "app/src/default-client-helper.ts",
+        "app/src/flux/mailsync-bridge.ts",
+        "app/src/flux/stores/attachment-store.ts",
+        "app/src/flux/stores/database-store.ts",
+        "app/src/flux/stores/message-store.ts",
+        "app/src/mailsync-process.ts",
+        "app/src/package-manager.ts",
+        "app/src/quickpreview/index.ts",
+        "app/src/sheet-toolbar.tsx",
+        "app/src/spellchecker.ts",
+        "app/src/system-start-service.ts",
+        "app/src/window-event-handler.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off",
+        "no-restricted-syntax": "off"
+      }
+    }
+  ]
 }

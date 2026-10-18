@@ -61,6 +61,9 @@ export const Method = {
   MetadataList: 'metadata.list',
   AccountList: 'account.list',
   EngineLogsTail: 'engine.logs.tail',
+  // The engine-owned settings (Feature.Settings).
+  SettingsGet: 'settings.get',
+  SettingsSet: 'settings.set',
   // `serve` mode's stdin only: the account JSON carries credentials.
   AccountAdd: 'account.add',
   AccountRemove: 'account.remove',
@@ -77,6 +80,7 @@ export const Method = {
   Disconnect: 'disconnect',
   AccountState: 'account.state',
   MailNew: 'mail.new',
+  SettingsChanged: 'settings.changed',
 } as const;
 
 // What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
@@ -87,6 +91,7 @@ export const Feature = {
   MetadataList: 'metadata-list',
   MessageHidden: 'message-hidden',
   MailNew: 'mail-new',
+  Settings: 'settings',
 } as const;
 
 export const ErrorCode = {
@@ -181,6 +186,18 @@ export interface MailNewParams {
   accountId: string;
   threadId: string;
   messageId: string;
+}
+
+// `settings.get` params; without `keys`, every stored value.
+export interface SettingsGetParams {
+  keys?: string[];
+}
+
+// `settings.get`'s result, `settings.set`'s params and `settings.changed`'s params. Keys are
+// config key paths; null clears a key (set) or says it was cleared (changed), and a key
+// without a stored value is absent.
+export interface SettingsValues {
+  values: { [keyPath: string]: unknown };
 }
 
 // null means every account, or every model class.

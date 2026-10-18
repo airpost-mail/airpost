@@ -9,19 +9,53 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-let app, errorLogger, webContentsId;
+let errorLogger;
 import _ from 'underscore';
 import { valueForKeyPath, setValueForKeyPath, remove } from './config-utils';
 import { Emitter } from 'event-kit';
+import { ConfigChannel, ConfigReply } from './config-channels';
 
 if (process.type === 'renderer') {
-  app = require('@electron/remote').getGlobal('application');
-  webContentsId = require('@electron/remote').getCurrentWebContents().id;
   ({ errorLogger } = AppEnv);
 } else {
-  app = global.application;
-  webContentsId = null;
   ({ errorLogger } = global);
+}
+
+// Where config.json lives: the main process's ConfigPersistenceManager, called directly in main
+// and over the synchronous ConfigChannel from a window.
+interface Persistence {
+  getRawValuesString(): string;
+  setRawValue(keyPath: string, value: unknown): void;
+  setSettings(settings: object): void;
+}
+
+function sendSync(channel: string, ...args: unknown[]): string | undefined {
+  const { ipcRenderer } = require('electron');
+  const reply = ipcRenderer.sendSync(channel, ...args) as ConfigReply;
+  if (!reply || reply.error !== undefined) {
+    throw new Error((reply && reply.error) || `no answer on ${channel}`);
+  }
+  return reply.value;
+}
+
+function persistence(): Persistence {
+  if (process.type === 'renderer') {
+    return {
+      getRawValuesString: () => sendSync(ConfigChannel.GetRaw),
+      setRawValue: (keyPath, value) => {
+        sendSync(ConfigChannel.SetRaw, keyPath, value);
+      },
+      setSettings: (settings) => {
+        sendSync(ConfigChannel.SetAll, settings);
+      },
+    };
+  }
+  const manager = global.application.configPersistenceManager;
+  return {
+    getRawValuesString: () => manager.getRawValuesString(),
+    setRawValue: (keyPath, value) => manager.setRawValue(keyPath, value, null),
+    setSettings: (settings) => manager.setSettings(settings, null),
+  };
 }
 
 // Essential: Used to access all of N1's configuration details.
@@ -343,8 +377,8 @@ export default class Config {
       const { ipcRenderer } = require('electron');
       // If new Config() has already been called, unmount it's listener when
       // we attach ourselves. This is only done during specs, Config is a singleton.
-      ipcRenderer.removeAllListeners('on-config-reloaded');
-      ipcRenderer.on('on-config-reloaded', (event, settings) => {
+      ipcRenderer.removeAllListeners(ConfigChannel.Reloaded);
+      ipcRenderer.on(ConfigChannel.Reloaded, (event, settings) => {
         this.updateSettings(settings);
       });
     }
@@ -464,9 +498,8 @@ export default class Config {
       }
     }
 
-    // Ensure that we never send anything but plain javascript objects through
-    //require('@electron/remote'). Specifically, we don't want to serialize and send function bodies
-    // across the IPC bridge.
+    // Only plain objects cross the IPC channel to the main process: no function bodies, no
+    // class instances.
     if (_.isObject(value)) {
       value = JSON.parse(JSON.stringify(value));
     }
@@ -720,7 +753,7 @@ export default class Config {
       if (!settings || _.isEmpty(settings)) {
         throw new Error('settings is falsey or empty');
       }
-      app.configPersistenceManager.setSettings(settings, webContentsId);
+      persistence().setSettings(settings);
     });
   }
 
@@ -732,7 +765,7 @@ export default class Config {
 
   getRawValues() {
     try {
-      const result = JSON.parse(app.configPersistenceManager.getRawValuesString());
+      const result = JSON.parse(persistence().getRawValuesString());
       if (!result || _.isEmpty(result)) {
         throw new Error('settings is falsey or empty');
       }
@@ -744,7 +777,7 @@ export default class Config {
   }
 
   setRawValue(keyPath, value) {
-    app.configPersistenceManager.setRawValue(keyPath, value, webContentsId);
+    persistence().setRawValue(keyPath, value);
     this.load();
   }
 }

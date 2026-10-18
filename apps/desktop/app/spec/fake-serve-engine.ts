@@ -51,6 +51,9 @@ export class FakeEngine {
   socketErrors: { [method: string]: { code: number; message: string } } = {};
   // Deltas published before the first subscribe to every account and class, which takes them.
   backlog: any[] | null = null;
+  // The settings store, when the engine announces `settings`: settings.get and settings.set
+  // answer from it.
+  settings: { [key: string]: any } | null = null;
 
   constructor(dir: string) {
     this.dir = dir;
@@ -78,7 +81,8 @@ export class FakeEngine {
             const req = JSON.parse(line);
             this.socket.push(req);
             requests.push(req);
-            let result = req.method === 'calendar.sync' ? { started: true } : {};
+            let result: any = req.method === 'calendar.sync' ? { started: true } : {};
+            if (this.settings) result = this._settingsResult(req) || result;
             if (this.socketResults[req.method] !== undefined) {
               result = this.socketResults[req.method];
             }
@@ -97,6 +101,29 @@ export class FakeEngine {
       });
       this.server.listen(this.socketPath, () => resolve());
     });
+  }
+
+  _settingsResult(req: any) {
+    const p = req.params || {};
+    switch (req.method) {
+      case 'hello':
+        return { protocol: 1, engine: 'fake', pid: 1, accounts: [], features: ['settings'] };
+      case 'settings.get': {
+        const values = {};
+        for (const k of Object.keys(this.settings)) {
+          if (!p.keys || p.keys.includes(k)) values[k] = this.settings[k];
+        }
+        return { values };
+      }
+      case 'settings.set':
+        for (const [k, v] of Object.entries(p.values || {})) {
+          if (v === null) delete this.settings[k];
+          else this.settings[k] = v;
+        }
+        return {};
+      default:
+        return null;
+    }
   }
 
   stop() {

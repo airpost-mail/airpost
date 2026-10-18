@@ -12,7 +12,8 @@ EngineClient's relaunch rules, and makes the stdin-only calls windows ask for ov
 
 Windows open their own socket connections (src/engine-connection.ts) once Status names a
 ready engine. Its own connection subscribes to no model class, which leaves the deltas and the
-first subscriber's backlog to the windows and still brings it every `account.state`. Account
+first subscriber's backlog to the windows and still brings it every `account.state` and
+`settings.changed`; it also carries the engine-owned settings (src/browser/engine-settings.ts). Account
 events (launched, exited, too many failures) go to the main window, which updates AccountStore
 and OnlineStatusStore; it acks them, and those not acked are handed to its next renderer.
 */
@@ -21,6 +22,8 @@ import path from 'path';
 import { AccountJSON, EngineAccount, EngineClient } from '../engine-client';
 import { EngineServeProcess, MailsyncProcessExit } from '../mailsync-process';
 import { AccountSecretsJSON, KeyManager } from './key-manager';
+import { SettingsValues } from '../engine-protocol';
+import type { EngineSettingsMirror } from './engine-settings';
 import {
   AccountEvent,
   AccountTestReply,
@@ -53,6 +56,8 @@ export interface EngineSupervisorOptions {
   keyManager: KeyManager;
   // Sends Status to every window.
   broadcast: (channel: string, payload: unknown) => void;
+  // Gets each engine once its socket is greeted, and the settings it announces as changed.
+  settings?: Pick<EngineSettingsMirror, 'attach' | 'detach' | 'engineChanged'>;
 }
 
 type PendingEvent = AccountEvent & { seq: number };
@@ -224,10 +229,20 @@ export class EngineSupervisor {
       this._readyGeneration = generation;
       this._statusChanged();
     });
+    const { settings } = this.options;
     engine.on('close', () => {
       if (this._readyEngine === engine) this._readyEngine = null;
+      if (settings) settings.detach(engine);
       this._statusChanged();
     });
+    if (settings) {
+      engine.on('hello', () => {
+        if (this.client.engine === engine) settings.attach(engine);
+      });
+      engine.on('settings-changed', (values: SettingsValues) =>
+        settings.engineChanged(engine, values)
+      );
+    }
     return engine;
   }
 

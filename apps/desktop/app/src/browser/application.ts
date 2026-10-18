@@ -31,7 +31,8 @@ import SystemTrayManager from './system-tray-manager';
 import { DefaultClientHelper } from '../default-client-helper';
 import { developerToolsAvailable } from '../developer-tools';
 import MailspringProtocolHandler from './mailspring-protocol-handler';
-import ConfigPersistenceManager from './config-persistence-manager';
+import ConfigPersistenceManager, { registerConfigIPC } from './config-persistence-manager';
+import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from './engine-settings';
 import moveToApplications from './move-to-applications';
 import { MailsyncProcess } from '../mailsync-process';
 import Config from '../config';
@@ -147,6 +148,7 @@ export default class Application extends EventEmitter {
     const config = new Config();
     this.config = config;
     this.configPersistenceManager = new ConfigPersistenceManager({ configDirPath, resourcePath });
+    registerConfigIPC(ipcMain, this.configPersistenceManager);
 
     // If the user's config.json could not be read (eg: corrupted / truncated on disk)
     // and they chose to quit from the error dialog, ConfigPersistenceManager has
@@ -162,8 +164,12 @@ export default class Application extends EventEmitter {
     this.configMigrator = new ConfigMigrator(this.config);
     this.configMigrator.migrate();
 
-    // Before any window exists: every window asks for the engine and the keyset at boot.
+    // Before any window exists: every window asks for the engine and the keyset at boot, and
+    // reads the engine-owned settings synchronously from config.
     this.startEngineSupervisor();
+    if (this.configPersistenceManager.engineSettings) {
+      await this.configPersistenceManager.engineSettings.whenReady(ENGINE_SETTINGS_WAIT_MS);
+    }
 
     let initializeInBackground = options.background;
     if (initializeInBackground === undefined) {
@@ -226,11 +232,14 @@ export default class Application extends EventEmitter {
     this.keyManager = new KeyManager({ config: this.config });
     registerKeyManagerIPC(ipcMain, this.keyManager);
     if (!this.specMode) {
+      const settings = new EngineSettingsMirror(this.configPersistenceManager);
+      this.configPersistenceManager.engineSettings = settings;
       this.engineSupervisor = new EngineSupervisor({
         configDirPath: this.configDirPath,
         resourcePath: this.resourcePath,
         config: this.config,
         keyManager: this.keyManager,
+        settings,
         broadcast: (channel, payload) => {
           for (const win of BrowserWindow.getAllWindows()) {
             if (!win.isDestroyed()) win.webContents.send(channel, payload);
