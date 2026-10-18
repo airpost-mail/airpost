@@ -1,0 +1,26 @@
+[package]
+name = "ms-secrets"
+description = "The engine's secret store: OS keychain, Secret Service, or an AES-256-GCM file"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+ring.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+secret-service.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
