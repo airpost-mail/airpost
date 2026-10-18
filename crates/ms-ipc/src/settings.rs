@@ -89,9 +89,23 @@ pub fn setting_error(key: &str, value: &Value) -> Option<String> {
     match setting_kind(key) {
         None => Some(format!("{key:?} is not a setting the engine keeps")),
         Some(_) if value.is_null() => None,
+        Some(_) if key == AI_PROVIDERS && holds_key(value) => Some(format!(
+            "{key} takes no apiKey: the engine keeps provider keys in its secret store"
+        )),
         Some(kind) if kind.accepts(value) => None,
         Some(kind) => Some(format!("{key} must be {}", kind.name())),
     }
+}
+
+const AI_PROVIDERS: &str = "core.ai.providers";
+
+/// A provider entry with an `apiKey`, which the settings file must never hold.
+fn holds_key(providers: &Value) -> bool {
+    providers
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|p| p.get("apiKey").is_some())
 }
 
 /// `settings.get` params. Without `keys`, every stored value.
@@ -130,6 +144,17 @@ mod tests {
         assert!(setting_error("signatures", &json!([])).is_some());
         let unknown = setting_error("core.themes", &json!([])).unwrap();
         assert!(unknown.contains("not a setting"), "{unknown}");
+    }
+
+    #[test]
+    fn ai_providers_take_no_key() {
+        let keyless = json!([{"id": "p", "kind": "ollama", "model": "m"}]);
+        assert_eq!(setting_error("core.ai.providers", &keyless), None);
+        let keyed = json!([{"id": "p", "kind": "openai", "model": "m", "apiKey": "sk-x"}]);
+        let e = setting_error("core.ai.providers", &keyed).unwrap();
+        assert!(e.contains("apiKey") && !e.contains("sk-x"), "{e}");
+        let empty_key = json!([{"id": "p", "kind": "openai", "apiKey": null}]);
+        assert!(setting_error("core.ai.providers", &empty_key).is_some());
     }
 
     #[test]

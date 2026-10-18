@@ -186,13 +186,17 @@ pub struct AiTriageRunResult {
 }
 
 /// `ai.triage.progress`, to the connection that called `ai.triage.run`: `done` of `total`
-/// threads handled, triaged or skipped. The last one has `done == total`.
+/// threads handled, triaged or skipped. The last one has `done == total`, or `stopped`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiTriageProgressParams {
     pub job_id: String,
     pub done: usize,
     pub total: usize,
+    /// The job ended after `done` threads: it was cancelled, the account stopped, triage
+    /// was turned off for it, or the provider it named went away.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub stopped: bool,
 }
 
 /// `ai.triage.list`: the opted-in accounts' inbox threads with a triage result, newest
