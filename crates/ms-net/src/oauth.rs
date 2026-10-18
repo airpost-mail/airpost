@@ -61,27 +61,21 @@ pub struct TokenManager {
     on_rotate: Option<RotateCallback>,
     clock: Arc<dyn Clock>,
     endpoints: Endpoints,
-    gmail_client: Option<(String, String)>,
+    /// Google `(client id, secret)` pairs; a refresh sends the secret of the account's own
+    /// `refresh_client_id`.
+    gmail_clients: Vec<(String, String)>,
 }
 
 impl TokenManager {
-    /// Uses the system clock, [`Endpoints::from_env`] and the `GMAIL_CLIENT_ID` /
-    /// `GMAIL_CLIENT_SECRET` pair from the environment, else the Google client the engine
-    /// signs in with ([`OAuthProvider::client_from_env`]).
+    /// Uses the system clock, [`Endpoints::from_env`] and the Google clients of
+    /// [`gmail_clients`] from the environment.
     pub fn new(on_rotate: Option<RotateCallback>) -> Self {
-        let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
-        let gmail_client = env(ENV_GMAIL_CLIENT_ID)
-            .zip(env(ENV_GMAIL_CLIENT_SECRET))
-            .or_else(|| {
-                let client = OAuthProvider::Google.client_from_env();
-                client.secret.map(|secret| (client.id, secret))
-            });
         TokenManager {
             accounts: Mutex::new(HashMap::new()),
             on_rotate,
             clock: ms_core::clock::system(),
             endpoints: Endpoints::from_env(),
-            gmail_client,
+            gmail_clients: gmail_clients(&|k| std::env::var(k).ok()),
         }
     }
 
@@ -95,9 +89,14 @@ impl TokenManager {
         self
     }
 
-    /// The client secret sent with refreshes for the Google client id it belongs to.
-    pub fn with_gmail_client(mut self, client: Option<(String, String)>) -> Self {
-        self.gmail_client = client;
+    /// The client secret sent with refreshes for the Google client id it belongs to, in place
+    /// of the environment's.
+    pub fn with_gmail_client(self, client: Option<(String, String)>) -> Self {
+        self.with_gmail_clients(client.into_iter().collect())
+    }
+
+    pub fn with_gmail_clients(mut self, clients: Vec<(String, String)>) -> Self {
+        self.gmail_clients = clients;
         self
     }
 
@@ -230,10 +229,8 @@ impl TokenManager {
         // client id rather than a secret (RFC 8252 §8.5). Only send it for the client id it
         // was issued with.
         if oauth == OAuthProvider::Google {
-            if let Some((id, secret)) = &self.gmail_client {
-                if id == client_id {
-                    form.push(("client_secret", secret));
-                }
+            if let Some((_, secret)) = self.gmail_clients.iter().find(|(id, _)| id == client_id) {
+                form.push(("client_secret", secret));
             }
         }
         http.post_form(self.endpoints.token_url(oauth), &form)
@@ -247,6 +244,24 @@ impl TokenManager {
             .or_default()
             .clone()
     }
+}
+
+/// The Google clients a refresh may be for, each with its secret: the legacy
+/// `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` pair if set, then
+/// [`OAuthProvider::refresh_clients`] (the client the engine signs in with, and the built-in
+/// one that older accounts stay bound to).
+pub fn gmail_clients(env: &dyn Fn(&str) -> Option<String>) -> Vec<(String, String)> {
+    let var = |k: &str| env(k).filter(|v| !v.is_empty());
+    var(ENV_GMAIL_CLIENT_ID)
+        .zip(var(ENV_GMAIL_CLIENT_SECRET))
+        .into_iter()
+        .chain(
+            OAuthProvider::Google
+                .refresh_clients(env)
+                .into_iter()
+                .filter_map(|c| c.secret.map(|s| (c.id, s))),
+        )
+        .collect()
 }
 
 /// Each field is replaced whole, so a panic while the lock is held (which stops only that
@@ -320,6 +335,27 @@ pub fn summarize_for_log(resp: &Value) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_new_google_client_keeps_older_accounts_secrets() {
+        let env = |k: &str| match k {
+            ms_providers::oauth::ENV_GMAIL_CLIENT_ID => Some("tern-id".to_owned()),
+            ms_providers::oauth::ENV_GMAIL_CLIENT_SECRET => Some("tern-secret".to_owned()),
+            ENV_GMAIL_CLIENT_ID => Some("legacy-id".to_owned()),
+            ENV_GMAIL_CLIENT_SECRET => Some("legacy-secret".to_owned()),
+            _ => None,
+        };
+        let built_in = &OAuthProvider::Google.refresh_clients(&env)[1];
+        let clients = gmail_clients(&env);
+        assert_eq!(
+            clients,
+            vec![
+                ("legacy-id".to_owned(), "legacy-secret".to_owned()),
+                ("tern-id".to_owned(), "tern-secret".to_owned()),
+                (built_in.id.clone(), built_in.secret.clone().unwrap()),
+            ]
+        );
+    }
 
     #[test]
     fn expires_in_variants() {

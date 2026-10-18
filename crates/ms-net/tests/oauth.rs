@@ -222,6 +222,35 @@ fn gmail_client_secret_only_for_its_client_id() {
     assert_eq!(reqs[1].form_value("client_secret"), None);
 }
 
+/// An account bound to an older client still sends that client's secret once a new one is
+/// configured (plan 0.1 item 18).
+#[test]
+fn gmail_refreshes_send_the_secret_of_the_accounts_client() {
+    let mut f = fixture(vec![token("a1", json!(3600)), token("a2", json!(3600))]);
+    f.tokens = f.tokens.with_gmail_clients(vec![
+        ("new".into(), "new-s3cret".into()),
+        ("cid".into(), "old-s3cret".into()),
+    ]);
+    f.tokens
+        .token_for(&f.http, &account("gmail", "cid"))
+        .unwrap();
+    let newer = Account::from_json(json!({
+        "id": "acct-2", "provider": "gmail",
+        "settings": {"refresh_token": "r", "refresh_client_id": "new"}
+    }))
+    .unwrap();
+    f.tokens.token_for(&f.http, &newer).unwrap();
+    let reqs = f.server.requests();
+    assert_eq!(
+        reqs[0].form_value("client_secret").as_deref(),
+        Some("old-s3cret")
+    );
+    assert_eq!(
+        reqs[1].form_value("client_secret").as_deref(),
+        Some("new-s3cret")
+    );
+}
+
 #[test]
 fn provider_refusals_are_not_retryable() {
     // invalid_grant: the refresh token was revoked.
