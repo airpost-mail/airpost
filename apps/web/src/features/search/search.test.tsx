@@ -88,6 +88,20 @@ describe('search page', () => {
     expect(router.state.location.pathname).toBe('/search');
   });
 
+  it('edits a query with NOT and OR in place, and locks what they hold', async () => {
+    const user = userEvent.setup();
+    const { q } = renderAt(`/search?q=${encodeURIComponent('in:trash NOT invoice')}`);
+    await screen.findByText('Search');
+    await user.click(screen.getByRole('button', { name: /Unread/ }));
+    await waitFor(() => expect(q()).toBe('(in:trash NOT invoice) is:unread'));
+    expect(screen.queryByRole('button', { name: 'Remove “invoice”' })).not.toBeInTheDocument();
+    expect(screen.queryByText('“NOT”')).not.toBeInTheDocument();
+    expect(screen.getByText('trash')).toBeInTheDocument();
+    // Unread is a top-level AND operand: it comes off again.
+    await user.click(screen.getByRole('button', { name: /Unread/ }));
+    await waitFor(() => expect(q()).toBe('(in:trash NOT invoice)'));
+  });
+
   it('lets the engine read the grammar, dates included', async () => {
     renderAt(`/search?q=${encodeURIComponent('(invoice OR kickoff) after:30d NOT in:trash')}`);
     const list = await screen.findByRole('list', { name: 'Search results' });
@@ -168,5 +182,23 @@ describe('command palette', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/search'));
     expect(q()).toBe('Invoice 2026-031');
     expect((router.state.location.search as { thread?: string }).thread).toBeTruthy();
+  });
+
+  it('keeps mail results while a query is half typed, and says what the engine refused', async () => {
+    const user = userEvent.setup();
+    renderAt('/');
+    await screen.findByText('Home');
+    act(() => setCommandPaletteOpen(true));
+    const input = await screen.findByPlaceholderText('Search mail or type a command');
+    await user.type(input, 'Invoice 2026-031');
+    await screen.findByRole('option', { name: /Invoice 2026-031 paid/ });
+    for (const tail of [' from:', ' OR', ' "paid', ' (a']) {
+      await user.type(input, tail);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(screen.getByRole('option', { name: /Invoice 2026-031 paid/ }), tail).toBeTruthy();
+      for (let i = 0; i < tail.length; i++) await user.type(input, '{Backspace}');
+    }
+    await user.type(input, ' is:weird');
+    expect(await screen.findByText(/is:weird isn't a search filter/)).toBeInTheDocument();
   });
 });

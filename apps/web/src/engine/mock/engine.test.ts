@@ -331,7 +331,7 @@ describe('MockEngine', () => {
       ['(lisbon', {}],
       ['after:someday', {}],
       ['after:yesterday', { now: undefined }],
-      ['x', { tz: 'Mars/Base' }],
+      ['x after:2024-01-01', { tz: 'Mars/Base' }],
       ['x', { accountId: G, accounts: [G] }],
     ];
     for (const [query, extra] of refused) {

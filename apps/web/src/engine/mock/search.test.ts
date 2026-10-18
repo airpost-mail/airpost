@@ -2,7 +2,14 @@
 // (crates/ms-store/src/search_grammar.rs, search_dates.rs), so the two don't drift.
 import { describe, expect, it } from 'vitest';
 import { RpcErrorCode } from '../rpc';
-import { MAX_SEARCH_TOKENS, parseSearch, resolveSearchDate, type SearchExpr } from './search';
+import {
+  grammarMatcher,
+  MAX_MATCH_DEPTH,
+  MAX_SEARCH_TOKENS,
+  parseSearch,
+  resolveSearchDate,
+  type SearchExpr,
+} from './search';
 
 const generic = (text: string): SearchExpr => ({ type: 'generic', text });
 const and = (e1: SearchExpr, e2: SearchExpr): SearchExpr => ({ type: 'and', e1, e2 });
@@ -68,6 +75,24 @@ describe('parseSearch', () => {
     expect(() => parseSearch(long)).not.toThrow();
     expect(() => parseSearch(`${long} b`)).toThrow(/too long/);
     expect(() => parseSearch('('.repeat(100_000))).toThrow(/too long/);
+    for (const q of ['a - b', 'a : b', '""', 'from:""', 'subject:-']) {
+      expect(() => parseSearch(q), q).toThrow(/letters or digits|nothing to search/);
+    }
+    const nots = (n: number) => Array(n).fill('a').join(' NOT ');
+    expect(() => parseSearch(nots(MAX_MATCH_DEPTH))).not.toThrow();
+    expect(() => parseSearch(nots(MAX_MATCH_DEPTH + 1))).toThrow(/nests too deeply/);
+    expect(() => parseSearch(Array(MAX_SEARCH_TOKENS).fill('a').join(' '))).not.toThrow();
+    expect(() => parseSearch(`is:unread (${nots(MAX_MATCH_DEPTH + 1)})`)).toThrow(/too deeply/);
+    expect(() => parseSearch(`is:unread NOT (${nots(MAX_MATCH_DEPTH)})`)).not.toThrow();
+  });
+
+  it('glues a field value to a colon, as a plain word', () => {
+    expect(parseSearch('subject:re:hello')).toEqual({ type: 'subject', text: 're:hello' });
+  });
+
+  it('checks the zone only for date terms', () => {
+    expect(() => grammarMatcher('budget', 'UTC0')).not.toThrow();
+    expect(() => grammarMatcher('after:2024-01-01', 'Mars/Base')).toThrow(/IANA/);
   });
 });
 

@@ -2,15 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
   activeOperator,
   dateRange,
+  editSearchQuery,
   inDateRange,
   parseDateValue,
   parseSearchQuery,
+  searchLayout,
   serializeSearchQuery,
   toEngineQuery,
   toggleToken,
   withToken,
   withoutTerm,
   withoutToken,
+  type ParsedSearch,
 } from './query';
 
 const NOW = new Date(2026, 9, 16, 15, 30);
@@ -98,6 +101,67 @@ describe('serializeSearchQuery', () => {
 
   it('puts terms before operators', () => {
     expect(serializeSearchQuery(parseSearchQuery('is:unread hello'))).toBe('hello is:unread');
+  });
+
+  it('keeps quotes on terms the grammar would read as syntax', () => {
+    expect(serializeSearchQuery(parseSearchQuery('"or" "a (b" x'))).toBe('"or" "a (b" x');
+  });
+});
+
+describe('editSearchQuery (the grammar: edits the text in place)', () => {
+  const edit = (input: string, change: (q: ParsedSearch) => ParsedSearch) => {
+    const q = parseSearchQuery(input);
+    return editSearchQuery(input, q, change(q));
+  };
+
+  it('keeps a NOT and an OR when a filter is toggled on', () => {
+    // Rebuilt, these were 'NOT budget in:trash is:unread' and 'OR from:ann from:bob is:unread'.
+    expect(edit('in:trash NOT budget', (q) => toggleToken(q, 'is', 'unread'))).toBe(
+      '(in:trash NOT budget) is:unread',
+    );
+    expect(edit('from:ann OR from:bob', (q) => toggleToken(q, 'is', 'unread'))).toBe(
+      'from:ann OR from:bob is:unread',
+    );
+    expect(edit('"or" x', (q) => toggleToken(q, 'is', 'starred'))).toBe('"or" x is:starred');
+  });
+
+  it('removes a filter where it stands', () => {
+    expect(edit('is:unread budget NOT in:trash', (q) => toggleToken(q, 'is', 'unread'))).toBe(
+      'budget NOT in:trash',
+    );
+    expect(edit('a b NOT c', (q) => withoutTerm(q, 1))).toBe('a NOT c');
+    expect(edit('(a OR b) c', (q) => withoutTerm(q, 3))).toBe('(a OR b)');
+    expect(parseSearchQuery('(in:trash OR a)b').terms).toEqual(['OR', 'a', 'b']);
+  });
+
+  it("won't remove what an OR, NOT or parentheses hold", () => {
+    for (const [input, term] of [
+      ['from:ann OR budget', 0],
+      ['budget OR x', 0],
+      ['a NOT budget', 2],
+      ['budget NOT a', 0],
+      ['(budget a) c', 0],
+      ['a AND budget', 2],
+    ] as const) {
+      expect(
+        edit(input, (q) => withoutTerm(q, term)),
+        input,
+      ).toBeNull();
+    }
+    expect(edit('from:ann OR from:bob', (q) => withoutToken(q, 1))).toBeNull();
+    expect(searchLayout('a OR b c').terms.map((t) => t.removable)).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ]);
+    expect(searchLayout('a OR b').terms.map((t) => t.operator)).toEqual([false, true, false]);
+  });
+
+  it('replaces a date bound in place of the old one', () => {
+    expect(
+      edit('budget after:2026-01-01', (q) => withToken(q, { field: 'after', value: '7d' })),
+    ).toBe('budget after:7d');
   });
 });
 

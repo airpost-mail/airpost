@@ -52,33 +52,169 @@ function normalizeValue(field: SearchField, value: string): string {
   return value;
 }
 
-export function parseSearchQuery(input: string): ParsedSearch {
-  const out: ParsedSearch = { terms: [], tokens: [] };
-  const re = /([A-Za-z]+):(?:"([^"]*)"?|(\S*))|"([^"]*)"?|(\S+)/g;
-  for (const m of input.matchAll(re)) {
-    const [whole, name, quotedValue, value, phrase, word] = m;
+type Scanned =
+  | { kind: 'term'; text: string; start: number; end: number; quoted: boolean }
+  | { kind: 'token'; token: SearchToken; start: number; end: number; quoted: boolean }
+  /** A bare `field:` while typing: not a filter yet. */
+  | { kind: 'skip'; start: number; end: number }
+  | { kind: 'paren'; open: boolean; start: number; end: number };
+
+// Parentheses outside quotes are the grammar's, glued to a word or not, as in the engine.
+const SCAN = /([A-Za-z]+):(?:"([^"]*)"?|([^\s()]*))|"([^"]*)"?|([()])|([^\s()]+)/g;
+
+function scan(input: string): Scanned[] {
+  const out: Scanned[] = [];
+  for (const m of input.matchAll(SCAN)) {
+    const [whole, name, quotedValue, value, phrase, paren, word] = m;
+    const start = m.index;
+    const end = start + whole.length;
     const field = name ? toField(name) : null;
     if (field) {
       const v = (quotedValue ?? value ?? '').trim();
-      // A bare `from:` while typing is not a filter yet.
-      if (v) out.tokens.push({ field, value: normalizeValue(field, v) });
+      out.push(
+        v
+          ? {
+              kind: 'token',
+              token: { field, value: normalizeValue(field, v) },
+              start,
+              end,
+              quoted: quotedValue !== undefined,
+            }
+          : { kind: 'skip', start, end },
+      );
     } else if (name) {
-      out.terms.push(whole);
+      out.push({ kind: 'term', text: whole, start, end, quoted: false });
     } else if (phrase !== undefined) {
-      if (phrase.trim()) out.terms.push(phrase.trim());
+      out.push(
+        phrase.trim()
+          ? { kind: 'term', text: phrase.trim(), start, end, quoted: true }
+          : { kind: 'skip', start, end },
+      );
+    } else if (paren) {
+      out.push({ kind: 'paren', open: paren === '(', start, end });
     } else if (word) {
-      out.terms.push(word);
+      out.push({ kind: 'term', text: word, start, end, quoted: false });
     }
   }
   return out;
 }
 
+export function parseSearchQuery(input: string): ParsedSearch {
+  const out: ParsedSearch = { terms: [], tokens: [] };
+  for (const s of scan(input)) {
+    if (s.kind === 'term') out.terms.push(s.text);
+    else if (s.kind === 'token') out.tokens.push(s.token);
+  }
+  return out;
+}
+
+const OPERATORS = new Set(['and', 'or', 'not']);
+
+function isOperatorWord(value: string): boolean {
+  return OPERATORS.has(value.toLowerCase());
+}
+
+/** Values the engine's grammar would read as syntax unless quoted. */
 function quote(value: string): string {
-  return /\s/.test(value) ? `"${value.replace(/"/g, '')}"` : value;
+  return /[\s()"]/.test(value) || isOperatorWord(value) ? `"${value.replace(/"/g, '')}"` : value;
 }
 
 export function serializeSearchQuery(q: ParsedSearch): string {
   return [...q.terms.map(quote), ...q.tokens.map((t) => `${t.field}:${quote(t.value)}`)].join(' ');
+}
+
+// -- Editing the query text in place, for the engine's grammar --------------------------------
+//
+// With the grammar, the order of the text and its AND/OR/NOT and parentheses carry meaning,
+// so the filter controls edit the text the person typed rather than rebuilding it from the
+// parsed terms and filters (which would move a leading NOT or split an OR).
+
+interface Placed {
+  start: number;
+  end: number;
+  /** Removing it from the text leaves the rest of the query meaning what it did. */
+  removable: boolean;
+  /** An unquoted AND/OR/NOT: grammar, not a term. */
+  operator: boolean;
+}
+
+/** Where each of `parseSearchQuery(input)`'s terms and tokens sits in `input`. */
+export interface SearchLayout {
+  terms: Placed[];
+  tokens: Placed[];
+  /** The text has an unquoted `NOT` outside parentheses, which takes all that follows it. */
+  topLevelNot: boolean;
+}
+
+function isOperator(s: Scanned | undefined): boolean {
+  return s?.kind === 'term' && !s.quoted && isOperatorWord(s.text);
+}
+
+export function searchLayout(input: string): SearchLayout {
+  const items = scan(input);
+  const out: SearchLayout = { terms: [], tokens: [], topLevelNot: false };
+  let depth = 0;
+  items.forEach((s, i) => {
+    if (s.kind === 'paren') {
+      depth = Math.max(0, depth + (s.open ? 1 : -1));
+      return;
+    }
+    const operator = isOperator(s);
+    const before = items[i - 1];
+    const after = items[i + 1];
+    // `w x NOT y` without x is `w NOT y`, still w and not y; `x NOT y` without x is not.
+    const notAfter = isOperator(after) && after?.kind === 'term' && /^not$/i.test(after.text);
+    const removable =
+      depth === 0 &&
+      !out.topLevelNot &&
+      !operator &&
+      !isOperator(before) &&
+      (!isOperator(after) || (notAfter && i > 0));
+    if (operator && depth === 0 && s.kind === 'term' && /^not$/i.test(s.text)) {
+      out.topLevelNot = true;
+    }
+    const placed = { start: s.start, end: s.end, removable, operator };
+    if (s.kind === 'term') out.terms.push(placed);
+    else if (s.kind === 'token') out.tokens.push(placed);
+  });
+  return out;
+}
+
+/**
+ * `input` with the terms and tokens `parsed` (`parseSearchQuery(input)`) has and `next`
+ * doesn't removed, and the tokens `next` adds appended, ANDed with the rest. `next` comes from
+ * the helpers below, which keep the token objects they don't touch. `null` when an item to
+ * remove can't be taken out without changing what the rest means.
+ */
+export function editSearchQuery(
+  input: string,
+  parsed: ParsedSearch,
+  next: ParsedSearch,
+): string | null {
+  const layout = searchLayout(input);
+  const cut: Placed[] = [];
+  parsed.tokens.forEach((t, i) => {
+    if (!next.tokens.includes(t)) cut.push(layout.tokens[i]);
+  });
+  // `next.terms` is `parsed.terms` with some left out, in order.
+  let j = 0;
+  parsed.terms.forEach((t, i) => {
+    if (next.terms[j] === t) j++;
+    else cut.push(layout.terms[i]);
+  });
+  if (cut.some((p) => !p?.removable)) return null;
+  let text = input;
+  for (const p of [...cut].sort((a, b) => b.start - a.start)) {
+    text = text.slice(0, p.start) + text.slice(p.end);
+  }
+  text = text.replace(/\s+/g, ' ').trim();
+  const added = next.tokens
+    .filter((t) => !parsed.tokens.includes(t))
+    .map((t) => `${t.field}:${quote(t.value)}`);
+  if (added.length === 0) return text;
+  if (!text) return added.join(' ');
+  const base = searchLayout(text).topLevelNot ? `(${text})` : text;
+  return [base, ...added].join(' ');
 }
 
 export function isEmptySearch(q: ParsedSearch): boolean {
@@ -177,6 +313,19 @@ export function toEngineQuery(input: string, grammar: boolean): string {
     terms: q.terms,
     tokens: q.tokens.filter((t) => t.field !== 'before' && t.field !== 'after'),
   });
+}
+
+/**
+ * Text someone is still typing, which the grammar would refuse: an open quote or
+ * parenthesis, a bare `from:`, or a trailing AND/OR/NOT.
+ */
+export function isUnfinishedSearch(input: string): boolean {
+  if ((input.match(/"/g)?.length ?? 0) % 2 === 1) return true;
+  const items = scan(input);
+  let depth = 0;
+  for (const s of items) if (s.kind === 'paren') depth += s.open ? 1 : -1;
+  const last = items.at(-1);
+  return depth > 0 || last?.kind === 'skip' || isOperator(last);
 }
 
 /** The partial `field:value` operator under the caret, for autocomplete. */

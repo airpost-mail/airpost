@@ -39,9 +39,12 @@ function summary(bounds: DateBounds, now: Date): string | null {
 /** One control for both bounds: presets plus a range calendar. */
 export function DateFilter({
   bounds,
+  disabled,
   onChange,
 }: {
   bounds: DateBounds;
+  /** The query's dates sit inside an OR, NOT or parentheses: edit them in the text. */
+  disabled?: boolean;
   onChange: (bounds: DateBounds) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -64,6 +67,7 @@ export function DateFilter({
         <Button
           variant="outline"
           size="sm"
+          disabled={disabled}
           className={cn('h-6 gap-1.5 px-2 text-xs', label && 'border-primary/40 text-primary')}
         >
           <CalendarRange className="size-3.5" />

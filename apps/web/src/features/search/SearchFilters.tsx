@@ -31,6 +31,7 @@ import {
   withoutTerm,
   withoutToken,
   type ParsedSearch,
+  type SearchLayout,
 } from './query';
 import { focusSearchBox } from './store';
 import { useAllCategories } from './useAllCategories';
@@ -48,7 +49,8 @@ function Chip({
   label?: string;
   children: ReactNode;
   invalid?: boolean;
-  onRemove: () => void;
+  /** Absent: the chip can't be removed on its own (it's inside an OR, NOT or parentheses). */
+  onRemove?: () => void;
   removeLabel: string;
 }) {
   return (
@@ -60,26 +62,30 @@ function Chip({
       )}
     >
       {label && <span className="text-muted-foreground">{label}</span>}
-      <span className="truncate font-medium">{children}</span>
-      <button
-        type="button"
-        aria-label={removeLabel}
-        onClick={onRemove}
-        className="ml-0.5 grid size-5 place-items-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-      >
-        <X className="size-3" />
-      </button>
+      <span className={cn('truncate font-medium', !onRemove && 'pr-1.5')}>{children}</span>
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={removeLabel}
+          onClick={onRemove}
+          className="ml-0.5 grid size-5 place-items-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="size-3" />
+        </button>
+      )}
     </span>
   );
 }
 
 function FlagToggle({
   pressed,
+  disabled,
   onToggle,
   icon,
   children,
 }: {
   pressed: boolean;
+  disabled?: boolean;
   onToggle: () => void;
   icon: ReactNode;
   children: ReactNode;
@@ -89,6 +95,7 @@ function FlagToggle({
       size="sm"
       variant="outline"
       pressed={pressed}
+      disabled={disabled}
       onPressedChange={onToggle}
       className="h-6 gap-1.5 rounded-md px-2 text-xs font-normal data-[state=on]:border-primary/40 data-[state=on]:bg-primary/10 data-[state=on]:text-primary"
     >
@@ -100,12 +107,15 @@ function FlagToggle({
 
 export function SearchFilters({
   parsed,
+  layout,
   onChange,
   accounts,
   accountId,
   onAccountChange,
 }: {
   parsed: ParsedSearch;
+  /** With the engine's grammar: which terms and filters can be removed on their own. */
+  layout?: SearchLayout;
   onChange: (next: ParsedSearch) => void;
   accounts: AccountJSON[];
   accountId?: string;
@@ -126,6 +136,11 @@ export function SearchFilters({
     after: parsed.tokens.find((t) => t.field === 'after')?.value,
     before: parsed.tokens.find((t) => t.field === 'before')?.value,
   };
+  const termRemovable = (i: number) => layout?.terms[i]?.removable ?? true;
+  const tokenRemovable = (i: number) => layout?.tokens[i]?.removable ?? true;
+  const datesLocked = parsed.tokens.some(
+    (t, i) => (t.field === 'after' || t.field === 'before') && !tokenRemovable(i),
+  );
   const setDates = (b: DateBounds) => {
     let next: ParsedSearch = {
       ...parsed,
@@ -136,10 +151,14 @@ export function SearchFilters({
     onChange(next);
   };
 
-  const flag = (field: 'is' | 'has', value: string) => ({
-    pressed: hasToken(parsed, field, value),
-    onToggle: () => onChange(toggleToken(parsed, field, value)),
-  });
+  const flag = (field: 'is' | 'has', value: string) => {
+    const i = parsed.tokens.findIndex((t) => t.field === field && t.value === value);
+    return {
+      pressed: hasToken(parsed, field, value),
+      disabled: i !== -1 && !tokenRemovable(i),
+      onToggle: () => onChange(toggleToken(parsed, field, value)),
+    };
+  };
 
   const chips = parsed.tokens
     .map((t, i) => ({ t, i }))
@@ -154,15 +173,17 @@ export function SearchFilters({
     <div className="flex flex-col gap-2">
       {(parsed.terms.length > 0 || chips.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5" aria-label="Active filters">
-          {parsed.terms.map((term, i) => (
-            <Chip
-              key={`term:${i}:${term}`}
-              onRemove={() => onChange(withoutTerm(parsed, i))}
-              removeLabel={`Remove “${term}”`}
-            >
-              “{term}”
-            </Chip>
-          ))}
+          {parsed.terms.map((term, i) =>
+            layout?.terms[i]?.operator ? null : (
+              <Chip
+                key={`term:${i}:${term}`}
+                onRemove={termRemovable(i) ? () => onChange(withoutTerm(parsed, i)) : undefined}
+                removeLabel={`Remove “${term}”`}
+              >
+                “{term}”
+              </Chip>
+            ),
+          )}
           {chips.map(({ t, i }) => {
             const d = describeToken(t);
             return (
@@ -170,7 +191,7 @@ export function SearchFilters({
                 key={`token:${i}:${t.field}:${t.value}`}
                 label={d.label}
                 invalid={d.invalid}
-                onRemove={() => onChange(withoutToken(parsed, i))}
+                onRemove={tokenRemovable(i) ? () => onChange(withoutToken(parsed, i)) : undefined}
                 removeLabel={`Remove ${d.label ?? ''} ${d.value}`.replace(/\s+/g, ' ')}
               >
                 {d.value}
@@ -190,7 +211,7 @@ export function SearchFilters({
         <FlagToggle {...flag('has', 'attachment')} icon={<Paperclip className="size-3.5" />}>
           Attachment
         </FlagToggle>
-        <DateFilter bounds={dateBounds} onChange={setDates} />
+        <DateFilter bounds={dateBounds} disabled={datesLocked} onChange={setDates} />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

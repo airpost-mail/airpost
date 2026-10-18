@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Kbd } from '@/components/ui/kbd';
 import {
+  isInvalidParams,
   useAccounts,
   useSearch,
   useSearchGrammar,
@@ -42,7 +43,7 @@ import { formatListDate } from '@/lib/format';
 import { useShortcut, useShortcutScope } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 import { filterCommands } from './palette';
-import { toEngineQuery } from './query';
+import { isUnfinishedSearch, toEngineQuery } from './query';
 import { addRecentSearch } from './recent';
 import { setCommandPaletteOpen, useCommandPaletteOpen } from './store';
 import { threadSender } from './thread-sender';
@@ -61,6 +62,13 @@ const ICONS: Record<IconKey, LucideIcon> = {
 };
 
 const MAIL_LIMIT = 6;
+
+/** `value`, or while `ok` is false the last value it was true for. */
+function useLastWhere<T>(value: T, ok: boolean): T {
+  const [kept, setKept] = useState(value);
+  if (ok && kept !== value) setKept(value);
+  return ok ? value : kept;
+}
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -136,7 +144,10 @@ function PaletteBody({
   const matches = filterCommands(commands, query);
   const debounced = useDebounced(query.trim(), 120);
   const grammar = useSearchGrammar();
-  const engineQuery = debounced.length >= 2 ? toEngineQuery(debounced, grammar) : '';
+  const typed = debounced.length >= 2 ? toEngineQuery(debounced, grammar) : '';
+  // Mid-typing ('invoice from:', '"lisbon', 'a OR') the grammar refuses: keep the last
+  // results rather than drop them.
+  const engineQuery = useLastWhere(typed, !grammar || !isUnfinishedSearch(typed));
   const mail = useSearch(engineQuery ? { query: engineQuery, grammar } : null, {
     limit: MAIL_LIMIT,
   });
@@ -178,6 +189,11 @@ function PaletteBody({
           <Kbd className="font-mono text-2xs">↵</Kbd>
         </CommandShortcut>
       </CommandItem>
+      {isInvalidParams(mail.error) && (
+        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+          {mail.error.message.replace(/^invalid params: (search: )?/, '')}
+        </p>
+      )}
       {results.map((t) => (
         <MailResult
           key={`${t.aid}:${t.id}`}

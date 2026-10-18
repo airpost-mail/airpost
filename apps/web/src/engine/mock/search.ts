@@ -50,12 +50,34 @@ function expect(text: string, word: string): string {
 
 type Parsed = [SearchExpr | null, string];
 
+/** A plain word, with any `:` and word glued to its end (`http://x.test`, `re:hello`). */
+function gluedWord(word: string, after: string): [string, string] {
+  let rest = after;
+  while (rest.startsWith(':')) {
+    rest = rest.slice(1);
+    let end = 0;
+    while (end < rest.length && !isSpace(rest[end]) && !isSpecial(rest[end]) && rest[end] !== '"') {
+      end++;
+    }
+    word += `:${rest.slice(0, end)}`;
+    rest = rest.slice(end);
+  }
+  return [word, rest];
+}
+
 function fieldValue(text: string, field: string): [string, string] {
   const [t, rest] = nextToken(text);
   if (!t || (!t.quoted && isSpecial(t.s[0]))) {
     fail(`search: ${field}: needs a value, a word or a "quoted phrase"`);
   }
-  return [t.s, rest];
+  return t.quoted ? [t.s, rest] : gluedWord(t.s, rest);
+}
+
+/** A term the index can match: with a letter or digit. */
+function searchable(text: string): string {
+  if (/[\p{L}\p{N}]/u.test(text)) return text;
+  if (!text.trim()) fail('search: an empty "" phrase has nothing to search for');
+  return fail(`search: ${JSON.stringify(text)} has no letters or digits to search for`);
 }
 
 const FIELDS = ['from', 'to', 'subject', 'in', 'is', 'has', 'before', 'after', 'since'];
@@ -78,7 +100,7 @@ function fieldExpr(field: string, value: string): SearchExpr {
     case 'since':
       return { type: 'date', text: value, direction: 'after' };
     default:
-      return { type: field as 'from' | 'to' | 'subject' | 'in', text: value };
+      return { type: field as 'from' | 'to' | 'subject' | 'in', text: searchable(value) };
   }
 }
 
@@ -98,20 +120,9 @@ function parseSimple(text: string): Parsed {
     const [value, rest] = fieldValue(expect(after, ':'), field);
     return [fieldExpr(field, value), rest];
   }
-  if (tok.quoted) return [{ type: 'generic', text: tok.s }, after];
-  // A word glued to `:` and more (`http://x.test`) stays one word.
-  let word = tok.s;
-  let rest = after;
-  while (rest.startsWith(':')) {
-    rest = rest.slice(1);
-    let end = 0;
-    while (end < rest.length && !isSpace(rest[end]) && !isSpecial(rest[end]) && rest[end] !== '"') {
-      end++;
-    }
-    word += `:${rest.slice(0, end)}`;
-    rest = rest.slice(end);
-  }
-  return [{ type: 'generic', text: word }, rest];
+  if (tok.quoted) return [{ type: 'generic', text: searchable(tok.s) }, after];
+  const [word, rest] = gluedWord(tok.s, after);
+  return [{ type: 'generic', text: searchable(word) }, rest];
 }
 
 function parseOr(text: string): Parsed {
@@ -165,7 +176,44 @@ export function parseSearch(text: string): SearchExpr {
   const [exp, rest] = parseAnd(text);
   if (!exp) fail('search: the search has nothing to look for');
   if (nextToken(rest)[0]) fail("search: a ')' has no '(' before it");
+  checkDepth(exp);
   return exp;
+}
+
+/** How deep the engine's FTS expression for a subtree may nest (`MAX_MATCH_DEPTH`). */
+export const MAX_MATCH_DEPTH = 30;
+
+function isMatchCompatible(e: SearchExpr): boolean {
+  if (e.type === 'and' || e.type === 'or' || e.type === 'not') {
+    return isMatchCompatible(e.e1) && isMatchCompatible(e.e2);
+  }
+  return 'text' in e && e.type !== 'date';
+}
+
+/** The operands the engine writes flat: a run of one AND or OR, or a left run of NOTs. */
+function operands(e: SearchExpr): SearchExpr[] {
+  if (e.type === 'not') return [...(e.e1.type === 'not' ? operands(e.e1) : [e.e1]), e.e2];
+  if (e.type !== 'and' && e.type !== 'or') return [e];
+  const run = (x: SearchExpr): SearchExpr[] => (x.type === e.type ? operands(x) : [x]);
+  return [...run(e.e1), ...run(e.e2)];
+}
+
+function matchDepth(e: SearchExpr): number {
+  if (e.type !== 'and' && e.type !== 'or' && e.type !== 'not') return 1;
+  return 1 + Math.max(...operands(e).map(matchDepth));
+}
+
+function checkDepth(e: SearchExpr) {
+  if (isMatchCompatible(e)) {
+    if (matchDepth(e) > MAX_MATCH_DEPTH) {
+      fail(
+        `search: the search nests too deeply: at most ${MAX_MATCH_DEPTH} levels of NOT and parentheses`,
+      );
+    }
+  } else if (e.type === 'and' || e.type === 'or' || e.type === 'not') {
+    checkDepth(e.e1);
+    checkDepth(e.e2);
+  }
 }
 
 // -- Dates ----------------------------------------------------------------------------------
@@ -367,13 +415,15 @@ function phraseIn(column: string, phrase: string): boolean {
 
 /** A predicate for `text` in the grammar, its dates read in `tz` at `now`. */
 export function grammarMatcher(text: string, tz?: string, now?: number): Match {
-  if (tz !== undefined) {
+  // As in the engine, a bad zone fails only the date terms that need it.
+  const checkZone = () => {
+    if (tz === undefined) return;
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: tz });
     } catch {
       fail(`search: search.tz "${tz}" is not an IANA time zone`);
     }
-  }
+  };
   const build = (e: SearchExpr): Match => {
     switch (e.type) {
       case 'and':
@@ -400,6 +450,7 @@ export function grammarMatcher(text: string, tz?: string, now?: number): Match {
       case 'hasAttachment':
         return (t) => t.attachmentCount !== 0;
       case 'date': {
+        checkZone();
         const start = resolveSearchDate(e.text, tz, now);
         return e.direction === 'before' ? (t) => t.lmrt < start : (t) => t.lmrt >= start;
       }

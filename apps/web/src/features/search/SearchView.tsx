@@ -16,9 +16,11 @@ import { ReaderEmpty, ThreadReaderView } from '@/features/mailbox';
 import { useShortcut } from '@/lib/shortcuts';
 import {
   dateRange,
+  editSearchQuery,
   inDateRange,
   isEmptySearch,
   parseSearchQuery,
+  searchLayout,
   serializeSearchQuery,
   toEngineQuery,
   type ParsedSearch,
@@ -60,11 +62,13 @@ export function SearchView({
     return range ? found.filter((t) => inDateRange(t.lmt, range)) : found;
   }, [engineQuery, search.data, range]);
 
-  const setParsed = (next: ParsedSearch) =>
-    void navigate({
-      to: '/search',
-      search: (prev) => ({ ...prev, q: serializeSearchQuery(next) || undefined }),
-    });
+  // With the grammar the text's order and operators carry meaning: edit it in place.
+  const layout = useMemo(() => (grammar ? searchLayout(query) : undefined), [grammar, query]);
+  const setParsed = (next: ParsedSearch) => {
+    const q = grammar ? editSearchQuery(query, parsed, next) : serializeSearchQuery(next);
+    if (q === null) return;
+    void navigate({ to: '/search', search: (prev) => ({ ...prev, q: q || undefined }) });
+  };
   const setAccount = (next: string | undefined) =>
     void navigate({ to: '/search', search: (prev) => ({ ...prev, account: next }) });
 
@@ -82,6 +86,7 @@ export function SearchView({
         </div>
         <SearchFilters
           parsed={parsed}
+          layout={layout}
           onChange={setParsed}
           accounts={accounts}
           accountId={accountId}
