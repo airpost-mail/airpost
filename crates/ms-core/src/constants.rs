@@ -276,6 +276,8 @@ pub mod thread {
     pub const SOCKET_WRITER: &str = "socketWriter";
     /// `--socket`: removes the socket files on SIGTERM / SIGINT.
     pub const SIGNALS: &str = "signals";
+    /// `--socket`: answers one `files.get` once its download has written the file.
+    pub const FILES: &str = "files";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
     /// `serve`: runs one `account.test` for the parent.

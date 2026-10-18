@@ -185,6 +185,13 @@ pub fn random_id() -> String {
         .collect()
 }
 
+/// The id of a file the engine creates rather than finds in a message (`files.put`, an RFC
+/// 2822 export): 40 lowercase letters and digits, since `File::dir_in` lowercases ids and two
+/// ids differing only in case would share a directory.
+pub fn local_file_id() -> String {
+    random_id().to_ascii_lowercase()
+}
+
 /// The id of the invisible message that holds a deleted draft's placement until the
 /// deletion reaches the server (`Message::messageWithDeletionPlaceholderFor`).
 pub fn deletion_placeholder_id() -> String {
