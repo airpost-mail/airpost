@@ -1316,3 +1316,28 @@ not versions); `resetSettingsForSchemaChange` in `config.ts` reads with `GetRaw`
 another client's change; the `@electron/remote` ban only covers what `lint:check` globs
 (`app/src/**/*.{ts,tsx}`, `app/internal_packages/**/*.{ts,tsx}`), so `.js` files in `app/src`
 and `app/spec` aren't checked. Trial steps above still pending.
+
+2026-10-18, stage 7 (`query` with plain search), branch `roadmap/web-ready`: delivered, not
+merged. Engine: `crates/ms-store/src/model_query.rs` compiles the DCP 3.2 params on
+`ReadStore` against a checked-in allowlist (`model_query_allowlist.json`, every `queryable`
+and joined-data attribute of the eleven classes, with natural orders), including the
+`ThreadCategory` subselect, `ModelPluginMetadata` and `ContactContactGroup` joins, `include:
+["body"]`, `idsOnly`, `count`, `distinct`, offset paging and a keyset `cursor` (`""` first,
+id tiebreak); `search.grammar: false` is `.search(text)`'s FTS prefix match and `true` is
+refused with `INVALID_PARAMS`, `data: {"unsupported": "search-grammar"}`. `query` is a read
+method on the socket, in the relayed Open class, announced as `hello.features: "query"`;
+`tern-client` has `Engine::query`. Desktop: `Query.toJSON()` and `Matcher.toJSON()`, plus
+`spec/model-query-capture-spec.ts`, which regenerates and checks the allowlist and about 60
+queries from the call sites (`toJSON()` and `sql()` each). `tests/model_query_parity.rs`
+runs both against one fixture database and compares rows and order, and checks the
+allowlist against the schema. Deviations: the desktop SQL runs on rusqlite, not
+better-sqlite3 (same SQL text, keeps the suite in `cargo test`); SQLite reads the thread list
+subselect through `ThreadCategory_val_id`, not `ThreadListCategoryIndex`, for the desktop's
+own SQL as much as for ours, with or without large-mailbox statistics, so the plan test
+asserts the desktop's plan and no `Thread` scan instead; `accounts: null` adds no account
+clause, as the desktop reads; `Event.status` is queryable on the desktop but has no column,
+so the engine refuses it; `structuredSearch` has no JSON form until stage 9, so those call
+sites aren't captured; no CLI command (`tern rpc query '<json>'` works) and no tern-mcp
+change, whose search post-filters go with stage 9's grammar. Open: the parity suite has not
+run against a copy of the trial database; the capture covers the call sites with fixture ids,
+not every runtime variation.

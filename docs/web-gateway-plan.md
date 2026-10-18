@@ -479,3 +479,19 @@ Open:
 - No compression on the WebSocket (axum's `ws` has none); initial-sync deltas over a WAN are
   unmeasured.
 - W5 (files, DCP 16) next; then W6/W7 (DCP 7 and 9). DCP stage 6 will need one more rebase.
+
+2026-10-18, W6 (DCP 7 `query`), branch `roadmap/web-ready`, not merged:
+- Engine: `query` in the DCP 3.2 shape on `ReadStore` (`crates/ms-store/src/model_query.rs`),
+  plain search only (`grammar: true` is `-32602` with `data.unsupported: "search-grammar"`),
+  keyset `cursor` paging, `hello.features: "query"`, `query` in the relayed Open class. The
+  allowlist is generated from the desktop's `queryable` attributes. Parity: about 60 queries
+  captured from desktop call sites agree row for row with `Query.sql()` (see DCP Status).
+- Web: thread lists read with `query` when the engine announces it: Starred and unread
+  filtered by the engine, lists sorted by last received (Sent by last sent), unified views
+  paged by the engine in one list (`ThreadQuery.accountId: '*'`), contact autocomplete in
+  one read across accounts, and a read-only two-week calendar agenda (`/calendar`). Engines
+  without `query` keep the old paths. The mock implements `query` and has calendar fixtures;
+  `MockEngine({features: []})` stands in for an older engine.
+- Open: the row's message count and senders (`senders.ts`) need fields on Thread JSON, which
+  no DCP stage has; recurring events show as stored (one master), expansion is DCP 18; a
+  `query` without `limit` is unbounded, as on the desktop, including for relayed devices.
