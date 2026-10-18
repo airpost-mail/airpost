@@ -1,6 +1,8 @@
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import type { SecurityMode } from '@/engine';
 import { ChoiceSelect, type Choice } from '../components/ChoiceSelect';
-import type { AccountForm, FormErrors } from './account-draft';
+import { asksCleartextConsent, type AccountForm, type FormErrors } from './account-draft';
 import { TextField } from './TextField';
 
 const SECURITY: Choice<SecurityMode>[] = [
@@ -27,6 +29,8 @@ export function ServerFields({
   const port = `${proto}Port` as const;
   const security = `${proto}Security` as const;
   const username = `${proto}Username` as const;
+  const allowCleartext = `${proto}AllowCleartext` as const;
+  const consentError = errors[allowCleartext];
   const label = proto.toUpperCase();
   const set = <K extends keyof AccountForm>(k: K, v: AccountForm[K]) =>
     onChange({ [k]: v } as Partial<AccountForm>);
@@ -65,6 +69,27 @@ export function ServerFields({
           onChange={(v) => set(security, v)}
         />
       </div>
+      {asksCleartextConsent(form, proto) && (
+        <div className="col-span-3 flex flex-col gap-1">
+          <div className="flex items-center gap-2.5">
+            <Checkbox
+              id={`acct-${allowCleartext}`}
+              checked={form[allowCleartext]}
+              aria-invalid={!!consentError || undefined}
+              aria-describedby={consentError ? `acct-${allowCleartext}-error` : undefined}
+              onCheckedChange={(on) => set(allowCleartext, on === true)}
+            />
+            <Label htmlFor={`acct-${allowCleartext}`} className="text-sm font-normal">
+              Send password unencrypted
+            </Label>
+          </div>
+          {consentError && (
+            <p id={`acct-${allowCleartext}-error`} className="text-xs text-destructive">
+              {consentError}
+            </p>
+          )}
+        </div>
+      )}
       <TextField
         id={`acct-${username}`}
         className="col-span-3"

@@ -57,4 +57,21 @@ describe('account draft', () => {
     expect(a.id).toMatch(/^[0-9a-f]{8}$/);
     expect(a.aid).toBe(a.id);
   });
+
+  it('asks before sending the password unencrypted to a remote host', async () => {
+    const f = {
+      ...formForPreset(OTHER_PRESET, { email: 'me@okafor.studio' }),
+      password: 'pw',
+      imapSecurity: 'none' as const,
+    };
+    expect(Object.keys(validateForm(f))).toEqual(['imapAllowCleartext']);
+    const confirmed = { ...f, imapAllowCleartext: true };
+    expect(validateForm(confirmed)).toEqual({});
+    const a = await buildAccount(confirmed);
+    expect(a.settings.imap_allow_cleartext).toBe('imap.okafor.studio');
+    expect(a.settings.smtp_allow_cleartext).toBeUndefined();
+
+    // Loopback (Proton Bridge) needs no confirmation.
+    expect(validateForm({ ...f, imapHost: '127.0.0.1' })).toEqual({});
+  });
 });

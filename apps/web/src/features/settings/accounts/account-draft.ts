@@ -16,6 +16,23 @@ export interface AccountForm {
   /** Empty means the IMAP password. */
   smtpPassword: string;
   allowInsecureSsl: boolean;
+  /** "Send password unencrypted" for `none` on a remote host. Cleared when that
+   * protocol's host or security changes. */
+  imapAllowCleartext: boolean;
+  smtpAllowCleartext: boolean;
+}
+
+// Same rule as the desktop's onboarding/lib/connection-security.ts: a cleartext connection
+// to these never leaves the machine (Proton Bridge), so `none` needs no confirmation.
+const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost', '::1', '[::1]'];
+
+export function isLoopbackHost(host: string) {
+  return LOOPBACK_HOSTS.includes(host.trim().toLowerCase());
+}
+
+/** True when `proto` is set to `none` for a remote host, which needs the confirmation. */
+export function asksCleartextConsent(f: AccountForm, proto: 'imap' | 'smtp') {
+  return f[`${proto}Security`] === 'none' && !isLoopbackHost(f[`${proto}Host`]);
 }
 
 /** Fills server fields from the preset (or a guess from the domain for Other IMAP). */
@@ -41,6 +58,8 @@ export function formForPreset(
     smtpUsername: user,
     smtpPassword: prev.smtpPassword ?? '',
     allowInsecureSsl: prev.allowInsecureSsl ?? false,
+    imapAllowCleartext: false,
+    smtpAllowCleartext: false,
   };
 }
 
@@ -61,6 +80,12 @@ export function validateForm(f: AccountForm): FormErrors {
   if (!validPort(f.imapPort)) e.imapPort = 'Port 1–65535.';
   if (!f.smtpHost.trim()) e.smtpHost = 'Required.';
   if (!validPort(f.smtpPort)) e.smtpPort = 'Port 1–65535.';
+  for (const proto of ['imap', 'smtp'] as const) {
+    if (asksCleartextConsent(f, proto) && !f[`${proto}AllowCleartext`]) {
+      e[`${proto}AllowCleartext`] =
+        'Choose SSL / TLS or STARTTLS, or confirm that your password can be sent unencrypted.';
+    }
+  }
   return e;
 }
 
@@ -105,6 +130,11 @@ export async function buildAccount(
     smtp_security: f.smtpSecurity,
     smtp_allow_insecure_ssl: f.allowInsecureSsl,
   };
+  for (const proto of ['imap', 'smtp'] as const) {
+    if (asksCleartextConsent(f, proto) && f[`${proto}AllowCleartext`]) {
+      settings[`${proto}_allow_cleartext`] = settings[`${proto}_host`];
+    }
+  }
   // TODO(engine): the engine assigns the id on `account.add` from DCP stages 11/12; this
   // mirrors the desktop.
   const id = await accountIdFor(email, settings);

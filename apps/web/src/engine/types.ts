@@ -215,12 +215,16 @@ export interface AccountSettingsJSON {
   imap_password?: string;
   imap_allow_insecure_ssl?: boolean;
   imap_security?: SecurityMode;
+  /** The host the user confirmed `none` for; the engine refuses `none` for a remote host
+   * without it. */
+  imap_allow_cleartext?: string;
   smtp_host?: string;
   smtp_port?: number;
   smtp_username?: string;
   smtp_password?: string;
   smtp_allow_insecure_ssl?: boolean;
   smtp_security?: SecurityMode;
+  smtp_allow_cleartext?: string;
   refresh_token?: string;
   container_folder?: string;
 }

@@ -30,6 +30,8 @@ const SERVER_KEYS: (keyof Form)[] = [
   'smtpPort',
   'smtpSecurity',
   'smtpUsername',
+  'imapAllowCleartext',
+  'smtpAllowCleartext',
 ];
 
 export function AccountForm({ preset, onAdded }: { preset: ProviderPreset; onAdded: () => void }) {
@@ -53,6 +55,14 @@ export function AccountForm({ preset, onAdded }: { preset: ProviderPreset; onAdd
         const derived = formForPreset(preset, next);
         for (const k of SERVER_KEYS) {
           if (!nextTouched.has(k)) next = { ...next, [k]: derived[k] };
+        }
+      }
+      // The confirmation is for one server; a new host or security asks again.
+      for (const proto of ['imap', 'smtp'] as const) {
+        const host = `${proto}Host` as const;
+        const security = `${proto}Security` as const;
+        if (next[host] !== prev[host] || next[security] !== prev[security]) {
+          next = { ...next, [`${proto}AllowCleartext`]: false };
         }
       }
       return next;
