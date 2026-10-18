@@ -97,12 +97,22 @@ pub fn migrate(
 }
 
 /// `--mode reset`: deletes everything belonging to one account and resets its metadata
-/// cursor so metadata is fetched again on resync.
+/// cursor so metadata is fetched again on resync. The account's plugin metadata is kept in
+/// `DetatchedPluginMetadata` by Message-ID and attached again as the resync brings the
+/// messages back ([`crate::metadata_stash`]); `ACCOUNT_RESET_QUERIES`' delete of that table
+/// is skipped.
 pub fn reset_account(conn: &Connection, account_id: &str) -> Result<()> {
-    for sql in schema::ACCOUNT_RESET_QUERIES {
-        conn.execute(sql, [account_id])?;
+    let stash = crate::metadata_stash::collect(conn, Some(account_id))?;
+    let tx = conn.unchecked_transaction()?;
+    for sql in schema::ACCOUNT_RESET_QUERIES
+        .iter()
+        .filter(|sql| !sql.contains("`DetatchedPluginMetadata`"))
+    {
+        tx.execute(sql, [account_id])?;
     }
-    save_key_value(conn, &format!("cursor-{account_id}"), "0")?;
+    crate::metadata_stash::save(&tx, &stash)?;
+    save_key_value(&tx, &format!("cursor-{account_id}"), "0")?;
+    tx.commit()?;
     conn.execute_batch("VACUUM")?;
     Ok(())
 }

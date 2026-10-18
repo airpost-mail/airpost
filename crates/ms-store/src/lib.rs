@@ -15,6 +15,7 @@ pub mod counts;
 pub mod delta;
 pub mod invariants;
 pub mod legacy_import;
+pub mod metadata_stash;
 pub mod migrate;
 pub mod model;
 pub mod model_query;

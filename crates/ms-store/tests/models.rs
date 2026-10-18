@@ -699,6 +699,14 @@ fn reset_for_account_clears_every_table() {
             "{table}"
         );
     }
+    // The message's metadata waits for the resync under its Message-ID.
+    assert_eq!(
+        count(
+            &f,
+            "SELECT COUNT(*) FROM DetatchedPluginMetadata WHERE objectId = '<m@x>' AND pluginId = 'p'"
+        ),
+        1
+    );
     assert_eq!(
         f.store
             .get_key_value(&format!("cursor-{ACCOUNT}"))
@@ -708,6 +716,69 @@ fn reset_for_account_clears_every_table() {
     );
     assert!(f.thread(msg.thread_id()).is_none());
     let _ = Thread::TABLE;
+}
+
+#[test]
+fn reset_keeps_metadata_for_the_resync() {
+    let f = fixture();
+    let inbox = f.folder("INBOX", "inbox");
+    let first = f.insert("m@x", &inbox, 1, attrs(1, true), None);
+    f.insert("m2@x", &inbox, 2, attrs(2, true), Some(first.thread_id()));
+    let old_thread = first.thread_id().to_owned();
+    let mut m = f.load(first.id());
+    m.upsert_metadata("send-later", &json!({"expiration": 1_900_000_000}), None);
+    f.store.save(&mut m).unwrap();
+    let mut t = f.thread(&old_thread).unwrap();
+    t.upsert_metadata("thread-snooze", &json!({"expiration": 1_900_000_100}), None);
+    t.upsert_metadata("thread-snooze", &json!({"expiration": 1_900_000_200}), None);
+    t.upsert_metadata("cleared", &json!({}), None);
+    f.store.save(&mut t).unwrap();
+
+    f.store.reset_for_account(ACCOUNT).unwrap();
+    // One message row, and the thread's value under each of its two Message-IDs; the empty
+    // value is not kept.
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM DetatchedPluginMetadata"), 3);
+
+    // The reply comes back first, in a thread of its own id.
+    let reply = f.insert("m2@x", &inbox, 2, attrs(2, true), None);
+    assert_ne!(reply.thread_id(), old_thread);
+    let thread = f.thread(reply.thread_id()).unwrap();
+    let snooze = thread.json()["metadata"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["pluginId"] == "thread-snooze")
+        .cloned()
+        .unwrap();
+    assert_eq!(snooze["value"]["expiration"], 1_900_000_200);
+    assert_eq!(snooze["v"], 2);
+    let expiration: i64 = f
+        .store
+        .conn()
+        .query_row(
+            "SELECT expiration FROM ModelPluginMetadata WHERE id = ? AND value = 'thread-snooze'",
+            [thread.id()],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(expiration, 1_900_000_200);
+    // The thread's other row went with it; the message's waits for its message.
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM DetatchedPluginMetadata"), 1);
+
+    let first = f.insert("m@x", &inbox, 1, attrs(1, true), Some(reply.thread_id()));
+    let m = f.load(first.id());
+    assert!(m.json()["metadata"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|e| e["pluginId"] == "send-later" && e["value"]["expiration"] == 1_900_000_000));
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM DetatchedPluginMetadata"), 0);
+    let threads: i64 = count(
+        &f,
+        "SELECT COUNT(*) FROM ModelPluginMetadata WHERE objectType = 'Thread'",
+    );
+    assert_eq!(threads, 1);
+    f.assert_invariants();
 }
 
 #[test]
