@@ -121,6 +121,12 @@ fn seed(config: &Path) {
     insert_folder(&c, "f-spam", "spam");
     insert_folder(&c, "f-drafts", "drafts");
     insert_thread(&c, "t1", "Lunch");
+    c.execute(
+        "INSERT INTO ThreadCategory (id, value, inAllMail, unread, lastMessageReceivedTimestamp, \
+         lastMessageSentTimestamp) VALUES ('t1', 'f-inbox', 1, 0, 0, 0)",
+        [],
+    )
+    .unwrap();
     insert_thread(&c, "t-spam", "Prize");
     insert_thread(&c, "t-pgp", "Keys");
     let ann = ("Ann Lee", "ann@acme.io");
@@ -404,7 +410,14 @@ fn hello_announces_ai_and_its_capabilities() {
             "{f}"
         );
     }
-    assert!(ai.get("triage").is_none());
+    assert!(hello["features"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(feature::AI_TRIAGE)));
+    assert_eq!(
+        ai["triage"],
+        json!({"available": false, "reason": "not-set-up"})
+    );
 }
 
 /// Nothing is read or sent until the account is opted in and the feature is on.
@@ -824,4 +837,343 @@ fn relayed_connections_may_not_pass_config_or_settings() {
         c.call(method::AI_USAGE, Value::Null).unwrap();
     }
     assert_eq!(server.count(), 0);
+}
+
+// -- Stored settings and triage --------------------------------------------------------------
+
+/// The `core.ai.*` values for the Ollama fake at `server`, with `features`.
+fn stored(server: &MockServer, features: Value) -> Value {
+    json!({
+        "core.ai.providers": [{"id": "local", "kind": "ollama", "name": "Laptop",
+                               "url": server.url(), "model": "m-1"}],
+        "core.ai.features": features,
+        "core.ai.accounts": [ACCOUNT_ID],
+    })
+}
+
+fn store_settings(c: &mut Client, values: Value) {
+    c.call(method::SETTINGS_SET, json!({ "values": values }))
+        .unwrap();
+}
+
+/// The thread's `tern-ai-triage` value, if it has one.
+fn triage_value(c: &mut Client, thread: &str) -> Option<Value> {
+    let r = c
+        .call(
+            method::THREADS_GET,
+            json!({"accountId": ACCOUNT_ID, "id": thread}),
+        )
+        .unwrap();
+    r["thread"]["metadata"]
+        .as_array()?
+        .iter()
+        .find(|m| m["pluginId"] == "tern-ai-triage")
+        .map(|m| m["value"].clone())
+        .filter(|v| v.as_object().is_some_and(|o| !o.is_empty()))
+}
+
+#[track_caller]
+fn wait_for_triage(c: &mut Client, thread: &str) -> Value {
+    let deadline = Instant::now() + WAIT;
+    loop {
+        if let Some(v) = triage_value(c, thread) {
+            return v;
+        }
+        assert!(Instant::now() < deadline, "no triage value on {thread}");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// Sends `ai.triage.run` and reads its answer and progress until `done == total`, keeping
+/// the `capabilities.changed` that came meanwhile.
+fn run_job_seeing(c: &mut Client, params: Value) -> (Value, Vec<Value>, Vec<Value>) {
+    let req = Request::new(ms_ipc::Id::Num(9001), method::AI_TRIAGE_RUN, params);
+    c.send_raw(&ms_ipc::encode(&req)).unwrap();
+    let mut answer = None;
+    let mut progress = Vec::new();
+    let mut capabilities = Vec::new();
+    loop {
+        match c.read_message().unwrap() {
+            Message::Response(r) if r.id == req.id => {
+                assert!(progress.is_empty(), "progress before the answer");
+                answer = Some(r.into_result().unwrap());
+            }
+            Message::Notification(n) if n.method == method::AI_TRIAGE_PROGRESS => {
+                let done = n.params["done"] == n.params["total"];
+                progress.push(n.params);
+                if done {
+                    return (answer.expect("answered"), progress, capabilities);
+                }
+            }
+            Message::Notification(n) if n.method == method::CAPABILITIES_CHANGED => {
+                capabilities.push(n.params["ai"]["triage"].clone());
+            }
+            _ => {}
+        }
+    }
+}
+
+fn run_job(c: &mut Client, params: Value) -> (Value, Vec<Value>) {
+    let (answer, progress, _) = run_job_seeing(c, params);
+    (answer, progress)
+}
+
+const TRIAGE_ANSWER: &str =
+    r#"{"category": "needs-reply", "needsReply": true, "reason": "Ann asks about lunch."}"#;
+
+#[test]
+fn stored_settings_serve_calls_without_config() {
+    let e = Serve::start();
+    let server = ollama(&["From the store."]);
+    let mut c = e.client();
+    let bare = json!({"accountId": ACCOUNT_ID, "threadId": "t1"});
+    assert_eq!(
+        ai_key(c.call(method::AI_SUMMARIZE, bare.clone())),
+        "not-enabled"
+    );
+    store_settings(
+        &mut c,
+        stored(
+            &server,
+            json!({"summary": {"enabled": true, "provider": "local"}}),
+        ),
+    );
+    let r = c.call(method::AI_SUMMARIZE, bare.clone()).unwrap();
+    assert_eq!(r["text"], "From the store.");
+    assert_eq!(server.last().json()["model"], "m-1");
+    let models = c
+        .call(method::AI_MODELS, json!({"provider": "local"}))
+        .unwrap();
+    assert_eq!(models.as_array().unwrap().len(), 2);
+    // A request's own switches still win.
+    let off = json!({"accountId": ACCOUNT_ID, "threadId": "t1",
+                     "settings": {"accounts": [], "features": {}}});
+    assert_eq!(ai_key(c.call(method::AI_SUMMARIZE, off)), "not-enabled");
+
+    // A relayed device reads the stored settings, writes none of them, admin or not, and
+    // runs on the stored provider.
+    let mut relayed = Client::connect(&e.socket).unwrap();
+    relayed.set_read_timeout(Some(WAIT)).unwrap();
+    relayed
+        .call(
+            method::HELLO,
+            json!({"protocol": 1, "client": "gateway", "relayed": true, "scopes": ["admin"]}),
+        )
+        .unwrap();
+    let got = relayed
+        .call(method::SETTINGS_GET, json!({"keys": ["core.ai.providers"]}))
+        .unwrap();
+    assert_eq!(got["values"]["core.ai.providers"][0]["id"], "local");
+    let err = relayed
+        .call(
+            method::SETTINGS_SET,
+            json!({"values": {"core.ai.accounts": []}}),
+        )
+        .unwrap_err();
+    assert_eq!(err.code(), Some(code::FORBIDDEN_RELAYED));
+    let r = relayed
+        .call(
+            method::AI_SUMMARIZE,
+            json!({"accountId": ACCOUNT_ID, "threadId": "t1", "refresh": true}),
+        )
+        .unwrap();
+    assert_eq!(r["text"], "From the store.");
+}
+
+#[test]
+fn daily_token_cap_refuses_calls_until_midnight() {
+    let e = Serve::start();
+    let server = ollama(&["Capped."]);
+    let mut c = e.client();
+    let mut values = stored(
+        &server,
+        json!({"summary": {"enabled": true, "provider": "local"}}),
+    );
+    values["core.ai.limits"] = json!({"dailyTokens": {"local": 1}});
+    store_settings(&mut c, values);
+    let bare = json!({"accountId": ACCOUNT_ID, "threadId": "t1"});
+    c.call(method::AI_SUMMARIZE, bare.clone()).unwrap();
+    let err = rpc_error(
+        c.call(
+            method::AI_SUMMARIZE,
+            json!({"accountId": ACCOUNT_ID, "threadId": "t1", "refresh": true}),
+        )
+        .unwrap_err(),
+    );
+    let data = err.data.unwrap();
+    assert_eq!(data["key"], "quota-exceeded");
+    assert!(data["retryAfter"].as_u64().unwrap() <= 25 * 3600);
+    assert_eq!(server.count(), 1);
+}
+
+#[test]
+fn triage_run_stores_results_and_lists_them() {
+    let e = Serve::start();
+    let server = ollama(&[TRIAGE_ANSWER]);
+    let mut c = e.client();
+    let run = json!({"accountId": ACCOUNT_ID, "threadIds": ["t1"]});
+    assert_eq!(
+        ai_key(c.call(method::AI_TRIAGE_RUN, run.clone())),
+        "not-enabled"
+    );
+    store_settings(
+        &mut c,
+        stored(
+            &server,
+            json!({"triage": {"enabled": true, "provider": "local"}}),
+        ),
+    );
+    let hello = c.call(method::HELLO, json!({"protocol": 1})).unwrap();
+    assert_eq!(
+        hello["capabilities"]["ai"]["triage"],
+        json!({"available": true, "provider": "local", "local": true})
+    );
+
+    let (answer, progress) = run_job(&mut c, run.clone());
+    assert_eq!(answer["queued"], 1);
+    let job = answer["jobId"].as_str().unwrap();
+    assert_eq!(progress, [json!({"jobId": job, "done": 1, "total": 1})]);
+    let value = wait_for_triage(&mut c, "t1");
+    assert_eq!(value["category"], "needs-reply");
+    assert_eq!(value["needsReply"], true);
+    assert_eq!(value["reason"], "Ann asks about lunch.");
+    // The latest inbound message the model may read: m4 is encrypted, m5 is Bo's own.
+    assert_eq!(value["messageId"], "m1");
+    assert_eq!(value["model"], "m-1");
+    assert_eq!(value["v"], ms_ai::PROMPT_VERSION);
+    // Only that message's body went, with the others' headers; nothing secret.
+    let sent = server.last().json().to_string();
+    assert!(sent.contains("Lunch on Friday?"), "{sent}");
+    assert!(!sent.contains("Friday works."), "{sent}");
+    assert!(!sent.contains(SECRET), "{sent}");
+
+    let list = |c: &mut Client, p: Value| c.call(method::AI_TRIAGE_LIST, p).unwrap();
+    assert_eq!(
+        list(&mut c, json!({"category": "needs-reply", "limit": 10})),
+        json!({"threadIds": ["t1"], "total": 1})
+    );
+    assert_eq!(
+        list(&mut c, json!({"category": "newsletter", "limit": 10})),
+        json!({"threadIds": [], "total": 0})
+    );
+    let err = c
+        .call(
+            method::AI_TRIAGE_LIST,
+            json!({"category": "urgent", "limit": 10}),
+        )
+        .unwrap_err();
+    assert_eq!(err.code(), Some(code::INVALID_PARAMS));
+
+    // Already triaged for m1 with this prompt: not asked again.
+    let before = server.count();
+    let (_, progress) = run_job(&mut c, run.clone());
+    assert_eq!(progress.last().unwrap()["done"], 1);
+    assert_eq!(server.count(), before);
+
+    // A correction by the user is never replaced.
+    let corrected = json!({"category": "important", "needsReply": false, "source": "user"});
+    c.call(
+        method::TASK_QUEUE,
+        json!({"accountId": ACCOUNT_ID, "task": {
+            "__cls": "SyncbackMetadataTask", "id": "task-correct", "aid": ACCOUNT_ID,
+            "status": "local", "modelId": "t1", "modelClassName": "thread",
+            "pluginId": "tern-ai-triage", "value": corrected}}),
+    )
+    .unwrap();
+    let deadline = Instant::now() + WAIT;
+    while triage_value(&mut c, "t1").unwrap()["source"] != "user" {
+        assert!(Instant::now() < deadline, "the correction was not stored");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    run_job(&mut c, run);
+    assert_eq!(server.count(), before);
+    assert_eq!(triage_value(&mut c, "t1").unwrap()["category"], "important");
+    assert_eq!(
+        list(&mut c, json!({"category": "needs-reply", "limit": 10}))["total"],
+        0
+    );
+}
+
+#[test]
+fn triage_pauses_on_rate_limits_and_resumes() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    let e = Serve::start();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counted = calls.clone();
+    let server = MockServer::start(move |_| {
+        if counted.fetch_add(1, Ordering::SeqCst) == 0 {
+            Reply::json(429, json!({"error": "slow down"})).header("Retry-After", "1")
+        } else {
+            stream_reply(ProviderKind::Ollama, &[TRIAGE_ANSWER])
+        }
+    });
+    let mut c = e.client();
+    c.call(method::SUBSCRIBE, json!({})).unwrap();
+    store_settings(
+        &mut c,
+        stored(
+            &server,
+            json!({"triage": {"enabled": true, "provider": "local"}}),
+        ),
+    );
+    let started = Instant::now();
+    let (_, progress, capabilities) = run_job_seeing(
+        &mut c,
+        json!({"accountId": ACCOUNT_ID, "threadIds": ["t1", "t-missing"]}),
+    );
+    assert_eq!(progress.len(), 2);
+    // Unavailable while paused, available again once it resumed.
+    let reasons: Vec<&Value> = capabilities.iter().map(|t| &t["reason"]).collect();
+    assert!(
+        reasons.contains(&&json!("rate-limited")),
+        "{capabilities:?}"
+    );
+    assert_eq!(
+        capabilities.last().unwrap()["available"],
+        true,
+        "{capabilities:?}"
+    );
+    assert!(started.elapsed() >= Duration::from_secs(1));
+    assert_eq!(server.count(), 2);
+    assert_eq!(wait_for_triage(&mut c, "t1")["category"], "needs-reply");
+    let hello = c.call(method::HELLO, json!({"protocol": 1})).unwrap();
+    assert_eq!(hello["capabilities"]["ai"]["triage"]["available"], true);
+}
+
+#[test]
+fn triage_jobs_are_cancelled_by_their_connection() {
+    let e = Serve::start();
+    // The first chunk after 1 s, then 2 s of chunks: a cancel shows as an abort at the next
+    // write.
+    let server = slow_ollama(Duration::from_secs(1));
+    let mut c = e.client();
+    store_settings(
+        &mut c,
+        stored(
+            &server,
+            json!({"triage": {"enabled": true, "provider": "local"}}),
+        ),
+    );
+    let r = c
+        .call(
+            method::AI_TRIAGE_RUN,
+            json!({"accountId": ACCOUNT_ID, "threadIds": ["t1"]}),
+        )
+        .unwrap();
+    let job = r["jobId"].as_str().unwrap().to_owned();
+    let deadline = Instant::now() + WAIT;
+    while server.count() == 0 {
+        assert!(Instant::now() < deadline, "the job never asked");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    // Another connection can't cancel it.
+    let mut other = e.client();
+    other
+        .call(method::AI_CANCEL, json!({"jobId": job.clone()}))
+        .unwrap();
+    assert!(!server.saw_abort(Duration::from_millis(1500)));
+    c.call(method::AI_CANCEL, json!({"jobId": job})).unwrap();
+    assert!(server.saw_abort(Duration::from_secs(5)));
+    assert!(triage_value(&mut c, "t1").is_none());
 }

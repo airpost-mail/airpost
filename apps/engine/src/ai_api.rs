@@ -1,23 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! The `ai.*` methods on `serve`'s socket (docs/ai-plan.md section 3), over [`ms_ai`], and
-//! `capabilities.ai`. Triage (section 4) is not served yet.
+//! The `ai.*` methods on `serve`'s socket (docs/ai-plan.md section 3), over [`ms_ai`],
+//! `capabilities.ai` and the usage counters. Triage (section 4) is [`crate::ai_triage`].
 //!
 //! A thread call is checked and its [`MailContext`] read on the connection's reader
 //! thread, from its read-only database connection; the model call then runs on the AI
 //! workers ([`crate::workers::AI`]). The account must be opted in and the feature on before
-//! any mail is read. Until the engine keeps the AI settings and the provider keys
-//! (desktop-client-plan stages 3 and 11), both come with each call from a local client
-//! (`config`, `settings`); the relay policy keeps them out of relayed calls, which so far
-//! find no provider. Nothing here keeps or logs the key, the prompt or the answer.
+//! any mail is read. The switches and providers are the `core.ai.*` settings ([`StoredAi`]);
+//! a local client may still send its own with each call (`settings`, `config`), which the
+//! relay policy keeps out of relayed calls. The engine holds no keys until desktop-client-plan
+//! stage 11, so a stored provider that needs one is `not-configured` and only keyless ones
+//! (Ollama, local compatible servers) run from the store. Nothing here keeps or logs the key,
+//! the prompt or the answer.
 //!
 //! Every call holds a [`CancelToken`] registered with its connection ([`Streams`]):
 //! `ai.cancel {streamId}` and the connection closing cancel it, which drops the provider
 //! request.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::time::Duration;
 
 use chrono::{Local, TimeZone};
 use ms_ai::{
@@ -25,12 +29,16 @@ use ms_ai::{
     ProviderConfig, ReplyOpts, Sink, SummaryOpts, UsageRecord,
 };
 use ms_ipc::{
-    ai_feature, code, method, AccountStatus, AiCancelParams, AiDraftReplyParams, AiModelsParams,
-    AiProviderParams, AiSettings, AiSuggestRepliesParams, AiSummarizeParams, AiUsageParams,
-    AiUsageRow, Capability, ErrorObject, Request as RpcRequest, CREDENTIALS_PER_REQUEST,
+    ai_feature, capability_reason, code, method, AccountStatus, AiCancelParams, AiDraftReplyParams,
+    AiModelsParams, AiProviderParams, AiSettings, AiSuggestRepliesParams, AiSummarizeParams,
+    AiUsageParams, AiUsageRow, Capability, ErrorObject, Request as RpcRequest,
+    CREDENTIALS_PER_REQUEST,
 };
 use ms_store::read::{CategoryTable, ReadStore};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
+use tracing::warn;
+
+use crate::ai_triage::Job as TriageJob;
 
 use crate::dispatch::Reply;
 use crate::read_api::ReadApi;
@@ -55,19 +63,21 @@ const BODY_CHARS_PER_TOKEN: usize = 8;
 /// `ai.usage` keeps this many days.
 const USAGE_DAYS: i64 = 90;
 const DEFAULT_USAGE_DAYS: u32 = 30;
+/// `<config>/ai-usage.json`: the usage counters, kept across restarts.
+pub const USAGE_FILE: &str = "ai-usage.json";
 
 /// `-32011` with the serialized error as `data`. Its text never holds a key, an address
 /// or mail text.
-fn failed(e: AiError) -> ErrorObject {
+pub(crate) fn failed(e: AiError) -> ErrorObject {
     let data = serde_json::to_value(&e).unwrap_or(Value::Null);
     ErrorObject::new(code::AI_FAILED, format!("AI request failed: {e}")).with_data(data)
 }
 
-fn internal(e: impl std::fmt::Display) -> ErrorObject {
+pub(crate) fn internal(e: impl std::fmt::Display) -> ErrorObject {
     ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
 }
 
-fn invalid(why: impl std::fmt::Display) -> ErrorObject {
+pub(crate) fn invalid(why: impl std::fmt::Display) -> ErrorObject {
     ErrorObject::new(code::INVALID_PARAMS, format!("invalid params: {why}"))
 }
 
@@ -79,7 +89,7 @@ static SHARED: Mutex<Option<Arc<Ai>>> = Mutex::new(None);
 
 /// The process's [`Ai`], made on the first call: its caches and the usage counters are
 /// shared by every connection.
-fn ai() -> Result<Arc<Ai>, ErrorObject> {
+pub(crate) fn ai() -> Result<Arc<Ai>, ErrorObject> {
     let mut shared = SHARED.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(ai) = &*shared {
         return Ok(ai.clone());
@@ -101,12 +111,157 @@ pub fn clear_cache() {
     }
 }
 
+// -- Stored settings ------------------------------------------------------------------------
+
+pub const PROVIDERS_KEY: &str = "core.ai.providers";
+pub const FEATURES_KEY: &str = "core.ai.features";
+pub const ACCOUNTS_KEY: &str = "core.ai.accounts";
+pub const LIMITS_KEY: &str = "core.ai.limits";
+pub const INCLUDE_ADDRESSES_KEY: &str = "core.ai.includeAddresses";
+const KEYS: [&str; 5] = [
+    PROVIDERS_KEY,
+    FEATURES_KEY,
+    ACCOUNTS_KEY,
+    LIMITS_KEY,
+    INCLUDE_ADDRESSES_KEY,
+];
+
+/// Triage requests per account per hour when `core.ai.limits` names none.
+pub const DEFAULT_TRIAGE_PER_HOUR: u64 = 200;
+
+/// The `core.ai.*` settings: providers without keys, the switches, the limits. Values of the
+/// wrong shape read as unset.
+#[derive(Clone, Debug, Default)]
+pub struct StoredAi {
+    providers: Vec<Value>,
+    switches: AiSettings,
+    triage_per_hour: Option<u64>,
+    daily_tokens: BTreeMap<String, u64>,
+}
+
+impl StoredAi {
+    /// From the store's values (`settings.get` without keys).
+    pub fn from_values(values: &Map<String, Value>) -> StoredAi {
+        StoredAi::read(&|k| values.get(k).cloned())
+    }
+
+    pub fn read(get: &dyn Fn(&str) -> Option<Value>) -> StoredAi {
+        let [providers, features, accounts, limits, include] = KEYS.map(get);
+        let limits = limits.unwrap_or(Value::Null);
+        StoredAi {
+            providers: match providers {
+                Some(Value::Array(list)) => list,
+                _ => Vec::new(),
+            },
+            switches: AiSettings {
+                accounts: accounts
+                    .as_ref()
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect(),
+                features: match features {
+                    Some(Value::Object(map)) => map,
+                    _ => Map::new(),
+                },
+                include_addresses: include.as_ref().and_then(Value::as_bool) == Some(true),
+            },
+            triage_per_hour: limits["triagePerHour"].as_u64(),
+            daily_tokens: limits["dailyTokens"]
+                .as_object()
+                .into_iter()
+                .flatten()
+                .filter_map(|(k, v)| Some((k.clone(), v.as_u64()?)))
+                .collect(),
+        }
+    }
+
+    pub fn switches(&self) -> &AiSettings {
+        &self.switches
+    }
+
+    /// The stored provider `id`, `None` when there is none.
+    pub fn provider(&self, id: &str) -> Option<Result<ProviderConfig, ErrorObject>> {
+        let raw = self
+            .providers
+            .iter()
+            .find(|p| p["id"].as_str() == Some(id))?;
+        Some(serde_json::from_value(raw.clone()).map_err(|_| {
+            failed(AiError::NotConfigured {
+                what: "the model provider",
+            })
+        }))
+    }
+
+    /// The provider id `feature` uses.
+    pub fn feature_provider(&self, feature: &str) -> Option<&str> {
+        self.switches.features.get(feature)?["provider"].as_str()
+    }
+
+    pub fn triage_per_hour(&self) -> u64 {
+        self.triage_per_hour.unwrap_or(DEFAULT_TRIAGE_PER_HOUR)
+    }
+
+    /// The provider's daily token cap, `None` for no cap.
+    pub fn daily_tokens(&self, provider_id: &str) -> Option<u64> {
+        self.daily_tokens.get(provider_id).copied()
+    }
+}
+
+/// The provider a call uses: the `config` a local client sent, else the stored provider it
+/// names (`provider`), else the one the feature uses.
+pub(crate) fn resolve_provider(
+    p: &AiProviderParams,
+    feature: Option<&str>,
+    stored: &StoredAi,
+) -> Result<ProviderConfig, ErrorObject> {
+    if let Some(c) = p.config.as_ref().filter(|c| !c.is_null()) {
+        return serde_json::from_value(c.clone()).map_err(|e| invalid(format!("config: {e}")));
+    }
+    let not_configured = || {
+        failed(AiError::NotConfigured {
+            what: "the model provider",
+        })
+    };
+    let id = p
+        .provider
+        .as_deref()
+        .or_else(|| feature.and_then(|f| stored.feature_provider(f)))
+        .ok_or_else(not_configured)?;
+    stored.provider(id).ok_or_else(not_configured)?
+}
+
+/// `quota-exceeded` until local midnight once the provider used its daily cap.
+pub(crate) fn check_daily_cap(provider_id: &str, cap: Option<u64>) -> Result<(), AiError> {
+    match cap {
+        Some(cap) if tokens_today(provider_id) >= cap => Err(AiError::QuotaExceeded {
+            status: None,
+            retry_after: Some(until_midnight()),
+        }),
+        _ => Ok(()),
+    }
+}
+
+fn until_midnight() -> Duration {
+    let now = Local::now();
+    let midnight = (now.date_naive() + chrono::Duration::days(1))
+        .and_hms_opt(0, 0, 0)
+        .and_then(|t| t.and_local_timezone(Local).earliest());
+    midnight
+        .and_then(|m| (m - now).to_std().ok())
+        .unwrap_or(Duration::from_secs(3600))
+}
+
 // -- Calls ----------------------------------------------------------------------------------
 
 /// A checked call, its mail already read, ready for a worker.
 pub struct Prepared {
     stream_id: Option<String>,
     job: Job,
+    /// The provider's daily token cap.
+    cap: Option<u64>,
 }
 
 enum Job {
@@ -128,6 +283,15 @@ impl Prepared {
     /// token stops the call.
     pub fn run(self, sink: &mut dyn Sink) -> Reply {
         let ai = ai()?;
+        let provider = match &self.job {
+            Job::Models(_) => None,
+            Job::Test(c) | Job::Summarize(c, ..) | Job::Suggest(c, ..) | Job::Draft(c, ..) => {
+                Some(c.id.as_str())
+            }
+        };
+        if let Some(id) = provider {
+            check_daily_cap(id, self.cap).map_err(failed)?;
+        }
         match self.job {
             Job::Models(config) => answer(ai.models(&config)),
             Job::Test(config) => answer(ai.test(&config)),
@@ -149,19 +313,39 @@ pub fn prepare(
     req: &RpcRequest,
     reads: &mut ReadApi,
     accounts: &dyn Accounts,
+    stored: &StoredAi,
+) -> Result<Prepared, ErrorObject> {
+    let prepared = prepare_job(req, reads, accounts, stored)?;
+    Ok(Prepared {
+        cap: match &prepared.job {
+            Job::Models(_) => None,
+            Job::Test(c) | Job::Summarize(c, ..) | Job::Suggest(c, ..) | Job::Draft(c, ..) => {
+                stored.daily_tokens(&c.id)
+            }
+        },
+        ..prepared
+    })
+}
+
+fn prepare_job(
+    req: &RpcRequest,
+    reads: &mut ReadApi,
+    accounts: &dyn Accounts,
+    stored: &StoredAi,
 ) -> Result<Prepared, ErrorObject> {
     let now = |job| Prepared {
         stream_id: None,
         job,
+        cap: None,
     };
     match req.method.as_str() {
         method::AI_MODELS => {
             let p: AiModelsParams = req.params_as()?;
-            Ok(now(Job::Models(provider_config(&p)?)))
+            Ok(now(Job::Models(resolve_provider(&p, None, stored)?)))
         }
         method::AI_TEST => {
             let p: AiModelsParams = req.params_as()?;
-            Ok(now(Job::Test(provider_config(&p)?)))
+            Ok(now(Job::Test(resolve_provider(&p, None, stored)?)))
         }
         method::AI_SUMMARIZE => {
             let p: AiSummarizeParams = req.params_as()?;
@@ -173,12 +357,14 @@ pub fn prepare(
                 ai_feature::SUMMARY,
                 p.settings.as_ref(),
                 &p.provider,
+                stored,
             )?;
             let context = thread.context(reads, accounts)?;
             let opts = SummaryOpts { refresh: p.refresh };
             Ok(Prepared {
                 stream_id,
                 job: Job::Summarize(thread.config, context, opts),
+                cap: None,
             })
         }
         method::AI_SUGGEST_REPLIES => {
@@ -191,6 +377,7 @@ pub fn prepare(
                 ai_feature::REPLY,
                 p.settings.as_ref(),
                 &p.provider,
+                stored,
             )?;
             let context = thread.context(reads, accounts)?;
             let opts = match p.count {
@@ -200,6 +387,7 @@ pub fn prepare(
             Ok(Prepared {
                 stream_id,
                 job: Job::Suggest(thread.config, context, opts),
+                cap: None,
             })
         }
         method::AI_DRAFT_REPLY => {
@@ -212,6 +400,7 @@ pub fn prepare(
                 ai_feature::REPLY,
                 p.settings.as_ref(),
                 &p.provider,
+                stored,
             )?;
             let context = thread.context(reads, accounts)?;
             let opts = DraftOpts {
@@ -221,6 +410,7 @@ pub fn prepare(
             Ok(Prepared {
                 stream_id,
                 job: Job::Draft(thread.config, context, opts),
+                cap: None,
             })
         }
         other => Err(ErrorObject::new(
@@ -230,25 +420,12 @@ pub fn prepare(
     }
 }
 
-fn checked_stream_id(id: Option<String>) -> Result<Option<String>, ErrorObject> {
+pub(crate) fn checked_stream_id(id: Option<String>) -> Result<Option<String>, ErrorObject> {
     match id {
         Some(id) if id.is_empty() || id.len() > 128 => {
             Err(invalid("streamId must be 1 to 128 characters"))
         }
         id => Ok(id),
-    }
-}
-
-/// The call's provider: the `config` it carries. The engine keeps no provider configs yet,
-/// so a `provider` id alone (a relayed call) names none.
-fn provider_config(p: &AiProviderParams) -> Result<ProviderConfig, ErrorObject> {
-    match &p.config {
-        Some(c) if !c.is_null() => {
-            serde_json::from_value(c.clone()).map_err(|e| invalid(format!("config: {e}")))
-        }
-        _ => Err(failed(AiError::NotConfigured {
-            what: "the model provider",
-        })),
     }
 }
 
@@ -261,6 +438,8 @@ struct ThreadCall<'a> {
 }
 
 impl<'a> ThreadCall<'a> {
+    /// The switches are the call's own `settings` when a local client sent them, else the
+    /// stored ones.
     fn check(
         accounts: &dyn Accounts,
         account_id: &'a str,
@@ -268,24 +447,15 @@ impl<'a> ThreadCall<'a> {
         feature: &'static str,
         settings: Option<&AiSettings>,
         provider: &AiProviderParams,
+        stored: &StoredAi,
     ) -> Result<Self, ErrorObject> {
         accounts.check(account_id)?;
-        let settings = settings
-            .filter(|s| s.account_enabled(account_id))
-            .ok_or_else(|| {
-                failed(AiError::NotEnabled {
-                    what: "AI for this account",
-                })
-            })?;
-        if !settings.feature_enabled(feature) {
-            return Err(failed(AiError::NotEnabled {
-                what: feature_name(feature),
-            }));
-        }
+        let settings = settings.unwrap_or(stored.switches());
+        check_switches(settings, account_id, feature)?;
         Ok(ThreadCall {
             account_id,
             thread_id,
-            config: provider_config(provider)?,
+            config: resolve_provider(provider, Some(feature), stored)?,
             include_addresses: settings.include_addresses,
         })
     }
@@ -299,11 +469,35 @@ impl<'a> ThreadCall<'a> {
         let body_chars =
             (self.config.context_tokens() as usize).saturating_mul(BODY_CHARS_PER_TOKEN);
         let store = reads.store()?;
-        let mut context = mail_context(store, self.account_id, self.thread_id, body_chars)?;
+        let mut context = mail_context(
+            store,
+            self.account_id,
+            self.thread_id,
+            Bodies::NewestFirst(body_chars),
+        )?;
         context.owner = owner;
         context.include_addresses = self.include_addresses;
         Ok(context)
     }
+}
+
+/// `not-enabled` unless the account is opted in and `feature` is on.
+pub(crate) fn check_switches(
+    settings: &AiSettings,
+    account_id: &str,
+    feature: &'static str,
+) -> Result<(), ErrorObject> {
+    if !settings.account_enabled(account_id) {
+        return Err(failed(AiError::NotEnabled {
+            what: "AI for this account",
+        }));
+    }
+    if !settings.feature_enabled(feature) {
+        return Err(failed(AiError::NotEnabled {
+            what: feature_name(feature),
+        }));
+    }
+    Ok(())
 }
 
 fn feature_name(feature: &str) -> &'static str {
@@ -314,7 +508,7 @@ fn feature_name(feature: &str) -> &'static str {
     }
 }
 
-fn owner(statuses: Vec<AccountStatus>, account_id: &str) -> Person {
+pub(crate) fn owner(statuses: Vec<AccountStatus>, account_id: &str) -> Person {
     statuses
         .into_iter()
         .find(|s| s.account_id == account_id)
@@ -333,15 +527,24 @@ fn owner(statuses: Vec<AccountStatus>, account_id: &str) -> Person {
 
 // -- Mail context ---------------------------------------------------------------------------
 
+/// Which bodies [`mail_context`] reads.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Bodies<'a> {
+    /// Newest first until this many characters; older messages go with `body_omitted`.
+    NewestFirst(usize),
+    /// Only the newest message not from `owner` (an address), the one triage judges; the
+    /// others go with their headers alone (docs/ai-plan.md section 4).
+    LatestInbound { owner: &'a str },
+}
+
 /// The thread as the model may see it (docs/ai-plan.md section 5): drafts, hidden
 /// messages, messages only in Spam or Trash and encrypted ones left out; bodies as plain
-/// text without quoted replies, read newest first until `body_chars`, older messages
-/// with their headers and `body_omitted`; the participants of the messages kept.
-fn mail_context(
+/// text without quoted replies, as `bodies` says; the participants of the messages kept.
+pub(crate) fn mail_context(
     store: &ReadStore,
     account_id: &str,
     thread_id: &str,
-    body_chars: usize,
+    bodies: Bodies<'_>,
 ) -> Result<MailContext, ErrorObject> {
     let thread = store
         .thread(account_id, thread_id)
@@ -364,7 +567,11 @@ fn mail_context(
 
     // Every body is read for the inline-PGP check, budget or not, so what is left out
     // doesn't depend on the budget; only those within it are turned into text.
-    let mut left = body_chars;
+    let mut left = match bodies {
+        Bodies::NewestFirst(chars) => chars,
+        Bodies::LatestInbound { .. } => usize::MAX,
+    };
+    let mut inbound_seen = false;
     let mut kept: Vec<&Value> = Vec::with_capacity(messages.len());
     let mut out: Vec<ContextMessage> = Vec::with_capacity(messages.len());
     for m in messages.iter().rev() {
@@ -382,8 +589,17 @@ fn mail_context(
             .as_deref()
             .or(snippet)
             .is_some_and(|b| !b.trim().is_empty());
-        let body_omitted = left == 0 && has_text;
-        let body = if left > 0 {
+        let take = match bodies {
+            Bodies::NewestFirst(_) => left > 0,
+            Bodies::LatestInbound { owner } => {
+                let from = m["from"][0]["email"].as_str().unwrap_or("");
+                let inbound = !inbound_seen && !from.eq_ignore_ascii_case(owner);
+                inbound_seen |= inbound;
+                inbound
+            }
+        };
+        let body_omitted = matches!(bodies, Bodies::NewestFirst(_)) && !take && has_text;
+        let body = if take {
             match stored {
                 Some(stored) => Some(body_text(&stored, m["plaintext"] == json!(true))),
                 None => snippet.map(str::to_owned),
@@ -588,6 +804,9 @@ pub struct Streams {
 struct StreamsState {
     next: u64,
     calls: Vec<(u64, Option<String>, CancelToken)>,
+    /// The connection's `ai.triage.run` jobs, for `ai.cancel {jobId}`. They outlive the
+    /// connection: their results are stored, not sent.
+    jobs: Vec<Weak<TriageJob>>,
     /// The connection is gone: later registrations start cancelled.
     closed: bool,
 }
@@ -639,7 +858,15 @@ impl Streams {
         })
     }
 
-    /// `ai.cancel`. An id that isn't streaming (it just finished) is not an error.
+    /// Remembers a triage job this connection started.
+    pub fn add_job(&self, job: &Arc<TriageJob>) {
+        let mut st = self.lock();
+        st.jobs.retain(|j| j.strong_count() > 0);
+        st.jobs.push(Arc::downgrade(job));
+    }
+
+    /// `ai.cancel`. An id that isn't streaming (it just finished) is not an error. A job is
+    /// cancelled only by the connection that started it.
     pub fn cancel(&self, req: &RpcRequest) -> Reply {
         let p: AiCancelParams = req.params_as()?;
         match (p.stream_id, p.job_id) {
@@ -650,8 +877,13 @@ impl Streams {
                     }
                 }
             }
-            // No triage jobs yet.
-            (None, Some(_)) => {}
+            (None, Some(id)) => {
+                for job in self.lock().jobs.iter().filter_map(Weak::upgrade) {
+                    if job.id() == id {
+                        job.cancel();
+                    }
+                }
+            }
             (None, None) => return Err(invalid("ai.cancel takes streamId or jobId")),
         }
         Ok(json!({}))
@@ -676,8 +908,93 @@ struct Totals {
     requests: u64,
 }
 
-/// By day, provider id and feature, since the engine started.
-static USAGE: Mutex<BTreeMap<(String, String, &'static str), Totals>> = Mutex::new(BTreeMap::new());
+type UsageKey = (String, String, &'static str);
+
+/// By day, provider id and feature, loaded from and saved to [`USAGE_PATH`] when set.
+static USAGE: Mutex<BTreeMap<UsageKey, Totals>> = Mutex::new(BTreeMap::new());
+/// `<config>/ai-usage.json`, set by [`init_usage`] (`serve`).
+static USAGE_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+fn feature_key(name: &str) -> Option<&'static str> {
+    match name {
+        ai_feature::SUMMARY => Some(ai_feature::SUMMARY),
+        ai_feature::REPLY => Some(ai_feature::REPLY),
+        ai_feature::TRIAGE => Some(ai_feature::TRIAGE),
+        "test" => Some("test"),
+        _ => None,
+    }
+}
+
+/// Loads the counters from `<config_dir>/ai-usage.json` and saves them there from now on. A
+/// file that doesn't read starts the counters anew.
+pub fn init_usage(config_dir: &Path) {
+    let path = config_dir.join(USAGE_FILE);
+    let rows: Vec<AiUsageRow> = match std::fs::read(&path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|e| {
+            warn!(
+                "-X Could not read {}: {e}; AI usage starts anew",
+                path.display()
+            );
+            Vec::new()
+        }),
+        Err(_) => Vec::new(),
+    };
+    let mut usage = USAGE.lock().unwrap_or_else(|e| e.into_inner());
+    for r in rows {
+        let Some(feature) = feature_key(&r.feature) else {
+            continue;
+        };
+        let t = usage.entry((r.day, r.provider, feature)).or_default();
+        t.input += r.input_tokens;
+        t.output += r.output_tokens;
+        t.requests += r.requests;
+    }
+    *USAGE_PATH.lock().unwrap_or_else(|e| e.into_inner()) = Some(path);
+}
+
+fn rows(usage: &BTreeMap<UsageKey, Totals>, oldest: &str) -> Vec<AiUsageRow> {
+    let mut rows: Vec<AiUsageRow> = usage
+        .iter()
+        .filter(|((day, _, _), _)| day.as_str() >= oldest)
+        .map(|((day, provider, feature), t)| AiUsageRow {
+            day: day.clone(),
+            provider: provider.clone(),
+            feature: (*feature).to_owned(),
+            input_tokens: t.input,
+            output_tokens: t.output,
+            requests: t.requests,
+        })
+        .collect();
+    rows.sort_by(|a, b| b.day.cmp(&a.day));
+    rows
+}
+
+/// Writes the counters beside the file, then renames it over the file.
+fn save_usage(usage: &BTreeMap<UsageKey, Totals>) {
+    let Some(path) = USAGE_PATH.lock().unwrap_or_else(|e| e.into_inner()).clone() else {
+        return;
+    };
+    let bytes = match serde_json::to_vec(&rows(usage, "")) {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+    let tmp = path.with_extension("json.tmp");
+    if let Err(e) = std::fs::write(&tmp, bytes).and_then(|()| std::fs::rename(&tmp, &path)) {
+        warn!("-X Could not write {}: {e}", path.display());
+    }
+}
+
+/// Input and output tokens the provider used today.
+pub(crate) fn tokens_today(provider_id: &str) -> u64 {
+    let today = day_key(0);
+    USAGE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .filter(|((day, provider, _), _)| *day == today && provider == provider_id)
+        .map(|(_, t)| t.input + t.output)
+        .sum()
+}
 
 fn day_key(days_ago: i64) -> String {
     (Local::now().date_naive() - chrono::Duration::days(days_ago))
@@ -701,6 +1018,7 @@ fn record_usage(r: &UsageRecord) {
     t.input += r.usage.input_tokens;
     t.output += r.usage.output_tokens;
     t.requests += 1;
+    save_usage(&usage);
 }
 
 /// `ai.usage`: the last `days` days, newest first.
@@ -713,29 +1031,16 @@ pub fn usage(req: &RpcRequest) -> Reply {
     );
     let oldest = day_key(days - 1);
     let usage = USAGE.lock().unwrap_or_else(|e| e.into_inner());
-    let mut rows: Vec<AiUsageRow> = usage
-        .iter()
-        .filter(|((day, _, _), _)| *day >= oldest)
-        .map(|((day, provider, feature), t)| AiUsageRow {
-            day: day.clone(),
-            provider: provider.clone(),
-            feature: (*feature).to_owned(),
-            input_tokens: t.input,
-            output_tokens: t.output,
-            requests: t.requests,
-        })
-        .collect();
-    rows.sort_by(|a, b| b.day.cmp(&a.day));
-    serde_json::to_value(rows).map_err(internal)
+    serde_json::to_value(rows(&usage, &oldest)).map_err(internal)
 }
 
 // -- Capabilities ---------------------------------------------------------------------------
 
-/// `capabilities.ai`: the features this engine serves. The client sends the provider,
-/// key and switches with each call, so it decides availability from its own settings
-/// ([`CREDENTIALS_PER_REQUEST`]).
-pub fn capabilities() -> BTreeMap<String, Capability> {
-    [ai_feature::SUMMARY, ai_feature::REPLY]
+/// `capabilities.ai`. The client sends the key with each summary and reply call, so it
+/// decides their availability from its own settings ([`CREDENTIALS_PER_REQUEST`]). Triage
+/// runs in the engine from the stored settings alone, so the engine says whether it can.
+pub fn capabilities(stored: &StoredAi) -> BTreeMap<String, Capability> {
+    let mut caps: BTreeMap<String, Capability> = [ai_feature::SUMMARY, ai_feature::REPLY]
         .into_iter()
         .map(|f| {
             (
@@ -747,7 +1052,51 @@ pub fn capabilities() -> BTreeMap<String, Capability> {
                 },
             )
         })
-        .collect()
+        .collect();
+    caps.insert(ai_feature::TRIAGE.to_owned(), triage_capability(stored));
+    caps
+}
+
+fn triage_capability(stored: &StoredAi) -> Capability {
+    let unavailable = |reason: &str, config: Option<&ProviderConfig>| Capability {
+        available: false,
+        provider: config.map(|c| c.id.clone()),
+        local: config.map(ProviderConfig::is_local),
+        reason: Some(reason.to_owned()),
+        ..Capability::default()
+    };
+    let switches = stored.switches();
+    if !switches.feature_enabled(ai_feature::TRIAGE) || switches.accounts.is_empty() {
+        return unavailable(capability_reason::NOT_SET_UP, None);
+    }
+    let Some(Ok(config)) = stored
+        .feature_provider(ai_feature::TRIAGE)
+        .and_then(|id| stored.provider(id))
+    else {
+        return unavailable(capability_reason::NOT_SET_UP, None);
+    };
+    match config.check() {
+        Err(AiError::NotConfigured {
+            what: "the API key",
+        }) => return unavailable(capability_reason::NEEDS_ENGINE_KEY, Some(&config)),
+        Err(_) => return unavailable(capability_reason::NOT_SET_UP, Some(&config)),
+        Ok(()) => {}
+    }
+    let paused = crate::ai_triage::paused(&config.id).or_else(|| {
+        check_daily_cap(&config.id, stored.daily_tokens(&config.id))
+            .err()
+            .map(|e| e.key())
+    });
+    match paused {
+        Some("rate-limited") => unavailable(capability_reason::RATE_LIMITED, Some(&config)),
+        Some(_) => unavailable(capability_reason::QUOTA_EXCEEDED, Some(&config)),
+        None => Capability {
+            available: true,
+            provider: Some(config.id.clone()),
+            local: Some(config.is_local()),
+            ..Capability::default()
+        },
+    }
 }
 
 #[cfg(test)]
@@ -851,20 +1200,156 @@ mod tests {
         assert_eq!(summary["day"], json!(day_key(0)));
     }
 
+    fn stored(values: Value) -> StoredAi {
+        StoredAi::from_values(values.as_object().unwrap())
+    }
+
     #[test]
-    fn a_relayed_call_finds_no_provider() {
-        let e = provider_config(&AiProviderParams {
+    fn providers_come_from_the_call_or_the_store() {
+        let none = StoredAi::default();
+        let by_id = AiProviderParams {
             config: None,
             provider: Some("p".into()),
-        })
-        .unwrap_err();
+        };
+        let e = resolve_provider(&by_id, None, &none).unwrap_err();
         assert_eq!(e.code, code::AI_FAILED);
         assert_eq!(e.data.unwrap()["key"], "not-configured");
-        let e = provider_config(&AiProviderParams {
-            config: Some(json!({"id": "p", "kind": "nope"})),
-            provider: None,
-        })
+        let e = resolve_provider(
+            &AiProviderParams {
+                config: Some(json!({"id": "p", "kind": "nope"})),
+                provider: None,
+            },
+            None,
+            &none,
+        )
         .unwrap_err();
         assert_eq!(e.code, code::INVALID_PARAMS);
+
+        let s = stored(json!({
+            "core.ai.providers": [
+                {"id": "p", "kind": "ollama", "name": "Laptop", "model": "llama3"},
+                {"id": "q", "kind": "anthropic", "model": "claude"},
+            ],
+            "core.ai.features": {"triage": {"enabled": true, "provider": "q"}},
+        }));
+        assert_eq!(resolve_provider(&by_id, None, &s).unwrap().model, "llama3");
+        let default = AiProviderParams::default();
+        assert_eq!(
+            resolve_provider(&default, Some(ai_feature::TRIAGE), &s)
+                .unwrap()
+                .id,
+            "q"
+        );
+        assert!(resolve_provider(&default, Some(ai_feature::SUMMARY), &s).is_err());
+    }
+
+    #[test]
+    fn stored_switches_and_limits() {
+        let s = stored(json!({
+            "core.ai.accounts": ["a1", 3],
+            "core.ai.features": {"summary": true, "triage": {"enabled": false}},
+            "core.ai.includeAddresses": true,
+            "core.ai.limits": {"triagePerHour": 10, "dailyTokens": {"p": 5000, "q": "x"}},
+        }));
+        assert!(s.switches().account_enabled("a1"));
+        assert_eq!(s.switches().accounts.len(), 1);
+        assert!(s.switches().feature_enabled("summary"));
+        assert!(!s.switches().feature_enabled("triage"));
+        assert!(s.switches().include_addresses);
+        assert_eq!(s.triage_per_hour(), 10);
+        assert_eq!(
+            (s.daily_tokens("p"), s.daily_tokens("q")),
+            (Some(5000), None)
+        );
+        assert_eq!(
+            StoredAi::default().triage_per_hour(),
+            DEFAULT_TRIAGE_PER_HOUR
+        );
+        let e = check_switches(s.switches(), "a2", ai_feature::SUMMARY).unwrap_err();
+        assert_eq!(e.data.unwrap()["key"], "not-enabled");
+        assert!(check_switches(s.switches(), "a1", ai_feature::TRIAGE).is_err());
+        assert!(check_switches(s.switches(), "a1", ai_feature::SUMMARY).is_ok());
+    }
+
+    #[test]
+    fn triage_capability_follows_the_store() {
+        let reason = |v: Value| {
+            let caps = capabilities(&stored(v));
+            assert!(caps[ai_feature::SUMMARY].available);
+            caps[ai_feature::TRIAGE].reason.clone()
+        };
+        assert_eq!(reason(json!({})).as_deref(), Some("not-set-up"));
+        let on = |kind: &str| {
+            json!({
+                "core.ai.providers": [{"id": "cap-p", "kind": kind, "model": "m"}],
+                "core.ai.features": {"triage": {"enabled": true, "provider": "cap-p"}},
+                "core.ai.accounts": ["a1"],
+            })
+        };
+        assert_eq!(reason(on("ollama")), None);
+        assert_eq!(reason(on("anthropic")).as_deref(), Some("needs-engine-key"));
+        let caps = capabilities(&stored(on("ollama")));
+        let triage = &caps[ai_feature::TRIAGE];
+        assert_eq!(
+            (triage.provider.as_deref(), triage.local),
+            (Some("cap-p"), Some(true))
+        );
+    }
+
+    #[test]
+    fn the_daily_cap_runs_to_midnight() {
+        record_usage(&UsageRecord {
+            provider_id: "cap-test".to_owned(),
+            kind: ms_ai::ProviderKind::Ollama,
+            model: "m".into(),
+            feature: Feature::Summary,
+            usage: ms_ai::TokenUsage {
+                input_tokens: 90,
+                output_tokens: 20,
+                estimated: false,
+            },
+        });
+        assert!(check_daily_cap("cap-test", None).is_ok());
+        assert!(check_daily_cap("cap-test", Some(1000)).is_ok());
+        let e = check_daily_cap("cap-test", Some(100)).unwrap_err();
+        assert_eq!(e.key(), "quota-exceeded");
+        let wait = e.retry_after().unwrap();
+        assert!(wait <= Duration::from_secs(25 * 3600), "{wait:?}");
+    }
+
+    #[test]
+    fn usage_survives_a_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let rows = vec![AiUsageRow {
+            day: day_key(0),
+            provider: "file-test".into(),
+            feature: "triage".into(),
+            input_tokens: 7,
+            output_tokens: 1,
+            requests: 1,
+        }];
+        std::fs::write(
+            dir.path().join(USAGE_FILE),
+            serde_json::to_vec(&rows).unwrap(),
+        )
+        .unwrap();
+        init_usage(dir.path());
+        assert_eq!(tokens_today("file-test"), 8);
+        record_usage(&UsageRecord {
+            provider_id: "file-test".to_owned(),
+            kind: ms_ai::ProviderKind::Ollama,
+            model: "m".into(),
+            feature: Feature::Triage,
+            usage: ms_ai::TokenUsage {
+                input_tokens: 2,
+                output_tokens: 0,
+                estimated: true,
+            },
+        });
+        let saved: Vec<AiUsageRow> =
+            serde_json::from_slice(&std::fs::read(dir.path().join(USAGE_FILE)).unwrap()).unwrap();
+        let mine = saved.iter().find(|r| r.provider == "file-test").unwrap();
+        assert_eq!((mine.input_tokens, mine.requests), (9, 2));
+        *USAGE_PATH.lock().unwrap() = None;
     }
 }

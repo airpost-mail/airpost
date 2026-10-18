@@ -147,6 +147,13 @@ pub fn run(opts: &Options) -> i32 {
         database,
         settings: Some(settings),
     });
+    crate::ai_api::init_usage(&opts.config_dir);
+    let for_capabilities = Arc::downgrade(&server);
+    crate::ai_triage::on_capabilities_changed(Box::new(move || {
+        if let Some(server) = for_capabilities.upgrade() {
+            socket::publish_capabilities(&server);
+        }
+    }));
     socket::serve(listener, server.clone());
     info!(
         "{}",
@@ -182,6 +189,8 @@ struct Slot {
     state: &'static str,
     error: Option<Value>,
     deltas: Arc<DeltaStream>,
+    /// The account's AI triage queue, closed when it stops.
+    triage: Arc<crate::ai_triage::Feed>,
     runtime: Option<Arc<Runtime>>,
     /// The `accountStop` thread is joining the account's threads after a failure.
     stopping: bool,
@@ -695,7 +704,7 @@ impl Engine {
             "{}",
             ms_core::logmsg::starting_sync(account.email_address())
         );
-        let (ctx, deltas) = self.context(account.clone(), parsed, generation);
+        let (ctx, deltas, triage) = self.context(account.clone(), parsed, generation);
         let slot = Slot {
             account,
             identity,
@@ -703,6 +712,7 @@ impl Engine {
             state: account_state::STARTING,
             error: None,
             deltas,
+            triage: triage.clone(),
             runtime: None,
             stopping: false,
             removing: false,
@@ -728,6 +738,7 @@ impl Engine {
         // The registry stays locked until the runtime is stored, so a thread failing at once
         // finds it to stop.
         let runtime = Arc::new(AccountRuntime::start(ctx, Some(dispatcher)));
+        crate::ai_triage::start(runtime.context(), triage);
         if let Some(slot) = reg.current(&id, generation) {
             slot.runtime = Some(runtime);
         }
@@ -751,22 +762,23 @@ impl Engine {
         .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e.to_string()))
     }
 
-    /// The account's context: its own delta stream into the hub (secrets to stdout), token
-    /// manager, metadata backend and failure handler.
+    /// The account's context: its own delta stream into the hub (secrets to stdout) through
+    /// its AI triage feed, token manager, metadata backend and failure handler.
     fn context(
         &self,
         account: Arc<Account>,
         identity: crate::modes::IdentityLine,
         generation: u64,
-    ) -> (WorkerContext, Arc<DeltaStream>) {
+    ) -> (WorkerContext, Arc<DeltaStream>, Arc<crate::ai_triage::Feed>) {
         let id = account.id().to_owned();
-        let deltas = DeltaStream::with_sink(self.hub.sink(
+        let triage = crate::ai_triage::Feed::register(&id);
+        let deltas = DeltaStream::with_sink(triage.tap(self.hub.sink(
             &id,
             Box::new(ParentSink {
                 account_id: id.clone(),
                 detached: self.detached,
             }),
-        ));
+        )));
         let metadata =
             crate::modes::metadata_backend(&self.config_dir, &account, identity, &deltas);
         let for_tokens = deltas.clone();
@@ -820,7 +832,7 @@ impl Engine {
         );
         ctx.verbose = now_ms() < self.verbose_until.load(Ordering::SeqCst);
         ctx.settings = Some(self.settings.clone());
-        (ctx, deltas)
+        (ctx, deltas, triage)
     }
 
     /// The account's `main` thread opened the database and is taking commands.
@@ -850,6 +862,7 @@ impl Engine {
         slot.error = Some(failure.error.clone());
         slot.stopping = true;
         let runtime = slot.runtime.clone();
+        slot.triage.close();
         drop(reg);
         self.changed.notify_all();
 
@@ -1018,7 +1031,10 @@ impl Engine {
         let (mut reg, _) =
             self.wait_until(reg, stop_wait, |r| r.get(&id).is_none_or(|s| !s.stopping));
         let (runtime, deltas) = match reg.get_mut(&id) {
-            Some(s) => (s.runtime.take(), s.deltas.clone()),
+            Some(s) => {
+                s.triage.close();
+                (s.runtime.take(), s.deltas.clone())
+            }
             None => return Ok(Vec::new()),
         };
         drop(reg);

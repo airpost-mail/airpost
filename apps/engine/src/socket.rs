@@ -32,7 +32,7 @@ use ms_core::constants::{
 use ms_core::Account;
 use ms_ipc::{
     account_state, code, feature, method, policy, AccountChangedParams, AccountInfo,
-    AccountListResult, AccountStateParams, AccountStatus, AiDeltaParams, BodiesFetchParams,
+    AccountListResult, AccountStateParams, AccountStatus, AiDeltaParams, AiTriageProgressParams, BodiesFetchParams,
     CalendarSyncParams, Capabilities, CredentialsStatus, DisconnectParams, EngineStatusResult,
     ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams, LogsTailResult,
     MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response, SettingsGetParams,
@@ -44,7 +44,7 @@ use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
-use crate::ai_api::{self, is_ai_method, Streams};
+use crate::ai_api::{self, is_ai_method, StoredAi, Streams};
 use crate::dispatch::{Command, Deferred, Reply, Request};
 use crate::files::is_files_method;
 use crate::integrations_api::{self, is_capability_setting, is_integrations_method};
@@ -1045,8 +1045,27 @@ fn features(server: &Server) -> Vec<String> {
         out.push(feature::INTEGRATIONS.to_owned());
         out.push(feature::CAPABILITIES.to_owned());
         out.push(feature::AI.to_owned());
+        out.push(feature::AI_TRIAGE.to_owned());
     }
     out
+}
+
+/// `serve`'s `core.ai.*` settings; none without a store, or when it can't be read.
+fn stored_ai(server: &Server) -> StoredAi {
+    server
+        .settings
+        .as_ref()
+        .and_then(|s| s.lock().get(None).ok())
+        .map(|values| StoredAi::from_values(&values))
+        .unwrap_or_default()
+}
+
+/// Sends `capabilities.changed` with the current capabilities: an AI triage pause began or
+/// ended.
+pub fn publish_capabilities(server: &Server) {
+    if let Some(caps) = capabilities(server) {
+        server.hub.capabilities_changed(&caps);
+    }
 }
 
 /// `serve`'s capabilities; `sync` mode has none.
@@ -1059,8 +1078,9 @@ fn capabilities(server: &Server) -> Option<Capabilities> {
 
 /// An unreadable store reads as empty: every integration not set up.
 fn capabilities_of(guard: &SettingsGuard<'_>) -> Capabilities {
-    let mut caps = integrations_api::capabilities(&guard.get(None).unwrap_or_default());
-    caps.ai = ai_api::capabilities();
+    let values = guard.get(None).unwrap_or_default();
+    let mut caps = integrations_api::capabilities(&values);
+    caps.ai = ai_api::capabilities(&StoredAi::from_values(&values));
     caps
 }
 
@@ -1093,7 +1113,7 @@ fn settings_call(
             let before = p
                 .values
                 .keys()
-                .any(|k| is_capability_setting(k))
+                .any(|k| is_capability_setting(k) || k.starts_with("core.ai."))
                 .then(|| capabilities_of(&guard));
             let changed = guard.set(p.values)?;
             if !changed.is_empty() {
@@ -1351,6 +1371,21 @@ impl Connection {
                 self.ai_streams.cancel(&req)
             }
             method::AI_USAGE if self.session.server.settings.is_some() => ai_api::usage(&req),
+            method::AI_TRIAGE_RUN if self.session.server.settings.is_some() => {
+                match self.triage_run(&req) {
+                    Ok(()) => return None,
+                    Err(e) => Err(e),
+                }
+            }
+            method::AI_TRIAGE_LIST if self.session.server.settings.is_some() => {
+                let stored = stored_ai(&self.session.server);
+                crate::ai_triage::list(
+                    &req,
+                    &mut self.session.reads,
+                    &*self.session.server.accounts,
+                    &stored,
+                )
+            }
             name if is_ai_method(name) && self.session.server.settings.is_some() => {
                 match self.ai_call(&req) {
                     Ok(()) => return None,
@@ -1440,7 +1475,13 @@ impl Connection {
     /// with a sink that sends its `ai.delta` notifications to this connection only, ahead
     /// of the response.
     fn ai_call(&mut self, req: &RpcRequest) -> Result<(), ErrorObject> {
-        let call = ai_api::prepare(req, &mut self.session.reads, &*self.session.server.accounts)?;
+        let stored = stored_ai(&self.session.server);
+        let call = ai_api::prepare(
+            req,
+            &mut self.session.reads,
+            &*self.session.server.accounts,
+            &stored,
+        )?;
         let registration = self.ai_streams.register(call.stream_id())?;
         let mut sink = AiSink {
             conn: self.id,
@@ -1458,6 +1499,49 @@ impl Connection {
                 reply
             }),
         );
+        Ok(())
+    }
+
+    /// `ai.triage.run`: queues the job on the account's triage thread and answers; its
+    /// `ai.triage.progress` notifications come after the answer, to this connection only.
+    fn triage_run(&mut self, req: &RpcRequest) -> Result<(), ErrorObject> {
+        let stored = stored_ai(&self.session.server);
+        let (conn, outbox, hub) = (
+            self.id,
+            self.outbox.clone(),
+            self.session.server.hub.clone(),
+        );
+        let progress: crate::ai_triage::Progress = Box::new(move |p: &AiTriageProgressParams| {
+            let n = Notification::new(
+                method::AI_TRIAGE_PROGRESS,
+                serde_json::to_value(p).unwrap_or(Value::Null),
+            );
+            if let Err(PushError::Full) = outbox.push(ms_ipc::encode(&n).into()) {
+                drop_slow(conn, &outbox);
+                hub.unsubscribe(conn);
+            }
+        });
+        let id = req.id.clone();
+        let (answer_outbox, answer_hub) = (self.outbox.clone(), self.session.server.hub.clone());
+        let respond = move |result: Value| {
+            let Some(id) = id else {
+                return;
+            };
+            let line = ms_ipc::encode(&Response::ok(Some(id), result));
+            if let Err(PushError::Full) = answer_outbox.push(line.into()) {
+                drop_slow(conn, &answer_outbox);
+                answer_hub.unsubscribe(conn);
+            }
+        };
+        let job = crate::ai_triage::run(
+            req,
+            &mut self.session.reads,
+            &*self.session.server.accounts,
+            &stored,
+            progress,
+            respond,
+        )?;
+        self.ai_streams.add_job(&job);
         Ok(())
     }
 

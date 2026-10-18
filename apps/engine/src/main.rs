@@ -10,6 +10,8 @@
 
 #[cfg(unix)]
 mod ai_api;
+#[cfg(unix)]
+mod ai_triage;
 mod cli;
 mod dispatch;
 #[cfg(unix)]
