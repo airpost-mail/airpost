@@ -614,7 +614,11 @@ merged:
   counts as hearing from the browser, and a ping also follows every 64 KiB written; without
   the second, a tab reading 1 MB/s through what loopback socket buffers held was closed in
   the test. When the engine connection ends, what is queued still reaches the browser
-  before the 4502 or 4008. The close frame gets 5 s. Interval and timeout live in
+  before the 4502 or 4008; browser requests in that window are dropped rather than written
+  to the closed engine socket, and a failed engine write waits for the engine read to reach
+  EOF, so a tab dropped for falling behind gets 4008 even if it keeps sending. After the
+  close frame the gateway reads until the browser's close, so a tab still sending doesn't
+  reset the connection and lose the frames it hadn't read; the handshake gets 5 s. Interval and timeout live in
   `Config::heartbeat` (no flag or env var); tests use 300 ms and 700 ms.
 - `file_routes` flake (ConnectionReset at relay.rs:392 under load): the gateway answered 413
   to a chunked upload past the cap with the rest of the body unread, and closing a socket
@@ -628,7 +632,9 @@ merged:
   pongs is closed with 1001 within interval + timeout and its engine connection closes
   mid-stream; a library client that pongs and a client that only sends stay open over
   three silences with their engine connections; a client reading a 5 MB `ai.delta` burst at
-  about 1 MB/s isn't closed and gets every delta in order. Run under 16 CPU-bound
+  about 1 MB/s isn't closed and gets every delta in order; a slow reader the fake engine
+  drops (`disconnect`, then close) while it keeps sending requests gets every queued delta,
+  the `disconnect`, then 4008. Run under 16 CPU-bound
   processes as well.
 - Open: a tab that takes more than 45 s to read 64 KiB, or one large frame the socket
   buffers took whole, without the gateway's writes waiting, can still be closed, and then
