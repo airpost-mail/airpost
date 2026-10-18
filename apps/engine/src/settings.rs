@@ -103,6 +103,17 @@ impl Settings {
     }
 }
 
+/// The executor reads a key's stored value; an unreadable file reads as unset, so it
+/// applies the defaults.
+impl ms_sync::EngineSettings for Settings {
+    fn get(&self, key: &str) -> Option<Value> {
+        self.lock()
+            .get(Some(&[key.to_owned()]))
+            .ok()
+            .and_then(|mut values| values.remove(key))
+    }
+}
+
 fn invalid(message: String) -> ErrorObject {
     ErrorObject::new(code::INVALID_PARAMS, message)
 }

@@ -395,6 +395,11 @@ fn relayed_connection_policy() {
         .as_array()
         .unwrap()
         .contains(&json!(ms_ipc::feature::RELAYED)));
+    // `sync` mode emits due metadata for the client instead of acting on it.
+    assert!(!hello["features"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(ms_ipc::feature::EXPIRATION_EXECUTOR)));
 
     let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
     let account = &list["accounts"][0]["account"];

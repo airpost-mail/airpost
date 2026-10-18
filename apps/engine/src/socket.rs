@@ -872,6 +872,8 @@ fn features(server: &Server) -> Vec<String> {
     .to_vec();
     if server.settings.is_some() {
         out.push(feature::SETTINGS.to_owned());
+        // The settings store is serve's, and so is the executor that reads it.
+        out.push(feature::EXPIRATION_EXECUTOR.to_owned());
     }
     out
 }

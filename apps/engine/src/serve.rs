@@ -88,6 +88,7 @@ pub fn run(opts: &Options) -> i32 {
 
     let hub = Hub::new(socket::queue_limit());
     let database = socket::DatabaseGeneration::default();
+    let settings = Arc::new(crate::settings::Settings::open(&opts.config_dir));
     let engine = Arc::new_cyclic(|me| Engine {
         config_dir: opts.config_dir.clone(),
         socket: socket_path.clone(),
@@ -98,6 +99,7 @@ pub fn run(opts: &Options) -> i32 {
         resetting: Mutex::new(HashSet::new()),
         resetting_database: AtomicBool::new(false),
         database: database.clone(),
+        settings: settings.clone(),
         me: me.clone(),
     });
     let server = Arc::new(Server {
@@ -106,7 +108,7 @@ pub fn run(opts: &Options) -> i32 {
         started: Instant::now(),
         config_dir: opts.config_dir.clone(),
         database,
-        settings: Some(Arc::new(crate::settings::Settings::open(&opts.config_dir))),
+        settings: Some(settings),
     });
     socket::serve(listener, server.clone());
     info!(
@@ -188,6 +190,8 @@ pub struct Engine {
     resetting_database: AtomicBool,
     /// Bumped when the database file is replaced, so socket sessions reopen it.
     database: socket::DatabaseGeneration,
+    /// The settings store, which the accounts' expiration executors read.
+    settings: Arc<crate::settings::Settings>,
     /// The engine itself, for the callbacks an account's threads make.
     me: Weak<Engine>,
 }
@@ -489,6 +493,7 @@ impl Engine {
             Arc::new(on_failure),
         );
         ctx.verbose = now_ms() < self.verbose_until.load(Ordering::SeqCst);
+        ctx.settings = Some(self.settings.clone());
         (ctx, deltas)
     }
 

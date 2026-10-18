@@ -1011,10 +1011,9 @@ fn settings_round_trip_and_notify_the_other_connections() {
     let mut writer = e.hello();
     let mut watcher = e.hello();
     let status = writer.call(method::ENGINE_STATUS, json!({})).unwrap();
-    assert!(status["features"]
-        .as_array()
-        .unwrap()
-        .contains(&json!("settings")));
+    let features = status["features"].as_array().unwrap();
+    assert!(features.contains(&json!("settings")));
+    assert!(features.contains(&json!(ms_ipc::feature::EXPIRATION_EXECUTOR)));
     for c in [&mut writer, &mut watcher] {
         // A class filter doesn't hold settings.changed back.
         c.call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
