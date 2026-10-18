@@ -488,6 +488,85 @@ impl ReadStore {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// The ids of the threads in any of `categories` (in all mail) whose last message arrived
+    /// at or after `since`, newest first, at most `limit`.
+    pub fn category_threads_since(
+        &self,
+        categories: &[String],
+        since: i64,
+        limit: usize,
+    ) -> Result<Vec<String>> {
+        if categories.is_empty() {
+            return Ok(Vec::new());
+        }
+        let sql = format!(
+            "SELECT t.id FROM Thread t WHERE t.id IN (SELECT c.id FROM ThreadCategory c \
+             WHERE c.inAllMail = 1 AND c.value IN ({})) AND t.lastMessageReceivedTimestamp >= ? \
+             ORDER BY t.lastMessageReceivedTimestamp DESC, t.id DESC LIMIT ?",
+            placeholders(categories.len())
+        );
+        let mut args: Vec<SqlValue> = categories.iter().cloned().map(SqlValue::Text).collect();
+        args.push(SqlValue::Integer(since));
+        args.push(SqlValue::Integer(clamp(limit)));
+        let mut stmt = self.conn.prepare_cached(&sql)?;
+        let rows = stmt.query_map(params_from_iter(args), |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The threads in any of `categories` (in all mail) with a non-empty `plugin_id` value,
+    /// newest first by last received message, and how many there are in all. With
+    /// `category`, only those whose value has that `category`, or, for `needs-reply`,
+    /// `needsReply: true` (the AI triage values, docs/ai-plan.md section 4).
+    pub fn triaged_threads(
+        &self,
+        categories: &[String],
+        plugin_id: &str,
+        category: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(Vec<String>, usize)> {
+        if categories.is_empty() {
+            return Ok((Vec::new(), 0));
+        }
+        let mut filter = format!(
+            "FROM Thread t WHERE t.id IN (SELECT c.id FROM ThreadCategory c \
+             WHERE c.inAllMail = 1 AND c.value IN ({})) \
+             AND t.id IN (SELECT p.id FROM ModelPluginMetadata p \
+             WHERE p.value = ? AND p.objectType = 'Thread')",
+            placeholders(categories.len())
+        );
+        let mut args: Vec<SqlValue> = categories.iter().cloned().map(SqlValue::Text).collect();
+        args.push(SqlValue::Text(plugin_id.to_owned()));
+        if let Some(category) = category {
+            let needs_reply = if category == "needs-reply" {
+                " OR json_extract(j.value, '$.value.needsReply') = 1"
+            } else {
+                ""
+            };
+            filter.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM json_each(t.data, '$.metadata') j \
+                 WHERE json_extract(j.value, '$.pluginId') = ? \
+                 AND (json_extract(j.value, '$.value.category') = ?{needs_reply}))"
+            ));
+            args.push(SqlValue::Text(plugin_id.to_owned()));
+            args.push(SqlValue::Text(category.to_owned()));
+        }
+        let total: i64 = self
+            .conn
+            .prepare_cached(&format!("SELECT count(*) {filter}"))?
+            .query_row(params_from_iter(args.iter()), |r| r.get(0))?;
+        let sql = format!(
+            "SELECT t.id {filter} ORDER BY t.lastMessageReceivedTimestamp DESC, t.id DESC \
+             LIMIT ? OFFSET ?"
+        );
+        args.push(SqlValue::Integer(clamp(limit)));
+        args.push(SqlValue::Integer(offset.min(i64::MAX as usize) as i64));
+        let mut stmt = self.conn.prepare_cached(&sql)?;
+        let rows = stmt.query_map(params_from_iter(args), |r| r.get(0))?;
+        let ids = rows.collect::<rusqlite::Result<_>>()?;
+        Ok((ids, usize::try_from(total).unwrap_or(0)))
+    }
+
     pub fn task(&self, account_id: &str, id: &str) -> Result<Option<Value>> {
         Ok(self
             .conn

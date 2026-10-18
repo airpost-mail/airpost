@@ -771,11 +771,12 @@ fn reset_keeps_metadata_for_the_resync() {
     t.upsert_metadata("thread-snooze", &json!({"expiration": 1_900_000_100}), None);
     t.upsert_metadata("thread-snooze", &json!({"expiration": 1_900_000_200}), None);
     t.upsert_metadata("cleared", &json!({}), None);
+    t.upsert_metadata("tern-ai-triage", &json!({"category": "other"}), None);
     f.store.save(&mut t).unwrap();
 
     f.store.reset_for_account(ACCOUNT, true).unwrap();
     // One message row, and the thread's value under each of its two Message-IDs; the empty
-    // value is not kept.
+    // value and the AI triage value are not kept.
     assert_eq!(count(&f, "SELECT COUNT(*) FROM DetatchedPluginMetadata"), 3);
 
     // The reply comes back first, in a thread of its own id.

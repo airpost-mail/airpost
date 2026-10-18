@@ -15,6 +15,7 @@
 
 use std::path::Path;
 
+use ms_core::constants::AI_TRIAGE_PLUGIN;
 use ms_core::Result;
 use rusqlite::{params, Connection};
 use serde_json::Value;
@@ -113,7 +114,9 @@ fn text(v: rusqlite::types::ValueRef<'_>) -> String {
     }
 }
 
-/// `(pluginId, value, version)` of each non-empty value in a model's `metadata`.
+/// `(pluginId, value, version)` of each non-empty value in a model's `metadata`. AI triage
+/// values are not kept: a reset drops what a model read from the mail (docs/ai-plan.md
+/// section 5).
 fn entries(data: &Value) -> Vec<(String, Value, i64)> {
     data.get("metadata")
         .and_then(Value::as_array)
@@ -127,7 +130,7 @@ fn entries(data: &Value) -> Vec<(String, Value, i64)> {
                         json_i64(&m["v"]),
                     )
                 })
-                .filter(|(plugin, ..)| !plugin.is_empty())
+                .filter(|(plugin, ..)| !plugin.is_empty() && plugin != AI_TRIAGE_PLUGIN)
                 .collect()
         })
         .unwrap_or_default()

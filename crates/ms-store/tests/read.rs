@@ -341,6 +341,57 @@ fn metadata_by_plugin_object_draft_expiration_and_date() {
 }
 
 #[test]
+fn triaged_inbox_threads_by_category() {
+    let f = fixture();
+    let inbox = f.folder("INBOX", "inbox");
+    let archive = f.folder("Archive", "archive");
+    let a = f.insert("a@x", &inbox, 1, attrs(1, false), None);
+    let b = f.insert("b@x", &inbox, 2, attrs(2, false), None);
+    let c = f.insert("c@x", &inbox, 3, attrs(3, false), None);
+    let d = f.insert("d@x", &archive, 4, attrs(4, false), None);
+    let triage = |m: &ms_store::Message, value: Value| {
+        let mut t = f.thread(m.thread_id()).unwrap();
+        t.upsert_metadata("tern-ai-triage", &value, None).unwrap();
+        f.store.save(&mut t).unwrap();
+        t.id().to_owned()
+    };
+    let ta = triage(&a, json!({"category": "needs-reply", "needsReply": true}));
+    let tb = triage(&b, json!({"category": "important", "needsReply": true}));
+    let tc = triage(&c, json!({"category": "newsletter", "needsReply": false}));
+    triage(&d, json!({"category": "needs-reply", "needsReply": true}));
+
+    let r = reads(&f);
+    let inboxes = accounts(&[inbox.id()]);
+    let list = |category, limit, offset| {
+        r.triaged_threads(&inboxes, "tern-ai-triage", category, limit, offset)
+            .unwrap()
+    };
+    let (all, total) = list(None, 50, 0);
+    assert_eq!((all.len(), total), (3, 3));
+    // Newest first: c (uid 3), then b and a.
+    assert_eq!(all, [tc.clone(), tb.clone(), ta.clone()]);
+    assert_eq!(
+        list(Some("needs-reply"), 50, 0),
+        (vec![tb.clone(), ta.clone()], 2)
+    );
+    assert_eq!(list(Some("important"), 50, 0), (vec![tb.clone()], 1));
+    assert_eq!(list(Some("needs-reply"), 1, 1), (vec![ta], 2));
+    assert_eq!(list(Some("promotion"), 50, 0), (vec![], 0));
+    assert!(r
+        .triaged_threads(&[], "tern-ai-triage", None, 50, 0)
+        .unwrap()
+        .0
+        .is_empty());
+
+    let since = r.category_threads_since(&inboxes, 0, 2).unwrap();
+    assert_eq!(since, [tc, tb]);
+    assert!(r
+        .category_threads_since(&inboxes, i64::MAX, 50)
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
 fn hidden_follows_message_is_hidden() {
     let f = fixture();
     let inbox = f.folder("INBOX", "inbox");
