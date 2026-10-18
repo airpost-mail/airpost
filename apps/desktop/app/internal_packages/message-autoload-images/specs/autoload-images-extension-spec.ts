@@ -99,3 +99,26 @@ describe('AutoloadImages', function () {
     expect(MessageBodyProcessor.remoteImagesAllowed(message)).toBe(true);
   });
 });
+
+describe('AutoloadImages defaults', function () {
+  it('blocks remote images for a profile that never set core.reading.autoloadImages', () => {
+    expect((AppEnv.config.getSchema('core.reading.autoloadImages') as any).default).toBe(false);
+    expect(AppEnv.config.get('core.reading.autoloadImages')).toBe(false);
+
+    const message = new Message({
+      id: 'autoload-images-defaults-spec',
+      accountId: 'acct',
+      body: IMAGE_BODY,
+      from: [new Contact({ email: 'news@shop.example.com', name: 'Shop' })],
+    } as any);
+    spyOn(message, 'folderIds').andReturn([]);
+    AutoloadImagesStore._whitelistEmails = {};
+    AutoloadImagesStore._whitelistMessageIds = {};
+    expect(AutoloadImagesStore.remoteImagesAllowed(message)).toBe(false);
+  });
+
+  it('keeps an explicit true', () => {
+    AppEnv.config.set('core.reading.autoloadImages', true);
+    expect(AppEnv.config.get('core.reading.autoloadImages')).toBe(true);
+  });
+});

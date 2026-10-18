@@ -2,201 +2,109 @@ import {
   ExtensionRegistry,
   MessageViewExtension,
   ComposerExtension,
-  RegExpUtils,
   Message,
 } from 'mailspring-exports';
+import { MailTrackerBlockerRules } from './mail-tracker-blocker-rules';
 
-const TrackingBlacklist = [
-  {
-    name: 'NGPVan',
-    pattern: 'click.ngpvan.com/',
-    homepage: 'https://click.ngpvan.com',
-  },
-  {
-    name: 'Sidekick',
-    pattern: 't.signaux',
-    homepage: 'http://getsidekick.com',
-  },
-  {
-    name: 'Sidekick',
-    pattern: 't.senal',
-    homepage: 'http://getsidekick.com',
-  },
-  {
-    name: 'Sidekick',
-    pattern: 't.sidekickopen',
-    homepage: 'http://getsidekick.com',
-  },
-  {
-    name: 'Sidekick',
-    pattern: 't.sigopn',
-    homepage: 'http://getsidekick.com',
-  },
-  {
-    name: 'Banana Tag',
-    pattern: 'bl-1.com',
-    homepage: 'http://bananatag.com',
-  },
-  {
-    name: 'Boomerang',
-    pattern: 'mailstat.us/tr',
-    homepage: 'http://boomeranggmail.com',
-  },
-  {
-    name: 'Cirrus Inisght',
-    pattern: 'tracking.cirrusinsight.com',
-    homepage: 'http://cirrusinsight.com',
-  },
-  {
-    name: 'Yesware',
-    pattern: 'app.yesware.com',
-    homepage: 'http://yesware.com',
-  },
-  {
-    name: 'Yesware',
-    pattern: 't.yesware.com',
-    homepage: 'http://yesware.com',
-  },
-  {
-    name: 'Streak',
-    pattern: 'mailfoogae.appspot.com',
-    homepage: 'http://streak.com',
-  },
-  {
-    name: 'LaunchBit',
-    pattern: 'launchbit.com/taz-pixel',
-    homepage: 'http://launchbit.com',
-  },
-  {
-    name: 'MailChimp',
-    pattern: 'list-manage.com/track',
-    homepage: 'http://mailchimp.com',
-  },
-  {
-    name: 'Postmark',
-    pattern: 'cmail1.com/t',
-    homepage: 'http://postmarkapp.com',
-  },
-  {
-    name: 'iContact',
-    pattern: 'click.icptrack.com/icp/',
-    homepage: 'http://icontact.com',
-  },
-  {
-    name: 'Infusionsoft',
-    pattern: 'infusionsoft.com/app/emailOpened',
-    homepage: 'http://infusionsoft.com',
-  },
-  {
-    name: 'Intercom',
-    pattern: 'via.intercom.io/o',
-    homepage: 'http://intercom.io',
-  },
-  {
-    name: 'Mandrill',
-    pattern: 'mandrillapp.com/track',
-    homepage: 'http://mandrillapp.com',
-  },
-  {
-    name: 'Hubspot',
-    pattern: 't.hsms06.com',
-    homepage: 'http://hubspot.com',
-  },
-  {
-    name: 'RelateIQ',
-    pattern: 'app.relateiq.com/t.png',
-    homepage: 'http://relateiq.com',
-  },
-  {
-    name: 'RJ Metrics',
-    pattern: 'go.rjmetrics.com',
-    homepage: 'http://rjmetrics.com',
-  },
-  {
-    name: 'Mixpanel',
-    pattern: 'api.mixpanel.com/track',
-    homepage: 'http://mixpanel.com',
-  },
-  {
-    name: 'Front App',
-    pattern: 'web.frontapp.com/api',
-    homepage: 'http://frontapp.com',
-  },
-  {
-    name: 'Mailtrack.io',
-    pattern: 'mailtrack.io/trace',
-    homepage: 'http://mailtrack.io',
-  },
-  {
-    name: 'Salesloft',
-    pattern: 'sdr.salesloft.com/email_trackers',
-    homepage: 'http://salesloft.com',
-  },
-];
+// Mailspring's original list, kept where the MailTrackerBlocker rules don't cover a pattern.
+// Same format: case-insensitive regexes tested against the whole <img> tag.
+const AdditionalRules: { [vendor: string]: string[] } = {
+  NGPVan: ['click\\.ngpvan\\.com/'],
+  Yesware: ['app\\.yesware\\.com'],
+  MailChimp: ['list-manage\\.com/track'],
+  'Campaign Monitor': ['cmail1\\.com/t'],
+  Mandrill: ['mandrillapp\\.com/track'],
+  HubSpot: ['t\\.hsms06\\.com'],
+  // Mailspring's opaque-token read receipts (/o/<token>.png); the /open/ form is in the list.
+  Mailspring: ['getmailspring\\.com/o/'],
+};
 
-export function rejectImagesInBody(body: string, callback: (url: string) => boolean) {
-  const spliceRegions = [];
-  const regex = RegExpUtils.imageTagRegex();
+const TrackerRegexp = new RegExp(
+  [...Object.values(MailTrackerBlockerRules), ...Object.values(AdditionalRules)]
+    .flat()
+    .map((rule) => `(?:${rule})`)
+    .join('|'),
+  'i'
+);
 
-  // Identify img tags that should be cut
-  let result = null;
-  while ((result = regex.exec(body)) !== null) {
-    if (callback(result[1])) {
-      spliceRegions.push({ start: result.index, end: result.index + result[0].length });
+// An <img> tag, allowing ">" inside quoted attribute values.
+const ImgTagRegexp = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
+const AttributeRegexp = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+
+function parseImgAttributes(tag: string) {
+  const attrs: { [name: string]: string } = {};
+  const inner = tag.replace(/^<img\b/i, '').replace(/\/?>$/, '');
+  let match: RegExpExecArray | null;
+  AttributeRegexp.lastIndex = 0;
+  while ((match = AttributeRegexp.exec(inner)) !== null) {
+    const name = match[1].toLowerCase();
+    if (!(name in attrs)) {
+      attrs[name] = match[2] ?? match[3] ?? match[4] ?? '';
     }
   }
-  // Remove them all, from the end of the string to the start
-  let updated = body;
-  spliceRegions.reverse().forEach(({ start, end }) => {
-    updated = updated.substr(0, start) + updated.substr(end);
-  });
-
-  return updated;
+  return attrs;
 }
 
+function parseStyle(style: string) {
+  const decls: { [prop: string]: string } = {};
+  for (const decl of style.split(';')) {
+    const idx = decl.indexOf(':');
+    if (idx === -1) continue;
+    const prop = decl.slice(0, idx).trim().toLowerCase();
+    const value = decl
+      .slice(idx + 1)
+      .replace(/!important/i, '')
+      .trim()
+      .toLowerCase();
+    if (prop) decls[prop] = value;
+  }
+  return decls;
+}
+
+// A size in pixels from a width/height attribute ("1", "1px") or CSS value ("1px", "0"):
+// undefined when unset, Infinity when set in other units ("100%", "auto").
+function pixelSize(value: string | undefined) {
+  if (value === undefined) return undefined;
+  const match = /^\s*(\d+(?:\.\d+)?)\s*(px)?\s*$/i.exec(value);
+  return match ? parseFloat(match[1]) : Infinity;
+}
+
+export function isRemoteURL(url: string) {
+  return /^\s*(https?:)?\/\//i.test(url);
+}
+
+// A remote image nobody is meant to see: hidden with display:none, visibility:hidden or the
+// hidden attribute, zero-sized, or 1x1. A missing dimension counts as 1 when the other is set,
+// since a tracking pixel's natural size is 1x1.
+function isHidden(attrs: { [name: string]: string }) {
+  const style = parseStyle(attrs.style || '');
+  if (style.display === 'none' || style.visibility === 'hidden' || 'hidden' in attrs) {
+    return true;
+  }
+  const width = pixelSize(style.width ?? attrs.width);
+  const height = pixelSize(style.height ?? attrs.height);
+  if (width === 0 || height === 0) return true;
+  if (width === undefined && height === undefined) return false;
+  return (width ?? 1) <= 1 && (height ?? 1) <= 1;
+}
+
+// Whether an <img> tag is a known tracker or a hidden remote image. Images that aren't remote
+// (cid:, data:) can't report anything and are left alone.
+export function isTrackingImage(tag: string) {
+  const attrs = parseImgAttributes(tag);
+  if (!isRemoteURL(attrs.src || '')) return false;
+  return TrackerRegexp.test(tag) || isHidden(attrs);
+}
+
+export function rejectImagesInBody(body: string, callback: (tag: string) => boolean) {
+  return body.replace(ImgTagRegexp, (tag) => (callback(tag) ? '' : tag));
+}
+
+// Runs on every message, from anyone: known tracker images and hidden remote images are removed
+// before the body renders, so they never load even when remote images are allowed.
 export function removeTrackingPixels(message: Message) {
-  const isFromMe = message.isFromMe();
-
-  message.body = rejectImagesInBody(message.body, (imageURL) => {
-    if (isFromMe) {
-      // If the image is sent by the user, remove all forms of tracking pixels.
-      // They could be viewing an email they sent with Salesloft, etc.
-      for (const item of TrackingBlacklist) {
-        if (imageURL.indexOf(item.pattern) >= 0) {
-          return true;
-        }
-      }
-    }
-
-    // Remove Mailspring read receipt pixels for the current account. If this is a
-    // reply or a bounce, our read receipt could still be in the body and could
-    // trigger additional opens. (isFromMe is not sufficient!) [BG NOTE "HMID"]
-    if (
-      imageURL.includes(`getmailspring.com/open/${message.accountId.toUpperCase()}`) ||
-      imageURL.includes(`me=${encodeURIComponent(message.accountId)}`)
-    ) {
-      return true;
-    }
-
-    // Also detect the new opaque-token format: /o/<base64url-token>.png
-    // The token is a Base64url-encoded JSON object containing the accountId.
-    if (imageURL.includes('getmailspring.com/o/')) {
-      try {
-        const match = imageURL.match(/\/o\/([A-Za-z0-9_-]+)\.png/);
-        if (match) {
-          const padded = match[1].replace(/-/g, '+').replace(/_/g, '/');
-          const decoded = JSON.parse(atob(padded));
-          if (decoded && decoded.accountId === message.accountId) {
-            return true;
-          }
-        }
-      } catch {
-        // If decoding fails this is not our pixel — leave it alone.
-      }
-    }
-
-    return false;
-  });
+  if (typeof message.body !== 'string') return;
+  message.body = rejectImagesInBody(message.body, isTrackingImage);
 }
 
 class TrackingPixelsMessageExtension extends MessageViewExtension {

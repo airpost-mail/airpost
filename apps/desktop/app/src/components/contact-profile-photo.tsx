@@ -15,15 +15,19 @@ export class ContactProfilePhoto extends React.Component<{
     const hue = Utils.hueForString(contact.email);
     const bgColor = `hsl(${hue}, 50%, 45%)`;
 
-    const hash = crypto
-      .createHash('sha256')
-      .update((contact.email || '').toLowerCase().trim())
-      .digest('hex');
-    const gravatarBg = `url("https://www.gravatar.com/avatar/${hash}/?s=88&msw=88&msh=88&d=blank")`;
+    // Off by default: each lookup tells Gravatar which contact the user is looking at.
+    let gravatarBg: string | undefined;
+    if (AppEnv.config.get('core.reading.loadGravatar')) {
+      const hash = crypto
+        .createHash('sha256')
+        .update((contact.email || '').toLowerCase().trim())
+        .digest('hex');
+      gravatarBg = `url("https://www.gravatar.com/avatar/${hash}/?s=88&msw=88&msh=88&d=blank")`;
+    }
 
     let content = (
       <div className="default-profile-image" style={{ backgroundColor: bgColor }}>
-        <div className="layer" style={{ zIndex: 2, backgroundImage: gravatarBg }} />
+        {gravatarBg && <div className="layer" style={{ zIndex: 2, backgroundImage: gravatarBg }} />}
         <div className="layer" style={{ zIndex: 1 }}>
           {contact.nameAbbreviation()}
         </div>

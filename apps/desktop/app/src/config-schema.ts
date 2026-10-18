@@ -164,8 +164,13 @@ export default {
           },
           autoloadImages: {
             type: 'boolean',
-            default: true,
+            default: false,
             title: localized('Automatically load images in viewed messages'),
+          },
+          loadGravatar: {
+            type: 'boolean',
+            default: false,
+            title: localized('Load contact photos from Gravatar'),
           },
           detailedHeaders: {
             type: 'boolean',
