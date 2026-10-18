@@ -1,0 +1,64 @@
+# cargo-fuzz targets for the parsers that read server- and sender-controlled input (TD45).
+# Its own workspace, built on nightly by `cargo fuzz` (the nightly `fuzz` CI job); the
+# engine's workspace and gate don't build it.
+[package]
+name = "tern-fuzz"
+version = "0.0.0"
+edition = "2021"
+license = "GPL-3.0-only"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+ms-core = { path = "../crates/ms-core" }
+ms-imap = { path = "../crates/ms-imap" }
+ms-mime = { path = "../crates/ms-mime" }
+ms-dav = { path = "../crates/ms-dav" }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "imap_response"
+path = "fuzz_targets/imap_response.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_message"
+path = "fuzz_targets/parse_message.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rfc2047"
+path = "fuzz_targets/rfc2047.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "flatten_html"
+path = "fuzz_targets/flatten_html.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ical"
+path = "fuzz_targets/ical.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vcard"
+path = "fuzz_targets/vcard.rs"
+test = false
+doc = false
+bench = false
