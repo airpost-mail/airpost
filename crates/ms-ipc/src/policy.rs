@@ -50,8 +50,8 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::TASKS_LIST
         | method::METADATA_LIST
         | method::ACCOUNT_LIST
-        // A relayed device can already read and send mail, so the settings (signatures, rules)
-        // give it nothing more.
+        // settings.set is open for the keys in RELAYED_SETTINGS_KEYS only
+        // (relayed_settings_allowed).
         | method::SETTINGS_GET
         | method::SETTINGS_SET => MethodClass::Open,
         method::ACCOUNT_ADD
@@ -105,6 +105,45 @@ pub fn relayed_task_allowed(task: &Value, scopes: &[String]) -> bool {
     task.get("__cls")
         .and_then(Value::as_str)
         .is_some_and(|cls| RELAYED_TASK_CLASSES.contains(&cls))
+}
+
+/// The settings a relayed device without [`SCOPE_ADMIN`] may write. The rest carry HTML the
+/// desktop renders in a window with Node (`signatures`, `templates`, the resurfacing bodies)
+/// or act on mail by themselves (`mailRules`), so they stay local until those clients treat
+/// them as untrusted.
+pub const RELAYED_SETTINGS_KEYS: &[&str] = &[
+    "core.sending.undoSend",
+    "core.sending.defaultAccountIdForSend",
+    "core.notifications.unsnoozeToTop",
+    "core.composing.html",
+    "defaultSignatures",
+];
+
+/// Whether a relayed device with `scopes` may write every key of `values` (the
+/// `settings.set` params' `values`).
+pub fn relayed_settings_allowed(values: &Map<String, Value>, scopes: &[String]) -> bool {
+    is_admin(scopes)
+        || values
+            .keys()
+            .all(|k| RELAYED_SETTINGS_KEYS.contains(&k.as_str()))
+}
+
+/// Whether a relayed device with `scopes` may make the request `name` with `params`: the
+/// method's class, and for `task.queue` and `settings.set` what the params ask for.
+pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) -> bool {
+    if !relayed_method_allowed(name, scopes) {
+        return false;
+    }
+    match name {
+        method::TASK_QUEUE => params
+            .get("task")
+            .is_some_and(|t| relayed_task_allowed(t, scopes)),
+        method::SETTINGS_SET => params
+            .get("values")
+            .and_then(Value::as_object)
+            .is_some_and(|v| relayed_settings_allowed(v, scopes)),
+        _ => true,
+    }
 }
 
 const ACCOUNT_FIELDS: &[&str] = &[
@@ -179,6 +218,29 @@ mod tests {
             &t("GetMessageRFC2822Task"),
             &[SCOPE_ADMIN.to_owned()]
         ));
+    }
+
+    #[test]
+    fn settings() {
+        let admin = vec![SCOPE_ADMIN.to_owned()];
+        let set = |values: Value| json!({ "values": values });
+        let sig = set(json!({"signatures": {"s1": {"body": "<img src=x onerror=alert(1)>"}}}));
+        assert!(!relayed_request_allowed("settings.set", &sig, &[]));
+        assert!(relayed_request_allowed("settings.set", &sig, &admin));
+        for key in ["templates", "mailRules", "resurfacing.snoozeBody"] {
+            let p = set(json!({ key: null }));
+            assert!(!relayed_request_allowed("settings.set", &p, &[]), "{key}");
+        }
+        // One refused key refuses the call.
+        let mixed = set(json!({"core.sending.undoSend": 0, "templates": []}));
+        assert!(!relayed_request_allowed("settings.set", &mixed, &[]));
+        let undo = set(json!({"core.sending.undoSend": 0}));
+        assert!(relayed_request_allowed("settings.set", &undo, &[]));
+        assert!(!relayed_request_allowed("settings.set", &json!({}), &[]));
+        assert!(relayed_request_allowed("settings.get", &json!({}), &[]));
+        let task = json!({"task": {"__cls": "GetManyRFC2822Task"}});
+        assert!(!relayed_request_allowed("task.queue", &task, &[]));
+        assert!(!relayed_request_allowed("secrets.set", &json!({}), &[]));
     }
 
     #[test]

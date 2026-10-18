@@ -91,6 +91,12 @@ pub struct SettingsGetParams {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SettingsValues {
     pub values: Map<String, Value>,
+    /// `settings.get` only: the store's id, new whenever the engine starts a store from
+    /// nothing (no file, or a corrupt one moved aside). A client that copied its values into
+    /// the store copies them again when the id changes, rather than taking the missing keys
+    /// as cleared.
+    #[serde(rename = "storeId", default, skip_serializing_if = "Option::is_none")]
+    pub store_id: Option<String>,
 }
 
 #[cfg(test)]
@@ -118,5 +124,18 @@ mod tests {
         let v: SettingsValues =
             serde_json::from_value(json!({"values": {"core.composing.html": false}})).unwrap();
         assert_eq!(v.values["core.composing.html"], false);
+        assert_eq!(v.store_id, None);
+        assert_eq!(
+            serde_json::to_value(&v).unwrap(),
+            json!({"values": {"core.composing.html": false}})
+        );
+        let v = SettingsValues {
+            store_id: Some("s".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_value(&v).unwrap(),
+            json!({"values": {}, "storeId": "s"})
+        );
     }
 }
