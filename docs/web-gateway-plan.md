@@ -428,9 +428,9 @@ gateway (section 2); **Web** = web-only.
 W1 and W2 run in parallel now. After W5 the web runs against a real (desktop-owned) engine
 for reading, triage, compose and attachments; W6 and W7 remove its client-side workarounds.
 
-**Stages this plan takes on:** G0, the gateway, 16, 7 and 9 (engine halves, the CLI and
-tern-mcp parts, and the desktop's `Query.toJSON()` capture for 7's parity tests; stage 8's
-transport switch stays with the desktop work). Offered next once stage 6 is on main: 3 and
+**Stages this plan takes on:** G0, the gateway, 16, 7, 9 and 15 (engine halves, the CLI and
+tern-mcp parts, and the desktop's `Query.toJSON()` capture for 7's parity tests and its
+`list-unsubscribe` switch for 15; stage 8's transport switch stays with the desktop work). Offered next once stage 6 is on main: 3 and
 4. Not taken: 6, 10, 11, 12, 13 and the desktop halves of 8 and 9.
 
 ## 8. Answers (2026-10-16)
@@ -641,3 +641,17 @@ merged:
   reconnects; the web doesn't refuse a file
   over 25 MB before uploading it, and a browser may see the reset from an early 413 on a
   declared-size body as a network error rather than the gateway's message.
+
+2026-10-18, DCP 15 (unsubscribe, snooze method), branch `roadmap/web-ready`, not merged:
+- Engine: `threads.snooze` / `threads.unsnooze` (feature `snooze`) and `messages.unsubscribe`
+  (feature `unsubscribe`), all three Open on relayed connections, so a paired device without
+  admin can use them. Details, deviations and the one-click address check in DCP Status.
+- Web: the reader has a snooze menu (`z`; the desktop's presets, a picked time, "Unsnooze
+  now" in Snoozed) on `threads.snooze`, and an Unsubscribe button on messages whose
+  List-Unsubscribe header has an http(s) or mailto URI, on `messages.unsubscribe`. A web link
+  comes back to a toast's Open button, a click, so popup blockers allow it. Neither shows
+  without its feature. The mock does both, with Snoozed categories in the fixtures and the
+  return when a snooze comes due. There were no `TODO(engine)` markers for either;
+  `TODO-engine.md` records them.
+- Open: snoozed rows move on the deltas, not optimistically; no snooze in the list's bulk
+  toolbar yet; body-only unsubscribe links aren't offered in the web.

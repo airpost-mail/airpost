@@ -1104,7 +1104,8 @@ Open items:
 - The supported subset of natural-language date terms (stage 9), from the desktop's spec
   cases.
 - Where `draft.send`'s `bodies` are stored during the undo window (stage 13).
-- Whether the unsubscribe body-link fallback moves to the engine (stage 15).
+- Whether the unsubscribe body-link fallback moves to the engine (stage 15: it stays in the
+  clients, the engine reads headers only; to confirm).
 - An engine-side hook for third-party send transforms, if users ask for it.
 - `IMAPSearchQueryBackend` (server-side search) in the engine, after stage 9.
 - Windows: named pipe, DPAPI store.
@@ -1556,3 +1557,30 @@ desktop half (`Query.searchText`, the printer for `structuredSearch`, deleting t
 backend) is tern-client's; `search` keeps its `lastMessageTimestamp` order and has no cursor;
 `IMAPSearchQueryBackend` is still later.
 
+2026-10-18, stage 15 (unsubscribe, snooze method), branch `roadmap/web-ready`: delivered, not
+merged. Engine (socket, all Open for relayed devices): `threads.snooze {accountId, threadIds,
+until}` and `threads.unsnooze` (feature `snooze`) queue what `snooze-utils.ts` does, built from
+the store in `ms_tasks::mail_actions`: the move (Gmail swaps the Inbox label for Snoozed's;
+elsewhere `ChangeFolderTask` with `sourceFolderIds: [inbox]`), then a `thread-snooze`
+`{expiration}` metadata task per thread, answering `{taskIds}`; the stage 4 executor brings
+the threads back. Unsnooze moves back only threads still in Snoozed and clears the metadata,
+without a resurfacing message. `until` must be in the future (`-32602`); an unknown thread or
+an account without a Snoozed folder is `NOT_FOUND`. `messages.unsubscribe {accountId,
+messageId, method?}` (feature `unsubscribe`, `ms_net::unsubscribe`) picks one-click, else
+mailto, else web, as the desktop does; one-click is an RFC 8058 POST from an `unsubscribe`
+thread (T21) only to an https host whose every address is public, pinned to the checked
+addresses, no redirects, 10 s connect and 30 s total; mailto (at most 5 recipients, subject
+control characters dropped, body up to 16 KiB, "unsubscribe" when empty) becomes a plain-text
+`SendDraftTask` from the address or alias the list wrote to; web returns `url`. A message
+whose body (and so header) isn't fetched yet is fetched and waited for as `files.get` does.
+URIs are never logged. `tern-client`, `tern snooze/unsnooze/unsubscribe` (`--until 2h`,
+`tomorrow`, a date, a date and time) and tern-mcp `snooze_threads`, `unsnooze_threads` and
+`unsubscribe` (Send category) use them; the desktop's `list-unsubscribe` calls the engine for
+header methods when it has `unsubscribe` and opens web links itself; desktop snooze stays on
+its tasks. Deviations: mailto is sent without the composer review the desktop gave it; the
+body-link fallback stays in the clients (the web doesn't look for one). Tests: ms-net unit
+tests with a local HTTP server, `apps/engine/tests/mail_actions.rs`, the harness scenarios
+`snooze-method` and `unsubscribe-mailto` (new `client.rpc` step), `test_cli.py`, tern-mcp and
+web tests, the desktop spec. Open: the snooze move is built twice (here and in the
+executor); one-click on a release build has only the unit and debug-binary tests (no public
+https test server); trial pending: one-click unsubscribe on a test list.
