@@ -159,7 +159,7 @@ impl HttpClient {
 
 /// reqwest panics when building a rustls client with no process-wide provider. The bin
 /// installs ring at startup; this covers tests and any caller that runs before it.
-fn ensure_crypto_provider() {
+pub(crate) fn ensure_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }

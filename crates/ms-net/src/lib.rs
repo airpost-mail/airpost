@@ -18,6 +18,7 @@ pub mod metadata;
 pub mod oauth;
 pub mod outbox;
 pub mod people;
+pub mod unsubscribe;
 
 pub use endpoints::Endpoints;
 pub use http::HttpClient;
