@@ -333,8 +333,9 @@ fn engine_path(
     Ok(got.path.filter(|_| got.downloaded).map(PathBuf::from))
 }
 
-/// `resources/read` of an attachment URI: `(contents, accountId)`. The attachment must be
-/// on disk already (get_attachment downloads it).
+/// `resources/read` of an attachment URI: `(contents, accountId)`. An engine with `files`
+/// downloads a missing attachment first; with an older one it must be on disk already
+/// (get_attachment downloads it).
 pub fn read_attachment_resource(
     ctx: &mut Ctx<'_>,
     uri: &str,
