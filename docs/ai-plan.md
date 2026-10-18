@@ -441,7 +441,10 @@ ms-net, ms-store, ms-ipc and the engine, the CLI's clap tests, the harness `test
 fake Ollama (`harness/servers/ai.py`): `ai_triage_new_mail`, `ai_triage_rate_limit_pause` and
 `tern ai`, and desktop specs (triage, capabilities, the settings mirror).
 
-Open after AI4: background triage with a keyed provider waits for stage 11 (engine-held keys);
+Open after AI4: background triage with a keyed provider still answers `needs-engine-key`. Stage 11
+landed on main during AI4 (rebased onto it): `credentials.import` stores the desktop's
+`integration-ai-<id>-key` as `integration:ai-<id>`, but `StoredAi` doesn't read the secret store
+yet, so that is the next step, together with dropping the per-request key;
 the usage chart in Preferences > AI is not built (`ai.usage` and `tern ai usage` have the data);
 `core.ai.limits` has no UI; AI5 (web) waits for tern-web's relay of `ai.delta` and
 `ai.triage.progress`.
