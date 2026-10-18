@@ -33,9 +33,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Each rule is a case-insensitive regular expression tested against a whole <img> tag. To
-// refresh, convert a newer getTrackerDict literal (drop comments and the @ prefixes) and update
-// the commit above.
+// Each rule is a case-insensitive regular expression tested against each image URL; main.ts
+// bounds the `.+` wildcards when it compiles them. To refresh, convert a newer getTrackerDict
+// literal (drop comments and the @ prefixes), keep the "Tern:" edits, and update the commit above.
 export const MailTrackerBlockerRules: { [vendor: string]: string[] } = {
   '1&1': ['simg.1und1.de', 'oc.ionos.com/\\?utm_rid=', 't.ionos.com/oms_p/'],
   '365offers.trade': ['trk.365offers.trade'],
@@ -75,7 +75,9 @@ export const MailTrackerBlockerRules: { [vendor: string]: string[] } = {
     'amazonappservices.com/trk',
     'amazonappservices.com/r/',
     'awscloud.com/trk',
-    '/CI0/.+/.+=[0-9][0-9][0-9]',
+    // Tern: upstream has '/CI0/.+/.+=…'; two adjacent wildcards backtrack cubically on a crafted
+    // URL, so the last path segment is matched with [^/] instead.
+    '/CI0/.+/[^/]+=[0-9][0-9][0-9]',
   ],
   Amobee: ['d.turn.com/r/'],
   'Apo.com': ['info.apo.com/op/'],

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Editor } from 'slate';
 import { RetinaImg } from 'mailspring-component-kit';
-import { localized, SanitizeTransformer } from 'mailspring-exports';
+import { localized, SanitizeTransformer, SignatureStore } from 'mailspring-exports';
 import { ComposerEditorPlugin } from './types';
 
 export const UNEDITABLE_TYPE = 'uneditable';
@@ -27,6 +27,71 @@ function sanitizeUneditableHtml(raw: string): string {
   }
   sanitizeCache.set(raw, clean);
   return clean;
+}
+
+// The composer renders in the app window, whose CSP lets images load from anywhere, so quoted
+// mail would fetch its remote images (and trackers) on Reply or Forward even with remote images
+// off. While core.reading.autoloadImages is off, the editor shows these blocks without remote
+// image URLs, except ones from the user's own signatures. Only the display changes: serialize
+// keeps the original HTML, so the sent message still has its images.
+const RemoteImageAttributes = ['src', 'background', 'poster'];
+const RemoteCSSImageRegexp = /(?:url|image-set)\((?!\s*['"]?\s*(?:data|cid):)[^)]*\)/gi;
+const MayHaveRemoteImages = /\b(?:src|srcset|background|poster)\s*=|url\(|image-set\(/i;
+
+function isRemoteImageURL(url: string) {
+  return !/^\s*(?:cid|data|mailspring|tern-file|file):/i.test(url) && url.trim() !== '';
+}
+
+const displayCache = new Map<string, string>();
+let signatureURLs: { signatures: unknown; urls: Set<string> } = null;
+
+function ownSignatureImageURLs() {
+  const signatures = SignatureStore.getSignatures();
+  if (!signatureURLs || signatureURLs.signatures !== signatures) {
+    const urls = new Set<string>();
+    for (const { body } of Object.values(signatures || {})) {
+      if (!body) continue;
+      const doc = new DOMParser().parseFromString(body, 'text/html');
+      doc.querySelectorAll('[src]').forEach((el) => urls.add(el.getAttribute('src')));
+    }
+    signatureURLs = { signatures, urls };
+    displayCache.clear();
+  }
+  return signatureURLs.urls;
+}
+
+// DOMParser documents are inert, so parsing here loads nothing.
+export function withoutRemoteImages(html: string) {
+  if (!MayHaveRemoteImages.test(html)) return html;
+  const own = ownSignatureImageURLs();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.body.querySelectorAll('*').forEach((el) => {
+    for (const attr of RemoteImageAttributes) {
+      const value = el.getAttribute(attr);
+      if (value !== null && isRemoteImageURL(value) && !own.has(value)) el.removeAttribute(attr);
+    }
+    el.removeAttribute('srcset');
+    const style = el.getAttribute('style');
+    if (style) el.setAttribute('style', style.replace(RemoteCSSImageRegexp, 'none'));
+    if (el.tagName === 'STYLE') {
+      el.textContent = el.textContent.replace(RemoteCSSImageRegexp, 'none');
+    }
+  });
+  return doc.body.innerHTML;
+}
+
+function displayHtml(clean: string) {
+  if (AppEnv.config.get('core.reading.autoloadImages')) return clean;
+  ownSignatureImageURLs();
+  let display = displayCache.get(clean);
+  if (display === undefined) {
+    display = withoutRemoteImages(clean);
+    if (displayCache.size >= SANITIZE_CACHE_MAX) {
+      displayCache.delete(displayCache.keys().next().value);
+    }
+    displayCache.set(clean, display);
+  }
+  return display;
 }
 
 function UneditableNode(props) {
@@ -58,7 +123,7 @@ function UneditableNode(props) {
           mode={RetinaImg.Mode.ContentPreserve}
         />
       </a>
-      <div dangerouslySetInnerHTML={{ __html }} />
+      <div dangerouslySetInnerHTML={{ __html: displayHtml(__html) }} />
       {/* This node below is necessary for selection of the uneditable block, and
       we also put the text content of the HTML in so that copy/paste works nicely. */}
       <div style={{ position: 'absolute', height: 0, overflow: 'hidden' }}>{children}</div>

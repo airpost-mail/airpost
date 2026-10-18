@@ -117,8 +117,26 @@ describe('AutoloadImages defaults', function () {
     expect(AutoloadImagesStore.remoteImagesAllowed(message)).toBe(false);
   });
 
-  it('keeps an explicit true', () => {
-    AppEnv.config.set('core.reading.autoloadImages', true);
-    expect(AppEnv.config.get('core.reading.autoloadImages')).toBe(true);
+  it('keeps an explicit true from an existing profile', () => {
+    const saved = AppEnv.config.settings;
+    try {
+      // The path settings loaded from config.json take (Config.load and the main-process reload).
+      AppEnv.config.updateSettings({ core: { reading: { autoloadImages: true } } });
+      expect(AppEnv.config.get('core.reading.autoloadImages')).toBe(true);
+
+      const message = new Message({
+        id: 'autoload-images-explicit-spec',
+        accountId: 'acct',
+        body: IMAGE_BODY,
+        from: [new Contact({ email: 'news@shop.example.com', name: 'Shop' })],
+      } as any);
+      spyOn(message, 'folderIds').andReturn([]);
+      AutoloadImagesStore._whitelistEmails = {};
+      AutoloadImagesStore._whitelistMessageIds = {};
+      expect(AutoloadImagesStore.remoteImagesAllowed(message)).toBe(true);
+      expect(MessageBodyProcessor.remoteImagesAllowed(message)).toBe(true);
+    } finally {
+      AppEnv.config.settings = saved;
+    }
   });
 });
