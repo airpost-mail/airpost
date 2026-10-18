@@ -149,8 +149,12 @@ pub mod feature {
     pub const TASKS_LIST: &str = "tasks-list";
     /// `metadata.list`.
     pub const METADATA_LIST: &str = "metadata-list";
-    /// `query`, with plain search (`search.grammar: false`) only.
+    /// `query`. Its `search.grammar: true` comes with [`SEARCH_GRAMMAR`].
     pub const QUERY: &str = "query";
+    /// The search grammar (`from:`, `in:`, `is:`, `has:attachment`, `before:`/`after:`,
+    /// `AND`/`OR`/`NOT`, parentheses) in `query.search {grammar: true, tz, now}` and in
+    /// `search {grammar: true, tz, now}`, and `search {accounts}`.
+    pub const SEARCH_GRAMMAR: &str = "search-grammar";
     /// `hidden` on the Message JSON the read methods return (`Message.isHidden()`).
     pub const MESSAGE_HIDDEN: &str = "message-hidden";
     /// `mail.new` notifications for subscribed connections.

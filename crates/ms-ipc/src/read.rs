@@ -103,12 +103,36 @@ pub struct MessagesGetResult {
     pub files: Vec<Value>,
 }
 
-/// `search` (over `ThreadSearch`) and `contacts.search` (over `ContactSearch`). The query
-/// is plain text: each whitespace-separated term must match, and nothing in it is read as
-/// FTS syntax. Contact terms match word prefixes.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// `search` (over `ThreadSearch`). Without `grammar`, `query` is plain text: each
+/// whitespace-separated term must match, and nothing in it is read as FTS syntax. With
+/// `grammar: true` (feature `search-grammar`) it is the search grammar, its date terms read
+/// in `tz` (an IANA name, UTC when absent) and counted back from `now` (unix seconds; needed
+/// only by relative dates); text that doesn't parse, or a date outside the documented
+/// subset, is `INVALID_PARAMS`. The threads are `accountId`'s, or `accounts`' (feature
+/// `search-grammar`), or, with neither, every account's the engine holds.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchParams {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<Vec<String>>,
+    pub query: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub grammar: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tz: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now: Option<i64>,
+}
+
+/// `contacts.search` (over `ContactSearch`): plain text, each term matching a word prefix
+/// of the contact's email or name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactsSearchParams {
     pub account_id: String,
     pub query: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -253,8 +277,8 @@ pub struct QueryParams {
 }
 
 /// `query.search`. `grammar: false` is the plain FTS prefix match of `.search(text)`;
-/// `grammar: true` (the search grammar, with `tz` and `now` for date terms) is refused with
-/// `INVALID_PARAMS` and `data: {"unsupported": "search-grammar"}` until the engine has it.
+/// `grammar: true` (feature `search-grammar`, Thread only) is the search grammar, with date
+/// terms read in `tz` (IANA, UTC when absent) and counted back from `now` (unix seconds).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuerySearch {
