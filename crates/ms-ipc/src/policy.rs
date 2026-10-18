@@ -51,6 +51,11 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::METADATA_LIST
         | method::QUERY
         | method::ACCOUNT_LIST
+        // The tasks these queue are open too; unsubscribe acts only on URIs from the
+        // message's own header.
+        | method::THREADS_SNOOZE
+        | method::THREADS_UNSNOOZE
+        | method::MESSAGES_UNSUBSCRIBE
         // settings.set is open for the keys in RELAYED_SETTINGS_KEYS only
         // (relayed_settings_allowed).
         | method::SETTINGS_GET
@@ -268,6 +273,9 @@ mod tests {
     #[test]
     fn classes() {
         assert_eq!(method_class("threads.list"), MethodClass::Open);
+        for m in ["threads.snooze", "threads.unsnooze", "messages.unsubscribe"] {
+            assert!(relayed_method_allowed(m, &[]), "{m}");
+        }
         assert_eq!(method_class("account.add"), MethodClass::ParentOnly);
         assert_eq!(method_class("test.panic"), MethodClass::Debug);
         assert_eq!(method_class("secrets.set"), MethodClass::LocalOnly);

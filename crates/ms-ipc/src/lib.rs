@@ -15,6 +15,7 @@ mod client;
 mod envelope;
 mod files;
 mod frame;
+mod mail;
 mod methods;
 pub mod policy;
 mod read;
@@ -27,6 +28,7 @@ pub use envelope::{
 };
 pub use files::*;
 pub use frame::{encode, read_frame, write_frame, FrameError};
+pub use mail::*;
 pub use methods::*;
 pub use read::*;
 pub use settings::*;
@@ -84,6 +86,17 @@ pub mod method {
     pub const FILES_READ: &str = "files.read";
     /// Stores bytes as a new File for a draft, params [`FilesPutParams`](crate::FilesPutParams).
     pub const FILES_PUT: &str = "files.put";
+    /// Moves threads to Snoozed with the metadata that brings them back
+    /// ([`feature::SNOOZE`](crate::feature::SNOOZE)), params
+    /// [`ThreadsSnoozeParams`](crate::ThreadsSnoozeParams).
+    pub const THREADS_SNOOZE: &str = "threads.snooze";
+    /// Ends a snooze now, params [`ThreadsUnsnoozeParams`](crate::ThreadsUnsnoozeParams).
+    pub const THREADS_UNSNOOZE: &str = "threads.unsnooze";
+    /// Unsubscribes from the list a message came from
+    /// ([`feature::UNSUBSCRIBE`](crate::feature::UNSUBSCRIBE)), params
+    /// [`MessagesUnsubscribeParams`](crate::MessagesUnsubscribeParams). Socket only; answered
+    /// out of order while a one-click POST runs.
+    pub const MESSAGES_UNSUBSCRIBE: &str = "messages.unsubscribe";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
     /// `serve` mode, the parent's stdin only: start syncing an account.
@@ -173,6 +186,10 @@ pub mod feature {
     /// `clientFinalize`, and other plugins' rows, still come as `metadata-expiration` deltas
     /// for a client to act on.
     pub const EXPIRATION_EXECUTOR: &str = "expiration-executor";
+    /// `threads.snooze` and `threads.unsnooze`.
+    pub const SNOOZE: &str = "snooze";
+    /// `messages.unsubscribe`.
+    pub const UNSUBSCRIBE: &str = "unsubscribe";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
