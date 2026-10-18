@@ -213,6 +213,24 @@ describe('mock triage', () => {
     });
     expect(e.store.threads.get(ids[1])!.metadata?.some((m) => m.pluginId === PLUGIN_ID)).toBe(true);
   });
+
+  it('ends a cancelled job with a stopped progress', async () => {
+    const { e, notes } = await engine({ aiDemo: false, latency: 10 });
+    e.changeSettings(DEMO_AI_SETTINGS([G]));
+    const ids = [...e.store.threads.values()]
+      .filter((t) => t.aid === G && threadHasRole(t, 'inbox'))
+      .slice(0, 3)
+      .map((t) => t.id);
+    const { jobId } = await e.call('ai.triage.run', { accountId: G, threadIds: ids });
+    await e.call('ai.cancel', { jobId });
+    await until(() =>
+      notes.some((n) => n.method === 'ai.triage.progress' && n.params.stopped === true),
+    );
+    const progress = notes.flatMap((n) => (n.method === 'ai.triage.progress' ? [n.params] : []));
+    const last = progress[progress.length - 1];
+    expect(last).toMatchObject({ jobId, total: 3, stopped: true });
+    expect(last.done).toBeLessThan(3);
+  });
 });
 
 async function until(ok: () => boolean, ms = 2000) {
