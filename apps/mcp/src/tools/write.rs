@@ -168,7 +168,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "schedule_send",
-            description: "Schedule an existing draft to be sent automatically at a future date/time, equivalent to the \"Send Later\" composer button. The Tern desktop app does the send: it must be running when the time comes, or the draft goes out when the app next opens. Use cancel_scheduled_send to undo.",
+            description: "Schedule an existing draft to be sent automatically at a future date/time, equivalent to the \"Send Later\" composer button. The Tern engine sends it at that time with no window open (the result's note says when an older engine needs the desktop app instead). Use cancel_scheduled_send to undo.",
             schema: schema(
                 json!({
                     "headerMessageId": {"type": "string", "description": "The headerMessageId of the draft to schedule"},
@@ -661,18 +661,30 @@ pub(super) fn schedule_send(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         Some(json!({"expiration": null})),
     );
     ctx.queue(&account.account_id, task)?;
+    let note = if ctx
+        .backend
+        .has_feature(&account.account_id, ms_ipc::feature::EXPIRATION_EXECUTOR)
+    {
+        SCHEDULE_NOTE
+    } else {
+        SCHEDULE_NOTE_DESKTOP
+    };
     Ok(Output::text(&json!({
         "scheduled": true,
         "headerMessageId": hmid,
         "sendAt": when.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-        "note": SCHEDULE_NOTE,
+        "note": note,
     }))
     .with_account(&account.account_id))
 }
 
-/// The engine only announces a due send-later; the desktop's send-later plugin sends it.
-const SCHEDULE_NOTE: &str = "The Tern desktop app sends scheduled drafts: it must be running at \
-                             sendAt, or the draft goes out when the app next opens.";
+/// An engine with the expiration executor sends a due draft itself.
+const SCHEDULE_NOTE: &str = "The Tern engine sends the draft at sendAt by itself; if it isn't \
+                             running then, the draft goes out when it next starts.";
+/// An older engine only announces a due send-later; the desktop's send-later plugin sends it.
+const SCHEDULE_NOTE_DESKTOP: &str = "This Tern engine leaves scheduled drafts to the desktop \
+                                     app: it must be running at sendAt, or the draft goes out \
+                                     when the app next opens.";
 
 /// `sendAt` the way the plugin's `new Date(sendAt)` read it: a date-time without an offset
 /// is local time (to the minute or with seconds), a date alone is midnight UTC.

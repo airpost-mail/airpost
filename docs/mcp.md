@@ -6,7 +6,8 @@ desktop ships tern-mcp (see "The desktop" below). tern-mcp talks to the running 
 (docs/engine-protocol-plan.md): reads go through the read API, and changes are queued as the
 same task JSON the desktop sends (`__cls`, the `DraftFactory` fields), so the desktop and the
 engine can't tell the two apart. The desktop doesn't have to be open, but an engine does
-(scheduled sends are the exception, see `schedule_send` below).
+(scheduled sends on an engine without the expiration executor are the exception, see
+`schedule_send` below).
 
 stdout carries MCP; stderr is the log, which MCP clients keep.
 
@@ -139,10 +140,11 @@ Changes from the plugin:
   again before building the task. A draft synced from another device gets `plaintext` and its
   `files` only when its body is downloaded; the header-only copy would fail to send or drop
   the attachments.
-- `schedule_send` only writes the `send-later` metadata. The engine announces the due send as a
-  `metadata-expiration` delta and the desktop's send-later plugin sends it, so the desktop has
-  to be running at `sendAt`; otherwise the draft goes out when it next opens. The tool
-  description and result say so. `sendAt` without an offset is local time, with or without
+- `schedule_send` only writes the `send-later` metadata. A `serve` engine (`hello.features`
+  lists `expiration-executor`, docs/desktop-client-plan.md 3.3) sends the draft at `sendAt`
+  itself, or when it next starts. An engine without it announces the due send as a
+  `metadata-expiration` delta and the desktop's send-later plugin sends it, so the desktop
+  has to be running at `sendAt`; the result's `note` says which applies. `sendAt` without an offset is local time, with or without
   seconds; a date alone is midnight UTC (both as `new Date()` read them).
 
 `list_tracked_messages`, `get_top_links` and `list_scheduled_sends` read through

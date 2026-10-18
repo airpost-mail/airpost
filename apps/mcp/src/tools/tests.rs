@@ -623,7 +623,7 @@ fn send_at_without_an_offset_is_local_time() {
 }
 
 #[test]
-fn schedule_send_says_the_desktop_does_the_send() {
+fn schedule_send_says_who_does_the_send() {
     let mut f = fake();
     let send = policy("read-write-send", json!({}));
     let at = (chrono::Local::now() + chrono::Duration::hours(2))
@@ -636,6 +636,14 @@ fn schedule_send_says_the_desktop_does_the_send() {
         json!({"headerMessageId": "draft-0@x.test", "sendAt": at}),
     ));
     assert!(out["note"].as_str().unwrap().contains("desktop app"));
+    f.features.push(ms_ipc::feature::EXPIRATION_EXECUTOR.into());
+    let out = json_of(&run(
+        &mut f,
+        &send,
+        "schedule_send",
+        json!({"headerMessageId": "draft-0@x.test", "sendAt": at}),
+    ));
+    assert!(out["note"].as_str().unwrap().contains("engine sends"));
     let want = chrono::NaiveDateTime::parse_from_str(&at, "%Y-%m-%dT%H:%M")
         .unwrap()
         .and_local_timezone(chrono::Local)
