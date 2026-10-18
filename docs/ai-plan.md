@@ -341,3 +341,7 @@ Open after AI2: the engine trusts the request's `settings` until stage 3 adds th
 devices get `not-enabled` / `not-configured`; `capabilities.ai` can only say "served" until
 then. Usage isn't persisted (AI4).
 
+
+2026-10-18, AI2 gated and merged: fmt, clippy, workspace tests, `cargo deny`, release build
+of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (141 passed, 4
+skipped). Rust only, so no desktop or web gate. Open as above.
