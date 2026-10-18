@@ -151,8 +151,11 @@ pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) ->
             .get("values")
             .and_then(Value::as_object)
             .is_some_and(|v| relayed_settings_allowed(v, scopes)),
-        // Admin or not, a remote device never names a path for the engine to read.
-        method::FILES_PUT => params.get("path").is_none_or(Value::is_null),
+        // Admin or not, a remote device never names a path for the engine to read. Params
+        // that aren't an object are refused: positional params fill `path` too.
+        method::FILES_PUT => params
+            .as_object()
+            .is_some_and(|p| p.get("path").is_none_or(Value::is_null)),
         _ => true,
     }
 }
@@ -287,6 +290,9 @@ mod tests {
         assert!(!put(
             json!({"accountId": "a", "name": "x", "path": "/etc/passwd"})
         ));
+        assert!(!put(json!(["a", "x", null, null, "/etc/passwd"])));
+        assert!(!put(json!(["a", "x", null, "aGk="])));
+        assert!(!put(json!(null)));
     }
 
     #[test]
