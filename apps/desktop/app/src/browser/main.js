@@ -373,8 +373,8 @@ const start = () => {
   // Configure Chromium command line switches before app ready event.
   // These must be set before the ready event for them to take effect.
   // Reference: https://www.electronjs.org/docs/latest/api/command-line-switches
+  // New-mail sounds play with no user gesture (src/registries/sound-registry.ts).
   app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-  app.commandLine.appendSwitch('js-flags', '--harmony');
 
   const options = parseCommandLine(process.argv);
   // Before the error logger: it starts the crash reporter, which writes under userData.
@@ -408,6 +408,16 @@ const start = () => {
 
   setupCompileCache(configDirPath, options.devMode);
 
+  // Every session gets the deny-by-default permission handlers as it is created: the default
+  // one, quickpreview's and the <webview> partition, and any a plugin opens.
+  const installPermissionHandlers = ses => {
+    require('./permission-policy').installPermissionHandlers(ses, {
+      isAppWindow: require('./mailspring-window').isMailspringWindowContents,
+      logDenials: options.devMode,
+    });
+  };
+  app.on('session-created', installPermissionHandlers);
+
   const profileImport = startProfileImport(configDirPath, importFromPath);
 
   // Must precede `ready`: disableHardwareAcceleration() has no effect afterward.
@@ -437,6 +447,9 @@ const start = () => {
 
     app.removeListener('open-file', onOpenFileBeforeReady);
     app.removeListener('open-url', onOpenUrlBeforeReady);
+
+    // In case the default session was created before the listener above.
+    installPermissionHandlers(session.defaultSession);
 
     // No window may reach file://host/... (a UNC path on Windows), which the app CSP's `*`,
     // `file:` and 'self' all allow from a file: document. Message HTML also renders in the
