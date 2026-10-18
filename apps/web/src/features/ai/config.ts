@@ -136,8 +136,12 @@ export function isLocal(p: AiProvider): boolean {
   const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
   if (v4) return isPrivateV4(v4.slice(1).map(Number));
   if (host.includes(':')) {
-    const mapped = /^::ffff:(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
-    if (mapped) return isPrivateV4(mapped.slice(1).map(Number));
+    // URL serialises an IPv4-mapped address in hex: [::ffff:192.168.1.5] is ::ffff:c0a8:105.
+    const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(host);
+    if (mapped) {
+      const hi = parseInt(mapped[1], 16);
+      return isPrivateV4([hi >> 8, hi & 255]);
+    }
     return host === '::1' || /^f[cd]/.test(host) || /^fe[89ab]/.test(host);
   }
   return false;

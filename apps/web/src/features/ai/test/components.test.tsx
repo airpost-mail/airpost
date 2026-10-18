@@ -23,9 +23,9 @@ import {
 } from '@/engine';
 import { BodyEditor, type BodyEditorHandle } from '@/features/composer/BodyEditor';
 import { AiSettingsView } from '../AiSettings';
-import { NeedsReplyView } from '../NeedsReplyView';
+import { NeedsReplyLink, NeedsReplyView } from '../NeedsReplyView';
 import { SuggestReply } from '../SuggestReply';
-import { forgetSummaries } from '../summary-memory';
+import { forgetSummaries, remembered } from '../summary-memory';
 import { ThreadAi } from '../ThreadSummary';
 import { triageOf } from '../triage';
 import { TriageChip } from '../TriageChip';
@@ -88,6 +88,35 @@ describe('ThreadAi', () => {
     render(t.wrap(<ThreadAi thread={thread} messages={messages} />));
     expect(await screen.findByRole('region', { name: 'Summary' })).toBeInTheDocument();
     expect(t.of('ai.summarize')).toHaveLength(1);
+  });
+
+  it('forgets summaries on a provider change or a reconnect, and keeps the host that wrote one', async () => {
+    const t = await setup();
+    const { thread, messages } = conversation(t.engine);
+    const user = userEvent.setup();
+    render(t.wrap(<ThreadAi thread={thread} messages={messages} />));
+    await user.click(await screen.findByRole('button', { name: 'Summarize' }));
+    const card = await screen.findByRole('region', { name: 'Summary' });
+    await waitFor(() => expect(remembered.size).toBe(1));
+
+    act(() =>
+      t.engine.changeSettings({
+        'core.ai.providers': [{ id: 'o', kind: 'openai', url: 'http://10.0.0.2/v1', model: 'm' }],
+        'core.ai.features': { summary: { enabled: true, provider: 'o' } },
+      }),
+    );
+    expect(remembered.size).toBe(0);
+    // The card still names the provider that wrote the summary on screen.
+    expect(within(card).getByText(/Runs on the engine's computer \(Ollama\)/)).toBeInTheDocument();
+
+    await user.click(within(card).getByRole('button', { name: 'Regenerate' }));
+    await waitFor(() => expect(remembered.size).toBe(1));
+    expect(within(card).getByText(/Sent to 10\.0\.0\.2/)).toBeInTheDocument();
+    await act(async () => {
+      t.engine.close();
+      await t.engine.connect();
+    });
+    expect(remembered.size).toBe(0);
   });
 
   it('shows model output without HTML or links', async () => {
@@ -287,6 +316,38 @@ describe('NeedsReplyView', () => {
     await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(before + 1), {
       timeout: 3000,
     });
+  });
+
+  it('leaves out an opted-in account the engine no longer has', async () => {
+    const t = await setup();
+    const opted = (await t.engine.call('settings.get', { keys: ['core.ai.accounts'] })).values[
+      'core.ai.accounts'
+    ] as string[];
+    t.engine.changeSettings({ 'core.ai.accounts': [...opted, 'removed-account'] });
+    routed(t.wrap, '/needs-reply');
+    const list = await screen.findByRole('list', { name: 'Needs reply' });
+    await waitFor(() => expect(within(list).getAllByRole('listitem').length).toBeGreaterThan(0));
+    const asked = t
+      .of('ai.triage.list')
+      .map((c) => (c.params as { accountIds: string[] }).accountIds);
+    expect(asked.flat()).not.toContain('removed-account');
+  });
+
+  it('hides the link when only removed accounts are opted in', async () => {
+    const t = await setup();
+    t.engine.changeSettings({ 'core.ai.accounts': ['removed-account'] });
+    const root = createRootRoute({ component: () => <NeedsReplyLink /> });
+    const router = createRouter({
+      routeTree: root,
+      history: createMemoryHistory({ initialEntries: ['/'] }),
+    });
+    render(t.wrap(<RouterProvider router={router} />));
+    await waitFor(() => expect(t.of('account.list').length).toBeGreaterThan(0));
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(screen.queryByRole('link', { name: 'Needs reply' })).toBeNull();
+
+    act(() => t.engine.changeSettings({ 'core.ai.accounts': [G] }));
+    expect(await screen.findByRole('link', { name: 'Needs reply' })).toBeInTheDocument();
   });
 
   it('says when triage is off', async () => {

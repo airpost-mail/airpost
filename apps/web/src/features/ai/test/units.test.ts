@@ -54,6 +54,10 @@ describe('config', () => {
     expect(hostOf(p('openai'))).toBe('api.openai.com');
     expect(isLocal(p('openai', 'http://192.168.1.20:1234/v1'))).toBe(true);
     expect(isLoopback(p('openai', 'http://192.168.1.20:1234/v1'))).toBe(false);
+    // URL turns [::ffff:192.168.1.5] into ::ffff:c0a8:105.
+    expect(isLocal(p('openai', 'http://[::ffff:192.168.1.5]:1234/v1'))).toBe(true);
+    expect(isLocal(p('openai', 'http://[::ffff:10.0.0.2]/v1'))).toBe(true);
+    expect(isLocal(p('openai', 'http://[::ffff:8.8.8.8]/v1'))).toBe(false);
     expect(isLoopback(p('ollama'))).toBe(true);
     expect(keyRequired(p('openai'))).toBe(true);
     expect(keyRequired(p('openai', 'http://127.0.0.1:1234/v1'))).toBe(false);

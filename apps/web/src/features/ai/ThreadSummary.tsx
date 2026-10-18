@@ -5,7 +5,13 @@ import { useEngine, type MessageJSON, type ThreadJSON } from '@/engine';
 import { errorMessage, isCancelled, summarize, type AiCall } from './api';
 import { destinationNote, providerName } from './config';
 import { unavailableMessage, useAiAvailability } from './hooks';
-import { remember, remembered, worthSummarizing, type Summary } from './summary-memory';
+import {
+  remember,
+  remembered,
+  watchSummaries,
+  worthSummarizing,
+  type Summary,
+} from './summary-memory';
 import { TriageChip } from './TriageChip';
 
 type State =
@@ -44,6 +50,7 @@ function SummaryCard({ thread, memoryKey }: { thread: ThreadJSON; memoryKey: str
   const [open, setOpen] = useState(() => remembered.has(memoryKey));
   const call = useRef<AiCall<unknown> | null>(null);
 
+  useEffect(() => watchSummaries(client), [client]);
   // Closing the thread or the card stops the provider request.
   useEffect(() => () => call.current?.cancel(), []);
 
@@ -70,7 +77,7 @@ function SummaryCard({ thread, memoryKey }: { thread: ThreadJSON; memoryKey: str
       (r) => {
         if (call.current !== c) return;
         call.current = null;
-        const summary = { text: r.text, model: r.model };
+        const summary = { text: r.text, model: r.model, where };
         remember(memoryKey, summary);
         setState({ kind: 'done', summary });
       },
@@ -128,7 +135,9 @@ function SummaryCard({ thread, memoryKey }: { thread: ThreadJSON; memoryKey: str
           Summary
         </h2>
         <span className="min-w-0 flex-1 truncate text-2xs text-muted-foreground">
-          {[state.kind === 'done' ? state.summary.model : null, where].filter(Boolean).join(' · ')}
+          {(state.kind === 'done' ? [state.summary.model, state.summary.where] : [where])
+            .filter(Boolean)
+            .join(' · ')}
         </span>
         {state.kind === 'streaming' ? (
           <Button size="xs" variant="ghost" onClick={stop}>

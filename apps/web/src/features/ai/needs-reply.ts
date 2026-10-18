@@ -2,12 +2,13 @@
 // first, and drops threads the user answered), then the threads themselves through `query`
 // or, on engines without it, `threads.get`.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   ensureConnected,
   hasQuery,
   RpcError,
   RpcErrorCode,
+  useAccounts,
   useDeltas,
   useEngine,
   type EngineClient,
@@ -73,12 +74,20 @@ export async function fetchNeedsReply(
   return { threads, total: per.reduce((n, p) => n + p.total, 0) };
 }
 
-/** The accounts the list covers: opted in with triage on, or just `accountId`. */
+/**
+ * The accounts the list covers: opted in with triage on, or just `accountId`. Only accounts
+ * the engine has: the desktop leaves a removed account in `core.ai.accounts`, and
+ * `ai.triage.list` rejects an unknown id.
+ */
 export function useNeedsReplyAccounts(accountId?: string): string[] {
   const settings = useAiSettings();
   const shown = useTriageShown(accountId ?? '');
-  if (accountId) return shown ? [accountId] : [];
-  return settings.features.triage.enabled ? settings.accounts : [];
+  const { data: known } = useAccounts();
+  return useMemo(() => {
+    const ids = new Set((known ?? []).map((a) => a.id));
+    if (accountId) return shown && ids.has(accountId) ? [accountId] : [];
+    return settings.features.triage.enabled ? settings.accounts.filter((a) => ids.has(a)) : [];
+  }, [accountId, shown, known, settings]);
 }
 
 export function useNeedsReply(accounts: string[]) {
