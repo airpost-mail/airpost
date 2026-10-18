@@ -864,6 +864,7 @@ fn features(server: &Server) -> Vec<String> {
         feature::MESSAGE_HIDDEN,
         feature::MAIL_NEW,
         feature::RELAYED,
+        feature::QUERY,
     ]
     .map(str::to_owned)
     .to_vec();

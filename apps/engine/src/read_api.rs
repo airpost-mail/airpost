@@ -13,10 +13,11 @@ use std::sync::Arc;
 use ms_ipc::{
     code, method, CategoriesListParams, CategoryCounts, ContactsSearchResult, CountsGetParams,
     CountsGetResult, ErrorObject, FoldersListResult, LabelsListResult, MessagesGetParams,
-    MessagesGetResult, MetadataListParams, MetadataListResult, Request as RpcRequest, SearchParams,
-    SearchResult, TasksGetParams, TasksGetResult, TasksListParams, TasksListResult,
+    MessagesGetResult, MetadataListParams, MetadataListResult, QueryResult, Request as RpcRequest,
+    SearchParams, SearchResult, TasksGetParams, TasksGetResult, TasksListParams, TasksListResult,
     ThreadsGetParams, ThreadsGetResult, ThreadsListParams, ThreadsListResult, READ_DEFAULT_LIMIT,
 };
+use ms_store::model_query::{ModelQuery, QueryError, QueryOutput};
 use ms_store::read::{
     Category, CategoryTable, Cursor, InCategory, MetadataFilter, MetadataObject, ReadStore,
     TaskFilter,
@@ -41,6 +42,7 @@ pub fn is_read_method(name: &str) -> bool {
             | method::COUNTS_GET
             | method::TASKS_LIST
             | method::METADATA_LIST
+            | method::QUERY
     )
 }
 
@@ -268,11 +270,45 @@ impl ReadApi {
                 to_reply(TasksListResult { tasks })
             }
             method::METADATA_LIST => self.metadata_list(req.params_as()?),
+            method::QUERY => self.query(req.params_as()?),
             other => Err(ErrorObject::new(
                 code::METHOD_NOT_FOUND,
                 format!("unknown method {other}"),
             )),
         }
+    }
+
+    /// `query`: the params are a [`ModelQuery`], parsed strictly so a misspelt key is an
+    /// error rather than a silently wider read. `accounts: null` reads every account.
+    fn query(&mut self, q: ModelQuery) -> Reply {
+        if let Some(accounts) = &q.accounts {
+            for a in accounts {
+                self.check_account(a)?;
+            }
+        }
+        let out = self.store()?.model_query(&q).map_err(|e| match e {
+            QueryError::Invalid(why) => invalid(&why),
+            QueryError::Unsupported(why) => {
+                ErrorObject::new(code::INVALID_PARAMS, format!("unsupported: {why}"))
+                    .with_data(serde_json::json!({"unsupported": "search-grammar"}))
+            }
+            QueryError::Database(e) => internal(e),
+        })?;
+        to_reply(match out {
+            QueryOutput::Rows { rows, next_cursor } => QueryResult {
+                rows,
+                next_cursor,
+                ..Default::default()
+            },
+            QueryOutput::Ids(ids) => QueryResult {
+                ids: Some(ids),
+                ..Default::default()
+            },
+            QueryOutput::Count(n) => QueryResult {
+                count: Some(n),
+                ..Default::default()
+            },
+        })
     }
 
     fn metadata_list(&mut self, p: MetadataListParams) -> Reply {

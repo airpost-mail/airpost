@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use ms_ipc::{
     code, feature, method, Client, CountsGetResult, MessagesGetResult, MetadataListResult,
-    TasksListResult, ThreadsGetResult, ThreadsListResult,
+    QueryResult, TasksListResult, ThreadsGetResult, ThreadsListResult,
 };
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
@@ -785,6 +785,7 @@ fn hello_and_status_announce_the_features() {
         feature::METADATA_LIST,
         feature::MESSAGE_HIDDEN,
         feature::MAIL_NEW,
+        feature::QUERY,
     ] {
         assert!(
             hello.features.iter().any(|x| x == f),
@@ -915,5 +916,107 @@ fn metadata_list_and_hidden() {
         )
         .unwrap();
     assert!(t.messages.iter().all(|m| m["hidden"] == false));
+    e.stop();
+}
+
+#[test]
+fn query_threads_contacts_and_refusals() {
+    let e = Engine::start();
+    let mut c = e.hello();
+    let query = |c: &mut Client, p: Value| -> QueryResult { c.call_as(method::QUERY, p).unwrap() };
+
+    // The inbox thread list by cursor, both accounts, newest first: the same threads as
+    // threads.list, plus the other account's.
+    let inbox = json!({"attr": "categories", "op": "containsAny", "value": ["f-inbox"]});
+    let mut cursor = String::new();
+    let mut paged = Vec::new();
+    loop {
+        let r = query(
+            &mut c,
+            json!({"class": "Thread", "where": [inbox, {"attr": "inAllMail", "op": "=", "value": true}],
+                   "order": [{"attr": "lastMessageReceivedTimestamp", "dir": "desc"}],
+                   "limit": 25, "cursor": cursor}),
+        );
+        paged.extend(ids(&r.rows));
+        match r.next_cursor {
+            Some(Some(next)) => cursor = next,
+            Some(None) => break,
+            None => panic!("a cursor query answers nextCursor"),
+        }
+    }
+    assert_eq!(paged[0], "t:other");
+    let (listed, _) = list_all(
+        &mut c,
+        json!({"accountId": ACCOUNT_ID, "folderId": "f-inbox", "limit": 50}),
+    );
+    assert_eq!(paged[1..], listed[..]);
+
+    let mine = query(
+        &mut c,
+        json!({"class": "Thread", "accounts": [ACCOUNT_ID], "where": inbox, "count": true}),
+    );
+    assert_eq!((mine.count, mine.rows.len()), (Some(60), 0));
+    let some = query(
+        &mut c,
+        json!({"class": "Thread", "where": {"attr": "id", "op": "in", "value": ["t:000", "t:other", "nope"]},
+               "idsOnly": true}),
+    );
+    let mut got = some.ids.unwrap();
+    got.sort();
+    assert_eq!(got, ["t:000", "t:other"]);
+
+    // Contacts across accounts with plain search; hidden ones out.
+    let r = query(
+        &mut c,
+        json!({"class": "Contact", "search": {"text": "ann", "grammar": false},
+               "where": {"attr": "hidden", "op": "=", "value": false},
+               "order": [{"attr": "refs", "dir": "desc"}], "limit": 10}),
+    );
+    assert_eq!(ids(&r.rows), ["c-4", "c-2", "c-1"]);
+
+    // A message with its body, and `hidden` on the JSON.
+    let r = query(
+        &mut c,
+        json!({"class": "Message", "where": {"attr": "threadId", "op": "=", "value": "t:000"},
+               "include": ["body"]}),
+    );
+    assert_eq!(ids(&r.rows), ["m-1", "m-2"]);
+    assert_eq!(r.rows[0]["body"], "<p>Hello body</p>");
+    assert_eq!(
+        (&r.rows[1]["body"], &r.rows[0]["hidden"]),
+        (&Value::Null, &json!(false))
+    );
+
+    let grammar = c
+        .call(
+            method::QUERY,
+            json!({"class": "Thread", "search": {"text": "from:ann", "grammar": true}}),
+        )
+        .unwrap_err();
+    assert_eq!(grammar.code(), Some(code::INVALID_PARAMS));
+    let ms_ipc::ClientError::Rpc(obj) = &grammar else {
+        panic!("{grammar:?}")
+    };
+    assert_eq!(obj.data, Some(json!({"unsupported": "search-grammar"})));
+    for bad in [
+        json!({"class": "Account"}),
+        json!({"class": "Thread", "wher": []}),
+        json!({"class": "Thread", "where": {"attr": "snippet", "op": "=", "value": "x"}}),
+        json!({"class": "Thread", "order": [{"attr": "subject", "dir": "sideways"}]}),
+    ] {
+        assert_eq!(
+            error_code(&mut c, method::QUERY, bad.clone()),
+            Some(code::INVALID_PARAMS),
+            "{bad}"
+        );
+    }
+    assert_eq!(
+        error_code(
+            &mut c,
+            method::QUERY,
+            json!({"class": "Thread", "accounts": ["nobody"]})
+        ),
+        Some(code::UNKNOWN_ACCOUNT)
+    );
     e.stop();
 }
