@@ -84,12 +84,17 @@ class _SendActionsStore extends MailspringStore {
     return this._sendActions.find((a) => a.configKey === configKey);
   }
 
+  // Whether an engine with the expiration executor performs this after-send action itself.
+  enginePerformsSendAction(actionKey: string = DefaultSendActionKey) {
+    return ENGINE_SEND_ACTION_KEYS.includes(actionKey);
+  }
+
   // Whether a scheduled send of `draft` with `actionKey` must be finalized by a window
   // (docs/desktop-client-plan.md T9): an action the engine doesn't perform, or a composer
   // extension that transforms the body for sending, which only a window can run. Such a
   // send-later row is marked `clientFinalize` and the engine leaves it to the client.
   needsClientFinalize(draft: Message, actionKey: string = DefaultSendActionKey) {
-    if (!ENGINE_SEND_ACTION_KEYS.includes(actionKey)) return true;
+    if (!this.enginePerformsSendAction(actionKey)) return true;
     return ExtensionRegistry.Composer.extensions().some((ext) => {
       // Every ComposerExtension subclass inherits the base class's no-op.
       if (!Object.prototype.hasOwnProperty.call(ext, 'applyTransformsForSending')) return false;

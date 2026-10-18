@@ -208,13 +208,15 @@ class _AccountStore extends MailspringStore {
       await revocation;
       await KeyManager.deleteAccountSecrets(account);
       const ipc = require('electron').ipcRenderer;
-      ipc.send('command', 'application:reset-database', {});
+      ipc.send('command', 'application:reset-database', { keepMetadata: false });
     } else {
       // Clear the cached data for the account and reset secrets once that has completed
-      AppEnv.mailsyncBridge.resetCacheForAccount(account, { silent: true }).then(() => {
-        console.log('Account removal complete.');
-        KeyManager.deleteAccountSecrets(account);
-      });
+      AppEnv.mailsyncBridge
+        .resetCacheForAccount(account, { silent: true, keepMetadata: false })
+        .then(() => {
+          console.log('Account removal complete.');
+          KeyManager.deleteAccountSecrets(account);
+        });
     }
   };
 

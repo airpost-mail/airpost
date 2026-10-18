@@ -35,9 +35,13 @@ export function handleMetadataExpiration(change, engine = EngineEvents) {
     if (!metadata || !metadata.expiration || metadata.expiration > new Date()) {
       return;
     }
-    // The engine sends it, unless the send needs this window's transforms.
+    // The engine sends it, unless the send needs this window's transforms or a send action
+    // only a plugin has. It also clears the schedule of a message that is no longer a draft.
     if (engine.has(Feature.ExpirationExecutor) && !metadata.clientFinalize) {
-      return;
+      const action = metadata.actionKey || SendActionsStore.DefaultSendActionKey;
+      if (!message.draft || SendActionsStore.enginePerformsSendAction(action)) {
+        return;
+      }
     }
 
     if (!message.draft) {

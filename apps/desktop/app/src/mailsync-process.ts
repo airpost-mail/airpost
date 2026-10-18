@@ -40,6 +40,13 @@ import {
   GMAIL_CLIENT_SECRET,
 } from '../internal_packages/onboarding/lib/onboarding-constants';
 
+// account.reset / engine.resetDatabase: whether plugin metadata (send-later, snoozes,
+// reminders) survives. Removing an account passes false, so an account added again with the
+// same id doesn't get the old schedules back.
+export interface ResetOptions {
+  keepMetadata?: boolean;
+}
+
 export interface MailsyncProcessExit {
   code: number;
   error?: Error;
@@ -871,14 +878,22 @@ export class EngineServeProcess extends MailsyncProcess {
   }
 
   // Deletes the account's local data so it syncs from scratch. The engine forgets the
-  // account; the caller adds it again.
-  resetAccount(accountId: string) {
-    return this._parentCall(Method.AccountReset, { accountId });
+  // account; the caller adds it again. `keepMetadata: false` (removing the account) deletes
+  // its plugin metadata too instead of keeping it for the resync.
+  resetAccount(accountId: string, { keepMetadata = true }: ResetOptions = {}) {
+    return this._parentCall(
+      Method.AccountReset,
+      keepMetadata ? { accountId } : { accountId, keepMetadata }
+    );
   }
 
   // Removes every account and starts over on an empty database. The caller relaunches.
-  resetDatabase() {
-    return this._parentCall<ResetDatabaseResult>(Method.EngineResetDatabase, {});
+  // `keepMetadata: false` (the last account was removed) carries no plugin metadata over.
+  resetDatabase({ keepMetadata = true }: ResetOptions = {}) {
+    return this._parentCall<ResetDatabaseResult>(
+      Method.EngineResetDatabase,
+      keepMetadata ? {} : { keepMetadata }
+    );
   }
 
   // Verbose logging until `verboseUntil` (ms since the epoch; 0 turns it off). Running

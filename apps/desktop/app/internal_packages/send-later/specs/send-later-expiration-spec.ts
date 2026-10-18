@@ -46,6 +46,18 @@ describe('send-later on metadata-expiration', function () {
     expect(DraftStore.sessionForClientId).not.toHaveBeenCalled();
   });
 
+  it('sends a draft whose send action the engine does not have', async () => {
+    engine.connected([Feature.ExpirationExecutor], () => Promise.resolve(null));
+    await expire(dueDraft({ actionKey: 'send-and-snooze' }), engine);
+    expect(DraftStore.sessionForClientId).toHaveBeenCalledWith('h1');
+  });
+
+  it('leaves an engine send action to the engine', async () => {
+    engine.connected([Feature.ExpirationExecutor], () => Promise.resolve(null));
+    await expire(dueDraft({ actionKey: 'send-and-archive' }), engine);
+    expect(DraftStore.sessionForClientId).not.toHaveBeenCalled();
+  });
+
   it('still finalizes a draft marked clientFinalize', async () => {
     engine.connected([Feature.ExpirationExecutor], () => Promise.resolve(null));
     await expire(dueDraft({ clientFinalize: true }), engine);

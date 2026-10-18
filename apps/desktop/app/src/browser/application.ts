@@ -396,7 +396,11 @@ export default class Application extends EventEmitter {
     }
   }
 
-  _resetDatabaseAndRelaunch = ({ errorMessage }: { errorMessage?: string } = {}) => {
+  // `keepMetadata: false` after the last account was removed: nothing is carried over.
+  _resetDatabaseAndRelaunch = ({
+    errorMessage,
+    keepMetadata,
+  }: { errorMessage?: string; keepMetadata?: boolean } = {}) => {
     if (this._resettingAndRelaunching) return;
     this._resettingAndRelaunching = true;
 
@@ -422,7 +426,7 @@ export default class Application extends EventEmitter {
       return;
     }
     // The engine empties the database it holds open; if it can't, the files go once it exited.
-    supervisor.resetDatabase().then(
+    supervisor.resetDatabase(keepMetadata === false ? { keepMetadata } : {}).then(
       () => supervisor.shutdown().then(done),
       (err) => {
         console.error(`engine.resetDatabase failed: ${err}`);

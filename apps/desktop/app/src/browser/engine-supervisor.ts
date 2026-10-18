@@ -20,7 +20,7 @@ and OnlineStatusStore; it acks them, and those not acked are handed to its next 
 import fs from 'fs';
 import path from 'path';
 import { AccountJSON, EngineAccount, EngineClient } from '../engine-client';
-import { EngineServeProcess, MailsyncProcessExit } from '../mailsync-process';
+import { EngineServeProcess, MailsyncProcessExit, ResetOptions } from '../mailsync-process';
 import { AccountSecretsJSON, KeyManager } from './key-manager';
 import { SettingsValues } from '../engine-protocol';
 import type { EngineSettingsMirror } from './engine-settings';
@@ -171,9 +171,9 @@ export class EngineSupervisor {
   }
 
   // The account may already be gone from config.json, as when it is being deleted.
-  resetCache(accountId: string) {
+  resetCache(accountId: string, options: ResetOptions = {}) {
     return this.client.resetCache(accountId, () =>
-      this.client.withEngine((engine) => engine.resetAccount(accountId))
+      this.client.withEngine((engine) => engine.resetAccount(accountId, options))
     );
   }
 
@@ -182,8 +182,8 @@ export class EngineSupervisor {
     return this.client.withEngine((engine) => engine.testAccount(account));
   }
 
-  resetDatabase() {
-    return this.client.resetDatabase();
+  resetDatabase(options: ResetOptions = {}) {
+    return this.client.resetDatabase(options);
   }
 
   shutdown() {
@@ -350,10 +350,14 @@ export function registerEngineSupervisorIPC(
   ipcMain.handle(SupervisorChannel.ForceRelaunch, (_event, accountId: string) =>
     supervisor.forceRelaunch(accountId)
   );
-  ipcMain.handle(SupervisorChannel.ResetCache, (_event, accountId: string) =>
-    reply(() => supervisor.resetCache(accountId))
+  ipcMain.handle(
+    SupervisorChannel.ResetCache,
+    (_event, accountId: string, options?: ResetOptions) =>
+      reply(() => supervisor.resetCache(accountId, options))
   );
-  ipcMain.handle(SupervisorChannel.ResetDatabase, () => reply(() => supervisor.resetDatabase()));
+  ipcMain.handle(SupervisorChannel.ResetDatabase, (_event, options?: ResetOptions) =>
+    reply(() => supervisor.resetDatabase(options))
+  );
   ipcMain.handle(
     SupervisorChannel.TestAccount,
     async (_event, account: AccountSecretsJSON): Promise<AccountTestReply> => {

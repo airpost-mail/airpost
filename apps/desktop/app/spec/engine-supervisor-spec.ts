@@ -321,6 +321,18 @@ describe('the engine supervisor', function () {
     await until('the add', () => fake.stdinOf('account.add').length === 3);
   });
 
+  it('drops the plugin metadata of an account being removed', async function () {
+    await started();
+    await supervisor.resetCache('a1', { keepMetadata: false });
+    expect(fake.stdinOf('account.reset').map((r) => r.params)).toEqual([
+      { accountId: 'a1', keepMetadata: false },
+    ]);
+    await supervisor.resetDatabase({ keepMetadata: false });
+    expect(fake.stdinOf('engine.resetDatabase').map((r) => r.params)).toEqual([
+      { keepMetadata: false },
+    ]);
+  });
+
   it('tests an account on stdin for onboarding, with its secrets redacted after', async function () {
     config.values.accounts = [];
     supervisor.start();
@@ -355,7 +367,7 @@ describe('the engine supervisor', function () {
   it('empties the database through the engine and leaves its accounts out', async function () {
     await started();
     await supervisor.resetDatabase();
-    expect(fake.stdinOf('engine.resetDatabase').length).toBe(1);
+    expect(fake.stdinOf('engine.resetDatabase').map((r) => r.params)).toEqual([{}]);
     expect(lastStatus().accounts).toEqual({});
     config.set('accounts', [configAccount('a1'), configAccount('a2'), configAccount('a3')]);
     await tick();

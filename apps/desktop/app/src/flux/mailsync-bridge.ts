@@ -262,10 +262,15 @@ export default class MailsyncBridge {
     }
   }
 
-  async resetCacheForAccount(account: Account, { silent }: { silent?: boolean } = {}) {
+  // `keepMetadata: false` when the account is being removed: its plugin metadata goes too.
+  async resetCacheForAccount(
+    account: Account,
+    { silent, keepMetadata }: { silent?: boolean; keepMetadata?: boolean } = {}
+  ) {
     // The supervisor drops the account from the engine, resets it and adds it back.
     const reset = async () => {
-      const result = await ipcRenderer.invoke(SupervisorChannel.ResetCache, account.id);
+      const options = keepMetadata === false ? { keepMetadata } : {};
+      const result = await ipcRenderer.invoke(SupervisorChannel.ResetCache, account.id, options);
       if (result && result.error) throw new Error(result.error);
     };
 

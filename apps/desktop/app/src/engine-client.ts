@@ -12,7 +12,7 @@ again, until CrashTracker's cutoff. An engine exit counts as an engine crash and
 with every account. Nothing here touches AppEnv or the stores, so the spec drives it with a
 fake engine.
 */
-import type { EngineServeProcess, MailsyncProcessExit } from './mailsync-process';
+import type { EngineServeProcess, MailsyncProcessExit, ResetOptions } from './mailsync-process';
 import {
   AccountAddResult,
   AccountState,
@@ -272,9 +272,9 @@ export class EngineClient {
 
   // Empties the engine's database. The engine forgets every account and ensure() leaves it
   // that way: the caller relaunches the app.
-  async resetDatabase() {
+  async resetDatabase(options: ResetOptions = {}) {
     this.resettingDatabase = true;
-    const result = await this.withEngine((engine) => engine.resetDatabase());
+    const result = await this.withEngine((engine) => engine.resetDatabase(options));
     const ids = [...this.entries.keys()];
     this.entries.clear();
     this._changed();
