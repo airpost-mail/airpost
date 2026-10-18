@@ -14,6 +14,7 @@ import { useEngine } from './context';
 import {
   engineKeys,
   EVERY_ACCOUNT,
+  listsOutsideAllMail,
   type EventRange,
   type SearchQuery,
   type ThreadQuery,
@@ -250,12 +251,6 @@ export function threadQueryFor(
 /** A page of a thread list, and the key it is sorted by (the cache inserts by it). */
 export interface ThreadPage extends ThreadsListResult {
   sort?: ThreadSort;
-}
-
-/** Spam and trash list threads outside all mail (ms-store `threads()`, the desktop's perspectives). */
-export function listsOutsideAllMail(q: ThreadQuery): boolean {
-  const role = q.categoryRole ?? q.role;
-  return role === 'spam' || role === 'trash';
 }
 
 /** The sort of a thread list read with `query`: Sent by last sent, the rest by last received. */
@@ -603,8 +598,8 @@ export function useCalendars() {
   });
 }
 
-/** The most events one range reads. */
-const EVENTS_LIMIT = 1000;
+/** The most events one range reads: the engine's cap on a relayed `query`. */
+const EVENTS_LIMIT = 500;
 
 /**
  * Events overlapping the range in the given calendars, by start. Recurring events come as

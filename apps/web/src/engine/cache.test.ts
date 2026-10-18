@@ -121,6 +121,35 @@ describe('upsertThreadInPages', () => {
 });
 
 describe('query-backed lists', () => {
+  it('drop a thread that left all mail from a list without a role', () => {
+    const custom: ThreadCategoryRef = {
+      ...inbox,
+      id: 'l-work',
+      __cls: 'Label',
+      path: 'Work',
+      role: '',
+    };
+    const label: ThreadQuery = { accountId: A, labelId: 'l-work' };
+    const labelled = thread('a', 300, { labels: [{ ...custom, _refs: 1, _u: 0 }] });
+    const data = pages([
+      [labelled, thread('b', 200, { labels: [{ ...custom, _refs: 1, _u: 0 }] })],
+      false,
+    ]);
+    const trashed = { ...labelled, inAllMail: false };
+    expect(upsertThreadInPages(data, trashed, label)!.pages[0].threads.map((t) => t.id)).toEqual([
+      'b',
+    ]);
+    // Trash itself still lists it.
+    const trash: ThreadQuery = { accountId: A, folderId: 'trash', categoryRole: 'trash' };
+    const inTrash = thread('a', 300, {
+      inAllMail: false,
+      folders: [{ ...inbox, id: 'trash', path: 'Trash', role: 'trash', _refs: 1, _u: 0 }],
+    });
+    expect(
+      upsertThreadInPages(pages([[], false]), inTrash, trash)!.pages[0].threads.map((t) => t.id),
+    ).toEqual(['a']);
+  });
+
   it('insert by the sort the page was read with', () => {
     // b was received last but a's last message is newer (a sent reply).
     const a = thread('a', 500, { lmrt: 100, lmst: 500 });

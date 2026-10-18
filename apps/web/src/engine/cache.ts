@@ -1,7 +1,7 @@
 // Applies delta notifications to the TanStack Query cache, so views update without
 // refetching. This plays the role of the desktop's DatabaseStore change records.
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
-import { engineKeys, EVERY_ACCOUNT, type ThreadQuery } from './keys';
+import { engineKeys, EVERY_ACCOUNT, listsOutsideAllMail, type ThreadQuery } from './keys';
 import {
   compareMessages,
   compareThreads,
@@ -33,9 +33,9 @@ export function matchesThreadQuery(t: ThreadJSON, q: ThreadQuery): boolean {
   if (q.role && !threadHasRole(t, q.role)) return false;
   if (q.starred !== undefined && t.starred > 0 !== q.starred) return false;
   if (q.unread !== undefined && t.unread > 0 !== q.unread) return false;
-  // Lists outside spam and trash hold threads in all mail (when the list's role is known).
-  const role = q.categoryRole ?? q.role;
-  if (role !== undefined && role !== 'spam' && role !== 'trash' && !t.inAllMail) return false;
+  // Lists outside spam and trash hold threads in all mail, role or not, as `query` and
+  // `threads.list` read them (only an older engine's flag lists without a category don't).
+  if (!listsOutsideAllMail(q) && !t.inAllMail) return false;
   return true;
 }
 

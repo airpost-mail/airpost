@@ -25,6 +25,12 @@ export interface ThreadQuery {
   /** Unread threads only (`query` only). */
   unread?: boolean;
 }
+/** Spam and trash list threads outside all mail (ms-store `threads()`, the desktop's perspectives). */
+export function listsOutsideAllMail(q: ThreadQuery): boolean {
+  const role = q.categoryRole ?? q.role;
+  return role === 'spam' || role === 'trash';
+}
+
 /** Events overlapping `[start, end)` (unix seconds) in the given calendars. */
 export interface EventRange {
   start: number;
