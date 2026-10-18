@@ -43,12 +43,13 @@ pub fn get(ctx: &Ctx, engines: &mut [Engine], keys: Vec<String>) -> Result<()> {
         keys: (!keys.is_empty()).then_some(keys),
     };
     let result = call(engine, method::SETTINGS_GET, json!(params))?;
-    if ctx.json {
-        output::json(&result);
-        return Ok(());
-    }
     let values: SettingsValues = serde_json::from_value(result)
         .map_err(|e| CliError::failed(format!("odd settings.get result: {e}")))?;
+    if ctx.json {
+        // The values only, as `set` prints them; the store id is the engine's business.
+        output::json(&json!({ "values": values.values }));
+        return Ok(());
+    }
     let mut keys: Vec<&String> = values.values.keys().collect();
     keys.sort();
     for k in keys {
