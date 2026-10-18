@@ -55,9 +55,9 @@ and event reads with a read-only agenda, and calendar fixtures in the mock. Engi
 
 Done in step W5 (DCP 16, markers removed): downloads link to the gateway's file route when
 the engine announces `files` (`EngineFeature.Files`); `cid:` images load from it with
-`?inline=1`, which the reader frame's CSP allows (`img-src 'self'`); the composer uploads
-each picked file at once (`POST /gateway/v1/files/:accountId`, `files.put`) and saves and
-sends only uploaded ones; before SendDraftTask (and before scheduling a send) every
+`?inline=1`, which the reader frame's CSP allows (`img-src` names the file route); the
+composer uploads each picked file at once (`POST /gateway/v1/files/:accountId`, `files.put`),
+again when From moves to another account, and saves and sends only uploaded ones; before SendDraftTask (and before scheduling a send) every
 attachment, a forwarded original's included, is fetched with `HEAD` on its download route,
 which makes the engine download it. GetMessageRFC2822Task's file-id mode is in the types
 and the mock; nothing in the web asks for a raw message yet.

@@ -111,8 +111,8 @@ Every response: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer
 CSP `default-src 'self'`, `frame-ancestors 'none'`, `connect-src 'self'`, and `img-src`
 allowing `'self'` (rewritten `cid:` images, 2.5) besides what the reader needs today. The
 reader's srcdoc iframe has its own CSP with `img-src data: blob:`
-(`src/components/email/sanitize.ts:13`, per the review, I) and inherits the app's, so both
-gain `'self'`.
+(`src/components/email/sanitize.ts:13`, per the review, I) and inherits the app's; the
+frame's gains the file route (`<origin>/gateway/v1/files/`), not all of `'self'`.
 
 ### 2.3 Pairing, device tokens and the admin scope
 
@@ -519,11 +519,16 @@ Open:
   uploads at once; leftovers older than a day are swept at start and in housekeeping. The
   WebSocket policy check is `policy::relayed_request_allowed` now (the DCP stage 3 open item).
 - Web: download links and `cid:` images (`?inline=1`) on the file routes when the engine
-  announces `files`; the reader frame's CSP gains `img-src 'self'` (the app's CSP already had
-  it); the composer uploads each picked file at once, shows it uploading or failed, saves and
-  sends only uploaded ones, and before SendDraftTask or scheduling calls `HEAD` on every
-  attachment's route so the engine has a forwarded original's files. The mock keeps uploads'
-  bytes and assigns an export's `fileId`.
+  announces `files`; the reader frame's CSP allows images from the file route only
+  (`<origin>/gateway/v1/files/`, not `'self'`, so a message can't make the browser hit other
+  gateway GETs); the composer uploads each picked file at once, shows it uploading or
+  failed, saves and sends only uploaded ones, uploads picked files again when From moves to
+  another account (the engine finds a File only under the account it was put to), and
+  before SendDraftTask or scheduling calls `HEAD` on every attachment's route so the engine
+  has a forwarded original's files. The mock keeps uploads' bytes and account, refuses
+  `prepareFile` under another account, and assigns an export's `fileId`. A relayed
+  `files.put` whose params aren't an object is refused (positional params would fill
+  `path`).
 - Tests: `apps/engine/tests/files.rs`, the file-id export in `ms-tasks/tests/tasks.rs`, the
   policy unit tests, `apps/gateway/tests/relay.rs` `file_routes` against a `serve` engine
   (upload, download, inline sniffing with a lying label, Range, HEAD, 404/401/403/400, 413
@@ -532,6 +537,6 @@ Open:
   server, and vitest for the client file calls, the mock and the composer upload flow.
 - Open: the per-device upload quota (1 GiB not yet attached) isn't built, and uploads removed
   from a draft or never sent stay in `<config>/files` with their File rows; nothing in the web
-  asks for a raw message yet (the task type and mock are ready); still no browser run; a File
-  uploaded under one account and sent from another (the composer's From changed) downloads
-  only under the first account's route.
+  asks for a raw message yet (the task type and mock are ready); still no browser run; a
+  message body can still point an `<img>` at the file route for another file id of an
+  account, which runs `files.get` (and a body fetch) for it.
