@@ -375,7 +375,7 @@ fn triaged_inbox_threads_by_category() {
         (vec![tb.clone(), ta.clone()], 2)
     );
     assert_eq!(list(Some("important"), 50, 0), (vec![tb.clone()], 1));
-    assert_eq!(list(Some("needs-reply"), 1, 1), (vec![ta], 2));
+    assert_eq!(list(Some("needs-reply"), 1, 1), (vec![ta.clone()], 2));
     assert_eq!(list(Some("promotion"), 50, 0), (vec![], 0));
     assert!(r
         .triaged_threads(&[], "tern-ai-triage", None, 50, 0)
@@ -384,7 +384,40 @@ fn triaged_inbox_threads_by_category() {
         .is_empty());
 
     let since = r.category_threads_since(&inboxes, 0, 2).unwrap();
-    assert_eq!(since, [tc, tb]);
+    assert_eq!(since, [tc.clone(), tb.clone()]);
+
+    // A reply sent after the last mail came in answers the thread: it leaves needs-reply,
+    // unless the user filed it so after replying.
+    let sent = f.folder("Sent", "sent");
+    f.insert("a-reply@x", &sent, 10, attrs(10, false), Some(&ta));
+    f.insert("b-reply@x", &sent, 11, attrs(11, false), Some(&tb));
+    let filed = 1_600_000_000 + 20;
+    triage(
+        &b,
+        json!({"category": "important", "needsReply": true, "source": "user", "at": filed}),
+    );
+    let r = reads(&f);
+    let list = |category, limit, offset| {
+        r.triaged_threads(&inboxes, "tern-ai-triage", category, limit, offset)
+            .unwrap()
+    };
+    assert_eq!(list(Some("needs-reply"), 50, 0), (vec![tb.clone()], 1));
+    assert_eq!(list(None, 50, 0).1, 3);
+    triage(
+        &b,
+        json!({"category": "important", "needsReply": true, "source": "user", "at": 5}),
+    );
+    let r = reads(&f);
+    assert_eq!(
+        r.triaged_threads(&inboxes, "tern-ai-triage", Some("needs-reply"), 50, 0)
+            .unwrap(),
+        (vec![], 0)
+    );
+    assert_eq!(
+        r.triaged_threads(&inboxes, "tern-ai-triage", Some("important"), 50, 0)
+            .unwrap(),
+        (vec![tb], 1)
+    );
     assert!(r
         .category_threads_since(&inboxes, i64::MAX, 50)
         .unwrap()

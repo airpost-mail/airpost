@@ -516,7 +516,9 @@ impl ReadStore {
     /// The threads in any of `categories` (in all mail) with a non-empty `plugin_id` value,
     /// newest first by last received message, and how many there are in all. With
     /// `category`, only those whose value has that `category`, or, for `needs-reply`,
-    /// `needsReply: true` (the AI triage values, docs/ai-plan.md section 4).
+    /// `needsReply: true` (the AI triage values, docs/ai-plan.md section 4); a needs-reply
+    /// value lapses once the user sent mail on the thread after the last mail came in, or,
+    /// for one the user set (`source: "user"`), after setting it (`at`).
     pub fn triaged_threads(
         &self,
         categories: &[String],
@@ -538,15 +540,21 @@ impl ReadStore {
         let mut args: Vec<SqlValue> = categories.iter().cloned().map(SqlValue::Text).collect();
         args.push(SqlValue::Text(plugin_id.to_owned()));
         if let Some(category) = category {
-            let needs_reply = if category == "needs-reply" {
-                " OR json_extract(j.value, '$.value.needsReply') = 1"
+            let (needs_reply, unanswered) = if category == "needs-reply" {
+                (
+                    " OR json_extract(j.value, '$.value.needsReply') = 1",
+                    " AND (IFNULL(t.lastMessageSentTimestamp, 0) = 0 \
+                     OR t.lastMessageSentTimestamp < t.lastMessageReceivedTimestamp \
+                     OR (json_extract(j.value, '$.value.source') = 'user' \
+                     AND json_extract(j.value, '$.value.at') > t.lastMessageSentTimestamp))",
+                )
             } else {
-                ""
+                ("", "")
             };
             filter.push_str(&format!(
                 " AND EXISTS (SELECT 1 FROM json_each(t.data, '$.metadata') j \
                  WHERE json_extract(j.value, '$.pluginId') = ? \
-                 AND (json_extract(j.value, '$.value.category') = ?{needs_reply}))"
+                 AND (json_extract(j.value, '$.value.category') = ?{needs_reply}){unanswered})"
             ));
             args.push(SqlValue::Text(plugin_id.to_owned()));
             args.push(SqlValue::Text(category.to_owned()));
