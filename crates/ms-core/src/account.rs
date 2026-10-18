@@ -17,16 +17,23 @@ pub enum Security {
     Tls,
     /// `"STARTTLS"`
     StartTls,
-    /// anything else
+    /// `"none"`, the value the client's security menu stores. Only this exact string opts
+    /// into cleartext, so a typo or a missing key can never send the password in clear.
     Clear,
 }
 
 impl Security {
-    fn from_setting(value: &str) -> Security {
-        match value {
-            "SSL / TLS" => Security::Tls,
-            "STARTTLS" => Security::StartTls,
-            _ => Security::Clear,
+    /// The setting's value as stored, or why it is refused (unknown, empty, missing or not
+    /// a string). `key` names the setting in the message.
+    pub fn from_setting(key: &str, value: Option<&Value>) -> Result<Security, String> {
+        match value.and_then(Value::as_str) {
+            Some("SSL / TLS") => Ok(Security::Tls),
+            Some("STARTTLS") => Ok(Security::StartTls),
+            Some("none") => Ok(Security::Clear),
+            _ => Err(format!(
+                "Account has an invalid {key}: {} (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")",
+                value.map_or_else(|| "missing".to_owned(), Value::to_string)
+            )),
         }
     }
 }
@@ -46,9 +53,21 @@ impl Account {
         Ok(Account { data })
     }
 
-    /// `""` when usable, otherwise the name of what is missing, appended by the caller to
-    /// `"Account is missing required fields:"`.
-    pub fn valid(&self) -> &'static str {
+    /// `Ok` when usable, otherwise the error the client is shown:
+    /// `"Account is missing required fields:<what>"` or an invalid security setting.
+    pub fn validate(&self) -> Result<(), String> {
+        let missing = self.missing_fields();
+        if !missing.is_empty() {
+            return Err(format!("Account is missing required fields:{missing}"));
+        }
+        for key in ["imap_security", "smtp_security"] {
+            Security::from_setting(key, self.settings().get(key))?;
+        }
+        Ok(())
+    }
+
+    /// `""` when every required field is there, otherwise the name of what is missing.
+    fn missing_fields(&self) -> &'static str {
         let d = &self.data;
         if d.get("id").is_none() || d.get("settings").is_none() {
             return "id or settings";
@@ -182,8 +201,10 @@ impl Account {
         self.setting_str("imap_password")
     }
 
+    /// [`Account::validate`] refuses an invalid value; an unvalidated account falls back to
+    /// TLS, so it fails the handshake instead of sending in clear.
     pub fn imap_security(&self) -> Security {
-        Security::from_setting(self.setting_str("imap_security"))
+        self.security("imap_security")
     }
 
     pub fn imap_allow_insecure_ssl(&self) -> bool {
@@ -206,8 +227,13 @@ impl Account {
         self.setting_str("smtp_password")
     }
 
+    /// See [`Account::imap_security`].
     pub fn smtp_security(&self) -> Security {
-        Security::from_setting(self.setting_str("smtp_security"))
+        self.security("smtp_security")
+    }
+
+    fn security(&self, key: &str) -> Security {
+        Security::from_setting(key, self.settings().get(key)).unwrap_or(Security::Tls)
     }
 
     pub fn smtp_allow_insecure_ssl(&self) -> bool {
@@ -296,7 +322,7 @@ mod tests {
     #[test]
     fn accessors() {
         let a = Account::from_json(harness_account()).unwrap();
-        assert_eq!(a.valid(), "");
+        assert_eq!(a.validate(), Ok(()));
         assert_eq!(a.start_delay(), 0);
         assert_eq!(a.imap_port(), 1143);
         assert_eq!(a.smtp_port(), 10025);
@@ -313,14 +339,73 @@ mod tests {
             .unwrap()
             .remove("imap_allow_insecure_ssl");
         assert_eq!(
-            Account::from_json(v).unwrap().valid(),
-            "imap_allow_insecure_ssl"
+            Account::from_json(v).unwrap().validate(),
+            Err("Account is missing required fields:imap_allow_insecure_ssl".into())
         );
         assert_eq!(
-            Account::from_json(json!({"id": "x"})).unwrap().valid(),
-            "id or settings"
+            Account::from_json(json!({"id": "x"})).unwrap().validate(),
+            Err("Account is missing required fields:id or settings".into())
         );
         assert!(Account::from_json(json!([])).is_err());
+    }
+
+    #[test]
+    fn security_from_setting() {
+        let parse = |v: Value| Security::from_setting("imap_security", Some(&v));
+        assert_eq!(parse(json!("SSL / TLS")), Ok(Security::Tls));
+        assert_eq!(parse(json!("STARTTLS")), Ok(Security::StartTls));
+        assert_eq!(parse(json!("none")), Ok(Security::Clear));
+        for bad in [
+            json!(""),
+            json!("None"),
+            json!("NONE"),
+            json!("ssl / tls"),
+            json!("starttls"),
+            json!("TLS"),
+            json!(" none"),
+            json!(null),
+            json!(false),
+            json!(0),
+        ] {
+            assert!(parse(bad.clone()).is_err(), "{bad} was accepted");
+        }
+        assert_eq!(
+            Security::from_setting("smtp_security", None),
+            Err("Account has an invalid smtp_security: missing (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")".into())
+        );
+        assert_eq!(
+            parse(json!("None")),
+            Err("Account has an invalid imap_security: \"None\" (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")".into())
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_security() {
+        for key in ["imap_security", "smtp_security"] {
+            for bad in [
+                Some(json!("")),
+                Some(json!("None")),
+                Some(json!("plain")),
+                None,
+            ] {
+                let mut v = harness_account();
+                let s = v["settings"].as_object_mut().unwrap();
+                match &bad {
+                    Some(b) => s.insert(key.into(), b.clone()),
+                    None => s.remove(key),
+                };
+                let a = Account::from_json(v).unwrap();
+                let err = a.validate().unwrap_err();
+                assert!(err.contains(key), "{err}");
+                // Never Clear: the accessor fails closed.
+                let sec = if key == "imap_security" {
+                    a.imap_security()
+                } else {
+                    a.smtp_security()
+                };
+                assert_eq!(sec, Security::Tls, "{key} {bad:?}");
+            }
+        }
     }
 
     #[test]

@@ -137,9 +137,8 @@ fn read_account(opts: &Options) -> Result<Account, i32> {
             return Err(EXIT_FAILURE);
         }
     };
-    let missing = account.valid();
-    if !missing.is_empty() {
-        one_shot_error(&format!("Account is missing required fields:{missing}"));
+    if let Err(e) = account.validate() {
+        one_shot_error(&e);
         return Err(EXIT_FAILURE);
     }
     Ok(account)

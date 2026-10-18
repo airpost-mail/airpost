@@ -399,6 +399,23 @@ fn two_accounts_listed_routed_and_logged_apart() {
         )
         .unwrap_err();
     assert_eq!(bad.code, code::INVALID_PARAMS);
+    let mut clear = account("e1-clear");
+    clear["settings"]["smtp_security"] = json!("None");
+    let refused = e
+        .parent
+        .call(
+            method::ACCOUNT_ADD,
+            json!({ "account": clear, "identity": null }),
+        )
+        .unwrap_err();
+    assert_eq!(refused.code, code::INVALID_PARAMS);
+    assert!(
+        refused
+            .message
+            .starts_with("Account has an invalid smtp_security: \"None\""),
+        "{}",
+        refused.message
+    );
 
     // sync.wake without an account wakes each one.
     assert_eq!(c.call(method::SYNC_WAKE, json!({})).unwrap(), json!({}));

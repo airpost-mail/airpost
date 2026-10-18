@@ -285,7 +285,9 @@ class RpcChannel:
                 self._cond.wait(min(left, 0.1))
             reply = self._replies.pop(rid)
         if "error" in reply:
-            raise MailsyncError(f"{method} failed: {reply['error']}")
+            err = MailsyncError(f"{method} failed: {reply['error']}")
+            err.rpc_error = reply["error"]
+            raise err
         return reply.get("result")
 
     def response(self, msg: dict) -> Optional[tuple]:
@@ -689,6 +691,40 @@ class MailsyncProcess:
             self._threads.append(t)
         if self.transport == "socket":
             self._connect()
+
+    def start_refused(self, timeout: float = 15.0) -> Optional[str]:
+        """Starts the account expecting the engine to refuse it before it connects anywhere:
+        returns the engine's error (serve: `account.add`'s error message; stdio and socket:
+        the one-shot `{"error": ...}` line before the process exits), or None when the
+        account was accepted, in which case it is removed or stopped again."""
+        try:
+            self.start()
+        except MailsyncError as e:
+            err = getattr(e, "rpc_error", None)
+            if self.transport == "serve":
+                if err is None:
+                    raise
+                self.engine.handles.pop(self.account["id"], None)
+                self._stopped.set()
+                for t in self._threads:
+                    t.join(timeout=2)
+                return str(err.get("message") or json.dumps(err))
+        if self.transport == "serve":
+            self.remove_account()
+            return None
+        deadline = time.monotonic() + timeout
+        while self.proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        exited = self.proc.poll() is not None
+        self.stop()
+        if not exited:
+            return None
+        for _, line in self.state.stdout_noise:
+            with contextlib.suppress(json.JSONDecodeError):
+                d = json.loads(line)
+                if isinstance(d, dict) and d.get("error"):
+                    return str(d["error"])
+        return f"exited ({describe_exit(self.exit_code)}) with no error line"
 
     def _start_serve(self):
         if self.peer is not None:

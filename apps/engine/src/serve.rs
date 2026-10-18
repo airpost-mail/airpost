@@ -819,12 +819,7 @@ fn now_ms() -> i64 {
 fn parse_account(json: Value) -> Result<Account, ErrorObject> {
     let account =
         Account::from_json(json).map_err(|e| invalid(format!("Invalid Account JSON: {e}")))?;
-    let missing = account.valid();
-    if !missing.is_empty() {
-        return Err(invalid(format!(
-            "Account is missing required fields:{missing}"
-        )));
-    }
+    account.validate().map_err(invalid)?;
     Ok(account)
 }
 

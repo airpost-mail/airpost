@@ -158,7 +158,11 @@ non-retryable error: its `account.state` error on serve, the SyncError its proce
 as critical before aborting elsewhere; `wait: {stopped: true}` waits for that.
 `engine_log: {present, absent}` checks `engine.log` on serve and passes elsewhere.
 `server.set_password: {password}` (fake only) makes the next login with the old password
-fail. `restart` is refused in a scenario with several accounts.
+fail. `restart` is refused in a scenario with several accounts. An account with `start: false`
+is added only by an `account.add` step; `account.add: {name: b, refused: regex}` expects the
+engine to refuse it (serve: `account.add`'s error; stdio and socket: the one-shot error before
+the process exits) and `server_connections: {imap: 0}` (fake only) that it never connected
+(`account-security-refused`).
 
 ## How a scenario works
 

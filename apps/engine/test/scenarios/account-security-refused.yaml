@@ -1,0 +1,38 @@
+name: account-security-refused
+description: >
+  Account a stores an explicit "none" for imap_security and smtp_security (the harness
+  default) and syncs from the plaintext fake server, as a user who opted into cleartext
+  does. Accounts b (empty imap_security) and c (smtp_security "None", which older
+  autoconfig code wrote) are refused when added: the engine reports the invalid setting
+  and never connects to their servers, so an unknown value can't fall back to cleartext.
+source: docs/tech-debt.md TD4
+servers: [{fake: dovecot}]
+mailboxes:
+  INBOX: {messages: 3}
+accounts:
+  b:
+    server: {fake: dovecot}
+    start: false
+    account: {imap_security: ""}
+    mailboxes:
+      INBOX: {messages: 2}
+  c:
+    server: {fake: dovecot}
+    start: false
+    account: {smtp_security: "None"}
+steps:
+  - wait: quiescent
+  - account.add: {name: b, refused: 'invalid imap_security: ""'}
+  - account.add: {name: c, refused: 'invalid smtp_security: "None"'}
+  - sync: pass
+expect:
+  counts: {INBOX: 3}
+  db_matches_server: {}
+  server_connections: {imap: {min: 1}}
+  running: true
+  accounts:
+    b:
+      server_connections: {imap: 0}
+      counts: {INBOX: 0}
+    c:
+      server_connections: {imap: 0}

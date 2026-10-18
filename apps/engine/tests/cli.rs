@@ -165,6 +165,19 @@ fn account_handshake_and_errors() {
         "\n{\"error\":\"Account is missing required fields:id or settings\"}"
     );
 
+    // An unknown security value is refused, never taken as cleartext.
+    let blank = ACCOUNT.replace(r#""imap_security":"none""#, r#""imap_security":"""#);
+    let out = mailsync(dir.path())
+        .args(["--mode", "sync", "--account", &blank])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        r#"
+{"error":"Account has an invalid imap_security: \"\" (expected \"SSL / TLS\", \"STARTTLS\" or \"none\")"}"#
+    );
+
     let out = mailsync(dir.path())
         .args(["--mode", "sync", "--account", ACCOUNT, "--identity", "{}"])
         .output()

@@ -134,6 +134,8 @@ class ExtraAccount:
     earlier_deltas: list = field(default_factory=list)
     # The handle `account.remove` stopped, for database reads while the account is out.
     removed: Optional[MailsyncProcess] = None
+    # False: not started with the scenario, only by an `account.add` step.
+    start: bool = True
 
 
 # The primary account's name in `account:` step keys and `accounts:` expectations.
@@ -321,7 +323,8 @@ class ScenarioRun(PimMixin, BackendMixin):
         the account logs in to the scenario's server as another device of the same user.
         `account` overrides fields of its Account JSON (e.g. `password`). Its id is
         `c0ffee-<name>`. Steps take `account: <name>` to act on it (`a` is the primary), and
-        `expect: {accounts: {<name>: {...}}}` checks it."""
+        `expect: {accounts: {<name>: {...}}}` checks it. `start: false` leaves it out until
+        an `account.add` step."""
         for name, opts in (self.sc.get("accounts") or {}).items():
             opts = opts or {}
             if name == PRIMARY_ACCOUNT:
@@ -343,7 +346,8 @@ class ScenarioRun(PimMixin, BackendMixin):
             kw.update(opts.get("account") or {})
             kw.setdefault("account_id", f"c0ffee-{name}")
             ignore = [server.server_path(p) for p in (opts.get("quiescence") or {}).get("ignore_busy", [])]
-            self.accounts[name] = ExtraAccount(name, account_json(**kw), server, own, ignore)
+            self.accounts[name] = ExtraAccount(name, account_json(**kw), server, own, ignore,
+                                               start=opts.get("start", True))
         if self.accounts:
             self.ms.scoped_db = True
 
@@ -356,6 +360,8 @@ class ScenarioRun(PimMixin, BackendMixin):
 
     def _start_accounts(self):
         for acct in self.accounts.values():
+            if not acct.start:
+                continue
             acct.ms = self._new_account_process(acct)
             acct.ms.start()
             self._note(f"account {acct.name} ({acct.account['id']}) started on {acct.ms.transport}")
@@ -647,13 +653,25 @@ class ScenarioRun(PimMixin, BackendMixin):
 
     def _account_add(self, arg):
         """Adds account `name` back (`account.add: b` or `{name: b, wait: true}`) and waits for
-        a sync pass that started after the add, then quiescence."""
+        a sync pass that started after the add, then quiescence. `{name: b, refused: regex}`
+        expects the engine to refuse the account with an error matching `regex` instead;
+        the account then stays out, its database rows readable as after `account.remove`."""
         name, opts = (arg, {}) if isinstance(arg, str) else (arg["name"], arg)
         acct = self.accounts.get(name)
         if acct is None:
             raise ScenarioFailure(f"account.add: no account {name!r}")
         if acct.ms is not None:
             raise ScenarioFailure(f"account.add: account {name} is already added")
+        if "refused" in opts:
+            ms = self._new_account_process(acct)
+            error = ms.start_refused()
+            acct.removed = ms
+            if error is None:
+                raise ScenarioFailure(f"account.add: account {name} was accepted, expected /{opts['refused']}/")
+            self._note(f"account {name} refused on {ms.transport}: {error}")
+            if not re.search(opts["refused"], error):
+                raise ScenarioFailure(f"account.add: account {name} refused with {error!r}, expected /{opts['refused']}/")
+            return error
         added = time.time()
         acct.removed = None
         acct.ms = self._new_account_process(acct)
@@ -1073,6 +1091,18 @@ class ScenarioRun(PimMixin, BackendMixin):
         want = arg.get("key") if isinstance(arg, dict) else None
         if want and not re.search(want, str(err.get("key"))):
             return [f"the account stopped with {json.dumps(err)[:300]}, expected key /{want}/"]
+        return []
+
+    def expect_server_connections(self, arg: dict) -> list:
+        """fake only: `{imap: n}` or `{imap: {min, max}}`, how many connections the fake IMAP
+        server accepted over the whole run (`0`: the engine never reached it)."""
+        if self.server.kind != "fake":
+            return []
+        n = len(self.server.imap.sessions)
+        want = arg.get("imap")
+        lo, hi = (want, want) if isinstance(want, int) else (want.get("min", 0), want.get("max"))
+        if n < lo or (hi is not None and n > hi):
+            return [f"the IMAP server accepted {n} connections, expected {want}"]
         return []
 
     def expect_engine_log(self, arg: dict) -> list:
