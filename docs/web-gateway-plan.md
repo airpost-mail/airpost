@@ -540,3 +540,32 @@ Open:
   asks for a raw message yet (the task type and mock are ready); still no browser run; a
   message body can still point an `<img>` at the file route for another file id of an
   account, which runs `files.get` (and a body fetch) for it.
+
+2026-10-18, relay of the AI notifications (docs/ai-plan.md A7, section 3), branch
+`roadmap/web-ready`, not merged:
+- No gateway change was needed. Each WebSocket has its own engine connection (G2) and the
+  relay forwards engine lines in order with no notification allowlist or subscription filter
+  of its own, so `ai.delta` and `ai.triage.progress` reach only the tab whose connection the
+  engine sends them to; there is no backlog in the gateway. The frame limit (50 a second,
+  burst 200) counts browser frames only. The relay's end drops the engine connection, so a
+  closed tab or dropped TCP connection closes it and the engine cancels the provider
+  request. `ws.rs`'s module doc now says so.
+- AI2 isn't on main, so `ai.*` are still unknown to `ms_ipc::policy` and therefore
+  `LocalOnly`: only an admin device's `ai.*` request reaches the engine today. The gateway
+  checks every frame with `policy::relayed_request_allowed(method, params, scopes)`, so
+  when AI2 puts the `ai.*` classes and the relayed `config` refusal in that function, the
+  gateway enforces them with no change here. If AI2 puts the `config` check only in the
+  engine's socket code, the gateway won't enforce it; the new test fails in that case.
+- Tests: `apps/gateway/tests/notifications.rs` against a fake engine on a Unix socket: two
+  tabs of one device stream 5000 `ai.delta` each at once and each gets exactly its own, in
+  order, before its reply; 300 `ai.triage.progress` reach only the caller; the other tab and
+  another device get nothing; a close frame and a dropped TCP connection each close that
+  tab's engine connection mid-stream while a third tab's stream goes on; `ai.models` with
+  `config` or `provider` reaches the engine exactly when the shared policy allows it (and,
+  once `ai.*` are `Open`, `config` must be refused for admin and non-admin devices).
+- Open: the gateway sends no WebSocket pings, so a tab that vanishes without a TCP close
+  (a sleeping laptop) holds its engine connection, and any stream it started, until TCP
+  gives up; a ping every 30 s with a timeout would bound that. `WsEngineClient`'s 30 s
+  per-call timeout is shorter than the engine's 120 s AI deadline, so AI5 needs a longer
+  timeout for streamed `ai.*` calls. The web has no `ai.*` types yet; tern-ai adds them with
+  AI5 (ai-plan question 6).
