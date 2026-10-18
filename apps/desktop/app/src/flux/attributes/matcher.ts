@@ -11,6 +11,13 @@ const singleQuoteEscapeSequence = "''";
 // https://www.sqlite.org/fts5.html#section_3
 const doubleQuoteEscapeSequence = '""';
 
+/** A matcher as `ModelQuery.toJSON()` sends it to the engine's `query`. */
+export type MatcherJSON =
+  | { attr: string; op: string; value: unknown }
+  | { and: MatcherJSON[] }
+  | { or: MatcherJSON[] }
+  | { not: MatcherJSON[] };
+
 /*
 Public: The Matcher class encapsulates a particular comparison clause on an {Attribute}.
 Matchers can evaluate whether or not an object matches them, and also compose
@@ -144,6 +151,18 @@ export class Matcher {
     }
   }
 
+  // The JSON form the engine's `query` takes (docs/desktop-client-plan.md 3.2). Comparators
+  // and values go as the SQL above uses them, so `AttributeBoolean.equal(true)` is sent as
+  // `!= 0` and a Date as the unix seconds its column stores.
+  toJSON(): MatcherJSON {
+    const value = (v: unknown) => (v instanceof Date ? v.getTime() / 1000 : v);
+    return {
+      attr: this.attr.modelKey,
+      op: this.comparator,
+      value: this.val instanceof Array ? this.val.map(value) : value(this.val),
+    };
+  }
+
   joinTableRef() {
     return `M${this.muid}`;
   }
@@ -237,6 +256,10 @@ export class OrCompositeMatcher extends Matcher {
     return this.children.some((matcher) => matcher.evaluate(model));
   }
 
+  toJSON(): MatcherJSON {
+    return { or: this.children.map((m) => m.toJSON()) };
+  }
+
   joinSQL(klass: typeof Model) {
     const joins = [];
     for (const matcher of this.children) {
@@ -274,6 +297,10 @@ export class AndCompositeMatcher extends Matcher {
     return this.children.every((m) => m.evaluate(model));
   }
 
+  toJSON(): MatcherJSON {
+    return { and: this.children.map((m) => m.toJSON()) };
+  }
+
   joinSQL(klass: typeof Model) {
     const joins = [];
     for (const matcher of this.children) {
@@ -292,6 +319,10 @@ export class AndCompositeMatcher extends Matcher {
 }
 
 class NotCompositeMatcher extends AndCompositeMatcher {
+  toJSON(): MatcherJSON {
+    return { not: this.children.map((m) => m.toJSON()) };
+  }
+
   whereSQL(klass: typeof Model) {
     return `NOT (${super.whereSQL(klass)})`;
   }
@@ -321,6 +352,12 @@ class StructuredSearchMatcher extends Matcher {
     return true;
   }
 
+  toJSON(): MatcherJSON {
+    throw new Error(
+      'structuredSearch has no JSON form until the engine parses the search grammar (desktop-client-plan stage 9)'
+    );
+  }
+
   whereSQL(klass: typeof Model) {
     return new LocalSearchQueryBackend(klass.name).compile(this._searchQuery);
   }
@@ -328,12 +365,15 @@ class StructuredSearchMatcher extends Matcher {
 
 class SearchMatcher extends Matcher {
   searchQuery: string;
+  /** The text as given; the engine applies the trimming and escaping below itself. */
+  text: string;
 
   constructor(searchQuery: string) {
     if (typeof searchQuery !== 'string' || searchQuery.length === 0) {
       throw new Error('You must pass a string with non-zero length to search.');
     }
     super(null, null, null);
+    this.text = searchQuery;
     this.searchQuery = searchQuery
       .trim()
       .replace(/^['"]/, '')
@@ -356,6 +396,11 @@ class SearchMatcher extends Matcher {
   // SearchQuerySubscription result set
   evaluate() {
     return true;
+  }
+
+  // `ModelQuery.toJSON()` sends a top-level search as `search: {text, grammar: false}`.
+  toJSON(): MatcherJSON {
+    throw new Error('A search matcher is only valid at the top level of a query');
   }
 
   whereSQL(klass: typeof Model) {

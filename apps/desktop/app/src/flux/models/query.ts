@@ -1,11 +1,31 @@
 /* eslint global-require: 0 */
 import { Matcher, AttributeJoinedData, AttributeCollection, SortOrder } from '../attributes';
+import type { MatcherJSON } from '../attributes/matcher';
 import { QueryRange } from './query-range';
 import { QueryExpression } from '../../services/search/search-query-ast';
 import * as Utils from './utils';
 import { Model } from './model';
 
 type DB = typeof import('mailspring-exports').DatabaseStore;
+
+/**
+ * A query as the engine's `query` method takes it (docs/desktop-client-plan.md 3.2). The
+ * engine compiles it to the SQL `sql()` builds; `crates/ms-store/tests/model_query_parity.rs`
+ * checks the two return the same rows.
+ */
+export interface ModelQueryJSON {
+  class: string;
+  accounts: string[] | null;
+  where: MatcherJSON | null;
+  search: { text: string; grammar: boolean } | null;
+  order: { attr: string; dir: 'asc' | 'desc' }[];
+  limit: number | null;
+  offset: number | null;
+  distinct: boolean;
+  include: string[];
+  idsOnly: boolean;
+  count: boolean;
+}
 
 /*
 Public: ModelQuery exposes an ActiveRecord-style syntax for building database queries
@@ -344,6 +364,37 @@ export default class ModelQuery<T extends Model | Model[]> {
       return inflated.length > 0 ? inflated[0] : null;
     }
     return [...inflated];
+  }
+
+  // Public: The JSON form of the query for the engine's `query` method. Finalizes the query
+  // as `sql()` does, so the natural sort order and `one()`'s limit are explicit. A plain
+  // `search()` becomes `search`; `structuredSearch()` throws until the engine parses the
+  // search grammar.
+  toJSON(): ModelQueryJSON {
+    this.finalize();
+    const isSearch = (m: Matcher) => m instanceof Matcher.Search;
+    const searches = this._matchers.filter(isSearch) as InstanceType<typeof Matcher.Search>[];
+    if (searches.length > 1) {
+      throw new Error('ModelQuery.toJSON: a query takes one search()');
+    }
+    const rest = this._matchers.filter((m) => !isSearch(m));
+    const integer = (n: number | null) => (Number.isInteger(n) ? n : null);
+    return {
+      class: this._klass.name,
+      accounts: null,
+      where: rest.length > 0 ? { and: rest.map((m) => m.toJSON()) } : null,
+      search: searches.length > 0 ? { text: searches[0].text, grammar: false } : null,
+      order: this._orders.map((o) => ({
+        attr: o.attr.modelKey,
+        dir: o.direction === 'ASC' ? 'asc' : 'desc',
+      })),
+      limit: integer(this._range.limit),
+      offset: integer(this._range.offset),
+      distinct: this._distinct,
+      include: this._includeJoinedData.map((a) => a.modelKey),
+      idsOnly: this._returnIds,
+      count: this._count,
+    };
   }
 
   // Query SQL Building
