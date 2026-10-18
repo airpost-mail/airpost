@@ -205,12 +205,20 @@ pub struct AccountListResult {
 /// only accepted on the parent's stdin.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AccountAddParams {
-    /// The account JSON `sync` mode reads from `--account` or stdin.
+    /// The account JSON `sync` mode reads from `--account` or stdin. Without an `id` the
+    /// engine derives one ([`ACCOUNT_ID_SETTINGS`](crate::ACCOUNT_ID_SETTINGS)).
     pub account: Value,
     /// The identity line `sync` mode reads: a Tern server object, a Mailspring identity
-    /// (ignored) or null.
+    /// (ignored) or null. Null uses the server `server.set` stored, if any.
     #[serde(default)]
     pub identity: Value,
+    /// Secrets to store with the account, in place of any in its `settings`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secrets: Option<crate::AccountSecrets>,
+    /// Run `account.test` first and add the account only when it passes; a failure is
+    /// [`code::ACCOUNT_TEST_FAILED`](crate::code::ACCOUNT_TEST_FAILED) with the test's result.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub test: bool,
 }
 
 /// `account.add` result: the account's state when the call returns, `running` once its
@@ -234,6 +242,12 @@ pub struct AccountAddResult {
 #[serde(rename_all = "camelCase")]
 pub struct AccountRemoveParams {
     pub account_id: String,
+    /// Revoke the account's OAuth grant at the provider (Google; Microsoft has no such call).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub revoke: bool,
+    /// Delete the account's rows from the database, plugin metadata included.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub delete_data: bool,
 }
 
 /// `credentials.import` params: accounts and secrets a client stored until now. An
@@ -328,11 +342,13 @@ fn keep_metadata_default() -> bool {
     true
 }
 
-/// `account.test` params. The account JSON carries credentials, which is why the method is
-/// only accepted on the parent's stdin.
+/// `account.test` params: the account JSON with its credentials in `settings` or in
+/// `secrets`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AccountTestParams {
     pub account: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secrets: Option<crate::AccountSecrets>,
 }
 
 /// `engine.resetDatabase` result: the accounts it stopped and forgot.

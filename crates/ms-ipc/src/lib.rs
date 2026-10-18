@@ -11,6 +11,7 @@
 //! without pulling in the engine. The engine serves the protocol; this crate also has a
 //! blocking [`Client`], used by the CLI and the engine's tests.
 
+mod accounts;
 mod ai;
 mod client;
 mod envelope;
@@ -23,6 +24,7 @@ pub mod policy;
 mod read;
 mod settings;
 
+pub use accounts::*;
 pub use ai::*;
 pub use client::{Client, ClientError, Notifications};
 pub use envelope::{
@@ -103,13 +105,44 @@ pub mod method {
     pub const MESSAGES_UNSUBSCRIBE: &str = "messages.unsubscribe";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
-    /// `serve` mode, the parent's stdin only (the socket too on a `--detached` engine):
-    /// register an account, store its secrets and start syncing it.
+    /// `serve` mode: register an account, store its secrets and start syncing it
+    /// ([`AccountAddParams`](crate::AccountAddParams)). On the parent's stdin, and on the
+    /// socket of an engine with [`feature::ACCOUNT_SETUP`](crate::feature::ACCOUNT_SETUP)
+    /// (local-only class, [`policy`](crate::policy)).
     pub const ACCOUNT_ADD: &str = "account.add";
-    /// `serve` mode, the parent's stdin only (the socket too on a `--detached` engine): stop
-    /// an account; with `forget`, also drop it from the registry and delete its secrets.
-    /// Its database rows stay.
+    /// `serve` mode: stop an account, unregister it and delete its secrets, with `revoke`
+    /// also its OAuth grant and with `deleteData` its rows
+    /// ([`AccountRemoveParams`](crate::AccountRemoveParams)). Without `deleteData` the rows
+    /// stay. Where `account.add` is taken.
     pub const ACCOUNT_REMOVE: &str = "account.remove";
+    /// IMAP and SMTP settings for an address ([`AccountDiscoverParams`](crate::AccountDiscoverParams)).
+    /// Open to relayed connections; answered out of order (MX and autoconfig lookups).
+    pub const ACCOUNT_DISCOVER: &str = "account.discover";
+    /// Starts an OAuth sign-in: the engine keeps the PKCE verifier, `state` and client
+    /// secret ([`OAuthBeginParams`](crate::OAuthBeginParams)).
+    pub const ACCOUNT_OAUTH_BEGIN: &str = "account.oauth.begin";
+    /// Ends it with the redirect's `code` and `state`: exchange, profile, discovery, test,
+    /// then the account is stored and started ([`OAuthCompleteParams`](crate::OAuthCompleteParams)).
+    /// Answered out of order.
+    pub const ACCOUNT_OAUTH_COMPLETE: &str = "account.oauth.complete";
+    /// New credentials for a registered account ([`AccountSetSecretsParams`](crate::AccountSetSecretsParams)).
+    pub const ACCOUNT_SET_SECRETS: &str = "account.setSecrets";
+    /// Changes an account's JSON ([`AccountUpdateParams`](crate::AccountUpdateParams)).
+    /// Relayed devices without the admin scope may change only
+    /// [`ACCOUNT_DISPLAY_FIELDS`](crate::ACCOUNT_DISPLAY_FIELDS).
+    pub const ACCOUNT_UPDATE: &str = "account.update";
+    /// The order of `account.list` ([`AccountReorderParams`](crate::AccountReorderParams)).
+    pub const ACCOUNT_REORDER: &str = "account.reorder";
+    /// Stores a secret that isn't an account's ([`SecretsSetParams`](crate::SecretsSetParams)).
+    /// There is no `secrets.get`.
+    pub const SECRETS_SET: &str = "secrets.set";
+    pub const SECRETS_DELETE: &str = "secrets.delete";
+    /// Which of the named secrets are stored ([`SecretsHasParams`](crate::SecretsHasParams)).
+    pub const SECRETS_HAS: &str = "secrets.has";
+    /// The Tern server the accounts sync metadata with ([`ServerSetParams`](crate::ServerSetParams)).
+    pub const SERVER_SET: &str = "server.set";
+    /// Forgets it and its token; accounts sync metadata locally.
+    pub const SERVER_CLEAR: &str = "server.clear";
     /// `serve` mode, the parent's stdin only (the socket too on a `--detached` engine): stop
     /// every account, remove the socket files and exit 0.
     pub const ENGINE_SHUTDOWN: &str = "engine.shutdown";
@@ -121,13 +154,14 @@ pub mod method {
     /// [`AccountChangedParams`](crate::AccountChangedParams). Filtered by account, never held
     /// for a later subscriber: a client calls `account.list` after `subscribe`.
     pub const ACCOUNT_CHANGED: &str = "account.changed";
-    /// `serve` mode, the parent's stdin only: check an account's IMAP and SMTP settings,
-    /// as `--mode test` does. The result is that mode's JSON object, with any rotated
-    /// refresh token in its `account`.
+    /// `serve` mode: check an account's IMAP and SMTP settings, as `--mode test` does
+    /// ([`AccountTestParams`](crate::AccountTestParams)). The result is that mode's JSON
+    /// object, with any rotated refresh token in its `account` on stdin only. Where
+    /// `account.add` is taken; answered out of order.
     pub const ACCOUNT_TEST: &str = "account.test";
-    /// `serve` mode, the parent's stdin only: stop and forget the account if the engine
-    /// holds it, then delete its rows from the database (`--mode reset`). The client adds
-    /// it again to resync.
+    /// `serve` mode: stop and forget the account if the engine holds it, then delete its
+    /// rows from the database (`--mode reset`). The client adds it again to resync. Where
+    /// `account.add` is taken; answered out of order.
     pub const ACCOUNT_RESET: &str = "account.reset";
     /// `serve` mode, the parent's stdin only: stop and forget every account, delete the
     /// database and create an empty one. The client adds the accounts again.
@@ -253,15 +287,22 @@ pub mod feature {
     /// The `ai.*` methods but triage, `ai.delta`, and `capabilities.ai`.
     pub const AI: &str = "ai";
     /// The engine owns the accounts (docs/desktop-client-plan.md 3.6): the registry
-    /// (`accounts.json`) and secret store behind `account.add` and `account.remove
-    /// {forget}`, accounts started at launch, rotated tokens stored instead of sent,
-    /// the restart policy (`retryAt`, `authFailed`), `credentials.import`,
-    /// `account.changed`, and `credentials`, `build` and `detached` in `hello`.
+    /// (`accounts.json`) and secret store behind `account.add` and `account.remove` (which
+    /// unregisters and deletes the secrets), accounts started at launch, rotated tokens
+    /// stored instead of sent, the restart policy (`retryAt`, `authFailed`),
+    /// `credentials.import`, `account.changed`, and `credentials`, `build` and `detached` in
+    /// `hello`.
     pub const ACCOUNTS: &str = "accounts";
     /// Triage (docs/ai-plan.md section 4): the per-account triage of new inbox mail,
     /// `ai.triage.run`, `ai.triage.list`, `ai.triage.progress`, `capabilities.ai.triage`, and
     /// the `core.ai.*` settings keys.
     pub const AI_TRIAGE: &str = "ai-triage";
+    /// Account setup on the socket (desktop-client-plan stage 12): `account.discover`,
+    /// `account.oauth.begin|complete`, `account.add` and `account.test` with `secrets`,
+    /// `account.setSecrets`, `account.update`, `account.reorder`, `account.remove {revoke,
+    /// deleteData}`, `account.reset`, `secrets.*` and `server.*`; ids derived by the engine;
+    /// `integrations.*` read a missing key from the secret `integration:<provider>`.
+    pub const ACCOUNT_SETUP: &str = "account-setup";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
@@ -290,8 +331,8 @@ pub mod code {
     pub const ACCOUNT_STOPPED: i64 = -32005;
     /// `account.add` named an account that is already starting or running.
     pub const ACCOUNT_EXISTS: i64 = -32006;
-    /// The method is only accepted on the parent's stdin (`account.add`, `account.remove`,
-    /// `engine.shutdown`), or only on the socket (`subscribe`).
+    /// The method is only accepted on the parent's stdin (`credentials.import`,
+    /// `engine.shutdown`, ...), or only on the socket (`subscribe`).
     pub const WRONG_CHANNEL: i64 = -32007;
     /// A relayed connection asked for a method or task its device's scopes don't allow
     /// ([`policy`](crate::policy)).
@@ -307,6 +348,13 @@ pub mod code {
     /// The engine's workers for this kind of call are all busy and their queue is full; the
     /// client may try again later.
     pub const ENGINE_BUSY: i64 = -32012;
+    /// "Account test failed": `account.add {test}`, `account.setSecrets {test}` or
+    /// `account.oauth.complete` found the settings or credentials don't work; `data` is the
+    /// `account.test` result (`error`, `error_service`, `log`, ...).
+    pub const ACCOUNT_TEST_FAILED: i64 = -32013;
+    /// "OAuth sign-in failed": the code exchange or the profile request failed, or the
+    /// account has no mailbox; `data` is `{key, status?, providerError?}`.
+    pub const OAUTH_FAILED: i64 = -32014;
 }
 
 /// The `state` of an account in `hello`, `engine.status`, `account.list` and `account.state`.

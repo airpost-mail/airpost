@@ -21,8 +21,8 @@ pub enum MethodClass {
     /// secrets or the engine itself, or hand out local paths. Every method this table
     /// doesn't name is in this class.
     LocalOnly,
-    /// `serve` mode's stdin only (`account.add` and the rest of [`crate::method`]'s
-    /// parent methods).
+    /// `serve` mode's stdin only, and the socket of a `--detached` engine for local clients
+    /// (`credentials.import` stays on stdin): methods that stop or restart the whole engine.
     ParentOnly,
     /// Debug builds' crash and panic triggers.
     Debug,
@@ -59,12 +59,27 @@ pub fn method_class(name: &str) -> MethodClass {
         // settings.set is open for the keys in RELAYED_SETTINGS_KEYS only
         // (relayed_settings_allowed).
         | method::SETTINGS_GET
-        | method::SETTINGS_SET => MethodClass::Open,
+        | method::SETTINGS_SET
+        // Writes no account or secret; account.update is open for ACCOUNT_DISPLAY_FIELDS
+        // only (relayed_request_allowed).
+        | method::ACCOUNT_DISCOVER
+        | method::ACCOUNT_REORDER
+        | method::ACCOUNT_UPDATE => MethodClass::Open,
+        // T13's local-only class: accounts, their secrets and the engine's server.
         method::ACCOUNT_ADD
         | method::ACCOUNT_REMOVE
         | method::ACCOUNT_TEST
         | method::ACCOUNT_RESET
-        | method::ENGINE_RESET_DATABASE
+        | method::ACCOUNT_OAUTH_BEGIN
+        | method::ACCOUNT_OAUTH_COMPLETE
+        | method::ACCOUNT_SET_SECRETS
+        | method::SECRETS_SET
+        | method::SECRETS_DELETE
+        | method::SECRETS_HAS
+        | method::SERVER_SET
+        | method::SERVER_CLEAR
+        | method::ENGINE_LOGS_TAIL => MethodClass::LocalOnly,
+        method::ENGINE_RESET_DATABASE
         | method::ENGINE_SET_LOG_LEVEL
         | method::ENGINE_SHUTDOWN
         | method::CREDENTIALS_IMPORT => MethodClass::ParentOnly,
@@ -194,6 +209,16 @@ pub fn relayed_request_allowed(name: &str, params: &Value, scopes: &[String]) ->
             .get("values")
             .and_then(Value::as_object)
             .is_some_and(|v| relayed_settings_allowed(v, scopes)),
+        method::ACCOUNT_UPDATE => {
+            is_admin(scopes)
+                || params
+                    .get("patch")
+                    .and_then(Value::as_object)
+                    .is_some_and(|p| {
+                        p.keys()
+                            .all(|k| crate::ACCOUNT_DISPLAY_FIELDS.contains(&k.as_str()))
+                    })
+        }
         // Admin or not, a remote device never names a path for the engine to read. Params
         // that aren't an object are refused: positional params fill `path` too.
         method::FILES_PUT => params
@@ -324,7 +349,8 @@ mod tests {
         for m in ["threads.snooze", "threads.unsnooze", "messages.unsubscribe"] {
             assert!(relayed_method_allowed(m, &[]), "{m}");
         }
-        assert_eq!(method_class("account.add"), MethodClass::ParentOnly);
+        assert_eq!(method_class("account.add"), MethodClass::LocalOnly);
+        assert_eq!(method_class("credentials.import"), MethodClass::ParentOnly);
         assert_eq!(method_class("test.panic"), MethodClass::Debug);
         assert_eq!(method_class("secrets.set"), MethodClass::LocalOnly);
         assert_eq!(method_class("Threads.List"), MethodClass::LocalOnly);
@@ -333,7 +359,10 @@ mod tests {
         assert!(relayed_method_allowed("settings.set", &[]));
         assert!(!relayed_method_allowed("secrets.set", &[]));
         assert!(relayed_method_allowed("secrets.set", &admin));
-        assert!(!relayed_method_allowed("account.add", &admin));
+        assert!(relayed_method_allowed("account.add", &admin));
+        assert!(!relayed_method_allowed("account.add", &[]));
+        assert!(!relayed_method_allowed("credentials.import", &admin));
+        assert!(!relayed_method_allowed("engine.shutdown", &admin));
         assert!(!relayed_method_allowed("test.crash", &admin));
         for m in ["files.get", "files.read", "files.put"] {
             assert_eq!(method_class(m), MethodClass::LocalOnly);
@@ -444,6 +473,62 @@ mod tests {
         let task = json!({"task": {"__cls": "GetManyRFC2822Task"}});
         assert!(!relayed_request_allowed("task.queue", &task, &[]));
         assert!(!relayed_request_allowed("secrets.set", &json!({}), &[]));
+    }
+
+    #[test]
+    fn the_local_only_class() {
+        let admin = vec![SCOPE_ADMIN.to_owned()];
+        for m in [
+            method::ACCOUNT_ADD,
+            method::ACCOUNT_TEST,
+            method::ACCOUNT_REMOVE,
+            method::ACCOUNT_RESET,
+            method::ACCOUNT_OAUTH_BEGIN,
+            method::ACCOUNT_OAUTH_COMPLETE,
+            method::ACCOUNT_SET_SECRETS,
+            method::SECRETS_SET,
+            method::SECRETS_DELETE,
+            method::SECRETS_HAS,
+            method::SERVER_SET,
+            method::SERVER_CLEAR,
+            method::ENGINE_LOGS_TAIL,
+        ] {
+            assert_eq!(method_class(m), MethodClass::LocalOnly, "{m}");
+            assert!(!relayed_request_allowed(m, &json!({}), &[]), "{m}");
+            assert!(relayed_request_allowed(m, &json!({}), &admin), "{m}");
+        }
+        assert!(relayed_request_allowed(
+            method::ACCOUNT_DISCOVER,
+            &json!({"email": "a@b.test"}),
+            &[]
+        ));
+        let update = |patch: Value| json!({"accountId": "a", "patch": patch});
+        assert!(relayed_request_allowed(
+            method::ACCOUNT_UPDATE,
+            &update(json!({"label": "Work", "aliases": []})),
+            &[]
+        ));
+        for patch in [
+            json!({"settings": {"imap_host": "evil.test"}}),
+            json!({"label": "x", "provider": "imap"}),
+            json!(null),
+        ] {
+            assert!(!relayed_request_allowed(
+                method::ACCOUNT_UPDATE,
+                &update(patch.clone()),
+                &[]
+            ));
+            assert!(relayed_request_allowed(
+                method::ACCOUNT_UPDATE,
+                &update(patch),
+                &admin
+            ));
+        }
+        assert!(relayed_request_allowed(
+            method::ACCOUNT_REORDER,
+            &json!({"ids": []}),
+            &[]
+        ));
     }
 
     #[test]
