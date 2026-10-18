@@ -25,6 +25,8 @@ pub mod query;
 pub mod read;
 pub mod schema;
 pub mod search;
+pub mod search_dates;
+pub mod search_grammar;
 pub mod store;
 
 pub use counts::THREAD_COUNTS;

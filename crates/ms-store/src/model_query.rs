@@ -18,7 +18,8 @@
 //! - `accounts` adds `accountId IN (…)`; `null` reads every account in the database, as the
 //!   desktop's own SQLite reads do. The thread list's subselect also keeps only the rows of
 //!   those accounts' folders and labels, so its LIMIT and OFFSET count their threads.
-//! - `search` with `grammar: true` is refused until the engine parses the search grammar.
+//! - `search` with `grammar: true` is the search grammar ([`crate::search_grammar`]) on
+//!   Thread, its dates read in `search.tz` at `search.now`; other classes refuse it.
 //! - Booleans compared with `=`/`!=` against `true`/`false` mean "non-zero"/"zero", as
 //!   `AttributeBoolean.equal` sends them; `Thread.unread` and `starred` are counts.
 //! - `cursor` pages by key instead of `offset` (T5); the desktop never sends one. A cursor
@@ -35,6 +36,8 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::read::{with_hidden, ReadStore};
+use crate::search_dates::DateContext;
+use crate::search_grammar::{self, GrammarError};
 
 /// A `query` request (`ms_ipc::QueryParams` on the wire).
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -76,9 +79,10 @@ pub struct Search {
     pub text: String,
     #[serde(default)]
     pub grammar: bool,
-    /// For date terms in the grammar.
+    /// The IANA zone date terms in the grammar are read in; `None` is UTC.
     #[serde(default)]
     pub tz: Option<String>,
+    /// Unix seconds that relative date terms (`yesterday`, `3d`) count back from.
     #[serde(default)]
     pub now: Option<i64>,
 }
@@ -122,17 +126,16 @@ pub enum QueryOutput {
 
 #[derive(Debug)]
 pub enum QueryError {
-    /// The query names something the allowlist doesn't have, or is malformed.
+    /// The query names something the allowlist doesn't have, is malformed, or its search
+    /// text doesn't parse.
     Invalid(String),
-    /// Valid, but needs a feature this engine doesn't have yet (`search.grammar`).
-    Unsupported(String),
     Database(ms_core::Error),
 }
 
 impl std::fmt::Display for QueryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            QueryError::Invalid(m) | QueryError::Unsupported(m) => f.write_str(m),
+            QueryError::Invalid(m) => f.write_str(m),
             QueryError::Database(e) => write!(f, "{e}"),
         }
     }
@@ -691,6 +694,13 @@ enum Output {
     Count,
 }
 
+/// `query.search`: the plain prefix match of `.search(text)` on the class's FTS table, or
+/// the search grammar's condition on `Thread`.
+enum SearchClause {
+    Fts(&'static str, String),
+    Grammar(search_grammar::Where),
+}
+
 /// A compiled query, for running or for `EXPLAIN QUERY PLAN`.
 pub struct Compiled {
     pub sql: String,
@@ -736,18 +746,22 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
     let search = match &q.search {
         None => None,
         Some(s) if s.grammar => {
-            return Err(QueryError::Unsupported(
-                "search.grammar is not supported by this engine yet (desktop-client-plan \
-                 stage 9); send grammar: false for a plain text match"
-                    .into(),
-            ))
+            if class != "Thread" {
+                return Err(invalid(format!(
+                    "the search grammar finds threads; search {class} with grammar: false"
+                )));
+            }
+            let grammar_error = |e: GrammarError| invalid(format!("search: {e}"));
+            let dates = DateContext::new(s.tz.as_deref(), s.now).map_err(grammar_error)?;
+            let w = search_grammar::thread_condition(&s.text, &dates).map_err(grammar_error)?;
+            Some(SearchClause::Grammar(w))
         }
         Some(s) => {
             let fts = search_table(class)
                 .ok_or_else(|| invalid(format!("{class} has no search index")))?;
             let expr = search_expression(&s.text)
                 .ok_or_else(|| invalid("search.text has nothing to match"))?;
-            Some((fts, expr))
+            Some(SearchClause::Fts(fts, expr))
         }
     };
 
@@ -988,15 +1002,22 @@ pub fn compile(q: &ModelQuery) -> Result<Compiled, QueryError> {
             for n in &nodes {
                 wheres.push(node_sql(n, main)?);
             }
-            if let Some((fts, expr)) = &search {
-                let mut s = Sql::default();
-                s.push(&format!(
-                    "{quoted_table}.`id` IN (SELECT `content_id` FROM {f} WHERE {f} MATCH ",
-                    f = quoted(fts)
-                ))
-                .bind(SqlValue::Text(expr.clone()))
-                .push(" LIMIT 1000)");
-                wheres.push(s);
+            match search {
+                Some(SearchClause::Fts(fts, expr)) => {
+                    let mut s = Sql::default();
+                    s.push(&format!(
+                        "{quoted_table}.`id` IN (SELECT `content_id` FROM {f} WHERE {f} MATCH ",
+                        f = quoted(fts)
+                    ))
+                    .bind(SqlValue::Text(expr))
+                    .push(" LIMIT 1000)");
+                    wheres.push(s);
+                }
+                Some(SearchClause::Grammar(w)) => wheres.push(Sql {
+                    text: w.sql,
+                    params: w.params,
+                }),
+                None => {}
             }
             if q.accounts.is_some() {
                 let mut s = Sql::default();
@@ -1245,11 +1266,47 @@ mod tests {
     }
 
     #[test]
+    fn grammar_search_is_a_thread_condition() {
+        let (text, params) = sql(json!({
+            "class": "Thread", "accounts": ["a1"],
+            "search": {"text": "from:ann after:yesterday", "grammar": true,
+                       "tz": "Europe/Lisbon", "now": 1_791_990_000},
+            "order": [{"attr": "lastMessageReceivedTimestamp", "dir": "desc"}],
+            "limit": 5,
+        }));
+        assert!(
+            text.contains(
+                "WHERE ((`Thread`.`id` IN (SELECT `content_id` FROM `ThreadSearch` WHERE \
+                 `ThreadSearch` MATCH ?)) AND (`Thread`.`lastMessageReceivedTimestamp` >= ?)) \
+                 AND `Thread`.`accountId` IN (?)"
+            ),
+            "{text}"
+        );
+        // 2026-10-13 00:00 in Lisbon (UTC+1).
+        assert_eq!(
+            params[..3],
+            [
+                SqlValue::Text("(from_ : \"ann\"*)".into()),
+                SqlValue::Integer(1_791_846_000),
+                SqlValue::Text("a1".into())
+            ]
+        );
+    }
+
+    #[test]
     fn refusals() {
-        let grammar = compile(&query(json!({
-            "class": "Thread", "search": {"text": "from:ann", "grammar": true}
-        })));
-        assert!(matches!(grammar, Err(QueryError::Unsupported(_))));
+        assert!(error(
+            json!({"class": "Contact", "search": {"text": "from:ann", "grammar": true}})
+        )
+        .contains("finds threads"));
+        assert!(error(
+            json!({"class": "Thread", "search": {"text": "after:someday", "grammar": true}})
+        )
+        .contains("isn't a date"));
+        assert!(error(
+            json!({"class": "Thread", "search": {"text": "x", "grammar": true, "tz": "Nowhere"}})
+        )
+        .contains("IANA"));
         assert!(error(json!({"class": "Account"})).contains("no class"));
         assert!(error(
             json!({"class": "Thread", "where": {"attr": "snippet", "op": "=", "value": "x"}})

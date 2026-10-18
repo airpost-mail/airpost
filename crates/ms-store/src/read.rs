@@ -21,7 +21,19 @@ use rusqlite::types::ValueRef;
 use rusqlite::{params, params_from_iter, Connection, OpenFlags, OptionalExtension, Row};
 use serde_json::Value;
 
+use crate::model_query::QueryError;
 use crate::models::is_hidden_json;
+use crate::search_dates::DateContext;
+use crate::search_grammar::{self, Where};
+
+/// What `search` matches threads with.
+#[derive(Clone, Copy, Debug)]
+pub enum ThreadSearch<'a> {
+    /// Plain terms, each matched anywhere (see [`fts_query`]).
+    Plain(&'a str),
+    /// The search grammar ([`crate::search_grammar`]), dates read in `dates`.
+    Grammar { text: &'a str, dates: DateContext },
+}
 
 /// Rows a read can return once, whatever the caller asks for.
 pub const MAX_LIMIT: usize = 500;
@@ -502,25 +514,43 @@ impl ReadStore {
             .optional()?)
     }
 
-    /// Threads matching `query` in `ThreadSearch`, newest first. See [`fts_query`] for how
-    /// the text is read; a query with no terms matches nothing.
+    /// The accounts' threads matching `search`, newest first by `(lastMessageTimestamp,
+    /// id)`. Plain text with no terms matches nothing; grammar text that doesn't parse, or
+    /// whose dates don't resolve, is an error.
     pub fn search_threads(
         &self,
-        account_id: &str,
-        query: &str,
+        accounts: &[String],
+        search: &ThreadSearch<'_>,
         limit: usize,
-    ) -> Result<Vec<Value>> {
-        let Some(expr) = fts_query(query, false) else {
-            return Ok(Vec::new());
+    ) -> std::result::Result<Vec<Value>, QueryError> {
+        let condition = match search {
+            ThreadSearch::Plain(text) => {
+                let Some(expr) = fts_query(text, false) else {
+                    return Ok(Vec::new());
+                };
+                Where {
+                    sql: "`Thread`.`id` IN (SELECT `content_id` FROM `ThreadSearch` WHERE \
+                          `ThreadSearch` MATCH ?)"
+                        .into(),
+                    params: vec![SqlValue::Text(expr)],
+                }
+            }
+            ThreadSearch::Grammar { text, dates } => search_grammar::thread_condition(text, dates)
+                .map_err(|e| QueryError::Invalid(format!("search: {e}")))?,
         };
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT t.data FROM ThreadSearch s INNER JOIN Thread t ON t.id = s.content_id \
-             WHERE ThreadSearch MATCH ?1 AND t.accountId = ?2 \
-             ORDER BY t.lastMessageTimestamp DESC, t.id DESC LIMIT ?3",
-        )?;
-        let rows = stmt.query_map(params![expr, account_id, clamp(limit)], |r| {
-            json_column(r, 0)
-        })?;
+        let sql = format!(
+            "SELECT `Thread`.`data` FROM `Thread` WHERE {} AND `Thread`.`accountId` IN \
+             (SELECT value FROM json_each(?)) \
+             ORDER BY `Thread`.`lastMessageTimestamp` DESC, `Thread`.`id` DESC LIMIT ?",
+            condition.sql
+        );
+        let mut binds = condition.params;
+        binds.push(SqlValue::Text(
+            serde_json::to_string(accounts).expect("strings"),
+        ));
+        binds.push(SqlValue::Integer(clamp(limit)));
+        let mut stmt = self.conn.prepare_cached(&sql)?;
+        let rows = stmt.query_map(params_from_iter(binds.iter()), |r| json_column(r, 0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
