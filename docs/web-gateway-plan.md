@@ -655,3 +655,37 @@ merged:
   `TODO-engine.md` records them.
 - Open: snoozed rows move on the deltas, not optimistically; no snooze in the list's bulk
   toolbar yet; body-only unsubscribe links aren't offered in the web.
+
+2026-10-18, `test_gateway.py` (section 6, gateway integration), branch `roadmap/web-ready`, not
+merged:
+- `apps/engine/test/test_gateway.py`: a `serve` engine on the fake IMAP server (whatever
+  `MAILSYNC_TRANSPORT` says), `tern-gateway serve --bind 127.0.0.1:0` on the scenario's
+  profile, and a browser played by `http.client` and a stdlib WebSocket client (masking,
+  extended lengths, fragments, pongs, close codes). It mints codes with `tern-gateway pair
+  --json` and redeems them over HTTP (cookie flags on loopback http, a spent code is 401),
+  checks 4401 without or with a bad cookie and 4403 without or with a foreign Origin, then
+  `hello` (`relayed`, `files`, `gateway.scopes`), `account.list` without passwords,
+  `folders.list`, `threads.list`, `query` (search and count), `threads.get`, `messages.get`,
+  a ChangeStarredTask whose Task delta completes and whose `\Flagged` reaches the server,
+  `-32008` for local-only, parent-only, debug and unknown methods and for refused task
+  classes (with no export file written), a download of the IMAP attachment (fetched by
+  `files.get`, Range too) and an upload read back, an admin device (`files.get` passes,
+  `engine.shutdown`, `account.add` and `files.put {path}` don't), `devices revoke` closing
+  with 4401, SIGKILL of the engine closing with 4502 with `/session` down at once, and a new
+  engine picked up by a new WebSocket. Last, the gateway log holds no cookie, code or path.
+  About 6 s. In the quick tier; skips without the binary unless `CI` or `REQUIRE_TERN`.
+  `TERN_GATEWAY_BIN` (else the newer of `target/release` and `target/debug`); the Makefile's
+  `build`, `release`, `test` and `gate` and the CI harness job build and pass it.
+- Gateway fixes it found: `tern-gateway --config-dir X pair` (and every subcommand) was
+  refused, since clap's `args_conflicts_with_subcommands` doesn't exempt global options; the
+  check is now ours and refuses only serve options before a subcommand. With port 0 the
+  public URL named port 0, so the Host and Origin checks failed; `serve` now binds first and
+  builds the config from the bound address. `/session` kept saying "up" for up to the 2 s
+  probe cache after a relay lost the engine; a 4502 close now drops the cached probe. A
+  browser's own close got no close frame back (tungstenite queues the echo and refuses the
+  gateway's close after the peer's), so browsers saw 1006; the gateway now flushes the echo.
+  New Rust tests for each (`cli` unit tests, `relay.rs` `/session` right after the kill and
+  `a_close_from_the_browser_is_answered`).
+- Open: the test doesn't cover heartbeats (the Rust `heartbeat.rs` does), the 4008 slow
+  subscriber, rate limits past pairing, or a browser; the CI harness job still doesn't build
+  tern-mcp, which `test_mcp.py` requires when `CI` is set.
