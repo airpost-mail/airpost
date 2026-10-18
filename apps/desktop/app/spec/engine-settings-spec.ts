@@ -15,6 +15,7 @@ import {
 } from '../src/browser/engine-settings';
 import { KeyManager } from '../src/browser/key-manager';
 import { ConfigChannel } from '../src/config-channels';
+import { resurfacingBodies } from '../src/resurfacing';
 import { EngineServeProcess } from '../src/mailsync-process';
 import { FakeEngine, until } from './fake-serve-engine';
 
@@ -245,6 +246,41 @@ describe('the engine-owned settings in the main process', function () {
     await until('the answer', () => mirror._inFlight.size === 0);
     mirror.engineChanged(engine, { values: { 'core.composing.html': true } });
     expect(manager.get('core.composing.html')).toBe(true);
+  });
+
+  it('writes the resurfacing texts in the configured language to an engine with the executor', async function () {
+    fake.settings = {};
+    fake.settingsFeatures = ['settings', 'expiration-executor'];
+    writeConfig({ [STORE_KEY]: 'store-1', core: { intl: { language: 'de' } } });
+    await launch();
+    await until('the texts', () => fake.socketOf('settings.set').length === 1);
+    expect(fake.settings['resurfacing.snoozeBody']).toContain('Tern-Erinnerung');
+    expect(fake.settings['resurfacing.reminderBody']).toContain('Tern-Erinnerung');
+    // Not config.json's: the windows build their own.
+    expect(manager.get('resurfacing.snoozeBody')).toBeUndefined();
+
+    // A store that has them already isn't written again.
+    supervisor.client.engine._closeSocket();
+    fake.socket = [];
+    await launch();
+    expect(fake.socketOf('settings.set').length).toBe(0);
+
+    manager.setRawValue('core.intl.language', 'en', null);
+    await until('the rewrite', () => fake.socketOf('settings.set').length === 1);
+    expect(fake.settings['resurfacing.snoozeBody']).toBe(resurfacingBodies((en) => en).snoozeBody);
+  });
+
+  it('writes no resurfacing texts to an engine without the executor', async function () {
+    fake.settings = {};
+    writeConfig({ [STORE_KEY]: 'store-1' });
+    await launch();
+    manager.setRawValue('core.intl.language', 'de', null);
+    // A later write that does reach the engine: the language change sent nothing before it.
+    manager.setRawValue('core.sending.undoSend', 5000, null);
+    await until('the set', () => fake.socketOf('settings.set').length > 0);
+    expect(fake.socketOf('settings.set').map((r) => Object.keys(r.params.values))).toEqual([
+      ['core.sending.undoSend'],
+    ]);
   });
 
   it('leaves an engine without settings alone and keeps config.json', async function () {

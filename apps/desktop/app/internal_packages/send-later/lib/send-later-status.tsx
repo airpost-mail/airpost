@@ -71,6 +71,20 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
 
   render() {
     const metadata = this.props.draft.metadataForPluginId(PLUGIN_ID);
+    if (metadata && !metadata.expiration && metadata.error) {
+      // The engine couldn't send it at its time (docs/desktop-client-plan.md 3.3).
+      return (
+        <div className="send-later-status send-later-error" title={metadata.error}>
+          <span className="time">{localized('Not sent: %@', metadata.error)}</span>
+          <RetinaImg
+            name="image-cancel-button.png"
+            title={localized('Dismiss')}
+            onClick={this.onCancelSendLater}
+            mode={RetinaImg.Mode.ContentPreserve}
+          />
+        </div>
+      );
+    }
     if (!metadata || !metadata.expiration) {
       return <span />;
     }

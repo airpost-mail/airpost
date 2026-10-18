@@ -56,6 +56,8 @@ export class FakeEngine {
   settings: { [key: string]: any } | null = null;
   // settings.get's storeId.
   settingsStoreId = 'store-1';
+  // The hello's features when the engine has the settings store.
+  settingsFeatures = ['settings'];
 
   constructor(dir: string) {
     this.dir = dir;
@@ -109,7 +111,13 @@ export class FakeEngine {
     const p = req.params || {};
     switch (req.method) {
       case 'hello':
-        return { protocol: 1, engine: 'fake', pid: 1, accounts: [], features: ['settings'] };
+        return {
+          protocol: 1,
+          engine: 'fake',
+          pid: 1,
+          accounts: [],
+          features: this.settingsFeatures,
+        };
       case 'settings.get': {
         const values = {};
         for (const k of Object.keys(this.settings)) {

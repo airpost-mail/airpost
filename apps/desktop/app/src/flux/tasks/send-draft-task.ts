@@ -153,6 +153,11 @@ export class SendDraftTask extends Task {
   }
 
   onError({ key, debuginfo }: { key: string; debuginfo: string }) {
+    // A silent send (a resurfacing message) has no composer or draft to report to.
+    if (this.silent) {
+      console.warn(`A background send failed: ${key} ${debuginfo}`);
+      return;
+    }
     let errorMessage = null;
     let errorDetail = null;
 

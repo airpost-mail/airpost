@@ -17,6 +17,9 @@ synchronously and never talk to the store.
 - A local write of an engine-owned key goes to `settings.set`, one call per key, so a value the
   engine refuses doesn't hold back the others.
 - `settings.changed` (another client's change) is applied to config.json and the windows.
+- An engine that runs the expiration executor (`expiration-executor`) gets the texts of the
+  resurfacing messages it sends (`resurfacing.*`) in the user's language after each sync and
+  when the language changes; config.json has no copy of them.
 
 config.json keeps every key either way, so an engine without `settings` (or a downgrade) still
 finds them. The engine answers a connection in the order its store applied the changes, so a
@@ -25,10 +28,12 @@ applied before that set, and is skipped: the local write wins.
 */
 import _ from 'underscore';
 import { Feature, Method, SettingsValues } from '../engine-protocol';
+import { localizerFor } from '../intl';
+import { REMINDER_BODY_KEY, SNOOZE_BODY_KEY, resurfacingBodies } from '../resurfacing';
 
 // The keys the desktop mirrors. The engine also keeps `templates` (the desktop's are files in
 // <config>/templates), `mailRules` and `mailRulesAutoSince` (in the main window's localStorage
-// until the rules move, stage 14) and `resurfacing.*` (written from stage 4).
+// until the rules move, stage 14) and `resurfacing.*` (written, not mirrored: _writeResurfacing).
 export const ENGINE_SETTINGS_KEYS = [
   'core.sending.undoSend',
   'core.sending.defaultAccountIdForSend',
@@ -37,6 +42,10 @@ export const ENGINE_SETTINGS_KEYS = [
   'signatures',
   'defaultSignatures',
 ];
+
+// The config key of the UI language; a change rewrites the resurfacing texts.
+export const LANGUAGE_KEY = 'core.intl.language';
+const RESURFACING_KEYS = [SNOOZE_BODY_KEY, REMINDER_BODY_KEY];
 
 // The id (settings.get's `storeId`) of the engine store config.json's values were copied into.
 export const STORE_KEY = 'engineSettingsStore';
@@ -120,6 +129,11 @@ export class EngineSettingsMirror {
     if (this.engine) this._sendKeys(this.engine, keys);
   }
 
+  // The UI language changed: the engine's resurfacing messages follow it.
+  languageChanged() {
+    if (this.engine) this._writeResurfacing(this.engine, {});
+  }
+
   // settings.changed: another client's change.
   engineChanged(engine: SettingsEngine, { values }: SettingsValues) {
     if (engine !== this.engine || !values) return;
@@ -129,9 +143,10 @@ export class EngineSettingsMirror {
   async _sync(engine: SettingsEngine) {
     try {
       const { values, storeId } = await engine.request<SettingsValues>(Method.SettingsGet, {
-        keys: ENGINE_SETTINGS_KEYS,
+        keys: [...ENGINE_SETTINGS_KEYS, ...RESURFACING_KEYS],
       });
       if (this.engine !== engine) return;
+      this._writeResurfacing(engine, values || {});
       const store = storeId || UNNAMED_STORE;
       const copy = store !== this.host.get(STORE_KEY);
       const keys = ENGINE_SETTINGS_KEYS.filter(
@@ -151,6 +166,20 @@ export class EngineSettingsMirror {
     } catch (err) {
       console.warn(`Could not read the engine's settings: ${err.message}`);
     }
+  }
+
+  // Writes the resurfacing texts in the configured language unless `current` has them already.
+  _writeResurfacing(engine: SettingsEngine, current: { [key: string]: unknown }) {
+    if (!(engine.features || []).includes(Feature.ExpirationExecutor)) return;
+    const bodies = resurfacingBodies(localizerFor(this.host.get(LANGUAGE_KEY) as string));
+    const values = {
+      [SNOOZE_BODY_KEY]: bodies.snoozeBody,
+      [REMINDER_BODY_KEY]: bodies.reminderBody,
+    };
+    if (RESURFACING_KEYS.every((key) => current[key] === values[key])) return;
+    engine.request(Method.SettingsSet, { values }).catch((err) => {
+      if (!err.engineExited) console.warn(`Could not write the resurfacing texts: ${err.message}`);
+    });
   }
 
   _kept(): string[] {

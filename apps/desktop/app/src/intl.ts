@@ -216,6 +216,21 @@ export function initializeLocalization({ configDirPath }) {
   }
 }
 
+// A lookup for the language `choice` (a config `core.intl.language` value, '' for automatic)
+// that leaves this process's localization alone: for text another process sends on the user's
+// behalf, such as the engine's resurfacing messages, after a language change the windows only
+// pick up on relaunch.
+export function localizerFor(choice: string | null | undefined): (en: string) => string {
+  const want = choice || automaticLocale;
+  const lang = want.split('-')[0] || 'en';
+  let table = {};
+  if (langsFiles.includes(lang)) table = { ...require(path.join(langsDir, `${lang}.json`)) };
+  if (langsFiles.includes(want)) {
+    table = Object.assign(table, require(path.join(langsDir, `${want}.json`)));
+  }
+  return (en: string) => table[en] || en;
+}
+
 export function localized(en, ...subs) {
   let i = 0;
   let translated = localizations[en] || en;

@@ -92,6 +92,9 @@ export const Feature = {
   MessageHidden: 'message-hidden',
   MailNew: 'mail-new',
   Settings: 'settings',
+  // The engine acts on due send-later, thread-snooze and send-reminders metadata itself; only
+  // send-later rows marked `clientFinalize` still need a window (docs/desktop-client-plan.md 3.3).
+  ExpirationExecutor: 'expiration-executor',
 } as const;
 
 export const ErrorCode = {

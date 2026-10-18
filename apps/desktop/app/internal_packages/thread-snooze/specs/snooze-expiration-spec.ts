@@ -1,6 +1,8 @@
 import { Actions, Folder, Thread, SyncbackMetadataTask } from 'mailspring-exports';
 import { SnoozeStore } from '../lib/snooze-store';
 import { PLUGIN_ID } from '../lib/snooze-constants';
+import { EngineEvents } from '../../../src/engine-events';
+import { Feature } from '../../../src/engine-protocol';
 
 function snoozedThread(id: string, expiration: Date) {
   const snoozed = new Folder({ id: `${id}-folder`, accountId: 'a1', role: 'snoozed' });
@@ -35,6 +37,17 @@ describe('SnoozeStore metadata expiration', function () {
 
   it('queues nothing when no thread in the batch is due', () => {
     SnoozeStore._onMetadataExpired([snoozedThread('later', new Date(Date.now() + 3600 * 1000))]);
+    expect(Actions.queueTasks).not.toHaveBeenCalled();
+    expect(SnoozeStore._onUnsnoozeThreads).not.toHaveBeenCalled();
+  });
+
+  it('leaves due threads to an engine that runs the expiration executor', () => {
+    const engine = new EngineEvents();
+    engine.connected([Feature.ExpirationExecutor], () => Promise.resolve(null));
+    SnoozeStore._onMetadataExpired(
+      [snoozedThread('due', new Date(Date.now() - 60 * 1000))],
+      engine
+    );
     expect(Actions.queueTasks).not.toHaveBeenCalled();
     expect(SnoozeStore._onUnsnoozeThreads).not.toHaveBeenCalled();
   });

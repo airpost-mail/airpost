@@ -523,11 +523,15 @@ class DraftStore extends MailspringStore {
       throw new Error(`Cant find send action ${actionKey} `);
     }
 
-    const sendLaterMetadataValue = delay > 0 && {
-      expiration: new Date(Date.now() + delay),
-      isUndoSend: true,
-      actionKey: actionKey,
-    };
+    const sendLaterMetadataValue: {
+      expiration: Date;
+      isUndoSend: boolean;
+      actionKey: string;
+      clientFinalize?: boolean;
+    } | null =
+      delay > 0
+        ? { expiration: new Date(Date.now() + delay), isUndoSend: true, actionKey: actionKey }
+        : null;
 
     // get the draft session, apply any last-minute edits and get the final draft.
     // We need to call `changes.commit` here to ensure the body of the draft is
@@ -591,6 +595,9 @@ class DraftStore extends MailspringStore {
 
     // attach send-later metadata if a send delay is enabled
     if (sendLaterMetadataValue) {
+      if (SendActionsStore.needsClientFinalize(draft, actionKey)) {
+        sendLaterMetadataValue.clientFinalize = true;
+      }
       session.changes.addPluginMetadata('send-later', sendLaterMetadataValue);
     }
 

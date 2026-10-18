@@ -8,6 +8,8 @@ import {
   Thread,
 } from 'mailspring-exports';
 
+import EngineEvents from '../../../src/engine-events';
+import { Feature } from '../../../src/engine-protocol';
 import { markUnreadOrResurfaceThreads, moveThreads, snoozedUntilMessage } from './snooze-utils';
 import { PLUGIN_ID } from './snooze-constants';
 import * as SnoozeActions from './snooze-actions';
@@ -69,8 +71,9 @@ class _SnoozeStore extends MailspringStore {
     markUnreadOrResurfaceThreads(threads, localized('Unsnoozed message'));
   };
 
-  _onMetadataExpired = (threads: Thread[]) => {
-    if (!AppEnv.isMainWindow()) {
+  _onMetadataExpired = (threads: Thread[], engine = EngineEvents) => {
+    // The engine unsnoozes by itself when it runs the expiration executor.
+    if (!AppEnv.isMainWindow() || engine.has(Feature.ExpirationExecutor)) {
       return;
     }
     const unsnooze = threads.filter((thread) => {

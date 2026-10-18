@@ -12,6 +12,7 @@ import {
   SendDraftTask,
   Thread,
 } from 'mailspring-exports';
+import { resurfacingBodies } from '../../../src/resurfacing';
 
 export function snoozedUntilMessage(snoozeDate: string | null, now: Moment = moment()) {
   let message = localized('Snoozed');
@@ -63,11 +64,7 @@ export async function markUnreadOrResurfaceThreads(threads: Thread[], source: st
   if (AppEnv.config.get('core.notifications.unsnoozeToTop')) {
     // send a hidden email that will mark the thread as unread and bring it
     // to the top of your inbox in any mail client
-    const body = `
-    <strong>${localized('Tern Reminder')}:</strong> ${localized(
-      'This thread has been moved to the top of your inbox by Tern.'
-    )}</p>
-    <p>--${localized('The Tern Team')}</p>`;
+    const body = resurfacingBodies().snoozeBody;
 
     for (const thread of threads) {
       const draft = await DraftFactory.createDraftForResurfacing(thread, null, body);

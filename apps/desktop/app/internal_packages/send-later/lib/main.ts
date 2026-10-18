@@ -10,6 +10,8 @@ import {
 } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
 
+import EngineEvents from '../../../src/engine-events';
+import { Feature } from '../../../src/engine-protocol';
 import SendLaterButton from './send-later-button';
 import SendLaterStatus from './send-later-status';
 import { PLUGIN_ID } from './send-later-constants';
@@ -23,7 +25,7 @@ const SendLaterButtonWithTip = HasTutorialTip(SendLaterButton, {
   ),
 });
 
-function handleMetadataExpiration(change) {
+export function handleMetadataExpiration(change, engine = EngineEvents) {
   if (change.type !== 'metadata-expiration' || change.objectClass !== Message.name) {
     return;
   }
@@ -31,6 +33,10 @@ function handleMetadataExpiration(change) {
   change.objects.forEach(async (message) => {
     const metadata = message.metadataForPluginId(PLUGIN_ID);
     if (!metadata || !metadata.expiration || metadata.expiration > new Date()) {
+      return;
+    }
+    // The engine sends it, unless the send needs this window's transforms.
+    if (engine.has(Feature.ExpirationExecutor) && !metadata.clientFinalize) {
       return;
     }
 

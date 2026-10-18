@@ -9,6 +9,9 @@ import {
 } from 'mailspring-exports';
 import MailspringStore from 'mailspring-store';
 
+import EngineEvents from '../../../src/engine-events';
+import { Feature } from '../../../src/engine-protocol';
+import { resurfacingBodies } from '../../../src/resurfacing';
 import { PLUGIN_ID } from './send-reminders-constants';
 import { updateReminderMetadata } from './send-reminders-utils';
 
@@ -28,21 +31,23 @@ class SendRemindersStore extends MailspringStore {
   }
 
   _sendReminderEmail = async (thread: Thread, sentHeaderMessageId: string) => {
-    const body = `
-      <strong>Tern Reminder:</strong> This thread has been moved to the top of
-      your inbox by Tern because no one has replied to your message.</p>
-      <p>--The Tern Team</p>`;
+    const body = resurfacingBodies().reminderBody;
 
     const draft = await DraftFactory.createDraftForResurfacing(thread, sentHeaderMessageId, body);
     Actions.queueTask(SendDraftTask.forSending(draft, { silent: true }));
   };
 
-  _onDatabaseChanged = ({ type, objects, objectClass }: DatabaseChangeRecord<Thread>) => {
+  _onDatabaseChanged = (
+    { type, objects, objectClass }: DatabaseChangeRecord<Thread>,
+    engine = EngineEvents
+  ) => {
     if (objectClass !== Thread.name) {
       return;
     }
 
-    if (!AppEnv.isMainWindow()) {
+    // The engine keeps the baseline, clears on reply and reminds when it runs the expiration
+    // executor; the focus handler below still acknowledges a reminder.
+    if (!AppEnv.isMainWindow() || engine.has(Feature.ExpirationExecutor)) {
       return;
     }
 

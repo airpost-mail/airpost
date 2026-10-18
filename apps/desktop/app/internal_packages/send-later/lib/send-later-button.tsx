@@ -1,7 +1,13 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
 import moment from 'moment';
-import { localized, Actions, Message, DraftEditingSession } from 'mailspring-exports';
+import {
+  localized,
+  Actions,
+  Message,
+  DraftEditingSession,
+  SendActionsStore,
+} from 'mailspring-exports';
 import { RetinaImg } from 'mailspring-component-kit';
 
 import SendLaterPopover from './send-later-popover';
@@ -74,9 +80,11 @@ class SendLaterButton extends Component<SendLaterButtonProps, SendLaterButtonSta
       this.setState({ saving: true });
     }
 
-    this.props.session.changes.addPluginMetadata(PLUGIN_ID, {
-      expiration: sendLaterDate,
-    });
+    const value: { expiration: Date; clientFinalize?: boolean } = { expiration: sendLaterDate };
+    if (SendActionsStore.needsClientFinalize(this.props.draft)) {
+      value.clientFinalize = true;
+    }
+    this.props.session.changes.addPluginMetadata(PLUGIN_ID, value);
 
     if (AppEnv.isComposerWindow()) {
       AppEnv.close();

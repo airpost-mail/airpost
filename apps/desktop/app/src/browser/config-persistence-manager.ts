@@ -7,6 +7,7 @@ import { ConfigChannel, ConfigReply } from '../config-channels';
 import {
   ENGINE_SETTINGS_KEYS,
   EngineSettingsMirror,
+  LANGUAGE_KEY,
   SettingsHost,
   touchesKey,
 } from './engine-settings';
@@ -220,10 +221,14 @@ export default class ConfigPersistenceManager implements SettingsHost {
     const keys = this.engineSettings
       ? ENGINE_SETTINGS_KEYS.filter((key) => touchesKey(keyPath, key))
       : [];
+    const language = this.engineSettings && touchesKey(keyPath, LANGUAGE_KEY);
+    const languageBefore = language ? this.get(LANGUAGE_KEY) : undefined;
     const before = keys.map((key) => JSON.stringify(this.get(key)));
     write();
     const changed = keys.filter((key, i) => JSON.stringify(this.get(key)) !== before[i]);
     if (changed.length) this.engineSettings.localChanged(changed);
+    if (language && this.get(LANGUAGE_KEY) !== languageBefore)
+      this.engineSettings.languageChanged();
   }
 
   emitChangeEvent = ({ sourceWebcontentsId }: { sourceWebcontentsId?: number } = {}) => {

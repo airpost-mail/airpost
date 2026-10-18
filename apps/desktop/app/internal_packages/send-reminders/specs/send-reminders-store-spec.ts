@@ -2,6 +2,8 @@ import { Actions, Thread, SyncbackMetadataTask } from 'mailspring-exports';
 
 import SendRemindersStore from '../lib/send-reminders-store';
 import { PLUGIN_ID } from '../lib/send-reminders-constants';
+import { EngineEvents } from '../../../src/engine-events';
+import { Feature } from '../../../src/engine-protocol';
 
 const LAST_RECEIVED = new Date('2026-09-01T12:00:00Z');
 const LAST_RECEIVED_SECONDS = LAST_RECEIVED.getTime() / 1000;
@@ -17,12 +19,15 @@ function threadWithReminder(value: Record<string, unknown>) {
   return thread;
 }
 
-async function dispatch(thread: Thread, type = 'persist') {
-  (SendRemindersStore as any)._onDatabaseChanged({
-    type,
-    objectClass: Thread.name,
-    objects: [thread],
-  });
+async function dispatch(thread: Thread, type = 'persist', engine = new EngineEvents()) {
+  (SendRemindersStore as any)._onDatabaseChanged(
+    {
+      type,
+      objectClass: Thread.name,
+      objects: [thread],
+    },
+    engine
+  );
   // Timers are frozen in specs, so drain microtasks instead of using setTimeout.
   for (let i = 0; i < 5; i++) await Promise.resolve();
 }
@@ -95,5 +100,15 @@ describe('SendRemindersStore', function sendRemindersStore() {
       );
       expect(queuedMetadataValue()).toEqual({});
     });
+  });
+
+  it('leaves baseline, reply and reminder to an engine that runs the expiration executor', async () => {
+    const engine = new EngineEvents();
+    engine.connected([Feature.ExpirationExecutor], () => Promise.resolve(null));
+    const due = { expiration: new Date(Date.now() - 1000), sentHeaderMessageId: 'sent-1' };
+    await dispatch(threadWithReminder(due), 'persist', engine);
+    await dispatch(threadWithReminder(due), 'metadata-expiration', engine);
+    expect(Actions.queueTask).not.toHaveBeenCalled();
+    expect((SendRemindersStore as any)._sendReminderEmail).not.toHaveBeenCalled();
   });
 });
