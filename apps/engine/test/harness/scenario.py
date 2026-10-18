@@ -35,7 +35,7 @@ from . import db as dbmod
 from . import invariants
 from . import mailgen
 from .assertions import TRACKED_FLAGS, compare_placements, placement_changes
-from .mailsync import MailsyncError, MailsyncProcess, account_json, describe_exit
+from .mailsync import MailsyncError, MailsyncProcess, account_json, default_transport, describe_exit
 from .scenario_backend import BackendMixin
 from .scenario_pim import PimMixin, ScenarioFailure
 from .servers.base import Server, normalize_message_id
@@ -422,6 +422,12 @@ class ScenarioRun(PimMixin, BackendMixin):
         try:
             if self.sc.get("skip"):
                 raise ScenarioSkipped(f"{self.sc['name']}: {self.sc['skip']}")
+            # `transports: [serve]`: behaviour only some transports have (the expiration
+            # executor runs in `serve` only, docs/desktop-client-plan.md T8).
+            if self.sc.get("transports") and not self.sc.get("binary") \
+                    and default_transport() not in self.sc["transports"]:
+                raise ScenarioSkipped(f"{self.sc['name']} runs on {', '.join(self.sc['transports'])}, "
+                                      f"not {default_transport()}")
             self.setup()
             try:
                 self.ms.start()
@@ -514,6 +520,8 @@ class ScenarioRun(PimMixin, BackendMixin):
             result = self._snapshot(arg if isinstance(arg, str) else label or "snapshot")
         elif verb == "restart":
             result = self._restart(arg or {})
+        elif verb == "reset_account":
+            result = self._reset_account(arg or {})
         elif verb == "force_scans":
             result = self._force_scans(arg or {})
         elif verb == "db.sql":
@@ -687,6 +695,37 @@ class ScenarioRun(PimMixin, BackendMixin):
         self._note(f"mailsync {self.ms.binary.resolve().name} restarted; migrate said: {self.ms.migrate_output}")
         if arg.get("wait", True):
             self.ms.wait_quiescent(timeout=float(arg.get("timeout", 180)), ignore_busy=self.ignore_busy)
+
+    def _reset_account(self, arg: dict):
+        """What Preferences' Reset Cache does: `account.reset` on serve (the engine forgets the
+        account and deletes its rows) and `account.add` again; on stdio and socket the
+        account's process stops, `--mode reset` runs and the process starts again. Then waits
+        for a sync pass that began after it, and quiescence."""
+        if self.accounts:
+            raise ScenarioFailure("reset_account is not supported in a scenario with several accounts")
+        started = time.time()
+        if self.ms.transport == "serve":
+            aid = self.ms.account["id"]
+            result = self.ms.engine.parent.call("account.reset", {"accountId": aid}, 60)
+            self._note(f"account.reset answered {json.dumps(result)}")
+            self.ms.engine.add(self.ms)
+        else:
+            code = self.ms.stop()
+            self.earlier_deltas += self.ms.deltas()
+            self._note(f"mailsync stopped for reset (exit {code})")
+            r = self.ms.run_mode("reset")
+            if r.returncode != 0 or '"error":null' not in r.stdout.replace(" ", ""):
+                raise ScenarioFailure(f"--mode reset failed ({describe_exit(r.returncode)}): {r.stdout[-300:]} {r.stderr[-300:]}")
+            self.ms = MailsyncProcess(self.ms.account, self.work, binary=self.binary, verbose=True,
+                                      env=self._engine_env(), transport=self._transport_for(self.binary))
+            self._attach_backend(self.ms)
+            self.ms.start()
+        ms = self.ms
+        ms.wait_for(lambda: any(l.msg == "Sync loop complete." and l.wall >= started
+                                for l in ms.log("background", engine_only=True)),
+                    float(arg.get("timeout", 120)), "a sync pass after the reset")
+        if arg.get("wait", True):
+            ms.wait_quiescent(timeout=float(arg.get("timeout", 180)), ignore_busy=self.ignore_busy)
 
     def _force_scans(self, arg: dict):
         """Stopgap until the engine reads scan intervals from the environment: backdate the

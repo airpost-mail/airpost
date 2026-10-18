@@ -1,0 +1,44 @@
+name: reset-keeps-plugin-metadata
+description: >
+  The user snoozes a thread and tracks a message, then resets the account (Preferences >
+  Reset Cache). The reset deletes every row of the account, but with the local-only metadata
+  backend nothing would bring the plugin metadata back, so the reset keeps it in
+  DetatchedPluginMetadata by Message-ID. The resync attaches it to the message and to the
+  thread again (whose id may differ), the expiration is indexed again, and the snooze still
+  comes due after the reset.
+source: "docs/tech-debt.md TD32; MetadataExpirationWorker.cpp; legacy_import::attach_pending_thread_metadata"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 3}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {threads: {mailbox: INBOX, uids: [1]}}
+      pluginId: thread-snooze
+      value: {expiration: {now_plus: 45}, snoozeCategoryId: null}
+    as: snooze
+  - wait: {task: snooze, timeout: 30}
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {mailbox: INBOX, uids: [2]}}
+      pluginId: open-tracking
+      value: {uid: "tracking-1", open_count: 2}
+    as: tracking
+  - wait: {task: tracking, timeout: 30}
+  - reset_account: {}
+  - assert:
+      metadata:
+        - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, expiration: true}
+        - {messages: {mailbox: INBOX, uids: [2]}, plugin: open-tracking, value: {uid: "tracking-1", open_count: 2}, expiration: false}
+      sql:
+        - {db: main, query: "SELECT count(*) FROM DetatchedPluginMetadata", equals: 0}
+  - mark: reset
+  - wait: {delta: {class: Thread, type: metadata-expiration, count: 1, since: reset}, timeout: 90}
+expect:
+  metadata_expiration:
+    - {threads: {mailbox: INBOX, uids: [1]}, plugin: thread-snooze, since: reset, count: {min: 1}}
+    - {threads: {mailbox: INBOX, uids: [2, 3]}, since: reset, count: 0}
+  db_matches_server: {}
+  running: true
