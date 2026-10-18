@@ -196,6 +196,8 @@ CLI (`apps/cli`, `tern`, on `clap` + `ms-ipc`):
 - `tern logs [<account>] [-f]` (tails `mailsync-<id>.log`; no engine call; the account defaults
   to `--account`, else the only account with a log)
 - `tern rpc <method> [params]`: raw call, for scripting and debugging
+- `tern settings get [<key>…]`, `tern settings set <key> <json|text>`: the engine-owned
+  settings (docs/desktop-client-plan.md 3.4); `null` clears a key
 - `--config-dir` (default: the Tern profile dir per OS), `--json` on every command.
 
 CLI output, as built. Exit codes: 0 ok, 1 the command failed (an engine error, a task that

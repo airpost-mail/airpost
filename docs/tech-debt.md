@@ -733,6 +733,10 @@ composer HTML (sanitised by hand because of this, `composer-editor.tsx:287-289`,
   decision (plugins `require` Node directly), which plan section 6 doesn't address; start with
   composer and popout windows.
 - Size: M–L, ~60 files, mostly mechanical; Config and `showErrorDialog` are the delicate parts.
+- Progress (stage 3, 2026-10-18): Config's initial read and writes go over `ConfigChannel`
+  (`src/config-channels.ts`, `sendSync`); `.eslintrc` bans `@electron/remote` imports and
+  requires outside an allowlist of the 56 files that still use it. Dialogs, `openUrl`,
+  `isQuitting`, window count, menu and updater remain.
 
 ### TD36. Store graph held together by the barrel and require order (before stage 6)
 

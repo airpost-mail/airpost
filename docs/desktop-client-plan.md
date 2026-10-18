@@ -1228,3 +1228,44 @@ gate. Order and rough sizes:
 
 Trial checks on `~/tern-trial` are left to the user; each stage lists its trial steps as
 pending.
+
+2026-10-18, stage 3 (settings store), branch `roadmap/client-next`: delivered, not merged.
+Engine: `settings.get {keys?}` → `{values}`, `settings.set {values}` (null clears a key) and
+`settings.changed {values}` on `serve` only (`apps/engine/src/settings.rs`), feature `settings`;
+`<config>/settings.json` is one flat object keyed by config key path, rewritten through a
+temporary file and rename. Keys and value kinds are in `ms_ipc::SETTINGS_KEYS` (the 3.4 list);
+an unknown key or a wrong kind is refused with nothing stored. `settings.changed` goes to every
+subscribed connection whatever its filter, except the one that made the change; the parent's
+changes reach everyone; nothing is held for a later subscriber. Each connection gets its
+`settings.*` answers and other connections' notifications in the order the store applied them
+(the answer is queued under the store's lock). Both methods are open to relayed connections.
+`tern settings get [key…]` and `tern settings set <key> <json|text>`. tern-mcp takes the default
+sending account from `settings.get` when an engine keeps settings (unset there means none), else
+from `config.json`. Desktop: `src/browser/engine-settings.ts` mirrors the six keys the desktop
+holds today (`core.sending.undoSend`, `core.sending.defaultAccountIdForSend`,
+`core.notifications.unsnoozeToTop`, `core.composing.html`, `signatures`, `defaultSignatures`)
+over the supervisor's connection: one-time push of config.json's values (flag
+`engineSettingsPushed` in config.json), then pending local writes, then `settings.get` with the
+engine winning; local writes go to `settings.set` one key at a time; `settings.changed` is
+applied to config.json and every window; config.json keeps every key. Launch waits up to 3 s for
+the first sync before opening windows. TD35's stage-3 part: Config's initial read and writes use
+`ConfigChannel` (`sendSync`) instead of `@electron/remote`; `.eslintrc` bans `@electron/remote`
+imports and requires outside a 56-file allowlist. Tests: `settings.rs` unit tests, the serve
+round trip and notification test, the CLI harness test (serve: get/set/clear, socket: refused),
+tern-mcp's default-account test, `engine-settings-spec.ts` against the fake serve engine
+(push once then engine wins, a window's synchronous boot read, forwarding and notifications, a
+local write kept over an earlier notification, an engine without `settings` left on
+config.json); full desktop suite passes.
+Decisions taken, to confirm: `templates` is an array and the desktop doesn't mirror it (its
+templates are files in `<config>/templates`); `mailRules`/`mailRulesAutoSince` wait for stage 14
+and `resurfacing.*` for stage 4; settings live in `serve` only (no store in per-account `sync`);
+the first push wins over values already in the engine, after that the engine wins, so a lost or
+corrupt `settings.json` (moved to `settings.json.bad`) clears those keys in the desktop too;
+settings methods are open to relayed devices. Deviation: the C++ engine is gone (stage 10), so
+"a C++ engine run still sees the keys" is covered by the spec of an engine without `settings`
+and by config.json being written in every case. Open: aliases and auto-cc in tern-mcp still come
+from config.json (accounts are engine-owned from stage 11); writes made while the engine is down
+are pushed on its next start only within the same app run; tern-web: the web client's
+signatures in browser storage should move to `settings` (not ours). Trial pending: change the
+undo-send delay in Preferences and see it in `tern settings get`; change it with
+`tern settings set core.sending.undoSend 15000` and see the composer pick it up.
