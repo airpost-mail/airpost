@@ -80,14 +80,19 @@ These are cheap, independent of the plan's stages, or block something the plan d
 
 Done (roadmap/security, df38be698). `extra.plist` sets `LSFileQuarantineEnabled`. The new
 `src/attachment-safety.ts` tags a file as downloaded, with `/usr/bin/xattr -w com.apple.quarantine
-0081;<hex epoch>;Tern;<uuid>` via `execFile` on macOS (an existing attribute is kept, so an
-approved file isn't re-checked) and a `Zone.Identifier` stream (`ZoneId=3`) on Windows. It runs
+0081;<hex epoch>;Tern;<uuid>` via `execFile` on macOS (in `files/` an existing attribute is
+kept, so an approved file isn't re-checked; saved copies always get a fresh value, since a file
+overwritten in place keeps the old file's xattrs) and a `Zone.Identifier` stream (`ZoneId=3`) on Windows. It runs
 on the attachment before `shell.openPath`, on the copy after Save / Save All and after Save Image
 from a message, and on the source at drag start. A failure is logged and doesn't stop the open.
 Opening a file whose last extension (case-insensitive, trailing dots/spaces and bidi/zero-width
 characters ignored, so `invoice.pdf.exe` and `invoice<U+202E>fdp.exe` count) is on the
 platform's denylist asks first through a main-process dialog (`attachment-safety:confirm-open`,
-Cancel by default); a decoy extension is named in the prompt. Save-as now resolves when the write
+Cancel by default); a decoy extension or hidden characters are named in the prompt, which shows
+the name with them stripped. The denylists cover Outlook's Level 1 list (minus certificates and
+data files), NTLM-leaking types (library-ms, search-ms, theme), rdp, py* and extra disk images;
+on Linux they include Windows types for wine, and a file starting with MZ, ELF or `#!` asks too
+(review fixes, 83a65a63f). Save-as now resolves when the write
 finishes and reports write errors. Not done: the drag-out drop target is a fresh copy Chromium
 writes from the `DownloadURL`, so on Windows it likely has no Zone.Identifier, and on macOS it
 relies on the main process's `LSFileQuarantineEnabled` (untested); switching to
