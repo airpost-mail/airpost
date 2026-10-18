@@ -292,6 +292,8 @@ pub mod thread {
     pub const UNSUBSCRIBE: &str = "unsubscribe";
     /// `serve`: the workers running `integrations.*` calls.
     pub const INTEGRATIONS: &str = "integrations";
+    /// `serve`: the workers running `ai.*` model calls.
+    pub const AI: &str = "ai";
     /// `serve`: joins a failed account's threads and reports it stopped.
     pub const ACCOUNT_STOP: &str = "accountStop";
     /// `serve`: the workers running `account.test` for the parent.
