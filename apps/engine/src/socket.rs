@@ -1068,7 +1068,10 @@ impl Connection {
 
     /// The response to `req`, or `None` when there is none to send (a client notification,
     /// which runs but is not answered, or `subscribe`, which queues its own).
-    fn handle(&mut self, req: RpcRequest) -> Option<Response> {
+    fn handle(&mut self, mut req: RpcRequest) -> Option<Response> {
+        if self.relay.is_some() && req.method == method::QUERY {
+            policy::cap_relayed_query(&mut req.params);
+        }
         let result = match req.method.as_str() {
             method::HELLO => {
                 let r = self.session.call(&req).unwrap_or(Ok(Value::Null));

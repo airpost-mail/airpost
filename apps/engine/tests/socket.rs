@@ -437,6 +437,12 @@ fn relayed_connection_policy() {
         forbidden
     );
 
+    // `query` rows are bounded: a cursor query, which needs a limit, gets the relayed
+    // default here and is refused locally.
+    let unbounded = json!({ "class": "Thread", "cursor": "" });
+    let page = c.call(method::QUERY, unbounded.clone()).unwrap();
+    assert!(page["rows"].is_array(), "{page}");
+
     // A second hello, unrelayed, changes nothing.
     c.call(method::HELLO, json!({ "protocol": 1, "client": "x" }))
         .unwrap();
@@ -449,6 +455,10 @@ fn relayed_connection_policy() {
     // A local connection is unaffected.
     let mut local = e.hello();
     queue(&mut local, task("t-local")).unwrap();
+    assert_eq!(
+        local.call(method::QUERY, unbounded).unwrap_err().code(),
+        Some(code::INVALID_PARAMS)
+    );
     assert_eq!(
         local.call("secrets.set", json!({})).unwrap_err().code(),
         Some(code::METHOD_NOT_FOUND)

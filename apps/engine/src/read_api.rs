@@ -279,7 +279,8 @@ impl ReadApi {
     }
 
     /// `query`: the params are a [`ModelQuery`], parsed strictly so a misspelt key is an
-    /// error rather than a silently wider read. `accounts: null` reads every account.
+    /// error rather than a silently wider read. `accounts: null` reads every account in the
+    /// database. A relayed connection's rows are capped first (`policy::cap_relayed_query`).
     fn query(&mut self, q: ModelQuery) -> Reply {
         if let Some(accounts) = &q.accounts {
             for a in accounts {
