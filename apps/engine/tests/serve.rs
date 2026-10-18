@@ -2271,3 +2271,110 @@ fn accounts_secrets_and_the_server_are_edited_on_the_socket() {
     assert!(!server.exists());
     e.shutdown();
 }
+
+/// The `tern` binary built beside this one (`cargo build -p tern`), if it was.
+fn tern_binary() -> Option<PathBuf> {
+    let bin = Path::new(env!("CARGO_BIN_EXE_mailsync")).with_file_name("tern");
+    if bin.is_file() {
+        return Some(bin);
+    }
+    assert!(
+        std::env::var_os("REQUIRE_TERN").is_none(),
+        "no tern binary at {}",
+        bin.display()
+    );
+    eprintln!(
+        "skipped: no tern binary at {}; cargo build -p tern",
+        bin.display()
+    );
+    None
+}
+
+/// `tern account add`, IMAP and OAuth, against a detached engine and the mock provider. The
+/// accounts' servers refuse connections, so the engine's test fails: the sign-in itself is
+/// what is checked.
+#[test]
+fn the_cli_adds_accounts() {
+    let Some(tern) = tern_binary() else { return };
+    let (root, seen) = oauth_provider();
+    let e = Detached::start(&[
+        ("MAILSYNC_GOOGLE_TOKEN_URL", format!("{root}/token")),
+        ("MAILSYNC_GOOGLE_USERINFO_URL", format!("{root}/userinfo")),
+        ("TERN_TEST_DISCOVERY", discovered_settings().to_string()),
+        no_retry(),
+    ]);
+    let tern_cmd = || {
+        let mut c = Command::new(&tern);
+        c.arg("--config-dir")
+            .arg(e.dir.path())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        c
+    };
+
+    let mut imap = tern_cmd()
+        .args(["account", "add", "new@tern.test", "--password-stdin"])
+        .spawn()
+        .unwrap();
+    imap.stdin.take().unwrap().write_all(b"pw\n").unwrap();
+    let out = imap.wait_with_output().unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("Account test failed"), "{stderr}");
+    let bad = tern_cmd()
+        .args(["account", "add", "new@tern.test", "--imap-security", "none"])
+        .output()
+        .unwrap();
+    assert_eq!(bad.status.code(), Some(2), "TD4: no cleartext");
+
+    let mut oauth = tern_cmd()
+        .args([
+            "account",
+            "add",
+            "ben@tern.test",
+            "--provider",
+            "gmail",
+            "--no-browser",
+            "--port",
+            "0",
+        ])
+        .spawn()
+        .unwrap();
+    let mut err = BufReader::new(oauth.stderr.take().unwrap());
+    let url = loop {
+        let mut line = String::new();
+        assert!(err.read_line(&mut line).unwrap() > 0, "no sign-in address");
+        if line.starts_with("http") {
+            break line.trim().to_owned();
+        }
+    };
+    let param = |name: &str| {
+        url.split(['?', '&'])
+            .find_map(|p| p.strip_prefix(&format!("{name}=")))
+            .unwrap()
+            .to_owned()
+    };
+    let (state, redirect) = (param("state"), param("redirect_uri"));
+    let port: u16 = redirect.rsplit("%3A").next().unwrap().parse().unwrap();
+    let mut browser = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+    write!(
+        browser,
+        "GET /?code=cli-code&state={state} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+    )
+    .unwrap();
+    let mut page = String::new();
+    browser.read_to_string(&mut page).unwrap();
+    assert!(page.starts_with("HTTP/1.1 200"), "{page}");
+    let status = oauth.wait().unwrap();
+    let mut rest = String::new();
+    err.read_to_string(&mut rest).unwrap();
+    assert_eq!(status.code(), Some(1), "{rest}");
+    assert!(rest.contains("Account test failed"), "{rest}");
+    assert!(seen
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|r| r.contains("code=cli-code")));
+    e.shutdown();
+}
