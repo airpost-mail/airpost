@@ -399,6 +399,7 @@ impl Hub {
             method::SETTINGS_CHANGED,
             serde_json::to_value(SettingsValues {
                 values: values.clone(),
+                store_id: None,
             })
             .unwrap_or(Value::Null),
         );
@@ -892,7 +893,8 @@ fn settings_call(
     let result = if req.method == method::SETTINGS_GET {
         req.params_as::<SettingsGetParams>().and_then(|p| {
             to_value(serde_json::to_value(SettingsValues {
-                values: guard.get(p.keys.as_deref()),
+                values: guard.get(p.keys.as_deref())?,
+                store_id: guard.store_id(),
             }))
         })
     } else {
@@ -1147,13 +1149,7 @@ impl Connection {
         let Some(relay) = &self.relay else {
             return false;
         };
-        if !policy::relayed_method_allowed(&req.method, &relay.scopes) {
-            return true;
-        }
-        req.method == method::TASK_QUEUE
-            && req
-                .params_as::<TaskQueueParams>()
-                .is_ok_and(|p| !policy::relayed_task_allowed(&p.task, &relay.scopes))
+        !policy::relayed_request_allowed(&req.method, &req.params, &relay.scopes)
     }
 
     fn subscribe(&self, req: &RpcRequest) -> Result<(), ErrorObject> {

@@ -1001,10 +1001,9 @@ fn settings_round_trip_and_notify_the_other_connections() {
         c.call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
             .unwrap();
     }
-    assert_eq!(
-        writer.call(method::SETTINGS_GET, json!({})).unwrap(),
-        json!({ "values": {} })
-    );
+    let empty = writer.call(method::SETTINGS_GET, json!({})).unwrap();
+    assert_eq!(empty["values"], json!({}));
+    let store_id = empty["storeId"].as_str().unwrap().to_owned();
 
     let values =
         json!({ "core.sending.undoSend": 15000, "signatures": { "s1": { "body": "<b>hi</b>" } } });
@@ -1022,10 +1021,15 @@ fn settings_round_trip_and_notify_the_other_connections() {
             json!({ "keys": ["core.sending.undoSend", "core.composing.html"] }),
         )
         .unwrap();
-    assert_eq!(got, json!({ "values": { "core.sending.undoSend": 15000 } }));
-    let file: Value =
+    assert_eq!(
+        got,
+        json!({ "values": { "core.sending.undoSend": 15000 }, "storeId": store_id })
+    );
+    let mut file: Value =
         serde_json::from_slice(&std::fs::read(e.dir.path().join("settings.json")).unwrap())
             .unwrap();
+    assert_eq!(file["$storeId"], json!(store_id));
+    file.as_object_mut().unwrap().remove("$storeId");
     assert_eq!(file, values);
 
     // The parent's change reaches every subscriber, the writer included; a cleared key is
@@ -1073,5 +1077,35 @@ fn settings_round_trip_and_notify_the_other_connections() {
         )
         .unwrap_err();
     assert_eq!(bad.code(), Some(code::INVALID_PARAMS));
+    e.stop();
+}
+
+/// A relayed device without the admin scope may change the plain settings but not the ones
+/// the desktop renders as HTML (signatures) or that act on mail (ms-ipc's policy).
+#[test]
+fn relayed_settings_writes_are_limited() {
+    let e = Serve::start();
+    let mut relayed = Client::connect(&e.socket).unwrap();
+    relayed.set_read_timeout(Some(WAIT)).unwrap();
+    relayed
+        .call(
+            method::HELLO,
+            json!({ "protocol": 1, "client": "tern-gateway/test", "relayed": true,
+                    "scopes": [], "device": { "id": "d1", "name": "Test browser" } }),
+        )
+        .unwrap();
+    let html = json!({ "signatures": { "s1": { "body": "<img src=x onerror=alert(1)>" } } });
+    let refused = relayed
+        .call(method::SETTINGS_SET, json!({ "values": html }))
+        .unwrap_err();
+    assert_eq!(refused.code(), Some(code::FORBIDDEN_RELAYED));
+    relayed
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { "core.sending.undoSend": 0 } }),
+        )
+        .unwrap();
+    let got = e.hello().call(method::SETTINGS_GET, json!({})).unwrap();
+    assert_eq!(got["values"], json!({ "core.sending.undoSend": 0 }));
     e.stop();
 }
