@@ -112,11 +112,11 @@ export function MessageItem({
           <Button
             variant="outline"
             size="xs"
-            disabled={unsubscribe.busy}
+            disabled={unsubscribe.busy || unsubscribe.done}
             onClick={() => void unsubscribe.run()}
             className="shrink-0 text-muted-foreground"
           >
-            Unsubscribe
+            {unsubscribe.done ? 'Unsubscribed' : 'Unsubscribe'}
           </Button>
         )}
         <time

@@ -224,5 +224,10 @@ describe('ThreadReaderView', () => {
       ok: true,
       url: 'https://lists.example/u/9',
     });
+    // Done: no second POST or second mailto message from another click.
+    const done = await screen.findByRole('button', { name: 'Unsubscribed' });
+    expect(done).toBeDisabled();
+    await user.click(done);
+    expect(call.mock.calls.filter((c) => c[0] === 'messages.unsubscribe')).toHaveLength(1);
   });
 });

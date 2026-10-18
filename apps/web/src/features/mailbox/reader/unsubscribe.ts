@@ -34,8 +34,11 @@ const host = (url: string) => {
   }
 };
 
-/** Tells the user what happened. A web link opens only from the toast's button, a click. */
-export function reportUnsubscribe(r: MessagesUnsubscribeResult) {
+/**
+ * Tells the user what happened. A web link opens only from the toast's button, a click.
+ * Returns whether the engine unsubscribed (one-click done, or the mailto message queued).
+ */
+export function reportUnsubscribe(r: MessagesUnsubscribeResult): boolean {
   const url = r.url ?? '';
   if (!r.ok) {
     toast.error(`Couldn't unsubscribe: ${r.error ?? 'the list refused'}`, {
@@ -45,7 +48,7 @@ export function reportUnsubscribe(r: MessagesUnsubscribeResult) {
           ? { label: 'Open link', onClick: () => openLink(url) }
           : undefined,
     });
-    return;
+    return false;
   }
   switch (r.method) {
     case 'one-click':
@@ -59,24 +62,33 @@ export function reportUnsubscribe(r: MessagesUnsubscribeResult) {
         action: { label: 'Open', onClick: () => openLink(url) },
         duration: 15_000,
       });
-      break;
+      return false;
   }
+  return true;
 }
+
+// Messages unsubscribed from in this tab. A second mailto unsubscribe would send another
+// email, so the button stays off for them, also after the reader remounts.
+const unsubscribed = new Set<string>();
 
 export function useUnsubscribe(m: MessageJSON) {
   const engine = useEngine();
   const features = useEngineFeatures();
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(() => unsubscribed.has(m.id));
   const available =
     !m.draft && !!features?.has(EngineFeature.Unsubscribe) && hasUnsubscribeHeader(m);
 
   const run = async () => {
+    if (busy || done) return;
     setBusy(true);
     try {
       await ensureConnected(engine);
-      reportUnsubscribe(
-        await engine.call('messages.unsubscribe', { accountId: m.aid, messageId: m.id }),
-      );
+      const r = await engine.call('messages.unsubscribe', { accountId: m.aid, messageId: m.id });
+      if (reportUnsubscribe(r)) {
+        unsubscribed.add(m.id);
+        setDone(true);
+      }
     } catch (err) {
       toast.error(
         err instanceof RpcError && err.code === RpcErrorCode.NotFound
@@ -89,5 +101,5 @@ export function useUnsubscribe(m: MessageJSON) {
       setBusy(false);
     }
   };
-  return { available, busy, run };
+  return { available, busy, done, run };
 }
