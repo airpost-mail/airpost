@@ -80,7 +80,10 @@ hostname = "0.4"
 # Secrets: AES-256-GCM for the file store, the macOS Keychain, the Linux Secret Service.
 ring = "0.17"
 security-framework = "3"
-secret-service = { version = "5", default-features = false, features = ["rt-async-io-crypto-rust"] }
+# libdbus rather than zbus (no async runtime; secret-service 5 is on zbus 5, whose zvariant
+# crates are unmaintained). `vendored` links libdbus statically (AFL-2.1 or GPL-2.0-or-later,
+# NOTICE.md), so the engine runs where libdbus isn't installed and builds need no dbus headers.
+dbus-secret-service = { version = "4.1", features = ["crypto-rust", "vendored"] }
 
 # Logging, errors, serialization
 tracing = "0.1"

@@ -32,6 +32,11 @@ Third-party components that ship inside Tern's binaries are listed with their li
 View License in the application menu (`static/all_licenses.html`). The sections below cover code
 that was translated or copied into Tern's own source files.
 
+On Linux the engine links libdbus (https://gitlab.freedesktop.org/dbus/dbus) statically, from
+the copy vendored in the `libdbus-sys` crate, to reach the Secret Service. libdbus is offered
+under the Academic Free License 2.1 or the GNU General Public License, version 2 or any later
+version; Tern uses it under the GPL. Its source is in the `libdbus-sys` crate (`vendor/dbus`).
+
 ## mailcore2
 
 `crates/ms-imap`, `crates/ms-smtp`, `crates/ms-mime`, `crates/ms-core` and `crates/ms-providers`

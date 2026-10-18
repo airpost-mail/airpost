@@ -8,8 +8,7 @@
 
 use std::collections::HashMap;
 
-use secret_service::blocking::SecretService;
-use secret_service::EncryptionType;
+use dbus_secret_service::{EncryptionType, SecretService};
 
 use crate::{Backend, Error, Result, StoreKind};
 
@@ -35,7 +34,7 @@ impl SecretServiceBackend {
         ])
     }
 
-    fn connect<'a>() -> Result<SecretService<'a>> {
+    fn connect() -> Result<SecretService> {
         SecretService::connect(EncryptionType::Dh)
             .map_err(|e| Error::Unavailable(format!("Secret Service: {e}")))
     }
@@ -61,7 +60,7 @@ impl Backend for SecretServiceBackend {
 
     fn load(&self) -> Result<Option<Vec<u8>>> {
         let unreadable =
-            |e: secret_service::Error| Error::Unreadable(format!("Secret Service: {e}"));
+            |e: dbus_secret_service::Error| Error::Unreadable(format!("Secret Service: {e}"));
         let ss = Self::connect()?;
         let found = ss.search_items(self.attributes()).map_err(unreadable)?;
         if let Some(item) = found.unlocked.first() {
@@ -75,7 +74,7 @@ impl Backend for SecretServiceBackend {
     }
 
     fn save(&self, blob: &[u8]) -> Result<()> {
-        let failed = |e: secret_service::Error| Error::Backend(format!("Secret Service: {e}"));
+        let failed = |e: dbus_secret_service::Error| Error::Backend(format!("Secret Service: {e}"));
         let ss = Self::connect()?;
         let collection = ss.get_default_collection().map_err(failed)?;
         if collection.is_locked().map_err(failed)? {

@@ -20,7 +20,7 @@ libc.workspace = true
 security-framework.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-secret-service.workspace = true
+dbus-secret-service.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
