@@ -226,7 +226,11 @@ fn triage_asks_for_json_in_every_format() {
         let answer = r#"{"category": "needs-reply", "needsReply": true, "reason": "Ann asks if you can come."}"#;
         let server =
             MockServer::start(move |_| stream_reply(kind, &[&answer[..20], &answer[20..]]));
-        let triage = ai().triage(&config(kind, &server), &thread()).unwrap();
+        let answer = ai()
+            .triage_until(&config(kind, &server), &thread(), None)
+            .unwrap();
+        assert!(!answer.model.is_empty());
+        let triage = answer.triage;
         assert_eq!(triage.category, Category::NeedsReply, "{kind:?}");
         assert!(triage.needs_reply);
         assert_eq!(triage.reason.as_deref(), Some("Ann asks if you can come."));

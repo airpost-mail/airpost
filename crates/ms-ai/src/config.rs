@@ -178,6 +178,13 @@ impl ProviderConfig {
             })
     }
 
+    /// Whether a model call can go out with these settings: the URL, the key the kind needs
+    /// and the model, as every call but `models` checks them. The engine checks a stored
+    /// config before queueing work in the background.
+    pub fn check(&self) -> Result<()> {
+        self.target(true).map(|_| ())
+    }
+
     /// Checks the settings a call needs. Anthropic always needs a key, OpenAI's own API
     /// does (a compatible server may not), Ollama doesn't. Plain http is only for a server
     /// on this computer or network: mail and keys go nowhere else in clear text.
@@ -330,6 +337,22 @@ mod tests {
                 .key(),
             "bad-request"
         );
+    }
+
+    #[test]
+    fn check_needs_a_key_only_where_the_kind_does() {
+        assert!(config(ProviderKind::Ollama, None).check().is_ok());
+        let keyless = config(ProviderKind::Anthropic, None).check().unwrap_err();
+        assert_eq!(keyless.key(), "not-configured");
+        assert!(config(ProviderKind::OpenAi, None).check().is_err());
+        assert!(
+            config(ProviderKind::OpenAi, Some("http://127.0.0.1:1234/v1"))
+                .check()
+                .is_ok()
+        );
+        let mut no_model = config(ProviderKind::Ollama, None);
+        no_model.model = " ".into();
+        assert!(no_model.check().is_err());
     }
 
     #[test]

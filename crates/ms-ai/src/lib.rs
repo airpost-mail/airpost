@@ -260,6 +260,14 @@ impl fmt::Debug for DraftOpts {
     }
 }
 
+/// [`Ai::triage_until`]'s result.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TriageAnswer {
+    pub triage: Triage,
+    /// The model that answered, as the provider named it.
+    pub model: String,
+}
+
 /// The provider clients and caches. One per engine process; `Send + Sync`, so connection
 /// threads share it.
 pub struct Ai {
@@ -460,6 +468,17 @@ impl Ai {
     /// [`Triage::fallback`], not an error; a failed request is retried once after
     /// `offline` or `provider-error`.
     pub fn triage(&self, config: &ProviderConfig, context: &MailContext) -> Result<Triage> {
+        Ok(self.triage_until(config, context, None)?.triage)
+    }
+
+    /// [`Ai::triage`] with the model that answered, stopped with `cancelled` once `cancel`
+    /// is cancelled.
+    pub fn triage_until(
+        &self,
+        config: &ProviderConfig,
+        context: &MailContext,
+        cancel: Option<&CancelToken>,
+    ) -> Result<TriageAnswer> {
         let target = config.target(true)?;
         let g = self.generate(
             config,
@@ -468,10 +487,13 @@ impl Ai {
             context,
             prompt::triage(),
             Some(prompt::triage_schema()),
-            &mut Discard,
+            &mut cancel::Until(cancel),
             true,
         )?;
-        Ok(Triage::from_answer(&g.text))
+        Ok(TriageAnswer {
+            triage: Triage::from_answer(&g.text),
+            model: g.model,
+        })
     }
 
     fn timeouts(&self) -> Timeouts {

@@ -797,6 +797,22 @@ fn cancelled_token_sends_nothing() {
 }
 
 #[test]
+fn cancelled_triage_sends_nothing() {
+    let server = MockServer::start(|_| stream_reply(ProviderKind::Ollama, &["{}"]));
+    let token = CancelToken::new();
+    token.cancel();
+    let e = ai()
+        .triage_until(
+            &config(ProviderKind::Ollama, &server),
+            &thread(),
+            Some(&token),
+        )
+        .unwrap_err();
+    assert_eq!(e, AiError::Cancelled);
+    assert_eq!(server.count(), 0);
+}
+
+#[test]
 fn token_cancels_suggestions() {
     let reply = slow_stream(ProviderKind::Ollama).first_chunk_after(Duration::from_secs(2));
     let server = MockServer::start(move |_| reply.clone());
