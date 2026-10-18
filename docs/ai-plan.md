@@ -473,3 +473,10 @@ stored earlier. `tern ai summarize` strips control characters from model text. "
 drops threads the user answered (store filter and chip); the chip has no right-click menu
 (the thread list's own opened as well), and the view's threads can be moved, archived and
 trashed again.
+
+2026-10-18, AI4 gated and merged: fmt, clippy, workspace tests, `cargo deny`, release build
+of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (147 passed, 4
+skipped, `test_ai.py`'s 3 among them); desktop lint and typecheck clean, the ai package's specs
+and those of the modules it touches (settings mirror, package manager, account sidebar,
+capability packages; 114) pass. No web changes. Open as after AI4: the engine reading
+`integration:ai-<id>` from the secret store, the usage chart, a UI for `core.ai.limits`, AI5.
