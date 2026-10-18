@@ -47,6 +47,19 @@ describe('attachment-safety', () => {
       expect(executableExtension('run.command', 'win32')).toBe(null);
       expect(executableExtension('', 'win32')).toBe(null);
     });
+
+    it('covers types that run without an executable extension', () => {
+      for (const ext of ['py', 'pyw', 'rdp', 'library-ms', 'search-ms', 'theme', 'msu', 'wsb']) {
+        expect(executableExtension(`a.${ext}`, 'win32')).toBe(ext);
+      }
+      for (const ext of ['smi', 'dmgpart', 'toast', 'osas']) {
+        expect(executableExtension(`a.${ext}`, 'darwin')).toBe(ext);
+      }
+      // Wine runs these on double-click.
+      for (const ext of ['exe', 'msi', 'lnk']) {
+        expect(executableExtension(`a.${ext}`, 'linux')).toBe(ext);
+      }
+    });
   });
 
   describe('markFileFromInternet on darwin', () => {
@@ -56,9 +69,9 @@ describe('attachment-safety', () => {
         calls.push([cmd, args]);
         cb(args[0] === '-p' ? new Error('No such xattr: com.apple.quarantine') : null);
       });
-      expect(await markFileFromInternet('/tmp/x/a.command', 'darwin')).toBe(true);
-      expect(calls.length).toBe(2);
-      const [cmd, args] = calls[1];
+      expect(await markFileFromInternet('/tmp/x/a.command', { platform: 'darwin' })).toBe(true);
+      expect(calls.length).toBe(1);
+      const [cmd, args] = calls[0];
       expect(cmd).toBe('/usr/bin/xattr');
       expect(args[0]).toBe('-w');
       expect(args[1]).toBe('com.apple.quarantine');
@@ -66,20 +79,26 @@ describe('attachment-safety', () => {
       expect(args[3]).toBe('/tmp/x/a.command');
     });
 
-    it('keeps an existing quarantine attribute', async () => {
+    it('keeps an existing quarantine attribute only when asked', async () => {
       const calls = [];
       spyOn(childProcess, 'execFile').andCallFake((cmd, args, cb) => {
         calls.push(args[0]);
         cb(null);
       });
-      expect(await markFileFromInternet('/tmp/x/a.command', 'darwin')).toBe(true);
+      const platform = 'darwin';
+      expect(await markFileFromInternet('/tmp/x/a.command', { platform, keepExisting: true })).toBe(
+        true
+      );
       expect(calls).toEqual(['-p']);
+      calls.length = 0;
+      expect(await markFileFromInternet('/tmp/x/a.command', { platform })).toBe(true);
+      expect(calls).toEqual(['-w']);
     });
 
     it('logs and resolves false when xattr fails', async () => {
       spyOn(childProcess, 'execFile').andCallFake((cmd, args, cb) => cb(new Error('EPERM')));
       spyOn(console, 'warn');
-      expect(await markFileFromInternet('/tmp/x/a.command', 'darwin')).toBe(false);
+      expect(await markFileFromInternet('/tmp/x/a.command', { platform: 'darwin' })).toBe(false);
       expect(console.warn).toHaveBeenCalled();
     });
 
@@ -99,13 +118,39 @@ describe('attachment-safety', () => {
           fs.rmSync(dir, { recursive: true, force: true });
         }
       });
+
+      it('replaces an approved attribute left by a file saved over', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-quarantine-'));
+        const source = path.join(dir, 'source.command');
+        const dest = path.join(dir, 'run.command');
+        fs.writeFileSync(source, '#!/bin/sh\necho new\n');
+        fs.writeFileSync(dest, '#!/bin/sh\necho old\n');
+        childProcess.execFileSync('/usr/bin/xattr', [
+          '-w',
+          'com.apple.quarantine',
+          '00c1;65000000;Tern;X',
+          dest,
+        ]);
+        try {
+          await AttachmentStore._writeToExternalPath(source, dest);
+          const value = childProcess
+            .execFileSync('/usr/bin/xattr', ['-p', 'com.apple.quarantine', dest])
+            .toString()
+            .trim();
+          expect(QUARANTINE.test(value)).toBe(true);
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      });
     }
   });
 
   describe('markFileFromInternet on win32', () => {
     it('writes a Zone.Identifier stream with ZoneId=3', async () => {
       const write = spyOn(fs.promises, 'writeFile').andReturn(Promise.resolve());
-      expect(await markFileFromInternet('C:\\Users\\a\\Downloads\\a.exe', 'win32')).toBe(true);
+      expect(
+        await markFileFromInternet('C:\\Users\\a\\Downloads\\a.exe', { platform: 'win32' })
+      ).toBe(true);
       expect(write).toHaveBeenCalledWith(
         'C:\\Users\\a\\Downloads\\a.exe:Zone.Identifier',
         ZONE_IDENTIFIER
@@ -116,7 +161,7 @@ describe('attachment-safety', () => {
     it('logs and resolves false on a volume without streams', async () => {
       spyOn(fs.promises, 'writeFile').andReturn(Promise.reject(new Error('ENOENT')));
       spyOn(console, 'warn');
-      expect(await markFileFromInternet('E:\\a.exe', 'win32')).toBe(false);
+      expect(await markFileFromInternet('E:\\a.exe', { platform: 'win32' })).toBe(false);
       expect(console.warn).toHaveBeenCalled();
     });
   });
@@ -150,6 +195,44 @@ describe('attachment-safety', () => {
 
       invoke.andReturn(Promise.resolve(true));
       expect(await confirmOpeningFile('/files/run.command', 'darwin')).toBe(true);
+    });
+
+    it('shows a name with bidi overrides as it really is', async () => {
+      await confirmOpeningFile('/files/invoice\u202Efdp.exe', 'win32');
+      const [, message, detail] = invoke.calls[0].args;
+      expect(message).toBe('Open invoicefdp.exe?');
+      expect(detail).toContain('hidden characters');
+    });
+
+    describe('on linux', () => {
+      let dir: string;
+      beforeEach(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-sniff-'));
+      });
+      afterEach(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+      });
+
+      it('asks for programs whose name gives no hint', async () => {
+        for (const [name, head] of [
+          ['invoice', 'MZ\x90\x00'],
+          ['invoice.dat', '\x7fELF'],
+          ['notes', '#!/bin/sh\n'],
+        ]) {
+          const file = path.join(dir, name);
+          fs.writeFileSync(file, Buffer.from(head, 'latin1'));
+          expect(await confirmOpeningFile(file, 'linux')).toBe(false);
+        }
+        expect(invoke.calls.length).toBe(3);
+      });
+
+      it('opens other files without asking', async () => {
+        const file = path.join(dir, 'notes');
+        fs.writeFileSync(file, 'hello');
+        expect(await confirmOpeningFile(file, 'linux')).toBe(true);
+        expect(await confirmOpeningFile(path.join(dir, 'missing'), 'linux')).toBe(true);
+        expect(invoke).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -199,6 +282,7 @@ describe('attachment-safety', () => {
         await AttachmentStore._writeToExternalPath(source, dest);
         expect(fs.readFileSync(dest, 'utf8')).toBe('#!/bin/sh\n');
         expect(mark).toHaveBeenCalledWith(dest);
+        expect(mark.calls[0].args.length).toBe(1);
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
       }

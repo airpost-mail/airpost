@@ -177,7 +177,7 @@ class AttachmentStore extends MailspringStore {
     return this._prepareAndResolveFilePath(file)
       .then(async (filePath) => {
         // The engine writes files/ itself, so the plist's LSFileQuarantineEnabled doesn't cover it.
-        await markFileFromInternet(filePath);
+        await markFileFromInternet(filePath, { keepExisting: true });
         if (await confirmOpeningFile(filePath)) {
           await shell.openPath(filePath);
         }

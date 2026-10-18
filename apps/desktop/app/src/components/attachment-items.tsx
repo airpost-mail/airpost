@@ -143,7 +143,7 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
     if (fs.existsSync(filePath)) {
       // Tags the source. The drop target is a fresh download written by the main process, so on
       // macOS LSFileQuarantineEnabled should cover it; untested, see TD1 in docs/tech-debt.md.
-      markFileFromInternet(filePath);
+      markFileFromInternet(filePath, { keepExisting: true });
       // Note: From trial and error, it appears that the second param /MUST/ be the
       // same as the last component of the filePath URL, or the download fails.
       const downloadURL = `${contentType}:${path.basename(filePath)}:file://${filePath}`;
