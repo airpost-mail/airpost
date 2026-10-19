@@ -4,7 +4,8 @@
 //! Calendar and contact tools on the engine's `events.*` and `contacts.*`
 //! (docs/desktop-client-plan.md 3.8). The engine builds the ICS and vCards and queues the
 //! tasks that write them. Anything that mails somebody (an answer to an invitation, an event
-//! with guests, whom the server invites) needs the send level.
+//! with guests, whom the server invites, and any change to a meeting the account organizes,
+//! which the server mails to its guests) needs the send level.
 
 use serde_json::{json, Map, Value};
 
@@ -59,7 +60,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "update_event",
-            description: "Change or delete a calendar event. For a repeating event, scope says which occurrences: 'this' (one, named by occurrenceStart), 'following' (that one and the ones after) or 'all'. Only the fields given change; attendees replaces the guest list (needs read-write-send, as the server mails them).",
+            description: "Change or delete a calendar event. For a repeating event, scope says which occurrences: 'this' (one, named by occurrenceStart), 'following' (that one and the ones after) or 'all'. Only the fields given change; attendees replaces the guest list. Changing or deleting a meeting the account organizes that has guests, or giving attendees, needs read-write-send, as the server mails the guests.",
             schema: schema(
                 json!({
                     "eventId": {"type": "string"},
@@ -388,13 +389,31 @@ pub(super) fn update_event(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     if let Some(t) = time_arg(args, "occurrenceStart")? {
         params["occurrenceStart"] = json!(t);
     }
+    let what = format!("Event '{event_id}'");
+    if ctx.policy.check_access(Category::Send).is_err() {
+        // The server mails the guests any change to a meeting the account organizes; the
+        // engine says whether this is one, writing nothing.
+        let mut dry = params.clone();
+        dry["queue"] = json!(false);
+        let (_, r) = on_holder(
+            ctx,
+            args,
+            ms_ipc::feature::CALENDAR_EDITING,
+            ms_ipc::method::EVENTS_UPDATE,
+            dry,
+            &what,
+        )?;
+        if r["notifiesGuests"] == json!(true) {
+            need_send(ctx)?;
+        }
+    }
     let (aid, r) = on_holder(
         ctx,
         args,
         ms_ipc::feature::CALENDAR_EDITING,
         ms_ipc::method::EVENTS_UPDATE,
         params,
-        &format!("Event '{event_id}'"),
+        &what,
     )?;
     let writes: Vec<Value> = r["writes"]
         .as_array()

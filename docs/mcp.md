@@ -122,7 +122,7 @@ The plugin's tools keep their names, arguments and output shapes:
 | --- | --- |
 | read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `get_attachment`, `list_events`, `get_contact` |
 | read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
-| read-write-send | `send_draft`, `schedule_send`, `unsubscribe`, `respond_to_event`; `create_event` and `update_event` with `attendees` |
+| read-write-send | `send_draft`, `schedule_send`, `unsubscribe`, `respond_to_event`; `create_event` and `update_event` with `attendees`; `update_event` on a meeting the account organizes that has guests |
 
 Attachments are also served as the resource template `attachment://{messageId}/{fileId}`,
 read from `<config-dir>/files/` (fetching the body first when the file isn't there yet).
@@ -168,7 +168,10 @@ Changes from the plugin:
   (`contact-editing`). The engine builds the ICS or vCard and queues the tasks the desktop
   would. Times read as `sendAt` does, in the machine's zone, which is passed as `tz`.
   `respond_to_event` mails the organizer, and guests on an event are mailed by the calendar
-  server, so those need `read-write-send`.
+  server, so those need `read-write-send`. So does any change or deletion of a meeting the
+  account organizes that has guests, which the server mails to them: at `read-write`,
+  `update_event` first asks `events.update` with `queue: false`, which writes nothing and
+  answers `notifiesGuests`.
 
 `list_tracked_messages`, `get_top_links` and `list_scheduled_sends` read through
 `metadata.list` and fail with "needs a newer Tern engine" on an engine without it. With

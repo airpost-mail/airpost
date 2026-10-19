@@ -1202,6 +1202,39 @@ fn calendar_and_contact_tools() {
     );
     assert!(run(&mut f, &rw(), "update_event", json!({"eventId": "ev1"})).is_error);
 
+    // A meeting the account organizes mails its guests any change: read-write asks the engine
+    // without writing and is refused; read-write-send writes at once.
+    for args in [
+        json!({"eventId": "meeting", "start": "2026-03-02T10:00:00Z"}),
+        json!({"eventId": "meeting", "description": "agenda"}),
+        json!({"eventId": "meeting", "delete": true, "scope": "this",
+               "occurrenceStart": "2026-03-02T09:00:00Z"}),
+    ] {
+        let before = f.actions.len();
+        let o = run(&mut f, &rw(), "update_event", args.clone());
+        assert!(o.is_error && o.denied, "{}", o.first_text());
+        let asked: Vec<&Value> = f.actions[before..].iter().map(|(_, p)| p).collect();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0]["queue"], false);
+        let before = f.actions.len();
+        assert!(!run(&mut f, &send, "update_event", args).is_error);
+        assert_eq!(f.actions.len(), before + 1);
+        assert!(f.actions.last().unwrap().1.get("queue").is_none());
+    }
+    // One that mails nobody is written after the check.
+    let before = f.actions.len();
+    assert!(
+        !run(
+            &mut f,
+            &rw(),
+            "update_event",
+            json!({"eventId": "ev1", "title": "x"})
+        )
+        .is_error
+    );
+    assert_eq!(f.actions.len(), before + 2);
+    assert!(f.actions.last().unwrap().1.get("queue").is_none());
+
     // An answer mails the organizer.
     let o = run(
         &mut f,

@@ -363,10 +363,13 @@ impl Backend for Fake {
                 if str_of(&params, "eventId") == "missing" {
                     return Err(not_found("event"));
                 }
-                Ok(
-                    json!({"writes": [{"kind": if method == "events.create" { "create" } else { "update" },
-                    "eventId": "ev-new", "taskId": "task-ev"}], "icsuid": "u@tern"}),
-                )
+                let mut out = json!({"writes": [{"kind": if method == "events.create" { "create" } else { "update" },
+                    "eventId": "ev-new", "taskId": "task-ev"}], "icsuid": "u@tern"});
+                // A meeting the account organizes, with guests.
+                if str_of(&params, "eventId") == "meeting" {
+                    out["notifiesGuests"] = json!(true);
+                }
+                Ok(out)
             }
             "events.rsvp" => {
                 self.actions.push((method.to_owned(), params));
