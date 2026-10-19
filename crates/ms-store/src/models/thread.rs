@@ -38,6 +38,7 @@ pub struct Thread {
     initial_lmst: i64,
     initial_lmrt: i64,
     initial_category_ids: BTreeMap<String, bool>,
+    initial_search_categories: String,
 }
 
 impl PartialEq for Thread {
@@ -84,6 +85,7 @@ impl Thread {
             initial_lmst: 0,
             initial_lmrt: 0,
             initial_category_ids: BTreeMap::new(),
+            initial_search_categories: String::new(),
         };
         t.capture_initial_state();
         t
@@ -93,6 +95,7 @@ impl Thread {
         self.initial_lmst = self.last_message_sent_timestamp();
         self.initial_lmrt = self.last_message_received_timestamp();
         self.initial_category_ids = self.category_ids();
+        self.initial_search_categories = self.categories_search_string();
     }
 
     /// What a save does to a pending reminder, from `send-reminders-store.ts`
@@ -613,14 +616,17 @@ impl Thread {
                 }
             }
             crate::counts::emit_rows(store, changed)?;
+        }
 
-            if self.search_row_id() != 0 {
-                conn.prepare_cached("UPDATE ThreadSearch SET categories = ? WHERE rowid = ?")?
-                    .execute(rusqlite::params![
-                        self.categories_search_string(),
-                        self.search_row_id()
-                    ])?;
-            }
+        // A renamed folder or label keeps its id, so its path (or role) can change under
+        // unchanged ids; `in:` search reads this column.
+        let search_categories = self.categories_search_string();
+        if (self.initial_category_ids != category_ids
+            || self.initial_search_categories != search_categories)
+            && self.search_row_id() != 0
+        {
+            conn.prepare_cached("UPDATE ThreadSearch SET categories = ? WHERE rowid = ?")?
+                .execute(rusqlite::params![search_categories, self.search_row_id()])?;
         }
         // Note: the C++ kept the load-time state, so a second save of the same object
         // re-applied the ThreadCounts diff. Saving twice is legitimate; count it once.

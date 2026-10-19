@@ -46,6 +46,9 @@ expect:
     - {query: "SELECT COUNT(*) FROM Folder WHERE path = 'Projects' AND id IN (SELECT json_extract(data, '$.created.id') FROM Task WHERE json_extract(data, '$.existingPath') = 'Projects')", equals: 0}
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Projects%'", equals: 0}
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Clients%'", equals: 9}
+    # in: search reads the paths ThreadSearch holds.
+    - {query: "SELECT COUNT(*) FROM ThreadSearch WHERE categories LIKE '%Projects%'", equals: 0}
+    - {query: "SELECT COUNT(*) FROM ThreadSearch WHERE categories LIKE '%Clients%'", equals: 9}
   log_absent: ["Clients[^ ]*, UIDs: .*Heavy: true", "\\[critical\\]"]
   deltas: {Message: {unpersist: 0}}
   stable: {passes: 1}

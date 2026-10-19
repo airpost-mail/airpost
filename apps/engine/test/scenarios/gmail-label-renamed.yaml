@@ -47,6 +47,9 @@ expect:
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Work\"%' OR data LIKE '%\"path\":\"Receipts\"%'", equals: 0}
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Clients\"%'", equals: 5}
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Bills\"%'", equals: 2}
+    - {query: "SELECT COUNT(*) FROM ThreadSearch WHERE categories LIKE '%Work %' OR categories LIKE '%Receipts %'", equals: 0}
+    - {query: "SELECT COUNT(*) FROM ThreadSearch WHERE categories LIKE '%Clients %'", equals: 5}
+    - {query: "SELECT COUNT(*) FROM ThreadSearch WHERE categories LIKE '%Bills %'", equals: 2}
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%localStatus%'", equals: 0}
   log_present: ["Receipts renamed to Bills \\(same UIDVALIDITY\\)"]
   log_absent: ["Label not found: (Clients|Bills)", "\\[critical\\]"]

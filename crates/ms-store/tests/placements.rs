@@ -1016,6 +1016,35 @@ fn saving_a_thread_twice_counts_once() {
 }
 
 #[test]
+fn renamed_entry_rewrites_search_categories() {
+    let f = fixture();
+    let projects = f.folder("Projects", "");
+    let a = f.insert("a@x", &projects, 1, attrs(1, true), None);
+    let search = |t: &Thread| -> String {
+        f.store
+            .conn()
+            .query_row(
+                "SELECT categories FROM ThreadSearch WHERE rowid = ?",
+                [t.search_row_id()],
+                |r| r.get(0),
+            )
+            .unwrap()
+    };
+    let mut t = f.thread(a.thread_id()).unwrap();
+    assert_eq!(search(&t), "Projects ");
+
+    // A rename keeps the id: only the entry's path changes.
+    let mut renamed = projects.clone();
+    renamed.set_path("Clients");
+    f.store.save(&mut renamed).unwrap();
+    assert!(t.refresh_category_entry(&renamed.to_json()));
+    f.store.save(&mut t).unwrap();
+    assert_eq!(search(&t), "Clients ");
+    assert_eq!(f.thread_counts(projects.id()), (1, 1));
+    f.assert_invariants();
+}
+
+#[test]
 fn invariants_catch_a_broken_snapshot() {
     let f = fixture();
     let inbox = f.folder("INBOX", "inbox");

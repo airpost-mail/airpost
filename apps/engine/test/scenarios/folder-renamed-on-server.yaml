@@ -38,6 +38,8 @@ expect:
     - {query: "SELECT COUNT(*) FROM Folder WHERE path LIKE 'Projects%'", equals: 0}
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Projects%'", equals: 0}
     - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Clients%'", equals: 9}
+    - {query: "SELECT COUNT(*) FROM ThreadSearch WHERE categories LIKE '%Projects%'", equals: 0}
+    - {query: "SELECT COUNT(*) FROM ThreadSearch WHERE categories LIKE '%Clients%'", equals: 9}
   log_present:
     - "Projects renamed to Clients \\(same UIDVALIDITY\\)"
     - "Projects/2026 renamed to Clients/2026 \\(same UIDVALIDITY\\)"
