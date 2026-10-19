@@ -91,9 +91,11 @@ pub fn track_body(
     let links = RefCell::new(links);
     let in_quote = Cell::new(false);
     let pixel_placed = Cell::new(!kinds.open);
+    // The pixel goes in as raw HTML, so its URL (from the server) is escaped here; lol_html's
+    // set_attribute does that for the link hrefs.
     let pixel = format!(
         r#"<img alt="" src="{}">"#,
-        pixel_url(target, tracking_id, rid)
+        escape_attribute(&pixel_url(target, tracking_id, rid))
     );
 
     let mut settings = RewriteStrSettings::new().with_strict(false);
@@ -306,6 +308,21 @@ fn encode_uri_component(s: &str) -> String {
 
 /// An attribute value as lol_html returns it (entities kept), decoded the way a browser's
 /// `getAttribute` would, by the HTML tokenizer.
+fn escape_attribute(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 fn decode_attribute(raw: &str) -> String {
     if !raw.contains('&') {
         return raw.to_owned();
@@ -397,6 +414,27 @@ mod tests {
                 r#"<p>Hi</p><div class="gmail_quote_attribution">On Monday</div>{pixel}<blockquote class="gmail_quote"><div class="gmail_quote">x</div></blockquote>"#
             )
         );
+    }
+
+    #[test]
+    fn a_hostile_public_url_stays_inside_the_pixel_src() {
+        let hostile = Target {
+            public_url: r#"https://t.example/a"><a/href="https://evil">Pay/now</a><img/src="x"#
+                .into(),
+            ns: "N".repeat(22),
+        };
+        let none = Kinds {
+            open: true,
+            links: false,
+        };
+        let out = track_body("<p>hi</p>", &hostile, "TID", "RID", none, &mut vec![]).unwrap();
+        assert_eq!(
+            out,
+            "<p>hi</p><img alt=\"\" src=\"https://t.example/a&quot;&gt;&lt;a/href=&quot;https://evil&quot;&gt;Pay/now&lt;/a&gt;&lt;img/src=&quot;x/t/o/NNNNNNNNNNNNNNNNNNNNNN/TID.RID.png\">"
+        );
+        let quoted = r#"<p>hi</p><div class="gmail_quote">q</div>"#;
+        let out = track_body(quoted, &hostile, "TID", "RID", none, &mut vec![]).unwrap();
+        assert!(!out.contains("<a/href"), "{out}");
     }
 
     #[test]
