@@ -10,7 +10,7 @@ were agreed with the user on 2026-10-18. Desktop paths are relative to `apps/des
 |---|---|
 | A1 | Provider calls run in the engine, never in Electron, the browser or the backend. A new crate `crates/ms-ai` holds the providers, prompts and output parsing, transport-free and store-free like `ms-integrations`; the engine adds `ai.*` socket methods and builds the model input from its own database. Desktop, CLI, web (through the gateway) and tern-mcp share one implementation. |
 | A2 | Three provider kinds: **OpenAI-compatible** (`/v1/chat/completions`; covers OpenAI, OpenRouter, Groq, Mistral, Gemini's compatible endpoint, LM Studio, llama.cpp, vLLM), **Anthropic** (`/v1/messages`), **Ollama** native (`/api/chat`, `/api/tags`). Ollama gets its own kind because its OpenAI endpoint ignores `num_ctx` and silently truncates long threads to the model's default window. |
-| A3 | Keys follow integrations I3 and T13: the engine reads a stored provider's key from its SecretStore as `integration:ai-<providerId>`, and requests carry no key. The desktop saves and forgets it with `secrets.set` / `secrets.delete` on an engine that lists `account-setup` and `ai-triage`; stage 11's `credentials.import` moved the keyset's `integration-ai-<providerId>-key`. With an older engine the desktop keeps it in `KeyManager` under that name and sends it per request. |
+| A3 | Keys follow integrations I3 and T13: the engine reads a stored provider's key from its SecretStore as `integration:ai-<providerId>`, and requests carry no key. The key belongs to the provider's server: a `settings.set` that removes the provider or changes its kind or base URL deletes `integration:ai-<id>` before it writes, and is refused if it can't. The desktop saves and forgets it with `secrets.set` / `secrets.delete` on an engine that lists `ai-keys`, and changes no key while the engine is down; stage 11's `credentials.import` moved the keyset's `integration-ai-<providerId>-key`. With an older engine (one before AI6 lists `account-setup` and `ai-triage` too) the desktop keeps it in `KeyManager` under that name and sends it per request. |
 | A4 | Non-secret AI config (providers, models, feature switches, account opt-in, limits) is engine-owned, in stage 3's `settings` store under `ai.*` keys. Until stage 3 lands it lives in the desktop's `config.json` (`core.ai.*`) and goes with each request, next to the key. |
 | A5 | Off by default. Each account is opted in separately, each feature is switched on separately, and the engine enforces both on every call, whichever client asks. Mail content goes only from the engine to the provider host the user configured; never through `apps/backend`. |
 | A6 | The model never acts. Output is text shown to the user or inserted into an editable draft, plus triage values from a fixed vocabulary. No tool use, no sending, no IMAP changes. Model output is rendered as plain text (no links, no images), so an injected prompt can't exfiltrate through a URL. |
@@ -94,8 +94,10 @@ settings), picked by `provider` id or, without one, the one the feature uses, wi
 the secret store (`integration:ai-<id>`). A local client may instead send `config`, the provider
 config; one without `apiKey` gets the stored key of the provider with that `id` only when it
 names the same kind and base URL, so the stored key never goes to another host (Preferences'
-Test and Load Models send the form this way). The desktop sends `provider` to an engine that
-lists `account-setup` and `ai-triage`, and `config` with the keyset's key to an older one.
+Test and Load Models send the form this way). Nor does rewriting `core.ai.providers`: a
+`settings.set` that removes a provider or points it at another kind or base URL deletes its key
+first (`ai_api::forget_unbound_keys`). The desktop sends `provider` to an engine that lists
+`ai-keys` (`feature::AI_KEYS`), and `config` with the keyset's key to an older one.
 The thread methods also take `settings` (`ms_ipc::AiSettings`): `{accounts: [accountId],
 features: {summary, reply, triage}, includeAddresses?}`, each feature `true` or `{enabled: true,
 …}`, from the desktop's `core.ai.*`; it wins over the stored switches. Without either, or with
@@ -516,7 +518,7 @@ keyed providers. A local client's `config` without a key gets the stored one onl
 provider id, kind and base URL. `capabilities.ai` is judged by the engine for all three features
 (`needs-engine-key` only while the secret is missing); `secrets.set` / `secrets.delete` of an
 `integration:ai-*` name and a `credentials.import` carrying one send `capabilities.changed`.
-Desktop: with an engine that lists `account-setup` and `ai-triage`, Preferences > AI saves,
+Desktop: with an engine that lists `ai-keys` (added in review, below), Preferences > AI saves,
 finds and forgets keys with `secrets.set`, `secrets.has` and `secrets.delete` (dropping a keyset
 copy), a server change or Remove deletes the engine's key (and keeps the provider if the engine
 can't), the thread calls and "Triage inbox" send `provider` instead of `config`, and Test and
@@ -529,6 +531,23 @@ stdin, a fake Anthropic provider: triage and a relayed summary send the stored k
 gets none, delete and set change the capabilities, and no message on either socket carries the
 key), engine unit tests for the key lookup and the capabilities, desktop specs for both paths
 (client, Preferences, triage, capabilities).
+
+AI6 review fixes: the engine lists `ai-keys`, and the desktop keeps keys in the engine only
+with it (an engine before AI6 lists `account-setup` and `ai-triage` too, so the earlier gate
+moved keys to engines that never read them). `settings.set` deletes the key of a provider it
+removes or re-points at another kind or base URL before writing, and refuses the write when the
+delete fails on a readable store. `secrets.delete` answers `{}` when the store can't be opened or
+read (`Registry::forget_secret`): nothing in it can be read to send, and Preferences could
+otherwise never remove or re-point the provider. The call that uses up a provider's daily cap
+sends `capabilities.changed`, and while one is capped an `aiCapReset` thread sends another once
+the local day ends. The desktop's `forgetKey` and `hasSavedKey` throw while the engine is down,
+so Preferences keeps the old server or the provider; with an older engine `forgetKey` also
+drops `integration:ai-<id>` where `secrets.*` exists. Tests:
+`a_provider_moved_or_removed_loses_its_key` and the cap notification in
+`daily_token_cap_refuses_calls_until_midnight` (`apps/engine/tests/ai_api.rs`), unit tests for
+`unbound_keys` and `forget_secret`, desktop specs for an engine without `ai-keys` and for a
+disconnected one. Left as is: a store unreadable when a provider is removed and readable later
+still holds its key; it is used again only if a provider with that id is stored again.
 
 Open after AI6: the usage chart in Preferences > AI, a UI for `core.ai.limits`; on the web,
 "Triage inbox", and its `needs-engine-key` text still says to use a local model or the desktop.
