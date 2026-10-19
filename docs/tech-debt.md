@@ -857,6 +857,12 @@ composer for a draft the user never wrote.
   (`expiration-send-offline`). Open
   for stage 13: the same for sends from the composer (`draft.send`), and the "Queued, sends when
   online" state on the draft.
+- Status (2026-10-18, stage 13, roadmap/client-next): `draft.send` queues its `SendDraftTask` with
+  `retryWhenOnline`, so a composer send through the engine stays queued on an offline or
+  retryable failure like the executor's. The desktop reads the engine's `_offlineSince` on the
+  task (`SendDraftTask.offlineSince`) and the draft list shows "Queued, sends when online" while
+  such a send is pending. Done for engines with `draft-pipeline`; a send through a plugin's send
+  action still runs once.
 
 ### TD34. Message bodies render inside the Node-enabled renderer (before stage 5)
 
@@ -1194,6 +1200,17 @@ hard-coded `h:mm A` in eight places (`calendar-event-popover.tsx:971-976`,
   attribution line (localised template, locale and 24h from settings) and store template and
   locale in the engine settings store, as the plan does for resurfacing texts.
 - Size: ~150 TS plus ~15 call sites.
+- Status (2026-10-18, stage 13, roadmap/client-next): done. `src/date-format.ts` has
+  `formatTime`, `formatShortTime`, `formatDate`, `formatDateTime` and `hourCycle` on
+  Intl.DateTimeFormat; the hard-coded `h:mm A`/`h:mma` sites, the `LT` checks and renders
+  (time picker, calendar helpers, popover, drag preview, search bar, agenda, day and week
+  views, participant profile, propose-time popover) and `date-utils.ts`'s own hour-cycle reads go
+  through it. One rule: the 24-hour setting on is 24 hours, off is the locale's own clock (a
+  decision to confirm; before, off meant 12 hours in `date-utils.ts` and the locale's clock in
+  `LT`). The attribution line is `localized('On %1$@, %2$@ wrote:')` with the date from
+  `formatQuoteDate`, and the engine builds the same line from `composing.quoteTexts`, which the
+  settings mirror writes in the user's language and clock (date pattern from Intl's parts).
+  moment is still imported for date arithmetic and the remaining date-only formats.
 
 ### TD49. Very large sync and send functions (stage 13; with TD39 and TD55)
 
@@ -1207,6 +1224,10 @@ Python harness.
   the code is the only reference.
 - Fix: extract per-step functions with unit tests as part of the stage that next edits them (send
   path in stage 13; `sync_now` with TD39 or TD55), not as a standalone pass.
+- Status (2026-10-18, stage 13): not done. Stage 13 didn't edit `perform_remote_send_draft`
+  (`draft.send` queues the existing `SendDraftTask`; the shared finalisation is
+  `ms_sync::expiration_executor::finalise_draft`), so the split stays with the next stage that
+  changes the send body.
 
 ### TD50. EventSearch and ContactSearch updated by an UNINDEXED column (before stage 18)
 

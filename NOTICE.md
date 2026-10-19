@@ -240,7 +240,8 @@ SOFTWARE.
 The tracker rules in
 `apps/desktop/app/internal_packages/remove-tracking-pixels/lib/mail-tracker-blocker-rules.ts` are
 ported from MailTrackerBlocker (https://github.com/apparition47/MailTrackerBlocker,
-`Source/MTBBlockedMessage.m`, commit `7463682a3`).
+`Source/MTBBlockedMessage.m`, commit `7463682a3`). The engine's draft pipeline keeps a copy of
+the vendor rules in `crates/ms-compose/src/desktop_data.json` (`trackerRules`).
 
 ```
 BSD 3-Clause License
@@ -273,3 +274,11 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
+
+## Blink default stylesheet
+
+`apps/desktop/app/src/chrome-user-agent-stylesheet-string.ts`, and its copy in
+`crates/ms-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
+stylesheet of Chromium's Blink engine (`Source/core/css/html.css`), which comes from KHTML and
+WebKit: Copyright (C) 2000 Lars Knoll, Copyright (C) 2003-2011 Apple Inc. The upstream file is
+under the GNU Library General Public License, version 2 or (at your option) any later version.

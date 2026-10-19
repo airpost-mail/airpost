@@ -5,7 +5,11 @@ desktop's `mcp-server` plugin, which ran inside the Electron app and has been re
 desktop ships tern-mcp (see "The desktop" below). tern-mcp talks to the running engine over its socket
 (docs/engine-protocol-plan.md): reads go through the read API, and changes are queued as the
 same task JSON the desktop sends (`__cls`, the `DraftFactory` fields), so the desktop and the
-engine can't tell the two apart. The desktop doesn't have to be open, but an engine does
+engine can't tell the two apart. With an engine that has the draft pipeline (`draft-pipeline`),
+`create_draft` and `reply_to_thread` build the draft with `draft.create` and `send_draft` sends
+with `draft.send`, so drafts get the same quoting, attribution line and signature as the
+desktop's; against an older engine tern-mcp builds them itself with the same code
+(`crates/ms-compose`). The desktop doesn't have to be open, but an engine does
 (scheduled sends on an engine without the expiration executor are the exception, see
 `schedule_send` below).
 

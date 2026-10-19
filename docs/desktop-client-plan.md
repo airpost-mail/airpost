@@ -1112,7 +1112,8 @@ Open items:
   `error` on the send-later metadata; to confirm).
 - The supported subset of natural-language date terms (stage 9), from the desktop's spec
   cases.
-- Where `draft.send`'s `bodies` are stored during the undo window (stage 13).
+- Where `draft.send`'s `bodies` are stored during the undo window (stage 13: a file per
+  draft under `<config>/pending-sends/`, not the metadata; to confirm).
 - Whether the unsubscribe body-link fallback moves to the engine (stage 15: it stays in the
   clients, the engine reads headers only; to confirm).
 - An engine-side hook for third-party send transforms, if users ask for it.
@@ -2116,3 +2117,91 @@ Merged to main by fast-forward.
 
 Trial pending (not run): add an IMAP account and an OAuth account (not the production
 accounts), reconnect one, remove one, and save an integration key.
+
+Stage 13 (draft pipeline), 2026-10-18, roadmap/client-next, not merged. New crate
+`crates/ms-compose`: the DraftFactory builders (new, reply, reply-all, forward, mailto,
+resurface) with the desktop's whitespace templates, the quoting path (`cid:` images dropped,
+DOMPurify's allowlist through ammonia, juice's inlining through css-inline with the Blink
+stylesheet), signatures from `signatures`/`defaultSignatures`, tracking-image removal, the
+plaintext wrap and quote, mailto parsing, `validateDraftForSending` and the attachment, salutation
+and empty-template warnings. The lists it shares with the desktop (sanitizer, tracker rules,
+stylesheet, salutations, name parts, not-a-person terms) are one JSON file the desktop spec writes
+and checks. Engine (`draft-pipeline`, serve only, open in policy): `draft.create` for every kind
+(`save: false` answers without saving; `resurface` replaces stage 4's builder in the executor),
+`draft.send` (finalisation shared with the executor through `finalise_draft`; with `delayMs` it
+writes the send-later `{expiration, isUndoSend, actionKey}` and keeps `bodies` until it fires; a
+send already pending is refused), `draft.cancelSend` (false once the send has started or the draft
+is gone) and `draft.validate` (`{errors, warnings}`). `composing.quoteTexts` (attribution template,
+forward header labels, date pattern, month names, day periods) is a settings key the desktop
+writes. Desktop: DraftFactory builds new, reply, forward and mailto drafts with `draft.create`
+when the engine has the feature and falls back to its own builders otherwise or when the engine
+refuses; DraftStore skips the two built-in `prepareNewDraft` hooks on such drafts and runs the
+plugins'. Send with an engine send action goes through `draft.send` with the window's
+`applyTransformsForSending` output as `bodies` (only when a transform changed something), from
+whichever window sends; Undo Send calls `draft.cancelSend` from the main window. A plugin's send
+action keeps the JS path. tern-mcp's `drafts.rs` builders are gone: `create_draft` and
+`reply_to_thread` use `draft.create`, `send_draft` uses `draft.send`, with `ms-compose` locally
+against an older engine. TD48 done, TD33's composer half done (see docs/tech-debt.md), TD49 not
+touched (the send body wasn't edited).
+
+Tests: the corpus (`crates/ms-compose/tests/corpus.rs` against
+`tests/fixtures/draft_corpus.json`, written by `spec/draft-corpus-capture-spec.ts` from the
+desktop's own DraftFactory, quoting and signature code: dates, quoting, reply/forward/mailto
+drafts, signatures, tracking pixels, wrapping, send warnings; HTML compared as tokens, with the
+known drift listed in the test), ms-compose unit tests, the harness scenarios
+`draft-pipeline-reply` (signatures and German quote texts, reply, validate, send, a second send
+refused, forward without saving) and `draft-pipeline-undo-send` (cancel inside the window; a send
+with per-recipient bodies, engine restarted inside the window, fired at the next start with those
+bodies), a tern-mcp test against an engine with the pipeline, and the desktop spec
+`engine-drafts-spec.ts` (draft.create params, fallback, extension skipping, a test extension's
+bodies and per-recipient bodies, undo through a JSON round trip, a send already gone, a refused
+send) and the quote-texts mirror in `engine-settings-spec.ts`. Checks: cargo fmt and clippy on
+ms-compose, ms-ipc, ms-sync, ms-tasks, mailsync and tern-mcp; cargo deny licenses; cargo test for
+those crates; the harness on serve with the debug build, `-k "draft-pipeline or expiration or
+send"` (17 passed, 2 skipped) and `test_mcp.py` (3 passed); desktop typecheck, lint and prettier;
+the specs for engine drafts, engine settings, DraftFactory, DraftStore, UndoRedoStore, the
+corpus capture, send-later, signatures, tracking pixels, time picker, propose-time popover,
+messages and the calendar (all passing). Not run: the full gate and a release build.
+
+Decision taken, to confirm:
+- Bodies during the undo window live in a side file per draft,
+  `<config>/pending-sends/<accountId>/<draftId>.json` (mode 0600, matched to the metadata's
+  expiration, removed when it fires, on cancel and on a reset that drops metadata, swept at
+  executor start), not in the send-later metadata: metadata syncs to other devices and the
+  bodies can be large and per recipient.
+- The desktop keeps its own synchronous send checks (DOM quote removal, plugins'
+  `warningsForSending`, the salutation skip list in localStorage); `draft.validate` serves the
+  CLI, tern-mcp and the web. Its quote removal is an approximation of the desktop's.
+- `draft.create` has `save` (default true; the desktop and tern-mcp pass false and save through
+  their own `SyncbackDraftTask`) and, for `resurface`, `body`. `accountId` is required for reply,
+  forward and resurface; new and mailto default to `core.sending.defaultAccountIdForSend`, then the
+  first account (the desktop passes its own choice, which also looks at the focused perspective).
+- Without `delayMs` `draft.send` sends at once; a second `draft.send` while one is pending is
+  refused (`-32602`).
+- The desktop keeps finding an existing reply draft itself (`prefer-existing`,
+  `prefer-existing-if-pristine` read the in-memory session); `draft.create`'s `behavior` serves the
+  other clients. Resurfacing and Send Again stay on the JS builders in the desktop.
+- Quick replies built by the engine carry the From address's default signature (the desktop's
+  quick reply had none). The forward header's labels come from `quoteTexts` and the subject is
+  HTML-escaped in both builders (the JS forward had an English `From:` and an unescaped subject).
+- Resurfacing drafts built by the engine leave the account's auto-cc/bcc off.
+- `composing.quoteTexts` isn't writable from relayed devices.
+- The 24-hour setting off means the locale's own clock (TD48).
+- An Undo Send entry can't be redone with the pipeline (a redo would schedule it without the
+  window's transforms).
+- The desktop's JS DraftFactory stays as the fallback for engines without the feature.
+
+Open:
+- tern-web: `apps/web`'s `draft.ts` and `signature.ts` should move to `draft.create`,
+  `draft.send` (with `delayMs` for undo send) and `draft.cancelSend`; its quote texts come from
+  `composing.quoteTexts`. Not ours.
+- `bodies` stay with the engine that got `draft.send`. Another device's engine that sees the
+  synced send-later metadata has no bodies and would send the stored body, until claims (T22,
+  stage 17) decide which engine fires. A plugin's transform doesn't run for sends started outside
+  the app (documented in `apps/desktop/docs/creating-composer-plugins.md`).
+- TD49's send-function split isn't done.
+- The Blink stylesheet notice in NOTICE.md is from the upstream file's header as we know it;
+  check it against `html.css`.
+
+Trial pending (not run): on ~/tern-trial, new message, reply, reply all, forward, undo send,
+send with an attachment, and quit inside the undo window then start again (the send goes out).
