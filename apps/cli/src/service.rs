@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `tern service install|uninstall|list` and `tern engine install|uninstall`: service plugins
+//! `tern service install|uninstall|list` and `tern engine install|uninstall|start|restart`:
+//! service plugins
 //! (docs/desktop-client-plan.md T19, stage 19) and the detached engine they talk to, run by
 //! the OS as user units ([`crate::units`]).
 //!
@@ -17,6 +18,8 @@
 //! was shown (path and SHA-256, TD29) is the one that runs until the next install, whatever
 //! later happens to the package. The unit sets `TERN_CONFIG_DIR` and `TERN_SERVICE_PACKAGE`.
 //! What was installed, from where and with which hash is kept in `<config>/services.json`.
+//! A dry run also prints `planSha256`, a digest of the binary's hash and every unit the
+//! install would write; `--expect-plan` refuses an install whose plan is no longer that one.
 //!
 //! Units are loaded (`launchctl bootstrap`, `systemctl --user enable`) only when they are
 //! written to the manager's own directory; `--unit-dir` writes them elsewhere and loads
@@ -374,6 +377,8 @@ pub trait Loader {
     fn load(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()>;
     /// Stops the unit and forgets it; a unit that isn't loaded is no error.
     fn unload(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()>;
+    /// Starts the unit when it isn't running; `restart` stops a running one first.
+    fn start(&mut self, manager: Manager, name: &str, unit: &Path, restart: bool) -> Result<()>;
 }
 
 pub struct System;
@@ -446,6 +451,36 @@ impl Loader for System {
             }
         }
         Ok(())
+    }
+
+    fn start(&mut self, manager: Manager, name: &str, unit: &Path, restart: bool) -> Result<()> {
+        let result = match manager {
+            Manager::Launchd => {
+                let target = format!("{}/{name}", Self::gui_domain());
+                let kick = if restart {
+                    vec!["kickstart", "-k", &target]
+                } else {
+                    vec!["kickstart", &target]
+                };
+                // A job that was booted out (or never loaded this login) has to be bootstrapped;
+                // RunAtLoad then starts it.
+                Self::run("launchctl", &kick).or_else(|_| {
+                    Self::run(
+                        "launchctl",
+                        &["bootstrap", &Self::gui_domain(), &unit.to_string_lossy()],
+                    )
+                })
+            }
+            Manager::Systemd => Self::run(
+                "systemctl",
+                &[
+                    "--user",
+                    if restart { "restart" } else { "start" },
+                    &format!("{name}.service"),
+                ],
+            ),
+        };
+        result.map_err(CliError::failed)
     }
 }
 
@@ -609,6 +644,24 @@ pub fn engine_uninstall(
     Ok(json!({"name": name, "path": unit, "removed": true}))
 }
 
+/// Starts the installed engine unit, or restarts it so it runs the binary now at its path (the
+/// desktop does this after an update instead of stopping the unit's engine, which would then
+/// stay stopped: the units restart only after a failed exit).
+pub fn engine_start(place: &Place, restart: bool, loader: &mut dyn Loader) -> Result<Value> {
+    let name = place.names.engine(place.manager);
+    let unit = place.path(&name);
+    if !unit.exists() {
+        return Err(CliError::failed(format!(
+            "the engine unit is not installed ({} is missing)",
+            unit.display()
+        )));
+    }
+    if place.load {
+        loader.start(place.manager, &name, &unit, restart)?;
+    }
+    Ok(json!({"name": name, "path": unit, "load": place.load, "restarted": restart}))
+}
+
 fn remove_file(path: &Path) -> Result<()> {
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
@@ -627,6 +680,9 @@ pub struct ServiceArgs {
     /// The engine unit's `TERN_ENGINE_KEY_FILE`, when the engine unit is written.
     pub engine_key_file: Option<PathBuf>,
     pub expect_sha256: Option<String>,
+    /// Refuse unless the plan (binary hash, unit texts and paths) is the one a dry run showed
+    /// as `planSha256`.
+    pub expect_plan: Option<String>,
     pub dry_run: bool,
 }
 
@@ -640,6 +696,8 @@ pub struct ServicePlan {
     pub text: String,
     /// The engine unit to write first; None when it is there already.
     pub engine: Option<EnginePlan>,
+    /// Digest of everything the install writes and runs: what `--expect-plan` pins.
+    pub plan_sha256: String,
     engine_name: String,
     engine_unit: PathBuf,
 }
@@ -700,14 +758,26 @@ impl ServicePlan {
             log: Some(service_dir.join(SERVICE_LOG)),
         };
         let text = units::render(place.manager, &spec).map_err(CliError::failed)?;
+        let unit = place.path(&name);
+        let plan_sha256 = plan_digest(&sha256, &installed_bin, &unit, &text, engine.as_ref());
+        if let Some(want) = args.expect_plan.as_deref() {
+            if !want.eq_ignore_ascii_case(&plan_sha256) {
+                return Err(CliError::failed(format!(
+                    "the install of {} changed since it was shown (plan {plan_sha256}, not \
+                     {want}); check it and install again",
+                    manifest.package
+                )));
+            }
+        }
         Ok(ServicePlan {
-            unit: place.path(&name),
+            unit,
             manifest,
             sha256,
             installed_bin,
             name,
             text,
             engine,
+            plan_sha256,
             engine_name,
             engine_unit,
         })
@@ -728,6 +798,7 @@ impl ServicePlan {
             "source": self.manifest.dir,
             "bin": self.manifest.bin,
             "sha256": self.sha256,
+            "planSha256": self.plan_sha256,
             "installedBin": self.installed_bin,
             "args": self.manifest.args,
             "manager": place.manager.as_str(),
@@ -775,6 +846,38 @@ impl ServicePlan {
         }
         Ok(record)
     }
+}
+
+/// SHA-256 over what a service install writes and runs: the service binary's hash, where it
+/// is copied, the service unit's path and text, and the engine unit's binary hash, path and
+/// text when the install writes it. Each part is length-prefixed so no two plans collide.
+fn plan_digest(
+    bin_sha256: &str,
+    installed_bin: &Path,
+    unit: &Path,
+    text: &str,
+    engine: Option<&EnginePlan>,
+) -> String {
+    let mut h = Sha256::new();
+    let mut part = |bytes: &[u8]| {
+        h.update((bytes.len() as u64).to_be_bytes());
+        h.update(bytes);
+    };
+    part(b"tern-service-plan-1");
+    part(bin_sha256.as_bytes());
+    part(installed_bin.to_string_lossy().as_bytes());
+    part(unit.to_string_lossy().as_bytes());
+    part(text.as_bytes());
+    match engine {
+        Some(e) => {
+            part(b"engine");
+            part(e.sha256.as_bytes());
+            part(e.unit.to_string_lossy().as_bytes());
+            part(e.text.as_bytes());
+        }
+        None => part(b"engine-kept"),
+    }
+    units::hex(&h.finalize())
 }
 
 fn check_expected(actual: &str, expected: Option<&str>, bin: &Path) -> Result<()> {
@@ -893,6 +996,7 @@ pub fn install_command(ctx: &Ctx, place: &PlaceArgs, args: &ServiceArgs) -> Resu
         format!("Binary:   {}", s(&v["bin"])),
         format!("SHA-256:  {}", s(&v["sha256"])),
         format!("Copied to {}", s(&v["installedBin"])),
+        format!("Plan:     {} (--expect-plan)", s(&v["planSha256"])),
     ];
     if v["engine"]["installed"].as_bool() == Some(false) {
         text.push(format!(
@@ -982,6 +1086,25 @@ pub fn engine_install_command(
     Ok(())
 }
 
+pub fn engine_start_command(ctx: &Ctx, place: &PlaceArgs, restart: bool) -> Result<()> {
+    let place = Place::resolve(&ctx.config_dir, place)?;
+    let v = engine_start(&place, restart, &mut System)?;
+    let line = if v["load"].as_bool() == Some(true) {
+        format!(
+            "{} {}",
+            if restart { "Restarted" } else { "Started" },
+            s(&v["name"])
+        )
+    } else {
+        format!(
+            "Not started {}: --unit-dir, --no-load or TERN_SERVICE_NO_LOAD",
+            s(&v["name"])
+        )
+    };
+    print(ctx, &v, &[line]);
+    Ok(())
+}
+
 pub fn engine_uninstall_command(ctx: &Ctx, place: &PlaceArgs) -> Result<()> {
     let place = Place::resolve(&ctx.config_dir, place)?;
     let v = engine_uninstall(&ctx.config_dir, &place, &mut System)?;
@@ -1006,6 +1129,11 @@ mod tests {
         }
         fn unload(&mut self, m: Manager, name: &str, _unit: &Path) -> Result<()> {
             self.calls.push(format!("unload {} {name}", m.as_str()));
+            Ok(())
+        }
+        fn start(&mut self, m: Manager, name: &str, _unit: &Path, restart: bool) -> Result<()> {
+            let verb = if restart { "restart" } else { "start" };
+            self.calls.push(format!("{verb} {} {name}", m.as_str()));
             Ok(())
         }
     }
@@ -1265,6 +1393,95 @@ mod tests {
             [
                 "unload launchd com.ternmail.tern.service.sample",
                 "unload launchd com.ternmail.tern.engine"
+            ]
+        );
+    }
+
+    #[test]
+    fn install_refuses_a_plan_that_changed_after_the_dry_run() {
+        let env = env();
+        let dir = package(&env, "sample", json!({"bin": "svc", "args": ["--a"]}));
+        executable(&dir.join("svc"), "service v1");
+        let place = place(&env, Manager::Launchd);
+        let mut fake = Fake::default();
+        let mut a = args("sample", &env);
+        a.dry_run = true;
+        let shown = service_install(&env.config, &place, &a, &mut fake).unwrap();
+        let plan = shown["planSha256"].as_str().unwrap().to_owned();
+        assert_eq!(plan.len(), 64);
+        a.dry_run = false;
+        a.expect_sha256 = Some(shown["sha256"].as_str().unwrap().to_owned());
+        a.expect_plan = Some(plan.clone());
+
+        // Same binary, other args: the unit would differ from the one shown.
+        package(&env, "sample", json!({"bin": "svc", "args": ["--b"]}));
+        let e = service_install(&env.config, &place, &a, &mut fake).unwrap_err();
+        assert!(e.to_string().contains("changed since it was shown"), "{e}");
+        // Another engine binary for the engine unit.
+        package(&env, "sample", json!({"bin": "svc", "args": ["--a"]}));
+        let other_engine = env.engine.with_file_name("mailsync-other");
+        executable(&other_engine, "#!/bin/sh\nexit 1\n");
+        let mut b = a.clone();
+        b.engine_bin = Some(other_engine);
+        assert!(service_install(&env.config, &place, &b, &mut fake).is_err());
+        assert!(!env.units.exists());
+        assert!(!env.config.join(SERVICES_DIR).exists());
+        assert!(!env.config.join(RECORDS_FILE).exists());
+
+        // The plan shown, unchanged, installs.
+        let v = service_install(&env.config, &place, &a, &mut fake).unwrap();
+        assert_eq!(
+            (v["installed"].as_bool(), v["planSha256"].as_str()),
+            (Some(true), Some(plan.as_str()))
+        );
+        // With the engine unit there now, the same plan is no longer the one a new dry run
+        // would show: that one leaves the engine unit alone.
+        let e = service_install(&env.config, &place, &a, &mut fake).unwrap_err();
+        assert!(e.to_string().contains("changed since it was shown"), "{e}");
+    }
+
+    #[test]
+    fn engine_start_and_restart_go_to_the_installed_unit_only() {
+        let env = env();
+        let mut place = place(&env, Manager::Launchd);
+        let mut fake = Fake::default();
+        assert!(engine_start(&place, true, &mut fake)
+            .unwrap_err()
+            .to_string()
+            .contains("not installed"));
+        engine_install(
+            &env.config,
+            &place,
+            Some(&env.engine),
+            None,
+            false,
+            &mut fake,
+        )
+        .unwrap();
+        let v = engine_start(&place, true, &mut fake).unwrap();
+        assert_eq!(v["load"], false);
+        assert!(fake.calls.is_empty(), "nothing loads outside the unit dir");
+        place.load = true;
+        engine_start(&place, true, &mut fake).unwrap();
+        engine_start(&place, false, &mut fake).unwrap();
+        place.manager = Manager::Systemd;
+        engine_install(
+            &env.config,
+            &place,
+            Some(&env.engine),
+            None,
+            false,
+            &mut fake,
+        )
+        .unwrap();
+        engine_start(&place, true, &mut fake).unwrap();
+        assert_eq!(
+            fake.calls,
+            [
+                "restart launchd com.ternmail.tern.engine",
+                "start launchd com.ternmail.tern.engine",
+                "load systemd tern-engine",
+                "restart systemd tern-engine"
             ]
         );
     }

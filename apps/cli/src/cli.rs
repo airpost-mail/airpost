@@ -276,6 +276,10 @@ pub enum ServiceCommand {
         /// Refuse unless the service binary has this SHA-256 (the one a dry run showed).
         #[arg(long, value_name = "HEX")]
         expect_sha256: Option<String>,
+        /// Refuse unless the install would write exactly what a dry run showed (its
+        /// planSha256: the binary's hash and both units).
+        #[arg(long, value_name = "HEX")]
+        expect_plan: Option<String>,
         /// Print the binary, its hash and the units, and write nothing.
         #[arg(long)]
         dry_run: bool,
@@ -311,6 +315,16 @@ pub enum EngineCommand {
     },
     /// Stop the engine unit and remove it. Refused while services are installed.
     Uninstall {
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// Start the installed engine unit if it isn't running.
+    Start {
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// Restart the installed engine unit, so it runs the engine binary now at its path.
+    Restart {
         #[command(flatten)]
         units: UnitArgs,
     },
@@ -585,6 +599,9 @@ mod tests {
         assert!(parse(&["service", "install", "x", "--manager", "launchd"]).is_err());
         assert!(parse(&["service", "uninstall", "x", "--no-load"]).is_ok());
         assert!(parse(&["engine", "install", "--bin", "/x", "--dry-run"]).is_ok());
+        assert!(parse(&["engine", "restart"]).is_ok());
+        assert!(parse(&["engine", "start", "--no-load"]).is_ok());
+        assert!(parse(&["service", "install", "x", "--expect-plan", "ab"]).is_ok());
         let cli = parse(&["snooze", "t1", "t2", "--until", "2h"]).unwrap();
         let Command::Snooze { threads, until } = cli.command else {
             panic!("snooze")

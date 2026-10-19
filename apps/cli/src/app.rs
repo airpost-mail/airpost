@@ -179,6 +179,7 @@ fn service(ctx: &Ctx, command: &ServiceCommand) -> Result<()> {
             engine_bin,
             engine_key_file,
             expect_sha256,
+            expect_plan,
             dry_run,
             units,
         } => crate::service::install_command(
@@ -190,6 +191,7 @@ fn service(ctx: &Ctx, command: &ServiceCommand) -> Result<()> {
                 engine_bin: engine_bin.clone(),
                 engine_key_file: engine_key_file.clone(),
                 expect_sha256: expect_sha256.clone(),
+                expect_plan: expect_plan.clone(),
                 dry_run: *dry_run,
             },
         ),
@@ -216,6 +218,12 @@ fn engine_unit(ctx: &Ctx, command: &EngineCommand) -> Result<()> {
         ),
         EngineCommand::Uninstall { units } => {
             crate::service::engine_uninstall_command(ctx, &place_args(units))
+        }
+        EngineCommand::Start { units } => {
+            crate::service::engine_start_command(ctx, &place_args(units), false)
+        }
+        EngineCommand::Restart { units } => {
+            crate::service::engine_start_command(ctx, &place_args(units), true)
         }
     }
 }

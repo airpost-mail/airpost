@@ -191,7 +191,10 @@ fn launchd_plist(spec: &UnitSpec) -> String {
     key(&mut s, "RunAtLoad");
     s.push_str("\t<true/>\n");
     // Restarted after a crash or a failed start, not after a clean exit: the engine exits 0
-    // on `engine.shutdown`, which the desktop sends to an engine it won't join.
+    // on `engine.shutdown`, which the desktop sends to an engine it can't join (the
+    // credentials are still in the app) before running its own. The desktop restarts the
+    // engine unit instead after an update (`tern engine restart`), and starts it again when it
+    // quits (`tern engine start`).
     key(&mut s, "KeepAlive");
     s.push_str("\t<dict>\n\t\t<key>SuccessfulExit</key>\n\t\t<false/>\n\t</dict>\n");
     key(&mut s, "ThrottleInterval");
