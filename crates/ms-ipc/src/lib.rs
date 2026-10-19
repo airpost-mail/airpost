@@ -23,6 +23,7 @@ mod mail;
 mod methods;
 pub mod policy;
 mod read;
+mod rules;
 mod settings;
 
 pub use accounts::*;
@@ -39,6 +40,7 @@ pub use integrations::*;
 pub use mail::*;
 pub use methods::*;
 pub use read::*;
+pub use rules::*;
 pub use settings::*;
 
 /// The protocol version a `hello` names. Additive changes (a new method, a new optional
@@ -254,6 +256,18 @@ pub mod method {
     pub const AI_DELTA: &str = "ai.delta";
     /// Notification: triage progress for the connection that called `ai.triage.run`.
     pub const AI_TRIAGE_PROGRESS: &str = "ai.triage.progress";
+    /// Mail rules ([`feature::RULES`](crate::feature::RULES)): params and results in
+    /// [`crate::RulesReprocessParams`] and [`crate::RulesCancelParams`]. The rules themselves
+    /// are the `mailRules` setting.
+    pub const RULES_REPROCESS: &str = "rules.reprocess";
+    pub const RULES_CANCEL: &str = "rules.cancel";
+    /// Notification: a `rules.reprocess` job's progress, to the connection that started it
+    /// only, without `subscribe`; never held.
+    pub const RULES_PROGRESS: &str = "rules.progress";
+    /// Notification: the engine disabled a failing rule. Sent to every subscribed connection
+    /// whatever its filter, never held: the rule's `disabled` and `disabledReason` are saved in
+    /// `mailRules`, and `settings.changed` carries them as well.
+    pub const RULES_DISABLED: &str = "rules.disabled";
 }
 
 /// The names in `hello.features` and `engine.status.features`
@@ -326,6 +340,10 @@ pub mod feature {
     /// deleteData}`, `account.reset`, `secrets.*` and `server.*`; ids derived by the engine;
     /// `integrations.*` read a missing key from the secret `integration:<provider>`.
     pub const ACCOUNT_SETUP: &str = "account-setup";
+    /// `serve` applies the `mailRules` setting to arriving mail itself (T12), with
+    /// `rules.reprocess`, `rules.cancel`, `rules.progress`, `rules.disabled` and the
+    /// `mailRulesAutoSince` setting. Clients that see it stop evaluating rules.
+    pub const RULES: &str = "rules";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`

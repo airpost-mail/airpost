@@ -91,6 +91,9 @@ pub fn method_class(name: &str) -> MethodClass {
         method::TEST_CRASH | method::TEST_PANIC => MethodClass::Debug,
         // Paths on the engine's machine; browsers use the gateway's file routes.
         method::FILES_GET | method::FILES_READ | method::FILES_PUT => MethodClass::LocalOnly,
+        // Runs the rules (forwards included) over the whole inbox; the rules themselves can
+        // only be set locally (RELAYED_SETTINGS_KEYS).
+        method::RULES_REPROCESS | method::RULES_CANCEL => MethodClass::LocalOnly,
         // The engine makes HTTP requests to the URL in the params' `config`, from the
         // user's machine and network.
         method::INTEGRATIONS_TRANSLATE
