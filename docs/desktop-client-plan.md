@@ -2681,7 +2681,9 @@ this is the engine side of T22 and backend-plan 3.6/3.8, tested against a mock s
   `Claim::NoServer`). `HttpMetadataBackend` keeps its last `/tern/v1/me` (binding() refreshes it
   before each stream connect), asks again with a 15 s bound when it is over 2 h old, and gives a
   target only with `features.tracking`, a base64url `trackingNS` and a `publicURL` (or, empty, the
-  server URL) that passes `check_url`; a refused token clears it. Claims are
+  server URL) that passes `check_url` and holds only RFC 3986 unreserved, sub-delims, `:`, `/` and
+  `%` bytes; a refused token clears it. The pixel URL is attribute-escaped before it goes into the
+  body. Claims are
   `POST /tern/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>` (15 s bound): 200 won, 409 lost,
   anything else, a network error or a refused token lets the device act.
 - Executor (`with_metadata`): before acting on a due `send-later` (one it performs), `thread-snooze`
@@ -2698,7 +2700,9 @@ this is the engine side of T22 and backend-plan 3.6/3.8, tested against a mock s
   resets it. `hello.features` gains `tracking` (serve).
 - Desktop: the open- and link-tracking composer extensions and `PLUGIN_URL` are gone; the toggles
   write metadata as before and are enabled by the capability (`isTrackingServerAvailable` is the
-  capability store's answer); `needsClientFinalize` counts any extension with its own
+  capability store's answer, and the buttons subscribe with `useCapability`, so an open composer
+  follows `capabilities.changed`; a toggle that is on while the capability is gone stays clickable
+  and its tooltip gives the reason); `needsClientFinalize` counts any extension with its own
   `applyTransformsForSending` (the built-in tracking ones no longer exist); `Feature.Tracking`,
   `CapabilityReason.NotOnServer` and its text "Your Tern server doesn’t offer it".
 - Docs: backend-plan 3.6 (the engine generates the ids, the exact markup, one index per distinct
@@ -2735,6 +2739,9 @@ Decisions taken, to confirm:
   are unchanged (still `needs-tern-server`).
 - The desktop's JS tracking transforms are removed rather than kept as a fallback: no engine
   without this stage reports the capability, so they could never run.
+- The open- and link-tracking toggles start off on a new draft until the user turns one on once
+  (`plugins.<id>.defaultOn` must be `true`; a missing key no longer counts as on), so connecting a
+  server doesn't switch tracking on for every draft.
 
 Open:
 - apps/backend (paused): the `/t/o/<ns>/<trackingId>.<rid>.png` pixel, the `/t/l/<ns>/<trackingId>/
