@@ -2901,3 +2901,65 @@ fake IMAP server's single-message threads; a profile with long threads isn't mea
 Open: unchanged from the stage 8 entry above, minus the latency measurement. Nothing for tern-web.
 Trial pending (not run): as in the stage 8 entry; also reply with a signature to a thread whose
 existing reply draft is collapsed.
+
+2026-10-19, stage 8 gate (attempt 1), branch `roadmap/client-next`, merged to main. Already on
+top of main (8629081ba), so the rebase was a no-op. Gate: fmt, clippy, `cargo test --workspace`
+(106 test binaries, all ok), `cargo deny check` (advisories, bans, licences and sources ok),
+release build of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve with the
+release binaries (159 passed, 4 skipped, including `test_query_latency.py`). Desktop: lint and
+typecheck pass; full suite 3287 passing, the 4 known failures that also fail on main (AI triage
+dispose, three SystemTrayIconStore focus/blur). No code changed in this step. No new decisions;
+the ones in the stage 8 and stage 8 review fixes entries still need confirming.
+
+Open from the review (low):
+- `apps/desktop/app/src/flux/stores/engine-reads.ts`: after `_waitForHello` resolves, the fallback
+  check is `!this._events.has(Feature.Query)`. If the connection drops again between the hello
+  and the continuation, `features` is null, `has()` is false and the read goes to SQLite silently
+  although the flag is `"engine"` and the engine answers `query`. That mixes transports in one
+  session, and becomes a wrong result once the SQLite path is removed. Decide from the hello that
+  resolved the wait, not from the current state.
+- `apps/desktop/app/src/flux/stores/engine-reads.ts`: an oversized `query` reply counts as a
+  connection drop. The engine has no reply-size budget (`read_api.rs` query, `model_query.rs`),
+  and the desktop drops the socket on a line over `MAX_LINE_BYTES` (`engine-connection.ts:300`).
+  EngineReads then retries up to three times, each drop sets `_missedDeltas`, and each reconnect
+  fires `resync`, which re-runs every subscription including the same large one. Unbounded reads
+  such as `contacts/lib/Store.ts:30` (`findAll(Contact).where(refs>0)`) can get there on large
+  profiles, and large replies also fill the outbox toward `SOCKET_QUEUE_BYTES` (`drop_slow`).
+  Needs a reply budget in the engine with a distinct error, and paging for the unbounded reads.
+- `apps/desktop/app/src/engine-connection.ts`: the 10 s bound covers waiting for a hello only. A
+  `query` written to a live connection has no timeout, and the engine answers a connection's
+  requests in order on its reader thread (`socket.rs` module doc), so a slow or wedged read (a
+  long FTS search) leaves every later read in that window pending, with no `EngineUnavailable`
+  and no engine state shown.
+- `apps/desktop/app/src/flux/stores/message-store.ts`: on `resync` (every reconnect, on the SQLite
+  transport too) `_fetchFromCache` keeps shown bodies for non-drafts only. The open draft's body
+  becomes undefined, `itemsExpandedState()` drops it, and `MessageItemContainer` renders it
+  collapsed: the inline composer the user is typing in unmounts and remounts after the body
+  read, losing focus and the cursor on every engine respawn. Keep the open draft's body (or its
+  expanded state) across a resync.
+- `apps/desktop/app/src/engine-client.ts`: an engine killed from outside with SIGTERM isn't
+  respawned until the next `ensure()`. With reads on the engine the window then shows "Waiting
+  for the sync engine" indefinitely, and the state doesn't say that nothing happens without Try
+  Again. The kill-the-engine check in the stage text and the trial step below ("re-reads after
+  the respawn") hold only for SIGKILL or a crash; the trial step should use `kill -9`, and SIGTERM
+  needs either a respawn or a state that says so.
+- `apps/desktop/app/spec/stores/database-store-spec.ts` and the other existing subscription specs:
+  the review fixes run `database-store-spec`, `query-subscription-spec`,
+  `query-subscription-pool-spec`, `unread-query-subscription-spec` and `message-store-spec` on
+  both transports for selected cases (`forEachTransport`), but most existing subscription
+  behaviour (range shifts, `MutableQuerySubscription`, `ObservableListDataSource`) still runs on
+  SQLite stubs only and isn't exercised on `query`.
+- Latency (section 8, Risks): `test_query_latency.py` measures the socket round trip on serve
+  against the fake IMAP server's single-message threads (median 1.3 ms per page, release), and
+  `thread-list-engine-spec` the renderer on the in-process mock. A measurement on a profile with
+  long threads and real mailbox sizes is still a precondition for the default flip, alongside
+  stage 9's desktop half and the trial day.
+Nothing for tern-web.
+Trial pending (not run): as in the stage 8 entry and its review fixes entry (a day on
+`core.engine.reads: "engine"` once stage 9's desktop half has shipped; kill the engine with the
+thread list open, with `kill -9`, and check rows are kept, re-read after the respawn and the
+state with Try Again after a give-up; a long unread thread opens three unread messages and
+"expand all" loads the rest; starring or labelling doesn't reload the thread; the "251 trigger
+listeners" warning is gone on a tall window; reply with a signature to a thread whose existing
+reply draft is collapsed). Also: with an inline reply open, restart the engine and check whether
+the composer keeps focus (it is expected not to, see above).
