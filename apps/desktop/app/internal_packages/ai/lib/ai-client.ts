@@ -27,10 +27,10 @@ import {
 const AI_FAILED = -32011;
 const ENGINE_BUSY = -32012;
 const ENGINE_FEATURE = 'ai';
-// ms-ipc `feature::ACCOUNT_SETUP` (`secrets.*` on the socket) and `feature::AI_TRIAGE` (the
-// engine's own `core.ai.*`, which the main process mirrors).
+// ms-ipc `feature::AI_KEYS` (stored providers read `integration:ai-<id>`) and
+// `feature::ACCOUNT_SETUP` (`secrets.*` on the socket).
+const KEYS_FEATURE = 'ai-keys';
 const SECRETS_FEATURE = 'account-setup';
-const STORED_SETTINGS_FEATURE = 'ai-triage';
 
 /**
  * crates/ms-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
@@ -201,10 +201,23 @@ function requireEngine() {
 
 /**
  * Whether the engine keeps the AI keys (`integration:ai-<id>`, desktop-client-plan stage 11) and
- * the providers, so calls name a provider and send no key.
+ * the providers, so calls name a provider and send no key. An engine before AI6 lists
+ * `account-setup` and `ai-triage` too, but reads no key from its secret store.
  */
 export function keysInEngine() {
-  return Engine.has(SECRETS_FEATURE) && Engine.has(STORED_SETTINGS_FEATURE);
+  return Engine.has(KEYS_FEATURE);
+}
+
+// Until the engine connects, which one holds the key is unknown: one that keeps keys may have
+// it, so saying "none saved" or forgetting only the keyset's copy could let it reach a new server.
+function requireConnected() {
+  if (!Engine.connected) {
+    throw new AiError({
+      key: 'engine-disconnected',
+      message: localized('The sync engine is not connected.'),
+      retryable: true,
+    });
+  }
 }
 
 /** The engine's secret for the provider's key (ms-secrets `names::ai_provider`). */
@@ -229,16 +242,22 @@ export async function saveKey(providerId: string, value: string) {
   await dropKeysetCopy(providerId);
 }
 
-/** Deletes the provider's key from the engine and the keyset. */
+/** Deletes the provider's key from the engine and the keyset; throws while disconnected. */
 export async function forgetKey(providerId: string) {
+  requireConnected();
   if (keysInEngine()) {
     await Engine.request('secrets.delete', { name: secretName(providerId) });
+  } else if (Engine.has(SECRETS_FEATURE)) {
+    // This engine reads no AI key, but one that does may have run before and kept it; it
+    // also drops the key itself when the provider changes server.
+    await Engine.request('secrets.delete', { name: secretName(providerId) }).catch(() => {});
   }
   await dropKeysetCopy(providerId);
 }
 
-/** Whether a key is saved for the provider where calls take it from. */
+/** Whether a key is saved for the provider where calls take it from; throws while disconnected. */
 export async function hasSavedKey(providerId: string) {
+  requireConnected();
   if (keysInEngine()) {
     const name = secretName(providerId);
     const has = await Engine.request<{ [name: string]: boolean }>('secrets.has', {

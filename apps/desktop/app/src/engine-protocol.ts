@@ -161,6 +161,9 @@ export const Feature = {
   Ai: 'ai',
   // `ai.triage.*`, `capabilities.ai.triage`, and the `core.ai.*` settings keys.
   AiTriage: 'ai-triage',
+  // Stored AI providers read their keys from the secret store (`integration:ai-<id>`), and a
+  // provider's key goes when settings.set removes it or points it at another server.
+  AiKeys: 'ai-keys',
 } as const;
 
 export const ErrorCode = {

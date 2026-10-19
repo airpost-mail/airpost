@@ -23,6 +23,13 @@ export function fakeEngine(
 ) {
   const sent: Sent[] = [];
   spyOn(Engine, 'has').andCallFake((feature: string) => hasAi && features.includes(feature));
+  // Engine.connected reads the window's EngineEvents; restored after the spec.
+  const events = Engine.events;
+  const previous = events.features;
+  events.features = hasAi ? new Set(features) : null;
+  jasmine.getEnv().currentSpec.after(() => {
+    events.features = previous;
+  });
   spyOn(Engine, 'request').andCallFake(async (method: string, params: any) => {
     sent.push({ method, params });
     const answer = answers[method];
@@ -48,7 +55,10 @@ export function fakeKeyset(initial: { [name: string]: string } = {}) {
 }
 
 /** The features of an engine that keeps the AI keys and the providers. */
-export const ENGINE_KEYS = ['ai', 'ai-triage', 'account-setup'];
+export const ENGINE_KEYS = ['ai', 'ai-triage', 'account-setup', 'ai-keys'];
+
+/** The features of an engine before AI6: secrets.* and the stored settings, no AI keys. */
+export const ENGINE_BEFORE_KEYS = ['ai', 'ai-triage', 'account-setup'];
 
 /** The engine's secret store: `secrets.*` answers over `stored`. */
 export function secretAnswers(stored: { [name: string]: string }) {

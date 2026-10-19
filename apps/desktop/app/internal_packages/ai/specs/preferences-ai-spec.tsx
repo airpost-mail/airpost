@@ -285,6 +285,24 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     renderer.unmount();
   });
 
+  it('keeps the server and the provider while the engine is down', async () => {
+    withProvider('openai');
+    secrets['integration:ai-openai'] = SYNTHETIC_KEY;
+    fakeEngine(secretAnswers(secrets), { hasAi: false });
+    spyOn(AppEnv, 'showErrorDialog');
+    const renderer = await render();
+    await type(renderer, 'ai-provider-openai-url', 'http://192.168.1.20:1234/v1');
+    expect(AppEnv.config.get('core.ai').providers[0].url).toBeUndefined();
+    expect(textOf(renderer)).toContain('The sync engine is not connected.');
+    await act(async () => {
+      await button(renderer, 'Remove').props.onClick();
+    });
+    expect(AppEnv.showErrorDialog).toHaveBeenCalled();
+    expect(AppEnv.config.get('core.ai').providers.length).toBe(1);
+    expect(secrets).toEqual({ 'integration:ai-openai': SYNTHETIC_KEY });
+    renderer.unmount();
+  });
+
   it('keeps the provider when the engine cannot forget its key', async () => {
     withProvider('anthropic');
     secrets['integration:ai-anthropic'] = SYNTHETIC_KEY;

@@ -17,6 +17,7 @@ import {
 } from '../lib/ai-client';
 import {
   ACCOUNT_ID,
+  ENGINE_BEFORE_KEYS,
   ENGINE_KEYS,
   SYNTHETIC_KEY,
   aiError,
@@ -291,5 +292,54 @@ describe('ai.* calls to an engine that keeps the keys', () => {
     await moveKeysToEngine();
     expect(secrets).toEqual({ 'integration:ai-anthropic': SYNTHETIC_KEY });
     expect(keys).toEqual({});
+  });
+});
+
+describe('keys with an engine before AI6, or none connected', () => {
+  let keys: { [name: string]: string };
+  let secrets: { [name: string]: string };
+
+  beforeEach(() => {
+    keys = fakeKeyset({ 'integration-ai-anthropic-key': SYNTHETIC_KEY });
+    secrets = {};
+  });
+
+  it("keeps the keyset's keys for an engine that lists account-setup but not ai-keys", async () => {
+    setUpAi();
+    const sent = fakeEngine(
+      {
+        ...secretAnswers(secrets),
+        'ai.summarize': () => ({ text: 'A summary.', model: 'claude-test' }),
+      },
+      { features: ENGINE_BEFORE_KEYS }
+    );
+    await moveKeysToEngine();
+    expect(keys['integration-ai-anthropic-key']).toBe(SYNTHETIC_KEY);
+    expect(secrets).toEqual({});
+
+    await summarize(ACCOUNT_ID, 't1').promise;
+    const call = sent.find((s) => s.method === 'ai.summarize');
+    expect(call.params.provider).toBeUndefined();
+    expect(call.params.config.apiKey).toBe(SYNTHETIC_KEY);
+
+    await saveKey('openai', 'other-synthetic');
+    expect(keys['integration-ai-openai-key']).toBe('other-synthetic');
+    expect(secrets).toEqual({});
+    expect(await hasSavedKey('openai')).toBe(true);
+
+    // Forgetting also drops a copy a newer engine may have kept.
+    secrets['integration:ai-anthropic'] = SYNTHETIC_KEY;
+    await forgetKey('anthropic');
+    expect(keys['integration-ai-anthropic-key']).toBeUndefined();
+    expect(secrets).toEqual({});
+  });
+
+  it('forgets nowhere and knows no saved key while the engine is down', async () => {
+    const sent = fakeEngine(secretAnswers(secrets), { hasAi: false });
+    const forgot = await rejection(forgetKey('anthropic'));
+    expect(forgot.key).toBe('engine-disconnected');
+    expect((await rejection(hasSavedKey('anthropic'))).key).toBe('engine-disconnected');
+    expect(keys['integration-ai-anthropic-key']).toBe(SYNTHETIC_KEY);
+    expect(sent).toEqual([]);
   });
 });
