@@ -12,6 +12,8 @@
 //!   unknown. A thread or message with a copy in an excluded folder or label is blocked, even
 //!   when it is also somewhere allowed.
 //! - `http`: `{enabled, port}` for `tern-mcp http`; off by default.
+//! - `enabled`: `false` turns every tool off (the desktop's "Let apps on this computer use
+//!   Tern" switch). Absent means on, so files written before the switch keep working.
 //!
 //! Without `mcp.json`, the desktop's `core.mcp.accessLevel` and `core.mcp.enabledAccounts`
 //! in `config.json` are read instead, so settings made in the old preferences pane keep
@@ -67,6 +69,10 @@ fn default_port() -> u16 {
     DEFAULT_HTTP_PORT
 }
 
+fn default_true() -> bool {
+    true
+}
+
 impl Default for HttpPolicy {
     fn default() -> Self {
         HttpPolicy {
@@ -89,6 +95,8 @@ pub enum Source {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PolicyFile {
+    #[serde(default = "default_true")]
+    enabled: bool,
     #[serde(default)]
     access_level: Option<String>,
     #[serde(default)]
@@ -99,6 +107,7 @@ struct PolicyFile {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Policy {
+    pub enabled: bool,
     /// As configured; [`Policy::check_access`] treats an unknown value as read-only.
     pub access_level: String,
     pub enabled_accounts: BTreeMap<String, AccountPolicy>,
@@ -109,6 +118,7 @@ pub struct Policy {
 impl Default for Policy {
     fn default() -> Self {
         Policy {
+            enabled: true,
             access_level: "read-only".into(),
             enabled_accounts: BTreeMap::new(),
             http: HttpPolicy::default(),
@@ -127,6 +137,7 @@ impl Policy {
                 let f: PolicyFile = serde_json::from_slice(&bytes)
                     .map_err(|e| format!("{} is not a valid policy file: {e}", path.display()))?;
                 Ok(Policy {
+                    enabled: f.enabled,
                     access_level: f.access_level.unwrap_or_else(|| "read-only".into()),
                     enabled_accounts: f.enabled_accounts,
                     http: f.http,
@@ -150,6 +161,7 @@ impl Policy {
             return Ok(Policy::default());
         }
         Ok(Policy {
+            enabled: true,
             access_level: level.unwrap_or("read-only").to_owned(),
             enabled_accounts: accounts.unwrap_or_default(),
             http: HttpPolicy::default(),
@@ -159,6 +171,13 @@ impl Policy {
 
     /// `checkAccessLevel`: `Err` with the message the plugin returned.
     pub fn check_access(&self, category: Category) -> Result<(), String> {
+        if !self.enabled {
+            return Err(
+                "Access denied: apps on this computer are not allowed to use Tern. \
+                        Turn it on in Tern's Preferences > Agents."
+                    .into(),
+            );
+        }
         let level = self.access_level.as_str();
         let ok = match category {
             Category::Read => true,
@@ -181,11 +200,12 @@ impl Policy {
     }
 
     pub fn account_allowed(&self, account_id: &str) -> bool {
-        self.enabled_accounts.is_empty()
-            || self
-                .enabled_accounts
-                .get(account_id)
-                .is_some_and(|a| a.enabled)
+        self.enabled
+            && (self.enabled_accounts.is_empty()
+                || self
+                    .enabled_accounts
+                    .get(account_id)
+                    .is_some_and(|a| a.enabled))
     }
 
     fn excluded(&self, account_id: &str) -> &[String] {
@@ -230,6 +250,7 @@ impl Policy {
         };
         serde_json::json!({
             "source": source,
+            "enabled": self.enabled,
             "accessLevel": self.access_level,
             "enabledAccounts": self.enabled_accounts,
             "http": self.http,
@@ -335,6 +356,18 @@ mod tests {
         assert!(!p.message_allowed(&msg));
         assert!(p.message_allowed(&json!({"aid": "a", "folders": {"inbox": 0}})));
         assert!(!p.message_allowed(&json!({"aid": "b", "folders": {}})));
+    }
+
+    #[test]
+    fn enabled_false_turns_every_tool_and_account_off() {
+        assert!(policy(json!({})).enabled);
+        let p = policy(json!({"enabled": false, "accessLevel": "read-write-send"}));
+        let e = p.check_access(Category::Read).unwrap_err();
+        assert!(e.contains("Preferences > Agents"), "{e}");
+        assert!(p.check_access(Category::Send).is_err());
+        assert!(!p.account_allowed("a"));
+        assert!(!p.thread_allowed(&json!({"aid": "a", "folders": [], "labels": []})));
+        assert_eq!(p.summary()["enabled"], false);
     }
 
     #[test]

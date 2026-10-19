@@ -81,6 +81,8 @@ open Tern.
 - `enabledAccounts`: empty means every account. Otherwise an account that is absent or has
   `enabled: false` is invisible: not listed, and its ids answer "not found". Threads and
   messages in an excluded folder are hidden the same way, and the folder isn't listed.
+- `enabled`: `false` refuses every tool call and hides every account; absent or `true` is
+  on. The desktop's Agents switch ("Let apps on this computer use Tern") writes it.
 - The file is re-read on every call. A file that doesn't parse is an error for every tool, so
   a typo can't widen access.
 - Without `mcp.json`, `accessLevel` and `enabledAccounts` come from the desktop's

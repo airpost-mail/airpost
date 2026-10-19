@@ -170,6 +170,9 @@ fn print_status(s: &Value) {
             p["accessLevel"].as_str().unwrap_or(""),
             p["source"].as_str().unwrap_or("")
         );
+        if p["enabled"] == false {
+            println!("Access:    off (every tool is refused)");
+        }
         let accounts = p["enabledAccounts"].as_object().filter(|o| !o.is_empty());
         match accounts {
             None => println!("Accounts:  all"),
