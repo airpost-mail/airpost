@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2329  # build_* are called as build_$platform
-# Builds the release engine (`mailsync`) and the MCP server (`tern-mcp`, apps/mcp) for macOS
-# and Linux and optionally places them where the desktop build picks them up
-# (apps/desktop/app/mailsync-rs and apps/desktop/app/tern-mcp, unpacked from the asar by
-# apps/desktop/app/build/build.js).
+# Builds the release engine (`mailsync`), the MCP server (`tern-mcp`, apps/mcp) and the CLI
+# (`tern`, apps/cli) for macOS and Linux and optionally places them where the desktop build
+# picks them up (apps/desktop/app/mailsync-rs, apps/desktop/app/tern-mcp and
+# apps/desktop/app/tern, unpacked from the asar by apps/desktop/app/build/build.js).
 #
 #   build-release.sh [macos] [linux] [--install-desktop[=ARCH]]
 #
@@ -13,10 +13,11 @@
 #   aarch64-apple-darwin/mailsync     x86_64-apple-darwin/mailsync   universal-apple-darwin/mailsync
 #   x86_64-unknown-linux-gnu/mailsync aarch64-unknown-linux-gnu/mailsync
 #
-# and tern-mcp next to each mailsync.
+# and tern-mcp and tern next to each mailsync.
 # Each target directory also gets LICENSE.md, NOTICE.md and THIRD-PARTY-NOTICES.txt (the
 # engine crates' licences, from third-party-notices.sh) and tern-mcp.THIRD-PARTY-NOTICES.txt
-# (tern-mcp's), which ship next to the binaries. Without
+# (tern-mcp's, which also cover tern: its crates are a subset of tern-mcp's), which ship next
+# to the binaries. Without
 # cargo-about the notices are skipped with a warning; TERN_REQUIRE_NOTICES=1 (set in CI) makes
 # that an error.
 #
@@ -26,8 +27,8 @@
 # bullseye container (glibc 2.31, older than any distro the desktop's Linux packages
 # support). Linux debug info is split into mailsync.debug next to each binary.
 #
-# --install-desktop copies one mailsync to apps/desktop/app/mailsync-rs and its tern-mcp to
-# apps/desktop/app/tern-mcp, and the notices to
+# --install-desktop copies one mailsync to apps/desktop/app/mailsync-rs and its tern-mcp and
+# tern to apps/desktop/app/tern-mcp and apps/desktop/app/tern, and the notices to
 # apps/desktop/app/mailsync-rs.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
 # universal (macOS only); the default is the arch build.js packages for: x64 when
 # OVERRIDE_TO_INTEL is set, else the host's.
@@ -44,7 +45,7 @@ export CARGO_TARGET_DIR="$TARGET_DIR"
 OUT_DIR="${OUT_DIR:-$TARGET_DIR/engine-dist}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$PWD/$OUT_DIR" ;; esac
 DESKTOP_APP_DIR="$REPO_ROOT/apps/desktop/app"
-BINARIES=(mailsync tern-mcp)
+BINARIES=(mailsync tern-mcp tern)
 LINUX_IMAGE="${LINUX_IMAGE:-rust:$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$REPO_ROOT/rust-toolchain.toml")-bullseye}"
 # Electron 44's floor; also above arm64's 11.0 minimum.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-12.0}"
@@ -78,9 +79,9 @@ cargo_build() {
     local bin
     bin="$(dirname "$("$RUSTUP" which --toolchain "$TOOLCHAIN" cargo)")"
     PATH="$bin:$PATH" RUSTC="$bin/rustc" "$bin/cargo" build --release --locked -p mailsync \
-      -p tern-mcp --target "$target" "$@"
+      -p tern-mcp -p tern --target "$target" "$@"
   else
-    cargo build --release --locked -p mailsync -p tern-mcp --target "$target" "$@" ||
+    cargo build --release --locked -p mailsync -p tern-mcp -p tern --target "$target" "$@" ||
       die "cargo build for $target failed; without rustup the $target standard library must already be installed"
   fi
 }
@@ -237,7 +238,9 @@ install_desktop() {
   done
   install -m 755 "$OUT_DIR/$target/mailsync" "$DESKTOP_APP_DIR/mailsync-rs"
   install -m 755 "$OUT_DIR/$target/tern-mcp" "$DESKTOP_APP_DIR/tern-mcp"
-  log "Installed $target into $DESKTOP_APP_DIR/mailsync-rs and $DESKTOP_APP_DIR/tern-mcp"
+  # Preferences > Plugins runs it for `tern service install`.
+  install -m 755 "$OUT_DIR/$target/tern" "$DESKTOP_APP_DIR/tern"
+  log "Installed $target into $DESKTOP_APP_DIR/mailsync-rs, $DESKTOP_APP_DIR/tern-mcp and $DESKTOP_APP_DIR/tern"
   if [ -f "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" \
       "$DESKTOP_APP_DIR/mailsync-rs.THIRD-PARTY-NOTICES.txt"

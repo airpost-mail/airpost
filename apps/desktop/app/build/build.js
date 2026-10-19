@@ -255,13 +255,16 @@ function buildPackagerOptions() {
       unpack:
         '{' +
         [
-          // The Rust engine and the MCP server, placed by
+          // The Rust engine, the MCP server and the CLI, placed by
           // apps/engine/packaging/build-release.sh --install-desktop. Preferences runs
-          // tern-mcp, and MCP clients run it from here, so it must be a real file.
+          // tern-mcp and tern, and MCP clients and service units run binaries from here, so
+          // they must be real files.
           'mailsync-rs',
           'mailsync-rs.exe',
           'tern-mcp',
           'tern-mcp.exe',
+          'tern',
+          'tern.exe',
           '*.so',
           '*.so.*',
           '*.dll',

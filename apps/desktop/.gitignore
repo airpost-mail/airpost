@@ -66,6 +66,8 @@ client_secret.json
 /app/mailsync-rs
 /app/mailsync-rs.THIRD-PARTY-NOTICES.txt
 /app/tern-mcp
+/app/tern
+/app/tern.exe
 /app/tern-mcp.exe
 /app/tern-mcp.THIRD-PARTY-NOTICES.txt
 /logfile.txt
