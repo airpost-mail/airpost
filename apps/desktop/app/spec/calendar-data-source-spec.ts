@@ -101,6 +101,8 @@ describe('CalendarDataSource', function () {
       await new Promise((resolve) => setImmediate(resolve));
     }
     sub.dispose();
+    // Runs the pool's cleanup timer, which a later spec's subscriptions would otherwise wait on.
+    advanceClock(10);
     const [params] = engine.callsTo('events.expand');
     expect(params.calendarIds).toEqual(['work']);
     expect(params.start).toBe(100);
