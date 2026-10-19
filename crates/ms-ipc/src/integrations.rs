@@ -36,6 +36,8 @@ pub mod capability_reason {
     pub const MISSING_URL: &str = "missing-url";
     /// Only a Tern server offers it, and none is connected.
     pub const NEEDS_TERN_SERVER: &str = "needs-tern-server";
+    /// A Tern server is connected but doesn't offer it (its `features` leave it off).
+    pub const NOT_ON_SERVER: &str = "not-on-server";
     /// AI: the provider needs an API key and the secret store holds none under
     /// `integration:ai-<id>` (Ollama needs none).
     pub const NEEDS_ENGINE_KEY: &str = "needs-engine-key";

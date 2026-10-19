@@ -311,6 +311,12 @@ pub mod feature {
     /// `serve`: `draft.create`, `draft.send` (with `bodies` kept with the pending send),
     /// `draft.cancelSend` and `draft.validate`, and the `composing.quoteTexts` setting.
     pub const DRAFT_PIPELINE: &str = "draft-pipeline";
+    /// `draft.send` and the expiration executor send drafts with `open-tracking` or
+    /// `link-tracking` on tracked, in the Tern URL format, when the connected server offers
+    /// tracking (`capabilities.server.readReceipts` / `linkTracking`); the executor claims due
+    /// rows on the server first (docs/backend-plan.md 3.6, 3.8). Clients don't transform
+    /// tracked drafts themselves.
+    pub const TRACKING: &str = "tracking";
     /// The `integrations.*` methods (docs/integrations-plan.md section 4).
     pub const INTEGRATIONS: &str = "integrations";
     /// `capabilities` in `hello` and `engine.status`, and `capabilities.changed`
