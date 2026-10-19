@@ -63,7 +63,7 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD47 | Provider presets: dead entries, three copies, unbounded MX lookup | ux | low | 1–2 days | stage 12 |
 | TD48 | Three 12/24-hour rules; reply attribution line is English 12-hour | i18n | medium | ~150 TS | before stage 13 |
 | TD49 | Very large sync and send functions | engine | low | M, spread | stage 13 / with TD39 |
-| TD50 | EventSearch and ContactSearch updated by an UNINDEXED column | engine | medium | ~120 Rust | before stage 18 |
+| TD50 | EventSearch and ContactSearch updated by an UNINDEXED column (done) | engine | medium | ~120 Rust | before stage 18 |
 | TD51 | Three timezone databases, two copies of ical.js | deps | low | M, mostly free | after stage 18 |
 | **Later** | | | | | |
 | TD52 | React 17 with APIs React 19 removes | deps | medium | ~1 week + M | codemod now; React 18 after stage 8 |
@@ -1277,6 +1277,11 @@ Python harness.
   `sync_now` is unchanged.
 
 ### TD50. EventSearch and ContactSearch updated by an UNINDEXED column (before stage 18)
+
+Done (roadmap/client-next, stage 18). Event and Contact keep their FTS rowid as `searchRowId`
+(`crates/ms-store/src/models/search_row.rs`) and update and delete by it. A row written before
+that is found by `content_id` once, on its next save, so no migration was needed; a
+`searchRowId` that names another model's row is not trusted.
 
 Verified (EXPLAIN). `content_id` is declared UNINDEXED (`crates/ms-store/src/schema.rs:31`, `:66`)
 and every event update and delete and non-mail contact update uses `WHERE content_id = ?`

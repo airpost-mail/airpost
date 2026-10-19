@@ -154,6 +154,12 @@ impl Contact {
         self.data["refs"] = json!(self.refs() + 1);
     }
 
+    /// Mail-sourced contacts only change their refcount after creation, so their search
+    /// text is written once.
+    fn writes_search(&self) -> bool {
+        self.version() == 1 || self.source() != CONTACT_SOURCE_MAIL
+    }
+
     /// `ContactSearch.content`: the email with its `@` as a space, then the name.
     pub fn search_content(&self) -> String {
         let mut content = self.email().replacen('@', " ", 1);
@@ -198,26 +204,31 @@ impl Model for Contact {
         Ok(())
     }
 
-    /// Mail-sourced contacts only change their refcount after creation, so their search
-    /// text is written once.
-    fn after_save(&mut self, store: &Store) -> Result<()> {
-        let conn = store.conn();
-        if self.version() == 1 {
-            conn.prepare_cached("INSERT INTO ContactSearch (content_id, content) VALUES (?, ?)")?
-                .execute(rusqlite::params![self.id(), self.search_content()])?;
-        } else if self.source() != CONTACT_SOURCE_MAIL {
-            conn.prepare_cached("UPDATE ContactSearch SET content = ? WHERE content_id = ?")?
-                .execute(rusqlite::params![self.search_content(), self.id()])?;
+    fn before_save(&mut self, store: &Store) -> Result<()> {
+        if self.writes_search() {
+            let id = self.id().to_owned();
+            super::search_row::assign(store, "ContactSearch", &id, &mut self.data)?;
         }
         Ok(())
     }
 
+    fn after_save(&mut self, store: &Store) -> Result<()> {
+        if !self.writes_search() {
+            return Ok(());
+        }
+        let rowid = json_i64(&self.data["searchRowId"]);
+        super::search_row::write(
+            store,
+            "ContactSearch",
+            rowid,
+            self.id(),
+            &["content"],
+            &[&self.search_content()],
+        )
+    }
+
     fn after_remove(&mut self, store: &Store) -> Result<()> {
-        store
-            .conn()
-            .prepare_cached("DELETE FROM ContactSearch WHERE content_id = ?")?
-            .execute([self.id()])?;
-        Ok(())
+        super::search_row::remove(store, "ContactSearch", self.id(), &self.data)
     }
 }
 

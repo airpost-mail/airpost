@@ -327,42 +327,35 @@ impl Model for Event {
         Ok(())
     }
 
-    fn after_save(&mut self, store: &Store) -> Result<()> {
-        if !self.has_search_content() {
-            return Ok(());
-        }
-        let conn = store.conn();
-        if self.version() == 1 {
-            conn.prepare_cached(
-                "INSERT INTO EventSearch (content_id, title, description, location, participants) VALUES (?, ?, ?, ?, ?)",
-            )?
-            .execute(rusqlite::params![
-                self.id(),
-                self.search_title,
-                self.search_description,
-                self.search_location,
-                self.search_participants
-            ])?;
-        } else {
-            conn.prepare_cached(
-                "UPDATE EventSearch SET title = ?, description = ?, location = ?, participants = ? WHERE content_id = ?",
-            )?
-            .execute(rusqlite::params![
-                self.search_title,
-                self.search_description,
-                self.search_location,
-                self.search_participants,
-                self.id()
-            ])?;
+    fn before_save(&mut self, store: &Store) -> Result<()> {
+        if self.has_search_content() {
+            let id = self.id().to_owned();
+            super::search_row::assign(store, "EventSearch", &id, &mut self.data)?;
         }
         Ok(())
     }
 
+    fn after_save(&mut self, store: &Store) -> Result<()> {
+        if !self.has_search_content() {
+            return Ok(());
+        }
+        let rowid = json_i64(&self.data["searchRowId"]);
+        super::search_row::write(
+            store,
+            "EventSearch",
+            rowid,
+            self.id(),
+            &["title", "description", "location", "participants"],
+            &[
+                &self.search_title,
+                &self.search_description,
+                &self.search_location,
+                &self.search_participants,
+            ],
+        )
+    }
+
     fn after_remove(&mut self, store: &Store) -> Result<()> {
-        store
-            .conn()
-            .prepare_cached("DELETE FROM EventSearch WHERE content_id = ?")?
-            .execute([self.id()])?;
-        Ok(())
+        super::search_row::remove(store, "EventSearch", self.id(), &self.data)
     }
 }

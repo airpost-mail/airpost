@@ -849,3 +849,90 @@ fn safe_display_name_matches_the_client() {
         root.join("ab").join("cd").join("abcdef12").join("x.pdf")
     );
 }
+
+/// TD50: search rows are found by the rowid kept on the model, a row from before that by
+/// `content_id` once, and a `searchRowId` naming another model's row is not trusted.
+#[test]
+fn search_rows_are_found_by_rowid() {
+    let f = pim_fixture();
+    let rowid_of = |id: &str| -> i64 {
+        f.store
+            .conn()
+            .query_row(
+                "SELECT rowid FROM ContactSearch WHERE content_id = ?",
+                [id],
+                |r| r.get(0),
+            )
+            .unwrap()
+    };
+    let load = |id: &str| {
+        f.store
+            .find::<Contact>(&Query::new().equal("id", id))
+            .unwrap()
+            .unwrap()
+    };
+    let c1 = load("c1");
+    assert_eq!(c1.data["searchRowId"], json!(rowid_of("c1")));
+
+    // A row written before searchRowId: found by content_id and recorded.
+    let mut legacy = load("c2");
+    legacy.data.as_object_mut().unwrap().remove("searchRowId");
+    let before = rowid_of("c2");
+    legacy.data["name"] = json!("Two");
+    f.store.save(&mut legacy).unwrap();
+    assert_eq!(legacy.data["searchRowId"], json!(before));
+    assert_eq!(rowid_of("c2"), before);
+
+    // JSON carrying c1's rowid for c2 leaves c1's row alone.
+    let mut stale = load("c2");
+    stale.data["searchRowId"] = json!(rowid_of("c1"));
+    stale.data["name"] = json!("Deux");
+    f.store.save(&mut stale).unwrap();
+    assert_eq!(stale.data["searchRowId"], json!(before));
+    let content = |id: &str| -> String {
+        f.store
+            .conn()
+            .query_row(
+                "SELECT content FROM ContactSearch WHERE content_id = ?",
+                [id],
+                |r| r.get(0),
+            )
+            .unwrap()
+    };
+    assert_eq!(content("c1"), "c1 x ");
+    assert_eq!(content("c2"), "c2 x Deux");
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM ContactSearch"), 2);
+    f.assert_invariants();
+
+    // Events alike.
+    let mut e = f.store.find::<Event>(&Query::new()).unwrap().unwrap();
+    let event_row: i64 = f
+        .store
+        .conn()
+        .query_row("SELECT rowid FROM EventSearch", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(e.data["searchRowId"], json!(event_row));
+    e.data.as_object_mut().unwrap().remove("searchRowId");
+    let fields = IcsEventFields {
+        uid: "uid-1".into(),
+        summary: "Supper".into(),
+        ..Default::default()
+    };
+    e.apply_ics_event_data("etag2", "/cal/1.ics", "BEGIN:VCALENDAR", &fields);
+    f.store.save(&mut e).unwrap();
+    assert_eq!(e.data["searchRowId"], json!(event_row));
+    assert_eq!(
+        count(
+            &f,
+            "SELECT COUNT(*) FROM EventSearch WHERE title = 'Supper'"
+        ),
+        1
+    );
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM EventSearch"), 1);
+    f.store.remove(&mut e).unwrap();
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM EventSearch"), 0);
+
+    f.store.remove(&mut load("c1")).unwrap();
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM ContactSearch"), 1);
+    f.assert_invariants();
+}

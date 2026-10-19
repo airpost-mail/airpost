@@ -34,6 +34,7 @@ mod file;
 mod folder;
 pub(crate) mod generic;
 mod message;
+mod search_row;
 mod task;
 mod thread;
 
