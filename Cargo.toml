@@ -23,6 +23,8 @@ ms-net = { path = "crates/ms-net" }
 ms-dav = { path = "crates/ms-dav" }
 ms-sync = { path = "crates/ms-sync" }
 ms-tasks = { path = "crates/ms-tasks" }
+# Drafts as the desktop builds them: quoting, signatures, send warnings (desktop-client-plan 3.3).
+ms-compose = { path = "crates/ms-compose" }
 # Shared with tern-backend, which must not depend on the engine crates above.
 ms-wire = { path = "crates/ms-wire" }
 # The engine socket protocol (docs/engine-protocol-plan.md): serde and serde_json only.
@@ -54,6 +56,10 @@ calcard = "0.3"
 encoding_rs = "0.8"
 chardetng = "1.0"
 html5ever = "0.40"
+# Draft quoting (ms-compose): the desktop's DOMPurify and juice passes.
+ammonia = "4.2"
+css-inline = { version = "0.23", default-features = false }
+idna = "1.1"
 roxmltree = "0.21"
 hickory-resolver = { version = "0.26", default-features = false, features = ["tokio", "system-config"] }
 

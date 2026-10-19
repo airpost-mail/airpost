@@ -1,0 +1,3312 @@
+{
+  "tz": "America/Chicago",
+  "accounts": [
+    {
+      "id": "acc1",
+      "name": "Ann Owner",
+      "emailAddress": "ann@example.com",
+      "provider": "imap",
+      "aliases": [
+        "Ann at Work <ann@work.example>",
+        "Support Desk <help@example.com>"
+      ],
+      "autoaddress": {
+        "type": "bcc",
+        "value": ""
+      }
+    },
+    {
+      "id": "acc2",
+      "name": "Ann Personal",
+      "emailAddress": "ann.p@example.org",
+      "provider": "imap",
+      "aliases": [],
+      "defaultAlias": "Annie <ann.p@example.org>",
+      "autoaddress": {
+        "type": "cc",
+        "value": "Archive <archive@example.org>, log@example.org"
+      }
+    }
+  ],
+  "signatures": {
+    "sig1": {
+      "id": "sig1",
+      "title": "Work",
+      "body": "<div>Ann Owner<br/>Example Inc.</div>"
+    },
+    "sig2": {
+      "id": "sig2",
+      "title": "Personal",
+      "body": "<b>-- Annie</b>"
+    }
+  },
+  "defaultSignatures": {
+    "ann@example.com": "sig1",
+    "ann.p@example.org": "sig2"
+  },
+  "quoteTexts": {
+    "attribution": "On {date}, {from} wrote:",
+    "forwardedMessage": "Forwarded Message",
+    "from": "From",
+    "subject": "Subject",
+    "date": "Date",
+    "to": "To",
+    "cc": "Cc",
+    "dateTime": "{month} {day}, {year}, {hour}:{minute} {dayPeriod}",
+    "months": [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ],
+    "dayPeriods": [
+      "AM",
+      "PM"
+    ]
+  },
+  "quoteTexts24": {
+    "attribution": "On {date}, {from} wrote:",
+    "forwardedMessage": "Forwarded Message",
+    "from": "From",
+    "subject": "Subject",
+    "date": "Date",
+    "to": "To",
+    "cc": "Cc",
+    "dateTime": "{month} {day}, {year}, {hour2}:{minute}",
+    "months": [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ],
+    "dayPeriods": [
+      "AM",
+      "PM"
+    ]
+  },
+  "quoteTextsDe": {
+    "attribution": "On {date}, {from} wrote:",
+    "forwardedMessage": "Weitergeleitete E-Mail",
+    "from": "Von",
+    "subject": "Betreff",
+    "date": "Datum",
+    "to": "An",
+    "cc": "CC",
+    "dateTime": "{day2}.{month2}.{year}, {hour2}:{minute}",
+    "months": [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12"
+    ],
+    "dayPeriods": [
+      "AM",
+      "PM"
+    ]
+  },
+  "dates": [
+    {
+      "at": 1700000000,
+      "locale": "en-US",
+      "cycle": "h12",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Forwarded Message",
+        "from": "From",
+        "subject": "Subject",
+        "date": "Date",
+        "to": "To",
+        "cc": "Cc",
+        "dateTime": "{month} {day}, {year}, {hour}:{minute} {dayPeriod}",
+        "months": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "Nov 14, 2023, 4:13 PM"
+    },
+    {
+      "at": 978310800,
+      "locale": "en-US",
+      "cycle": "h12",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Forwarded Message",
+        "from": "From",
+        "subject": "Subject",
+        "date": "Date",
+        "to": "To",
+        "cc": "Cc",
+        "dateTime": "{month} {day}, {year}, {hour}:{minute} {dayPeriod}",
+        "months": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "Dec 31, 2000, 7:00 PM"
+    },
+    {
+      "at": 1704067140,
+      "locale": "en-US",
+      "cycle": "h12",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Forwarded Message",
+        "from": "From",
+        "subject": "Subject",
+        "date": "Date",
+        "to": "To",
+        "cc": "Cc",
+        "dateTime": "{month} {day}, {year}, {hour}:{minute} {dayPeriod}",
+        "months": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "Dec 31, 2023, 5:59 PM"
+    },
+    {
+      "at": 1700000000,
+      "locale": "en-US",
+      "cycle": "h23",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Forwarded Message",
+        "from": "From",
+        "subject": "Subject",
+        "date": "Date",
+        "to": "To",
+        "cc": "Cc",
+        "dateTime": "{month} {day}, {year}, {hour2}:{minute}",
+        "months": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "Nov 14, 2023, 16:13"
+    },
+    {
+      "at": 978310800,
+      "locale": "en-US",
+      "cycle": "h23",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Forwarded Message",
+        "from": "From",
+        "subject": "Subject",
+        "date": "Date",
+        "to": "To",
+        "cc": "Cc",
+        "dateTime": "{month} {day}, {year}, {hour2}:{minute}",
+        "months": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "Dec 31, 2000, 19:00"
+    },
+    {
+      "at": 1704067140,
+      "locale": "en-US",
+      "cycle": "h23",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Forwarded Message",
+        "from": "From",
+        "subject": "Subject",
+        "date": "Date",
+        "to": "To",
+        "cc": "Cc",
+        "dateTime": "{month} {day}, {year}, {hour2}:{minute}",
+        "months": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "Dec 31, 2023, 17:59"
+    },
+    {
+      "at": 1700000000,
+      "locale": "de-DE",
+      "cycle": "h23",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Weitergeleitete E-Mail",
+        "from": "Von",
+        "subject": "Betreff",
+        "date": "Datum",
+        "to": "An",
+        "cc": "CC",
+        "dateTime": "{day2}.{month2}.{year}, {hour2}:{minute}",
+        "months": [
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "14.11.2023, 16:13"
+    },
+    {
+      "at": 978310800,
+      "locale": "de-DE",
+      "cycle": "h23",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Weitergeleitete E-Mail",
+        "from": "Von",
+        "subject": "Betreff",
+        "date": "Datum",
+        "to": "An",
+        "cc": "CC",
+        "dateTime": "{day2}.{month2}.{year}, {hour2}:{minute}",
+        "months": [
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "31.12.2000, 19:00"
+    },
+    {
+      "at": 1704067140,
+      "locale": "de-DE",
+      "cycle": "h23",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "Weitergeleitete E-Mail",
+        "from": "Von",
+        "subject": "Betreff",
+        "date": "Datum",
+        "to": "An",
+        "cc": "CC",
+        "dateTime": "{day2}.{month2}.{year}, {hour2}:{minute}",
+        "months": [
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12"
+        ],
+        "dayPeriods": [
+          "AM",
+          "PM"
+        ]
+      },
+      "desktop": "31.12.2023, 17:59"
+    },
+    {
+      "at": 1700000000,
+      "locale": "ja-JP",
+      "cycle": "h12",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "転送されたメッセージ",
+        "from": "差出人",
+        "subject": "件名",
+        "date": "日付",
+        "to": "宛先",
+        "cc": "CC",
+        "dateTime": "{year}/{month2}/{day2} {dayPeriod}{hour}:{minute}",
+        "months": [
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12"
+        ],
+        "dayPeriods": [
+          "午前",
+          "午後"
+        ]
+      },
+      "desktop": "2023/11/14 午後4:13"
+    },
+    {
+      "at": 978310800,
+      "locale": "ja-JP",
+      "cycle": "h12",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "転送されたメッセージ",
+        "from": "差出人",
+        "subject": "件名",
+        "date": "日付",
+        "to": "宛先",
+        "cc": "CC",
+        "dateTime": "{year}/{month2}/{day2} {dayPeriod}{hour}:{minute}",
+        "months": [
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12"
+        ],
+        "dayPeriods": [
+          "午前",
+          "午後"
+        ]
+      },
+      "desktop": "2000/12/31 午後7:00"
+    },
+    {
+      "at": 1704067140,
+      "locale": "ja-JP",
+      "cycle": "h12",
+      "texts": {
+        "attribution": "On {date}, {from} wrote:",
+        "forwardedMessage": "転送されたメッセージ",
+        "from": "差出人",
+        "subject": "件名",
+        "date": "日付",
+        "to": "宛先",
+        "cc": "CC",
+        "dateTime": "{year}/{month2}/{day2} {dayPeriod}{hour}:{minute}",
+        "months": [
+          "01",
+          "02",
+          "03",
+          "04",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "10",
+          "11",
+          "12"
+        ],
+        "dayPeriods": [
+          "午前",
+          "午後"
+        ]
+      },
+      "desktop": "2023/12/31 午後5:59"
+    }
+  ],
+  "quoting": [
+    {
+      "name": "simple",
+      "message": {
+        "id": "msg-simple",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "simple@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>"
+    },
+    {
+      "name": "styled",
+      "message": {
+        "id": "msg-styled",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<html><head><style>.big { font-size: 20px; color: #333 } p { margin: 0 } #x { color: red }</style></head><body><p class=\"big\">Big text</p><p id=\"x\">Red</p><div>plain</div></body></html>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "styled@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<style>\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-clear-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"search\" i]:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-search-cancel-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-inner-spin-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"button\" i]:active,\ninput[type=\"submit\" i]:active,\ninput[type=\"reset\" i]:active,\ninput[type=\"file\" i]:active::-webkit-file-upload-button,\nbutton:active {\n  border-style: inset;\n}\ninput[type=\"button\" i]:active:disabled,\ninput[type=\"submit\" i]:active:disabled,\ninput[type=\"reset\" i]:active:disabled,\ninput[type=\"file\" i]:active:disabled::-webkit-file-upload-button,\nbutton:active:disabled {\n  border-style: outset;\n}\ninput::-webkit-calendar-picker-indicator:hover {\n  background-color: #eee;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-calendar-picker-indicator,\ninput::-webkit-calendar-picker-indicator:focus {\n  opacity: 1;\n  pointer-events: auto;\n}\nselect:-internal-list-box:focus option:checked {\n  background-color: -internal-active-list-box-selection !important;\n  color: -internal-active-list-box-selection-text !important;\n}\n:focus {\n  outline: auto 5px -webkit-focus-ring-color;\n}\nhtml:focus,\nbody:focus,\ninput[readonly]:focus {\n  outline: none;\n}\napplet:focus,\nembed:focus,\niframe:focus,\nobject:focus {\n  outline: none;\n}\ninput:focus,\ntextarea:focus,\nkeygen:focus,\nselect:focus {\n  outline-offset: -2px;\n}\ninput[type=\"button\" i]:focus,\ninput[type=\"checkbox\" i]:focus,\ninput[type=\"file\" i]:focus,\ninput[type=\"hidden\" i]:focus,\ninput[type=\"image\" i]:focus,\ninput[type=\"radio\" i]:focus,\ninput[type=\"reset\" i]:focus,\ninput[type=\"search\" i]:focus,\ninput[type=\"submit\" i]:focus,\ninput[type=\"file\" i]:focus::-webkit-file-upload-button {\n  outline-offset: 0;\n}\na:-webkit-any-link:active {\n  color: -webkit-activelink;\n}\n@media print {\n  * {\n    -webkit-columns: auto !important;\n  }\n}\n</style><p class=\"big\" style=\"display: block; -webkit-margin-before: 1__qem; -webkit-margin-after: 1__qem; -webkit-margin-start: 0; -webkit-margin-end: 0; margin: 0px; font-size: 20px; color: rgb(51, 51, 51);\">Big text</p><p id=\"x\" style=\"display: block; -webkit-margin-before: 1__qem; -webkit-margin-after: 1__qem; -webkit-margin-start: 0; -webkit-margin-end: 0; margin: 0px; color: red;\">Red</p><div style=\"display: block;\">plain</div>"
+    },
+    {
+      "name": "style-import",
+      "message": {
+        "id": "msg-style-import",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<style>@import url(\"https://tracker.example/x.css\"); td { padding: 4px }</style><table><tr><td>cell</td></tr></table>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "style-import@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<style>\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-clear-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"search\" i]:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-search-cancel-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-inner-spin-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"button\" i]:active,\ninput[type=\"submit\" i]:active,\ninput[type=\"reset\" i]:active,\ninput[type=\"file\" i]:active::-webkit-file-upload-button,\nbutton:active {\n  border-style: inset;\n}\ninput[type=\"button\" i]:active:disabled,\ninput[type=\"submit\" i]:active:disabled,\ninput[type=\"reset\" i]:active:disabled,\ninput[type=\"file\" i]:active:disabled::-webkit-file-upload-button,\nbutton:active:disabled {\n  border-style: outset;\n}\ninput::-webkit-calendar-picker-indicator:hover {\n  background-color: #eee;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-calendar-picker-indicator,\ninput::-webkit-calendar-picker-indicator:focus {\n  opacity: 1;\n  pointer-events: auto;\n}\nselect:-internal-list-box:focus option:checked {\n  background-color: -internal-active-list-box-selection !important;\n  color: -internal-active-list-box-selection-text !important;\n}\n:focus {\n  outline: auto 5px -webkit-focus-ring-color;\n}\nhtml:focus,\nbody:focus,\ninput[readonly]:focus {\n  outline: none;\n}\napplet:focus,\nembed:focus,\niframe:focus,\nobject:focus {\n  outline: none;\n}\ninput:focus,\ntextarea:focus,\nkeygen:focus,\nselect:focus {\n  outline-offset: -2px;\n}\ninput[type=\"button\" i]:focus,\ninput[type=\"checkbox\" i]:focus,\ninput[type=\"file\" i]:focus,\ninput[type=\"hidden\" i]:focus,\ninput[type=\"image\" i]:focus,\ninput[type=\"radio\" i]:focus,\ninput[type=\"reset\" i]:focus,\ninput[type=\"search\" i]:focus,\ninput[type=\"submit\" i]:focus,\ninput[type=\"file\" i]:focus::-webkit-file-upload-button {\n  outline-offset: 0;\n}\na:-webkit-any-link:active {\n  color: -webkit-activelink;\n}\n@media print {\n  * {\n    -webkit-columns: auto !important;\n  }\n}\n</style><table style=\"border-collapse: separate; border-color: gray;\"><tbody style=\"display: table-row-group; vertical-align: middle; border-color: inherit;\" valign=\"middle\"><tr style=\"display: table-row; vertical-align: inherit; border-color: inherit;\" valign=\"inherit\"><td style=\"display: table-cell; vertical-align: inherit; padding: 4px;\" valign=\"inherit\">cell</td></tr></tbody></table>"
+    },
+    {
+      "name": "scripts",
+      "message": {
+        "id": "msg-scripts",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p onclick=\"steal()\">Hi</p><script>alert(1)</script><iframe src=\"https://evil.example\"></iframe><a href=\"javascript:alert(1)\">bad</a> <a href=\"https://ok.example/\" target=\"_blank\">ok</a><div data-secret=\"1\" title=\"t\">data</div><form action=\"https://f.example\"><input name=\"a\"></form>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "scripts@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<p>Hi</p><a>bad</a> <a href=\"https://ok.example/\" target=\"_blank\">ok</a><div title=\"t\">data</div><form action=\"https://f.example\"><input name=\"a\"></form>"
+    },
+    {
+      "name": "images",
+      "message": {
+        "id": "msg-images",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Logo <img src=\"cid:logo123\" alt=\"logo\"> and <img src=\"https://cdn.example/a.png\" width=\"100\"></p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "images@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<p>Logo  and <img src=\"https://cdn.example/a.png\" width=\"100\"></p>"
+    },
+    {
+      "name": "pixels",
+      "message": {
+        "id": "msg-pixels",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>News</p><img src=\"https://list-manage.com/track/open.php?u=1\" width=\"1\" height=\"1\"><img src=\"https://cdn.example/hidden.gif\" style=\"display:none\"><img src=\"https://cdn.example/photo.jpg\" width=\"300\">",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "pixels@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<p>News</p><img src=\"https://list-manage.com/track/open.php?u=1\" width=\"1\" height=\"1\"><img src=\"https://cdn.example/hidden.gif\" style=\"display:none\"><img src=\"https://cdn.example/photo.jpg\" width=\"300\">"
+    },
+    {
+      "name": "quoted",
+      "message": {
+        "id": "msg-quoted",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<div>Top reply</div><div class=\"gmail_quote\"><div class=\"gmail_quote_attribution\">On Mon, Bob wrote:</div><blockquote class=\"gmail_quote\" style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\"><p>Older text</p></blockquote></div>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "quoted@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<div>Top reply</div><div class=\"gmail_quote\"><div class=\"gmail_quote_attribution\">On Mon, Bob wrote:</div><blockquote class=\"gmail_quote\" style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\"><p>Older text</p></blockquote></div>"
+    },
+    {
+      "name": "entities",
+      "message": {
+        "id": "msg-entities",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Caf&eacute; &amp; cr&egrave;me &lt;3 — “quotes” 😀</p><p>&nbsp;</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "entities@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<p>Café &amp; crème &lt;3 — “quotes” 😀</p><p>&nbsp;</p>"
+    },
+    {
+      "name": "newsletter",
+      "message": {
+        "id": "msg-newsletter",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"0;url=https://x.example\"><title>News</title><style type=\"text/css\"><!-- .btn { background: #06c; color: #fff } --></style><link rel=\"stylesheet\" href=\"https://x.example/s.css\"></head><body bgcolor=\"#eee\"><table width=\"600\" align=\"center\" cellpadding=\"0\"><tr><td class=\"btn\">Click</td></tr></table></body></html>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "newsletter@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<title>News</title><style>\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-clear-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"search\" i]:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-search-cancel-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-inner-spin-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"button\" i]:active,\ninput[type=\"submit\" i]:active,\ninput[type=\"reset\" i]:active,\ninput[type=\"file\" i]:active::-webkit-file-upload-button,\nbutton:active {\n  border-style: inset;\n}\ninput[type=\"button\" i]:active:disabled,\ninput[type=\"submit\" i]:active:disabled,\ninput[type=\"reset\" i]:active:disabled,\ninput[type=\"file\" i]:active:disabled::-webkit-file-upload-button,\nbutton:active:disabled {\n  border-style: outset;\n}\ninput::-webkit-calendar-picker-indicator:hover {\n  background-color: #eee;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-calendar-picker-indicator,\ninput::-webkit-calendar-picker-indicator:focus {\n  opacity: 1;\n  pointer-events: auto;\n}\nselect:-internal-list-box:focus option:checked {\n  background-color: -internal-active-list-box-selection !important;\n  color: -internal-active-list-box-selection-text !important;\n}\n:focus {\n  outline: auto 5px -webkit-focus-ring-color;\n}\nhtml:focus,\nbody:focus,\ninput[readonly]:focus {\n  outline: none;\n}\napplet:focus,\nembed:focus,\niframe:focus,\nobject:focus {\n  outline: none;\n}\ninput:focus,\ntextarea:focus,\nkeygen:focus,\nselect:focus {\n  outline-offset: -2px;\n}\ninput[type=\"button\" i]:focus,\ninput[type=\"checkbox\" i]:focus,\ninput[type=\"file\" i]:focus,\ninput[type=\"hidden\" i]:focus,\ninput[type=\"image\" i]:focus,\ninput[type=\"radio\" i]:focus,\ninput[type=\"reset\" i]:focus,\ninput[type=\"search\" i]:focus,\ninput[type=\"submit\" i]:focus,\ninput[type=\"file\" i]:focus::-webkit-file-upload-button {\n  outline-offset: 0;\n}\na:-webkit-any-link:active {\n  color: -webkit-activelink;\n}\n@media print {\n  * {\n    -webkit-columns: auto !important;\n  }\n}\n</style><table width=\"600\" align=\"center\" cellpadding=\"0\" style=\"border-collapse: separate; border-color: gray;\"><tbody style=\"display: table-row-group; vertical-align: middle; border-color: inherit;\" valign=\"middle\"><tr style=\"display: table-row; vertical-align: inherit; border-color: inherit;\" valign=\"inherit\"><td class=\"btn\" style=\"display: table-cell; vertical-align: inherit; background: rgb(0, 102, 204); color: rgb(255, 255, 255);\" valign=\"inherit\">Click</td></tr></tbody></table>"
+    },
+    {
+      "name": "attach-mention",
+      "message": {
+        "id": "msg-attach-mention",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hi Carol,</p><p>I attached the report.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "attach-mention@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<p>Hi Carol,</p><p>I attached the report.</p>"
+    },
+    {
+      "name": "plaintext",
+      "message": {
+        "id": "msg-plaintext",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "Hello Ann,\n\n> quoted earlier\n> more\n\nThanks & bye <3",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "plaintext@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": true,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": "<div style=\"white-space: pre-wrap;\">Hello Ann,<br><br>&gt; quoted earlier<br>&gt; more<br><br>Thanks &amp; bye &lt;3</div>"
+    }
+  ],
+  "drafts": [
+    {
+      "name": "reply-simple",
+      "kind": "reply",
+      "message": {
+        "id": "msg-simple",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "simple@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "simple@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-styled",
+      "kind": "reply",
+      "message": {
+        "id": "msg-styled",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<html><head><style>.big { font-size: 20px; color: #333 } p { margin: 0 } #x { color: red }</style></head><body><p class=\"big\">Big text</p><p id=\"x\">Red</p><div>plain</div></body></html>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "styled@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <style>\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-clear-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"search\" i]:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-search-cancel-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-inner-spin-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"button\" i]:active,\ninput[type=\"submit\" i]:active,\ninput[type=\"reset\" i]:active,\ninput[type=\"file\" i]:active::-webkit-file-upload-button,\nbutton:active {\n  border-style: inset;\n}\ninput[type=\"button\" i]:active:disabled,\ninput[type=\"submit\" i]:active:disabled,\ninput[type=\"reset\" i]:active:disabled,\ninput[type=\"file\" i]:active:disabled::-webkit-file-upload-button,\nbutton:active:disabled {\n  border-style: outset;\n}\ninput::-webkit-calendar-picker-indicator:hover {\n  background-color: #eee;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-calendar-picker-indicator,\ninput::-webkit-calendar-picker-indicator:focus {\n  opacity: 1;\n  pointer-events: auto;\n}\nselect:-internal-list-box:focus option:checked {\n  background-color: -internal-active-list-box-selection !important;\n  color: -internal-active-list-box-selection-text !important;\n}\n:focus {\n  outline: auto 5px -webkit-focus-ring-color;\n}\nhtml:focus,\nbody:focus,\ninput[readonly]:focus {\n  outline: none;\n}\napplet:focus,\nembed:focus,\niframe:focus,\nobject:focus {\n  outline: none;\n}\ninput:focus,\ntextarea:focus,\nkeygen:focus,\nselect:focus {\n  outline-offset: -2px;\n}\ninput[type=\"button\" i]:focus,\ninput[type=\"checkbox\" i]:focus,\ninput[type=\"file\" i]:focus,\ninput[type=\"hidden\" i]:focus,\ninput[type=\"image\" i]:focus,\ninput[type=\"radio\" i]:focus,\ninput[type=\"reset\" i]:focus,\ninput[type=\"search\" i]:focus,\ninput[type=\"submit\" i]:focus,\ninput[type=\"file\" i]:focus::-webkit-file-upload-button {\n  outline-offset: 0;\n}\na:-webkit-any-link:active {\n  color: -webkit-activelink;\n}\n@media print {\n  * {\n    -webkit-columns: auto !important;\n  }\n}\n</style><p class=\"big\" style=\"display: block; -webkit-margin-before: 1__qem; -webkit-margin-after: 1__qem; -webkit-margin-start: 0; -webkit-margin-end: 0; margin: 0px; font-size: 20px; color: rgb(51, 51, 51);\">Big text</p><p id=\"x\" style=\"display: block; -webkit-margin-before: 1__qem; -webkit-margin-after: 1__qem; -webkit-margin-start: 0; -webkit-margin-end: 0; margin: 0px; color: red;\">Red</p><div style=\"display: block;\">plain</div>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "styled@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-pixels",
+      "kind": "reply",
+      "message": {
+        "id": "msg-pixels",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>News</p><img src=\"https://list-manage.com/track/open.php?u=1\" width=\"1\" height=\"1\"><img src=\"https://cdn.example/hidden.gif\" style=\"display:none\"><img src=\"https://cdn.example/photo.jpg\" width=\"300\">",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "pixels@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>News</p><img src=\"https://cdn.example/photo.jpg\" width=\"300\">\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "pixels@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-quoted",
+      "kind": "reply",
+      "message": {
+        "id": "msg-quoted",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<div>Top reply</div><div class=\"gmail_quote\"><div class=\"gmail_quote_attribution\">On Mon, Bob wrote:</div><blockquote class=\"gmail_quote\" style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\"><p>Older text</p></blockquote></div>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "quoted@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <div>Top reply</div><div class=\"gmail_quote\"><div class=\"gmail_quote_attribution\">On Mon, Bob wrote:</div><blockquote class=\"gmail_quote\" style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\"><p>Older text</p></blockquote></div>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "quoted@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-images",
+      "kind": "reply",
+      "message": {
+        "id": "msg-images",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Logo <img src=\"cid:logo123\" alt=\"logo\"> and <img src=\"https://cdn.example/a.png\" width=\"100\"></p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "images@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>Logo  and <img src=\"https://cdn.example/a.png\" width=\"100\"></p>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "images@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-all",
+      "kind": "reply-all",
+      "message": {
+        "id": "msg-reply-all",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Ann",
+            "email": "ANN@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Bob again",
+            "email": "bob+x@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "reply-all@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [
+          {
+            "name": "Carol",
+            "email": "carol@sender.example"
+          },
+          {
+            "name": "",
+            "email": "dan@sender.example"
+          }
+        ],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "reply-all@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-to-alias",
+      "kind": "reply",
+      "message": {
+        "id": "msg-to-alias",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Support Desk",
+            "email": "help@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "to-alias@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Support Desk",
+            "email": "help@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "to-alias@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-with-reply-to",
+      "kind": "reply-all",
+      "message": {
+        "id": "msg-reply-to",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [
+          {
+            "name": "List",
+            "email": "list@lists.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "reply-to@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "List",
+            "email": "list@lists.example"
+          }
+        ],
+        "cc": [
+          {
+            "name": "Carol",
+            "email": "carol@sender.example"
+          },
+          {
+            "name": "",
+            "email": "dan@sender.example"
+          }
+        ],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "reply-to@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-all-from-me",
+      "kind": "reply-all",
+      "message": {
+        "id": "msg-from-me",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Erin",
+            "email": "erin@else.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "Frank",
+            "email": "frank@else.example",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann at Work",
+            "email": "ann@work.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "from-me@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Erin",
+            "email": "erin@else.example"
+          }
+        ],
+        "cc": [
+          {
+            "name": "Frank",
+            "email": "frank@else.example"
+          }
+        ],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Ann at Work &lt;ann@work.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "from-me@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-to-forward",
+      "kind": "reply",
+      "message": {
+        "id": "msg-fwd-subject",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "fwd-subject@sender.example",
+        "subject": "FWD: Quarterly",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly",
+        "body": "\n        <br/>\n        <br/>\n        <signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote_attribution\">On Nov 14, 2023, 4:13 PM, Bob Sender &lt;bob@sender.example&gt; wrote:</div>\n        <blockquote class=\"gmail_quote\"\n          style=\"margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex;\">\n          <p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>\n          <br/>\n        </blockquote>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "fwd-subject@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "forward-simple",
+      "kind": "forward",
+      "message": {
+        "id": "msg-fwd-simple",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [
+          {
+            "id": "file1",
+            "aid": "acc1",
+            "filename": "report.pdf",
+            "size": 3,
+            "__cls": "File"
+          }
+        ],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "fwd-simple@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": [
+          "file1"
+        ]
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [],
+        "cc": [],
+        "bcc": [],
+        "subject": "Fwd: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote\">\n          <br>\n          ---------- Forwarded Message ---------\n          <br><br>\n          From: Bob Sender &lt;bob@sender.example&gt;<br>Subject: Quarterly numbers<br>Date: Nov 14, 2023, 4:13 PM<br>To: Ann Owner &lt;ann@example.com&gt;, Carol &lt;carol@sender.example&gt;<br>Cc: dan@sender.example\n          <br><br>\n          <p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>\n          <br/>\n        </div>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "",
+        "fwdMsgId": "fwd-simple@sender.example",
+        "files": [
+          "file1"
+        ]
+      }
+    },
+    {
+      "name": "forward-newsletter",
+      "kind": "forward",
+      "message": {
+        "id": "msg-fwd-newsletter",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<!DOCTYPE html><html><head><meta http-equiv=\"refresh\" content=\"0;url=https://x.example\"><title>News</title><style type=\"text/css\"><!-- .btn { background: #06c; color: #fff } --></style><link rel=\"stylesheet\" href=\"https://x.example/s.css\"></head><body bgcolor=\"#eee\"><table width=\"600\" align=\"center\" cellpadding=\"0\"><tr><td class=\"btn\">Click</td></tr></table></body></html>",
+        "files": [
+          {
+            "id": "file1",
+            "aid": "acc1",
+            "filename": "report.pdf",
+            "size": 3,
+            "__cls": "File"
+          }
+        ],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "fwd-newsletter@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": [
+          "file1"
+        ]
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [],
+        "cc": [],
+        "bcc": [],
+        "subject": "Fwd: Quarterly numbers",
+        "body": "\n        <br/>\n        <br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote\">\n          <br>\n          ---------- Forwarded Message ---------\n          <br><br>\n          From: Bob Sender &lt;bob@sender.example&gt;<br>Subject: Quarterly numbers<br>Date: Nov 14, 2023, 4:13 PM<br>To: Ann Owner &lt;ann@example.com&gt;, Carol &lt;carol@sender.example&gt;<br>Cc: dan@sender.example\n          <br><br>\n          <title>News</title><style>\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-clear-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"search\" i]:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-search-cancel-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-inner-spin-button {\n  opacity: 1;\n  pointer-events: auto;\n}\ninput[type=\"button\" i]:active,\ninput[type=\"submit\" i]:active,\ninput[type=\"reset\" i]:active,\ninput[type=\"file\" i]:active::-webkit-file-upload-button,\nbutton:active {\n  border-style: inset;\n}\ninput[type=\"button\" i]:active:disabled,\ninput[type=\"submit\" i]:active:disabled,\ninput[type=\"reset\" i]:active:disabled,\ninput[type=\"file\" i]:active:disabled::-webkit-file-upload-button,\nbutton:active:disabled {\n  border-style: outset;\n}\ninput::-webkit-calendar-picker-indicator:hover {\n  background-color: #eee;\n}\ninput:enabled:read-write:-webkit-any(:focus,\n:hover)::-webkit-calendar-picker-indicator,\ninput::-webkit-calendar-picker-indicator:focus {\n  opacity: 1;\n  pointer-events: auto;\n}\nselect:-internal-list-box:focus option:checked {\n  background-color: -internal-active-list-box-selection !important;\n  color: -internal-active-list-box-selection-text !important;\n}\n:focus {\n  outline: auto 5px -webkit-focus-ring-color;\n}\nhtml:focus,\nbody:focus,\ninput[readonly]:focus {\n  outline: none;\n}\napplet:focus,\nembed:focus,\niframe:focus,\nobject:focus {\n  outline: none;\n}\ninput:focus,\ntextarea:focus,\nkeygen:focus,\nselect:focus {\n  outline-offset: -2px;\n}\ninput[type=\"button\" i]:focus,\ninput[type=\"checkbox\" i]:focus,\ninput[type=\"file\" i]:focus,\ninput[type=\"hidden\" i]:focus,\ninput[type=\"image\" i]:focus,\ninput[type=\"radio\" i]:focus,\ninput[type=\"reset\" i]:focus,\ninput[type=\"search\" i]:focus,\ninput[type=\"submit\" i]:focus,\ninput[type=\"file\" i]:focus::-webkit-file-upload-button {\n  outline-offset: 0;\n}\na:-webkit-any-link:active {\n  color: -webkit-activelink;\n}\n@media print {\n  * {\n    -webkit-columns: auto !important;\n  }\n}\n</style><table width=\"600\" align=\"center\" cellpadding=\"0\" style=\"border-collapse: separate; border-color: gray;\"><tbody style=\"display: table-row-group; vertical-align: middle; border-color: inherit;\" valign=\"middle\"><tr style=\"display: table-row; vertical-align: inherit; border-color: inherit;\" valign=\"inherit\"><td class=\"btn\" style=\"display: table-cell; vertical-align: inherit; background: rgb(0, 102, 204); color: rgb(255, 255, 255);\" valign=\"inherit\">Click</td></tr></tbody></table>\n          <br/>\n        </div>\n        ",
+        "plaintext": false,
+        "threadId": "thread-1",
+        "rthMsgId": "",
+        "fwdMsgId": "fwd-newsletter@sender.example",
+        "files": [
+          "file1"
+        ]
+      }
+    },
+    {
+      "name": "new",
+      "kind": "new",
+      "fields": {
+        "to": [
+          {
+            "name": "Gail",
+            "email": "gail@else.example"
+          }
+        ],
+        "subject": "Hi"
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Gail",
+            "email": "gail@else.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Hi",
+        "body": "<br/><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>",
+        "plaintext": false,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "new-acc2-autocc",
+      "kind": "new",
+      "fields": {
+        "aid": "acc2",
+        "from": [
+          {
+            "name": "Annie",
+            "email": "ann.p@example.org"
+          }
+        ]
+      },
+      "html": true,
+      "desktop": {
+        "accountId": "acc2",
+        "from": [
+          {
+            "name": "Annie",
+            "email": "ann.p@example.org"
+          }
+        ],
+        "to": [],
+        "cc": [
+          {
+            "name": "Archive",
+            "email": "archive@example.org"
+          },
+          {
+            "name": "log@example.org",
+            "email": "log@example.org"
+          }
+        ],
+        "bcc": [],
+        "subject": "",
+        "body": "<br/><br/><signature id=\"sig2\"><b>-- Annie</b></signature>",
+        "plaintext": false,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-plaintext-of-html",
+      "kind": "reply",
+      "message": {
+        "id": "msg-plain-reply",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "<p>Hello Ann,</p><p>See you <b>tomorrow</b>.</p>",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "plain-reply@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": false,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": false,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n\nOn Nov 14, 2023, 4:13 PM, Bob Sender <bob@sender.example> wrote:\n\n> Hello Ann,\n> \n> See you tomorrow.",
+        "plaintext": true,
+        "threadId": "thread-1",
+        "rthMsgId": "plain-reply@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "reply-plaintext-of-plain",
+      "kind": "reply",
+      "message": {
+        "id": "msg-plaintext",
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          },
+          {
+            "name": "Carol",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [
+          {
+            "name": "",
+            "email": "dan@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "date": 1700000000,
+        "body": "Hello Ann,\n\n> quoted earlier\n> more\n\nThanks & bye <3",
+        "files": [],
+        "events": [],
+        "threadId": "thread-1",
+        "hMsgId": "plaintext@sender.example",
+        "subject": "Quarterly numbers",
+        "draft": false,
+        "plaintext": true,
+        "__cls": "Message",
+        "file_ids": []
+      },
+      "html": false,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Bob Sender",
+            "email": "bob@sender.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Re: Quarterly numbers",
+        "body": "\n\nOn Nov 14, 2023, 4:13 PM, Bob Sender <bob@sender.example> wrote:\n\n> Hello Ann,\n> \n>> quoted earlier\n>> more\n> \n> Thanks & bye <3",
+        "plaintext": true,
+        "threadId": "thread-1",
+        "rthMsgId": "plaintext@sender.example",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "name": "new-plaintext",
+      "kind": "new",
+      "fields": {
+        "body": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word end"
+      },
+      "html": false,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [],
+        "cc": [],
+        "bcc": [],
+        "subject": "",
+        "body": "word word word word word word word word word word word word word word\n​word word word word word word word word word word word word word word\n​word word end",
+        "plaintext": true,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    }
+  ],
+  "signaturesApplied": [
+    {
+      "name": "empty-sig1",
+      "body": "<br/>",
+      "signature": {
+        "id": "sig1",
+        "title": "Work",
+        "body": "<div>Ann Owner<br/>Example Inc.</div>"
+      },
+      "desktop": "<br/><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>"
+    },
+    {
+      "name": "empty-none",
+      "body": "<br/>",
+      "signature": null,
+      "desktop": "<br/>"
+    },
+    {
+      "name": "text-sig1",
+      "body": "<div>Hi</div>",
+      "signature": {
+        "id": "sig1",
+        "title": "Work",
+        "body": "<div>Ann Owner<br/>Example Inc.</div>"
+      },
+      "desktop": "<div>Hi</div><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>"
+    },
+    {
+      "name": "text-none",
+      "body": "<div>Hi</div>",
+      "signature": null,
+      "desktop": "<div>Hi</div>"
+    },
+    {
+      "name": "two-brs-sig1",
+      "body": "<div>Hi</div><br/><br/>",
+      "signature": {
+        "id": "sig1",
+        "title": "Work",
+        "body": "<div>Ann Owner<br/>Example Inc.</div>"
+      },
+      "desktop": "<div>Hi</div><br/><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>"
+    },
+    {
+      "name": "two-brs-none",
+      "body": "<div>Hi</div><br/><br/>",
+      "signature": null,
+      "desktop": "<div>Hi</div><br/><br/>"
+    },
+    {
+      "name": "before-quote-sig1",
+      "body": "<div>Hi</div><br/><div class=\"gmail_quote\">quoted</div>",
+      "signature": {
+        "id": "sig1",
+        "title": "Work",
+        "body": "<div>Ann Owner<br/>Example Inc.</div>"
+      },
+      "desktop": "<div>Hi</div><br/><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote\">quoted</div>"
+    },
+    {
+      "name": "before-quote-none",
+      "body": "<div>Hi</div><br/><div class=\"gmail_quote\">quoted</div>",
+      "signature": null,
+      "desktop": "<div>Hi</div><br/><div class=\"gmail_quote\">quoted</div>"
+    },
+    {
+      "name": "replace-existing-sig1",
+      "body": "<div>Hi</div><signature id=\"sig2\"><b>-- Annie</b></signature><div class=\"gmail_quote\">q</div>",
+      "signature": {
+        "id": "sig1",
+        "title": "Work",
+        "body": "<div>Ann Owner<br/>Example Inc.</div>"
+      },
+      "desktop": "<div>Hi</div><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature><div class=\"gmail_quote\">q</div>"
+    },
+    {
+      "name": "replace-existing-none",
+      "body": "<div>Hi</div><signature id=\"sig2\"><b>-- Annie</b></signature><div class=\"gmail_quote\">q</div>",
+      "signature": null,
+      "desktop": "<div>Hi</div><div class=\"gmail_quote\">q</div>"
+    }
+  ],
+  "pixels": [
+    {
+      "body": "<p>News</p><img src=\"https://list-manage.com/track/open.php?u=1\" width=\"1\" height=\"1\"><img src=\"https://cdn.example/hidden.gif\" style=\"display:none\"><img src=\"https://cdn.example/photo.jpg\" width=\"300\">",
+      "desktop": "<p>News</p><img src=\"https://cdn.example/photo.jpg\" width=\"300\">"
+    },
+    {
+      "body": "<p>Logo <img src=\"cid:logo123\" alt=\"logo\"> and <img src=\"https://cdn.example/a.png\" width=\"100\"></p>",
+      "desktop": "<p>Logo <img src=\"cid:logo123\" alt=\"logo\"> and <img src=\"https://cdn.example/a.png\" width=\"100\"></p>"
+    },
+    {
+      "body": "<img src=\"https://t.yesware.com/x\" ><picture><source srcset=\"https://app.yesware.com/t/1 1x, https://cdn.example/b.png 2x\"></picture>",
+      "desktop": "<picture></picture>"
+    },
+    {
+      "body": "<img src=\"data:image/png;base64,AAA\" width=\"1\" height=\"1\"><input type=\"image\" src=\"https://cdn.example/i.png\" style=\"width:0\">",
+      "desktop": "<img src=\"data:image/png;base64,AAA\" width=\"1\" height=\"1\">"
+    }
+  ],
+  "mailto": [
+    {
+      "url": "mailto:someone@example.net",
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "someone@example.net",
+            "email": "someone@example.net"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "",
+        "body": "<br/><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>",
+        "plaintext": false,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "url": "mailto:someone@example.net?subject=Hello%20there&body=Line%201%0ALine%202&cc=a%40b.example",
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "someone@example.net",
+            "email": "someone@example.net"
+          }
+        ],
+        "cc": [
+          {
+            "name": "a@b.example",
+            "email": "a@b.example"
+          }
+        ],
+        "bcc": [],
+        "subject": "Hello there",
+        "body": "Line 1<br>Line 2<br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>",
+        "plaintext": false,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "url": "mailto:?to=x@y.example,z@w.example&bcc=hidden@y.example&subject=Hi",
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "x@y.example",
+            "email": "x@y.example"
+          },
+          {
+            "name": "z@w.example",
+            "email": "z@w.example"
+          }
+        ],
+        "cc": [],
+        "bcc": [
+          {
+            "name": "hidden@y.example",
+            "email": "hidden@y.example"
+          }
+        ],
+        "subject": "Hi",
+        "body": "<br/><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>",
+        "plaintext": false,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "url": "mailto:Some%20One%20%3Cone@example.net%3E?body=https://github.com/x/issues?utf8=&q=is%3Aopen&subject=Bug",
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "Some One",
+            "email": "one@example.net"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "Bug",
+        "body": "https://github.com/x/issues?utf8=&q=is%3Aopen<br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>",
+        "plaintext": false,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    },
+    {
+      "url": "mailto:user%40example.net",
+      "html": true,
+      "desktop": {
+        "accountId": "acc1",
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com"
+          }
+        ],
+        "to": [
+          {
+            "name": "user@example.net",
+            "email": "user@example.net"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "subject": "",
+        "body": "<br/><br/><signature id=\"sig1\"><div>Ann Owner<br/>Example Inc.</div></signature>",
+        "plaintext": false,
+        "threadId": "",
+        "rthMsgId": "",
+        "fwdMsgId": "",
+        "files": []
+      }
+    }
+  ],
+  "wrap": [
+    {
+      "text": "lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum dolor",
+      "desktop": "lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum\n​lorem ipsum lorem ipsum lorem ipsum lorem ipsum dolor"
+    },
+    {
+      "text": "> quoted words quoted words quoted words quoted words quoted words quoted words quoted words quoted words end",
+      "desktop": "> quoted words quoted words quoted words quoted words quoted words\n​> quoted words quoted words quoted words end"
+    },
+    {
+      "text": "short\nlines\n\nkept",
+      "desktop": "short\nlines\n\nkept"
+    },
+    {
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx tail",
+      "desktop": "\n​xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n​tail"
+    }
+  ],
+  "validate": [
+    {
+      "name": "ok",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi Carol,</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "ok@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "no-recipients",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hello</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "no-recipients@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [
+          "You need to provide one or more recipients before sending the message."
+        ],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "invalid-recipient",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "",
+            "email": "not-an-address",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hello</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "invalid-recipient@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [
+          "not-an-address is not a valid email address - please remove or edit it before sending."
+        ],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "blank-subject",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hello</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "blank-subject@example.com",
+        "subject": "",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": [
+          "The subject field is blank."
+        ]
+      }
+    },
+    {
+      "name": "attach-mentioned",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi Carol,</p><p>I attached the report.</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "attach-mentioned@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": [
+          "The message mentions an attachment but none are attached."
+        ]
+      }
+    },
+    {
+      "name": "attach-in-quote-only",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi</p><div class=\"gmail_quote\"><blockquote>see attached</blockquote></div>",
+        "files": [],
+        "events": [],
+        "hMsgId": "attach-in-quote-only@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "attach-with-file",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi Carol,</p><p>I attached the report.</p>",
+        "files": [
+          {
+            "id": "f",
+            "filename": "a.pdf",
+            "__cls": "File"
+          }
+        ],
+        "events": [],
+        "hMsgId": "attach-with-file@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [
+          "f"
+        ],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "salutation-mismatch",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi Dave,</p><p>text</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "salutation-mismatch@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [
+          "The message is addressed to a name that doesn't appear to be a recipient (\"Dave\")"
+        ],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "salutation-first-name",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hey Carol!</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "salutation-first-name@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "salutation-family",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi Mom,</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "salutation-family@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "salutation-unnamed",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi Dave,</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "salutation-unnamed@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [
+          "The message is addressed to a name that doesn't appear to be a recipient (\"Dave\")"
+        ],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "salutation-nonhuman",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Billing",
+            "email": "noreply@shop.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Dear Sir,</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "salutation-nonhuman@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "unsendable-from",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Stranger",
+            "email": "stranger@else.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hello</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "unsendable-from@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [
+          "The From address is not one of your accounts or aliases. Choose a From address and try again."
+        ],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "from-alias",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Support Desk",
+            "email": "help@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hello</p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "from-alias@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    },
+    {
+      "name": "empty-template",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hi</p><p><code class=\"var empty\">name</code></p>",
+        "files": [],
+        "events": [],
+        "hMsgId": "empty-template@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": [
+          "The message contains an empty template area."
+        ]
+      }
+    },
+    {
+      "name": "signature-attach",
+      "draft": {
+        "aid": "acc1",
+        "metadata": [],
+        "to": [
+          {
+            "name": "Carol Jones",
+            "email": "carol@sender.example",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "cc": [],
+        "bcc": [],
+        "from": [
+          {
+            "name": "Ann Owner",
+            "email": "ann@example.com",
+            "gis": [],
+            "__cls": "Contact"
+          }
+        ],
+        "replyTo": [],
+        "body": "<p>Hello</p><signature id=\"sig1\">attachment policy</signature>",
+        "files": [],
+        "events": [],
+        "hMsgId": "signature-attach@example.com",
+        "subject": "Subject",
+        "draft": true,
+        "__cls": "Message",
+        "file_ids": [],
+        "object": "draft"
+      },
+      "desktop": {
+        "recipientErrors": [],
+        "recipientWarnings": [],
+        "miscErrors": [],
+        "miscWarnings": []
+      }
+    }
+  ]
+}
