@@ -102,14 +102,29 @@ class QuerySubscriptionPool {
     return stack.slice(ii, ii + 4).join('\n');
   }
 
+  // The query as the engine reads it. structuredSearch() has no JSON form yet (plan stage 9);
+  // those queries key on their SQL.
   _keyForQuery<T extends Model | Model[]>(query: ModelQuery<T>) {
-    return query.sql();
+    try {
+      return JSON.stringify(query.toJSON());
+    } catch (err) {
+      return query.sql();
+    }
   }
 
   _setup() {
     DatabaseStore = DatabaseStore || require('../stores/database-store').default;
     DatabaseStore.listen(this._onChange);
+    require('../stores/engine-reads').default.on('resync', this._rerunAll);
   }
+
+  // After a reconnect: the deltas sent while the window had no connection are gone.
+  _rerunAll = () => {
+    for (const key of Object.keys(this._subscriptions)) {
+      const subscription = this._subscriptions[key];
+      if (subscription.callbackCount() > 0) subscription.rerun();
+    }
+  };
 
   _onChange = (record: DatabaseChangeRecord<Model>) => {
     for (const key of Object.keys(this._subscriptions)) {

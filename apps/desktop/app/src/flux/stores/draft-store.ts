@@ -324,7 +324,13 @@ class DraftStore extends MailspringStore {
           'newMessageWithContext: `message` present, expected a Model. Maybe you wanted to pass `messageId`?'
         );
       }
-      queries.message = message;
+      // MessageStore loads the bodies of expanded messages only.
+      queries.message =
+        message.body !== undefined
+          ? message
+          : DatabaseStore.find<Message>(Message, message.id)
+              .include(Message.attributes.body)
+              .then((loaded) => loaded || message);
     } else if (messageId && messageId.length) {
       queries.message = DatabaseStore.find<Message>(Message, messageId).include(
         Message.attributes.body

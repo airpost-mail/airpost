@@ -24,6 +24,18 @@ export default {
           },
         },
       },
+      engine: {
+        type: 'object',
+        properties: {
+          // Where DatabaseStore reads (flux/stores/engine-reads.ts). "engine" uses the sync
+          // engine's `query`; SQLite stays in use when the engine doesn't answer it.
+          reads: {
+            type: 'string',
+            default: 'sqlite',
+            enum: ['sqlite', 'engine'],
+          },
+        },
+      },
       appearance: {
         type: 'object',
         properties: {

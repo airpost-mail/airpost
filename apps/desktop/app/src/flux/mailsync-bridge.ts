@@ -325,11 +325,14 @@ export default class MailsyncBridge {
     ipcRenderer.on(SupervisorChannel.Status, (_event, status: EngineStatus) => {
       statusSeen = true;
       connection.setStatus(status);
+      EngineEvents.supervisorStatus(status);
     });
     // A Status that arrives first is newer than this answer.
     ipcRenderer.invoke(SupervisorChannel.GetStatus).then(
       (status: EngineStatus | null) => {
-        if (!statusSeen) connection.setStatus(status);
+        if (statusSeen) return;
+        connection.setStatus(status);
+        EngineEvents.supervisorStatus(status);
       },
       (err) => console.error(`Could not ask the main process for the sync engine: ${err}`)
     );

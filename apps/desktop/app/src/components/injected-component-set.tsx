@@ -114,9 +114,15 @@ export class InjectedComponentSet extends React.Component<
   }
 
   listen() {
-    this._componentUnlistener = ComponentRegistry.listen(() =>
-      this.setState(this._getStateFromStores())
-    );
+    this._componentUnlistener = ComponentRegistry.listenShared(() => {
+      const next = this._getStateFromStores();
+      const { components, visible } = this.state;
+      const same =
+        next.visible === visible &&
+        next.components.length === components.length &&
+        next.components.every((c, i) => c === components[i]);
+      if (!same) this.setState(next);
+    });
   }
 
   componentDidUpdate(prevProps: InjectedComponentSetProps) {

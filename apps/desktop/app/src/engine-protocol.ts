@@ -57,6 +57,8 @@ export const Method = {
   EngineStatus: 'engine.status',
   // Reads; an engine has them when `hello.features` lists their Feature.
   CountsGet: 'counts.get',
+  // A ModelQuery (Query.toJSON()) over the stored models (Feature.Query).
+  Query: 'query',
   TasksList: 'tasks.list',
   MetadataList: 'metadata.list',
   AccountList: 'account.list',
@@ -157,6 +159,8 @@ export const Feature = {
   // secrets.* and server.*.
   AccountSetup: 'account-setup',
   Counts: 'counts',
+  // `query`: DatabaseStore reads over the socket (docs/desktop-client-plan.md 4.1 step 2).
+  Query: 'query',
   TasksList: 'tasks-list',
   MetadataList: 'metadata-list',
   MessageHidden: 'message-hidden',
@@ -361,6 +365,14 @@ export interface CategoryCounts {
 // `accounts` null (or absent) means every account the engine holds.
 export interface CountsGetParams {
   accounts?: string[] | null;
+}
+
+// `query`'s answer (ms-ipc QueryResult): `rows` always (model JSON, with each `include` key),
+// `ids` for idsOnly, `count` for count.
+export interface QueryResult {
+  rows: Record<string, any>[];
+  ids?: string[];
+  count?: number;
 }
 
 // Keyed by category id. The same rows arrive as ThreadCounts deltas after it.

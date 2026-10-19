@@ -45,6 +45,8 @@ export const SupervisorChannel = {
   // invoke -> {error?: string}. Removes every account and empties the database; the caller
   // relaunches.
   ResetDatabase: 'engine-supervisor:reset-database',
+  // invoke: starts the engine again now, after it gave up or while a respawn waits.
+  RetryEngine: 'engine-supervisor:retry-engine',
 } as const;
 
 // The OAuth redirect receiver in the main process (browser/oauth-receiver.ts).
@@ -76,6 +78,9 @@ export interface EngineStatus {
   generation: number | null;
   // Set once the engine has bound its socket and answered on stdin.
   socketPath: string | null;
+  // Set once the engine crashed too often; it isn't respawned until RetryEngine or an account's
+  // Try Again.
+  gaveUp?: boolean;
   accounts: { [accountId: string]: EngineAccountRoute };
 }
 

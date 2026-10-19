@@ -233,6 +233,20 @@ export class EngineClient {
     return missing.length ? this._add(missing, { force: false }) : Promise.resolve();
   }
 
+  // The engine's Try Again: forgets its crashes and starts it now, also when a respawn is
+  // waiting out its backoff.
+  retryEngine() {
+    if (this.shuttingDown || this.resettingDatabase) return;
+    this.engineGaveUp = false;
+    this.inUseExits = 0;
+    this.engineCrashes.forgetCrashes(ENGINE_CRASH_KEY);
+    if (this.respawnTimer) {
+      clearTimeout(this.respawnTimer);
+      this.respawnTimer = null;
+    }
+    this.ensure();
+  }
+
   // "Try Again": forgets the account's crashes (and the engine's, if it gave up) and adds it
   // again, removing it first if the engine still runs it.
   async forceRelaunch(account: EngineAccount) {

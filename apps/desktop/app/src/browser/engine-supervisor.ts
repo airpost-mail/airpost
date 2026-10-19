@@ -227,8 +227,15 @@ export class EngineSupervisor {
     return {
       generation: ready ? this._readyGeneration : null,
       socketPath: ready ? this._readyEngine._socketPath : null,
+      ...(this.client.engineGaveUp ? { gaveUp: true } : {}),
       accounts,
     };
+  }
+
+  // A window's Try Again on the engine state it shows.
+  retryEngine() {
+    this.client.retryEngine();
+    this._statusChanged();
   }
 
   // The main window's renderer started (or restarted): it gets the events it hasn't acked,
@@ -514,6 +521,7 @@ export function registerEngineSupervisorIPC(
   ipcMain.handle(SupervisorChannel.ResetDatabase, (_event, options?: ResetOptions) =>
     reply(() => supervisor.resetDatabase(options))
   );
+  ipcMain.handle(SupervisorChannel.RetryEngine, () => supervisor.retryEngine());
 }
 
 // How long launch waits for an engine from an earlier run before migrating anyway: serve exits

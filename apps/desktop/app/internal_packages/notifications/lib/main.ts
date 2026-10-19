@@ -10,12 +10,14 @@ import DevModeNotification from './items/dev-mode-notif';
 import DisabledMailRulesNotification from './items/disabled-mail-rules-notif';
 import OfflineNotification from './items/offline-notification';
 import UpdateNotification from './items/update-notification';
+import { EngineUnavailableNotification } from '../../../src/components/engine-unavailable-state';
 
 const notifications = [
   AccountErrorNotification,
   DefaultClientNotification,
   DevModeNotification,
   DisabledMailRulesNotification,
+  EngineUnavailableNotification,
   OfflineNotification,
   UpdateNotification,
 ];

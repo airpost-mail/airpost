@@ -1,5 +1,9 @@
 import { AccountStore } from 'mailspring-exports';
 import React from 'react';
+import { sharedListener } from '../global/shared-listener';
+
+// Every thread row has one; they share an AccountStore listener.
+let listenToAccounts: ReturnType<typeof sharedListener> = null;
 
 class AccountColorBar extends React.Component<{ accountId: string }, { color: string | null }> {
   static displayName = 'AccountColorBar';
@@ -17,7 +21,8 @@ class AccountColorBar extends React.Component<{ accountId: string }, { color: st
   };
 
   componentDidMount() {
-    this.unsubscribe = AccountStore.listen(() => {
+    listenToAccounts = listenToAccounts || sharedListener(AccountStore);
+    this.unsubscribe = listenToAccounts(() => {
       const nextColor = this.getColor();
       if (this.state.color !== nextColor) this.setState({ color: nextColor });
     });

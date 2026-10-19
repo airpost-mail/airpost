@@ -108,6 +108,16 @@ export class QuerySubscription<T extends Model> {
     this._updateInFlight = false;
   };
 
+  // Reads the whole result again, dropping what the change records would have patched: the
+  // pool calls it after the window reconnects to the engine, since deltas were missed.
+  rerun() {
+    if (!this._query) return;
+    this.cancelPendingUpdate();
+    this._queuedChangeRecords = [];
+    this._set = null;
+    this.update();
+  }
+
   // Scan through change records and apply them to the last result set.
   _processChangeRecords = () => {
     if (this._queuedChangeRecords.length === 0) {
@@ -248,6 +258,14 @@ export class QuerySubscription<T extends Model> {
       rangeQuery.background();
     }
 
+    // A read that fails (the engine unavailable) keeps the last result; the change records wait
+    // for the next update or rerun().
+    const readFailed = (err: Error) => {
+      if (this._queryVersion !== version) return;
+      this._updateInFlight = false;
+      console.warn(`QuerySubscription: could not read ${this._query.objectClass()}: ${err}`);
+    };
+
     DatabaseStore.run<T[] | string[]>(rangeQuery, { format: false }).then(async (results) => {
       if (this._queryVersion !== version) {
         return;
@@ -277,7 +295,13 @@ export class QuerySubscription<T extends Model> {
       this._set.clipToRange(this._query.range());
 
       // todo: this is returning fewer objects because they're being deleted immediately after being saved
-      const models = await this._fetchMissingModels();
+      let models: T[];
+      try {
+        models = await this._fetchMissingModels();
+      } catch (err) {
+        readFailed(err);
+        return;
+      }
       if (this._queryVersion !== version) {
         return;
       }
@@ -285,7 +309,7 @@ export class QuerySubscription<T extends Model> {
         this._set.updateModel(m);
       }
       this._createResultAndTrigger();
-    });
+    }, readFailed);
   }
 
   async _fetchMissingModels() {

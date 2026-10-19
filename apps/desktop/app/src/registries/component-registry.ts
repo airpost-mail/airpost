@@ -1,5 +1,6 @@
 import _ from 'underscore';
 import MailspringStore from 'mailspring-store';
+import { sharedListener } from '../global/shared-listener';
 import { SheetToolbarDeclaration } from '../flux/stores/workspace-store';
 
 type LocationDescriptor = { id: string } | SheetToolbarDeclaration;
@@ -31,6 +32,10 @@ class ComponentRegistry extends MailspringStore {
   } = {};
   _cache = {};
   _showComponentRegions = false;
+
+  // Public: Like `listen`, for components that mount many times (InjectedComponent and
+  // InjectedComponentSet in every list row): they share one store listener.
+  listenShared = sharedListener(this);
 
   // Public: Register a new component with the Component Registry.
   // Typically, packages call this method from their main `activate` method

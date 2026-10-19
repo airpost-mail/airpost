@@ -216,6 +216,24 @@ describe('the serve engine client', function () {
     expect(fake.stdinOf('account.remove')).toEqual([]);
   });
 
+  it("starts the engine again on the engine's Try Again, after a give-up or during a backoff", function () {
+    const ensure = spyOn(client, 'ensure').andReturn(Promise.resolve());
+    client.engineGaveUp = true;
+    client.inUseExits = 3;
+    client.retryEngine();
+    expect(client.engineGaveUp).toBe(false);
+    expect(client.inUseExits).toBe(0);
+    expect(ensure.callCount).toBe(1);
+
+    const respawn = jasmine.createSpy('respawn');
+    client.respawnTimer = setTimeout(respawn, 8000);
+    client.retryEngine();
+    expect(client.respawnTimer).toBe(null);
+    expect(ensure.callCount).toBe(2);
+    advanceClock(8000);
+    expect(respawn).not.toHaveBeenCalled();
+  });
+
   it('removes only the accounts the app deleted from an engine that has others', async function () {
     fake.keepsAccounts(['a1', 'a2', 'other', 'gone']);
     let deleted = ['gone'];

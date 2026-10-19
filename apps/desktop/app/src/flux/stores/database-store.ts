@@ -9,7 +9,8 @@ import { ExponentialBackoffScheduler } from '../../backoff-schedulers';
 import { Model } from '../models/model';
 import MailspringStore from '../../global/mailspring-store';
 import * as Utils from '../models/utils';
-import Query from '../models/query';
+import Query, { ModelQueryJSON } from '../models/query';
+import EngineReads from './engine-reads';
 
 const debug = createDebug('app:RxDB');
 const debugVerbose = createDebug('app:RxDB:all');
@@ -545,13 +546,37 @@ class DatabaseStore extends MailspringStore {
   run<U>(modelQuery: Query<any>, options: { format: false }): Promise<U>;
 
   run(modelQuery: Query<any>, options = { format: true }): Promise<any> {
-    return this._query(modelQuery.sql(), [], modelQuery._background).then((result) => {
-      let transformed: any = modelQuery.inflateResult(result);
-      if (options.format !== false) {
-        transformed = modelQuery.formatResult(transformed);
+    return this._inflated(modelQuery).then((transformed: any) =>
+      options.format !== false ? modelQuery.formatResult(transformed) : transformed
+    );
+  }
+
+  // The query's models, ids or count, from the engine or SQLite (engine-reads.ts).
+  async _inflated(modelQuery: Query<any>) {
+    const json = EngineReads.usesEngine() ? this._engineQuery(modelQuery) : null;
+    if (json) {
+      const start = Date.now();
+      const result = await EngineReads.query(json);
+      if (result) {
+        const msec = Date.now() - start;
+        if (msec > 100) {
+          console.log(`DatabaseStore: query took ${msec}msec: ${trimTo(JSON.stringify(json))}`);
+        }
+        return modelQuery.inflateEngineResult(result);
       }
-      return Promise.resolve(transformed);
-    });
+    }
+    const rows = await this._query(modelQuery.sql(), [], modelQuery._background);
+    return modelQuery.inflateResult(rows);
+  }
+
+  // structuredSearch() has no JSON form until the desktop sends the search grammar's text
+  // (plan stage 9), so those queries stay on SQLite.
+  _engineQuery(modelQuery: Query<any>): ModelQueryJSON | null {
+    try {
+      return modelQuery.toJSON();
+    } catch (err) {
+      return null;
+    }
   }
 
   inTransaction() {

@@ -9,6 +9,7 @@ import {
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
 import { SyncingListState } from 'mailspring-component-kit';
+import { EngineUnavailableState } from './engine-unavailable-state';
 
 type EmptyPerspectiveStateProps = {
   perspective?: MailboxPerspective;
@@ -129,7 +130,9 @@ class EmptyListState extends React.Component<
 
     return (
       <div className={classes}>
-        <ContentComponent perspective={current} messageContent={messageContent} />
+        <EngineUnavailableState>
+          <ContentComponent perspective={current} messageContent={messageContent} />
+        </EngineUnavailableState>
       </div>
     );
   }

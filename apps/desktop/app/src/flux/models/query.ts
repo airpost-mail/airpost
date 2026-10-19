@@ -5,6 +5,7 @@ import { QueryRange } from './query-range';
 import { QueryExpression } from '../../services/search/search-query-ast';
 import * as Utils from './utils';
 import { Model } from './model';
+import type { QueryResult } from '../../engine-protocol';
 
 type DB = typeof import('mailspring-exports').DatabaseStore;
 
@@ -298,8 +299,11 @@ export default class ModelQuery<T extends Model | Model[]> {
   // Returns a {Promise} that resolves with the Models returned by the
   // query, or rejects with an error from the Database layer.
   //
-  then<U>(next: (arg0: T) => U): Promise<U> {
-    return this.run().then(next);
+  then<U, E = never>(
+    next: (arg0: T) => U,
+    onRejected?: (err: any) => E | PromiseLike<E>
+  ): Promise<U | E> {
+    return this.run().then(next, onRejected);
   }
 
   // Public: Returns a {Promise} that resolves with the Models returned by the
@@ -343,6 +347,33 @@ export default class ModelQuery<T extends Model | Model[]> {
     } catch (error) {
       throw new Error(
         `Query could not parse the database result. Query: ${this.sql()}, Error: ${error.toString()}`
+      );
+    }
+  }
+
+  // The engine's `query` answer as inflateResult reads sql()'s rows: model JSON with each
+  // included joined-data attribute under its model key.
+  inflateEngineResult(result: QueryResult) {
+    if (this._count) {
+      return Number(result.count) || 0;
+    }
+    if (this._returnIds) {
+      return result.ids || [];
+    }
+    try {
+      return (result.rows || []).map((json) => {
+        const object: T = Utils.convertToModel(json);
+        for (const attr of this._includeJoinedData) {
+          const value = json[attr.modelKey];
+          object[attr.modelKey] = attr.deserialize(object, value === undefined ? null : value);
+        }
+        return object;
+      });
+    } catch (error) {
+      throw new Error(
+        `Query could not parse the engine's result. Query: ${JSON.stringify(
+          this.toJSON()
+        )}, Error: ${error.toString()}`
       );
     }
   }

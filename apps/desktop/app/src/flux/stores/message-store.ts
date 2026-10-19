@@ -10,8 +10,18 @@ import * as ExtensionRegistry from '../../registries/extension-registry';
 import electron from 'electron';
 import { MessageViewExtension } from 'mailspring-exports';
 import { DatabaseChangeRecord } from './database-change-record';
+import EngineReads from './engine-reads';
 
 const FolderNamesHiddenByDefault = ['spam', 'trash'];
+
+// A thread opens with at most this many unread messages expanded, the newest; "expand all"
+// opens the rest. Each expanded message mounts an EmailFrame.
+export const MAX_DEFAULT_EXPANDED_UNREAD = 3;
+
+type MessageChange = { type: string; objects: Message[] };
+
+const byDate = (a: Message, b: Message) =>
+  (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0);
 
 class _MessageStore extends MailspringStore {
   FolderNamesHiddenByDefault = FolderNamesHiddenByDefault;
@@ -23,6 +33,9 @@ class _MessageStore extends MailspringStore {
   _itemsLoading: boolean;
   _lastMarkedAsReadThreadId?: string;
   _onFocusChangedTimer?: NodeJS.Timeout;
+  // Message changes for the thread that arrive while its messages are being read, applied on
+  // top of the result; null when no read is out.
+  _changesWhileLoading: MessageChange[] = null;
 
   constructor() {
     super();
@@ -60,7 +73,13 @@ class _MessageStore extends MailspringStore {
   itemsExpandedState() {
     // ensure that we're always serving up immutable objects.
     // this.state == nextState is always true if we modify objects in place.
-    return Object.assign({}, this._itemsExpanded);
+    // A message whose body isn't loaded yet shows collapsed until it is: MessageItemBody reads
+    // the body when it mounts.
+    const state = Object.assign({}, this._itemsExpanded);
+    for (const item of this._items) {
+      if (item.body === undefined) delete state[item.id];
+    }
+    return state;
   }
 
   hasCollapsedItems() {
@@ -112,51 +131,71 @@ class _MessageStore extends MailspringStore {
     this.listenTo(Actions.toggleAllMessagesExpanded, this._onToggleAllMessagesExpanded);
     this.listenTo(Actions.toggleHiddenMessages, this._onToggleHiddenMessages);
     this.listenTo(Actions.popoutThread, this._onPopoutThread);
-    return this.listenTo(Actions.focusThreadMainWindow, this._onFocusThreadMainWindow);
+    this.listenTo(Actions.focusThreadMainWindow, this._onFocusThreadMainWindow);
+    // The deltas sent while the window had no engine connection are gone.
+    EngineReads.on('resync', () => this._fetchFromCache());
   }
 
   _onPerspectiveChanged() {
     return this.trigger();
   }
 
+  // Message deltas patch the loaded messages, keeping the bodies they don't carry: the engine
+  // sends a message's body only with the save that set it.
   _onDataChanged(change: DatabaseChangeRecord<any>) {
     if (!this._thread) return;
 
     if (change.objectClass === Message.name) {
-      const inDisplayedThread = change.objects.some((obj) => obj.threadId === this._thread.id);
-      if (!inDisplayedThread) return;
-
-      if (change.objects.length === 1 && change.objects[0].draft === true) {
-        const item = change.objects[0];
-        const itemIndex = this._items.findIndex((msg) => msg.id === item.id);
-
-        if (change.type === 'persist' && itemIndex === -1) {
-          this._items = [...this._items, item].filter((m) => !m.isHidden());
-          this._items = this._sortItemsForDisplay(this._items);
-          this._expandItemsToDefault();
-          this.trigger();
-          return;
-        }
-
-        if (change.type === 'unpersist' && itemIndex !== -1) {
-          this._items = [...this._items].filter((m) => !m.isHidden());
-          this._items.splice(itemIndex, 1);
-          this._expandItemsToDefault();
-          this.trigger();
-          return;
-        }
+      const loaded = new Set(this._items.map((m) => m.id));
+      const objects = (change.objects as Message[]).filter(
+        (m) => m.threadId === this._thread.id || loaded.has(m.id)
+      );
+      if (objects.length === 0) return;
+      if (this._changesWhileLoading) {
+        this._changesWhileLoading.push({ type: change.type, objects });
+        return;
       }
-
-      this._fetchFromCache();
+      this._items = this._patchedItems(this._items, { type: change.type, objects });
+      this._expandNewItems(loaded);
+      this._fetchExpandedAttachments(this._items);
+      this.trigger();
+      this._loadExpandedBodies(() => this.trigger());
     }
 
     if (change.objectClass === Thread.name) {
       const updatedThread = change.objects.find((t) => t.id === this._thread.id);
       if (updatedThread) {
         this._thread = updatedThread;
-        this._fetchFromCache();
+        this.trigger();
       }
     }
+  }
+
+  // A message that arrives unread, a new draft and a new last message open expanded; the
+  // others keep the state they had.
+  _expandNewItems(before: Set<string>) {
+    const visibleItems = this.items();
+    visibleItems.forEach((item, idx) => {
+      if (before.has(item.id)) return;
+      if (item.unread || item.draft || idx === visibleItems.length - 1) {
+        this._itemsExpanded[item.id] = 'default';
+      }
+    });
+  }
+
+  _patchedItems(items: Message[], { type, objects }: MessageChange) {
+    const byId = new Map(items.map((m) => [m.id, m]));
+    for (const message of objects) {
+      if (type === 'unpersist' || message.threadId !== this._thread.id) {
+        byId.delete(message.id);
+        continue;
+      }
+      const old = byId.get(message.id);
+      if (old && message.body === undefined) message.body = old.body;
+      byId.set(message.id, message);
+    }
+    const next = [...byId.values()].filter((m) => !m.isHidden()).sort(byDate);
+    return this._sortItemsForDisplay(next);
   }
 
   _onFocusChanged(change: { impactsCollection: (collection: string) => boolean }) {
@@ -253,6 +292,7 @@ class _MessageStore extends MailspringStore {
     this._expandItemsToDefault();
     this._fetchExpandedAttachments(this._items);
     this.trigger();
+    this._loadExpandedBodies(() => this.trigger());
   }
 
   _onToggleMessageIdExpanded(id: string) {
@@ -271,48 +311,97 @@ class _MessageStore extends MailspringStore {
   _expandItem(item: Message) {
     this._itemsExpanded[item.id] = 'explicit';
     this._fetchExpandedAttachments([item]);
+    this._loadExpandedBodies(() => this.trigger());
   }
 
   _collapseItem(item: Message) {
     delete this._itemsExpanded[item.id];
   }
 
-  _fetchFromCache(options = null) {
-    if (options == null) options = {};
+  // Reads the thread's messages without bodies, then the bodies of the ones shown expanded.
+  _fetchFromCache() {
     if (!this._thread) return;
 
     const loadedThreadId = this._thread.id;
+    const changes: MessageChange[] = [];
+    this._changesWhileLoading = changes;
 
     const query = DatabaseStore.findAll<Message>(Message);
     query.where({ threadId: loadedThreadId });
-    query.include(Message.attributes.body);
 
-    return query.then((items) => {
-      // Check to make sure that our thread is still the thread we were
-      // loading items for. Necessary because this takes a while.
-      if (loadedThreadId !== this.threadId()) return;
+    return query.then(
+      (items) => {
+        // Check to make sure that our thread is still the thread we were
+        // loading items for. Necessary because this takes a while.
+        if (loadedThreadId !== this.threadId() || this._changesWhileLoading !== changes) return;
+        this._changesWhileLoading = null;
 
-      this._items = items.filter((m) => !m.isHidden());
-      this._items = this._sortItemsForDisplay(this._items);
+        // A re-read of the open thread (after a reconnect) keeps the bodies it showed; a draft's
+        // may have changed meanwhile.
+        const shown = new Map(this._items.map((m) => [m.id, m]));
+        for (const item of items) {
+          const old = shown.get(item.id);
+          if (old && !old.draft && item.body === undefined) item.body = old.body;
+        }
+        let next = this._sortItemsForDisplay(items.filter((m) => !m.isHidden()));
+        for (const change of changes) next = this._patchedItems(next, change);
+        this._items = next;
+        this._expandItemsToDefault();
 
-      this._expandItemsToDefault();
+        this._loadExpandedBodies(() => {
+          // Download the attachments on expanded messages.
+          this._fetchExpandedAttachments(this._items);
 
-      if (this._itemsLoading) {
-        this._fetchMissingBodies(this._items);
+          // Normally, we would trigger often and let the view's
+          // shouldComponentUpdate decide whether to re-render, but if we
+          // know we're not ready, don't even bother.  Trigger once at start
+          // and once when ready. Many third-party stores will observe
+          // MessageStore and they'll be stupid and re-render constantly.
+          this._itemsLoading = false;
+          this._markAsRead();
+          this.trigger(this);
+        });
+      },
+      (err) => {
+        if (loadedThreadId !== this.threadId() || this._changesWhileLoading !== changes) return;
+        this._changesWhileLoading = null;
+        console.warn(`MessageStore: could not read the messages of ${loadedThreadId}: ${err}`);
+        this._itemsLoading = false;
+        this.trigger(this);
       }
+    );
+  }
 
-      // Download the attachments on expanded messages.
-      this._fetchExpandedAttachments(this._items);
-
-      // Normally, we would trigger often and let the view's
-      // shouldComponentUpdate decide whether to re-render, but if we
-      // know we're not ready, don't even bother.  Trigger once at start
-      // and once when ready. Many third-party stores will observe
-      // MessageStore and they'll be stupid and re-render constantly.
-      this._itemsLoading = false;
-      this._markAsRead();
-      this.trigger(this);
-    });
+  // Loads the bodies of the expanded messages that have none loaded, asks the engine for the
+  // ones it hasn't downloaded, then runs `done` (at once when nothing was missing).
+  _loadExpandedBodies(done: () => void) {
+    const threadId = this.threadId();
+    const missing = this._items.filter((m) => this._itemsExpanded[m.id] && m.body === undefined);
+    if (missing.length === 0) {
+      done();
+      return;
+    }
+    DatabaseStore.findAll<Message>(Message, { id: missing.map((m) => m.id) })
+      .include(Message.attributes.body)
+      .then(
+        (loaded) => {
+          if (threadId !== this.threadId()) return;
+          const bodies = new Map(loaded.map((m) => [m.id, m.body]));
+          this._items = this._items.map((item) => {
+            if (item.body !== undefined || !bodies.has(item.id)) return item;
+            const withBody = new Message(item);
+            withBody.body = bodies.get(item.id);
+            return withBody;
+          });
+          this._fetchMissingBodies(this._items.filter((m) => bodies.has(m.id)));
+          done();
+        },
+        (err) => {
+          if (threadId !== this.threadId()) return;
+          console.warn(`MessageStore: could not read message bodies: ${err}`);
+          done();
+        }
+      );
   }
 
   _fetchMissingBodies(items: Message[]) {
@@ -329,7 +418,8 @@ class _MessageStore extends MailspringStore {
     }
   }
 
-  // Expand all unread messages, all drafts, and the last message
+  // Expand the newest unread messages (MAX_DEFAULT_EXPANDED_UNREAD of them), the last draft,
+  // and the last message. Expanded messages stay expanded.
   _expandItemsToDefault() {
     const visibleItems = this.items();
     let lastDraftIdx = -1;
@@ -340,9 +430,12 @@ class _MessageStore extends MailspringStore {
       }
     });
 
-    for (let idx = 0; idx < visibleItems.length; idx++) {
+    let unreadLeft = MAX_DEFAULT_EXPANDED_UNREAD;
+    for (let idx = visibleItems.length - 1; idx >= 0; idx--) {
       const item = visibleItems[idx];
-      if (item.unread || idx === lastDraftIdx || idx === visibleItems.length - 1) {
+      const expandUnread = item.unread && unreadLeft > 0;
+      if (item.unread) unreadLeft -= 1;
+      if (expandUnread || idx === lastDraftIdx || idx === visibleItems.length - 1) {
         this._itemsExpanded[item.id] = 'default';
       }
     }

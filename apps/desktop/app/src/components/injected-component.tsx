@@ -83,8 +83,11 @@ export default class InjectedComponent extends React.Component<
   }
 
   componentDidMount() {
-    this._componentUnlistener = ComponentRegistry.listen(() => {
-      this.setState(this._getStateFromStores());
+    this._componentUnlistener = ComponentRegistry.listenShared(() => {
+      const next = this._getStateFromStores();
+      if (next.component !== this.state.component || next.visible !== this.state.visible) {
+        this.setState(next);
+      }
     });
     if (this.state.component && this.state.component.containerRequired === false) {
       this.props.onComponentDidChange();

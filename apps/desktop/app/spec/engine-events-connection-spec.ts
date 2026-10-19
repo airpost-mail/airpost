@@ -13,6 +13,7 @@ import { applyDeltas, feedEngineEvents } from '../src/flux/mailsync-bridge';
 import { Notifier } from '../internal_packages/unread-notifications/lib/main';
 import { EngineStatus } from '../src/supervisor-channels';
 import { FakeEngine, until } from './fake-serve-engine';
+import { EngineReads } from '../src/flux/stores/engine-reads';
 
 const hello = (features: string[]) => ({
   protocol: 1,
@@ -168,6 +169,34 @@ describe('stage 1 engine events on a window connection', function () {
     fake.publishDelta(countsDelta('c2', 0, 1));
     await until('the delta', () => got.length === 1);
     expect(got[0]).toEqual({ type: 'persist', rows: countsDelta('c2', 0, 1).modelJSONs });
+  });
+
+  it('sends reads as query, holds them while the socket is down and resyncs after the reconnect', async function () {
+    fake.socketResults.hello = hello([Feature.Query]);
+    fake.socketResults.query = { rows: [{ __cls: 'Thread', id: 't1', aid: 'a1' }] };
+    const reads = new EngineReads(events, () => 'engine');
+    const resyncs = jasmine.createSpy('resync');
+    reads.on('resync', resyncs);
+    const json: any = { class: 'Thread', where: null, include: [], limit: 1 };
+
+    open(fake.socketPath, { mainWindow: false });
+    expect((await reads.query(json)).rows[0].id).toBe('t1');
+    expect(fake.socketOf('query')[0].params).toEqual(json);
+    expect(resyncs).not.toHaveBeenCalled();
+
+    fake.notify('disconnect', { reason: 'slow consumer' }, fake.conns[0]);
+    await until('the drop', () => connection._socket === null);
+    let answer = null;
+    reads.query(json).then((r) => (answer = r));
+    await until('a turn', () => true);
+    expect(answer).toBe(null);
+    expect(reads.unavailable()).toBe('waiting');
+
+    advanceClock(500);
+    await until('the read after the reconnect', () => answer !== null);
+    expect(fake.socketOf('query').length).toBe(2);
+    expect(resyncs.callCount).toBe(1);
+    expect(reads.unavailable()).toBe(null);
   });
 });
 
