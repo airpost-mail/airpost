@@ -2494,10 +2494,15 @@ ThrottleInterval 10, log in the service's directory) or a systemd `--user` unit
 unit (`com.ternmail.tern.engine` / `tern-engine`: `mailsync --mode serve --detached` with
 `CONFIG_DIR_PATH`, optional `TERN_ENGINE_KEY_FILE`) is written first when missing, from
 `--engine-bin` or the `mailsync-rs`/`mailsync` beside `tern`; `tern engine install|uninstall`
-manage it alone (uninstall refused while services are installed). Units of a profile other
+manage it alone (uninstall refused while services are installed), and `tern engine
+start|restart` start or restart it (`launchctl kickstart [-k]`, bootstrapping a job that isn't
+loaded; `systemctl --user start|restart`), only where units are loaded. Units of a profile other
 than the desktop's default get a profile tag in their names. `--dry-run` prints the binary,
-its SHA-256, the copy, and both unit texts; `--expect-sha256` refuses a binary whose hash
-changed, checked again on the bytes copied. `<config>/services.json` records each service's
+its SHA-256, the copy, both unit texts and `planSha256`, a digest of the binary's hash, the
+copy's path and every unit path and text the install writes; `--expect-sha256` refuses a binary
+whose hash changed, checked again on the bytes copied, and `--expect-plan` refuses an install
+whose plan isn't the one shown (other args, another engine binary or key file, an engine unit
+that appeared meanwhile). `<config>/services.json` records each service's
 source directory, binary, copy, hash, unit and time, and the engine unit's binary and hash;
 `tern service list` adds whether the unit file is there and the copy unchanged. `tern service
 uninstall` stops the unit, removes it, the copy and the record. Units are loaded
@@ -2512,14 +2517,28 @@ engine, subscribes to Thread and Message deltas, and on a `metadata-expiration` 
 `tasks::syncback_thread_metadata`. Desktop: Preferences > Plugins (new tab) lists third-party
 plugins with their directory, active state and install record, and for a plugin with
 `tern.service` runs the bundled `tern service install --dry-run` and shows the binary, hash,
-copy and unit texts before an Install button that passes `--expect-sha256`; installed services
+copy and unit texts before an Install button that passes `--expect-sha256` and
+`--expect-plan`; installed services
 show their copy and hash (and a missing unit or changed copy), with Uninstall. The engine unit
-gets this build's engine and, in unpackaged runs, `<config>/engine-dev.key`.
+gets this build's engine and, in unpackaged runs, `<config>/engine-dev.key`. Supervisor
+(`src/browser/engine-unit.ts`): with an engine unit installed (the services.json record and its
+unit file), a launch that finds the unit's detached engine of another build or protocol (after
+an update the unit's path holds the new build) runs `tern engine restart`, waits up to 30 s for
+the restarted engine in run/engine.json and joins it; one still not joinable is stopped as
+before. With the credentials still in the app it stops the engine without a restart. When the
+app quits, after its own engine stopped, it runs `tern engine start`, so the unit's engine runs
+again while Tern is closed (a no-op when the desktop had joined it).
 `installPackageFromPath` records `core.plugins.installs[name] = {source, sha256, installedAt}`
 (SHA-256 over sorted relative paths and file hashes, symlinks by target). Packaging:
 `build-release.sh` builds and installs `tern` next to `tern-mcp` (asar-unpacked, the linux-arm64
 workflow copies it, `make desktop` links the debug build); its crates are a subset of
 tern-mcp's, so tern-mcp's notices cover it. TD29's remaining items are done (tech-debt.md).
+Review fixes (2026-10-19): `--expect-plan` and `tern engine start|restart` with their tests
+(`cargo test -p tern`: a plan with other args or another engine binary refused, start and
+restart only for an installed unit and only where loaded), supervisor specs for the restart
+path (joined after a restart, stopped when still another build, nothing stopped when the unit
+doesn't come back, no restart with the credentials in the app), engine-unit spec (a fake
+`tern` via TERN_BIN), and a pane spec where changed args are refused; desktop specs 34 passing.
 Checks: `cargo test -p tern -p tern-client -p tern-sample-service` (unit generation for both
 managers into temp dirs, escaping, manifest refusals, install/uninstall/list with a fake
 loader, the load rule), fmt, clippy, `cargo deny check licenses bans`; harness
@@ -2537,8 +2556,10 @@ the file in the package, so a plugin update needs a reinstall and the binary mus
 self-contained (one file). `tern service install` installs the engine unit when it is missing
 rather than refusing, and the pane shows both units; `tern engine install` was added here
 (stage 11 left it open). launchd has no start order, so the service unit doesn't name the
-engine there; services wait for the socket and reconnect. Both units restart only after a
-failed exit (the engine exits 0 on `engine.shutdown`). The service's plugin id is its package
+engine there; services wait for the socket and reconnect. Both units restart only after a failed exit (the engine exits 0 on `engine.shutdown`); the
+desktop restarts or starts the engine unit itself instead (review fix), rather than the engine
+exiting non-zero on a desktop's shutdown. The launch restarts the unit only for a build,
+protocol or hello mismatch, and waits for it at most 30 s. The service's plugin id is its package
 name (`TERN_SERVICE_PACKAGE`); no subscribe filter by plugin id was added, a service filters
 `metadata-expiration` deltas itself. Units for a non-default profile carry
 `profile-<8 hex of sha256(config dir)>` in their names. The per-user units are generated, not
@@ -2547,10 +2568,14 @@ section 5 now says so. Plugin install records live in `core.plugins.installs` in
 plugins copied into `packages/` by hand have none.
 
 Open:
-- While the desktop runs its own (non-detached) engine, an installed engine unit fails to bind
-  the socket and launchd/systemd retry it every 10 s until the desktop quits; the desktop
-  joins it at the next launch (stage 11). The supervisor could hand over to the unit's engine
-  instead of spawning its own when an engine unit is installed.
+- While the desktop runs its own (non-detached) engine (no unit engine was running at launch,
+  the credentials were still in the app, or the restarted unit didn't come back in 30 s), an
+  engine unit started meanwhile (a login) fails to bind the socket and launchd/systemd retry
+  it every 10 s until the desktop quits. A launch with the unit installed but its engine
+  stopped spawns its own engine rather than starting the unit; the quit starts the unit.
+- The update path (`application:install-update`) stops the engine before will-quit, so it
+  doesn't start the unit; the relaunched app restarts or starts it. A quit whose engine
+  shutdown fails doesn't start the unit either.
 - Uninstalling the plugin in the desktop doesn't uninstall its service (the pane lists such a
   service under its package name with Uninstall).
 - The pane doesn't refresh after "Install a plugin…" (the dialog has no callback); reopening
@@ -2562,4 +2587,6 @@ Open:
 Trial pending (not run): on ~/tern-trial, build the sample into `examples/service-plugin/bin`,
 install it from Preferences > Plugins (check the binary, hash and units shown), give a thread a
 `tern-sample-service` reminder a minute out, quit the desktop, and see the thread starred and
-unread; then uninstall the service and the engine unit.
+unread; then uninstall the service and the engine unit. For the review fix: with the engine
+unit installed, rebuild or update the engine, launch Tern (the log says "Restarting the engine
+unit" then "Joining"), quit, and check the unit's engine still runs.

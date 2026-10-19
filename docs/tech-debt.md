@@ -765,7 +765,8 @@ is kept in `core.plugins.engineMethodApprovals`, a no for the session. The app's
 bundled packages are never asked. Stage 19 (roadmap/client-next) did the rest: Preferences >
 Plugins runs `tern service install --dry-run` and shows the binary, its SHA-256, the copy that
 will run and the exact unit text before anything is written, and the install refuses a binary
-whose hash changed since (`--expect-sha256`); the unit runs a copy in the profile, so a later
+whose hash changed since (`--expect-sha256`) or any change to what it writes, args and engine
+unit included (`--expect-plan` with the dry run's `planSha256`); the unit runs a copy in the profile, so a later
 plugin update changes nothing until the next install. `<config>/services.json` records each
 service's source, binary, hash and unit, and `core.plugins.installs` each plugin installed
 through Tern with its source directory and a SHA-256 over its files, shown in the pane. Still
