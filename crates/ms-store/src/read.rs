@@ -109,6 +109,16 @@ pub struct ReadStore {
     conn: Connection,
 }
 
+/// Which Event rows [`ReadStore::events`] reads.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct EventFilter<'a> {
+    /// Rows outside these accounts are never read.
+    pub account_ids: &'a [String],
+    pub calendar_ids: Option<&'a [String]>,
+    pub event_ids: Option<&'a [String]>,
+    pub window: Option<(i64, i64)>,
+}
+
 /// The stored JSON in column `idx`; `data` is TEXT on some tables and BLOB on others. A row
 /// that does not parse reads as null rather than failing the whole page.
 fn json_column(row: &Row<'_>, idx: usize) -> rusqlite::Result<Value> {
@@ -651,6 +661,71 @@ impl ReadStore {
         let mut stmt = self.conn.prepare_cached(&sql)?;
         let rows = stmt.query_map(params_from_iter(binds.iter()), |r| json_column(r, 0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Event rows: those of `event_ids` and every row sharing their calendar and UID, else
+    /// those on `calendar_ids`, else on every calendar of `account_ids`; with a window, only
+    /// rows whose `recurrenceStart..recurrenceEnd` overlaps it.
+    pub fn events(&self, filter: &EventFilter<'_>) -> Result<Vec<Value>> {
+        let mut sql = String::from("SELECT data FROM Event WHERE ");
+        let mut binds: Vec<SqlValue> = Vec::new();
+        let marks = |n: usize| vec!["?"; n].join(",");
+        if let Some(ids) = filter.event_ids {
+            sql.push_str(&format!(
+                "EXISTS (SELECT 1 FROM Event e WHERE e.id IN ({}) AND e.calendarId = Event.calendarId \
+                 AND e.icsuid = Event.icsuid)",
+                marks(ids.len())
+            ));
+            binds.extend(ids.iter().map(|i| SqlValue::Text(i.clone())));
+        } else if let Some(ids) = filter.calendar_ids {
+            sql.push_str(&format!("calendarId IN ({})", marks(ids.len())));
+            binds.extend(ids.iter().map(|i| SqlValue::Text(i.clone())));
+        } else {
+            sql.push_str(&format!("accountId IN ({})", marks(filter.account_ids.len())));
+            binds.extend(filter.account_ids.iter().map(|i| SqlValue::Text(i.clone())));
+        }
+        sql.push_str(&format!(
+            " AND accountId IN ({})",
+            marks(filter.account_ids.len())
+        ));
+        binds.extend(filter.account_ids.iter().map(|i| SqlValue::Text(i.clone())));
+        if let Some((start, end)) = filter.window {
+            sql.push_str(" AND recurrenceStart <= ? AND recurrenceEnd >= ?");
+            binds.push(SqlValue::Integer(end));
+            binds.push(SqlValue::Integer(start));
+        }
+        sql.push_str(" ORDER BY id");
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(binds.iter()), |r| json_column(r, 0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The accounts' calendars.
+    pub fn calendars(&self, account_ids: &[String]) -> Result<Vec<Value>> {
+        let sql = format!(
+            "SELECT data FROM Calendar WHERE accountId IN ({}) ORDER BY id",
+            vec!["?"; account_ids.len()].join(",")
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(params_from_iter(account_ids.iter()), |r| json_column(r, 0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The account's contacts among `ids`, in that order; ids it lacks are left out.
+    pub fn contacts(&self, account_id: &str, ids: &[String]) -> Result<Vec<Value>> {
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT data FROM Contact WHERE id = ? AND accountId = ?")?;
+        let mut out = Vec::new();
+        for id in ids {
+            if let Some(v) = stmt
+                .query_row([id, account_id], |r| json_column(r, 0))
+                .optional()?
+            {
+                out.push(v);
+            }
+        }
+        Ok(out)
     }
 
     /// Visible contacts whose email or name has words starting with every term of `query`,

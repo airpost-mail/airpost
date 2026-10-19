@@ -60,6 +60,8 @@ pub enum Request {
     DraftCancelSend(ms_ipc::DraftCancelSendParams),
     /// `draft.validate`, with every account's addresses.
     DraftValidate(ms_ipc::DraftValidateParams, ms_compose::Identities),
+    /// The `events.*` and `contacts.*` writes (`crate::pim_api`).
+    Pim(Box<crate::pim_api::Call>),
     /// stdin only.
     TestCrash,
     /// stdin only.
@@ -222,6 +224,12 @@ impl Dispatcher<'_> {
             Request::DraftSend(p) => self.drafts().send(p),
             Request::DraftCancelSend(p) => self.drafts().cancel_send(p),
             Request::DraftValidate(p, accounts) => self.drafts().validate(p, accounts),
+            Request::Pim(call) => crate::pim_api::Here {
+                store: self.tasks.store,
+                account: &self.ctx.account,
+                queue: self,
+            }
+            .handle(*call),
             Request::TestCrash => {
                 let e = SyncError::fatal("test", "triggered via cin");
                 self.ctx

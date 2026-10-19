@@ -28,6 +28,7 @@ ms-integrations.workspace = true
 ms-ai.workspace = true
 ms-secrets.workspace = true
 ms-compose.workspace = true
+ms-pim.workspace = true
 ring.workspace = true
 base64.workspace = true
 chrono.workspace = true

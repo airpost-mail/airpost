@@ -963,6 +963,7 @@ impl Session {
             name if crate::drafts_api::is_draft_method(name) && self.server.settings.is_some() => {
                 crate::drafts_api::call(self, req)
             }
+            name if crate::pim_api::is_pim_method(name) => crate::pim_api::call(self, req),
             _ => return None,
         })
     }
@@ -1066,6 +1067,8 @@ fn features(server: &Server) -> Vec<String> {
         feature::FILES,
         feature::SNOOZE,
         feature::UNSUBSCRIBE,
+        feature::CALENDAR_EDITING,
+        feature::CONTACT_EDITING,
     ]
     .map(str::to_owned)
     .to_vec();

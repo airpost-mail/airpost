@@ -1886,6 +1886,7 @@ dependencies = [
  "ms-ipc",
  "ms-mime",
  "ms-net",
+ "ms-pim",
  "ms-providers",
  "ms-secrets",
  "ms-smtp",

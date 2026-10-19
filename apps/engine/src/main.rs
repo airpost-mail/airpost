@@ -23,6 +23,7 @@ mod files;
 mod integrations_api;
 mod modes;
 mod output;
+mod pim_api;
 mod platform;
 #[cfg(unix)]
 mod read_api;
