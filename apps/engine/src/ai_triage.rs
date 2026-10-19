@@ -9,8 +9,8 @@
 //! (`ms_net::LOCAL_ONLY_PLUGINS`), so no Tern server receives it.
 //!
 //! - Only for accounts opted in (`core.ai.accounts`) with triage on (`core.ai.features`),
-//!   with the stored provider; one that needs a key waits for the engine to hold keys
-//!   (desktop-client-plan stage 11), so new mail is triaged by keyless providers only.
+//!   with the stored provider and its key from the secret store (`integration:ai-<id>`);
+//!   one that needs a key and has none is skipped.
 //! - One request in flight per provider across accounts; at most `core.ai.limits.triagePerHour`
 //!   (200) per account per hour; a `rate-limited` or `quota-exceeded` answer pauses every
 //!   account on that provider until `retryAfter` (15 minutes without one; 1 s to 24 h), and
@@ -416,7 +416,8 @@ pub fn on_capabilities_changed(f: Box<dyn Fn() + Send + Sync>) {
     let _ = ON_CAPABILITIES.set(f);
 }
 
-fn capabilities_changed() {
+/// Sends `capabilities.changed` (`serve`); nothing in `sync` mode.
+pub(crate) fn capabilities_changed() {
     if let Some(f) = ON_CAPABILITIES.get() {
         f();
     }

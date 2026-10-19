@@ -9,10 +9,9 @@
 //! workers ([`crate::workers::AI`]). The account must be opted in and the feature on before
 //! any mail is read. The switches and providers are the `core.ai.*` settings ([`StoredAi`]);
 //! a local client may still send its own with each call (`settings`, `config`), which the
-//! relay policy keeps out of relayed calls. The engine holds no keys until desktop-client-plan
-//! stage 11, so a stored provider that needs one is `not-configured` and only keyless ones
-//! (Ollama, local compatible servers) run from the store. Nothing here keeps or logs the key,
-//! the prompt or the answer.
+//! relay policy keeps out of relayed calls. A stored provider's key is `serve`'s secret
+//! `integration:ai-<id>` ([`on_secret`]), never a setting and never sent to a client. Nothing
+//! here keeps or logs the key, the prompt or the answer.
 //!
 //! Every call holds a [`CancelToken`] registered with its connection ([`Streams`]):
 //! `ai.cancel {streamId}` and the connection closing cancel it, which drops the provider
@@ -20,7 +19,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::Duration;
 
 use chrono::{Local, TimeZone};
@@ -28,11 +27,11 @@ use ms_ai::{
     Ai, AiError, CancelToken, ContextMessage, DraftOpts, Feature, MailContext, Options, Person,
     ProviderConfig, ReplyOpts, Sink, SummaryOpts, UsageRecord,
 };
+use ms_integrations::Secret;
 use ms_ipc::{
     ai_feature, capability_reason, code, method, AccountStatus, AiCancelParams, AiDraftReplyParams,
     AiModelsParams, AiProviderParams, AiSettings, AiSuggestRepliesParams, AiSummarizeParams,
     AiUsageParams, AiUsageRow, Capability, ErrorObject, Request as RpcRequest,
-    CREDENTIALS_PER_REQUEST,
 };
 use ms_store::read::{CategoryTable, ReadStore};
 use serde_json::{json, Map, Value};
@@ -129,11 +128,27 @@ const KEYS: [&str; 5] = [
 /// Triage requests per account per hour when `core.ai.limits` names none.
 pub const DEFAULT_TRIAGE_PER_HOUR: u64 = 200;
 
-/// The `core.ai.*` settings: providers without keys, the switches, the limits. Values of the
-/// wrong shape read as unset.
+type SecretSource = Box<dyn Fn(&str) -> Option<String> + Send + Sync>;
+
+static SECRETS: OnceLock<SecretSource> = OnceLock::new();
+
+/// Where [`StoredAi`] reads the providers' keys: `serve`'s secret store. Without it (`sync`
+/// mode) stored providers have none.
+pub fn on_secret(f: SecretSource) {
+    let _ = SECRETS.set(f);
+}
+
+fn stored_secret(name: &str) -> Option<String> {
+    SECRETS.get().and_then(|f| f(name))
+}
+
+/// The `core.ai.*` settings: providers, their keys from the secret store, the switches, the
+/// limits. Values of the wrong shape read as unset.
 #[derive(Clone, Debug, Default)]
 pub struct StoredAi {
     providers: Vec<Value>,
+    /// By provider id: `integration:ai-<id>`, when it holds a value.
+    keys: BTreeMap<String, Secret>,
     switches: AiSettings,
     triage_per_hour: Option<u64>,
     daily_tokens: BTreeMap<String, u64>,
@@ -146,23 +161,41 @@ impl StoredAi {
     }
 
     pub fn read(get: &dyn Fn(&str) -> Option<Value>) -> StoredAi {
+        StoredAi::read_with(get, &stored_secret)
+    }
+
+    /// [`StoredAi::read`] with the keys from `secret` (a secret name to its value).
+    pub fn read_with(
+        get: &dyn Fn(&str) -> Option<Value>,
+        secret: &dyn Fn(&str) -> Option<String>,
+    ) -> StoredAi {
         let [providers, features, accounts, limits, include] = KEYS.map(get);
         let limits = limits.unwrap_or(Value::Null);
+        // `settings.set` refuses a provider with a key; one stored before that is used
+        // without it.
+        let providers: Vec<Value> = match providers {
+            Some(Value::Array(list)) => list
+                .into_iter()
+                .map(|mut p| {
+                    if let Some(p) = p.as_object_mut() {
+                        p.remove("apiKey");
+                    }
+                    p
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        let keys = providers
+            .iter()
+            .filter_map(|p| p["id"].as_str())
+            .filter_map(|id| {
+                let key = Secret::new(secret(&ms_secrets::names::ai_provider(id))?);
+                (!key.is_blank()).then(|| (id.to_owned(), key))
+            })
+            .collect();
         StoredAi {
-            // `settings.set` refuses a provider with a key; one stored before that is used
-            // without it.
-            providers: match providers {
-                Some(Value::Array(list)) => list
-                    .into_iter()
-                    .map(|mut p| {
-                        if let Some(p) = p.as_object_mut() {
-                            p.remove("apiKey");
-                        }
-                        p
-                    })
-                    .collect(),
-                _ => Vec::new(),
-            },
+            providers,
+            keys,
             switches: AiSettings {
                 accounts: accounts
                     .as_ref()
@@ -192,17 +225,34 @@ impl StoredAi {
         &self.switches
     }
 
-    /// The stored provider `id`, `None` when there is none.
+    /// The stored provider `id` with its stored key, `None` when there is none.
     pub fn provider(&self, id: &str) -> Option<Result<ProviderConfig, ErrorObject>> {
         let raw = self
             .providers
             .iter()
             .find(|p| p["id"].as_str() == Some(id))?;
-        Some(serde_json::from_value(raw.clone()).map_err(|_| {
-            failed(AiError::NotConfigured {
-                what: "the model provider",
-            })
-        }))
+        Some(
+            serde_json::from_value::<ProviderConfig>(raw.clone())
+                .map(|mut config| {
+                    config.api_key = self.keys.get(id).cloned();
+                    config
+                })
+                .map_err(|_| {
+                    failed(AiError::NotConfigured {
+                        what: "the model provider",
+                    })
+                }),
+        )
+    }
+
+    /// The stored key of provider `config.id`, for a `config` sent without one that goes to
+    /// the same server: a caller naming another host must bring its own key, or a request
+    /// could carry the stored key anywhere.
+    fn key_for(&self, config: &ProviderConfig) -> Option<Secret> {
+        let stored = self.provider(&config.id)?.ok()?;
+        let same_server = stored.kind == config.kind
+            && matches!((stored.base_url(), config.base_url()), (Ok(a), Ok(b)) if a == b);
+        same_server.then_some(stored.api_key).flatten()
     }
 
     /// The provider id `feature` uses.
@@ -220,15 +270,23 @@ impl StoredAi {
     }
 }
 
-/// The provider a call uses: the `config` a local client sent, else the stored provider it
-/// names (`provider`), else the one the feature uses.
+/// The provider a call uses: the `config` a local client sent (with the stored key when it
+/// has none, [`StoredAi::key_for`]), else the stored provider it names (`provider`), else
+/// the one the feature uses.
 pub(crate) fn resolve_provider(
     p: &AiProviderParams,
     feature: Option<&str>,
     stored: &StoredAi,
 ) -> Result<ProviderConfig, ErrorObject> {
     if let Some(c) = p.config.as_ref().filter(|c| !c.is_null()) {
-        return serde_json::from_value(c.clone()).map_err(|e| invalid(format!("config: {e}")));
+        let mut config: ProviderConfig =
+            serde_json::from_value(c.clone()).map_err(|e| invalid(format!("config: {e}")))?;
+        if config.api_key.as_ref().is_none_or(Secret::is_blank) {
+            if let Some(key) = stored.key_for(&config) {
+                config.api_key = Some(key);
+            }
+        }
+        return Ok(config);
     }
     let not_configured = || {
         failed(AiError::NotConfigured {
@@ -1052,28 +1110,19 @@ pub fn usage(req: &RpcRequest) -> Reply {
 
 // -- Capabilities ---------------------------------------------------------------------------
 
-/// `capabilities.ai`. The client sends the key with each summary and reply call, so it
-/// decides their availability from its own settings ([`CREDENTIALS_PER_REQUEST`]). Triage
-/// runs in the engine from the stored settings alone, so the engine says whether it can.
+/// `capabilities.ai`, from the stored settings and keys: what a call without `config` and
+/// `settings` (a relayed one, `tern ai`, background triage) can do. Not per account: a
+/// feature is available once it is on for some account.
 pub fn capabilities(stored: &StoredAi) -> BTreeMap<String, Capability> {
-    let mut caps: BTreeMap<String, Capability> = [ai_feature::SUMMARY, ai_feature::REPLY]
+    [ai_feature::SUMMARY, ai_feature::REPLY, ai_feature::TRIAGE]
         .into_iter()
-        .map(|f| {
-            (
-                f.to_owned(),
-                Capability {
-                    available: true,
-                    credentials: Some(CREDENTIALS_PER_REQUEST.to_owned()),
-                    ..Capability::default()
-                },
-            )
-        })
-        .collect();
-    caps.insert(ai_feature::TRIAGE.to_owned(), triage_capability(stored));
-    caps
+        .map(|f| (f.to_owned(), feature_capability(stored, f)))
+        .collect()
 }
 
-fn triage_capability(stored: &StoredAi) -> Capability {
+/// `needs-engine-key` for a provider that needs a key while `integration:ai-<id>` holds
+/// none; `rate-limited` only for triage, the one feature that pauses.
+fn feature_capability(stored: &StoredAi, feature: &str) -> Capability {
     let unavailable = |reason: &str, config: Option<&ProviderConfig>| Capability {
         available: false,
         provider: config.map(|c| c.id.clone()),
@@ -1082,11 +1131,11 @@ fn triage_capability(stored: &StoredAi) -> Capability {
         ..Capability::default()
     };
     let switches = stored.switches();
-    if !switches.feature_enabled(ai_feature::TRIAGE) || switches.accounts.is_empty() {
+    if !switches.feature_enabled(feature) || switches.accounts.is_empty() {
         return unavailable(capability_reason::NOT_SET_UP, None);
     }
     let Some(Ok(config)) = stored
-        .feature_provider(ai_feature::TRIAGE)
+        .feature_provider(feature)
         .and_then(|id| stored.provider(id))
     else {
         return unavailable(capability_reason::NOT_SET_UP, None);
@@ -1098,11 +1147,14 @@ fn triage_capability(stored: &StoredAi) -> Capability {
         Err(_) => return unavailable(capability_reason::NOT_SET_UP, Some(&config)),
         Ok(()) => {}
     }
-    let paused = crate::ai_triage::paused(&config.id).or_else(|| {
-        check_daily_cap(&config.id, stored.daily_tokens(&config.id))
-            .err()
-            .map(|e| e.key())
-    });
+    let paused = (feature == ai_feature::TRIAGE)
+        .then(|| crate::ai_triage::paused(&config.id))
+        .flatten()
+        .or_else(|| {
+            check_daily_cap(&config.id, stored.daily_tokens(&config.id))
+                .err()
+                .map(|e| e.key())
+        });
     match paused {
         Some("rate-limited") => unavailable(capability_reason::RATE_LIMITED, Some(&config)),
         Some(_) => unavailable(capability_reason::QUOTA_EXCEEDED, Some(&config)),
@@ -1291,7 +1343,10 @@ mod tests {
     fn triage_capability_follows_the_store() {
         let reason = |v: Value| {
             let caps = capabilities(&stored(v));
-            assert!(caps[ai_feature::SUMMARY].available);
+            assert_eq!(
+                caps[ai_feature::SUMMARY].reason.as_deref(),
+                Some("not-set-up")
+            );
             caps[ai_feature::TRIAGE].reason.clone()
         };
         assert_eq!(reason(json!({})).as_deref(), Some("not-set-up"));
@@ -1316,6 +1371,77 @@ mod tests {
         assert_eq!(
             (triage.provider.as_deref(), triage.local),
             (Some("cap-p"), Some(true))
+        );
+    }
+
+    #[test]
+    fn stored_providers_take_their_keys_from_the_secret_store() {
+        let values = json!({
+            "core.ai.providers": [
+                {"id": "claude", "kind": "anthropic", "url": "https://api.anthropic.com", "model": "m"},
+                {"id": "blank", "kind": "anthropic", "model": "m"},
+                {"id": "other", "kind": "anthropic", "model": "m"},
+            ],
+            "core.ai.features": {
+                "summary": {"enabled": true, "provider": "claude"},
+                "reply": {"enabled": true, "provider": "blank"},
+                "triage": {"enabled": true, "provider": "claude"},
+            },
+            "core.ai.accounts": ["a1"],
+        });
+        let secrets = |name: &str| match name {
+            "integration:ai-claude" => Some("sk-engine".to_owned()),
+            "integration:ai-blank" => Some("  ".to_owned()),
+            _ => None,
+        };
+        let values = values.as_object().unwrap();
+        let s = StoredAi::read_with(&|k| values.get(k).cloned(), &secrets);
+        let key = |c: &ProviderConfig| c.api_key.as_ref().map(|k| k.expose().to_owned());
+        assert_eq!(
+            key(&s.provider("claude").unwrap().unwrap()).as_deref(),
+            Some("sk-engine")
+        );
+        assert_eq!(key(&s.provider("blank").unwrap().unwrap()), None);
+        assert!(!format!("{s:?}").contains("sk-engine"));
+
+        let caps = capabilities(&s);
+        for f in [ai_feature::SUMMARY, ai_feature::TRIAGE] {
+            assert!(caps[f].available, "{f}: {:?}", caps[f]);
+            assert_eq!(caps[f].credentials, None);
+        }
+        assert_eq!(
+            caps[ai_feature::REPLY].reason.as_deref(),
+            Some("needs-engine-key")
+        );
+        // Without the secret store, the same settings need the key.
+        let none = StoredAi::read_with(&|k| values.get(k).cloned(), &|_| None);
+        assert_eq!(
+            capabilities(&none)[ai_feature::TRIAGE].reason.as_deref(),
+            Some("needs-engine-key")
+        );
+
+        // A local client's config without a key gets the stored one for the same server only.
+        let sent = |config: Value| {
+            let p = AiProviderParams {
+                config: Some(config),
+                provider: None,
+            };
+            key(&resolve_provider(&p, None, &s).unwrap())
+        };
+        let draft = json!({"id": "claude", "kind": "anthropic", "model": "draft"});
+        assert_eq!(sent(draft).as_deref(), Some("sk-engine"));
+        let typed =
+            json!({"id": "claude", "kind": "anthropic", "model": "m", "apiKey": "sk-typed"});
+        assert_eq!(sent(typed).as_deref(), Some("sk-typed"));
+        let elsewhere = json!({"id": "claude", "kind": "anthropic", "model": "m",
+                               "url": "https://evil.example"});
+        assert_eq!(sent(elsewhere), None);
+        let compatible = json!({"id": "claude", "kind": "openai", "model": "m",
+                                "url": "https://api.anthropic.com"});
+        assert_eq!(sent(compatible), None);
+        assert_eq!(
+            sent(json!({"id": "other", "kind": "anthropic", "model": "m"})),
+            None
         );
     }
 

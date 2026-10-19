@@ -65,6 +65,13 @@ pub mod names {
     pub fn integration(provider: &str) -> String {
         format!("integration:{provider}")
     }
+    /// What every [`ai_provider`] name starts with.
+    pub const AI_PROVIDER_PREFIX: &str = "integration:ai-";
+    /// An AI provider's key (docs/ai-plan.md A3), by the provider's id in `core.ai.providers`;
+    /// `credentials.import` maps the desktop's `integration-ai-<id>-key` to it.
+    pub fn ai_provider(provider_id: &str) -> String {
+        format!("{AI_PROVIDER_PREFIX}{provider_id}")
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

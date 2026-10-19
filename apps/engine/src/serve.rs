@@ -157,6 +157,11 @@ pub fn run(opts: &Options) -> i32 {
         settings: Some(settings),
     });
     crate::ai_api::init_usage(&opts.config_dir);
+    let for_keys = Arc::downgrade(&engine);
+    crate::ai_api::on_secret(Box::new(move |name| {
+        // An unreadable store holds no key here; `hello.credentials` reports why.
+        for_keys.upgrade()?.registered.secret(name).ok().flatten()
+    }));
     let for_capabilities = Arc::downgrade(&server);
     crate::ai_triage::on_capabilities_changed(Box::new(move || {
         if let Some(server) = for_capabilities.upgrade() {
@@ -609,7 +614,11 @@ impl Engine {
     /// without starting them; the client adds them next.
     fn import(&self, req: &RpcRequest) -> Reply {
         let p: CredentialsImportParams = req.params_as()?;
+        let ai_keys = p.secrets.keys().any(|k| k.starts_with("integration-ai-"));
         let result = self.registered.import(p);
+        if ai_keys {
+            crate::ai_triage::capabilities_changed();
+        }
         for id in &result.imported {
             if let Some(account) = self.registered.get(id) {
                 self.announce(&account);
@@ -1577,6 +1586,13 @@ fn needs_credentials_error(message: &str) -> Value {
 /// The most names `secrets.has` takes.
 const MAX_SECRET_NAMES: usize = 256;
 
+/// An AI provider's key decides `capabilities.ai`.
+fn secret_changed(name: &str) {
+    if name.starts_with(ms_secrets::names::AI_PROVIDER_PREFIX) {
+        crate::ai_triage::capabilities_changed();
+    }
+}
+
 impl Engine {
     /// The identity for an account added without one: the latest `account.add` gave, or
     /// else the Tern server of `server.set` with its token, or none.
@@ -1830,6 +1846,7 @@ impl Engine {
             .set_secret(&p.name, &p.value)
             .map_err(internal)?;
         info!("Secret {} stored", p.name);
+        secret_changed(&p.name);
         Ok(json!({}))
     }
 
@@ -1843,6 +1860,7 @@ impl Engine {
         }
         self.registered.delete_secret(&p.name).map_err(internal)?;
         info!("Secret {} deleted", p.name);
+        secret_changed(&p.name);
         Ok(json!({}))
     }
 

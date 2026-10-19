@@ -36,8 +36,8 @@ pub mod capability_reason {
     pub const MISSING_URL: &str = "missing-url";
     /// Only a Tern server offers it, and none is connected.
     pub const NEEDS_TERN_SERVER: &str = "needs-tern-server";
-    /// AI triage: the provider needs an API key and the engine holds none yet (keys go with
-    /// each request until desktop-client-plan stage 11; Ollama needs none).
+    /// AI: the provider needs an API key and the secret store holds none under
+    /// `integration:ai-<id>` (Ollama needs none).
     pub const NEEDS_ENGINE_KEY: &str = "needs-engine-key";
     /// AI triage: the provider is rate limiting; triage waits and resumes by itself.
     pub const RATE_LIMITED: &str = "rate-limited";
@@ -46,9 +46,9 @@ pub mod capability_reason {
 }
 
 /// [`Capability::credentials`]: the client sends the provider's key with each request (in
-/// `config`), so the engine can't tell whether one is saved; the client checks. On an
-/// [`Capabilities::ai`] entry it also means the client sends the AI switches, which it
-/// applies itself.
+/// `config`), so the engine can't tell whether one is saved; the client checks. Engines
+/// before desktop-client-plan stage 11 also set it on [`Capabilities::ai`] entries, meaning
+/// the client sends the AI switches and applies them itself.
 pub const CREDENTIALS_PER_REQUEST: &str = "request";
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

@@ -48,6 +48,7 @@ fn account() -> Value {
 fn mailsync(config: &Path) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_mailsync"));
     c.env("CONFIG_DIR_PATH", config)
+        .env("TERN_ENGINE_KEY_FILE", config.join("engine.key"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -439,7 +440,7 @@ fn hello_announces_ai_and_its_capabilities() {
     for f in ["summary", "reply"] {
         assert_eq!(
             ai[f],
-            json!({"available": true, "credentials": "request"}),
+            json!({"available": false, "reason": "not-set-up"}),
             "{f}"
         );
     }
@@ -1460,4 +1461,214 @@ fn triage_judges_the_latest_message_not_from_an_alias() {
     let sent = server.last().json().to_string();
     assert!(sent.contains("Did the invoice arrive?"), "{sent}");
     assert!(!sent.contains("ALIAS REPLY"), "{sent}");
+}
+
+/// A connection that keeps every message the engine sent on it, to check what it carried.
+struct Recorded {
+    c: Client,
+    seen: Vec<String>,
+    /// Notifications read while waiting for a response.
+    pending: std::collections::VecDeque<ms_ipc::Notification>,
+    next: i64,
+}
+
+impl Recorded {
+    fn connect(e: &Serve, hello: Value) -> Recorded {
+        let c = Client::connect(&e.socket).unwrap();
+        c.set_read_timeout(Some(WAIT)).unwrap();
+        let mut r = Recorded {
+            c,
+            seen: Vec::new(),
+            pending: Default::default(),
+            next: 0,
+        };
+        r.call(method::HELLO, hello).unwrap();
+        r
+    }
+
+    fn read(&mut self) -> Message {
+        let m = self
+            .c
+            .read_message()
+            .unwrap_or_else(|e| panic!("{e:?} after {:#?}", self.seen));
+        self.seen.push(format!("{m:?}"));
+        m
+    }
+
+    fn call(&mut self, method: &str, params: Value) -> Result<Value, ms_ipc::ErrorObject> {
+        self.next += 1;
+        let req = Request::new(ms_ipc::Id::Num(20_000 + self.next), method, params);
+        self.c.send_raw(&ms_ipc::encode(&req)).unwrap();
+        loop {
+            match self.read() {
+                Message::Response(r) if r.id == req.id => return r.into_result(),
+                Message::Notification(n) => self.pending.push_back(n),
+                _ => {}
+            }
+        }
+    }
+
+    fn notification(&mut self) -> ms_ipc::Notification {
+        if let Some(n) = self.pending.pop_front() {
+            return n;
+        }
+        loop {
+            if let Message::Notification(n) = self.read() {
+                return n;
+            }
+        }
+    }
+
+    /// Reads until a `capabilities.changed` whose `ai.triage` passes `want`; its `ai`.
+    fn capabilities_until(&mut self, want: impl Fn(&Value) -> bool) -> Value {
+        loop {
+            let n = self.notification();
+            if n.method == method::CAPABILITIES_CHANGED && want(&n.params["ai"]["triage"]) {
+                return n.params["ai"].clone();
+            }
+        }
+    }
+
+    /// Runs `ai.triage.run` and reads its progress to the end; the last progress.
+    fn triage(&mut self, params: Value) -> Value {
+        self.call(method::AI_TRIAGE_RUN, params).unwrap();
+        loop {
+            let n = self.notification();
+            if n.method == method::AI_TRIAGE_PROGRESS
+                && (n.params["done"] == n.params["total"] || n.params["stopped"] == true)
+            {
+                return n.params;
+            }
+        }
+    }
+
+    #[track_caller]
+    fn assert_never_carried(&self, secret: &str) {
+        assert!(!self.seen.is_empty());
+        for m in &self.seen {
+            assert!(!m.contains(secret), "the socket carried the key: {m}");
+        }
+    }
+}
+
+/// The engine holds the key (desktop-client-plan stage 11): background triage and relayed
+/// calls run on a keyed provider, the key goes to that provider only, and no message from
+/// the engine carries it. The key comes in on the parent's stdin, as the desktop imports it.
+#[test]
+fn engine_held_keys_serve_triage_and_relayed_calls() {
+    let mut e = Serve::start();
+    let server = provider(ProviderKind::Anthropic, &[TRIAGE_ANSWER]);
+    let mut c = Recorded::connect(&e, json!({"protocol": 1, "client": "ai-test/1"}));
+    c.call(method::SUBSCRIBE, json!({})).unwrap();
+    let values = json!({
+        "core.ai.providers": [{"id": "claude", "kind": "anthropic", "url": server.url(),
+                               "model": "m-1"}],
+        "core.ai.features": {"summary": {"enabled": true, "provider": "claude"},
+                             "triage": {"enabled": true, "provider": "claude"}},
+        "core.ai.accounts": [ACCOUNT_ID],
+    });
+    c.call(method::SETTINGS_SET, json!({ "values": values }))
+        .unwrap();
+    let hello = c.call(method::HELLO, json!({"protocol": 1})).unwrap();
+    for f in ["summary", "triage"] {
+        assert_eq!(
+            hello["capabilities"]["ai"][f]["reason"], "needs-engine-key",
+            "{f}"
+        );
+    }
+    let run = json!({"accountId": ACCOUNT_ID, "threadIds": ["t1"]});
+    let refused = c.call(method::AI_TRIAGE_RUN, run.clone()).unwrap_err();
+    assert_eq!(refused.data.unwrap()["key"], "not-configured");
+    assert_eq!(server.count(), 0);
+
+    e.parent(
+        method::CREDENTIALS_IMPORT,
+        json!({"accounts": [], "secrets": {"integration-ai-claude-key": KEY}}),
+    );
+    let ai = c.capabilities_until(|t| t["available"] == true);
+    assert_eq!(
+        ai["triage"],
+        json!({"available": true, "provider": "claude", "local": true})
+    );
+    assert_eq!(ai["summary"]["available"], true);
+    let has = c
+        .call(
+            method::SECRETS_HAS,
+            json!({"names": ["integration:ai-claude"]}),
+        )
+        .unwrap();
+    assert_eq!(has["integration:ai-claude"], true);
+
+    // Background triage: no config, the stored provider and its stored key.
+    let done = c.triage(run.clone());
+    assert_eq!((&done["done"], &done["total"]), (&json!(1), &json!(1)));
+    let value = c
+        .call(
+            method::THREADS_GET,
+            json!({"accountId": ACCOUNT_ID, "id": "t1"}),
+        )
+        .unwrap()["thread"]["metadata"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["pluginId"] == "tern-ai-triage")
+        .map(|m| m["value"].clone())
+        .unwrap();
+    assert_eq!(value["category"], "needs-reply");
+    assert_eq!(server.count(), 1);
+    assert_eq!(server.last().header("x-api-key"), Some(KEY));
+
+    // A relayed device sends no config and gets the stored key's answer.
+    let mut relayed = Recorded::connect(
+        &e,
+        json!({"protocol": 1, "client": "gateway", "relayed": true, "scopes": []}),
+    );
+    let r = relayed
+        .call(
+            method::AI_SUMMARIZE,
+            json!({"accountId": ACCOUNT_ID, "threadId": "t1"}),
+        )
+        .unwrap();
+    assert!(r["text"].is_string());
+    assert_eq!(server.count(), 2);
+    assert_eq!(server.last().header("x-api-key"), Some(KEY));
+
+    // A local client's config for another server doesn't get the stored key.
+    let elsewhere = provider(ProviderKind::Anthropic, &["x"]);
+    let mut config = json!({"id": "claude", "kind": "anthropic", "url": elsewhere.url(),
+                            "model": "m-1"});
+    let other = c.call(method::AI_TEST, json!({ "config": config.clone() }));
+    assert_eq!(other.unwrap_err().data.unwrap()["key"], "not-configured");
+    assert_eq!(elsewhere.count(), 0);
+    // The same server does: Preferences' Test with the form's model.
+    config["url"] = json!(server.url());
+    c.call(method::AI_TEST, json!({ "config": config }))
+        .unwrap();
+    assert_eq!(server.last().header("x-api-key"), Some(KEY));
+
+    // secrets.delete and secrets.set of the key change the capabilities.
+    c.call(
+        method::SECRETS_DELETE,
+        json!({"name": "integration:ai-claude"}),
+    )
+    .unwrap();
+    let ai = c.capabilities_until(|t| t["available"] == false);
+    assert_eq!(ai["triage"]["reason"], "needs-engine-key");
+    assert_eq!(ai["summary"]["reason"], "needs-engine-key");
+    c.call(
+        method::SECRETS_SET,
+        json!({"name": "integration:ai-claude", "value": "sk-set-later"}),
+    )
+    .unwrap();
+    c.capabilities_until(|t| t["available"] == true);
+    c.call(
+        method::AI_SUMMARIZE,
+        json!({"accountId": ACCOUNT_ID, "threadId": "t1", "refresh": true}),
+    )
+    .unwrap();
+    assert_eq!(server.last().header("x-api-key"), Some("sk-set-later"));
+
+    c.assert_never_carried(KEY);
+    c.assert_never_carried("sk-set-later");
+    relayed.assert_never_carried(KEY);
 }
