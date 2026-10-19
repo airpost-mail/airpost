@@ -56,6 +56,11 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::THREADS_SNOOZE
         | method::THREADS_UNSNOOZE
         | method::MESSAGES_UNSUBSCRIBE
+        // Drafts and their sends, as task.queue's SyncbackDraftTask and SendDraftTask.
+        | method::DRAFT_CREATE
+        | method::DRAFT_SEND
+        | method::DRAFT_CANCEL_SEND
+        | method::DRAFT_VALIDATE
         // settings.set is open for the keys in RELAYED_SETTINGS_KEYS only
         // (relayed_settings_allowed).
         | method::SETTINGS_GET

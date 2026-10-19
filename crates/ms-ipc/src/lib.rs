@@ -14,6 +14,7 @@
 mod accounts;
 mod ai;
 mod client;
+mod drafts;
 mod envelope;
 mod files;
 mod frame;
@@ -27,6 +28,7 @@ mod settings;
 pub use accounts::*;
 pub use ai::*;
 pub use client::{Client, ClientError, Notifications};
+pub use drafts::*;
 pub use envelope::{
     delta_notification_line, parse_message, parse_request, ErrorObject, Id, Message, Notification,
     Request, Response,
@@ -103,6 +105,18 @@ pub mod method {
     /// [`MessagesUnsubscribeParams`](crate::MessagesUnsubscribeParams). Socket only; answered
     /// out of order while a one-click POST runs.
     pub const MESSAGES_UNSUBSCRIBE: &str = "messages.unsubscribe";
+    /// Builds a draft as the desktop does and saves it
+    /// ([`feature::DRAFT_PIPELINE`](crate::feature::DRAFT_PIPELINE)), params
+    /// [`DraftCreateParams`](crate::DraftCreateParams); answers with its Message JSON.
+    pub const DRAFT_CREATE: &str = "draft.create";
+    /// Sends a draft now or after an undo window, params
+    /// [`DraftSendParams`](crate::DraftSendParams).
+    pub const DRAFT_SEND: &str = "draft.send";
+    /// Cancels a send waiting out its undo window, params
+    /// [`DraftCancelSendParams`](crate::DraftCancelSendParams).
+    pub const DRAFT_CANCEL_SEND: &str = "draft.cancelSend";
+    /// The checks before a send, params [`DraftValidateParams`](crate::DraftValidateParams).
+    pub const DRAFT_VALIDATE: &str = "draft.validate";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
     /// `serve` mode: register an account, store its secrets and start syncing it
@@ -280,6 +294,9 @@ pub mod feature {
     pub const SNOOZE: &str = "snooze";
     /// `messages.unsubscribe`.
     pub const UNSUBSCRIBE: &str = "unsubscribe";
+    /// `serve`: `draft.create`, `draft.send` (with `bodies` kept with the pending send),
+    /// `draft.cancelSend` and `draft.validate`, and the `composing.quoteTexts` setting.
+    pub const DRAFT_PIPELINE: &str = "draft-pipeline";
     /// The `integrations.*` methods (docs/integrations-plan.md section 4).
     pub const INTEGRATIONS: &str = "integrations";
     /// `capabilities` in `hello` and `engine.status`, and `capabilities.changed`

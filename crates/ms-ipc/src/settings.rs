@@ -60,6 +60,9 @@ pub const SETTINGS_KEYS: &[(&str, SettingKind)] = &[
     ("mailRulesAutoSince", SettingKind::Count),
     ("resurfacing.snoozeBody", SettingKind::String),
     ("resurfacing.reminderBody", SettingKind::String),
+    // The reply attribution, forward header and date pattern in the user's language and hour
+    // cycle, for the drafts the engine builds (`ms_compose::settings::QuoteTexts`).
+    ("composing.quoteTexts", SettingKind::Object),
     // `{provider, enabled, url?, username?}`, never a key (docs/integrations-plan.md 2).
     // They decide `capabilities.integrations`.
     ("core.integrations.translation", SettingKind::Object),
