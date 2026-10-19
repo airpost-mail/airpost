@@ -20,14 +20,16 @@
 //!   `settings.changed` and `rules.disabled` ([`on_disable`]).
 //! - `rules.reprocess` walks the account's inbox threads, newest first, 50 at a time,
 //!   reporting `rules.progress` to its caller after each batch. Mail that arrives meanwhile
-//!   goes between batches. `mailRulesAutoSince` doesn't apply to it.
+//!   goes between batches. `mailRulesAutoSince` doesn't apply to it. A job stops (its last
+//!   progress says `stopped`) on `rules.cancel`, when its connection closes, when the account
+//!   stops and on a database error.
 //!
 //! What a delta announced but the thread hadn't handled yet when the engine stopped is not
 //! looked at again, as with the desktop closed; `rules.reprocess` covers it.
 
 use std::collections::{HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::Duration;
 
 use ms_compose::settings::local_tz;
@@ -178,6 +180,30 @@ impl Job {
             total,
             stopped,
         });
+    }
+}
+
+/// The `rules.reprocess` jobs a connection started. They are cancelled when it closes: only
+/// that connection knows their ids, so nobody else could stop them.
+#[derive(Default)]
+pub struct ConnectionJobs(Mutex<Vec<Weak<Job>>>);
+
+impl ConnectionJobs {
+    fn lock(&self) -> MutexGuard<'_, Vec<Weak<Job>>> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn add(&self, job: &Arc<Job>) {
+        let mut jobs = self.lock();
+        jobs.retain(|j| j.strong_count() > 0);
+        jobs.push(Arc::downgrade(job));
+    }
+
+    /// The connection closed.
+    pub fn close(&self) {
+        for job in self.lock().drain(..).filter_map(|j| j.upgrade()) {
+            job.cancel();
+        }
     }
 }
 
@@ -403,11 +429,13 @@ fn internal(e: impl std::fmt::Display) -> ErrorObject {
 // -- the socket's half ----------------------------------------------------------------------
 
 /// `rules.reprocess`: queues a job over the account's inbox threads, newest first, and
-/// answers through `respond` before its first progress.
+/// answers through `respond` before its first progress. The job is cancelled when `jobs`
+/// closes.
 pub fn reprocess(
     p: RulesReprocessParams,
     reads: &ReadStore,
     accounts: &dyn Accounts,
+    jobs: &ConnectionJobs,
     progress: Progress,
     respond: impl FnOnce(Value),
 ) -> Result<(), ErrorObject> {
@@ -442,7 +470,9 @@ pub fn reprocess(
         job.thread_ids.len(),
         job.id
     );
-    feed.push_job(job, || respond(value))
+    feed.push_job(job.clone(), || respond(value))?;
+    jobs.add(&job);
+    Ok(())
 }
 
 /// `rules.cancel`.
@@ -508,9 +538,8 @@ impl Worker {
             let result = match work {
                 Work::Arrived(ids) => self.arrived(&ids),
                 Work::Job(job) => {
-                    let r = self.job(&job);
-                    self.feed.job_done(&job);
-                    r
+                    let feed = self.feed.clone();
+                    run_job(&feed, &job, |job| self.job(job))
                 }
             };
             if let Err(e) = result {
@@ -809,6 +838,19 @@ impl Worker {
     }
 }
 
+/// Runs `job` through `f` and frees the account for the next one. A job that ends early (on a
+/// database error too) still sends its last progress, `stopped`.
+fn run_job(
+    feed: &Feed,
+    job: &Arc<Job>,
+    f: impl FnOnce(&Arc<Job>) -> ms_core::Result<()>,
+) -> ms_core::Result<()> {
+    let r = f(job);
+    job.stop();
+    feed.job_done(job);
+    r
+}
+
 /// The worker's task queue for the draft pipeline: local phases on the worker's store. A
 /// database error is kept to stop the account once the pipeline call has returned.
 struct LocalQueue<'a> {
@@ -881,5 +923,59 @@ mod tests {
         feed.arrived(&line(json!({"id": "m4", "rulesReady": true})));
         assert!(feed.take_arrived().is_empty());
         assert!(Feed::find("tap-acct").is_none());
+    }
+
+    fn job(id: &str, threads: usize, sent: &Arc<Mutex<Vec<RulesProgressParams>>>) -> Arc<Job> {
+        let sent = sent.clone();
+        Arc::new(Job {
+            id: id.to_owned(),
+            account_id: "job-acct".to_owned(),
+            thread_ids: (0..threads).map(|i| format!("t{i}")).collect(),
+            cancelled: AtomicBool::new(false),
+            progress: Box::new(move |p| sent.lock().unwrap().push(p.clone())),
+            reported: Mutex::new((0, false)),
+        })
+    }
+
+    #[test]
+    fn a_job_that_fails_still_reports_stopped_and_frees_the_account() {
+        let feed = Feed::register("fail-acct");
+        let sent = Arc::default();
+        let j = job("j1", 120, &sent);
+        feed.push_job(j.clone(), || {}).unwrap();
+        let Some(Work::Job(taken)) = feed.next(&|| false) else {
+            panic!("no job")
+        };
+        let r = run_job(&feed, &taken, |j| {
+            j.report(50);
+            Err(ms_core::Error::other("disk I/O error"))
+        });
+        assert!(r.is_err());
+        let sent = sent.lock().unwrap();
+        assert_eq!(sent.len(), 2);
+        assert!(sent[1].stopped && sent[1].done == 50 && sent[1].total == 120);
+        assert!(feed.push_job(job("j2", 1, &Arc::default()), || {}).is_ok());
+        feed.close();
+    }
+
+    #[test]
+    fn closing_the_connection_cancels_its_job() {
+        let feed = Feed::register("conn-acct");
+        let jobs = ConnectionJobs::default();
+        let sent = Arc::default();
+        let j = job("j1", 120, &sent);
+        feed.push_job(j.clone(), || {}).unwrap();
+        jobs.add(&j);
+        drop(j);
+        jobs.close();
+        let Some(Work::Job(taken)) = feed.next(&|| false) else {
+            panic!("no job")
+        };
+        assert!(taken.is_cancelled());
+        run_job(&feed, &taken, |_| Ok(())).unwrap();
+        assert!(sent.lock().unwrap()[0].stopped);
+        // The account takes a new job at once.
+        assert!(feed.push_job(job("j2", 1, &Arc::default()), || {}).is_ok());
+        feed.close();
     }
 }

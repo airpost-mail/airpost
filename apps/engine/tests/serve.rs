@@ -1090,7 +1090,7 @@ fn logs_tail_reads_the_end_of_a_log() {
 
 #[test]
 fn storing_rules_sets_their_auto_since_once() {
-    let mut e = Serve::start();
+    let e = Serve::start();
     let mut writer = e.hello();
     let mut watcher = e.hello();
     let status = writer.call(method::ENGINE_STATUS, json!({})).unwrap();

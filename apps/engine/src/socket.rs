@@ -830,6 +830,7 @@ fn start_connection(id: u64, stream: UnixStream, server: Arc<Server>, slot: Open
         hello: false,
         relay: None,
         ai_streams: Arc::default(),
+        rules_jobs: Default::default(),
     };
     let reader = std::thread::Builder::new()
         .name(thread::SOCKET_READER.into())
@@ -1348,6 +1349,8 @@ struct Connection {
     relay: Option<Relay>,
     /// The connection's `ai.*` calls in flight, cancelled when it closes.
     ai_streams: Arc<Streams>,
+    /// The connection's `rules.reprocess` jobs, cancelled when it closes.
+    rules_jobs: crate::rules::ConnectionJobs,
 }
 
 struct Relay {
@@ -1394,6 +1397,7 @@ impl Connection {
         }
         self.session.server.hub.unsubscribe(self.id);
         self.ai_streams.close();
+        self.rules_jobs.close();
         self.outbox.close();
     }
 
@@ -1718,7 +1722,7 @@ impl Connection {
         };
         let accounts = self.session.server.accounts.clone();
         let reads = self.session.reads.store()?;
-        crate::rules::reprocess(p, reads, &*accounts, progress, respond)
+        crate::rules::reprocess(p, reads, &*accounts, &self.rules_jobs, progress, respond)
     }
 
     fn on_first_hello(&mut self, req: &RpcRequest) {
