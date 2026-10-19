@@ -53,8 +53,8 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD37 | `AppEnv` is an undeclared plugin API; stage 6 changes `mailsyncBridge` under plugins | architecture | medium | S | stage 6 |
 | TD38 | Deltas fan out unbatched through four event systems | architecture | low | S / M | stage 6; rx-lite after 8 |
 | TD39 | Folder identity is a path hash; rename is delete + create (done for renames) | engine | medium | ~1 week | stage 3, before 14 |
-| TD40 | MessageStore reloads every body on each delta and expands every unread message | perf | medium | ~150 TS | before stage 8 flip |
-| TD41 | Every thread row subscribes to ComponentRegistry three times | perf | medium | ~80 TS | before stage 8 |
+| TD40 | MessageStore reloads every body on each delta and expands every unread message (done) | perf | medium | ~150 TS | before stage 8 flip |
+| TD41 | Every thread row subscribes to ComponentRegistry three times (done) | perf | medium | ~80 TS | before stage 8 |
 | TD42 | ThreadSearch is one append-only FTS row per thread | engine | high | ~1–1.5 weeks | before stage 9 |
 | TD43 | Transient errors in a task's remote phase revert the user's action | engine | high | ~300 Rust | before stages 11/14 |
 | TD44 | Any non-SyncError stops the account for good | engine | medium | ~80 Rust | before or with stage 11 |
@@ -1053,6 +1053,10 @@ the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with 
 
 ### TD40. MessageStore reloads every body on each delta (before stage 8's flip)
 
+Done (roadmap/client-next, stage 8). MessageStore reads a thread without bodies and then the
+expanded messages' bodies, patches Message deltas in place, and opens at most three unread
+messages expanded; see the stage 8 Status entry in `docs/desktop-client-plan.md`.
+
 Verified; cost inferred. Any Message or Thread delta touching the focused thread, except a single
 draft change, reruns `findAll(Message).where(threadId).include(body)`
 (`src/flux/stores/message-store.ts:121-158`, `:279-312`). Opening an unread thread queues mark-read,
@@ -1068,6 +1072,10 @@ thread mounts 100 EmailFrames.
 - Size: ~150 TS. Stage 8 is the natural place if the call becomes one `query` with `include`.
 
 ### TD41. Every thread row subscribes to ComponentRegistry three times (before stage 8)
+
+Done (roadmap/client-next, stage 8). `InjectedComponent` and `InjectedComponentSet` share one
+registry listener (`ComponentRegistry.listenShared`) and `AccountColorBar` one AccountStore
+listener; checked in `spec/components/shared-store-listeners-spec.tsx`, not yet in devtools.
 
 Inferred: the warning's source isn't confirmed in devtools. `MailspringStore` caps listeners at 250
 (`src/global/mailspring-store.ts:96-104`), so the "251 trigger listeners" warning comes from a

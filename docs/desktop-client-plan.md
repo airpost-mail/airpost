@@ -791,7 +791,7 @@ added later through it, instead of importing `MailsyncProcess`.
 | 2 | semver check | plugins with an unsatisfiable range stop loading; with `*` or `>=1.x` nothing changes |
 | 4 | engine executes expirations | none, as long as their drafts are marked `clientFinalize` (T9); plugins that listened for `metadata-expiration` of the built-in ids stop getting them |
 | 5 (1.27.0) | message body in a cross-origin frame (TD34) | `renderedMessageBodyIntoDocument` gets `body` (MessageBody) instead of `document`; reading `document` throws. Plugins that read it break, although `^1.26.0` still matches 1.27.0 |
-| 8 | reads over the engine | private `DatabaseStore._query` with raw SQL fails; queries on non-`queryable` attributes fail with an error instead of a SQL error; reads during an engine restart wait up to 10 s, then reject (4.1 step 2). No change to tasks: `Actions.queueTask.listen` in the main window still sees every desktop window's tasks through `ActionBridge`, and never CLI or MCP tasks (use Task deltas for those) |
+| 8 | reads over the engine | private `DatabaseStore._query` with raw SQL fails; queries on non-`queryable` attributes fail with an error instead of a SQL error; reads during an engine restart wait up to 10 s, then reject (4.1 step 2); `MessageStore.items()` carries bodies for expanded messages only (TD40). No change to tasks: `Actions.queueTask.listen` in the main window still sees every desktop window's tasks through `ActionBridge`, and never CLI or MCP tasks (use Task deltas for those) |
 | 9 | search in the engine | `structuredSearch(ast)` deprecated in favour of `Query.searchText`; date terms outside the documented subset fail |
 | 13 | draft pipeline in the engine | send hooks don't run for CLI, MCP or engine-executed sends (documented) |
 | 2.0.0 | removals | `MailsyncProcess`, `KeyManager`, `MailRulesProcessor`, `IMAPSearchQueryBackend`, `QuerySubscriptionPool` internals, `MailspringTestUtils` |
@@ -2805,3 +2805,73 @@ Nothing for tern-web.
 Trial pending (not run): a tracked send against a local backend (needs the backend endpoints);
 on ~/tern-trial, check the tracking toggles stay off and disabled with the no-server reason in
 their tooltip, and that a send goes out unchanged.
+
+2026-10-19, stage 8 (DatabaseStore on `query`, flag and reconnect only) with TD40 and TD41,
+branch `roadmap/client-next`, not merged. No engine change: stage 7's `query` and
+`Query.toJSON()` cover the reads as they landed. Desktop: `DatabaseStore.run` sends
+`Query.toJSON()` to `query` over the window's own connection when `core.engine.reads` is
+`"engine"` (default `"sqlite"`, in `config-schema.ts`) and inflates the rows with
+`Query.inflateEngineResult` (model JSON plus each `include` key); otherwise, and whenever the
+last hello lacked `query` (feature `query`, `Feature.Query`), it runs `Query.sql()` on the
+read-only SQLite as before. Plain `.search(text)` goes as `search: {text, grammar: false}`.
+`src/flux/stores/engine-reads.ts` holds the transport choice and the reconnect contract: a read
+issued while the connection is down waits for the next hello up to 10 s and then rejects with
+`EngineUnavailableError` (`name` `EngineUnavailable`); a read whose connection drops under it is
+sent again after the reconnect (three attempts); an engine error (`INVALID_PARAMS` for a
+non-queryable attribute) rejects at once. After a reconnect, and after a read that gave up,
+`resync` makes `QuerySubscriptionPool` re-run every live subscription (`QuerySubscription.rerun`
+drops the set and reads the whole range) and MessageStore re-read the open thread, on both
+transports, since deltas were missed; `ThreadCountsStore` already reads `counts.get` on each
+hello. A failed subscription read keeps the last result and no longer leaves the subscription
+stuck in flight. Pool keys are `JSON.stringify(query.toJSON())`. The supervisor's Status carries
+`gaveUp`, `SupervisorChannel.RetryEngine` and `EngineClient.retryEngine()` start the engine again
+(after a give-up or during a respawn backoff), and `EngineEvents.engineState()` follows the
+connection and that flag. `src/components/engine-unavailable-state.tsx` shows the engine state
+with Try Again in place of an empty list (`EmptyListState`) and as a notification over lists
+that keep their rows, only while reads go to the engine, after 2 s of waiting or at once after a
+give-up. TD40: MessageStore reads the thread without bodies, then the bodies of the expanded
+messages only; Message deltas patch the loaded messages in place (keeping a body the delta
+doesn't carry, ordering by date, removing unpersisted or moved ones), Thread deltas update the
+thread without a read, changes during the first read are replayed on its result, and expanded
+messages without a loaded body show collapsed until it arrives (MessageItemBody reads the body
+when it mounts); at most three unread messages (the newest) open expanded, plus the last
+message and the last draft; "expand all" loads the rest. `DraftStore.newMessageWithContext`
+loads the body of a message passed without one. TD41: `ComponentRegistry.listenShared` (one
+registry listener for every `InjectedComponent` and `InjectedComponentSet`, which skip the
+re-render when their components didn't change) and one shared `AccountStore` listener for
+`AccountColorBar`, via `src/global/shared-listener.ts`; the listener count was checked in a spec,
+not in devtools on the trial profile. Tests: `spec/mock-engine.ts` answers `query` from fixture
+models (matchers run as the desktop's `Matcher`, order, offset, limit, count, idsOnly, include,
+a substring search) on the window's `EngineEvents`; `database-store-engine-spec`,
+`query-subscription-engine-spec` (deltas, reconnect re-run, a failed read, the Unread view),
+`message-store-engine-spec`, `shared-store-listeners-spec`, `thread-list-engine-spec` (scroll
+through 1,500 threads in 25-row steps: at most three reads per page and under 50 ms per page,
+about 1.3 ms here; kill the engine with the list open: reads wait, the list re-runs after the
+respawn, the state and Try Again show after a give-up), a socket-level case in
+`engine-events-connection-spec` (reads held over a dropped `FakeEngine` connection, resync after
+the reconnect) and `retryEngine` in `engine-client-spec`. Full desktop suite: 3265 passing, the 4
+known failures (AI triage dispose, three SystemTrayIconStore focus/blur). Lint and typecheck pass.
+Decisions taken, to confirm: `structuredSearch()` queries stay on SQLite even with the flag on,
+since they have no JSON form until stage 9's desktop half (`Query.searchText`); the pool falls
+back to `sql()` keys for them. `_query(sql)` with raw SQL keeps reading SQLite (ThreadCountsStore's
+fallback uses it); it fails only once SQLite is removed. Reads before the first hello wait for it
+when the flag is on (the engine's features aren't known yet). Re-run after every reconnect on
+the SQLite transport too. The engine state shows only while reads go to the engine (with SQLite
+reads the account error notification already covers a give-up), with a 2 s grace for respawns.
+The expansion cap counts unread messages on the thread's first read only; messages arriving
+later open expanded when unread, a draft, or the new last message. TD41's colour stays read by
+`AccountColorBar` from AccountStore (one shared listener) rather than passed through row props,
+which would need `ThreadListParticipants`' memo to compare it. The scroll timing check runs on
+the mock engine, so it measures the renderer's cost per page, not the socket's.
+Open: the default flip waits for stage 9's desktop half and a trial day; SQLite removal for a
+release after that and stage 10 (done). Plugins reading `MessageStore.items()` see `body`
+undefined on collapsed messages (message-view-on-github already handled it). Windows without
+the notifications package (composer, popout) show no engine state; their reads still wait and
+reject. Nothing for tern-web.
+Trial pending (not run): a day on `core.engine.reads: "engine"` once stage 9's desktop half has
+shipped (inbox, unified inbox, Starred, Unread, the draft list, calendar, contacts, search,
+activity); kill the engine process with the thread list open and check the list keeps its rows,
+re-reads after the respawn and shows the state with Try Again after a give-up; open a long unread
+thread and check three unread messages open, "expand all" loads the rest, and starring or
+labelling a message doesn't reload the thread; check the "251 trigger listeners" warning is gone
+on a tall window.
