@@ -32,6 +32,17 @@ export default class MetadataComposerToggleButton extends React.Component<
   }
 
   componentDidMount() {
+    this._applyDefault();
+  }
+
+  componentDidUpdate(prevProps: MetadataComposerToggleButtonProps) {
+    // The feature became available while the composer was open (eg. the server connected).
+    if (prevProps.unavailableReason && !this.props.unavailableReason) {
+      this._applyDefault();
+    }
+  }
+
+  _applyDefault() {
     if (!this.props.unavailableReason && this._isEnabledByDefault() && !this._isEnabled()) {
       this._setEnabled(true);
     }
@@ -47,8 +58,10 @@ export default class MetadataComposerToggleButton extends React.Component<
     return _.isEqual(value, metadataEnabledValue) || _.isMatch(value, metadataEnabledValue);
   }
 
+  // Off until the user turns it on once: the toggles are open and link tracking, which a
+  // server connecting shouldn't switch on for every new draft.
   _isEnabledByDefault() {
-    return AppEnv.config.get(this._configKey()) !== false;
+    return AppEnv.config.get(this._configKey()) === true;
   }
 
   async _setEnabled(enabled) {
@@ -101,9 +114,13 @@ export default class MetadataComposerToggleButton extends React.Component<
       attrs.name = this.props.iconName;
     }
 
-    const title = unavailable
-      ? this.props.unavailableReason
-      : `${enabled ? localized('Disable') : localized('Enable')} ${this.props.pluginName}`;
+    let title = `${enabled ? localized('Disable') : localized('Enable')} ${this.props.pluginName}`;
+    if (unavailable) {
+      title = this.props.unavailableReason;
+    } else if (this.props.unavailableReason) {
+      // On, but it won't apply when sent; say why and leave it clickable to turn off.
+      title = `${title}. ${this.props.unavailableReason}`;
+    }
 
     return (
       <button

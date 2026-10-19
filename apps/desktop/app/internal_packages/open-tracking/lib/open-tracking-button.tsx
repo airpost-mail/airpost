@@ -1,5 +1,5 @@
 import React from 'react';
-import { Message, DraftEditingSession, localized } from 'mailspring-exports';
+import { Message, DraftEditingSession, localized, useCapability } from 'mailspring-exports';
 import { MetadataComposerToggleButton } from 'mailspring-component-kit';
 import { PLUGIN_ID, PLUGIN_NAME, trackingUnavailableReason } from './open-tracking-constants';
 
@@ -13,6 +13,8 @@ function errorMessage(error: Error) {
 }
 
 const OpenTrackingButtonInner: React.FC<Props> = ({ draft, session }) => {
+  // Subscribes to the store, so the memo'd button follows capabilities.changed.
+  const { available } = useCapability('read-receipts');
   if (draft.plaintext) {
     return <span />;
   }
@@ -25,7 +27,7 @@ const OpenTrackingButtonInner: React.FC<Props> = ({ draft, session }) => {
       errorMessage={errorMessage}
       draft={draft}
       session={session}
-      unavailableReason={trackingUnavailableReason()}
+      unavailableReason={available ? undefined : trackingUnavailableReason()}
     />
   );
 };

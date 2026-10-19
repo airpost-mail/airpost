@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { findRenderedDOMComponentWithTag, Simulate } from 'react-dom/test-utils';
 import { Message } from 'mailspring-exports';
 
@@ -30,11 +31,43 @@ describe('MetadataComposerToggleButton', function toggleButtonSpec() {
     spyOn(AppEnv.config, 'set');
   });
 
-  it('turns itself on for a default-on plugin', () => {
+  it('stays off when the user never turned it on', () => {
     spyOn(AppEnv.config, 'get').andReturn(undefined);
+    const { session, button } = renderButton(new Message({ draft: true }));
+    expect(session.changes.addPluginMetadata).not.toHaveBeenCalled();
+    expect(button.disabled).toBe(false);
+  });
+
+  it('turns itself on once the user turned it on before', () => {
+    spyOn(AppEnv.config, 'get').andReturn(true);
     const { session, button } = renderButton(new Message({ draft: true }));
     expect(session.changes.addPluginMetadata).toHaveBeenCalledWith(PLUGIN_ID, { enabled: true });
     expect(button.disabled).toBe(false);
+  });
+
+  it('applies the default when the feature becomes available while open', () => {
+    spyOn(AppEnv.config, 'get').andReturn(true);
+    const session = { changes: { addPluginMetadata: jasmine.createSpy('addPluginMetadata') } };
+    const container = document.createElement('div');
+    const render = (reason?: string) =>
+      ReactDOM.render(
+        <MetadataComposerToggleButton
+          iconName="icon.png"
+          pluginId={PLUGIN_ID}
+          pluginName="Spec Plugin"
+          metadataEnabledValue={{ enabled: true }}
+          errorMessage={() => 'error'}
+          draft={new Message({ draft: true })}
+          session={session as any}
+          unavailableReason={reason}
+        />,
+        container
+      );
+    render('No server');
+    expect(session.changes.addPluginMetadata).not.toHaveBeenCalled();
+    render(undefined);
+    expect(session.changes.addPluginMetadata).toHaveBeenCalledWith(PLUGIN_ID, { enabled: true });
+    ReactDOM.unmountComponentAtNode(container);
   });
 
   describe('with an unavailableReason', () => {
@@ -56,6 +89,7 @@ describe('MetadataComposerToggleButton', function toggleButtonSpec() {
       draft.directlyAttachMetadata(PLUGIN_ID, { enabled: true });
       const { session, button } = renderButton(draft, 'No server');
       expect(button.disabled).toBe(false);
+      expect(button.title).toBe('Disable Spec Plugin. No server');
 
       Simulate.click(button);
       expect(session.changes.addPluginMetadata).toHaveBeenCalledWith(PLUGIN_ID, null);
