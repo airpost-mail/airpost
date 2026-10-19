@@ -791,7 +791,7 @@ added later through it, instead of importing `MailsyncProcess`.
 | 2 | semver check | plugins with an unsatisfiable range stop loading; with `*` or `>=1.x` nothing changes |
 | 4 | engine executes expirations | none, as long as their drafts are marked `clientFinalize` (T9); plugins that listened for `metadata-expiration` of the built-in ids stop getting them |
 | 5 (1.27.0) | message body in a cross-origin frame (TD34) | `renderedMessageBodyIntoDocument` gets `body` (MessageBody) instead of `document`; reading `document` throws. Plugins that read it break, although `^1.26.0` still matches 1.27.0 |
-| 8 | reads over the engine | private `DatabaseStore._query` with raw SQL fails; queries on non-`queryable` attributes fail with an error instead of a SQL error; reads during an engine restart wait up to 10 s, then reject (4.1 step 2); `MessageStore.items()` carries bodies for expanded messages only (TD40). No change to tasks: `Actions.queueTask.listen` in the main window still sees every desktop window's tasks through `ActionBridge`, and never CLI or MCP tasks (use Task deltas for those) |
+| 8 (1.31.0) | reads over the engine | private `DatabaseStore._query` with raw SQL fails; queries on non-`queryable` attributes fail with an error instead of a SQL error; reads during an engine restart wait up to 10 s, then reject (4.1 step 2); `MessageStore.items()` carries bodies for expanded messages only (TD40). No change to tasks: `Actions.queueTask.listen` in the main window still sees every desktop window's tasks through `ActionBridge`, and never CLI or MCP tasks (use Task deltas for those) |
 | 9 | search in the engine | `structuredSearch(ast)` deprecated in favour of `Query.searchText`; date terms outside the documented subset fail |
 | 13 | draft pipeline in the engine | send hooks don't run for CLI, MCP or engine-executed sends (documented) |
 | 2.0.0 | removals | `MailsyncProcess`, `KeyManager`, `MailRulesProcessor`, `IMAPSearchQueryBackend`, `QuerySubscriptionPool` internals, `MailspringTestUtils` |
@@ -2875,3 +2875,29 @@ re-reads after the respawn and shows the state with Try Again after a give-up; o
 thread and check three unread messages open, "expand all" loads the rest, and starring or
 labelling a message doesn't reload the thread; check the "251 trigger listeners" warning is gone
 on a tall window.
+
+2026-10-19, stage 8 review fixes, branch `roadmap/client-next`, not merged. Socket latency:
+`apps/engine/test/test_query_latency.py` (quick tier) replays the thread list's paging reads,
+the captured `inbox-ids`, `missing-models` and `messages-of-threads` forms from
+`model_queries.json`, over the socket on `serve` with 1,500 synced inbox threads, in 25-row
+steps (three reads per page): median 1.3 ms per page on a release build, 4.1 ms on a debug one;
+it asserts a median under 50 ms and writes the times to `latency.json`. With the renderer's
+1.3 ms per page from `thread-list-engine-spec`, the latency precondition for the flip is
+measured. Specs on both transports: `spec/mock-engine.ts` gains `FixtureReads` and
+`forEachTransport`, which answer the SQLite path's `_query` from the same fixtures in
+better-sqlite3's row shape; `database-store-spec` (modelify), `query-subscription-spec`
+(`_fetchRange`), `query-subscription-pool-spec`, `unread-query-subscription-spec` (a full read
+keeps the whitelisted thread) and `message-store-spec` (focus changes, mark as read) run on
+both; their SQL text cases stay SQLite-only. MessageStore: "expand all" and expanding one
+message load the bodies once after the state change, and ids already being read aren't asked
+for again (a 10-message thread sends one body read). Reply: `candidateDraftForUpdating` loads
+the body of an existing reply draft that MessageStore holds without one, so `prefer-existing`
+replies no longer throw in the signature extension. Plugin API 1.31.0:
+`ComponentRegistry.listenShared`, and `MessageStore.items()` carries bodies for expanded
+messages only (CHANGELOG, `plugin-api-version.ts`, the section 6 table).
+Decisions taken, to confirm: a reply draft whose body can't be read (gone from the database)
+starts a new reply rather than reusing it without a body. The latency case runs against the
+fake IMAP server's single-message threads; a profile with long threads isn't measured.
+Open: unchanged from the stage 8 entry above, minus the latency measurement. Nothing for tern-web.
+Trial pending (not run): as in the stage 8 entry; also reply with a signature to a thread whose
+existing reply draft is collapsed.
