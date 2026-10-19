@@ -2228,3 +2228,57 @@ pipeline too (the old `{expiration}` dropped `clientFinalize`, so the executor s
 Trial pending (not run): on ~/tern-trial, new message, reply, reply all, forward, undo send,
 Send now from the Undo Send toast, send with an attachment, and quit inside the undo window then
 start again (the send goes out).
+
+Stage 13 gate, attempt 1, 2026-10-18. Rebased onto main (b929ca026, AI6 and `ai-keys`); two
+conflicts, both lists that each side extended: `features()` in `apps/engine/src/socket.rs`
+advertises `draft-pipeline` with the other settings-store features and `ai-keys` still only with
+credentials, and `Feature` in `engine-protocol.ts` has both `AiKeys` and `DraftPipeline`. Gate
+green: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D
+warnings`, `cargo test --workspace --locked`, `cargo deny check`, the release build of mailsync,
+tern, tern-mcp and tern-gateway, and the harness quick tier on serve with the release binaries
+(149 passed, 4 skipped). Desktop: lint and typecheck pass; the full desktop suite has 3221
+passing and 4 failing, the same 4 that fail on main without this branch (AI triage "stops
+listening once disposed", and three SystemTrayIconStore focus/blur specs expecting the
+`-unread` icon); not ours, left alone. The corpus capture spec left `draft_corpus.json`
+unchanged. Merged to main by fast-forward.
+
+Open from the review (low):
+- `crates/ms-sync/src/expiration_executor.rs`: the executor deletes the pending-bodies file
+  before `set_metadata` and before queuing the `SendDraftTask`. If either fails with a database
+  error the row stays due and is retried (`Error::Database` propagates from `handle`, the
+  metadata clear never committed), but the retry no longer finds the bodies and sends the stored
+  body: the extension's transform and per-recipient bodies are lost without notice. Remove the
+  file after the transaction commits.
+- `apps/engine/src/drafts_api.rs`: the decision above says a second `draft.send` while one is
+  pending is refused, but `send_pending` only looks for a queued `SendDraftTask`. Inside an undo
+  window (send-later metadata only) a second `draft.send` with `delayMs` overwrites the schedule
+  and the bodies, and one without `delayMs` sends at once, clears the window and drops the
+  pending bodies. Either may be wanted; it differs from the recorded decision and nothing tests
+  it.
+- `apps/mcp/src/tools/write.rs`: `reply_to_thread` regresses against an engine with
+  `draft-pipeline` when the replied-to body hasn't arrived within `BODY_WAIT`. Before, it made a
+  reply with an empty quote (the local `ms-compose` fallback still does, `unwrap_or_default`);
+  now `draft.create` answers NOT_FOUND ("body isn't downloaded yet") and the tool fails with
+  "The engine could not build the draft".
+- `apps/desktop/app/src/flux/stores/draft-store.ts`: when `draft.send` is refused or the
+  window's engine connection is down, `_sendWithEngine` shows the error and returns, but
+  `_onSendDraft` still calls `AppEnv.close()` in a composer window. The session is already torn
+  down, so the user loses the composer and has to find the draft in Drafts. The JS path keeps the
+  composer open on the `ensureCorrectAccount` failure.
+- `apps/desktop/app/src/browser/engine-settings.ts`: the engine's quote date uses
+  `core.intl.language` as its locale (main process), while the desktop's `formatQuoteDate` and
+  `replyAttributionLine` use `navigator.language` (`date-format.ts` `appLocale`), and the app
+  never sets Chromium's locale from the language setting. With an en-US system and a German UI,
+  engine-built replies get a German date and JS-fallback replies, Send Again and resurfacing a
+  US one. The corpus runs with a single locale, so it doesn't catch this.
+- `apps/desktop/app/src/engine-drafts.ts`: the engine always adds the signature and removes
+  tracking images on drafts it builds. Before, disabling the composer-signature or
+  remove-tracking-pixels package turned those off; with the pipeline, disabling either has no
+  effect on new, reply, forward and mailto drafts.
+- This plan, 3.3: still says the bodies' storage is "(I: in the metadata value or a local side
+  table, to decide in stage 13)". The decision (a file per draft under `<config>/pending-sends/`)
+  is recorded only in section 8 and the Status entry above.
+
+Trial pending (not run): on ~/tern-trial, new message, reply, reply all, forward, undo send,
+Send now from the Undo Send toast, send with an attachment, and quit inside the undo window then
+start again (the send goes out).
