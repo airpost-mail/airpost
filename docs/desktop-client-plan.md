@@ -2291,24 +2291,31 @@ kind before anything is detached: first by a rename the `SyncbackCategoryTask` r
 it, kept an hour; children follow the parent; either direction, for a listing taken just
 before the RENAME), then by UIDVALIDITY with UIDNEXT not going backwards, checked for folders
 by fetching the newest three stored UIDs under the new path and comparing message ids (a value
-several folders share is settled by those messages; labels need a unique value). A paired row
+several folders share is settled by those messages; a folder with no stored copies pairs only on
+a value no other mailbox of the account has; labels need a unique value). A paired row
 keeps its id, role and `localStatus`, so messages, threads, rule targets and settings keep
 pointing at it and no header is refetched. Gmail labels record their UIDVALIDITY in
 `localStatus` (25 STATUS per pass until each has one; left out of thread snapshots). The task
 finds its row by path, keeps the id and renames children locally. After any rename the
-X-GM-LABELS name on the copies (Gmail) and the thread snapshots are rewritten in chunks; the
+X-GM-LABELS name on the copies (Gmail), the thread snapshots and their `ThreadSearch.categories`
+(so `in:` follows the new path; `Thread::sync_categories` rewrites the column whenever the search
+string changes, not only the ids) are rewritten in chunks; the
 work is queued in `_State` `folderRenameRefresh-<accountId>` in the transaction that changes
 the path, so a quit resumes it on the next pass. A folder created at a path whose hash a
 renamed row holds gets `hash(accountId:path#n)`. Import-legacy finds a draft's folder by path.
 `sync_folders_and_labels` lost the LIST step and role assignment to their own functions (TD49).
 Desktop: `FocusedPerspectiveStore` swaps the renamed category into the current perspective in
-place (title and sidebar selection follow; the open thread and sheet stay). Tests:
+place (title and sidebar selection follow), and `ThreadListStore._onPerspectiveChanged` keeps its
+data source for a perspective with the same type, accounts, category ids and roles, so the list
+position and the open thread stay (a role change rebuilds: the query depends on it). Tests:
 `ms_sync::folder_identity` unit tests, `ms_core::ids::free_folder_id`, four `ms-tasks` tests
 (folder rename with child and thread snapshot, second rename by path, new folder at the old
 path; refused rename leaves no record; Gmail label rename on copies, message and thread; a
-queued refresh survives until run), the focused-perspective spec, harness scenarios
+queued refresh survives until run), `ms-store` `renamed_entry_rewrites_search_categories`, the
+focused-perspective and thread-list-store specs, harness scenarios
 `folder-renamed-in-tern` and `folder-renamed-on-server` (fake ×2 and Dovecot),
-`folder-replaced-with-same-uidvalidity`, `gmail-label-renamed`, a `server.rename_mailbox` step
+`folder-replaced-with-same-uidvalidity`, `folder-replaced-empty-with-shared-uidvalidity`,
+`gmail-label-renamed` (the rename scenarios assert `ThreadSearch.categories`), a `server.rename_mailbox` step
 (Gmail fake renames the label on its messages without a MODSEQ bump) and conformance probe
 `probe_rename_keeps_uidvalidity` (Dovecot keeps UIDVALIDITY, UIDs and children). Quick tier
 passes on stdio and serve with a debug build.

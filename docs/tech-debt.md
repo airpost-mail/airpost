@@ -1021,18 +1021,22 @@ the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with 
   (`_State` `folderRenames-<accountId>`, written before the RENAME, kept an hour, children
   follow their parent, either direction), else by a UIDVALIDITY (with UIDNEXT not going
   backwards) checked against the newest three stored copies, whose ids must match at the same
-  UIDs under the new path; a value several folders share is settled by those messages, and a
-  label pairs only on a unique value. A paired row keeps its id, role and `localStatus`, so no
+  UIDs under the new path; a value several folders share is settled by those messages, a
+  folder with no stored copies pairs only on a value no other mailbox of the account has
+  (stored rows and this pass's STATUS), and a label pairs only on a unique value. A paired row keeps its id, role and `localStatus`, so no
   header is fetched again. Labels record their UIDVALIDITY in `localStatus` (25 STATUS per pass
   until each has one; stripped from thread snapshots). The task finds its row by path, keeps the
   id and renames children locally. After a rename the X-GM-LABELS name on the copies and the
-  thread snapshots are rewritten in chunks, queued in `_State` `folderRenameRefresh-<accountId>`
+  thread snapshots (and their `ThreadSearch.categories`, which `in:` reads) are rewritten in
+  chunks, queued in `_State` `folderRenameRefresh-<accountId>`
   in the same transaction so a quit resumes it. A new folder at a path whose hash a renamed row
   holds gets `hash(accountId:path#n)` (`ms_core::ids::free_folder_id`). Code in
   `ms_sync::folder_identity`, `Background::pair_renamed`, `ms_tasks` folders.rs. Desktop:
-  `FocusedPerspectiveStore` swaps in the renamed category in place. Scenarios
-  `folder-renamed-in-tern`, `folder-renamed-on-server`, `folder-replaced-with-same-uidvalidity`,
-  `gmail-label-renamed`; conformance probe `probe_rename_keeps_uidvalidity` (Dovecot keeps
+  `FocusedPerspectiveStore` swaps in the renamed category in place, and `ThreadListStore` keeps
+  its data source (scroll position, open thread) for a perspective with the same type,
+  accounts, category ids and roles. Scenarios `folder-renamed-in-tern`,
+  `folder-renamed-on-server`, `folder-replaced-with-same-uidvalidity`,
+  `folder-replaced-empty-with-shared-uidvalidity`, `gmail-label-renamed`; conformance probe `probe_rename_keeps_uidvalidity` (Dovecot keeps
   UIDVALIDITY, UIDs and children across RENAME). Open: whether Gmail keeps a label's
   UIDVALIDITY and bumps MODSEQ on rename is unrecorded; servers that change UIDVALIDITY on
   RENAME pair only through the task's record (the id survives, headers are refetched); mail
