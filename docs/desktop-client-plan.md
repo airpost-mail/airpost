@@ -2407,6 +2407,15 @@ Decisions taken, to confirm:
   backreferences count as invalid and disable the rule.
 - The localStorage keys stay after the move (with `MailRules-MovedToSettings`) for a downgrade.
 - A rule disabled during a reprocess job doesn't stop the job; later batches skip it.
+- A reprocess job is cancelled when the connection that started it closes (a window reload, a
+  CLI or MCP caller exiting), at the next batch boundary; its last `rules.progress` is `stopped`
+  on a database error too.
+Review fixes (2026-10-19): the job's stopped progress on a database error, the job cancelled with
+its connection (unit tests `a_job_that_fails_still_reports_stopped_and_frees_the_account`,
+`closing_the_connection_cancels_its_job`), the Playwright mail-rule case reads `mailRules` from
+config. No serve test drops a connection mid-job: serve.rs accounts have no inbox, and a harness job
+over the fake server ends too fast to tell a cancel from a finish. The Playwright spec was
+typechecked, not run (it launches Electron with the app's keychain-backed key store).
 Open:
 - No `tern rules` CLI command.
 - Deprecation warnings go to the console only; Preferences > Plugins doesn't show them.
