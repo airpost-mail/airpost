@@ -9,7 +9,9 @@
 //!
 //! - `send-later` on a draft: the metadata is cleared, the current draft is finalised
 //!   ([`finalise_draft`]) and a `SendDraftTask` queued, then the after-send action. Undo send
-//!   writes the same metadata (`isUndoSend`), so it is covered too. A draft that lacks its
+//!   writes the same metadata (`isUndoSend`), so it is covered too, and `draft.send` with a
+//!   delay; the bodies its client's send hooks made go out instead of the stored one
+//!   ([`crate::pending_sends`]). A draft that lacks its
 //!   body, its plaintext flag or an attachment (synced from another device, or not yet
 //!   downloaded) gets a body fetch and another look after 1, 2, 4 and 8 minutes, then the
 //!   send fails with `error` on the metadata. A row marked `clientFinalize` (third-party send
@@ -34,6 +36,8 @@ use ms_core::constants::{EXECUTOR_INCOMPLETE_DRAFT_WAITS, FILES_DIR};
 use ms_core::{Account, Error, Result};
 use ms_store::model::{json_str, metadata_value};
 use ms_store::{File, Folder, Label, Message, Model, Query, Store, Task, Thread};
+
+use crate::pending_sends::PendingSends;
 use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
@@ -88,6 +92,8 @@ pub struct Executor<'a> {
     settings: Arc<dyn EngineSettings>,
     queue: QueueTask<'a>,
     fetch_bodies: FetchBodies<'a>,
+    /// `draft.send`'s bodies, kept for the undo window.
+    pending: PendingSends,
     /// Scheduled drafts waiting to be complete: looks taken so far, next look.
     waiting: RefCell<HashMap<String, (usize, i64)>>,
 }
@@ -101,15 +107,40 @@ impl<'a> Executor<'a> {
         queue: QueueTask<'a>,
         fetch_bodies: FetchBodies<'a>,
     ) -> Self {
-        Executor {
+        let pending = PendingSends::new(config_dir, account.id());
+        let executor = Executor {
             account,
             store,
             files_root: config_dir.join(FILES_DIR),
             settings,
             queue,
             fetch_bodies,
+            pending,
             waiting: RefCell::new(HashMap::new()),
+        };
+        if let Err(e) = executor.sweep_pending() {
+            warn!("-X Could not look over the pending sends: {e}");
         }
+        executor
+    }
+
+    /// Removes the pending bodies of drafts that are gone or no longer wait to be sent at the
+    /// time the bodies were kept for.
+    fn sweep_pending(&self) -> Result<()> {
+        for id in self.pending.ids() {
+            let draft = self
+                .store
+                .find::<Message>(&Query::new().equal("id", id.as_str()))?;
+            let due = draft.as_ref().and_then(send_later_expiration);
+            let current = self
+                .pending
+                .get(&id)
+                .is_some_and(|p| Some(p.expiration) == due);
+            if !current {
+                self.pending.remove(&id);
+            }
+        }
+        Ok(())
     }
 
     /// Acts on `plugin_id`'s due row on model `id` of `class`. A failure other than a
@@ -161,7 +192,16 @@ impl<'a> Executor<'a> {
         }
         self.waiting.borrow_mut().remove(id);
 
-        let body = self.body(id)?.unwrap_or_default();
+        let expiration = send_later_expiration(&draft);
+        let pending = self
+            .pending
+            .get(id)
+            .filter(|p| Some(p.expiration) == expiration);
+        self.pending.remove(id);
+        let body = match pending.as_ref().and_then(|p| p.self_body.clone()) {
+            Some(b) => b,
+            None => self.body(id)?.unwrap_or_default(),
+        };
         let finalised = match finalise_draft(&self.account, &draft, &body) {
             Ok(f) => f,
             Err(reason) => {
@@ -179,14 +219,18 @@ impl<'a> Executor<'a> {
             .store
             .find::<Message>(&Query::new().equal("id", id))?
             .unwrap_or(draft);
-        let mut task = Task::create(
-            "SendDraftTask",
-            self.account.id(),
-            &send_task_json(&draft, &finalised, false),
-        );
+        let mut data = send_task_json(&draft, &finalised, false);
+        if let Some(p) = &pending {
+            data["perRecipientBodies"] = p.per_recipient_json(&finalised.body);
+        }
+        let mut task = Task::create("SendDraftTask", self.account.id(), &data);
         (self.queue)(&mut task)?;
         if action == "send-and-archive" {
-            self.archive(draft.thread_id())?;
+            if let Some((class, data)) =
+                archive_task(self.store, self.account.id(), draft.thread_id())?
+            {
+                self.queue_task(class, &data)?;
+            }
         }
         Ok(Outcome::Done)
     }
@@ -251,51 +295,7 @@ impl<'a> Executor<'a> {
     }
 
     fn body(&self, id: &str) -> Result<Option<String>> {
-        let mut stmt = self
-            .store
-            .conn()
-            .prepare_cached("SELECT value FROM MessageBody WHERE id = ?")?;
-        let mut rows = stmt.query([id])?;
-        Ok(match rows.next()? {
-            Some(row) => match row.get_ref(0)? {
-                rusqlite::types::ValueRef::Text(b) | rusqlite::types::ValueRef::Blob(b) => {
-                    Some(String::from_utf8_lossy(b).into_owned())
-                }
-                _ => None,
-            },
-            None => None,
-        })
-    }
-
-    /// `send-and-archive-extension.ts` with `TaskFactory.tasksForArchiving`: on Gmail the
-    /// inbox label goes, elsewhere the thread moves to Archive (or All Mail).
-    fn archive(&self, thread_id: &str) -> Result<()> {
-        if thread_id.is_empty() {
-            return Ok(());
-        }
-        let source = "Send and Archive";
-        let data = if let Some(inbox) = self.label("inbox")? {
-            json!({
-                "threadIds": [thread_id], "labelsToAdd": [], "labelsToRemove": [inbox.to_json()],
-                "source": source,
-            })
-        } else if let Some(archive) = match self.folder("archive")? {
-            Some(f) => Some(f),
-            None => self.folder("all")?,
-        } {
-            json!({
-                "threadIds": [thread_id], "folder": archive.to_json(), "sourceFolderIds": [],
-                "source": source,
-            })
-        } else {
-            return Ok(());
-        };
-        let class = if data.get("folder").is_some() {
-            "ChangeFolderTask"
-        } else {
-            "ChangeLabelsTask"
-        };
-        self.queue_task(class, &data)
+        stored_body(self.store, id)
     }
 
     // -- thread-snooze ------------------------------------------------------------------
@@ -422,34 +422,16 @@ impl<'a> Executor<'a> {
         } else {
             in_reply_to.to_owned()
         };
-        let email = self.account.email_address().to_owned();
-        let name = json_str(self.account.as_json(), "name");
-        let name = if name.is_empty() {
-            email.as_str()
-        } else {
-            name
-        };
-        let header_message_id = new_header_message_id(&email);
-        let draft = json!({
-            "__cls": "Message",
-            "aid": self.account.id(),
-            "v": 0,
-            "hMsgId": header_message_id,
-            "subject": thread.subject(),
-            "from": [{"name": format!("{name} via Tern"), "email": email}],
-            "to": [{"name": name, "email": email}],
-            "cc": [], "bcc": [], "replyTo": [], "files": [],
-            "body": body,
-            "plaintext": false,
-            "draft": true,
-            "pristine": false,
-            "unread": false,
-            "starred": false,
-            "threadId": thread.id(),
-            "rthMsgId": reply_to,
-            "fwdMsgId": "",
-            "date": self.store.now(),
-        });
+        let identity = ms_compose::Identity::from_account_json(self.account.as_json());
+        let draft = ms_compose::draft::resurface_draft(
+            &identity,
+            thread.id(),
+            thread.subject(),
+            &reply_to,
+            &body,
+            self.store.now(),
+        );
+        let header_message_id = json_str(&draft, "hMsgId").to_owned();
         let mut task = Task::create(
             "SendDraftTask",
             self.account.id(),
@@ -567,6 +549,77 @@ pub fn send_task_json(draft: &Message, finalised: &FinalDraft, silent: bool) -> 
     })
 }
 
+/// The stored body of message `id`.
+pub fn stored_body(store: &Store, id: &str) -> Result<Option<String>> {
+    let mut stmt = store
+        .conn()
+        .prepare_cached("SELECT value FROM MessageBody WHERE id = ?")?;
+    let mut rows = stmt.query([id])?;
+    Ok(match rows.next()? {
+        Some(row) => match row.get_ref(0)? {
+            rusqlite::types::ValueRef::Text(b) | rusqlite::types::ValueRef::Blob(b) => {
+                Some(String::from_utf8_lossy(b).into_owned())
+            }
+            _ => None,
+        },
+        None => None,
+    })
+}
+
+/// The send-later expiration of a draft (Unix seconds), when one is set.
+pub fn send_later_expiration(draft: &Message) -> Option<i64> {
+    metadata_value(&draft.data, SEND_LATER)?
+        .get("expiration")?
+        .as_f64()
+        .map(|e| e as i64)
+}
+
+/// `send-and-archive-extension.ts` with `TaskFactory.tasksForArchiving`: on Gmail the inbox
+/// label goes, elsewhere the thread moves to Archive (or All Mail). The task's class and
+/// data, `None` when there is nowhere to archive to.
+pub fn archive_task(
+    store: &Store,
+    account_id: &str,
+    thread_id: &str,
+) -> Result<Option<(&'static str, Value)>> {
+    if thread_id.is_empty() {
+        return Ok(None);
+    }
+    let by_role = |table_label: bool, role: &str| -> Result<Option<Value>> {
+        let q = Query::new()
+            .equal("accountId", account_id)
+            .equal("role", role);
+        Ok(if table_label {
+            store.find::<Label>(&q)?.map(|l| l.to_json())
+        } else {
+            store.find::<Folder>(&q)?.map(|f| f.to_json())
+        })
+    };
+    let source = "Send and Archive";
+    if let Some(inbox) = by_role(true, "inbox")? {
+        return Ok(Some((
+            "ChangeLabelsTask",
+            json!({
+                "threadIds": [thread_id], "labelsToAdd": [], "labelsToRemove": [inbox],
+                "source": source,
+            }),
+        )));
+    }
+    let archive = match by_role(false, "archive")? {
+        Some(f) => Some(f),
+        None => by_role(false, "all")?,
+    };
+    Ok(archive.map(|folder| {
+        (
+            "ChangeFolderTask",
+            json!({
+                "threadIds": [thread_id], "folder": folder, "sourceFolderIds": [],
+                "source": source,
+            }),
+        )
+    }))
+}
+
 /// The draft's files without inline ones its body no longer references.
 fn kept_files(draft: &Message, body: &str) -> Vec<Value> {
     draft
@@ -589,23 +642,6 @@ fn has_role(categories: &Value, role: &str) -> bool {
     categories
         .as_array()
         .is_some_and(|list| list.iter().any(|c| json_str(c, "role") == role))
-}
-
-/// `generateHeaderMessageId` (`draft-factory.ts`): a random UUID at the sender's domain.
-fn new_header_message_id(from_email: &str) -> String {
-    let domain = from_email
-        .rsplit_once('@')
-        .map(|(_, d)| d.trim())
-        .filter(|d| {
-            !d.is_empty()
-                && d.chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
-        })
-        .unwrap_or("localhost");
-    format!(
-        "{}@{domain}",
-        uuid::Uuid::new_v4().to_string().to_ascii_uppercase()
-    )
 }
 
 #[cfg(test)]
@@ -669,12 +705,5 @@ mod tests {
         )
         .unwrap();
         assert_eq!(f.body, "ab");
-    }
-
-    #[test]
-    fn header_message_ids_use_the_sender_domain() {
-        let id = new_header_message_id("me@example.com");
-        assert!(id.ends_with("@example.com"), "{id}");
-        assert!(new_header_message_id("bad").ends_with("@localhost"));
     }
 }

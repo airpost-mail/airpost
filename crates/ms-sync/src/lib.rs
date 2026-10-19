@@ -20,6 +20,7 @@ pub mod mail_processor;
 pub mod mailbox_model;
 pub mod metadata_expiration;
 pub mod metadata_worker;
+pub mod pending_sends;
 pub mod runtime;
 pub mod tasks;
 mod worker;
