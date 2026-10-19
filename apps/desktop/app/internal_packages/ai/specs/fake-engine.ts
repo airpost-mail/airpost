@@ -47,6 +47,28 @@ export function fakeKeyset(initial: { [name: string]: string } = {}) {
   return keys;
 }
 
+/** The features of an engine that keeps the AI keys and the providers. */
+export const ENGINE_KEYS = ['ai', 'ai-triage', 'account-setup'];
+
+/** The engine's secret store: `secrets.*` answers over `stored`. */
+export function secretAnswers(stored: { [name: string]: string }) {
+  return {
+    'secrets.set': ({ name, value }: any) => {
+      stored[name] = value;
+      return {};
+    },
+    'secrets.delete': ({ name }: any) => {
+      delete stored[name];
+      return {};
+    },
+    'secrets.has': ({ names }: any) => {
+      const has: { [name: string]: boolean } = {};
+      for (const name of names) has[name] = name in stored;
+      return has;
+    },
+  };
+}
+
 export function aiError(key: string, message = key, extra: object = {}) {
   return Object.assign(new Error('AI request failed'), {
     code: -32011,

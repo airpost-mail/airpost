@@ -6,17 +6,23 @@ import {
   destinationNote,
   draftReply,
   errorMessage,
+  forgetKey,
+  hasSavedKey,
   listModels,
+  moveKeysToEngine,
+  saveKey,
   summarize,
   suggestReplies,
   testProvider,
 } from '../lib/ai-client';
 import {
   ACCOUNT_ID,
+  ENGINE_KEYS,
   SYNTHETIC_KEY,
   aiError,
   fakeEngine,
   fakeKeyset,
+  secretAnswers,
   setUpAi,
   settle,
 } from './fake-engine';
@@ -206,5 +212,84 @@ describe('ai.* calls', () => {
     });
     await testProvider(provider);
     expect(sent[1].params.config.apiKey).toBe(SYNTHETIC_KEY);
+  });
+});
+
+describe('ai.* calls to an engine that keeps the keys', () => {
+  let keys: { [name: string]: string };
+  let secrets: { [name: string]: string };
+
+  beforeEach(() => {
+    keys = fakeKeyset();
+    secrets = {};
+  });
+
+  const engine = (answers = {}) =>
+    fakeEngine({ ...secretAnswers(secrets), ...answers }, { features: ENGINE_KEYS });
+
+  it('names the provider and sends no key', async () => {
+    setUpAi();
+    const sent = engine({ 'ai.summarize': () => ({ text: 'A summary.', model: 'claude-test' }) });
+    await summarize(ACCOUNT_ID, 't1').promise;
+    const { streamId, ...params } = sent[0].params;
+    expect(params).toEqual({
+      accountId: ACCOUNT_ID,
+      threadId: 't1',
+      refresh: false,
+      provider: 'anthropic',
+      settings: {
+        accounts: [ACCOUNT_ID],
+        features: { summary: true, reply: true, triage: false },
+        includeAddresses: false,
+      },
+    });
+    expect(KeyManager.getPassword).not.toHaveBeenCalled();
+  });
+
+  it("tests the form's config with the typed key, or none for the engine to add", async () => {
+    const sent = engine({
+      'ai.test': () => ({ host: 'h', model: 'm', local: false, latencyMs: 1 }),
+    });
+    const provider = { id: 'anthropic', kind: 'anthropic' as const, model: 'draft' };
+    await testProvider(provider);
+    await testProvider(provider, 'typed-synthetic');
+    expect(sent[0].params).toEqual({
+      config: { id: 'anthropic', kind: 'anthropic', model: 'draft' },
+    });
+    expect(sent[1].params.config.apiKey).toBe('typed-synthetic');
+    expect(KeyManager.getPassword).not.toHaveBeenCalled();
+  });
+
+  it('saves, finds and forgets keys in the secret store, dropping keyset copies', async () => {
+    engine();
+    keys['integration-ai-anthropic-key'] = 'old-synthetic';
+    await saveKey('anthropic', SYNTHETIC_KEY);
+    expect(secrets).toEqual({ 'integration:ai-anthropic': SYNTHETIC_KEY });
+    expect(keys).toEqual({});
+    expect(KeyManager.replacePassword).not.toHaveBeenCalled();
+    expect(await hasSavedKey('anthropic')).toBe(true);
+    expect(await hasSavedKey('openai')).toBe(false);
+    await forgetKey('anthropic');
+    expect(secrets).toEqual({});
+    expect(await hasSavedKey('anthropic')).toBe(false);
+  });
+
+  it('moves keys left in the keyset to the engine, and only to one that keeps them', async () => {
+    setUpAi({
+      providers: [
+        { id: 'anthropic', kind: 'anthropic', model: 'claude-test' },
+        { id: 'ollama', kind: 'ollama', model: 'llama3' },
+      ],
+    });
+    keys['integration-ai-anthropic-key'] = SYNTHETIC_KEY;
+    fakeEngine(secretAnswers(secrets), { features: ['ai', 'ai-triage'] });
+    await moveKeysToEngine();
+    expect(secrets).toEqual({});
+    expect(keys['integration-ai-anthropic-key']).toBe(SYNTHETIC_KEY);
+
+    (Engine.has as any).andCallFake((f: string) => ENGINE_KEYS.includes(f));
+    await moveKeysToEngine();
+    expect(secrets).toEqual({ 'integration:ai-anthropic': SYNTHETIC_KEY });
+    expect(keys).toEqual({});
   });
 });

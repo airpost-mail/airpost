@@ -18,10 +18,12 @@ import { ThreadSummary, watchSummaries } from './thread-summary';
 import { SuggestReplyButton } from './reply-suggestions';
 import { TriageChip } from './triage-chip';
 import { NeedsReplySidebarExtension } from './needs-reply';
+import { moveKeysToEngine } from './ai-client';
 
 let preferencesTab = null;
 let stopWatchingSummaries: (() => void) | null = null;
 let stopWatchingTriage: (() => void) | null = null;
+let stopMovingKeys: (() => void) | null = null;
 
 // Registering again makes the sidebar ask for its items again: "Needs reply" follows the
 // triage switch, the opted-in accounts and the engine's features.
@@ -43,6 +45,17 @@ function watchTriage() {
   };
 }
 
+// The main window moves keys a build without engine-held keys left in the keyset.
+function watchKeys() {
+  const move = () =>
+    moveKeysToEngine().catch((err) =>
+      console.warn(`Could not move the AI keys to the engine: ${err}`)
+    );
+  Engine.events.on('connected', move);
+  move();
+  return () => Engine.events.removeListener('connected', move);
+}
+
 export function activate() {
   preferencesTab = new PreferencesUIStore.TabItem({
     tabId: 'AI',
@@ -56,6 +69,7 @@ export function activate() {
   ComponentRegistry.register(SuggestReplyButton, { role: 'Composer:ActionButton' });
   ComponentRegistry.register(TriageChip, { role: 'Thread:MailLabel' });
   stopWatchingTriage = watchTriage();
+  if (AppEnv.isMainWindow()) stopMovingKeys = watchKeys();
 }
 
 export function deactivate() {
@@ -66,6 +80,8 @@ export function deactivate() {
   ComponentRegistry.unregister(TriageChip);
   if (stopWatchingTriage) stopWatchingTriage();
   stopWatchingTriage = null;
+  if (stopMovingKeys) stopMovingKeys();
+  stopMovingKeys = null;
   if (preferencesTab) PreferencesUIStore.unregisterPreferencesTab(preferencesTab.tabId);
   preferencesTab = null;
 }

@@ -5,7 +5,15 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { KeyManager } from 'mailspring-exports';
 import PreferencesAI from '../lib/preferences-ai';
-import { ACCOUNT_ID, SYNTHETIC_KEY, fakeEngine, fakeKeyset, settle } from './fake-engine';
+import {
+  ACCOUNT_ID,
+  ENGINE_KEYS,
+  SYNTHETIC_KEY,
+  fakeEngine,
+  fakeKeyset,
+  secretAnswers,
+  settle,
+} from './fake-engine';
 
 async function render() {
   let renderer: TestRenderer.ReactTestRenderer;
@@ -197,6 +205,101 @@ describe('Preferences > AI', () => {
     const renderer = await render();
     expect(textOf(renderer)).toContain('When you click Summarize');
     expect(textOf(renderer)).toContain('Attachments are never sent');
+    renderer.unmount();
+  });
+});
+
+describe('Preferences > AI with an engine that keeps the keys', () => {
+  let keys: { [name: string]: string };
+  let secrets: { [name: string]: string };
+
+  beforeEach(() => {
+    keys = fakeKeyset();
+    secrets = {};
+  });
+
+  const engine = (answers = {}) =>
+    fakeEngine({ ...secretAnswers(secrets), ...answers }, { features: ENGINE_KEYS });
+
+  function withProvider(kind: 'anthropic' | 'openai') {
+    AppEnv.config.set('core.ai', {
+      providers: [{ id: kind, kind, model: 'm' }],
+      features: {},
+      accounts: [],
+      includeAddresses: false,
+    });
+  }
+
+  it('saves and forgets the key with secrets.set and secrets.delete', async () => {
+    withProvider('anthropic');
+    const sent = engine();
+    const renderer = await render();
+    await act(async () => {
+      byId(renderer, 'ai-provider-anthropic-key').props.onChange({
+        target: { value: SYNTHETIC_KEY },
+      });
+    });
+    await act(async () => {
+      await button(renderer, 'Save Key').props.onClick();
+    });
+    expect(secrets).toEqual({ 'integration:ai-anthropic': SYNTHETIC_KEY });
+    expect(KeyManager.replacePassword).not.toHaveBeenCalled();
+    expect(keys).toEqual({});
+    expect(textOf(renderer)).not.toContain(SYNTHETIC_KEY);
+
+    await act(async () => {
+      await button(renderer, 'Forget Key').props.onClick();
+    });
+    expect(secrets).toEqual({});
+    expect(sent.map((s) => s.method)).toContain('secrets.delete');
+    expect(sent.some((s) => s.method.startsWith('ai.'))).toBe(false);
+    renderer.unmount();
+  });
+
+  it('shows a key the engine holds as saved', async () => {
+    withProvider('anthropic');
+    secrets['integration:ai-anthropic'] = SYNTHETIC_KEY;
+    engine();
+    const renderer = await render();
+    expect(byId(renderer, 'ai-provider-anthropic-key').props.placeholder).toBe(
+      'Saved. Type a new key to replace it.'
+    );
+    renderer.unmount();
+  });
+
+  it("deletes the engine's key when the server changes or the provider goes", async () => {
+    withProvider('openai');
+    secrets['integration:ai-openai'] = SYNTHETIC_KEY;
+    engine();
+    const renderer = await render();
+    await type(renderer, 'ai-provider-openai-url', 'http://192.168.1.20:1234/v1');
+    expect(secrets).toEqual({});
+    expect(textOf(renderer)).toContain('The server changed, so the saved API key was removed.');
+
+    secrets['integration:ai-openai'] = SYNTHETIC_KEY;
+    await act(async () => {
+      await button(renderer, 'Remove').props.onClick();
+    });
+    expect(secrets).toEqual({});
+    expect(AppEnv.config.get('core.ai').providers).toEqual([]);
+    renderer.unmount();
+  });
+
+  it('keeps the provider when the engine cannot forget its key', async () => {
+    withProvider('anthropic');
+    secrets['integration:ai-anthropic'] = SYNTHETIC_KEY;
+    engine({
+      'secrets.delete': () => {
+        throw new Error('The sync engine connection closed');
+      },
+    });
+    spyOn(AppEnv, 'showErrorDialog');
+    const renderer = await render();
+    await act(async () => {
+      await button(renderer, 'Remove').props.onClick();
+    });
+    expect(AppEnv.showErrorDialog).toHaveBeenCalled();
+    expect(AppEnv.config.get('core.ai').providers.length).toBe(1);
     renderer.unmount();
   });
 });

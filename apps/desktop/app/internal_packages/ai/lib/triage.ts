@@ -18,7 +18,7 @@ import {
   AiTriageProgressParams,
   AiTriageRunResult,
 } from 'mailspring-exports';
-import { AiError, configFor, toAiError } from './ai-client';
+import { AiError, providerParams, toAiError } from './ai-client';
 
 export const PLUGIN_ID = 'tern-ai-triage';
 // ms-ipc `feature::AI_TRIAGE`.
@@ -196,7 +196,7 @@ export function triageInbox(
       const result = await Engine.request<AiTriageRunResult>('ai.triage.run', {
         accountId,
         sinceDays: TRIAGE_SINCE_DAYS,
-        config: await configFor(provider),
+        ...(await providerParams(provider)),
       });
       jobId = result.jobId;
       if (cancelled) {

@@ -103,10 +103,29 @@ describe('AI features in the capability store', () => {
     };
     await store.whenReady();
     expect(reason('needs-engine-key')).toBe(
-      'Inbox triage: Background triage needs a model without an API key, such as Ollama, for now'
+      'Inbox triage: Add your Anthropic API key in Preferences > AI'
     );
     expect(reason('rate-limited')).toContain('limiting requests');
     expect(reason('quota-exceeded')).toContain('used up');
+  });
+
+  it('takes the key from the engine that keeps it, with none in the keyset', async () => {
+    setUpAi();
+    const features = ['ai', 'ai-triage', 'account-setup', 'capabilities'];
+    events.connected(features, async () => ({}), {
+      ai: { summary: { available: false, reason: 'needs-engine-key' } },
+    });
+    await store.whenReady();
+    expect(store.get('ai-summary').reason).toBe('Add your Anthropic API key in Preferences > AI');
+    events.connected(features, async () => ({}), {
+      ai: { summary: { available: true, provider: 'anthropic', local: false } },
+    });
+    expect(store.get('ai-summary')).toEqual({
+      available: true,
+      source: 'ai',
+      host: 'api.anthropic.com',
+      local: false,
+    });
   });
 
   it("takes the engine's word when it reports a feature unavailable", async () => {

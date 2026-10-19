@@ -5,9 +5,11 @@
 The desktop's AI settings (docs/ai-plan.md A3, A4): the model providers, which one each feature
 uses, the feature switches, the accounts opted in and "Include email addresses". They live in
 config under `core.ai.*`, which the main process mirrors into the engine's settings store
-(engine-settings.ts) when the engine lists `ai-triage`. They still go with each `ai.*` request,
-with the provider's key read from the keyset (KeyManager) as `integration-ai-<providerId>-key`,
-until the engine holds the keys (stage 11). Keys are never in config and never logged.
+(engine-settings.ts) when the engine lists `ai-triage`. An engine that also lists `account-setup`
+keeps the keys in its secret store as `integration:ai-<providerId>`, and the `ai.*`
+requests name the provider; with an older engine the key is read from the keyset (KeyManager) as
+`integration-ai-<providerId>-key` (keyName) and goes with each request. Keys are never in config
+and never logged.
 
 The requests themselves are made by internal_packages/ai through the Engine export; this module
 is shared with the CapabilityStore, which needs the settings to say whether a feature is set up.

@@ -14,7 +14,15 @@ import {
 } from '../lib/triage';
 import { TriageChip, CorrectionMenu } from '../lib/triage-chip';
 import { NeedsReplySidebarExtension, NeedsReplySubscription } from '../lib/needs-reply';
-import { ACCOUNT_ID, SYNTHETIC_KEY, fakeEngine, fakeKeyset, setUpAi, settle } from './fake-engine';
+import {
+  ACCOUNT_ID,
+  ENGINE_KEYS,
+  SYNTHETIC_KEY,
+  fakeEngine,
+  fakeKeyset,
+  setUpAi,
+  settle,
+} from './fake-engine';
 
 const TRIAGE_FEATURES = ['ai', 'ai-triage'];
 
@@ -147,6 +155,21 @@ describe('AI triage', () => {
       expect(call.params.accountId).toBe(ACCOUNT_ID);
       expect(call.params.sinceDays).toBe(TRIAGE_SINCE_DAYS);
       expect(call.params.config.apiKey).toBe(SYNTHETIC_KEY);
+    });
+
+    it('names the provider to an engine that keeps the keys', async () => {
+      setUpTriage();
+      const sent = fakeEngine(
+        { 'ai.triage.run': () => ({ jobId: 'j3', queued: 0 }) },
+        { features: ENGINE_KEYS }
+      );
+      await triageInbox(ACCOUNT_ID).finished;
+      const [call] = sent.filter((s) => s.method === 'ai.triage.run');
+      expect(call.params).toEqual({
+        accountId: ACCOUNT_ID,
+        sinceDays: TRIAGE_SINCE_DAYS,
+        provider: 'anthropic',
+      });
     });
 
     it('cancels its job in the engine', async () => {

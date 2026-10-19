@@ -6,15 +6,17 @@
 //
 // The connected engine decides (its `capabilities`, from hello and capabilities.changed): the
 // provider settings are mirrored into its settings store. Keys are in the engine's secret store
-// or, from before, the keyset (KeyManager); the store checks here that the provider's key is
-// saved in one. Without an engine that reports capabilities it decides from config alone.
+// or, from before, the keyset (KeyManager). For a capability the engine leaves to the client
+// (`credentials: 'request'`: integrations, and AI with an engine that keeps no AI keys) the store
+// checks here that the provider's key is saved in one. Without an engine that reports
+// capabilities it decides from config alone.
 
 import { useEffect, useState } from 'react';
 import MailspringStore from 'mailspring-store';
 import { localized } from '../../intl';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine-events';
 import { CapabilityReason, EngineCapability, Feature } from '../../engine-protocol';
-import AI, { AiFeature } from '../../ai';
+import AI, { AiFeature, AiProvider } from '../../ai';
 import {
   Integrations,
   IntegrationKind,
@@ -244,7 +246,7 @@ export class CapabilityStoreClass extends MailspringStore {
       ...where,
     });
     if (reported && !reported.available) {
-      return unavailable(aiEngineReason(reported));
+      return unavailable(aiEngineReason(reported, provider));
     }
     const hasKey = !!(provider && this._hasKey[aiKeyEntry(provider.id)]);
     const missing = AI.missingSetting(settings, feature, hasKey);
@@ -331,16 +333,16 @@ function aiKeyEntry(providerId: string) {
   return `ai:${providerId}`;
 }
 
-function aiEngineReason(capability: EngineCapability) {
+function aiEngineReason(capability: EngineCapability, provider: AiProvider | null) {
   switch (capability.reason) {
     case CapabilityReason.NotSetUp:
       return localized('Set up a model in Preferences > AI');
     case 'not-enabled':
       return localized('Turn on AI for this account');
     case CapabilityReason.NeedsEngineKey:
-      return localized(
-        'Background triage needs a model without an API key, such as Ollama, for now'
-      );
+      return provider
+        ? localized('Add your %@ API key in Preferences > AI', AI.providerName(provider))
+        : localized('Add your API key in Preferences > AI');
     case CapabilityReason.RateLimited:
       return localized('The model provider is limiting requests; triage goes on by itself');
     case CapabilityReason.QuotaExceeded:

@@ -6,7 +6,6 @@ import {
   AI,
   AccountStore,
   CapabilityStore,
-  KeyManager,
   localized,
   AiFeature,
   AiModelInfo,
@@ -15,11 +14,21 @@ import {
   AiSettings,
   Engine,
 } from 'mailspring-exports';
-import { destinationNote, errorMessage, isCancelled, listModels, testProvider } from './ai-client';
+import {
+  destinationNote,
+  errorMessage,
+  forgetKey,
+  hasSavedKey,
+  isCancelled,
+  listModels,
+  saveKey,
+  testProvider,
+} from './ai-client';
 import { TRIAGE_ENGINE_FEATURE, TriageRun, triageInbox } from './triage';
 
-// Preferences > AI (docs/ai-plan.md section 7). Settings go to config under core.ai; API keys only
-// to the keyset as integration-ai-<id>-key, and are never shown again once saved.
+// Preferences > AI (docs/ai-plan.md section 7). Settings go to config under core.ai; API keys to
+// the engine's secret store (integration:ai-<id>), or the keyset (integration-ai-<id>-key) with
+// an engine that can't keep them, and are never shown again once saved.
 
 const KIND_ORDER: AiProviderKind[] = ['anthropic', 'openai', 'ollama'];
 
@@ -91,6 +100,8 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
   componentDidMount() {
     this._mounted = true;
     this._loadKeyPresence();
+    // Where the key is saved depends on the engine connected.
+    Engine.events.on('connected', this._loadKeyPresence);
   }
 
   componentDidUpdate(prev: ProviderProps) {
@@ -101,15 +112,28 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
 
   componentWillUnmount() {
     this._mounted = false;
+    Engine.events.removeListener('connected', this._loadKeyPresence);
   }
 
   _id(field: string) {
     return `ai-provider-${this.props.provider.id}-${field}`;
   }
 
-  async _loadKeyPresence() {
-    const key = await KeyManager.getPassword(AI.keyName(this.props.provider.id));
-    if (this._mounted) this.setState({ hasKey: !!(key || '').trim() });
+  _loadKeyPresence = async () => {
+    let hasKey = false;
+    try {
+      hasKey = await hasSavedKey(this.props.provider.id);
+    } catch (err) {
+      // Unknown: offer Save Key, not Forget Key.
+    }
+    if (this._mounted) this.setState({ hasKey });
+  };
+
+  _keyFailed(err: any) {
+    if (!this._mounted) return;
+    this.setState({
+      keyNotice: localized('Could not change the saved API key: %@', (err && err.message) || err),
+    });
   }
 
   _onChangeField =
@@ -128,15 +152,20 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     if (JSON.stringify(next) === JSON.stringify(previous)) return;
     // The saved key was given for the old server; it must not go to a new one.
     if (serverOf(next) !== serverOf(previous)) {
-      const name = AI.keyName(previous.id);
       let saved = true;
       try {
-        saved = !!(await KeyManager.getPassword(name));
+        saved = await hasSavedKey(previous.id);
       } catch (err) {
-        // Unreadable: remove it anyway.
+        // Unknown: remove it anyway.
       }
       if (saved) {
-        await KeyManager.deletePassword(name);
+        try {
+          await forgetKey(previous.id);
+        } catch (err) {
+          // The engine is unreachable: keep the old server, whose key it may still hold.
+          this._keyFailed(err);
+          return;
+        }
         if (this._mounted) {
           this.setState({
             hasKey: false,
@@ -165,7 +194,12 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
   _onSaveKey = async () => {
     const value = this.state.keyInput.trim();
     if (!value) return;
-    await KeyManager.replacePassword(AI.keyName(this.props.provider.id), value);
+    try {
+      await saveKey(this.props.provider.id, value);
+    } catch (err) {
+      this._keyFailed(err);
+      return;
+    }
     if (this._mounted && this.state.keyInput.trim() === value) {
       this.setState({ keyInput: '', hasKey: true, keyNotice: '' });
     }
@@ -173,8 +207,15 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
 
   _onForgetKey = async () => {
     this._formGeneration++;
-    await KeyManager.deletePassword(AI.keyName(this.props.provider.id));
-    if (this._mounted) this.setState({ keyInput: '', hasKey: false, testResult: null });
+    try {
+      await forgetKey(this.props.provider.id);
+    } catch (err) {
+      this._keyFailed(err);
+      return;
+    }
+    if (this._mounted) {
+      this.setState({ keyInput: '', hasKey: false, testResult: null, keyNotice: '' });
+    }
   };
 
   _onLoadModels = async () => {
@@ -468,7 +509,15 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
 
   /** Drops the provider, its key, and its place in the features that used it. */
   _onRemoveProvider = async (provider: AiProvider) => {
-    await KeyManager.deletePassword(AI.keyName(provider.id));
+    try {
+      await forgetKey(provider.id);
+    } catch (err) {
+      // The engine is unreachable: keep the provider, so its key can still be forgotten.
+      AppEnv.showErrorDialog(
+        localized('Could not remove the saved API key: %@', (err && err.message) || err)
+      );
+      return;
+    }
     const settings = AI.readSettings();
     const features = { ...settings.features };
     for (const f of AI.AI_FEATURES) {
