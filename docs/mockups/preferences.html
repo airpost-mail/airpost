@@ -1,0 +1,988 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Tern Preferences (mockup)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0a1a3d;
+  --tern: #096ee6;
+  --font: 'Inter', -apple-system, system-ui, sans-serif;
+  --r-card: 10px;
+  --r-ctl: 6px;
+}
+[data-theme="light"] {
+  --desk: radial-gradient(1200px 700px at 20% 0%, #dfe8f7 0%, #c9d6ec 40%, #b4c3de 100%);
+  --win: #f5f5f7;
+  --side: rgba(232, 233, 238, .92);
+  --side-line: rgba(0, 0, 0, .07);
+  --card: #ffffff;
+  --card-line: rgba(0, 0, 0, .07);
+  --row-line: rgba(0, 0, 0, .06);
+  --text: #1b1c20;
+  --text-2: #6a6d75;
+  --text-3: #9a9da5;
+  --ctl: #ffffff;
+  --ctl-line: rgba(0, 0, 0, .14);
+  --ctl-hover: #f2f3f6;
+  --sel: rgba(9, 110, 230, .12);
+  --sel-text: #0b5cc0;
+  --accent: #096ee6;
+  --accent-soft: rgba(9, 110, 230, .1);
+  --sw-off: #dcdde2;
+  --ok: #1f9d55; --ok-soft: rgba(31, 157, 85, .12);
+  --warn: #b7791f; --warn-soft: rgba(214, 158, 46, .16);
+  --bad: #d64545; --bad-soft: rgba(214, 69, 69, .1);
+  --muted-soft: rgba(0, 0, 0, .05);
+  --shadow: 0 30px 80px rgba(10, 26, 61, .28), 0 8px 24px rgba(10, 26, 61, .14);
+}
+[data-theme="dark"] {
+  --desk: radial-gradient(1200px 700px at 20% 0%, #1c2a4d 0%, #0f1830 45%, #070c1a 100%);
+  --win: #1a1b1f;
+  --side: rgba(30, 31, 36, .94);
+  --side-line: rgba(255, 255, 255, .06);
+  --card: #232429;
+  --card-line: rgba(255, 255, 255, .06);
+  --row-line: rgba(255, 255, 255, .06);
+  --text: #ececef;
+  --text-2: #9b9ea7;
+  --text-3: #6e717a;
+  --ctl: #2c2d33;
+  --ctl-line: rgba(255, 255, 255, .1);
+  --ctl-hover: #34353c;
+  --sel: rgba(59, 140, 255, .2);
+  --sel-text: #8cbcff;
+  --accent: #3b8cff;
+  --accent-soft: rgba(59, 140, 255, .16);
+  --sw-off: #45464e;
+  --ok: #4cc38a; --ok-soft: rgba(76, 195, 138, .14);
+  --warn: #e0b45a; --warn-soft: rgba(224, 180, 90, .15);
+  --bad: #f07272; --bad-soft: rgba(240, 114, 114, .13);
+  --muted-soft: rgba(255, 255, 255, .06);
+  --shadow: 0 30px 80px rgba(0, 0, 0, .55), 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 13px/1.45 var(--font);
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  color: var(--text);
+  background: var(--desk);
+  display: grid;
+  place-items: center;
+  -webkit-font-smoothing: antialiased;
+  transition: background .4s;
+}
+button, input, select { font: inherit; color: inherit; }
+
+/* mockup chrome outside the window */
+.mock-bar {
+  position: fixed; top: 14px; right: 16px; display: flex; gap: 8px; align-items: center;
+  font-size: 12px; color: rgba(255, 255, 255, .85);
+}
+[data-theme="light"] .mock-bar { color: rgba(10, 26, 61, .7); }
+.mock-bar .seg { background: rgba(255, 255, 255, .5); }
+[data-theme="dark"] .mock-bar .seg { background: rgba(255, 255, 255, .08); }
+
+/* window */
+.window {
+  width: min(1080px, calc(100vw - 48px));
+  height: min(740px, calc(100vh - 64px));
+  background: var(--win);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  overflow: hidden;
+  border: 1px solid var(--card-line);
+  animation: rise .5s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(12px) scale(.985); } }
+
+/* sidebar */
+.side {
+  background: var(--side);
+  border-right: 1px solid var(--side-line);
+  display: flex; flex-direction: column;
+  min-height: 0;
+}
+.traffic { display: flex; gap: 8px; padding: 16px 16px 10px; }
+.traffic i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.traffic i:nth-child(1) { background: #ff5f57; }
+.traffic i:nth-child(2) { background: #febc2e; }
+.traffic i:nth-child(3) { background: #28c840; }
+.search {
+  margin: 4px 12px 10px; position: relative;
+}
+.search input {
+  width: 100%; height: 28px; border-radius: 7px; border: 1px solid var(--side-line);
+  background: var(--muted-soft); padding: 0 10px 0 28px; outline: none;
+}
+.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.search svg { position: absolute; left: 9px; top: 7px; width: 14px; height: 14px; color: var(--text-3); }
+.nav { overflow: auto; padding: 0 8px 16px; flex: 1; }
+.server-chip {
+  display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 9px;
+  cursor: pointer; margin-bottom: 8px; border: 1px solid transparent;
+}
+.server-chip:hover { background: var(--muted-soft); }
+.server-chip.active { background: var(--sel); }
+.server-chip .bird {
+  width: 34px; height: 34px; border-radius: 9px; flex: none;
+  background: linear-gradient(160deg, #13306e, var(--navy));
+  display: grid; place-items: center;
+}
+.server-chip b { display: block; font-weight: 600; font-size: 13px; }
+.server-chip span { color: var(--text-2); font-size: 11.5px; }
+.group-label {
+  font-size: 11px; font-weight: 600; color: var(--text-3); padding: 10px 8px 3px;
+  letter-spacing: .02em;
+}
+.nav a {
+  display: flex; align-items: center; gap: 9px; padding: 4px 8px; border-radius: 7px;
+  color: var(--text); text-decoration: none; cursor: default; font-weight: 450;
+}
+.nav a:hover { background: var(--muted-soft); }
+.nav a.active { background: var(--sel); color: var(--sel-text); font-weight: 550; }
+.nav a .badge { margin-left: auto; }
+.count {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff;
+  font-size: 11px; font-weight: 600; display: grid; place-items: center;
+}
+.nav-sep { height: 1px; background: var(--side-line); margin: 10px 8px; }
+.tile {
+  width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: none;
+  color: #fff; box-shadow: inset 0 0 0 .5px rgba(0, 0, 0, .12);
+}
+.tile svg { width: 14px; height: 14px; }
+.t-grey { background: linear-gradient(#9aa0aa, #7c828d); }
+.t-red { background: linear-gradient(#ff6b6b, #e84545); }
+.t-indigo { background: linear-gradient(#7b7bff, #5a4fe0); }
+.t-slate { background: linear-gradient(#5d6472, #444a56); }
+.t-blue { background: linear-gradient(#4aa3ff, #0f78f0); }
+.t-teal { background: linear-gradient(#3cc8b4, #1aa594); }
+.t-orange { background: linear-gradient(#ffa24d, #f07b16); }
+.t-pink { background: linear-gradient(#ff7aa8, #e8467f); }
+.t-amber { background: linear-gradient(#ffcb5a, #f2941a); }
+.t-green { background: linear-gradient(#58d68d, #26a95d); }
+.t-ai { background: linear-gradient(#8478ff, #523ae6); }
+.t-navy { background: linear-gradient(#1f3f86, var(--navy)); }
+.t-purple { background: linear-gradient(#a96bff, #7b2ff7); }
+
+/* main */
+.main { overflow: auto; min-height: 0; scroll-behavior: smooth; }
+.page { display: none; padding: 26px 40px 48px; max-width: 760px; }
+.page.active { display: block; animation: fade .25s ease both; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+.page > header { display: flex; gap: 14px; align-items: center; margin-bottom: 22px; }
+.page > header .tile { width: 40px; height: 40px; border-radius: 10px; }
+.page > header .tile svg { width: 24px; height: 24px; }
+h1 { font-size: 20px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+.page > header p { margin: 2px 0 0; color: var(--text-2); }
+
+h2 {
+  font-size: 12px; font-weight: 600; color: var(--text-2); margin: 22px 4px 7px;
+  display: flex; align-items: center; gap: 8px;
+}
+h2 .pill { font-weight: 500; }
+.card {
+  background: var(--card); border: 1px solid var(--card-line); border-radius: var(--r-card);
+  overflow: hidden;
+}
+.row {
+  display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;
+  padding: 11px 14px; min-height: 44px;
+}
+.row + .row, .row + .sub, .sub + .row { border-top: 1px solid var(--row-line); }
+.row .l b { display: block; font-weight: 500; }
+.row .l small { display: block; color: var(--text-2); font-size: 12px; margin-top: 1px; max-width: 470px; }
+.row .r { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.row.disabled .l, .row.disabled .r { opacity: .5; }
+.row.disabled .r .pill { opacity: 1; }
+.sub { padding: 2px 14px 12px 14px; background: transparent; }
+.note { color: var(--text-2); font-size: 12px; margin: 8px 4px 0; }
+.note a, .link { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 500; }
+.note a:hover, .link:hover { text-decoration: underline; }
+
+/* controls */
+.sw {
+  width: 34px; height: 20px; border-radius: 10px; border: none; background: var(--sw-off);
+  position: relative; cursor: pointer; transition: background .18s; flex: none; padding: 0;
+}
+.sw::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .18s cubic-bezier(.3, .7, .3, 1.2);
+}
+.sw[aria-checked="true"] { background: var(--accent); }
+.sw[aria-checked="true"]::after { transform: translateX(14px); }
+.sw:disabled { cursor: not-allowed; }
+.btn {
+  height: 26px; padding: 0 11px; border-radius: var(--r-ctl); border: 1px solid var(--ctl-line);
+  background: var(--ctl); cursor: pointer; font-weight: 500; white-space: nowrap;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+}
+.btn:hover { background: var(--ctl-hover); }
+.btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.danger { color: var(--bad); }
+.btn.danger-solid { background: var(--bad); border-color: transparent; color: #fff; }
+.btn.ghost { border-color: transparent; background: transparent; box-shadow: none; color: var(--accent); }
+.btn.ghost:hover { background: var(--accent-soft); }
+.select {
+  height: 26px; border-radius: var(--r-ctl); border: 1px solid var(--ctl-line); background: var(--ctl);
+  padding: 0 26px 0 9px; appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2.5 4l2.5 2.5L7.5 4' fill='none' stroke='%23888' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+.input {
+  height: 28px; border-radius: var(--r-ctl); border: 1px solid var(--ctl-line); background: var(--ctl);
+  padding: 0 9px; width: 100%; outline: none;
+}
+.input:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+.seg {
+  display: inline-flex; background: var(--muted-soft); border-radius: 7px; padding: 2px; gap: 2px;
+}
+.seg button {
+  border: none; background: transparent; padding: 3px 10px; border-radius: 5px; cursor: pointer;
+  color: var(--text-2); font-weight: 500;
+}
+.seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+[data-theme="dark"] .seg button.on { background: #3a3b42; }
+.pill {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px;
+  font-size: 11.5px; font-weight: 550; white-space: nowrap;
+}
+.pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.ok { color: var(--ok); background: var(--ok-soft); }
+.pill.warn { color: var(--warn); background: var(--warn-soft); }
+.pill.bad { color: var(--bad); background: var(--bad-soft); }
+.pill.off { color: var(--text-2); background: var(--muted-soft); }
+.pill.server { color: var(--accent); background: var(--accent-soft); }
+.pill.server::before { display: none; }
+.kbd {
+  display: inline-block; min-width: 22px; text-align: center; padding: 1px 6px; border-radius: 5px;
+  border: 1px solid var(--ctl-line); border-bottom-width: 2px; font-size: 11.5px; background: var(--ctl);
+  font-weight: 500;
+}
+.field { display: grid; grid-template-columns: 140px 1fr; gap: 10px; align-items: center; margin-top: 8px; }
+.field label { color: var(--text-2); }
+
+/* provider / app cards */
+.prov { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; }
+.prov + .prov, .prov-body + .prov { border-top: 1px solid var(--row-line); }
+.prov .logo {
+  width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+  font-weight: 700; font-size: 13px; color: #fff; flex: none;
+}
+.prov .l b { font-weight: 550; display: block; }
+.prov .l small { color: var(--text-2); font-size: 12px; }
+.prov .r { display: flex; gap: 8px; align-items: center; }
+.prov .chev { transition: transform .2s; color: var(--text-3); width: 14px; height: 14px; }
+.prov.open .chev { transform: rotate(90deg); }
+.prov.expandable { cursor: pointer; }
+.prov.expandable:hover { background: var(--muted-soft); }
+.prov-body { display: none; padding: 0 14px 14px 58px; }
+.prov.open + .prov-body { display: block; animation: fade .2s ease both; }
+.prov-body .actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.privacy {
+  display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 8px 10px; border-radius: 7px;
+  background: var(--muted-soft); color: var(--text-2); font-size: 12px;
+}
+.privacy svg { flex: none; width: 14px; height: 14px; margin-top: 1px; }
+
+/* hero card (agents, server) */
+.hero {
+  border-radius: 12px; padding: 18px 18px; display: grid; grid-template-columns: 1fr auto; gap: 18px;
+  align-items: center; color: #fff; position: relative; overflow: hidden;
+  background: linear-gradient(135deg, #12306f 0%, var(--navy) 70%);
+}
+.hero::after {
+  content: ''; position: absolute; right: -40px; top: -60px; width: 260px; height: 260px;
+  background: radial-gradient(circle, rgba(59, 140, 255, .45), transparent 65%);
+  pointer-events: none;
+}
+.hero b { font-size: 15px; font-weight: 600; display: block; }
+.hero p { margin: 4px 0 0; color: rgba(255, 255, 255, .72); max-width: 470px; }
+.hero .sw { background: rgba(255, 255, 255, .25); }
+.hero .sw[aria-checked="true"] { background: #3b8cff; }
+.dim { opacity: .45; pointer-events: none; transition: opacity .25s; }
+
+/* activity */
+.act { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; padding: 10px 14px; align-items: start; }
+.act + .act { border-top: 1px solid var(--row-line); }
+.act .dot { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.act b { font-weight: 550; }
+.act small { color: var(--text-2); display: block; font-size: 12px; }
+.act time { color: var(--text-3); font-size: 11.5px; white-space: nowrap; }
+
+/* accounts */
+.acct-list .acct { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 11px 14px; cursor: pointer; }
+.acct-list .acct + .acct { border-top: 1px solid var(--row-line); }
+.acct-list .acct:hover { background: var(--muted-soft); }
+.acct-list .acct.sel { background: var(--sel); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; flex: none; }
+.acct b { font-weight: 550; display: block; }
+.acct small { color: var(--text-2); font-size: 12px; }
+.banner {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 14px;
+  background: var(--bad-soft); color: var(--text); border-bottom: 1px solid var(--row-line);
+}
+.banner svg { color: var(--bad); width: 16px; height: 16px; }
+.swatches { display: flex; gap: 6px; }
+.swatches i { width: 18px; height: 18px; border-radius: 50%; display: block; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .1); }
+.swatches i.on { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
+
+/* appearance */
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 14px; }
+.theme-opt { cursor: pointer; text-align: center; }
+.theme-opt .pv {
+  height: 74px; border-radius: 8px; border: 1px solid var(--card-line); overflow: hidden; display: grid;
+  grid-template-columns: 30% 1fr; margin-bottom: 6px; transition: box-shadow .15s;
+}
+.theme-opt.on .pv { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
+.pv .a { background: #e7e8ed; } .pv .b { background: #fff; padding: 8px; }
+.pv.dark .a { background: #26272c; } .pv.dark .b { background: #1b1c20; }
+.pv.auto { background: linear-gradient(135deg, #fff 50%, #1b1c20 50%); }
+.pv .b i { display: block; height: 6px; border-radius: 3px; background: rgba(9, 110, 230, .5); margin-bottom: 6px; width: 70%; }
+.pv .b i + i { background: rgba(127, 127, 127, .3); width: 90%; }
+.pv .b i + i + i { width: 55%; }
+
+/* two-pane editors */
+.split { display: grid; grid-template-columns: 200px 1fr; min-height: 300px; }
+.split .list { border-right: 1px solid var(--row-line); }
+.split .list div { padding: 9px 12px; cursor: pointer; }
+.split .list div + div { border-top: 1px solid var(--row-line); }
+.split .list div.sel { background: var(--sel); color: var(--sel-text); font-weight: 550; }
+.split .list .foot { color: var(--accent); font-weight: 500; }
+.split .ed { padding: 14px; }
+.editor { border: 1px solid var(--ctl-line); border-radius: 7px; padding: 12px; min-height: 150px; background: var(--ctl); margin-top: 10px; line-height: 1.6; }
+
+/* tables */
+.disclose { cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.disclose svg { width: 12px; height: 12px; transition: transform .2s; color: var(--text-3); }
+.disclose.open svg { transform: rotate(90deg); }
+.disclose-body { display: none; }
+.disclose.open + .disclose-body { display: block; animation: fade .2s ease both; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th { text-align: left; font-weight: 600; color: var(--text-2); padding: 8px 14px; border-bottom: 1px solid var(--row-line); }
+td { padding: 9px 14px; vertical-align: top; border-top: 1px solid var(--row-line); }
+tr:first-child td { border-top: none; }
+
+.bars { display: flex; gap: 3px; align-items: flex-end; height: 34px; }
+.bars i { width: 8px; border-radius: 2px; background: var(--accent); opacity: .75; display: block; }
+.bars i:last-child { opacity: 1; }
+
+.empty {
+  text-align: center; padding: 34px 20px 26px;
+}
+.empty .art {
+  width: 72px; height: 72px; margin: 0 auto 14px; border-radius: 18px;
+  background: linear-gradient(160deg, #13306e, var(--navy)); display: grid; place-items: center;
+  box-shadow: 0 10px 30px rgba(10, 26, 61, .3);
+}
+.empty h3 { margin: 0 0 6px; font-size: 16px; font-weight: 650; }
+.empty p { color: var(--text-2); max-width: 440px; margin: 0 auto 16px; }
+.connect { display: flex; gap: 8px; max-width: 420px; margin: 0 auto; }
+.feat-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.feat-grid > div { padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
+.feat-grid > div:nth-child(odd) { border-right: 1px solid var(--row-line); }
+.feat-grid > div:nth-child(n+3) { border-top: 1px solid var(--row-line); }
+.feat-grid svg { width: 16px; height: 16px; color: var(--accent); flex: none; margin-top: 1px; }
+.feat-grid b { font-weight: 550; display: block; }
+.feat-grid small { color: var(--text-2); font-size: 12px; }
+
+.danger { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0;
+  background: #1b1c20; color: #fff; padding: 10px 14px; border-radius: 10px; font-weight: 500;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .3); transition: all .3s cubic-bezier(.2, .8, .2, 1);
+  display: flex; gap: 10px; align-items: center; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast svg { width: 16px; height: 16px; color: #4cc38a; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="mock-bar">
+  Mockup
+  <div class="seg" id="mockTheme"><button class="on" data-t="light">Light</button><button data-t="dark">Dark</button></div>
+</div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-brush" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="1.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="1.5" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="2" d="M12 2a10 10 0 0 0 0 20c1 0 1.6-.8 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.8-1.7 1.7-1.7h2a5.6 5.6 0 0 0 5.5-5.5C22 6 17.5 2 12 2Z"/></symbol>
+    <symbol id="i-cmd" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></symbol>
+    <symbol id="i-at" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+    <symbol id="i-sign" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 17c3-1 4-9 7-9s-1 9 2 9 3-5 5-5 1 4 4 4M3 21h18"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-rules" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 9a9 9 0 0 1-9 9"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path fill="currentColor" d="M10 3l1.6 5.4L17 10l-5.4 1.6L10 17l-1.6-5.4L3 10l5.4-1.6zM18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM18 2l.6 1.4L20 4l-1.4.6L18 6l-.6-1.4L16 4l1.4-.6z"/></symbol>
+    <symbol id="i-agent" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 17l6-6-6-6M12 19h8"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 2l9 5v10l-9 5-9-5V7zM12 22V12M21 7l-9 5-9-5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 21l-4.3-4.3"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l10 18H2z"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 10v5M12 18v.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 12l3 3 5-6"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 0 1-15 6.7L3 16M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M3 21v-5h5"/></symbol>
+    <symbol id="i-bird" viewBox="0 0 64 64"><path fill="#4d95ff" d="M8 14l26 18-6 4z"/><path fill="#a9c8ff" d="M34 32L8 14l22 6z"/><path fill="#ffffff" d="M14 50l20-18 8 2 14 2-12 2-12 2z"/><path fill="#d6e4ff" d="M34 32l8 2-10 10-18 6z"/></symbol>
+  </defs>
+</svg>
+
+<div class="window">
+  <aside class="side">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <div class="search">
+      <svg><use href="#i-search"/></svg>
+      <input id="search" placeholder="Search settings">
+    </div>
+    <nav class="nav" id="nav">
+      <div class="server-chip" data-go="server" data-k="tern server web sync sign in tracking">
+        <div class="bird"><img src="../../assets/brand/web/tern-bird-on-dark-128.png" width="24" height="24" alt=""></div>
+        <div><b>Tern server</b><span id="chipState">Not set up</span></div>
+      </div>
+
+      <div class="group-label">App</div>
+      <a data-go="general" class="active" data-k="startup login background menu bar default language clock"><span class="tile t-grey"><svg><use href="#i-gear"/></svg></span>General</a>
+      <a data-go="notifications" data-k="sound badge alerts notify"><span class="tile t-red"><svg><use href="#i-bell"/></svg></span>Notifications</a>
+      <a data-go="appearance" data-k="theme dark light layout density accent"><span class="tile t-indigo"><svg><use href="#i-brush"/></svg></span>Appearance</a>
+      <a data-go="shortcuts" data-k="keyboard keys gmail outlook"><span class="tile t-slate"><svg><use href="#i-cmd"/></svg></span>Shortcuts</a>
+
+      <div class="group-label">Mail</div>
+      <a data-go="accounts" data-k="account add remove aliases sender color reconnect"><span class="tile t-blue"><svg><use href="#i-at"/></svg></span>Accounts <span class="count badge">1</span></a>
+      <a data-go="reading" data-k="read images headers swipe conversation gravatar"><span class="tile t-teal"><svg><use href="#i-book"/></svg></span>Reading</a>
+      <a data-go="composing" data-k="send undo reply spelling grammar rich text attachments"><span class="tile t-orange"><svg><use href="#i-pen"/></svg></span>Composing &amp; sending</a>
+      <a data-go="signatures" data-k="signature"><span class="tile t-pink"><svg><use href="#i-sign"/></svg></span>Signatures</a>
+      <a data-go="templates" data-k="template canned"><span class="tile t-amber"><svg><use href="#i-doc"/></svg></span>Templates</a>
+      <a data-go="rules" data-k="filter rules automation"><span class="tile t-green"><svg><use href="#i-rules"/></svg></span>Rules</a>
+
+      <div class="group-label">Connected</div>
+      <a data-go="ai" data-k="ai model summary triage reply suggestions ollama anthropic openai"><span class="tile t-ai"><svg><use href="#i-spark"/></svg></span>AI</a>
+      <a data-go="agents" data-k="agents mcp claude codex cursor cli command line terminal"><span class="tile t-navy"><svg><use href="#i-agent"/></svg></span>Agents</a>
+      <a data-go="integrations" data-k="translation grammar languagetool deepl contact people data labs"><span class="tile t-amber"><svg><use href="#i-plug"/></svg></span>Integrations</a>
+      <a data-go="plugins" data-k="plugins extensions install"><span class="tile t-purple"><svg><use href="#i-cube"/></svg></span>Plugins</a>
+
+      <div class="nav-sep"></div>
+      <a data-go="advanced" data-k="advanced reset cache logs folders debug"><span class="tile t-grey"><svg><use href="#i-sliders"/></svg></span>Advanced</a>
+    </nav>
+  </aside>
+
+  <main class="main" id="main">
+
+    <!-- GENERAL -->
+    <section class="page active" id="p-general">
+      <header><span class="tile t-grey"><svg><use href="#i-gear"/></svg></span><div><h1>General</h1><p>How Tern starts and runs.</p></div></header>
+
+      <h2>Startup</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Open Tern when you log in</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Keep Tern running in the background</b><small>Scheduled sends go out and agents keep working after you close the window. Quit from the menu bar icon.</small></div><div class="r"><button class="sw" role="switch" aria-checked="false" id="bgSwitch"></button></div></div>
+        <div class="row"><div class="l"><b>Show Tern in the menu bar</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+      </div>
+
+      <h2>Default mail app</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Tern isn't your default mail app</b><small>Mail links in other apps open in Apple Mail.</small></div><div class="r"><button class="btn">Make Tern the default</button></div></div>
+      </div>
+
+      <h2>Language and time</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Language</b><small>Tern restarts to switch language.</small></div><div class="r"><select class="select"><option>Automatic (English)</option><option>Português</option><option>Deutsch</option><option>Français</option></select></div></div>
+        <div class="row"><div class="l"><b>Use 24-hour time</b></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section class="page" id="p-notifications">
+      <header><span class="tile t-red"><svg><use href="#i-bell"/></svg></span><div><h1>Notifications</h1><p>When Tern gets your attention.</p></div></header>
+      <h2>New mail</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Notify me about new mail</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>For</b></div><div class="r"><div class="seg"><button class="on">Inbox</button><button>Important only</button><button>Every folder</button></div></div></div>
+        <div class="row"><div class="l"><b>Sound</b></div><div class="r"><select class="select"><option>Tern</option><option>Soft chime</option><option>None</option></select></div></div>
+      </div>
+      <h2>App icon</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Badge</b></div><div class="r"><select class="select"><option>Unread count</option><option>Dot only</option><option>Off</option></select></div></div>
+        <div class="row"><div class="l"><b>Count unread mail in every account</b><small>Off: only the folder you're looking at.</small></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+      <h2>Snooze and reminders</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Move snoozed mail to the top of the inbox when it comes back</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row disabled"><div class="l"><b>Tell me when someone opens my mail or clicks a link</b><small>Read receipts and link tracking go through a Tern server.</small></div><div class="r"><span class="pill server">Needs a Tern server</span></div></div>
+      </div>
+    </section>
+
+    <!-- APPEARANCE -->
+    <section class="page" id="p-appearance">
+      <header><span class="tile t-indigo"><svg><use href="#i-brush"/></svg></span><div><h1>Appearance</h1><p>Theme, layout and density.</p></div></header>
+      <h2>Theme</h2>
+      <div class="card">
+        <div class="themes" id="themes">
+          <div class="theme-opt on" data-t="light"><div class="pv"><div class="a"></div><div class="b"><i></i><i></i><i></i></div></div>Light</div>
+          <div class="theme-opt" data-t="dark"><div class="pv dark"><div class="a"></div><div class="b"><i></i><i></i><i></i></div></div>Dark</div>
+          <div class="theme-opt" data-t="auto"><div class="pv auto"></div>Match system</div>
+        </div>
+        <div class="row"><div class="l"><b>Accent colour</b></div><div class="r"><div class="swatches"><i class="on" style="background:#096ee6"></i><i style="background:#5a4fe0"></i><i style="background:#e8467f"></i><i style="background:#f07b16"></i><i style="background:#26a95d"></i><i style="background:#7c828d"></i></div></div></div>
+        <div class="row"><div class="l"><b>Show mail in dark mode with a dark background</b><small>Off: messages keep the sender's colours.</small></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+      </div>
+      <h2>Layout</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Reading pane</b></div><div class="r"><div class="seg"><button>Off</button><button class="on">Right</button><button>Below</button></div></div></div>
+        <div class="row"><div class="l"><b>Density</b></div><div class="r"><div class="seg"><button>Compact</button><button class="on">Comfortable</button></div></div></div>
+        <div class="row"><div class="l"><b>Limit line length in messages</b><small>Easier to read on wide windows.</small></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+      <p class="note">More themes come from <a data-go="plugins">plugins</a>.</p>
+    </section>
+
+    <!-- SHORTCUTS -->
+    <section class="page" id="p-shortcuts">
+      <header><span class="tile t-slate"><svg><use href="#i-cmd"/></svg></span><div><h1>Shortcuts</h1><p>Start from a set you know, then change any key.</p></div></header>
+      <div class="card">
+        <div class="row"><div class="l"><b>Shortcut set</b></div><div class="r"><select class="select"><option>Gmail</option><option>Outlook</option><option>Apple Mail</option><option>Tern</option></select></div></div>
+      </div>
+      <h2>Common</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Compose</b></div><div class="r"><span class="kbd">C</span></div></div>
+        <div class="row"><div class="l"><b>Reply</b></div><div class="r"><span class="kbd">R</span></div></div>
+        <div class="row"><div class="l"><b>Archive</b></div><div class="r"><span class="kbd">E</span></div></div>
+        <div class="row"><div class="l"><b>Snooze</b></div><div class="r"><span class="kbd">B</span></div></div>
+        <div class="row"><div class="l"><b>Search</b></div><div class="r"><span class="kbd">/</span></div></div>
+        <div class="row"><div class="l"><b>Summarize thread</b></div><div class="r"><span class="kbd">⇧</span><span class="kbd">S</span></div></div>
+      </div>
+      <p class="note"><a>Show all 84 shortcuts</a> · <a>Edit in a file</a></p>
+    </section>
+
+    <!-- ACCOUNTS -->
+    <section class="page" id="p-accounts">
+      <header><span class="tile t-blue"><svg><use href="#i-at"/></svg></span><div><h1>Accounts</h1><p>Mail accounts on this computer.</p></div></header>
+      <div class="card acct-list">
+        <div class="acct sel"><div class="avatar" style="background:#e8467f">W</div><div class="l"><b>Work</b><small>sam@acme.co · Google</small></div><span class="pill ok">Up to date</span></div>
+        <div class="acct"><div class="avatar" style="background:#26a95d">P</div><div class="l"><b>Personal</b><small>sam@fastmail.com · IMAP</small></div><span class="pill bad">Can't sign in</span></div>
+      </div>
+      <p class="note"><a>+ Add account</a></p>
+
+      <h2>Work</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Name in the sidebar</b></div><div class="r"><input class="input" style="width:240px" value="Work"></div></div>
+        <div class="row"><div class="l"><b>Your name on sent mail</b></div><div class="r"><input class="input" style="width:240px" value="Sam Rivera"></div></div>
+        <div class="row"><div class="l"><b>Colour</b></div><div class="r"><div class="swatches"><i class="on" style="background:#e8467f"></i><i style="background:#096ee6"></i><i style="background:#26a95d"></i><i style="background:#f07b16"></i><i style="background:#5a4fe0"></i></div></div></div>
+        <div class="row"><div class="l"><b>Other addresses you send from</b><small>Set them up with Google first.</small></div><div class="r"><span style="color:var(--text-2)">sam@acme.dev</span><button class="btn">Edit</button></div></div>
+        <div class="row"><div class="l"><b>Always copy</b><small>Bcc or Cc these addresses on every message.</small></div><div class="r"><button class="btn">Add</button></div></div>
+      </div>
+      <h2>Connection</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Signed in with Google</b><small>Last synced a minute ago.</small></div><div class="r"><button class="btn">Sign in again</button></div></div>
+        <div class="row"><div class="l"><b>Contacts</b></div><div class="r"><button class="btn">Manage</button></div></div>
+        <div class="row"><div class="l"><b>Remove this account</b><small>Removes its mail from this computer. Nothing changes on Google.</small></div><div class="r"><button class="btn danger">Remove</button></div></div>
+      </div>
+      <p class="note">The error case looks like this:</p>
+      <div class="card" style="margin-top:8px">
+        <div class="banner"><svg><use href="#i-warn"/></svg><div><b style="font-weight:550">Fastmail rejected the password for sam@fastmail.com</b><div style="color:var(--text-2);font-size:12px">Mail for this account stopped syncing at 09:14.</div></div><div style="display:flex;gap:6px"><button class="btn">Details</button><button class="btn primary">Fix</button></div></div>
+      </div>
+    </section>
+
+    <!-- READING -->
+    <section class="page" id="p-reading">
+      <header><span class="tile t-teal"><svg><use href="#i-book"/></svg></span><div><h1>Reading</h1><p>How messages open and show.</p></div></header>
+      <div class="card">
+        <div class="row"><div class="l"><b>Mark as read</b></div><div class="r"><select class="select"><option>After half a second</option><option>Right away</option><option>After 2 seconds</option><option>Only when I say</option></select></div></div>
+        <div class="row"><div class="l"><b>Load images</b><small>Images from senders can tell them you opened the mail.</small></div><div class="r"><div class="seg"><button>Always</button><button class="on">From contacts</button><button>Ask</button></div></div></div>
+        <div class="row"><div class="l"><b>Conversation order</b></div><div class="r"><div class="seg"><button class="on">Oldest first</button><button>Newest first</button></div></div></div>
+        <div class="row"><div class="l"><b>Show full names of recipients</b></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+        <div class="row"><div class="l"><b>Show all message headers</b></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+        <div class="row"><div class="l"><b>Show Gmail's important markers</b><small>Gmail accounts only.</small></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Show unread counts on every folder</b></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+      <h2>Swipe and delete</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Swipe in the message list</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Swipe and Delete key</b></div><div class="r"><div class="seg"><button class="on">Archive</button><button>Move to Trash</button></div></div></div>
+      </div>
+      <h2>Contact photos</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Load photos from Gravatar</b><small>Sends a scrambled form of each sender's address to gravatar.com.</small></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+    </section>
+
+    <!-- COMPOSING -->
+    <section class="page" id="p-composing">
+      <header><span class="tile t-orange"><svg><use href="#i-pen"/></svg></span><div><h1>Composing &amp; sending</h1><p>Writing, replying and what happens when you hit Send.</p></div></header>
+      <h2>Writing</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Formatting</b><small>Plain text turns off links, images and most other features. Hold Option when you click Compose for one plain-text message.</small></div><div class="r"><div class="seg"><button class="on">Rich text</button><button>Plain text</button></div></div></div>
+        <div class="row"><div class="l"><b>Check spelling</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Check grammar</b><small>Uses LanguageTool. <a class="link" data-go="integrations">Set up in Integrations</a></small></div><div class="r"><span class="pill ok">On</span></div></div>
+      </div>
+      <h2>Sending</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Undo Send</b><small>How long you have to take a message back.</small></div><div class="r"><select class="select"><option>5 seconds</option><option>10 seconds</option><option>30 seconds</option><option>Off</option></select></div></div>
+        <div class="row"><div class="l"><b>Send button</b></div><div class="r"><div class="seg"><button class="on">Send</button><button>Send and archive</button></div></div></div>
+        <div class="row"><div class="l"><b>Reply button</b></div><div class="r"><div class="seg"><button>Reply</button><button class="on">Reply all</button></div></div></div>
+        <div class="row"><div class="l"><b>New mail from</b></div><div class="r"><select class="select"><option>The account you're in</option><option>Work</option><option>Personal</option></select></div></div>
+        <div class="row"><div class="l"><b>Play a sound when mail is sent</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Warnings you turned off</b><small>For example "you mentioned an attachment but didn't attach one".</small></div><div class="r"><button class="btn">Turn back on</button></div></div>
+      </div>
+      <h2>Attachments</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Show previews of attachments</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Show the file in Finder after downloading</b></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+    </section>
+
+    <!-- SIGNATURES -->
+    <section class="page" id="p-signatures">
+      <header><span class="tile t-pink"><svg><use href="#i-sign"/></svg></span><div><h1>Signatures</h1><p>Added to the end of your messages.</p></div></header>
+      <div class="card split">
+        <div class="list"><div class="sel">Work</div><div>Short</div><div class="foot">+ New signature</div></div>
+        <div class="ed">
+          <div class="field" style="margin-top:0"><label>Name</label><input class="input" value="Work"></div>
+          <div class="field"><label>Use for</label><select class="select" style="width:100%"><option>Work (sam@acme.co)</option></select></div>
+          <div class="editor"><b>Sam Rivera</b><br>Product, Acme<br><span style="color:var(--text-2)">+1 415 555 0134</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TEMPLATES -->
+    <section class="page" id="p-templates">
+      <header><span class="tile t-amber"><svg><use href="#i-doc"/></svg></span><div><h1>Templates</h1><p>Messages you send often. Insert one from the composer.</p></div></header>
+      <div class="card split">
+        <div class="list"><div class="sel">Intro call</div><div>Invoice reminder</div><div>Out of office</div><div class="foot">+ New template</div></div>
+        <div class="ed">
+          <div class="field" style="margin-top:0"><label>Name</label><input class="input" value="Intro call"></div>
+          <div class="field"><label>Subject</label><input class="input" value="Quick intro call?"></div>
+          <div class="editor">Hi {{first name}},<br><br>Would you have 20 minutes this week for a quick call?<br><br>Thanks,<br>Sam</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RULES -->
+    <section class="page" id="p-rules">
+      <header><span class="tile t-green"><svg><use href="#i-rules"/></svg></span><div><h1>Rules</h1><p>Sort mail automatically as it arrives.</p></div></header>
+      <div class="card">
+        <div class="row"><div class="l"><b>Receipts to Finance</b><small>Subject contains "receipt" or "invoice" → label Finance, skip inbox</small></div><div class="r"><button class="btn ghost">Edit</button><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Newsletters</b><small>Has an unsubscribe link → move to Reading</small></div><div class="r"><button class="btn ghost">Edit</button><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Boss is important</b><small>From dana@acme.co → star</small></div><div class="r"><button class="btn ghost">Edit</button><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+      <p class="note"><a>+ New rule</a> · Rules run on this computer while Tern is open, or in the background if you <a data-go="general">keep Tern running</a>.</p>
+    </section>
+
+    <!-- AI -->
+    <section class="page" id="p-ai">
+      <header><span class="tile t-ai"><svg><use href="#i-spark"/></svg></span><div><h1>AI</h1><p>Summaries, reply suggestions and inbox sorting with a model you choose.</p></div></header>
+
+      <h2>Models</h2>
+      <div class="card">
+        <div class="prov expandable open"><div class="logo" style="background:#1b1c20">O</div><div class="l"><b>Ollama</b><small>On this computer · llama3.1:8b</small></div><div class="r"><span class="pill ok">Ready</span><svg class="chev"><use href="#i-chev"/></svg></div></div>
+        <div class="prov-body">
+          <div class="field"><label>Address</label><input class="input" value="http://localhost:11434"></div>
+          <div class="field"><label>Model</label><select class="select" style="width:100%"><option>llama3.1:8b</option><option>qwen2.5:14b</option></select></div>
+          <div class="actions"><button class="btn">Test</button><span class="pill ok">Answered in 0.8 s</span><span style="flex:1"></span><button class="btn danger">Remove</button></div>
+          <div class="privacy"><svg><use href="#i-lock"/></svg>Mail stays on this computer.</div>
+        </div>
+        <div class="prov expandable"><div class="logo" style="background:#c96442">A</div><div class="l"><b>Anthropic</b><small>Claude, with your own API key</small></div><div class="r"><span class="pill warn">Needs a key</span><svg class="chev"><use href="#i-chev"/></svg></div></div>
+        <div class="prov-body">
+          <div class="field"><label>API key</label><input class="input" placeholder="sk-ant-…" type="password"></div>
+          <div class="field"><label>Model</label><select class="select" style="width:100%"><option>claude-sonnet-5-5</option><option>claude-haiku-5-5</option></select></div>
+          <div class="actions"><button class="btn primary">Save</button><button class="btn">Test</button></div>
+          <div class="privacy"><svg><use href="#i-globe"/></svg>The parts of mail listed under "What is sent" go to Anthropic when you use a feature. The key is stored encrypted, like your passwords.</div>
+        </div>
+      </div>
+      <p class="note"><a>+ Add a model</a> &nbsp;Anthropic, OpenAI, any OpenAI-compatible server, Ollama, LM Studio</p>
+
+      <h2>Features</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Thread summaries</b><small>A short summary above long threads.</small></div><div class="r"><select class="select"><option>Ollama</option><option>Anthropic</option></select><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Reply suggestions</b><small>Draft a reply from a few words.</small></div><div class="r"><select class="select"><option>Ollama</option><option>Anthropic</option></select><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Inbox sorting</b><small>Tags new mail as Needs reply, FYI, Newsletter and so on.</small></div><div class="r"><select class="select"><option>Ollama</option><option>Anthropic</option></select><button class="sw" role="switch" aria-checked="false"></button></div></div>
+        <div class="row"><div class="l"><b>Sort the last 7 days</b><small>One pass over mail that arrived before you turned sorting on.</small></div><div class="r"><button class="btn">Sort now</button></div></div>
+      </div>
+
+      <h2>Which mail</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Work</b><small>sam@acme.co</small></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="row"><div class="l"><b>Personal</b><small>sam@fastmail.com</small></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+        <div class="row"><div class="l"><b>Include email addresses</b><small>Off: the model sees names only.</small></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+      </div>
+
+      <h2>Usage today</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>38 requests · 21,400 tokens</b><small>Anthropic: about $0.06. Ollama: free.</small></div><div class="r"><div class="bars"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:70%"></i><i style="height:45%"></i><i style="height:85%"></i><i style="height:60%"></i></div></div></div>
+      </div>
+
+      <h2 class="disclose"><svg><use href="#i-chev"/></svg>What is sent to the model</h2>
+      <div class="disclose-body">
+        <div class="card">
+          <table>
+            <thead><tr><th>Feature</th><th>What leaves Tern</th><th>When</th></tr></thead>
+            <tbody>
+              <tr><td>Summary</td><td>Subject, sender names, dates and the text of the messages, without quoted replies and signatures</td><td>When you click Summarize</td></tr>
+              <tr><td>Reply suggestions</td><td>The same, plus what you ask for and your name</td><td>When you ask for a suggestion</td></tr>
+              <tr><td>Inbox sorting</td><td>Subject, sender names and the text of the newest message</td><td>When new mail arrives</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Attachments are never sent, only their file names. Spam, Trash, drafts and encrypted mail are always left out. Summaries are kept in memory only.</p>
+      </div>
+    </section>
+
+    <!-- AGENTS -->
+    <section class="page" id="p-agents">
+      <header><span class="tile t-navy"><svg><use href="#i-agent"/></svg></span><div><h1>Agents</h1><p>Let AI apps and scripts on this computer work with your mail.</p></div></header>
+
+      <div class="hero">
+        <div><b>Let apps on this computer use Tern</b><p>Claude, Codex, Cursor and your own scripts can read and act on your mail, with the access you choose for each one. Tern keeps running in the background while this is on.</p></div>
+        <button class="sw" role="switch" aria-checked="false" id="agentsMaster"></button>
+      </div>
+
+      <div id="agentsBody" class="dim">
+        <h2>Apps</h2>
+        <div class="card">
+          <div class="prov"><div class="logo" style="background:#c96442">C</div><div class="l"><b>Claude Desktop</b><small>Connected · used 4 minutes ago</small></div><div class="r"><select class="select"><option>Read mail</option><option selected>Read and draft</option><option>Read, draft and send</option></select><button class="btn ghost">Disconnect</button></div></div>
+          <div class="prov"><div class="logo" style="background:#d97757">C</div><div class="l"><b>Claude Code</b><small>Not connected</small></div><div class="r"><button class="btn">Connect</button></div></div>
+          <div class="prov"><div class="logo" style="background:#10a37f">X</div><div class="l"><b>Codex</b><small>Not connected</small></div><div class="r"><button class="btn">Connect</button></div></div>
+          <div class="prov"><div class="logo" style="background:#1b1c20">Cu</div><div class="l"><b>Cursor</b><small>Not installed on this computer</small></div><div class="r"><span class="pill off">Not found</span></div></div>
+        </div>
+        <p class="note">Another app? <a>Copy the setup for any MCP client</a></p>
+
+        <h2>Mail agents can see</h2>
+        <div class="card">
+          <div class="row"><div class="l"><b>Work</b><small>Every folder</small></div><div class="r"><button class="btn ghost">Choose folders</button><button class="sw" role="switch" aria-checked="true"></button></div></div>
+          <div class="row"><div class="l"><b>Personal</b></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+        </div>
+
+        <h2>Command line</h2>
+        <div class="card">
+          <div class="row"><div class="l"><b>tern command</b><small>Search, read and send from the terminal and from your own scripts.</small></div><div class="r"><button class="btn ghost">Guide</button><button class="btn primary">Install</button></div></div>
+        </div>
+
+        <h2>Activity <span class="pill off">Last 24 hours</span></h2>
+        <div class="card">
+          <div class="act"><div class="dot" style="background:#c96442">C</div><div><b>Claude Desktop searched your mail</b><small>"invoice from northwind" · 6 results</small></div><time>4 min ago</time></div>
+          <div class="act"><div class="dot" style="background:#c96442">C</div><div><b>Claude Desktop drafted a reply</b><small>Re: Q3 numbers · to Dana Kim · <a class="link">Open draft</a></small></div><time>5 min ago</time></div>
+          <div class="act"><div class="dot" style="background:var(--bad)">!</div><div><b>Claude Desktop tried to send a message</b><small>Blocked: it can read and draft, not send. <a class="link">Change access</a></small></div><time>5 min ago</time></div>
+          <div class="act"><div class="dot" style="background:#5d6472">›_</div><div><b>tern listed unread threads</b><small>from a terminal</small></div><time>1 h ago</time></div>
+        </div>
+        <p class="note"><a>Show all activity</a></p>
+      </div>
+    </section>
+
+    <!-- INTEGRATIONS -->
+    <section class="page" id="p-integrations">
+      <header><span class="tile t-amber"><svg><use href="#i-plug"/></svg></span><div><h1>Integrations</h1><p>Services Tern can call for translation, grammar and contact details.</p></div></header>
+      <div class="card">
+        <div class="prov expandable"><div class="logo" style="background:#0f2b46">D</div><div class="l"><b>Translation</b><small>DeepL or LibreTranslate</small></div><div class="r"><span class="pill off">Off</span><button class="btn">Set up</button><svg class="chev"><use href="#i-chev"/></svg></div></div>
+        <div class="prov-body">
+          <div class="field"><label>Service</label><div class="seg"><button class="on">DeepL</button><button>LibreTranslate</button></div></div>
+          <div class="field"><label>API key</label><input class="input" type="password" placeholder="From your DeepL account"></div>
+          <div class="actions"><button class="btn primary">Turn on</button><button class="btn">Test</button></div>
+          <div class="privacy"><svg><use href="#i-globe"/></svg>The message you translate is sent to DeepL, only when you click Translate.</div>
+        </div>
+        <div class="prov expandable open"><div class="logo" style="background:#3b7dd8">LT</div><div class="l"><b>Grammar</b><small>LanguageTool · api.languagetool.org</small></div><div class="r"><span class="pill ok">On</span><svg class="chev"><use href="#i-chev"/></svg></div></div>
+        <div class="prov-body">
+          <div class="field"><label>Server</label><input class="input" value="https://api.languagetool.org"></div>
+          <div class="field"><label>Premium account</label><input class="input" placeholder="Optional: email and API key for Premium"></div>
+          <div class="actions"><button class="btn">Test</button><span class="pill ok">Working</span><span style="flex:1"></span><button class="btn danger">Turn off</button></div>
+          <div class="privacy"><svg><use href="#i-globe"/></svg>What you type in a draft is sent to LanguageTool while you write.</div>
+        </div>
+        <div class="prov expandable"><div class="logo" style="background:#7b2ff7">P</div><div class="l"><b>Contact details</b><small>People Data Labs: job titles, companies and profiles</small></div><div class="r"><span class="pill off">Off</span><button class="btn">Set up</button><svg class="chev"><use href="#i-chev"/></svg></div></div>
+        <div class="prov-body">
+          <div class="field"><label>API key</label><input class="input" type="password" placeholder="Required"></div>
+          <div class="actions"><button class="btn primary">Turn on</button><button class="btn">Test</button></div>
+          <div class="privacy"><svg><use href="#i-globe"/></svg>The address of each person you look at is sent to People Data Labs.</div>
+        </div>
+      </div>
+      <p class="note">AI models are set up in <a data-go="ai">AI</a>. Apps that use your mail, like Claude, are in <a data-go="agents">Agents</a>.</p>
+    </section>
+
+    <!-- PLUGINS -->
+    <section class="page" id="p-plugins">
+      <header><span class="tile t-purple"><svg><use href="#i-cube"/></svg></span><div><h1>Plugins</h1><p>Add features to Tern.</p></div></header>
+      <div class="card">
+        <div class="prov"><div class="logo" style="background:#e8467f">T</div><div class="l"><b>Todoist</b><small>Turn a thread into a task · by Doist</small></div><div class="r"><button class="btn ghost">Settings</button><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        <div class="prov"><div class="logo" style="background:#5d6472">Q</div><div class="l"><b>Quiet hours</b><small>Hold notifications at night · by you · has a background service</small></div><div class="r"><span class="pill warn">Service not running</span><button class="sw" role="switch" aria-checked="true"></button></div></div>
+      </div>
+      <p class="note"><a>Install from a file…</a></p>
+      <div class="privacy" style="margin-top:14px"><svg><use href="#i-warn"/></svg>Plugins run inside Tern and can read all of your mail. Only install plugins from people you trust.</div>
+      <h2>Background services</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Some plugins run a small program in the background</b><small>It needs the tern command and Tern running in the background.</small></div><div class="r"><button class="btn primary">Set up</button></div></div>
+      </div>
+    </section>
+
+    <!-- SERVER -->
+    <section class="page" id="p-server">
+      <div id="serverOff">
+        <div class="card">
+          <div class="empty">
+            <div class="art"><img src="../../assets/brand/web/tern-bird-on-dark-128.png" width="50" height="50" alt=""></div>
+            <h3>Connect a Tern server</h3>
+            <p>A Tern server you run gives you Tern on the web, sends that go out while this computer is off, read receipts, and settings that follow you to your other computers. Your mail keeps syncing here too.</p>
+            <div class="connect"><input class="input" placeholder="tern.example.com" id="serverUrl"><button class="btn primary" id="serverConnect">Sign in</button></div>
+            <p class="note" style="margin-top:12px"><a>How to set up a Tern server</a></p>
+          </div>
+        </div>
+        <h2>What a server adds</h2>
+        <div class="card feat-grid">
+          <div><svg><use href="#i-globe"/></svg><div><b>Tern on the web</b><small>Your mail in any browser.</small></div></div>
+          <div><svg><use href="#i-clock"/></svg><div><b>Always on</b><small>Scheduled sends and rules run while your computers sleep.</small></div></div>
+          <div><svg><use href="#i-eye"/></svg><div><b>Read receipts and link tracking</b><small>See when mail is opened.</small></div></div>
+          <div><svg><use href="#i-sync"/></svg><div><b>Settings everywhere</b><small>Signatures, templates, rules and snoozes on every computer.</small></div></div>
+        </div>
+      </div>
+
+      <div id="serverOn" class="hidden">
+        <header><span class="tile t-navy"><img src="../../assets/brand/web/tern-bird-on-dark-128.png" width="28" height="28" alt=""></span><div><h1>tern.example.com</h1><p>Signed in as sam@acme.co · <span class="pill ok">Connected</span></p></div></header>
+        <div class="card">
+          <div class="row"><div class="l"><b>Tern on the web</b><small>https://tern.example.com</small></div><div class="r"><button class="btn">Open</button></div></div>
+        </div>
+        <h2>Sync with the server</h2>
+        <div class="card">
+          <div class="row"><div class="l"><b>Settings, signatures and templates</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+          <div class="row"><div class="l"><b>Rules</b></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+          <div class="row"><div class="l"><b>Snoozes, reminders and scheduled sends</b><small>So they happen even when this computer is off.</small></div><div class="r"><button class="sw" role="switch" aria-checked="true"></button></div></div>
+        </div>
+        <h2>Mail on the server</h2>
+        <div class="card">
+          <div class="row"><div class="l"><b>Work</b><small>Syncing on the server too. Needed for the web and for sends while this computer is off.</small></div><div class="r"><span class="pill ok">On server</span><button class="sw" role="switch" aria-checked="true"></button></div></div>
+          <div class="row"><div class="l"><b>Personal</b><small>Only on this computer.</small></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+        </div>
+        <h2>Your devices</h2>
+        <div class="card">
+          <div class="row"><div class="l"><b>This Mac</b><small>Tern for Mac · now</small></div><div class="r"></div></div>
+          <div class="row"><div class="l"><b>Firefox on Linux</b><small>Web · yesterday</small></div><div class="r"><button class="btn ghost">Sign out</button></div></div>
+        </div>
+        <p class="note"><a id="serverSignOut">Sign out of tern.example.com</a></p>
+      </div>
+    </section>
+
+    <!-- ADVANCED -->
+    <section class="page" id="p-advanced">
+      <header><span class="tile t-grey"><svg><use href="#i-sliders"/></svg></span><div><h1>Advanced</h1><p>Rarely needed. Change these if support asks you to.</p></div></header>
+      <h2>Folders</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Special folders</b><small>Which folder each account uses for Sent, Drafts, Archive, Spam and Trash.</small></div><div class="r"><button class="btn">Choose</button></div></div>
+      </div>
+      <h2>Troubleshooting</h2>
+      <div class="card">
+        <div class="row"><div class="l"><b>Detailed logs</b><small>Writes more detail to the log files. Turn off when done.</small></div><div class="r"><button class="sw" role="switch" aria-checked="false"></button></div></div>
+        <div class="row"><div class="l"><b>Log files</b></div><div class="r"><button class="btn">Show in Finder</button></div></div>
+        <div class="row"><div class="l"><b>Rebuild the mail database</b><small>Downloads your mail again. Your settings stay.</small></div><div class="r"><button class="btn">Rebuild</button></div></div>
+      </div>
+      <h2>Reset</h2>
+      <div class="card danger">
+        <div class="row"><div class="l"><b>Remove all accounts and settings</b><small>Tern starts over as if newly installed. Mail on your providers isn't touched.</small></div><div class="r"><button class="btn danger-solid">Reset Tern…</button></div></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"><svg><use href="#i-check"/></svg><span id="toastText"></span></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+
+function go(id) {
+  $$('.page').forEach(p => p.classList.toggle('active', p.id === 'p-' + id));
+  $$('#nav [data-go]').forEach(a => a.classList.toggle('active', a.dataset.go === id));
+  $('#main').scrollTop = 0;
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-go]');
+  if (t) { e.preventDefault(); go(t.dataset.go); }
+});
+
+$$('.sw').forEach(sw => sw.addEventListener('click', () => {
+  sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') !== 'true');
+}));
+
+$$('.seg').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || seg.id === 'mockTheme') return;
+  $$('button', seg).forEach(x => x.classList.toggle('on', x === b));
+}));
+
+$$('.swatches').forEach(s => s.addEventListener('click', e => {
+  if (e.target.tagName !== 'I') return;
+  $$('i', s).forEach(x => x.classList.toggle('on', x === e.target));
+}));
+
+$$('.prov.expandable').forEach(p => p.addEventListener('click', e => {
+  if (e.target.closest('input, select')) return;
+  p.classList.toggle('open');
+}));
+$$('.disclose').forEach(d => d.addEventListener('click', () => d.classList.toggle('open')));
+
+function setTheme(t) {
+  const resolved = t === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+  document.documentElement.dataset.theme = resolved;
+  $$('#themes .theme-opt').forEach(o => o.classList.toggle('on', o.dataset.t === t));
+  $$('#mockTheme button').forEach(b => b.classList.toggle('on', b.dataset.t === resolved));
+}
+$$('#themes .theme-opt').forEach(o => o.addEventListener('click', () => setTheme(o.dataset.t)));
+$$('#mockTheme button').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.t)));
+
+let toastTimer;
+function toast(msg) {
+  $('#toastText').textContent = msg;
+  $('#toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 3200);
+}
+
+$('#agentsMaster').addEventListener('click', () => {
+  const on = $('#agentsMaster').getAttribute('aria-checked') === 'true';
+  $('#agentsBody').classList.toggle('dim', !on);
+  if (on && $('#bgSwitch').getAttribute('aria-checked') !== 'true') {
+    $('#bgSwitch').setAttribute('aria-checked', 'true');
+    toast('Tern will keep running in the background so agents keep working');
+  }
+});
+
+function setServer(on) {
+  $('#serverOff').classList.toggle('hidden', on);
+  $('#serverOn').classList.toggle('hidden', !on);
+  $('#chipState').textContent = on ? 'tern.example.com' : 'Not set up';
+  $$('.pill.server').forEach(p => {
+    p.className = on ? 'pill ok' : 'pill server';
+    p.textContent = on ? 'Available' : 'Needs a Tern server';
+    p.closest('.row')?.classList.toggle('disabled', !on);
+  });
+}
+$('#serverConnect').addEventListener('click', () => { setServer(true); toast('Signed in to tern.example.com'); });
+$('#serverSignOut').addEventListener('click', e => { e.preventDefault(); setServer(false); });
+
+$('#search').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  $$('#nav [data-go]').forEach(a => {
+    const hit = !q || (a.textContent + ' ' + (a.dataset.k || '')).toLowerCase().includes(q);
+    a.classList.toggle('hidden', !hit);
+  });
+  $$('#nav .group-label').forEach(l => {
+    let n = l.nextElementSibling, any = false;
+    while (n && !n.classList.contains('group-label')) { if (!n.classList.contains('hidden')) any = true; n = n.nextElementSibling; }
+    l.classList.toggle('hidden', !!q && !any);
+  });
+});
+</script>
+</body>
+</html>
