@@ -2,7 +2,9 @@ name: draft-pipeline-undo-send
 description: >
   `draft.send` with an undo window on serve, and the bodies a client's send hooks made. The
   first draft is cancelled inside its window with `draft.cancelSend`: nothing goes out, the
-  draft stays. The second is sent with `bodies` (what a test extension's
+  draft stays. The third is sent with `bodies` and a long window, then "Send now" in the Undo
+  Send toast moves the expiration to now and keeps `isUndoSend`: it goes out at once with the
+  extension's body. The second is sent with `bodies` (what a test extension's
   `applyTransformsForSending` returned) and the engine is quit inside the window and started
   again after it: the new process sends it once, with the extension's body to the recipient,
   and the pending bodies are gone.
@@ -24,7 +26,12 @@ steps:
       params:
         kind: new
         fields: {hMsgId: "undo-b@example.test", subject: "Sent after restart", body: "<p>stored body</p>", to: [{name: Someone, email: someone@example.org}]}
-  - wait: {models: {Message: {where: {draft: true}, count: 2}}, timeout: 30}
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: new
+        fields: {hMsgId: "undo-c@example.test", subject: "Sent now", body: "<p>stored body</p>", to: [{name: Someone, email: someone@example.org}]}
+  - wait: {models: {Message: {where: {draft: true}, count: 3}}, timeout: 30}
   - client.rpc:
       method: draft.send
       params: {headerMessageId: "undo-a@example.test", delayMs: 4000}
@@ -33,6 +40,24 @@ steps:
       method: draft.cancelSend
       params: {headerMessageId: "undo-a@example.test"}
       expect: {cancelled: true}
+  - client.rpc:
+      method: draft.send
+      params:
+        headerMessageId: "undo-c@example.test"
+        delayMs: 600000
+        after: send
+        bodies:
+          self: "<p>sent now, from the extension</p>"
+          perRecipient: {"someone@example.org": "<p>sent now for someone, from the extension</p>"}
+      expect: {scheduledAt: {present: true}}
+  # The toast's "Send now" (undo-redo-toast.tsx sendMessageNow).
+  - client.task:
+      __cls: SyncbackMetadataTask
+      model: {messages: {header_message_ids: ["undo-c@example.test"]}}
+      pluginId: send-later
+      value: {expiration: {now_plus: 0}, isUndoSend: true, actionKey: send}
+    as: sendnow
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 60}
   - client.rpc:
       method: draft.send
       params:
@@ -47,13 +72,16 @@ steps:
       wait: false
       before:
         - wait: {until: sent, plus: 7}
-  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 2}}, timeout: 90}
   - wait: {quiescent: true}
   - sync: pass
 expect:
   smtp:
-    count: 1
+    count: 2
     messages:
+      - recipients: ["someone@example.org"]
+        headers: {Message-ID: "<undo-c@example.test>"}
+        body: {contains: ["sent now for someone, from the extension"], lacks: ["stored body"]}
       - recipients: ["someone@example.org"]
         headers: {Message-ID: "<undo-b@example.test>"}
         body: {contains: ["for someone, from the extension"], lacks: ["stored body"]}
@@ -61,7 +89,9 @@ expect:
     Message:
       where: {headerMessageId: "undo-a@example.test", draft: true}
       count: 1
+  tasks:
+    sendnow: {status: complete, error: null}
   metadata_expiration:
-    - {messages: {header_message_ids: ["undo-a@example.test", "undo-b@example.test"]}, count: 0}
-  server_counts: {Sent: 1}
+    - {messages: {header_message_ids: ["undo-a@example.test", "undo-b@example.test", "undo-c@example.test"]}, count: 0}
+  server_counts: {Sent: 2}
   running: true

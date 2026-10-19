@@ -24,7 +24,7 @@ use ms_sync::expiration_executor::{
     archive_task, finalise_draft, send_later_expiration, send_task_json, stored_body, SEND_ACTIONS,
     SEND_LATER, SNOOZE_BODY_EN, SNOOZE_BODY_KEY,
 };
-use ms_sync::pending_sends::{PendingBodies, PendingSends};
+use ms_sync::pending_sends::{recipient_mismatch, PendingBodies, PendingSends};
 use serde_json::{json, Map, Value};
 use tracing::info;
 
@@ -193,6 +193,28 @@ pub trait QueueTask {
 }
 
 impl Here<'_> {
+    /// Runs `f` in one write transaction, rolled back when it fails. The expiration executor
+    /// sends a due draft in one transaction on its own connection, so a send or a cancel
+    /// decided here comes wholly before or after it.
+    fn atomically<T>(
+        &self,
+        name: &str,
+        f: impl FnOnce() -> Result<T, ErrorObject>,
+    ) -> Result<T, ErrorObject> {
+        let mut refused = None;
+        let result = self.store.transaction(name, |_| {
+            f().map_err(|e| {
+                refused = Some(e);
+                ms_core::Error::other("rolled back")
+            })
+        });
+        match (result, refused) {
+            (_, Some(e)) => Err(e),
+            (Ok(v), None) => Ok(v),
+            (Err(e), None) => Err(internal(e)),
+        }
+    }
+
     fn queue_task(&self, class: &str, data: &Value) -> Result<String, ErrorObject> {
         let task = Task::create(class, self.account.id(), data);
         let id = task.id().to_owned();
@@ -346,7 +368,15 @@ impl Here<'_> {
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_owned();
-        built["id"] = json!(ms_core::ids::draft_id(self.account.id(), &hmid));
+        // An existing reply draft keeps its id: one synced from the server or another device
+        // has a message id, not `draft_id`, and a new id would save it as a second draft.
+        if built
+            .get("id")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            built["id"] = json!(ms_core::ids::draft_id(self.account.id(), &hmid));
+        }
         if p.save != Some(false) {
             self.save_draft(&built)?;
         }
@@ -381,13 +411,14 @@ impl Here<'_> {
                 &Query::new()
                     .equal("accountId", self.account.id())
                     .equal("threadId", thread)
-                    .equal("replyToHeaderMessageId", hmid)
                     .equal("draft", true)
                     .order_by("date", true),
             )
             .map_err(internal)?;
+        // `rthMsgId` lives in the JSON only; the replyToHeaderMessageId column isn't written.
         let chosen = drafts.into_iter().rev().find(|d| {
-            !pristine_only || d.data.get("pristine").and_then(Value::as_bool) == Some(true)
+            d.reply_to_header_message_id() == hmid
+                && (!pristine_only || d.data.get("pristine").and_then(Value::as_bool) == Some(true))
         });
         let Some(d) = chosen else { return Ok(None) };
         let mut json = d.data.clone();
@@ -442,6 +473,20 @@ impl Here<'_> {
     // -- draft.send / draft.cancelSend ---------------------------------------------------
 
     pub fn send(&self, p: DraftSendParams) -> Reply {
+        let pending = PendingSends::new(self.config_dir, self.account.id());
+        let (reply, draft_id) = self.atomically("draft.send", || self.send_in_transaction(p))?;
+        if let Some(id) = draft_id {
+            // Sent now: any bodies kept for an earlier undo window are spent.
+            pending.remove(&id);
+        }
+        Ok(reply)
+    }
+
+    /// `draft.send`'s reply, and the draft's id when it was queued to send now.
+    fn send_in_transaction(
+        &self,
+        p: DraftSendParams,
+    ) -> Result<(Value, Option<String>), ErrorObject> {
         let draft = self.draft(&p.header_message_id)?;
         if self.send_pending(&p.header_message_id)? {
             return Err(invalid(format!(
@@ -451,6 +496,9 @@ impl Here<'_> {
         }
         let after = p.after.as_deref().unwrap_or(SEND_ACTIONS[0]).to_owned();
         let bodies = p.bodies.unwrap_or_default();
+        if let Some(why) = recipient_mismatch(&draft.data, &bodies.per_recipient) {
+            return Err(invalid(why));
+        }
         let pending = PendingSends::new(self.config_dir, self.account.id());
         let delay = p.delay_ms.unwrap_or(0);
         if delay > 0 {
@@ -463,6 +511,11 @@ impl Here<'_> {
                     .with_data(json!({ "message": why }))
             })?;
             let expiration = self.store.now() + delay.div_ceil(1000) as i64;
+            self.set_send_later(
+                &draft,
+                json!({ "expiration": expiration, "isUndoSend": true, "actionKey": after }),
+            )?;
+            // Inside the transaction, so the executor can't fire before the file is there.
             if bodies.is_empty() {
                 pending.remove(draft.id());
             } else {
@@ -477,21 +530,17 @@ impl Here<'_> {
                     )
                     .map_err(|e| internal(format!("could not keep the send's bodies: {e}")))?;
             }
-            self.set_send_later(
-                &draft,
-                json!({ "expiration": expiration, "isUndoSend": true, "actionKey": after }),
-            )?;
             info!(
                 "-- Sending draft {} at {expiration} ({after})",
                 p.header_message_id
             );
-            return to_value(DraftSendResult {
+            let reply = to_value(DraftSendResult {
                 task_id: None,
                 scheduled_at: Some(expiration),
-            });
+            })?;
+            return Ok((reply, None));
         }
 
-        pending.remove(draft.id());
         let body = match &bodies.self_body {
             Some(b) => b.clone(),
             None => stored_body(self.store, draft.id()).map_err(internal)?.ok_or_else(|| {
@@ -526,30 +575,36 @@ impl Here<'_> {
                 self.queue_task(class, &data)?;
             }
         }
-        to_value(DraftSendResult {
+        let reply = to_value(DraftSendResult {
             task_id: Some(task_id),
             scheduled_at: None,
-        })
+        })?;
+        Ok((reply, Some(draft.id().to_owned())))
     }
 
     pub fn cancel_send(&self, p: DraftCancelSendParams) -> Reply {
-        let draft = match self.draft(&p.header_message_id) {
-            Ok(d) => d,
-            // Sent already: the draft is gone.
-            Err(e) if e.code == code::NOT_FOUND => {
-                return to_value(DraftCancelSendResult { cancelled: false })
+        // Decided in one transaction: once the executor has queued the SendDraftTask the send
+        // can't be called back, and until then it can't queue one.
+        let cancelled = self.atomically("draft.cancelSend", || {
+            let draft = match self.draft(&p.header_message_id) {
+                Ok(d) => d,
+                // Sent already: the draft is gone.
+                Err(e) if e.code == code::NOT_FOUND => return Ok(None),
+                Err(e) => return Err(e),
+            };
+            if send_later_expiration(&draft).is_none() || self.send_pending(&p.header_message_id)? {
+                return Ok(None);
             }
-            Err(e) => return Err(e),
-        };
-        PendingSends::new(self.config_dir, self.account.id()).remove(draft.id());
-        // Once the executor has queued the SendDraftTask the send can't be called back.
-        let cancelled =
-            send_later_expiration(&draft).is_some() && !self.send_pending(&p.header_message_id)?;
-        if cancelled {
             self.set_send_later(&draft, json!({ "expiration": null, "isUndoSend": true }))?;
+            Ok(Some(draft.id().to_owned()))
+        })?;
+        if let Some(id) = &cancelled {
+            PendingSends::new(self.config_dir, self.account.id()).remove(id);
             info!("-- Cancelled the send of draft {}", p.header_message_id);
         }
-        to_value(DraftCancelSendResult { cancelled })
+        to_value(DraftCancelSendResult {
+            cancelled: cancelled.is_some(),
+        })
     }
 
     // -- draft.validate ------------------------------------------------------------------
@@ -566,4 +621,277 @@ impl Here<'_> {
 
 fn to_value<T: serde::Serialize>(v: T) -> Reply {
     serde_json::to_value(v).map_err(internal)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ms_store::{DeltaStream, Folder};
+    use ms_sync::expiration_executor::{EngineSettings, Executor};
+    use ms_tasks::TaskProcessor;
+    use std::path::Path;
+    use std::sync::{Arc, Barrier};
+
+    const ACCOUNT: &str = "acct1";
+
+    fn account() -> Arc<Account> {
+        Arc::new(
+            Account::from_json(json!({
+                "id": ACCOUNT, "provider": "imap", "emailAddress": "me@example.com",
+                "settings": {},
+            }))
+            .unwrap(),
+        )
+    }
+
+    fn open(dir: &Path) -> Store {
+        Store::open(dir, DeltaStream::new(Box::new(std::io::sink()))).unwrap()
+    }
+
+    fn setup() -> (tempfile::TempDir, Store) {
+        let dir = tempfile::tempdir().unwrap();
+        let clock = ms_core::ManualClock::new(1_700_000_000);
+        ms_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let store = open(dir.path());
+        let mut drafts = Folder::new(&ms_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
+        drafts.set_path("Drafts");
+        drafts.set_role("drafts");
+        store.save(&mut drafts).unwrap();
+        (dir, store)
+    }
+
+    /// The local phases, as the account's main thread runs them.
+    struct Local<'a>(TaskProcessor<'a>);
+
+    impl QueueTask for Local<'_> {
+        fn queue_task(&self, mut json: Value) -> Reply {
+            json["v"] = json!(0);
+            let mut task = Task::from_json(json).map_err(internal)?;
+            self.0.perform_local(&mut task).map_err(internal)?;
+            if task.error().is_null() {
+                Ok(task.data)
+            } else {
+                Err(ErrorObject::new(code::TASK_REJECTED, "rejected")
+                    .with_data(task.error().clone()))
+            }
+        }
+    }
+
+    fn with_here<T>(dir: &Path, store: &Store, f: impl FnOnce(&Here) -> T) -> T {
+        let account = account();
+        let local = Local(TaskProcessor::new(account.clone(), store).with_config_dir(dir));
+        f(&Here {
+            store,
+            account: &account,
+            config_dir: dir,
+            queue: &local,
+        })
+    }
+
+    fn save_draft(dir: &Path, store: &Store, draft: Value) {
+        with_here(dir, store, |h| {
+            h.queue_task(
+                "SyncbackDraftTask",
+                &json!({"headerMessageId": draft["hMsgId"], "draft": draft}),
+            )
+            .unwrap()
+        });
+    }
+
+    fn draft(hmid: &str) -> Value {
+        json!({
+            "__cls": "Message", "aid": ACCOUNT, "v": 0, "hMsgId": hmid, "subject": "Hi",
+            "body": "<p>Hi</p>", "plaintext": false,
+            "from": [{"name": "Me", "email": "me@example.com"}],
+            "to": [{"email": "ann@example.net"}, {"email": "bob@example.net"}],
+            "cc": [], "bcc": [], "replyTo": [], "files": [],
+        })
+    }
+
+    fn drafts_with(store: &Store, hmid: &str) -> Vec<Message> {
+        store
+            .find_all::<Message>(
+                &Query::new()
+                    .equal("headerMessageId", hmid)
+                    .equal("draft", true),
+            )
+            .unwrap()
+    }
+
+    fn send_tasks(store: &Store, hmid: &str) -> usize {
+        store
+            .find_all::<Task>(&Query::new().equal("accountId", ACCOUNT))
+            .unwrap()
+            .iter()
+            .filter(|t| t.class() == "SendDraftTask" && t.data["headerMessageId"] == hmid)
+            .count()
+    }
+
+    fn params<T: serde::de::DeserializeOwned>(v: Value) -> T {
+        serde_json::from_value(v).unwrap()
+    }
+
+    #[test]
+    fn prefer_existing_keeps_the_id_of_a_reply_draft_synced_from_the_server() {
+        let (dir, store) = setup();
+        let mut received = Message::new(json!({
+            "__cls": "Message", "id": "m1", "aid": ACCOUNT, "v": 0, "hMsgId": "orig@example.net",
+            "threadId": "t1", "draft": false, "subject": "Plans", "date": 1_700_000_000,
+            "from": [{"name": "Bob", "email": "bob@example.net"}],
+            "to": [{"email": "me@example.com"}], "cc": [], "bcc": [], "replyTo": [],
+            "files": [], "folders": {}, "labels": [],
+        }));
+        store.save(&mut received).unwrap();
+        store
+            .conn()
+            .execute(
+                "REPLACE INTO MessageBody (id, value) VALUES ('m1', '<p>Lunch?</p>')",
+                [],
+            )
+            .unwrap();
+        // A message id, as the Drafts folder's sync gives a draft it found on the server.
+        let mut synced = draft("reply-1@example.com");
+        synced["id"] = json!("synced-draft-id");
+        synced["threadId"] = json!("t1");
+        synced["rthMsgId"] = json!("orig@example.net");
+        synced["date"] = json!(1_700_000_100);
+        save_draft(dir.path(), &store, synced);
+
+        let built = with_here(dir.path(), &store, |h| {
+            h.create(CreateCall {
+                params: params(json!({
+                    "accountId": ACCOUNT, "kind": "reply", "messageId": "m1",
+                    "behavior": "prefer-existing",
+                })),
+                settings: ComposeSettings::default(),
+                accounts: Identities::from_accounts_json([account().as_json()]),
+                resurface_body: None,
+            })
+        })
+        .unwrap();
+        assert_eq!(built["id"], "synced-draft-id");
+        let drafts = drafts_with(&store, "reply-1@example.com");
+        assert_eq!(drafts.len(), 1, "saved in place, not as a second draft");
+        assert_eq!(drafts[0].id(), "synced-draft-id");
+    }
+
+    #[test]
+    fn send_refuses_per_recipient_bodies_that_leave_out_a_recipient() {
+        let (dir, store) = setup();
+        save_draft(dir.path(), &store, draft("per-1@example.com"));
+        for delay in [None, Some(4000)] {
+            let err = with_here(dir.path(), &store, |h| {
+                h.send(params(json!({
+                    "accountId": ACCOUNT, "headerMessageId": "per-1@example.com",
+                    "delayMs": delay,
+                    "bodies": {"self": "<p>x</p>", "perRecipient": {"ann@example.net": "<p>a</p>"}},
+                })))
+            })
+            .unwrap_err();
+            assert_eq!(err.code, code::INVALID_PARAMS);
+            assert!(err.message.contains("bob@example.net"), "{}", err.message);
+        }
+        assert_eq!(send_tasks(&store, "per-1@example.com"), 0);
+        let d = &drafts_with(&store, "per-1@example.com")[0];
+        assert_eq!(send_later_expiration(d), None);
+        assert!(PendingSends::new(dir.path(), ACCOUNT).ids().is_empty());
+    }
+
+    struct NoSettings;
+
+    impl EngineSettings for NoSettings {
+        fn get(&self, _: &str) -> Option<Value> {
+            None
+        }
+    }
+
+    /// draft.cancelSend on the main thread and the executor on the metadataExpiration thread,
+    /// each on its own connection, racing at the end of the undo window: the cancel wins and
+    /// nothing is queued, or the send is queued and the cancel says it was too late.
+    #[test]
+    fn cancel_send_and_the_executor_never_both_win() {
+        let (dir, store) = setup();
+        let dir = dir.path();
+        for i in 0..45 {
+            let hmid = format!("race-{i}@example.com");
+            save_draft(dir, &store, draft(&hmid));
+            let scheduled = with_here(dir, &store, |h| {
+                h.send(params(json!({
+                    "accountId": ACCOUNT, "headerMessageId": hmid, "delayMs": 1000,
+                    "bodies": {"self": "<p>transformed</p>"},
+                })))
+            })
+            .unwrap();
+            let due = scheduled["scheduledAt"].as_i64().unwrap();
+            let id = drafts_with(&store, &hmid)[0].id().to_owned();
+            // Each order in turn, then the two at once.
+            let order = i % 3;
+            let (executor_first, cancel_first) = (order == 0, order == 1);
+            let barrier = Barrier::new(2);
+            let cancelled = std::thread::scope(|s| {
+                s.spawn(|| {
+                    let store = open(dir);
+                    let account = account();
+                    let processor = TaskProcessor::new(account.clone(), &store);
+                    let executor = Executor::new(
+                        account,
+                        &store,
+                        dir,
+                        Arc::new(NoSettings),
+                        Box::new(move |task| processor.perform_local(task)),
+                        Box::new(|_| {}),
+                        Box::new(|| {}),
+                    );
+                    if !executor_first {
+                        barrier.wait();
+                    }
+                    executor.handle("Message", &id, SEND_LATER, due).unwrap();
+                    if executor_first {
+                        barrier.wait();
+                    }
+                });
+                let cancel = s.spawn(|| {
+                    let store = open(dir);
+                    if !cancel_first {
+                        barrier.wait();
+                    }
+                    let cancelled = with_here(dir, &store, |h| {
+                        h.cancel_send(params(json!({
+                            "accountId": ACCOUNT, "headerMessageId": hmid,
+                        })))
+                    })
+                    .unwrap()["cancelled"]
+                        .as_bool()
+                        .unwrap();
+                    if cancel_first {
+                        barrier.wait();
+                    }
+                    cancelled
+                });
+                cancel.join().unwrap()
+            });
+            let sends = send_tasks(&store, &hmid);
+            let d = &drafts_with(&store, &hmid)[0];
+            assert!(!(executor_first && cancelled), "round {i}: sent first");
+            assert!(!cancel_first || cancelled, "round {i}: cancelled first");
+            if cancelled {
+                assert_eq!(sends, 0, "round {i}: cancelled, yet queued to send");
+                assert_eq!(send_later_expiration(d), None, "round {i}");
+            } else {
+                assert_eq!(sends, 1, "round {i}: not cancelled, yet not sent");
+                let task = store
+                    .find_all::<Task>(&Query::new().equal("accountId", ACCOUNT))
+                    .unwrap()
+                    .into_iter()
+                    .find(|t| {
+                        t.class() == "SendDraftTask" && t.data["headerMessageId"] == hmid.as_str()
+                    })
+                    .unwrap();
+                assert_eq!(
+                    task.data["draft"]["body"], "<p>transformed</p>",
+                    "round {i}: the kept body goes out"
+                );
+            }
+        }
+    }
 }
