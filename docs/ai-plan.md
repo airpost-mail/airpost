@@ -551,3 +551,10 @@ still holds its key; it is used again only if a provider with that id is stored 
 
 Open after AI6: the usage chart in Preferences > AI, a UI for `core.ai.limits`; on the web,
 "Triage inbox", and its `needs-engine-key` text still says to use a local model or the desktop.
+
+2026-10-18, AI6 gated and merged: fmt, clippy, workspace tests (1185), `cargo deny`, release
+build of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (147 passed, 4
+skipped); desktop lint and typecheck clean, the ai package's specs (81) pass, and the full
+desktop suite has 3208 passing and 4 failing, the same 4 as on main: "stops listening once
+disposed" in `triage-spec.tsx` (passes alone; an earlier spec leaves a `gone` listener) and
+three `SystemTrayIconStore` focus specs. No web changes. Open as after AI6.
