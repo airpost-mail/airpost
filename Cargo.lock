@@ -2230,6 +2230,7 @@ dependencies = [
  "ms-smtp",
  "ms-store",
  "ms-sync",
+ "regex",
  "reqwest",
  "rusqlite",
  "serde_json",

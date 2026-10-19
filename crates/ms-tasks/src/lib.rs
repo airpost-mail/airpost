@@ -33,6 +33,7 @@ mod folders;
 mod imap_ops;
 mod json;
 pub mod mail_actions;
+pub mod mail_rules;
 mod mailer;
 mod messages;
 mod rsvp;
