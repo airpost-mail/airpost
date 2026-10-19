@@ -488,6 +488,18 @@ impl ReadStore {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Every thread `ThreadCategory` lists under `category`, newest received first (the
+    /// desktop's `Thread.categories.contains`, which doesn't look at `inAllMail`).
+    pub fn category_thread_ids(&self, category: &str) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT t.id FROM Thread t WHERE t.id IN \
+             (SELECT c.id FROM ThreadCategory c WHERE c.value = ?) \
+             ORDER BY t.lastMessageReceivedTimestamp DESC, t.id DESC",
+        )?;
+        let rows = stmt.query_map([category], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// The ids of the threads in any of `categories` (in all mail) whose last message arrived
     /// at or after `since`, newest first, at most `limit`.
     pub fn category_threads_since(
