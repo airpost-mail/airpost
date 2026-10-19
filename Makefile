@@ -15,7 +15,7 @@ STACK := docker compose -f deploy/dev/compose.yaml
 PROFILE ?=
 STACK_PROFILE := $(if $(PROFILE),--profile $(PROFILE))
 RELEASE_BINS := MAILSYNC_BIN=target/release/mailsync TERN_BIN=target/release/tern TERN_MCP_BIN=target/release/tern-mcp \
-	TERN_GATEWAY_BIN=target/release/tern-gateway
+	TERN_GATEWAY_BIN=target/release/tern-gateway SAMPLE_SERVICE_BIN=target/release/tern-sample-service
 
 .PHONY: help
 help: ## List the targets
@@ -41,16 +41,18 @@ $(VENV): apps/engine/test/requirements.txt
 	@touch $(VENV)
 
 .PHONY: build
-build: ## Debug builds of mailsync, tern, tern-mcp, tern-gateway and tern-backend
-	cargo build -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-backend
+build: ## Debug builds of mailsync, tern, tern-mcp, tern-gateway, tern-backend and the sample service
+	cargo build -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-backend -p tern-sample-service
 
 .PHONY: release
 release: ## Release builds of the same
-	cargo build --release --locked -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-backend
+	cargo build --release --locked -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-backend \
+		-p tern-sample-service
 
 .PHONY: desktop
 desktop: build ## Run the desktop on .dev/profile with the debug engine
 	ln -sf ../../../target/debug/mailsync apps/desktop/app/mailsync-rs
+	ln -sf ../../../target/debug/tern apps/desktop/app/tern
 	mkdir -p $(PROFILE_DIR)
 	cd apps/desktop && TERN_ENGINE_KEY_FILE="$(abspath $(PROFILE_DIR))/engine-dev.key" npm start -- --config-dir-path="$(PROFILE_DIR)"
 
@@ -86,9 +88,9 @@ stack-reset: ## Stop the local stack and delete its data
 .PHONY: test
 test: $(VENV) ## Workspace tests and the harness quick tier (debug engine)
 	cargo test --workspace
-	cargo build -p mailsync -p tern -p tern-mcp -p tern-gateway
+	cargo build -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-sample-service
 	MAILSYNC_BIN=target/debug/mailsync TERN_BIN=target/debug/tern TERN_MCP_BIN=target/debug/tern-mcp \
-		TERN_GATEWAY_BIN=target/debug/tern-gateway $(PY) -m pytest apps/engine/test -q
+		TERN_GATEWAY_BIN=target/debug/tern-gateway SAMPLE_SERVICE_BIN=target/debug/tern-sample-service $(PY) -m pytest apps/engine/test -q
 
 .PHONY: lint
 lint: ## fmt, clippy, cargo deny, and the JS linters
