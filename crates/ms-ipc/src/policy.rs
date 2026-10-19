@@ -61,6 +61,11 @@ pub fn method_class(name: &str) -> MethodClass {
         | method::DRAFT_SEND
         | method::DRAFT_CANCEL_SEND
         | method::DRAFT_VALIDATE
+        // Reads. The calendar and contact writes queue event and contact tasks, which stay
+        // local until they have been reviewed for the web (RELAYED_TASK_CLASSES).
+        | method::EVENTS_EXPAND
+        | method::CONTACTS_GET
+        | method::CONTACTS_EXPORT
         // settings.set is open for the keys in RELAYED_SETTINGS_KEYS only
         // (relayed_settings_allowed).
         | method::SETTINGS_GET
@@ -385,6 +390,20 @@ mod tests {
             assert_eq!(method_class(m), MethodClass::Open, "{m}");
         }
         assert_eq!(method_class("ai.other"), MethodClass::LocalOnly);
+        for m in ["events.expand", "contacts.get", "contacts.export"] {
+            assert_eq!(method_class(m), MethodClass::Open, "{m}");
+        }
+        for m in [
+            "events.create",
+            "events.update",
+            "events.rsvp",
+            "contacts.create",
+            "contacts.update",
+            "contacts.import",
+        ] {
+            assert!(!relayed_method_allowed(m, &[]), "{m}");
+            assert!(relayed_method_allowed(m, &admin), "{m}");
+        }
         let put = |p: Value| relayed_request_allowed("files.put", &p, &admin);
         assert!(put(json!({"accountId": "a", "name": "x", "data": ""})));
         assert!(put(json!({"accountId": "a", "name": "x", "path": null})));

@@ -21,6 +21,7 @@ mod frame;
 mod integrations;
 mod mail;
 mod methods;
+mod pim;
 pub mod policy;
 mod read;
 mod rules;
@@ -39,6 +40,7 @@ pub use frame::{encode, read_frame, write_frame, FrameError};
 pub use integrations::*;
 pub use mail::*;
 pub use methods::*;
+pub use pim::*;
 pub use read::*;
 pub use rules::*;
 pub use settings::*;
@@ -119,6 +121,29 @@ pub mod method {
     pub const DRAFT_CANCEL_SEND: &str = "draft.cancelSend";
     /// The checks before a send, params [`DraftValidateParams`](crate::DraftValidateParams).
     pub const DRAFT_VALIDATE: &str = "draft.validate";
+    /// Occurrences of stored events or of an ICS
+    /// ([`feature::CALENDAR_EDITING`](crate::feature::CALENDAR_EDITING)), params
+    /// [`EventsExpandParams`](crate::EventsExpandParams).
+    pub const EVENTS_EXPAND: &str = "events.expand";
+    /// A new event, params [`EventsCreateParams`](crate::EventsCreateParams).
+    pub const EVENTS_CREATE: &str = "events.create";
+    /// An edit to an event or some of its occurrences, params
+    /// [`EventsUpdateParams`](crate::EventsUpdateParams).
+    pub const EVENTS_UPDATE: &str = "events.update";
+    /// An answer to an invitation or a counter-proposal, params
+    /// [`EventsRsvpParams`](crate::EventsRsvpParams).
+    pub const EVENTS_RSVP: &str = "events.rsvp";
+    /// A contact's details ([`feature::CONTACT_EDITING`](crate::feature::CONTACT_EDITING)),
+    /// params [`ContactsGetParams`](crate::ContactsGetParams).
+    pub const CONTACTS_GET: &str = "contacts.get";
+    /// A new contact, params [`ContactsCreateParams`](crate::ContactsCreateParams).
+    pub const CONTACTS_CREATE: &str = "contacts.create";
+    /// An edit to a contact, params [`ContactsUpdateParams`](crate::ContactsUpdateParams).
+    pub const CONTACTS_UPDATE: &str = "contacts.update";
+    /// Contacts from a .vcf file, params [`ContactsImportParams`](crate::ContactsImportParams).
+    pub const CONTACTS_IMPORT: &str = "contacts.import";
+    /// Contacts as a .vcf file, params [`ContactsExportParams`](crate::ContactsExportParams).
+    pub const CONTACTS_EXPORT: &str = "contacts.export";
     /// Every account the engine holds, with its state.
     pub const ACCOUNT_LIST: &str = "account.list";
     /// `serve` mode: register an account, store its secrets and start syncing it
@@ -350,6 +375,12 @@ pub mod feature {
     /// `rules.reprocess`, `rules.cancel`, `rules.progress`, `rules.disabled` and the
     /// `mailRulesAutoSince` setting. Clients that see it stop evaluating rules.
     pub const RULES: &str = "rules";
+    /// `events.expand`, `events.create`, `events.update` and `events.rsvp`, and
+    /// SyncbackEventTask's `restore` (an undo or redo re-sent over the copy stored now).
+    pub const CALENDAR_EDITING: &str = "calendar-editing";
+    /// `contacts.get`, `contacts.create`, `contacts.update`, `contacts.import` and
+    /// `contacts.export`.
+    pub const CONTACT_EDITING: &str = "contact-editing";
 }
 
 /// Error codes (plan 1.3). The standard JSON-RPC codes, then the engine's from `-32000`
