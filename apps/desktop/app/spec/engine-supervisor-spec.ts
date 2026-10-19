@@ -563,6 +563,71 @@ describe('the engine supervisor', function () {
         child.kill();
       }
     });
+
+    it('restarts an engine unit of another build and joins the restarted one', async function () {
+      const binary = path.join(dir, 'mailsync-rs');
+      fs.writeFileSync(binary, 'the bundled engine');
+      const build = await engineBuildId(binary);
+      const children = [spawn('/bin/sleep', ['30']), spawn('/bin/sleep', ['30'])];
+      const discovery = (pid: number) =>
+        fs.writeFileSync(
+          path.join(dir, 'run', 'engine.json'),
+          JSON.stringify({ pid, socket: fake.socketPath, protocol: 1, detached: true })
+        );
+      try {
+        // The unit still runs the build from before the update.
+        discovery(children[0].pid);
+        fake.keepsAccounts([], { build: 'sha256:older', detached: true });
+        let restarts = 0;
+        const restartUnit = async () => {
+          restarts++;
+          fake.keepsAccounts([], { build, detached: true });
+          discovery(children[1].pid);
+          return true;
+        };
+        expect(await detachedEngineToReuse(dir, dir, { canReuse: true, restartUnit })).toBe(
+          fake.socketPath
+        );
+        expect(restarts).toBe(1);
+        expect(fake.socketOf('engine.shutdown')).toEqual([]);
+
+        // Still another build after the restart: stopped, and the app runs its own.
+        discovery(children[0].pid);
+        fake.keepsAccounts([], { build: 'sha256:older', detached: true });
+        const sameBuild = async () => {
+          restarts++;
+          discovery(children[1].pid);
+          return true;
+        };
+        expect(
+          await detachedEngineToReuse(dir, dir, { canReuse: true, restartUnit: sameBuild })
+        ).toBe(null);
+        expect(restarts).toBe(2);
+        expect(fake.socketOf('engine.shutdown').length).toBe(1);
+
+        // A unit that doesn't come back leaves nothing to stop.
+        discovery(children[0].pid);
+        const gone = async () => {
+          restarts++;
+          return true;
+        };
+        expect(
+          await detachedEngineToReuse(dir, dir, {
+            canReuse: true,
+            restartUnit: gone,
+            restartWaitMs: 0,
+          })
+        ).toBe(null);
+        expect(fake.socketOf('engine.shutdown').length).toBe(1);
+
+        // Credentials still in the app: a restart wouldn't make it joinable.
+        expect(await detachedEngineToReuse(dir, dir, { canReuse: false, restartUnit })).toBe(null);
+        expect(restarts).toBe(3);
+        expect(fake.socketOf('engine.shutdown').length).toBe(2);
+      } finally {
+        for (const child of children) child.kill();
+      }
+    });
   });
 
   it('starts the engine without accounts, so onboarding has one', async function () {

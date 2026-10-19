@@ -1,7 +1,9 @@
-import fs from 'fs';
-import path from 'path';
 import { execFile } from 'child_process';
-import { devEngineKeyFile, engineBinaryPath } from '../../../../../src/mailsync-process';
+import {
+  devEngineKeyFile,
+  engineBinaryPath,
+  ternBinaryPath,
+} from '../../../../../src/mailsync-process';
 
 // The bundled `tern` CLI (apps/cli), shipped next to mailsync-rs in app.asar.unpacked.
 // Service plugins are installed and removed by `tern service install|uninstall`, so the
@@ -25,6 +27,9 @@ export interface ServicePlan {
   source: string;
   bin: string;
   sha256: string;
+  // Digest of the hash and every unit text and path the install writes; tern refuses an
+  // install whose plan is no longer this one.
+  planSha256: string;
   installedBin: string;
   args: string[];
   manager: 'launchd' | 'systemd';
@@ -61,13 +66,7 @@ export interface UnitOptions {
 
 /** `TERN_BIN` (a source checkout), else the binary in this build. */
 export function ternBinary(): string | null {
-  const fromEnv = process.env.TERN_BIN;
-  if (fromEnv) return fs.existsSync(fromEnv) ? fromEnv : null;
-  const name = process.platform === 'win32' ? 'tern.exe' : 'tern';
-  const bundled = path
-    .join(AppEnv.getLoadSettings().resourcePath, name)
-    .replace('app.asar', 'app.asar.unpacked');
-  return fs.existsSync(bundled) ? bundled : null;
+  return ternBinaryPath(AppEnv.getLoadSettings().resourcePath);
 }
 
 export function runTern(args: string[], timeout = 60000): Promise<RunResult> {
@@ -121,14 +120,19 @@ export function planServiceInstall(pkg: string, opts: UnitOptions = {}) {
   ]);
 }
 
-/** Installs the binary the plan showed: tern refuses when its hash is no longer `sha256`. */
-export function installService(pkg: string, sha256: string, opts: UnitOptions = {}) {
+/**
+ * Installs what the plan showed: tern refuses when the binary's hash or anything it would
+ * write (args, unit texts, the engine unit) is no longer what `plan` holds.
+ */
+export function installService(plan: ServicePlan, opts: UnitOptions = {}) {
   return runJSON<ServicePlan>([
     'service',
     'install',
-    pkg,
+    plan.package,
     '--expect-sha256',
-    sha256,
+    plan.sha256,
+    '--expect-plan',
+    plan.planSha256,
     ...engineArgs(),
     ...unitArgs(opts),
   ]);

@@ -117,7 +117,7 @@ export class PluginsSection extends React.Component<Props, State> {
     if (!plan) return;
     this.setState({ busy: plan.package });
     try {
-      const done = await installService(plan.package, plan.sha256, this._unitOptions());
+      const done = await installService(plan, this._unitOptions());
       this._result(
         plan.package,
         true,

@@ -160,4 +160,27 @@ describe('Preferences > Plugins', function () {
     expect(fs.existsSync(path.join(profile, 'services', SERVICE))).toBe(false);
     expect(fs.existsSync(path.join(profile, 'services.json'))).toBe(false);
   });
+
+  it('refuses to install when the unit would differ from the one shown', async () => {
+    if (skipWithoutTern()) return;
+    let renderer: TestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<PluginsSection plugins={[plugin]} unitDir={units} />);
+    });
+    await waitFor(() => textOf(renderer).includes('not installed'), 'the service row');
+    await act(async () => byId(renderer, `plugin-review-${SERVICE}`).props.onClick());
+    await waitFor(() => textOf(renderer).includes('plugin-plan'), 'the plan');
+    const plan = (renderer.root.findByType(PluginsSection).instance as PluginsSection).state.plan;
+    expect(plan.planSha256).toMatch(/^[0-9a-f]{64}$/);
+
+    // Same binary, other args: only the plan digest catches it.
+    const manifest = path.join(plugin.directory, 'package.json');
+    const json = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+    json.tern.service.args = ['--loud'];
+    fs.writeFileSync(manifest, JSON.stringify(json));
+    await act(async () => byId(renderer, `plugin-install-${SERVICE}`).props.onClick());
+    await waitFor(() => textOf(renderer).includes('changed since it was shown'), 'the refusal');
+    expect(fs.existsSync(units)).toBe(false);
+    expect(fs.existsSync(path.join(profile, 'services.json'))).toBe(false);
+  });
 });

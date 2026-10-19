@@ -140,6 +140,16 @@ export function engineBinaryPath(resourcePath: string) {
   return path.join(resourcePath, 'mailsync-rs').replace('app.asar', 'app.asar.unpacked');
 }
 
+// The `tern` CLI shipped next to mailsync-rs: TERN_BIN (a source checkout), else the bundled
+// one; null when neither exists.
+export function ternBinaryPath(resourcePath: string): string | null {
+  const fromEnv = process.env.TERN_BIN;
+  if (fromEnv) return fs.existsSync(fromEnv) ? fromEnv : null;
+  const name = process.platform === 'win32' ? 'tern.exe' : 'tern';
+  const bundled = path.join(resourcePath, name).replace('app.asar', 'app.asar.unpacked');
+  return fs.existsSync(bundled) ? bundled : null;
+}
+
 // Unpackaged runs (`make desktop`, `npm start`, specs) keep the engine's secrets in a file
 // keyed by this, not the keychain: an unsigned engine rebuilt every day would make the
 // keychain ask each time (docs/desktop-client-plan.md section 5, Signing).

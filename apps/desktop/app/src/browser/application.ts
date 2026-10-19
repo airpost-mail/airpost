@@ -64,6 +64,7 @@ import {
   detachedEngineToReuse,
 } from './engine-supervisor';
 import { registerOAuthReceiverIPC } from './oauth-receiver';
+import { installedEngineUnit, runEngineUnit } from './engine-unit';
 
 // The application's singleton class.
 //
@@ -127,11 +128,14 @@ export default class Application extends EventEmitter {
 
     try {
       // A detached engine with the bundled build is joined, and has migrated the database
-      // itself; any other is asked to stop first.
+      // itself; an engine unit of another build is restarted first, any other is asked to stop.
       this._attachTo = specMode
         ? null
         : await detachedEngineToReuse(configDirPath, resourcePath, {
             canReuse: credentialsMovedToEngine(configDirPath),
+            restartUnit: installedEngineUnit(configDirPath)
+              ? () => runEngineUnit(configDirPath, resourcePath, 'restart')
+              : undefined,
           });
       if (!this._attachTo) {
         await waitForEarlierEngine(configDirPath);
@@ -724,13 +728,18 @@ export default class Application extends EventEmitter {
     }
 
     // The supervised engine stops its accounts before the app exits, so a relaunch finds the
-    // socket and the database free.
+    // socket and the database free. An installed engine unit is started again once it has:
+    // the launch may have stopped the unit's engine, and the unit doesn't restart a clean exit.
     app.on('will-quit', (event) => {
       const supervisor = this.engineSupervisor;
       if (!supervisor || (supervisor.stopped && !this.quitGate.waiting)) return;
       this.quitGate.hold(
         event,
-        () => supervisor.shutdown(),
+        () =>
+          supervisor.shutdown().then(() => {
+            if (this.specMode || !installedEngineUnit(this.configDirPath)) return;
+            return runEngineUnit(this.configDirPath, this.resourcePath, 'start');
+          }),
         (relaunchArgs) => {
           if (relaunchArgs) app.relaunch({ args: process.argv.slice(1).concat(relaunchArgs) });
           app.quit();

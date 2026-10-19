@@ -28,7 +28,8 @@ config.json `accounts` stays the list of accounts the desktop runs; the accounts
 are kept under accountsToRemoveFromEngine until the engine's account.remove answers, and the
 engine's other accounts are left alone (AccountStore lists them). A `serve --detached` engine found at launch with the bundled build is joined instead
 of spawned (detachedEngineToReuse); it can't take `credentials.import`, so it is reused only
-once the credentials moved.
+once the credentials moved. An installed engine unit running another build is restarted and
+then joined (engine-unit.ts).
 */
 import fs from 'fs';
 import path from 'path';
@@ -647,38 +648,51 @@ export function engineSocketExchange(
 The socket of a `serve --detached` engine (run/engine.json) the launch can join instead of
 spawning its own: one that runs the bundled build and protocol, keeps the accounts, and only
 once `canReuse` (the credentials moved into the engine; a joined engine can't take
-`credentials.import`). Any other detached engine is asked to stop (engine.shutdown on its
-socket), so waitForEarlierEngine then waits for it to exit and the bundled one starts. Null
-when there is none to join. An earlier engine that isn't detached is left to
+`credentials.import`). Null when there is none to join.
+
+With an engine unit installed (`restartUnit`, engine-unit.ts), an engine that is only of
+another build or protocol (the unit's binary path holds this build after an update) is
+restarted through the unit and the restarted one joined. Any other detached engine, and one
+still not joinable after the restart, is asked to stop (engine.shutdown on its socket), so
+waitForEarlierEngine then waits for it to exit and the bundled one starts; the app starts the
+unit again when it quits. An earlier engine that isn't detached is left to
 waitForEarlierEngine: it exits once its parent's stdin closed.
 */
 export async function detachedEngineToReuse(
   configDirPath: string,
   resourcePath: string,
-  { canReuse, timeoutMs = PROBE_TIMEOUT_MS }: { canReuse: boolean; timeoutMs?: number }
-): Promise<string | null> {
-  const found = readEngineDiscovery(configDirPath);
-  if (!found || !found.detached || !pidAlive(found.pid)) return null;
-  let hello: HelloResult = null;
-  try {
-    const [answer] = await engineSocketExchange(found.socket, [], timeoutMs);
-    hello = answer.result || null;
-    if (!hello) {
-      console.warn(
-        `The detached sync engine refused hello: ${answer.error && answer.error.message}`
-      );
-    }
-  } catch (err) {
-    console.warn(`Could not reach the detached sync engine (pid ${found.pid}): ${err.message}`);
-    return null;
+  {
+    canReuse,
+    timeoutMs = PROBE_TIMEOUT_MS,
+    restartUnit,
+    restartWaitMs = UNIT_RESTART_WAIT_MS,
+  }: {
+    canReuse: boolean;
+    timeoutMs?: number;
+    restartUnit?: () => Promise<boolean>;
+    restartWaitMs?: number;
   }
+): Promise<string | null> {
+  let found = readEngineDiscovery(configDirPath);
+  if (!found || !found.detached || !pidAlive(found.pid)) return null;
   const bundled = await engineBuildId(engineBinaryPath(resourcePath));
-  let reason: string = null;
-  if (!hello) reason = 'it refused hello';
-  else if (hello.protocol !== PROTOCOL_VERSION) reason = `it speaks protocol ${hello.protocol}`;
-  else if (!hello.build || hello.build !== bundled) reason = 'it runs another build';
-  else if (!(hello.features || []).includes(Feature.Accounts)) reason = 'it keeps no accounts';
-  else if (!canReuse) reason = 'the credentials are still in the app';
+  let reason = await reasonNotToJoin(found, bundled, canReuse, timeoutMs);
+  if (reason === UNREACHABLE) return null;
+  if (reason && canReuse && restartUnit) {
+    console.log(`Restarting the engine unit (pid ${found.pid}): ${reason}`);
+    if (!(await restartUnit())) {
+      console.warn('Could not restart the engine unit; stopping its engine instead');
+    } else {
+      const restarted = await waitForRestartedEngine(configDirPath, found.pid, restartWaitMs);
+      if (!restarted) {
+        console.warn('The engine unit did not come back; starting the bundled engine');
+        return null;
+      }
+      found = restarted;
+      reason = await reasonNotToJoin(found, bundled, canReuse, timeoutMs);
+      if (reason === UNREACHABLE) return null;
+    }
+  }
   if (!reason) {
     console.log(`Joining the detached sync engine (pid ${found.pid})`);
     return found.socket;
@@ -695,6 +709,53 @@ export async function detachedEngineToReuse(
     // It may exit before answering.
   }
   return null;
+}
+
+// How long the launch waits for a restarted engine unit to bind its socket.
+export const UNIT_RESTART_WAIT_MS = 30000;
+const UNREACHABLE = 'unreachable';
+
+// Null when the launch can join `found`; UNREACHABLE when its socket didn't answer.
+async function reasonNotToJoin(
+  found: EngineDiscovery,
+  bundled: string,
+  canReuse: boolean,
+  timeoutMs: number
+): Promise<string | null> {
+  let hello: HelloResult = null;
+  try {
+    const [answer] = await engineSocketExchange(found.socket, [], timeoutMs);
+    hello = answer.result || null;
+    if (!hello) {
+      console.warn(
+        `The detached sync engine refused hello: ${answer.error && answer.error.message}`
+      );
+    }
+  } catch (err) {
+    console.warn(`Could not reach the detached sync engine (pid ${found.pid}): ${err.message}`);
+    return UNREACHABLE;
+  }
+  if (!hello) return 'it refused hello';
+  if (hello.protocol !== PROTOCOL_VERSION) return `it speaks protocol ${hello.protocol}`;
+  if (!hello.build || hello.build !== bundled) return 'it runs another build';
+  if (!(hello.features || []).includes(Feature.Accounts)) return 'it keeps no accounts';
+  if (!canReuse) return 'the credentials are still in the app';
+  return null;
+}
+
+// The detached engine that replaced `oldPid` in run/engine.json, once it is bound.
+async function waitForRestartedEngine(
+  configDirPath: string,
+  oldPid: number,
+  timeoutMs: number
+): Promise<EngineDiscovery | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const found = readEngineDiscovery(configDirPath);
+    if (found && found.pid !== oldPid && found.detached && pidAlive(found.pid)) return found;
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, EARLIER_ENGINE_POLL_MS));
+  }
 }
 
 /*
