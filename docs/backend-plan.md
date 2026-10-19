@@ -306,15 +306,30 @@ the client's version check.
 
 ### 3.6 Tracking (Tern format)
 
-The client generates, per tracked message, a random 128-bit `trackingId` (base64url, 22 chars),
-and per recipient a random 64-bit `rid` (11 chars). Both live in the plugin value, which the
-client pushes after the send as today:
-- `open-tracking`: `{trackingId, recipients: {<rid>: <email>}, open_count, open_data}`.
-- `link-tracking`: `{trackingId, recipients, links: [{url, click_count, click_data}]}`.
+The engine generates, per tracked message, a random 128-bit `trackingId` (base64url, 22
+chars), and per recipient a random 64-bit `rid` (11 chars), when it sends a draft (`draft.send`
+or the expiration executor; desktop-client-plan T22, `ms_compose::tracking`). Both live in the
+plugin value, which the send moves to the sent message and pushes as any metadata:
+- `open-tracking`: `{trackingId, recipients: {<rid>: <email>}, open_count, open_data, uid}`.
+- `link-tracking`: `{trackingId, recipients, links: [{url, click_count, click_data}], uid}`, one
+  entry per distinct URL; `i` is its index. `uid` is the draft's Message-ID, as the desktop
+  wrote it before.
+The open-tracking toggle writes `{open_count: 0, open_data: []}` and the link-tracking one
+`{tracked: true}`; the engine keeps those keys and adds the rest. One `trackingId` serves both
+plugins of a message. Every To, Cc and Bcc recipient gets their own body (one SMTP submission
+each); the copy saved to Sent keeps the untracked body, so the sender never trips their own
+pixel or links.
 
 URLs, with `<ns>` the sender's `trackingNS` from `/tern/v1/me`:
-- pixel `<public_url>/t/o/<ns>/<trackingId>.<rid>.png`;
-- link `<public_url>/t/l/<ns>/<trackingId>/<i>.<rid>?u=<url-encoded original>`.
+- pixel `<public_url>/t/o/<ns>/<trackingId>.<rid>.png`, as `<img alt="" src="…">` before the
+  first `.gmail_quote` element, or at the end of the body;
+- link `<public_url>/t/l/<ns>/<trackingId>/<i>.<rid>?u=<url-encoded original>` (JavaScript's
+  `encodeURIComponent`), for every `http`/`https` `<a href>` outside `.gmail_quote`, up to
+  1000 distinct URLs of at most 2 KiB each; the rest stay as written.
+
+The engine builds them only when `/tern/v1/me` reports `features.tracking`, `trackingNS` is
+base64url and `publicURL` (or, when it is empty, the server URL) passes the 4.1 URL check;
+otherwise a tracked draft is sent untracked. Plaintext drafts are never tracked.
 
 The server looks the row up by `(user of <ns>, plugin_id, tracking_id)`. Scoping by `ns` is what
 stops hijacking: a recipient on the same server sees the `trackingId` in their copy and could
@@ -396,8 +411,17 @@ send-reminders that means one reminder email per device (`send-reminders-store.t
 `_sendReminderEmail`); for snooze, racing moves. `POST /tern/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>`
 inserts into `claims`: the first caller gets 200, every later one 409. The device holding the
 claim gets 200 again if it repeats the call (a retry after a lost response). When a server is
-connected, the client claims before acting and does nothing on 409. On a network error it acts
-anyway (D2: no feature depends on the server), accepting a possible duplicate.
+connected, the engine's expiration executor claims before acting and does nothing on 409. On a
+network error, a refused token or any other answer it acts anyway (D2: no feature depends on
+the server), accepting a possible duplicate.
+
+The executor claims due `send-later` (on a draft, for actions it performs), `thread-snooze` and
+`send-reminders` rows. `<aid>` is the account id; `<objectId>` is a Message-ID, since model ids
+differ across devices: the draft's for `send-later`, and for a thread the Message-ID of its oldest
+non-draft message (the anchor of 4.1 can differ between devices that first saw different
+messages of the thread); `<expiration>` is the metadata's expiration in Unix seconds. The request
+has no body and the engine reads only the status. A claim it lost is remembered until the
+engine restarts, and the row is left for the winning device's change to sync in.
 
 ## 4. Engine and client changes
 
@@ -508,11 +532,17 @@ Needed for the backend (all B1-C):
 - **Refresh and revocation.** On `ProcessIdentityRefreshNeeded`, and at launch, call
   `GET /tern/v1/me`: on 200 update `tern.server`; on 401 sign out locally (no DELETE) and show
   "signed out by the server" in the pane. Network errors change nothing.
-- **Plugins.** Server-backed features are disabled with a tooltip today
-  (`docs/pro-features-backend.md`). They turn on from `tern.server.features` once a server is
-  connected: tracking builds the 3.6 URLs from `publicURL` and `trackingNS` and generates
-  `trackingId`, `rid` and `recipients`; sharing in B2-S.
-- Snooze and send-reminders claim an expiration (3.8) before acting when a server is connected.
+- **Plugins.** Server-backed features are disabled with a tooltip until a server is connected
+  (`docs/pro-features-backend.md`). The engine, not the desktop, builds the tracking URLs and
+  `trackingId`, `rid`, `recipients` and the per-recipient bodies (3.6), from the `trackingNS`
+  and `publicURL` of its own `/tern/v1/me` answer (desktop-client-plan T22, stage 17). The
+  open- and link-tracking toggles only write metadata, and they turn on when the engine
+  reports `capabilities.server.readReceipts` / `linkTracking` available, which it does while a
+  connected server's `/tern/v1/me` has `features.tracking` (`not-on-server` when a server is
+  connected without it). Sharing in B2-S.
+- The engine's expiration executor claims an expiration (3.8) before it acts, when a server is
+  connected; the desktop no longer acts on the built-in plugins' expirations (stage 4), so it
+  claims nothing. A third-party plugin acting on its own expirations doesn't claim.
 - Thread sharing stores and reads the returned `link` (3.7).
 - Signature images get `width` / `height` attributes (3.7).
 

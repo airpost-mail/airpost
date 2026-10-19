@@ -430,8 +430,9 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
   D C M W.
 - **Tracking transforms** (T22): pixel before `.gmail_quote`, link rewrite outside it,
   `trackingId`/`rid`, per-recipient bodies, using `trackingNS`/`publicURL` from the backend.
-  Inert today (`PLUGIN_URL = null`, server-only capability), so it ships with the backend
-  work, not before. HTML rewriter in Rust (lol_html or html5ever, both MIT/Apache). ~500 Rust.
+  Done in stage 17 (engine half, `ms_compose::tracking` on lol_html, BSD-3-Clause), applied by
+  `draft.send` and the executor; inert until a server whose `/tern/v1/me` has
+  `features.tracking` is connected, and the backend's tracking endpoints don't exist yet.
 - **`threads.snooze {accountId, threadIds, until}`** and **`threads.unsnooze`**: the task
   pair plus metadata in one call, for the CLI and mcp. ~150 Rust. C M W.
 - **`messages.unsubscribe {accountId, messageId, method?}`** → `{method: "one-click"|"mailto"|
@@ -2661,3 +2662,95 @@ Plugins and check the binary, hash and units shown, a `tern-sample-service` remi
 acted on with the desktop closed, then uninstall the service and the engine unit; with the engine
 unit installed, rebuild the engine, launch Tern and see "Restarting the engine unit" then
 "Joining", quit, and check the unit's engine still runs).
+
+2026-10-19, stage 17 (tracking transforms and claims, engine half), branch `roadmap/client-next`,
+not merged. The backend work is paused and `apps/backend` has no tracking or claims endpoints, so
+this is the engine side of T22 and backend-plan 3.6/3.8, tested against a mock server.
+- `ms_compose::tracking` (lol_html): per recipient, the pixel
+  `<publicURL>/t/o/<ns>/<trackingId>.<rid>.png` before the first `.gmail_quote` (else at the end)
+  and every `http(s)` link outside `.gmail_quote` rewritten to
+  `<publicURL>/t/l/<ns>/<trackingId>/<i>.<rid>?u=<encodeURIComponent(url)>`; hrefs are
+  entity-decoded through html5ever's tokenizer; untouched markup stays byte for byte. `trackingId`
+  is 128 random bits and each `rid` 64, base64url. `track_send` gives `perRecipientBodies`
+  (`self` untracked, one body per To/Cc/Bcc address, or per key of a client's `bodies`, which are
+  tracked in place of the stored body) and the new `open-tracking`/`link-tracking` values
+  (`trackingId`, `recipients {rid: email}`, `uid`, and `links [{url, click_count, click_data}]`),
+  which the send moves to the sent message and pushes. Plaintext drafts and drafts with no
+  recipient aren't tracked; a body lol_html can't rewrite goes out untracked.
+- ms-net: `MetadataBackend::tracking()` and `claim(objectId, pluginId, expiration)` (defaults: none,
+  `Claim::NoServer`). `HttpMetadataBackend` keeps its last `/tern/v1/me` (binding() refreshes it
+  before each stream connect), asks again with a 15 s bound when it is over 2 h old, and gives a
+  target only with `features.tracking`, a base64url `trackingNS` and a `publicURL` (or, empty, the
+  server URL) that passes `check_url`; a refused token clears it. Claims are
+  `POST /tern/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>` (15 s bound): 200 won, 409 lost,
+  anything else, a network error or a refused token lets the device act.
+- Executor (`with_metadata`): before acting on a due `send-later` (one it performs), `thread-snooze`
+  or `send-reminders` row it claims it, outside the transaction, keyed on the draft's Message-ID or
+  the thread's oldest non-draft message's; a lost claim leaves the row (`Done`) and is remembered
+  until restart. A scheduled tracked draft gets `apply_tracking` on its `SendDraftTask`, with the
+  target read before the transaction. `draft.send` tracks a send-now the same way (target read
+  before its transaction; a delayed send is tracked when the executor fires it). Rules' forwards
+  go through the same path.
+- Capabilities: every account's backend reports its `/tern/v1/me` to `server_features`;
+  `capabilities.server.readReceipts` and `linkTracking` are available while the connected server
+  has `features.tracking`, `not-on-server` (new reason) with a server without it, and
+  `needs-tern-server` otherwise; a change sends `capabilities.changed`, and `server.set`/`clear`
+  resets it. `hello.features` gains `tracking` (serve).
+- Desktop: the open- and link-tracking composer extensions and `PLUGIN_URL` are gone; the toggles
+  write metadata as before and are enabled by the capability (`isTrackingServerAvailable` is the
+  capability store's answer); `needsClientFinalize` counts any extension with its own
+  `applyTransformsForSending` (the built-in tracking ones no longer exist); `Feature.Tracking`,
+  `CapabilityReason.NotOnServer` and its text "Your Tern server doesn’t offer it".
+- Docs: backend-plan 3.6 (the engine generates the ids, the exact markup, one index per distinct
+  URL), 3.8 (the executor claims; the objectId and expiration it sends) and 4.2 amended to say the
+  engine builds tracking URLs and claims; `docs/pro-features-backend.md` updated.
+
+Tests: ms-compose unit tests (pixel placement, quoted links left, entity decoding, index per URL
+shared across recipients, limits, `encodeURIComponent`, `track_send`), `crates/ms-net/tests/
+tracking_claims.rs` against the mock HTTP server (me read once and kept, feature off, unusable URL,
+fallback URL, 401 dormancy and listener, claim won/lost/path encoding, 500, closed port, 404),
+executor tests in `crates/ms-tasks/tests/tasks.rs` with the real HTTP backend against the mock
+server (claim then tracked send, one SMTP submission per recipient with its own rid, the values
+pushed from the sent message; untracked without the feature; a snooze another device claimed left
+alone and asked once; no answer acts), the `draft.send` unit test (tracked now, delayed waits,
+plain untouched) and the capabilities unit test; desktop specs for the capability store,
+send-actions store and both tracking packages. Checks: fmt and clippy on ms-compose, ms-net,
+ms-sync, ms-tasks, ms-ipc and mailsync; `cargo deny check licenses`; cargo test for those crates;
+the serve harness on the debug build, `-k "draft-pipeline or expiration or send or metadata"` (21
+passed, 3 skipped); desktop typecheck, lint of the touched files and the affected specs. Not run:
+the full gate and a release build.
+
+Decisions taken, to confirm:
+- lol_html (BSD-3-Clause) is the rewriter; it brings second copies of cssparser (0.36) and
+  selectors (0.37).
+- One `trackingId` for both plugins of a message; one link index per distinct URL (the desktop
+  numbered every occurrence); the sent copy is untracked; Bcc recipients get tracked bodies too;
+  `uid` (the Message-ID) is kept in both values and `redirect_url` is no longer written.
+- The executor claims `send-later` as well as snooze and reminders (drafts' send-later metadata
+  does reach other devices through the Drafts folder and the metadata push), keyed on Message-IDs
+  as above; a 404 (a server without claims) counts as no answer and the device acts.
+- `/tern/v1/me` is reused for 2 h and asked again with a 15 s bound; on a failure a stale answer
+  still serves. A `publicURL` must be https (or loopback http), like the server URL.
+- New capability reason `not-on-server`; `metadataSync`, `threadSharing` and `activitySharing`
+  are unchanged (still `needs-tern-server`).
+- The desktop's JS tracking transforms are removed rather than kept as a fallback: no engine
+  without this stage reports the capability, so they could never run.
+
+Open:
+- apps/backend (paused): the `/t/o/<ns>/<trackingId>.<rid>.png` pixel, the `/t/l/<ns>/<trackingId>/
+  <i>.<rid>?u=` redirect and interstitial, pending events and the push merge rule (3.6), the
+  `claims` table and `POST /tern/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>` (3.8), and
+  `features.tracking` in `/tern/v1/me` for a server that has them.
+- No harness scenario: the harness has no Tern server; covered by the Rust tests against the mock.
+- Capabilities turn on only once an account's backend has read `/tern/v1/me` (an engine with no
+  account, or before the first metadata connect, reports `needs-tern-server`).
+- `draft.send` reads the target on the account's main thread; with no kept `/tern/v1/me` and a
+  slow server it waits up to 15 s, and each due row's claim can delay an undo send by as much.
+- Not claimed: `clientFinalize` send-later rows the desktop sends, and third-party plugins'
+  expirations. A send-later another device's engine wins goes out with that device's stored body
+  (the hook bodies stay with the engine that got `draft.send`), tracked by that engine.
+- A thread's claim key differs between devices when one hasn't synced the thread's oldest message;
+  both then act, the duplicate D2 accepts.
+- Nothing for tern-web: the web's sends go through `draft.send` and its toggles can read the same
+  capabilities.
+Trial pending (not run): a tracked send against a local backend (needs the backend endpoints).
