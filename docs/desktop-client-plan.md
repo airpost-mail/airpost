@@ -794,7 +794,8 @@ added later through it, instead of importing `MailsyncProcess`.
 | 8 (1.31.0) | reads over the engine | private `DatabaseStore._query` with raw SQL fails; queries on non-`queryable` attributes fail with an error instead of a SQL error; reads during an engine restart wait up to 10 s, then reject (4.1 step 2); `MessageStore.items()` carries bodies for expanded messages only (TD40). No change to tasks: `Actions.queueTask.listen` in the main window still sees every desktop window's tasks through `ActionBridge`, and never CLI or MCP tasks (use Task deltas for those) |
 | 9 | search in the engine | `structuredSearch(ast)` deprecated in favour of `Query.searchText`; date terms outside the documented subset fail |
 | 13 | draft pipeline in the engine | send hooks don't run for CLI, MCP or engine-executed sends (documented) |
-| 2.0.0 | removals | `MailsyncProcess`, `KeyManager`, `MailRulesProcessor`, `IMAPSearchQueryBackend`, `QuerySubscriptionPool` internals, `MailspringTestUtils` |
+| 18 (1.32.0) | calendar and contacts in the engine | `ICSEventHelpers` deprecated (every function throws) and its types gone except `CalendarConflict`, now the engine's; `CalendarUtils.resolveIanaZone` and `createVTIMEZONEString` gone; `SyncbackEventTask` gains `restore` and `tz` |
+| 2.0.0 | removals | `MailsyncProcess`, `KeyManager`, `MailRulesProcessor`, `IMAPSearchQueryBackend`, `QuerySubscriptionPool` internals, `MailspringTestUtils`, `ICSEventHelpers` |
 
 Plugins can't define new Task classes (the engine rejects unknown `__cls`), which is already
 true today.
@@ -2963,3 +2964,70 @@ state with Try Again after a give-up; a long unread thread opens three unread me
 listeners" warning is gone on a tall window; reply with a signature to a thread whose existing
 reply draft is collapsed). Also: with an inline reply open, restart the engine and check whether
 the composer keeps focus (it is expected not to, see above).
+
+2026-10-19, stage 18 (3.8, T23), branch `roadmap/client-next`, not merged. Engine: new crate
+`crates/ms-pim` (ICS edits, recurrence expansion, RSVP and counter-proposals, vCard mapping, VCF
+import and export) on the calcard parser already in the tree, with `ms-dav` Zones for TZIDs;
+`events.expand`, `events.create`, `events.update` (scope `this`, `following` or `all`; SEQUENCE
+bumps, overrides, EXDATEs, guest edits, `deleted`), `events.rsvp` (with `counter`),
+`contacts.get`, `contacts.create`, `contacts.update`, `contacts.import` and `contacts.export`,
+behind the `calendar-editing` and `contact-editing` features; they queue the existing
+SyncbackEventTask, DestroyEventTask, EventRSVPTask (REPLY, COUNTER) and SyncbackContactTask.
+SyncbackEventTask gains `restore` and `tz`: an undo or redo re-sends its snapshot, applied over
+the copy stored by then (never below its SEQUENCE). TD50 folded: EventSearch and ContactSearch
+rows by rowid. `crates/ms-pim/tests/corpus.rs` replays every call the desktop's ICS and vCard
+specs made into `ics-event-helpers.ts`, `calendar-utils.ts`, `calendar-data-source.ts`,
+`ContactInfoMapping.ts` and `VCFImportExport.ts` (`fixtures/desktop_corpus.ndjson`, recorded in
+America/Chicago), recurrence expansion included; the harness scenario `pim-edit-methods.yaml`
+runs the methods against Radicale. CLI: `tern calendar list|create|update|rsvp` and
+`tern contact get|create|update|import|export`. tern-mcp: event and contact tools (docs/mcp.md).
+Desktop: `src/engine-pim.ts` wraps the methods; the calendar (data source, grid moves, popover
+saves, deletes, new events, RSVP), the mail view's invitation header (times, conflicts, RSVP,
+applying a counter) and the contacts package (detail load and save, VCF import, export and drag)
+call them and keep their UI. Gone: `ics-event-helpers.ts`, the VTIMEZONE half of
+`calendar-utils.ts` (`resolveIanaZone`, `createVTIMEZONEString`), the occurrence expansion in
+`calendar-data-source.ts`, `ContactInfoMapping.ts`, `VCFHelpers.ts`, `VCFImportExport.ts` and
+their specs; the calendar, event and contact specs now assert what is asked of the engine
+(`spec/fake-pim-engine.ts`) and the tasks queued. Plugin API 1.32.0: `ICSEventHelpers`
+deprecated (every function throws, removed in 2.0.0), its types gone except `CalendarConflict`,
+SyncbackEventTask `restore` and `tz` (CHANGELOG, `plugin-api-version.ts`, the section 6 table).
+`cargo deny check licenses bans` ok; no new crates.
+Decisions taken, to confirm:
+- No icalendar or rrule crate: ms-pim builds on calcard, already a dependency, with its own
+  RRULE expansion. An IANA TZID without a VTIMEZONE is read by its name.
+- An override inline in the series' resource is edited in place. `following` ends the series
+  before the occurrence (UNTIL) and starts a new one under a new UID. RECURRENCE-ID is written
+  in UTC.
+- Where the TypeScript differed from the RFCs, ms-pim follows the RFCs (RDATE and DTSTART,
+  leap-day yearly series), unlike ical.js; the corpus's `differs` lists each case. Built vCards
+  are 4.0; contacts.update fixes the TS mapping's bugs, an empty list removes the property, and
+  `photoURL` is written.
+- Methods beyond the plan's: `queue: false` (the desktop queues the writes itself so
+  UndoRedoStore can undo them), `restore` and `tz` on SyncbackEventTask, `eventIds`, `ics`,
+  `focus`, `conflicts` and `first` on events.expand, contacts.get and contacts.create.
+- REPLY and COUNTER subjects are English, with a `subject` override; the desktop sends a
+  localized counter subject.
+- Writes are local-only for relayed connections; reads stay open. In tern-mcp, guests and RSVP
+  need the send level. No tern-client wrappers yet.
+- The mail view's REPLY is built from the emailed invitation, not the synced copy (Google
+  rewrites ORGANIZER on a shared calendar's copy); the answer is recorded on our copy when one is
+  certainly ours, or on `addTo` when accepting one we have none of.
+- VCF import works for Google accounts too (People), and the unified contacts view imports into
+  the first account.
+- The desktop UI keeps "this occurrence" and "all occurrences"; `following` is for the CLI and
+  tern-mcp.
+- ical.js stays in the desktop to display an emailed invitation (the display half of
+  `calendar-utils.ts`); its times come from the engine (`first`, `upcoming`).
+- Dragging contacts to the desktop writes the stored CardDAV cards at once, then rewrites the
+  file with the engine's export (the drag needs the path synchronously).
+- `EventRSVPTask.forReplying` and `forProposingNewTime` stay for plugins; `ICSEventHelpers` is a
+  throwing stub until 2.0.0.
+- The corpus fixture is frozen: it was recorded before the TS went, so it can't be re-recorded.
+- An exception row written by an edit appears on the next calendar pass.
+Open: `ical-expander` and `vcf` are unused in `apps/desktop/app/package.json` now; removing them
+needs a lockfile update, left for a dependency pass.
+Open for tern-web: the web review of event and contact tasks and writes for relayed devices
+(writes are local-only for now), and the web client calling `events.*` and `contacts.*` for
+editing (apps/web).
+Trial pending (not run): create, move and RSVP an event (including one occurrence of a series and
+undo of the move); edit a CardDAV contact; import a VCF.
