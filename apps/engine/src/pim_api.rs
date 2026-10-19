@@ -238,7 +238,7 @@ fn expand(session: &mut Session, p: EventsExpandParams) -> Reply {
         result.occurrences =
             occurrence::occurrences(std::slice::from_ref(&row), p.start, p.end, &owners, &env);
         if let Some(focus) = &p.focus {
-            result.upcoming = Some(match occurrence::upcoming(&doc, focus.now, &env) {
+            let times = |t: Option<(i64, i64, Option<i64>, bool)>| match t {
                 Some((start, end, rid, all_day)) => {
                     let mut v = json!({ "start": start, "end": end, "isAllDay": all_day });
                     if let Some(r) = rid {
@@ -247,7 +247,9 @@ fn expand(session: &mut Session, p: EventsExpandParams) -> Reply {
                     v
                 }
                 None => Value::Null,
-            });
+            };
+            result.upcoming = Some(times(occurrence::upcoming(&doc, focus.now, &env)));
+            result.first = Some(times(occurrence::first_times(&doc, &env)));
         }
         return to_reply(result);
     }

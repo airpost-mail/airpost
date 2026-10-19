@@ -287,6 +287,8 @@ fn events_expand_and_edit() {
         .unwrap();
     assert_eq!(r["occurrences"].as_array().unwrap().len(), 1, "{r}");
     assert_eq!(r["upcoming"]["start"], 1_772_636_400, "{r}");
+    assert_eq!(r["first"]["end"], 1_772_640_000, "{r}");
+    assert!(r["first"].get("recurrenceId").is_none(), "{r}");
 
     // Move the second standup an hour later: an exception in the stored resource.
     let r = c

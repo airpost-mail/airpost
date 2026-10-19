@@ -36,7 +36,7 @@ pub struct EventsExpandParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tz: Option<String>,
     /// With `eventIds`: also answer `focused`, the occurrence to show for an event opened
-    /// from outside the calendar. With `ics`: also answer `upcoming`.
+    /// from outside the calendar. With `ics`: also answer `upcoming` and `first`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus: Option<EventsFocus>,
     /// Also answer `conflicts`: the timed occurrences of the chosen rows that overlap
@@ -76,6 +76,10 @@ pub struct EventsExpandResult {
     /// `{start, end, isAllDay, recurrenceId?}`; null once a series is over.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upcoming: Option<Value>,
+    /// With `ics` and `focus`: the invitation's own times, from its first VEVENT, in the
+    /// same shape; `recurrenceId` when it is about one occurrence of a series.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<Value>>,
 }

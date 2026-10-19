@@ -474,6 +474,18 @@ pub fn upcoming(doc: &Doc, now: i64, env: &Env) -> Option<(i64, i64, Option<i64>
     Some((o.start, o.end, o.recurrence_id, o.all_day))
 }
 
+/// An invitation's own times, read off its first VEVENT: start, end, the slot it fills
+/// when it is about one occurrence of a series, and whether it is all-day.
+pub fn first_times(doc: &Doc, env: &Env) -> Option<(i64, i64, Option<i64>, bool)> {
+    let zones = doc.zones(env);
+    let first = doc.first()?;
+    let s = start_of(first)?;
+    let st = s.ts(&zones);
+    let et = end_of(first).map(|e| e.ts(&zones)).unwrap_or(st);
+    let rid = rid_of(first).map(|r| r.ts(&zones));
+    Some((st, et, rid, s.is_date()))
+}
+
 /// Cancelled, marked free, or an invitation one of `addresses` has declined.
 fn is_free_time(item: &crate::ics::Component, addresses: &[String]) -> bool {
     if item
