@@ -2332,3 +2332,35 @@ Trial pending (not run): on ~/tern-trial, rename a folder holding mail in Tern a
 client (webmail), rename a Gmail label in Tern and in the Gmail web UI, and check the folder
 keeps its mail without a resync, the open folder's title follows, and a mail rule moving into
 it still works.
+
+TD39 gate, attempt 1, 2026-10-19. Rebase onto main (9bd9810a2, stage 13 status) was a no-op: the
+branch already sat on it. Gate green: `cargo fmt --all --check`, `cargo clippy --workspace
+--all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, `cargo deny check`, the
+release build of mailsync, tern, tern-mcp and tern-gateway, and the harness quick tier on serve
+with the release binaries (156 passed, 4 skipped). Desktop: lint and typecheck pass; the
+focused-perspective-store and thread-list-store specs pass (15). Merged to main by fast-forward.
+
+Open from the review (low):
+- `crates/ms-sync/src/folder_identity.rs`: a rename record stays usable in both directions for
+  the full hour, even after the rename has gone through and a listing has confirmed it. Within
+  that hour an unrelated server-side change that matches the reverse direction gets paired. For
+  example, the renamed folder B is deleted in webmail and a new folder A is created: the listing
+  shows A as new and B as gone, so B's row and id (rules, settings) go to the unrelated new A.
+  Drop the record (or its reverse direction) once a listing confirms the rename.
+- `crates/ms-tasks/src/folders.rs`: the rename task loads the row by path outside the
+  transaction and saves the whole stale object inside it, so any `localStatus` (UIDNEXT, modseq,
+  scan progress) or role the background worker wrote in between is overwritten. The pairing makes
+  that window more likely: the background may already have paired and updated the same row via
+  the record written before the RENAME. Reload the row inside the transaction.
+- `crates/ms-sync/src/background.rs`: `record_label_validity` spends its budget of 25 on every
+  label it attempts, including ones whose STATUS fails, and retries those on every pass. With 25
+  or more labels that keep failing (the server refuses STATUS on them, say), labels later in the
+  list never get a UIDVALIDITY recorded, so a server-side rename of them can't be paired.
+- `docs/labels-plan.md` (labels work, not ours): decision L6 still says a Gmail label rename gives
+  a new id "as a Gmail rename does today". After TD39 that's false: Gmail labels keep their id
+  across renames, and a renamed label's id no longer equals `folder_id(aid, path)`. Open item for
+  the labels branch to update L6 and anything that relies on it.
+
+Trial pending (not run): the TD39 steps above (rename a folder holding mail in Tern and in
+webmail, rename a Gmail label in Tern and in the Gmail web UI; the folder keeps its mail without a
+resync, the open folder's title follows, a mail rule moving into it still works).
