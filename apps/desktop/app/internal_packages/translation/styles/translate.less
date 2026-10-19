@@ -18,13 +18,13 @@
 .translate-message-header {
   display: flex;
   align-items: stretch;
-  background-color: mix(@background-primary, @feature-tint, 90%);
-  color: mix(@text-color-subtle, @feature-tint, 40%);
+  background-color: color-mix(in srgb, @background-primary 90%, @feature-tint);
+  color: color-mix(in srgb, @text-color-subtle 40%, @feature-tint);
   margin: 10px 0;
 
   .message {
     flex: 1;
-    border: 1px solid darken(mix(@background-primary, @feature-tint, 50%), 25%);
+    border: 1px solid ~"hsl(from color-mix(in srgb, @{background-primary} 50%, @{feature-tint}) h s max(0, l - 25) / alpha)";
     border-radius: @border-radius-base;
 
     &.with-actions {
@@ -51,15 +51,15 @@
     .action {
       padding: 0 8px;
       min-height: 27px;
-      background: mix(@background-primary, @feature-tint, 80%);
-      border: 1px solid darken(mix(@background-primary, @feature-tint, 50%), 25%);
+      background: color-mix(in srgb, @background-primary 80%, @feature-tint);
+      border: 1px solid ~"hsl(from color-mix(in srgb, @{background-primary} 50%, @{feature-tint}) h s max(0, l - 25) / alpha)";
       border-bottom: 0;
       display: flex;
       align-items: center;
       min-width: 90px;
       flex: 1;
       &:active {
-        background: mix(@background-primary, @feature-tint, 70%);
+        background: color-mix(in srgb, @background-primary 70%, @feature-tint);
       }
     }
 
@@ -80,7 +80,7 @@
         padding: 0 8px;
 
         img.content-mask {
-          background: mix(@text-color-subtle, @feature-tint, 40%);
+          background: color-mix(in srgb, @text-color-subtle 40%, @feature-tint);
         }
       }
     }
@@ -89,7 +89,7 @@
     }
     .action:last-child {
       border-bottom-right-radius: @border-radius-base;
-      border-bottom: 1px solid darken(mix(@background-primary, @feature-tint, 50%), 25%);
+      border-bottom: 1px solid ~"hsl(from color-mix(in srgb, @{background-primary} 50%, @{feature-tint}) h s max(0, l - 25) / alpha)";
     }
   }
 }

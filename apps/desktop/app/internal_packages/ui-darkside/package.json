@@ -2,6 +2,8 @@
   "name": "ui-darkside",
   "displayName": "Darkside",
   "theme": "ui",
+  "scheme": "light",
+  "sidebarScheme": "dark",
   "version": "1.0.0",
   "description": "A customizable, dark sidebar theme for Tern.",
   "license": "MIT",

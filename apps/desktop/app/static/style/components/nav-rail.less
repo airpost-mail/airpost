@@ -5,6 +5,7 @@
   width: 48px;
   display: flex;
   flex-direction: column;
+  background: var(--rail-background);
 
   .nav-rail-item {
     display: flex;
@@ -19,18 +20,18 @@
 
     // Set here rather than inherited from .btn-icon, which themes recolour for their toolbars.
     img.content-mask {
-      background-color: @text-color-subtle;
+      background-color: var(--rail-foreground);
     }
     &:hover {
-      background: fade(@text-color, 6%);
+      background: var(--rail-hover);
     }
     // The rail shares the sidebar's colour on macOS, so selection lifts to the content colour.
     &.active {
-      background: @background-primary;
+      background: var(--rail-selected);
       box-shadow: 0 1px 2px fade(@black, 14%);
     }
     &.active img.content-mask {
-      background-color: @source-list-active-color;
+      background-color: var(--rail-selected-foreground);
     }
   }
 
@@ -44,7 +45,7 @@
     width: 20px;
     height: 1px;
     margin: 0 0 8px;
-    background: fade(@text-color, 12%);
+    background: var(--rail-border);
   }
 }
 
@@ -71,12 +72,12 @@
   opacity: 0.5;
 
   img.content-mask {
-    background-color: @text-color-subtle;
+    background-color: var(--sidebar-foreground);
   }
   &:hover,
   &:focus-visible {
     opacity: 1;
-    background: fade(@text-color, 6%);
+    background: var(--sidebar-hover);
   }
 }
 
@@ -90,7 +91,7 @@
   .column-CalendarSidebar {
     padding-left: 8px;
     padding-bottom: 32px;
-    background-color: @source-list-bg;
+    background-color: var(--sidebar-background);
   }
 }
 
@@ -102,7 +103,7 @@
 
 .nav-rail-content {
   margin: 0 4px 4px 0;
-  border: 1px solid fade(@text-color, 7%);
+  border: 1px solid color-mix(in srgb, @text-color 7%, transparent);
   border-radius: 6px;
   overflow: hidden;
 }

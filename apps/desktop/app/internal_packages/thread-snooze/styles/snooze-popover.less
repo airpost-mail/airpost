@@ -11,7 +11,7 @@
 }
 
 .snooze-popover {
-  color: fadeout(@btn-default-text-color, 20%);
+  color: color-mix(in srgb, @btn-default-text-color 80%, transparent);
   display: flex;
   flex-direction: column;
 
@@ -30,20 +30,20 @@
       text-align: initial;
 
       img {
-        background-color: fadeout(@btn-default-text-color, 20%);
+        background-color: color-mix(in srgb, @btn-default-text-color 80%, transparent);
       }
       &:hover {
-        background-color: darken(@btn-default-bg-color, 5%);
-        color: fadeout(@btn-default-text-color, 10%);
+        background-color: ~"hsl(from @{btn-default-bg-color} h s max(0, l - 5) / alpha)";
+        color: color-mix(in srgb, @btn-default-text-color 90%, transparent);
         img {
-          background-color: fadeout(@btn-default-text-color, 10%);
+          background-color: color-mix(in srgb, @btn-default-text-color 90%, transparent);
         }
       }
       &:active {
-        background-color: darken(@btn-default-bg-color, 8%);
-        color: fadeout(@btn-default-text-color, 0%);
+        background-color: ~"hsl(from @{btn-default-bg-color} h s max(0, l - 8) / alpha)";
+        color: @btn-default-text-color;
         img {
-          background-color: fadeout(@btn-default-text-color, 0%);
+          background-color: @btn-default-text-color;
         }
       }
       & + .snooze-item {

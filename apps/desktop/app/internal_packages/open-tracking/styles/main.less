@@ -6,7 +6,7 @@
 }
 
 .open-tracking-icon img.content-mask.unopened {
-  background-color: fadeout(@open-tracking-color, 80%);
+  background-color: color-mix(in srgb, @open-tracking-color 20%, transparent);
   cursor: default;
 }
 .open-tracking-icon img.content-mask.opened {
@@ -17,7 +17,7 @@
 .list-item.focused,
 .list-item.selected {
   .open-tracking-icon img.content-mask.unopened {
-    background-color: fadeout(@text-color-inverse, 70%);
+    background-color: color-mix(in srgb, @text-color-inverse 30%, transparent);
   }
   .open-tracking-icon img.content-mask.opened {
     background-color: @text-color-inverse;

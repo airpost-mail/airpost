@@ -1,0 +1,63 @@
+/* Darkside: a dark sidebar and nav rail beside a white thread list and an off-white reading pane,
+   with a coral accent. Tokens only; app/static/style/tokens/defaults.css has the rest at the Light
+   values, and docs/theme-tokens.md lists every token.
+
+   The look comes from two colours, --sidebar-background and --primary; everything
+   below derives from them the way the LESS theme did (tint() is a color-mix() with white, fade() a
+   color-mix() with transparent). To make your own variant, change those two. Palettes from the
+   original theme:
+     Default  #313042 / #f18260     Luna     #202c46 / #39dff8     Zond   #333333 / #f6d49c
+     Gemini   #00203c / #f6b312     Mercury  #555555 / #999999     Apollo #3a1e15 / #f6aa1c */
+:root {
+  /* The accent is part of the palette, so Darkside ignores the "use the system accent colour"
+     setting, as it always has. --selected is set too, since its default follows the system accent. */
+  --primary: #f18260;
+  --selected: color-mix(in srgb, var(--primary), black 10%);
+  --unread: var(--primary);
+  --info: var(--primary);
+
+  /* ---- Sidebar (folder list, calendar list) ---- */
+  --sidebar-background: #313042;
+  --sidebar-inset-background: var(--sidebar-background);
+  /* desaturate(lighten(@sidebar, 40%), 75%): #9f9f9f for the default palette. */
+  --sidebar-foreground: hsl(from var(--sidebar-background) h max(s - 75, 0) min(l + 40, 100));
+  --sidebar-muted-foreground: color-mix(in srgb, var(--sidebar-foreground) 50%, transparent);
+  --sidebar-hover: rgba(255, 255, 255, 0.1);
+  /* Selection by text colour only, as before. */
+  --sidebar-selected: var(--sidebar-background);
+  --sidebar-selected-foreground: #ffffff;
+  --sidebar-border: color-mix(in srgb, var(--sidebar-foreground) 20%, transparent);
+
+  /* ---- Nav rail: joins the sidebar column ---- */
+  --rail-background: var(--sidebar-background);
+  --rail-foreground: var(--sidebar-foreground);
+  --rail-hover: rgba(255, 255, 255, 0.1);
+  --rail-selected-foreground: var(--primary);
+  --rail-border: color-mix(in srgb, var(--sidebar-foreground) 20%, transparent);
+
+  /* ---- Toolbar: flat, no hairline. Each column's part matches the column below it; the rest
+     (Preferences, single-pane message view, popout windows) is tint(@sidebar, 90%). ---- */
+  --toolbar-background: color-mix(in srgb, var(--sidebar-background) 10%, var(--background));
+  --toolbar-border: transparent;
+  --sidebar-toolbar-background: var(--sidebar-background);
+  --thread-list-toolbar-background: var(--thread-list-background);
+  --message-list-toolbar-background: var(--message-list-background);
+
+  /* ---- Thread list: hairlines in the sidebar colour, accent-tinted multi-selection ---- */
+  --thread-list-border: color-mix(in srgb, var(--sidebar-background) 10%, transparent);
+  --thread-list-hover: color-mix(in srgb, var(--sidebar-background) 5%, var(--thread-list-background));
+  --thread-list-selected: color-mix(in srgb, var(--primary) 10%, var(--thread-list-background));
+  --thread-list-selected-foreground: var(--sidebar-background);
+  --thread-list-selected-border: var(--thread-list-border);
+  /* The focused row (and the open thread in split mode) is the same pale accent tint as the
+     selection, with sidebar-coloured text, unwhitened icons and an accent cursor stripe. */
+  --thread-list-focused: var(--thread-list-selected);
+  --thread-list-focused-foreground: var(--sidebar-background);
+  --thread-list-focused-border: var(--thread-list-border);
+  --thread-list-focused-icon-whiten: 0;
+  --thread-list-cursor: var(--primary);
+
+  /* ---- Reading pane: tint(@sidebar, 95%) ---- */
+  --message-list-background: color-mix(in srgb, var(--sidebar-background) 5%, var(--background));
+  --message-list-border: color-mix(in srgb, var(--sidebar-background) 10%, transparent);
+}

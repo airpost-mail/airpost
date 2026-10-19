@@ -11,6 +11,14 @@ const CONFIG_USE_SYSTEM_ACCENT_KEY = 'core.appearance.useSystemAccent';
 const CONFIG_LIGHT_THEME_KEY = 'core.appearance.lightThemeName';
 const CONFIG_DARK_THEME_KEY = 'core.appearance.darkThemeName';
 const SYSTEM_ACCENT_SOURCE_PATH = 'system-accent:dynamic';
+// The token sheets get synthetic source paths so EmailFrameStylesStore can find them on every
+// platform, and so the LESS reload loops leave the compat sheet to activateThemePackage().
+export const TOKEN_DEFAULTS_SOURCE_PATH = 'tokens:defaults';
+export const THEME_TOKENS_SOURCE_PATH = 'tokens:theme';
+const THEME_TOKENS_FILE = 'tokens.css';
+const THEME_VARIABLES_FILE = 'ui-variables.less';
+
+export type ThemeScheme = 'light' | 'dark';
 export const AUTOMATIC_THEME_NAME = 'ui-automatic';
 export const LIGHT_THEME_NAME = 'ui-light';
 export const DARK_THEME_NAME = 'ui-dark';
@@ -23,11 +31,39 @@ function buildSystemAccentCSS(color: string): string {
 }
 
 /**
+ * LESS for a LESS-variables theme's tokens: the literal base, then the theme's variables, then
+ * the token mapping, so the theme's values win even if its file doesn't import the base.
+ * Compile it with static/style/compat ahead of static/style in the import path.
+ */
+export function compatTokensSource(resourcePath: string, themeStylesPath: string) {
+  const compat = path.join(resourcePath, 'static', 'style', 'compat');
+  const lessPath = (p: string) => JSON.stringify(p.split(path.sep).join('/'));
+  return [
+    `@import (reference) ${lessPath(path.join(compat, 'base', 'ui-variables.less'))};`,
+    `@import (reference) ${lessPath(path.join(themeStylesPath, THEME_VARIABLES_FILE))};`,
+    `@import ${lessPath(path.join(compat, 'tokens.less'))};`,
+  ].join('\n');
+}
+
+function parseScheme(value: unknown): ThemeScheme | null {
+  return value === 'light' || value === 'dark' ? value : null;
+}
+
+/**
  * The ThemeManager observes the user's theme selection and ensures that
  * LESS stylesheets in packages are compiled to CSS with the theme's
  * variables in the @import path. When the theme changes, the ThemeManager
  * empties it's LESSCache and rebuilds all less stylesheets against the
  * new theme.
+ *
+ * Themes are theme tokens: CSS custom properties on :root (docs/theme-tokens.md).
+ * static/style/tokens/defaults.css loads at core priority with the Light values;
+ * the active theme's styles/tokens.css loads after it at theme priority. A theme
+ * with only a styles/ui-variables.less gets its tokens from compat/tokens.less,
+ * compiled against its variables, and its LESS compiles against the literal
+ * compat/base/ui-variables.less. The theme's scheme (package.json `scheme` and
+ * `sidebarScheme`, or for a LESS-variables theme the lightness of its
+ * backgrounds) becomes the theme-scheme-* and theme-sidebar-scheme-* body classes.
  *
  * This class is loosely based on Atom's Theme Manager but:
  *  - Only one theme is active at a time and always overrides ui-light
@@ -40,6 +76,7 @@ export default class ThemeManager {
   private baseThemeOnly = false;
   private emitter = new Emitter();
   private styleSheetDisposablesBySourcePath = {};
+  private themeTokensDisposable: Disposable | null = null;
   private lessCache: LessCompileCache;
   private packageManager: PackageManager;
   private configDirPath: string;
@@ -118,11 +155,12 @@ export default class ThemeManager {
   }
 
   updateThemePackageAndRecomputeLESS() {
-    this.activateThemePackage();
-
+    // Import paths first: activating a LESS-variables theme compiles its compat tokens.
     if (this.lessCache) {
       this.lessCache.setImportPaths(this.getImportPaths());
     }
+    this.activateThemePackage();
+
     // reload all stylesheets attached to the dom
     for (const styleEl of Array.from(document.head.querySelectorAll('[source-path]'))) {
       if ((styleEl as any).sourcePath.endsWith('.less')) {
@@ -145,6 +183,7 @@ export default class ThemeManager {
     };
     reloadStylesIn(`${this.resourcePath}/static`);
     reloadStylesIn(`${this.resourcePath}/internal_packages`);
+    if (this.activeThemePackage) this.loadThemeTokens(this.activeThemePackage);
   }
 
   // Essential: Invoke `callback` when style sheet changes associated with
@@ -223,6 +262,7 @@ export default class ThemeManager {
     if (this.activeThemePackage) {
       this.activeThemePackage.deactivate();
     }
+    const { scheme, sidebarScheme } = this.loadThemeTokens(next);
     next.activate();
 
     // Update the body classList to include the theme name so plugin
@@ -234,6 +274,8 @@ export default class ThemeManager {
     }
     document.body.classList.add(`theme-${this.getBaseTheme().name}`);
     document.body.classList.add(`theme-${this.getActiveTheme().name}`);
+    document.body.classList.add(`theme-scheme-${scheme}`);
+    document.body.classList.add(`theme-sidebar-scheme-${sidebarScheme}`);
 
     this.themeValueCache = {};
     this.activeThemePackage = next;
@@ -243,9 +285,62 @@ export default class ThemeManager {
     const paths = [this.getBaseTheme().getStylesheetsPath()];
     const active = this.getActiveTheme();
     if (active) {
+      // Ahead of static/style, so the theme's `@import 'base/ui-variables'` gets the literals.
+      if (this.usesCompatTokens(active)) paths.unshift(this.compatStylesPath());
       paths.unshift(active.getStylesheetsPath());
     }
     return paths;
+  }
+
+  /** A theme that sets LESS variables and no tokens, so its tokens come from compat/tokens.less. */
+  usesCompatTokens(theme) {
+    const styles = theme.getStylesheetsPath();
+    return (
+      !fs.existsSync(path.join(styles, THEME_TOKENS_FILE)) &&
+      fs.existsSync(path.join(styles, THEME_VARIABLES_FILE))
+    );
+  }
+
+  private compatStylesPath() {
+    return path.join(this.resourcePath, 'static', 'style', 'compat');
+  }
+
+  /** The theme's tokens as CSS: its styles/tokens.css, or the compat tokens. Empty for neither. */
+  themeTokensCSS(theme): string {
+    const tokensPath = path.join(theme.getStylesheetsPath(), THEME_TOKENS_FILE);
+    if (fs.existsSync(tokensPath)) return fs.readFileSync(tokensPath, 'utf8');
+    if (!this.usesCompatTokens(theme)) return '';
+    const source = compatTokensSource(this.resourcePath, theme.getStylesheetsPath());
+    try {
+      return this.lessCache.cssForFile(path.join(this.compatStylesPath(), 'theme.less'), source);
+    } catch (error) {
+      console.error(`Error compiling theme tokens for ${theme.name}`, error);
+      return '';
+    }
+  }
+
+  /** package.json `scheme` / `sidebarScheme`; else what compat tokens derived; else light. */
+  themeSchemes(theme, tokensCSS: string): { scheme: ThemeScheme; sidebarScheme: ThemeScheme } {
+    const derived = (prop: string) =>
+      parseScheme(new RegExp(`${prop}:\\s*(light|dark)`).exec(tokensCSS)?.[1]);
+    const scheme = theme.scheme() || derived('--compat-scheme') || 'light';
+    const sidebarScheme = theme.sidebarScheme() || derived('--compat-sidebar-scheme') || scheme;
+    return { scheme, sidebarScheme };
+  }
+
+  private loadThemeTokens(theme) {
+    if (this.themeTokensDisposable) {
+      this.themeTokensDisposable.dispose();
+      this.themeTokensDisposable = null;
+    }
+    const css = this.themeTokensCSS(theme);
+    if (css) {
+      this.themeTokensDisposable = AppEnv.styles.addStyleSheet(css, {
+        sourcePath: THEME_TOKENS_SOURCE_PATH,
+        priority: 1,
+      });
+    }
+    return this.themeSchemes(theme, css);
   }
 
   // Writes a <style> tag setting the --system-accent CSS custom properties
@@ -283,6 +378,12 @@ export default class ThemeManager {
   }
 
   loadStaticStylesheets() {
+    const defaults = path.join(this.resourcePath, 'static', 'style', 'tokens', 'defaults.css');
+    this.styleSheetDisposablesBySourcePath[TOKEN_DEFAULTS_SOURCE_PATH] =
+      AppEnv.styles.addStyleSheet(fs.readFileSync(defaults, 'utf8'), {
+        sourcePath: TOKEN_DEFAULTS_SOURCE_PATH,
+        priority: -1,
+      });
     this.requireStylesheet('../static/style/index');
     this.requireStylesheet('../static/style/email-frame');
   }

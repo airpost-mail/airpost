@@ -1,0 +1,94 @@
+// Theme tokens for a theme that ships only LESS variables (styles/ui-variables.less,
+// no styles/tokens.css). ThemeManager.compatTokensSource() imports the theme's
+// variables ahead of this file, with static/style/compat ahead of static/style in
+// the import path, and loads the result at theme priority after tokens/defaults.css.
+// On its own it compiles to the Light values.
+//
+// Every variable has a literal value here (compat/base/ui-variables.less), so a
+// token never ends up as var(--itself). Tokens with no LESS source keep their
+// defaults.css derivation and so follow the tokens set below.
+@import (reference) 'base/ui-variables';
+
+:root {
+  --background: @background-primary;
+  --foreground: @text-color;
+  --primary: @accent-primary;
+  --primary-foreground: @text-color-inverse;
+  --secondary: @background-secondary;
+  --muted: @background-off-primary;
+  --muted-foreground: @text-color-very-subtle;
+  --destructive: @btn-danger-bg-color;
+  --destructive-foreground: @btn-danger-text-color;
+  --border: @border-color-divider;
+  --input: @input-border-color;
+
+  --subtle-foreground: @text-color-subtle;
+  --heading-foreground: @text-color-heading;
+  --link: @text-color-link;
+  --link-hover: @text-color-link-hover;
+  --control: @input-bg;
+  --control-foreground: @btn-default-text-color;
+  --control-border: @btn-border-color;
+  --shadow-color: @standard-shadow-color;
+
+  --selected: @component-active-color;
+  --selected-foreground: @component-active-bg;
+  --success: @color-success;
+  --warning: @color-warning;
+  --danger: @color-danger;
+  --info: @color-info;
+
+  --sidebar-background: @source-list-bg;
+  --sidebar-inset-background: @source-list-inset-bg;
+  --sidebar-selected: @source-list-active-bg;
+  --sidebar-selected-foreground: @source-list-active-color;
+
+  --thread-list-background: @list-bg;
+  --thread-list-border: @list-border;
+  --thread-list-selected: @list-selected-bg;
+  .compat-list-selected-color(@list-selected-color);
+  --thread-list-selected-border: @list-selected-border;
+  --thread-list-focused: @list-focused-bg;
+  --thread-list-focused-foreground: @list-focused-color;
+  --thread-list-focused-border: @list-focused-border;
+
+  --radius: @border-radius-base;
+  --radius-sm: @border-radius-small;
+  --radius-md: @border-radius-base;
+  --radius-lg: @border-radius-large;
+  --font-serif: @font-family-serif;
+  --font-mono: @font-family-monospace;
+  --font-size: @font-size;
+
+  // Read by ThemeManager when the theme's package.json doesn't declare a scheme.
+  .compat-scheme(--compat-scheme, @background-primary);
+  .compat-scheme(--compat-sidebar-scheme, @source-list-bg);
+}
+
+// The macOS toolbar and nav-rail frame were painted with the panel colour, not the sidebar's.
+:root:where(:has(> body.platform-darwin)) {
+  --toolbar-background: @panel-background-color;
+}
+
+// Windows draws the UI in system-ui whatever the theme says (workspace.less).
+:root:where(:not(:has(> body.platform-win32))) {
+  --font-sans: @font-family;
+  --font-heading: @font-family-heading;
+}
+
+// `inherit` would make the token inherit from nothing on :root; leave the default instead.
+.compat-list-selected-color(@c) when not (@c = inherit) {
+  --thread-list-selected-foreground: @c;
+}
+
+// Guards evaluate both sides of `and`, so the colour check and the lightness check are
+// separate mixins: lightness() throws on a value that isn't a LESS colour.
+.compat-scheme(@prop, @bg) when (iscolor(@bg)) {
+  .compat-scheme-of(@prop, @bg);
+}
+.compat-scheme-of(@prop, @bg) when (lightness(@bg) >= 50%) {
+  @{prop}: light;
+}
+.compat-scheme-of(@prop, @bg) when (lightness(@bg) < 50%) {
+  @{prop}: dark;
+}

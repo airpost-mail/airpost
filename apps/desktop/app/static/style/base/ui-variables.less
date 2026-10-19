@@ -32,28 +32,29 @@
 @blue-light: #1c65d4; // was Mailspring's cyan #009ec4 (menus, info banners)
 
 //== Color Descriptors
-// --system-accent / --system-accent-dark are optionally set at runtime by
-// ThemeManager when the user opts into mirroring the OS tint color. When
-// unset, the fallbacks below are used. We derive @accent-primary-dark from
-// @accent-primary via CSS color-mix() so per-theme overrides of
-// @accent-primary also flow through automatically (LESS resolves @accent-
-// primary lazily to the theme's last declaration).
-@accent-primary: var(--system-accent, @blue);
-@accent-primary-dark: var(--system-accent-dark, color-mix(in srgb, @accent-primary, black 10%));
+// The themeable colours, radii and fonts read the theme tokens on :root
+// (tokens/defaults.css, docs/theme-tokens.md), so LESS follows whatever a theme
+// sets there. That makes them CSS values rather than LESS colours: LESS colour
+// functions and guards can't take them, so use color-mix() / relative colours.
+// A theme that still overrides these in its own ui-variables.less compiles
+// against compat/base/ui-variables.less instead (ThemeManager), which keeps the
+// literal values for it.
+@accent-primary: var(--primary);
+@accent-primary-dark: var(--selected);
 
-@background-primary: @white;
-@background-off-primary: #fdfdfd;
-@background-secondary: #f4f6f9;
+@background-primary: var(--background);
+@background-off-primary: var(--muted);
+@background-secondary: var(--secondary);
 @background-tertiary: #6d7987;
 
-@color-info: @blue-dark;
-@color-success: #5cb346;
-@color-warning: #f0ad4e;
-@color-error: #d9534f;
-@color-danger: #d9534f;
+@color-info: var(--info);
+@color-success: var(--success);
+@color-warning: var(--warning);
+@color-error: var(--danger);
+@color-danger: var(--danger);
 
-@component-active-color: @accent-primary-dark;
-@component-active-bg: @background-primary;
+@component-active-color: var(--selected);
+@component-active-bg: var(--selected-foreground);
 
 @background-gradient: linear-gradient(
   to top,
@@ -61,40 +62,38 @@
   rgba(253, 253, 253, 0.75) 100%
 );
 
-@border-color-primary: darken(@background-primary, 10%);
-// mix() rather than darken(): same result on neutral greys, but keeps the
-// cool tint of @background-secondary faint instead of saturating it.
-@border-color-secondary: mix(@background-secondary, #000, 90%);
-@border-color-tertiary: darken(@background-tertiary, 10%);
-@border-color-divider: @border-color-secondary;
+@border-color-primary: var(--input);
+@border-color-secondary: var(--border);
+@border-color-tertiary: ~"hsl(from @{background-tertiary} h s max(l - 10, 0))";
+@border-color-divider: var(--border);
 
 //============================= Typography =============================//
 
 // ----- Colors -----
-@text-color: @black;
-@text-color-subtle: fadeout(@text-color, 15%);
-@text-color-very-subtle: fadeout(@text-color, 40%);
-@text-color-inverse: @white;
-@text-color-inverse-subtle: fadeout(@text-color-inverse, 20%);
-@text-color-inverse-very-subtle: fadeout(@text-color-inverse, 50%);
+@text-color: var(--foreground);
+@text-color-subtle: var(--subtle-foreground);
+@text-color-very-subtle: var(--muted-foreground);
+@text-color-inverse: var(--primary-foreground);
+@text-color-inverse-subtle: color-mix(in srgb, var(--primary-foreground) 80%, transparent);
+@text-color-inverse-very-subtle: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
 
-@text-color-heading: #3a3f47;
+@text-color-heading: var(--heading-foreground);
 
-@text-color-link: @blue;
-@text-color-link-hover: @blue-dark;
-@text-color-link-active: @blue-dark;
+@text-color-link: var(--link);
+@text-color-link-hover: var(--link-hover);
+@text-color-link-active: var(--link-hover);
 
 @text-color-selected: @text-color-inverse;
 
 @text-color-search-match: #fff000;
 @text-color-search-current-match: #ff8b1a;
 
-@font-family-sans-serif: 'Inter', 'Helvetica', sans-serif;
-@font-family-serif: Georgia, 'Times New Roman', Times, serif;
-@font-family-monospace: 'DejaVu Sans Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
+@font-family-sans-serif: var(--font-sans);
+@font-family-serif: var(--font-serif);
+@font-family-monospace: var(--font-mono);
 
-@font-family: @font-family-sans-serif;
-@font-family-heading: @font-family-sans-serif;
+@font-family: var(--font-sans);
+@font-family-heading: var(--font-heading);
 
 // ----- Font Weights -----
 @font-weight-thin: 200;
@@ -112,7 +111,7 @@
 @font-size-tiny: @font-size-base * 0.75; // 10.5px
 @font-size-smaller: @font-size-base * 0.86; // 12px
 @font-size-small: @font-size-base * 0.93; // 13px
-@font-size: @font-size-base; // 14px
+@font-size: var(--font-size); // 14px
 @font-size-large: @font-size-base * 1.14; // 16px
 @font-size-larger: @font-size-base * 1.29; // 18px
 
@@ -154,13 +153,14 @@
 @line-height-large: @line-height-computed * 1.3;
 @line-height-small: @line-height-computed * 0.95;
 
-@border-radius-base: 3px;
-@border-radius-large: 5px;
-@border-radius-small: 2px;
+// CSS values: use calc() for arithmetic on them.
+@border-radius-base: var(--radius-md);
+@border-radius-large: var(--radius-lg);
+@border-radius-small: var(--radius-sm);
 
 //============================== Shadows ===============================//
 
-@standard-shadow-color: rgba(0, 0, 0, 0.15);
+@standard-shadow-color: var(--shadow-color);
 @standard-shadow: 0 1px 4px 0 @standard-shadow-color;
 @standard-shadow-up: 0 -1px 4px 0 @standard-shadow-color;
 @shadow-border: 0 0.5px 0 @standard-shadow-color, 0 -0.5px 0 @standard-shadow-color,
@@ -168,73 +168,76 @@
 
 //=============================== Buttons ==============================//
 
-@btn-border-color: @standard-shadow-color;
+@btn-border-color: var(--control-border);
 
-@btn-default-bg-color: darken(@background-primary, 0.5%);
-@btn-default-text-color: @text-color;
+@btn-default-bg-color: var(--control);
+@btn-default-text-color: var(--control-foreground);
 
 @btn-icon-color: #919191;
 
-@btn-action-bg-color: @color-success;
-@btn-action-text-color: @text-color;
+@btn-action-bg-color: var(--success);
+@btn-action-text-color: var(--foreground);
 
+// Fixed blue, ignoring the theme accent and the system accent; see docs/theme-tokens.md.
 @btn-emphasis-bg-color: @blue;
-@btn-emphasis-text-color: @text-color-inverse;
+@btn-emphasis-text-color: var(--primary-foreground);
 
-@btn-danger-bg-color: @color-danger;
-@btn-danger-text-color: @text-color-inverse;
+@btn-danger-bg-color: var(--destructive);
+@btn-danger-text-color: var(--destructive-foreground);
 
 //=============================== Dropdowns ============================//
 
-@dropdown-default-bg-color: @background-primary;
-@dropdown-default-text-color: @text-color;
-@dropdown-default-border-color: fadeout(@border-color-primary, 10%);
+@dropdown-default-bg-color: var(--control);
+@dropdown-default-text-color: var(--control-foreground);
+@dropdown-default-border-color: var(--input);
 
 //=============================== Inputs ===============================//
 
-@input-bg: @white;
+@input-bg: var(--control);
 @input-bg-disabled: @gray-lighter;
 
-@input-border-color: fadeout(@border-color-primary, 10%);
-@input-border-color-blurred: desaturate(@input-border-color, 100%);
+@input-border-color: var(--input);
+@input-border-color-blurred: ~"hsl(from @{input-border-color} h max(s - 100, 0) l)";
 
 @input-font-size: 14px;
 
 //=============================== Components ===========================//
 
 //== Toolbar
+// Only the blurred-window gradient and the Windows hairline read this; focused
+// toolbars use --toolbar-background.
 @toolbar-background-color: #cfd4dc;
 // macOS only: the unified toolbar is taller and holds capsule-shaped buttons.
 @toolbar-height-darwin: 46px;
 @toolbar-btn-height-darwin: 30px;
 
 //== Account Sidebar
-@panel-background-color: #f1f3f7;
-@source-list-bg: @panel-background-color;
-@source-list-active-bg: @panel-background-color;
-@source-list-active-color: @component-active-color;
-@source-list-inset-bg: mix(@source-list-bg, @background-primary, 50%);
+@panel-background-color: var(--sidebar-background);
+@source-list-bg: var(--sidebar-background);
+@source-list-active-bg: var(--sidebar-selected);
+@source-list-active-color: var(--sidebar-selected-foreground);
+@source-list-inset-bg: var(--sidebar-inset-background);
 
 //== Thread List (e.g, `.list-group-item`, `.list-item`)
-@list-bg: @white;
-@list-border: #dcdfe5;
-@list-hover-bg: darken(@list-bg, 4%);
-@list-focused-color: @list-bg;
-@list-focused-bg: @component-active-color;
-@list-focused-border: @list-focused-bg;
-@list-selected-color: inherit;
-@list-selected-bg: color-mix(in srgb, @component-active-color 17%, @list-bg);
-@list-selected-border: color-mix(in srgb, @component-active-color 50%, @list-bg);
+@list-bg: var(--thread-list-background);
+@list-border: var(--thread-list-border);
+@list-hover-bg: var(--thread-list-hover);
+@list-focused-color: var(--thread-list-focused-foreground);
+@list-focused-bg: var(--thread-list-focused);
+@list-focused-border: var(--thread-list-focused-border);
+@list-selected-color: var(--thread-list-selected-foreground);
+@list-selected-bg: var(--thread-list-selected);
+@list-selected-border: var(--thread-list-selected-border);
 
 //== Notifications
-@background-color-info: @blue-light;
+@background-color-info: var(--info);
 @background-color-success: #00ac6f;
 @background-color-warning: #ff4800;
 @background-color-error: #ca2541;
 @background-color-pending: #b4babd;
 
 //== Menus
-@menu-item-color-hover: fade(@blue-light, 10%);
+@menu-item-color-hover: color-mix(in srgb, @blue-light 10%, transparent);
 @menu-item-color-selected: @blue-light;
 @menu-text-color-selected: @text-color-inverse;
 

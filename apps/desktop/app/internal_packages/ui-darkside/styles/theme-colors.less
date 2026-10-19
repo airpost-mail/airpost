@@ -1,6 +1,8 @@
-/* The variables declared here are used by the theme picker in Mailspring
-to show an appropriate mini-preview of your theme. */
-@import 'ui-variables';
-
-@component-active-color: @accent;
-@panel-background-color: @sidebar;
+// Literal colours for the theme previews (Preferences > Appearance and the theme picker), which
+// compile LESS variables rather than reading tokens. Keep in step with tokens.css.
+@source-list-bg: #313042;
+@panel-background-color: #313042;
+@background-primary: #ffffff;
+@text-color: #231f20;
+@accent-primary: var(--system-accent, #f18260);
+@component-active-color: #f18260;

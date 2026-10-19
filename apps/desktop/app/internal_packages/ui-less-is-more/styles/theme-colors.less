@@ -1,9 +1,10 @@
-/* The variables declared here are used by the theme picker in Mailspring
-to show an appropriate mini-preview of your theme. */
-@import 'index';
-
-@background-secondary: @less-background;
-@text-color: @less-text;
-@component-active-color: @less-background;
-@toolbar-background-color: @less-background;
-@panel-background-color: @less-background;
+// Literal colours for the theme previews in Preferences > Appearance and the theme picker,
+// which compile LESS variables and don't see tokens.css. Keep in step with tokens.css.
+@background-primary: #ffffff;
+@background-secondary: #ffffff;
+@source-list-bg: #ffffff;
+@panel-background-color: #ffffff;
+@toolbar-background-color: #ffffff;
+@accent-primary: var(--system-accent, #1f70ec);
+@component-active-color: #ffffff;
+@text-color: #566c75;

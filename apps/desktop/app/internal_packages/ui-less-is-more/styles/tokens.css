@@ -1,0 +1,28 @@
+/* Less Is More: one white surface everywhere, slate text in lists, no dividers.
+   Tokens only; docs/theme-tokens.md lists what each token covers. */
+:root {
+  --toolbar-background: var(--background);
+  --toolbar-border: transparent;
+
+  --rail-foreground: #899fa8;
+  --rail-border: #dddddd;
+  --rail-hover: #fafafa;
+  --rail-selected: var(--rail-background);
+  --rail-selected-foreground: #566c75;
+
+  --sidebar-background: #ffffff;
+  --sidebar-inset-background: var(--sidebar-background);
+  --sidebar-foreground: #899fa8;
+  --sidebar-muted-foreground: #899fa8;
+  --sidebar-selected-foreground: #566c75;
+
+  --thread-list-foreground: #566c75;
+  --thread-list-border: transparent;
+  --thread-list-hover: #fafafa;
+  --thread-list-selected: #fafafa;
+  --thread-list-selected-foreground: #566c75;
+  --thread-list-selected-border: transparent;
+
+  --message-list-background: var(--background);
+  --message-list-border: #dddddd;
+}

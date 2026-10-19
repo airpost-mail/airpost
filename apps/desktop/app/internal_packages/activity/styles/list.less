@@ -58,7 +58,7 @@
       vertical-align: baseline;
     }
     &:active {
-      background: darken(@btn-default-bg-color, 9%);
+      background: ~"hsl(from @{btn-default-bg-color} h s max(0, l - 9) / alpha)";
     }
   }
 
@@ -84,7 +84,7 @@
       color: @text-color;
       background: @background-primary;
       &:hover {
-        background: darken(@background-primary, 2%);
+        background: ~"hsl(from @{background-primary} h s max(0, l - 2) / alpha)";
       }
       .action-message {
         font-weight: @font-weight-semi-bold;
@@ -92,7 +92,7 @@
     }
 
     &:hover {
-      background: darken(@background-secondary, 2%);
+      background: ~"hsl(from @{background-secondary} h s max(0, l - 2) / alpha)";
     }
 
     .disclosure-triangle {

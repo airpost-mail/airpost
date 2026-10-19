@@ -1,0 +1,23 @@
+// A community theme from before theme tokens: LESS variables only, no tokens.css.
+@import 'base/ui-variables';
+
+@nord0: #2e3440;
+@nord1: #3b4252;
+@nord4: #d8dee9;
+@nord6: #eceff4;
+@nord8: #88c0d0;
+@nord11: #bf616a;
+@nord14: #a3be8c;
+
+@accent-primary: var(--system-accent, @nord8);
+@background-primary: @nord0;
+@background-secondary: darken(@nord0, 3%);
+@text-color: @nord6;
+@text-color-heading: @nord4;
+@color-success: @nord14;
+@color-danger: @nord11;
+@border-color-divider: lighten(@nord0, 8%);
+@list-bg: lighten(@nord0, 4%);
+@source-list-bg: @nord1;
+// A colour function on a variable the theme doesn't set, which only works on literal values.
+@input-bg: mix(@nord1, @background-off-primary, 90%);

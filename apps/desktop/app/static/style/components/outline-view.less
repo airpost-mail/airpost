@@ -1,7 +1,10 @@
 @import 'ui-variables';
 @import 'ui-mixins';
 
-@count-color: fadeout(@text-color-subtle, 40%);
+// The sidebar's own text tokens, so a dark sidebar on a light theme gets light text.
+@outline-text: var(--sidebar-foreground);
+@outline-text-muted: var(--sidebar-muted-foreground);
+@count-color: ~"rgb(from @{outline-text} r g b / max(alpha - 0.4, 0))";
 
 .outline-view {
   order: 1;
@@ -19,7 +22,7 @@
     display: flex;
     align-items: center;
     cursor: default;
-    color: @text-color-very-subtle;
+    color: @outline-text-muted;
     font-weight: @font-weight-semi-bold;
     font-size: @font-size-small * 0.9;
     padding-left: @padding-small-horizontal;
@@ -38,7 +41,7 @@
       margin-right: @padding-small-horizontal;
       cursor: pointer;
       img {
-        background: @text-color-very-subtle;
+        background: @outline-text-muted;
       }
       display: none;
     }
@@ -64,7 +67,7 @@
   .item-container {
     display: flex;
     &.dropping {
-      background-color: lighten(@source-list-bg, 20%);
+      background-color: ~"hsl(from @{source-list-bg} h s min(l + 20, 100))";
       .item {
         color: @source-list-active-color;
         img.content-mask {
@@ -75,7 +78,7 @@
   }
 
   .item {
-    color: @text-color-subtle;
+    color: @outline-text;
     flex: 1;
     display: flex;
     align-items: center;
@@ -91,7 +94,7 @@
     overflow: hidden;
 
     img.content-mask {
-      background-color: @text-color-subtle;
+      background-color: @outline-text;
       vertical-align: text-bottom;
     }
 
@@ -137,11 +140,11 @@
       width: 18px;
       text-align: center;
       border-radius: 3px;
-      color: @text-color-very-subtle;
+      color: @outline-text-muted;
       display: none;
       &:hover {
-        color: @text-color-subtle;
-        background: fade(@text-color-subtle, 15%);
+        color: @outline-text;
+        background: ~"rgb(from @{outline-text} r g b / 0.15)";
       }
     }
 
@@ -160,7 +163,7 @@
       }
     }
     &.dropping {
-      background-color: lighten(@source-list-bg, 20%);
+      background-color: ~"hsl(from @{source-list-bg} h s min(l + 20, 100))";
       color: @source-list-active-color;
       img.content-mask {
         background-color: @source-list-active-color;

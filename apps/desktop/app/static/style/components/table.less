@@ -17,7 +17,7 @@
 
   .table-row {
     .table-cell {
-      border: 1px solid lighten(@border-color-secondary, 5%);
+      border: 1px solid ~"hsl(from @{border-color-secondary} h s min(l + 5, 100))";
       color: @text-color-very-subtle;
 
       & > div {

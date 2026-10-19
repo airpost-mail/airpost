@@ -136,7 +136,7 @@
   .notification-error {
     background: linear-gradient(
       to top,
-      darken(@background-color-error, 4%) 0%,
+      ~"hsl(from @{background-color-error} h s max(0, l - 4) / alpha)" 0%,
       @background-color-error 100%
     );
     border-color: @background-color-error;

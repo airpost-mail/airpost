@@ -12,33 +12,14 @@
     "name": "ui-darkside-custom",
     "displayName": "Darkside Custom",
 
-> **Edit LESS files**  
-> Open the `ui-variables.less` file. To change colors, just comment out the default `@sidebar` and `@accent` variables and uncomment another theme or simply replace with your own colors.
+> **Edit the colours**  
+> Open `styles/tokens.css`. The whole theme follows two colours: `--sidebar-background` and the fallback in `--primary` (`var(--system-accent, …)`, so the "use the system accent colour" setting still applies). Replace them with one of the palettes listed at the top of the file, or your own. Update `styles/theme-colors.less` to match so the theme preview shows your colours.
 
-```sass
-// Default
-@sidebar: #313042;
-@accent: #F18260;
-
-// Luna
-// @sidebar: #202C46;
-// @accent: #39DFF8;
-
-// Zond
-// @sidebar: #333333;
-// @accent: #F6D49C;
-
-// Gemini
-// @sidebar: #00203C;
-// @accent: #F6B312;
-
-// Mercury
-// @sidebar: #555;
-// @accent: #999;
-
-// Apollo
-// @sidebar: #3A1E15;
-// @accent: #F6AA1C;
+```css
+:root {
+  --primary: var(--system-accent, #f18260);
+  --sidebar-background: #313042;
+}
 ```
 
 ### Feedback

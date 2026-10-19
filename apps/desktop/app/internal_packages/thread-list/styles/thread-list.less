@@ -10,7 +10,7 @@
   // subpixel antialiasing looks awful against dark background colors
   -webkit-font-smoothing: antialiased;
 
-  color: @text-color-inverse;
+  color: @list-focused-color;
 
   .participants {
     .unread-true {
@@ -21,18 +21,20 @@
     font-weight: @font-weight-normal;
   }
 
+  // brightness(600%) grayscale(100%) when the token is 1, no change when it's 0.
   .thread-icon,
   .draft-icon,
   .mail-important-icon {
-    filter: brightness(600%) grayscale(100%);
+    filter: brightness(calc(1 + 5 * var(--thread-list-focused-icon-whiten)))
+      grayscale(var(--thread-list-focused-icon-whiten));
   }
 
   .mail-label {
     // !important to override the label's own colours, which are inline styles.
-    background: fade(@text-color-inverse, 20%) !important;
-    color: @text-color-inverse !important;
+    background: color-mix(in srgb, @list-focused-color 20%, transparent) !important;
+    color: @list-focused-color !important;
     .x {
-      background-color: @text-color-inverse !important;
+      background-color: @list-focused-color !important;
     }
   }
 }
@@ -53,7 +55,7 @@
   }
 
   .swipe-backing {
-    background-color: darken(@background-primary, 10%);
+    background-color: ~"hsl(from @{background-primary} h s max(0, l - 10) / alpha)";
     &::after {
       color: fade(white, 90%);
       padding-top: 45px;
@@ -74,7 +76,7 @@
 
     &.swipe-trash {
       transition: background-color linear 150ms;
-      background-color: mix(#ed304b, @background-primary, 75%);
+      background-color: color-mix(in srgb, #ed304b 75%, @background-primary);
       &::after {
         transition: left linear 150ms, transform linear 150ms;
         content: 'Trash';
@@ -93,7 +95,7 @@
     &.swipe-archive,
     &.swipe-all {
       transition: background-color linear 150ms;
-      background-color: mix(#6cd420, @background-primary, 75%);
+      background-color: color-mix(in srgb, #6cd420 75%, @background-primary);
       &::after {
         transition: left linear 150ms, transform linear 150ms;
         content: 'Archive';
@@ -111,7 +113,7 @@
     }
     &.swipe-snooze {
       transition: background-color linear 150ms;
-      background-color: mix(#8d6be3, @background-primary, 75%);
+      background-color: color-mix(in srgb, #8d6be3 75%, @background-primary);
       &::after {
         transition: right linear 150ms, transform linear 150ms;
         content: 'Snooze';
@@ -130,8 +132,8 @@
   }
 
   .list-item {
-    background-color: darken(@background-primary, 2%);
-    border-bottom: 1px solid fade(@list-border, 60%);
+    background-color: ~"hsl(from @{background-primary} h s max(0, l - 2) / alpha)";
+    border-bottom: 1px solid color-mix(in srgb, @list-border 60%, transparent);
     line-height: 36px;
   }
 
@@ -214,9 +216,10 @@
   }
 
   .unread:not(.focused):not(.selected) {
-    background-color: @background-primary;
+    background-color: var(--thread-list-unread);
+    color: var(--thread-list-unread-foreground);
     &:hover {
-      background: darken(@background-primary, 2%);
+      background: ~"hsl(from var(--thread-list-unread) h s max(0, l - 2) / alpha)";
     }
     .snippet {
       color: @text-color-subtle;
@@ -269,7 +272,8 @@
       margin-left: 0;
     }
     &.thread-icon-unread {
-      background-image: url(../static/images/thread-list/icon-unread-@2x.png);
+      background-color: var(--unread);
+      -webkit-mask: url(../static/images/thread-list/icon-unread-@2x.png) center / 15px no-repeat;
     }
     &.thread-icon-replied {
       background-image: url(../static/images/thread-list/icon-replied-@2x.png);
@@ -301,10 +305,15 @@
   }
 }
 
+// Drafts and other lists have no read state, so only the thread list dims read rows.
+.thread-list .list-item:not(.unread):not(.selected):not(.focused) {
+  color: var(--thread-list-read-foreground);
+}
+
 .thread-list-empty-folder-bar {
-  color: mix(@color-warning, @text-color, 30%);
-  background-color: mix(@color-warning, @background-primary, 20%);
-  border-bottom: 1px solid mix(@color-warning, @border-color-divider, 30%);
+  color: color-mix(in srgb, @color-warning 30%, @text-color);
+  background-color: color-mix(in srgb, @color-warning 20%, @background-primary);
+  border-bottom: 1px solid color-mix(in srgb, @color-warning 30%, @border-color-divider);
   padding: @padding-base-vertical @padding-base-vertical @padding-base-vertical
     @padding-base-horizontal * 1.5;
   align-items: center;
@@ -375,9 +384,9 @@ body.platform-win32 {
 .thread-list .list-item:hover .list-column-HoverActions .inner {
   background-image: linear-gradient(
     to right,
-    fade(darken(@list-bg, 5%), 0%) 0%,
-    darken(@list-bg, 5%) 50%,
-    darken(@list-bg, 5%) 100%
+    color-mix(in srgb, ~"hsl(from @{list-bg} h s max(0, l - 5) / alpha)" 0%, transparent) 0%,
+    ~"hsl(from @{list-bg} h s max(0, l - 5) / alpha)" 50%,
+    ~"hsl(from @{list-bg} h s max(0, l - 5) / alpha)" 100%
   );
 }
 
@@ -398,7 +407,8 @@ body.platform-win32 {
     @list-focused-bg 100%
   );
   .action {
-    filter: invert(100%) brightness(300%);
+    filter: invert(var(--thread-list-focused-icon-whiten))
+      brightness(calc(1 + 2 * var(--thread-list-focused-icon-whiten)));
   }
   .action.action-archive {
     background: url(@archive-img) center no-repeat;
@@ -430,6 +440,8 @@ body.platform-win32 {
   visibility: inherit;
 }
 .thread-list .thread-icon-star-on-hover:hover {
+  background-color: transparent;
+  -webkit-mask: none;
   background-image: url(../static/images/thread-list/icon-star-hover-@2x.png);
   background-size: 16px;
 }
@@ -526,7 +538,8 @@ body.platform-win32 {
       @list-focused-bg 100%
     );
     .action {
-      filter: invert(100%) brightness(300%);
+      filter: invert(var(--thread-list-focused-icon-whiten))
+        brightness(calc(1 + 2 * var(--thread-list-focused-icon-whiten)));
     }
     .action.action-archive {
       background: url(@archive-img) center no-repeat;
@@ -560,4 +573,10 @@ body.is-blurred {
   .sheet-toolbar { 
     -webkit-app-region: none;
   }
+}
+
+// Thread icons are drawn for light rows; a dark theme inverts them. The unread dot and the star
+// keep their colour.
+:where(body.theme-scheme-dark) .thread-icon:not(.thread-icon-unread):not(.thread-icon-star) {
+  filter: invert(100%);
 }

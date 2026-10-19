@@ -18,8 +18,8 @@
 
   .fixed-popover {
     position: absolute;
-    color: @text-color;
-    background-color: @background-secondary;
+    color: var(--menu-foreground);
+    background-color: var(--menu-background);
     border-radius: @border-radius-base;
     box-shadow: 0 0.5px 0 @standard-shadow-color, 0 -0.5px 0 @standard-shadow-color,
       0.5px 0 0 @standard-shadow-color, -0.5px 0 0 @standard-shadow-color, 0 4px 7px @standard-shadow-color;
@@ -33,7 +33,7 @@
   }
   .fixed-popover-pointer {
     -webkit-mask-image: url('images/tooltip/tooltip-bg-pointer@2x.png');
-    background-color: @background-secondary;
+    background-color: var(--menu-background);
   }
   .fixed-popover-pointer.shadow {
     -webkit-mask-image: url('images/tooltip/tooltip-bg-pointer-shadow@2x.png');

@@ -1,0 +1,45 @@
+/* Dark: theme tokens over static/style/tokens/defaults.css (docs/theme-tokens.md). Tokens not set
+   here keep their defaults.css derivation, which follows the values below. theme-colors.less holds
+   the same colours as LESS variables for the theme previews in Preferences. */
+:root {
+  --background: #212121;
+  --foreground: #eee;
+  --secondary: #111318;
+  --muted: var(--background);
+  --primary: var(--system-accent, #4d8ff4);
+  --primary-foreground: #ffffff;
+  --border: #2a2d33;
+  --input: color-mix(in srgb, hsl(from var(--background) h s min(l + 10, 100)) 90%, transparent);
+
+  --subtle-foreground: color-mix(in srgb, var(--foreground) 80%, transparent);
+  --heading-foreground: #ffffff;
+  --link: var(--primary);
+  /* Lighter on hover: the darker accent shade is too dim for text on dark surfaces. */
+  --link-hover: color-mix(in srgb, var(--primary), white 15%);
+  --control: #2e2e2e;
+  --control-border: color-mix(in srgb, var(--foreground) 35%, transparent);
+
+  /* Deeper than the default 10% mix so text on focused rows keeps AA contrast. */
+  --selected: var(--system-accent-dark, color-mix(in srgb, var(--primary), black 28%));
+  --selected-foreground: var(--foreground);
+
+  /* One flat toolbar on every platform, the sidebar colour. */
+  --toolbar-background: var(--sidebar-background);
+  --toolbar-border: transparent;
+
+  --sidebar-background: #111318;
+  /* Selection is text-only, so the brighter accent shade reads on the dark panel. */
+  --sidebar-selected-foreground: var(--primary);
+
+  --thread-list-background: #31343a;
+  --thread-list-border: #383b42;
+  --thread-list-selected-foreground: var(--primary-foreground);
+  /* Read threads are dimmer than unread ones. */
+  --thread-list-read-foreground: #aaa;
+}
+
+/* On Linux and Windows the nav rail sits on the window background rather than the toolbar colour. */
+:root:where(:has(> body.platform-linux)),
+:root:where(:has(> body.platform-win32)) {
+  --rail-background: var(--background);
+}

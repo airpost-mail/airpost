@@ -38,10 +38,10 @@
     flex-shrink: 0;
     margin-right: 8px;
     white-space: nowrap;
-    background: fade(@black, 20%);
+    background: color-mix(in srgb, @black 20%, transparent);
     padding: 3px 8px;
     border-radius: 4px;
-    border: 1px solid fade(@background-primary, 20%);
+    border: 1px solid color-mix(in srgb, @background-primary 20%, transparent);
     cursor: pointer;
 
     img {
@@ -49,13 +49,13 @@
     }
 
     &:hover {
-      background: fade(@black, 30%);
-      border: 1px solid fade(@background-primary, 30%);
+      background: color-mix(in srgb, @black 30%, transparent);
+      border: 1px solid color-mix(in srgb, @background-primary 30%, transparent);
     }
 
     &:active {
-      background: fade(@black, 45%);
-      border: 1px solid fade(@background-primary, 40%);
+      background: color-mix(in srgb, @black 45%, transparent);
+      border: 1px solid color-mix(in srgb, @background-primary 40%, transparent);
     }
 
     .send-action-text,

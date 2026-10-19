@@ -2,6 +2,7 @@
   "name": "ui-taiga",
   "displayName": "Taiga",
   "theme": "ui",
+  "scheme": "light",
   "version": "0.2.8",
   "description": "A clean, Mailbox-inspired theme for Tern.",
   "license": "MIT",

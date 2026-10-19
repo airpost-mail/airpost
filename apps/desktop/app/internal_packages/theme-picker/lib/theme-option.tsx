@@ -25,10 +25,14 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
     this._writeContent();
   }
 
+  // Previews are drawn from LESS variables in an iframe without the theme tokens, so they
+  // compile against the literal variables in static/style/compat, like a LESS-variables theme.
   _getImportPaths() {
+    const { resourcePath } = AppEnv.getLoadSettings();
     return [
       ...new Set([
         this.props.theme.getStylesheetsPath(),
+        path.join(resourcePath, 'static', 'style', 'compat'),
         AppEnv.themes.getBaseTheme().getStylesheetsPath(),
       ]),
     ];
@@ -53,7 +57,9 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
       `${resourcePath}/internal_packages/theme-picker/preview-styles`,
       this.props.theme.getStylesheetsPath()
     );
-    let varImports = `@import "base/ui-variables";`;
+    // After the stylesheet: LESS takes a variable's last definition, so these override what its
+    // own `@import "ui-variables"` brought in.
+    let varImports = `@import "compat/base/ui-variables";`;
     if (fs.existsSync(`${this.props.theme.getStylesheetsPath()}/ui-variables.less`)) {
       varImports += `@import "${themeVarPath}/ui-variables";`;
     }
@@ -61,7 +67,7 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
       varImports += `@import "${themeVarPath}/theme-colors";`;
     }
     const less = fs.readFileSync(lessStylesheetPath, 'utf8');
-    return this.lessCache.cssForFile(lessStylesheetPath, [varImports, less].join('\n'));
+    return this.lessCache.cssForFile(lessStylesheetPath, [less, varImports].join('\n'));
   }
 
   _writeContent() {

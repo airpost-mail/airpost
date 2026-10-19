@@ -1,0 +1,168 @@
+/* Theme tokens at the Light theme's values. A theme overrides tokens on :root and nothing else;
+   docs/theme-tokens.md lists every token and the LESS variable each one replaces.
+
+   Where ui-variables.less derives one variable from another, the token is derived the same way
+   (var(), color-mix(), relative colours), so overriding a base token moves everything that
+   followed it in LESS. Custom properties resolve where they are declared, so this only holds
+   while themes declare on :root too.
+
+   This file must load before any theme's tokens: the platform blocks at the end use :root:where(),
+   which has the specificity of :root, so a theme's :root rule wins by order. */
+
+:root {
+  /* ---- Base (shadcn names) ---- */
+  --background: #ffffff;
+  --foreground: #231f20;
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover: var(--secondary);
+  --popover-foreground: var(--foreground);
+  /* --system-accent is set by ThemeManager when "use system accent" is on. A theme that sets
+     --primary keeps that behaviour by writing var(--system-accent, <its colour>). */
+  --primary: var(--system-accent, #1f70ec);
+  --primary-foreground: #ffffff;
+  --secondary: #f4f6f9;
+  --secondary-foreground: var(--foreground);
+  --muted: #fdfdfd;
+  --muted-foreground: color-mix(in srgb, var(--foreground) 60%, transparent);
+  --accent: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --accent-foreground: var(--foreground);
+  --destructive: #d9534f;
+  --destructive-foreground: #ffffff;
+  --border: color-mix(in srgb, var(--secondary) 90%, #000);
+  --input: color-mix(in srgb, hsl(from var(--background) h s max(l - 10, 0)) 90%, transparent);
+  --ring: var(--primary);
+
+  /* ---- Base, Tern additions ---- */
+  --subtle-foreground: color-mix(in srgb, var(--foreground) 85%, transparent);
+  --heading-foreground: #3a3f47;
+  --link: #1f70ec;
+  --link-hover: #1a5fcc;
+  --control: #ffffff;
+  --control-foreground: var(--foreground);
+  --control-border: var(--shadow-color);
+  --shadow-color: rgba(0, 0, 0, 0.15);
+
+  /* ---- State ---- */
+  --hover: var(--accent);
+  /* ThemeManager sets --system-accent-dark alongside --system-accent. */
+  --selected: var(--system-accent-dark, color-mix(in srgb, var(--primary), black 10%));
+  --selected-foreground: var(--background);
+  /* The unread dot in the thread list. The literal is the colour of the dot icon it replaced. */
+  --unread: #258fe1;
+  --success: #5cb346;
+  --warning: #f0ad4e;
+  --danger: var(--destructive);
+  /* Info banners and notices. */
+  --info: #1c65d4;
+
+  /* ---- Surface: toolbar (window toolbar strip and the frame around the nav-rail card) ---- */
+  --toolbar-background: var(--sidebar-background);
+  --toolbar-foreground: var(--heading-foreground);
+  --toolbar-muted-foreground: var(--subtle-foreground);
+  --toolbar-border: color-mix(in srgb, var(--foreground) 10%, transparent);
+  /* The part of the toolbar above each column, painted over --toolbar-background. Transparent
+     rather than var(--toolbar-background) so a blurred window keeps one continuous toolbar, and so
+     a LESS theme that paints .sheet-toolbar-container isn't covered. */
+  --sidebar-toolbar-background: transparent;
+  --thread-list-toolbar-background: transparent;
+  --message-list-toolbar-background: transparent;
+
+  /* ---- Surface: nav rail ---- */
+  --rail-background: var(--toolbar-background);
+  --rail-foreground: var(--subtle-foreground);
+  --rail-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --rail-hover: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --rail-selected: var(--background);
+  --rail-selected-foreground: var(--sidebar-selected-foreground);
+
+  /* ---- Surface: sidebar (folder list, calendar list, preferences and contacts sidebars) ---- */
+  --sidebar-background: #f1f3f7;
+  /* The sidebar inside the nav-rail card. */
+  --sidebar-inset-background: color-mix(in srgb, var(--sidebar-background) 50%, var(--background));
+  --sidebar-foreground: var(--subtle-foreground);
+  --sidebar-muted-foreground: var(--muted-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-hover: var(--hover);
+  /* Light selects by text colour only. */
+  --sidebar-selected: var(--sidebar-background);
+  --sidebar-selected-foreground: var(--selected);
+
+  /* ---- Surface: thread list (every ListTabular list) ---- */
+  --thread-list-background: var(--background);
+  --thread-list-foreground: var(--foreground);
+  --thread-list-muted-foreground: var(--muted-foreground);
+  --thread-list-border: #dcdfe5;
+  --thread-list-hover: hsl(from var(--thread-list-background) h s max(l - 5, 0));
+  --thread-list-unread: var(--background);
+  --thread-list-unread-foreground: var(--thread-list-foreground);
+  /* Text of read threads; a dark theme dims it below unread. */
+  --thread-list-read-foreground: var(--thread-list-foreground);
+  /* Selected: part of a multi-selection, or the open thread while the list isn't focused. */
+  --thread-list-selected: color-mix(in srgb, var(--selected) 17%, var(--thread-list-background));
+  --thread-list-selected-foreground: var(--thread-list-foreground);
+  --thread-list-selected-border: color-mix(in srgb, var(--selected) 50%, var(--thread-list-background));
+  /* Focused: the keyboard cursor row. */
+  --thread-list-focused: var(--selected);
+  --thread-list-focused-foreground: var(--selected-foreground);
+  --thread-list-focused-border: var(--thread-list-focused);
+  /* The stripe on the keyboard-cursor row's left edge. */
+  --thread-list-cursor: var(--thread-list-focused);
+  /* 1 whitens the thread list's image icons on focused rows (for a dark --thread-list-focused),
+     0 leaves them as drawn (for a pale one). A number so it can scale filter amounts. */
+  --thread-list-focused-icon-whiten: 1;
+
+  /* ---- Surface: reading pane (message list and its participant sidebar) ---- */
+  --message-list-background: var(--secondary);
+  --message-list-foreground: var(--foreground);
+  --message-list-muted-foreground: var(--muted-foreground);
+  --message-list-border: var(--border);
+
+  /* ---- Surface: composer ---- */
+  --composer-background: var(--background);
+  --composer-foreground: var(--foreground);
+  --composer-muted-foreground: var(--muted-foreground);
+  --composer-border: var(--border);
+
+  /* ---- Surface: menus and popovers ---- */
+  --menu-background: var(--popover);
+  --menu-foreground: var(--popover-foreground);
+  --menu-muted-foreground: var(--subtle-foreground);
+  --menu-border: var(--border);
+
+  /* ---- Surface: modals ---- */
+  --modal-background: var(--background);
+  --modal-foreground: var(--foreground);
+  --modal-muted-foreground: var(--muted-foreground);
+  --modal-border: var(--border);
+  --modal-overlay: rgba(255, 255, 255, 0.58);
+
+  /* ---- Shape ---- */
+  --radius: 3px;
+  --radius-sm: calc(var(--radius) * 2 / 3);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 5 / 3);
+  --font-sans: 'Inter', 'Helvetica', sans-serif;
+  --font-serif: Georgia, 'Times New Roman', Times, serif;
+  --font-mono: 'DejaVu Sans Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
+  --font-heading: var(--font-sans);
+  --font-size: 14px;
+  /* Padding multiplier for kit components; legacy LESS paddings ignore it. */
+  --density: 1;
+  /* Plain lengths, no calc(): ListTabular reads row heights from JS and parses a number. */
+  --row-height: 36px;
+  --row-height-narrow: 85px;
+}
+
+/* Linux and Windows draw the toolbar on the window background; macOS joins it to the sidebar. */
+:root:where(:has(> body.platform-linux)),
+:root:where(:has(> body.platform-win32)) {
+  --toolbar-background: var(--background);
+}
+:root:where(:has(> body.platform-linux)) {
+  --toolbar-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+/* Inter renders blurry on Windows. */
+:root:where(:has(> body.platform-win32)) {
+  --font-sans: system-ui;
+}

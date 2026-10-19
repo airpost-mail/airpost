@@ -7,8 +7,8 @@
 
   .header-container {
     flex-shrink: 0; // Don't squish the header! There may be a search box here
-    background-color: @background-secondary;
-    border-bottom: 1px solid @border-color-secondary;
+    background-color: var(--menu-background);
+    border-bottom: 1px solid var(--menu-border);
     padding: 3px;
     position: relative;
   }
@@ -18,7 +18,7 @@
   }
 
   .content-container {
-    background: @background-secondary;
+    background: var(--menu-background);
     width: 100%;
     margin-top: -1px;
     overflow: auto;
@@ -30,12 +30,12 @@
       background: transparent;
     }
     &::-webkit-scrollbar-thumb {
-      background: fade(@text-color, 20%);
+      background: color-mix(in srgb, @text-color 20%, transparent);
       border-radius: 4px;
       border: 2px solid transparent;
       background-clip: padding-box;
       &:hover {
-        background: fade(@text-color, 35%);
+        background: color-mix(in srgb, @text-color 35%, transparent);
         background-clip: padding-box;
       }
     }
@@ -101,7 +101,7 @@
 
   .item:not(.active):not(.selected):hover {
     text-decoration: none;
-    background-color: fade(@text-color, 5%);
+    background-color: color-mix(in srgb, @text-color 5%, transparent);
   }
 }
 body.platform-win32 {
@@ -116,7 +116,7 @@ body.platform-win32 {
 
 .dropdown-menu {
   .menu {
-    background: @background-secondary;
+    background: var(--menu-background);
     width: 250px;
     max-height: 400px;
     box-shadow: 0 0.5px 0 @standard-shadow-color, 0 -0.5px 0 @standard-shadow-color,

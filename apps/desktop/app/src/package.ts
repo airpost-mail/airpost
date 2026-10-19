@@ -98,6 +98,18 @@ export default class Package {
     return !!this.json.theme;
   }
 
+  /** A theme's `scheme`: whether its content surfaces are light or dark. */
+  scheme(): 'light' | 'dark' | null {
+    const { scheme } = this.json;
+    return scheme === 'light' || scheme === 'dark' ? scheme : null;
+  }
+
+  /** A theme's `sidebarScheme`, for a sidebar that differs from the rest (Darkside). */
+  sidebarScheme(): 'light' | 'dark' | null {
+    const { sidebarScheme } = this.json;
+    return sidebarScheme === 'light' || sidebarScheme === 'dark' ? sidebarScheme : null;
+  }
+
   isOptional() {
     return !!this.json.isOptional;
   }
@@ -166,7 +178,8 @@ export default class Package {
         stylesheets = [path.join(stylesRoot, index)];
       } else {
         stylesheets = filenames
-          .filter((fn) => fn.endsWith('ss'))
+          // ThemeManager loads a theme's tokens itself, ahead of its other stylesheets.
+          .filter((fn) => fn.endsWith('ss') && !(this.isTheme() && fn === 'tokens.css'))
           .map((fn) => path.join(stylesRoot, fn));
       }
     } catch (err) {

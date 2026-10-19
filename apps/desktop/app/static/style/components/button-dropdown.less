@@ -118,7 +118,7 @@
       }
       .item:hover {
         text-decoration: none;
-        background-color: fade(@text-color, 3%);
+        background-color: color-mix(in srgb, @text-color 3%, transparent);
       }
     }
   }
@@ -154,7 +154,7 @@ body.platform-win32 {
         background: @btn-emphasis-bg-color;
         &:hover {
           border-radius: 0;
-          background: darken(@btn-emphasis-bg-color, 10%);
+          background: ~"hsl(from @{btn-emphasis-bg-color} h s max(l - 10, 0))";
         }
         &:active {
           background: @btn-emphasis-bg-color;
@@ -163,19 +163,19 @@ body.platform-win32 {
       .primary-item {
         box-shadow: -1px 0 0 2px @btn-emphasis-bg-color;
         &:hover {
-          box-shadow: -1px 0 0 2px darken(@btn-emphasis-bg-color, 10%);
+          box-shadow: -1px 0 0 2px ~"hsl(from @{btn-emphasis-bg-color} h s max(l - 10, 0))";
         }
       }
       .secondary-picker {
         box-shadow: 1px 0 0 2px @btn-emphasis-bg-color;
         &:hover {
-          box-shadow: 1px 0 0 2px darken(@btn-emphasis-bg-color, 10%);
+          box-shadow: 1px 0 0 2px ~"hsl(from @{btn-emphasis-bg-color} h s max(l - 10, 0))";
         }
       }
       .only-item {
         box-shadow: 0 0 0 2px @btn-emphasis-bg-color;
         &:hover {
-          box-shadow: 0 0 0 2px darken(@btn-emphasis-bg-color, 10%);
+          box-shadow: 0 0 0 2px ~"hsl(from @{btn-emphasis-bg-color} h s max(l - 10, 0))";
         }
       }
     }

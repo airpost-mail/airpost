@@ -70,7 +70,7 @@ body.platform-win32 {
     &:focus {
       border: 0;
       border-radius: 0;
-      box-shadow: 0 0 0 2px darken(@input-border-color, 20%);
+      box-shadow: 0 0 0 2px ~"hsl(from @{input-border-color} h s max(l - 20, 0))";
     }
   }
 }

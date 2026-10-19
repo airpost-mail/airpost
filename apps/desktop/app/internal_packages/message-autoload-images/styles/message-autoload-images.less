@@ -1,10 +1,10 @@
 @import 'ui-variables';
 
 .autoload-images-header {
-  background-color: mix(@background-primary, #ffcc11, 80%);
-  border: 1px solid mix(@black, mix(@background-primary, #ffcc11, 50%), 25%);
+  background-color: color-mix(in srgb, @background-primary 80%, #ffcc11);
+  border: 1px solid color-mix(in srgb, @black 25%, color-mix(in srgb, @background-primary 50%, #ffcc11));
   border-radius: @border-radius-base;
-  color: mix(@text-color-subtle, #ffcc11, 40%);
+  color: color-mix(in srgb, @text-color-subtle 40%, #ffcc11);
   margin: @padding-base-vertical 0;
   padding: @padding-base-vertical @padding-base-horizontal;
   white-space: nowrap;
@@ -12,9 +12,9 @@
   text-overflow: ellipsis;
 
   .option {
-    color: fade(mix(@text-color-subtle, #ffcc11, 80%), 70%);
+    color: ~"rgb(from color-mix(in srgb, @{text-color-subtle} 80%, #ffcc11) r g b / 70%)";
   }
   .option:hover {
-    color: mix(@black, mix(@text-color-subtle, #ffcc11, 80%), 25%);
+    color: color-mix(in srgb, @black 25%, color-mix(in srgb, @text-color-subtle 80%, #ffcc11));
   }
 }

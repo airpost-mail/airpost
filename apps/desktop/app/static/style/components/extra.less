@@ -4,7 +4,7 @@
 .quoted-text-control {
   color: @text-color-very-subtle;
   display: inline-block;
-  border: 1px solid fade(@text-color-very-subtle, 15%);
+  border: 1px solid ~"rgb(from @{text-color-very-subtle} r g b / 0.15)";
   border-radius: 3px;
   line-height: 11px;
   padding: 1px 5px;
@@ -15,7 +15,7 @@
   &:hover {
     cursor: pointer;
     color: @text-color-subtle;
-    border: 1px solid fade(@text-color-subtle, 35%);
+    border: 1px solid ~"rgb(from @{text-color-subtle} r g b / 0.35)";
   }
 
   .dots {
@@ -40,12 +40,29 @@ body.platform-win32 {
   }
 }
 
+// ThemeManager sets theme-scheme-* and theme-sidebar-scheme-* on body. :where() keeps the sidebar
+// rules at the specificity of `.account-sidebar`, so a theme's own rule still wins by order.
 :root {
-  .label-chip-bounds(@list-bg);
-  .label-dot-bounds(@background-primary);
+  .label-chip-bounds-light();
+  .label-dot-bounds-light();
 }
-.account-sidebar {
-  .label-dot-bounds(@source-list-bg);
+body.theme-scheme-dark {
+  .label-chip-bounds-dark();
+  .label-dot-bounds-dark();
+}
+// Image icons are drawn for light backgrounds; a dark theme inverts them. :where() leaves these at
+// the specificity of `img.content-dark`, so a theme's own filter still wins by order.
+:where(body.theme-scheme-dark) {
+  img.content-dark,
+  img.content-light {
+    filter: invert(100%);
+  }
+}
+:where(body.theme-sidebar-scheme-light) .account-sidebar {
+  .label-dot-bounds-light();
+}
+:where(body.theme-sidebar-scheme-dark) .account-sidebar {
+  .label-dot-bounds-dark();
 }
 
 .mail-label {

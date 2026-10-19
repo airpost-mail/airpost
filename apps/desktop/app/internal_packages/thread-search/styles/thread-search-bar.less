@@ -25,7 +25,7 @@
   &:focus {
     border: 0;
     border-radius: 0;
-    box-shadow: 0 0 0 2px darken(@input-border-color, 20%);
+    box-shadow: 0 0 0 2px ~"hsl(from @{input-border-color} h s max(0, l - 20) / alpha)";
   }
   &.placeholder {
     .tokenizing-contenteditable .layer-tokens {
@@ -69,7 +69,7 @@
         }
       }
       &:hover:not(.selected) {
-        background-color: fade(@black, 3%);
+        background-color: color-mix(in srgb, @black 3%, transparent);
       }
       .suggestion-token {
         color: @token-color;
@@ -82,8 +82,8 @@
       color: @text-color-subtle;
       line-height: 1.4em;
       padding: @padding-base-vertical @padding-small-horizontal;
-      background-color: fade(@black, 3%);
-      border-top: 1px solid fade(@black, 6%);
+      background-color: color-mix(in srgb, @black 3%, transparent);
+      border-top: 1px solid color-mix(in srgb, @black 6%, transparent);
       font-size: @font-size-small;
     }
   }

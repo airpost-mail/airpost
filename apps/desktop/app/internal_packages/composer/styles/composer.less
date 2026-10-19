@@ -6,8 +6,9 @@
 @compose-width: 800px;
 @compose-min-height: 70px;
 
-@blurred-primary-color: mix(@background-primary, #ffbb00, 96%);
-@blurred-off-primary-color: mix(@background-off-primary, #ffbb00, 96%);
+@composer-bg: var(--composer-background);
+@blurred-primary-color: color-mix(in srgb, @composer-bg 96%, #ffbb00);
+@blurred-off-primary-color: color-mix(in srgb, @background-off-primary 96%, #ffbb00);
 
 // Basic Rich Editor
 
@@ -53,7 +54,7 @@
 
 .RichEditor-root blockquote {
   border-left: 2px solid @border-color-divider;
-  color: mix(@text-color, purple, 50%);
+  color: color-mix(in srgb, @text-color 50%, purple);
   margin: 0;
   padding: 0 0 0 10px;
   -webkit-margin-after: initial !important;
@@ -97,7 +98,7 @@
   }
 
   blockquote {
-    color: mix(@text-color, purple, 50%);
+    color: color-mix(in srgb, @text-color 50%, purple);
   }
 
   &:hover {
@@ -123,7 +124,7 @@
   }
 
   .inner {
-    background: @background-primary;
+    background: @composer-bg;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -168,7 +169,7 @@
 
         &:active,
         &:focus {
-          background-color: @background-primary;
+          background-color: @composer-bg;
         }
       }
     }
@@ -181,7 +182,7 @@
   .dropdown {
     z-index: 4;
     position: absolute;
-    background: @background-primary;
+    background: @composer-bg;
     border-radius: @border-radius-base @border-radius-base 0 @border-radius-base;
     box-shadow: 0 0.5px 0 @standard-shadow-color, 0 -0.5px 0 @standard-shadow-color,
       0.5px 0 0 @standard-shadow-color, -0.5px 0 0 @standard-shadow-color,
@@ -244,7 +245,7 @@ body.platform-win32 {
 
 .action-bar-cover-gen() {
   .action-bar-cover {
-    background-image: linear-gradient(to right, fade(@action-bar-bg, 0) 0%, @action-bar-bg 10%);
+    background-image: linear-gradient(to right, color-mix(in srgb, @action-bar-bg 0%, transparent) 0%, @action-bar-bg 10%);
   }
 }
 
@@ -274,7 +275,7 @@ body.platform-win32 {
     z-index: 1000;
     background: rgba(255, 255, 255, 0.7);
     border-radius: @border-radius-base;
-    border: 4px dashed lighten(@gray, 30%);
+    border: 4px dashed ~"hsl(from @{gray} h s min(100, l + 30) / alpha)";
     text-align: center;
     line-height: 2.3em;
     pointer-events: none;
@@ -284,7 +285,7 @@ body.platform-win32 {
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      color: lighten(@gray, 20%);
+      color: ~"hsl(from @{gray} h s min(100, l + 20) / alpha)";
       font-weight: 500;
       font-size: 1.1em;
 
@@ -292,7 +293,7 @@ body.platform-win32 {
         margin: auto;
         display: block;
         margin-bottom: 20px;
-        background-color: lighten(@gray, 20%);
+        background-color: ~"hsl(from @{gray} h s min(100, l + 20) / alpha)";
       }
     }
   }
@@ -642,7 +643,7 @@ body.platform-win32 {
 
   .composer-inner-wrap {
     .composer-action-bar-wrap {
-      @action-bar-bg: darken(@background-primary, 1%);
+      @action-bar-bg: ~"hsl(from @{background-primary} h s max(0, l - 1) / alpha)";
       background: @action-bar-bg;
       border-top: 1px solid @border-color-divider;
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -676,8 +677,8 @@ body.platform-win32 {
 
       .show-more-fade {
         background: linear-gradient(to right,
-            fade(@blurred-primary-color, 0%) 0%,
-            fade(@blurred-primary-color, 100%) 40%);
+            color-mix(in srgb, @blurred-primary-color 0%, transparent) 0%,
+            @blurred-primary-color 40%);
       }
 
       .composer-action-bar-wrap {
@@ -694,12 +695,12 @@ body.platform-win32 {
     .message-item-white-wrap.composer-outer-wrap.focused {
       box-shadow: 0 0 0.5px rgba(0, 0, 0, 0.28), 0 1px 1.5px rgba(0, 0, 0, 0.08),
         0 0 3px @accent-primary;
-      background-color: @background-primary;
+      background-color: @composer-bg;
 
       .show-more-fade {
         background: linear-gradient(to right,
-            fade(@background-primary, 0%) 0%,
-            fade(@background-primary, 100%) 40%);
+            color-mix(in srgb, @composer-bg 0%, transparent) 0%,
+            @composer-bg 40%);
       }
 
       .composer-action-bar-wrap {
@@ -709,7 +710,7 @@ body.platform-win32 {
       }
 
       .RichEditor-toolbar .inner {
-        background: @background-primary;
+        background: @composer-bg;
       }
     }
   }
@@ -819,7 +820,7 @@ body.platform-win32 {
 .emoji-picker {
   z-index: 3;
   padding: 4px;
-  background: @background-primary;
+  background: @composer-bg;
   box-shadow: @standard-shadow;
   min-width: 140px;
 

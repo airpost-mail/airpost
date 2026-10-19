@@ -3,25 +3,40 @@
 // colour then reads in light and dark themes alike, without per-theme colour lists: chip text
 // keeps 4.5:1 against the chip (WCAG 1.4.3) and dots 3:1 against the surface (1.4.11), checked
 // for every scheme colour in label-color-store-spec.
-.label-chip-bounds(@bg) when (lightness(@bg) >= 50%) {
+.label-chip-bounds-light() {
   --label-chip-lmin: 0.86;
   --label-chip-lmax: 0.95;
   --label-chip-cmax: 0.16;
   --label-text-l: 0.4;
   --label-text-cmax: 0.18;
 }
-.label-chip-bounds(@bg) when (lightness(@bg) < 50%) {
+.label-chip-bounds-dark() {
   --label-chip-lmin: 0.28;
   --label-chip-lmax: 0.38;
   --label-chip-cmax: 0.1;
   --label-text-l: 0.88;
   --label-text-cmax: 0.12;
 }
-.label-dot-bounds(@bg) when (lightness(@bg) >= 50%) {
+.label-dot-bounds-light() {
   --label-dot-lmin: 0.3;
   --label-dot-lmax: 0.58;
 }
-.label-dot-bounds(@bg) when (lightness(@bg) < 50%) {
+.label-dot-bounds-dark() {
   --label-dot-lmin: 0.7;
   --label-dot-lmax: 0.88;
+}
+
+// For themes that compile against literal colours (compat/base/ui-variables.less). Core picks
+// the bounds by the theme-scheme-* body classes instead, since its colours are tokens.
+.label-chip-bounds(@bg) when (lightness(@bg) >= 50%) {
+  .label-chip-bounds-light();
+}
+.label-chip-bounds(@bg) when (lightness(@bg) < 50%) {
+  .label-chip-bounds-dark();
+}
+.label-dot-bounds(@bg) when (lightness(@bg) >= 50%) {
+  .label-dot-bounds-light();
+}
+.label-dot-bounds(@bg) when (lightness(@bg) < 50%) {
+  .label-dot-bounds-dark();
 }

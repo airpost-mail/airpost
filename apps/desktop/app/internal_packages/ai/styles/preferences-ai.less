@@ -71,7 +71,7 @@
 
   .ai-status {
     display: block;
-    color: darken(@color-warning, 12%);
+    color: ~"hsl(from @{color-warning} h s max(0, l - 12) / alpha)";
   }
 
   .ai-triage-progress {

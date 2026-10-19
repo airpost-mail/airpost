@@ -1,0 +1,9 @@
+{
+  "name": "theme-with-tokens",
+  "displayName": "Tokens",
+  "theme": "ui",
+  "scheme": "dark",
+  "engines": {
+    "mailspring": "*"
+  }
+}

@@ -115,10 +115,10 @@
       border-right: none;
     }
     &:hover {
-        background-color: darken(@btn-default-bg-color, 5%);
+        background-color: ~"hsl(from @{btn-default-bg-color} h s max(l - 5, 0))";
     }
     &:active {
-        background-color: darken(@btn-default-bg-color, 8%);
+        background-color: ~"hsl(from @{btn-default-bg-color} h s max(l - 8, 0))";
     }
   }
 
@@ -210,7 +210,7 @@ body.platform-win32 {
   }
 
   &:hover {
-    border: 1px dashed fade(@text-color, 20%);
+    border: 1px dashed color-mix(in srgb, @text-color 20%, transparent);
 
     .file-action-icon,
     .file-name-container,

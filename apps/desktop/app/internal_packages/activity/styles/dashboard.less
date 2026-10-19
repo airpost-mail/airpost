@@ -74,10 +74,10 @@
   }
 
   .usage-note {
-    color: mix(@color-warning, @text-color-subtle, 20%);
+    color: color-mix(in srgb, @color-warning 20%, @text-color-subtle);
     padding: @padding-base-vertical @padding-base-horizontal;
-    background: mix(@color-warning, @background-primary, 10%);
-    border-left: 4px solid mix(@color-warning, @border-color-divider, 20%);
+    background: color-mix(in srgb, @color-warning 10%, @background-primary);
+    border-left: 4px solid color-mix(in srgb, @color-warning 20%, @border-color-divider);
     border-radius: @border-radius-base;
     margin: 0 @report-gutter @report-gap @report-gutter;
   }
@@ -90,7 +90,7 @@
     right: 0;
     bottom: 0;
     pointer-events: none;
-    background-color: fade(@background-primary, 82%);
+    background-color: color-mix(in srgb, @background-primary 82%, transparent);
     transition: opacity 200ms linear;
     z-index: 5;
 
@@ -329,7 +329,7 @@
     td {
       padding: 0 @padding-base-horizontal 0 0;
       line-height: 34px;
-      border-bottom: 1px solid fade(@border-color-divider, 50%);
+      border-bottom: 1px solid color-mix(in srgb, @border-color-divider 50%, transparent);
       &.numeric {
         text-align: right;
         font-variant-numeric: tabular-nums;

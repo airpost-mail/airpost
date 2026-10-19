@@ -36,7 +36,7 @@
 
   .integrations-status {
     margin-top: 10px;
-    color: darken(@color-warning, 12%);
+    color: ~"hsl(from @{color-warning} h s max(0, l - 12) / alpha)";
     font-size: 12px;
   }
 }

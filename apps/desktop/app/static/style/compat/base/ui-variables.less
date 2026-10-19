@@ -1,0 +1,89 @@
+// Literal values for the variables that base/ui-variables.less maps to theme
+// tokens, as they were before the tokens. A theme that ships only a
+// ui-variables.less (no styles/tokens.css) compiles against this file:
+// ThemeManager puts static/style/compat ahead of static/style in the import
+// path, so the theme's `@import 'base/ui-variables'` lands here. The theme's
+// overrides then stay LESS colours, LESS colour functions on any of these keep
+// working, and compat/tokens.less turns the result into tokens.
+//
+// Needs synchronous imports (less-cache uses syncImport): with async imports,
+// LESS may keep base/ui-variables.less where ui-mixins.less imports it, after
+// these values, and its var() values then win.
+@import '../../base/ui-variables';
+
+@accent-primary: var(--system-accent, @blue);
+@accent-primary-dark: var(--system-accent-dark, color-mix(in srgb, @accent-primary, black 10%));
+
+@background-primary: @white;
+@background-off-primary: #fdfdfd;
+@background-secondary: #f4f6f9;
+
+@color-info: @blue-dark;
+@background-color-info: @blue-light;
+@color-success: #5cb346;
+@color-warning: #f0ad4e;
+@color-error: #d9534f;
+@color-danger: #d9534f;
+
+@component-active-color: @accent-primary-dark;
+@component-active-bg: @background-primary;
+
+@border-color-primary: darken(@background-primary, 10%);
+@border-color-secondary: mix(@background-secondary, #000, 90%);
+@border-color-divider: @border-color-secondary;
+
+@text-color: @black;
+@text-color-subtle: fadeout(@text-color, 15%);
+@text-color-very-subtle: fadeout(@text-color, 40%);
+@text-color-inverse: @white;
+@text-color-inverse-subtle: fadeout(@text-color-inverse, 20%);
+@text-color-inverse-very-subtle: fadeout(@text-color-inverse, 50%);
+@text-color-heading: #3a3f47;
+@text-color-link: @blue;
+@text-color-link-hover: @blue-dark;
+@text-color-link-active: @blue-dark;
+
+@font-family-sans-serif: 'Inter', 'Helvetica', sans-serif;
+@font-family-serif: Georgia, 'Times New Roman', Times, serif;
+@font-family-monospace: 'DejaVu Sans Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
+@font-family: @font-family-sans-serif;
+@font-family-heading: @font-family-sans-serif;
+@font-size: @font-size-base;
+
+@border-radius-base: 3px;
+@border-radius-large: 5px;
+@border-radius-small: 2px;
+
+@standard-shadow-color: rgba(0, 0, 0, 0.15);
+
+@btn-border-color: @standard-shadow-color;
+@btn-default-bg-color: darken(@background-primary, 0.5%);
+@btn-default-text-color: @text-color;
+@btn-action-bg-color: @color-success;
+@btn-action-text-color: @text-color;
+@btn-emphasis-text-color: @text-color-inverse;
+@btn-danger-bg-color: @color-danger;
+@btn-danger-text-color: @text-color-inverse;
+
+@dropdown-default-bg-color: @background-primary;
+@dropdown-default-text-color: @text-color;
+@dropdown-default-border-color: fadeout(@border-color-primary, 10%);
+
+@input-bg: @white;
+@input-border-color: fadeout(@border-color-primary, 10%);
+
+@panel-background-color: #f1f3f7;
+@source-list-bg: @panel-background-color;
+@source-list-active-bg: @panel-background-color;
+@source-list-active-color: @component-active-color;
+@source-list-inset-bg: mix(@source-list-bg, @background-primary, 50%);
+
+@list-bg: @white;
+@list-border: #dcdfe5;
+@list-hover-bg: darken(@list-bg, 4%);
+@list-focused-color: @list-bg;
+@list-focused-bg: @component-active-color;
+@list-focused-border: @list-focused-bg;
+@list-selected-color: inherit;
+@list-selected-bg: color-mix(in srgb, @component-active-color 17%, @list-bg);
+@list-selected-border: color-mix(in srgb, @component-active-color 50%, @list-bg);

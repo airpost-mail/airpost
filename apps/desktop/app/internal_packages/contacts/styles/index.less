@@ -2,8 +2,8 @@
 
 .contacts-perspective-list {
   display: flex;
-  background-color: @source-list-bg;
-  color: @text-color-subtle;
+  background-color: var(--sidebar-background);
+  color: var(--sidebar-foreground);
 
   .item.found-in-mail-disabled:not(.selected) {
     opacity: 0.5;
@@ -291,13 +291,13 @@
       z-index: 10;
       align-items: center;
       justify-content: center;
-      background-color: mix(@color-info, @background-primary, 15%);
-      border: 2px dashed mix(@color-info, @border-color-divider, 60%);
+      background-color: color-mix(in srgb, @color-info 15%, @background-primary);
+      border: 2px dashed color-mix(in srgb, @color-info 60%, @border-color-divider);
       pointer-events: none;
 
       .vcf-drop-overlay-label {
         font-size: 1.1em;
-        color: mix(@color-info, @text-color, 30%);
+        color: color-mix(in srgb, @color-info 30%, @text-color);
         font-weight: @font-weight-medium;
       }
     }
@@ -305,9 +305,9 @@
 }
 
 .found-in-mail-enabled-bar {
-  color: mix(@color-info, @text-color, 30%);
-  background-color: mix(@color-info, @background-primary, 20%);
-  border-bottom: 1px solid mix(@color-info, @border-color-divider, 30%);
+  color: color-mix(in srgb, @color-info 30%, @text-color);
+  background-color: color-mix(in srgb, @color-info 20%, @background-primary);
+  border-bottom: 1px solid color-mix(in srgb, @color-info 30%, @border-color-divider);
   padding: 5px 12px;
   align-items: center;
   display: flex;

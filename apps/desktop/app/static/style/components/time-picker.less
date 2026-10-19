@@ -7,7 +7,7 @@
   input {
     width: 5.5em;
     &.invalid {
-      background: fade(@color-error, 10%);
+      background: color-mix(in srgb, @color-error 10%, transparent);
     }
   }
 
@@ -42,7 +42,7 @@
       }
       &.focused,
       &:hover {
-        background: fade(@text-color, 5%);
+        background: color-mix(in srgb, @text-color 5%, transparent);
       }
       .rel-text {
         font-size: 0.8em;

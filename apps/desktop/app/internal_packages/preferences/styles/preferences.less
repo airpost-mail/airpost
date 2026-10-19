@@ -63,8 +63,9 @@
     flex: none;
     display: flex;
     flex-direction: column;
-    background-color: @source-list-bg;
-    border-right: 1px solid @border-color-divider;
+    background-color: var(--sidebar-background);
+    color: var(--sidebar-foreground);
+    border-right: 1px solid var(--sidebar-border);
     font-size: 13px;
   }
   .preferences-sidebar-search {
@@ -88,12 +89,12 @@
   .preferences-sidebar-label {
     font-size: 11px;
     font-weight: 600;
-    color: @text-color-very-subtle;
+    color: var(--sidebar-muted-foreground);
     padding: 10px 8px 3px;
   }
   .preferences-sidebar-separator {
     height: 1px;
-    background: @border-color-divider;
+    background: var(--sidebar-border);
     margin: 10px 8px;
   }
   .preferences-sidebar-item {
@@ -105,11 +106,11 @@
     cursor: default;
     outline: none;
     &:hover {
-      background: color-mix(in srgb, @text-color 6%, transparent);
+      background: var(--sidebar-hover);
     }
     &.active {
       background: color-mix(in srgb, @accent-primary 16%, transparent);
-      color: @text-color-link;
+      color: var(--sidebar-selected-foreground);
       font-weight: 550;
     }
     &:focus-visible:not(.active) {
@@ -151,7 +152,7 @@
     cursor: default;
     outline: none;
     &:hover {
-      background: color-mix(in srgb, @text-color 6%, transparent);
+      background: var(--sidebar-hover);
     }
     &.active {
       background: color-mix(in srgb, @accent-primary 16%, transparent);
@@ -174,12 +175,12 @@
     }
     small {
       display: block;
-      color: @text-color-subtle;
+      color: var(--sidebar-muted-foreground);
       font-size: 11.5px;
     }
   }
   .preferences-sidebar-empty {
-    color: @text-color-very-subtle;
+    color: var(--sidebar-muted-foreground);
     padding: 12px 8px;
   }
 

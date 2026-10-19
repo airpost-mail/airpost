@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { applyColorScheme, darkenDocument, formatColor, isDarkColor } from '@tern/email-dark';
 import { darkPalette, themeBackgroundAt } from '../lib/email-render-mode';
+import { compatTokensSource } from '../../../src/theme-manager';
 
 const less = require('less');
 
@@ -17,10 +18,10 @@ const EMAIL = `
   <p id="black" style="color: #000000">Order number 1042.</p>
 </td></tr></table>`;
 
-function compile(file: string, paths: string[]) {
+function compile(file: string, paths: string[], source = fs.readFileSync(file, 'utf8')) {
   let css = '';
   less.render(
-    fs.readFileSync(file, 'utf8'),
+    source,
     { filename: file, paths, syncImport: true },
     (err: Error, result: { css: string }) => {
       if (err) throw err;
@@ -41,11 +42,25 @@ function themeDirs() {
 
 function themeCss(theme: string) {
   const stylesDir = path.join(resourcePath, 'internal_packages', theme, 'styles');
+  const compat = AppEnv.themes.usesCompatTokens({ getStylesheetsPath: () => stylesDir });
   const paths = [
     stylesDir,
+    ...(compat ? [path.join(resourcePath, 'static', 'style', 'compat')] : []),
     path.join(resourcePath, 'static', 'style'),
     path.join(resourcePath, 'static', 'style', 'base'),
   ];
+  const tokensFile = path.join(stylesDir, 'tokens.css');
+  const tokens = [
+    fs.readFileSync(path.join(resourcePath, 'static', 'style', 'tokens', 'defaults.css'), 'utf8'),
+    fs.existsSync(tokensFile) ? fs.readFileSync(tokensFile, 'utf8') : '',
+    compat
+      ? compile(
+          path.join(resourcePath, 'static', 'style', 'compat', 'theme.less'),
+          paths,
+          compatTokensSource(resourcePath, stylesDir)
+        )
+      : '',
+  ].join('\n');
   const app = [
     path.join(resourcePath, 'static', 'style', 'index.less'),
     path.join(resourcePath, 'internal_packages', 'message-list', 'styles', 'message-list.less'),
@@ -55,6 +70,7 @@ function themeCss(theme: string) {
     .filter((f) => f.endsWith('.less'))
     .map((f) => path.join(stylesDir, f));
   return {
+    tokens,
     app: [...app, ...own].map((f) => compile(f, paths)).join('\n'),
     emailFrame: compile(path.join(resourcePath, 'static', 'style', 'email-frame.less'), paths),
   };
@@ -76,7 +92,8 @@ describe('email darkening under the bundled themes', function () {
     const hostDoc = host.contentDocument;
     hostDoc.open();
     hostDoc.write(
-      `<!DOCTYPE html><style>${accent ? SYSTEM_ACCENT : ''}</style><style>${css.app}</style>` +
+      `<!DOCTYPE html><style>${css.tokens}</style><style>${accent ? SYSTEM_ACCENT : ''}</style>` +
+        `<style>${css.app}</style>` +
         `<style>${css.emailFrame}</style>` +
         `<body class="platform-darwin theme-ui-light theme-${theme}"><div id="message-list">` +
         `<div class="messages-wrap"><div class="scroll-region-content-inner">` +
@@ -102,7 +119,7 @@ describe('email darkening under the bundled themes', function () {
     const doc = frame.contentDocument;
     doc.open();
     doc.write(
-      `<!DOCTYPE html><style>${accent ? SYSTEM_ACCENT : ''}` +
+      `<!DOCTYPE html><style>${css.tokens}${accent ? SYSTEM_ACCENT : ''}` +
         `${css.emailFrame.replace(/.ignore-in-parent-frame/g, '')}</style>` +
         `<div id="inbox-html-wrapper">${EMAIL}</div>`
     );

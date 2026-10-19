@@ -34,6 +34,19 @@ describe('EmailFrameStylesStore', () => {
     expect(themeStyles).not.toContain('ignore-in-parent-frame');
   });
 
+  it('sends the theme tokens with the email frame styles, in document order', () => {
+    const tokens = document.createElement('style');
+    tokens.setAttribute('source-path', 'tokens:theme');
+    tokens.innerText = ':root { --foreground: rgb(7, 8, 9); }';
+    document.head.insertBefore(tokens, coreSheet);
+    store._findStyles();
+    tokens.remove();
+
+    const { themeStyles } = store.styles();
+    expect(themeStyles).toContain('--foreground: rgb(7, 8, 9)');
+    expect(themeStyles.indexOf('--foreground')).toBeLessThan(themeStyles.indexOf('font-family'));
+  });
+
   it('reads the theme text and link colors the email frame uses', () => {
     themeSheet.innerText +=
       '\n.ignore-in-parent-frame #inbox-html-wrapper { color: rgb(1, 2, 3); }' +

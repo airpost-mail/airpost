@@ -211,7 +211,7 @@
     background: color-mix(in srgb, @color-success 14%, transparent);
   }
   &.warn {
-    color: darken(@color-warning, 12%);
+    color: ~"hsl(from @{color-warning} h s max(l - 12, 0))";
     background: color-mix(in srgb, @color-warning 18%, transparent);
   }
   &.bad {

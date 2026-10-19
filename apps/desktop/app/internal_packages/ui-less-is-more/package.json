@@ -2,6 +2,7 @@
   "name": "less-is-more",
   "displayName": "Less Is More",
   "theme": "ui",
+  "scheme": "light",
   "version": "1.0.7",
   "description": "A minimal approach to email in Tern",
   "license": "MIT",

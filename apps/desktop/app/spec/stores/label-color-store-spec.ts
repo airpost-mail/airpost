@@ -53,15 +53,14 @@ const contrast = (y1: number, y2: number) => (Math.max(y1, y2) + 0.05) / (Math.m
 
 const clamp = (min: number, v: number, max: number) => Math.min(max, Math.max(min, v));
 
-/** The custom properties each `.label-*-bounds` guard sets, read from the stylesheet itself. */
+/** The custom properties each `.label-*-bounds-light/-dark` mixin sets, read from the stylesheet itself. */
 function bounds(mixin: string, dark: boolean): Record<string, number> {
   const file = path.join(
     AppEnv.getLoadSettings().resourcePath,
     'static/style/mixins/label-colors.less'
   );
   const less = fs.readFileSync(file).toString();
-  const guard = dark ? '< 50%' : '>= 50%';
-  const start = less.indexOf(`.${mixin}(@bg) when (lightness(@bg) ${guard})`);
+  const start = less.indexOf(`.${mixin}-${dark ? 'dark' : 'light'}() {`);
   const body = less.slice(start, less.indexOf('}', start));
   const out: Record<string, number> = {};
   for (const [, name, value] of body.matchAll(/--label-([\w-]+):\s*([\d.]+);/g)) {

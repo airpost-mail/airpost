@@ -19,7 +19,7 @@
     }
   }
 
-  color: fadeout(@text-color, 20%);
+  color: color-mix(in srgb, @text-color 80%, transparent);
   background-color: @background-primary;
   display: flex;
   flex-direction: column;
@@ -171,7 +171,7 @@
     border-bottom: 1px solid @border-color-divider;
 
     &:hover {
-      background-color: fade(@background-secondary, 50%);
+      background-color: color-mix(in srgb, @background-secondary 50%, transparent);
     }
 
     &:last-child {
@@ -239,7 +239,7 @@
       border-radius: @border-radius-small;
 
       &:hover {
-        background-color: fade(@text-color-inverse, 20%);
+        background-color: color-mix(in srgb, @text-color-inverse 20%, transparent);
       }
     }
 
@@ -247,7 +247,7 @@
       width: 14px;
       height: 14px;
       border-radius: @border-radius-small;
-      border: 1px solid fade(@black, 20%);
+      border: 1px solid color-mix(in srgb, @black 20%, transparent);
     }
 
     .color-picker-chevron {
@@ -305,7 +305,7 @@
       border-radius: 50%;
       margin-right: 8px;
       flex-shrink: 0;
-      border: 1px solid fade(@black, 15%);
+      border: 1px solid color-mix(in srgb, @black 15%, transparent);
     }
 
     select {
@@ -424,7 +424,7 @@
 
     &:hover {
       color: @text-color;
-      background-color: fade(@background-secondary, 50%);
+      background-color: color-mix(in srgb, @background-secondary 50%, transparent);
     }
 
     &:last-child {
@@ -607,12 +607,12 @@
         }
         .suggestion-time,
         .suggestion-location {
-          color: fadeout(@text-color-inverse, 20%);
+          color: color-mix(in srgb, @text-color-inverse 80%, transparent);
         }
       }
 
       &:hover:not(.selected) {
-        background-color: fade(@black, 3%);
+        background-color: color-mix(in srgb, @black 3%, transparent);
       }
 
       .suggestion-calendar-dot {

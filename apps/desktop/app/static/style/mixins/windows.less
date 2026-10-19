@@ -5,10 +5,10 @@
   background: transparent;
   border-radius: 0;
   &:hover {
-    background: fade(@border-color-divider, 80%);
+    background: color-mix(in srgb, @border-color-divider 80%, transparent);
   }
 }
 .windows-btn-border {
   border: 0;
-  box-shadow: 0 0 0 2px fade(@border-color-divider, 80%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, @border-color-divider 80%, transparent);
 }

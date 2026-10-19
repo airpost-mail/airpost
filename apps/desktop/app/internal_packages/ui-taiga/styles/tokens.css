@@ -1,0 +1,21 @@
+/* Taiga: white surfaces, slate-grey text, a sky-blue accent, light blue multi-selection.
+   Tokens only; docs/theme-tokens.md lists what each token covers. */
+:root {
+  --foreground: #697278;
+  --subtle-foreground: #9da4aa;
+  --muted-foreground: #87939a;
+  --secondary: #ffffff;
+
+  --primary: var(--system-accent, #5dade1);
+  --selected: var(--system-accent-dark, color-mix(in srgb, var(--primary), black 20%));
+
+  --control-foreground: #87939a;
+
+  --sidebar-background: #ffffff;
+
+  --thread-list-hover: #f0f7fa;
+  --thread-list-selected: #ddedf4;
+  --thread-list-selected-border: #ddedf4;
+
+  --radius: 4px;
+}

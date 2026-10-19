@@ -2,6 +2,7 @@
   "name": "ui-light",
   "displayName": "Light",
   "theme": "ui",
+  "scheme": "light",
   "version": "0.1.0",
   "description": "The N1 Client Theme",
   "license": "GPL-3.0-only",

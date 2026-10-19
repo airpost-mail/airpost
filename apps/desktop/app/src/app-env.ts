@@ -831,6 +831,8 @@ export default class AppEnvConstructor {
     item.setAttribute('tabIndex', '-1');
     if (isRTL) {
       item.setAttribute('dir', 'rtl');
+      // Portals (menus, popovers, tooltips) render outside the workspace.
+      document.documentElement.setAttribute('dir', 'rtl');
     }
 
     const React = require('react');

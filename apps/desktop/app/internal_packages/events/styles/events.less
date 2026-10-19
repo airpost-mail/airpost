@@ -95,10 +95,10 @@
         text-align: center;
 
         &:hover {
-          background: mix(@background-primary, @text-color, 95%);
+          background: color-mix(in srgb, @background-primary 95%, @text-color);
         }
         &:active {
-          background: mix(@background-primary, @text-color, 92%);
+          background: color-mix(in srgb, @background-primary 92%, @text-color);
         }
 
         &.DECLINED {

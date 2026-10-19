@@ -97,8 +97,8 @@
     opacity: 1;
     .scrollbar-handle {
       cursor: default;
-      background-color: lighten(@gray, 30%);
-      border: 1px solid lighten(@gray, 20%);
+      background-color: ~"hsl(from @{gray} h s min(l + 30, 100))";
+      border: 1px solid ~"hsl(from @{gray} h s min(l + 20, 100))";
       .tooltip {
         opacity: 1;
         display: block;
@@ -112,8 +112,8 @@
   }
 
   .scrollbar-handle {
-    background-color: lighten(@gray, 40%);
-    border: 1px solid lighten(@gray, 30%);
+    background-color: ~"hsl(from @{gray} h s min(l + 40, 100))";
+    border: 1px solid ~"hsl(from @{gray} h s min(l + 30, 100))";
     border-radius: 8px;
     .tooltip {
       opacity: 0;
