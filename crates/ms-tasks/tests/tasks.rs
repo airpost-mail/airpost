@@ -2181,7 +2181,7 @@ fn executor_unsnoozes_to_the_inbox_and_resurfaces() {
     let wire = e.imap.outbox.submissions()[0].text();
     for h in [
         "via Tern\" <me@example.com>",
-        "To: \"me@example.com\" <me@example.com>",
+        "To: <me@example.com>",
         "In-Reply-To: <m3@x>",
     ] {
         assert!(wire.contains(h), "{h} missing from\n{wire}");
