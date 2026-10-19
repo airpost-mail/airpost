@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 /// The setting holding the rules, in order.
 pub const MAIL_RULES_KEY: &str = "mailRules";
-/// Unix milliseconds: rules apply to mail dated after it. The engine sets it when it starts
-/// a store without one.
+/// Unix milliseconds: rules apply to mail dated from it on. The engine sets it to the time of
+/// the first `settings.set` that stores rules, when there is none yet.
 pub const MAIL_RULES_AUTO_SINCE_KEY: &str = "mailRulesAutoSince";
 
 /// `rules.reprocess`: applies the account's enabled rules to the mail in its inbox, newest
