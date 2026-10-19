@@ -155,7 +155,7 @@ test("a template's subject line is saved into the template file", async () => {
 
 // --- Mail Rules ---
 
-test('creating a mail rule persists it to localStorage', async () => {
+test('creating a mail rule stores it in the mailRules config key', async () => {
   await mainWindow.locator('.preferences-tabs .item:has-text("Mail Rules")').click();
   await mainWindow.waitForTimeout(500);
 
@@ -188,13 +188,10 @@ test('creating a mail rule persists it to localStorage', async () => {
     await mainWindow.waitForTimeout(500);
   }
 
-  // Verify the rule was persisted to localStorage (debounced 1s save)
-  await mainWindow.waitForTimeout(1_500);
-
-  const rules = await mainWindow.evaluate(() => {
-    const raw = window.localStorage.getItem('MailRules-V2');
-    return raw ? JSON.parse(raw) : [];
-  });
+  // The store writes the rules to config synchronously; the engine runs them from there.
+  const rules = await mainWindow.evaluate(
+    () => (window as any).AppEnv.config.get('mailRules') || []
+  );
 
   expect(rules.length).toBeGreaterThan(0);
   const newRule = rules.find((r: any) => r.name === 'Untitled Rule');
