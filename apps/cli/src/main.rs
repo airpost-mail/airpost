@@ -17,9 +17,11 @@ mod mail_actions;
 mod output;
 mod platform;
 mod read;
+mod service;
 mod settings;
 mod status;
 mod tasks;
+mod units;
 mod watch;
 
 use clap::Parser;

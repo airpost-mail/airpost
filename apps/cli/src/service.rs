@@ -1,0 +1,1337 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! `tern service install|uninstall|list` and `tern engine install|uninstall`: service plugins
+//! (docs/desktop-client-plan.md T19, stage 19) and the detached engine they talk to, run by
+//! the OS as user units ([`crate::units`]).
+//!
+//! A plugin declares its service in `package.json`:
+//!
+//! ```json
+//! "tern": {"service": {"bin": "bin/my-service", "args": ["--quiet"]}}
+//! ```
+//!
+//! `bin` is a path inside the package, or an object keyed by `<platform>-<arch>` in Node's
+//! names (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`). Installing copies that one
+//! file to `<config>/services/<package>/` and the unit runs the copy, so the binary the user
+//! was shown (path and SHA-256, TD29) is the one that runs until the next install, whatever
+//! later happens to the package. The unit sets `TERN_CONFIG_DIR` and `TERN_SERVICE_PACKAGE`.
+//! What was installed, from where and with which hash is kept in `<config>/services.json`.
+//!
+//! Units are loaded (`launchctl bootstrap`, `systemctl --user enable`) only when they are
+//! written to the manager's own directory; `--unit-dir` writes them elsewhere and loads
+//! nothing, as does `--no-load` or `TERN_SERVICE_NO_LOAD`.
+
+use std::collections::BTreeMap;
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+
+use crate::app::Ctx;
+use crate::error::{CliError, Result};
+use crate::output;
+use crate::units::{self, Manager, Names, UnitSpec};
+
+pub const RECORDS_FILE: &str = "services.json";
+pub const SERVICES_DIR: &str = "services";
+/// launchd's stdout and stderr for the engine unit, in the profile.
+const ENGINE_LOG: &str = "engine-launchd.log";
+const SERVICE_LOG: &str = "service.log";
+
+/// Where units go, and whether to load them.
+#[derive(Clone, Debug)]
+pub struct Place {
+    pub manager: Manager,
+    pub dir: PathBuf,
+    pub load: bool,
+    pub names: Names,
+}
+
+/// The unit options every install and uninstall command takes.
+#[derive(Clone, Debug, Default)]
+pub struct PlaceArgs {
+    pub unit_dir: Option<PathBuf>,
+    pub manager: Option<Manager>,
+    pub no_load: bool,
+}
+
+impl Place {
+    pub fn resolve(config_dir: &Path, args: &PlaceArgs) -> Result<Place> {
+        let manager = match args.manager.or_else(Manager::host) {
+            Some(m) => m,
+            None => {
+                return Err(CliError::failed(
+                    "Tern installs services with launchd (macOS) or systemd (Linux) only",
+                ))
+            }
+        };
+        let (dir, own_dir) = match &args.unit_dir {
+            Some(d) => (absolute(d)?, false),
+            None => (
+                manager.default_dir().ok_or_else(|| {
+                    CliError::failed("HOME is not set, so there is no user unit directory")
+                })?,
+                true,
+            ),
+        };
+        let no_load_env = std::env::var_os("TERN_SERVICE_NO_LOAD").is_some_and(|v| !v.is_empty());
+        let default_profile = tern_client::discovery::default_config_dirs()
+            .into_iter()
+            .next();
+        Ok(Place {
+            manager,
+            dir,
+            load: own_dir && !args.no_load && !no_load_env,
+            names: Names::for_profile(config_dir, default_profile.as_deref()),
+        })
+    }
+
+    fn path(&self, name: &str) -> PathBuf {
+        self.dir.join(self.manager.file_name(name))
+    }
+}
+
+fn absolute(p: &Path) -> Result<PathBuf> {
+    if p.is_absolute() {
+        return Ok(p.to_owned());
+    }
+    std::env::current_dir()
+        .map(|d| d.join(p))
+        .map_err(|e| CliError::failed(format!("no current directory: {e}")))
+}
+
+// -- Manifest -------------------------------------------------------------------------------
+
+/// A package's `tern.service`, resolved for this machine.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Manifest {
+    pub package: String,
+    pub dir: PathBuf,
+    /// The binary in the package, canonical.
+    pub bin: PathBuf,
+    pub args: Vec<String>,
+}
+
+/// `darwin-arm64`, `linux-x64`, ...: Node's `process.platform`-`process.arch`, the names
+/// plugin authors know.
+pub fn platform_key() -> String {
+    let os = match std::env::consts::OS {
+        "macos" => "darwin",
+        "windows" => "win32",
+        other => other,
+    };
+    let arch = match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        "x86_64" => "x64",
+        "x86" => "ia32",
+        other => other,
+    };
+    format!("{os}-{arch}")
+}
+
+/// The desktop's rule for package names (`isValidPackageName` in `src/package.ts`).
+pub fn valid_package_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+}
+
+pub fn read_manifest(dir: &Path, platform: &str) -> std::result::Result<Manifest, String> {
+    let file = dir.join("package.json");
+    let text =
+        fs::read_to_string(&file).map_err(|e| format!("could not read {}: {e}", file.display()))?;
+    let json: Value = serde_json::from_str(&text)
+        .map_err(|e| format!("{} is not valid JSON: {e}", file.display()))?;
+    let package = json["name"].as_str().unwrap_or_default().to_owned();
+    if !valid_package_name(&package) {
+        return Err(format!(
+            "{} has an invalid or missing \"name\"",
+            file.display()
+        ));
+    }
+    let service = &json["tern"]["service"];
+    if !service.is_object() {
+        return Err(format!("{package} declares no service (tern.service)"));
+    }
+    let entry = match &service["bin"] {
+        Value::String(s) => s.clone(),
+        Value::Object(per_platform) => match per_platform.get(platform) {
+            Some(Value::String(s)) => s.clone(),
+            _ => {
+                let mut have: Vec<&str> = per_platform.keys().map(String::as_str).collect();
+                have.sort();
+                return Err(format!(
+                    "{package} has no service binary for {platform} (it has: {})",
+                    have.join(", ")
+                ));
+            }
+        },
+        _ => return Err(format!("{package}: tern.service.bin is missing")),
+    };
+    let args = match &service["args"] {
+        Value::Null => Vec::new(),
+        Value::Array(a) if a.iter().all(Value::is_string) => a
+            .iter()
+            .filter_map(|v| v.as_str().map(str::to_owned))
+            .collect(),
+        _ => {
+            return Err(format!(
+                "{package}: tern.service.args must be a list of strings"
+            ))
+        }
+    };
+    let relative = Path::new(&entry);
+    if entry.is_empty() || relative.is_absolute() {
+        return Err(format!(
+            "{package}: tern.service.bin must be a path inside the package"
+        ));
+    }
+    let root = dir
+        .canonicalize()
+        .map_err(|e| format!("{}: {e}", dir.display()))?;
+    let bin = root
+        .join(relative)
+        .canonicalize()
+        .map_err(|e| format!("{package}: the service binary {entry}: {e}"))?;
+    if !bin.starts_with(&root) {
+        return Err(format!(
+            "{package}: the service binary {entry} is outside the package"
+        ));
+    }
+    let meta = fs::metadata(&bin).map_err(|e| format!("{}: {e}", bin.display()))?;
+    if !meta.is_file() || !is_executable(&meta) {
+        return Err(format!(
+            "{package}: the service binary {} is not an executable file",
+            bin.display()
+        ));
+    }
+    Ok(Manifest {
+        package,
+        dir: root,
+        bin,
+        args,
+    })
+}
+
+#[cfg(unix)]
+fn is_executable(meta: &fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    meta.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn is_executable(_meta: &fs::Metadata) -> bool {
+    true
+}
+
+/// The installed package named `name`: in `<config>/packages`, else `<config>/dev/packages`
+/// (the desktop's dev mode), matched by the `name` in its package.json as the desktop does.
+pub fn find_package(config_dir: &Path, name: &str) -> Result<PathBuf> {
+    let roots = [
+        config_dir.join("packages"),
+        config_dir.join("dev").join("packages"),
+    ];
+    for root in &roots {
+        let direct = root.join(name);
+        if package_name(&direct).as_deref() == Some(name) {
+            return Ok(direct);
+        }
+        let Ok(entries) = fs::read_dir(root) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            if package_name(&entry.path()).as_deref() == Some(name) {
+                return Ok(entry.path());
+            }
+        }
+    }
+    Err(CliError::failed(format!(
+        "no plugin named {name} in {}; install it in Tern first, or give --package-dir",
+        roots[0].display()
+    )))
+}
+
+fn package_name(dir: &Path) -> Option<String> {
+    let text = fs::read_to_string(dir.join("package.json")).ok()?;
+    let json: Value = serde_json::from_str(&text).ok()?;
+    json["name"].as_str().map(str::to_owned)
+}
+
+pub fn sha256_file(path: &Path) -> std::io::Result<String> {
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(units::hex(&hasher.finalize()))
+}
+
+// -- Records --------------------------------------------------------------------------------
+
+/// `<config>/services.json`: what `tern` installed, so it can be shown, checked and removed.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Records {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engine: Option<EngineRecord>,
+    #[serde(default)]
+    pub services: BTreeMap<String, ServiceRecord>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceRecord {
+    pub package: String,
+    /// The package directory it was installed from.
+    pub source: PathBuf,
+    /// The binary in that package that was copied.
+    pub source_bin: PathBuf,
+    /// The copy the unit runs.
+    pub bin: PathBuf,
+    pub args: Vec<String>,
+    pub sha256: String,
+    pub manager: String,
+    pub name: String,
+    pub unit: PathBuf,
+    pub installed_at: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineRecord {
+    pub bin: PathBuf,
+    pub sha256: String,
+    pub manager: String,
+    pub name: String,
+    pub unit: PathBuf,
+    pub installed_at: i64,
+}
+
+impl Records {
+    pub fn load(config_dir: &Path) -> Result<Records> {
+        let path = config_dir.join(RECORDS_FILE);
+        match fs::read_to_string(&path) {
+            Ok(text) => serde_json::from_str(&text)
+                .map_err(|e| CliError::failed(format!("{} is not valid: {e}", path.display()))),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Records::default()),
+            Err(e) => Err(CliError::failed(format!("{}: {e}", path.display()))),
+        }
+    }
+
+    pub fn save(&self, config_dir: &Path) -> Result<()> {
+        let text = serde_json::to_string_pretty(self).unwrap_or_default() + "\n";
+        write_atomic(&config_dir.join(RECORDS_FILE), text.as_bytes(), false)
+    }
+}
+
+fn write_atomic(path: &Path, bytes: &[u8], executable: bool) -> Result<()> {
+    let fail = |e: std::io::Error| CliError::failed(format!("{}: {e}", path.display()));
+    let dir = path.parent().unwrap_or(Path::new("."));
+    fs::create_dir_all(dir).map_err(fail)?;
+    let tmp = dir.join(format!(
+        ".{}.tmp-{}",
+        path.file_name().unwrap_or_default().to_string_lossy(),
+        std::process::id()
+    ));
+    fs::write(&tmp, bytes).map_err(fail)?;
+    set_mode(&tmp, if executable { 0o755 } else { 0o644 }).map_err(fail)?;
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        fail(e)
+    })
+}
+
+#[cfg(unix)]
+fn set_mode(path: &Path, mode: u32) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))
+}
+
+#[cfg(not(unix))]
+fn set_mode(_path: &Path, _mode: u32) -> std::io::Result<()> {
+    Ok(())
+}
+
+fn now() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+// -- Loading --------------------------------------------------------------------------------
+
+/// Starts and stops units. Only [`System`] touches the service manager.
+pub trait Loader {
+    fn load(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()>;
+    /// Stops the unit and forgets it; a unit that isn't loaded is no error.
+    fn unload(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()>;
+}
+
+pub struct System;
+
+impl System {
+    fn run(program: &str, args: &[&str]) -> std::result::Result<(), String> {
+        if cfg!(test) {
+            return Err(format!("tests never run {program}"));
+        }
+        let out = std::process::Command::new(program)
+            .args(args)
+            .output()
+            .map_err(|e| format!("could not run {program}: {e}"))?;
+        if out.status.success() {
+            return Ok(());
+        }
+        let err = String::from_utf8_lossy(&out.stderr);
+        Err(format!(
+            "{program} {} failed: {}",
+            args.join(" "),
+            err.trim()
+        ))
+    }
+
+    #[cfg(unix)]
+    fn gui_domain() -> String {
+        // SAFETY: getuid has no preconditions and can't fail.
+        format!("gui/{}", unsafe { libc::getuid() })
+    }
+
+    #[cfg(not(unix))]
+    fn gui_domain() -> String {
+        String::new()
+    }
+}
+
+impl Loader for System {
+    fn load(&mut self, manager: Manager, name: &str, unit: &Path) -> Result<()> {
+        let unit = unit.to_string_lossy();
+        let result = match manager {
+            Manager::Launchd => {
+                let domain = Self::gui_domain();
+                // A loaded job keeps its old definition until it is booted out.
+                let _ = Self::run("launchctl", &["bootout", &format!("{domain}/{name}")]);
+                Self::run("launchctl", &["bootstrap", &domain, &unit])
+            }
+            Manager::Systemd => {
+                let service = format!("{name}.service");
+                Self::run("systemctl", &["--user", "daemon-reload"])
+                    .and_then(|()| Self::run("systemctl", &["--user", "enable", &service]))
+                    .and_then(|()| Self::run("systemctl", &["--user", "restart", &service]))
+            }
+        };
+        result.map_err(CliError::failed)
+    }
+
+    fn unload(&mut self, manager: Manager, name: &str, _unit: &Path) -> Result<()> {
+        match manager {
+            Manager::Launchd => {
+                let _ = Self::run(
+                    "launchctl",
+                    &["bootout", &format!("{}/{name}", Self::gui_domain())],
+                );
+            }
+            Manager::Systemd => {
+                let _ = Self::run(
+                    "systemctl",
+                    &["--user", "disable", "--now", &format!("{name}.service")],
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+fn reload_after_remove(place: &Place) {
+    if place.load && place.manager == Manager::Systemd {
+        let _ = System::run("systemctl", &["--user", "daemon-reload"]);
+    }
+}
+
+// -- Engine unit ----------------------------------------------------------------------------
+
+/// The engine binary beside `tern`: `mailsync-rs` in the desktop's bundle, `mailsync` in a
+/// cargo target directory or a dist install.
+fn default_engine_bin() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?.canonicalize().ok()?;
+    let dir = exe.parent()?;
+    let suffix = std::env::consts::EXE_SUFFIX;
+    ["mailsync-rs", "mailsync"]
+        .iter()
+        .map(|n| dir.join(format!("{n}{suffix}")))
+        .find(|p| p.is_file())
+}
+
+#[derive(Clone, Debug)]
+pub struct EnginePlan {
+    pub bin: PathBuf,
+    pub sha256: String,
+    pub name: String,
+    pub unit: PathBuf,
+    pub text: String,
+}
+
+impl EnginePlan {
+    pub fn new(
+        config_dir: &Path,
+        place: &Place,
+        bin: Option<&Path>,
+        key_file: Option<&Path>,
+    ) -> Result<EnginePlan> {
+        let bin = match bin {
+            Some(b) => absolute(b)?,
+            None => default_engine_bin().ok_or_else(|| {
+                CliError::usage(
+                    "no engine binary beside tern (mailsync-rs or mailsync); give --engine-bin",
+                )
+            })?,
+        };
+        let bin = bin
+            .canonicalize()
+            .map_err(|e| CliError::failed(format!("the engine binary {}: {e}", bin.display())))?;
+        let sha256 =
+            sha256_file(&bin).map_err(|e| CliError::failed(format!("{}: {e}", bin.display())))?;
+        let mut env = vec![(
+            "CONFIG_DIR_PATH".to_owned(),
+            config_dir.to_string_lossy().into_owned(),
+        )];
+        if let Some(k) = key_file {
+            env.push((
+                "TERN_ENGINE_KEY_FILE".to_owned(),
+                absolute(k)?.to_string_lossy().into_owned(),
+            ));
+        }
+        let name = place.names.engine(place.manager);
+        let spec = UnitSpec {
+            name: name.clone(),
+            description: "Tern mail engine".to_owned(),
+            program: vec![
+                bin.to_string_lossy().into_owned(),
+                "--mode".into(),
+                "serve".into(),
+                "--detached".into(),
+            ],
+            env,
+            after: None,
+            log: Some(config_dir.join(ENGINE_LOG)),
+        };
+        let text = units::render(place.manager, &spec).map_err(CliError::failed)?;
+        Ok(EnginePlan {
+            bin,
+            sha256,
+            unit: place.path(&name),
+            name,
+            text,
+        })
+    }
+
+    fn to_json(&self) -> Value {
+        json!({
+            "installed": false,
+            "bin": self.bin,
+            "sha256": self.sha256,
+            "name": self.name,
+            "path": self.unit,
+            "text": self.text,
+        })
+    }
+
+    fn apply(&self, config_dir: &Path, place: &Place, loader: &mut dyn Loader) -> Result<()> {
+        write_atomic(&self.unit, self.text.as_bytes(), false)?;
+        let mut records = Records::load(config_dir)?;
+        records.engine = Some(EngineRecord {
+            bin: self.bin.clone(),
+            sha256: self.sha256.clone(),
+            manager: place.manager.as_str().to_owned(),
+            name: self.name.clone(),
+            unit: self.unit.clone(),
+            installed_at: now(),
+        });
+        records.save(config_dir)?;
+        if place.load {
+            loader.load(place.manager, &self.name, &self.unit)?;
+        }
+        Ok(())
+    }
+}
+
+pub fn engine_install(
+    config_dir: &Path,
+    place: &Place,
+    bin: Option<&Path>,
+    key_file: Option<&Path>,
+    dry_run: bool,
+    loader: &mut dyn Loader,
+) -> Result<Value> {
+    let plan = EnginePlan::new(config_dir, place, bin, key_file)?;
+    let mut out = plan.to_json();
+    out["manager"] = json!(place.manager.as_str());
+    out["load"] = json!(place.load);
+    if !dry_run {
+        plan.apply(config_dir, place, loader)?;
+        out["installed"] = json!(true);
+    }
+    Ok(out)
+}
+
+pub fn engine_uninstall(
+    config_dir: &Path,
+    place: &Place,
+    loader: &mut dyn Loader,
+) -> Result<Value> {
+    let mut records = Records::load(config_dir)?;
+    if !records.services.is_empty() {
+        let names: Vec<&str> = records.services.keys().map(String::as_str).collect();
+        return Err(CliError::failed(format!(
+            "these services run on the engine unit; uninstall them first: {}",
+            names.join(", ")
+        )));
+    }
+    let name = place.names.engine(place.manager);
+    let unit = place.path(&name);
+    if !unit.exists() && records.engine.is_none() {
+        return Err(CliError::failed("the engine unit is not installed"));
+    }
+    if place.load {
+        loader.unload(place.manager, &name, &unit)?;
+    }
+    remove_file(&unit)?;
+    reload_after_remove(place);
+    records.engine = None;
+    records.save(config_dir)?;
+    Ok(json!({"name": name, "path": unit, "removed": true}))
+}
+
+fn remove_file(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(CliError::failed(format!("{}: {e}", path.display()))),
+    }
+}
+
+// -- Service units --------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Default)]
+pub struct ServiceArgs {
+    pub package: String,
+    pub package_dir: Option<PathBuf>,
+    pub engine_bin: Option<PathBuf>,
+    /// The engine unit's `TERN_ENGINE_KEY_FILE`, when the engine unit is written.
+    pub engine_key_file: Option<PathBuf>,
+    pub expect_sha256: Option<String>,
+    pub dry_run: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ServicePlan {
+    pub manifest: Manifest,
+    pub sha256: String,
+    pub installed_bin: PathBuf,
+    pub name: String,
+    pub unit: PathBuf,
+    pub text: String,
+    /// The engine unit to write first; None when it is there already.
+    pub engine: Option<EnginePlan>,
+    engine_name: String,
+    engine_unit: PathBuf,
+}
+
+impl ServicePlan {
+    pub fn new(config_dir: &Path, place: &Place, args: &ServiceArgs) -> Result<ServicePlan> {
+        if !valid_package_name(&args.package) {
+            return Err(CliError::usage(format!(
+                "{:?} is not a plugin name",
+                args.package
+            )));
+        }
+        let dir = match &args.package_dir {
+            Some(d) => absolute(d)?,
+            None => find_package(config_dir, &args.package)?,
+        };
+        let manifest = read_manifest(&dir, &platform_key()).map_err(CliError::failed)?;
+        if manifest.package != args.package {
+            return Err(CliError::failed(format!(
+                "{} holds the plugin {}, not {}",
+                dir.display(),
+                manifest.package,
+                args.package
+            )));
+        }
+        let sha256 = sha256_file(&manifest.bin)
+            .map_err(|e| CliError::failed(format!("{}: {e}", manifest.bin.display())))?;
+        check_expected(&sha256, args.expect_sha256.as_deref(), &manifest.bin)?;
+        let service_dir = config_dir.join(SERVICES_DIR).join(&manifest.package);
+        let installed_bin = service_dir.join(manifest.bin.file_name().unwrap_or_default());
+        let engine_name = place.names.engine(place.manager);
+        let engine_unit = place.path(&engine_name);
+        let engine = if engine_unit.exists() {
+            None
+        } else {
+            Some(EnginePlan::new(
+                config_dir,
+                place,
+                args.engine_bin.as_deref(),
+                args.engine_key_file.as_deref(),
+            )?)
+        };
+        let name = place.names.service(place.manager, &manifest.package);
+        let mut program = vec![installed_bin.to_string_lossy().into_owned()];
+        program.extend(manifest.args.iter().cloned());
+        let spec = UnitSpec {
+            name: name.clone(),
+            description: format!("Tern service plugin {}", manifest.package),
+            program,
+            env: vec![
+                (
+                    "TERN_CONFIG_DIR".to_owned(),
+                    config_dir.to_string_lossy().into_owned(),
+                ),
+                ("TERN_SERVICE_PACKAGE".to_owned(), manifest.package.clone()),
+            ],
+            after: Some(engine_name.clone()),
+            log: Some(service_dir.join(SERVICE_LOG)),
+        };
+        let text = units::render(place.manager, &spec).map_err(CliError::failed)?;
+        Ok(ServicePlan {
+            unit: place.path(&name),
+            manifest,
+            sha256,
+            installed_bin,
+            name,
+            text,
+            engine,
+            engine_name,
+            engine_unit,
+        })
+    }
+
+    pub fn to_json(&self, place: &Place) -> Value {
+        let engine = match &self.engine {
+            Some(e) => e.to_json(),
+            None => json!({
+                "installed": true,
+                "name": self.engine_name,
+                "path": self.engine_unit,
+                "text": fs::read_to_string(&self.engine_unit).unwrap_or_default(),
+            }),
+        };
+        json!({
+            "package": self.manifest.package,
+            "source": self.manifest.dir,
+            "bin": self.manifest.bin,
+            "sha256": self.sha256,
+            "installedBin": self.installed_bin,
+            "args": self.manifest.args,
+            "manager": place.manager.as_str(),
+            "load": place.load,
+            "unit": {"name": self.name, "path": self.unit, "text": self.text},
+            "engine": engine,
+        })
+    }
+
+    pub fn apply(
+        &self,
+        config_dir: &Path,
+        place: &Place,
+        loader: &mut dyn Loader,
+    ) -> Result<ServiceRecord> {
+        if let Some(engine) = &self.engine {
+            engine.apply(config_dir, place, loader)?;
+        }
+        let bytes = fs::read(&self.manifest.bin)
+            .map_err(|e| CliError::failed(format!("{}: {e}", self.manifest.bin.display())))?;
+        // Hashed again as read: the file may have changed since the plan was shown.
+        let copied = units::hex(&Sha256::digest(&bytes));
+        check_expected(&copied, Some(&self.sha256), &self.manifest.bin)?;
+        write_atomic(&self.installed_bin, &bytes, true)?;
+        write_atomic(&self.unit, self.text.as_bytes(), false)?;
+        let record = ServiceRecord {
+            package: self.manifest.package.clone(),
+            source: self.manifest.dir.clone(),
+            source_bin: self.manifest.bin.clone(),
+            bin: self.installed_bin.clone(),
+            args: self.manifest.args.clone(),
+            sha256: copied,
+            manager: place.manager.as_str().to_owned(),
+            name: self.name.clone(),
+            unit: self.unit.clone(),
+            installed_at: now(),
+        };
+        let mut records = Records::load(config_dir)?;
+        records
+            .services
+            .insert(record.package.clone(), record.clone());
+        records.save(config_dir)?;
+        if place.load {
+            loader.load(place.manager, &self.name, &self.unit)?;
+        }
+        Ok(record)
+    }
+}
+
+fn check_expected(actual: &str, expected: Option<&str>, bin: &Path) -> Result<()> {
+    match expected {
+        Some(want) if !want.eq_ignore_ascii_case(actual) => Err(CliError::failed(format!(
+            "{} changed: its SHA-256 is {actual}, not {want}; check it and install again",
+            bin.display()
+        ))),
+        _ => Ok(()),
+    }
+}
+
+pub fn service_install(
+    config_dir: &Path,
+    place: &Place,
+    args: &ServiceArgs,
+    loader: &mut dyn Loader,
+) -> Result<Value> {
+    let plan = ServicePlan::new(config_dir, place, args)?;
+    let mut out = plan.to_json(place);
+    out["installed"] = json!(false);
+    if !args.dry_run {
+        let record = plan.apply(config_dir, place, loader)?;
+        out["installed"] = json!(true);
+        out["record"] = json!(record);
+    }
+    Ok(out)
+}
+
+pub fn service_uninstall(
+    config_dir: &Path,
+    place: &Place,
+    package: &str,
+    loader: &mut dyn Loader,
+) -> Result<Value> {
+    if !valid_package_name(package) {
+        return Err(CliError::usage(format!("{package:?} is not a plugin name")));
+    }
+    let mut records = Records::load(config_dir)?;
+    let name = place.names.service(place.manager, package);
+    let unit = place.path(&name);
+    let record = records.services.remove(package);
+    if record.is_none() && !unit.exists() {
+        return Err(CliError::failed(format!(
+            "no service installed for {package}"
+        )));
+    }
+    if place.load {
+        loader.unload(place.manager, &name, &unit)?;
+    }
+    remove_file(&unit)?;
+    reload_after_remove(place);
+    let dir = config_dir.join(SERVICES_DIR).join(package);
+    match fs::remove_dir_all(&dir) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(CliError::failed(format!("{}: {e}", dir.display()))),
+    }
+    records.save(config_dir)?;
+    Ok(json!({"package": package, "name": name, "path": unit, "removed": true}))
+}
+
+/// The records, each with whether its unit file is still there and its binary unchanged.
+pub fn service_list(config_dir: &Path) -> Result<Value> {
+    let records = Records::load(config_dir)?;
+    let services: Vec<Value> = records
+        .services
+        .values()
+        .map(|r| {
+            let mut v = json!(r);
+            v["unitPresent"] = json!(r.unit.exists());
+            v["binUnchanged"] = json!(sha256_file(&r.bin).ok().as_deref() == Some(&r.sha256));
+            v
+        })
+        .collect();
+    let engine = records.engine.as_ref().map(|r| {
+        let mut v = json!(r);
+        v["unitPresent"] = json!(r.unit.exists());
+        v
+    });
+    Ok(json!({"engine": engine, "services": services}))
+}
+
+// -- Commands -------------------------------------------------------------------------------
+
+fn print(ctx: &Ctx, v: &Value, text: &[String]) {
+    if ctx.json {
+        output::json(v);
+    } else {
+        for line in text {
+            output::line(line);
+        }
+    }
+}
+
+fn s(v: &Value) -> String {
+    match v {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+fn load_note(v: &Value, done: &str) -> String {
+    if v["load"].as_bool() == Some(true) {
+        format!("{done} and started it")
+    } else {
+        format!("{done}; not loaded (--unit-dir, --no-load or TERN_SERVICE_NO_LOAD)")
+    }
+}
+
+pub fn install_command(ctx: &Ctx, place: &PlaceArgs, args: &ServiceArgs) -> Result<()> {
+    let place = Place::resolve(&ctx.config_dir, place)?;
+    let v = service_install(&ctx.config_dir, &place, args, &mut System)?;
+    let mut text = vec![
+        format!("Plugin:   {} ({})", s(&v["package"]), s(&v["source"])),
+        format!("Binary:   {}", s(&v["bin"])),
+        format!("SHA-256:  {}", s(&v["sha256"])),
+        format!("Copied to {}", s(&v["installedBin"])),
+    ];
+    if v["engine"]["installed"].as_bool() == Some(false) {
+        text.push(format!(
+            "Engine unit {} (runs {}):",
+            s(&v["engine"]["path"]),
+            s(&v["engine"]["bin"])
+        ));
+        text.push(s(&v["engine"]["text"]));
+    }
+    text.push(format!("Unit {}:", s(&v["unit"]["path"])));
+    text.push(s(&v["unit"]["text"]));
+    text.push(if args.dry_run {
+        "Dry run: nothing written.".to_owned()
+    } else {
+        load_note(&v, "Installed the service")
+    });
+    print(ctx, &v, &text);
+    Ok(())
+}
+
+pub fn uninstall_command(ctx: &Ctx, place: &PlaceArgs, package: &str) -> Result<()> {
+    let place = Place::resolve(&ctx.config_dir, place)?;
+    let v = service_uninstall(&ctx.config_dir, &place, package, &mut System)?;
+    print(ctx, &v, &[format!("Removed {}", s(&v["path"]))]);
+    Ok(())
+}
+
+pub fn list_command(ctx: &Ctx) -> Result<()> {
+    let v = service_list(&ctx.config_dir)?;
+    let mut text = Vec::new();
+    match &v["engine"] {
+        Value::Null => text.push("Engine unit: not installed".to_owned()),
+        e => text.push(format!(
+            "Engine unit: {} ({})",
+            s(&e["name"]),
+            s(&e["unit"])
+        )),
+    }
+    for svc in v["services"].as_array().into_iter().flatten() {
+        let mut problems = Vec::new();
+        if svc["unitPresent"].as_bool() != Some(true) {
+            problems.push("unit file missing");
+        }
+        if svc["binUnchanged"].as_bool() != Some(true) {
+            problems.push("binary changed since install");
+        }
+        text.push(format!(
+            "{}  {}  sha256 {}{}",
+            s(&svc["package"]),
+            s(&svc["bin"]),
+            s(&svc["sha256"]),
+            if problems.is_empty() {
+                String::new()
+            } else {
+                format!("  ({})", problems.join(", "))
+            }
+        ));
+    }
+    if v["services"].as_array().is_none_or(Vec::is_empty) {
+        text.push("No services installed.".to_owned());
+    }
+    print(ctx, &v, &text);
+    Ok(())
+}
+
+pub fn engine_install_command(
+    ctx: &Ctx,
+    place: &PlaceArgs,
+    bin: Option<&Path>,
+    key_file: Option<&Path>,
+    dry_run: bool,
+) -> Result<()> {
+    let place = Place::resolve(&ctx.config_dir, place)?;
+    let v = engine_install(&ctx.config_dir, &place, bin, key_file, dry_run, &mut System)?;
+    let text = vec![
+        format!("Engine:   {}", s(&v["bin"])),
+        format!("SHA-256:  {}", s(&v["sha256"])),
+        format!("Unit {}:", s(&v["path"])),
+        s(&v["text"]),
+        if dry_run {
+            "Dry run: nothing written.".to_owned()
+        } else {
+            load_note(&v, "Installed the engine unit")
+        },
+    ];
+    print(ctx, &v, &text);
+    Ok(())
+}
+
+pub fn engine_uninstall_command(ctx: &Ctx, place: &PlaceArgs) -> Result<()> {
+    let place = Place::resolve(&ctx.config_dir, place)?;
+    let v = engine_uninstall(&ctx.config_dir, &place, &mut System)?;
+    print(ctx, &v, &[format!("Removed {}", s(&v["path"]))]);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Records what would have been loaded; nothing reaches launchctl or systemctl.
+    #[derive(Default)]
+    struct Fake {
+        calls: Vec<String>,
+    }
+
+    impl Loader for Fake {
+        fn load(&mut self, m: Manager, name: &str, _unit: &Path) -> Result<()> {
+            self.calls.push(format!("load {} {name}", m.as_str()));
+            Ok(())
+        }
+        fn unload(&mut self, m: Manager, name: &str, _unit: &Path) -> Result<()> {
+            self.calls.push(format!("unload {} {name}", m.as_str()));
+            Ok(())
+        }
+    }
+
+    struct Env {
+        _tmp: tempfile::TempDir,
+        config: PathBuf,
+        units: PathBuf,
+        engine: PathBuf,
+    }
+
+    fn executable(path: &Path, body: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+        set_mode(path, 0o755).unwrap();
+    }
+
+    fn env() -> Env {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let config = root.join("profile");
+        let units = root.join("units");
+        let engine = root.join("bin").join("mailsync");
+        executable(&engine, "#!/bin/sh\nexit 0\n");
+        Env {
+            _tmp: tmp,
+            config,
+            units,
+            engine,
+        }
+    }
+
+    fn package(env: &Env, name: &str, service: Value) -> PathBuf {
+        let dir = env.config.join("packages").join(name);
+        fs::create_dir_all(&dir).unwrap();
+        let manifest = json!({
+            "name": name,
+            "engines": {"mailspring": "^1.27.0"},
+            "tern": {"service": service},
+        });
+        fs::write(dir.join("package.json"), manifest.to_string()).unwrap();
+        dir
+    }
+
+    fn place(env: &Env, manager: Manager) -> Place {
+        Place {
+            manager,
+            dir: env.units.clone(),
+            load: false,
+            names: Names::for_profile(&env.config, Some(&env.config)),
+        }
+    }
+
+    fn args(name: &str, env: &Env) -> ServiceArgs {
+        ServiceArgs {
+            package: name.into(),
+            engine_bin: Some(env.engine.clone()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn manifest_takes_a_path_or_one_per_platform() {
+        let env = env();
+        let dir = package(&env, "p", json!({"bin": "bin/svc", "args": ["-q"]}));
+        executable(&dir.join("bin/svc"), "x");
+        let m = read_manifest(&dir, "linux-x64").unwrap();
+        assert_eq!(m.bin, dir.join("bin/svc"));
+        assert_eq!(m.args, ["-q"]);
+
+        let dir = package(
+            &env,
+            "q",
+            json!({"bin": {"darwin-arm64": "mac/svc", "linux-x64": "linux/svc"}}),
+        );
+        executable(&dir.join("mac/svc"), "x");
+        executable(&dir.join("linux/svc"), "x");
+        assert_eq!(
+            read_manifest(&dir, "darwin-arm64").unwrap().bin,
+            dir.join("mac/svc")
+        );
+        let e = read_manifest(&dir, "win32-x64").unwrap_err();
+        assert!(e.contains("darwin-arm64, linux-x64"), "{e}");
+    }
+
+    #[test]
+    fn manifest_refuses_binaries_outside_the_package_and_bad_blocks() {
+        let env = env();
+        let outside = env.config.join("outside");
+        executable(&outside, "x");
+        let dir = package(&env, "p", json!({"bin": "../../outside"}));
+        assert!(read_manifest(&dir, "linux-x64")
+            .unwrap_err()
+            .contains("outside the package"));
+        let dir = package(&env, "abs", json!({"bin": outside}));
+        assert!(read_manifest(&dir, "linux-x64")
+            .unwrap_err()
+            .contains("inside the package"));
+        #[cfg(unix)]
+        {
+            let dir = package(&env, "link", json!({"bin": "svc"}));
+            std::os::unix::fs::symlink(&outside, dir.join("svc")).unwrap();
+            assert!(read_manifest(&dir, "linux-x64")
+                .unwrap_err()
+                .contains("outside the package"));
+            let dir = package(&env, "noexec", json!({"bin": "svc"}));
+            fs::write(dir.join("svc"), "x").unwrap();
+            assert!(read_manifest(&dir, "linux-x64")
+                .unwrap_err()
+                .contains("not an executable"));
+        }
+        let dir = package(&env, "args", json!({"bin": "svc", "args": [1]}));
+        assert!(read_manifest(&dir, "linux-x64")
+            .unwrap_err()
+            .contains("list of strings"));
+        let dir = env.config.join("packages").join("none");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("package.json"), r#"{"name":"none"}"#).unwrap();
+        assert!(read_manifest(&dir, "linux-x64")
+            .unwrap_err()
+            .contains("no service"));
+    }
+
+    #[test]
+    fn dry_run_shows_the_binary_and_units_and_writes_nothing() {
+        let env = env();
+        let dir = package(&env, "sample", json!({"bin": "svc", "args": ["--x"]}));
+        executable(&dir.join("svc"), "service v1");
+        let place = place(&env, Manager::Launchd);
+        let mut fake = Fake::default();
+        let mut a = args("sample", &env);
+        a.dry_run = true;
+        let v = service_install(&env.config, &place, &a, &mut fake).unwrap();
+        assert_eq!(v["installed"], false);
+        assert_eq!(v["bin"], json!(dir.join("svc")));
+        assert_eq!(v["sha256"], sha256_file(&dir.join("svc")).unwrap());
+        assert_eq!(
+            v["installedBin"],
+            json!(env.config.join("services/sample/svc"))
+        );
+        assert_eq!(v["unit"]["name"], "com.ternmail.tern.service.sample");
+        let text = v["unit"]["text"].as_str().unwrap();
+        assert!(text.contains(&format!(
+            "<string>{}</string>",
+            env.config.join("services/sample/svc").display()
+        )));
+        assert!(text.contains("<key>TERN_SERVICE_PACKAGE</key>\n\t\t<string>sample</string>"));
+        assert_eq!(v["engine"]["installed"], false);
+        assert!(v["engine"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("<string>--detached</string>"));
+        assert!(!env.units.exists());
+        assert!(!env.config.join(RECORDS_FILE).exists());
+        assert!(fake.calls.is_empty());
+    }
+
+    #[test]
+    fn install_copies_the_binary_records_it_and_writes_both_units() {
+        let env = env();
+        let dir = package(&env, "sample", json!({"bin": "svc"}));
+        executable(&dir.join("svc"), "service v1");
+        let hash = sha256_file(&dir.join("svc")).unwrap();
+        let mut place = place(&env, Manager::Systemd);
+        let mut fake = Fake::default();
+        let mut a = args("sample", &env);
+        a.expect_sha256 = Some(hash.to_uppercase());
+        let v = service_install(&env.config, &place, &a, &mut fake).unwrap();
+        assert_eq!(v["installed"], true);
+
+        let copy = env.config.join("services/sample/svc");
+        assert_eq!(fs::read_to_string(&copy).unwrap(), "service v1");
+        let unit = fs::read_to_string(env.units.join("tern-service-sample.service")).unwrap();
+        assert!(unit.contains("After=tern-engine.service\n"));
+        assert!(unit.contains(&format!("ExecStart=\"{}\"\n", copy.display())));
+        let engine = fs::read_to_string(env.units.join("tern-engine.service")).unwrap();
+        assert!(engine.contains(&format!(
+            "ExecStart=\"{}\" \"--mode\" \"serve\" \"--detached\"",
+            env.engine.display()
+        )));
+        assert!(engine.contains(&format!(
+            "Environment=\"CONFIG_DIR_PATH={}\"",
+            env.config.display()
+        )));
+
+        let records = Records::load(&env.config).unwrap();
+        let r = &records.services["sample"];
+        assert_eq!((r.sha256.as_str(), &r.source), (hash.as_str(), &dir));
+        assert_eq!(r.source_bin, dir.join("svc"));
+        assert_eq!(records.engine.as_ref().unwrap().bin, env.engine);
+        assert!(fake.calls.is_empty(), "nothing loads outside the unit dir");
+
+        // A changed plugin binary isn't what the unit runs until it is installed again, and
+        // the list says the copy is intact.
+        executable(&dir.join("svc"), "service v2");
+        let listed = service_list(&env.config).unwrap();
+        assert_eq!(listed["services"][0]["binUnchanged"], true);
+        assert_eq!(listed["services"][0]["unitPresent"], true);
+        let e = service_install(&env.config, &place, &a, &mut fake).unwrap_err();
+        assert!(e.to_string().contains("changed"), "{e}");
+        assert_eq!(fs::read_to_string(&copy).unwrap(), "service v1");
+
+        // Loading goes engine first, then the service; an existing engine unit is kept.
+        place.load = true;
+        a.expect_sha256 = None;
+        service_install(&env.config, &place, &a, &mut fake).unwrap();
+        assert_eq!(fake.calls, ["load systemd tern-service-sample"]);
+        assert_eq!(fs::read_to_string(&copy).unwrap(), "service v2");
+    }
+
+    #[test]
+    fn a_missing_engine_unit_is_loaded_before_the_service() {
+        let env = env();
+        let dir = package(&env, "sample", json!({"bin": "svc"}));
+        executable(&dir.join("svc"), "x");
+        let mut place = place(&env, Manager::Launchd);
+        place.load = true;
+        let mut fake = Fake::default();
+        service_install(&env.config, &place, &args("sample", &env), &mut fake).unwrap();
+        assert_eq!(
+            fake.calls,
+            [
+                "load launchd com.ternmail.tern.engine",
+                "load launchd com.ternmail.tern.service.sample"
+            ]
+        );
+    }
+
+    #[test]
+    fn uninstall_removes_the_unit_copy_and_record_and_keeps_the_engine() {
+        let env = env();
+        let dir = package(&env, "sample", json!({"bin": "svc"}));
+        executable(&dir.join("svc"), "x");
+        let mut place = place(&env, Manager::Launchd);
+        let mut fake = Fake::default();
+        service_install(&env.config, &place, &args("sample", &env), &mut fake).unwrap();
+        let e = engine_uninstall(&env.config, &place, &mut fake).unwrap_err();
+        assert!(e.to_string().contains("sample"), "{e}");
+
+        place.load = true;
+        service_uninstall(&env.config, &place, "sample", &mut fake).unwrap();
+        assert!(!env
+            .units
+            .join("com.ternmail.tern.service.sample.plist")
+            .exists());
+        assert!(!env.config.join("services/sample").exists());
+        assert!(Records::load(&env.config).unwrap().services.is_empty());
+        assert!(env.units.join("com.ternmail.tern.engine.plist").exists());
+        assert!(service_uninstall(&env.config, &place, "sample", &mut fake).is_err());
+        assert!(service_uninstall(&env.config, &place, "../x", &mut fake).is_err());
+
+        engine_uninstall(&env.config, &place, &mut fake).unwrap();
+        assert!(!env.units.join("com.ternmail.tern.engine.plist").exists());
+        assert!(Records::load(&env.config).unwrap().engine.is_none());
+        assert_eq!(
+            fake.calls,
+            [
+                "unload launchd com.ternmail.tern.service.sample",
+                "unload launchd com.ternmail.tern.engine"
+            ]
+        );
+    }
+
+    #[test]
+    fn engine_install_takes_a_key_file() {
+        let env = env();
+        let place = place(&env, Manager::Systemd);
+        let key = env.config.join("engine.key");
+        let v = engine_install(
+            &env.config,
+            &place,
+            Some(&env.engine),
+            Some(&key),
+            false,
+            &mut Fake::default(),
+        )
+        .unwrap();
+        assert_eq!(v["installed"], true);
+        let unit = fs::read_to_string(env.units.join("tern-engine.service")).unwrap();
+        assert!(unit.contains(&format!(
+            "Environment=\"TERN_ENGINE_KEY_FILE={}\"",
+            key.display()
+        )));
+        assert_eq!(
+            Records::load(&env.config).unwrap().engine.unwrap().sha256,
+            sha256_file(&env.engine).unwrap()
+        );
+    }
+
+    #[test]
+    fn packages_are_found_by_their_manifest_name() {
+        let env = env();
+        let dev = env.config.join("dev/packages/checkout-dir");
+        fs::create_dir_all(&dev).unwrap();
+        fs::write(dev.join("package.json"), r#"{"name":"devpkg"}"#).unwrap();
+        assert_eq!(find_package(&env.config, "devpkg").unwrap(), dev);
+        assert!(find_package(&env.config, "missing").is_err());
+        let dir = package(&env, "real", json!({"bin": "svc"}));
+        executable(&dir.join("svc"), "x");
+        let mut a = args("real", &env);
+        a.package_dir = Some(dev);
+        let e = ServicePlan::new(&env.config, &place(&env, Manager::Launchd), &a).unwrap_err();
+        assert!(e.to_string().contains("devpkg"), "{e}");
+    }
+
+    #[test]
+    fn units_load_only_from_the_managers_own_directory() {
+        let env = env();
+        let given = PlaceArgs {
+            unit_dir: Some(env.units.clone()),
+            manager: Some(Manager::Systemd),
+            no_load: false,
+        };
+        assert!(!Place::resolve(&env.config, &given).unwrap().load);
+        let own = PlaceArgs {
+            unit_dir: None,
+            manager: Some(Manager::Systemd),
+            no_load: true,
+        };
+        assert!(!Place::resolve(&env.config, &own).unwrap().load);
+        assert!(valid_package_name("a.b_c-1"));
+        assert!(!valid_package_name("a/b") && !valid_package_name("..") && !valid_package_name(""));
+        assert!(
+            ["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64"]
+                .contains(&platform_key().as_str())
+                || cfg!(not(any(target_os = "macos", target_os = "linux")))
+        );
+    }
+}

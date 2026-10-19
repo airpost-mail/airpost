@@ -10,7 +10,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::cli::{
-    AccountCommand, AiCommand, CalendarCommand, Cli, Command, SettingsCommand, TaskCommand,
+    AccountCommand, AiCommand, CalendarCommand, Cli, Command, EngineCommand, ServiceCommand,
+    SettingsCommand, TaskCommand, UnitArgs,
 };
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
@@ -70,6 +71,11 @@ pub fn run(cli: Cli) -> Result<()> {
             },
         };
         return crate::logs::run(&ctx.config_dir, &account, *follow, *lines, ctx.json);
+    }
+    match &cli.command {
+        Command::Service { command } => return service(&ctx, command),
+        Command::Engine { command } => return engine_unit(&ctx, command),
+        _ => {}
     }
     let mut engines = discovery::connect_all(&ctx.config_dir)?;
     match cli.command {
@@ -146,7 +152,71 @@ pub fn run(cli: Cli) -> Result<()> {
             TaskCommand::Cancel { id } => crate::tasks::cancel(&ctx, &mut engines, &id),
             TaskCommand::Wait { id, timeout } => crate::tasks::wait(&ctx, engines, &id, timeout),
         },
-        Command::Logs { .. } => unreachable!("handled before connecting"),
+        Command::Logs { .. } | Command::Service { .. } | Command::Engine { .. } => {
+            unreachable!("handled before connecting")
+        }
+    }
+}
+
+fn place_args(u: &UnitArgs) -> crate::service::PlaceArgs {
+    use crate::units::Manager;
+    crate::service::PlaceArgs {
+        unit_dir: u.unit_dir.clone(),
+        manager: u.manager.as_deref().map(|m| match m {
+            "launchd" => Manager::Launchd,
+            _ => Manager::Systemd,
+        }),
+        no_load: u.no_load,
+    }
+}
+
+/// Unit commands need no engine: they write files and talk to the service manager.
+fn service(ctx: &Ctx, command: &ServiceCommand) -> Result<()> {
+    match command {
+        ServiceCommand::Install {
+            package,
+            package_dir,
+            engine_bin,
+            engine_key_file,
+            expect_sha256,
+            dry_run,
+            units,
+        } => crate::service::install_command(
+            ctx,
+            &place_args(units),
+            &crate::service::ServiceArgs {
+                package: package.clone(),
+                package_dir: package_dir.clone(),
+                engine_bin: engine_bin.clone(),
+                engine_key_file: engine_key_file.clone(),
+                expect_sha256: expect_sha256.clone(),
+                dry_run: *dry_run,
+            },
+        ),
+        ServiceCommand::Uninstall { package, units } => {
+            crate::service::uninstall_command(ctx, &place_args(units), package)
+        }
+        ServiceCommand::List => crate::service::list_command(ctx),
+    }
+}
+
+fn engine_unit(ctx: &Ctx, command: &EngineCommand) -> Result<()> {
+    match command {
+        EngineCommand::Install {
+            bin,
+            key_file,
+            dry_run,
+            units,
+        } => crate::service::engine_install_command(
+            ctx,
+            &place_args(units),
+            bin.as_deref(),
+            key_file.as_deref(),
+            *dry_run,
+        ),
+        EngineCommand::Uninstall { units } => {
+            crate::service::engine_uninstall_command(ctx, &place_args(units))
+        }
     }
 }
 

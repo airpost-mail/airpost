@@ -150,6 +150,18 @@ pub enum Command {
         #[command(subcommand)]
         command: AiCommand,
     },
+    /// Install and remove service plugins: a plugin's background program, run by launchd
+    /// (macOS) or systemd --user (Linux) after the engine, also while the desktop is closed.
+    Service {
+        #[command(subcommand)]
+        command: ServiceCommand,
+    },
+    /// Run the engine as a user unit (`serve --detached`), for service plugins and headless
+    /// use.
+    Engine {
+        #[command(subcommand)]
+        command: EngineCommand,
+    },
     /// Send one raw JSON-RPC request and print its result.
     Rpc {
         /// e.g. engine.status, threads.list.
@@ -225,6 +237,83 @@ impl AccountAddArgs {
             || self.smtp_security.is_some()
             || self.smtp_username.is_some()
     }
+}
+
+/// Where units go. Units are loaded only in the service manager's own directory.
+#[derive(Debug, Args)]
+pub struct UnitArgs {
+    /// Write the units here instead of ~/Library/LaunchAgents or ~/.config/systemd/user, and
+    /// load nothing.
+    #[arg(long, value_name = "DIR", env = "TERN_UNIT_DIR")]
+    pub unit_dir: Option<PathBuf>,
+    /// Write the units but don't load or start them.
+    #[arg(long)]
+    pub no_load: bool,
+    /// The unit format; with --unit-dir only (tests).
+    #[arg(long, hide = true, requires = "unit_dir", value_parser = ["launchd", "systemd"])]
+    pub manager: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ServiceCommand {
+    /// Copy the plugin's service binary (tern.service in its package.json) into the profile
+    /// and install a unit that runs it. The engine unit is installed first when it is
+    /// missing.
+    Install {
+        /// The plugin's name, as installed in Tern.
+        package: String,
+        /// The plugin's directory, instead of looking it up in the profile.
+        #[arg(long, value_name = "DIR")]
+        package_dir: Option<PathBuf>,
+        /// The engine binary for the engine unit (default: mailsync-rs or mailsync beside
+        /// tern).
+        #[arg(long, value_name = "PATH")]
+        engine_bin: Option<PathBuf>,
+        /// For the engine unit: keep the engine's secrets in a file sealed with this key
+        /// (TERN_ENGINE_KEY_FILE), as the desktop's own engine does in a dev run.
+        #[arg(long, value_name = "PATH")]
+        engine_key_file: Option<PathBuf>,
+        /// Refuse unless the service binary has this SHA-256 (the one a dry run showed).
+        #[arg(long, value_name = "HEX")]
+        expect_sha256: Option<String>,
+        /// Print the binary, its hash and the units, and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// Stop the plugin's service and remove its unit and binary copy.
+    Uninstall {
+        package: String,
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// The installed services: source, binary, hash and unit.
+    List,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum EngineCommand {
+    /// Install a unit that runs the engine detached, started at login.
+    Install {
+        /// The engine binary (default: mailsync-rs or mailsync beside tern).
+        #[arg(long, value_name = "PATH")]
+        bin: Option<PathBuf>,
+        /// Keep the engine's secrets in a file sealed with this key instead of the OS
+        /// keychain (TERN_ENGINE_KEY_FILE).
+        #[arg(long, value_name = "PATH")]
+        key_file: Option<PathBuf>,
+        /// Print the unit and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        #[command(flatten)]
+        units: UnitArgs,
+    },
+    /// Stop the engine unit and remove it. Refused while services are installed.
+    Uninstall {
+        #[command(flatten)]
+        units: UnitArgs,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -475,6 +564,27 @@ mod tests {
         assert!(parse(&["logs", "acc", "-f"]).is_ok());
         assert!(parse(&["-a", "acc", "logs", "-n", "3"]).is_ok());
         assert!(parse(&["rpc", "engine.status"]).is_ok());
+        let cli = parse(&[
+            "service",
+            "install",
+            "sample",
+            "--dry-run",
+            "--unit-dir",
+            "/tmp/u",
+            "--manager",
+            "systemd",
+        ])
+        .unwrap();
+        let Command::Service {
+            command: ServiceCommand::Install { dry_run, units, .. },
+        } = cli.command
+        else {
+            panic!("service install")
+        };
+        assert!(dry_run && units.manager.as_deref() == Some("systemd"));
+        assert!(parse(&["service", "install", "x", "--manager", "launchd"]).is_err());
+        assert!(parse(&["service", "uninstall", "x", "--no-load"]).is_ok());
+        assert!(parse(&["engine", "install", "--bin", "/x", "--dry-run"]).is_ok());
         let cli = parse(&["snooze", "t1", "t2", "--until", "2h"]).unwrap();
         let Command::Snooze { threads, until } = cli.command else {
             panic!("snooze")
