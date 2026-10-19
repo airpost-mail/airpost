@@ -2590,3 +2590,74 @@ install it from Preferences > Plugins (check the binary, hash and units shown), 
 unread; then uninstall the service and the engine unit. For the review fix: with the engine
 unit installed, rebuild or update the engine, launch Tern (the log says "Restarting the engine
 unit" then "Joining"), quit, and check the unit's engine still runs.
+
+2026-10-19, stage 19 gate (attempt 1), branch `roadmap/client-next`, merged to main. Already on
+top of main (106bc6524), so the rebase was a no-op. Gate: fmt, clippy, `cargo test --workspace`
+(one run hit "unable to open database file" in `ms-store --test models`
+`invariants_catch_event_and_calendar_drift`; it passed alone and in the full rerun, so it reads
+as a one-off on the shared disk, not this branch), `cargo deny check` (advisories, bans, licences
+and sources ok), release build of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on
+serve with the release binaries and `SAMPLE_SERVICE_BIN` set to a release `tern-sample-service`
+(158 passed, 4 skipped). Desktop: lint and typecheck pass; the preferences-plugins,
+engine-supervisor, engine-unit, plugin-install-record, package-manager, engine-api and
+mailsync-process specs pass (74). No code changed in this step. No new decisions; the ones above
+still need confirming.
+
+Open from the review (low). Already addressed: the dry run pinning only the binary (TD29 "the
+exact unit text") is covered by `--expect-plan`, which the pane passes (review fixes above).
+- `apps/cli/src/service.rs`: `ServicePlan::apply` writes and loads the engine unit before it
+  hashes the service binary again. If that check fails (the binary changed after review), the
+  command reports an error, but the engine unit is already installed, recorded and started at
+  login. Recheck before writing anything.
+- `apps/cli/src/service.rs`: `service_uninstall` and `engine_uninstall` work out the unit path and
+  name from the current `Place`, not from the `ServiceRecord`. A service installed into
+  ~/Library/LaunchAgents (loaded) and uninstalled later with `--unit-dir`, `TERN_UNIT_DIR` or
+  under another profile tag loses its record and copy, but the loaded unit stays and relaunches a
+  deleted binary every 10 s. Take the path and label from the record.
+- `apps/cli/src/service.rs`: the config dir goes into the units as given (`CONFIG_DIR_PATH`,
+  `TERN_CONFIG_DIR`, the services/ copy path). A relative `--config-dir` or `TERN_CONFIG_DIR`
+  (the desktop passes `--config-dir-path` through as-is) gives an engine unit whose
+  `CONFIG_DIR_PATH` resolves against the manager's cwd (/), and the service install fails with
+  an unclear "program must be an absolute path". Make it absolute first.
+- `apps/cli/src/units.rs`: launchd `StandardOutPath`/`StandardErrorPath` (`engine-launchd.log` in
+  the profile, `service.log` per service) are never rotated. While the desktop runs its own
+  engine the engine unit fails to bind and writes a line every 10 s (open item above), and a
+  chatty third-party service can fill the shared disk.
+- `apps/cli/src/service.rs` / desktop: nothing in the desktop removes the engine unit. After the
+  last service is uninstalled from the pane the engine unit stays loaded with RunAtLoad; while the
+  desktop runs its own engine it relaunches every 10 s, writing to `engine-launchd.log` and
+  "Starting the engine" to the shared mailsync.log (`ms_core::log::init_file` runs before the
+  socket bind in `apps/engine/src/serve.rs`). The trial step "uninstall the service and the
+  engine unit" needs the CLI (`tern engine uninstall`).
+- `examples/service-plugin/src/main.rs`: the sample adds (model, expiration) to `handled` before
+  `act()` succeeds. If a `task.queue` fails (the engine restarts between the star and the clear),
+  `serve()` returns and reconnects, and the engine re-announces the still-due row, but the sample
+  skips it for the rest of the process's life. Separately, for Message rows it rebuilds the
+  message as `{id, aid}`, so `modelHeaderMessageId` is null and remote metadata sync loses its
+  anchor for other devices. This is the reference code plugin authors will copy.
+- `apps/desktop/app/src/plugin-api-version.ts`: stage 19 adds `tern.service` and Preferences >
+  Plugins, but `PLUGIN_API_VERSION` stays 1.30.0 (section 6: additions get a minor bump). The
+  CHANGELOG lists them under "Plugin API 1.27.0" and the sample asks for `^1.27.0`, which a
+  desktop without the pane satisfies, so a plugin can't require a desktop that installs its
+  service. Bump to 1.31.0 and move the entries.
+- `preferences-plugins.tsx`: section 6 says a plugin whose `tern.engineFeatures` or
+  `tern.capabilities` are missing "is listed but not activated, with the reason in Preferences >
+  Plugins" (left open by stage 5 until the pane existed). The pane shows only "(not active)" with
+  no reason, and nothing checks engineFeatures/capabilities against `Engine.features`. Still open;
+  the stage 19 open list above dropped it.
+- `tern-cli.ts`: the pane offers "Install service…" in the snap build and the CLI runs there. The
+  snap is strictly confined (`apps/desktop/snap/snapcraft.yaml`), HOME is ~/snap/tern/<rev>, so
+  `Manager::default_dir` points at a systemd/user directory systemd never reads, `Place::resolve`
+  still calls `systemctl --user` (blocked by confinement or no unit found), and the engine path
+  embeds the snap revision, which changes on every refresh. Hide the action in the snap or refuse
+  in the CLI.
+- `apps/desktop/app/src/package-manager.ts`: `recordPluginInstall` (hashing every file plus
+  `config.set`) runs inside the same try as `cpSync`. If hashing throws (an unreadable file, a
+  readdir EACCES), the catch removes `packageFinalDir`: the fresh copy, and on a reinstall the
+  already installed plugin too. Record outside that try.
+Nothing for tern-web.
+Trial pending (not run): the stage 19 steps above (build the sample, install it from Preferences >
+Plugins and check the binary, hash and units shown, a `tern-sample-service` reminder a minute out
+acted on with the desktop closed, then uninstall the service and the engine unit; with the engine
+unit installed, rebuild the engine, launch Tern and see "Restarting the engine unit" then
+"Joining", quit, and check the unit's engine still runs).
