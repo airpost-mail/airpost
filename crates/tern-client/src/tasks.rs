@@ -161,6 +161,27 @@ pub fn syncback_message_metadata(
     task("SyncbackMetadataTask", str_of(message, "aid"), fields)
 }
 
+/// `SyncbackMetadataTask.forSaving` on a Thread: `value` replaces the plugin's value, and a
+/// value without `expiration` ends any expiration it had.
+pub fn syncback_thread_metadata(
+    account_id: &str,
+    thread_id: &str,
+    plugin_id: &str,
+    value: Value,
+) -> Value {
+    task(
+        "SyncbackMetadataTask",
+        account_id,
+        json!({
+            "pluginId": plugin_id,
+            "modelId": thread_id,
+            "modelClassName": "thread",
+            "modelHeaderMessageId": null,
+            "value": value,
+        }),
+    )
+}
+
 /// A task id no other client picks: `prefix`, the pid, the time in nanoseconds and a
 /// counter (the clock may not tick between two calls).
 pub fn new_task_id(prefix: &str) -> String {
