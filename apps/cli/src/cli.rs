@@ -102,6 +102,11 @@ pub enum Command {
         #[arg(long, short = 'n')]
         limit: Option<usize>,
     },
+    /// Read, create, change, import and export contacts.
+    Contact {
+        #[command(subcommand)]
+        command: ContactCommand,
+    },
     /// Move threads to Snoozed until a time, as the desktop's snooze menu does.
     Snooze {
         #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
@@ -379,6 +384,132 @@ pub enum AiCommand {
 pub enum CalendarCommand {
     /// Start a calendar pass now.
     Sync,
+    /// Events between two times, every occurrence of a repeating one.
+    List {
+        /// From (30m, 2h, 3d, tomorrow, a date or a date and time); now by default.
+        #[arg(long, value_name = "WHEN")]
+        from: Option<String>,
+        /// To; a week after --from by default.
+        #[arg(long, value_name = "WHEN")]
+        to: Option<String>,
+        /// Only these calendars (ids).
+        #[arg(long = "calendar", value_delimiter = ',', value_name = "ID")]
+        calendars: Vec<String>,
+    },
+    /// Create an event; with guests it is organised by the account and they are invited
+    /// when the server sends invitations.
+    Create {
+        /// The calendar's id.
+        #[arg(long, value_name = "ID")]
+        calendar: String,
+        #[arg(long)]
+        title: String,
+        #[arg(long, value_name = "WHEN")]
+        start: String,
+        /// An hour after --start by default (a day for --all-day).
+        #[arg(long, value_name = "WHEN")]
+        end: Option<String>,
+        #[arg(long)]
+        all_day: bool,
+        #[arg(long)]
+        location: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        /// Guests' addresses.
+        #[arg(long = "guest", value_delimiter = ',', value_name = "EMAIL")]
+        guests: Vec<String>,
+        /// An RRULE, e.g. FREQ=WEEKLY;BYDAY=MO.
+        #[arg(long, value_name = "RULE")]
+        repeat: Option<String>,
+    },
+    /// Change or delete an event, one occurrence of it, or it from one occurrence on.
+    Update {
+        #[arg(value_name = "EVENT_ID")]
+        event: String,
+        /// Which occurrences of a repeating event.
+        #[arg(long, default_value = "all", value_parser = ["this", "following", "all"])]
+        scope: String,
+        /// The occurrence --scope this or following starts from, by its start.
+        #[arg(long, value_name = "WHEN")]
+        occurrence: Option<String>,
+        #[arg(long, value_name = "WHEN")]
+        start: Option<String>,
+        #[arg(long, value_name = "WHEN")]
+        end: Option<String>,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        location: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        #[arg(long)]
+        delete: bool,
+    },
+    /// Answer an invitation, and tell the organizer by mail; or propose another time.
+    Rsvp {
+        #[arg(value_name = "EVENT_ID")]
+        event: String,
+        #[arg(value_parser = ["accepted", "tentative", "declined"])]
+        status: String,
+        #[arg(long)]
+        comment: Option<String>,
+        /// Propose this start instead (with --propose-end): a counter-proposal.
+        #[arg(long, value_name = "WHEN", requires = "propose_end")]
+        propose_start: Option<String>,
+        #[arg(long, value_name = "WHEN", requires = "propose_start")]
+        propose_end: Option<String>,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct ContactFieldArgs {
+    /// Fields as JSON, in the shape `tern contact get --json` prints under `data`.
+    #[arg(long, value_name = "JSON")]
+    pub patch: Option<String>,
+    /// "Given Family".
+    #[arg(long)]
+    pub name: Option<String>,
+    #[arg(long)]
+    pub email: Option<String>,
+    #[arg(long)]
+    pub phone: Option<String>,
+    #[arg(long)]
+    pub company: Option<String>,
+    #[arg(long)]
+    pub title: Option<String>,
+    #[arg(long)]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ContactCommand {
+    /// A contact's details.
+    Get {
+        #[arg(value_name = "CONTACT_ID")]
+        id: String,
+    },
+    /// A new contact in the account's address book.
+    Create {
+        #[command(flatten)]
+        fields: ContactFieldArgs,
+    },
+    /// Change a contact; the fields given replace the stored ones.
+    Update {
+        #[arg(value_name = "CONTACT_ID")]
+        id: String,
+        #[command(flatten)]
+        fields: ContactFieldArgs,
+    },
+    /// Add the vCards of a .vcf file (or - for stdin) as new contacts.
+    Import {
+        #[arg(value_name = "FILE")]
+        file: String,
+    },
+    /// Print contacts as a .vcf file.
+    Export {
+        #[arg(required = true, num_args = 1.., value_name = "CONTACT_ID")]
+        ids: Vec<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -575,6 +706,51 @@ mod tests {
         );
         assert_eq!(parse(&["search"]).unwrap_err().exit_code(), 2);
         assert_eq!(parse(&["calendar"]).unwrap_err().exit_code(), 2);
+        assert!(parse(&[
+            "calendar",
+            "list",
+            "--from",
+            "tomorrow",
+            "--calendar",
+            "c1,c2"
+        ])
+        .is_ok());
+        assert!(parse(&[
+            "calendar",
+            "create",
+            "--calendar",
+            "c",
+            "--title",
+            "x",
+            "--start",
+            "2h"
+        ])
+        .is_ok());
+        assert!(parse(&[
+            "calendar",
+            "update",
+            "e1",
+            "--scope",
+            "this",
+            "--occurrence",
+            "2026-11-02T09:00",
+            "--delete"
+        ])
+        .is_ok());
+        assert!(parse(&["calendar", "update", "e1", "--scope", "some"]).is_err());
+        assert!(parse(&["calendar", "rsvp", "e1", "accepted"]).is_ok());
+        assert!(parse(&[
+            "calendar",
+            "rsvp",
+            "e1",
+            "tentative",
+            "--propose-start",
+            "2h"
+        ])
+        .is_err());
+        assert!(parse(&["contact", "update", "c1", "--title", "Lead"]).is_ok());
+        assert!(parse(&["contact", "import", "-"]).is_ok());
+        assert!(parse(&["contact", "export"]).is_err());
         assert!(parse(&["logs", "acc", "-f"]).is_ok());
         assert!(parse(&["-a", "acc", "logs", "-n", "3"]).is_ok());
         assert!(parse(&["rpc", "engine.status"]).is_ok());

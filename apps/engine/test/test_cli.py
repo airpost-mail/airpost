@@ -331,3 +331,31 @@ def test_cli_end_to_end(engine, tmp_path):
     assert account_id in r.stderr
 
     assert engine.ms.running
+
+
+def test_cli_calendar_and_contacts(engine, tmp_path):
+    """`tern calendar list` and `tern contact`: the account has no calendars on the fake
+    server, so the calendar half is the empty list and the refusals; contacts are imported,
+    read, changed and exported through the engine."""
+    tern = Tern(engine)
+    assert tern.json("calendar", "list", "--from", "2026-01-01", "--to", "2026-02-01") == {"occurrences": []}
+    assert "No events." in tern.run("calendar", "list", json_out=False).stdout
+    r = tern.run("calendar", "create", "--calendar", "nope", "--title", "x", "--start", "2h", expect=1)
+    assert "no calendar nope" in r.stderr
+    tern.run("calendar", "list", "--from", "3d", "--to", "1d", expect=2)
+
+    vcf = tmp_path / "people.vcf"
+    vcf.write_text("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Zed Zebra\r\nN:Zebra;Zed;;;\r\nEMAIL:zed@example.org\r\nEND:VCARD\r\n")
+    r = tern.json("contact", "import", str(vcf))
+    [cid] = r["contactIds"]
+    got = tern.json("contact", "get", cid)
+    assert got["data"]["name"]["displayName"] == "Zed Zebra"
+    r = tern.json("contact", "update", cid, "--title", "Keeper", "--company", "Zoo")
+    assert "TITLE:Keeper" in r["contact"]["info"]["vcf"]
+    text = tern.run("contact", "get", cid, json_out=False).stdout
+    assert "title: Keeper" in text and "company: Zoo" in text
+    out = tern.run("contact", "export", cid, json_out=False).stdout
+    assert out.startswith("BEGIN:VCARD") and "ORG:Zoo" in out
+    tern.run("contact", "update", cid, expect=2)
+    r = tern.run("contact", "get", "no-such-contact", expect=1)
+    assert "no contact no-such-contact" in r.stderr

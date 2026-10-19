@@ -15,6 +15,7 @@ mod error;
 mod logs;
 mod mail_actions;
 mod output;
+mod pim;
 mod platform;
 mod read;
 mod service;

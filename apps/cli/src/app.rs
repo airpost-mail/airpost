@@ -10,8 +10,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::cli::{
-    AccountCommand, AiCommand, CalendarCommand, Cli, Command, EngineCommand, ServiceCommand,
-    SettingsCommand, TaskCommand, UnitArgs,
+    AccountCommand, AiCommand, CalendarCommand, Cli, Command, ContactCommand, EngineCommand,
+    ServiceCommand, SettingsCommand, TaskCommand, UnitArgs,
 };
 use crate::discovery::{self, Engine, Target};
 use crate::error::{CliError, Result};
@@ -85,9 +85,8 @@ pub fn run(cli: Cli) -> Result<()> {
             command: AccountCommand::Add(args),
         } => crate::account::add(&ctx, &mut engines, &args),
         Command::Sync => crate::status::sync(&ctx, &mut engines),
-        Command::Calendar {
-            command: CalendarCommand::Sync,
-        } => crate::status::calendar_sync(&ctx, &mut engines),
+        Command::Calendar { command } => calendar(&ctx, &mut engines, command),
+        Command::Contact { command } => contact(&ctx, &mut engines, command),
         Command::Settings { command } => match command {
             SettingsCommand::Get { keys } => crate::settings::get(&ctx, &mut engines, keys),
             SettingsCommand::Set { key, value } => {
@@ -225,6 +224,102 @@ fn engine_unit(ctx: &Ctx, command: &EngineCommand) -> Result<()> {
         EngineCommand::Restart { units } => {
             crate::service::engine_start_command(ctx, &place_args(units), true)
         }
+    }
+}
+
+fn calendar(ctx: &Ctx, engines: &mut [Engine], command: CalendarCommand) -> Result<()> {
+    use crate::pim;
+    match command {
+        CalendarCommand::Sync => crate::status::calendar_sync(ctx, engines),
+        CalendarCommand::List {
+            from,
+            to,
+            calendars,
+        } => pim::list(ctx, engines, from.as_deref(), to.as_deref(), &calendars),
+        CalendarCommand::Create {
+            calendar,
+            title,
+            start,
+            end,
+            all_day,
+            location,
+            description,
+            guests,
+            repeat,
+        } => pim::create(
+            ctx,
+            engines,
+            pim::NewEvent {
+                calendar: &calendar,
+                title: &title,
+                start: &start,
+                end: end.as_deref(),
+                all_day,
+                location: location.as_deref(),
+                description: description.as_deref(),
+                guests: &guests,
+                rrule: repeat.as_deref(),
+            },
+        ),
+        CalendarCommand::Update {
+            event,
+            scope,
+            occurrence,
+            start,
+            end,
+            title,
+            location,
+            description,
+            delete,
+        } => pim::update(
+            ctx,
+            engines,
+            pim::EventEdit {
+                event: &event,
+                scope: &scope,
+                occurrence: occurrence.as_deref(),
+                start: start.as_deref(),
+                end: end.as_deref(),
+                title: title.as_deref(),
+                location: location.as_deref(),
+                description: description.as_deref(),
+                delete,
+            },
+        ),
+        CalendarCommand::Rsvp {
+            event,
+            status,
+            comment,
+            propose_start,
+            propose_end,
+        } => {
+            let propose = propose_start.as_deref().zip(propose_end.as_deref());
+            pim::rsvp(ctx, engines, &event, &status, comment.as_deref(), propose)
+        }
+    }
+}
+
+fn contact(ctx: &Ctx, engines: &mut [Engine], command: ContactCommand) -> Result<()> {
+    use crate::pim;
+    let fields = |f: &crate::cli::ContactFieldArgs| {
+        pim::contact_fields(
+            f.patch.as_deref(),
+            f.name.as_deref(),
+            f.email.as_deref(),
+            f.phone.as_deref(),
+            f.company.as_deref(),
+            f.title.as_deref(),
+            f.notes.as_deref(),
+        )
+    };
+    match command {
+        ContactCommand::Get { id } => pim::contact_get(ctx, engines, &id),
+        ContactCommand::Create { fields: f } => pim::contact_create(ctx, engines, fields(&f)?),
+        ContactCommand::Update { id, fields: f } => {
+            pim::contact_update(ctx, engines, &id, fields(&f)?)
+        }
+        ContactCommand::Import { file } => pim::contact_import(ctx, engines, &file),
+        ContactCommand::Export { ids } => pim::contact_export(ctx, engines, &ids),
     }
 }
 
