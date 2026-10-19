@@ -13,5 +13,9 @@
  *
  * 1.30.0: the `rules` feature and the `rules.*` types; the engine runs the mail rules, and
  * `MailRulesProcessor` is deprecated (its `processMessages` does nothing).
+ *
+ * 1.31.0: `ComponentRegistry.listenShared`; `MessageStore.items()` carries `body` for expanded
+ * messages only (undefined on collapsed ones, TD40), and Thread deltas no longer re-read the
+ * open thread's messages.
  */
-export const PLUGIN_API_VERSION = '1.30.0';
+export const PLUGIN_API_VERSION = '1.31.0';

@@ -5,47 +5,98 @@ import { Thread } from '../../src/flux/models/thread';
 import { Folder } from '../../src/flux/models/folder';
 import { ChangeUnreadTask } from '../../src/flux/tasks/change-unread-task';
 import { ChangeFolderTask } from '../../src/flux/tasks/change-folder-task';
+import { DatabaseChangeRecord } from '../../src/flux/stores/database-change-record';
+import { forEachTransport, settle } from '../mock-engine';
 
 const thread = new Thread({ id: 't1', accountId: 'a1' });
 const markRead = () =>
   Actions.queueTask(new ChangeUnreadTask({ threads: [thread], unread: false, source: 'spec' }));
 
 describe('UnreadQuerySubscription', function UnreadQuerySubscriptionSpecs() {
-  beforeEach(() => {
-    spyOn(QuerySubscription.prototype, 'update');
+  describe('the query', () => {
+    beforeEach(() => {
+      spyOn(QuerySubscription.prototype, 'update');
+    });
+
+    it('keeps a thread read in the view, inside the view categories, on the ThreadCategory subselect', () => {
+      const subscription = new UnreadQuerySubscription(['inbox']);
+      markRead();
+      const sql = subscription._query.sql();
+      expect(sql).toContain('WHERE `id` IN (SELECT `id` FROM `ThreadCategory`');
+      expect(sql).toContain(
+        "`ThreadCategory`.`value` IN ('inbox') AND ((`ThreadCategory`.`unread` != 0 AND `ThreadCategory`.`inAllMail` != 0) OR `ThreadCategory`.`id` = 't1')"
+      );
+      subscription.onLastCallbackRemoved();
+    });
+
+    it('drops a thread from the whitelist when it is moved', () => {
+      const subscription = new UnreadQuerySubscription(['inbox']);
+      markRead();
+      Actions.queueTask(
+        new ChangeFolderTask({
+          threads: [thread],
+          folder: new Folder({ id: 'archive', accountId: 'a1', path: 'Archive' }),
+          source: 'spec',
+        })
+      );
+      expect(subscription._query.sql()).not.toContain("'t1'");
+      subscription.onLastCallbackRemoved();
+    });
+
+    it('starts empty, whatever earlier subscriptions whitelisted', () => {
+      const earlier = new UnreadQuerySubscription(['inbox']);
+      markRead();
+      earlier.onLastCallbackRemoved();
+      const next = new UnreadQuerySubscription(['inbox']);
+      expect(next._query.sql()).not.toContain("'t1'");
+      next.onLastCallbackRemoved();
+    });
   });
 
-  it('keeps a thread read in the view, inside the view categories, on the ThreadCategory subselect', () => {
-    const subscription = new UnreadQuerySubscription(['inbox']);
-    markRead();
-    const sql = subscription._query.sql();
-    expect(sql).toContain('WHERE `id` IN (SELECT `id` FROM `ThreadCategory`');
-    expect(sql).toContain(
-      "`ThreadCategory`.`value` IN ('inbox') AND ((`ThreadCategory`.`unread` != 0 AND `ThreadCategory`.`inAllMail` != 0) OR `ThreadCategory`.`id` = 't1')"
-    );
-    subscription.onLastCallbackRemoved();
-  });
+  // The SQL text cases above hold for the SQLite path; these read through either transport.
+  describe('reading', () =>
+    forEachTransport((reads) => {
+      const inbox = new Folder({ id: 'inbox', accountId: 'a1', path: 'INBOX' });
+      const stored = (id: string, unread: boolean, ts: number) =>
+        new Thread({
+          id,
+          accountId: 'a1',
+          folders: [inbox],
+          unread,
+          inAllMail: true,
+          lastMessageReceivedTimestamp: new Date(ts * 1000),
+        });
 
-  it('drops a thread from the whitelist when it is moved', () => {
-    const subscription = new UnreadQuerySubscription(['inbox']);
-    markRead();
-    Actions.queueTask(
-      new ChangeFolderTask({
-        threads: [thread],
-        folder: new Folder({ id: 'archive', accountId: 'a1', path: 'Archive' }),
-        source: 'spec',
-      })
-    );
-    expect(subscription._query.sql()).not.toContain("'t1'");
-    subscription.onLastCallbackRemoved();
-  });
+      it('keeps a thread read in the view on the next full read', async () => {
+        reads().add(stored('t1', true, 3000), stored('t2', true, 2000), stored('t3', false, 1000));
+        const subscription = new UnreadQuerySubscription(['inbox']);
+        const results = [];
+        subscription.addCallback((set: any) => results.push(set.models().map((t) => t.id)));
+        subscription.replaceRange({ start: 0, end: 50 });
+        await settle();
+        expect(results[results.length - 1]).toEqual(['t1', 't2']);
 
-  it('starts empty, whatever earlier subscriptions whitelisted', () => {
-    const earlier = new UnreadQuerySubscription(['inbox']);
-    markRead();
-    earlier.onLastCallbackRemoved();
-    const next = new UnreadQuerySubscription(['inbox']);
-    expect(next._query.sql()).not.toContain("'t1'");
-    next.onLastCallbackRemoved();
-  });
+        markRead();
+        const read = stored('t1', false, 3000);
+        reads().add(read);
+        subscription.applyChangeRecord(
+          new DatabaseChangeRecord({
+            type: 'persist',
+            objectClass: 'Thread',
+            objects: [read],
+            objectsRawJSON: [read.toJSON()],
+          })
+        );
+        await settle();
+        expect(results[results.length - 1]).toEqual(['t1', 't2']);
+
+        // A full read (after a reconnect) asks for the whitelisted thread too.
+        subscription.rerun();
+        await settle();
+        expect(results[results.length - 1]).toEqual(['t1', 't2']);
+        const last = reads().queries('Thread').pop();
+        expect(JSON.stringify(last.where)).toContain('"t1"');
+        subscription.onLastCallbackRemoved();
+      });
+    }));
 });

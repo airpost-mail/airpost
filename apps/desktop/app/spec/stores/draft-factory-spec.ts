@@ -577,6 +577,7 @@ describe('DraftFactory', function draftFactory() {
           replyToHeaderMessageId: fakeMessage1.headerMessageId,
           threadId: fakeMessage1.threadId,
           draft: true,
+          body: '<p>draft</p>',
         });
         this.sessionStub = {
           changes: {

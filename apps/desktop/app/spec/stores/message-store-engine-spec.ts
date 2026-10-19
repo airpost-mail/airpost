@@ -126,6 +126,27 @@ describe('MessageStore on the engine', function () {
     expect(MessageStore.items().find((m) => m.id === 'm2').body).toBe('<p>body 2</p>');
   });
 
+  it('loads the rest of the bodies in one read on expand all', async function () {
+    engine.requests = [];
+    (Actions.fetchBodies as unknown as jasmine.Spy).reset();
+    const triggered = jasmine.createSpy('trigger');
+    const unlisten = MessageStore.listen(triggered);
+    Actions.toggleAllMessagesExpanded();
+    // Expanding again before the read returns doesn't ask for the same bodies.
+    Actions.toggleMessageIdExpanded('m1');
+    Actions.toggleMessageIdExpanded('m1');
+    await settle();
+    unlisten();
+    const reads = bodyReads();
+    expect(reads.length).toBe(1);
+    expect((reads[0].where as any).and[0].value.sort()).toEqual(
+      ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'].sort()
+    );
+    expect(MessageStore.items().every((m) => typeof m.body === 'string')).toBe(true);
+    expect(Actions.fetchBodies).not.toHaveBeenCalled();
+    expect(triggered.callCount).toBeLessThan(6);
+  });
+
   it('asks the engine only for the expanded bodies it has not downloaded', async function () {
     engine.add(message(12, { unread: true, body: null }));
     engine.joined.set('m12', { body: null });

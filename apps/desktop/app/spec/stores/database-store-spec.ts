@@ -3,6 +3,7 @@ import { Thread } from '../../src/flux/models/thread';
 import TestModel from '../fixtures/db-test-model';
 import ModelQuery from '../../src/flux/models/query';
 import DatabaseStore from '../../src/flux/stores/database-store';
+import { forEachTransport } from '../mock-engine';
 
 const testMatchers = { id: 'b' };
 
@@ -58,85 +59,63 @@ describe('DatabaseStore', function DatabaseStoreSpecs() {
     });
   });
 
-  describe('modelify', () => {
-    beforeEach(() => {
-      this.models = [
-        new Thread({ id: 'local-A' }),
-        new Thread({ id: 'local-B' }),
-        new Thread({ id: 'local-C' }),
-        new Thread({ id: 'local-D' }),
-        new Thread({ id: 'local-E' }),
-        new Thread({ id: 'local-F' }),
-        new Thread({ id: 'local-G' }),
-      ];
-      // Actually returns correct sets for queries, since matchers can evaluate
-      // themselves against models in memory
-      spyOn(DatabaseStore, 'run').andCallFake((query) => {
-        const results = this.models.filter((model) =>
-          query._matchers.every((matcher) => matcher.evaluate(model))
+  // modelify reads the ids it was given, so it runs on both transports.
+  describe('modelify', () =>
+    forEachTransport((reads) => {
+      const ids = (models: Thread[]) => models.map((m) => m.id);
+
+      beforeEach(() => {
+        this.models = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map(
+          (l) => new Thread({ id: `local-${l}`, accountId: TEST_ACCOUNT_ID })
         );
-        return Promise.resolve(results);
+        reads().add(...this.models);
       });
-    });
 
-    describe('when given an array or input that is not an array', () =>
-      it('resolves immediately with an empty array', () =>
-        waitsForPromise(() => {
-          return DatabaseStore.modelify(Thread, null).then((output) => {
-            expect(output).toEqual([]);
-          });
-        })));
+      describe('when given an array or input that is not an array', () =>
+        it('resolves immediately with an empty array', async () => {
+          expect(await DatabaseStore.modelify<Thread>(Thread, null)).toEqual([]);
+          expect(reads().queries('Thread')).toEqual([]);
+        }));
 
-    describe('when given an array of mixed IDs, and models', () =>
-      it('resolves with an array of models', () => {
-        const input = ['local-F', 'local-B', 'local-C', 'local-D', this.models[6]];
-        const expectedOutput = [
-          this.models[5],
-          this.models[1],
-          this.models[2],
-          this.models[3],
-          this.models[6],
-        ];
-        return waitsForPromise(() => {
-          return DatabaseStore.modelify(Thread, input).then((output) => {
-            expect(output).toEqual(expectedOutput);
-          });
-        });
-      }));
+      describe('when given an array of mixed IDs, and models', () =>
+        it('resolves with an array of models', async () => {
+          const input = ['local-F', 'local-B', 'local-C', 'local-D', this.models[6]];
+          const output = await DatabaseStore.modelify<Thread>(Thread, input);
+          expect(ids(output)).toEqual(['local-F', 'local-B', 'local-C', 'local-D', 'local-G']);
+          // A model passed in is kept as it is; only the ids are read.
+          expect(output[4]).toBe(this.models[6]);
+          expect(output[0] instanceof Thread).toBe(true);
+          expect(reads().queries('Thread').length).toBe(1);
+        }));
 
-    describe('when the input is only IDs', () =>
-      it('resolves with an array of models', () => {
-        const input = ['local-D', 'local-F', 'local-G'];
-        const expectedOutput = [this.models[3], this.models[5], this.models[6]];
-        return waitsForPromise(() => {
-          return DatabaseStore.modelify(Thread, input).then((output) => {
-            expect(output).toEqual(expectedOutput);
-          });
-        });
-      }));
+      describe('when the input is only IDs', () =>
+        it('resolves with an array of models', async () => {
+          const output = await DatabaseStore.modelify<Thread>(Thread, [
+            'local-D',
+            'local-F',
+            'local-G',
+          ]);
+          expect(ids(output)).toEqual(['local-D', 'local-F', 'local-G']);
+        }));
 
-    describe('when the input is all models', () =>
-      it('resolves with an array of models', () => {
-        const input = [this.models[0], this.models[1], this.models[2], this.models[3]];
-        const expectedOutput = [this.models[0], this.models[1], this.models[2], this.models[3]];
-        return waitsForPromise(() => {
-          return DatabaseStore.modelify(Thread, input).then((output) => {
-            expect(output).toEqual(expectedOutput);
-          });
-        });
-      }));
+      describe('when the input is all models', () =>
+        it('resolves with an array of models', async () => {
+          const input = [this.models[0], this.models[1], this.models[2], this.models[3]];
+          const output = await DatabaseStore.modelify<Thread>(Thread, input);
+          expect(output).toEqual(input);
+          expect(reads().queries('Thread')).toEqual([]);
+        }));
 
-    describe('when the input contains IDs not present in the database', () =>
-      it('omits missing entries rather than returning undefined', () => {
-        const input = ['local-A', 'does-not-exist', 'local-C'];
-        const expectedOutput = [this.models[0], this.models[2]];
-        return waitsForPromise(() => {
-          return DatabaseStore.modelify(Thread, input).then((output) => {
-            expect(output).toEqual(expectedOutput);
-          });
-        });
-      }));
-  });
+      describe('when the input contains IDs not present in the database', () =>
+        it('omits missing entries rather than returning undefined', async () => {
+          const output = await DatabaseStore.modelify<Thread>(Thread, [
+            'local-A',
+            'does-not-exist',
+            'local-C',
+          ]);
+          expect(ids(output)).toEqual(['local-A', 'local-C']);
+        }));
+    }));
 
   describe('count', () => {
     it('should pass the provided predicates on to the ModelQuery', () => {

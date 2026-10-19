@@ -36,6 +36,8 @@ class _MessageStore extends MailspringStore {
   // Message changes for the thread that arrive while its messages are being read, applied on
   // top of the result; null when no read is out.
   _changesWhileLoading: MessageChange[] = null;
+  // Ids whose bodies are being read, so overlapping loads don't ask for them again.
+  _bodiesLoading = new Set<string>();
 
   constructor() {
     super();
@@ -117,6 +119,7 @@ class _MessageStore extends MailspringStore {
   _setStoreDefaults() {
     this._items = [];
     this._itemsExpanded = {};
+    this._bodiesLoading = new Set();
     this._itemsLoading = false;
     this._showingHiddenItems = false;
     this._thread = null;
@@ -236,6 +239,7 @@ class _MessageStore extends MailspringStore {
     this._itemsLoading = true;
     this._showingHiddenItems = false;
     this._itemsExpanded = {};
+    this._bodiesLoading = new Set();
     this.trigger();
 
     this._setWindowTitle();
@@ -280,6 +284,7 @@ class _MessageStore extends MailspringStore {
   _onToggleAllMessagesExpanded() {
     if (this.hasCollapsedItems()) {
       this._items.forEach((i) => this._expandItem(i));
+      this._loadExpandedBodies(() => this.trigger());
     } else {
       // Do not collapse the latest message, i.e. the last one
       this._items.slice(0, -1).forEach((i) => this._collapseItem(i));
@@ -303,15 +308,16 @@ class _MessageStore extends MailspringStore {
       this._collapseItem(item);
     } else {
       this._expandItem(item);
+      this._loadExpandedBodies(() => this.trigger());
     }
 
     this.trigger();
   }
 
+  // Callers load the bodies once after expanding (_loadExpandedBodies).
   _expandItem(item: Message) {
     this._itemsExpanded[item.id] = 'explicit';
     this._fetchExpandedAttachments([item]);
-    this._loadExpandedBodies(() => this.trigger());
   }
 
   _collapseItem(item: Message) {
@@ -376,15 +382,21 @@ class _MessageStore extends MailspringStore {
   // ones it hasn't downloaded, then runs `done` (at once when nothing was missing).
   _loadExpandedBodies(done: () => void) {
     const threadId = this.threadId();
-    const missing = this._items.filter((m) => this._itemsExpanded[m.id] && m.body === undefined);
+    const missing = this._items.filter(
+      (m) => this._itemsExpanded[m.id] && m.body === undefined && !this._bodiesLoading.has(m.id)
+    );
     if (missing.length === 0) {
       done();
       return;
     }
-    DatabaseStore.findAll<Message>(Message, { id: missing.map((m) => m.id) })
+    const ids = missing.map((m) => m.id);
+    const inFlight = this._bodiesLoading;
+    ids.forEach((id) => inFlight.add(id));
+    DatabaseStore.findAll<Message>(Message, { id: ids })
       .include(Message.attributes.body)
       .then(
         (loaded) => {
+          ids.forEach((id) => inFlight.delete(id));
           if (threadId !== this.threadId()) return;
           const bodies = new Map(loaded.map((m) => [m.id, m.body]));
           this._items = this._items.map((item) => {
@@ -397,6 +409,7 @@ class _MessageStore extends MailspringStore {
           done();
         },
         (err) => {
+          ids.forEach((id) => inFlight.delete(id));
           if (threadId !== this.threadId()) return;
           console.warn(`MessageStore: could not read message bodies: ${err}`);
           done();

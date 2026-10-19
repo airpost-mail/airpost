@@ -19,7 +19,9 @@ import EngineReads from '../src/flux/stores/engine-reads';
 import { Matcher } from '../src/flux/attributes/matcher';
 import { AttributeJoinedData } from '../src/flux/attributes/attribute-joined-data';
 import DatabaseObjectRegistry from '../src/registries/database-object-registry';
+import type ModelQuery from '../src/flux/models/query';
 import type { ModelQueryJSON } from '../src/flux/models/query';
+import DatabaseStore from '../src/flux/stores/database-store';
 import type { MatcherJSON } from '../src/flux/attributes/matcher';
 import { Model } from '../src/flux/models/model';
 
@@ -201,4 +203,97 @@ function matcherFor(klass: typeof Model, json: MatcherJSON): Matcher {
 export async function settle(turns = 20) {
   for (let i = 0; i < turns; i++) await Promise.resolve();
   await new Promise((resolve) => setImmediate(resolve));
+}
+
+export type Transport = 'sqlite' | 'engine';
+
+/*
+Fixtures for DatabaseStore reads on either transport, so one spec runs on both. "engine"
+installs the MockEngine; "sqlite" leaves `core.engine.reads` alone and answers the SQLite path's
+`_query` with the rows the same fixtures give, in better-sqlite3's shape (`data`, joined
+columns, `id`, `count`), so `Query.inflateResult` runs as it does on a real database.
+*/
+export class FixtureReads {
+  transport: Transport;
+  engine = new MockEngine();
+
+  constructor(transport: Transport) {
+    this.transport = transport;
+  }
+
+  install() {
+    if (this.transport === 'engine') {
+      this.engine.install();
+      return this;
+    }
+    // _inflated calls _query synchronously on the SQLite path, so the query is the last one
+    // _inflated was given; other SQL (transactions) gets no rows.
+    let current: ModelQuery<any> | null = null;
+    const inflated = DatabaseStore._inflated;
+    spyOn(DatabaseStore, '_inflated').andCallFake((query: ModelQuery<any>) => {
+      current = query;
+      return inflated.call(DatabaseStore, query);
+    });
+    jasmine.unspy(DatabaseStore, '_query');
+    spyOn(DatabaseStore, '_query').andCallFake(() => {
+      const query = current;
+      current = null;
+      if (!query) return Promise.resolve([]);
+      const json = query.toJSON();
+      this.engine.requests.push({ method: Method.Query, params: json });
+      return Promise.resolve().then(() => sqliteRows(query, this.engine.answer(json)));
+    });
+    return this;
+  }
+
+  uninstall() {
+    if (this.transport === 'engine') this.engine.uninstall();
+  }
+
+  add(...models: Model[]) {
+    this.engine.add(...models);
+  }
+
+  /** The reads sent, as Query.toJSON(), on either transport. */
+  queries(className?: string): ModelQueryJSON[] {
+    return this.engine.queries(className);
+  }
+}
+
+function sqliteRows(query: ModelQuery<any>, result: QueryResult) {
+  const q = query as any;
+  if (q._count) return [{ count: result.count }];
+  if (q._returnIds) return (result.ids || []).map((id) => ({ id }));
+  return (result.rows || []).map((json) => {
+    const data = { ...json };
+    const row: Record<string, unknown> = {};
+    for (const attr of q._includeJoinedData as AttributeJoinedData[]) {
+      const value = json[attr.modelKey];
+      delete data[attr.modelKey];
+      row[attr.tableColumn] =
+        value === null || value === undefined ? AttributeJoinedData.NullPlaceholder : value;
+    }
+    row.data = JSON.stringify(data);
+    return row;
+  });
+}
+
+/**
+ * Runs `body` once per transport, each in its own describe, with a FixtureReads installed.
+ * Specs that assert on SQL text keep a sqlite-only branch (`reads().transport`).
+ */
+export function forEachTransport(body: (reads: () => FixtureReads) => void) {
+  for (const transport of ['sqlite', 'engine'] as Transport[]) {
+    describe(`on ${transport}`, function () {
+      let reads: FixtureReads = null;
+      beforeEach(function () {
+        reads = new FixtureReads(transport).install();
+      });
+      afterEach(function () {
+        reads.uninstall();
+        reads = null;
+      });
+      body(() => reads);
+    });
+  }
 }

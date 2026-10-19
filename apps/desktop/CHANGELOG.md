@@ -2,6 +2,11 @@
 
 ## Unreleased (Tern)
 
+Plugin API 1.31.0:
+
+- `ComponentRegistry.listenShared(callback)`: one registry listener shared by every caller, for components rendered many times (thread rows).
+- `MessageStore.items()` carries `body` for expanded messages only; it is `undefined` on collapsed ones until they are expanded. Read the body with `DatabaseStore.find(Message, id).include(Message.attributes.body)` when you need it. Thread changes no longer re-read the open thread's messages.
+
 Plugin API 1.27.0:
 
 - New `Engine` export (`request`, `subscribe`, `features`, `has`, `capabilities`, `connected`, `onDidChange`) and the `tern.engineMethods` manifest field. See PLUGIN_SYSTEM_ARCHITECTURE.md.

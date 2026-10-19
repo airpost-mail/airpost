@@ -6,9 +6,12 @@ import {
   DraftStore,
   AccountStore,
   DatabaseStore,
+  MessageStore,
+  SignatureStore,
 } from 'mailspring-exports';
 
 import DraftFactory from '../../src/flux/stores/draft-factory';
+import SignatureComposerExtension from '../../internal_packages/composer-signature/lib/signature-composer-extension';
 
 // Answers queries from an in-memory set of models, honouring where, order and limit.
 function runAgainst(models: any[]) {
@@ -105,6 +108,32 @@ describe('DraftStore reply target', function replyTarget() {
     expect(DraftFactory.createDraftForReply).not.toHaveBeenCalled();
     const finalized = (DraftStore._finalizeAndPersistNewMessage as any).mostRecentCall.args[0];
     expect(finalized.headerMessageId).toEqual('reply-draft@example.com');
+  });
+
+  it('loads the body of an existing reply draft the open thread holds without one', async () => {
+    // MessageStore keeps bodies of expanded messages only (TD40).
+    const collapsed = new Message(this.replyDraft);
+    collapsed.body = undefined;
+    spyOn(MessageStore, 'threadId').andReturn('thread-1');
+    spyOn(MessageStore, 'items').andReturn([this.received, collapsed]);
+    spyOn(SignatureStore, 'signatureForEmail').andReturn({
+      id: 'sig-1',
+      body: '<div>Signed</div>',
+    });
+    (DraftStore._finalizeAndPersistNewMessage as any).andCallFake((draft) => {
+      SignatureComposerExtension.prepareNewDraft({ draft });
+      return Promise.resolve({ headerMessageId: draft.headerMessageId, draft });
+    });
+    await DraftStore._onComposeReply({
+      threadId: 'thread-1',
+      type: 'reply-all',
+      behavior: 'prefer-existing',
+    });
+    expect(DraftFactory.createDraftForReply).not.toHaveBeenCalled();
+    const finalized = (DraftStore._finalizeAndPersistNewMessage as any).mostRecentCall.args[0];
+    expect(finalized.headerMessageId).toEqual('reply-draft@example.com');
+    expect(finalized.body).toContain('unsent');
+    expect(finalized.body).toContain('Signed');
   });
 
   it('forwards the last received message, not a newer draft, given only a threadId', async () => {

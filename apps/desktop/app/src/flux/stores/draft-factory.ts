@@ -428,7 +428,14 @@ class DraftFactory {
       return null;
     }
     if (behavior === 'prefer-existing') {
-      return candidateDrafts.pop();
+      const draft = candidateDrafts.pop();
+      // MessageStore holds bodies for expanded messages only, and the read above skips them;
+      // the draft is persisted again with its body, so load it first.
+      if (draft.body !== undefined) return draft;
+      const withBody = await DatabaseStore.find<Message>(Message, draft.id).include(
+        Message.attributes.body
+      );
+      return withBody || null;
     }
     if (behavior === 'prefer-existing-if-pristine') {
       DraftStore = DraftStore || require('./draft-store').default;

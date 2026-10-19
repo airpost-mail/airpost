@@ -9,6 +9,7 @@ import DatabaseStore from '../../src/flux/stores/database-store';
 import { ChangeUnreadTask } from '../../src/flux/tasks/change-unread-task';
 import CategoryStore from '../../src/flux/stores/category-store';
 import * as Actions from '../../src/flux/actions';
+import { forEachTransport, settle } from '../mock-engine';
 
 const testThread = new Thread({ id: '123', accountId: TEST_ACCOUNT_ID });
 const testMessage1 = new Message({
@@ -199,111 +200,118 @@ describe('MessageStore', function () {
       }));
   });
 
-  describe('when applying focus changes', function () {
-    beforeEach(function () {
-      (MessageStore as any)._lastLoadedThreadId = null;
-
-      this.focus = null;
-      spyOn(FocusedContentStore, 'focused').andCallFake((collection) => {
-        if (collection === 'thread') {
-          return this.focus;
-        } else {
-          return null;
-        }
-      });
-
-      spyOn(FocusedContentStore, 'focusedId').andCallFake((collection) => {
-        if (collection === 'thread') {
-          return this.focus != null ? this.focus.id : undefined;
-        } else {
-          return null;
-        }
-      });
-
-      spyOn(DatabaseStore, 'findAll').andCallFake(function () {
-        return {
-          include() {
-            return this;
-          },
-          where() {
-            return this;
-          },
-          then(callback) {
-            return callback([testMessage1, testMessage2]);
-          },
-        };
-      });
-    });
-
-    it('should retrieve the focused thread', function () {
-      this.focus = testThread;
-      MessageStore._thread = null;
-      MessageStore._onApplyFocusChange();
-      expect(DatabaseStore.findAll).toHaveBeenCalled();
-      expect((DatabaseStore.findAll as jasmine.Spy).mostRecentCall.args[0]).toBe(Message);
-    });
-
-    describe('when the thread is already focused', () =>
-      it('should do nothing', function () {
-        this.focus = testThread;
-        MessageStore._thread = this.focus;
-        MessageStore._onApplyFocusChange();
-        expect(DatabaseStore.findAll).not.toHaveBeenCalled();
-      }));
-
-    describe('when the thread is unread', function () {
+  // Reads the thread through DatabaseStore, so these run on both transports.
+  describe('when applying focus changes', () =>
+    forEachTransport((reads) => {
       beforeEach(function () {
+        (MessageStore as any)._lastLoadedThreadId = null;
+
         this.focus = null;
-        MessageStore._onApplyFocusChange();
-        testThread.unread = true;
-        spyOn(Actions, 'queueTask');
-        spyOn(AppEnv.config, 'get').andCallFake((key) => {
-          if (key === 'core.reading.markAsReadDelay') {
-            return 600;
+        spyOn(FocusedContentStore, 'focused').andCallFake((collection) => {
+          if (collection === 'thread') {
+            return this.focus;
+          } else {
+            return null;
           }
         });
+
+        spyOn(FocusedContentStore, 'focusedId').andCallFake((collection) => {
+          if (collection === 'thread') {
+            return this.focus != null ? this.focus.id : undefined;
+          } else {
+            return null;
+          }
+        });
+
+        reads().add(
+          ...[testMessage1, testMessage2].map(
+            (m, i) => new Message({ ...m, threadId: testThread.id, date: new Date((i + 1) * 1000) })
+          )
+        );
+        spyOn(DatabaseStore, 'findAll').andCallThrough();
       });
 
-      it('should queue a task to mark the thread as read', function () {
+      afterEach(function () {
+        MessageStore._setStoreDefaults();
+      });
+
+      it('should retrieve the focused thread', async function () {
         this.focus = testThread;
+        MessageStore._thread = null;
         MessageStore._onApplyFocusChange();
-        advanceClock(500);
-        expect(Actions.queueTask).not.toHaveBeenCalled();
-        advanceClock(500);
-        expect(Actions.queueTask).toHaveBeenCalled();
-        expect(
-          (Actions.queueTask as unknown as jasmine.Spy).mostRecentCall.args[0] instanceof
-            ChangeUnreadTask
-        ).toBe(true);
+        expect(DatabaseStore.findAll).toHaveBeenCalled();
+        expect((DatabaseStore.findAll as jasmine.Spy).mostRecentCall.args[0]).toBe(Message);
+        await settle();
+        expect(MessageStore.items().map((m) => m.id)).toEqual(['a', 'b']);
+        // The last message opens expanded with its body.
+        expect(MessageStore.items()[1].body).toBe('123');
       });
 
-      it('should not queue a task to mark the thread as read if the thread is no longer selected 500msec later', function () {
-        this.focus = testThread;
-        MessageStore._onApplyFocusChange();
-        advanceClock(500);
-        expect(Actions.queueTask).not.toHaveBeenCalled();
-        this.focus = null;
-        MessageStore._onApplyFocusChange();
-        advanceClock(500);
-        expect(Actions.queueTask).not.toHaveBeenCalled();
-      });
+      describe('when the thread is already focused', () =>
+        it('should do nothing', function () {
+          this.focus = testThread;
+          MessageStore._thread = this.focus;
+          MessageStore._onApplyFocusChange();
+          expect(DatabaseStore.findAll).not.toHaveBeenCalled();
+        }));
 
-      it('should not re-mark the thread as read when made unread', function () {
-        this.focus = testThread;
-        testThread.unread = false;
-        MessageStore._onApplyFocusChange();
-        advanceClock(500);
-        expect(Actions.queueTask).not.toHaveBeenCalled();
+      describe('when the thread is unread', function () {
+        beforeEach(function () {
+          this.focus = null;
+          MessageStore._onApplyFocusChange();
+          testThread.unread = true;
+          spyOn(Actions, 'queueTask');
+          spyOn(AppEnv.config, 'get').andCallFake((key) => {
+            if (key === 'core.reading.markAsReadDelay') {
+              return 600;
+            }
+          });
+        });
 
-        // This simulates a DB change or some attribute changing on the
-        // thread.
-        testThread.unread = true;
-        MessageStore._fetchFromCache();
-        advanceClock(500);
-        expect(Actions.queueTask).not.toHaveBeenCalled();
+        it('should queue a task to mark the thread as read', async function () {
+          this.focus = testThread;
+          MessageStore._onApplyFocusChange();
+          await settle();
+          advanceClock(500);
+          expect(Actions.queueTask).not.toHaveBeenCalled();
+          advanceClock(500);
+          expect(Actions.queueTask).toHaveBeenCalled();
+          expect(
+            (Actions.queueTask as unknown as jasmine.Spy).mostRecentCall.args[0] instanceof
+              ChangeUnreadTask
+          ).toBe(true);
+        });
+
+        it('should not queue a task to mark the thread as read if the thread is no longer selected 500msec later', async function () {
+          this.focus = testThread;
+          MessageStore._onApplyFocusChange();
+          await settle();
+          advanceClock(500);
+          expect(Actions.queueTask).not.toHaveBeenCalled();
+          this.focus = null;
+          MessageStore._onApplyFocusChange();
+          advanceClock(500);
+          expect(Actions.queueTask).not.toHaveBeenCalled();
+        });
+
+        it('should not re-mark the thread as read when made unread', async function () {
+          this.focus = testThread;
+          testThread.unread = false;
+          MessageStore._onApplyFocusChange();
+          await settle();
+          advanceClock(500);
+          expect(Actions.queueTask).not.toHaveBeenCalled();
+
+          // This simulates a DB change or some attribute changing on the
+          // thread.
+          testThread.unread = true;
+          MessageStore._fetchFromCache();
+          await settle();
+          advanceClock(500);
+          expect(Actions.queueTask).not.toHaveBeenCalled();
+        });
       });
-    });
-  });
+    }));
 
   describe('when toggling expansion of all messages', function () {
     beforeEach(function () {
