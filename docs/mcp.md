@@ -76,7 +76,8 @@ open Tern.
 
 - `accessLevel`: `read-only` (default), `read-write` or `read-write-send`, with the plugin's
   tool categories: read tools need nothing, drafts and thread changes need `read-write`,
-  `send_draft`, `schedule_send` and `unsubscribe` need `read-write-send`. An unknown value is read-only.
+  `send_draft`, `schedule_send`, `unsubscribe` and `respond_to_event` (and events with
+  guests) need `read-write-send`. An unknown value is read-only.
 - `enabledAccounts`: empty means every account. Otherwise an account that is absent or has
   `enabled: false` is invisible: not listed, and its ids answer "not found". Threads and
   messages in an excluded folder are hidden the same way, and the folder isn't listed.
@@ -119,9 +120,9 @@ The plugin's tools keep their names, arguments and output shapes:
 
 | Category | Tools |
 | --- | --- |
-| read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `get_attachment` |
-| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads` |
-| read-write-send | `send_draft`, `schedule_send`, `unsubscribe` |
+| read | `list_accounts`, `list_folders`, `search_mail`, `list_threads`, `get_thread`, `get_message`, `get_message_tracking`, `list_tracked_messages`, `get_top_links`, `list_scheduled_sends`, `get_attachment`, `list_events`, `get_contact` |
+| read-write | `create_draft`, `reply_to_thread`, `update_draft`, `delete_draft`, `archive_threads`, `trash_threads`, `move_to_folder`, `set_labels`, `set_unread`, `set_starred`, `cancel_scheduled_send`, `snooze_threads`, `unsnooze_threads`, `create_event`, `update_event`, `create_contact`, `update_contact` |
+| read-write-send | `send_draft`, `schedule_send`, `unsubscribe`, `respond_to_event`; `create_event` and `update_event` with `attendees` |
 
 Attachments are also served as the resource template `attachment://{messageId}/{fileId}`,
 read from `<config-dir>/files/` (fetching the body first when the file isn't there yet).
@@ -160,6 +161,14 @@ Changes from the plugin:
   makes the one-click POST or sends the mailto message from the account, and a web-only list
   comes back as a `url` with a note to have the user open it. It is in the send category
   because it can send mail.
+- `list_events`, `create_event`, `update_event` and `respond_to_event` (new) call the engine's
+  `events.expand`, `events.create`, `events.update` and `events.rsvp` (the `calendar-editing`
+  feature, docs/desktop-client-plan.md 3.8); `get_contact`, `create_contact` and
+  `update_contact` (new) its `contacts.get`, `contacts.create` and `contacts.update`
+  (`contact-editing`). The engine builds the ICS or vCard and queues the tasks the desktop
+  would. Times read as `sendAt` does, in the machine's zone, which is passed as `tz`.
+  `respond_to_event` mails the organizer, and guests on an event are mailed by the calendar
+  server, so those need `read-write-send`.
 
 `list_tracked_messages`, `get_top_links` and `list_scheduled_sends` read through
 `metadata.list` and fail with "needs a newer Tern engine" on an engine without it. With

@@ -8,6 +8,7 @@
 //! policy doesn't enable, so their ids read as unknown.
 
 mod attachments;
+mod pim;
 mod read;
 mod write;
 
@@ -122,6 +123,7 @@ pub fn definitions() -> Vec<ToolDef> {
     let mut defs = read::definitions();
     defs.extend(attachments::definitions());
     defs.extend(write::definitions());
+    defs.extend(pim::definitions());
     defs
 }
 
@@ -162,6 +164,13 @@ pub fn call(ctx: &mut Ctx<'_>, name: &str, args: &Value) -> Output {
         "snooze_threads" => write::snooze_threads(ctx, args),
         "unsnooze_threads" => write::unsnooze_threads(ctx, args),
         "unsubscribe" => write::unsubscribe(ctx, args),
+        "list_events" => pim::list_events(ctx, args),
+        "create_event" => pim::create_event(ctx, args),
+        "update_event" => pim::update_event(ctx, args),
+        "respond_to_event" => pim::respond_to_event(ctx, args),
+        "get_contact" => pim::get_contact(ctx, args),
+        "create_contact" => pim::create_contact(ctx, args),
+        "update_contact" => pim::update_contact(ctx, args),
         _ => Err(failed(format!("Unknown tool '{name}'"))),
     };
     match result {

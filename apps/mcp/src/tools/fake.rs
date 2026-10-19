@@ -351,6 +351,37 @@ impl Backend for Fake {
                 let url = list.trim_matches(|c| c == '<' || c == '>');
                 Ok(json!({"method": "web", "ok": true, "url": url}))
             }
+            "events.expand" => {
+                self.actions.push((method.to_owned(), params));
+                Ok(json!({"occurrences": [
+                    {"eventId": "ev2", "accountId": account, "title": "Later", "start": 2000, "end": 2600, "isAllDay": false},
+                    {"eventId": "ev1", "accountId": account, "title": "Offsite", "startDate": 0, "endDate": 0, "isAllDay": true},
+                ]}))
+            }
+            "events.create" | "events.update" => {
+                self.actions.push((method.to_owned(), params.clone()));
+                if str_of(&params, "eventId") == "missing" {
+                    return Err(not_found("event"));
+                }
+                Ok(
+                    json!({"writes": [{"kind": if method == "events.create" { "create" } else { "update" },
+                    "eventId": "ev-new", "taskId": "task-ev"}], "icsuid": "u@tern"}),
+                )
+            }
+            "events.rsvp" => {
+                self.actions.push((method.to_owned(), params));
+                Ok(json!({"email": "me@x.test", "replyTaskId": "task-rsvp"}))
+            }
+            "contacts.get" | "contacts.create" | "contacts.update" => {
+                self.actions.push((method.to_owned(), params.clone()));
+                if str_of(&params, "contactId") == "elsewhere" && account == "a1" {
+                    return Err(not_found("contact"));
+                }
+                Ok(
+                    json!({"contact": {"id": "c1"}, "metadata": {"origin": "CardDAV", "readonly": false},
+                    "data": params.get("patch").or(params.get("data")).cloned().unwrap_or(json!({}))}),
+                )
+            }
             other => Err(EngineError::Rpc {
                 code: ms_ipc::code::METHOD_NOT_FOUND,
                 message: format!("unknown method {other}"),

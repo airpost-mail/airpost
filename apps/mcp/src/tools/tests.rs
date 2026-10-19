@@ -1129,3 +1129,144 @@ fn drafts_are_html_when_the_composer_default_is_plaintext() {
         }
     }
 }
+
+#[test]
+fn calendar_and_contact_tools() {
+    let mut f = fake();
+    f.features = vec![
+        ms_ipc::feature::CALENDAR_EDITING.into(),
+        ms_ipc::feature::CONTACT_EDITING.into(),
+    ];
+    let ro = policy("read-only", json!({}));
+    let send = policy("read-write-send", json!({}));
+
+    let out = json_of(&run(
+        &mut f,
+        &ro,
+        "list_events",
+        json!({"start": "2026-03-01T00:00:00Z", "end": "2026-03-08T00:00:00Z"}),
+    ));
+    assert_eq!(out["count"], 2);
+    // Oldest first; all-day ones by their day, end exclusive.
+    assert_eq!(out["events"][0]["eventId"], "ev1");
+    assert_eq!(out["events"][0]["startDate"], "1970-01-01");
+    assert_eq!(out["events"][0]["endDate"], "1970-01-02");
+    assert_eq!(out["events"][1]["start"], "1970-01-01T00:33:20Z");
+    let (_, p) = f.actions.last().unwrap();
+    assert_eq!(p["start"], 1_772_323_200);
+    assert!(p["tz"].is_string());
+
+    // Writes need read-write; guests, whom the server mails, read-write-send.
+    let create = json!({"calendarId": "cal", "title": "Lunch",
+        "start": "2026-03-02T12:00:00Z", "end": "2026-03-02T13:00:00Z"});
+    let o = run(&mut f, &ro, "create_event", create.clone());
+    assert!(o.is_error && o.denied);
+    let out = json_of(&run(&mut f, &rw(), "create_event", create.clone()));
+    assert_eq!(out["eventId"], "ev-new");
+    let mut with_guests = create.clone();
+    with_guests["attendees"] = json!([{"email": "g@y.test"}]);
+    let o = run(&mut f, &rw(), "create_event", with_guests.clone());
+    assert!(o.is_error && o.denied, "{}", o.first_text());
+    assert!(!run(&mut f, &send, "create_event", with_guests).is_error);
+    let (m, p) = f.actions.last().unwrap();
+    assert_eq!(m, "events.create");
+    assert_eq!(p["attendees"], json!([{"email": "g@y.test"}]));
+
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "update_event",
+        json!({"eventId": "ev1", "scope": "this", "occurrenceStart": "2026-03-02T09:00:00Z",
+               "title": "Moved", "start": "2026-03-02T10:00:00Z"}),
+    ));
+    assert_eq!(out["writes"][0]["kind"], "update");
+    let (_, p) = f.actions.last().unwrap();
+    assert_eq!(
+        p["patch"],
+        json!({"summary": "Moved", "start": 1_772_445_600})
+    );
+    assert_eq!(
+        (p["scope"].as_str(), p["occurrenceStart"].as_i64()),
+        (Some("this"), Some(1_772_442_000))
+    );
+    let o = run(
+        &mut f,
+        &rw(),
+        "update_event",
+        json!({"eventId": "missing", "title": "x"}),
+    );
+    assert!(
+        o.is_error && o.first_text().contains("not found"),
+        "{}",
+        o.first_text()
+    );
+    assert!(run(&mut f, &rw(), "update_event", json!({"eventId": "ev1"})).is_error);
+
+    // An answer mails the organizer.
+    let o = run(
+        &mut f,
+        &rw(),
+        "respond_to_event",
+        json!({"eventId": "ev1", "status": "accepted"}),
+    );
+    assert!(o.is_error && o.denied);
+    let out = json_of(&run(
+        &mut f,
+        &send,
+        "respond_to_event",
+        json!({"eventId": "ev1", "status": "accepted"}),
+    ));
+    assert_eq!(
+        (
+            out["responded"].as_bool(),
+            out["organizerNotified"].as_bool()
+        ),
+        (Some(true), Some(true))
+    );
+    let out = json_of(&run(
+        &mut f,
+        &send,
+        "respond_to_event",
+        json!({"eventId": "ev1", "status": "tentative",
+               "proposedStart": "2026-03-02T15:00:00Z", "proposedEnd": "2026-03-02T16:00:00Z"}),
+    ));
+    assert_eq!(out["proposed"], true);
+    assert!(
+        run(
+            &mut f,
+            &send,
+            "respond_to_event",
+            json!({"eventId": "ev1", "status": "maybe"})
+        )
+        .is_error
+    );
+
+    let out = json_of(&run(&mut f, &ro, "get_contact", json!({"contactId": "c1"})));
+    assert_eq!(out["source"], "CardDAV");
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "update_contact",
+        json!({"contactId": "c1", "title": "Lead", "phone": "+1 555"}),
+    ));
+    assert_eq!(out["details"]["title"], "Lead");
+    assert_eq!(out["details"]["phoneNumbers"], json!([{"value": "+1 555"}]));
+    let out = json_of(&run(
+        &mut f,
+        &rw(),
+        "create_contact",
+        json!({"name": "Ann Archer", "email": "ann@y.test"}),
+    ));
+    assert_eq!(out["details"]["name"]["familyName"], "Archer");
+    assert!(run(&mut f, &rw(), "create_contact", json!({})).is_error);
+
+    // Accounts the policy disables don't exist.
+    let only_other = policy("read-write", json!({"a1": {"enabled": false}}));
+    let o = run(
+        &mut f,
+        &only_other,
+        "get_contact",
+        json!({"contactId": "c1"}),
+    );
+    assert!(o.is_error);
+}
