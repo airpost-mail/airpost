@@ -2431,3 +2431,52 @@ Open:
 Trial pending (not run): on ~/tern-trial, check the rules move out of localStorage, a rule that
 labels or moves arriving mail, one that forwards (to an address of the user's), a broken
 expression getting disabled with the notification, and "Process entire inbox" with Stop.
+
+2026-10-19, stage 14 gate (attempt 1), branch `roadmap/client-next`, merged to main. Already on
+top of main (6838788db), so the rebase was a no-op. Gate: fmt, clippy, `cargo test --workspace`,
+`cargo deny check` (advisories, bans, licences and sources ok), release build of mailsync, tern,
+tern-mcp and tern-gateway, harness quick tier on serve with the release binaries (157 passed, 4
+skipped). Desktop: lint and typecheck pass; the engine-settings, package-manager and
+mail-rules-store specs pass (44). No code changed in this step. No new decisions; the ones above
+still need confirming.
+
+Open from the review (low; the job kept running after its connection closed is fixed above):
+- `apps/engine/src/socket.rs`: the `mailRulesAutoSince` the engine sets itself (`set_auto_since`)
+  goes out with `settings_changed(&changed, origin)`, which skips the origin connection although
+  the origin never set that value. The desktop main process is the usual origin, so its mirror and
+  config.json (the copy T11 keeps for a downgrade or a store reset) lack the value until the next
+  `settings.get`. Send the engine-set key to every connection, origin included.
+- `apps/engine/src/socket.rs`: `disable_rule` sits between `publish_capabilities` and its doc
+  comment, so `disable_rule`'s rustdoc starts with "Sends `capabilities.changed`..." and
+  `publish_capabilities` has none. Move the comment back.
+- `crates/ms-tasks/src/mail_rules.rs`: `matchesExpression` compiles with the `regex` crate, which
+  rejects lookaround and backreferences the desktop's JS RegExp accepted. An existing rule that
+  used them fails on its first match after the upgrade and stays disabled (listed above as a
+  decision to confirm).
+- `apps/engine/src/rules.rs`: `rules.reprocess` loads every message and stored body of every inbox
+  thread even when the account has no enabled rules, and `apply()` then does nothing. The
+  desktop's `_onStartReprocessing` returned early there; return early in the engine too.
+- `apps/engine/src/rules.rs`: a forward whose `draft.send` fails with anything but NOT_FOUND
+  disables the rule but leaves the draft saved by `draft.create` (`save: true`) in Drafts, where
+  it syncs to the server. Tasks from the rule's earlier actions have already run by then; in the
+  desktop any action failure meant nothing was queued.
+- `apps/desktop/app/src/engine-api.ts`: ms-ipc classes `rules.reprocess` and `rules.cancel` as
+  local-only, and reprocess sends forwards over the whole inbox, but the desktop's
+  `LOCAL_ONLY_METHODS` (TD29 plugin consent) doesn't list them. Any plugin can start a reprocess,
+  forwards included, through `Engine.request` without `tern.engineMethods` or the user's yes, and
+  the `MailRulesProcessor` deprecation text points plugins at that call. Add both methods.
+- `apps/desktop/app/src/flux/stores/mail-rules-store.ts`: Stop clears the local reprocess state at
+  once, but the engine only checks the cancel flag before its next batch of 50 threads. Process
+  clicked right after Stop gets ENGINE_BUSY and shows the raw engine message in an error dialog.
+- `apps/engine/test/scenarios/mail-rules.yaml`: nothing covers a running job stopped by
+  `rules.cancel` or by an account stop (`rules.progress` with `stopped`); the scenario only cancels
+  an unknown job id. The desktop spec's "_applyRuleToMessage ordering" case (a later rule reads
+  the thread after an earlier rule's local change) has no engine counterpart.
+- `apps/desktop/app/src/global/mailspring-exports.js`: the new `deprecate()` helper (section 6:
+  the getter stays a getter, caches the value, warns once per calling package, app code isn't
+  warned) has no spec, and nothing tests that `MailRulesProcessor.processMessages` is a resolved
+  no-op. Recording the warning in Preferences > Plugins is open (above).
+Nothing for tern-web.
+Trial pending (not run): the stage 14 steps above (rules move out of localStorage, a rule that
+labels or moves arriving mail, one that forwards to an address of the user's, a broken expression
+disabled with the notification, "Process entire inbox" with Stop).
