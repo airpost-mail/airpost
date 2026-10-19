@@ -17,7 +17,7 @@ use crate::platform;
 /// The snap's name in `apps/desktop/snap/snapcraft.yaml`. A snap install keeps its profile
 /// in `$SNAP_USER_COMMON` (`~/snap/<name>/common`), which a client outside the snap can't see
 /// in its environment.
-const SNAP_NAME: &str = "mailspring";
+const SNAP_NAME: &str = "tern";
 
 /// The discovery file of a `serve` engine.
 pub const ENGINE_FILE: &str = "engine.json";
