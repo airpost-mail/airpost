@@ -19,6 +19,7 @@ use ms_providers::ServerProfile;
 use ms_store::{DeltaStream, File, Folder, Message, Model, Query, Store, Task, Thread};
 use ms_sync::expiration_executor::{Executor, Outcome};
 use ms_sync::mail_processor::{id_for_message, MailProcessor};
+use ms_sync::pending_sends::{PendingBodies, PendingSends};
 use ms_sync::{EngineSettings, RemoteTaskRunner};
 use ms_tasks::{Mailer, TaskProcessor};
 use serde_json::{json, Value};
@@ -1865,6 +1866,7 @@ impl Env {
             Arc::new(TestSettings(settings)),
             Box::new(move |task| processor.perform_local(task)),
             Box::new(move |ids| into.lock().unwrap().extend(ids)),
+            Box::new(|| {}),
         );
         (executor, fetched)
     }
@@ -2037,6 +2039,119 @@ fn executor_fails_a_draft_whose_from_is_not_the_account() {
             .as_str()
             .unwrap()
             .contains("someone@else.example"),
+        "{value}"
+    );
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+}
+
+/// A due row the scan read before a cancel (or a send) cleared it isn't sent, and one moved
+/// later waits.
+#[test]
+fn executor_rereads_the_schedule_before_sending() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let id = e.scheduled_draft(
+        "cancelled-1@example.test",
+        json!({}),
+        json!({"expiration": T0, "isUndoSend": true, "actionKey": "send"}),
+    );
+    e.queue(
+        "SyncbackMetadataTask",
+        json!({"modelId": id, "modelClassName": "message", "pluginId": "send-later",
+               "value": {"expiration": null, "isUndoSend": true}}),
+    );
+    assert_eq!(e.handle("Message", &id, "send-later", T0), Outcome::Done);
+    let later = e.scheduled_draft(
+        "later-2@example.test",
+        json!({}),
+        json!({"expiration": T0 + 60, "actionKey": "send"}),
+    );
+    assert_eq!(
+        e.handle("Message", &later, "send-later", T0),
+        Outcome::Waiting(T0 + 60)
+    );
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+}
+
+/// "Send now" in the Undo Send toast moves the window earlier and keeps `isUndoSend`: the
+/// bodies draft.send kept still go out. A plain send-later moved earlier doesn't take them.
+#[test]
+fn executor_keeps_draft_send_bodies_when_send_now_moves_the_window() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let pending = PendingSends::new(e._dir.path(), ACCOUNT);
+    let bodies = PendingBodies {
+        expiration: T0 + 5,
+        self_body: Some("<p>sent copy</p>".into()),
+        per_recipient: [
+            ("bob@example.net".to_owned(), "<p>for bob</p>".to_owned()),
+            ("boss@example.net".to_owned(), "<p>for boss</p>".to_owned()),
+        ]
+        .into(),
+    };
+    let now = e.scheduled_draft(
+        "now-1@example.test",
+        json!({}),
+        json!({"expiration": T0, "isUndoSend": true, "actionKey": "send"}),
+    );
+    pending.put(&now, &bodies).unwrap();
+    let plain = e.scheduled_draft(
+        "now-2@example.test",
+        json!({}),
+        json!({"expiration": T0, "actionKey": "send"}),
+    );
+    pending.put(&plain, &bodies).unwrap();
+    assert_eq!(e.handle("Message", &now, "send-later", T0), Outcome::Done);
+    assert_eq!(e.handle("Message", &plain, "send-later", T0), Outcome::Done);
+    let sends = e.tasks_of("SendDraftTask");
+    let of = |hmid: &str| {
+        sends
+            .iter()
+            .find(|t| t.data["headerMessageId"] == hmid)
+            .unwrap()
+            .data
+            .clone()
+    };
+    let kept = of("now-1@example.test");
+    assert_eq!(kept["draft"]["body"], "<p>sent copy</p>");
+    assert_eq!(
+        kept["perRecipientBodies"],
+        json!({"self": "<p>sent copy</p>", "bob@example.net": "<p>for bob</p>", "boss@example.net": "<p>for boss</p>"})
+    );
+    let stored = of("now-2@example.test");
+    assert_eq!(stored["draft"]["body"], "<p>Hi Bob</p>");
+    assert!(stored["perRecipientBodies"].is_null());
+    assert!(pending.ids().is_empty());
+}
+
+/// Bodies kept for recipients the draft no longer has fail the send instead of skipping one.
+#[test]
+fn executor_fails_a_send_whose_kept_bodies_miss_a_recipient() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let id = e.scheduled_draft(
+        "changed-1@example.test",
+        json!({}),
+        json!({"expiration": T0, "isUndoSend": true, "actionKey": "send"}),
+    );
+    PendingSends::new(e._dir.path(), ACCOUNT)
+        .put(
+            &id,
+            &PendingBodies {
+                expiration: T0,
+                self_body: None,
+                per_recipient: [("bob@example.net".to_owned(), "<p>b</p>".to_owned())].into(),
+            },
+        )
+        .unwrap();
+    assert_eq!(e.handle("Message", &id, "send-later", T0), Outcome::Done);
+    let value = e.metadata_of::<Message>(&id, "send-later");
+    assert!(value["expiration"].is_null(), "{value}");
+    assert!(
+        value["error"]
+            .as_str()
+            .unwrap()
+            .contains("boss@example.net"),
         "{value}"
     );
     assert!(e.tasks_of("SendDraftTask").is_empty());
