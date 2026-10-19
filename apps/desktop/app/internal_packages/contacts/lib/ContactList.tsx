@@ -11,7 +11,7 @@ import {
   ListDataSource,
 } from 'mailspring-component-kit';
 import { ContactsPerspective, Store } from './Store';
-import { writeContactsToTempVCF, importContactsFromPaths } from './VCFImportExport';
+import { writeContactsToTempVCF, importContactsFromPaths } from './ContactFiles';
 import { ContactListContextMenu } from './ContactListContextMenu';
 
 const ContactColumn = new ListTabular.Column({

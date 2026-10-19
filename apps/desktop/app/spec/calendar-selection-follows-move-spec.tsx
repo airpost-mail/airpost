@@ -8,6 +8,7 @@ import { TimedOccurrence } from '../internal_packages/main-calendar/lib/core/cal
 import * as RecurringEventActions from '../internal_packages/main-calendar/lib/core/recurring-event-actions';
 import { CalendarView } from '../internal_packages/main-calendar/lib/core/calendar-constants';
 import FocusedMomentStore from '../internal_packages/main-calendar/lib/core/focused-moment-store';
+import { fakePimEngine } from './fake-pim-engine';
 
 const START = Date.UTC(2026, 8, 22, 13, 0, 0) / 1000;
 const QUARTER = 900;
@@ -84,6 +85,36 @@ const occurrenceAt = (start: number, over: Partial<TimedOccurrence> = {}): Timed
     ...over,
   }) as TimedOccurrence;
 
+// The engine's expansion of a row (events.expand with `eventIds`), for the rows here: one
+// VEVENT, or a DAILY or WEEKLY series with inline overrides. The expansion itself is
+// crates/ms-pim's tests.
+function expand(ics: string, start: number, end: number): TimedOccurrence[] {
+  const unixOf = (v: string) =>
+    Date.UTC(+v.slice(0, 4), +v.slice(4, 6) - 1, +v.slice(6, 8), +v.slice(9, 11), +v.slice(11, 13)) /
+    1000;
+  const prop = (vevent: string, name: string) =>
+    (new RegExp(`^${name}:(\\S+)`, 'm').exec(vevent) || [])[1];
+  const [master, ...overrides] = ics.split('BEGIN:VEVENT').slice(1);
+  const first = unixOf(prop(master, 'DTSTART'));
+  const rule = prop(master, 'RRULE');
+  const step = !rule ? 0 : rule.includes('DAILY') ? 86400 : 7 * 86400;
+  const moved = new Map(
+    overrides.map((o) => [unixOf(prop(o, 'RECURRENCE-ID')), unixOf(prop(o, 'DTSTART'))])
+  );
+  const out: TimedOccurrence[] = [];
+  const add = (at: number, slot?: number) => {
+    if (at + 1800 <= start || at >= end) return;
+    const exception = slot === undefined ? {} : { isException: true, recurrenceIdStart: slot };
+    out.push(occurrenceAt(at, { isRecurring: !!rule, ...exception }));
+  };
+  if (!step) add(first);
+  for (let t = first; step && t < end; t += step) {
+    if (moved.has(t)) add(moved.get(t), t);
+    else add(t);
+  }
+  return out;
+}
+
 function calendarWith(selected: TimedOccurrence[]) {
   const calendar: any = new MailspringCalendar({} as any);
   calendar.setState = (update: object) => Object.assign(calendar.state, update);
@@ -107,6 +138,10 @@ describe('the selection after an event is moved', function () {
   beforeEach(function () {
     row = eventAt(START);
     spyOn(DatabaseStore, 'find').andCallFake(() => Promise.resolve(row));
+    const engine = fakePimEngine();
+    engine.answers['events.expand'] = (params) => ({
+      occurrences: expand(row.ics, params.start, params.end),
+    });
     modify = spyOn(RecurringEventActions, 'modifyEventWithRecurringSupport').andReturn(
       Promise.resolve({ success: true })
     );

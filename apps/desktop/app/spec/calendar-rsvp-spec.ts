@@ -1,20 +1,15 @@
+// The calendar's answers and counter-proposals go to the engine (events.rsvp), which builds the
+// PARTSTAT edit, the REPLY and the COUNTER (crates/ms-pim plan.rs and its tests).
+import { AccountStore, Actions, DatabaseStore, Event } from 'mailspring-exports';
 import {
-  AccountStore,
-  Actions,
-  DatabaseStore,
-  Event,
-  EventRSVPTask,
-  SyncbackEventTask,
-} from 'mailspring-exports';
-import { Calendar } from '../src/flux/models/calendar';
-import {
-  occurrenceRecurrenceId,
+  occurrenceSlot,
   offerCounterInsteadOfMove,
   openProposeNewTimePopover,
   proposeNewTimeForCalendarEvent,
   respondToCalendarEvent,
 } from '../internal_packages/main-calendar/lib/core/calendar-rsvp';
 import { parseCalendarDate } from '../src/calendar-date';
+import { fakePimEngine, refusal } from './fake-pim-engine';
 
 const ME = 'brian@example.com';
 const START = Date.UTC(2026, 2, 10, 14) / 1000;
@@ -36,11 +31,6 @@ const SERIES_ICS = [
   'END:VEVENT',
   'END:VCALENDAR',
 ].join('\r\n');
-
-const ALL_DAY_ICS = SERIES_ICS.replace(
-  'DTSTART:20260303T140000Z',
-  'DTSTART;VALUE=DATE:20260303'
-).replace('DTEND:20260303T150000Z', 'DTEND;VALUE=DATE:20260304');
 
 function occurrence(overrides: any = {}) {
   return {
@@ -65,36 +55,25 @@ function occurrence(overrides: any = {}) {
   } as any;
 }
 
-const lines = (ics: string) => ics.replace(/\r\n[ \t]/g, '').split(/\r?\n/);
-
-describe('occurrenceRecurrenceId', function () {
-  it('is null for an event that does not repeat', function () {
-    expect(occurrenceRecurrenceId(occurrence({ isRecurring: false }))).toBe(null);
-  });
-
+describe('occurrenceSlot', function () {
   it('names a regular occurrence by its start', function () {
-    expect(occurrenceRecurrenceId(occurrence()).toString()).toBe('2026-03-10T14:00:00Z');
+    expect(occurrenceSlot(occurrence())).toBe(START);
   });
 
   it('names a moved occurrence by where it was, not where it is', function () {
     const moved = occurrence({ isException: true, recurrenceIdStart: START - 86400 });
-    expect(occurrenceRecurrenceId(moved).toString()).toBe('2026-03-09T14:00:00Z');
-  });
-
-  it('names an all-day occurrence by its date', function () {
-    const allDay = occurrence({ isAllDay: true, start: undefined, end: undefined });
-    expect(occurrenceRecurrenceId(allDay).toString()).toBe('2026-03-10');
+    expect(occurrenceSlot(moved)).toBe(START - 86400);
   });
 });
 
 describe('answering and countering from the calendar', function () {
-  let queued: any[];
   let event: Event;
-  let calendar: Calendar;
   let dialog: jasmine.Spy;
+  let engine: ReturnType<typeof fakePimEngine>;
 
   beforeEach(function () {
-    queued = [];
+    engine = fakePimEngine();
+    engine.answers['events.rsvp'] = () => ({ email: ME, replyTaskId: 't-reply' });
     event = new Event({
       id: 'event-1',
       accountId: 'acct-1',
@@ -102,16 +81,7 @@ describe('answering and countering from the calendar', function () {
       icsuid: 'series@test',
       ics: SERIES_ICS,
     } as any);
-    calendar = new Calendar({
-      id: 'cal-1',
-      accountId: 'acct-1',
-      name: ME,
-      ownership: 'mine',
-    } as any);
-    spyOn(DatabaseStore, 'find').andCallFake((klass: any) =>
-      Promise.resolve(klass === Event ? event : calendar)
-    );
-    spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
+    spyOn(DatabaseStore, 'find').andCallFake(() => Promise.resolve(event));
     spyOn(AccountStore, 'accountForEmail').andCallFake((email: string) =>
       email.toLowerCase() === ME ? { id: 'acct-1', emailAddress: ME } : null
     );
@@ -128,37 +98,43 @@ describe('answering and countering from the calendar', function () {
       comment: 'Clashes with standup',
     };
 
-    it('sends a COUNTER to the organizer naming the occurrence', async function () {
+    it('asks the engine for a COUNTER naming the occurrence', async function () {
       await proposeNewTimeForCalendarEvent(occurrence(), proposal);
-      const task = queued[0] as EventRSVPTask;
-      expect(task instanceof EventRSVPTask).toBe(true);
-      expect(task.method).toBe('COUNTER');
-      expect(task.toJSON().to).toBe('ada@example.com');
-      expect(lines(task.ics)).toContain('RECURRENCE-ID:20260310T140000Z');
-      expect(lines(task.ics)).toContain('DTSTART:20260310T160000Z');
-      expect(lines(task.ics)).not.toContain('RRULE:FREQ=WEEKLY');
-      expect(task.comment).toBe('Clashes with standup');
+      const [params] = engine.callsTo('events.rsvp');
+      expect(params.accountId).toBe('acct-1');
+      expect(params.eventId).toBe('event-1');
+      expect(params.counter).toEqual({
+        start: Date.UTC(2026, 2, 10, 16) / 1000,
+        end: Date.UTC(2026, 2, 10, 17) / 1000,
+      });
+      expect(params.occurrenceStart).toBe(START);
+      expect(params.comment).toBe('Clashes with standup');
+      expect(params.subject).toBe('New time proposed: Design Review');
     });
 
-    it('keeps an all-day occurrence on dates', async function () {
-      event.ics = ALL_DAY_ICS;
-      await proposeNewTimeForCalendarEvent(occurrence({ isAllDay: true }), {
-        start: new Date(2026, 2, 12),
-        end: new Date(2026, 2, 13),
-        comment: '',
-      });
-      const written = lines((queued[0] as EventRSVPTask).ics);
-      expect(written).toContain('RECURRENCE-ID;VALUE=DATE:20260310');
-      expect(written).toContain('DTSTART;VALUE=DATE:20260312');
-      expect(written).toContain('DTEND;VALUE=DATE:20260313');
+    it('names no occurrence for an event that does not repeat', async function () {
+      await proposeNewTimeForCalendarEvent(occurrence({ isRecurring: false }), proposal);
+      expect(engine.callsTo('events.rsvp')[0].occurrenceStart).toBeUndefined();
     });
 
     it('explains instead of sending when we are not a guest', async function () {
-      event.ics = SERIES_ICS.replace(`mailto:${ME}`, 'mailto:bo@example.com');
-      await proposeNewTimeForCalendarEvent(occurrence(), proposal);
-      expect(queued.length).toBe(0);
+      await proposeNewTimeForCalendarEvent(
+        occurrence({ attendees: [{ email: 'ada@example.com', partstat: 'ACCEPTED' }] }),
+        proposal
+      );
+      expect(engine.calls.length).toBe(0);
       expect((AppEnv.showErrorDialog as jasmine.Spy).mostRecentCall.args[0]).toContain(
         'guest list'
+      );
+    });
+
+    it('explains when the engine finds no organizer to send it to', async function () {
+      engine.answers['events.rsvp'] = () => {
+        throw refusal('no-organizer');
+      };
+      await proposeNewTimeForCalendarEvent(occurrence(), proposal);
+      expect((AppEnv.showErrorDialog as jasmine.Spy).mostRecentCall.args[0]).toContain(
+        'no organizer'
       );
     });
   });
@@ -180,24 +156,13 @@ describe('answering and countering from the calendar', function () {
   });
 
   describe('respondToCalendarEvent', function () {
-    const myLines = (ics: string) =>
-      lines(ics).filter((l) => l.startsWith('ATTENDEE') && l.includes(ME));
-    const veventsOf = (ics: string) =>
-      ics
-        .replace(/\r\n[ \t]/g, '')
-        .split('BEGIN:VEVENT')
-        .slice(1);
-
-    it('writes our answer onto our copy and emails the organizer', async function () {
+    it('answers on our copy; the engine writes it and emails the organizer', async function () {
       await respondToCalendarEvent(occurrence(), 'ACCEPTED');
-      const [write, reply] = queued as [SyncbackEventTask, EventRSVPTask];
-      expect(write instanceof SyncbackEventTask).toBe(true);
-      expect(lines(write.event.ics).find((l) => l.includes(ME))).toContain('PARTSTAT=ACCEPTED');
-      expect(write.rsvp.email).toBe(ME);
-      expect(write.rsvp.status).toBe('ACCEPTED');
-      expect(reply instanceof EventRSVPTask).toBe(true);
-      expect(reply.toJSON().to).toBe('ada@example.com');
-      expect(reply.icsRSVPStatus).toBe('ACCEPTED');
+      const [params] = engine.callsTo('events.rsvp');
+      expect(params.accountId).toBe('acct-1');
+      expect(params.eventId).toBe('event-1');
+      expect(params.status).toBe('ACCEPTED');
+      expect(params.occurrenceStart).toBeUndefined();
     });
 
     it('asks whether the answer is for this occurrence or the whole series', async function () {
@@ -209,75 +174,32 @@ describe('answering and countering from the calendar', function () {
       expect(options.detail).toContain('answer only this occurrence');
     });
 
-    it('answers only the clicked occurrence when asked to, on our copy and in the reply', async function () {
+    it('answers only the clicked occurrence when asked to', async function () {
       dialog.andReturn(0);
       await respondToCalendarEvent(occurrence(), 'ACCEPTED');
-      const [write, reply] = queued as [SyncbackEventTask, EventRSVPTask];
-      const [master, exception] = veventsOf(write.event.ics);
-      expect(myLines(master)[0]).toContain('PARTSTAT=NEEDS-ACTION');
-      expect(exception).toContain('RECURRENCE-ID:20260310T140000Z');
-      expect(exception).toContain('DTSTART:20260310T140000Z');
-      expect(exception).toContain('DTEND:20260310T150000Z');
-      expect(exception).not.toContain('RRULE');
-      expect(myLines(exception)[0]).toContain('PARTSTAT=ACCEPTED');
-      expect(write.rsvp.occurrenceIcs).toContain('RECURRENCE-ID:20260310T140000Z');
-      // The REPLY is about that occurrence alone (RFC 5546 section 3.2.3).
-      const replied = veventsOf(reply.ics);
-      expect(replied.length).toBe(1);
-      expect(replied[0]).toContain('RECURRENCE-ID:20260310T140000Z');
-      expect(replied[0]).not.toContain('RRULE');
-    });
-
-    it('answers the whole series when asked to', async function () {
-      dialog.andReturn(1);
-      await respondToCalendarEvent(occurrence(), 'DECLINED');
-      const [write, reply] = queued as [SyncbackEventTask, EventRSVPTask];
-      expect(veventsOf(write.event.ics).length).toBe(1);
-      expect(myLines(write.event.ics)[0]).toContain('PARTSTAT=DECLINED');
-      expect(write.rsvp.occurrenceIcs).toBeUndefined();
-      expect(reply.ics).toContain('RRULE:FREQ=WEEKLY');
+      expect(engine.callsTo('events.rsvp')[0].occurrenceStart).toBe(START);
     });
 
     it('does nothing when the question is dismissed', async function () {
       dialog.andReturn(2);
       await respondToCalendarEvent(occurrence(), 'ACCEPTED');
-      expect(queued.length).toBe(0);
+      expect(engine.calls.length).toBe(0);
     });
 
     it('does not ask about an event that does not repeat', async function () {
-      event = new Event({
-        id: 'event-1',
-        accountId: 'acct-1',
-        calendarId: 'cal-1',
-        icsuid: 'series@test',
-        ics: SERIES_ICS.replace('RRULE:FREQ=WEEKLY\r\n', ''),
-      } as any);
       await respondToCalendarEvent(occurrence({ isRecurring: false }), 'ACCEPTED');
       expect(dialog.callCount).toBe(0);
-      expect(queued.length).toBe(2);
+      expect(engine.callsTo('events.rsvp').length).toBe(1);
     });
 
-    it("only emails when the copy is on a calendar the server says is someone else's", async function () {
-      calendar = new Calendar({
-        id: 'cal-1',
-        accountId: 'acct-1',
-        name: 'Team',
-        ownership: 'other',
-      } as any);
-      await respondToCalendarEvent(occurrence(), 'DECLINED');
-      expect(queued.length).toBe(1);
-      expect(queued[0] instanceof EventRSVPTask).toBe(true);
-    });
-
-    it('only emails when the calendar is read-only', async function () {
-      calendar = new Calendar({
-        id: 'cal-1',
-        accountId: 'acct-1',
-        name: ME,
-        readOnly: true,
-      } as any);
-      await respondToCalendarEvent(occurrence(), 'TENTATIVE');
-      expect(queued.length).toBe(1);
+    it('explains when the engine does not find us on the guest list', async function () {
+      engine.answers['events.rsvp'] = () => {
+        throw refusal('not-invited');
+      };
+      await respondToCalendarEvent(occurrence({ isRecurring: false }), 'ACCEPTED');
+      expect((AppEnv.showErrorDialog as jasmine.Spy).mostRecentCall.args[0]).toContain(
+        'guest list'
+      );
     });
   });
 });

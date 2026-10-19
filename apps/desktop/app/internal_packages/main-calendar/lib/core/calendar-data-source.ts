@@ -1,19 +1,13 @@
 import Rx from 'rx-lite';
 import {
   Event,
-  Matcher,
   DatabaseStore,
-  CalendarUtils,
   CalendarDateUtils,
   CalendarDate,
-  ICSEventHelpers,
-  AndCompositeMatcher,
-  OrCompositeMatcher,
-  AccountStore,
   Calendar,
-  Utils,
 } from 'mailspring-exports';
-import IcalExpander from 'ical-expander';
+import EngineEvents from '../../../../src/engine-events';
+import { expandEvents } from '../../../../src/engine-pim';
 
 /** Participation status values from iCalendar spec */
 export type ParticipationStatus = 'NEEDS-ACTION' | 'ACCEPTED' | 'DECLINED' | 'TENTATIVE' | string;
@@ -26,15 +20,6 @@ export interface EventAttendee {
   email: string;
   name?: string | null;
   partstat?: ParticipationStatus;
-}
-
-type ICAL = typeof import('ical.js').default;
-type ICALEvent = InstanceType<ICAL['Event']>;
-type ICALTime = InstanceType<ICAL['Time']>;
-
-/** An ICAL.Time's date, taken from its parts so no timezone is applied on the way. */
-function dateFromICALTime(time: ICALTime): CalendarDate {
-  return CalendarDateUtils.calendarDateFromParts(time.year, time.month, time.day);
 }
 
 /** Whether an occurrence covers the given day. */
@@ -105,19 +90,6 @@ export function coveredDates(
   return { startDate, endDate: endDate > startDate ? endDate : startDate };
 }
 
-/**
- * The last day an all-day span covers, given an exclusive end date.
- *
- * Subtracted in date space rather than by a second. For ends parsed from ICS the two agree,
- * since ical.js hands back an exact midnight — but the expansion-failure path reads the
- * denormalized columns, which the sync engine writes an hour late for any date inside DST.
- * There `dateOf(end - 1s)` lands a day late and this doesn't. Floored at the start so a
- * malformed span can't end before it begins.
- */
-function lastCoveredDate(exclusiveEnd: CalendarDate, startDate: CalendarDate): CalendarDate {
-  return Math.max(CalendarDateUtils.addCalendarDays(exclusiveEnd, -1), startDate) as CalendarDate;
-}
-
 /** Fields common to all occurrences, all-day or timed. */
 interface OccurrenceBase {
   /**
@@ -162,6 +134,14 @@ interface OccurrenceBase {
   isRecurring: boolean;
   organizer: { email: string } | null;
   attendees: EventAttendee[];
+  /** The Event row it was expanded from, and the row's UID. */
+  eventId?: string;
+  icsuid?: string;
+  /** This account's PARTSTAT on the guest list, upper-cased; null when it isn't a guest. */
+  myStatus?: string | null;
+  /** The series' RRULE value, and the zone its times are written in. */
+  rrule?: string | null;
+  timezone?: string | null;
 
   /** True if this is a synthetic drag preview event (not a real event) */
   isDragPreview?: boolean;
@@ -192,71 +172,54 @@ export type EventOccurrence = AllDayOccurrence | TimedOccurrence;
 export type FocusedEventInfo = { id: string; start: number };
 
 /**
- * The address in a calendar's collection path, which on Google is the calendar's own id
- * (`/caldav/v2/c_1a2b%40group.calendar.google.com/events/`); '' when the path carries none.
+ * The occurrences the engine expands (`events.expand`) for the shown range, on the calendars
+ * not switched off, again whenever an Event or Calendar row changes or the engine connection
+ * comes back. A request that fails (the engine restarting) keeps what is shown.
  */
-export function calendarAddress(calendar: Calendar): string {
-  const segments = (calendar.path || '').split('/').map((segment) => {
-    try {
-      return decodeURIComponent(segment);
-    } catch (e) {
-      return segment;
-    }
-  });
-  return segments.filter((segment) => segment.includes('@')).pop() || '';
-}
-
-/**
- * Calendar id to its own address, for the calendars the server (DAV:owner) says are this
- * account's; a nameless default is not. A meeting such a calendar organizes is ours.
- */
-export function ownCalendarAddresses(calendars: Calendar[]): Map<string, string> {
-  return new Map(
-    calendars.filter((c) => c.ownership === 'mine').map((c) => [c.id, calendarAddress(c)])
-  );
-}
-
-/** Strip mailto: prefix from email addresses (common in iCalendar data) */
-function normalizeEmail(email: string): string {
-  return email.replace(/^mailto:/i, '');
-}
-
 export class CalendarDataSource {
   observable: Rx.Observable<{ events: EventOccurrence[] }>;
 
-  buildObservable({ startUnix, endUnix, disabledCalendars }) {
-    const end = Event.attributes.recurrenceEnd;
-    const start = Event.attributes.recurrenceStart;
-
-    // Query all events (masters and exceptions) that fall in the date range
-    const dateMatcher = new Matcher.Or([
-      new Matcher.And([start.lte(endUnix), end.gte(startUnix)]),
-      new Matcher.And([start.lte(endUnix), start.gte(startUnix)]),
-      new Matcher.And([end.gte(startUnix), end.lte(endUnix)]),
-      new Matcher.And([end.gte(endUnix), start.lte(startUnix)]),
-    ]);
-
-    let matcher: AndCompositeMatcher | OrCompositeMatcher = dateMatcher;
-
-    if (disabledCalendars && disabledCalendars.length) {
-      matcher = new Matcher.And([matcher, Event.attributes.calendarId.notIn(disabledCalendars)]);
-    }
-
-    const query = DatabaseStore.findAll<Event>(Event).where(matcher);
-    // Google rewrites ORGANIZER on a secondary calendar to the calendar's own id, so a meeting
-    // organized by the calendar it sits on is ours when the calendar is.
+  buildObservable({
+    startUnix,
+    endUnix,
+    disabledCalendars,
+  }: {
+    startUnix: number;
+    endUnix: number;
+    disabledCalendars?: string[];
+  }) {
+    const disabled = new Set(disabledCalendars || []);
     const calendars = Rx.Observable.fromQuery(DatabaseStore.findAll<Calendar>(Calendar));
+    const eventChanges = Rx.Observable.create<null>((observer) => {
+      observer.onNext(null);
+      const unlisten = DatabaseStore.listen((record: { objectClass: string }) => {
+        if (record.objectClass === Event.name) observer.onNext(null);
+      });
+      const onConnected = () => observer.onNext(null);
+      EngineEvents.on('connected', onConnected);
+      return Rx.Disposable.create(() => {
+        unlisten();
+        EngineEvents.removeListener('connected', onConnected);
+      });
+    });
     this.observable = Rx.Observable.combineLatest(
-      Rx.Observable.fromQuery(query),
       calendars,
-      (results: Event[], cals: Calendar[]) => ({
-        events: occurrencesForEvents(results, {
-          startUnix,
-          endUnix,
-          ownCalendarAddresses: ownCalendarAddresses(cals),
-        }),
+      eventChanges,
+      (cals: Calendar[]) => cals
+    )
+      .flatMapLatest((cals: Calendar[]) => {
+        const calendarIds = cals.filter((c) => !disabled.has(c.id)).map((c) => c.id);
+        if (!calendarIds.length) return Rx.Observable.just({ events: [] as EventOccurrence[] });
+        return Rx.Observable.fromPromise(
+          expandEvents({ calendarIds, start: startUnix, end: endUnix })
+            .then((r) => ({ events: (r.occurrences || []) as EventOccurrence[] }))
+            .catch((err) => {
+              console.warn(`Calendar: could not expand events: ${err.message}`);
+              return null;
+            })
+        );
       })
-    );
+      .filter((result) => result !== null);
     return this.observable;
   }
 
@@ -266,279 +229,20 @@ export class CalendarDataSource {
 }
 
 /**
- * `startTime`/`endTime` are separate from `item` because an expanded occurrence's times differ
- * from the component its properties come from.
+ * The occurrences of `events` (with the rest of each one's series) that overlap the range, as
+ * the engine expands them.
  */
-function occurrenceFromICS(args: {
-  id: string;
-  event: Event;
-  item: ICALEvent;
-  startTime: ICALTime;
-  endTime: ICALTime;
-  isRecurring: boolean;
-  /** Defaults to whether the component carries a RECURRENCE-ID */
-  isException?: boolean;
-  ownCalendarAddresses: Map<string, string>;
-}): EventOccurrence {
-  const { id, event, item, startTime, endTime, ownCalendarAddresses } = args;
-  const startUnix = startTime.toJSDate().getTime() / 1000;
-  const endUnix = endTime.toJSDate().getTime() / 1000;
-
-  const statusValue = item.component?.getFirstPropertyValue('status');
-  const status = (typeof statusValue === 'string' ? statusValue : '').toUpperCase();
-
-  const attendees: EventAttendee[] = item.attendees.map((a) => ({
-    email: normalizeEmail(String(a.getFirstValue() || '')),
-    name: a.getFirstParameter('cn') || '',
-    partstat: (a.getFirstParameter('partstat') || 'NEEDS-ACTION') as ParticipationStatus,
-  }));
-
-  // "Me" is the account this event belongs to, not any connected account: an invitation from
-  // another of our accounts is still somebody else's meeting here.
-  const isThisAccount = (email: string) => {
-    const account = AccountStore.accountForEmail(email);
-    return !!account && account.id === event.accountId;
-  };
-
-  // Pending styling also covers an event I'm invited to but haven't answered
-  const myAttendee = attendees.find((a) => a.email && isThisAccount(a.email));
-  const myPartstat = myAttendee?.partstat?.toUpperCase();
-  const isAwaitingMyResponse = myAttendee && myPartstat !== 'ACCEPTED' && myPartstat !== 'DECLINED';
-
-  const organizerEmail = item.organizer
-    ? normalizeEmail(CalendarUtils.emailFromParticipantURI(String(item.organizer)) || '')
-    : '';
-  const calendarOwnAddress = ownCalendarAddresses.get(event.calendarId);
-  const iAmOrganizer =
-    !!organizerEmail &&
-    (isThisAccount(organizerEmail) ||
-      (!!calendarOwnAddress && Utils.emailIsEquivalent(organizerEmail, calendarOwnAddress)));
-
-  const isAllDay = !!startTime.isDate;
-  const startDate = isAllDay
-    ? dateFromICALTime(startTime)
-    : CalendarDateUtils.calendarDateFromUnix(startUnix);
-  const endDate = isAllDay
-    ? lastCoveredDate(dateFromICALTime(endTime), startDate)
-    : // the end instant is exclusive, so step inside it before reading the date
-      CalendarDateUtils.calendarDateFromUnix(Math.max(endUnix - 1, startUnix));
-
-  const rid = item.component?.getFirstPropertyValue('recurrence-id');
-
-  const base: OccurrenceBase = {
-    id,
-    accountId: event.accountId,
-    calendarId: event.calendarId,
-    title: item.summary || '',
-    location: item.location || '',
-    description: item.description || '',
-    startDate,
-    endDate,
-    isCancelled: status === 'CANCELLED',
-    isPending: status === 'TENTATIVE' || !!isAwaitingMyResponse,
-    isMine: !organizerEmail || iAmOrganizer,
-    isFree: item.component?.getFirstPropertyValue('transp') === 'TRANSPARENT',
-    isException: args.isException ?? !!rid,
-    recurrenceIdStart: rid ? (rid as any).toJSDate().getTime() / 1000 : undefined,
-    isRecurring: args.isRecurring,
-    organizer: organizerEmail ? { email: organizerEmail } : null,
-    attendees,
-  };
-
-  return isAllDay
-    ? { ...base, isAllDay: true }
-    : { ...base, isAllDay: false, start: startUnix, end: endUnix };
-}
-
-export function occurrencesForEvents(
-  results: Event[],
-  {
-    startUnix,
-    endUnix,
-    ownCalendarAddresses = new Map<string, string>(),
-  }: { startUnix: number; endUnix: number; ownCalendarAddresses?: Map<string, string> }
-) {
-  const occurrences: EventOccurrence[] = [];
-
-  // Group events by icsUID to handle master/exception relationships
-  const eventsByUid = new Map<string, Event[]>();
-  for (const event of results) {
-    const uid = event.icsuid;
-    if (!eventsByUid.has(uid)) {
-      eventsByUid.set(uid, []);
-    }
-    eventsByUid.get(uid).push(event);
-  }
-
-  // Process each group of events with the same UID
-  for (const [, events] of eventsByUid) {
-    // Separate master from exceptions
-    const master = events.find((e) => !e.recurrenceId);
-    const exceptions = events.filter((e) => e.recurrenceId);
-
-    // Track occurrence start times generated from master expansion
-    // to avoid duplicates when exceptions are in the same ICS file
-    const expandedStartTimes = new Set<number>();
-
-    // Expand the master event's ICS (handles exceptions in same ICS file)
-    if (master) {
-      try {
-        // The budget is derived from the series' own frequency rather than fixed. It was
-        // 100, which is not a limit on work but on how far back a series may begin: a
-        // weekly meeting older than about two years never reached the present, so it
-        // expanded to nothing and vanished from the calendar entirely.
-        const icalExpander = new IcalExpander({
-          ics: master.ics,
-          maxIterations: ICSEventHelpers.expansionIterationBudget(
-            master.ics,
-            master.recurrenceStart,
-            endUnix
-          ),
-        });
-        const expanded = icalExpander.between(new Date(startUnix * 1000), new Date(endUnix * 1000));
-
-        const masterIsRecurring = ICSEventHelpers.isRecurringEvent(master.ics);
-
-        [...expanded.events, ...expanded.occurrences].forEach((e) => {
-          const start = e.startDate.toJSDate().getTime() / 1000;
-          const end = e.endDate.toJSDate().getTime() / 1000;
-          // For occurrences, the actual event data is in e.item; for events, e is the event itself
-          const item = 'item' in e ? e.item : e;
-          expandedStartTimes.add(start);
-
-          occurrences.push(
-            occurrenceFromICS({
-              // Key on the occurrence start, not the expansion index: idx depends on the query
-              // range, so the same occurrence got a different id per view — breaking selection
-              // (and React keys) when switching views. The start is stable across ranges.
-              id: occurrenceId(master.id, start),
-              event: master,
-              item,
-              startTime: e.startDate,
-              endTime: e.endDate,
-              ownCalendarAddresses,
-              isRecurring: masterIsRecurring,
-            })
-          );
-        });
-      } catch (err) {
-        console.error(`Failed to expand ICS for event ${master.id}:`, err);
-        // Fallback: show the master event as a single occurrence so it doesn't vanish.
-        // Push it only when rs/re are finite — null/non-finite derive to NaN or 1970 dates
-        // that render nowhere. Guard the push, not the iteration: a bad master must still
-        // fall through to this UID's standalone exceptions below.
-        if (Number.isFinite(master.recurrenceStart) && Number.isFinite(master.recurrenceEnd)) {
-          const isAllDay = master.recurrenceEnd - master.recurrenceStart >= 82800;
-          const { startDate, endDate } = coveredDates(
-            master.recurrenceStart,
-            master.recurrenceEnd,
-            isAllDay
-          );
-
-          // Expansion failed, so there's no DATE flag to read — isAllDay fell back on
-          // duration above. A recurring master's columns can hold one occurrence's span, so
-          // a series can misread as all-day here.
-          const errorBase: OccurrenceBase = {
-            id: `${master.id}-e0`,
-            accountId: master.accountId,
-            calendarId: master.calendarId,
-            title: '(Error expanding event)',
-            location: '',
-            description: '',
-            startDate,
-            endDate,
-            isCancelled: false,
-            isPending: false,
-            isMine: true,
-            isException: false,
-            isRecurring: false,
-            organizer: null,
-            attendees: [],
-          };
-          occurrences.push(
-            isAllDay
-              ? { ...errorBase, isAllDay: true }
-              : {
-                  ...errorBase,
-                  isAllDay: false,
-                  start: master.recurrenceStart,
-                  end: master.recurrenceEnd,
-                }
-          );
-        }
-      }
-    }
-
-    // Handle standalone exceptions (separate database records)
-    // Only add if their start time wasn't already covered by master expansion
-    for (const exception of exceptions) {
-      const start = exception.recurrenceStart;
-      if (expandedStartTimes.has(start)) {
-        // Already covered by master expansion, skip to avoid duplicates
-        continue;
-      }
-
-      // Exception events are single-instance (no RRULE), so parse directly
-      // with ICAL.js instead of using ical-expander (which is for recurrence expansion)
-      try {
-        const { event: icsEvent } = CalendarUtils.parseICSString(exception.ics);
-        const occStart = icsEvent.startDate.toJSDate().getTime() / 1000;
-        const occEnd = icsEvent.endDate.toJSDate().getTime() / 1000;
-
-        // Skip if outside the visible range
-        if (occEnd < startUnix || occStart > endUnix) {
-          continue;
-        }
-
-        occurrences.push(
-          occurrenceFromICS({
-            id: `${exception.id}-e0`,
-            event: exception,
-            item: icsEvent,
-            startTime: icsEvent.startDate,
-            endTime: icsEvent.endDate,
-            isRecurring: true, // exceptions only exist for a series
-            isException: true,
-            ownCalendarAddresses,
-          })
-        );
-      } catch (err) {
-        console.error(`Failed to parse ICS for exception ${exception.id}:`, err);
-      }
-    }
-  }
-
-  return occurrences;
-}
-
-const UPCOMING_LOOKAHEAD_SECONDS = 366 * 86400;
-
-/**
- * The occurrence of a series that `recurrenceIdStart` names. A moved occurrence is no longer
- * at that instant, so its own VEVENT is read for where it went.
- */
-function occurrenceForRecurrenceId(
+export async function occurrencesForEvents(
   events: Event[],
-  recurrenceIdStart: number
-): EventOccurrence | undefined {
-  const unix = (time: ICALTime) => time.toJSDate().getTime() / 1000;
-  const master = events.find((e) => !e.recurrenceId) || events[0];
-  let start = recurrenceIdStart;
-  try {
-    for (const vevent of CalendarUtils.parseICSString(master.ics).root.getAllSubcomponents(
-      'vevent'
-    )) {
-      const rid = vevent.getFirstPropertyValue('recurrence-id') as ICALTime | null;
-      if (rid && unix(rid) === recurrenceIdStart) {
-        start = unix(vevent.getFirstPropertyValue('dtstart') as ICALTime);
-      }
-    }
-  } catch (err) {
-    // No rows, or a calendar object that won't parse. occurrencesForEvents handles both.
-  }
-  return occurrencesForEvents(events, { startUnix: start, endUnix: start + 86400 }).find(
-    (o) => (o.recurrenceIdStart ?? occurrenceStartUnix(o)) === recurrenceIdStart
-  );
+  { startUnix, endUnix }: { startUnix: number; endUnix: number }
+): Promise<EventOccurrence[]> {
+  if (!events.length) return [];
+  const result = await expandEvents({
+    eventIds: events.map((e) => e.id),
+    start: startUnix,
+    end: endUnix,
+  });
+  return (result.occurrences || []) as EventOccurrence[];
 }
 
 /**
@@ -548,33 +252,19 @@ function occurrenceForRecurrenceId(
  *
  * @param events - Every Event row sharing one UID, so a series' exceptions are placed.
  */
-export function focusedEventInfoForEvents(
+export async function focusedEventInfoForEvents(
   events: Event[],
   nowUnix: number,
   recurrenceIdStart?: number
-): FocusedEventInfo | null {
-  const byStart = (a: EventOccurrence, b: EventOccurrence) =>
-    occurrenceStartUnix(a) - occurrenceStartUnix(b);
-
-  let occurrence =
-    recurrenceIdStart !== undefined
-      ? occurrenceForRecurrenceId(events, recurrenceIdStart)
-      : undefined;
-
-  if (!occurrence) {
-    [occurrence] = occurrencesForEvents(events, {
-      startUnix: nowUnix,
-      endUnix: nowUnix + UPCOMING_LOOKAHEAD_SECONDS,
-    }).sort(byStart);
-  }
-
-  if (!occurrence) {
-    const firstStart = Math.min(...events.map((e) => e.recurrenceStart));
-    [occurrence] = occurrencesForEvents(events, {
-      startUnix: firstStart,
-      endUnix: firstStart + 86400,
-    });
-  }
-
+): Promise<FocusedEventInfo | null> {
+  if (!events.length) return null;
+  const now = Math.floor(nowUnix);
+  const result = await expandEvents({
+    eventIds: [events[0].id],
+    start: now,
+    end: now,
+    focus: { now, recurrenceIdStart },
+  });
+  const occurrence = result.focused as EventOccurrence | null;
   return occurrence ? { id: occurrence.id, start: occurrenceStartUnix(occurrence) } : null;
 }

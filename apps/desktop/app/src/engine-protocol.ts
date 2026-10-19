@@ -76,6 +76,17 @@ export const Method = {
   DraftSend: 'draft.send',
   DraftCancelSend: 'draft.cancelSend',
   DraftValidate: 'draft.validate',
+  // Calendar and contact editing (Feature.CalendarEditing, Feature.ContactEditing): occurrences
+  // the engine expands, and edits it builds as ICS and vCards and queues as the usual tasks.
+  EventsExpand: 'events.expand',
+  EventsCreate: 'events.create',
+  EventsUpdate: 'events.update',
+  EventsRsvp: 'events.rsvp',
+  ContactsGet: 'contacts.get',
+  ContactsCreate: 'contacts.create',
+  ContactsUpdate: 'contacts.update',
+  ContactsImport: 'contacts.import',
+  ContactsExport: 'contacts.export',
   // Mail rules (Feature.Rules): the engine applies the `mailRules` setting to arriving mail;
   // these run the rules over an account's inbox.
   RulesReprocess: 'rules.reprocess',
@@ -192,6 +203,11 @@ export const Feature = {
   // The engine runs the mail rules (`mailRules`, `mailRulesAutoSince`), with rules.reprocess,
   // rules.cancel, rules.progress and rules.disabled.
   Rules: 'rules',
+  // `events.expand`, `events.create`, `events.update` and `events.rsvp`, and SyncbackEventTask's
+  // `restore` (docs/desktop-client-plan.md 3.8).
+  CalendarEditing: 'calendar-editing',
+  // `contacts.get`, `contacts.create`, `contacts.update`, `contacts.import` and `contacts.export`.
+  ContactEditing: 'contact-editing',
 } as const;
 
 // `draft.create` params (ms-ipc DraftCreateParams).
@@ -776,4 +792,148 @@ export interface AiUsageRow {
   inputTokens: number;
   outputTokens: number;
   requests: number;
+}
+
+// Calendar and contact editing (ms-ipc pim.rs). Times are epoch seconds; `tz` is the zone floating
+// times, DATE values and all-day events are read in.
+
+export interface EventsExpandParams {
+  accountIds?: string[];
+  calendarIds?: string[];
+  eventIds?: string[];
+  // An ICS that is not stored (an emailed invitation), read as `accountIds[0]` would have it.
+  ics?: string;
+  start: number;
+  end: number;
+  tz?: string;
+  focus?: { now: number; recurrenceIdStart?: number };
+  conflicts?: { excludeIcsuid?: string };
+}
+
+// `upcoming` and `first`: an invitation's next occurrence and its own times.
+export interface EventTimes {
+  start: number;
+  end: number;
+  isAllDay: boolean;
+  recurrenceId?: number;
+}
+
+export interface EventConflictJSON {
+  eventId: string;
+  calendarId: string;
+  icsuid: string;
+  title: string;
+  start: number;
+  end: number;
+}
+
+// An occurrence has the calendar's EventOccurrence keys, plus `eventId`, `icsuid`, `myStatus`,
+// `rrule` and `timezone`.
+export interface EventsExpandResult {
+  occurrences: any[];
+  focused?: any | null;
+  upcoming?: EventTimes | null;
+  first?: EventTimes | null;
+  conflicts?: EventConflictJSON[];
+}
+
+export interface EventGuestJSON {
+  email: string;
+  name?: string;
+  role?: string;
+}
+
+export interface EventsCreateParams {
+  accountId: string;
+  calendarId: string;
+  summary: string;
+  start: number;
+  end: number;
+  isAllDay?: boolean;
+  timezone?: string;
+  description?: string;
+  location?: string;
+  attendees?: EventGuestJSON[];
+  recurrenceRule?: string;
+  transparency?: string;
+  tz?: string;
+  queue?: boolean;
+}
+
+// `deleted: true` removes the occurrences the scope covers; `recurrenceRule: null` removes the rule.
+export interface EventPatch {
+  start?: number;
+  end?: number;
+  isAllDay?: boolean;
+  timezone?: string;
+  summary?: string;
+  location?: string;
+  description?: string;
+  attendees?: EventGuestJSON[];
+  transparency?: string;
+  recurrenceRule?: string | null;
+  deleted?: boolean;
+}
+
+export type EventScope = 'this' | 'following' | 'all';
+
+export interface EventsUpdateParams {
+  accountId: string;
+  eventId: string;
+  patch: EventPatch;
+  scope?: EventScope;
+  // The occurrence, by the slot it fills (its recurrenceIdStart, else its start).
+  occurrenceStart?: number;
+  tz?: string;
+  queue?: boolean;
+}
+
+export interface EventWriteJSON {
+  kind: 'create' | 'update' | 'destroy';
+  eventId?: string;
+  calendarId?: string;
+  ics?: string;
+  taskId?: string;
+}
+
+export interface EventsWriteResult {
+  writes: EventWriteJSON[];
+  icsuid?: string;
+}
+
+export interface EventsRsvpParams {
+  accountId: string;
+  eventId?: string;
+  ics?: string;
+  messageId?: string;
+  status: string;
+  comment?: string;
+  counter?: { start: number; end: number };
+  occurrenceStart?: number;
+  calendarId?: string;
+  reply?: boolean;
+  write?: boolean;
+  subject?: string;
+  tz?: string;
+  retried?: boolean;
+}
+
+export interface EventsRsvpResult {
+  email: string;
+  write?: EventWriteJSON;
+  replyTaskId?: string;
+}
+
+// `data` is the contact editor's shape (name, emailAddresses, phoneNumbers, addresses, company,
+// title, birthdays, urls, nicknames, relations, notes, photoURL).
+export interface ContactDetailsJSON {
+  contact: any;
+  metadata: { origin: string; readonly: boolean };
+  data: any;
+  taskId?: string;
+}
+
+export interface ContactsImportResult {
+  contactIds: string[];
+  taskIds: string[];
 }

@@ -209,16 +209,13 @@ export type CalendarDateUtils = typeof import('../calendar-date');
 export const CalendarDateUtils: CalendarDateUtils;
 export { CalendarDate } from '../calendar-date';
 
-export type ICSEventHelpers = typeof import('../ics-event-helpers');
-export const ICSEventHelpers: ICSEventHelpers;
-export {
-  CalendarConflict,
-  CreateEventOptions,
-  Occurrence,
-  UpdateTimesOptions,
-  RecurrenceExceptionResult,
-  RecurrenceInfo,
-} from '../ics-event-helpers';
+/**
+ * @deprecated since plugin API 1.32.0, removed in 2.0.0: the engine builds and edits events
+ * (feature `calendar-editing`). Every function throws; use `Engine.request('events.expand')`,
+ * `'events.create'`, `'events.update'` or `'events.rsvp'`.
+ */
+export const ICSEventHelpers: { [name: string]: (...args: unknown[]) => never };
+export type { EventConflictJSON as CalendarConflict } from '../engine-protocol';
 
 export type FsUtils = typeof import('../fs-utils');
 export const FsUtils: FsUtils;

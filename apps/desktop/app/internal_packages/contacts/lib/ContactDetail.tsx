@@ -1,18 +1,12 @@
 import React from 'react';
-import {
-  Contact,
-  localized,
-  Actions,
-  SyncbackContactTask,
-  AccountStore,
-  ContactGroup,
-} from 'mailspring-exports';
+import { Contact, localized, AccountStore, ContactGroup } from 'mailspring-exports';
 import { isEqual } from 'underscore';
 import { FocusContainer, ListensToFluxStore, ScrollRegion } from 'mailspring-component-kit';
-import { parse, ContactBase, ContactInteractorMetadata, apply } from './ContactInfoMapping';
+import { ContactBase, ContactInteractorMetadata } from './ContactTypes';
 import { ContactDetailRead } from './ContactDetailRead';
 import { ContactDetailEdit } from './ContactDetailEdit';
 import { Store, ContactsPerspective } from './Store';
+import { getContact, saveContact } from '../../../src/engine-pim';
 
 interface ContactDetailProps {
   editing: string | 'new' | false;
@@ -28,35 +22,59 @@ interface ContactDetailState {
   metadata: ContactInteractorMetadata | null;
 }
 
-function emptyContactForAccountId(accountId: string) {
+// What a new contact starts from; contacts.create builds the vCard or Google person.
+function emptyContactForAccountId(accountId: string): ContactDetailState {
   const account = AccountStore.accountForId(accountId);
-  const source = account.provider === 'gmail' ? 'gpeople' : 'carddav';
-  const info: Contact['info'] =
-    source === 'gpeople'
-      ? {
-          names: [],
-          resourceName: '',
-          etag: '',
-          addresses: [],
-        }
-      : {
-          vcf: `BEGIN:VCARD\r\nVERSION:3.0\r\nUID:${crypto.randomUUID()}\r\nEND:VCARD\r\n`,
-          href: '',
-        };
-
-  return new Contact({
-    source,
-    name: '',
-    email: '',
-    accountId: account.id,
-    info,
-  });
+  const google = account.provider === 'gmail';
+  return {
+    contact: new Contact({
+      source: google ? 'gpeople' : 'carddav',
+      name: '',
+      email: '',
+      accountId: account.id,
+    }),
+    data: {
+      name: {
+        displayName: '',
+        familyName: '',
+        givenName: '',
+        honorificPrefix: '',
+        honorificSuffix: '',
+      },
+      company: '',
+      title: '',
+      emailAddresses: [],
+      phoneNumbers: [],
+      addresses: [],
+      urls: [],
+      nicknames: [],
+      relations: [],
+      birthdays: [],
+      notes: '',
+    },
+    metadata: { origin: google ? 'Google Contacts' : 'CardDAV', readonly: false },
+  };
 }
 
+const EMPTY: ContactDetailState = { contact: null, data: null, metadata: null };
+
 class ContactDetailWithFocus extends React.Component<ContactDetailProps, ContactDetailState> {
+  // The contact whose details the last contacts.get was for, so a late answer is dropped.
+  _loading: Contact | null = null;
+  _mounted = false;
+
   constructor(props: ContactDetailProps) {
     super(props);
-    this.state = this.getStateForProps();
+    this.state = EMPTY;
+  }
+
+  componentDidMount() {
+    this._mounted = true;
+    this.load();
+  }
+
+  componentWillUnmount() {
+    this._mounted = false;
   }
 
   componentDidUpdate(prevProps: ContactDetailProps) {
@@ -65,45 +83,59 @@ class ContactDetailWithFocus extends React.Component<ContactDetailProps, Contact
 
     if (isEqual(prevContact, newContact) && prevProps.editing === this.props.editing) return;
     if (newContact && this.props.editing !== newContact.id) Store.setEditing(false);
-    this.setState(this.getStateForProps());
+    this.load();
   }
 
-  getStateForProps() {
+  // The engine reads the vCard or Google person into the editor's shape (contacts.get).
+  async load() {
     const { editing, contacts, focusedId, perspective } = this.props;
-
-    const contact =
-      editing === 'new' && 'accountId' in perspective
-        ? emptyContactForAccountId(perspective.accountId)
-        : contacts?.find((c) => c.id === focusedId);
-
-    if (!contact) {
-      return { metadata: null, data: null, contact: null };
+    if (editing === 'new' && 'accountId' in perspective) {
+      this._loading = null;
+      this.setState(emptyContactForAccountId(perspective.accountId));
+      return;
     }
-
-    const { metadata, data } = parse(contact);
-
-    return {
-      contact: contact,
-      data,
-      metadata,
-    };
+    const contact = contacts?.find((c) => c.id === focusedId);
+    this._loading = contact || null;
+    if (!contact) {
+      this.setState(EMPTY);
+      return;
+    }
+    try {
+      const { data, metadata } = await getContact({
+        accountId: contact.accountId,
+        contactId: contact.id,
+      });
+      if (!this._mounted || this._loading !== contact) return;
+      this.setState({ contact, data, metadata });
+    } catch (err) {
+      if (!this._mounted || this._loading !== contact) return;
+      console.warn(`Contacts: could not read contact ${contact.id}: ${err.message}`);
+      this.setState(EMPTY);
+    }
   }
 
   onCancel = () => {
     Store.setEditing(false);
   };
 
-  onSaveChanges = () => {
+  onSaveChanges = async () => {
     const { perspective } = this.props;
-    const contact = apply(this.state.contact, this.state.data);
+    const { contact, data } = this.state;
+    if (!('accountId' in perspective) || !contact) return;
 
-    if (!('accountId' in perspective)) return;
-
-    const task = contact.id
-      ? SyncbackContactTask.forUpdating({ contact })
-      : SyncbackContactTask.forCreating({ contact, accountId: perspective.accountId });
-    Actions.queueTask(task);
-    Store.setEditing(false);
+    try {
+      await saveContact({
+        accountId: contact.id ? contact.accountId : perspective.accountId,
+        contactId: contact.id || undefined,
+        data,
+      });
+      Store.setEditing(false);
+    } catch (err) {
+      AppEnv.showErrorDialog({
+        title: localized('Unable to save contact'),
+        message: err.message,
+      });
+    }
   };
 
   render() {

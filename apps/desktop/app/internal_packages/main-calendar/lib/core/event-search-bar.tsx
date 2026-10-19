@@ -107,7 +107,7 @@ export class EventSearchBar extends Component<Record<string, unknown>, EventSear
       const events = await dbQuery.search(query).limit(10);
 
       // Expand events to occurrences within a wide time range
-      const suggestions = occurrencesForEvents(events, {
+      const suggestions = await occurrencesForEvents(events, {
         startUnix: moment().add(-2, 'years').unix(),
         endUnix: moment().add(2, 'years').unix(),
       });

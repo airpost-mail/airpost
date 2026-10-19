@@ -17,5 +17,9 @@
  * 1.31.0: `ComponentRegistry.listenShared`; `MessageStore.items()` carries `body` for expanded
  * messages only (undefined on collapsed ones, TD40), and Thread deltas no longer re-read the
  * open thread's messages.
+ *
+ * 1.32.0: the `calendar-editing` and `contact-editing` features; the engine expands, builds and
+ * edits events and vCards. `ICSEventHelpers` is deprecated (every function throws), the
+ * `CalendarUtils` VTIMEZONE helpers are gone, and SyncbackEventTask gains `restore` and `tz`.
  */
-export const PLUGIN_API_VERSION = '1.31.0';
+export const PLUGIN_API_VERSION = '1.32.0';

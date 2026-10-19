@@ -10,9 +10,6 @@ import {
   Event,
   localized,
   Autolink,
-  ICSEventHelpers,
-  CalendarUtils,
-  SyncbackEventTask,
   CalendarDateUtils,
   Utils,
 } from 'mailspring-exports';
@@ -34,7 +31,6 @@ import { canRespondToEvent, openProposeNewTimePopover } from './calendar-rsvp';
 import { EventPropertyRow } from './event-property-row';
 import {
   createCalendarEvent,
-  organizerForAccount,
   inclusiveAllDayEnd,
   shiftEndWithStart,
   clampEnd,
@@ -51,6 +47,8 @@ import { EventPopoverActions } from './event-popover-actions';
 import { TimeZoneSelector } from './timezone-selector';
 import { parseEventIdFromOccurrence } from './calendar-drag-utils';
 import { showRecurringEventDialog } from './recurring-event-dialog';
+import { editEvent } from '../../../../src/engine-pim';
+import type { EventPatch } from '../../../../src/engine-protocol';
 
 /**
  * Convert a RepeatOption UI value to an RRULE string (or null for 'none').
@@ -224,22 +222,10 @@ export class CalendarEventPopover extends React.Component<
   // The Repeat control defaults to 'none' until this has read the event; the save writes the
   // rule only when the control was changed, so a save before then leaves the rule alone.
   async _loadEditDefaults(): Promise<void> {
-    let repeat: RepeatOption = 'none';
-    let timezone = this.state.timezone;
-    try {
-      const eventId = parseEventIdFromOccurrence(this.props.event.id);
-      const event = await DatabaseStore.find<Event>(Event, eventId);
-      if (event) {
-        const recurrenceInfo = ICSEventHelpers.getRecurrenceInfo(event.ics);
-        repeat = frequencyToRepeatOption(recurrenceInfo.frequency);
-        const eventTz = ICSEventHelpers.getEventTimezone(event.ics);
-        if (eventTz) {
-          timezone = eventTz;
-        }
-      }
-    } catch (e) {
-      // Fall back to defaults if we can't read the event
-    }
+    const { rrule, timezone: eventTz } = this.props.event;
+    const frequency = rrule ? /(?:^|;)FREQ=([^;]+)/i.exec(rrule)?.[1] : undefined;
+    const repeat = frequencyToRepeatOption(frequency);
+    const timezone = eventTz || this.state.timezone;
     this.setState({ repeat, timezone, originalRepeat: repeat, originalTimezone: timezone });
   }
 
@@ -293,25 +279,17 @@ export class CalendarEventPopover extends React.Component<
   getStartMoment = () => moment(this.state.start * 1000);
   getEndMoment = () => moment(this.state.end * 1000);
 
-  /**
-   * Apply the current popover state as ICS property changes (title, location,
-   * description, attendees) to an ICS string. Time updates are handled separately
-   * by the caller so that recurring events can use delta-based shifting.
-   */
-  _applyPropertyEdits(ics: string): string {
-    ics = ICSEventHelpers.updateEventProperty(
-      ics,
-      'summary',
-      this.state.title || localized('New Event')
-    );
-    ics = ICSEventHelpers.updateEventProperty(ics, 'location', this.state.location || '');
-    ics = ICSEventHelpers.updateEventProperty(ics, 'description', this.state.description || '');
-    ics = ICSEventHelpers.updateAttendees(
-      ics,
-      this.state.attendees || [],
-      organizerForAccount(this.props.event.accountId)
-    );
-    return ics;
+  /** The popover's title, location, notes and guests, as an events.update patch. */
+  _propertyPatch(): EventPatch {
+    return {
+      summary: this.state.title || localized('New Event'),
+      location: this.state.location || '',
+      description: this.state.description || '',
+      attendees: (this.state.attendees || []).map((a) => ({
+        email: a.email,
+        name: a.name || undefined,
+      })),
+    };
   }
 
   saveEdits = async (): Promise<void> => {
@@ -332,8 +310,7 @@ export class CalendarEventPopover extends React.Component<
         return;
       }
 
-      const isRecurring =
-        ICSEventHelpers.isRecurringEvent(event.ics) && !event.isRecurrenceException();
+      const isRecurring = this.props.event.isRecurring && !event.isRecurrenceException();
 
       if (this.props.event.isException) {
         // This occurrence already has an exception — always edit the exception directly.
@@ -348,10 +325,10 @@ export class CalendarEventPopover extends React.Component<
         if (choice === 'this-occurrence') {
           await this._saveOccurrenceException(event);
         } else {
-          this._saveAllOccurrences(event);
+          await this._saveAllOccurrences(event, true);
         }
       } else {
-        this._saveAllOccurrences(event);
+        await this._saveAllOccurrences(event, false);
       }
 
       this.setState({ editing: false });
@@ -369,136 +346,61 @@ export class CalendarEventPopover extends React.Component<
   /**
    * Save edits to the master event (used for non-recurring events and "all occurrences").
    *
-   * For recurring events, time changes use delta-based shifting (not absolute times) so
-   * that occurrences before the one being edited are not dropped. Inline exception
-   * RECURRENCE-IDs are shifted by the same delta so they remain mapped to the correct
-   * RRULE-generated slots. Exception DTSTART/DTEND are left unchanged — preserving the
-   * user's explicit exception time (e.g., a 2AM exception stays at 2AM after shifting
-   * the base series to a different time).
+   * A series moves by the change made to this occurrence, so the occurrences before it stay,
+   * and its overrides keep the times the user gave them (the engine shifts their RECURRENCE-IDs
+   * with the series).
    */
-  _saveAllOccurrences(event: Event): void {
-    const undoData = {
-      ics: event.ics,
-      recurrenceStart: event.recurrenceStart,
-      recurrenceEnd: event.recurrenceEnd,
+  async _saveAllOccurrences(event: Event, isRecurring: boolean): Promise<void> {
+    const patch: EventPatch = {
+      ...this._propertyPatch(),
+      start: this.state.start,
+      end: this.state.end,
+      isAllDay: this.state.allDay,
     };
-
-    // Apply non-time property edits (title, location, description, attendees)
-    let ics = this._applyPropertyEdits(event.ics);
-
-    // Apply time updates with the appropriate strategy
-    const isRecurring = ICSEventHelpers.isRecurringEvent(ics);
-    if (isRecurring) {
-      // Delta-based shifting: compute how much the user moved the occurrence and apply
-      // the same delta to the master DTSTART. This preserves all occurrences relative
-      // to the new master start (unlike absolute updateEventTimes which would drop
-      // occurrences scheduled before the selected occurrence's date).
-      const originalOccurrenceStart = occurrenceStartUnix(this.props.event);
-      // Passing the picker's zone unchanged would rewrite every EXDATE and RECURRENCE-ID of a
-      // UTC series into the machine's zone, so only a zone the user picked is passed.
-      ics = ICSEventHelpers.updateRecurringEventTimes(
-        ics,
-        originalOccurrenceStart,
-        this.state.start,
-        this.state.end,
-        this.state.allDay,
-        this.state.timezone !== this.state.originalTimezone ? this.state.timezone : undefined
-      );
-      // Shift inline exception RECURRENCE-IDs so they still map to the correct slots
-      const deltaMs = (this.state.start - originalOccurrenceStart) * 1000;
-      if (deltaMs !== 0) {
-        ics = ICSEventHelpers.shiftInlineExceptions(ics, deltaMs);
-      }
-    } else {
-      // Non-recurring: absolute time update is correct
-      ics = ICSEventHelpers.updateEventTimes(ics, {
-        start: this.state.start,
-        end: this.state.end,
-        isAllDay: this.state.allDay,
-        timezone: this.state.timezone,
-      });
+    // Passing the picker's zone unchanged would rewrite every EXDATE and RECURRENCE-ID of a
+    // UTC series into the machine's zone, so a series gets only a zone the user picked.
+    if (!isRecurring || this.state.timezone !== this.state.originalTimezone) {
+      patch.timezone = this.state.timezone;
     }
-
     // The Repeat control can't express INTERVAL, BYDAY, COUNT, UNTIL or RDATE, so writing it back
     // unchanged would flatten the rule and bump SEQUENCE for every guest.
     if (this.state.repeat !== this.state.originalRepeat) {
-      ics = ICSEventHelpers.updateRecurrenceRule(ics, repeatOptionToRRule(this.state.repeat));
+      patch.recurrenceRule = repeatOptionToRRule(this.state.repeat);
     }
     const showAs = this._changedShowAs();
     if (showAs) {
-      ics = ICSEventHelpers.updateEventProperty(ics, 'transp', showAs);
+      patch.transparency = showAs;
     }
-
-    // One save is one revision, however many helpers assembled it.
-    event.ics = ICSEventHelpers.bumpEventSequence(ics);
-    // Re-derive the cached columns from the written ICS, not from state: for a recurring "all
-    // events" edit the master DTSTART/DTEND are shifted+resized and differ from the edited
-    // occurrence's times (matches modifyAllOccurrences). For a non-recurring edit this equals
-    // state anyway.
-    const { event: savedIcsEvent } = CalendarUtils.parseICSString(ics);
-    event.recurrenceStart = savedIcsEvent.startDate.toJSDate().getTime() / 1000;
-    event.recurrenceEnd = savedIcsEvent.endDate.toJSDate().getTime() / 1000;
-
-    Actions.queueTask(
-      SyncbackEventTask.forUpdating({
-        event,
-        undoData,
-        description: localized('Edit event'),
-      })
-    );
+    await editEvent({
+      event,
+      scope: 'all',
+      occurrenceStart: isRecurring ? occurrenceStartUnix(this.props.event) : undefined,
+      patch,
+      description: localized('Edit event'),
+    });
   }
 
   /**
-   * Create an exception for a single occurrence, embedding it inline in the master
-   * VCALENDAR and queuing a single update task (RFC 4791 §4.1 compliant).
+   * Saves the edits on this occurrence alone: an override in the series' resource, added, or
+   * changed when the occurrence already has one (RFC 4791 section 4.1).
    */
   async _saveOccurrenceException(masterEvent: Event): Promise<void> {
-    const masterUndoData = {
-      ics: masterEvent.ics,
-      recurrenceStart: masterEvent.recurrenceStart,
-      recurrenceEnd: masterEvent.recurrenceEnd,
-    };
-
-    // The original occurrence start time — i.e., the time the RRULE generates for this slot.
-    // For a first-time exception this equals event.start (the occurrence's normal time).
-    // For a re-edit of an existing exception, event.start is the *moved* time, so we use
-    // recurrenceIdStart instead (the RECURRENCE-ID value = the original unmodified time).
-    // This ensures the upsert in createRecurrenceException finds and replaces the existing
-    // inline exception VEVENT rather than creating a duplicate.
-    const originalOccurrenceStart =
+    // The slot the occurrence fills: for one already moved, its RECURRENCE-ID, not its start.
+    const occurrenceStart =
       this.props.event.recurrenceIdStart ?? occurrenceStartUnix(this.props.event);
-
-    // Embed the exception VEVENT inline in the master VCALENDAR with new times
-    const { masterIcs, recurrenceId } = ICSEventHelpers.createRecurrenceException(
-      masterEvent.ics,
-      originalOccurrenceStart,
-      this.state.start,
-      this.state.end,
-      this.state.allDay
-    );
-
-    // Apply property edits (title, location, description, attendees) to the inline exception
-    const updatedMasterIcs = ICSEventHelpers.applyEditsToException(masterIcs, recurrenceId, {
-      summary: this.state.title || localized('New Event'),
-      location: this.state.location || '',
-      description: this.state.description || '',
-      attendees: this.state.attendees || [],
-      organizer: organizerForAccount(this.props.event.accountId),
-      transparency: this._changedShowAs(),
+    await editEvent({
+      event: masterEvent,
+      scope: 'this',
+      occurrenceStart,
+      patch: {
+        ...this._propertyPatch(),
+        start: this.state.start,
+        end: this.state.end,
+        isAllDay: this.state.allDay,
+        transparency: this._changedShowAs(),
+      },
+      description: localized('Edit occurrence'),
     });
-
-    masterEvent.ics = ICSEventHelpers.bumpEventSequence(updatedMasterIcs, recurrenceId);
-    masterEvent.recurrenceStart = this.state.start;
-    masterEvent.recurrenceEnd = this.state.end;
-
-    // Queue a single update task with full undo support
-    Actions.queueTask(
-      SyncbackEventTask.forUpdating({
-        event: masterEvent,
-        undoData: masterUndoData,
-        description: localized('Edit occurrence'),
-      })
-    );
   }
 
   _createNewEvent = async (): Promise<void> => {

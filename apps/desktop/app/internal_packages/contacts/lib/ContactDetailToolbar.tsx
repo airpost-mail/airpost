@@ -15,7 +15,7 @@ import {
   ChangeContactGroupMembershipTask,
 } from 'mailspring-exports';
 import { showGPeopleReadonlyNotice } from './GoogleSupport';
-import { exportContactsToFile } from './VCFImportExport';
+import { exportContactsToFile } from './ContactFiles';
 
 interface ContactDetailToolbarProps {
   editing: string | 'new' | false;

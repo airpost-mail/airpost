@@ -3,14 +3,9 @@ import * as Attributes from '../attributes';
 import { Event } from '../models/event';
 import { AttributeValues } from '../models/model';
 import { localized } from '../../intl';
-import {
-  Actions,
-  DatabaseChangeRecord,
-  DatabaseStore,
-  ICSEventHelpers,
-  ICSParticipantStatus,
-} from 'mailspring-exports';
-import { matchEventSequence, revertAddedOverrides } from '../../ics-event-helpers';
+import { DatabaseChangeRecord, DatabaseStore, ICSParticipantStatus } from 'mailspring-exports';
+import { answerEvent } from '../../engine-pim';
+import { localTimeZone } from '../../engine-drafts';
 
 /**
  * Snapshot of event data for undo/redo support.
@@ -33,9 +28,6 @@ export interface RSVPAnswer {
 }
 
 const FRESH_COPY_TIMEOUT_MS = 30 * 1000;
-// Event id to the ICS this window last queued for it. Undo and redo re-send a snapshot that can be
-// several revisions behind it.
-const latestQueuedIcs = new Map<string, string>();
 
 export class SyncbackEventTask extends Task {
   static attributes = {
@@ -62,6 +54,18 @@ export class SyncbackEventTask extends Task {
     rsvp: Attributes.Obj({
       modelKey: 'rsvp',
     }),
+    /**
+     * Set on an undo or redo: the engine re-sends `event.ics`, a snapshot that can be several
+     * revisions behind the stored copy, over that copy, with the overrides added since put back
+     * and SEQUENCE no lower than the stored one (ms-pim plan::restore).
+     */
+    restore: Attributes.Boolean({
+      modelKey: 'restore',
+    }),
+    /** The zone `restore` reads floating times and dates in. */
+    tz: Attributes.String({
+      modelKey: 'tz',
+    }),
   };
 
   event: Event;
@@ -70,6 +74,8 @@ export class SyncbackEventTask extends Task {
   newData?: EventSnapshot;
   taskDescription?: string;
   rsvp?: RSVPAnswer;
+  restore?: boolean;
+  tz?: string;
 
   static forCreating({
     event,
@@ -106,7 +112,6 @@ export class SyncbackEventTask extends Task {
       recurrenceStart: event.recurrenceStart,
       recurrenceEnd: event.recurrenceEnd,
     };
-    latestQueuedIcs.set(event.id, event.ics);
 
     return new SyncbackEventTask({
       event,
@@ -123,7 +128,6 @@ export class SyncbackEventTask extends Task {
    * emailed beside it cannot be retracted.
    */
   static forAnswering({ event, answer }: { event: Event; answer: RSVPAnswer }) {
-    latestQueuedIcs.set(event.id, event.ics);
     return new SyncbackEventTask({
       event,
       calendarId: event.calendarId,
@@ -143,8 +147,8 @@ export class SyncbackEventTask extends Task {
   }
 
   /**
-   * Creates an undo task that restores the event to its previous state, at no lower a SEQUENCE
-   * than the copy last queued.
+   * Creates an undo task that restores the event to its previous state. The engine applies it
+   * over the copy stored when the undo runs (`restore`).
    *
    * Note: This relies on Event.clone() creating a deep clone. If Event.clone()
    * were shallow, modifications to restoredEvent would leak to this.event,
@@ -155,14 +159,8 @@ export class SyncbackEventTask extends Task {
       throw new Error('SyncbackEventTask: Cannot create undo task without undoData');
     }
 
-    // Create a new event with the original state restored (deep clone)
     const restoredEvent = this.event.clone();
-    const current = latestQueuedIcs.get(this.event.id);
-    restoredEvent.ics = matchEventSequence(
-      revertAddedOverrides(this.undoData.ics, current),
-      current
-    );
-    latestQueuedIcs.set(restoredEvent.id, restoredEvent.ics);
+    restoredEvent.ics = this.undoData.ics;
     restoredEvent.recurrenceStart = this.undoData.recurrenceStart;
     restoredEvent.recurrenceEnd = this.undoData.recurrenceEnd;
 
@@ -175,13 +173,14 @@ export class SyncbackEventTask extends Task {
       undoData: this.newData, // New state becomes undo data for redo-of-undo
       newData: this.undoData, // Old state becomes new data (what we're applying)
       taskDescription: localized('Undo %@', this.taskDescription || localized('event change')),
+      restore: true,
+      tz: localTimeZone(),
     });
   }
 
   /**
-   * Creates the redo task: the captured newData snapshot, at no lower a SEQUENCE than the copy
-   * last queued. The snapshot keeps redo reliable even if the event object has been mutated since
-   * task creation.
+   * Creates the redo task: the captured newData snapshot, re-sent as an undo is (`restore`). The
+   * snapshot keeps redo reliable even if the event object has been mutated since task creation.
    */
   createIdenticalTask(): this {
     if (!this.newData) {
@@ -189,11 +188,8 @@ export class SyncbackEventTask extends Task {
       return super.createIdenticalTask();
     }
 
-    // Create a fresh event with the new state from our snapshot
     const redoEvent = this.event.clone();
-    const current = latestQueuedIcs.get(this.event.id);
-    redoEvent.ics = matchEventSequence(revertAddedOverrides(this.newData.ics, current), current);
-    latestQueuedIcs.set(redoEvent.id, redoEvent.ics);
+    redoEvent.ics = this.newData.ics;
     redoEvent.recurrenceStart = this.newData.recurrenceStart;
     redoEvent.recurrenceEnd = this.newData.recurrenceEnd;
 
@@ -204,6 +200,8 @@ export class SyncbackEventTask extends Task {
       undoData: this.undoData,
       newData: this.newData,
       taskDescription: this.taskDescription,
+      restore: true,
+      tz: localTimeZone(),
     }) as this;
   }
 
@@ -246,23 +244,26 @@ export class SyncbackEventTask extends Task {
   /**
    * An invitation update reaches our copy on the server before the engine's periodic sync shows
    * it, so an answer given in between is refused as an etag-conflict. Our answer is the only
-   * change this write made, so it is made once more on the copy the server holds now. False
-   * when that copy did not arrive or no longer lists us.
+   * change this write made, so it is made once more on the copy the server holds now, without
+   * mailing the organizer again. False when that copy did not arrive or no longer lists us.
    */
   async _answerAgainOnCurrentCopy(): Promise<boolean> {
     const current = await this._nextCopyOfEvent();
     if (!current) return false;
-    const { email, status, occurrenceIcs } = this.rsvp;
-    const ics = occurrenceIcs
-      ? ICSEventHelpers.updateOccurrenceAttendeeStatus(current.ics, occurrenceIcs, email, status)
-      : ICSEventHelpers.updateAttendeeStatus(current.ics, email, status);
-    if (!ics) return false;
-    const event = current.clone();
-    event.ics = ics;
-    Actions.queueTask(
-      SyncbackEventTask.forAnswering({ event, answer: { ...this.rsvp, retried: true } })
-    );
-    return true;
+    const { status, occurrenceIcs } = this.rsvp;
+    try {
+      const result = await answerEvent({
+        accountId: this.accountId,
+        eventId: current.id,
+        ics: occurrenceIcs,
+        status,
+        reply: false,
+        retried: true,
+      });
+      return !!result.write;
+    } catch (err) {
+      return false;
+    }
   }
 
   // Asks the engine to re-read the calendar, and resolves with the event as that sync stores it.

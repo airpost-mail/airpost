@@ -1,86 +1,41 @@
-import { AccountStore, Actions, DatabaseStore, SyncbackEventTask } from 'mailspring-exports';
+// The popover's save path: what it asks the engine to change (events.update with queue: false)
+// and the undoable task it queues. The ICS the engine writes for these edits (a detailed RRULE
+// or RDATEs kept, EXDATEs rezoned, one SEQUENCE bump, ORGANIZER on the first guest, TRANSP per
+// VEVENT) is crates/ms-pim's desktop corpus, recorded from this spec.
+import { Actions, DatabaseStore, SyncbackEventTask } from 'mailspring-exports';
 import { Event as MailspringEvent } from '../src/flux/models/event';
 import { CalendarEventPopover } from '../internal_packages/main-calendar/lib/core/calendar-event-popover';
 import { TimedOccurrence } from '../internal_packages/main-calendar/lib/core/calendar-data-source';
 import { AllDayToggle } from '../internal_packages/main-calendar/lib/core/all-day-toggle';
 import { ShowAsSelector } from '../internal_packages/main-calendar/lib/core/show-as-selector';
+import { fakePimEngine, flush } from './fake-pim-engine';
 
 // A fortnightly Tue/Thu meeting that ends in June. Every part of this rule beyond FREQ is
 // something the five-value Repeat control cannot express.
 const DETAILED_RRULE = 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH;UNTIL=20260630T000000Z';
-
-const FORTNIGHTLY_ICS = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Test//Test//EN
-BEGIN:VEVENT
-UID:fortnightly@test
-DTSTART:20260303T140000Z
-DTEND:20260303T150000Z
-RRULE:${DETAILED_RRULE}
-EXDATE:20260317T140000Z
-SUMMARY:Planning
-DTSTAMP:20260101T000000Z
-SEQUENCE:0
-END:VEVENT
-END:VCALENDAR`;
-
-// A series defined by explicit dates only. It has no RRULE, so the Repeat control reads 'none'.
-const RDATE_ONLY_ICS = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Test//Test//EN
-BEGIN:VEVENT
-UID:rdate-only@test
-DTSTART:20260303T140000Z
-DTEND:20260303T150000Z
-RDATE:20260310T140000Z,20260324T140000Z
-SUMMARY:Board meeting
-DTSTAMP:20260101T000000Z
-SEQUENCE:0
-END:VEVENT
-END:VCALENDAR`;
-
-// A Berlin series as Google writes it, for the zone picker.
-const BERLIN_ICS = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Test//Test//EN
-BEGIN:VTIMEZONE
-TZID:Europe/Berlin
-BEGIN:STANDARD
-DTSTART:19700101T000000
-TZOFFSETFROM:+0100
-TZOFFSETTO:+0100
-TZNAME:CET
-END:STANDARD
-END:VTIMEZONE
-BEGIN:VEVENT
-UID:berlin@test
-DTSTART;TZID=Europe/Berlin:20260303T150000
-DTEND;TZID=Europe/Berlin:20260303T160000
-RRULE:FREQ=WEEKLY
-EXDATE;TZID=Europe/Berlin:20260310T150000
-SUMMARY:Standup
-DTSTAMP:20260101T000000Z
-SEQUENCE:0
-END:VEVENT
-END:VCALENDAR`;
+const ICS = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:planning@test\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n';
+const WRITTEN = ICS.replace('UID', 'SEQUENCE:1\r\nUID');
 
 const START = Date.UTC(2026, 2, 3, 14, 0, 0) / 1000;
 const END = Date.UTC(2026, 2, 3, 15, 0, 0) / 1000;
 
-function makeEvent(ics: string) {
+function makeEvent() {
   return new MailspringEvent({
     id: 'event-1',
     accountId: 'account-1',
     calendarId: 'calendar-1',
-    ics,
+    ics: ICS,
     recurrenceStart: START,
     recurrenceEnd: END,
   } as any);
 }
 
+// What the calendar's data source gives the popover, from events.expand: the series' rule and
+// zone come with the occurrence.
 function makeOccurrence(title: string, extra: Partial<TimedOccurrence> = {}): TimedOccurrence {
   return {
     id: 'event-1-e0',
+    eventId: 'event-1',
     accountId: 'account-1',
     calendarId: 'calendar-1',
     title,
@@ -96,6 +51,8 @@ function makeOccurrence(title: string, extra: Partial<TimedOccurrence> = {}): Ti
     attendees: [],
     start: START,
     end: END,
+    rrule: DETAILED_RRULE,
+    timezone: null,
     ...extra,
   } as TimedOccurrence;
 }
@@ -103,140 +60,138 @@ function makeOccurrence(title: string, extra: Partial<TimedOccurrence> = {}): Ti
 // The editor is exercised the way the UI drives it: onEdit reads the event's recurrence into
 // state, updateField is what every input calls, and _saveAllOccurrences is the save. The
 // component is not mounted, so setState is redirected straight into state.
-async function openEditor(
-  event: MailspringEvent,
-  title: string,
-  extra: Partial<TimedOccurrence> = {}
-) {
+async function openEditor(title: string, extra: Partial<TimedOccurrence> = {}) {
   const popover: any = new CalendarEventPopover({
     event: makeOccurrence(title, extra),
     onEdit: () => {},
     onDelete: () => {},
   } as any);
   popover.setState = (update: object) => Object.assign(popover.state, update);
-  spyOn(DatabaseStore, 'find').andReturn(Promise.resolve(event));
   await popover.onEdit();
   return popover;
 }
 
-function rruleOf(ics: string): string | undefined {
-  return (/^RRULE:(.*)$/m.exec(ics) || [])[1];
+let engine: ReturnType<typeof fakePimEngine>;
+let queued: any[];
+
+function stubEngine() {
+  engine = fakePimEngine();
+  engine.answers['events.update'] = (params) => ({
+    writes: [{ kind: 'update', eventId: params.eventId, ics: WRITTEN }],
+  });
+  queued = [];
+  spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
 }
 
-/** SEQUENCE of each VEVENT in file order; null where a VEVENT has none. */
-function sequencesOf(ics: string): (number | null)[] {
-  return ics
-    .replace(/\r\n[ \t]/g, '')
-    .split('BEGIN:VEVENT')
-    .slice(1)
-    .map((v) => {
-      const m = /^SEQUENCE:(\d+)$/m.exec(v);
-      return m ? parseInt(m[1], 10) : null;
-    });
-}
+const updates = () => engine.callsTo('events.update');
+const update = () => updates()[0];
 
 describe('CalendarEventPopover save path and the recurrence rule', function () {
-  let queued: any[];
+  beforeEach(stubEngine);
 
-  beforeEach(function () {
-    queued = [];
-    spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
-    spyOn(SyncbackEventTask, 'forUpdating').andCallFake((opts) => opts);
-  });
-
-  it('keeps a detailed RRULE when only the title changed', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
+  it('leaves a detailed RRULE to the engine when only the title changed', async function () {
+    const popover = await openEditor('Planning');
     expect(popover.state.repeat).toBe('weekly');
     popover.updateField('title', 'Planning (renamed)');
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), true);
 
-    expect(queued.length).toBe(1);
-    const ics = queued[0].event.ics;
-    expect(ics).toContain('SUMMARY:Planning (renamed)');
-    expect(rruleOf(ics)).toBe(DETAILED_RRULE);
-    expect(ics).toContain('EXDATE:20260317T140000Z');
+    expect(update().scope).toBe('all');
+    expect(update().occurrenceStart).toBe(START);
+    expect(update().patch.summary).toBe('Planning (renamed)');
+    expect('recurrenceRule' in update().patch).toBe(false);
+    expect('timezone' in update().patch).toBe(false);
   });
 
-  it('keeps an RDATE-only series intact when only the title changed', async function () {
-    const event = makeEvent(RDATE_ONLY_ICS);
-    const popover = await openEditor(event, 'Board meeting');
+  it('reads an RDATE-only series as not repeating, and sends no rule for it', async function () {
+    const popover = await openEditor('Board meeting', { rrule: null });
     expect(popover.state.repeat).toBe('none');
     popover.updateField('title', 'Board meeting (renamed)');
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), true);
 
-    expect(queued.length).toBe(1);
-    expect(queued[0].event.ics).toContain('RDATE:20260310T140000Z,20260324T140000Z');
+    expect('recurrenceRule' in update().patch).toBe(false);
   });
 
-  it('rezones a series when the zone picker changed, and brings its EXDATEs along', async function () {
-    const event = makeEvent(BERLIN_ICS);
-    const popover = await openEditor(event, 'Standup');
+  it('sends the zone when the zone picker changed', async function () {
+    const popover = await openEditor('Standup', { timezone: 'Europe/Berlin' });
     expect(popover.state.timezone).toBe('Europe/Berlin');
     popover.updateField('timezone', 'America/Chicago');
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), true);
 
-    const ics = queued[0].event.ics;
-    expect(ics).toContain('DTSTART;TZID=America/Chicago:20260303T080000');
-    expect(ics).toContain('EXDATE;TZID=America/Chicago:20260310T080000');
-    expect(ics).toContain('TZID:America/Chicago');
-    expect(ics).not.toContain('TZID:Europe/Berlin');
+    expect(update().patch.timezone).toBe('America/Chicago');
   });
 
-  it('still writes the rule the user picked when the Repeat control changed', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
+  it('always sends the zone of an event that does not repeat', async function () {
+    const popover = await openEditor('Lunch', { rrule: null, isRecurring: false });
+    await popover._saveAllOccurrences(makeEvent(), false);
+    expect(update().patch.timezone).toBe(popover.state.timezone);
+    expect(update().occurrenceStart).toBeUndefined();
+  });
+
+  it('writes the rule the user picked when the Repeat control changed', async function () {
+    const popover = await openEditor('Planning');
     popover.updateField('repeat', 'daily');
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), true);
 
-    expect(queued.length).toBe(1);
-    expect(rruleOf(queued[0].event.ics)).toBe('FREQ=DAILY');
+    expect(update().patch.recurrenceRule).toBe('FREQ=DAILY');
   });
 });
 
-describe('CalendarEventPopover save path and SEQUENCE', function () {
-  let queued: any[];
+describe('CalendarEventPopover save path and the engine', function () {
+  beforeEach(stubEngine);
 
-  beforeEach(function () {
-    queued = [];
-    spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
-    spyOn(SyncbackEventTask, 'forUpdating').andCallFake((opts) => opts);
-  });
-
-  it('revises the series once however many fields one save changed', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
+  it('sends one save as one change, queued as one undoable task', async function () {
+    const event = makeEvent();
+    const popover = await openEditor('Planning');
     popover.updateField('title', 'Planning (renamed)');
     popover.updateField('repeat', 'daily');
     popover.updateStart(START + 3600);
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(event, true);
 
-    expect(sequencesOf(queued[0].event.ics)).toEqual([1]);
+    expect(updates().length).toBe(1);
+    expect(update().queue).toBe(false);
+    expect(update().patch.start).toBe(START + 3600);
+    expect(queued.length).toBe(1);
+    expect(queued[0] instanceof SyncbackEventTask).toBe(true);
+    expect(queued[0].event.ics).toBe(WRITTEN);
+    expect(queued[0].undoData.ics).toBe(ICS);
   });
 
-  it('revises a series that never carried a SEQUENCE', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS.replace('SEQUENCE:0\n', ''));
-    const popover = await openEditor(event, 'Planning');
-    popover.updateField('title', 'Planning (renamed)');
-
-    popover._saveAllOccurrences(event);
-
-    expect(sequencesOf(queued[0].event.ics)).toEqual([1]);
-  });
-
-  it('revises only the occurrence when one occurrence is edited', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
+  it('edits one occurrence in the slot it fills', async function () {
+    const popover = await openEditor('Planning');
     popover.updateStart(START + 3600);
 
-    await popover._saveOccurrenceException(event);
+    await popover._saveOccurrenceException(makeEvent());
 
-    expect(sequencesOf(queued[0].event.ics)).toEqual([0, 1]);
+    expect(update().scope).toBe('this');
+    expect(update().occurrenceStart).toBe(START);
+    expect(update().patch.start).toBe(START + 3600);
+  });
+
+  it('edits an occurrence already moved in the slot it fills, not where it is now', async function () {
+    const popover = await openEditor('Planning', {
+      isException: true,
+      start: START + 7200,
+      end: END + 7200,
+      recurrenceIdStart: START,
+    } as any);
+
+    await popover._saveOccurrenceException(makeEvent());
+
+    expect(update().occurrenceStart).toBe(START);
+  });
+
+  it('sends the guests, for the engine to name the account as organizer', async function () {
+    const popover = await openEditor('Planning');
+    popover.updateAttendees([{ email: 'bo@example.com', name: 'Bo' }]);
+
+    await popover._saveAllOccurrences(makeEvent(), true);
+
+    expect(update().patch.attendees).toEqual([{ email: 'bo@example.com', name: 'Bo' }]);
   });
 });
 
@@ -267,16 +222,14 @@ describe('CalendarEventPopover and who may edit', function () {
     expect(popoverFor({ event: theirs, isNewEvent: true })._isEditable()).toBe(true);
   });
 
-  it('opens straight into the editor when asked, reading the rule off the event first', async function () {
-    spyOn(DatabaseStore, 'find').andReturn(Promise.resolve(makeEvent(FORTNIGHTLY_ICS)));
+  it('opens straight into the editor when asked, reading the rule off the occurrence first', async function () {
     const popover = popoverFor({ startEditing: true });
     popover.setState = (update: object) => Object.assign(popover.state, update);
     expect(popover.state.editing).toBe(true);
     expect(popover.state.repeat).toBe('none');
 
     popover.componentDidMount();
-    // The load is one awaited find; the runner mocks timers, so settle it on microtasks alone.
-    for (let i = 0; i < 4; i++) await Promise.resolve();
+    await flush();
 
     expect(popover.state.repeat).toBe('weekly');
     expect(popover.state.originalRepeat).toBe('weekly');
@@ -290,123 +243,68 @@ describe('CalendarEventPopover and who may edit', function () {
   });
 });
 
-describe('CalendarEventPopover save path and the organizer', function () {
-  let queued: any[];
-
-  beforeEach(function () {
-    queued = [];
-    spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
-    spyOn(SyncbackEventTask, 'forUpdating').andCallFake((opts) => opts);
-    spyOn(AccountStore, 'accountForId').andReturn({ emailAddress: 'me@example.com', name: 'Me' });
-  });
-
-  it('names the account as organizer when the first guest is added to the series', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
-    popover.updateAttendees([{ email: 'bo@example.com', name: 'Bo' }]);
-
-    popover._saveAllOccurrences(event);
-
-    expect(queued[0].event.ics).toContain('ORGANIZER;CN=Me:mailto:me@example.com');
-  });
-
-  it('names the account as organizer when the first guest is added to one occurrence', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
-    popover.updateAttendees([{ email: 'bo@example.com', name: 'Bo' }]);
-
-    await popover._saveOccurrenceException(event);
-
-    const vevents = queued[0].event.ics.split('BEGIN:VEVENT').slice(1);
-    expect(vevents.length).toBe(2);
-    for (const vevent of vevents) {
-      expect(vevent).toContain('ORGANIZER;CN=Me:mailto:me@example.com');
-    }
-  });
-});
-
 describe('CalendarEventPopover save path and Show As', function () {
-  // Google writes TRANSP on every VEVENT, and makes all-day events TRANSPARENT by default.
-  const BUSY_SERIES_ICS = FORTNIGHTLY_ICS.replace('SEQUENCE:0', 'SEQUENCE:0\nTRANSP:OPAQUE');
-  const FREE_SERIES_ICS = FORTNIGHTLY_ICS.replace('SEQUENCE:0', 'SEQUENCE:0\nTRANSP:TRANSPARENT');
-  let queued: any[];
-
-  beforeEach(function () {
-    queued = [];
-    spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
-    spyOn(SyncbackEventTask, 'forUpdating').andCallFake((opts) => opts);
-  });
-
-  /** TRANSP of each VEVENT in file order; null where a VEVENT has none. */
-  const transpsOf = (ics: string) =>
-    ics
-      .split('BEGIN:VEVENT')
-      .slice(1)
-      .map((v) => (/^TRANSP:(.*)$/m.exec(v) || [])[1] || null);
+  beforeEach(stubEngine);
 
   it('shows a free event as Free', async function () {
-    const free = await openEditor(makeEvent(FREE_SERIES_ICS), 'Planning', { isFree: true });
+    const free = await openEditor('Planning', { isFree: true });
     expect(free.state.showAs).toBe('TRANSPARENT');
   });
 
   it('shows a busy event as Busy', async function () {
-    const busy = await openEditor(makeEvent(BUSY_SERIES_ICS), 'Planning', { isFree: false });
+    const busy = await openEditor('Planning', { isFree: false });
     expect(busy.state.showAs).toBe('OPAQUE');
   });
 
   it('marks the series free when Show As changes to Free', async function () {
-    const event = makeEvent(BUSY_SERIES_ICS);
-    const popover = await openEditor(event, 'Planning');
+    const popover = await openEditor('Planning');
     popover.updateShowAs('TRANSPARENT');
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), true);
 
-    expect(transpsOf(queued[0].event.ics)).toEqual(['TRANSPARENT']);
-    expect(sequencesOf(queued[0].event.ics)).toEqual([1]);
+    expect(update().scope).toBe('all');
+    expect(update().patch.transparency).toBe('TRANSPARENT');
   });
 
   it('marks a free series busy when Show As changes to Busy', async function () {
-    const event = makeEvent(FREE_SERIES_ICS);
-    const popover = await openEditor(event, 'Planning', { isFree: true });
+    const popover = await openEditor('Planning', { isFree: true });
     popover.updateShowAs('OPAQUE');
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), true);
 
-    expect(transpsOf(queued[0].event.ics)).toEqual(['OPAQUE']);
+    expect(update().patch.transparency).toBe('OPAQUE');
   });
 
   it('leaves TRANSP as it was when Show As was not touched', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
+    const popover = await openEditor('Planning');
     popover.updateField('title', 'Planning (renamed)');
 
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), true);
 
-    expect(transpsOf(queued[0].event.ics)).toEqual([null]);
+    expect(update().patch.transparency).toBeUndefined();
   });
 
   it('marks only the occurrence free when one occurrence is edited', async function () {
-    const event = makeEvent(BUSY_SERIES_ICS);
-    const popover = await openEditor(event, 'Planning');
+    const popover = await openEditor('Planning');
     popover.updateShowAs('TRANSPARENT');
 
-    await popover._saveOccurrenceException(event);
+    await popover._saveOccurrenceException(makeEvent());
 
-    expect(transpsOf(queued[0].event.ics)).toEqual(['OPAQUE', 'TRANSPARENT']);
+    expect(update().scope).toBe('this');
+    expect(update().patch.transparency).toBe('TRANSPARENT');
   });
 
   it('adds no TRANSP to an occurrence whose Show As was not touched', async function () {
-    const event = makeEvent(FORTNIGHTLY_ICS);
-    const popover = await openEditor(event, 'Planning');
+    const popover = await openEditor('Planning');
     popover.updateField('title', 'Planning (moved)');
 
-    await popover._saveOccurrenceException(event);
+    await popover._saveOccurrenceException(makeEvent());
 
-    expect(transpsOf(queued[0].event.ics)).toEqual([null, null]);
+    expect(update().patch.transparency).toBeUndefined();
   });
 
   it('follows the event when it changes under the editor', async function () {
-    const popover = await openEditor(makeEvent(BUSY_SERIES_ICS), 'Planning');
+    const popover = await openEditor('Planning');
     const prevProps = popover.props;
     popover.props = { ...prevProps, event: makeOccurrence('Planning', { isFree: true }) };
     popover.componentDidUpdate(prevProps, popover.state);
@@ -444,7 +342,7 @@ describe('CalendarEventPopover save path and Show As', function () {
   });
 
   it('opens an existing all-day event with the Show As it has', async function () {
-    const busy = await openEditor(makeEvent(BUSY_SERIES_ICS), 'Planning', {
+    const busy = await openEditor('Planning', {
       isAllDay: true,
       isFree: false,
     } as any);
@@ -469,7 +367,7 @@ describe('CalendarEventPopover save path and Show As', function () {
   });
 
   it("leaves an existing event's Show As alone when it is made all-day", async function () {
-    const popover = await openEditor(makeEvent(BUSY_SERIES_ICS), 'Planning');
+    const popover = await openEditor('Planning');
     popover.updateAllDay(true);
     expect(popover.state.allDay).toBe(true);
     expect(popover.state.showAs).toBe('OPAQUE');

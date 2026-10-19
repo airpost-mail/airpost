@@ -1,5 +1,6 @@
-import { Actions, DatabaseStore, Event, ICSEventHelpers } from 'mailspring-exports';
+import { DatabaseStore, Event } from 'mailspring-exports';
 import { SyncbackEventTask } from '../../src/flux/tasks/syncback-event-task';
+import { fakePimEngine, refusal } from '../fake-pim-engine';
 
 const ME = 'brian@example.com';
 
@@ -25,12 +26,10 @@ const ics = ({ start = '20261022T160000Z', location = 'Cafe', partstat = 'NEEDS-
 const event = (icsText: string, id = 'event-1') =>
   new Event({ id, accountId: 'acct-1', calendarId: 'cal-1', ics: icsText } as any);
 
-const unfolded = (icsText: string) => icsText.replace(/\r\n[ \t]/g, '');
-
 describe('an answer refused because our copy changed on the server', function () {
   let listener: (record: any) => void;
   let unlisten: jasmine.Spy;
-  let queued: SyncbackEventTask[];
+  let engine: ReturnType<typeof fakePimEngine>;
   let dialog: jasmine.Spy;
 
   // Our ACCEPTED written over the copy we had, which the organizer has since moved.
@@ -53,8 +52,11 @@ describe('an answer refused because our copy changed on the server', function ()
       return unlisten;
     });
     spyOn(AppEnv.mailsyncBridge, 'sendSyncCalendarNow');
-    queued = [];
-    spyOn(Actions, 'queueTask').andCallFake((t) => queued.push(t));
+    engine = fakePimEngine();
+    engine.answers['events.rsvp'] = (params) => ({
+      email: ME,
+      write: { kind: 'update', eventId: params.eventId, taskId: 't-2' },
+    });
     dialog = spyOn(AppEnv, 'showErrorDialog');
   });
 
@@ -64,36 +66,26 @@ describe('an answer refused because our copy changed on the server', function ()
     listener(stored([moved()]));
     await done;
 
-    expect(queued.length).toBe(1);
-    const written = unfolded(queued[0].event.ics);
-    expect(written).toContain('DTSTART:20261022T170000Z');
-    expect(written).toContain("LOCATION:Ruthie's");
-    expect(written).toContain(`PARTSTAT=ACCEPTED:mailto:${ME}`);
-    expect(queued[0].rsvp).toEqual({ email: ME, status: 'ACCEPTED', retried: true });
+    const [params] = engine.callsTo('events.rsvp');
+    expect(params.eventId).toBe('event-1');
+    expect(params.status).toBe('ACCEPTED');
+    // Recorded on our copy only: the organizer had the REPLY already.
+    expect(params.reply).toBe(false);
+    expect(params.retried).toBe(true);
+    expect(params.ics).toBeUndefined();
     expect(dialog).not.toHaveBeenCalled();
     expect(unlisten.callCount).toBe(1);
   });
 
   it('answers only the occurrence it was asked about', async function () {
     const occurrenceIcs = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR';
-    spyOn(ICSEventHelpers, 'updateOccurrenceAttendeeStatus').andReturn(
-      ics({ partstat: 'DECLINED' })
-    );
     const done = answerTask({ email: ME, status: 'DECLINED', occurrenceIcs }).onError({
       key: 'etag-conflict',
       debuginfo: '',
     });
-    const current = moved();
-    listener(stored([current]));
+    listener(stored([moved()]));
     await done;
-
-    expect(ICSEventHelpers.updateOccurrenceAttendeeStatus).toHaveBeenCalledWith(
-      current.ics,
-      occurrenceIcs,
-      ME,
-      'DECLINED'
-    );
-    expect(queued.length).toBe(1);
+    expect(engine.callsTo('events.rsvp')[0].ics).toBe(occurrenceIcs);
   });
 
   it('waits for this event, not another one or a removal', async function () {
@@ -104,7 +96,7 @@ describe('an answer refused because our copy changed on the server', function ()
     expect(unlisten).not.toHaveBeenCalled();
     listener(stored([moved()]));
     await done;
-    expect(queued.length).toBe(1);
+    expect(engine.callsTo('events.rsvp').length).toBe(1);
   });
 
   it('shows the conflict when the calendar does not come back within 30 seconds', async function () {
@@ -114,7 +106,7 @@ describe('an answer refused because our copy changed on the server', function ()
     advanceClock(1000);
     await done;
     expect(unlisten).toHaveBeenCalled();
-    expect(queued.length).toBe(0);
+    expect(engine.calls.length).toBe(0);
     expect(dialog.mostRecentCall.args[0].message).toContain('changed by another client');
   });
 
@@ -127,10 +119,12 @@ describe('an answer refused because our copy changed on the server', function ()
   });
 
   it('shows the conflict when the new copy no longer lists us', async function () {
+    engine.answers['events.rsvp'] = () => {
+      throw refusal('not-invited');
+    };
     const done = answerTask().onError({ key: 'etag-conflict', debuginfo: '' });
     listener(stored([event(ics().replace(`mailto:${ME}`, 'mailto:someone@example.com'))]));
     await done;
-    expect(queued.length).toBe(0);
     expect(dialog).toHaveBeenCalled();
   });
 

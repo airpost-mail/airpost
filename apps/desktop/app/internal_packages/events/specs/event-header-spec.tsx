@@ -13,9 +13,7 @@ import {
   Calendar,
   Contact,
   Event,
-  EventRSVPTask,
   File,
-  ICSEventHelpers,
   Message,
   Rx,
   SyncbackEventTask,
@@ -23,6 +21,8 @@ import {
   Utils,
 } from 'mailspring-exports';
 import { EventHeader, renderLocation } from '../lib/event-header';
+import type { EventConflictJSON, EventTimes } from '../../../src/engine-protocol';
+import { fakePimEngine, refusal } from '../../../spec/fake-pim-engine';
 
 // A LOCATION as Zoom rooms write it: the join URL, then the rooms booked for the meeting.
 const ZOOM_WITH_ROOMS =
@@ -157,6 +157,46 @@ describe('EventHeader location', function () {
   });
 });
 
+// The engine reads the invitation's times (events.expand: `first`, `upcoming`), finds the
+// conflicts and answers (events.rsvp); this stands in for it. The ICS it builds is crates/ms-pim's
+// tests (plan.rs rsvp_*, counter_*).
+const unfold = (ics: string) => ics.replace(/\r?\n[ \t]/g, '');
+
+function unixOf(value: string) {
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(value);
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)) / 1000;
+}
+
+/** What the engine answers as `first`: the times of the file's first VEVENT. */
+function firstOf(ics: string): EventTimes {
+  const vevent = unfold(ics).split('BEGIN:VEVENT')[1];
+  const prop = (name: string) => {
+    const m = new RegExp(`^${name}[;:][^\\r\\n]*`, 'm').exec(vevent);
+    return m ? m[0].split(':').pop() : undefined;
+  };
+  const rid = prop('RECURRENCE-ID');
+  return {
+    start: unixOf(prop('DTSTART')),
+    end: unixOf(prop('DTEND')),
+    isAllDay: !prop('DTSTART').includes('T'),
+    ...(rid ? { recurrenceId: unixOf(rid) } : {}),
+  };
+}
+
+function pimEngine() {
+  const engine = fakePimEngine();
+  const answers = {
+    upcoming: (_ics: string): EventTimes | null => null,
+    conflicts: (): EventConflictJSON[] => [],
+  };
+  engine.answers['events.expand'] = (params) =>
+    params.ics
+      ? { occurrences: [], first: firstOf(params.ics), upcoming: answers.upcoming(params.ics) }
+      : { occurrences: [], conflicts: params.conflicts ? answers.conflicts() : undefined };
+  engine.answers['events.rsvp'] = () => ({ email: 'me' });
+  return Object.assign(engine, { expand: answers });
+}
+
 describe('EventHeader for an invitation to one occurrence of a series', function () {
   const vcalendar = (...vevents: string[][]) =>
     [
@@ -216,14 +256,14 @@ describe('EventHeader for an invitation to one occurrence of a series', function
   const dayOf = (iso: string) => moment(iso).format('dddd, MMMM Do');
 
   let icsPath: string;
+  let engine: ReturnType<typeof pimEngine>;
+  let emailedIcs: string;
 
   // With `onOwnCalendar`, the copy sits on a writable calendar of ours, so an answer is written.
   function render(emailed: string[], calendarIcs: string, { onOwnCalendar = false } = {}) {
     icsPath = path.join(os.tmpdir(), `event-header-spec-${process.pid}.ics`);
-    fs.writeFileSync(
-      icsPath,
-      vcalendar(emailed).replace('VERSION:2.0', 'VERSION:2.0\r\nMETHOD:REQUEST')
-    );
+    emailedIcs = vcalendar(emailed).replace('VERSION:2.0', 'VERSION:2.0\r\nMETHOD:REQUEST');
+    fs.writeFileSync(icsPath, emailedIcs);
     spyOn(AttachmentStore, 'pathForFile').andReturn(icsPath);
     const mine = new Calendar({ id: 'cal-mine', accountId: 'a1', name: 'me@example.com' } as any);
     const synced = new Event({
@@ -239,7 +279,7 @@ describe('EventHeader for an invitation to one occurrence of a series', function
     );
     const header = ReactTestUtils.renderIntoDocument(
       <EventHeader
-        message={new Message({ accountId: 'a1' })}
+        message={new Message({ id: 'm1', accountId: 'a1' })}
         file={new File({ id: 'f1', filename: 'invite.ics' })}
       />
     ) as unknown as EventHeader;
@@ -250,9 +290,29 @@ describe('EventHeader for an invitation to one occurrence of a series', function
     return Object.assign(text, { header });
   }
 
+  beforeEach(function () {
+    engine = pimEngine();
+    const account = new Account({ id: 'a1', emailAddress: 'me@example.com' });
+    spyOn(AccountStore, 'accountForEmail').andCallFake((email: string) =>
+      email === 'me@example.com' ? account : null
+    );
+    spyOn(AccountStore, 'accountForId').andReturn(account);
+    spyOn(AccountStore, 'aliases').andReturn([]);
+  });
+
   afterEach(function () {
     fs.unlinkSync(icsPath);
   });
+
+  const answer = () => engine.callsTo('events.rsvp')[0];
+
+  function click(text: ReturnType<typeof render>, label: string) {
+    const button = ReactTestUtils.scryRenderedDOMComponentsWithClass(text.header, 'btn-rsvp').find(
+      (b) => b.textContent === label
+    );
+    ReactTestUtils.Simulate.click(button);
+    waitsFor(() => !!answer());
+  }
 
   it("shows that occurrence from the calendar copy, not the series' first date", function () {
     const text = render(EMAILED, vcalendar(SERIES, OTHER_WEEK, SYNCED));
@@ -270,75 +330,30 @@ describe('EventHeader for an invitation to one occurrence of a series', function
     });
   });
 
-  let queueTask: jasmine.Spy;
-
-  // Clicks Decline and returns the ICS of the reply that was queued.
-  function declineAndGetReply(text: ReturnType<typeof render>): string {
-    const decline = ReactTestUtils.scryRenderedDOMComponentsWithClass(text.header, 'btn-rsvp').find(
-      (button) => button.textContent === 'Decline'
-    );
-    ReactTestUtils.Simulate.click(decline);
-    return queueTask.mostRecentCall.args[0].ics;
-  }
-
-  beforeEach(function () {
-    const account = new Account({ id: 'a1', emailAddress: 'me@example.com' });
-    spyOn(AccountStore, 'accountForEmail').andCallFake((email: string) =>
-      email === 'me@example.com' ? account : null
-    );
-    spyOn(AccountStore, 'accountForId').andReturn(account);
-    spyOn(AccountStore, 'aliases').andReturn([]);
-    queueTask = spyOn(Actions, 'queueTask');
-  });
-
-  // Clicks Accept and returns the ICS written to our calendar copy.
-  function acceptAndGetWrite(text: ReturnType<typeof render>): string {
-    const accept = ReactTestUtils.scryRenderedDOMComponentsWithClass(text.header, 'btn-rsvp').find(
-      (button) => button.textContent === 'Accept'
-    );
-    ReactTestUtils.Simulate.click(accept);
-    const write = queueTask.calls
-      .map((call) => call.args[0])
-      .find((task) => task instanceof SyncbackEventTask) as SyncbackEventTask;
-    return write.event.ics;
-  }
-  const myLines = (ics: string) =>
-    ics.split(/\r?\n/).filter((l) => l.startsWith('ATTENDEE') && l.includes('me@example.com'));
-
-  it('answers for that occurrence alone, not for the series', function () {
+  it('answers from the emailed occurrence, which the engine replies to alone', function () {
     const text = render(EMAILED, vcalendar(SERIES, OTHER_WEEK, SYNCED));
+    runs(() => click(text, 'Decline'));
     runs(() => {
-      const reply = declineAndGetReply(text);
-      expect(reply.split('BEGIN:VEVENT').length - 1).toBe(1);
-      expect(reply).toContain('RECURRENCE-ID:20260915T140000Z');
-      expect(reply).not.toContain('RRULE');
+      expect(answer().ics).toBe(emailedIcs);
+      expect(answer().messageId).toBe('m1');
+      expect(answer().status).toBe('DECLINED');
+      // Not on a calendar of ours: nothing is recorded.
+      expect(answer().write).toBe(false);
+      expect(answer().eventId).toBeUndefined();
     });
   });
 
-  it('records the answer on that occurrence of our copy, not on the series', function () {
-    const text = render(EMAILED, vcalendar(SERIES, OTHER_WEEK, SYNCED), { onOwnCalendar: true });
-    runs(() => {
-      const [master, otherWeek, synced] = acceptAndGetWrite(text).split('BEGIN:VEVENT').slice(1);
-      expect(myLines(master)[0]).toContain('PARTSTAT=NEEDS-ACTION');
-      expect(myLines(otherWeek)[0]).toContain('PARTSTAT=NEEDS-ACTION');
-      expect(synced).toContain('SUMMARY:Huddle (as synced)');
-      expect(myLines(synced)[0]).toContain('PARTSTAT=ACCEPTED');
-    });
-  });
-
-  it('adds the emailed occurrence to our copy when it has no entry for it, answered', function () {
+  it('records the answer on our copy, where the engine finds the occurrence', function () {
     const text = render(EMAILED, vcalendar(SERIES, OTHER_WEEK), { onOwnCalendar: true });
+    runs(() => click(text, 'Accept'));
     runs(() => {
-      const vevents = acceptAndGetWrite(text).split('BEGIN:VEVENT').slice(1);
-      expect(vevents.length).toBe(3);
-      expect(myLines(vevents[0])[0]).toContain('PARTSTAT=NEEDS-ACTION');
-      expect(vevents[2]).toContain('RECURRENCE-ID:20260915T140000Z');
-      expect(vevents[2]).toContain('DTSTART:20260915T150000Z');
-      expect(myLines(vevents[2])[0]).toContain('PARTSTAT=ACCEPTED');
+      expect(answer().ics).toBe(emailedIcs);
+      expect(answer().eventId).toBe('e1');
+      expect(answer().status).toBe('ACCEPTED');
     });
   });
 
-  it('still shows, and answers from, the calendar copy for an invitation to the whole series', function () {
+  it('still shows the calendar copy for an invitation to the whole series', function () {
     const text = render(
       SERIES,
       vcalendar([...SERIES.slice(0, 3), 'SUMMARY:Huddle (as synced)', ...GUESTS])
@@ -346,7 +361,6 @@ describe('EventHeader for an invitation to one occurrence of a series', function
     runs(() => {
       expect(text('event-day')).toBe(dayOf('2025-09-23T14:00:00Z'));
       expect(text('event-title')).toBe('Huddle (as synced)');
-      expect(declineAndGetReply(text)).toContain('SUMMARY:Huddle (as synced)');
     });
   });
 });
@@ -397,9 +411,10 @@ describe('EventHeader answering an invitation', function () {
   let icsPath: string;
   let header: EventHeader;
   let queued: Task[];
-  let nearbyBounds: { start: number; end: number };
+  let engine: ReturnType<typeof pimEngine>;
 
   beforeEach(function () {
+    engine = pimEngine();
     icsPath = path.join(os.tmpdir(), `event-header-rsvp-spec-${process.pid}.ics`);
     fs.writeFileSync(icsPath, INVITE);
     spyOn(AttachmentStore, 'pathForFile').andReturn(icsPath);
@@ -421,25 +436,14 @@ describe('EventHeader answering an invitation', function () {
   function mount({
     events,
     calendars,
-    nearby = [],
     from,
   }: {
     events: Event[];
     calendars: Calendar[];
-    nearby?: Event[];
     from?: string;
   }) {
-    spyOn(Rx.Observable, 'fromQuery').andCallFake(
-      (query: { _klass: unknown; _matchers: { attr: { modelKey: string }; val: number }[] }) => {
-        const keys = query._matchers.map((m) => m.attr && m.attr.modelKey);
-        if (query._klass !== Event) return Rx.Observable.just(calendars);
-        if (keys.includes('icsuid')) return Rx.Observable.just(events);
-        nearbyBounds = {
-          start: query._matchers.find((m) => m.attr.modelKey === 'recurrenceEnd').val,
-          end: query._matchers.find((m) => m.attr.modelKey === 'recurrenceStart').val,
-        };
-        return Rx.Observable.just(nearby);
-      }
+    spyOn(Rx.Observable, 'fromQuery').andCallFake((query: { _klass: unknown }) =>
+      Rx.Observable.just(query._klass === Event ? events : calendars)
     );
     header = ReactTestUtils.renderIntoDocument(
       <EventHeader
@@ -456,32 +460,37 @@ describe('EventHeader answering an invitation', function () {
     waitsFor(() => !!header.state.rsvp);
   }
 
+  const answer = () => engine.callsTo('events.rsvp')[0];
+
   function click(label: string) {
     const button = ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'btn-rsvp').find(
       (n) => n.textContent === label
     );
     ReactTestUtils.Simulate.click(button);
+    waitsFor(() => !!answer());
   }
 
   const destination = () =>
     ReactTestUtils.findRenderedDOMComponentWithClass(header, 'event-rsvp-destination');
-  const unfold = (ics: string) => ics.replace(/\r?\n[ \t]/g, '');
   const title = () =>
     ReactTestUtils.findRenderedDOMComponentWithClass(header, 'event-title').textContent;
 
-  it('addresses the reply to the organizer the mailed invitation names, from the synced copy', function () {
+  it('shows the synced copy and answers from the mailed invitation, which names the organizer', function () {
     mount({ events: [synced], calendars: [mine] });
     runs(() => {
       expect(title()).toBe('Kickoff (moved)');
       click('Accept');
-      const reply = queued[0] as EventRSVPTask;
-      expect(reply instanceof EventRSVPTask).toBe(true);
-      expect(reply.toJSON().to).toBe('ada@example.com');
-      expect(reply.ics).toContain('SUMMARY:Kickoff (moved)');
+    });
+    runs(() => {
+      expect(answer().ics).toBe(INVITE);
+      expect(answer().accountId).toBe('a1');
+      expect(answer().messageId).toBe('m1');
+      expect(answer().status).toBe('ACCEPTED');
+      expect(answer().eventId).toBe('e-mine');
     });
   });
 
-  it('also records the answer on our own copy, and says so beforehand', function () {
+  it('records the answer on our own copy of several, and says so beforehand', function () {
     mount({
       events: [onRoom, synced],
       calendars: [cal({ id: 'cal-room', name: 'Boardroom' }), mine],
@@ -490,13 +499,10 @@ describe('EventHeader answering an invitation', function () {
       expect(title()).toBe('Kickoff (moved)');
       expect(destination().textContent).toBe('Your response will be saved to brian@example.com');
       click('Maybe');
-      const write = queued[1] as SyncbackEventTask;
-      expect(write instanceof SyncbackEventTask).toBe(true);
-      expect(write.event.id).toBe('e-mine');
-      expect(unfold(write.event.ics)).toMatch(
-        /ATTENDEE[^\r\n]*PARTSTAT=TENTATIVE[^\r\n]*brian@example.com/
-      );
-      expect(write.rsvp.status).toBe('TENTATIVE');
+    });
+    runs(() => {
+      expect(answer().eventId).toBe('e-mine');
+      expect(answer().status).toBe('TENTATIVE');
     });
   });
 
@@ -510,13 +516,14 @@ describe('EventHeader answering an invitation', function () {
         'brian@example.com',
       ]);
       click('Accept');
-      const write = queued[1] as SyncbackEventTask;
-      expect(write.calendarId).toBe(mine.id);
-      expect(write.event.ics).not.toContain('METHOD');
+    });
+    runs(() => {
+      expect(answer().calendarId).toBe(mine.id);
+      expect(answer().eventId).toBeUndefined();
     });
   });
 
-  it('only emails a decline when the invitation is on no calendar', function () {
+  it('names where an acceptance would go when the invitation is on no calendar', function () {
     mount({ events: [], calendars: [mine] });
     runs(() => {
       expect(Array.from(destination().querySelectorAll('span')).map((n) => n.textContent)).toEqual([
@@ -527,9 +534,12 @@ describe('EventHeader answering an invitation', function () {
       expect(
         ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'event-view-in-calendar').length
       ).toBe(0);
+      // The engine adds it only for an acceptance (plan.rs rsvp_adds_an_invitation_...).
       click('Decline');
-      expect(queued.length).toBe(1);
-      expect(queued[0] instanceof EventRSVPTask).toBe(true);
+    });
+    runs(() => {
+      expect(answer().status).toBe('DECLINED');
+      expect(answer().calendarId).toBe(mine.id);
     });
   });
 
@@ -541,7 +551,25 @@ describe('EventHeader answering an invitation', function () {
       expect(title()).toBe('Kickoff (moved)');
       expect(destination().textContent).toContain('only be emailed to the organizer');
       click('Accept');
-      expect(queued.length).toBe(1);
+    });
+    runs(() => {
+      expect(answer().write).toBe(false);
+      expect(answer().eventId).toBeUndefined();
+    });
+  });
+
+  it('says so when the engine finds we are not invited', function () {
+    engine.answers['events.rsvp'] = () => {
+      throw refusal('not-invited');
+    };
+    mount({ events: [synced], calendars: [mine] });
+    runs(() => click('Accept'));
+    waitsFor(() => (AppEnv.showErrorDialog as jasmine.Spy).callCount > 0);
+    runs(() => {
+      expect((AppEnv.showErrorDialog as jasmine.Spy).mostRecentCall.args[0]).toContain(
+        'attendee list'
+      );
+      expect(header.state.inflight).toBe(undefined);
     });
   });
 
@@ -583,120 +611,77 @@ describe('EventHeader answering an invitation', function () {
   });
 
   describe('conflicts', function () {
-    const busyAt = (
-      id: string,
-      calendarId: string,
-      start: string,
-      end: string,
-      uid = `${id}@test`
-    ) =>
-      new Event({
-        id,
-        accountId: 'a1',
-        calendarId,
-        icsuid: uid,
-        ics: [
-          'BEGIN:VCALENDAR',
-          'VERSION:2.0',
-          'PRODID:-//Test//Test//EN',
-          'BEGIN:VEVENT',
-          `UID:${uid}`,
-          `DTSTART:${start}`,
-          `DTEND:${end}`,
-          `SUMMARY:${id}`,
-          'DTSTAMP:20260101T000000Z',
-          'END:VEVENT',
-          'END:VCALENDAR',
-        ].join('\r\n'),
-      } as any);
+    const conflict = (title: string, start: string, end: string): EventConflictJSON => ({
+      eventId: title,
+      calendarId: mine.id,
+      icsuid: `${title}@test`,
+      title,
+      start: unixOf(start),
+      end: unixOf(end),
+    });
     const conflictLines = () =>
       ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'event-conflict').map(
         (n) => n.textContent
       );
+    const lookUp = () => engine.callsTo('events.expand').find((p) => p.conflicts);
+    const SERIES = INVITE.replace(
+      'DTSTART:20260301T140000Z\r\nDTEND:20260301T150000Z',
+      'DTSTART:20260301T140000Z\r\nDTEND:20260301T150000Z\r\nRRULE:FREQ=WEEKLY'
+    );
+    // The series' next occurrence, as the engine finds it.
+    const NEXT = { start: unixOf('20261025T140000Z'), end: unixOf('20261025T150000Z') };
 
     beforeEach(function () {
       const original = AppEnv.config.get;
       spyOn(AppEnv.config, 'get').andCallFake((key: string) =>
         key === 'mailspring.disabledCalendars' ? ['cal-off'] : original.call(AppEnv.config, key)
       );
+      engine.expand.conflicts = () => [conflict('Standup', '20260301T143000Z', '20260301T150000Z')];
     });
 
-    it('lists what the invitation overlaps on the calendars that are our busy time', function () {
+    it('asks for what overlaps the invitation on the calendars that are our busy time', function () {
       const off = cal({ id: 'cal-off', name: 'Side project' });
-      mount({
-        events: [],
-        calendars: [mine, holidays, theirs, off],
-        nearby: [
-          busyAt('Standup', mine.id, '20260301T143000Z', '20260301T150000Z'),
-          busyAt('Bank holiday', holidays.id, '20260301T140000Z', '20260301T150000Z'),
-          busyAt('Their meeting', theirs.id, '20260301T140000Z', '20260301T150000Z'),
-          busyAt('Side thing', off.id, '20260301T140000Z', '20260301T150000Z'),
-          busyAt('Lunch', mine.id, '20260301T150000Z', '20260301T160000Z'),
-          busyAt(
-            'Itself',
-            mine.id,
-            '20260301T140000Z',
-            '20260301T150000Z',
-            'meeting-uid@example.com'
-          ),
-        ],
-      });
+      mount({ events: [], calendars: [mine, holidays, theirs, off] });
+      waitsFor(() => conflictLines().length > 0);
       runs(() => {
+        expect(lookUp().calendarIds).toEqual([mine.id]);
+        expect(lookUp().conflicts).toEqual({ excludeIcsuid: 'meeting-uid@example.com' });
+        expect([lookUp().start, lookUp().end]).toEqual([
+          unixOf('20260301T140000Z'),
+          unixOf('20260301T150000Z'),
+        ]);
         expect(
           ReactTestUtils.findRenderedDOMComponentWithClass(header, 'event-conflicts-title')
             .textContent
         ).toBe('Conflicts with an event on your calendar');
+        // The header shows the invitation's day, so the line gives only times.
         expect(conflictLines()).toEqual(['Standup (8:30 am - 9:00 am)']);
       });
     });
 
     it('checks the next occurrence of a recurring invitation, not the one it began with', function () {
-      const series = INVITE.replace(
-        'DTSTART:20260301T140000Z\r\nDTEND:20260301T150000Z',
-        'DTSTART:20260301T140000Z\r\nDTEND:20260301T150000Z\r\nRRULE:FREQ=WEEKLY'
-      );
-      fs.writeFileSync(icsPath, series);
-      const next = ICSEventHelpers.upcomingOccurrence(series, new Date());
-      const stamp = (d: Date) => d.toISOString().replace(/[-:]|\.\d{3}/g, '');
-      mount({
-        events: [],
-        calendars: [mine],
-        nearby: [
-          busyAt('First week', mine.id, '20260301T140000Z', '20260301T150000Z'),
-          busyAt('This week', mine.id, stamp(next.start), stamp(next.end)),
-        ],
-      });
+      fs.writeFileSync(icsPath, SERIES);
+      engine.expand.upcoming = (ics) => (ics === SERIES ? { ...NEXT, isAllDay: false } : null);
+      engine.expand.conflicts = () => [
+        conflict('This week', '20261025T140000Z', '20261025T150000Z'),
+      ];
+      mount({ events: [], calendars: [mine] });
+      waitsFor(() => conflictLines().length > 0);
       runs(() => {
-        expect(header.state.conflictWindow).toEqual({
-          start: next.start.getTime() / 1000,
-          end: next.end.getTime() / 1000,
-        });
-        expect(conflictLines().map((l) => l.split(' (')[0])).toEqual(['This week']);
+        expect(header.state.conflictWindow).toEqual(NEXT);
+        expect([lookUp().start, lookUp().end]).toEqual([NEXT.start, NEXT.end]);
         // The header shows the series' first date, so each line names the day it checked.
-        expect(conflictLines()[0]).toContain(`(${moment(next.start).format('dddd, MMMM Do')}, `);
-      });
-    });
-
-    it('gives only times when the clash is on the day shown', function () {
-      mount({
-        events: [],
-        calendars: [mine],
-        nearby: [busyAt('Standup', mine.id, '20260301T143000Z', '20260301T150000Z')],
-      });
-      runs(() => {
-        expect(conflictLines()).toEqual(['Standup (8:30 am - 9:00 am)']);
+        expect(conflictLines()[0]).toContain(
+          `(${moment.unix(NEXT.start).format('dddd, MMMM Do')}, `
+        );
       });
     });
 
     it('shows no conflicts on a reply, where we picked the slot ourselves', function () {
       fs.writeFileSync(icsPath, INVITE.replace('METHOD:REQUEST', 'METHOD:REPLY'));
-      mount({
-        events: [],
-        calendars: [mine],
-        nearby: [busyAt('Standup', mine.id, '20260301T143000Z', '20260301T150000Z')],
-      });
+      mount({ events: [], calendars: [mine] });
+      waitsFor(() => header.state.conflicts && header.state.conflicts.length > 0);
       runs(() => {
-        expect(header.state.conflicts.length).toBe(1);
         expect(
           ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'event-conflicts').length
         ).toBe(0);
@@ -705,13 +690,9 @@ describe('EventHeader answering an invitation', function () {
 
     it('does not bother with conflicts on a cancellation', function () {
       fs.writeFileSync(icsPath, INVITE.replace('METHOD:REQUEST', 'METHOD:CANCEL'));
-      mount({
-        events: [],
-        calendars: [mine],
-        nearby: [busyAt('Standup', mine.id, '20260301T143000Z', '20260301T150000Z')],
-      });
+      mount({ events: [], calendars: [mine] });
+      waitsFor(() => header.state.conflicts && header.state.conflicts.length > 0);
       runs(() => {
-        expect(header.state.conflicts.length).toBe(1);
         expect(
           ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'event-conflicts').length
         ).toBe(0);
@@ -719,37 +700,16 @@ describe('EventHeader answering an invitation', function () {
     });
 
     it('follows the calendar copy when it has moved the next occurrence of a series', function () {
-      const series = INVITE.replace(
-        'DTSTART:20260301T140000Z\r\nDTEND:20260301T150000Z',
-        'DTSTART:20260301T140000Z\r\nDTEND:20260301T150000Z\r\nRRULE:FREQ=WEEKLY'
-      );
-      fs.writeFileSync(icsPath, series);
-      const next = ICSEventHelpers.upcomingOccurrence(series, new Date());
-      const stamp = (d: Date) => d.toISOString().replace(/[-:]|\.\d{3}/g, '');
-      const later = (d: Date) => new Date(d.getTime() + 2 * 3600 * 1000);
+      fs.writeFileSync(icsPath, SERIES);
       const copy = synced.clone();
-      copy.ics = series
-        .replace('METHOD:REQUEST\r\n', '')
-        .replace(
-          'END:VCALENDAR',
-          [
-            'BEGIN:VEVENT',
-            'UID:meeting-uid@example.com',
-            `RECURRENCE-ID:${stamp(next.start)}`,
-            `DTSTART:${stamp(later(next.start))}`,
-            `DTEND:${stamp(later(next.end))}`,
-            'SUMMARY:Kickoff (this week later)',
-            'DTSTAMP:20260101T000000Z',
-            'END:VEVENT',
-            'END:VCALENDAR',
-          ].join('\r\n')
-        );
-      mount({ events: [copy], calendars: [mine], nearby: [] });
+      copy.ics = SERIES.replace('METHOD:REQUEST\r\n', '').replace('Kickoff', 'Kickoff (copy)');
+      const later = { start: NEXT.start + 7200, end: NEXT.end + 7200, isAllDay: false };
+      engine.expand.upcoming = (ics) =>
+        ics === copy.ics ? later : ics === SERIES ? { ...NEXT, isAllDay: false } : null;
+      mount({ events: [copy], calendars: [mine] });
+      waitsFor(() => !!header.state.conflictWindow);
       runs(() => {
-        expect(header.state.conflictWindow).toEqual({
-          start: later(next.start).getTime() / 1000,
-          end: later(next.end).getTime() / 1000,
-        });
+        expect(header.state.conflictWindow).toEqual({ start: later.start, end: later.end });
       });
     });
 
@@ -778,27 +738,27 @@ describe('EventHeader answering an invitation', function () {
           'END:VCALENDAR',
         ].join('\r\n')
       );
-      mount({
-        events: [series],
-        calendars: [mine],
-        nearby: [
-          busyAt('At the emailed time', mine.id, '20260308T140000Z', '20260308T150000Z'),
-          busyAt('At the moved time', mine.id, '20260308T163000Z', '20260308T170000Z'),
-        ],
-      });
+      engine.expand.conflicts = () => [
+        conflict('At the moved time', '20260308T163000Z', '20260308T170000Z'),
+      ];
+      mount({ events: [series], calendars: [mine] });
+      waitsFor(() => conflictLines().length > 0);
       runs(() => {
         expect(title()).toBe('Kickoff (moved later)');
-        expect(header.state.conflictWindow).toEqual({
+        const window = {
           start: Date.UTC(2026, 2, 8, 16) / 1000,
           end: Date.UTC(2026, 2, 8, 17) / 1000,
-        });
-        expect(nearbyBounds).toEqual(header.state.conflictWindow);
+        };
+        expect(header.state.conflictWindow).toEqual(window);
+        expect({ start: lookUp().start, end: lookUp().end }).toEqual(window);
         expect(conflictLines().map((l) => l.split(' (')[0])).toEqual(['At the moved time']);
       });
     });
 
     it('says nothing when the slot is free', function () {
-      mount({ events: [], calendars: [mine], nearby: [] });
+      engine.expand.conflicts = () => [];
+      mount({ events: [], calendars: [mine] });
+      waitsFor(() => !!lookUp());
       runs(() => {
         expect(
           ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'event-conflicts').length
@@ -825,6 +785,7 @@ describe('EventHeader answering an invitation', function () {
     const COUNTER = OURS.replace('BEGIN:VEVENT', 'METHOD:COUNTER\r\nBEGIN:VEVENT')
       .replace('DTSTART:20260301T140000Z', 'DTSTART:20260301T160000Z')
       .replace('DTEND:20260301T150000Z', 'DTEND:20260301T170000Z');
+    const MOVED = OURS.replace('SUMMARY:Kickoff', 'SUMMARY:Kickoff\r\nSEQUENCE:1');
     const ours = new Event({
       id: 'e-ours',
       accountId: 'a1',
@@ -838,13 +799,16 @@ describe('EventHeader answering an invitation', function () {
       ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'btn-large').find(
         (n) => n.textContent === 'Move event to this time'
       );
-    const lines = (ics: string) => unfold(ics).split(/\r?\n/);
+    const update = () => engine.callsTo('events.update')[0];
 
     beforeEach(function () {
       fs.writeFileSync(icsPath, COUNTER);
+      engine.answers['events.update'] = (params) => ({
+        writes: [{ kind: 'update', eventId: params.eventId, ics: MOVED }],
+      });
     });
 
-    it('shows the proposed time and moves the event to it, as one revision', function () {
+    it('shows the proposed time and moves the event to it, undoably', function () {
       mount({ events: [ours], calendars: [mine], from: 'bo@example.com' });
       runs(() => {
         expect(header.state.icsEvent.startDate.toJSDate().toISOString()).toBe(
@@ -852,14 +816,22 @@ describe('EventHeader answering an invitation', function () {
         );
         expect(destination().textContent).toBe('Your response will be saved to brian@example.com');
         ReactTestUtils.Simulate.click(moveButton());
+      });
+      waitsFor(() => queued.length > 0);
+      runs(() => {
+        expect(update().eventId).toBe('e-ours');
+        expect(update().scope).toBe('all');
+        expect(update().occurrenceStart).toBeUndefined();
+        expect(update().patch).toEqual({
+          start: Date.UTC(2026, 2, 1, 16) / 1000,
+          end: Date.UTC(2026, 2, 1, 17) / 1000,
+          isAllDay: false,
+        });
         const write = queued[0] as SyncbackEventTask;
         expect(write instanceof SyncbackEventTask).toBe(true);
         expect(write.event.id).toBe('e-ours');
-        expect(lines(write.event.ics)).toContain('DTSTART:20260301T160000Z');
-        expect(lines(write.event.ics)).toContain('DTEND:20260301T170000Z');
-        expect(lines(write.event.ics)).toContain('SEQUENCE:1');
-        expect(write.event.recurrenceStart).toBe(Date.UTC(2026, 2, 1, 16) / 1000);
-        expect(write.event.recurrenceEnd).toBe(Date.UTC(2026, 2, 1, 17) / 1000);
+        expect(write.event.ics).toBe(MOVED);
+        expect(write.undoData.ics).toBe(OURS);
       });
     });
 
@@ -877,19 +849,12 @@ describe('EventHeader answering an invitation', function () {
         ).replace('DTEND:20260301T170000Z', 'DTEND:20260308T170000Z')
       );
       mount({ events: [series], calendars: [mine], from: 'bo@example.com' });
+      runs(() => ReactTestUtils.Simulate.click(moveButton()));
+      waitsFor(() => queued.length > 0);
       runs(() => {
-        ReactTestUtils.Simulate.click(moveButton());
-        const write = queued[0] as SyncbackEventTask;
-        const written = lines(write.event.ics);
-        expect(written).toContain('DTSTART:20260301T140000Z');
-        expect(written).toContain('RRULE:FREQ=WEEKLY');
-        expect(written).toContain('RECURRENCE-ID:20260308T140000Z');
-        expect(written).toContain('DTSTART:20260308T160000Z');
-        expect(write.event.recurrenceStart).toBe(series.recurrenceStart);
-        // One revision of the occurrence, none of the series.
-        const [master, exception] = unfold(write.event.ics).split('BEGIN:VEVENT').slice(1);
-        expect(master).not.toContain('SEQUENCE:');
-        expect(exception).toContain('SEQUENCE:1');
+        expect(update().scope).toBe('this');
+        expect(update().occurrenceStart).toBe(Date.UTC(2026, 2, 8, 14) / 1000);
+        expect(update().patch.start).toBe(Date.UTC(2026, 2, 8, 16) / 1000);
       });
     });
 
@@ -906,52 +871,26 @@ describe('EventHeader answering an invitation', function () {
       });
     });
 
-    const ALL_DAY_OURS = OURS.replace(
-      'DTSTART:20260301T140000Z',
-      'DTSTART;VALUE=DATE:20260301'
-    ).replace('DTEND:20260301T150000Z', 'DTEND;VALUE=DATE:20260302');
-    const allDayCounter = (vevent: string) =>
-      ALL_DAY_OURS.replace('BEGIN:VEVENT', 'METHOD:COUNTER\r\nBEGIN:VEVENT').replace(
-        'DTSTART;VALUE=DATE:20260301\r\nDTEND;VALUE=DATE:20260302',
-        vevent
-      );
-
-    it('keeps an all-day meeting on dates when moving it', function () {
-      const allDay = ours.clone();
-      allDay.ics = ALL_DAY_OURS;
-      fs.writeFileSync(
-        icsPath,
-        allDayCounter('DTSTART;VALUE=DATE:20260303\r\nDTEND;VALUE=DATE:20260304')
-      );
-      mount({ events: [allDay], calendars: [mine], from: 'bo@example.com' });
-      runs(() => {
-        ReactTestUtils.Simulate.click(moveButton());
-        const written = lines((queued[0] as SyncbackEventTask).event.ics);
-        expect(written).toContain('DTSTART;VALUE=DATE:20260303');
-        expect(written).toContain('DTEND;VALUE=DATE:20260304');
-      });
-    });
-
     it('keeps an all-day series on dates when moving one occurrence', function () {
+      const ALL_DAY_OURS = OURS.replace(
+        'DTSTART:20260301T140000Z',
+        'DTSTART;VALUE=DATE:20260301'
+      ).replace('DTEND:20260301T150000Z', 'DTEND;VALUE=DATE:20260302\r\nRRULE:FREQ=WEEKLY');
       const allDaySeries = ours.clone();
-      allDaySeries.ics = ALL_DAY_OURS.replace(
-        'DTEND;VALUE=DATE:20260302',
-        'DTEND;VALUE=DATE:20260302\r\nRRULE:FREQ=WEEKLY'
-      );
+      allDaySeries.ics = ALL_DAY_OURS;
       fs.writeFileSync(
         icsPath,
-        allDayCounter(
+        ALL_DAY_OURS.replace('BEGIN:VEVENT', 'METHOD:COUNTER\r\nBEGIN:VEVENT').replace(
+          'DTSTART;VALUE=DATE:20260301\r\nDTEND;VALUE=DATE:20260302\r\nRRULE:FREQ=WEEKLY',
           'RECURRENCE-ID;VALUE=DATE:20260308\r\nDTSTART;VALUE=DATE:20260309\r\nDTEND;VALUE=DATE:20260310'
         )
       );
       mount({ events: [allDaySeries], calendars: [mine], from: 'bo@example.com' });
+      runs(() => ReactTestUtils.Simulate.click(moveButton()));
+      waitsFor(() => queued.length > 0);
       runs(() => {
-        ReactTestUtils.Simulate.click(moveButton());
-        const written = lines((queued[0] as SyncbackEventTask).event.ics);
-        expect(written).toContain('RRULE:FREQ=WEEKLY');
-        expect(written).toContain('RECURRENCE-ID;VALUE=DATE:20260308');
-        expect(written).toContain('DTSTART;VALUE=DATE:20260309');
-        expect(written).toContain('DTEND;VALUE=DATE:20260310');
+        expect(update().scope).toBe('this');
+        expect(update().patch.isAllDay).toBe(true);
       });
     });
 
@@ -984,17 +923,14 @@ describe('EventHeader answering an invitation', function () {
       });
     });
 
-    it('reports a proposal it cannot apply instead of crashing', function () {
-      fs.writeFileSync(
-        icsPath,
-        COUNTER.replace('DTEND:20260301T170000Z', 'DTEND:20260301T150000Z')
-      );
+    it('reports a proposal the engine cannot apply instead of crashing', function () {
+      engine.answers['events.update'] = () => {
+        throw refusal('invalid-params');
+      };
       mount({ events: [ours], calendars: [mine], from: 'bo@example.com' });
-      runs(() => {
-        ReactTestUtils.Simulate.click(moveButton());
-        expect(AppEnv.showErrorDialog).toHaveBeenCalled();
-        expect(queued.length).toBe(0);
-      });
+      runs(() => ReactTestUtils.Simulate.click(moveButton()));
+      waitsFor(() => (AppEnv.showErrorDialog as jasmine.Spy).callCount > 0);
+      runs(() => expect(queued.length).toBe(0));
     });
   });
 });

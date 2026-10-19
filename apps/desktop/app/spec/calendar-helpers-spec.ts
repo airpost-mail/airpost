@@ -1,5 +1,6 @@
 import moment from 'moment';
-import { AccountStore, Actions, SyncbackEventTask, TaskQueue } from 'mailspring-exports';
+import { Actions, SyncbackEventTask, TaskQueue } from 'mailspring-exports';
+import { fakePimEngine, refusal } from './fake-pim-engine';
 import { formatShortTime as shortTime } from '../src/date-format';
 // Import directly from the source file; the plugin isn't registered in mailspring-exports.
 import {
@@ -218,17 +219,27 @@ describe('formatShortTime', function () {
   });
 });
 
-describe('createCalendarEvent and the organizer', function () {
-  const unfold = (ics: string) => ics.replace(/\r\n[ \t]/g, '').split(/\r?\n/);
+// events.create builds the ICS (ORGANIZER and our ATTENDEE once there are guests, TRANSP);
+// crates/ms-pim's tests cover it. This is what the editor asks for and what happens after.
+describe('createCalendarEvent', function () {
+  let engine: ReturnType<typeof fakePimEngine>;
   let queued: any[];
+  const create = () => engine.callsTo('events.create')[0];
 
   beforeEach(function () {
+    engine = fakePimEngine();
+    engine.answers['events.create'] = (params) => ({
+      writes: [{ kind: 'create', calendarId: params.calendarId, ics: 'NEW' }],
+      icsuid: 'new@test',
+    });
     queued = [];
-    spyOn(AccountStore, 'accountForId').andReturn({ emailAddress: 'me@example.com', name: 'Me' });
     spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
     spyOn(Actions, 'focusCalendarEvent');
-    spyOn(SyncbackEventTask, 'forCreating').andCallFake((opts) => opts);
-    spyOn(TaskQueue, 'waitForPerformRemote').andReturn(Promise.resolve());
+    spyOn(AppEnv, 'showErrorDialog');
+    spyOn(TaskQueue, 'waitForPerformRemote').andCallFake((task) => {
+      task.event.id = 'created-row';
+      return Promise.resolve(task);
+    });
   });
 
   const options = (attendees: Array<{ email: string; name?: string }>) => ({
@@ -241,27 +252,49 @@ describe('createCalendarEvent and the organizer', function () {
     attendees,
   });
 
-  it('names the account as organizer and accepted attendee when the event has guests', async function () {
+  it('asks the engine for the event and queues it without the engine queueing it', async function () {
     await createCalendarEvent(options([{ email: 'bo@example.com', name: 'Bo' }]));
-    const lines = unfold(queued[0].event.ics);
-    expect(lines).toContain('ORGANIZER;CN=Me:mailto:me@example.com');
-    expect(lines).toContain('ATTENDEE;CN=Me;PARTSTAT=ACCEPTED:mailto:me@example.com');
+    expect(create().accountId).toBe('acct');
+    expect(create().calendarId).toBe('cal');
+    expect(create().summary).toBe('Kickoff');
+    expect(create().start).toBe(Date.UTC(2026, 2, 1, 14) / 1000);
+    expect(create().end).toBe(Date.UTC(2026, 2, 1, 15) / 1000);
+    expect(create().attendees).toEqual([{ email: 'bo@example.com', name: 'Bo' }]);
+    expect(create().queue).toBe(false);
+    expect(queued.length).toBe(1);
+    expect(queued[0] instanceof SyncbackEventTask).toBe(true);
+    expect(queued[0].calendarId).toBe('cal');
+    expect(queued[0].event.ics).toBe('NEW');
   });
 
-  it('writes the Show As the editor picked', async function () {
+  it('focuses the new event once it is saved', async function () {
+    await createCalendarEvent(options([]));
+    const start = Date.UTC(2026, 2, 1, 14) / 1000;
+    expect(Actions.focusCalendarEvent).toHaveBeenCalledWith({
+      id: `created-row-e${start}`,
+      start,
+    });
+  });
+
+  it('sends the Show As the editor picked', async function () {
     await createCalendarEvent({ ...options([]), transparency: 'TRANSPARENT' });
-    expect(unfold(queued[0].event.ics)).toContain('TRANSP:TRANSPARENT');
+    expect(create().transparency).toBe('TRANSPARENT');
   });
 
   it('makes an all-day event Free and a timed one Busy when no Show As is given', async function () {
     await createCalendarEvent({ ...options([]), isAllDay: true });
     await createCalendarEvent(options([]));
-    expect(unfold(queued[0].event.ics)).toContain('TRANSP:TRANSPARENT');
-    expect(unfold(queued[1].event.ics)).toContain('TRANSP:OPAQUE');
+    const [allDay, timed] = engine.callsTo('events.create');
+    expect(allDay.transparency).toBe('TRANSPARENT');
+    expect(timed.transparency).toBe('OPAQUE');
   });
 
-  it('leaves a private appointment without an organizer', async function () {
+  it('says so, and queues nothing, when the engine refuses', async function () {
+    engine.answers['events.create'] = () => {
+      throw refusal('read-only');
+    };
     await createCalendarEvent(options([]));
-    expect(queued[0].event.ics).not.toContain('ORGANIZER');
+    expect(queued.length).toBe(0);
+    expect(AppEnv.showErrorDialog).toHaveBeenCalled();
   });
 });

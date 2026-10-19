@@ -222,7 +222,31 @@ lazyLoad(`DateUtils`, 'date-utils');
 lazyLoadWithGetter(`imapUtf7`, () => require('../utils/imap-utf7').imapUtf7);
 lazyLoad(`CalendarUtils`, 'calendar-utils');
 lazyLoad(`CalendarDateUtils`, 'calendar-date');
-lazyLoad(`ICSEventHelpers`, 'ics-event-helpers');
+deprecate(
+  `ICSEventHelpers`,
+  {
+    since: '1.32.0',
+    removeIn: '2.0.0',
+    replacement:
+      'the engine builds and edits events (hello.features "calendar-editing"); use Engine.request("events.expand"), "events.create", "events.update" or "events.rsvp"',
+  },
+  () =>
+    // eslint-disable-next-line no-undef
+    new Proxy(
+      {},
+      {
+        // Symbols and `then` stay undefined, so logging or awaiting the stub doesn't throw.
+        get: (_target, name) =>
+          typeof name !== 'string' || name === 'then'
+            ? undefined
+            : () => {
+                throw new Error(
+                  `ICSEventHelpers.${name} is gone: use Engine.request("events.update") and the other events.* methods`
+                );
+              },
+      }
+    )
+);
 lazyLoad(`FsUtils`, 'fs-utils');
 lazyLoad(`CanvasUtils`, 'canvas-utils');
 lazyLoad(`DragDropTypes`, 'drag-drop-types');

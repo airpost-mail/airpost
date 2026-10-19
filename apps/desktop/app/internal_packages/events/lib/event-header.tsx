@@ -15,12 +15,10 @@ import {
   localized,
   DateUtils,
   CalendarUtils,
-  ICSEventHelpers,
   ICSParticipantStatus,
   Message,
   Event,
-  EventRSVPTask,
-  SyncbackEventTask,
+  DatabaseChangeRecord,
   DatabaseStore,
   RegExpUtils,
 } from 'mailspring-exports';
@@ -28,12 +26,14 @@ import ICAL from 'ical.js';
 import {
   resolveRSVPTarget,
   resolveAddTo,
-  planRSVPWrite,
+  rsvpWriteParams,
   conflictCalendarIds,
   counterProposalProblem,
   CounterProposalProblem,
   RSVPTargetResolution,
 } from './rsvp-target';
+import { answerEvent, editEvent, expandEvents, refusalKey } from '../../../src/engine-pim';
+import type { EventTimes } from '../../../src/engine-protocol';
 
 import { findOneIana } from 'windows-iana';
 
@@ -102,6 +102,14 @@ interface CalendarCopy {
   synced: ICAL.Event | null;
 }
 
+interface CopyLookUp {
+  calEvents: Event[];
+  calendars: Calendar[];
+  copy: CalendarCopy;
+  window: { start: number; end: number } | null;
+  conflicts: CalendarConflict[];
+}
+
 interface EventHeaderProps {
   message: Message;
   file: File;
@@ -116,6 +124,8 @@ interface EventHeaderState {
   inviteEvent?: ICAL.Event;
   /** Set when the emailed invitation is about one occurrence of a series, in unix seconds. */
   inviteRecurrenceIdStart?: number;
+  /** The invitation's own times as the engine reads them (events.expand `first`). */
+  inviteTimes?: EventTimes;
   icsMethod?: 'reply' | 'request' | 'cancel' | 'counter';
   /** The synced copy's VEVENT for this invitation when there is one, else the invitation. */
   icsEvent?: ICAL.Event;
@@ -156,6 +166,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     inviteIcs: undefined,
     inviteEvent: undefined,
     inviteRecurrenceIdStart: undefined,
+    inviteTimes: undefined,
     syncedIcs: undefined,
     isOnCalendar: false,
     rsvp: undefined,
@@ -222,19 +233,35 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     const normalizedMethod = ['reply', 'cancel', 'counter'].includes(methodLower)
       ? methodLower
       : 'request';
+    // The engine reads the times: a TZID the file has no VTIMEZONE for is an IANA or Windows
+    // name, which ical.js would read as floating time.
+    const times = await this._timesOf(data);
+    if (!this._mounted) return;
+    const inviteTimes = times ? times.first : undefined;
     this.setState({
       icsEvent: event,
       icsMethod: normalizedMethod as EventHeaderState['icsMethod'],
       inviteIcs: data,
       inviteEvent: event,
-      inviteRecurrenceIdStart: event.recurrenceId
-        ? event.recurrenceId.toJSDate().getTime() / 1000
-        : undefined,
+      inviteTimes,
+      inviteRecurrenceIdStart: inviteTimes
+        ? inviteTimes.recurrenceId
+        : event.recurrenceId
+          ? event.recurrenceId.toJSDate().getTime() / 1000
+          : undefined,
     });
 
     if (this._subscription) {
       this._subscription.dispose();
     }
+    // Anything on our calendars can start or stop clashing with the invitation.
+    const eventChanges = Rx.Observable.create<null>((observer) => {
+      observer.onNext(null);
+      const unlisten = DatabaseStore.listen((record: DatabaseChangeRecord<Event>) => {
+        if (record.objectClass === Event.name) observer.onNext(null);
+      });
+      return Rx.Disposable.create(unlisten);
+    });
     this._subscription = Rx.Observable.combineLatest(
       // Every calendar copy of this UID: it can sit on ours, a room's and a colleague's at once.
       Rx.Observable.fromQuery(
@@ -246,23 +273,60 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
       Rx.Observable.fromQuery(
         DatabaseStore.findAll<Calendar>(Calendar).where({ accountId: message.accountId })
       ),
+      eventChanges,
       (calEvents: Event[], calendars: Calendar[]) => ({ calEvents, calendars })
     )
-      .flatMapLatest(({ calEvents, calendars }) => {
-        const copy = this._copyFor(calEvents, calendars);
-        const window = this._conflictWindowFor(copy);
-        // Bounded by the stored series span, so a handful of rows; findConflicts expands them.
-        return Rx.Observable.fromQuery(
-          DatabaseStore.findAll<Event>(Event).where([
-            Event.attributes.accountId.equal(message.accountId),
-            Event.attributes.recurrenceStart.lessThan(window.end),
-            Event.attributes.recurrenceEnd.greaterThan(window.start),
-          ])
-        ).map((nearby: Event[]) => ({ calEvents, calendars, nearby, copy, window }));
-      })
-      .subscribe(({ calEvents, calendars, nearby, copy, window }) => {
-        if (this._mounted) this._onCalendarCopies(calEvents, calendars, nearby, copy, window);
+      .flatMapLatest(({ calEvents, calendars }) =>
+        Rx.Observable.fromPromise(this._lookUp(calEvents, calendars))
+      )
+      .subscribe((found) => {
+        if (this._mounted && found) this._onCalendarCopies(found);
       });
+  }
+
+  /** `first` and `upcoming` of an ICS, from the engine; null when it can't read it. */
+  async _timesOf(
+    ics: string
+  ): Promise<{ first?: EventTimes | null; upcoming?: EventTimes | null } | null> {
+    try {
+      const nowUnix = Math.floor(Date.now() / 1000);
+      return await expandEvents({
+        accountIds: [this.props.message.accountId],
+        ics,
+        start: 0,
+        end: 0,
+        focus: { now: nowUnix },
+      });
+    } catch (e) {
+      console.warn(`EventHeader: The engine could not read the invitation: ${e.message}`);
+      return null;
+    }
+  }
+
+  /** Our copy of the invitation, the slot it fills and what clashes with that slot. */
+  async _lookUp(calEvents: Event[], calendars: Calendar[]): Promise<CopyLookUp | null> {
+    const copy = this._copyFor(calEvents, calendars);
+    const window = await this._conflictWindowFor(copy);
+    const busy = conflictCalendarIds(
+      calendars,
+      AppEnv.config.get('mailspring.disabledCalendars') || []
+    );
+    let conflicts: CalendarConflict[] = [];
+    if (window && busy.length) {
+      try {
+        const result = await expandEvents({
+          accountIds: [this.props.message.accountId],
+          calendarIds: busy,
+          start: window.start,
+          end: window.end,
+          conflicts: { excludeIcsuid: this.state.inviteEvent.uid },
+        });
+        conflicts = result.conflicts || [];
+      } catch (e) {
+        console.warn(`EventHeader: Could not look for conflicts: ${e.message}`);
+      }
+    }
+    return { calEvents, calendars, copy, window, conflicts };
   }
 
   /** Which copy of the invitation is ours to answer, and its VEVENT for this invitation. */
@@ -287,38 +351,27 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
    * The slot conflicts are checked against: the occurrence the invitation is about, where the
    * calendar copy now has it; else the next occurrence of the series, or the event itself.
    */
-  _conflictWindowFor({ display, synced }: CalendarCopy): { start: number; end: number } {
+  async _conflictWindowFor({
+    display,
+    synced,
+  }: CalendarCopy): Promise<{ start: number; end: number } | null> {
     const unix = (d: Date) => Math.round(d.getTime() / 1000);
-    const shown = synced || this.state.inviteEvent;
-    const upcoming =
-      this.state.inviteRecurrenceIdStart === undefined && this.state.icsMethod !== 'counter'
-        ? ICSEventHelpers.upcomingOccurrence(
-            display ? display.ics : this.state.inviteIcs,
-            new Date()
-          )
-        : null;
-    return upcoming
-      ? { start: unix(upcoming.start), end: unix(upcoming.end) }
-      : { start: unix(shown.startDate.toJSDate()), end: unix(shown.endDate.toJSDate()) };
+    const { inviteRecurrenceIdStart, icsMethod, inviteTimes, inviteIcs } = this.state;
+    if (inviteRecurrenceIdStart === undefined && icsMethod !== 'counter') {
+      const times = await this._timesOf(display ? display.ics : inviteIcs);
+      const upcoming = times && times.upcoming;
+      if (upcoming) return { start: upcoming.start, end: upcoming.end };
+    }
+    if (synced) {
+      return { start: unix(synced.startDate.toJSDate()), end: unix(synced.endDate.toJSDate()) };
+    }
+    return inviteTimes ? { start: inviteTimes.start, end: inviteTimes.end } : null;
   }
 
-  _onCalendarCopies(
-    calEvents: Event[],
-    calendars: Calendar[],
-    nearby: Event[],
-    { rsvp, display, synced }: CalendarCopy,
-    conflictWindow: { start: number; end: number }
-  ) {
+  _onCalendarCopies({ calEvents, calendars, copy, window, conflicts }: CopyLookUp) {
+    const { rsvp, display, synced } = copy;
+    const conflictWindow = window || undefined;
     const addresses = this._accountAddresses();
-    const busy = new Set(
-      conflictCalendarIds(calendars, AppEnv.config.get('mailspring.disabledCalendars') || [])
-    );
-    const conflicts = ICSEventHelpers.findConflicts({
-      events: nearby.filter((e) => busy.has(e.calendarId)),
-      ...conflictWindow,
-      addresses,
-      excludeIcsuid: this.state.inviteEvent.uid,
-    });
     const addTo = resolveAddTo({
       rsvp,
       calendars,
@@ -350,15 +403,6 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
       next.syncedIcs = display.ics;
     }
     this.setState(next as EventHeaderState);
-  }
-
-  /**
-   * What the REPLY is built from: the calendar copy when there is one, except for an
-   * invitation to one occurrence, which the emailed copy describes alone.
-   */
-  _replyIcs(): string {
-    const { inviteIcs, inviteRecurrenceIdStart, syncedIcs } = this.state;
-    return inviteRecurrenceIdStart === undefined && syncedIcs ? syncedIcs : inviteIcs;
   }
 
   /** This account's own address plus any aliases, used to recognise our own calendar. */
@@ -541,54 +585,23 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
 
   // The server re-sends the invitation to the guests when the organizer moves the event, so
   // there is no REQUEST for us to send.
-  _onAcceptProposedTime = () => {
+  _onAcceptProposedTime = async () => {
     const { event: calEvent } = this.state.rsvp.target;
-    const proposed = this.state.inviteEvent;
-    const unix = (t: ICAL.Time) => Math.round(t.toJSDate().getTime() / 1000);
-    const start = unix(proposed.startDate);
-    const end = unix(proposed.endDate);
-    const isAllDay = !!proposed.startDate.isDate;
-
-    let ics: string;
+    const proposed = this.state.inviteTimes;
     try {
-      if (proposed.recurrenceId) {
-        // The counter names one occurrence, so only that one moves.
-        const exception = ICSEventHelpers.createRecurrenceException(
-          calEvent.ics,
-          unix(proposed.recurrenceId),
-          start,
-          end,
-          isAllDay
-        );
-        ics = ICSEventHelpers.bumpEventSequence(exception.masterIcs, exception.recurrenceId);
-      } else {
-        ics = ICSEventHelpers.bumpEventSequence(
-          ICSEventHelpers.updateEventTimes(calEvent.ics, { start, end, isAllDay })
-        );
-      }
+      if (!proposed) throw new Error('the proposed time could not be read');
+      // A counter that names one occurrence moves only that one.
+      await editEvent({
+        event: calEvent,
+        scope: proposed.recurrenceId !== undefined ? 'this' : 'all',
+        occurrenceStart: proposed.recurrenceId,
+        patch: { start: proposed.start, end: proposed.end, isAllDay: proposed.isAllDay },
+        description: localized('Move event'),
+      });
     } catch (e) {
       console.warn(`EventHeader: Could not apply the proposed time: ${e.message}`);
       AppEnv.showErrorDialog(localized("Sorry, we couldn't move this event to the proposed time."));
-      return;
     }
-
-    const event = calEvent.clone();
-    event.ics = ics;
-    if (!proposed.recurrenceId) {
-      event.recurrenceStart = start;
-      event.recurrenceEnd = end;
-    }
-    Actions.queueTask(
-      SyncbackEventTask.forUpdating({
-        event,
-        undoData: {
-          ics: calEvent.ics,
-          recurrenceStart: calEvent.recurrenceStart,
-          recurrenceEnd: calEvent.recurrenceEnd,
-        },
-        description: localized('Move event'),
-      })
-    );
   };
 
   _renderSenderResponse() {
@@ -742,7 +755,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     return <div className="event-rsvp-destination event-rsvp-email-only">{explanation}</div>;
   }
 
-  _onRSVP = (status: ICSParticipantStatus) => {
+  _onRSVP = async (status: ICSParticipantStatus) => {
     const { inviteEvent, inflight } = this.state;
     if (inflight) return; // prevent double clicks
 
@@ -758,58 +771,31 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
       return;
     }
 
-    // EventRSVPTask.forReplying throws if it can't find us as an attendee in the data it's
-    // replying with; catch that here instead of letting it crash the click handler.
-    let task: EventRSVPTask;
+    // The REPLY is built from the mailed invitation, and our answer recorded on the copy that
+    // is certainly ours, or on a new one when we have none (rsvp-target.ts).
+    const { rsvp, addTo, inviteIcs } = this.state;
+    const { accountId, id: messageId } = this.props.message;
+    this.setState({ inflight: status });
     try {
-      task = EventRSVPTask.forReplying({
-        accountId: this.props.message.accountId,
-        messageId: this.props.message.id,
-        icsOriginalData: this._replyIcs(),
-        icsRSVPStatus: status,
-        to: organizerEmail,
+      await answerEvent({
+        accountId,
+        ics: inviteIcs,
+        messageId,
+        status,
+        ...rsvpWriteParams({ rsvp, addTo }),
       });
     } catch (e) {
-      console.warn(`EventHeader: Could not build RSVP reply: ${e.message}`);
+      console.warn(`EventHeader: Could not send the RSVP: ${e.message}`);
+      if (this._mounted) this.setState({ inflight: undefined });
       AppEnv.showErrorDialog(
-        localized(
-          "Sorry, we couldn't find your email address in this event's attendee list, so an RSVP reply could not be sent."
-        )
+        refusalKey(e) === 'not-invited'
+          ? localized(
+              "Sorry, we couldn't find your email address in this event's attendee list, so an RSVP reply could not be sent."
+            )
+          : localized("Sorry, we couldn't send your response to this event.")
       );
-      return;
     }
-
-    this.setState({ inflight: status });
-    Actions.queueTask(task);
-    this._writeRSVPToCalendar(status);
   };
-
-  // Not undoable: the REPLY already sent cannot be retracted (iTIP has no way to).
-  _writeRSVPToCalendar(status: ICSParticipantStatus) {
-    const { rsvp, addTo, inviteIcs, inviteEvent } = this.state;
-    const { accountId } = this.props.message;
-    // _onRSVP has already built the REPLY from this attendee, so it exists.
-    const me = CalendarUtils.selfParticipant(inviteEvent, accountId);
-    const write = planRSVPWrite({
-      rsvp,
-      addTo,
-      status,
-      myEmail: me.email,
-      inviteIcs,
-      inviteEvent,
-      accountId,
-    });
-    if (!write) return;
-    Actions.queueTask(
-      write.kind === 'update'
-        ? SyncbackEventTask.forAnswering({ event: write.event, answer: write.answer })
-        : SyncbackEventTask.forCreating({
-            event: write.event,
-            calendarId: write.calendar.id,
-            accountId,
-          })
-    );
-  }
 }
 
 export default EventHeader;

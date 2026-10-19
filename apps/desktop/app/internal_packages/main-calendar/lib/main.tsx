@@ -112,7 +112,7 @@ async function onShowCalendar(
   if (!focus) return;
   const { icsuid, accountId, recurrenceIdStart } = focus;
   const events = await DatabaseStore.findAll<Event>(Event).where({ icsuid, accountId });
-  const info = focusedEventInfoForEvents(events, Date.now() / 1000, recurrenceIdStart);
+  const info = await focusedEventInfoForEvents(events, Date.now() / 1000, recurrenceIdStart);
   if (info) {
     Actions.focusCalendarEvent(info);
   }

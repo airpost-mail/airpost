@@ -1,6 +1,6 @@
 import React from 'react';
 import { Contact } from 'mailspring-exports';
-import { ContactBase } from './ContactInfoMapping';
+import { ContactBase } from './ContactTypes';
 import { YYMMDDInput } from './YYMMDDInput';
 import { ListEditor } from './ListEditor';
 import { TypeaheadFreeInput } from './TypeaheadFreeInput';

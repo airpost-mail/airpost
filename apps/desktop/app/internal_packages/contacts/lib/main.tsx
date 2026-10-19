@@ -12,7 +12,7 @@ import { ContactList, ContactListSearch } from './ContactList';
 import { ContactDetail } from './ContactDetail';
 import { FoundInMailEnabledBar } from './FoundInMailEnabledBar';
 import { Store } from './Store';
-import { exportContactsToFile, importContactsFromFile } from './VCFImportExport';
+import { exportContactsToFile, importContactsFromFile } from './ContactFiles';
 
 function adjustMenus() {
   const contactMenu: (typeof AppEnv.menu.template)[0] = {
@@ -70,8 +70,8 @@ function resolveImportAccountId(): string | null {
   if ('accountId' in perspective) {
     return perspective.accountId;
   }
-  // Unified view — fall back to the first CardDAV-capable account.
-  const account = AccountStore.accounts().find((a) => a.provider !== 'gmail');
+  // Unified view: the first account. A Google account's cards become People (contacts.import).
+  const account = AccountStore.accounts()[0];
   return account ? account.id : null;
 }
 
@@ -93,10 +93,8 @@ export function activate() {
       } else {
         require('@electron/remote').dialog.showMessageBox({
           type: 'info',
-          title: localized('No Compatible Account'),
-          message: localized(
-            'VCard import requires at least one CardDAV account. Google accounts must be managed via contacts.google.com.'
-          ),
+          title: localized('No Account'),
+          message: localized('Add an account to import contacts into.'),
           buttons: [localized('OK')],
         });
       }

@@ -112,7 +112,7 @@ export class EventRSVPTask extends Task {
     });
   }
 
-  /** Sends the COUNTER that ICSEventHelpers.createCounterProposal built. */
+  /** Sends a COUNTER built elsewhere; events.rsvp with `counter` builds and queues its own. */
   static forProposingNewTime({
     accountId,
     to,

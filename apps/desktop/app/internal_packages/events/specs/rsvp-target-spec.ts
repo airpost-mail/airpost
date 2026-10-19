@@ -1,8 +1,8 @@
-import { Calendar, CalendarUtils, Event } from 'mailspring-exports';
+import { Calendar, Event } from 'mailspring-exports';
 import {
   resolveRSVPTarget,
   resolveAddTo,
-  planRSVPWrite,
+  rsvpWriteParams,
   mayBeAddedToCalendar,
   conflictCalendarIds,
 } from '../lib/rsvp-target';
@@ -338,205 +338,43 @@ describe('mayBeAddedToCalendar', function () {
   });
 });
 
-describe('planRSVPWrite', function () {
-  const INVITE_ICS = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Test//Test//EN',
-    'METHOD:REQUEST',
-    'BEGIN:VEVENT',
-    'UID:meeting-uid@example.com',
-    'DTSTART:20260301T140000Z',
-    'DTEND:20260301T150000Z',
-    'SUMMARY:Kickoff',
-    'DTSTAMP:20260101T000000Z',
-    'ORGANIZER;CN=Ada:mailto:ada@example.com',
-    'ATTENDEE;CN=Ada;ROLE=CHAIR;PARTSTAT=ACCEPTED:mailto:ada@example.com',
-    'ATTENDEE;CN=Brian;ROLE=REQ-PARTICIPANT;RSVP=TRUE;PARTSTAT=NEEDS-ACTION:mailto:brian@example.com',
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].join('\r\n');
-  const inviteEvent = CalendarUtils.parseICSString(INVITE_ICS).event;
-  const synced = new Event({
-    id: 'e-mine',
-    accountId: ACCOUNT_ID,
-    calendarId: MINE.id,
-    icsuid: UID,
-    ics: INVITE_ICS.replace('METHOD:REQUEST\r\n', ''),
-  } as any);
-  const plan = (over: any = {}) =>
-    planRSVPWrite({
-      rsvp: NOT_ON_A_CALENDAR,
-      addTo: MINE,
-      status: 'ACCEPTED',
-      myEmail: 'brian@example.com',
-      inviteIcs: INVITE_ICS,
-      inviteEvent,
-      accountId: ACCOUNT_ID,
-      ...over,
-    });
-  const myLine = (ics: string) =>
-    ics.split(/\r?\n/).find((l) => l.startsWith('ATTENDEE') && l.includes('brian@'));
+// What the engine records for the answer (events.rsvp); the PARTSTAT edits themselves are
+// crates/ms-pim's.
+describe('rsvpWriteParams', function () {
+  const synced = event({ id: 'e-mine', calendarId: MINE.id });
 
-  it('records the answer on our synced copy and leaves the invitation alone', function () {
+  it('answers on our own copy', function () {
     const rsvp = resolveRSVPTarget({ events: [synced], calendars: [MINE], addresses: ADDRESSES });
-    const write = plan({ rsvp, status: 'DECLINED' });
-    if (write.kind !== 'update') throw new Error(`expected an update, got ${write.kind}`);
-    expect(write.event.id).toBe('e-mine');
-    expect(write.answer.email).toBe('brian@example.com');
-    expect(write.answer.status).toBe('DECLINED');
-    expect(write.answer.occurrenceIcs).toBeUndefined();
-    expect(write.event).not.toBe(synced);
-    expect(myLine(write.event.ics)).toContain('PARTSTAT=DECLINED');
-    expect(myLine(synced.ics)).toContain('PARTSTAT=NEEDS-ACTION');
+    expect(rsvpWriteParams({ rsvp, addTo: undefined })).toEqual({ eventId: 'e-mine' });
   });
 
-  it('writes nothing when our copy no longer lists us', function () {
-    const withoutMe = synced.clone();
-    withoutMe.ics = synced.ics.replace(/ATTENDEE[^\r\n]*brian@example.com\r\n/, '');
+  it('adds the invitation to the chosen calendar when we have no copy', function () {
+    expect(rsvpWriteParams({ rsvp: NOT_ON_A_CALENDAR, addTo: MINE })).toEqual({
+      calendarId: MINE.id,
+    });
+  });
+
+  it('writes nothing when no calendar was offered', function () {
+    expect(rsvpWriteParams({ rsvp: NOT_ON_A_CALENDAR, addTo: undefined })).toEqual({
+      write: false,
+    });
+  });
+
+  it('writes nothing when the copies are on calendars we cannot answer on', function () {
     const rsvp = resolveRSVPTarget({
-      events: [withoutMe],
-      calendars: [MINE],
+      events: [
+        event({ id: 'e-room', calendarId: ROOM.id }),
+        event({ id: 'e-shared', calendarId: SHARED.id }),
+      ],
+      calendars: [ROOM, SHARED],
       addresses: ADDRESSES,
     });
-    expect(plan({ rsvp })).toBe(null);
-  });
-
-  it('adds an accepted invitation to the chosen calendar, answered and without its METHOD', function () {
-    const write = plan();
-    if (write.kind !== 'create') throw new Error(`expected a create, got ${write.kind}`);
-    expect(write.calendar.id).toBe(MINE.id);
-    expect(write.event.calendarId).toBe(MINE.id);
-    expect(write.event.icsuid).toBe('meeting-uid@example.com');
-    expect(write.event.recurrenceStart).toBe(Date.UTC(2026, 2, 1, 14) / 1000);
-    expect(write.event.recurrenceEnd).toBe(Date.UTC(2026, 2, 1, 15) / 1000);
-    expect(write.event.ics).not.toContain('METHOD');
-    expect(myLine(write.event.ics)).toContain('PARTSTAT=ACCEPTED');
-    expect(myLine(write.event.ics)).not.toContain('RSVP=TRUE');
-  });
-
-  it('adds a tentative one too', function () {
-    expect(plan({ status: 'TENTATIVE' }).kind).toBe('create');
-  });
-
-  it('does not add a declined invitation', function () {
-    expect(plan({ status: 'DECLINED' })).toBe(null);
-  });
-
-  it('adds nothing when no calendar was offered', function () {
-    expect(plan({ addTo: undefined })).toBe(null);
-  });
-
-  it('adds nothing when the copies are on calendars we cannot answer on', function () {
-    const rsvp = resolveRSVPTarget({
-      events: [event({ id: 'e-h', calendarId: HOLIDAYS.id })],
-      calendars: [HOLIDAYS],
-      addresses: ADDRESSES,
-    });
-    expect(rsvp.problem).toBe('read-only');
-    expect(plan({ rsvp })).toBe(null);
-  });
-
-  it('adds nothing when the invitation does not list us', function () {
-    expect(plan({ myEmail: 'nobody@example.com' })).toBe(null);
+    expect(rsvp.problem).toBe('ambiguous');
+    expect(rsvpWriteParams({ rsvp, addTo: MINE })).toEqual({ write: false });
   });
 
   it('writes nothing before the calendar copies have loaded', function () {
-    expect(plan({ rsvp: undefined })).toBe(null);
-  });
-
-  describe('for an invitation to one occurrence of a series', function () {
-    // The emailed VEVENT names the 15 Sep occurrence; our copy holds the series and that week.
-    const occurrence = (summary: string, dtstart: string) => [
-      'BEGIN:VEVENT',
-      'UID:meeting-uid@example.com',
-      'RECURRENCE-ID:20260915T140000Z',
-      `DTSTART:${dtstart}`,
-      'DTEND:20260915T161500Z',
-      `SUMMARY:${summary}`,
-      'DTSTAMP:20260101T000000Z',
-      'ORGANIZER;CN=Ada:mailto:ada@example.com',
-      'ATTENDEE;CN=Ada;ROLE=CHAIR;PARTSTAT=ACCEPTED:mailto:ada@example.com',
-      'ATTENDEE;CN=Brian;ROLE=REQ-PARTICIPANT;RSVP=TRUE;PARTSTAT=NEEDS-ACTION:mailto:brian@example.com',
-      'END:VEVENT',
-    ];
-    const SERIES_MASTER = [
-      'BEGIN:VEVENT',
-      'UID:meeting-uid@example.com',
-      'DTSTART:20250923T140000Z',
-      'DTEND:20250923T141500Z',
-      'RRULE:FREQ=WEEKLY',
-      'SUMMARY:Huddle',
-      'DTSTAMP:20260101T000000Z',
-      'ORGANIZER;CN=Ada:mailto:ada@example.com',
-      'ATTENDEE;CN=Ada;ROLE=CHAIR;PARTSTAT=ACCEPTED:mailto:ada@example.com',
-      'ATTENDEE;CN=Brian;ROLE=REQ-PARTICIPANT;RSVP=TRUE;PARTSTAT=NEEDS-ACTION:mailto:brian@example.com',
-      'END:VEVENT',
-    ];
-    const vcalendar = (...vevents: string[][]) =>
-      [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//Test//Test//EN',
-        ...vevents.flat(),
-        'END:VCALENDAR',
-      ].join('\r\n');
-    const OCCURRENCE_INVITE = vcalendar(
-      ['METHOD:REQUEST'],
-      occurrence('Huddle', '20260915T150000Z')
-    );
-    const occurrenceEvent = CalendarUtils.parseICSString(OCCURRENCE_INVITE).event;
-    const copyWith = (...vevents: string[][]) =>
-      new Event({
-        id: 'e-mine',
-        accountId: ACCOUNT_ID,
-        calendarId: MINE.id,
-        icsuid: UID,
-        ics: vcalendar(SERIES_MASTER, ...vevents),
-      } as any);
-    // Unfolded first: ical.js folds a long ATTENDEE line at 75 columns (RFC 5545 section 3.1).
-    const myLines = (ics: string) =>
-      ics
-        .replace(/\r\n[ \t]/g, '')
-        .split(/\r?\n/)
-        .filter((l) => l.startsWith('ATTENDEE') && l.includes('brian@'));
-    const planOccurrence = (copy: Event) =>
-      plan({
-        rsvp: resolveRSVPTarget({ events: [copy], calendars: [MINE], addresses: ADDRESSES }),
-        inviteIcs: OCCURRENCE_INVITE,
-        inviteEvent: occurrenceEvent,
-      });
-
-    it("answers on that occurrence's VEVENT of our copy, and leaves the series as it was", function () {
-      const write = planOccurrence(copyWith(occurrence('Huddle (as synced)', '20260915T160000Z')));
-      if (write.kind !== 'update') throw new Error(`expected an update, got ${write.kind}`);
-      expect(write.answer.occurrenceIcs).toBe(OCCURRENCE_INVITE);
-      const [master, synced] = write.event.ics
-        .replace(/\r\n[ \t]/g, '')
-        .split('BEGIN:VEVENT')
-        .slice(1);
-      expect(myLines(master)).toEqual([
-        'ATTENDEE;CN=Brian;ROLE=REQ-PARTICIPANT;RSVP=TRUE;PARTSTAT=NEEDS-ACTION:mailto:brian@example.com',
-      ]);
-      expect(synced).toContain('DTSTART:20260915T160000Z');
-      expect(myLines(synced)[0]).toContain('PARTSTAT=ACCEPTED');
-      expect(myLines(synced)[0]).not.toContain('RSVP=TRUE');
-    });
-
-    it('stores the emailed occurrence as an exception when our copy has none for it', function () {
-      const write = planOccurrence(copyWith());
-      expect(write.kind).toBe('update');
-      const vevents = write.event.ics
-        .replace(/\r\n[ \t]/g, '')
-        .split('BEGIN:VEVENT')
-        .slice(1);
-      expect(vevents.length).toBe(2);
-      expect(myLines(vevents[0])[0]).toContain('PARTSTAT=NEEDS-ACTION');
-      expect(vevents[1]).toContain('RECURRENCE-ID:20260915T140000Z');
-      expect(vevents[1]).toContain('DTSTART:20260915T150000Z');
-      expect(myLines(vevents[1])[0]).toContain('PARTSTAT=ACCEPTED');
-      expect(write.event.ics).not.toContain('METHOD');
-    });
+    expect(rsvpWriteParams({ rsvp: undefined, addTo: MINE })).toEqual({ write: false });
   });
 });
 

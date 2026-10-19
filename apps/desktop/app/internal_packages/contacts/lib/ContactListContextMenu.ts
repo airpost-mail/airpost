@@ -1,6 +1,6 @@
 import { localized, Contact } from 'mailspring-exports';
 import { Store } from './Store';
-import { exportContactsToFile } from './VCFImportExport';
+import { exportContactsToFile } from './ContactFiles';
 import { showGPeopleReadonlyNotice } from './GoogleSupport';
 
 type TemplateItem = { label: string; click: () => void } | { type: 'separator' };

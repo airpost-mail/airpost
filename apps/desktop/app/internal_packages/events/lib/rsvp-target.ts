@@ -1,12 +1,4 @@
-import {
-  Calendar,
-  CalendarUtils,
-  Event,
-  ICSEventHelpers,
-  ICSParticipantStatus,
-  RSVPAnswer,
-  Utils,
-} from 'mailspring-exports';
+import { Calendar, CalendarUtils, Event, Utils } from 'mailspring-exports';
 import ICAL from 'ical.js';
 
 /** Where an RSVP will be recorded, once we're certain which copy of the event is ours. */
@@ -143,67 +135,21 @@ export function resolveAddTo({
   return { choices, addTo };
 }
 
-export type RSVPWrite =
-  | { kind: 'update'; event: Event; answer: RSVPAnswer }
-  | { kind: 'create'; event: Event; calendar: Calendar };
-
 /**
- * The calendar write that records an answer, beside the emailed REPLY: our PARTSTAT on our own
- * copy (RFC 6638 section 3.2.5), on the one occurrence an invitation names where it names one,
- * or the invitation itself when we are attending and have no copy.
+ * What events.rsvp is asked to record beside the emailed REPLY: our own copy when one is
+ * certainly ours, the invitation added to `addTo` when we have none, otherwise nothing (the
+ * engine would otherwise answer whichever copy of the UID it finds first).
  */
-export function planRSVPWrite({
+export function rsvpWriteParams({
   rsvp,
   addTo,
-  status,
-  myEmail,
-  inviteIcs,
-  inviteEvent,
-  accountId,
 }: {
   rsvp: RSVPTargetResolution | undefined;
   addTo: Calendar | undefined;
-  status: ICSParticipantStatus;
-  myEmail: string;
-  inviteIcs: string;
-  inviteEvent: ICAL.Event;
-  accountId: string;
-}): RSVPWrite | null {
-  if (!rsvp) return null;
-
-  if (rsvp.target) {
-    const { event: calEvent } = rsvp.target;
-    // An invitation to one occurrence is answered on that occurrence alone. A Google organizer
-    // takes the answer from this write and ignores the emailed REPLY (measured on #2924), so
-    // writing every VEVENT would accept or decline the whole series.
-    const occurrenceIcs = inviteEvent.component.getFirstPropertyValue('recurrence-id')
-      ? inviteIcs
-      : undefined;
-    const ics = occurrenceIcs
-      ? ICSEventHelpers.updateOccurrenceAttendeeStatus(calEvent.ics, occurrenceIcs, myEmail, status)
-      : ICSEventHelpers.updateAttendeeStatus(calEvent.ics, myEmail, status);
-    if (!ics) return null;
-    const event = calEvent.clone();
-    event.ics = ics;
-    return { kind: 'update', event, answer: { email: myEmail, status, occurrenceIcs } };
-  }
-
-  // Declining leaves the event off our calendar, as Google does.
-  const attending = status === 'ACCEPTED' || status === 'TENTATIVE';
-  if (!attending || rsvp.problem !== 'not-on-a-calendar' || !addTo) return null;
-
-  const answered = ICSEventHelpers.updateAttendeeStatus(inviteIcs, myEmail, status);
-  if (!answered) return null;
-  const event = new Event({
-    calendarId: addTo.id,
-    accountId,
-    // A stored event must not carry the invitation's METHOD (RFC 4791 section 4.1).
-    ics: ICSEventHelpers.stripITIPMethod(answered),
-    icsuid: inviteEvent.uid,
-    recurrenceStart: Math.round(inviteEvent.startDate.toJSDate().getTime() / 1000),
-    recurrenceEnd: Math.round(inviteEvent.endDate.toJSDate().getTime() / 1000),
-  });
-  return { kind: 'create', event, calendar: addTo };
+}): { eventId?: string; calendarId?: string; write?: boolean } {
+  if (rsvp && rsvp.target) return { eventId: rsvp.target.event.id };
+  if (rsvp && rsvp.problem === 'not-on-a-calendar' && addTo) return { calendarId: addTo.id };
+  return { write: false };
 }
 
 /** Why a counter-proposal that arrived by email may not be applied to our copy. */

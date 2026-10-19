@@ -2,12 +2,9 @@ import moment from 'moment';
 import { formatShortTime as shortTime } from '../../../../src/date-format';
 import {
   Utils,
-  AccountStore,
   Calendar,
   Actions,
   DateUtils,
-  Event,
-  ICSEventHelpers,
   SyncbackEventTask,
   TaskQueue,
   localized,
@@ -15,8 +12,9 @@ import {
 } from 'mailspring-exports';
 import { ShowAsOption, defaultShowAs } from './show-as-selector';
 import { MIN_EVENT_DURATION_SECONDS } from './calendar-constants';
-import { EventOccurrence, coveredDates, isTimed } from './calendar-data-source';
+import { EventOccurrence, coveredDates, isTimed, occurrenceId } from './calendar-data-source';
 import { dayFraction } from './week-view-helpers';
+import { createEvent } from '../../../../src/engine-pim';
 
 // Cache of calendar colors synced from CalDAV servers
 const calendarColorCache: Map<string, string> = new Map();
@@ -470,55 +468,44 @@ export interface CreateCalendarEventOptions {
   transparency?: ShowAsOption;
 }
 
-/** The account, as the ORGANIZER the ICS helpers name once an event has guests. */
-export function organizerForAccount(
-  accountId: string
-): { email: string; name?: string } | undefined {
-  const account = AccountStore.accountForId(accountId);
-  return account ? { email: account.emailAddress, name: account.name } : undefined;
-}
-
 /**
  * Create a new calendar event, queue the syncback task, and focus the event.
- * Shared by CalendarEventPopover and QuickEventPopover.
+ * Shared by CalendarEventPopover and QuickEventPopover. The engine builds the ICS
+ * (events.create), with the account as ORGANIZER once the event has guests.
  */
 export async function createCalendarEvent(options: CreateCalendarEventOptions): Promise<void> {
-  const icsuid = ICSEventHelpers.generateUID();
-  const ics = ICSEventHelpers.createICSString({
-    uid: icsuid,
-    summary: options.summary,
-    start: options.start,
-    end: options.end,
-    isAllDay: options.isAllDay,
-    timezone: options.timezone || DateUtils.timeZone,
-    description: options.description,
-    location: options.location,
-    organizer: organizerForAccount(options.accountId),
-    attendees: options.attendees,
-    recurrenceRule: options.recurrenceRule,
-    transparency: options.transparency ?? defaultShowAs(options.isAllDay),
-  });
-
-  const event = new Event({
-    calendarId: options.calendarId,
-    accountId: options.accountId,
-    ics,
-    icsuid,
-    recurrenceStart: Math.floor(options.start.getTime() / 1000),
-    recurrenceEnd: Math.floor(options.end.getTime() / 1000),
-  });
-  event.title = options.summary;
-
-  const task = SyncbackEventTask.forCreating({
-    event,
-    calendarId: options.calendarId,
-    accountId: options.accountId,
-  });
-  Actions.queueTask(task);
+  const start = Math.floor(options.start.getTime() / 1000);
+  const end = Math.floor(options.end.getTime() / 1000);
+  let task: SyncbackEventTask;
+  try {
+    ({ task } = await createEvent({
+      accountId: options.accountId,
+      calendarId: options.calendarId,
+      summary: options.summary,
+      start,
+      end,
+      isAllDay: options.isAllDay,
+      timezone: options.timezone || DateUtils.timeZone,
+      description: options.description,
+      location: options.location,
+      attendees: options.attendees,
+      recurrenceRule: options.recurrenceRule,
+      transparency: options.transparency ?? defaultShowAs(options.isAllDay),
+    }));
+  } catch (error) {
+    console.error('Failed to create the event:', error);
+    AppEnv.showErrorDialog({
+      title: localized('Unable to save event'),
+      message: localized('Failed to create the event. Please try again.'),
+    });
+    return;
+  }
 
   try {
-    await TaskQueue.waitForPerformRemote(task);
-    Actions.focusCalendarEvent({ id: event.id, start: event.recurrenceStart });
+    // The engine gives the new row its id in the task's local phase.
+    const done = await TaskQueue.waitForPerformRemote(task);
+    const eventId = done.event && done.event.id;
+    if (eventId) Actions.focusCalendarEvent({ id: occurrenceId(eventId, start), start });
   } catch (error) {
     console.error('Failed to sync new event to server:', error);
   }

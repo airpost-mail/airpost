@@ -1,10 +1,11 @@
-import { Actions, DatabaseStore, SyncbackEventTask } from 'mailspring-exports';
+import { Actions } from 'mailspring-exports';
 import moment from 'moment';
 import { Event as MailspringEvent } from '../src/flux/models/event';
 import { CalendarEventPopover } from '../internal_packages/main-calendar/lib/core/calendar-event-popover';
 import { TimedOccurrence } from '../internal_packages/main-calendar/lib/core/calendar-data-source';
+import { fakePimEngine } from './fake-pim-engine';
 
-// A one-hour meeting, not recurring, so the save takes the absolute updateEventTimes path.
+// A one-hour meeting, not recurring, so the save sends absolute times.
 const START = moment('2026-03-10 10:00', 'YYYY-MM-DD HH:mm').unix();
 const END = moment('2026-03-10 11:00', 'YYYY-MM-DD HH:mm').unix();
 
@@ -52,33 +53,33 @@ function makeOccurrence(): TimedOccurrence {
   } as TimedOccurrence;
 }
 
-async function openEditor(event: MailspringEvent) {
+async function openEditor() {
   const popover: any = new CalendarEventPopover({
     event: makeOccurrence(),
     onEdit: () => {},
     onDelete: () => {},
   } as any);
   popover.setState = (update: object) => Object.assign(popover.state, update);
-  spyOn(DatabaseStore, 'find').andReturn(Promise.resolve(event));
   await popover.onEdit();
   return popover;
 }
 
-function lineOf(ics: string, prop: string) {
-  return (new RegExp(`^${prop}[;:].*$`, 'm').exec(ics) || [])[0];
-}
-
-// The toggle leaves state.start and state.end at their wall-clock values, and two independent
-// normalizers keep that out of the ICS: shiftEndWithStart's all-day branch, and
-// createAllDayEndTime, which rolls end-1ms to the next day. These assert the written span, so
-// they survive either one being removed and fail when both are.
+// The toggle leaves state.start and state.end at their wall-clock values; shiftEndWithStart's
+// all-day branch keeps the span, and the engine writes the DATEs, rolling the last second over
+// to the next day (crates/ms-pim's desktop corpus has these rows with the DATEs written). The
+// days the patch covers are checked here: from the start's day to the day of its last second.
 describe('CalendarEventPopover all-day toggle', function () {
-  let queued: any[];
+  let engine: ReturnType<typeof fakePimEngine>;
+  const patch = () => engine.callsTo('events.update')[0].patch;
+  const days = () => [
+    moment.unix(patch().start).format('YYYYMMDD'),
+    moment.unix(patch().end - 1).add(1, 'day').format('YYYYMMDD'),
+  ];
 
   beforeEach(function () {
-    queued = [];
-    spyOn(Actions, 'queueTask').andCallFake((task) => queued.push(task));
-    spyOn(SyncbackEventTask, 'forUpdating').andCallFake((opts) => opts);
+    engine = fakePimEngine();
+    engine.answers['events.update'] = () => ({ writes: [] });
+    spyOn(Actions, 'queueTask');
   });
 
   // Each row toggles all-day on from a timed event, then moves the start, and asserts the
@@ -116,31 +117,25 @@ describe('CalendarEventPopover all-day toggle', function () {
     },
   ].forEach(({ what, to, dtstart, dtend }) => {
     it(`writes one whole day when ${what}`, async function () {
-      const event = makeEvent();
-      const popover = await openEditor(event);
+      const popover = await openEditor();
 
       popover.updateField('allDay', true);
       popover.updateStart(moment(to, 'YYYY-MM-DD HH:mm').unix());
-      popover._saveAllOccurrences(event);
+      await popover._saveAllOccurrences(makeEvent(), false);
 
-      const ics = queued[0].event.ics;
-      expect(`${lineOf(ics, 'DTSTART')} ${lineOf(ics, 'DTEND')}`).toBe(
-        `DTSTART;VALUE=DATE:${dtstart} DTEND;VALUE=DATE:${dtend}`
-      );
+      expect(patch().isAllDay).toBe(true);
+      expect(days()).toEqual([dtstart, dtend]);
     });
   });
 
   it('keeps a three-day span three days long', async function () {
-    const event = makeEvent();
-    const popover = await openEditor(event);
+    const popover = await openEditor();
 
     popover.updateEnd(moment('2026-03-12 11:00', 'YYYY-MM-DD HH:mm').unix());
     popover.updateField('allDay', true);
     popover.updateStart(moment('2026-03-17 10:00', 'YYYY-MM-DD HH:mm').unix());
-    popover._saveAllOccurrences(event);
+    await popover._saveAllOccurrences(makeEvent(), false);
 
-    const ics = queued[0].event.ics;
-    expect(lineOf(ics, 'DTSTART')).toBe('DTSTART;VALUE=DATE:20260317');
-    expect(lineOf(ics, 'DTEND')).toBe('DTEND;VALUE=DATE:20260320');
+    expect(days()).toEqual(['20260317', '20260320']);
   });
 });

@@ -867,166 +867,34 @@ END:VCALENDAR`;
     });
   });
 
-  describe('SEQUENCE across undo and redo', function () {
-    it('never sends an undo or redo below the SEQUENCE last sent', function () {
+  // What `restore` does with the snapshot (SEQUENCE no lower than the stored copy's, overrides
+  // added since put back) is crates/ms-pim plan::restore's tests.
+  describe('undo and redo against the copy stored when they run', function () {
+    it('asks the engine to restore the snapshot over that copy', function () {
       const event = makeEvent({ id: 'undo-redo-event', ics: SAMPLE_ICS_NEW } as any);
       const undoData = { ics: SAMPLE_ICS_ORIGINAL, recurrenceStart: 1000, recurrenceEnd: 2000 };
       const move = SyncbackEventTask.forUpdating({ event, undoData });
+      expect(move.restore).toBeFalsy();
 
-      const undo = revisionOf(move.createUndoTask().event.ics);
-      const redo = revisionOf(move.createIdenticalTask().event.ics);
-      const undoAgain = revisionOf(move.createUndoTask().event.ics);
+      const undo = move.createUndoTask();
+      expect(undo.restore).toBe(true);
+      expect(typeof undo.tz).toBe('string');
+      expect(revisionOf(undo.event.ics)).toEqual({ start: '2026-10-08T13:00:00Z', sequence: 1 });
 
-      expect(undo).toEqual({ start: '2026-10-08T13:00:00Z', sequence: 2 });
-      expect(redo).toEqual({ start: '2026-10-08T13:15:00Z', sequence: 2 });
-      expect(undoAgain).toEqual({ start: '2026-10-08T13:00:00Z', sequence: 2 });
+      const redo = move.createIdenticalTask();
+      expect(redo.restore).toBe(true);
+      expect(revisionOf(redo.event.ics)).toEqual({ start: '2026-10-08T13:15:00Z', sequence: 2 });
     });
 
-    it("undoes two moves of one event at the later move's SEQUENCE", function () {
-      const event = makeEvent({ id: 'two-moves-event', ics: SAMPLE_ICS_NEW } as any);
-      const first = SyncbackEventTask.forUpdating({
+    it('carries restore and tz to the engine', function () {
+      const event = makeEvent({ ics: SAMPLE_ICS_NEW } as any);
+      const move = SyncbackEventTask.forUpdating({
         event,
         undoData: { ics: SAMPLE_ICS_ORIGINAL, recurrenceStart: 1000, recurrenceEnd: 2000 },
       });
-      const movedAgain = makeEvent({ id: 'two-moves-event', ics: eventIcs('1330', 3) } as any);
-      const second = SyncbackEventTask.forUpdating({
-        event: movedAgain,
-        undoData: { ics: SAMPLE_ICS_NEW, recurrenceStart: 1000, recurrenceEnd: 2000 },
-      });
-
-      const undoSecond = revisionOf(second.createUndoTask().event.ics);
-      const undoFirst = revisionOf(first.createUndoTask().event.ics);
-
-      expect(undoSecond).toEqual({ start: '2026-10-08T13:15:00Z', sequence: 3 });
-      expect(undoFirst).toEqual({ start: '2026-10-08T13:00:00Z', sequence: 3 });
-    });
-
-    it('undoes an edit at the SEQUENCE of an answer queued after it', function () {
-      // The organizer's update reached our copy at SEQUENCE 3, and our answer was written on it.
-      const event = makeEvent({ id: 'answered-event', ics: SAMPLE_ICS_NEW } as any);
-      const edit = SyncbackEventTask.forUpdating({
-        event,
-        undoData: { ics: SAMPLE_ICS_ORIGINAL, recurrenceStart: 1000, recurrenceEnd: 2000 },
-      });
-      SyncbackEventTask.forAnswering({
-        event: makeEvent({ id: 'answered-event', ics: eventIcs('1315', 3) } as any),
-        answer: { email: 'me@example.com', status: 'ACCEPTED' },
-      });
-
-      expect(revisionOf(edit.createUndoTask().event.ics)).toEqual({
-        start: '2026-10-08T13:00:00Z',
-        sequence: 3,
-      });
-    });
-  });
-
-  describe('undo and redo against the copy last queued', function () {
-    // A daily series at 13:00Z, with optional overrides ([RECURRENCE-ID time, start time, SEQUENCE])
-    // and EXDATEs.
-    const seriesIcs = (
-      overrides: [string, string, number][] = [],
-      exdate = '',
-      summary = 'Test series'
-    ) =>
-      [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//Test//Test//EN',
-        'BEGIN:VEVENT',
-        'UID:series-uid@test',
-        'DTSTART:20261008T130000Z',
-        'DTEND:20261008T140000Z',
-        'RRULE:FREQ=DAILY',
-        ...(exdate ? [`EXDATE:${exdate}`] : []),
-        `SUMMARY:${summary}`,
-        'DTSTAMP:20261001T000000Z',
-        'SEQUENCE:0',
-        'END:VEVENT',
-        ...overrides.flatMap(([rid, start, sequence]) => [
-          'BEGIN:VEVENT',
-          'UID:series-uid@test',
-          `RECURRENCE-ID:${rid}`,
-          `DTSTART:${start}`,
-          `DTEND:${start.replace(/T(\d\d)/, (_, h) => `T${String(+h + 1).padStart(2, '0')}`)}`,
-          'SUMMARY:Test series',
-          'DTSTAMP:20261001T000000Z',
-          `SEQUENCE:${sequence}`,
-          'END:VEVENT',
-        ]),
-        'END:VCALENDAR',
-      ].join('\r\n');
-    const overridesOf = (ics: string) =>
-      parseICSString(ics)
-        .root.getAllSubcomponents('vevent')
-        .filter((v) => v.getFirstPropertyValue('recurrence-id'))
-        .map((v) => [
-          v.getFirstPropertyValue('recurrence-id').toString(),
-          v.getFirstPropertyValue('dtstart').toString(),
-          v.getFirstPropertyValue('sequence'),
-        ]);
-    const snapshot = (ics: string) => ({ ics, recurrenceStart: 1000, recurrenceEnd: 2000 });
-    const queue = (id: string, ics: string, undoIcs?: string) =>
-      SyncbackEventTask.forUpdating({
-        event: makeEvent({ id, ics } as any),
-        undoData: undoIcs ? snapshot(undoIcs) : undefined,
-      });
-
-    it('reverts an occurrence through two undos, the second a series edit', function () {
-      // Rename the series, then move one occurrence; undoing both must bring that occurrence back
-      // to the old title, though the rename never touched it.
-      const rid = '20261009T130000Z';
-      const original = seriesIcs();
-      const renamed = seriesIcs([], '', 'Renamed series');
-      const moved = seriesIcs([[rid, '20261009T150000Z', 1]], '', 'Renamed series');
-      const rename = queue('rename-chain', renamed, original);
-      const move = queue('rename-chain', moved, renamed);
-      move.createUndoTask();
-      const undone = parseICSString(rename.createUndoTask().event.ics).root.getAllSubcomponents(
-        'vevent'
-      );
-      expect(
-        undone.map((v) => [
-          v.getFirstPropertyValue('recurrence-id')?.toString() ?? null,
-          v.getFirstPropertyValue('summary'),
-        ])
-      ).toEqual([
-        [null, 'Test series'],
-        ['2026-10-09T13:00:00Z', 'Test series'],
-      ]);
-
-      const redone = parseICSString(
-        rename.createIdenticalTask().event.ics
-      ).root.getAllSubcomponents('vevent');
-      expect(redone.map((v) => v.getFirstPropertyValue('summary'))).toEqual([
-        'Renamed series',
-        'Renamed series',
-      ]);
-    });
-
-    it('redoes the first of two undone moves at the later SEQUENCE', function () {
-      const first = queue('two-undos', eventIcs('1315', 2), SAMPLE_ICS_ORIGINAL);
-      const second = queue('two-undos', eventIcs('1330', 3), eventIcs('1315', 2));
-      second.createUndoTask();
-      first.createUndoTask();
-      expect(revisionOf(first.createIdenticalTask().event.ics)).toEqual({
-        start: '2026-10-08T13:15:00Z',
-        sequence: 3,
-      });
-    });
-
-    it('measures an undo against the undo queued before it', function () {
-      // Edit an override (SEQUENCE 1 to 2), then cancel that occurrence, then undo both. The
-      // second undo's override has no counterpart in the cancelling copy, only in the first undo.
-      const rid = '20261009T130000Z';
-      const original = seriesIcs([[rid, '20261009T150000Z', 1]]);
-      const edited = seriesIcs([[rid, '20261009T160000Z', 2]]);
-      const cancelled = seriesIcs([], rid);
-      const edit = queue('undo-chain', edited, original);
-      const cancel = queue('undo-chain', cancelled, edited);
-      cancel.createUndoTask();
-      expect(overridesOf(edit.createUndoTask().event.ics)).toEqual([
-        ['2026-10-09T13:00:00Z', '2026-10-09T15:00:00Z', 2],
-      ]);
+      const json = move.createUndoTask().toJSON();
+      expect(json.restore).toBe(true);
+      expect(json.tz).toBeTruthy();
     });
   });
 

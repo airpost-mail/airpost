@@ -1,23 +1,18 @@
 import {
   AccountStore,
   Actions,
-  Calendar,
   CalendarUtils,
   DatabaseStore,
   Event,
-  EventRSVPTask,
-  ICSEventHelpers,
   ICSParticipantStatus,
-  SyncbackEventTask,
   localized,
 } from 'mailspring-exports';
 import React from 'react';
-import ICAL from 'ical.js';
 import { ProposeTimePopover } from 'mailspring-component-kit';
 import { EventOccurrence, occurrenceStartUnix, occurrenceEndUnix } from './calendar-data-source';
 import { parseEventIdFromOccurrence } from './calendar-drag-utils';
-import { formatCalendarDate } from '../../../../src/calendar-date';
 import { showRecurringEventDialog } from './recurring-event-dialog';
+import { answerEvent, refusalKey } from '../../../../src/engine-pim';
 
 /** Whether this occurrence is an invitation we can answer, rather than one we sent. */
 export function canRespondToEvent(occurrence: EventOccurrence): boolean {
@@ -58,7 +53,7 @@ export function myParticipationStatus(occurrence: EventOccurrence): string | nul
  * and an emailed REPLY to the organizer, which goes even when the copy cannot be written. On a
  * series it first asks, as Google Calendar and Delete do, whether the answer is for this
  * occurrence or for all of them; one occurrence is answered on its own VEVENT and in a REPLY
- * that names it (RFC 5546 section 3.2.3).
+ * that names it (RFC 5546 section 3.2.3). The engine builds both (events.rsvp).
  */
 export async function respondToCalendarEvent(
   occurrence: EventOccurrence,
@@ -70,17 +65,7 @@ export async function respondToCalendarEvent(
     console.warn(`Calendar RSVP: could not find event ${eventId}`);
     return;
   }
-
-  let parsed: ReturnType<typeof CalendarUtils.parseICSString>;
-  try {
-    parsed = CalendarUtils.parseICSString(event.ics);
-  } catch (e) {
-    AppEnv.showErrorDialog(localized("Sorry, this event's data could not be read."));
-    return;
-  }
-
-  const me = CalendarUtils.selfParticipant(parsed.event, event.accountId);
-  if (!me) {
+  if (!myAttendeeEmail(occurrence)) {
     AppEnv.showErrorDialog(
       localized("You're not on this event's guest list, so there's no RSVP to give.")
     );
@@ -88,64 +73,43 @@ export async function respondToCalendarEvent(
   }
 
   let thisOccurrenceOnly = false;
-  if (parsed.event.isRecurring() && !event.isRecurrenceException()) {
+  if (occurrence.isRecurring && !event.isRecurrenceException()) {
     const choice = await showRecurringEventDialog('answer', occurrence.title);
     if (choice === 'cancel') return;
     thisOccurrenceOnly = choice === 'this-occurrence';
   }
-  // What the answer is about: the one occurrence's VEVENT, or the whole stored object.
-  const answered = thisOccurrenceOnly
-    ? ICSEventHelpers.occurrenceIcs(event.ics, occurrenceRecurrenceId(occurrence))
-    : event.ics;
-
-  // A calendar the server named as somebody else's holds their event, not ours; the invitation
-  // header refuses the same copy through resolveRSVPTarget.
-  const calendar = await DatabaseStore.find<Calendar>(Calendar, event.calendarId);
-  const writable =
-    calendar && !calendar.readOnly && !CalendarUtils.isSomeoneElsesCalendar(calendar);
-  if (writable) {
-    const ics = thisOccurrenceOnly
-      ? ICSEventHelpers.updateOccurrenceAttendeeStatus(event.ics, answered, me.email, status)
-      : ICSEventHelpers.updateAttendeeStatus(event.ics, me.email, status);
-    if (ics) {
-      const updated = event.clone();
-      updated.ics = ics;
-      const answer = {
-        email: me.email,
-        status,
-        occurrenceIcs: thisOccurrenceOnly ? answered : undefined,
-      };
-      Actions.queueTask(SyncbackEventTask.forAnswering({ event: updated, answer }));
-    }
-  }
-
-  const organizerEmail = CalendarUtils.emailFromParticipantURI(parsed.event.organizer);
-  if (!organizerEmail) return; // nothing to tell - an event with no organizer isn't scheduled
 
   try {
-    Actions.queueTask(
-      EventRSVPTask.forReplying({
-        accountId: event.accountId,
-        icsOriginalData: answered,
-        icsRSVPStatus: status,
-        to: organizerEmail,
-      })
-    );
+    await answerEvent({
+      accountId: event.accountId,
+      eventId: event.id,
+      status,
+      occurrenceStart: thisOccurrenceOnly ? occurrenceSlot(occurrence) : undefined,
+    });
   } catch (e) {
-    console.warn(`Calendar RSVP: could not build the reply: ${e.message}`);
+    showRefusal(e, localized("You're not on this event's guest list, so there's no RSVP to give."));
   }
 }
 
-/**
- * What RECURRENCE-ID names this occurrence: its original start, as a DATE for an all-day
- * series. Null for an event that does not repeat.
- */
-export function occurrenceRecurrenceId(occurrence: EventOccurrence): ICAL.Time | null {
-  if (!occurrence.isRecurring && !occurrence.isException) return null;
-  const originalStart = occurrence.recurrenceIdStart ?? occurrenceStartUnix(occurrence);
-  return occurrence.isAllDay
-    ? ICAL.Time.fromDateString(formatCalendarDate(occurrence.startDate))
-    : ICAL.Time.fromJSDate(new Date(originalStart * 1000), true);
+/** The slot an occurrence fills: its RECURRENCE-ID instant, else its start. */
+export function occurrenceSlot(occurrence: EventOccurrence): number {
+  return occurrence.recurrenceIdStart ?? occurrenceStartUnix(occurrence);
+}
+
+function showRefusal(err: any, notInvited: string) {
+  const key = refusalKey(err);
+  if (key === 'not-invited') {
+    AppEnv.showErrorDialog(notInvited);
+  } else if (key === 'no-organizer') {
+    AppEnv.showErrorDialog(
+      localized("This event has no organizer, so there's nobody to propose a new time to.")
+    );
+  } else if (key === 'invalid-ics') {
+    AppEnv.showErrorDialog(localized("Sorry, this event's data could not be read."));
+  } else {
+    console.warn(`Calendar RSVP: ${err.message}`);
+    AppEnv.showErrorDialog(localized("Sorry, we couldn't send your response to this event."));
+  }
 }
 
 /**
@@ -163,60 +127,31 @@ export async function proposeNewTimeForCalendarEvent(
     console.warn(`Calendar counter-proposal: could not find event ${eventId}`);
     return;
   }
+  const notInvited = localized(
+    "You're not on this event's guest list, so there's no new time to propose."
+  );
+  if (!myAttendeeEmail(occurrence)) {
+    AppEnv.showErrorDialog(notInvited);
+    return;
+  }
 
-  let parsed: ReturnType<typeof CalendarUtils.parseICSString>;
   try {
-    parsed = CalendarUtils.parseICSString(event.ics);
-  } catch (e) {
-    AppEnv.showErrorDialog(localized("Sorry, this event's data could not be read."));
-    return;
-  }
-
-  const me = CalendarUtils.selfParticipant(parsed.event, event.accountId);
-  if (!me) {
-    AppEnv.showErrorDialog(
-      localized("You're not on this event's guest list, so there's no new time to propose.")
-    );
-    return;
-  }
-
-  const organizerEmail = CalendarUtils.emailFromParticipantURI(parsed.event.organizer);
-  if (!organizerEmail) {
-    AppEnv.showErrorDialog(
-      localized("This event has no organizer, so there's nobody to propose a new time to.")
-    );
-    return;
-  }
-
-  let ics: string;
-  try {
-    ics = ICSEventHelpers.createCounterProposal(event.ics, {
-      email: me.email,
-      start: proposal.start,
-      end: proposal.end,
-      comment: proposal.comment,
-      recurrenceId: occurrenceRecurrenceId(occurrence),
+    await answerEvent({
+      accountId: event.accountId,
+      eventId: event.id,
+      status: 'TENTATIVE',
+      counter: {
+        start: Math.round(proposal.start.getTime() / 1000),
+        end: Math.round(proposal.end.getTime() / 1000),
+      },
+      comment: proposal.comment || undefined,
+      occurrenceStart:
+        occurrence.isRecurring || occurrence.isException ? occurrenceSlot(occurrence) : undefined,
+      subject: localized('New time proposed: %@', occurrence.title),
     });
   } catch (e) {
-    console.warn(`Calendar counter-proposal: could not build it: ${e.message}`);
-    ics = null;
+    showRefusal(e, notInvited);
   }
-  if (!ics) {
-    AppEnv.showErrorDialog(
-      localized("Sorry, we couldn't build a counter-proposal for this event.")
-    );
-    return;
-  }
-
-  Actions.queueTask(
-    EventRSVPTask.forProposingNewTime({
-      accountId: event.accountId,
-      to: organizerEmail,
-      ics,
-      summary: parsed.event.summary,
-      comment: proposal.comment,
-    })
-  );
 }
 
 /**
