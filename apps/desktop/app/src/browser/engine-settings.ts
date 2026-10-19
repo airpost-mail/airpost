@@ -37,8 +37,7 @@ import { REMINDER_BODY_KEY, SNOOZE_BODY_KEY, resurfacingBodies } from '../resurf
 import { QUOTE_TEXTS_KEY, USE_24_HOUR_KEY, hourCycle, quoteTexts } from '../date-format';
 
 // The keys the desktop mirrors. The engine also keeps `templates` (the desktop's are files in
-// <config>/templates), `mailRules` and `mailRulesAutoSince` (in the main window's localStorage
-// until the rules move, stage 14) and `resurfacing.*` (written, not mirrored: _writeResurfacing).
+// <config>/templates) and `resurfacing.*` (written, not mirrored: _writeResurfacing).
 export const ENGINE_SETTINGS_KEYS = [
   'core.sending.undoSend',
   'core.sending.defaultAccountIdForSend',
@@ -57,6 +56,9 @@ export const ENGINE_SETTINGS_KEYS = [
   'core.ai.accounts',
   'core.ai.includeAddresses',
   'core.ai.limits',
+  // The mail rules the engine runs, edited by MailRulesStore, and the time they apply from.
+  'mailRules',
+  'mailRulesAutoSince',
 ];
 
 // Mirrored only with an engine whose hello lists the feature.
@@ -69,6 +71,8 @@ const KEY_FEATURES: { [key: string]: string } = {
   'core.ai.accounts': Feature.AiTriage,
   'core.ai.includeAddresses': Feature.AiTriage,
   'core.ai.limits': Feature.AiTriage,
+  mailRules: Feature.Rules,
+  mailRulesAutoSince: Feature.Rules,
 };
 
 // The keys a store named in STORE_KEY got when COPIED_KEY didn't exist yet (before stage 5).

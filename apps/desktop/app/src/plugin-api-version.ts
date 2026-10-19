@@ -10,5 +10,8 @@
  * 1.28.0: `AI` (src/ai.ts), the AI settings, and the `ai-summary` and `ai-reply` capabilities.
  *
  * 1.29.0: the `ai-triage` capability and the `ai.triage.*` types.
+ *
+ * 1.30.0: the `rules` feature and the `rules.*` types; the engine runs the mail rules, and
+ * `MailRulesProcessor` is deprecated (its `processMessages` does nothing).
  */
-export const PLUGIN_API_VERSION = '1.29.0';
+export const PLUGIN_API_VERSION = '1.30.0';

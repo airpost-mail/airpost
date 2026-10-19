@@ -269,6 +269,8 @@ export type {
   AiTriageProgressParams,
   AiTriageListResult,
   AiUsageRow,
+  RulesReprocessResult,
+  RulesProgressParams,
 } from '../engine-protocol';
 export type AI = typeof import('../ai').default;
 export const AI: AI;
@@ -298,7 +300,14 @@ export type SoundRegistry = typeof import('../registries/sound-registry').defaul
 export const SoundRegistry: SoundRegistry;
 export type MailRulesTemplates = typeof import('../mail-rules-templates');
 export const MailRulesTemplates: MailRulesTemplates;
-export type MailRulesProcessor = typeof import('../mail-rules-processor').default;
+/**
+ * @deprecated since plugin API 1.30.0, removed in 2.0.0: the engine applies the mail rules to
+ * arriving mail itself (feature `rules`). `processMessages` does nothing; run the rules over an
+ * inbox with `Engine.request('rules.reprocess', {accountId})`.
+ */
+export interface MailRulesProcessor {
+  processMessages(messages: unknown[]): Promise<void>;
+}
 export const MailRulesProcessor: MailRulesProcessor;
 export * from '../mailbox-perspective';
 export type NativeNotifications = typeof import('../native-notifications').default;

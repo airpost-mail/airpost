@@ -74,6 +74,10 @@ export const Method = {
   DraftSend: 'draft.send',
   DraftCancelSend: 'draft.cancelSend',
   DraftValidate: 'draft.validate',
+  // Mail rules (Feature.Rules): the engine applies the `mailRules` setting to arriving mail;
+  // these run the rules over an account's inbox.
+  RulesReprocess: 'rules.reprocess',
+  RulesCancel: 'rules.cancel',
   // Provider calls (Feature.Integrations), answered out of order; the params carry the
   // provider config, key included (docs/integrations-plan.md section 4).
   IntegrationsTranslate: 'integrations.translate',
@@ -134,6 +138,11 @@ export const Method = {
   AiDelta: 'ai.delta',
   // `{jobId, done, total}`, only to the connection that called ai.triage.run.
   AiTriageProgress: 'ai.triage.progress',
+  // RulesProgressParams, only to the connection that called rules.reprocess.
+  RulesProgress: 'rules.progress',
+  // `{ruleId, error}`, to every subscriber: the engine disabled a failing rule (also saved in
+  // `mailRules`, which settings.changed carries).
+  RulesDisabled: 'rules.disabled',
 } as const;
 
 // What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
@@ -173,6 +182,9 @@ export const Feature = {
   // `draft.create`, `draft.send` (with the send hooks' `bodies`), `draft.cancelSend`,
   // `draft.validate`, and the `composing.quoteTexts` setting.
   DraftPipeline: 'draft-pipeline',
+  // The engine runs the mail rules (`mailRules`, `mailRulesAutoSince`), with rules.reprocess,
+  // rules.cancel, rules.progress and rules.disabled.
+  Rules: 'rules',
 } as const;
 
 // `draft.create` params (ms-ipc DraftCreateParams).
@@ -716,6 +728,21 @@ export interface AiTriageProgressParams {
   done: number;
   total: number;
   /** The job ended after `done` threads: cancelled, the account stopped or triage turned off. */
+  stopped?: boolean;
+}
+
+export interface RulesReprocessResult {
+  jobId: string;
+  // The inbox threads the job goes through.
+  total: number;
+}
+
+export interface RulesProgressParams {
+  jobId: string;
+  accountId: string;
+  done: number;
+  total: number;
+  // The job ended after `done` threads: cancelled, or the account stopped.
   stopped?: boolean;
 }
 

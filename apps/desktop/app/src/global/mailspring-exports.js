@@ -27,6 +27,34 @@ const lazyLoadWithGetter = (prop, getter) => {
   });
 };
 
+/*
+A deprecated export (docs/desktop-client-plan.md section 6). Its getter stays a getter, so each
+package that reads it is warned once; the app's own code isn't.
+*/
+const deprecate = (prop, { since, replacement, removeIn }, getter) => {
+  let value;
+  let loaded = false;
+  const warned = new Set();
+  Object.defineProperty(exports, prop, {
+    configurable: true,
+    enumerable: true,
+    get: () => {
+      const caller = require('../engine-api').callerPackageFromStack(new Error().stack);
+      if (caller && !warned.has(caller.name)) {
+        warned.add(caller.name);
+        console.warn(
+          `${caller.name} uses ${prop}, deprecated since plugin API ${since} and removed in ${removeIn}: ${replacement}`
+        );
+      }
+      if (!loaded) {
+        value = getter();
+        loaded = true;
+      }
+      return value;
+    },
+  });
+};
+
 const lazyLoad = (prop, path) => {
   lazyLoadWithGetter(prop, () => resolveExport(prop, require(`../${path}`)));
 };
@@ -213,7 +241,16 @@ lazyLoad(`AI`, 'ai');
 lazyLoad(`Engine`, 'engine-api');
 lazyLoad(`SoundRegistry`, 'registries/sound-registry');
 lazyLoad(`MailRulesTemplates`, 'mail-rules-templates');
-lazyLoad(`MailRulesProcessor`, 'mail-rules-processor');
+deprecate(
+  `MailRulesProcessor`,
+  {
+    since: '1.30.0',
+    removeIn: '2.0.0',
+    replacement:
+      'the engine applies the mail rules to arriving mail itself (hello.features "rules"); run them over an inbox with Engine.request("rules.reprocess")',
+  },
+  () => ({ processMessages: () => Promise.resolve() })
+);
 lazyLoad(`MailboxPerspective`, 'mailbox-perspective');
 lazyLoad(`NativeNotifications`, 'native-notifications');
 lazyLoad(`Autolink`, 'services/autolinker');

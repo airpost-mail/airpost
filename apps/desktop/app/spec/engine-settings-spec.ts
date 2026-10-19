@@ -161,8 +161,10 @@ describe('the engine-owned settings in the main process', function () {
     ]);
     expect(manager.get('core.integrations.translation')).toEqual(TRANSLATION);
     expect(manager.get('core.sending.undoSend')).toBe(30000);
-    // Not the core.ai.* keys: this engine doesn't list ai-triage.
-    const mirrored = ENGINE_SETTINGS_KEYS.filter((key) => !key.startsWith('core.ai.'));
+    // Not the core.ai.* keys or the rules: this engine doesn't list ai-triage or rules.
+    const mirrored = ENGINE_SETTINGS_KEYS.filter(
+      (key) => !key.startsWith('core.ai.') && !key.startsWith('mailRules')
+    );
     expect([...configOnDisk()[COPIED_KEY]].sort()).toEqual(mirrored.sort());
     supervisor.client.engine._closeSocket();
 
@@ -327,6 +329,34 @@ describe('the engine-owned settings in the main process', function () {
     expect(configOnDisk().core.composing.html).toBe(false);
     // Not sent back.
     expect(fake.socketOf('settings.set').length).toBe(1);
+  });
+
+  it('mirrors the mail rules only with an engine that runs them', async function () {
+    const RULES = [{ id: 'r1', accountId: 'a1', name: 'Receipts' }];
+    fake.settings = {};
+    writeConfig({ [STORE_KEY]: 'store-1', mailRules: RULES, mailRulesAutoSince: 1700000000000 });
+    await launch();
+    expect(fake.socketOf('settings.get')[0].params.keys).not.toContain('mailRules');
+    expect(fake.settings.mailRules).toBeUndefined();
+    supervisor.client.engine._closeSocket();
+
+    fake.settingsFeatures = ['settings', 'rules'];
+    fake.socket = [];
+    await launch();
+    await until('the copy', () => fake.settings.mailRules !== undefined);
+    expect(fake.settings.mailRules).toEqual(RULES);
+    expect(fake.settings.mailRulesAutoSince).toBe(1700000000000);
+    await until('the answer', () => mirror._inFlight.size === 0);
+
+    // A rule the engine disabled reaches config.json, and isn't sent back.
+    const sets = fake.socketOf('settings.set').length;
+    const disabled = [{ ...RULES[0], disabled: true, disabledReason: 'Error: gone' }];
+    const before = changes.length;
+    fake.notify('settings.changed', { values: { mailRules: disabled } });
+    await until('the change', () => changes.length > before);
+    expect(manager.get('mailRules')).toEqual(disabled);
+    expect(configOnDisk().mailRules).toEqual(disabled);
+    expect(fake.socketOf('settings.set').length).toBe(sets);
   });
 
   it('keeps a local write over a notification the engine applied before it', async function () {
