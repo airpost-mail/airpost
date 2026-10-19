@@ -286,7 +286,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
   | `account.changed` | `accountId` | no; `account.list` after `subscribe` | absolute |
   | `mail.new` | `accountId` | no: mail that arrives with no client subscribed is not notified, as with the desktop closed today (I) | carries `messageId`; a client drops repeats. Each client posts its own notification (desktop native, web only when its tab allows) |
   | `rules.progress` | the connection that called `rules.reprocess` | no | `jobId` |
-  | `rules.disabled` | none | no; the rule's `disabled` and `error` are saved in `settings` | `ruleId` |
+  | `rules.disabled` | none | no; the rule's `disabled` and `disabledReason` are saved in `settings` | `ruleId` |
   | `query.changed` | the connection that owns `subId` | no; re-run after reconnect | `subId` |
 
 
@@ -453,8 +453,9 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
   the values, so a window's synchronous `AppEnv.config.get` never sees defaults while a
   `settings.get` is in flight.
 - **Rules** (T12). `rules.list` / `rules.set` are `settings` keys; **`rules.reprocess
-  {accountId}`** → `{jobId}`; notifications **`rules.disabled {ruleId, error}`** and
-  **`rules.progress {jobId, done, total}`**. Evaluation on the `rulesReady` save
+  {accountId}`** → `{jobId, total}` (inbox threads), **`rules.cancel {jobId}`** →
+  `{cancelled}`; notifications **`rules.disabled {ruleId, error}`** and
+  **`rules.progress {jobId, accountId, done, total, stopped?}`**. Evaluation on the `rulesReady` save
   (`crates/ms-store/src/models/message.rs:536-541`), ported from `mail-rules-processor.ts`
   and `mail-rules-templates.ts`; the forward action uses `draft.create` + `draft.send`.
   ~1k Rust. D C M.
@@ -2364,3 +2365,60 @@ Open from the review (low):
 Trial pending (not run): the TD39 steps above (rename a folder holding mail in Tern and in
 webmail, rename a Gmail label in Tern and in the Gmail web UI; the folder keeps its mail without a
 resync, the open folder's title follows, a mail rule moving into it still works).
+
+2026-10-19, stage 14 delivered (`client-next`, not merged): mail rules in the engine (3.4, T12,
+4.2). `crates/ms-tasks/src/mail_rules.rs` ports the evaluator from `mail-rules-processor.ts` and
+`mail-rules-templates.ts` (comparators, templates, `valueName` fallback for stale category ids,
+the actions as tasks with `source: "Mail Rules"`). `apps/engine/src/rules.rs` taps each account's
+delta stream for messages saved with `rulesReady`, runs the enabled rules on a per-account
+`mailRules` thread (local phases through the task processor, forwards through `draft.create` +
+`draft.send`), disables a failing rule by writing `disabled` and `disabledReason` into `mailRules`
+(`settings.changed` and `rules.disabled` go out), and runs `rules.reprocess` over the inbox in
+batches of 50 threads with `rules.progress` to the caller. `rules.reprocess` and `rules.cancel`
+are local-only; `hello.features` lists `rules`. Desktop: `MailRulesStore` edits the `mailRules`
+setting (mirrored by the main process with the `rules` feature) and calls `rules.reprocess` /
+`rules.cancel`; `mail-rules-processor.ts` is gone; the `MailRulesProcessor` export is deprecated
+(a no-op `processMessages`, warns each plugin once) and the plugin API is 1.30.0; the rules and
+`MailRules-Auto-Since` move from the main window's localStorage into config.json once. Tests: 11
+`ms-tasks` unit tests (the desktop's processor spec cases and category resolution), two in
+`apps/engine/src/rules.rs`, the serve test `storing_rules_sets_their_auto_since_once`, harness
+scenario `mail-rules` (fake Dovecot with SMTP: move by `valueName`, mark read, star, forward once,
+invalid expression disabled, another account's rule and older mail left alone, reprocess moves the
+old receipt and forwards again), the rewritten mail-rules-store spec (13) and an engine-settings
+case. `cargo test -p mailsync -p ms-tasks -p ms-ipc`, clippy on the touched crates, desktop
+lint, typecheck and the affected specs pass; harness `-k "mail-rules or rules-ready"` on serve with
+a debug build: 9 passed, 1 skipped.
+Decisions taken, to confirm:
+- `rules.cancel {jobId}` added (not in 3.4) so Stop in Preferences ends the engine's job;
+  `rules.progress` carries `accountId` and `stopped`, and the reprocess answer carries `total`.
+- The failure is saved as `disabledReason` (the desktop's field) rather than `error`; the
+  `rules.disabled` notification still says `error`.
+- Evaluation runs from the delta tap, so mail saved while the engine is down or the queue
+  (10,000 ids) is full isn't evaluated later; reprocess covers that.
+- `mailRulesAutoSince` is set by the engine on the first `settings.set` that stores rules when
+  there is none (a moved desktop value is written first and kept). Mail dated in the same second is
+  included.
+- Reprocess skips drafts and mail sent to others but ignores `mailRulesAutoSince`, and forwards
+  again, as the desktop did. Progress counts threads, not messages.
+- Forwards go out with no undo window. Mail from the account's own address isn't forwarded (loop
+  guard). A forward whose body isn't stored yet is skipped with a warning, without disabling the
+  rule.
+- `matchesExpression` uses the `regex` crate (case-insensitive, 1 MiB limit): lookaround and
+  backreferences count as invalid and disable the rule.
+- The localStorage keys stay after the move (with `MailRules-MovedToSettings`) for a downgrade.
+- A rule disabled during a reprocess job doesn't stop the job; later batches skip it.
+Open:
+- No `tern rules` CLI command.
+- Deprecation warnings go to the console only; Preferences > Plugins doesn't show them.
+- `spec/model-query-capture-spec.ts` keeps its `mail-rules-inbox` site names, which point at removed
+  code (the queries are still valid parity cases; renaming means regenerating the fixture).
+- Preferences still refuses to reprocess rules with body conditions; the engine could run them.
+- A desktop write of `mailRules` in flight when the engine disables a rule can overwrite the
+  disable (last write wins); the rule fails and is disabled again on the next match.
+- tern-web: nothing needed (no rules UI in `apps/web`); `mailRules` stays off
+  `RELAYED_SETTINGS_KEYS`, so relayed clients can't edit rules.
+- Not ours, untouched: `apps/web`, `apps/gateway`, the labels work, TD1-TD5, TD10, TD11, TD23, AI
+  providers.
+Trial pending (not run): on ~/tern-trial, check the rules move out of localStorage, a rule that
+labels or moves arriving mail, one that forwards (to an address of the user's), a broken
+expression getting disabled with the notification, and "Process entire inbox" with Stop.
