@@ -10,7 +10,7 @@ were agreed with the user on 2026-10-18. Desktop paths are relative to `apps/des
 |---|---|
 | A1 | Provider calls run in the engine, never in Electron, the browser or the backend. A new crate `crates/ms-ai` holds the providers, prompts and output parsing, transport-free and store-free like `ms-integrations`; the engine adds `ai.*` socket methods and builds the model input from its own database. Desktop, CLI, web (through the gateway) and tern-mcp share one implementation. |
 | A2 | Three provider kinds: **OpenAI-compatible** (`/v1/chat/completions`; covers OpenAI, OpenRouter, Groq, Mistral, Gemini's compatible endpoint, LM Studio, llama.cpp, vLLM), **Anthropic** (`/v1/messages`), **Ollama** native (`/api/chat`, `/api/tags`). Ollama gets its own kind because its OpenAI endpoint ignores `num_ctx` and silently truncates long threads to the model's default window. |
-| A3 | Keys follow integrations I3 and T13: until stage 11 the desktop keeps them in `KeyManager` as `integration-ai-<providerId>-key` and sends them per request; stage 11's `credentials.import` already moves `integration-*` keys, after which the engine reads `integration:ai-<providerId>` from its SecretStore and requests carry no key. |
+| A3 | Keys follow integrations I3 and T13: the engine reads a stored provider's key from its SecretStore as `integration:ai-<providerId>`, and requests carry no key. The desktop saves and forgets it with `secrets.set` / `secrets.delete` on an engine that lists `account-setup` and `ai-triage`; stage 11's `credentials.import` moved the keyset's `integration-ai-<providerId>-key`. With an older engine the desktop keeps it in `KeyManager` under that name and sends it per request. |
 | A4 | Non-secret AI config (providers, models, feature switches, account opt-in, limits) is engine-owned, in stage 3's `settings` store under `ai.*` keys. Until stage 3 lands it lives in the desktop's `config.json` (`core.ai.*`) and goes with each request, next to the key. |
 | A5 | Off by default. Each account is opted in separately, each feature is switched on separately, and the engine enforces both on every call, whichever client asks. Mail content goes only from the engine to the provider host the user configured; never through `apps/backend`. |
 | A6 | The model never acts. Output is text shown to the user or inserted into an editable draft, plus triage values from a fixed vocabulary. No tool use, no sending, no IMAP changes. Model output is rendered as plain text (no links, no images), so an injected prompt can't exfiltrate through a URL. |
@@ -89,13 +89,18 @@ ai.triage(&ProviderConfig, &MailContext)                    -> Result<Triage>
 ## 3. Socket methods
 
 All take `accountId`; the engine checks the account is opted in and the feature is on
-before it reads any mail. `config` is the provider config with key until stages 3 and 11,
-then omitted (the engine uses its stored config; `provider` picks a configured one by id).
-Until stage 3 has the `ai.*` settings keys, the thread methods also take `settings`
-(`ms_ipc::AiSettings`): `{accounts: [accountId], features: {summary, reply, triage}, includeAddresses?}`,
-each feature `true` or `{enabled: true, …}`, from the desktop's `core.ai.*`. Without it, or
-with the account or feature missing, the call is `not-enabled`; a `provider` id alone is
-`not-configured`, since the engine keeps no providers yet.
+before it reads any mail. The provider is a stored one (`core.ai.providers`, section 4's
+settings), picked by `provider` id or, without one, the one the feature uses, with its key from
+the secret store (`integration:ai-<id>`). A local client may instead send `config`, the provider
+config; one without `apiKey` gets the stored key of the provider with that `id` only when it
+names the same kind and base URL, so the stored key never goes to another host (Preferences'
+Test and Load Models send the form this way). The desktop sends `provider` to an engine that
+lists `account-setup` and `ai-triage`, and `config` with the keyset's key to an older one.
+The thread methods also take `settings` (`ms_ipc::AiSettings`): `{accounts: [accountId],
+features: {summary, reply, triage}, includeAddresses?}`, each feature `true` or `{enabled: true,
+…}`, from the desktop's `core.ai.*`; it wins over the stored switches. Without either, or with
+the account or feature missing, the call is `not-enabled`; a provider that is not stored, or
+that needs a key the store doesn't hold, is `not-configured`.
 
 | Method | Params | Result |
 |---|---|---|
@@ -136,12 +141,17 @@ socket code. Until then `ai.*` are unknown names, so `LocalOnly` (admin devices 
 order, and closing a tab closes that connection, which cancels the provider request (A7).
 
 **Features and capabilities.** `hello.features` gains `ai`. Stage 5's `capabilities` gains
-`ai: {summary, reply, triage}`, each `{available, provider?, local?, reason?}`, with the
-reasons of integrations-plan section 1 ("Set up a model in Preferences > AI", "Turn on AI
-for this account", "Waiting for engine support"). While the client sends config, key and
-switches with each call, the engine can't judge them, so `summary` and `reply` are
-`{available: true, credentials: "request"}` (the client applies its own settings, as for
-integrations) and `triage` is absent until AI4. `ms_ipc::Capability` gained `local`.
+`ai: {summary, reply, triage}`, each `{available, provider?, local?, reason?}`, judged by the
+engine from the stored settings and keys, which is what a call without `config` and `settings`
+(a relayed one, `tern ai`, background triage) can do: `not-set-up` (the feature off, no account
+opted in, no stored provider or model), `needs-engine-key` (a provider that needs a key while
+`integration:ai-<id>` holds none), `quota-exceeded` (the daily cap), and for triage only
+`rate-limited` and `quota-exceeded` during a pause. The desktop words them as integrations-plan
+section 1 does ("Set up a model in Preferences > AI", "Add your Anthropic API key in Preferences
+> AI"). `capabilities.changed` follows `settings.set` of `core.ai.*`, `secrets.set` /
+`secrets.delete` of an `integration:ai-*` name, a `credentials.import` that carried one, and
+triage pauses. Engines before AI6 sent `summary` and `reply` as `{available: true, credentials:
+"request"}`, leaving them to the client. `ms_ipc::Capability` gained `local`.
 
 ## 4. Triage
 
@@ -497,3 +507,28 @@ mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (147 pass
 web lint, typecheck, tests (378) and build clean. Web only, so no desktop gate. Open as after
 AI4: the engine reading `integration:ai-<id>` from the secret store, the usage chart on the
 desktop, a UI for `core.ai.limits`; on the web, "Triage inbox".
+
+2026-10-18, AI6 on `roadmap/ai`: engine-held keys. `StoredAi` reads each stored provider's key
+from `serve`'s secret store as `integration:ai-<id>` (`ms_secrets::names::ai_provider`;
+`credentials.import` maps the desktop's `integration-ai-<id>-key` to it), through a source
+`serve` registers (`ai_api::on_secret`), so background triage, relayed calls and `tern ai` run on
+keyed providers. A local client's `config` without a key gets the stored one only for the same
+provider id, kind and base URL. `capabilities.ai` is judged by the engine for all three features
+(`needs-engine-key` only while the secret is missing); `secrets.set` / `secrets.delete` of an
+`integration:ai-*` name and a `credentials.import` carrying one send `capabilities.changed`.
+Desktop: with an engine that lists `account-setup` and `ai-triage`, Preferences > AI saves,
+finds and forgets keys with `secrets.set`, `secrets.has` and `secrets.delete` (dropping a keyset
+copy), a server change or Remove deletes the engine's key (and keeps the provider if the engine
+can't), the thread calls and "Triage inbox" send `provider` instead of `config`, and Test and
+Load Models send the form's config with only a typed key. The main window moves keys a build
+before AI6 saved to the keyset after `credentials.import` ran (it imports non-account keys once)
+into the engine. Older engines keep the per-request path. The capability reason reads "Add your
+… API key in Preferences > AI". Tests: `engine_held_keys_serve_triage_and_relayed_calls` in
+`apps/engine/tests/ai_api.rs` (file-backed store via `TERN_ENGINE_KEY_FILE`, the key imported on
+stdin, a fake Anthropic provider: triage and a relayed summary send the stored key, another host
+gets none, delete and set change the capabilities, and no message on either socket carries the
+key), engine unit tests for the key lookup and the capabilities, desktop specs for both paths
+(client, Preferences, triage, capabilities).
+
+Open after AI6: the usage chart in Preferences > AI, a UI for `core.ai.limits`; on the web,
+"Triage inbox", and its `needs-engine-key` text still says to use a local model or the desktop.
