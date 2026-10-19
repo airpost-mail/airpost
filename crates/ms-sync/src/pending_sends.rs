@@ -9,10 +9,11 @@
 //! backend, and these bodies (per recipient, possibly with tracking links) are for this one
 //! send only. The file names the expiration it was written for, so a send rescheduled or
 //! cancelled through the metadata alone (an older client, the CLI) doesn't pick up stale
-//! bodies; such files go at the executor's next start. A draft sent from another device
+//! bodies; such files go at the executor's next start. "Send now", which moves the undo window
+//! earlier and keeps `isUndoSend`, keeps them ([`PendingBodies::belong_to`]). A draft sent from another device
 //! goes out with its stored body.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -57,6 +58,23 @@ impl PendingBodies {
         })
     }
 
+    /// Whether these bodies go out with the draft's send-later `value`: the window they were
+    /// kept for, or the same undo window moved earlier ("Send now" keeps `isUndoSend`). A
+    /// cleared, later or plain send-later schedule (rescheduled through the metadata alone)
+    /// doesn't take them.
+    pub fn belong_to(&self, value: &Value) -> bool {
+        let Some(due) = value
+            .get("expiration")
+            .and_then(Value::as_f64)
+            .map(|e| e as i64)
+        else {
+            return false;
+        };
+        due == self.expiration
+            || (due < self.expiration
+                && value.get("isUndoSend").and_then(Value::as_bool) == Some(true))
+    }
+
     /// `SendDraftTask.perRecipientBodies` for a send with `body` as the sent copy's.
     pub fn per_recipient_json(&self, body: &str) -> Value {
         if self.per_recipient.is_empty() {
@@ -69,6 +87,53 @@ impl PendingBodies {
         }
         Value::Object(m)
     }
+}
+
+/// Why `per_recipient` can't go out with `draft` (its JSON), `None` when it can. A multisend
+/// goes to the map's keys only, so they must be the draft's To, Cc and Bcc addresses, each
+/// once (compared case-insensitively; a `self` key is the sent copy's and is ignored): a
+/// missing one would never get the mail and an extra one would get it unseen.
+pub fn recipient_mismatch(
+    draft: &Value,
+    per_recipient: &BTreeMap<String, String>,
+) -> Option<String> {
+    if per_recipient.is_empty() {
+        return None;
+    }
+    let norm = |s: &str| s.trim().to_ascii_lowercase();
+    let want: BTreeSet<String> = ["to", "cc", "bcc"]
+        .iter()
+        .filter_map(|k| draft.get(*k).and_then(Value::as_array))
+        .flatten()
+        .filter_map(|c| c.get("email").and_then(Value::as_str))
+        .map(norm)
+        .filter(|e| !e.is_empty())
+        .collect();
+    let mut got = BTreeSet::new();
+    let mut repeated = Vec::new();
+    for key in per_recipient.keys().filter(|k| k.as_str() != "self") {
+        if !got.insert(norm(key)) {
+            repeated.push(key.clone());
+        }
+    }
+    let missing: Vec<&str> = want.difference(&got).map(String::as_str).collect();
+    let extra: Vec<&str> = got.difference(&want).map(String::as_str).collect();
+    let mut why = Vec::new();
+    if !missing.is_empty() {
+        why.push(format!("no body for {}", missing.join(", ")));
+    }
+    if !extra.is_empty() {
+        why.push(format!("{} not a recipient", extra.join(", ")));
+    }
+    if !repeated.is_empty() {
+        why.push(format!("{} given twice", repeated.join(", ")));
+    }
+    (!why.is_empty()).then(|| {
+        format!(
+            "perRecipient needs one body for each To, Cc and Bcc address: {}",
+            why.join("; ")
+        )
+    })
 }
 
 /// File-name-safe: the ids are hex or base64url already; anything else becomes `_`.
@@ -177,8 +242,52 @@ mod tests {
         );
         p.remove("d1");
         assert_eq!(p.get("d1"), None);
+        assert!(bodies.belong_to(&json!({"expiration": 100})));
+        assert!(bodies.belong_to(&json!({"expiration": 90, "isUndoSend": true})));
+        assert!(!bodies.belong_to(&json!({"expiration": 90})));
+        assert!(!bodies.belong_to(&json!({"expiration": 110, "isUndoSend": true})));
+        assert!(!bodies.belong_to(&json!({"expiration": null, "isUndoSend": true})));
         p.put("d2", &bodies).unwrap();
         PendingSends::remove_every_account(dir.path());
         assert!(p.ids().is_empty());
+    }
+
+    #[test]
+    fn per_recipient_bodies_must_match_the_recipients() {
+        let draft = json!({
+            "to": [{"email": "Ann@x.example"}],
+            "cc": [{"email": "bob@x.example"}],
+            "bcc": [{"email": "cat@x.example"}, {"email": ""}],
+        });
+        let map = |keys: &[&str]| -> BTreeMap<String, String> {
+            keys.iter()
+                .map(|k| (k.to_string(), "<p>b</p>".to_owned()))
+                .collect()
+        };
+        assert_eq!(recipient_mismatch(&draft, &BTreeMap::new()), None);
+        assert_eq!(
+            recipient_mismatch(
+                &draft,
+                &map(&["ann@x.example", "BOB@x.example", "cat@x.example", "self"])
+            ),
+            None
+        );
+        let why = recipient_mismatch(&draft, &map(&["ann@x.example", "eve@x.example"])).unwrap();
+        assert!(
+            why.contains("no body for bob@x.example, cat@x.example"),
+            "{why}"
+        );
+        assert!(why.contains("eve@x.example not a recipient"), "{why}");
+        let why = recipient_mismatch(
+            &draft,
+            &map(&[
+                "ann@x.example",
+                "Ann@x.example",
+                "bob@x.example",
+                "cat@x.example",
+            ]),
+        )
+        .unwrap();
+        assert!(why.contains("given twice"), "{why}");
     }
 }

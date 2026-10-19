@@ -27,7 +27,7 @@
 //! Metadata changes go through `SyncbackMetadataTask`'s local phase, as a client's would, so
 //! they reach the metadata backend. Every other plugin id is emitted as before.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ use ms_core::{Account, Error, Result};
 use ms_store::model::{json_str, metadata_value};
 use ms_store::{File, Folder, Label, Message, Model, Query, Store, Task, Thread};
 
-use crate::pending_sends::PendingSends;
+use crate::pending_sends::{recipient_mismatch, PendingSends};
 use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
@@ -80,10 +80,13 @@ pub enum Outcome {
 }
 
 /// Saves a task and runs its local phase on the scanning thread's store; an error is a
-/// database error.
+/// database error. It may run inside the executor's transaction, so it doesn't wake anyone.
 pub type QueueTask<'a> = Box<dyn Fn(&mut Task) -> Result<()> + 'a>;
 /// Asks the foreground worker for these messages' bodies (and so their attachments).
 pub type FetchBodies<'a> = Box<dyn Fn(Vec<String>) + 'a>;
+/// Wakes the foreground worker to run the queued tasks' remote phases, once the transaction
+/// that queued them has committed.
+pub type Wake<'a> = Box<dyn Fn() + 'a>;
 
 pub struct Executor<'a> {
     account: Arc<Account>,
@@ -92,6 +95,9 @@ pub struct Executor<'a> {
     settings: Arc<dyn EngineSettings>,
     queue: QueueTask<'a>,
     fetch_bodies: FetchBodies<'a>,
+    wake: Wake<'a>,
+    /// A task was queued since the last wake.
+    queued: Cell<bool>,
     /// `draft.send`'s bodies, kept for the undo window.
     pending: PendingSends,
     /// Scheduled drafts waiting to be complete: looks taken so far, next look.
@@ -106,6 +112,7 @@ impl<'a> Executor<'a> {
         settings: Arc<dyn EngineSettings>,
         queue: QueueTask<'a>,
         fetch_bodies: FetchBodies<'a>,
+        wake: Wake<'a>,
     ) -> Self {
         let pending = PendingSends::new(config_dir, account.id());
         let executor = Executor {
@@ -115,6 +122,8 @@ impl<'a> Executor<'a> {
             settings,
             queue,
             fetch_bodies,
+            wake,
+            queued: Cell::new(false),
             pending,
             waiting: RefCell::new(HashMap::new()),
         };
@@ -124,18 +133,19 @@ impl<'a> Executor<'a> {
         executor
     }
 
-    /// Removes the pending bodies of drafts that are gone or no longer wait to be sent at the
-    /// time the bodies were kept for.
+    /// Removes the pending bodies of drafts that are gone or no longer wait to be sent in the
+    /// undo window the bodies were kept for ([`crate::pending_sends::PendingBodies::belong_to`]).
     fn sweep_pending(&self) -> Result<()> {
         for id in self.pending.ids() {
             let draft = self
                 .store
                 .find::<Message>(&Query::new().equal("id", id.as_str()))?;
-            let due = draft.as_ref().and_then(send_later_expiration);
-            let current = self
-                .pending
-                .get(&id)
-                .is_some_and(|p| Some(p.expiration) == due);
+            let value = draft
+                .as_ref()
+                .and_then(|d| metadata_value(&d.data, SEND_LATER))
+                .cloned()
+                .unwrap_or(Value::Null);
+            let current = self.pending.get(&id).is_some_and(|p| p.belong_to(&value));
             if !current {
                 self.pending.remove(&id);
             }
@@ -147,11 +157,19 @@ impl<'a> Executor<'a> {
     /// database error is logged and the row left to the client.
     pub fn handle(&self, class: &str, id: &str, plugin_id: &str, now: i64) -> Result<Outcome> {
         let result = match (class, plugin_id) {
-            ("Message", SEND_LATER) => self.send_later(id, now),
+            // One write transaction from reading the draft to queuing its send, so a
+            // `draft.cancelSend` or `draft.send` (each one transaction too) on another
+            // connection comes wholly before or after it.
+            ("Message", SEND_LATER) => self
+                .store
+                .transaction("expirationSendLater", |_| self.send_later(id, now)),
             ("Thread", THREAD_SNOOZE) => self.unsnooze(id),
             ("Thread", SEND_REMINDERS) => self.remind(id, now),
             _ => return Ok(Outcome::Declined),
         };
+        if self.queued.replace(false) {
+            (self.wake)();
+        }
         match result {
             Err(e) if !matches!(e, Error::Database(_)) => {
                 error!("-X Could not act on {plugin_id} of {class} {id}: {e}");
@@ -173,6 +191,12 @@ impl<'a> Executor<'a> {
         if value.get("clientFinalize").and_then(Value::as_bool) == Some(true) {
             return Ok(Outcome::Declined);
         }
+        // The row was due when the scan read it; a cancel or another send may have come since.
+        match send_later_expiration(&draft) {
+            None => return Ok(Outcome::Done),
+            Some(at) if at > now => return Ok(Outcome::Waiting(at)),
+            Some(_) => {}
+        }
         if !draft.is_draft() {
             info!("-- Clearing send-later on message {id}, which is no longer a draft");
             self.set_metadata(&draft, SEND_LATER, json!({ "expiration": null }))?;
@@ -192,12 +216,16 @@ impl<'a> Executor<'a> {
         }
         self.waiting.borrow_mut().remove(id);
 
-        let expiration = send_later_expiration(&draft);
-        let pending = self
-            .pending
-            .get(id)
-            .filter(|p| Some(p.expiration) == expiration);
+        let pending = self.pending.get(id).filter(|p| p.belong_to(&value));
         self.pending.remove(id);
+        if let Some(why) = pending
+            .as_ref()
+            .and_then(|p| recipient_mismatch(&draft.data, &p.per_recipient))
+        {
+            // The recipients changed since draft.send checked them.
+            self.fail_send(&draft, &value, &why)?;
+            return Ok(Outcome::Done);
+        }
         let body = match pending.as_ref().and_then(|p| p.self_body.clone()) {
             Some(b) => b,
             None => self.body(id)?.unwrap_or_default(),
@@ -223,8 +251,7 @@ impl<'a> Executor<'a> {
         if let Some(p) = &pending {
             data["perRecipientBodies"] = p.per_recipient_json(&finalised.body);
         }
-        let mut task = Task::create("SendDraftTask", self.account.id(), &data);
-        (self.queue)(&mut task)?;
+        self.queue_task("SendDraftTask", &data)?;
         if action == "send-and-archive" {
             if let Some((class, data)) =
                 archive_task(self.store, self.account.id(), draft.thread_id())?
@@ -432,9 +459,8 @@ impl<'a> Executor<'a> {
             self.store.now(),
         );
         let header_message_id = json_str(&draft, "hMsgId").to_owned();
-        let mut task = Task::create(
+        self.queue_task(
             "SendDraftTask",
-            self.account.id(),
             &json!({
                 "draft": draft,
                 "headerMessageId": header_message_id,
@@ -442,8 +468,7 @@ impl<'a> Executor<'a> {
                 "silent": true,
                 RETRY_WHEN_ONLINE_KEY: true,
             }),
-        );
-        (self.queue)(&mut task)
+        )
     }
 
     // -- helpers ------------------------------------------------------------------------
@@ -466,6 +491,7 @@ impl<'a> Executor<'a> {
 
     fn queue_task(&self, class: &str, data: &Value) -> Result<()> {
         let mut task = Task::create(class, self.account.id(), data);
+        self.queued.set(true);
         (self.queue)(&mut task)
     }
 

@@ -50,21 +50,19 @@ pub fn run_metadata_expiration(ctx: WorkerContext) {
     if let Some(settings) = ctx.settings.clone() {
         let queue_ctx = ctx.clone();
         let fetch_ctx = ctx.clone();
+        let wake_ctx = ctx.clone();
         let store_ref = &store;
         worker = worker.with_executor(Executor::new(
             ctx.account.clone(),
             &store,
             &ctx.config_dir,
             settings,
-            Box::new(move |task| {
-                queue_ctx.tasks.perform_local(store_ref, &queue_ctx, task)?;
-                queue_ctx.foreground.interrupt();
-                Ok(())
-            }),
+            Box::new(move |task| queue_ctx.tasks.perform_local(store_ref, &queue_ctx, task)),
             Box::new(move |ids| {
                 fetch_ctx.foreground.queue_bodies(ids);
                 fetch_ctx.foreground.interrupt();
             }),
+            Box::new(move || wake_ctx.foreground.interrupt()),
         ));
     }
     while !ctx.is_stopping() {
