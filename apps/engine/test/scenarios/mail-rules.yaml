@@ -1,0 +1,108 @@
+name: mail-rules
+description: >
+  serve applies the `mailRules` setting to arriving mail itself, with no client attached
+  (T12). A receipt is marked read and moved to Receipts, found by the display name saved with
+  the rule because its folder id is stale; mail from the boss is starred and forwarded once
+  through draft.create and draft.send. A rule with an invalid expression is disabled: its
+  `disabled` and `disabledReason` are written into `mailRules`, and `settings.changed` and
+  `rules.disabled` go out. Another account's rule and mail dated before
+  `mailRulesAutoSince` are left alone, until `rules.reprocess` walks the inbox (reporting
+  `rules.progress`), which moves the old receipt and forwards the boss's mail again, as the
+  desktop's reprocessing did.
+source: "docs/desktop-client-plan.md 3.4, T12; mail-rules-processor.ts; mail-rules-store.ts; spec/mail-rules-processor-spec.ts"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 2}
+  Receipts: {}
+setup:
+  - server.append: {mailbox: INBOX, messages: {message_id: "<old-receipt@shop.example>", subject: "Old receipt"}, flags: []}
+steps:
+  - wait: quiescent
+  - client.settings:
+      values:
+        mailRules:
+          - id: r-receipts
+            accountId: $accountId
+            name: Receipts
+            conditionMode: any
+            conditions: [{templateKey: subject, comparatorKey: contains, value: RECEIPT}]
+            actions:
+              - {templateKey: markAsRead}
+              - {templateKey: changeFolder, value: stale-folder-id, valueName: Receipts}
+          - id: r-bad
+            accountId: $accountId
+            name: Broken
+            conditionMode: all
+            conditions: [{templateKey: subject, comparatorKey: matchesExpression, value: "(unclosed"}]
+            actions: [{templateKey: star}]
+          - id: r-boss
+            accountId: $accountId
+            name: Boss
+            conditionMode: all
+            conditions: [{templateKey: from, comparatorKey: endsWith, value: "@corp.example"}]
+            actions:
+              - {templateKey: star}
+              - {templateKey: forward, value: assistant@example.net}
+          - id: r-elsewhere
+            accountId: another-account
+            name: Not this account
+            conditionMode: any
+            conditions: [{templateKey: subject, comparatorKey: contains, value: nothing}]
+            actions: [{templateKey: moveToTrash}]
+  - server.append: {mailbox: INBOX, messages: {message_id: "<receipt-42@shop.example>", subject: "Your receipt 42", date: now}, flags: []}
+  - server.append: {mailbox: INBOX, messages: {message_id: "<plans@corp.example>", subject: "Plans", sender: ["The Boss", "boss@corp.example"], date: now}, flags: []}
+  - server.append: {mailbox: INBOX, messages: {message_id: "<nothing@example.org>", subject: "Nothing to see", date: now}, flags: []}
+  - wait: {models: {Task: {where: {__cls: ChangeFolderTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {notification: {method: rules.disabled, match: {ruleId: r-bad}}, timeout: 30}
+  - wait: {quiescent: true}
+  - assert:
+      server_has:
+        Receipts: [{message_id: "<receipt-42@shop.example>", flags: ["\\Seen"]}]
+        INBOX:
+          - {message_id: "<old-receipt@shop.example>", flags: []}
+          - {message_id: "<plans@corp.example>", flags: ["\\Flagged"]}
+          - {message_id: "<nothing@example.org>", flags: []}
+  - client.rpc:
+      method: rules.reprocess
+      params: {}
+      expect: {jobId: {present: true}, total: 5}
+  - wait: {notification: {method: rules.progress, match: {done: 5, total: 5}}, timeout: 60}
+  - wait: {models: {Task: {where: {__cls: ChangeFolderTask, status: complete}, count: 2}}, timeout: 90}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 2}}, timeout: 90}
+  - client.rpc:
+      method: rules.cancel
+      params: {jobId: no-such-job}
+      expect: {cancelled: false}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  notifications:
+    - {method: rules.disabled, match: {ruleId: r-bad, error: {re: "^SyntaxError: Invalid regular expression"}}, count: 1}
+    - {method: settings.changed, match: {values.mailRules.1.disabled: true, values.mailRules.1.disabledReason: {re: "Invalid regular expression"}}, count: 1}
+    - {method: rules.progress, match: {stopped: {present: true}}, count: 0}
+  smtp:
+    count: 2
+    messages:
+      - recipients: ["assistant@example.net"]
+        headers: {Subject: "Fwd: Plans"}
+        body: {contains: ["boss@corp.example"]}
+      - recipients: ["assistant@example.net"]
+        headers: {Subject: "Fwd: Plans"}
+  server_has:
+    Receipts:
+      - {message_id: "<receipt-42@shop.example>", flags: ["\\Seen"]}
+      - {message_id: "<old-receipt@shop.example>", flags: ["\\Seen"]}
+    INBOX:
+      - {message_id: "<plans@corp.example>", flags: ["\\Flagged"]}
+      - {message_id: "<nothing@example.org>", flags: []}
+  server_counts: {INBOX: 4, Receipts: 2}
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 2
+      match: [{status: complete, error: null}, {status: complete, error: null}]
+  db_matches_server: {}
+  running: true

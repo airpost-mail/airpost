@@ -26,6 +26,7 @@ import socket
 import sqlite3
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -218,6 +219,9 @@ class ScenarioRun(PimMixin, BackendMixin):
             spec = {"count": spec}
         count = int(spec.get("count", 1))
         kw = {k: v for k, v in spec.items() if k not in ("count", "self_addressed", "thread")}
+        if kw.get("date") == "now":
+            # Mail that arrives now, rather than the series' dates three days back.
+            kw["date"] = datetime.now(timezone.utc).replace(microsecond=0)
         if "attachment" in kw:
             kw["attachment"] = tuple(kw["attachment"])
         out = []
@@ -610,6 +614,16 @@ class ScenarioRun(PimMixin, BackendMixin):
                     raise TimeoutError(f"the account still runs after {arg.get('timeout', 60)}s\n{self.ms.describe()}")
                 time.sleep(0.1)
             self._note(f"account down: {self.ms.describe_stop()}")
+        if "notification" in arg:
+            # {method, match?, count?}: engine-wide notifications on serve (rules.progress,
+            # rules.disabled, settings.changed), `match` checked as in `models` waits.
+            want = arg["notification"]
+            n = int(want.get("count", 1))
+
+            def seen():
+                return len(self._matching_notifications(want))
+            self.ms.wait_for(lambda: seen() >= n, float(arg.get("timeout", 60)),
+                             f"{n} {want['method']} notifications matching {want.get('match')}")
         if "idle" in arg and self.spec.kind == "fake":
             self.server.imap.wait_for_idle(float(arg.get("timeout", 60)))
 
@@ -951,7 +965,8 @@ class ScenarioRun(PimMixin, BackendMixin):
             return self._undo_task(arg)
         if op == "settings":
             # {values}: the engine-owned settings (serve), e.g. the localized resurfacing texts.
-            result = self.ms.set_settings(dict(arg.get("values", arg)))
+            # "$accountId" in a value is the scenario account's id (mail rules name it).
+            result = self.ms.set_settings(self._with_account_id(dict(arg.get("values", arg))))
             self._note(f"settings set: {json.dumps(result)}")
             return result
         if op == "need_bodies":
@@ -960,6 +975,13 @@ class ScenarioRun(PimMixin, BackendMixin):
         if op == "rpc":
             return self._client_rpc(arg)
         raise ScenarioFailure(f"unknown client op {op!r}")
+
+    def _with_account_id(self, value):
+        if isinstance(value, dict):
+            return {k: self._with_account_id(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._with_account_id(v) for v in value]
+        return self.ms.account["id"] if value == "$accountId" else value
 
     def _client_rpc(self, arg: dict):
         """{method, params, expect?, expect_error?}: one socket request for the account.
@@ -1500,6 +1522,21 @@ class ScenarioRun(PimMixin, BackendMixin):
                        f"ProcessState deltas were {states}")
         if arg.get("cleared") and (not states or states[-1] is not False):
             out.append(f"expected the connection error to be cleared, ProcessState deltas were {states}")
+        return out
+
+    def _matching_notifications(self, want: dict) -> list:
+        match = want.get("match") or {}
+        return [p for p in self.ms.notifications(want["method"]) if pim.row_matches({"data": p}, match)]
+
+    def expect_notifications(self, arg: list) -> list:
+        """[{method, match?, count}]: how many engine-wide notifications of `method` matched."""
+        out = []
+        for want in arg:
+            got = self._matching_notifications(want)
+            if len(got) != int(want.get("count", 1)):
+                seen = self.ms.notifications(want["method"])
+                out.append(f"expected {want.get('count', 1)} {want['method']} matching {want.get('match')}, "
+                           f"got {len(got)} of {seen}")
         return out
 
     def expect_mail_new(self, arg) -> list:

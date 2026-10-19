@@ -334,6 +334,9 @@ class ServeEngine:
         self.errors: list = []         # engine-wide transport problems; every handle reports them
         self.stdout_noise: list = []
         self.capabilities: list = []   # capabilities.changed params, in order
+        # Engine-wide notifications a scenario waits for (rules.progress, rules.disabled, and
+        # settings.changed the engine made itself), as (method, params) in order.
+        self.notifications: list = []
         self._t0 = 0.0
         self._threads: list = []
         self._stdin_lock = threading.Lock()
@@ -545,6 +548,8 @@ class ServeEngine:
         elif method == "capabilities.changed":
             # Engine-wide: an AI provider's pause, a settings change (docs/ai-plan.md 5).
             self.capabilities.append(params)
+        elif method in ("rules.progress", "rules.disabled", "settings.changed"):
+            self.notifications.append((method, dict(params)))
         elif method == "disconnect":
             self._error(f"engine sent disconnect: {params}")
         elif "id" in msg:
@@ -1164,6 +1169,12 @@ class MailsyncProcess:
         """The `mail.new` notifications so far, as (t, params). Socket transports only."""
         with self._lock:
             return list(self.state.mail_new)
+
+    def notifications(self, method: str) -> list:
+        """serve: the params of the engine-wide `method` notifications so far, in order."""
+        if self.transport != "serve":
+            return []
+        return [p for m, p in list(self.engine.notifications) if m == method]
 
     @property
     def log_path(self) -> Path:
