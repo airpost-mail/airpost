@@ -1241,6 +1241,10 @@ impl Engine {
                     ErrorObject::new(code::INTERNAL_ERROR, format!("reset failed: {e}"))
                 })?;
             crate::ai_api::clear_cache();
+            if !keep_metadata {
+                // Their send-later metadata went with the drafts.
+                ms_sync::pending_sends::PendingSends::new(&self.config_dir, id).remove_all();
+            }
             info!("Account {id} reset");
             Ok(held)
         })();
@@ -1299,6 +1303,7 @@ impl Engine {
                     Vec::new()
                 })
             } else {
+                ms_sync::pending_sends::PendingSends::remove_every_account(&self.config_dir);
                 Vec::new()
             };
             for suffix in ["", "-wal", "-shm"] {

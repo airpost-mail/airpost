@@ -16,6 +16,7 @@ mod ai_api;
 mod ai_triage;
 mod cli;
 mod dispatch;
+mod drafts_api;
 #[cfg(unix)]
 mod files;
 #[cfg(unix)]

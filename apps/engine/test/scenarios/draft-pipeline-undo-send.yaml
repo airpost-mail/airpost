@@ -1,0 +1,67 @@
+name: draft-pipeline-undo-send
+description: >
+  `draft.send` with an undo window on serve, and the bodies a client's send hooks made. The
+  first draft is cancelled inside its window with `draft.cancelSend`: nothing goes out, the
+  draft stays. The second is sent with `bodies` (what a test extension's
+  `applyTransformsForSending` returned) and the engine is quit inside the window and started
+  again after it: the new process sends it once, with the extension's body to the recipient,
+  and the pending bodies are gone.
+source: "docs/desktop-client-plan.md 3.3 draft.send, draft.cancelSend; draft-store.ts _onSendDraft; send-draft-task.ts forSending"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+steps:
+  - wait: quiescent
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: new
+        fields: {hMsgId: "undo-a@example.test", subject: "Cancelled", body: "<p>never sent</p>", to: [{name: Someone, email: someone@example.org}]}
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: new
+        fields: {hMsgId: "undo-b@example.test", subject: "Sent after restart", body: "<p>stored body</p>", to: [{name: Someone, email: someone@example.org}]}
+  - wait: {models: {Message: {where: {draft: true}, count: 2}}, timeout: 30}
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "undo-a@example.test", delayMs: 4000}
+      expect: {scheduledAt: {present: true}}
+  - client.rpc:
+      method: draft.cancelSend
+      params: {headerMessageId: "undo-a@example.test"}
+      expect: {cancelled: true}
+  - client.rpc:
+      method: draft.send
+      params:
+        headerMessageId: "undo-b@example.test"
+        delayMs: 4000
+        bodies:
+          self: "<p>sent copy from the extension</p>"
+          perRecipient: {"someone@example.org": "<p>for someone, from the extension</p>"}
+      expect: {scheduledAt: {present: true}}
+  - mark: sent
+  - restart:
+      wait: false
+      before:
+        - wait: {until: sent, plus: 7}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 90}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp:
+    count: 1
+    messages:
+      - recipients: ["someone@example.org"]
+        headers: {Message-ID: "<undo-b@example.test>"}
+        body: {contains: ["for someone, from the extension"], lacks: ["stored body"]}
+  models:
+    Message:
+      where: {headerMessageId: "undo-a@example.test", draft: true}
+      count: 1
+  metadata_expiration:
+    - {messages: {header_message_ids: ["undo-a@example.test", "undo-b@example.test"]}, count: 0}
+  server_counts: {Sent: 1}
+  running: true

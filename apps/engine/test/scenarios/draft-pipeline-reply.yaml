@@ -1,0 +1,79 @@
+name: draft-pipeline-reply
+description: >
+  `draft.create` and `draft.send` on serve. A reply to a received message is built by the
+  engine as the desktop builds it: "Re:" subject, the sender as recipient, the default
+  signature of the From address above the quoted text, the localized attribution line from
+  `composing.quoteTexts`, and the quote sanitized (no script). `draft.validate` finds nothing
+  to stop the send; sent without a delay, it goes out once with a Sent copy and the draft
+  goes. A forward of the same message carries its subject and the forward header.
+source: "docs/desktop-client-plan.md 3.3 draft.create, draft.send, draft.validate; draft-factory.ts; composer-signature"
+transports: [serve]
+servers:
+  - {fake: dovecot, smtp: true}
+mailboxes:
+  INBOX: {messages: 1}
+setup:
+  - server.append:
+      mailbox: INBOX
+      messages:
+        message_id: "<orig-1@sender.example.net>"
+        subject: "Quarterly numbers"
+        sender: ["Bob Sender", "bob@sender.example.net"]
+        html: true
+        body: "See you <b>tomorrow</b>.<script>alert(1)</script>"
+steps:
+  - wait: quiescent
+  - client.need_bodies: {messages: {header_message_ids: ["orig-1@sender.example.net"]}}
+  - wait: {quiescent: true}
+  - client.rpc:
+      method: settings.set
+      params:
+        values:
+          signatures: {sig1: {id: sig1, title: Work, body: "<div>Harness Signature</div>"}}
+          defaultSignatures: {"test@example.test": sig1}
+          composing.quoteTexts: {attribution: "Am {date} schrieb {from}:", dateTime: "{day2}.{month2}.{year}, {hour2}:{minute}", months: ["01","02","03","04","05","06","07","08","09","10","11","12"], dayPeriods: [AM, PM], forwardedMessage: "Weitergeleitete Nachricht", from: Von, subject: Betreff, date: Datum, to: An, cc: CC}
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: reply
+        message: {header_message_ids: ["orig-1@sender.example.net"]}
+        fields: {hMsgId: "reply-1@example.test"}
+        tz: Europe/Berlin
+      expect: {subject: "Re: Quarterly numbers", rthMsgId: "orig-1@sender.example.net", draft: true}
+  - wait: {models: {Message: {where: {headerMessageId: "reply-1@example.test", draft: true}, count: 1}}, timeout: 30}
+  - client.rpc:
+      method: draft.validate
+      params: {headerMessageId: "reply-1@example.test"}
+      expect: {errors: []}
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "reply-1@example.test"}
+      expect: {taskId: {present: true}}
+  - client.rpc:
+      method: draft.send
+      params: {headerMessageId: "reply-1@example.test"}
+      expect_error: -32602
+  - client.rpc:
+      method: draft.create
+      params:
+        kind: forward
+        message: {header_message_ids: ["orig-1@sender.example.net"]}
+        save: false
+      expect: {subject: "Fwd: Quarterly numbers", fwdMsgId: "orig-1@sender.example.net"}
+  - wait: {models: {Task: {where: {__cls: SendDraftTask, status: complete}, count: 1}}, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  models:
+    Task:
+      where: {__cls: SendDraftTask}
+      count: 1
+      match: [{status: complete, error: null}]
+  smtp:
+    count: 1
+    messages:
+      - recipients: ["bob@sender.example.net"]
+        headers: {Subject: "Re: Quarterly numbers", In-Reply-To: "<orig-1@sender.example.net>", Message-ID: "<reply-1@example.test>"}
+        body: {contains: ["Harness Signature", "schrieb Bob Sender", "See you <b>tomorrow</b>"], lacks: ["<script", "alert(1)"]}
+  server_counts: {Sent: 1}
+  running: true

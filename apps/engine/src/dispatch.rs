@@ -52,6 +52,14 @@ pub enum Request {
         message_id: String,
         mailto: Mailto,
     },
+    /// `draft.create` (`crate::drafts_api`).
+    DraftCreate(Box<crate::drafts_api::CreateCall>),
+    /// `draft.send`.
+    DraftSend(ms_ipc::DraftSendParams),
+    /// `draft.cancelSend`.
+    DraftCancelSend(ms_ipc::DraftCancelSendParams),
+    /// `draft.validate`, with every account's addresses.
+    DraftValidate(ms_ipc::DraftValidateParams, ms_compose::Identities),
     /// stdin only.
     TestCrash,
     /// stdin only.
@@ -136,6 +144,12 @@ fn internal(e: ms_core::Error) -> ErrorObject {
     ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
 }
 
+impl crate::drafts_api::QueueTask for Dispatcher<'_> {
+    fn queue_task(&self, task: Value) -> Reply {
+        Dispatcher::queue_task(self, task)
+    }
+}
+
 struct Dispatcher<'a> {
     ctx: &'a WorkerContext,
     tasks: &'a TaskProcessor<'a>,
@@ -204,6 +218,10 @@ impl Dispatcher<'_> {
                 self.queue_task(task.data)?;
                 Ok(json!({ "taskId": id }))
             }
+            Request::DraftCreate(call) => self.drafts().create(*call),
+            Request::DraftSend(p) => self.drafts().send(p),
+            Request::DraftCancelSend(p) => self.drafts().cancel_send(p),
+            Request::DraftValidate(p, accounts) => self.drafts().validate(p, accounts),
             Request::TestCrash => {
                 let e = SyncError::fatal("test", "triggered via cin");
                 self.ctx
@@ -212,6 +230,15 @@ impl Dispatcher<'_> {
             }
             Request::TestSegfault => platform::raise_segfault(),
             Request::TestPanic => panic!("triggered via test.panic"),
+        }
+    }
+
+    fn drafts(&self) -> crate::drafts_api::Here<'_> {
+        crate::drafts_api::Here {
+            store: self.tasks.store,
+            account: &self.ctx.account,
+            config_dir: &self.ctx.config_dir,
+            queue: self,
         }
     }
 

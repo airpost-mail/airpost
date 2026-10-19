@@ -1388,7 +1388,7 @@ class ScenarioRun(PimMixin, BackendMixin):
         return [f"placements changed since snapshot {name}: " + "; ".join(changes[:6])] if changes else []
 
     def expect_smtp(self, arg: dict) -> list:
-        """What the fake SMTP server received: count, recipients, headers."""
+        """What the fake SMTP server received: count, recipients, headers, body text."""
         smtp = getattr(self.server, "smtp", None)
         if smtp is None:
             return ["scenario expects SMTP but the server has no SMTP endpoint"]
@@ -1409,6 +1409,17 @@ class ScenarioRun(PimMixin, BackendMixin):
                         out.append(f"SMTP message {i} header {h} = {m.header(h)!r}, expected /{v['re']}/")
                 elif m.header(h) != v:
                     out.append(f"SMTP message {i} header {h} = {m.header(h)!r}, expected {v!r}")
+            if "body" in want:
+                # {contains: [...], lacks: [...]}: substrings of the decoded text and HTML parts.
+                parsed = email.message_from_bytes(m.raw, policy=email.policy.default)
+                text = "\n".join(p.get_content() for p in parsed.walk()
+                                  if p.get_content_maintype() == "text" and not p.get_filename())
+                for needle in want["body"].get("contains", []):
+                    if needle not in text:
+                        out.append(f"SMTP message {i} body lacks {needle!r}: {text[:600]!r}")
+                for needle in want["body"].get("lacks", []):
+                    if needle in text:
+                        out.append(f"SMTP message {i} body has {needle!r}")
             if "attachments" in want:
                 # {filename: content}: the parts with that filename and their decoded bytes.
                 parsed = email.message_from_bytes(m.raw, policy=email.policy.default)
