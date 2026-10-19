@@ -794,7 +794,7 @@ added later through it, instead of importing `MailsyncProcess`.
 | 8 (1.31.0) | reads over the engine | private `DatabaseStore._query` with raw SQL fails; queries on non-`queryable` attributes fail with an error instead of a SQL error; reads during an engine restart wait up to 10 s, then reject (4.1 step 2); `MessageStore.items()` carries bodies for expanded messages only (TD40). No change to tasks: `Actions.queueTask.listen` in the main window still sees every desktop window's tasks through `ActionBridge`, and never CLI or MCP tasks (use Task deltas for those) |
 | 9 | search in the engine | `structuredSearch(ast)` deprecated in favour of `Query.searchText`; date terms outside the documented subset fail |
 | 13 | draft pipeline in the engine | send hooks don't run for CLI, MCP or engine-executed sends (documented) |
-| 18 (1.32.0) | calendar and contacts in the engine | `ICSEventHelpers` deprecated (every function throws) and its types gone except `CalendarConflict`, now the engine's; `CalendarUtils.resolveIanaZone` and `createVTIMEZONEString` gone; `SyncbackEventTask` gains `restore` and `tz` |
+| 18 (1.32.0) | calendar and contacts in the engine | `ICSEventHelpers` deprecated (every function throws) and its types gone except `CalendarConflict`, now the engine's; `CalendarUtils.resolveIanaZone` and `createVTIMEZONEString` deprecated (they throw), all three removed in 2.0.0; `SyncbackEventTask` gains `restore` and `tz` |
 | 2.0.0 | removals | `MailsyncProcess`, `KeyManager`, `MailRulesProcessor`, `IMAPSearchQueryBackend`, `QuerySubscriptionPool` internals, `MailspringTestUtils`, `ICSEventHelpers` |
 
 Plugins can't define new Task classes (the engine rejects unknown `__cls`), which is already
@@ -3022,8 +3022,27 @@ Decisions taken, to confirm:
   file with the engine's export (the drag needs the path synchronously).
 - `EventRSVPTask.forReplying` and `forProposingNewTime` stay for plugins; `ICSEventHelpers` is a
   throwing stub until 2.0.0.
+- A breaking change in a minor: `ICSEventHelpers` and `CalendarUtils.resolveIanaZone` and
+  `createVTIMEZONEString` throw from 1.32.0 (deprecated stubs that warn once per package, removed
+  in 2.0.0) instead of working until 2.0.0, since their code moved to the engine. Keeping semver
+  would mean keeping working copies of the TS until 2.0.0.
 - The corpus fixture is frozen: it was recorded before the TS went, so it can't be re-recorded.
 - An exception row written by an edit appears on the next calendar pass.
+- Review fixes: `occurrenceStart` (events.update, and `occurrenceStart` on events.rsvp and its
+  counter) must name a slot of the series or an override's RECURRENCE-ID, else INVALID_PARAMS
+  `not-an-occurrence`. events.expand carries at most 10,000 occurrences (`truncated: true`
+  past that) and its `ics` at most 1,000 VEVENTs and 20 series (`too-large`), for every caller;
+  the window itself is not bounded, since the series budget and the occurrence cap bound the
+  work. events.rsvp from an emailed `ics` without `eventId` follows `resolveRSVPTarget`:
+  only a copy certainly ours is written (our own calendar, or the only writable one not
+  somebody else's), a copy on no such calendar, or with no master there, gets nothing, and an
+  invitation is added only when there is no copy at all and its ORGANIZER isn't the account
+  (an explicit `calendarId` for one we organize is refused, `own-invitation`); the default
+  calendar is our own one, else the first writable. The desktop keeps `rsvp-target.ts` for
+  its UI and still sends `eventId`, `calendarId` or `write: false`. events.update answers
+  `notifiesGuests`; tern-mcp at read-write asks it with `queue: false` first and refuses
+  with the send level when the server would mail guests. The RSVP `comment` goes on the
+  EventRSVPTask of a REPLY too.
 Open: `ical-expander` and `vcf` are unused in `apps/desktop/app/package.json` now; removing them
 needs a lockfile update, left for a dependency pass.
 Open for tern-web: the web review of event and contact tasks and writes for relayed devices
