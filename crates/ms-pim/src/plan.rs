@@ -986,4 +986,184 @@ mod tests {
         assert!(msg.ics.contains("COMMENT:later?\r\n"));
         assert!(!msg.ics.contains("RRULE"));
     }
+
+    // An invitation to one moved occurrence, answered from the mail view (event-header-spec's
+    // cases): the REPLY is that occurrence alone, and the answer lands on its override.
+    const OCCURRENCE_INVITE: &str = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nMETHOD:REQUEST\r\nBEGIN:VEVENT\r\nUID:w@t\r\nRECURRENCE-ID:20260309T140000Z\r\nDTSTART:20260309T150000Z\r\nDTEND:20260309T151500Z\r\nSUMMARY:Standup\r\nORGANIZER:mailto:boss@x.com\r\nATTENDEE;PARTSTAT=ACCEPTED:mailto:boss@x.com\r\nATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:g@x.com\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+
+    fn my_partstat(vevent: &str) -> &str {
+        let line = vevent
+            .lines()
+            .find(|l| l.starts_with("ATTENDEE") && l.ends_with("g@x.com"))
+            .unwrap();
+        line.split(';')
+            .find_map(|p| p.strip_prefix("PARTSTAT="))
+            .and_then(|p| p.split(':').next())
+            .unwrap()
+    }
+
+    #[test]
+    fn rsvp_from_an_emailed_occurrence() {
+        let env = env();
+        let mut row = weekly();
+        row.ics = row
+            .ics
+            .replace("ORGANIZER:mailto:me@x.com", "ORGANIZER:mailto:boss@x.com");
+        let r = Rsvp {
+            stored: Some(&row),
+            writable: true,
+            invite: Some(OCCURRENCE_INVITE),
+            status: "ACCEPTED",
+            reply: true,
+            write: true,
+            ..Default::default()
+        };
+        let plan = plan_rsvp(&r, |e| e == "g@x.com", &env).unwrap();
+        let msg = plan.message.unwrap();
+        assert_eq!(msg.to, "boss@x.com");
+        assert_eq!(msg.ics.matches("BEGIN:VEVENT").count(), 1);
+        assert!(msg.ics.contains("RECURRENCE-ID:20260309T140000Z\r\n"));
+        assert!(!msg.ics.contains("RRULE"));
+
+        // Our copy had no override for it: one is added, answered, and the series is not.
+        let (Write::Update { ics, .. }, _) = plan.write.unwrap() else {
+            panic!()
+        };
+        let vevents: Vec<&str> = ics.split("BEGIN:VEVENT").skip(1).collect();
+        assert_eq!(vevents.len(), 2);
+        assert_eq!(my_partstat(vevents[0]), "NEEDS-ACTION");
+        assert!(vevents[1].contains("RECURRENCE-ID"));
+        assert!(vevents[1].contains("DTSTART:20260309T150000Z\r\n"));
+        assert_eq!(my_partstat(vevents[1]), "ACCEPTED");
+
+        // Answered again: the override is changed, not added twice.
+        let answered = EventRow { ics, ..row.clone() };
+        let again = Rsvp {
+            stored: Some(&answered),
+            status: "DECLINED",
+            ..r
+        };
+        let (Write::Update { ics, .. }, _) = plan_rsvp(&again, |e| e == "g@x.com", &env)
+            .unwrap()
+            .write
+            .unwrap()
+        else {
+            panic!()
+        };
+        let vevents: Vec<&str> = ics.split("BEGIN:VEVENT").skip(1).collect();
+        assert_eq!(vevents.len(), 2);
+        assert_eq!(my_partstat(vevents[0]), "NEEDS-ACTION");
+        assert_eq!(my_partstat(vevents[1]), "DECLINED");
+    }
+
+    #[test]
+    fn rsvp_adds_an_invitation_we_have_no_copy_of_only_when_attending() {
+        let env = env();
+        let invite = OCCURRENCE_INVITE.replace("RECURRENCE-ID:20260309T140000Z\r\n", "");
+        let r = Rsvp {
+            invite: Some(&invite),
+            add_to: Some("c"),
+            status: "DECLINED",
+            reply: true,
+            write: true,
+            ..Default::default()
+        };
+        let plan = plan_rsvp(&r, |e| e == "g@x.com", &env).unwrap();
+        assert!(plan.write.is_none());
+        assert!(plan.message.is_some());
+
+        let accept = Rsvp {
+            status: "ACCEPTED",
+            ..r
+        };
+        let plan = plan_rsvp(&accept, |e| e == "g@x.com", &env).unwrap();
+        let (Write::Create { calendar_id, ics }, _) = plan.write.unwrap() else {
+            panic!()
+        };
+        assert_eq!(calendar_id, "c");
+        assert!(!ics.contains("METHOD"));
+        assert_eq!(my_partstat(&ics), "ACCEPTED");
+    }
+
+    // Undo and redo (change-mail-tasks-spec's SyncbackEventTask cases): a snapshot re-sent over
+    // the stored copy.
+    fn series(overrides: &[(&str, &str, u32)], exdate: &str, summary: &str) -> String {
+        let mut out = String::from(
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:s@t\r\nDTSTART:20261008T130000Z\r\nDTEND:20261008T140000Z\r\nRRULE:FREQ=DAILY\r\n",
+        );
+        if !exdate.is_empty() {
+            out.push_str(&format!("EXDATE:{exdate}\r\n"));
+        }
+        out.push_str(&format!(
+            "SUMMARY:{summary}\r\nSEQUENCE:0\r\nEND:VEVENT\r\n"
+        ));
+        for (rid, start, seq) in overrides {
+            out.push_str(&format!(
+                "BEGIN:VEVENT\r\nUID:s@t\r\nRECURRENCE-ID:{rid}\r\nDTSTART:{start}\r\nSUMMARY:Test series\r\nSEQUENCE:{seq}\r\nEND:VEVENT\r\n"
+            ));
+        }
+        out.push_str("END:VCALENDAR\r\n");
+        out
+    }
+
+    fn single(start: &str, seq: u32) -> String {
+        format!("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:u@t\r\nDTSTART:20261008T{start}00Z\r\nDTEND:20261008T140000Z\r\nSEQUENCE:{seq}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+    }
+
+    fn vevents(ics: &str) -> Vec<(Option<String>, String, String)> {
+        Doc::parse(ics)
+            .unwrap()
+            .vevents()
+            .map(|v| {
+                (
+                    v.value("RECURRENCE-ID").map(str::to_owned),
+                    v.text("SUMMARY"),
+                    v.value("SEQUENCE").unwrap_or_default().to_owned(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn an_undo_or_redo_is_never_below_the_stored_sequence() {
+        let env = env();
+        let (original, moved) = (single("1300", 1), single("1315", 2));
+        let undo = restore(&original, &moved, &env).unwrap();
+        assert!(undo.contains("DTSTART:20261008T130000Z"), "{undo}");
+        assert!(undo.contains("SEQUENCE:2"), "{undo}");
+        let redo = restore(&moved, &undo, &env).unwrap();
+        assert!(
+            redo.contains("DTSTART:20261008T131500Z") && redo.contains("SEQUENCE:2"),
+            "{redo}"
+        );
+        // Two moves undone in turn: the first undo goes out at the later move's SEQUENCE.
+        let undo_second = restore(&moved, &single("1330", 3), &env).unwrap();
+        let undo_first = restore(&original, &undo_second, &env).unwrap();
+        assert!(
+            undo_first.contains("DTSTART:20261008T130000Z"),
+            "{undo_first}"
+        );
+        assert!(undo_first.contains("SEQUENCE:3"), "{undo_first}");
+    }
+
+    #[test]
+    fn an_undo_puts_back_an_override_added_since() {
+        // Rename the series, then move one occurrence; undoing both brings that occurrence back
+        // to the old title, though the rename never touched it.
+        let env = env();
+        let rid = "20261009T130000Z";
+        let original = series(&[], "", "Test series");
+        let renamed = series(&[], "", "Renamed series");
+        let moved = series(&[(rid, "20261009T150000Z", 1)], "", "Renamed series");
+        let undo_move = restore(&renamed, &moved, &env).unwrap();
+        let undo_rename = restore(&original, &undo_move, &env).unwrap();
+        let got = vevents(&undo_rename);
+        assert_eq!(got[0].1, "Test series", "{undo_rename}");
+        assert!(
+            got.iter()
+                .skip(1)
+                .all(|v| v.0.as_deref() == Some(rid) && v.1 == "Test series"),
+            "{undo_rename}"
+        );
+    }
 }
