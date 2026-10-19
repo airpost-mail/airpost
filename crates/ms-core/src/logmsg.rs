@@ -74,6 +74,18 @@ pub fn message_limit_applied(path: &str, min_uid: u32) -> String {
     format!("- {path}: server applied MESSAGELIMIT, only UIDs {min_uid} and up were scanned")
 }
 
+/// folder-renamed-on-server: `Projects renamed to Clients/Projects \(same UIDVALIDITY\)`;
+/// folder-renamed-in-tern: `\(recorded rename\)`.
+pub fn folder_kept_across_rename(old_path: &str, new_path: &str, how: &str) -> String {
+    format!("- {old_path} renamed to {new_path} ({how}), keeping its id")
+}
+
+/// folder-replaced-with-same-uidvalidity: `Receipts and Invoices share a UIDVALIDITY but not
+/// their messages`.
+pub fn folders_share_uidvalidity_only(old_path: &str, new_path: &str) -> String {
+    format!("- {old_path} and {new_path} share a UIDVALIDITY but not their messages.")
+}
+
 /// uidvalidity-change-large-mailbox: `UIDInvalidity! Resetting placement UIDs in INBOX`.
 pub fn uidvalidity_reset(path: &str) -> String {
     format!("UIDInvalidity! Resetting placement UIDs in {path}, rebuilding index. This may take a moment...")

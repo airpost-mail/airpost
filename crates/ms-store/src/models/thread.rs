@@ -230,6 +230,46 @@ impl Thread {
         self.data["labels"] = json!([]);
     }
 
+    /// Replaces this thread's `folders` or `labels` entry for `category` (a Folder's or
+    /// Label's JSON) with that JSON, without `localStatus` and keeping the entry's `_refs`
+    /// and `_u`, as the entry is first built. A renamed folder keeps its id, and its threads
+    /// would otherwise show the old path. Returns whether an entry changed.
+    pub fn refresh_category_entry(&mut self, category: &Value) -> bool {
+        let id = json_str(category, "id");
+        let mut changed = false;
+        for key in ["folders", "labels"] {
+            let Some(list) = self.data.get_mut(key).and_then(Value::as_array_mut) else {
+                continue;
+            };
+            for entry in list.iter_mut().filter(|e| json_str(e, "id") == id) {
+                let mut next = category.clone();
+                if let Some(obj) = next.as_object_mut() {
+                    obj.remove("localStatus");
+                    for counter in ["_refs", "_u"] {
+                        if let Some(v) = entry.get(counter) {
+                            obj.insert(counter.to_owned(), v.clone());
+                        }
+                    }
+                }
+                if *entry != next {
+                    *entry = next;
+                    changed = true;
+                }
+            }
+        }
+        changed
+    }
+
+    /// The threads `ThreadCategory` lists under `category_id`.
+    pub fn ids_in_category(store: &Store, category_id: &str) -> Result<Vec<String>> {
+        let ids = store
+            .conn()
+            .prepare_cached("SELECT id FROM ThreadCategory WHERE value = ?")?
+            .query_map([category_id], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(ids)
+    }
+
     /// The account's threads holding a copy whose stored X-GM-LABELS include a name that
     /// resolves differently under `after` than under `before`: to another label, to none, or
     /// to a label whose path or role changed. Their label refs were counted against
@@ -476,6 +516,10 @@ impl Thread {
             }
             if !found && delta > 0 {
                 let mut l = label.to_json();
+                // Labels keep a UIDVALIDITY there for rename pairing; threads don't need it.
+                if let Some(obj) = l.as_object_mut() {
+                    obj.remove("localStatus");
+                }
                 l["_refs"] = json!(1);
                 l["_u"] = json!(unread_bit);
                 next_labels.push(l);

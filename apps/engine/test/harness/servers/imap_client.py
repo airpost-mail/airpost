@@ -74,6 +74,16 @@ class ImapClientServer(Server):
         finally:
             c.logout()
 
+    def rename_mailbox(self, name, new_name):
+        c = self._client()
+        try:
+            typ, data = c.rename(self._qm(name), self._qm(new_name))
+            if typ != "OK":
+                raise RuntimeError(f"RENAME {name} {new_name}: {data}")
+            c.subscribe(self._qm(new_name))
+        finally:
+            c.logout()
+
     def append(self, mailbox, raw, flags=("\\Seen",)):
         return self.populate(mailbox, [raw], flags)[0]
 

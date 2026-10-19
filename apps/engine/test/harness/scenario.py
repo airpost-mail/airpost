@@ -876,6 +876,8 @@ class ScenarioRun(PimMixin, BackendMixin):
             s.create_mailbox(arg["name"], arg.get("special_use"))
         elif op == "delete_mailbox":
             s.delete_mailbox(arg["name"])
+        elif op == "rename_mailbox":
+            s.rename_mailbox(arg["name"], arg["to"])
         elif op == "set_uidvalidity":
             s.set_uidvalidity(arg["mailbox"], int(arg["value"]))
         elif op == "set_uidnext":

@@ -429,9 +429,9 @@ fn save_pending_draft_thread(
     Ok(())
 }
 
-/// The folder of the draft's UID-0 placement in this database, by path: folder ids are
-/// `accountId:path` hashes in both engines, but the path is what the server listing will
-/// match. Once sync has listed the account's folders and that path is not among them, the
+/// The folder of the draft's UID-0 placement in this database, by path: a folder keeps the
+/// id of the path it was first seen at across renames, and the path is what the server
+/// listing will match. Once sync has listed the account's folders and that path is not among them, the
 /// folder holding the same role takes the draft, since a folder the server does not list
 /// is deleted with its placements on the next pass. Before the first listing the folder is
 /// returned unsaved, with an empty `localStatus`, which the first pass treats as a folder
@@ -440,11 +440,11 @@ fn draft_folder(s: &Store, legacy: &LegacyDb, draft: &LegacyDraft) -> Result<Opt
     let Some((path, role)) = legacy.folder(&draft.folder_id)? else {
         return Ok(None);
     };
-    let id = ms_core::ids::folder_id(&draft.account_id, &path);
-    if let Some(f) = s.find::<Folder>(&Query::new().equal("id", &id))? {
+    let account = Query::new().equal("accountId", &draft.account_id);
+    if let Some(f) = s.find::<Folder>(&account.clone().equal("path", &path))? {
         return Ok(Some(f));
     }
-    let account = Query::new().equal("accountId", &draft.account_id);
+    let id = ms_core::ids::folder_id(&draft.account_id, &path);
     if s.count::<Folder>(&account)? > 0 {
         if role.is_empty() {
             return Ok(None);

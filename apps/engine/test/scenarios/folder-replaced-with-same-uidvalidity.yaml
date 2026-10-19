@@ -1,0 +1,32 @@
+name: folder-replaced-with-same-uidvalidity
+description: >
+  Another client deletes Receipts and creates Invoices, which the server gives the same
+  UIDVALIDITY (servers that use a constant or a per-second value do), with other messages.
+  A shared UIDVALIDITY alone doesn't make a rename: the message at Receipts' newest UID is a
+  different one in Invoices, so Receipts is removed with its messages and Invoices synced as
+  a new folder.
+source: "docs/tech-debt.md TD39; RFC 3501 2.3.1.1 (UIDVALIDITY identifies a UID space, not a mailbox)"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 3}
+  Receipts: {messages: 2}
+setup:
+  - server.set_uidvalidity: {mailbox: Receipts, value: 4242}
+steps:
+  - wait: quiescent
+  - server.delete_mailbox: {name: Receipts}
+  - server.create_mailbox: {name: Invoices}
+  - server.append: {mailbox: Invoices, messages: 2}
+  - server.set_uidvalidity: {mailbox: Invoices, value: 4242}
+  - sync: pass
+  - wait: {quiescent: true}
+expect:
+  server_counts: {INBOX: 3, Invoices: 2}
+  counts: {INBOX: 3, Invoices: 2, total: 5}
+  db_matches_server: {}
+  log_present: ["Receipts and Invoices share a UIDVALIDITY but not their messages"]
+  log_absent: ["Receipts renamed to", "\\[critical\\]"]
+  deltas: {Message: {unpersist: 2}}
+  stable: {passes: 1}
+  running: true

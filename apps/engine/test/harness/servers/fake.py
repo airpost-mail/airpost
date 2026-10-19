@@ -77,6 +77,9 @@ class FakeServer(Server):
     def delete_mailbox(self, name):
         self.store.delete(name)
 
+    def rename_mailbox(self, name, new_name):
+        self.store.rename(self.store.get(name).name, new_name)
+
     def append(self, mailbox, raw, flags=("\\Seen",)):
         return self.store.append(mailbox, raw, flags).uid
 

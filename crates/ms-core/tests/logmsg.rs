@@ -63,6 +63,18 @@ fn background_sync() {
         &message_limit_applied("Archive", 451),
     );
     assert_matches(
+        r"Projects renamed to Clients/Projects \(same UIDVALIDITY\)",
+        &folder_kept_across_rename("Projects", "Clients/Projects", "same UIDVALIDITY"),
+    );
+    assert_matches(
+        r"Projects renamed to Projects 2026 \(recorded rename\)",
+        &folder_kept_across_rename("Projects", "Projects 2026", "recorded rename"),
+    );
+    assert_matches(
+        r"Receipts and Invoices share a UIDVALIDITY but not their messages",
+        &folders_share_uidvalidity_only("Receipts", "Invoices"),
+    );
+    assert_matches(
         r"UIDInvalidity! Resetting placement UIDs in INBOX",
         &uidvalidity_reset("INBOX"),
     );

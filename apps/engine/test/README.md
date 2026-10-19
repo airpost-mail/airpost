@@ -228,7 +228,7 @@ Steps:
 | `wait: {smtp_sent_copies: n, timeout: s}` | until a `smtp_sent_copy_delay` server has filed n sent copies |
 | `wait: {counts: {mailbox: n}, timeout: s}` | until the local placement counts match, as `expect: counts`; the outcome, where a log line can arrive as an unparsed continuation |
 | `sync: pass` | `wake-workers` on stdin, then wait for that pass to finish |
-| `server.expunge / flags / move / copy / duplicate / append / create_mailbox / delete_mailbox / set_uidvalidity / set_uidnext / drop_connections / pause` | what another client does to the mailbox (`pause` changes nothing: with `at` and `delay` it holds one reply, as in `undo-before-remote-phase`); `at: before_fetch_body|idle_start|idle_tick|before_command` defers it to that protocol moment (fake only) |
+| `server.expunge / flags / move / copy / duplicate / append / create_mailbox / delete_mailbox / rename_mailbox / set_uidvalidity / set_uidnext / drop_connections / pause` | what another client does to the mailbox (`rename_mailbox: {name, to}` moves the children too and, on the Gmail fake, renames the label on its messages; `pause` changes nothing: with `at` and `delay` it holds one reply, as in `undo-before-remote-phase`); `at: before_fetch_body|idle_start|idle_tick|before_command` defers it to that protocol moment (fake only) |
 | `at: {hook, session: foreground|background, command: regex, mailbox, delay: s}` | the same, narrowed to one connection (`foreground` = the one that has idled), one command line (`"^UID FETCH 1:\\*"`) and one selected mailbox; `delay` holds that connection's reply so another connection acts on the change first (`mid-pass-foreground-tombstone`) |
 | `server.reject: {at: {hook: before_command, command: regex}, code, text}` | the hooked command is answered `NO [code] text` instead of being run (fake only; commands without literals), as in `move-rejected-by-server` |
 | `at: {..., every: true}` | keep the hook armed instead of firing once, e.g. a folder whose STATUS fails on every pass (`orphan-sweep-with-unreadable-folder`) |
@@ -557,6 +557,10 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | remote-move-destination-scanned-first | placements: move seen "present in B" before "gone from A"; never deleted/re-created | fake ×2, dovecot |
 | trash-message-with-two-placements | placements: trash from Inbox takes the Sent copy too; a plain archive does not | fake ×2, dovecot |
 | folder-deleted-with-copies-elsewhere | a folder deleted by another client or DestroyCategoryTask: its only-copies removed, copies elsewhere kept | fake, dovecot, cyrus |
+| folder-renamed-in-tern | a SyncbackCategoryTask rename keeps the folder's and its child's ids: no detach, no header refetch, threads show the new path; a new folder at the old path gets its own id | fake ×2, dovecot |
+| folder-renamed-on-server | another client's RENAME paired by UIDVALIDITY and the newest messages (per-second UIDVALIDITY settled by the messages), ids kept, no refetch | fake ×2, dovecot |
+| folder-replaced-with-same-uidvalidity | a deleted folder and a new one sharing a UIDVALIDITY but not their messages are not paired | fake |
+| gmail-label-renamed | label renamed in Tern and in the web UI keeps its id; X-GM-LABELS renamed on the copies, threads show the new name | fake |
 | flag-change-on-second-placement | placements: per-placement flags on the Sent copy of a self-addressed message | fake ×2, dovecot |
 | gmail-send-and-labels | Gmail: no Sent APPEND on send, one All Mail placement; ChangeLabelsTask keeps one placement | fake |
 | heavy-fetch-truncation-backlog | #140 1024-header truncation and draining-backlog back-off | fake, dovecot |

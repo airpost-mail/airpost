@@ -1077,6 +1077,150 @@ fn category_tasks() {
 }
 
 #[test]
+fn renaming_a_folder_keeps_its_id() {
+    let mut e = env(&[]);
+    let projects = e.folder("Projects", "");
+    let child = e.folder("Projects/2026", "");
+    let id = e.deliver(&projects, 1, MessageFlags::SEEN);
+    let path_of = |e: &Env, id: &str| {
+        e.store
+            .find::<Folder>(&Query::new().equal("id", id))
+            .unwrap()
+            .map(|f| f.path().to_owned())
+    };
+
+    let mut rename = e.queue(
+        "SyncbackCategoryTask",
+        json!({"path": "Clients", "existingPath": "Projects"}),
+    );
+    e.remote(&mut rename);
+    assert_eq!(rename.status(), "complete", "{}", rename.data);
+    assert_eq!(rename.data["created"]["id"], json!(projects.id()));
+    assert_eq!(path_of(&e, projects.id()).as_deref(), Some("Clients"));
+    assert_eq!(path_of(&e, child.id()).as_deref(), Some("Clients/2026"));
+    let thread = e.thread_of(&id);
+    assert_eq!(thread.folders()[0]["id"], json!(projects.id()));
+    assert_eq!(thread.folders()[0]["path"], "Clients");
+    assert_eq!(thread.folders()[0]["_refs"], 1);
+    assert_eq!(e.copies(&id), vec![("Clients".to_owned(), 1, None)]);
+    let records = ms_sync::folder_identity::recorded_renames(&e.store, ACCOUNT).unwrap();
+    assert_eq!(
+        (records[0].from.as_str(), records[0].to.as_str()),
+        ("Projects", "Clients")
+    );
+
+    // Found by path, not by the hash of it.
+    let mut again = e.queue(
+        "SyncbackCategoryTask",
+        json!({"path": "Archive/Clients", "existingPath": "Clients"}),
+    );
+    e.remote(&mut again);
+    assert_eq!(again.data["created"]["id"], json!(projects.id()));
+    assert_eq!(
+        path_of(&e, projects.id()).as_deref(),
+        Some("Archive/Clients")
+    );
+
+    // A new folder at the old path can't take the id the renamed one kept.
+    let mut create = e.queue("SyncbackCategoryTask", json!({"path": "Projects"}));
+    e.remote(&mut create);
+    let new_id = create.data["created"]["id"].as_str().unwrap().to_owned();
+    assert_ne!(new_id, projects.id());
+    assert_eq!(path_of(&e, &new_id).as_deref(), Some("Projects"));
+    assert_eq!(
+        path_of(&e, projects.id()).as_deref(),
+        Some("Archive/Clients")
+    );
+    e.assert_invariants();
+}
+
+#[test]
+fn a_queued_rename_refresh_waits_for_the_next_run() {
+    let mut e = env(&[]);
+    let mut projects = e.folder("Projects", "");
+    let id = e.deliver(&projects, 1, MessageFlags::SEEN);
+    // The path changed and the process quit before threads caught up.
+    projects.set_path("Clients");
+    e.store
+        .transaction("test", |s| {
+            s.save(&mut projects)?;
+            ms_sync::folder_identity::queue_refresh(s, ACCOUNT, projects.id(), "Projects")
+        })
+        .unwrap();
+    assert_eq!(e.thread_of(&id).folders()[0]["path"], "Projects");
+    ms_sync::folder_identity::run_pending_refreshes(&e.store, ACCOUNT).unwrap();
+    assert_eq!(e.thread_of(&id).folders()[0]["path"], "Clients");
+    let key = format!("folderRenameRefresh-{ACCOUNT}");
+    assert_eq!(e.store.get_key_value(&key).unwrap().as_deref(), Some("[]"));
+    ms_sync::folder_identity::run_pending_refreshes(&e.store, ACCOUNT).unwrap();
+    e.assert_invariants();
+}
+
+#[test]
+fn a_refused_rename_leaves_no_record() {
+    let mut e = env(&[]);
+    e.folder("Projects", "");
+    e.imap.reject.push("RENAME");
+    let mut rename = e.queue(
+        "SyncbackCategoryTask",
+        json!({"path": "Clients", "existingPath": "Projects"}),
+    );
+    let _ = processor(&e.store, e.harness()).perform_remote(&mut rename, &mut e.imap);
+    assert!(
+        ms_sync::folder_identity::recorded_renames(&e.store, ACCOUNT)
+            .unwrap()
+            .is_empty()
+    );
+    let kept = e
+        .store
+        .find::<Folder>(&Query::new().equal("path", "Projects"))
+        .unwrap();
+    assert!(kept.is_some());
+}
+
+#[test]
+fn renaming_a_gmail_label_renames_it_on_messages() {
+    let mut e = env(&["X-GM-EXT-1"]);
+    e.imap.profile.mailbox_model = ms_providers::MailboxModelKind::GmailLabels;
+    let all = e.folder("[Gmail]/All Mail", "all");
+    let mut work = ms_store::Label::new(&ms_core::ids::folder_id(ACCOUNT, "Work"), ACCOUNT, 0);
+    work.set_path("Work");
+    e.store.save(&mut work).unwrap();
+    let mut tagged = remote(1, MessageFlags::SEEN);
+    tagged.gmail_labels = vec!["Work".into(), "\\Important".into()];
+    let uid = e.imap.add(all.path(), tagged);
+    let fetched = e.imap.boxes[all.path()].messages[&uid].clone();
+    let mut mp = MailProcessor::new(&e.account, &e.store);
+    mp.is_gmail = true;
+    mp.insert_fallback_to_update_message(&fetched, &all, T0)
+        .unwrap();
+    let id = id_for_message(ACCOUNT, all.path(), &fetched);
+    assert_eq!(e.thread_of(&id).labels()[0]["path"], "Work");
+
+    let mut rename = e.queue(
+        "SyncbackCategoryTask",
+        json!({"path": "Clients", "existingPath": "Work"}),
+    );
+    e.remote(&mut rename);
+    assert_eq!(rename.status(), "complete", "{}", rename.data);
+    assert_eq!(rename.data["created"]["id"], json!(work.id()));
+    let placements = e.store.placements_for_message(&id).unwrap();
+    assert_eq!(placements[0].labels, vec!["Clients", "\\Important"]);
+    assert_eq!(
+        e.message(&id).unwrap().labels(),
+        &json!(["Clients", "\\Important"])
+    );
+    let thread = e.thread_of(&id);
+    let labels = thread.labels().as_array().unwrap();
+    assert_eq!(labels.len(), 1, "{labels:?}");
+    assert_eq!(labels[0]["id"], json!(work.id()));
+    assert_eq!(labels[0]["path"], "Clients");
+    assert_eq!(labels[0]["_refs"], 1);
+    assert!(labels[0].get("localStatus").is_none());
+    e.assert_invariants();
+}
+
+#[test]
 fn expunge_all_in_folder_removes_messages_only_there() {
     let mut e = env(&["MOVE", "UIDPLUS"]);
     let inbox = e.folder("INBOX", "inbox");

@@ -17,7 +17,8 @@ use ms_store::{Folder, Label, Message, Model, Query, Store};
 
 pub trait MailboxModel {
     /// Splits LIST output into the folders that hold placements and the labels. Both come
-    /// back new (version 0) with id and path set; the caller matches them to stored rows.
+    /// back new (version 0) with id and path set; the caller matches them to stored rows by
+    /// path, since a renamed row keeps the id of its first path.
     fn classify_folders(&self, listed: &[ListedFolder]) -> (Vec<Folder>, Vec<Label>);
     /// Called after a placement is inserted or updated, e.g. to apply X-GM-LABELS.
     fn on_placement_upserted(

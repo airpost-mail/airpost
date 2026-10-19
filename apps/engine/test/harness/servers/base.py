@@ -67,6 +67,10 @@ class Server(ABC):
     @abstractmethod
     def delete_mailbox(self, name: str): ...
 
+    def rename_mailbox(self, name: str, new_name: str):
+        """RENAME, as another client does it: children move with the mailbox."""
+        raise NotImplementedError(f"{self.kind} cannot rename mailboxes")
+
     @abstractmethod
     def append(self, mailbox: str, raw: bytes, flags: Iterable[str] = ("\\Seen",)) -> int: ...
 

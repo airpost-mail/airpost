@@ -107,6 +107,15 @@ pub const NO_BODY_CACHE_ROLES: [&str; 2] = ["spam", "trash"];
 
 /// IDLE is restarted after this long (RFC 3501 asks clients to re-IDLE within 29 minutes).
 pub const IDLE_TIMEOUT: i64 = 28 * 60;
+/// A rename `SyncbackCategoryTask` recorded stays usable this long (seconds) for pairing a
+/// folder the listing no longer shows with the path it was renamed to. Not in C++.
+pub const FOLDER_RENAME_RECORD_TTL: i64 = 60 * 60;
+/// Folder sync asks STATUS for at most this many newly listed folders per pass to pair them
+/// with vanished ones by UIDVALIDITY; above it they are created afresh. Not in C++.
+pub const RENAME_PAIRING_STATUS_LIMIT: usize = 50;
+/// Gmail labels whose UIDVALIDITY is recorded per pass (one STATUS each, once per label),
+/// so a label renamed on the server can be paired with its new name. Not in C++.
+pub const LABEL_UIDVALIDITY_LOOKUPS_PER_PASS: usize = 25;
 /// Workers sleep this long between passes and after a retryable error, unless woken.
 pub const WORKER_SLEEP: u64 = 120;
 /// `queue-task` interrupts the foreground IDLE after this debounce, so back-to-back tasks

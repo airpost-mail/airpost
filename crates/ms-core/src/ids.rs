@@ -122,6 +122,20 @@ pub fn folder_id(account_id: &str, folder_path: &str) -> String {
     hash_id(&format!("{account_id}:{folder_path}"))
 }
 
+/// The id for a new folder or label at `folder_path`: [`folder_id`] unless `taken` says a
+/// row already holds it, which happens once a renamed folder keeps the id of its old path
+/// and a new folder is created at that path. Then `accountId:path#n` for the first free `n`.
+pub fn free_folder_id(account_id: &str, folder_path: &str, taken: impl Fn(&str) -> bool) -> String {
+    let id = folder_id(account_id, folder_path);
+    if !taken(&id) {
+        return id;
+    }
+    (1u32..)
+        .map(|n| hash_id(&format!("{account_id}:{folder_path}#{n}")))
+        .find(|id| !taken(id))
+        .expect("an unbounded range has a free id")
+}
+
 /// `t:<first message id>`. Not hashed.
 pub fn thread_id(first_message_id: &str) -> String {
     format!("t:{first_message_id}")
@@ -328,6 +342,15 @@ mod tests {
     #[test]
     fn folder_and_simple_ids() {
         assert_eq!(folder_id("acc", "INBOX"), hash_id("acc:INBOX"));
+        assert_eq!(
+            free_folder_id("acc", "INBOX", |_| false),
+            folder_id("acc", "INBOX")
+        );
+        let first = folder_id("acc", "INBOX");
+        let next = free_folder_id("acc", "INBOX", |id| id == first);
+        assert_eq!(next, hash_id("acc:INBOX#1"));
+        let second = free_folder_id("acc", "INBOX", |id| id == first || id == next);
+        assert_eq!(second, hash_id("acc:INBOX#2"));
         assert_eq!(thread_id("abc"), "t:abc");
         assert_eq!(event_id("a", "c", "u", ""), hash_id("a-c-u"));
         assert_eq!(event_id("a", "c", "u", "r"), hash_id("a-c-u-r"));

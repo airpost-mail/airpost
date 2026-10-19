@@ -14,19 +14,21 @@ use std::time::Duration;
 
 use ms_core::constants::{
     ls, orphan_sweep_max_wait, thread, CACHE_CLEANUP_INTERVAL, CONDSTORE_GAP_SCAN_INTERVAL,
-    DEEP_SCAN_INTERVAL, FIRST_SYNC_CHUNK_SIZE, FOLDER_SYNC_ROLE_ORDER, MAILSPRING_FOLDER_PREFIX_V2,
-    MAX_FULL_HEADERS_REQUEST_SIZE, MAX_SINGLE_RANGE_SWEEP_SIZE, NEW_MAIL_BODY_FETCH_LIMIT,
+    DEEP_SCAN_INTERVAL, FIRST_SYNC_CHUNK_SIZE, FOLDER_SYNC_ROLE_ORDER,
+    LABEL_UIDVALIDITY_LOOKUPS_PER_PASS, MAILSPRING_FOLDER_PREFIX_V2, MAX_FULL_HEADERS_REQUEST_SIZE,
+    MAX_SINGLE_RANGE_SWEEP_SIZE, NEW_MAIL_BODY_FETCH_LIMIT, RENAME_PAIRING_STATUS_LIMIT,
     SHALLOW_SCAN_DEPTH, SHALLOW_SCAN_INTERVAL, WORKER_SLEEP,
 };
-use ms_core::{logmsg, Error, ErrorCode, FolderFlags, Result, SyncError};
-use ms_imap::{FolderStatus, ImapSession, ListedFolder, Namespace};
+use ms_core::{logmsg, Error, ErrorCode, FolderFlags, Result, SyncError, UidSet};
+use ms_imap::{FetchKind, FolderStatus, ImapSession, ListedFolder, Namespace};
 use ms_providers::roles::{role_for_folder, role_for_folder_flags, role_for_folder_path, ROLES};
 use ms_store::{Folder, Label, Message, Model, Query, Thread};
 use serde_json::Value;
 use tracing::{error, info, warn};
 
+use crate::folder_identity::{self, Validity};
 use crate::foreground::run_foreground;
-use crate::mail_processor::UnplacedMessages;
+use crate::mail_processor::{id_for_message, UnplacedMessages};
 use crate::mailbox_model;
 use crate::worker::{ls_i64, ls_u32, set_ls, Range, SyncWorker};
 use crate::WorkerContext;
@@ -99,6 +101,202 @@ impl Category {
             Category::Folder(_) => Folder::TABLE,
             Category::Label(_) => Label::TABLE,
         }
+    }
+
+    /// A row for a newly listed path; its id is set once rename pairing has run.
+    fn new_folder(account_id: &str, path: &str) -> Self {
+        let mut f = Folder::new("", account_id, 0);
+        f.set_path(path);
+        Category::Folder(f)
+    }
+
+    fn new_label(account_id: &str, path: &str) -> Self {
+        let mut l = Label::new("", account_id, 0);
+        l.set_path(path);
+        Category::Label(l)
+    }
+
+    fn id(&self) -> &str {
+        match self {
+            Category::Folder(f) => f.id(),
+            Category::Label(l) => l.id(),
+        }
+    }
+
+    fn data_mut(&mut self) -> &mut Value {
+        match self {
+            Category::Folder(f) => &mut f.data,
+            Category::Label(l) => &mut l.data,
+        }
+    }
+
+    fn set_id(&mut self, id: &str) {
+        self.data_mut()["id"] = Value::from(id);
+    }
+
+    fn set_path(&mut self, path: &str) {
+        match self {
+            Category::Folder(f) => f.set_path(path),
+            Category::Label(l) => l.set_path(path),
+        }
+    }
+
+    fn is_label(&self) -> bool {
+        matches!(self, Category::Label(_))
+    }
+
+    fn save(&mut self, store: &ms_store::Store) -> Result<()> {
+        match self {
+            Category::Folder(f) => store.save(f),
+            Category::Label(l) => store.save(l),
+        }
+    }
+}
+
+/// A row the listing showed at a new path and that keeps its id: `categories[index]`.
+struct Renamed {
+    index: usize,
+    old_path: String,
+}
+
+/// Path → row id. Rows sharing a path (an old database) resolve to the one whose id is the
+/// path's hash; the others stay unused and are removed.
+fn ids_by_path<'a>(
+    account_id: &str,
+    rows: impl Iterator<Item = (&'a str, &'a str)>,
+) -> HashMap<String, String> {
+    let mut out: HashMap<String, String> = HashMap::new();
+    for (id, path) in rows {
+        let keep_existing =
+            out.contains_key(path) && id != ms_core::ids::folder_id(account_id, path);
+        if !keep_existing {
+            out.insert(path.to_owned(), id.to_owned());
+        }
+    }
+    out
+}
+
+/// Reloads the Folder or Label `id` inside the transaction, applies `change` and saves it,
+/// so keys another thread wrote meanwhile survive; nothing when the row is gone.
+fn update_fresh(
+    s: &ms_store::Store,
+    id: &str,
+    is_label: bool,
+    change: impl FnOnce(&mut Category),
+) -> Result<()> {
+    let q = Query::new().equal("id", id);
+    let fresh = if is_label {
+        s.find::<Label>(&q)?.map(Category::Label)
+    } else {
+        s.find::<Folder>(&q)?.map(Category::Folder)
+    };
+    if let Some(mut c) = fresh {
+        change(&mut c);
+        c.save(s)?;
+    }
+    Ok(())
+}
+
+/// Labels keep their UIDVALIDITY (and UIDNEXT, for the pairing check) in `localStatus`.
+fn set_validity(c: &mut Category, v: Validity) {
+    let data = c.data_mut();
+    if !data["localStatus"].is_object() {
+        data["localStatus"] = Value::Object(Default::default());
+    }
+    data["localStatus"][ls::UIDVALIDITY] = Value::from(v.uid_validity);
+    data["localStatus"][ls::UIDNEXT] = Value::from(v.uid_next);
+}
+
+/// The new rows in `created` that are labels (or folders).
+fn of_kind(categories: &[Category], created: &[usize], is_label: bool) -> Vec<usize> {
+    created
+        .iter()
+        .copied()
+        .filter(|&i| categories[i].is_label() == is_label)
+        .collect()
+}
+
+/// Roles: for each role in order, a folder already holding it wins, then a folder whose
+/// flags say it, then one whose name does. Returns the stored rows that gained one, as (id,
+/// role, is a label); a new row is saved with its role.
+fn assign_roles(
+    remote: &[ListedFolder],
+    categories: &mut [Category],
+    by_path: &HashMap<String, usize>,
+    container: &str,
+    main_prefix: &str,
+) -> Vec<(String, &'static str, bool)> {
+    let mut role_updates: Vec<(String, &'static str, bool)> = Vec::new();
+    for role in ROLES {
+        if categories.iter().any(|c| c.role() == role) {
+            continue;
+        }
+        let by_flags = |r: &ListedFolder| role_for_folder_flags(r.flags) == Some(role);
+        let by_path_role = |r: &ListedFolder| {
+            role_for_folder_path(container, main_prefix, &r.path, r.delimiter) == Some(role)
+        };
+        for matcher in [&by_flags as &dyn Fn(&ListedFolder) -> bool, &by_path_role] {
+            let mut found = false;
+            for r in remote.iter().filter(|r| matcher(r)) {
+                let Some(&i) = by_path.get(&r.path) else {
+                    warn!("-X found folder for role, couldn't find local object for {role}");
+                    continue;
+                };
+                categories[i].set_role(role);
+                if categories[i].version() > 0 {
+                    let c = &categories[i];
+                    role_updates.push((c.id().to_owned(), role, c.is_label()));
+                }
+                found = true;
+                break;
+            }
+            if found {
+                break;
+            }
+        }
+    }
+    role_updates
+}
+
+/// Takes the unused row `id` out of its map.
+fn take_row(
+    unused_folders: &mut HashMap<String, Folder>,
+    unused_labels: &mut HashMap<String, Label>,
+    id: &str,
+    is_label: bool,
+) -> Category {
+    if is_label {
+        Category::Label(unused_labels.remove(id).expect("paired label is unused"))
+    } else {
+        Category::Folder(unused_folders.remove(id).expect("paired folder is unused"))
+    }
+}
+
+/// Puts `row`, at its new `path`, in place of the new row `categories[index]`.
+fn keep_renamed(
+    renamed: &mut Vec<Renamed>,
+    categories: &mut [Category],
+    created: &mut Vec<usize>,
+    mut row: Category,
+    index: usize,
+    path: &str,
+    how: &str,
+) {
+    let old_path = row.path().to_owned();
+    info!(
+        "{}",
+        logmsg::folder_kept_across_rename(&old_path, path, how)
+    );
+    row.set_path(path);
+    categories[index] = row;
+    created.retain(|&i| i != index);
+    renamed.push(Renamed { index, old_path });
+}
+
+fn stored_validity(status: &Value) -> Validity {
+    Validity {
+        uid_validity: ls_u32(status, ls::UIDVALIDITY),
+        uid_next: ls_u32(status, ls::UIDNEXT),
     }
 }
 
@@ -740,12 +938,10 @@ impl Background {
         *remote = kept;
     }
 
-    /// Lists the server's folders, creates the helper folders, assigns roles and brings
-    /// the local Folder and Label rows in line (`syncFoldersAndLabels`). Returns the
-    /// folders to scan.
-    fn sync_folders_and_labels(&mut self) -> Result<Vec<Folder>> {
+    /// LIST without `\Noselect` folders and repeated paths, after creating the helper
+    /// folders the account lacks.
+    fn list_remote_folders(&mut self) -> Result<Vec<ListedFolder>> {
         let account = self.ctx().account.clone();
-        let account_id = account.id().to_owned();
         let container = account.container_folder().to_owned();
         let components = self.container_components();
 
@@ -808,6 +1004,21 @@ impl Background {
         if self.w.session.profile().merge_duplicate_list_entries {
             self.remove_duplicate_folders(&mut remote);
         }
+        // Rows are matched by path, so a repeated LIST line must not become a second row.
+        let mut listed_paths = HashSet::new();
+        remote.retain(|r| listed_paths.insert(r.path.clone()));
+        Ok(remote)
+    }
+
+    /// Lists the server's folders, creates the helper folders, assigns roles and brings
+    /// the local Folder and Label rows in line (`syncFoldersAndLabels`). Returns the
+    /// folders to scan.
+    fn sync_folders_and_labels(&mut self) -> Result<Vec<Folder>> {
+        let account = self.ctx().account.clone();
+        let account_id = account.id().to_owned();
+        let container = account.container_folder().to_owned();
+        let main_prefix = self.namespace().prefix;
+        let remote = self.list_remote_folders()?;
 
         // Read local state and compute the diff outside the transaction, to keep the write
         // lock on the shared database short.
@@ -817,71 +1028,72 @@ impl Background {
         let labels_before = self.w.store.all_labels_cache(&account_id)?;
         let model = mailbox_model::for_profile(self.w.session.profile().mailbox_model, &account_id);
         let (_, labels) = model.classify_folders(&remote);
-        let label_ids: HashSet<String> = labels.iter().map(|l| l.id().to_owned()).collect();
+        let label_paths: HashSet<String> = labels.iter().map(|l| l.path().to_owned()).collect();
+        let mut taken_ids: HashSet<String> = unused_folders
+            .keys()
+            .chain(unused_labels.keys())
+            .cloned()
+            .collect();
 
+        // Rows are matched by path: a renamed folder keeps the id of the path it had first.
+        let folder_ids_by_path = ids_by_path(
+            &account_id,
+            unused_folders.values().map(|f| (f.id(), f.path())),
+        );
+        let label_ids_by_path = ids_by_path(
+            &account_id,
+            unused_labels.values().map(|l| (l.id(), l.path())),
+        );
         let mut categories: Vec<Category> = Vec::with_capacity(remote.len());
         let mut created: Vec<usize> = Vec::new();
-        let mut by_id: HashMap<String, usize> = HashMap::new();
+        let mut by_path: HashMap<String, usize> = HashMap::new();
         for r in &remote {
-            let id = ms_core::ids::folder_id(&account_id, &r.path);
-            let category = if label_ids.contains(&id) {
-                match unused_labels.remove(&id) {
+            let category = if label_paths.contains(&r.path) {
+                match label_ids_by_path
+                    .get(&r.path)
+                    .and_then(|id| unused_labels.remove(id))
+                {
                     Some(l) => Category::Label(l),
                     None => {
-                        let mut l = Label::new(&id, &account_id, 0);
-                        l.set_path(&r.path);
                         created.push(categories.len());
-                        Category::Label(l)
+                        Category::new_label(&account_id, &r.path)
                     }
                 }
             } else {
-                match unused_folders.remove(&id) {
+                match folder_ids_by_path
+                    .get(&r.path)
+                    .and_then(|id| unused_folders.remove(id))
+                {
                     Some(f) => Category::Folder(f),
                     None => {
-                        let mut f = Folder::new(&id, &account_id, 0);
-                        f.set_path(&r.path);
                         created.push(categories.len());
-                        Category::Folder(f)
+                        Category::new_folder(&account_id, &r.path)
                     }
                 }
             };
-            by_id.insert(id, categories.len());
+            by_path.insert(r.path.clone(), categories.len());
             categories.push(category);
         }
 
-        // Roles: for each role in order, a folder already holding it wins, then a folder
-        // whose flags say it, then one whose name does.
-        let mut role_updates: Vec<(String, &'static str)> = Vec::new();
-        for role in ROLES {
-            if categories.iter().any(|c| c.role() == role) {
-                continue;
-            }
-            let by_flags = |r: &ListedFolder| role_for_folder_flags(r.flags) == Some(role);
-            let by_path = |r: &ListedFolder| {
-                role_for_folder_path(&container, &main_prefix, &r.path, r.delimiter) == Some(role)
-            };
-            for matcher in [&by_flags as &dyn Fn(&ListedFolder) -> bool, &by_path] {
-                let mut found = false;
-                for r in remote.iter().filter(|r| matcher(r)) {
-                    let id = ms_core::ids::folder_id(&account_id, &r.path);
-                    let Some(&i) = by_id.get(&id) else {
-                        warn!("-X found folder for role, couldn't find local object for {role}");
-                        continue;
-                    };
-                    categories[i].set_role(role);
-                    // A new row is saved with its role; an existing one is reloaded fresh
-                    // inside the transaction.
-                    if categories[i].version() > 0 {
-                        role_updates.push((id, role));
-                    }
-                    found = true;
-                    break;
-                }
-                if found {
-                    break;
-                }
-            }
+        let renamed = self.pair_renamed(
+            &account_id,
+            &remote,
+            &mut categories,
+            &mut created,
+            &mut unused_folders,
+            &mut unused_labels,
+        )?;
+        for &i in &created {
+            let id = ms_core::ids::free_folder_id(&account_id, categories[i].path(), |id| {
+                taken_ids.contains(id)
+            });
+            taken_ids.insert(id.clone());
+            categories[i].set_id(&id);
         }
+        let label_validity = self.record_label_validity(&mut categories)?;
+
+        let role_updates =
+            assign_roles(&remote, &mut categories, &by_path, &container, &main_prefix);
 
         // Detach the copies in folders the server no longer has before their rows go, in
         // bounded transactions, so a quit before the removal leaves every message's
@@ -912,17 +1124,16 @@ impl Background {
                     );
                 }
             }
-            for (id, role) in &role_updates {
-                let fresh_q = Query::new().equal("id", id);
-                if label_ids.contains(id) {
-                    if let Some(mut l) = s.find::<Label>(&fresh_q)? {
-                        l.set_role(role);
-                        s.save(&mut l)?;
-                    }
-                } else if let Some(mut f) = s.find::<Folder>(&fresh_q)? {
-                    f.set_role(role);
-                    s.save(&mut f)?;
-                }
+            for r in &renamed {
+                let c = &categories[r.index];
+                update_fresh(s, c.id(), c.is_label(), |fresh| fresh.set_path(c.path()))?;
+                folder_identity::queue_refresh(s, &account_id, c.id(), &r.old_path)?;
+            }
+            for (id, role, is_label) in &role_updates {
+                update_fresh(s, id, *is_label, |fresh| fresh.set_role(role))?;
+            }
+            for (id, validity) in &label_validity {
+                update_fresh(s, id, true, |fresh| set_validity(fresh, *validity))?;
             }
             // A copy the foreground worker recorded in a removed folder after the detach is
             // deleted with the folder, and its message caught up once this commits.
@@ -943,11 +1154,13 @@ impl Background {
             "syncFoldersAndLabels",
         )?;
 
+        folder_identity::run_pending_refreshes(&self.w.store, &account_id)?;
+
         let labels_changed = !unused_labels.is_empty()
             || created
                 .iter()
                 .any(|&i| matches!(categories[i], Category::Label(_)))
-            || role_updates.iter().any(|(id, _)| label_ids.contains(id));
+            || role_updates.iter().any(|(_, _, is_label)| *is_label);
         if labels_changed {
             self.recount_relabelled_threads(&account_id, &labels_before)?;
         }
@@ -959,6 +1172,271 @@ impl Background {
                 Category::Label(_) => None,
             })
             .collect())
+    }
+
+    /// Pairs rows the listing no longer shows with newly listed paths of the same kind: by
+    /// a rename `SyncbackCategoryTask` recorded, then by a UIDVALIDITY only one of each has
+    /// (checked against the messages for folders). A paired row takes the listed path and
+    /// replaces the new row in `categories`, and leaves `created` and the unused maps.
+    fn pair_renamed(
+        &mut self,
+        account_id: &str,
+        remote: &[ListedFolder],
+        categories: &mut [Category],
+        created: &mut Vec<usize>,
+        unused_folders: &mut HashMap<String, Folder>,
+        unused_labels: &mut HashMap<String, Label>,
+    ) -> Result<Vec<Renamed>> {
+        let mut renamed = Vec::new();
+        if created.is_empty() || (unused_folders.is_empty() && unused_labels.is_empty()) {
+            return Ok(renamed);
+        }
+        let records = folder_identity::recorded_renames(&self.w.store, account_id)?;
+        for is_label in [false, true] {
+            let vanished: Vec<(String, String)> = if is_label {
+                unused_labels
+                    .values()
+                    .map(|l| (l.id().to_owned(), l.path().to_owned()))
+                    .collect()
+            } else {
+                unused_folders
+                    .values()
+                    .map(|f| (f.id().to_owned(), f.path().to_owned()))
+                    .collect()
+            };
+            let listed: Vec<(usize, String, Option<char>)> = of_kind(categories, created, is_label)
+                .into_iter()
+                .map(|i| (i, remote[i].path.clone(), remote[i].delimiter))
+                .collect();
+            if vanished.is_empty() || listed.is_empty() {
+                continue;
+            }
+            for (id, i) in folder_identity::pair_by_records(&vanished, &listed, &records) {
+                let mut row = take_row(unused_folders, unused_labels, &id, is_label);
+                if is_label {
+                    // The server may have given the new name another UIDVALIDITY; looked up
+                    // again below.
+                    if let Some(o) = row.data_mut()["localStatus"].as_object_mut() {
+                        o.remove(ls::UIDVALIDITY);
+                    }
+                }
+                keep_renamed(
+                    &mut renamed,
+                    categories,
+                    created,
+                    row,
+                    i,
+                    &remote[i].path,
+                    "recorded rename",
+                );
+            }
+
+            let vanished: Vec<(String, Validity)> = if is_label {
+                unused_labels
+                    .values()
+                    .map(|l| (l.id().to_owned(), stored_validity(l.local_status())))
+                    .collect()
+            } else {
+                unused_folders
+                    .values()
+                    .map(|f| (f.id().to_owned(), stored_validity(f.local_status())))
+                    .collect()
+            };
+            let vanished: Vec<_> = vanished
+                .into_iter()
+                .filter(|(_, v)| v.uid_validity != 0)
+                .collect();
+            let listed = of_kind(categories, created, is_label);
+            if vanished.is_empty() || listed.is_empty() {
+                continue;
+            }
+            if listed.len() > RENAME_PAIRING_STATUS_LIMIT {
+                info!(
+                    "- {} new folders listed, too many to pair with vanished ones by UIDVALIDITY.",
+                    listed.len()
+                );
+                continue;
+            }
+            let mut statuses = Vec::with_capacity(listed.len());
+            let mut complete = true;
+            for i in listed {
+                match self.status_for_pairing(&remote[i].path)? {
+                    Some(v) => {
+                        if is_label {
+                            set_validity(&mut categories[i], v);
+                        }
+                        statuses.push((i, v));
+                    }
+                    None => complete = false,
+                }
+            }
+            // A folder whose STATUS failed might share the value and make a pair ambiguous.
+            if !complete {
+                continue;
+            }
+            let candidates = folder_identity::uidvalidity_candidates(&vanished, &statuses);
+            let unique = folder_identity::unique_pairs(candidates.clone());
+            let mut pairs = Vec::new();
+            for (id, i) in &unique {
+                if is_label
+                    || self.holds_same_messages(
+                        account_id,
+                        &unused_folders[id],
+                        &remote[*i].path,
+                        false,
+                    )?
+                {
+                    pairs.push((id.clone(), *i));
+                } else {
+                    info!(
+                        "{}",
+                        logmsg::folders_share_uidvalidity_only(
+                            unused_folders[id].path(),
+                            &remote[*i].path
+                        )
+                    );
+                }
+            }
+            // A value several folders share (one per second of creation on some servers) is
+            // settled by the messages: a pair whose newest copies match, if only one does.
+            let ambiguous: Vec<(String, usize)> = candidates
+                .into_iter()
+                .filter(|c| !unique.contains(c))
+                .collect();
+            if !is_label && !ambiguous.is_empty() && ambiguous.len() <= RENAME_PAIRING_STATUS_LIMIT
+            {
+                let mut verified = Vec::new();
+                for (id, i) in ambiguous {
+                    if self.holds_same_messages(
+                        account_id,
+                        &unused_folders[&id],
+                        &remote[i].path,
+                        true,
+                    )? {
+                        verified.push((id, i));
+                    }
+                }
+                pairs.extend(folder_identity::unique_pairs(verified));
+            }
+            for (id, i) in pairs {
+                let path = &remote[i].path;
+                let mut row = take_row(unused_folders, unused_labels, &id, is_label);
+                if is_label {
+                    if let Some(&(_, v)) = statuses.iter().find(|(j, _)| *j == i) {
+                        set_validity(&mut row, v);
+                    }
+                }
+                keep_renamed(
+                    &mut renamed,
+                    categories,
+                    created,
+                    row,
+                    i,
+                    path,
+                    "same UIDVALIDITY",
+                );
+            }
+        }
+        Ok(renamed)
+    }
+
+    /// UIDVALIDITY and UIDNEXT of `path`, `None` when the server refused the STATUS. A
+    /// connection error ends the pass, before anything is removed.
+    fn status_for_pairing(&mut self, path: &str) -> Result<Option<Validity>> {
+        match self.w.session.status(path) {
+            Ok(st) => Ok(Some(Validity {
+                uid_validity: st.uid_validity,
+                uid_next: st.uid_next,
+            })),
+            Err(e) => {
+                warn!("{}", logmsg::folder_status_failed(path, e.code.name()));
+                let err = e.into_sync("syncFoldersAndLabels - status");
+                if err.is_offline() {
+                    return Err(err.into());
+                }
+                Ok(None)
+            }
+        }
+    }
+
+    /// Whether the newest copies stored for `folder` are at the same UIDs in `path`, with
+    /// the same message ids: a UIDVALIDITY alone can be shared by unrelated mailboxes. A
+    /// folder holding nothing has nothing to mislink and passes unless `strict`.
+    fn holds_same_messages(
+        &mut self,
+        account_id: &str,
+        folder: &Folder,
+        path: &str,
+        strict: bool,
+    ) -> Result<bool> {
+        let newest: Vec<(u32, String)> = self
+            .w
+            .store
+            .conn()
+            .prepare_cached(
+                "SELECT remoteUID, messageId FROM MessageFolder WHERE accountId = ? AND folderId = ? \
+                 AND remoteUID > 0 ORDER BY remoteUID DESC LIMIT 3",
+            )?
+            .query_map(rusqlite::params![account_id, folder.id()], |r| {
+                Ok((r.get::<_, i64>(0)? as u32, r.get(1)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        if newest.is_empty() {
+            return Ok(!strict);
+        }
+        let uids = UidSet::from_uids(newest.iter().map(|(uid, _)| *uid));
+        let fetched = match self.w.session.fetch_by_uid(path, FetchKind::Heavy, &uids) {
+            Ok(r) => r.messages,
+            Err(e) => {
+                let err = e.into_sync("syncFoldersAndLabels - fetchMessagesByUID");
+                if err.is_offline() {
+                    return Err(err.into());
+                }
+                return Ok(false);
+            }
+        };
+        let mut matched = false;
+        for m in &fetched {
+            let Some((_, stored)) = newest.iter().find(|(uid, _)| *uid == m.uid) else {
+                continue;
+            };
+            // Ids of dateless messages include the path, which was the old one when stored.
+            if &id_for_message(account_id, folder.path(), m) != stored {
+                return Ok(false);
+            }
+            matched = true;
+        }
+        Ok(matched)
+    }
+
+    /// Records the UIDVALIDITY of labels that have none yet, a few per pass, so a label
+    /// renamed in Gmail's web UI can be paired with its new name. Returns the stored labels
+    /// to update; new ones carry it in their row.
+    fn record_label_validity(
+        &mut self,
+        categories: &mut [Category],
+    ) -> Result<Vec<(String, Validity)>> {
+        let mut updates = Vec::new();
+        let mut budget = LABEL_UIDVALIDITY_LOOKUPS_PER_PASS;
+        for c in categories.iter_mut() {
+            let Category::Label(l) = c else { continue };
+            if ls_u32(l.local_status(), ls::UIDVALIDITY) != 0 {
+                continue;
+            }
+            if budget == 0 {
+                break;
+            }
+            budget -= 1;
+            let path = l.path().to_owned();
+            let Some(v) = self.status_for_pairing(&path)? else {
+                continue;
+            };
+            if c.version() > 0 {
+                updates.push((c.id().to_owned(), v));
+            }
+            set_validity(c, v);
+        }
+        Ok(updates)
     }
 
     /// Threads count their labels by resolving each message's X-GM-LABELS against the

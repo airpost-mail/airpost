@@ -14,6 +14,7 @@ pub mod background;
 pub mod cal_contacts;
 pub mod dav;
 pub mod expiration_executor;
+pub mod folder_identity;
 pub mod foreground;
 pub mod google_contacts;
 pub mod mail_processor;

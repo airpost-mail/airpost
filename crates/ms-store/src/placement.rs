@@ -178,6 +178,46 @@ fn collect_ids(mut rows: rusqlite::Rows<'_>) -> Result<Vec<String>> {
 }
 
 impl Store {
+    /// The account's messages with a copy whose X-GM-LABELS include `name`.
+    pub fn message_ids_with_label(&self, account_id: &str, name: &str) -> Result<Vec<String>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT DISTINCT mf.messageId FROM MessageFolder mf, json_each(mf.remoteXGMLabels) j \
+             WHERE mf.accountId = ? AND j.value = ?",
+        )?;
+        let ids = collect_ids(stmt.query(params![account_id, name])?)?;
+        Ok(ids)
+    }
+
+    /// Replaces X-GM-LABELS `from` with `to` on every copy of `message_ids`: a Gmail label
+    /// that kept its id across a rename, whose messages Gmail may not report again. Marks
+    /// nothing; the caller reloads, refreshes and saves the messages and recounts their
+    /// threads.
+    pub fn rename_label_in_placements(
+        &self,
+        message_ids: &[String],
+        from: &str,
+        to: &str,
+    ) -> Result<()> {
+        for id in message_ids {
+            for p in self.placements_for_message(id)? {
+                if !p.labels.iter().any(|l| l == from) {
+                    continue;
+                }
+                let mut labels: Vec<String> = Vec::with_capacity(p.labels.len());
+                for l in &p.labels {
+                    let l = if l == from { to } else { l.as_str() };
+                    if !labels.iter().any(|x| x == l) {
+                        labels.push(l.to_owned());
+                    }
+                }
+                self.conn()
+                    .prepare_cached("UPDATE MessageFolder SET remoteXGMLabels = ? WHERE rowid = ?")?
+                    .execute(params![labels_text(&labels), p.rowid])?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn placements_for_message(&self, message_id: &str) -> Result<Vec<Placement>> {
         let mut stmt = self.conn().prepare_cached(&format!(
             "SELECT {PLACEMENT_COLUMNS} FROM MessageFolder WHERE messageId = ? ORDER BY rowid"

@@ -470,6 +470,34 @@ class GmailStore(Store):
             self.mailboxes[name] = view
             return view
 
+    def rename(self, old, new):
+        """Renaming a label view renames the label on its messages. Modseqs are left alone,
+        so a client learns the new name only from LIST and its own bookkeeping.
+        NEEDS-RECORDING: whether Gmail bumps MODSEQ and keeps UIDVALIDITY on a label rename."""
+        with self.lock:
+            moved = [(n, new + n[len(old):]) for n in self.mailboxes
+                     if n == old or n.startswith(old + self.delimiter)]
+            super().rename(old, new)
+            for before, after in moved:
+                v = self.mailboxes.get(after)
+                if not isinstance(v, LabelView) or v.label != before:
+                    continue
+                v.label = after
+                for physical in [mb for mb in self.mailboxes.values() if not isinstance(mb, LabelView)]:
+                    for m in physical.messages:
+                        if before in m.labels:
+                            m.labels = (m.labels - {before}) | {after}
+
+    def set_uidvalidity(self, mailbox, value, renumber=True):
+        """A label view takes the value and keeps its UIDs: they are the view's own, and
+        renumbering would renumber All Mail."""
+        with self.lock:
+            mb = self.get(mailbox)
+            if isinstance(mb, LabelView):
+                mb.uidvalidity = value
+                return
+        super().set_uidvalidity(mailbox, value, renumber)
+
     def _physical(self, mb):
         return mb.backing if isinstance(mb, LabelView) else mb
 

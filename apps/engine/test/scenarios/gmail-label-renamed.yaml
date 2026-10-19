@@ -1,0 +1,55 @@
+name: gmail-label-renamed
+description: >
+  Gmail: the user renames the label Work to Clients from Tern, and Receipts is renamed to
+  Bills in the web UI. Both labels keep their ids, so threads keep them: the engine renames
+  the X-GM-LABELS entry on its copies itself (the fake, like a label rename that bumps no
+  MODSEQ, never re-sends those messages) and the threads show the new names. The server-side
+  rename is paired by the UIDVALIDITY the engine recorded for Receipts when it first saw it.
+source: "docs/tech-debt.md TD39; Gmail IMAP extensions (X-GM-LABELS names a label by its path). NEEDS-RECORDING: whether Gmail keeps a label's UIDVALIDITY and bumps MODSEQ on rename"
+servers:
+  - {fake: gmail}
+mailboxes:
+  INBOX: {messages: 8}
+  Work: {messages: 2}
+  Receipts: {messages: 2}
+setup:
+  - server.labels: {mailbox: INBOX, uids: "1:3", add: ["Work"]}
+  - server.set_uidvalidity: {mailbox: Receipts, value: 9001}
+steps:
+  - wait: quiescent
+  - assert:
+      db_matches_server: {labels: true}
+  - mark: before_rename
+  - client.task: {__cls: SyncbackCategoryTask, path: Clients, existingPath: Work}
+    as: rename
+  - wait: {task: rename, timeout: 60}
+  - sync: pass
+  - wait: {quiescent: true}
+  - assert:
+      db_matches_server: {labels: true}
+      changed_since:
+        mark: before_rename
+        Label: {key: path, unpersist: []}
+      sql:
+        - {query: "SELECT COUNT(*) FROM MessageFolder WHERE remoteXGMLabels LIKE '%\"Work\"%'", equals: 0}
+        - {query: "SELECT COUNT(*) FROM MessageFolder WHERE remoteXGMLabels LIKE '%\"Clients\"%'", equals: 5}
+  - server.rename_mailbox: {name: Receipts, to: Bills}
+  - sync: pass
+  - wait: {quiescent: true}
+expect:
+  db_matches_server: {labels: true}
+  changed_since:
+    mark: before_rename
+    Label: {key: path, unpersist: []}
+  sql:
+    - {query: "SELECT COUNT(*) FROM Label WHERE path IN ('Work', 'Receipts')", equals: 0}
+    - {query: "SELECT COUNT(*) FROM MessageFolder WHERE remoteXGMLabels LIKE '%\"Bills\"%'", equals: 2}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Work\"%' OR data LIKE '%\"path\":\"Receipts\"%'", equals: 0}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Clients\"%'", equals: 5}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Bills\"%'", equals: 2}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%localStatus%'", equals: 0}
+  log_present: ["Receipts renamed to Bills \\(same UIDVALIDITY\\)"]
+  log_absent: ["Label not found: (Clients|Bills)", "\\[critical\\]"]
+  deltas: {Message: {unpersist: 0}}
+  stable: {passes: 1}
+  running: true

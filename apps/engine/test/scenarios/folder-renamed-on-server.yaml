@@ -1,0 +1,47 @@
+name: folder-renamed-on-server
+description: >
+  Another client renames Projects, which holds messages and a subfolder, to Clients. The
+  next listing no longer shows Projects or Projects/2026 and shows Clients and Clients/2026
+  with the same UIDVALIDITY and the same messages at the same UIDs (RENAME keeps the
+  mailbox), so each keeps its id at the new path: no copy is detached and no header fetched
+  again. The fake gives mailboxes created in one second the same UIDVALIDITY, so on it the
+  pairs are told apart by their messages.
+source: "docs/tech-debt.md TD39; RFC 3501 6.3.5; conformance probe_rename_keeps_uidvalidity (Dovecot keeps UIDVALIDITY across RENAME)"
+servers:
+  - {fake: dovecot}
+  - {fake: plain}
+  - {dovecot: qresync}
+mailboxes:
+  INBOX: {messages: 4}
+  Projects: {messages: 6}
+  Projects/2026: {messages: 3}
+steps:
+  - wait: quiescent
+  - assert:
+      counts: {INBOX: 4, Projects: 6, Projects/2026: 3, total: 13}
+  - mark: before_rename
+  - server.rename_mailbox: {name: Projects, to: Clients}
+  - sync: pass
+  - wait: {quiescent: true}
+  - assert:
+      counts: {INBOX: 4, Clients: 6, Clients/2026: 3, total: 13}
+      db_matches_server: {}
+      changed_since:
+        mark: before_rename
+        Message: {persist: [], unpersist: []}
+        Folder: {key: path, unpersist: []}
+expect:
+  server_counts: {INBOX: 4, Clients: 6, Clients/2026: 3}
+  counts: {INBOX: 4, Clients: 6, Clients/2026: 3, total: 13}
+  db_matches_server: {}
+  sql:
+    - {query: "SELECT COUNT(*) FROM Folder WHERE path LIKE 'Projects%'", equals: 0}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Projects%'", equals: 0}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Clients%'", equals: 9}
+  log_present:
+    - "Projects renamed to Clients \\(same UIDVALIDITY\\)"
+    - "Projects/2026 renamed to Clients/2026 \\(same UIDVALIDITY\\)"
+  log_absent: ["Clients[^ ]*, UIDs: .*Heavy: true", "\\[critical\\]"]
+  deltas: {Message: {unpersist: 0}}
+  stable: {passes: 1}
+  running: true

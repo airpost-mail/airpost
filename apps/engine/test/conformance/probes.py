@@ -149,6 +149,36 @@ def probe_bulk_store_modseq(rig: Rig):
     return out
 
 
+def probe_rename_keeps_uidvalidity(rig: Rig):
+    """RENAME keeps the mailbox: its UIDVALIDITY, its messages at the same UIDs, and its
+    children under the new name. The engine pairs a folder that vanished from LIST with a new
+    one of the same UIDVALIDITY and keeps its synced state (docs/tech-debt.md TD39), so the
+    UIDVALIDITY values themselves (normalized elsewhere) are compared here."""
+    def uidvalidity(name):
+        for l in rig.a.cmd(f"STATUS {name} (UIDVALIDITY)"):
+            m = re.search(rb"UIDVALIDITY (\d+)", l)
+            if m:
+                return int(m.group(1))
+        return None
+
+    out = {}
+    rig.a.cmd("CREATE Renamed")
+    rig.a.cmd("CREATE Renamed/Sub")
+    rig.a.cmd("SELECT INBOX")
+    rig.a.cmd("UID COPY 1:2 Renamed")
+    before = uidvalidity("Renamed")
+    out["rename"] = [normalize(l) for l in rig.a.cmd("RENAME Renamed Renamed2")]
+    after = uidvalidity("Renamed2")
+    out["rename_uidvalidity"] = [b"same" if before is not None and before == after else b"different"]
+    out["rename_list"] = sorted(normalize(l) for l in rig.a.cmd('LIST "" "Renamed*"'))
+    rig.a.cmd("SELECT Renamed2")
+    out["rename_uids"] = [normalize(l) for l in rig.a.cmd("UID SEARCH ALL")]
+    rig.a.cmd("CLOSE")
+    rig.a.cmd("DELETE Renamed2/Sub")
+    rig.a.cmd("DELETE Renamed2")
+    return out
+
+
 def probe_changedsince(rig: Rig):
     out = {}
     rig.a.cmd("ENABLE QRESYNC")
@@ -261,4 +291,4 @@ def probe_stale_fetch(rig: Rig):
 
 
 PROBES = [probe_session_setup, probe_list_status, probe_select_fetch, probe_store, probe_bulk_store_modseq, probe_changedsince,
-          probe_copy_move_append, probe_idle, probe_stale_fetch]
+          probe_copy_move_append, probe_rename_keeps_uidvalidity, probe_idle, probe_stale_fetch]

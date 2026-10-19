@@ -14,6 +14,7 @@ use std::time::Duration;
 use ms_core::{MessageFlags, Result, SyncError, UidSet};
 use ms_imap::{ImapSession, StoreOp};
 use ms_store::{Folder, Label, Model, Query, Store};
+use ms_sync::folder_identity;
 use ms_sync::mail_processor::MailProcessor;
 use serde_json::Value;
 use tracing::{error, info};
@@ -43,6 +44,20 @@ impl Category {
         match self {
             Category::Folder(f) => f.set_role(role),
             Category::Label(l) => l.set_role(role),
+        }
+    }
+
+    fn path(&self) -> &str {
+        match self {
+            Category::Folder(f) => f.path(),
+            Category::Label(l) => l.path(),
+        }
+    }
+
+    fn id(&self) -> &str {
+        match self {
+            Category::Folder(f) => f.id(),
+            Category::Label(l) => l.id(),
         }
     }
 
@@ -99,41 +114,123 @@ impl TaskProcessor<'_> {
             };
         }
 
-        let result = if existing_path.is_empty() {
-            session.create_folder(&path)
-        } else {
+        let renaming = !existing_path.is_empty();
+        if renaming {
+            folder_identity::record_rename(self.store, account_id, &existing_path, &path)?;
+        }
+        let result = if renaming {
             session.rename_folder(&existing_path, &path)
+        } else {
+            session.create_folder(&path)
         };
         if let Err(e) = result {
+            if renaming {
+                if let Err(forget) =
+                    folder_identity::forget_rename(self.store, account_id, &existing_path, &path)
+                {
+                    error!("-X could not drop the rename record: {forget}");
+                }
+            }
             data["created"] = Value::Null;
             error!("Syncback of folder/label '{path}' failed.");
             return Err(e.into_sync("create/renameFolder").into());
         }
 
+        // The row is found by path: after an earlier rename its id is no longer the hash of
+        // it. A renamed row keeps its id (docs/tech-debt.md TD39).
         let gmail = is_gmail(session);
-        let mut local = None;
-        if !existing_path.is_empty() {
-            let query = Query::new()
-                .equal("accountId", account_id)
-                .equal("id", ms_core::ids::folder_id(account_id, &existing_path));
-            local = if gmail {
+        let by_path = |p: &str| -> Result<Option<Category>> {
+            let query = Query::new().equal("accountId", account_id).equal("path", p);
+            Ok(if gmail {
                 self.store.find::<Label>(&query)?.map(Category::Label)
             } else {
                 self.store.find::<Folder>(&query)?.map(Category::Folder)
-            };
+            })
+        };
+        let mut local = if renaming {
+            by_path(&existing_path)?
+        } else {
+            None
+        };
+        let found = local.is_some();
+        if local.is_none() {
+            local = by_path(&path)?;
         }
-        let mut local = local.unwrap_or_else(|| {
-            let id = ms_core::ids::folder_id(account_id, &path);
-            if gmail {
-                Category::Label(Label::new(&id, account_id, 0))
-            } else {
-                Category::Folder(Folder::new(&id, account_id, 0))
+        let mut local = match local {
+            Some(c) => c,
+            None => {
+                let id = ms_core::ids::free_folder_id(account_id, &path, |id| self.id_taken(id));
+                if gmail {
+                    Category::Label(Label::new(&id, account_id, 0))
+                } else {
+                    Category::Folder(Folder::new(&id, account_id, 0))
+                }
             }
-        });
+        };
         local.set_path(&path);
         data["created"] = local.to_json();
-        local.save(self.store)?;
+        let d = delimiter.chars().next();
+        self.store
+            .transaction("performRemoteSyncbackCategory", |s| {
+                local.save(s)?;
+                if renaming && found {
+                    folder_identity::queue_refresh(s, account_id, local.id(), &existing_path)?;
+                    self.rename_children(s, account_id, &existing_path, &path, d, gmail)?;
+                }
+                Ok(())
+            })?;
+        folder_identity::run_pending_refreshes(self.store, account_id)?;
         info!("Syncback of folder/label '{path}' succeeded.");
+        Ok(())
+    }
+
+    /// Whether a Folder or Label row holds `id`.
+    fn id_taken(&self, id: &str) -> bool {
+        let q = Query::new().equal("id", id);
+        // Note: a failed lookup counts as free; a clash then fails the save, not the loop.
+        self.store.count::<Folder>(&q).unwrap_or(0) > 0
+            || self.store.count::<Label>(&q).unwrap_or(0) > 0
+    }
+
+    /// Gives the rows inside a renamed folder their new paths, as the server renamed them
+    /// with it, keeping their ids.
+    fn rename_children(
+        &self,
+        s: &Store,
+        account_id: &str,
+        from: &str,
+        to: &str,
+        delimiter: Option<char>,
+        gmail: bool,
+    ) -> Result<()> {
+        let Some(d) = delimiter else {
+            return Ok(());
+        };
+        let query = Query::new().equal("accountId", account_id);
+        let children: Vec<Category> = if gmail {
+            s.find_all::<Label>(&query)?
+                .into_iter()
+                .map(Category::Label)
+                .collect()
+        } else {
+            s.find_all::<Folder>(&query)?
+                .into_iter()
+                .map(Category::Folder)
+                .collect()
+        };
+        let prefix = format!("{from}{d}");
+        for mut child in children {
+            let old_path = child.path().to_owned();
+            if !old_path.starts_with(&prefix) {
+                continue;
+            }
+            let Some(new_path) = folder_identity::renamed_path(&old_path, from, to, Some(d)) else {
+                continue;
+            };
+            child.set_path(&new_path);
+            child.save(s)?;
+            folder_identity::queue_refresh(s, account_id, child.id(), &old_path)?;
+        }
         Ok(())
     }
 

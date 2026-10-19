@@ -1,0 +1,52 @@
+name: folder-renamed-in-tern
+description: >
+  The user renames Projects, which holds messages and a subfolder, from Tern
+  (SyncbackCategoryTask with existingPath). The folder and its child keep their ids at the
+  new paths, so their messages stay where they are: no copy is detached, no header is
+  fetched again, and threads show the new path. A folder created afterwards at the old path
+  is a new folder with an id of its own.
+source: "docs/tech-debt.md TD39; RFC 3501 6.3.5 (RENAME moves inferior hierarchical names); conformance probe_rename_keeps_uidvalidity"
+servers:
+  - {fake: dovecot}
+  - {fake: plain}
+  - {dovecot: qresync}
+mailboxes:
+  INBOX: {messages: 4}
+  Projects: {messages: 6}
+  Projects/2026: {messages: 3}
+steps:
+  - wait: quiescent
+  - assert:
+      counts: {INBOX: 4, Projects: 6, Projects/2026: 3, total: 13}
+  - mark: before_rename
+  - client.task: {__cls: SyncbackCategoryTask, path: Clients, existingPath: Projects}
+    as: rename
+  - wait: {task: rename, timeout: 60}
+  - sync: pass
+  - wait: {quiescent: true}
+  - assert:
+      counts: {INBOX: 4, Clients: 6, Clients/2026: 3, total: 13}
+      changed_since:
+        mark: before_rename
+        Message: {persist: [], unpersist: []}
+        Folder: {key: path, unpersist: []}
+  - client.task: {__cls: SyncbackCategoryTask, path: Projects}
+    as: create
+  - wait: {task: create, timeout: 60}
+  - sync: pass
+  - wait: {quiescent: true}
+expect:
+  server_counts: {INBOX: 4, Clients: 6, Clients/2026: 3, Projects: 0}
+  counts: {INBOX: 4, Clients: 6, Clients/2026: 3, Projects: 0, total: 13}
+  db_matches_server: {}
+  sql:
+    - {query: "SELECT COUNT(*) FROM Folder WHERE path IN ('Clients', 'Clients/2026', 'Projects')", equals: 3}
+    # The new Projects doesn't take the id the renamed folder kept.
+    - {query: "SELECT COUNT(*) FROM Folder WHERE path = 'Clients' AND id IN (SELECT json_extract(data, '$.created.id') FROM Task WHERE json_extract(data, '$.existingPath') = 'Projects')", equals: 1}
+    - {query: "SELECT COUNT(*) FROM Folder WHERE path = 'Projects' AND id IN (SELECT json_extract(data, '$.created.id') FROM Task WHERE json_extract(data, '$.existingPath') = 'Projects')", equals: 0}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Projects%'", equals: 0}
+    - {query: "SELECT COUNT(*) FROM Thread WHERE data LIKE '%\"path\":\"Clients%'", equals: 9}
+  log_absent: ["Clients[^ ]*, UIDs: .*Heavy: true", "\\[critical\\]"]
+  deltas: {Message: {unpersist: 0}}
+  stable: {passes: 1}
+  running: true
