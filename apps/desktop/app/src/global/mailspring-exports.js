@@ -31,7 +31,17 @@ const lazyLoadWithGetter = (prop, getter) => {
 A deprecated export (docs/desktop-client-plan.md section 6). Its getter stays a getter, so each
 package that reads it is warned once; the app's own code isn't.
 */
-const deprecate = (prop, { since, replacement, removeIn }, getter) => {
+const warnDeprecated = (prop, { since, replacement, removeIn }, warned) => {
+  const caller = require('../engine-api').callerPackageFromStack(new Error().stack);
+  if (caller && !warned.has(caller.name)) {
+    warned.add(caller.name);
+    console.warn(
+      `${caller.name} uses ${prop}, deprecated since plugin API ${since} and removed in ${removeIn}: ${replacement}`
+    );
+  }
+};
+
+const deprecate = (prop, info, getter) => {
   let value;
   let loaded = false;
   const warned = new Set();
@@ -39,13 +49,7 @@ const deprecate = (prop, { since, replacement, removeIn }, getter) => {
     configurable: true,
     enumerable: true,
     get: () => {
-      const caller = require('../engine-api').callerPackageFromStack(new Error().stack);
-      if (caller && !warned.has(caller.name)) {
-        warned.add(caller.name);
-        console.warn(
-          `${caller.name} uses ${prop}, deprecated since plugin API ${since} and removed in ${removeIn}: ${replacement}`
-        );
-      }
+      warnDeprecated(prop, info, warned);
       if (!loaded) {
         value = getter();
         loaded = true;
@@ -53,6 +57,25 @@ const deprecate = (prop, { since, replacement, removeIn }, getter) => {
       return value;
     },
   });
+};
+
+/*
+An export some of whose members are deprecated: each of them warns as deprecate() does, once
+per package that reads it, and is `stub` from then on.
+*/
+const withDeprecatedMembers = (prop, value, members) => {
+  const out = Object.assign({}, value);
+  for (const [name, { stub, ...info }] of Object.entries(members)) {
+    const warned = new Set();
+    Object.defineProperty(out, name, {
+      enumerable: true,
+      get: () => {
+        warnDeprecated(`${prop}.${name}`, info, warned);
+        return stub;
+      },
+    });
+  }
+  return out;
 };
 
 const lazyLoad = (prop, path) => {
@@ -220,7 +243,28 @@ lazyLoad(`Utils`, 'flux/models/utils');
 lazyLoad(`DOMUtils`, 'dom-utils');
 lazyLoad(`DateUtils`, 'date-utils');
 lazyLoadWithGetter(`imapUtf7`, () => require('../utils/imap-utf7').imapUtf7);
-lazyLoad(`CalendarUtils`, 'calendar-utils');
+const vtimezoneGone = (name) => () => {
+  throw new Error(
+    `CalendarUtils.${name} is gone: the engine writes the VTIMEZONEs of the events it builds (Engine.request("events.create") and "events.update")`
+  );
+};
+lazyLoadWithGetter(`CalendarUtils`, () =>
+  withDeprecatedMembers('CalendarUtils', require('../calendar-utils'), {
+    resolveIanaZone: {
+      since: '1.32.0',
+      removeIn: '2.0.0',
+      replacement: 'the engine resolves time zones for the events it builds and edits',
+      stub: vtimezoneGone('resolveIanaZone'),
+    },
+    createVTIMEZONEString: {
+      since: '1.32.0',
+      removeIn: '2.0.0',
+      replacement:
+        'the engine writes the VTIMEZONEs of the events it builds (Engine.request("events.create") and "events.update")',
+      stub: vtimezoneGone('createVTIMEZONEString'),
+    },
+  })
+);
 lazyLoad(`CalendarDateUtils`, 'calendar-date');
 deprecate(
   `ICSEventHelpers`,

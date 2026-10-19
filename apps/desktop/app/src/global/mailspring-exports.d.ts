@@ -201,7 +201,18 @@ export const DateUtils: DateUtils;
 export type imapUtf7 = typeof import('../utils/imap-utf7').imapUtf7;
 export const imapUtf7: imapUtf7;
 
-export type CalendarUtils = typeof import('../calendar-utils');
+export type CalendarUtils = typeof import('../calendar-utils') & {
+  /**
+   * @deprecated since plugin API 1.32.0, removed in 2.0.0: throws. The engine resolves time
+   * zones for the events it builds and edits.
+   */
+  resolveIanaZone: (...args: unknown[]) => never;
+  /**
+   * @deprecated since plugin API 1.32.0, removed in 2.0.0: throws. The engine writes the
+   * VTIMEZONEs of the events it builds (`Engine.request('events.create')`, `'events.update'`).
+   */
+  createVTIMEZONEString: (...args: unknown[]) => never;
+};
 export const CalendarUtils: CalendarUtils;
 export { ICSParticipantStatus, ICSParticipant } from '../calendar-utils';
 

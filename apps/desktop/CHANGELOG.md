@@ -6,7 +6,7 @@ Plugin API 1.32.0:
 
 - The engine expands, creates and edits calendar events and contacts (`events.expand`, `events.create`, `events.update`, `events.rsvp`, `contacts.get`, `contacts.create`, `contacts.update`, `contacts.import`, `contacts.export`; features `calendar-editing` and `contact-editing`). Call them with `Engine.request`.
 - `ICSEventHelpers` is deprecated and removed in 2.0.0: every function throws. Its types `CreateEventOptions`, `Occurrence`, `UpdateTimesOptions`, `RecurrenceExceptionResult` and `RecurrenceInfo` are gone; `CalendarConflict` is now the engine's conflict (`eventId`, `calendarId`, `icsuid`, `title`, `start`, `end`).
-- `CalendarUtils.resolveIanaZone` and `CalendarUtils.createVTIMEZONEString` are gone; `CalendarUtils.registerTimezones` registers only the file's own VTIMEZONEs.
+- `CalendarUtils.resolveIanaZone` and `CalendarUtils.createVTIMEZONEString` are deprecated and removed in 2.0.0: they throw, and a package that reads them is warned once. The engine writes the VTIMEZONEs of the events it builds. `CalendarUtils.registerTimezones` registers only the file's own VTIMEZONEs.
 - `SyncbackEventTask` has `restore` and `tz`: an undo or redo re-sends its snapshot, which the engine applies over the copy stored by then.
 
 Plugin API 1.31.0:
