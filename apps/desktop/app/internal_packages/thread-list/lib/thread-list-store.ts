@@ -8,6 +8,7 @@ import {
   WorkspaceStore,
   FocusedContentStore,
   FocusedPerspectiveStore,
+  MailboxPerspective,
 } from 'mailspring-exports';
 import { ListTabular, ListDataSource } from 'mailspring-component-kit';
 import ThreadListDataSource from './thread-list-data-source';
@@ -15,6 +16,7 @@ import ThreadListDataSource from './thread-list-data-source';
 class ThreadListStore extends MailspringStore {
   _dataSource?: ListDataSource;
   _dataSourceUnlisten: () => void;
+  _perspectiveKey: string | null = null;
 
   constructor() {
     super();
@@ -36,6 +38,7 @@ class ThreadListStore extends MailspringStore {
       this._dataSource = null;
     }
 
+    this._perspectiveKey = ThreadListStore.perspectiveKey(FocusedPerspectiveStore.current());
     const threadsSubscription = FocusedPerspectiveStore.current().threads();
     if (threadsSubscription) {
       this._dataSource = new ThreadListDataSource(threadsSubscription);
@@ -54,7 +57,28 @@ class ThreadListStore extends MailspringStore {
 
   // Inbound Events
 
+  // What the thread query of a category perspective depends on. A renamed folder or label
+  // keeps its id, so FocusedPerspectiveStore swaps in a perspective with the new path and
+  // the same key: the list, its scroll position and the open thread stay. null for other
+  // perspectives, which are always rebuilt.
+  static perspectiveKey(perspective: MailboxPerspective | null): string | null {
+    const json = perspective && (perspective.toJSON() as { serializedCategories?: string });
+    if (!json || !json.serializedCategories) {
+      return null;
+    }
+    return JSON.stringify([
+      perspective.constructor.name,
+      perspective.accountIds,
+      perspective.categories().map((c) => [c.id, c.role]),
+    ]);
+  }
+
   _onPerspectiveChanged = () => {
+    const key = ThreadListStore.perspectiveKey(FocusedPerspectiveStore.current());
+    if (key !== null && key === this._perspectiveKey) {
+      this.trigger(this);
+      return;
+    }
     this.createListDataSource();
   };
 

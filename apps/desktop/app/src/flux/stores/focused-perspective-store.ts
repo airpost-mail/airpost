@@ -141,8 +141,9 @@ class FocusedPerspectiveStore extends MailspringStore {
   };
 
   // A renamed folder or label keeps its id, so the perspective stays valid but holds the
-  // old path, which its name and the sidebar selection come from. Swapped in place: the
-  // open thread and sheet stay as they are.
+  // old path, which its name and the sidebar selection come from. Swapped in place, without
+  // _setPerspective's sheet change; ThreadListStore keeps its list and the open thread for a
+  // perspective with the same ids (ThreadListStore.perspectiveKey).
   _refreshRenamedCategories() {
     const json = this._current.toJSON() as {
       type: string;
