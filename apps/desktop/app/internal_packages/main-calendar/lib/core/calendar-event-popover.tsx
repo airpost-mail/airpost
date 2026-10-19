@@ -1,4 +1,5 @@
 import moment, { Moment } from 'moment';
+import { formatShortTime, momentZone } from '../../../../src/date-format';
 import React from 'react';
 import {
   Actions,
@@ -968,9 +969,5 @@ function extractNotesFromDescription(description: string) {
 }
 
 function formatTime(momentTime: Moment) {
-  const min = momentTime.minutes();
-  if (min === 0) {
-    return momentTime.format('h A');
-  }
-  return momentTime.format('h:mm A');
+  return formatShortTime(momentTime.toDate(), { timeZone: momentZone(momentTime as any) });
 }

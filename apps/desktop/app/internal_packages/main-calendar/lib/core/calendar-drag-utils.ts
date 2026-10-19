@@ -1,4 +1,5 @@
 import moment from 'moment';
+import { formatTime } from '../../../../src/date-format';
 import {
   CalendarContainerType,
   DragConfig,
@@ -492,8 +493,8 @@ export function formatDragPreviewTime(start: number, end: number, isAllDay: bool
     return `${startDate} - ${endDate}`;
   }
 
-  const startTime = moment.unix(start).format('h:mm A');
-  const endTime = moment.unix(end).format('h:mm A');
+  const startTime = formatTime(new Date(start * 1000));
+  const endTime = formatTime(new Date(end * 1000));
   return `${startTime} - ${endTime}`;
 }
 

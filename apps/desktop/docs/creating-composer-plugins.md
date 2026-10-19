@@ -335,7 +335,10 @@ Source: `app/src/extensions/composer-extension.ts`
 
 ### prepareNewDraft
 
-Called once when a brand-new draft is created, before it's displayed:
+Called once when a brand-new draft is created in the app, before it's displayed. With an engine
+that builds drafts (`draft-pipeline`), the engine has already added the signature and removed
+tracking images; your hook still runs on every draft the app creates. Drafts made by the CLI,
+tern-mcp or the web client never pass through it.
 
 ```typescript
 import { ComposerExtension, Message } from 'mailspring-exports';
@@ -373,7 +376,11 @@ static warningsForSending({ draft }: { draft: Message }): string[] {
 
 ### applyTransformsForSending
 
-Transform the draft body just before it's sent. Must be reversible.
+Transform the draft body just before it's sent. Must be reversible. The app runs it when you
+press Send and hands the result to the engine (`draft.send`'s `bodies`), which keeps it through
+the undo window and sends it even if the app quits before the window ends. Sends started outside
+the app (the CLI, tern-mcp, the web client, and scheduled sends the engine runs on its own)
+don't run it.
 
 ```typescript
 static applyTransformsForSending({

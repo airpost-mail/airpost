@@ -1,7 +1,7 @@
 import React from 'react';
 import { localized, Contact, DOMUtils, RegExpUtils, Thread } from 'mailspring-exports';
 import { RetinaImg, ContactProfilePhoto } from 'mailspring-component-kit';
-import moment from 'moment-timezone';
+import { formatTime } from '../../../src/date-format';
 
 import ParticipantProfileDataSource from './participant-profile-data-source';
 
@@ -32,7 +32,8 @@ class TimeInTimezone extends React.Component<{ timeZone: string }, { tick: numbe
   };
 
   render() {
-    return <strong>{`Currently ${moment().tz(this.props.timeZone).format('h:mma')}`}</strong>;
+    const now = formatTime(new Date(), { timeZone: this.props.timeZone });
+    return <strong>{`Currently ${now}`}</strong>;
   }
 }
 

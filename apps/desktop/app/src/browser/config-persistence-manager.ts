@@ -11,6 +11,7 @@ import {
   SettingsHost,
   touchesKey,
 } from './engine-settings';
+import { USE_24_HOUR_KEY } from '../date-format';
 
 let _ = require('underscore');
 _ = Object.assign(_, require('../config-utils'));
@@ -225,12 +226,15 @@ export default class ConfigPersistenceManager implements SettingsHost {
       : [];
     const language = this.engineSettings && touchesKey(keyPath, LANGUAGE_KEY);
     const languageBefore = language ? this.get(LANGUAGE_KEY) : undefined;
+    const clock = this.engineSettings && touchesKey(keyPath, USE_24_HOUR_KEY);
+    const clockBefore = clock ? this.get(USE_24_HOUR_KEY) : undefined;
     const before = keys.map((key) => JSON.stringify(this.get(key)));
     write();
     const changed = keys.filter((key, i) => JSON.stringify(this.get(key)) !== before[i]);
     if (changed.length) this.engineSettings.localChanged(changed);
     if (language && this.get(LANGUAGE_KEY) !== languageBefore)
       this.engineSettings.languageChanged();
+    else if (clock && this.get(USE_24_HOUR_KEY) !== clockBefore) this.engineSettings.clockChanged();
   }
 
   emitChangeEvent = ({ sourceWebcontentsId }: { sourceWebcontentsId?: number } = {}) => {

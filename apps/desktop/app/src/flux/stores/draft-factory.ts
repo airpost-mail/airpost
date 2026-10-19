@@ -22,6 +22,8 @@ import {
   deepenPlaintextQuote,
   convertPlaintextToHTML,
 } from '../../components/composer-editor/plaintext';
+import { buildDraft, draftPipelineAvailable } from '../../engine-drafts';
+import { DraftCreateParams } from '../../engine-protocol';
 
 let DraftStore: typeof import('./draft-store').default = null;
 
@@ -70,8 +72,44 @@ class DraftFactory {
     return transformed;
   }
 
-  async createDraft(fields = {}) {
-    const account = this._accountForNewDraft();
+  // Builds the draft in the engine when it has the draft pipeline (src/engine-drafts.ts).
+  // `fields` are Message attributes over what the kind builds.
+  async _engineDraft(
+    params: DraftCreateParams,
+    fields: { [key: string]: any } = {}
+  ): Promise<Message | null> {
+    if (!draftPipelineAvailable()) return null;
+    const json: { [key: string]: unknown } = {};
+    for (const [key, value] of Object.entries(fields)) {
+      const attr = (Message.attributes as any)[key];
+      if (!attr || value === undefined || key === 'accountId') continue;
+      json[attr.jsonKey || key] = attr.toJSON(value);
+    }
+    try {
+      return await buildDraft({ ...params, html: this.useHTML(), fields: json });
+    } catch (err) {
+      // Refused or disconnected: the JavaScript builder still makes the draft.
+      console.warn(`draft.create failed, building the draft here: ${err.message}`);
+      return null;
+    }
+  }
+
+  // A new message (the composer's blank draft, mailto aside). DraftStore's compose actions
+  // come here; createDraft stays the plain builder other code adds its own content to.
+  async createNewDraft(fields: { accountId?: string; [key: string]: any } = {}) {
+    const account = fields.accountId ? null : this._accountForNewDraft();
+    const engine = await this._engineDraft(
+      { kind: 'new', accountId: fields.accountId || (account && account.id) },
+      fields
+    );
+    return engine || this.createDraft(fields);
+  }
+
+  async createDraft(fields: { accountId?: string; [key: string]: any } = {}) {
+    // A reply or forward names its account; its auto-cc/bcc is that account's.
+    const account =
+      (fields.accountId && AccountStore.accountForId(fields.accountId)) ||
+      this._accountForNewDraft();
     const rich = this.useHTML();
     const defaults = {
       body: rich ? '<br/>' : '',
@@ -111,6 +149,14 @@ class DraftFactory {
   }
 
   async createDraftForMailto(urlString: string) {
+    const account = this._accountForNewDraft();
+    const engine = await this._engineDraft({
+      kind: 'mailto',
+      accountId: account && account.id,
+      mailto: urlString,
+    });
+    if (engine) return engine;
+
     try {
       urlString = decodeURI(urlString);
     } catch (err) {
@@ -215,6 +261,12 @@ class DraftFactory {
     thread: Thread;
     type: ReplyType;
   }) {
+    const engine = await this._engineDraft(
+      { kind: type, accountId: message.accountId, messageId: message.id },
+      { threadId: thread.id }
+    );
+    if (engine) return engine;
+
     const prevBody = await this.prepareBodyForQuoting(message);
     let participants = { to: [], cc: [] };
     if (type === 'reply') {
@@ -252,14 +304,24 @@ class DraftFactory {
     // Start downloading the attachments, if they haven't been already
     message.files.forEach((f) => Actions.fetchFile(f));
 
+    const engine = await this._engineDraft(
+      { kind: 'forward', accountId: message.accountId, messageId: message.id },
+      { threadId: thread.id }
+    );
+    if (engine) return engine;
+
     const formatContact = (cs: Contact[]) => {
       const text = cs.map((c) => c.toString()).join(', ');
       return this.useHTML() ? DOMUtils.escapeHTMLCharacters(text) : text;
     };
 
     const fields = [];
-    if (message.from.length > 0) fields.push(`From: ${formatContact(message.from)}`);
-    fields.push(`${localized('Subject')}: ${message.subject}`);
+    if (message.from.length > 0)
+      fields.push(`${localized('From')}: ${formatContact(message.from)}`);
+    const subject = this.useHTML()
+      ? DOMUtils.escapeHTMLCharacters(message.subject || '')
+      : message.subject;
+    fields.push(`${localized('Subject')}: ${subject}`);
     fields.push(`${localized('Date')}: ${message.formattedDate()}`);
     if (message.to.length > 0) fields.push(`${localized('To')}: ${formatContact(message.to)}`);
     if (message.cc.length > 0) fields.push(`${localized('Cc')}: ${formatContact(message.cc)}`);

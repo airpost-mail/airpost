@@ -759,6 +759,45 @@ export function hueForString(str: string | null) {
   );
 }
 
+// Patterns of addresses that are likely not a person (likelyNonHumanEmail).
+const NonHumanAt = '[-@+=]';
+export const NonHumanEmailTerms = [
+  'no[-_]?reply',
+  'do[-_]?not[-_]?reply',
+  `bounce[s]?${NonHumanAt}`,
+  'postmaster',
+  `notification[s]?${NonHumanAt}`,
+  `jobs${NonHumanAt}`,
+  `developer${NonHumanAt}`,
+  `receipts${NonHumanAt}`,
+  `support${NonHumanAt}`,
+  `billing${NonHumanAt}`,
+  `ebill${NonHumanAt}`,
+  `hello${NonHumanAt}`,
+  `customercare${NonHumanAt}`,
+  `contact${NonHumanAt}`,
+  `team${NonHumanAt}`,
+  `status${NonHumanAt}`,
+  `alert[s]?${NonHumanAt}`,
+  'notify',
+  'auto[-_]confirm',
+  'invitations',
+  'newsletter',
+  `[-_]tracking${NonHumanAt}`,
+  'reply[-_]',
+  'room[-_]',
+  `[-_]reply${NonHumanAt}`,
+  `email${NonHumanAt}`,
+  `welcome${NonHumanAt}`,
+  `news${NonHumanAt}`,
+  `info${NonHumanAt}`,
+  `automated${NonHumanAt}`,
+  `list[s]?${NonHumanAt}`,
+  `distribute[s]?${NonHumanAt}`,
+  `catchall${NonHumanAt}`,
+  `catch[-_]all${NonHumanAt}`,
+];
+
 // Emails that nave no-reply or similar phrases in them are likely not a
 // human. As such it's not worth the cost to do a lookup on that person.
 //
@@ -777,43 +816,7 @@ export function likelyNonHumanEmail(email: string) {
   }
 
   // more advanced scan for common patterns
-  const at = '[-@+=]';
-  const terms = [
-    'no[-_]?reply',
-    'do[-_]?not[-_]?reply',
-    `bounce[s]?${at}`,
-    'postmaster',
-    `notification[s]?${at}`,
-    `jobs${at}`,
-    `developer${at}`,
-    `receipts${at}`,
-    `support${at}`,
-    `billing${at}`,
-    `ebill${at}`,
-    `hello${at}`,
-    `customercare${at}`,
-    `contact${at}`,
-    `team${at}`,
-    `status${at}`,
-    `alert[s]?${at}`,
-    'notify',
-    'auto[-_]confirm',
-    'invitations',
-    'newsletter',
-    `[-_]tracking${at}`,
-    'reply[-_]',
-    'room[-_]',
-    `[-_]reply${at}`,
-    `email${at}`,
-    `welcome${at}`,
-    `news${at}`,
-    `info${at}`,
-    `automated${at}`,
-    `list[s]?${at}`,
-    `distribute[s]?${at}`,
-    `catchall${at}`,
-    `catch[-_]all${at}`,
-  ];
+  const terms = NonHumanEmailTerms;
   const reStr = `(${terms.join('|')})`;
   const re = new RegExp(reStr, 'gi');
   return re.test(email);

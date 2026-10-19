@@ -3,6 +3,7 @@ import moment from 'moment';
 import { shell } from 'electron';
 import { localized, DateUtils, Actions, Contact } from 'mailspring-exports';
 import { RetinaImg } from 'mailspring-component-kit';
+import { hourCycle } from '../../../../src/date-format';
 
 import ActivityEventStore from '../activity-event-store';
 import { ActivityEvent, eventCountLabel } from '../activity-events';
@@ -11,7 +12,7 @@ import { GroupBy } from './activity-feed-toolbar';
 
 function compactTimeString(date: Date) {
   const opts: Intl.DateTimeFormatOptions = {
-    hourCycle: AppEnv.config.get('core.workspace.use24HourClock') ? 'h23' : 'h12',
+    hourCycle: hourCycle(),
     month: 'short',
     day: 'numeric',
     hour: 'numeric',

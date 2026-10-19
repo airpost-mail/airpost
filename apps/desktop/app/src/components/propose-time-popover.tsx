@@ -2,6 +2,7 @@ import React from 'react';
 import moment, { Moment } from 'moment';
 import { Actions, localized } from 'mailspring-exports';
 import { DatePicker, TimePicker } from 'mailspring-component-kit';
+import { formatTime } from '../date-format';
 
 // The pickers speak milliseconds; events are passed around in unix seconds.
 const toPicker = (unixSeconds: number) => unixSeconds * 1000;
@@ -18,7 +19,7 @@ function compactSlot(start: number, end: number, isAllDay: boolean): string {
       ? s.format('ddd, MMM D')
       : `${s.format('ddd, MMM D')} – ${last.format('ddd, MMM D')}`;
   }
-  const time = (m: Moment) => m.format('h:mm A');
+  const time = (m: Moment) => formatTime(m.toDate());
   return `${s.format('ddd, MMM D')} · ${time(s)} – ${time(e)}`;
 }
 

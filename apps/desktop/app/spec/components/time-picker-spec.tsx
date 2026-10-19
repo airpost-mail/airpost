@@ -1,14 +1,8 @@
 import React from 'react';
 import moment from 'moment';
-import 'moment/locale/de';
-import 'moment/locale/lb';
-import 'moment/locale/si';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 
 import TimePicker from '../../src/components/time-picker';
-
-// Requiring a locale file makes it the current one, so put the suite back where it was.
-moment.locale('en');
 
 // Clear of the 2026-03-08 transition, so a failed day assertion is a date bug, not a DST one.
 const EVENT_DAY = '2026-03-10';
@@ -121,11 +115,14 @@ describe('TimePicker', function timePicker() {
     expect(lastEmitted(onChange).format('YYYY-MM-DD HH:mm')).toBe(`${EVENT_DAY} 15:30`);
   });
 
-  // date-utils.ts runs moment.locale(navigator.language) at startup, so a German or Japanese
-  // user's field renders and accepts 24-hour text.
-  describe('in a 24-hour locale', () => {
-    beforeEach(() => moment.locale('de'));
-    afterEach(() => moment.locale('en'));
+  // The 24-hour clock setting (src/date-format.ts): the field renders and accepts 24-hour text.
+  describe('on a 24-hour clock', () => {
+    beforeEach(() => {
+      const realGet = AppEnv.config.get.bind(AppEnv.config);
+      spyOn(AppEnv.config, 'get').andCallFake((key: string) =>
+        key === 'core.workspace.use24HourClock' ? true : realGet(key)
+      );
+    });
 
     it('stays silent when the field is focused and blurred with no edit', () => {
       const { onChange, input } = renderPicker(MORNING_VALUE);
@@ -155,28 +152,6 @@ describe('TimePicker', function timePicker() {
       fireEvent.blur(input);
 
       expect(lastEmitted(onChange).format('YYYY-MM-DD HH:mm')).toBe(`${EVENT_DAY} 05:00`);
-    });
-  });
-
-  // A meridiem test would get both of these wrong: lb is 24-hour but its LT carries a
-  // bracketed "Auer", and si is 12-hour with a lowercase marker.
-  describe('picking the clock a locale uses', () => {
-    afterEach(() => moment.locale('en'));
-
-    const typeBareFive = () => {
-      const { onChange, input } = renderPicker();
-      fireEvent.focus(input);
-      fireEvent.change(input, { target: { value: '5' } });
-      fireEvent.blur(input);
-      return lastEmitted(onChange).format('HH:mm');
-    };
-
-    it('reads the hour token rather than the meridiem', () => {
-      moment.locale('lb');
-      expect(typeBareFive()).toBe('05:00');
-
-      moment.locale('si');
-      expect(typeBareFive()).toBe('17:00');
     });
   });
 

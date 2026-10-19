@@ -1,5 +1,4 @@
 import _ from 'underscore';
-import moment from 'moment';
 
 import { File } from './file';
 import * as Utils from './utils';
@@ -9,6 +8,8 @@ import { Category } from './category';
 import * as Attributes from '../attributes';
 import { ModelWithMetadata } from './model-with-metadata';
 import { AttributeValues } from './model';
+import { localized } from '../../intl';
+import { attributionTemplate, formatQuoteDate } from '../../date-format';
 
 let CategoryStore = null;
 
@@ -428,15 +429,17 @@ export class Message extends ModelWithMetadata {
     return (this.from || [])[0] || new Contact({ name: 'Unknown', email: 'Unknown' });
   }
 
-  // Public: Returns the standard attribution line for this message,
-  // localized for the current user.
-  // ie "On Dec. 12th, 2015 at 4:00PM, Ben Gotow wrote:"
+  // Public: Returns the standard attribution line for this message, localized for the
+  // current user, ie "On Dec 12, 2015, 4:00 PM, Ben Gotow <ben@example.com> wrote:". The engine
+  // builds the same line from `composing.quoteTexts` (src/date-format.ts).
   replyAttributionLine() {
-    return `On ${this.formattedDate()}, ${this.fromContact().toString()} wrote:`;
+    return attributionTemplate(localized)
+      .replace('{date}', this.formattedDate())
+      .replace('{from}', this.fromContact().toString());
   }
 
   formattedDate() {
-    return moment(this.date).format('MMM D YYYY, [at] h:mm a');
+    return formatQuoteDate(this.date);
   }
 
   hasEmptyBody() {

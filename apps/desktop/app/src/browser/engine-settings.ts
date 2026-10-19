@@ -20,7 +20,9 @@ synchronously and never talk to the store.
 - `settings.changed` (another client's change) is applied to config.json and the windows.
 - An engine that runs the expiration executor (`expiration-executor`) gets the texts of the
   resurfacing messages it sends (`resurfacing.*`) in the user's language after each sync and
-  when the language changes; config.json has no copy of them.
+  when the language changes; config.json has no copy of them. An engine that builds drafts
+  (`draft-pipeline`) likewise gets `composing.quoteTexts`, the reply attribution, forward header
+  and date pattern in the user's language and hour cycle, also when the clock setting changes.
 
 config.json keeps every key either way, so an engine without `settings` (or a downgrade) still
 finds them. A key that needs a feature (KEY_FEATURES) is left out entirely with an engine that
@@ -32,6 +34,7 @@ import _ from 'underscore';
 import { Feature, Method, SettingsValues } from '../engine-protocol';
 import { localizerFor } from '../intl';
 import { REMINDER_BODY_KEY, SNOOZE_BODY_KEY, resurfacingBodies } from '../resurfacing';
+import { QUOTE_TEXTS_KEY, USE_24_HOUR_KEY, hourCycle, quoteTexts } from '../date-format';
 
 // The keys the desktop mirrors. The engine also keeps `templates` (the desktop's are files in
 // <config>/templates), `mailRules` and `mailRulesAutoSince` (in the main window's localStorage
@@ -183,6 +186,12 @@ export class EngineSettingsMirror {
   // The UI language changed: the engine's resurfacing messages follow it.
   languageChanged() {
     if (this.engine) this._writeResurfacing(this.engine, {});
+    if (this.engine) this._writeQuoteTexts(this.engine, {});
+  }
+
+  // `core.workspace.use24HourClock` changed: the dates in the engine's quotes follow it.
+  clockChanged() {
+    if (this.engine) this._writeQuoteTexts(this.engine, {});
   }
 
   // settings.changed: another client's change.
@@ -199,10 +208,11 @@ export class EngineSettingsMirror {
     try {
       const mirrored = mirroredKeys(engine);
       const { values, storeId } = await engine.request<SettingsValues>(Method.SettingsGet, {
-        keys: [...mirrored, ...RESURFACING_KEYS],
+        keys: [...mirrored, ...RESURFACING_KEYS, QUOTE_TEXTS_KEY],
       });
       if (this.engine !== engine) return;
       this._writeResurfacing(engine, values || {});
+      this._writeQuoteTexts(engine, values || {});
       const store = storeId || UNNAMED_STORE;
       const sameStore = store === this.host.get(STORE_KEY);
       const copied = sameStore ? this._copied() : [];
@@ -239,6 +249,18 @@ export class EngineSettingsMirror {
     if (RESURFACING_KEYS.every((key) => current[key] === values[key])) return;
     engine.request(Method.SettingsSet, { values }).catch((err) => {
       if (!err.engineExited) console.warn(`Could not write the resurfacing texts: ${err.message}`);
+    });
+  }
+
+  // Writes the quote texts for the configured language and hour cycle unless `current` has them.
+  _writeQuoteTexts(engine: SettingsEngine, current: { [key: string]: unknown }) {
+    if (!(engine.features || []).includes(Feature.DraftPipeline)) return;
+    const language = this.host.get(LANGUAGE_KEY) as string;
+    const locale = language || Intl.DateTimeFormat().resolvedOptions().locale;
+    const value = quoteTexts(language, hourCycle(this.host.get(USE_24_HOUR_KEY), locale), locale);
+    if (_.isEqual(current[QUOTE_TEXTS_KEY], value)) return;
+    engine.request(Method.SettingsSet, { values: { [QUOTE_TEXTS_KEY]: value } }).catch((err) => {
+      if (!err.engineExited) console.warn(`Could not write the quote texts: ${err.message}`);
     });
   }
 

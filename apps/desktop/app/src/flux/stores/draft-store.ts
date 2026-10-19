@@ -19,6 +19,13 @@ import SoundRegistry from '../../registries/sound-registry';
 import * as ExtensionRegistry from '../../registries/extension-registry';
 import { localized } from '../../intl';
 import { DatabaseChangeRecord } from './database-change-record';
+import {
+  ENGINE_PREPARED_EXTENSIONS,
+  bodiesFromSendTask,
+  draftPipelineAvailable,
+  isEngineBuilt,
+  sendDraft as engineSendDraft,
+} from '../../engine-drafts';
 
 interface IThreadMessageModelOrId {
   thread?: Thread;
@@ -341,9 +348,14 @@ class DraftStore extends MailspringStore {
   }
 
   async _finalizeAndPersistNewMessage(draft: Message, { popout }: { popout?: boolean } = {}) {
-    // Give extensions an opportunity to perform additional setup to the draft
+    // Give extensions an opportunity to perform additional setup to the draft. A draft the
+    // engine built has the built-in ones' work done already.
+    const engineBuilt = isEngineBuilt(draft);
     ExtensionRegistry.Composer.extensions().forEach((extension) => {
       if (!extension.prepareNewDraft) {
+        return;
+      }
+      if (engineBuilt && ENGINE_PREPARED_EXTENSIONS.includes(extension.name)) {
         return;
       }
       extension.prepareNewDraft({ draft });
@@ -389,12 +401,12 @@ class DraftStore extends MailspringStore {
   }
 
   _onPopoutNewDraftToRecipient = async (contact: Contact) => {
-    const draft = await DraftFactory.createDraft({ to: [contact] });
+    const draft = await DraftFactory.createNewDraft({ to: [contact] });
     await this._finalizeAndPersistNewMessage(draft, { popout: true });
   };
 
   _onPopoutBlankDraft = async () => {
-    const draft = await DraftFactory.createDraft();
+    const draft = await DraftFactory.createNewDraft();
     const { headerMessageId } = await this._finalizeAndPersistNewMessage(draft);
     await this._onPopoutDraft(headerMessageId, { newDraft: true });
   };
@@ -434,7 +446,7 @@ class DraftStore extends MailspringStore {
 
   _onHandleMailFiles = async (event: Electron.IpcRendererEvent, paths: string[]) => {
     // returned promise is just used for specs
-    const draft = await DraftFactory.createDraft();
+    const draft = await DraftFactory.createNewDraft();
     const { headerMessageId } = await this._finalizeAndPersistNewMessage(draft);
 
     let remaining = paths.length;
@@ -522,6 +534,10 @@ class DraftStore extends MailspringStore {
     if (!sendAction) {
       throw new Error(`Cant find send action ${actionKey} `);
     }
+    // The engine sends it (draft.send) and keeps its undo window, unless the action is a
+    // plugin's (src/engine-drafts.ts).
+    const viaEngine =
+      draftPipelineAvailable() && SendActionsStore.enginePerformsSendAction(actionKey);
 
     const sendLaterMetadataValue: {
       expiration: Date;
@@ -594,7 +610,7 @@ class DraftStore extends MailspringStore {
     }
 
     // attach send-later metadata if a send delay is enabled
-    if (sendLaterMetadataValue) {
+    if (sendLaterMetadataValue && !viaEngine) {
       if (SendActionsStore.needsClientFinalize(draft, actionKey)) {
         sendLaterMetadataValue.clientFinalize = true;
       }
@@ -629,6 +645,14 @@ class DraftStore extends MailspringStore {
     this.trigger({ headerMessageId });
     this._doneWithSession(session);
 
+    if (viaEngine) {
+      await this._sendWithEngine(draft, { delay, actionKey });
+      if (AppEnv.isComposerWindow()) {
+        AppEnv.close();
+      }
+      return;
+    }
+
     // To be able to undo the send, we need to pretend that we added the send-later
     // metadata as it's own task so that the undo action is clear. We don't actually
     // want a separate SyncbackMetadataTask to be queued because a stray SyncbackDraftTask
@@ -651,6 +675,52 @@ class DraftStore extends MailspringStore {
       AppEnv.close();
     }
   };
+
+  // draft.send with this window's send transforms as `bodies`. With a delay the engine writes
+  // the send-later metadata; the Undo Send entry (queued in the main window, which may not be
+  // this one) calls draft.cancelSend (UndoRedoStore, engine-drafts.ts undoSendTarget).
+  async _sendWithEngine(
+    draft: Message,
+    { delay, actionKey }: { delay: number; actionKey: string }
+  ) {
+    const { headerMessageId, accountId } = draft;
+    let result: { scheduledAt?: number };
+    try {
+      const prepared = SendDraftTask.forSending(draft);
+      const bodies = bodiesFromSendTask(prepared);
+      const transformed =
+        (bodies.perRecipient && Object.keys(bodies.perRecipient).length > 0) ||
+        bodies.self !== draft.body;
+      result = await engineSendDraft({
+        accountId,
+        headerMessageId,
+        delayMs: delay > 0 ? delay : undefined,
+        after: actionKey,
+        bodies: transformed ? bodies : undefined,
+      });
+    } catch (err) {
+      this._draftsSending[headerMessageId] = false;
+      this.trigger({ headerMessageId });
+      const why = (err.data && err.data.message) || err.message;
+      AppEnv.showErrorDialog(localized('Sorry, this message could not be sent. %@', why));
+      return;
+    }
+    if (!result || !result.scheduledAt) return;
+
+    const value = {
+      expiration: new Date(result.scheduledAt * 1000),
+      isUndoSend: true,
+      actionKey,
+    };
+    Actions.queueUndoOnlyTask(
+      SyncbackMetadataTask.forSaving({
+        pluginId: 'send-later',
+        model: draft,
+        value,
+        undoValue: { expiration: null, isUndoSend: true },
+      })
+    );
+  }
 
   _onUnexpectedNotFoundDuringSend = (
     headerMessageId?: string,

@@ -2,6 +2,8 @@ import MailspringStore from 'mailspring-store';
 import * as Actions from '../actions';
 import { Task } from '../tasks/task';
 import TaskQueue from './task-queue';
+import { localized } from '../../intl';
+import { cancelSend, draftPipelineAvailable, undoSendTarget } from '../../engine-drafts';
 
 // Tasks with `engineWritesUndoData` can only be reversed exactly with data the engine
 // writes onto them during their local phase (ChangeFolderTask.undoPlacements), so their
@@ -51,6 +53,10 @@ class UndoRedoStore extends MailspringStore {
     }
 
     if (tasks.every((t) => t.canBeUndone)) {
+      // Undo Send with the draft pipeline: the engine holds the send (or, for a plugin's send
+      // action, its schedule) and calls it back, refusing once it has started. Not redoable:
+      // a redo would schedule it again without the window's send transforms.
+      const undoSend = draftPipelineAvailable() && tasks.length === 1 && undoSendTarget(tasks[0]);
       const block = {
         tasks: tasks,
         description: tasks.map((t) => t.description()).join(', '),
@@ -58,6 +64,18 @@ class UndoRedoStore extends MailspringStore {
           // no-op, tasks queued separately
         },
         undo: () => {
+          if (undoSend) {
+            cancelSend(undoSend).then(
+              (cancelled) => {
+                if (!cancelled) AppEnv.showErrorDialog(localized('The message was already sent.'));
+              },
+              (err) =>
+                AppEnv.showErrorDialog(
+                  localized('Sorry, the send could not be undone. %@', err.message)
+                )
+            );
+            return;
+          }
           Promise.all(tasks.map((t) => this._latestVersionOf(t, reachesEngine))).then((latest) => {
             let undoTasks: Task[];
             try {
@@ -76,6 +94,7 @@ class UndoRedoStore extends MailspringStore {
           });
         },
         redo: () => {
+          if (undoSend) return;
           this._queueingTasks = true;
           Actions.queueTasks(tasks.map((t) => t.createIdenticalTask()));
           this._queueingTasks = false;

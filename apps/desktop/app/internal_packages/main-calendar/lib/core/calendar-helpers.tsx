@@ -1,4 +1,5 @@
 import moment from 'moment';
+import { formatShortTime as shortTime } from '../../../../src/date-format';
 import {
   Utils,
   AccountStore,
@@ -368,18 +369,9 @@ export function newEventOccurrence(id: string, draft: NewEventDraft): EventOccur
   return { ...shared, isAllDay: false, start, end, ...coveredDates(start, end, false) };
 }
 
-/**
- * A time as compact as the locale allows: a 12-hour clock drops ":00" on the hour ("10 AM"),
- * a 24-hour clock keeps LT ("10:00"), where a bare "10" would not read as a time.
- */
+/** A time as compact as the clock allows (src/date-format.ts formatShortTime). */
 export function formatShortTime(unix: number): string {
-  const time = moment.unix(unix);
-  const lt = moment.localeData().longDateFormat('LT');
-  // moment's LT uses h for a 12-hour clock and H for a 24-hour one, as in time-picker.tsx
-  if (!/h/.test(lt) || time.minutes() !== 0) {
-    return time.format('LT');
-  }
-  return time.format(lt.replace(/[:.]mm/, ''));
+  return shortTime(new Date(unix * 1000));
 }
 
 /**

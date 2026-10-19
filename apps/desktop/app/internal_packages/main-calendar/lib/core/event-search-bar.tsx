@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import moment from 'moment-timezone';
+import { formatTime } from '../../../../src/date-format';
 import {
   Rx,
   Event,
@@ -206,12 +207,13 @@ export class EventSearchBar extends Component<Record<string, unknown>, EventSear
     const end = moment(event.end * 1000);
 
     if (start.isSame(end, 'day')) {
-      return `${start.format('ddd, MMM D')} \u00B7 ${start.format('h:mm A')} - ${end.format(
-        'h:mm A'
+      return `${start.format('ddd, MMM D')} \u00B7 ${formatTime(start.toDate())} - ${formatTime(
+        end.toDate()
       )}`;
     }
 
-    return `${start.format('MMM D, h:mm A')} - ${end.format('MMM D, h:mm A')}`;
+    const at = (m: moment.Moment) => `${m.format('MMM D')}, ${formatTime(m.toDate())}`;
+    return `${at(start)} - ${at(end)}`;
   };
 
   _getCalendarColor = (calendarId: string): string => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import moment, { Moment } from 'moment-timezone';
+import { formatTime } from '../../../../src/date-format';
 import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';
 import { localized, Actions, CalendarDateUtils } from 'mailspring-exports';
 import { MailspringCalendarViewProps } from './mailspring-calendar';
@@ -131,7 +132,7 @@ export class AgendaView extends React.Component<MailspringCalendarViewProps, Age
     if (isTimed(event)) {
       const start = moment.unix(event.start);
       const end = moment.unix(event.end);
-      return `${start.format('LT')} – ${end.format('LT')}`;
+      return `${formatTime(start.toDate())} – ${formatTime(end.toDate())}`;
     }
     return localized('All day');
   }

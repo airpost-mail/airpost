@@ -8,7 +8,7 @@ import { MailTrackerBlockerRules } from './mail-tracker-blocker-rules';
 
 // Mailspring's original list, kept where the MailTrackerBlocker rules don't cover a pattern.
 // Same format: case-insensitive regexes tested against each image URL.
-const AdditionalRules: { [vendor: string]: string[] } = {
+export const AdditionalRules: { [vendor: string]: string[] } = {
   NGPVan: ['click\\.ngpvan\\.com/'],
   Yesware: ['app\\.yesware\\.com'],
   MailChimp: ['list-manage\\.com/track'],

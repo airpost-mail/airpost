@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import moment from 'moment';
+import { formatTime, hourCycle } from '../date-format';
 import classnames from 'classnames';
 import { TabGroupContext } from 'mailspring-component-kit';
 
@@ -59,7 +60,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
   }
 
   _valToTimeString(value) {
-    return moment(value).format('LT');
+    return formatTime(moment(value).toDate());
   }
 
   _onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -138,10 +139,9 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
     this.setState({ rawText: this._valToTimeString(this.props.value) });
   }
 
-  // moment's LT uses h for a 12-hour clock and H for a 24-hour one. Test the hour token rather
-  // than the meridiem: lb writes "H:mm [Auer]" and si writes "a h:mm".
+  // The clock setting, as formatTime shows the times (docs/tech-debt.md TD48).
   _isTwelveHourLocale() {
-    return /h/.test(moment.localeData().longDateFormat('LT'));
+    return hourCycle() === 'h12';
   }
 
   /*
@@ -219,7 +219,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
 
       opts.push(
         <div className={className} key={val} onMouseDown={() => this._onSelectOption(val)}>
-          {timeIter.format('LT')}
+          {formatTime(timeIter.toDate())}
           {relTxt}
         </div>
       );

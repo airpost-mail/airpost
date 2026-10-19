@@ -70,6 +70,15 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
   }
 
   render() {
+    const { task } = this.state;
+    if (task && task.offlineSince && task.status !== 'complete' && task.status !== 'cancelled') {
+      // The engine keeps the send queued until the account can reach its server again.
+      return (
+        <div className="send-later-status send-later-queued">
+          <span className="time">{localized('Queued, sends when online')}</span>
+        </div>
+      );
+    }
     const metadata = this.props.draft.metadataForPluginId(PLUGIN_ID);
     if (metadata && !metadata.expiration && metadata.error) {
       // The engine couldn't send it at its time (docs/desktop-client-plan.md 3.3).

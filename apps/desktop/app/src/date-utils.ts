@@ -1,4 +1,5 @@
 import moment, { Moment } from 'moment-timezone';
+import { hourCycle } from './date-format';
 
 // Init locale for moment
 moment.locale(navigator.language);
@@ -398,7 +399,7 @@ const DateUtils = {
    * Checks whether or not to use 24 hour time format.
    */
   getTimeFormat(opts) {
-    const use24HourClock = AppEnv.config.get('core.workspace.use24HourClock');
+    const use24HourClock = hourCycle() === 'h23';
     let timeFormat = use24HourClock ? 'HH:mm' : 'h:mm';
 
     if (opts && opts.seconds) {
@@ -434,7 +435,7 @@ const DateUtils = {
     const diff = now.diff(datetime, 'days', true);
     const isSameDay = now.isSame(datetime, 'days');
     const opts: Intl.DateTimeFormatOptions = {
-      hourCycle: AppEnv.config.get('core.workspace.use24HourClock') ? 'h23' : 'h12',
+      hourCycle: hourCycle(),
     };
 
     if (diff <= 1 && isSameDay) {
@@ -473,7 +474,7 @@ const DateUtils = {
    */
   mediumTimeString(datetime: Date) {
     return datetime.toLocaleTimeString(navigator.language, {
-      hourCycle: AppEnv.config.get('core.workspace.use24HourClock') ? 'h23' : 'h12',
+      hourCycle: hourCycle(),
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -494,7 +495,7 @@ const DateUtils = {
     // `(?<!\d)${dateTime.getDay()}(?!\d)` replace `$1${localise(ordinal)}`
 
     return datetime.toLocaleTimeString(navigator.language, {
-      hourCycle: AppEnv.config.get('core.workspace.use24HourClock') ? 'h23' : 'h12',
+      hourCycle: hourCycle(),
       year: 'numeric',
       month: 'long',
       day: 'numeric',

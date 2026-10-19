@@ -68,6 +68,12 @@ export const Method = {
   ThreadsSnooze: 'threads.snooze',
   ThreadsUnsnooze: 'threads.unsnooze',
   MessagesUnsubscribe: 'messages.unsubscribe',
+  // The draft pipeline (Feature.DraftPipeline): drafts built as DraftFactory builds them, the send
+  // checks, and sends with an undo window the engine keeps.
+  DraftCreate: 'draft.create',
+  DraftSend: 'draft.send',
+  DraftCancelSend: 'draft.cancelSend',
+  DraftValidate: 'draft.validate',
   // Provider calls (Feature.Integrations), answered out of order; the params carry the
   // provider config, key included (docs/integrations-plan.md section 4).
   IntegrationsTranslate: 'integrations.translate',
@@ -164,7 +170,46 @@ export const Feature = {
   // Stored AI providers read their keys from the secret store (`integration:ai-<id>`), and a
   // provider's key goes when settings.set removes it or points it at another server.
   AiKeys: 'ai-keys',
+  // `draft.create`, `draft.send` (with the send hooks' `bodies`), `draft.cancelSend`,
+  // `draft.validate`, and the `composing.quoteTexts` setting.
+  DraftPipeline: 'draft-pipeline',
 } as const;
+
+// `draft.create` params (ms-ipc DraftCreateParams).
+export interface DraftCreateParams {
+  accountId?: string;
+  kind: 'new' | 'reply' | 'reply-all' | 'forward' | 'mailto' | 'resurface';
+  threadId?: string;
+  messageId?: string;
+  mailto?: string;
+  // Message JSON keys over what the kind builds.
+  fields?: { [key: string]: unknown };
+  behavior?: 'prefer-existing' | 'prefer-existing-if-pristine';
+  html?: boolean;
+  tz?: string;
+  // false: answered without saving it.
+  save?: boolean;
+}
+
+// What a client's send hooks made of the body: the sent copy's, and each recipient's.
+export interface DraftBodies {
+  self?: string;
+  perRecipient?: { [email: string]: string };
+}
+
+export interface DraftSendParams {
+  accountId: string;
+  headerMessageId: string;
+  delayMs?: number;
+  after?: string;
+  bodies?: DraftBodies;
+}
+
+export interface DraftSendResult {
+  taskId?: string;
+  // Unix seconds, when the send waits out the undo window.
+  scheduledAt?: number;
+}
 
 export const ErrorCode = {
   ParseError: -32700,

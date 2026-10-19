@@ -1,7 +1,6 @@
 import moment from 'moment';
 import { AccountStore, Actions, SyncbackEventTask, TaskQueue } from 'mailspring-exports';
-import 'moment/locale/de';
-import 'moment/locale/ko';
+import { formatShortTime as shortTime } from '../src/date-format';
 // Import directly from the source file; the plugin isn't registered in mailspring-exports.
 import {
   inclusiveAllDayEnd,
@@ -17,9 +16,6 @@ import {
   calendarDateFromUnix,
   calendarDaysBetween,
 } from '../src/calendar-date';
-
-// Each moment/locale import above switches the global locale as it loads.
-moment.locale('en');
 
 /** Local midnight, as unix seconds — all-day times are built from local date components */
 function localDay(year: number, month1Indexed: number, day: number): number {
@@ -197,27 +193,28 @@ describe('textColorOnFill', function () {
 
 describe('formatShortTime', function () {
   const at = (hour: number, minute: number) => new Date(2026, 8, 22, hour, minute).getTime() / 1000;
-  afterEach(() => moment.locale('en'));
 
   it('drops :00 on the hour on a 12-hour clock', function () {
-    moment.locale('en');
     expect(formatShortTime(at(10, 0))).toBe('10 AM');
     expect(formatShortTime(at(22, 0))).toBe('10 PM');
   });
 
   it('keeps the minutes off the hour', function () {
-    moment.locale('en');
     expect(formatShortTime(at(10, 30))).toBe('10:30 AM');
   });
 
   it('keeps a 24-hour clock whole, since a bare hour does not read as a time', function () {
-    moment.locale('de');
+    const realGet = AppEnv.config.get.bind(AppEnv.config);
+    spyOn(AppEnv.config, 'get').andCallFake((key: string) =>
+      key === 'core.workspace.use24HourClock' ? true : realGet(key)
+    );
     expect(formatShortTime(at(10, 0))).toBe('10:00');
   });
 
-  it('shortens a 12-hour locale whose meridiem comes first', function () {
-    moment.locale('ko');
-    expect(formatShortTime(at(22, 0))).toBe(moment.unix(at(22, 0)).format('A h'));
+  it("follows a locale's own clock and meridiem", function () {
+    const date = new Date(at(22, 0) * 1000);
+    expect(shortTime(date, { locale: 'ko' })).toBe('오후 10시');
+    expect(shortTime(date, { locale: 'de' })).toBe('22:00');
   });
 });
 

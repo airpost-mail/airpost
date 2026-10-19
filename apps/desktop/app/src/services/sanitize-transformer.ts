@@ -5,7 +5,8 @@ import DOMPurify from 'dompurify';
 // and we want to keep rendering them. <meta> and <keygen> are not allowed —
 // <meta http-equiv="refresh"> can navigate the message iframe to an attacker
 // origin, and <keygen> is obsolete with no legitimate email use.
-const AllowedTags = [
+// Exported for the engine's copy (crates/ms-compose/src/desktop_data.json).
+export const AllowedTags = [
   '#text',
   'a',
   'abbr',
@@ -113,7 +114,7 @@ const AllowedTags = [
   'html',
 ];
 
-const AllowedAttributes = [
+export const AllowedAttributes = [
   'abbr',
   'accept',
   'acceptcharset',

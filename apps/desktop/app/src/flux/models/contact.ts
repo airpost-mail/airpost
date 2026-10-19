@@ -108,8 +108,9 @@ export interface ContactInfoGoogle {
   }[];
 }
 
-const namePrefixes = {};
-const nameSuffixes = {};
+// Exported for the engine's copy (crates/ms-compose/src/desktop_data.json).
+export const namePrefixes = {};
+export const nameSuffixes = {};
 
 [
   '2dlt',

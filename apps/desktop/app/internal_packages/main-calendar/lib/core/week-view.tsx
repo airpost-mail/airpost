@@ -1,5 +1,6 @@
 /* eslint react/jsx-no-bind: 0 */
 import moment, { Moment } from 'moment-timezone';
+import { formatTime, momentZone } from '../../../../src/date-format';
 import classnames from 'classnames';
 import React from 'react';
 import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';
@@ -213,7 +214,7 @@ export class WeekView extends React.Component<
     for (const { time, y } of tickGenerator('major', this.state.intervalHeight)) {
       labels.push(
         <span className="legend-text" key={y} style={{ top: y === 0 ? y : y - 8 }}>
-          {time.format('LT')}
+          {formatTime(time.toDate(), { timeZone: momentZone(time as any) })}
         </span>
       );
     }

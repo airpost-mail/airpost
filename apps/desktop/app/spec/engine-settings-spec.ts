@@ -365,6 +365,32 @@ describe('the engine-owned settings in the main process', function () {
     expect(fake.settings['resurfacing.snoozeBody']).toBe(resurfacingBodies((en) => en).snoozeBody);
   });
 
+  it('writes the quote texts in the configured language and clock to an engine with the draft pipeline', async function () {
+    fake.settings = {};
+    fake.settingsFeatures = ['settings', 'draft-pipeline'];
+    writeConfig({
+      [STORE_KEY]: 'store-1',
+      core: { intl: { language: 'en-US' }, workspace: { use24HourClock: true } },
+    });
+    await launch();
+    await until('the texts', () => fake.socketOf('settings.set').length === 1);
+    const texts = fake.settings['composing.quoteTexts'];
+    expect(texts.attribution).toContain('{date}');
+    expect(texts.attribution).toContain('{from}');
+    expect(texts.dateTime).not.toContain('{dayPeriod}');
+    expect(manager.get('composing.quoteTexts')).toBeUndefined();
+
+    manager.setRawValue('core.workspace.use24HourClock', false, null);
+    await until('the rewrite', () => fake.socketOf('settings.set').length === 2);
+    // Off is the locale's own clock: 12 hours in en-US, 24 in German.
+    expect(fake.settings['composing.quoteTexts'].dateTime).toContain('{dayPeriod}');
+    manager.setRawValue('core.intl.language', 'de', null);
+    await until('the German texts', () => fake.socketOf('settings.set').length === 3);
+    expect(fake.settings['composing.quoteTexts'].dateTime).toBe(
+      '{day2}.{month2}.{year}, {hour2}:{minute}'
+    );
+  });
+
   it('writes no resurfacing texts to an engine without the executor', async function () {
     fake.settings = {};
     writeConfig({ [STORE_KEY]: 'store-1' });

@@ -95,11 +95,19 @@ export class SendDraftTask extends Task {
     silent: Attributes.Boolean({
       modelKey: 'silent',
     }),
+
+    // Set by the engine on a send it keeps queued while the account is offline or the SMTP
+    // server is unreachable (`retryWhenOnline`, docs/tech-debt.md TD33): when it first failed.
+    offlineSince: Attributes.Number({
+      modelKey: 'offlineSince',
+      jsonKey: '_offlineSince',
+    }),
   };
 
   draft: Message;
   perRecipientBodies: { [email: string]: string };
   silent: boolean;
+  offlineSince?: number;
   // These are defined as accessors via Object.defineProperty after class declaration
   declare headerMessageId: string;
 
