@@ -3050,3 +3050,63 @@ Open for tern-web: the web review of event and contact tasks and writes for rela
 editing (apps/web).
 Trial pending (not run): create, move and RSVP an event (including one occurrence of a series and
 undo of the move); edit a CardDAV contact; import a VCF.
+
+2026-10-19, stage 18 gate (attempt 1), branch `roadmap/client-next`, merged to main. Already on
+top of main (189b89cac), so the rebase was a no-op. Gate: fmt, clippy, `cargo test --workspace`
+(110 test binaries, all ok), `cargo deny check` (advisories, bans, licences and sources ok),
+release build of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve with the
+release binaries (161 passed, 4 skipped); `pim-edit-methods.yaml` also run against Radicale
+(`--servers radicale`, passed). Desktop: lint and typecheck pass; full suite 2888 passing (main
+has 3287; the difference is the ICS, VCF and ownership specs this stage removed), with the 4
+known failures that also fail on main (AI triage dispose, three SystemTrayIconStore focus/blur).
+One fix: `calendar-data-source-spec` disposed its subscription without running the pool's
+cleanup timer under the faked clock, which left `QuerySubscriptionPool._cleanupChecks`
+non-empty, so later specs never had their subscriptions cleaned up and two
+`query-subscription-engine-spec` cases failed; the spec now advances the clock after dispose.
+No new decisions; the ones in the stage 18 entry still need confirming.
+
+Open from the review (low):
+- `crates/ms-pim/src/plan.rs`: the events.rsvp `comment` now goes on the EventRSVPTask of a
+  REPLY (review fixes), but `edit::reply` still gets none, so the iTIP REPLY itself carries no
+  COMMENT; only COUNTER puts it in the ICS. Organizers whose clients read COMMENT from the REPLY
+  (rather than the mail body) don't see it, though tern-mcp's `respond_to_event` passes one.
+- `crates/ms-pim/src/plan.rs`: `truncate_before` always writes a timed series' UNTIL in UTC. RFC
+  5545 3.3.10 requires UNTIL to be a floating time when DTSTART is floating, so `following` edits
+  and deletes on a floating-time series write an RRULE that strict servers can refuse.
+- `crates/ms-pim/src/occurrence.rs`: `occurrences` groups rows by `icsuid` alone (the O(rows^2)
+  `find` is now a map). Copies of the same invitation on two calendars or two accounts (unified
+  calendar) collapse into one group with one master, so the second copy's occurrences are
+  dropped. Inherited from `calendar-data-source.ts`, but now engine code that the CLI and
+  tern-mcp's `list_events` depend on; group by calendar and `icsuid`.
+- `apps/engine/test/scenarios/pim-edit-methods.yaml`: the Radicale scenario covers create, an
+  update with scope `all`, one with scope `this`, a contact edit and a VCF import. Nothing runs
+  scope `following` (UNTIL plus the new series under a new UID), `deleted` (EXDATE or destroy),
+  or events.rsvp and counter end to end (EventRSVPTask through the fake SMTP server, PARTSTAT
+  written to the server); those are exercised only as queued tasks in
+  `apps/engine/tests/pim_api.rs`.
+- `crates/ms-pim/src/plan.rs`: `Patch` ignores unknown keys, and an empty patch still runs
+  `edit_all`, which bumps SEQUENCE and queues a SyncbackEventTask. A misspelt key (`title` for
+  `summary`, or `calendarId` to move an event) is a silent no-op that still rewrites the event on
+  the server. Refuse unknown keys (INVALID_PARAMS) and treat an empty patch as no change.
+- `apps/mcp/src/tools/pim.rs`: `list_events` silently skips accounts whose engine lacks
+  `calendar-editing`. If no account has it, it answers `{count: 0}` and the agent concludes the
+  calendar is empty; the other tools fail with the "update Tern" error (`require`), as docs/mcp.md
+  describes for `metadata.list`.
+- `crates/ms-pim/src/lib.rs`: ms-pim translates upstream Mailspring desktop code
+  (`ics-event-helpers.ts`, `calendar-utils.ts`, `calendar-data-source.ts`,
+  `ContactInfoMapping.ts`, `VCFImportExport.ts`, from Foundry376/Mailspring), but its header says
+  only "Copyright (C) 2026 Tern contributors", and NOTICE.md describes `crates/` as derived from
+  Mailspring-Sync only. The root CLAUDE.md asks to keep the upstream copyright and credit ported
+  code; `ms-dav`'s lib.rs shows the pattern.
+- Docs: section 6 still lists calendar and contact editing as Tier D ("Until stage 18 ..."), and
+  Tier C doesn't name calendar and contacts or `ICSEventHelpers` as moved and deprecated. The
+  `ContactsImportParams` doc (`crates/ms-ipc/src/pim.rs`) says "as new CardDAV contacts", but the
+  engine also imports into Google People, as the stage 18 entry says.
+Also open, from the stage 18 entry: `ical-expander` and `vcf` unused in
+`apps/desktop/app/package.json` (lockfile update, left for a dependency pass).
+Open for tern-web: the web review of event and contact tasks and writes for relayed devices
+(writes are local-only for now), and the web client calling `events.*` and `contacts.*` for
+editing (apps/web).
+Trial pending (not run): create, move and RSVP an event (including one occurrence of a series and
+undo of the move); edit a CardDAV contact; import a VCF; RSVP with a comment to an emailed
+invitation and check what the organizer receives.
