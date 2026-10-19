@@ -307,6 +307,77 @@ fn naive_of(p: &PartialDateTime) -> Option<(NaiveDateTime, bool)> {
     Some((date.and_time(time), has_time))
 }
 
+/// The zones of one resource, resolved as ingestion resolves them: a `TZID` through the
+/// resource's own VTIMEZONE (TZID, `X-LIC-LOCATION`, Microsoft CDO ids), an IANA or Windows
+/// name, or the offsets a custom VTIMEZONE defines; a floating time, or a `TZID` nothing
+/// resolves, in the [`FloatingZone`]. For callers that edit a resource's times and must read
+/// them the way its `Event` row columns were computed.
+pub struct Zones {
+    cal: Option<ICalendar>,
+    floating: FloatingZone,
+}
+
+impl Zones {
+    pub fn new(ics: &str, floating: FloatingZone) -> Self {
+        Zones {
+            cal: ICalendar::parse(ics).ok(),
+            floating,
+        }
+    }
+
+    fn zone(&self, tzid: Option<&str>, at: NaiveDateTime) -> Zone {
+        match (tzid, &self.cal) {
+            (Some(id), Some(cal)) => ZoneContext {
+                cal,
+                floating: self.floating,
+            }
+            .zone_for_tzid(id, at),
+            (Some(id), None) => chrono_tz::Tz::from_str(id)
+                .map(Zone::Named)
+                .unwrap_or(Zone::Floating(self.floating)),
+            (None, _) => Zone::Floating(self.floating),
+        }
+    }
+
+    /// Whether `tzid` resolves to a zone rather than falling back to the floating one.
+    pub fn knows(&self, tzid: &str) -> bool {
+        let at = NaiveDate::from_ymd_opt(2026, 1, 1)
+            .unwrap_or_default()
+            .and_time(NaiveTime::MIN);
+        !matches!(self.zone(Some(tzid), at), Zone::Floating(_))
+    }
+
+    /// The IANA zone `tzid` names, when it names one (not a custom VTIMEZONE or a fixed
+    /// offset).
+    pub fn named(&self, tzid: &str) -> Option<chrono_tz::Tz> {
+        let at = NaiveDate::from_ymd_opt(2026, 1, 1)?.and_time(NaiveTime::MIN);
+        match self.zone(Some(tzid), at) {
+            Zone::Named(tz) => Some(tz),
+            _ => None,
+        }
+    }
+
+    /// A wall-clock time in `tzid` (`None` for floating) as epoch seconds, with
+    /// [`local_to_ts`]'s rules for the hours a DST change repeats or skips.
+    pub fn to_utc(&self, tzid: Option<&str>, naive: NaiveDateTime) -> i64 {
+        local_to_ts(self.zone(tzid, naive), naive)
+    }
+
+    /// The wall clock in `tzid` (`None` for floating) at epoch second `ts`.
+    pub fn to_local(&self, tzid: Option<&str>, ts: i64) -> NaiveDateTime {
+        let approx = DateTime::from_timestamp(ts, 0)
+            .unwrap_or_default()
+            .naive_utc();
+        let mut zone = self.zone(tzid, approx);
+        if let Zone::Fixed(o) = zone {
+            // A custom VTIMEZONE's offset depends on the local time; look again from there.
+            let local = approx + Duration::seconds(i64::from(o.local_minus_utc()));
+            zone = self.zone(tzid, local);
+        }
+        ts_to_local(zone, ts).unwrap_or(approx)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Zone {
     Fixed(FixedOffset),

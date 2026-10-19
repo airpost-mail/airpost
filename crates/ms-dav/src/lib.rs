@@ -34,7 +34,7 @@ pub use client::{
     SyncCollection, SyncCollectionResult, TokenProvider, WriteResult, ETAG_CONFLICT,
 };
 pub use discovery::{DavHost, DavService, DnsResolver, HostResolver};
-pub use ical::{EventFields, FloatingZone};
+pub use ical::{EventFields, FloatingZone, Zones};
 pub use profile::{DavProfile, DavServer};
 pub use requests::{CalendarSyncRange, Collection};
 pub use transport::{HttpRequest, HttpResponse, ReqwestTransport, Transport};
