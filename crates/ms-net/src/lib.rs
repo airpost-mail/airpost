@@ -24,9 +24,9 @@ pub use endpoints::Endpoints;
 pub use http::HttpClient;
 pub use http_metadata::HttpMetadataBackend;
 pub use metadata::{
-    is_local_only_plugin, LocalOnly, MetadataBackend, MetadataDelta, MetadataPush,
-    LOCAL_ONLY_PLUGINS,
+    is_local_only_plugin, Claim, LocalOnly, MetadataBackend, MetadataDelta, MetadataPush,
+    TrackingTarget, LOCAL_ONLY_PLUGINS,
 };
-pub use ms_wire::{TernServer, TernServerError};
+pub use ms_wire::{Me, TernServer, TernServerError};
 pub use oauth::{AccessToken, RotateCallback, TokenManager};
 pub use people::PeopleClient;

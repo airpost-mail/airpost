@@ -68,6 +68,34 @@ pub enum MetadataDelta {
     IdentityRefreshNeeded,
 }
 
+/// Where a tracked message's pixel and links point (docs/backend-plan.md 3.6): the server's
+/// `publicURL` without a trailing slash, and the user's `trackingNS`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TrackingTarget {
+    pub public_url: String,
+    pub ns: String,
+}
+
+/// The answer to an expiration claim (docs/backend-plan.md 3.8).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Claim {
+    /// No server to ask: act.
+    NoServer,
+    /// This device holds the claim (first caller, or a repeat of its own): act.
+    Won,
+    /// Another device claimed it first: leave it to that one.
+    Lost,
+    /// The server couldn't say (network error, refused token, an unexpected answer): act
+    /// anyway, since no feature depends on the server (D2), accepting a possible duplicate.
+    Unreachable,
+}
+
+impl Claim {
+    pub fn acts(self) -> bool {
+        self != Claim::Lost
+    }
+}
+
 /// Shared by the foreground (push) and metadata (pull) threads. Implementations never send
 /// [`LOCAL_ONLY_PLUGINS`] to a server nor deliver them from one.
 pub trait MetadataBackend: Send + Sync {
@@ -112,6 +140,20 @@ pub trait MetadataBackend: Send + Sync {
     /// Mailspring's plan limits, which Tern does not have.
     fn record_feature_usage(&self, _feature: &str) -> Result<()> {
         Ok(())
+    }
+
+    /// Where tracking URLs point, when a server that offers tracking is connected; `None`
+    /// sends tracked drafts untracked. It may make a request, so callers ask outside a store
+    /// transaction.
+    fn tracking(&self) -> Option<TrackingTarget> {
+        None
+    }
+
+    /// Claims the right to act on `plugin_id`'s expiration at `expiration` (Unix seconds) on
+    /// the object a Message-ID names, before the expiration executor acts on it, so that one
+    /// device of the user's acts. It makes a request; callers ask outside a store transaction.
+    fn claim(&self, _object_id: &str, _plugin_id: &str, _expiration: i64) -> Claim {
+        Claim::NoServer
     }
 
     /// The metadata thread is not started for a local-only backend.

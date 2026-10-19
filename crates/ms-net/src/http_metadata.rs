@@ -17,13 +17,17 @@
 //! - A 401 or 403 on any call emits `ProcessIdentityRefreshNeeded` once and makes the backend
 //!   dormant for the life of the process: no more requests, pushes go to the outbox, and
 //!   `pull` fails retryably so the thread backs off.
+//! - The last `/tern/v1/me` answer is kept: it carries `trackingNS`, `publicURL` and the
+//!   server's features, which the tracking transforms read ([`MetadataBackend::tracking`]).
+//! - Expiration claims (3.8) are `POST /tern/v1/claim/<aid>/<objectId>/<pluginId>/<expiration>`:
+//!   200 wins, 409 loses, anything else lets the device act.
 
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
@@ -40,11 +44,25 @@ use serde_json::Value;
 use tracing::{error, info, warn};
 
 use crate::http::{check_status, transport_error, HttpClient, CONNECT_TIMEOUT};
-use crate::metadata::{is_local_only_plugin, MetadataBackend, MetadataDelta, MetadataPush};
+use crate::metadata::{
+    is_local_only_plugin, Claim, MetadataBackend, MetadataDelta, MetadataPush, TrackingTarget,
+};
 use crate::outbox::Outbox;
 
 /// What the client is told when the backend has gone dormant after a 401/403.
 const DORMANT_KEY: &str = "The Tern server rejected this device's token";
+
+/// How long a `/tern/v1/me` answer serves the tracking transforms before it is asked again.
+/// The metadata thread asks before each stream connect, and the server ends streams after an
+/// hour, so it is normally fresher than this.
+const ME_MAX_AGE: Duration = Duration::from_secs(2 * 3600);
+
+/// The bound on the requests a send or an expiration waits for (`/tern/v1/me` for tracking, a
+/// claim): long enough for a slow server, short enough not to hold up a send for long.
+const QUICK_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Told of each `/tern/v1/me` answer, and of `None` once the token is refused.
+pub type MeListener = Box<dyn Fn(Option<&Me>) + Send + Sync>;
 
 pub struct HttpMetadataBackend {
     server: TernServer,
@@ -62,6 +80,9 @@ pub struct HttpMetadataBackend {
     dormant: AtomicBool,
     binding_mismatch_reported: AtomicBool,
     on_identity_refresh: Box<dyn Fn() + Send + Sync>,
+    /// The last `/tern/v1/me` answer and when it came.
+    me: Mutex<Option<(Me, Instant)>>,
+    on_me: Option<MeListener>,
 }
 
 /// How a request ended.
@@ -104,7 +125,64 @@ impl HttpMetadataBackend {
             dormant: AtomicBool::new(false),
             binding_mismatch_reported: AtomicBool::new(false),
             on_identity_refresh,
+            me: Mutex::new(None),
+            on_me: None,
         })
+    }
+
+    /// Calls `listener` with each `/tern/v1/me` answer, and with `None` when the token is
+    /// refused; the engine follows the server's features with it.
+    pub fn with_me_listener(mut self, listener: MeListener) -> Self {
+        self.on_me = Some(listener);
+        self
+    }
+
+    /// The last `/tern/v1/me` answer, if any.
+    pub fn me(&self) -> Option<Me> {
+        self.me_lock().as_ref().map(|(me, _)| me.clone())
+    }
+
+    fn me_lock(&self) -> MutexGuard<'_, Option<(Me, Instant)>> {
+        self.me.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// `GET /tern/v1/me`, kept and passed to the listener. `timeout` bounds the whole request
+    /// (the push client's own bound is 300 s).
+    fn fetch_me(&self, timeout: Option<Duration>) -> Result<Me> {
+        if self.is_dormant() {
+            return Err(self.dormant_error());
+        }
+        let url = self.url(&["tern", "v1", "me"])?;
+        let mut req = self
+            .push_client
+            .inner()
+            .get(url.clone())
+            .header(ACCEPT, "application/json");
+        if let Some(t) = timeout {
+            req = req.timeout(t);
+        }
+        let body = match self.send(req, &url) {
+            Outcome::Ok(b) => b,
+            Outcome::Unauthorized => {
+                self.go_dormant("/tern/v1/me");
+                return Err(self.dormant_error());
+            }
+            Outcome::Retry(e) => return Err(e),
+            Outcome::Rejected(e) => return Err(as_retryable(e)),
+        };
+        let me: Me = serde_json::from_str(&body).map_err(|e| {
+            Error::from(SyncError::new(
+                "Invalid /tern/v1/me response",
+                e.to_string(),
+                true,
+                false,
+            ))
+        })?;
+        *self.me_lock() = Some((me.clone(), Instant::now()));
+        if let Some(listener) = &self.on_me {
+            listener(Some(&me));
+        }
+        Ok(me)
     }
 
     pub fn server(&self) -> &TernServer {
@@ -145,6 +223,10 @@ impl HttpMetadataBackend {
                 self.server.host()
             );
             (self.on_identity_refresh)();
+            *self.me_lock() = None;
+            if let Some(listener) = &self.on_me {
+                listener(None);
+            }
         }
     }
 
@@ -258,6 +340,34 @@ impl HttpMetadataBackend {
     }
 }
 
+/// Where `me`'s tracking URLs point, `None` when the server offers no tracking or gave
+/// something no recipient could use. A missing `publicURL` falls back to the server URL
+/// (O8).
+pub fn tracking_target(me: &Me, server_url: &str) -> Option<TrackingTarget> {
+    if !me.features.tracking {
+        return None;
+    }
+    let ns_ok = !me.tracking_ns.is_empty()
+        && me
+            .tracking_ns
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    let public = me.public_url.trim().trim_end_matches('/');
+    let public_url = if public.is_empty() {
+        server_url
+    } else {
+        public
+    };
+    if !ns_ok || ms_wire::check_url(public_url).is_err() {
+        warn!("-X The Tern server offers tracking but its trackingNS or publicURL is unusable; sending untracked");
+        return None;
+    }
+    Some(TrackingTarget {
+        public_url: public_url.to_owned(),
+        ns: me.tracking_ns.clone(),
+    })
+}
+
 fn classify(status: u16, url: &str, body: String) -> Outcome {
     match status {
         200..=209 => Outcome::Ok(body),
@@ -308,32 +418,7 @@ impl MetadataBackend for HttpMetadataBackend {
     }
 
     fn binding(&self) -> Result<Option<String>> {
-        if self.is_dormant() {
-            return Err(self.dormant_error());
-        }
-        let url = self.url(&["tern", "v1", "me"])?;
-        let req = self
-            .push_client
-            .inner()
-            .get(url.clone())
-            .header(ACCEPT, "application/json");
-        let body = match self.send(req, &url) {
-            Outcome::Ok(b) => b,
-            Outcome::Unauthorized => {
-                self.go_dormant("/tern/v1/me");
-                return Err(self.dormant_error());
-            }
-            Outcome::Retry(e) => return Err(e),
-            Outcome::Rejected(e) => return Err(as_retryable(e)),
-        };
-        let me: Me = serde_json::from_str(&body).map_err(|e| {
-            Error::from(SyncError::new(
-                "Invalid /tern/v1/me response",
-                e.to_string(),
-                true,
-                false,
-            ))
-        })?;
+        let me = self.fetch_me(None)?;
         let binding = me.binding();
         if binding != self.server.binding()
             && !self.binding_mismatch_reported.swap(true, Ordering::SeqCst)
@@ -345,6 +430,75 @@ impl MetadataBackend for HttpMetadataBackend {
             (self.on_identity_refresh)();
         }
         Ok(Some(binding))
+    }
+
+    fn tracking(&self) -> Option<TrackingTarget> {
+        if self.is_dormant() {
+            return None;
+        }
+        let cached = self.me_lock().clone();
+        let me = match cached {
+            Some((me, at)) if at.elapsed() < ME_MAX_AGE => me,
+            stale => match self.fetch_me(Some(QUICK_TIMEOUT)) {
+                Ok(me) => me,
+                Err(e) => {
+                    warn!("-X Could not ask the Tern server about tracking: {e}");
+                    stale.map(|(me, _)| me)?
+                }
+            },
+        };
+        tracking_target(&me, &self.server.url)
+    }
+
+    fn claim(&self, object_id: &str, plugin_id: &str, expiration: i64) -> Claim {
+        if self.is_dormant() {
+            return Claim::Unreachable;
+        }
+        let url = match self.url(&[
+            "tern",
+            "v1",
+            "claim",
+            &self.account_id,
+            object_id,
+            plugin_id,
+            &expiration.to_string(),
+        ]) {
+            Ok(u) => u,
+            Err(e) => {
+                warn!("-X Could not claim {plugin_id} of {object_id}: {e}");
+                return Claim::Unreachable;
+            }
+        };
+        let resp = self
+            .push_client
+            .inner()
+            .post(url.clone())
+            .timeout(QUICK_TIMEOUT)
+            .header(AUTHORIZATION, &self.authorization)
+            .header(ACCEPT, "application/json")
+            .send();
+        let status = match resp {
+            Ok(r) => r.status().as_u16(),
+            Err(e) => {
+                warn!(
+                    "-X Could not claim {plugin_id} of {object_id}; acting anyway: {}",
+                    transport_error(&e, url.as_str())
+                );
+                return Claim::Unreachable;
+            }
+        };
+        match status {
+            200..=209 => Claim::Won,
+            409 => Claim::Lost,
+            401 | 403 => {
+                self.go_dormant("claim");
+                Claim::Unreachable
+            }
+            other => {
+                warn!("-X The Tern server answered {other} to a claim of {plugin_id} of {object_id}; acting anyway");
+                Claim::Unreachable
+            }
+        }
     }
 
     fn rebind(&self, local: &[MetadataPush]) -> Result<()> {
