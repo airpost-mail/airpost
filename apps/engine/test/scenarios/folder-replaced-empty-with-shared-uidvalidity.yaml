@@ -1,0 +1,34 @@
+name: folder-replaced-empty-with-shared-uidvalidity
+description: >
+  Another client deletes the empty Receipts and creates Invoices on a server that gives
+  every folder the same UIDVALIDITY (Archive has it too). Receipts has no messages to
+  compare, and the value is not one only Receipts and Invoices have, so they are not
+  paired: Receipts is removed and Invoices synced as a new folder with an id of its own.
+source: "docs/tech-debt.md TD39; RFC 3501 2.3.1.1 (UIDVALIDITY identifies a UID space, not a mailbox)"
+servers:
+  - {fake: dovecot}
+mailboxes:
+  INBOX: {messages: 3}
+  Archive: {messages: 2}
+  Receipts: {messages: 0}
+setup:
+  - server.set_uidvalidity: {mailbox: Archive, value: 4242}
+  - server.set_uidvalidity: {mailbox: Receipts, value: 4242}
+steps:
+  - wait: quiescent
+  - server.delete_mailbox: {name: Receipts}
+  - server.create_mailbox: {name: Invoices}
+  - server.append: {mailbox: Invoices, messages: 2}
+  - server.set_uidvalidity: {mailbox: Invoices, value: 4242}
+  - sync: pass
+  - wait: {quiescent: true}
+expect:
+  server_counts: {INBOX: 3, Archive: 2, Invoices: 2}
+  counts: {INBOX: 3, Archive: 2, Invoices: 2, total: 7}
+  db_matches_server: {}
+  sql:
+    - {query: "SELECT COUNT(*) FROM Folder WHERE path = 'Receipts'", equals: 0}
+  log_present: ["Receipts and Invoices share a UIDVALIDITY other folders have too"]
+  log_absent: ["Receipts renamed to", "\\[critical\\]"]
+  stable: {passes: 1}
+  running: true

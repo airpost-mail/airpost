@@ -557,9 +557,10 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | remote-move-destination-scanned-first | placements: move seen "present in B" before "gone from A"; never deleted/re-created | fake ×2, dovecot |
 | trash-message-with-two-placements | placements: trash from Inbox takes the Sent copy too; a plain archive does not | fake ×2, dovecot |
 | folder-deleted-with-copies-elsewhere | a folder deleted by another client or DestroyCategoryTask: its only-copies removed, copies elsewhere kept | fake, dovecot, cyrus |
-| folder-renamed-in-tern | a SyncbackCategoryTask rename keeps the folder's and its child's ids: no detach, no header refetch, threads show the new path; a new folder at the old path gets its own id | fake ×2, dovecot |
+| folder-renamed-in-tern | a SyncbackCategoryTask rename keeps the folder's and its child's ids: no detach, no header refetch, threads and `ThreadSearch` show the new path; a new folder at the old path gets its own id | fake ×2, dovecot |
 | folder-renamed-on-server | another client's RENAME paired by UIDVALIDITY and the newest messages (per-second UIDVALIDITY settled by the messages), ids kept, no refetch | fake ×2, dovecot |
 | folder-replaced-with-same-uidvalidity | a deleted folder and a new one sharing a UIDVALIDITY but not their messages are not paired | fake |
+| folder-replaced-empty-with-shared-uidvalidity | an empty deleted folder isn't paired with a new one by a UIDVALIDITY a third folder also has | fake |
 | gmail-label-renamed | label renamed in Tern and in the web UI keeps its id; X-GM-LABELS renamed on the copies, threads show the new name | fake |
 | flag-change-on-second-placement | placements: per-placement flags on the Sent copy of a self-addressed message | fake ×2, dovecot |
 | gmail-send-and-labels | Gmail: no Sent APPEND on send, one All Mail placement; ChangeLabelsTask keeps one placement | fake |

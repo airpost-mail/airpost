@@ -56,6 +56,14 @@ pub fn protocol_line(direction: &str, line: &str) -> String {
 
 // -- Background sync (SyncWorker.cpp) ----------------------------------------------------
 
+/// folder-replaced-empty-with-shared-uidvalidity: `Receipts and Invoices share a UIDVALIDITY
+/// other folders have too`.
+pub fn empty_folder_uidvalidity_shared(old_path: &str, new_path: &str) -> String {
+    format!(
+        "- {old_path} and {new_path} share a UIDVALIDITY other folders have too, and {old_path} holds no messages to compare."
+    )
+}
+
 /// uidvalidity-change-large-mailbox: `syncFolderUIDRange for INBOX, UIDs: 1 - \*, Heavy: false`.
 /// `uids` is `"<lo> - <hi>"` or `"<lo> - *"` for an open-ended range.
 pub fn sync_folder_uid_range(path: &str, uids: &str, heavy: bool) -> String {

@@ -123,6 +123,13 @@ impl Category {
         }
     }
 
+    fn data(&self) -> &Value {
+        match self {
+            Category::Folder(f) => &f.data,
+            Category::Label(l) => &l.data,
+        }
+    }
+
     fn data_mut(&mut self) -> &mut Value {
         match self {
             Category::Folder(f) => &mut f.data,
@@ -1276,25 +1283,53 @@ impl Background {
             }
             let candidates = folder_identity::uidvalidity_candidates(&vanished, &statuses);
             let unique = folder_identity::unique_pairs(candidates.clone());
+            // How many of the account's mailboxes have each UIDVALIDITY: the stored rows,
+            // listed or vanished, and the new paths' STATUS. unique_pairs sees only this
+            // pass's vanished and new rows.
+            let mut uses: HashMap<u32, usize> = HashMap::new();
+            let stored = categories
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| !created.contains(j))
+                .map(|(_, c)| stored_validity(&c.data()["localStatus"]))
+                .chain(
+                    unused_folders
+                        .values()
+                        .map(|f| stored_validity(f.local_status())),
+                )
+                .chain(
+                    unused_labels
+                        .values()
+                        .map(|l| stored_validity(l.local_status())),
+                );
+            for v in stored.chain(statuses.iter().map(|(_, v)| *v)) {
+                *uses.entry(v.uid_validity).or_default() += 1;
+            }
+            let validity_of: HashMap<&String, u32> = vanished
+                .iter()
+                .map(|(id, v)| (id, v.uid_validity))
+                .collect();
             let mut pairs = Vec::new();
             for (id, i) in &unique {
-                if is_label
-                    || self.holds_same_messages(
-                        account_id,
-                        &unused_folders[id],
-                        &remote[*i].path,
-                        false,
-                    )?
-                {
+                if is_label {
                     pairs.push((id.clone(), *i));
-                } else {
-                    info!(
+                    continue;
+                }
+                let folder = &unused_folders[id];
+                // A folder holding nothing has no messages to check: its UIDVALIDITY must
+                // be one only it and the new path have.
+                let sole_users = uses.get(&validity_of[id]) == Some(&2);
+                match self.holds_same_messages(account_id, folder, &remote[*i].path)? {
+                    Some(true) => pairs.push((id.clone(), *i)),
+                    None if sole_users => pairs.push((id.clone(), *i)),
+                    None => info!(
                         "{}",
-                        logmsg::folders_share_uidvalidity_only(
-                            unused_folders[id].path(),
-                            &remote[*i].path
-                        )
-                    );
+                        logmsg::empty_folder_uidvalidity_shared(folder.path(), &remote[*i].path)
+                    ),
+                    Some(false) => info!(
+                        "{}",
+                        logmsg::folders_share_uidvalidity_only(folder.path(), &remote[*i].path)
+                    ),
                 }
             }
             // A value several folders share (one per second of creation on some servers) is
@@ -1311,8 +1346,8 @@ impl Background {
                         account_id,
                         &unused_folders[&id],
                         &remote[i].path,
-                        true,
-                    )? {
+                    )? == Some(true)
+                    {
                         verified.push((id, i));
                     }
                 }
@@ -1360,15 +1395,14 @@ impl Background {
     }
 
     /// Whether the newest copies stored for `folder` are at the same UIDs in `path`, with
-    /// the same message ids: a UIDVALIDITY alone can be shared by unrelated mailboxes. A
-    /// folder holding nothing has nothing to mislink and passes unless `strict`.
+    /// the same message ids: a UIDVALIDITY alone can be shared by unrelated mailboxes.
+    /// `None` when the folder holds no copies to compare.
     fn holds_same_messages(
         &mut self,
         account_id: &str,
         folder: &Folder,
         path: &str,
-        strict: bool,
-    ) -> Result<bool> {
+    ) -> Result<Option<bool>> {
         let newest: Vec<(u32, String)> = self
             .w
             .store
@@ -1382,7 +1416,7 @@ impl Background {
             })?
             .collect::<rusqlite::Result<_>>()?;
         if newest.is_empty() {
-            return Ok(!strict);
+            return Ok(None);
         }
         let uids = UidSet::from_uids(newest.iter().map(|(uid, _)| *uid));
         let fetched = match self.w.session.fetch_by_uid(path, FetchKind::Heavy, &uids) {
@@ -1392,7 +1426,7 @@ impl Background {
                 if err.is_offline() {
                     return Err(err.into());
                 }
-                return Ok(false);
+                return Ok(Some(false));
             }
         };
         let mut matched = false;
@@ -1402,11 +1436,11 @@ impl Background {
             };
             // Ids of dateless messages include the path, which was the old one when stored.
             if &id_for_message(account_id, folder.path(), m) != stored {
-                return Ok(false);
+                return Ok(Some(false));
             }
             matched = true;
         }
-        Ok(matched)
+        Ok(Some(matched))
     }
 
     /// Records the UIDVALIDITY of labels that have none yet, a few per pass, so a label

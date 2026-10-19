@@ -75,6 +75,10 @@ fn background_sync() {
         &folders_share_uidvalidity_only("Receipts", "Invoices"),
     );
     assert_matches(
+        r"Receipts and Invoices share a UIDVALIDITY other folders have too",
+        &empty_folder_uidvalidity_shared("Receipts", "Invoices"),
+    );
+    assert_matches(
         r"UIDInvalidity! Resetting placement UIDs in INBOX",
         &uidvalidity_reset("INBOX"),
     );
