@@ -184,6 +184,35 @@ describe('FocusedPerspectiveStore', function () {
     });
   });
 
+  describe('a renamed category', function () {
+    it('swaps in the new path without changing the sheet', function () {
+      FocusedPerspectiveStore._initialized = true;
+      FocusedPerspectiveStore._current = MailboxPerspective.forCategory(
+        new Folder({ id: 'id-456', path: 'OldName', accountId: this.account.id })
+      );
+      spyOn(FocusedPerspectiveStore, '_setPerspective');
+      FocusedPerspectiveStore._onCategoryStoreChanged();
+
+      const current = FocusedPerspectiveStore.current();
+      expect(current.categories()[0].id).toEqual('id-456');
+      expect(current.categories()[0].path).toEqual('MyCategory');
+      expect(current.name).toEqual('MyCategory');
+      expect(JSON.parse(AppEnv.savedState.perspective.serializedCategories)[0].path).toEqual(
+        'MyCategory'
+      );
+      expect(FocusedPerspectiveStore.trigger).toHaveBeenCalled();
+      expect(FocusedPerspectiveStore._setPerspective).not.toHaveBeenCalled();
+    });
+
+    it('leaves an unchanged perspective alone', function () {
+      FocusedPerspectiveStore._initialized = true;
+      FocusedPerspectiveStore._current = this.userPerspective;
+      FocusedPerspectiveStore._onCategoryStoreChanged();
+      expect(FocusedPerspectiveStore.current()).toBe(this.userPerspective);
+      expect(FocusedPerspectiveStore.trigger).not.toHaveBeenCalled();
+    });
+  });
+
   describe('_onFocusPerspective', () =>
     it('should focus the category and trigger', function () {
       FocusedPerspectiveStore._onFocusPerspective(this.userPerspective);

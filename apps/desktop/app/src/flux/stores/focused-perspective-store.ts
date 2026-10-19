@@ -8,7 +8,7 @@ import CategoryStore from './category-store';
 import * as Actions from '../actions';
 
 class FocusedPerspectiveStore extends MailspringStore {
-  _current = MailboxPerspective.forNothing();
+  _current: MailboxPerspective = MailboxPerspective.forNothing();
   _initialized = false;
 
   constructor() {
@@ -135,8 +135,42 @@ class FocusedPerspectiveStore extends MailspringStore {
       this._initializeFromSavedState();
     } else if (!this._isValidPerspective(this._current)) {
       this._setPerspective(this._defaultPerspective(this._current.accountIds));
+    } else {
+      this._refreshRenamedCategories();
     }
   };
+
+  // A renamed folder or label keeps its id, so the perspective stays valid but holds the
+  // old path, which its name and the sidebar selection come from. Swapped in place: the
+  // open thread and sheet stay as they are.
+  _refreshRenamedCategories() {
+    const json = this._current.toJSON() as {
+      type: string;
+      accountIds: string[];
+      serializedCategories?: string;
+    };
+    if (!json.serializedCategories) {
+      return;
+    }
+    const categories = this._current.categories();
+    const fresh = categories.map((c) => CategoryStore.byId(c.accountId, c.id) || c);
+    const renamed = fresh.some(
+      (f, i) => f.path !== categories[i].path || f.role !== categories[i].role
+    );
+    if (!renamed) {
+      return;
+    }
+    const next = MailboxPerspective.fromJSON({
+      ...json,
+      serializedCategories: JSON.stringify(fresh),
+    });
+    if (!next) {
+      return;
+    }
+    this._current = next;
+    AppEnv.savedState.perspective = next.toJSON();
+    this.trigger();
+  }
 
   _onFocusPerspective = (perspective: MailboxPerspective) => {
     // If looking at unified inbox, don't attempt to change the sidebar accounts
