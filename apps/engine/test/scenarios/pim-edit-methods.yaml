@@ -1,0 +1,72 @@
+name: pim-edit-methods
+description: >
+  Calendar and contact edits made by the engine (docs/desktop-client-plan.md 3.8): a new
+  event, an edit to a whole series and to one of its occurrences, a contact edit and a VCF
+  import. The engine builds the ICS and vCards and queues the tasks a client would; their
+  remote phases write them to the server, which afterwards holds what the database holds,
+  the occurrence's exception included.
+source: "apps/engine/src/pim_api.rs; ms-pim plan_update, contact::apply, vcf::import"
+transports: [socket, serve]
+servers:
+  - {radicale: default}
+mailboxes:
+  INBOX: {messages: 1}
+calendars:
+  default:
+    events:
+      - {uid: standup@example.test, summary: "Standup", start: "+1d", rrule: "FREQ=DAILY;COUNT=5"}
+addressbooks:
+  default:
+    contacts:
+      - {uid: alice-uid, name: "Alice Archer", email: alice@example.org}
+steps:
+  - wait: quiescent
+  - wait: {models: {Event: {count: 1}, Contact: {where: {s: carddav}, count: 1}}, timeout: 120}
+  - wait: {quiescent: true}
+  - client.rpc:
+      method: events.create
+      params: {calendar: default, summary: Lunch, start: {now_plus: 432000}, end: {now_plus: 435600}, timezone: Europe/Lisbon}
+      task_from: writes.0.taskId
+    as: create_event
+  - wait: {task: create_event, timeout: 60}
+  - client.rpc:
+      method: events.update
+      params: {event: {uid: standup@example.test}, scope: all, patch: {location: "Room 4"}}
+      task_from: writes.0.taskId
+    as: update_all
+  - wait: {task: update_all, timeout: 60}
+  - client.rpc:
+      method: events.update
+      params: {event: {uid: standup@example.test}, occurrence: 2, scope: this, patch: {summary: "Standup (moved)"}}
+      task_from: writes.0.taskId
+    as: update_this
+  - wait: {task: update_this, timeout: 60}
+  - client.rpc:
+      method: contacts.update
+      params: {contact: {uid: alice-uid}, patch: {title: "Lead", company: "Acme"}}
+      task_from: taskId
+    as: update_contact
+  - wait: {task: update_contact, timeout: 60}
+  - client.rpc:
+      method: contacts.import
+      params: {vcf: "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Dan Diver\r\nN:Diver;Dan;;;\r\nEMAIL:dan@example.org\r\nEND:VCARD\r\n"}
+      task_from: taskIds.0
+    as: import_contact
+  - wait: {task: import_contact, timeout: 60}
+  # The read-back after a PUT updates only the written row; the exception's own row comes
+  # with the next calendar pass, which a client asks for when an event task succeeds.
+  - client.sync_calendar: {}
+  - wait: {log: "^Stored new sync-token for calendar$", count: 2, timeout: 120}
+  - wait: {quiescent: true}
+expect:
+  tasks:
+    create_event: {status: complete, error: null}
+    update_all: {status: complete, error: null}
+    update_this: {status: complete, error: null}
+    update_contact: {status: complete, error: null}
+    import_contact: {status: complete, error: null}
+  dav_has:
+    events: [{uid: standup@example.test, summary: "Standup (moved)"}, {uid: standup@example.test, summary: "Standup"}]
+    contacts: [{uid: alice-uid, name: "Alice Archer"}, {email: dan@example.org, name: "Dan Diver"}]
+  dav_matches_db: {}
+  running: true

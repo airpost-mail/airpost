@@ -984,10 +984,14 @@ class ScenarioRun(PimMixin, BackendMixin):
         return self.ms.account["id"] if value == "$accountId" else value
 
     def _client_rpc(self, arg: dict):
-        """{method, params, expect?, expect_error?}: one socket request for the account.
-        `accountId` is filled in; in params `threads: {selector}` becomes `threadIds`,
-        `message: {selector}` the one `messageId`, and `{now_plus: s}` epoch seconds. `expect`
-        checks keys of the result (values as in `models` waits), `expect_error` the error code."""
+        """{method, params, expect?, expect_error?, task_from?}: one socket request for the
+        account. `accountId` is filled in; in params `threads: {selector}` becomes `threadIds`,
+        `message: {selector}` the one `messageId`, `event: {uid}` the master row's `eventId`,
+        `occurrence: n` (with `event`) the n-th occurrence's `occurrenceStart`, `calendar:
+        name` the `calendarId`, `contact: {selector}` the `contactId`, and `{now_plus: s}`
+        epoch seconds. `expect` checks keys of the result (values as in `models` waits),
+        `expect_error` the error code. `task_from: a.0.b` makes the step's result (what `as:`
+        labels) that value of the result, the id of a task the method queued."""
         params = pim.resolve_now(dict(arg.get("params") or {}))
         params.setdefault("accountId", self.ms.account["id"])
         if "threads" in params:
@@ -997,6 +1001,20 @@ class ScenarioRun(PimMixin, BackendMixin):
             if len(ids) != 1:
                 raise ScenarioFailure(f"client.rpc message: needs exactly one message, got {ids}")
             params["messageId"] = ids[0]
+        if "event" in params:
+            params["eventId"] = self._event_row(params.pop("event")["uid"])["id"]
+        if "occurrence" in params:
+            n = int(params.pop("occurrence"))
+            occ = self.ms.rpc_call("events.expand", {"eventIds": [params["eventId"]],
+                                                     "start": 0, "end": 4102444800})["occurrences"]
+            if n >= len(occ):
+                raise ScenarioFailure(f"client.rpc occurrence: {n}, the event has {len(occ)}")
+            params["occurrenceStart"] = occ[n].get("recurrenceIdStart") \
+                if isinstance(occ[n].get("recurrenceIdStart"), int) else occ[n]["start"]
+        if isinstance(params.get("calendar"), str):
+            params["calendarId"] = self._calendar_id(params.pop("calendar"))
+        if "contact" in params:
+            params["contactId"] = self._contact_row(params.pop("contact"))["id"]
         try:
             result = self.ms.rpc_call(arg["method"], params)
         except MailsyncError as e:
@@ -1012,6 +1030,14 @@ class ScenarioRun(PimMixin, BackendMixin):
             have = isinstance(result, dict) and key in result
             if not pim.value_matches(have, result.get(key) if have else None, want):
                 raise ScenarioFailure(f"{arg['method']} result {key} = {result.get(key) if have else '(absent)'}, expected {want}")
+        if "task_from" in arg:
+            value = result
+            for part in str(arg["task_from"]).split("."):
+                try:
+                    value = value[int(part)] if isinstance(value, list) else value[part]
+                except (KeyError, IndexError, TypeError, ValueError):
+                    raise ScenarioFailure(f"{arg['method']} result has no {arg['task_from']}: {result}")
+            return value
         return result
 
     def _stored_draft(self, header_message_id: str) -> dict:
