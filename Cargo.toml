@@ -29,6 +29,7 @@ ms-mime = { path = "crates/ms-mime" }
 ms-smtp = { path = "crates/ms-smtp" }
 ms-net = { path = "crates/ms-net" }
 ms-dav = { path = "crates/ms-dav" }
+ms-pim = { path = "crates/ms-pim" }
 ms-sync = { path = "crates/ms-sync" }
 ms-tasks = { path = "crates/ms-tasks" }
 # Drafts as the desktop builds them: quoting, signatures, send warnings (desktop-client-plan 3.3).

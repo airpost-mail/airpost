@@ -2182,6 +2182,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ms-pim"
+version = "0.1.0"
+dependencies = [
+ "calcard",
+ "chrono",
+ "chrono-tz",
+ "ms-dav",
+ "serde",
+ "serde_json",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ms-providers"
 version = "0.1.0"
 dependencies = [
