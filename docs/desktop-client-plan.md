@@ -2761,3 +2761,47 @@ Open:
 - Nothing for tern-web: the web's sends go through `draft.send` and its toggles can read the same
   capabilities.
 Trial pending (not run): a tracked send against a local backend (needs the backend endpoints).
+
+2026-10-19, stage 17 gate (attempt 1), branch `roadmap/client-next`, merged to main. Already on
+top of main (10c65c31a), so the rebase was a no-op. Gate: fmt, clippy, `cargo test --workspace`
+(106 test binaries, all ok), `cargo deny check` (advisories, bans, licences and sources ok),
+release build of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve with the
+release binaries (158 passed, 4 skipped). Desktop: lint and typecheck pass; the capability-store,
+send-actions-store, draft-store, metadata-composer-toggle-button, open-tracking and link-tracking
+specs pass (48). No code changed in this step. No new decisions; the ones in the stage 17 entry
+still need confirming.
+
+Open from the review (low):
+- `apps/engine/src/serve.rs`: `server_features::reported(None)` runs before `restart_running`, and
+  the global TRACKING takes the last report from any backend. An old account backend whose
+  `/tern/v1/me` is still in flight (`binding()` calls `fetch_me(None)` with the push client's
+  300 s bound) can finish after the reset and report the old server's features. After
+  `server.clear` no LocalOnly backend reports again, so `capabilities.server.readReceipts` and
+  `linkTracking` stay available with no server connected: the toggles are enabled but sends go
+  out untracked until the engine restarts. Tag reports with a server generation and drop stale
+  ones.
+- `apps/desktop/app/src/flux/stores/draft-store.ts`: tracking is applied only in `draft.send` and
+  the executor. A tracked draft sent through a plugin's own send action (not send or
+  send-and-archive, so `viaEngine` is false and `sendAction.performSendAction({draft})` queues a
+  plain `SendDraftTask.forSending`) goes out untracked without warning while the toggle shows
+  tracking on; the metadata has no trackingId, so the activity view never records an open.
+  Before this stage the JS extensions covered that path (once a server existed). The stage 17
+  open list only named claims for `clientFinalize` rows, not this.
+- `crates/ms-tasks/tests/tasks.rs`: claims are tested for a won send-later, a lost thread-snooze
+  and an unanswered thread-snooze. No test covers a `send-reminders` claim (keyed on the thread's
+  oldest Message-ID), a lost `send-later` claim (no SendDraftTask queued and no second request),
+  or a `clientFinalize` or unknown-action send-later not being claimed, though the stage 17 entry
+  says all three plugins are claimed.
+- Stale docs: `docs/integrations-plan.md` still says "tracking also still needs `PLUGIN_URL`",
+  which this stage removed, and `docs/plugins-inventory.md` (lines 183-184) still describes
+  open-tracking and link-tracking as ExtensionRegistry.Composer users that inject the pixel and
+  rewrite links; the engine does both now.
+- `apps/desktop/app/internal_packages/link-tracking/lib/types.ts`: `LinkTrackingMetadata` still
+  types `links` as `[{url, redirect_url}]`; the engine writes `{url, click_count, click_data}` with
+  no `redirect_url`, plus `tracked`, `trackingId`, `recipients` and `uid`.
+  `link-tracking-message-extension.tsx` still indexes `links[link.redirect_url]`, now always
+  undefined (harmless, dead).
+Nothing for tern-web.
+Trial pending (not run): a tracked send against a local backend (needs the backend endpoints);
+on ~/tern-trial, check the tracking toggles stay off and disabled with the no-server reason in
+their tooltip, and that a send goes out unchanged.
