@@ -10,8 +10,9 @@ use super::{
     failed, opt_recipients, opt_str, opt_str_list, recipients_schema, req_bool, req_str,
     req_str_list, schema, string_list_schema, Ctx, Output, ToolDef, ToolError, ToolResult,
 };
+use crate::compose;
 use crate::discovery::AccountRef;
-use crate::drafts::{self, NewDraft};
+use crate::drafts;
 use crate::model::{self, array_of, i64_of, str_of};
 use crate::policy::Category;
 use crate::tasks;
@@ -305,21 +306,13 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             a
         }
     };
-    let sender = ctx.sender(&account);
-    let draft = drafts::new_draft_json(
-        &sender,
-        NewDraft {
-            to,
-            cc,
-            bcc,
-            subject,
-            body,
-            from: sender.default_me(),
-            thread_id: None,
-            reply_to_header_message_id: None,
-        },
-        now_secs(),
-    );
+    let mut fields = serde_json::Map::new();
+    fields.insert("to".into(), drafts::recipients_json(&to));
+    fields.insert("cc".into(), drafts::recipients_json(&cc));
+    fields.insert("bcc".into(), drafts::recipients_json(&bcc));
+    fields.insert("subject".into(), json!(subject));
+    let built = compose::build(ctx, &account, ms_ipc::draft_kind::NEW, None, fields)?;
+    let draft = compose::with_text(built, &body);
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
     Ok(Output::text(&draft_result(&task, json!({}))).with_account(&account.account_id))
 }
@@ -374,28 +367,11 @@ pub(super) fn reply_to_thread(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         .collect();
 
     let quoted_body = ctx.body(&account.account_id, str_of(&target, "id"))?;
-    let me = ctx.me();
-    let (to, cc) = if kind == "reply-all" {
-        drafts::participants_for_reply_all(&target, &me)
-    } else {
-        drafts::participants_for_reply(&target, &me)
-    };
-    let sender = ctx.sender(&account);
-    let quote = drafts::reply_quote(&target, quoted_body.as_deref());
-    let draft = drafts::new_draft_json(
-        &sender,
-        NewDraft {
-            to,
-            cc,
-            bcc: Vec::new(),
-            subject: drafts::subject_with_prefix(str_of(&target, "subject"), "Re:"),
-            body: format!("{body}\n\n{quote}"),
-            from: sender.reply_from(&target),
-            thread_id: Some(str_of(&thread, "id").to_owned()),
-            reply_to_header_message_id: Some(str_of(&target, "hMsgId").to_owned()),
-        },
-        now_secs(),
-    );
+    let mut replied = target.clone();
+    replied["body"] = json!(quoted_body.clone().unwrap_or_default());
+    let built = compose::build(ctx, &account, &kind, Some(&replied), serde_json::Map::new())?;
+    let mut draft = compose::with_text(built, &body);
+    draft["threadId"] = json!(str_of(&thread, "id"));
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
     let mut note = Value::Null;
     if !existing.is_empty() {
@@ -663,9 +639,25 @@ pub(super) fn send_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
         ));
     }
     let (draft, body) = loaded_draft(ctx, &account.account_id, &draft)?;
-    let task = tasks::send_draft(drafts::desktop_message_json(&draft, Some(&body)));
-    let task_id = str_of(&task, "id").to_owned();
-    ctx.queue(&account.account_id, task)?;
+    let task_id = if ctx
+        .backend
+        .has_feature(&account.account_id, ms_ipc::feature::DRAFT_PIPELINE)
+    {
+        // The engine finalises the draft and queues the send itself.
+        let r = ctx
+            .call(
+                &account.account_id,
+                ms_ipc::method::DRAFT_SEND,
+                json!({"accountId": account.account_id, "headerMessageId": hmid}),
+            )
+            .map_err(|e| failed(format!("The engine refused to send the draft: {e}")))?;
+        str_of(&r, "taskId").to_owned()
+    } else {
+        let task = tasks::send_draft(drafts::desktop_message_json(&draft, Some(&body)));
+        let task_id = str_of(&task, "id").to_owned();
+        ctx.queue(&account.account_id, task)?;
+        task_id
+    };
     ctx.session
         .sends
         .lock()

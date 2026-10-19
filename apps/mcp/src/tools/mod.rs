@@ -26,7 +26,7 @@ pub fn attachment_uri_scheme() -> &'static str {
 
 use crate::config::DesktopConfig;
 use crate::discovery::{AccountRef, Backend, EngineError};
-use crate::drafts::{Me, Recipient, Sender};
+use crate::drafts::{Recipient, Sender};
 use crate::model::{array_of, str_of};
 use crate::policy::{Category, Policy};
 
@@ -106,7 +106,7 @@ impl From<EngineError> for ToolError {
 
 type ToolResult = Result<Output, ToolError>;
 
-fn failed(msg: impl Into<String>) -> ToolError {
+pub(crate) fn failed(msg: impl Into<String>) -> ToolError {
     ToolError::Failed(msg.into())
 }
 
@@ -348,17 +348,6 @@ impl Ctx<'_> {
             account_id: account.account_id.clone(),
             meta,
         }
-    }
-
-    /// Every address of every running account, enabled or not: it decides who "me" is.
-    pub(crate) fn me(&self) -> Me {
-        let senders: Vec<Sender> = self
-            .backend
-            .accounts()
-            .iter()
-            .map(|a| self.sender(a))
-            .collect();
-        Me::new(&senders)
     }
 
     /// `Account.usesLabels()` (Gmail). Without the desktop's account record, an account

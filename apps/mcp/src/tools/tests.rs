@@ -1032,3 +1032,61 @@ fn unsubscribe_needs_send_access_and_says_what_to_do() {
         o.first_text()
     );
 }
+
+#[test]
+fn an_engine_with_the_draft_pipeline_builds_and_sends_the_drafts() {
+    let mut f = fake();
+    f.features.push(ms_ipc::feature::DRAFT_PIPELINE.into());
+    json_of(&run(
+        &mut f,
+        &rw(),
+        "reply_to_thread",
+        json!({"threadId": "t1", "body": "<p>Sounds good</p>"}),
+    ));
+    let (method, params) = f.actions.last().unwrap().clone();
+    assert_eq!(method, "draft.create");
+    assert_eq!(
+        (&params["kind"], &params["messageId"], &params["save"]),
+        (&json!("reply"), &json!("m1"), &json!(false))
+    );
+    let draft = &f.queued.last().unwrap()["draft"];
+    let body = draft["body"].as_str().unwrap();
+    assert!(
+        body.starts_with("<p>Sounds good</p><!-- engine -->"),
+        "{body}"
+    );
+    assert!(body.contains("Bob &lt;bob@y.test&gt; wrote:"), "{body}");
+    assert_eq!(
+        (&draft["pristine"], &draft["threadId"]),
+        (&json!(false), &json!("t1"))
+    );
+
+    json_of(&run(
+        &mut f,
+        &rw(),
+        "create_draft",
+        json!({"to": [{"email": "gail@y.test"}], "subject": "Hi", "body": "<p>Hello</p>"}),
+    ));
+    let (method, params) = f.actions.last().unwrap().clone();
+    assert_eq!(
+        (method.as_str(), &params["kind"]),
+        ("draft.create", &json!("new"))
+    );
+    let draft = &f.queued.last().unwrap()["draft"];
+    assert_eq!(draft["subject"], "Hi");
+    assert_eq!(draft["to"][0]["email"], "gail@y.test");
+
+    let queued = f.queued.len();
+    json_of(&run(
+        &mut f,
+        &policy("read-write-send", json!({})),
+        "send_draft",
+        json!({"headerMessageId": "draft-0@x.test"}),
+    ));
+    let (method, params) = f.actions.last().unwrap().clone();
+    assert_eq!(
+        (method.as_str(), &params["headerMessageId"]),
+        ("draft.send", &json!("draft-0@x.test"))
+    );
+    assert_eq!(f.queued.len(), queued, "the engine queues the send itself");
+}

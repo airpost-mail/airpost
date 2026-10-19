@@ -13,6 +13,7 @@ use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 
 mod audit;
+mod compose;
 mod config;
 mod discovery;
 mod drafts;
