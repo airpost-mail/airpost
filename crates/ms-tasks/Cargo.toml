@@ -17,6 +17,7 @@ ms-mime.workspace = true
 ms-smtp.workspace = true
 ms-net.workspace = true
 ms-dav.workspace = true
+ms-pim.workspace = true
 ms-sync.workspace = true
 serde_json.workspace = true
 rusqlite.workspace = true

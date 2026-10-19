@@ -10,6 +10,10 @@
 //! Differences from the C++: a SyncbackEvent whose write the server refuses does not leave
 //! the client's ICS in the row. A never-written event is removed; any other is re-read from
 //! the server (C++ kept the refused edit until the event next changed on the server).
+//!
+//! A SyncbackEvent with `restore: true` is an undo or redo: its ICS is a snapshot from
+//! before or after an earlier write, re-sent over the copy stored now ([`ms_pim::plan::restore`]),
+//! read in the zone `tz` names.
 
 use ms_core::{Error, Result, SyncError};
 use ms_dav::{ical, DeleteOutcome};
@@ -65,7 +69,14 @@ impl TaskProcessor<'_> {
 
         if let Some(mut existing) = existing {
             if has(&event_json, "ics") {
-                existing.set_ics_data(&get_str(at(&event_json, "ics"))?);
+                let mut ics = get_str(at(&event_json, "ics"))?;
+                if at(data, "restore").as_bool() == Some(true) {
+                    let env = ms_pim::Env::for_zone(at(data, "tz").as_str());
+                    ics = ms_pim::plan::restore(&ics, existing.ics_data(), &env)
+                        .map_err(|e| invalid_ics(&e.message))?;
+                    data["event"]["ics"] = Value::from(ics.as_str());
+                }
+                existing.set_ics_data(&ics);
                 let events = ical::parse_events(existing.ics_data());
                 if let Some(m) = ical::matching_event(&events, existing.recurrence_id()) {
                     existing.data["rs"] = json!(m.recurrence_start);

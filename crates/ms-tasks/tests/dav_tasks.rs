@@ -324,3 +324,38 @@ fn a_refused_event_create_removes_the_event() {
     assert!(e.event(ev.id()).is_some());
     check_invariants(&e.store);
 }
+
+#[test]
+fn an_undo_is_resent_at_the_current_sequence() {
+    let e = env();
+    let ev = synced_event(&e);
+    let edited =
+        ics("p1", "20240611T100000Z", "Moved").replace("END:VEVENT", "SEQUENCE:4\r\nEND:VEVENT");
+    e.local(
+        "SyncbackEventTask",
+        json!({"calendarId": ev.calendar_id(), "event": {"id": ev.id(), "ics": edited}}),
+    );
+    let snapshot = ics("p1", "20240611T090000Z", "Planning");
+    let task = e.local(
+        "SyncbackEventTask",
+        json!({
+            "calendarId": ev.calendar_id(),
+            "event": {"id": ev.id(), "ics": snapshot},
+            "restore": true,
+            "tz": "Europe/Lisbon",
+        }),
+    );
+    let stored = e.event(ev.id()).unwrap();
+    assert!(
+        stored.ics_data().contains("SUMMARY:Planning"),
+        "{}",
+        stored.ics_data()
+    );
+    assert!(
+        stored.ics_data().contains("SEQUENCE:4"),
+        "{}",
+        stored.ics_data()
+    );
+    assert_eq!(task.data["event"]["ics"].as_str(), Some(stored.ics_data()));
+    check_invariants(&e.store);
+}

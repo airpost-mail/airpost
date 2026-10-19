@@ -2287,6 +2287,7 @@ dependencies = [
  "ms-imap",
  "ms-mime",
  "ms-net",
+ "ms-pim",
  "ms-providers",
  "ms-smtp",
  "ms-store",
