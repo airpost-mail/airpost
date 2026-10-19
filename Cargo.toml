@@ -67,6 +67,8 @@ html5ever = "0.40"
 # Draft quoting (ms-compose): the desktop's DOMPurify and juice passes.
 ammonia = "4.2"
 css-inline = { version = "0.23", default-features = false }
+# Tracking transforms (ms-compose): a streaming rewriter keeps the untouched markup as it was.
+lol_html = "3"
 idna = "1.1"
 roxmltree = "0.21"
 hickory-resolver = { version = "0.26", default-features = false, features = ["tokio", "system-config"] }
