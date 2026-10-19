@@ -207,7 +207,8 @@ impl Model for Contact {
     fn before_save(&mut self, store: &Store) -> Result<()> {
         if self.writes_search() {
             let id = self.id().to_owned();
-            super::search_row::assign(store, "ContactSearch", &id, &mut self.data)?;
+            let is_new = self.version() <= 1;
+            super::search_row::assign(store, "ContactSearch", &id, is_new, &mut self.data)?;
         }
         Ok(())
     }

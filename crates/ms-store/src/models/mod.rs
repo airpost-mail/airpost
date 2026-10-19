@@ -35,6 +35,8 @@ mod folder;
 pub(crate) mod generic;
 mod message;
 mod search_row;
+#[doc(hidden)]
+pub use search_row::content_id_lookups as search_row_lookups;
 mod task;
 mod thread;
 

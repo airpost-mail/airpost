@@ -936,3 +936,57 @@ fn search_rows_are_found_by_rowid() {
     assert_eq!(count(&f, "SELECT COUNT(*) FROM ContactSearch"), 1);
     f.assert_invariants();
 }
+
+/// A new Event or Contact is inserted, so its search row is never looked up by `content_id`
+/// (a scan of the whole FTS table); only a stored one without `searchRowId` is.
+#[test]
+fn new_search_rows_skip_the_content_id_scan() {
+    let f = pim_fixture();
+    let before = ms_store::models::search_row_lookups();
+    for i in 0..20 {
+        let mut c = Contact::create(&format!("n{i}"), ACCOUNT, &format!("n{i}@x"), 1, "mail");
+        f.store.save(&mut c).unwrap();
+        let mut d = Contact::create(&format!("d{i}"), ACCOUNT, &format!("d{i}@x"), 0, "carddav");
+        f.store.save(&mut d).unwrap();
+        let fields = IcsEventFields {
+            uid: format!("new-{i}"),
+            summary: "New".into(),
+            ..Default::default()
+        };
+        let mut e = Event::create("etag", ACCOUNT, "cal1", "BEGIN:VCALENDAR", &fields);
+        f.store.save(&mut e).unwrap();
+        // A second save finds the row by the rowid recorded on the first.
+        d.set_name("Dee");
+        f.store.save(&mut d).unwrap();
+    }
+    assert_eq!(ms_store::models::search_row_lookups(), before);
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM ContactSearch"), 2 + 40);
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM EventSearch"), 1 + 20);
+    let rowids: Vec<i64> = {
+        let mut stmt = f
+            .store
+            .conn()
+            .prepare("SELECT rowid FROM ContactSearch")
+            .unwrap();
+        stmt.query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    };
+    let mut unique = rowids.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    assert_eq!(unique.len(), rowids.len());
+
+    // A stored contact from before searchRowId is looked up once.
+    let mut legacy = f
+        .store
+        .find::<Contact>(&Query::new().equal("id", "d0"))
+        .unwrap()
+        .unwrap();
+    legacy.data.as_object_mut().unwrap().remove("searchRowId");
+    f.store.save(&mut legacy).unwrap();
+    assert_eq!(ms_store::models::search_row_lookups(), before + 1);
+    assert_eq!(count(&f, "SELECT COUNT(*) FROM ContactSearch"), 42);
+    f.assert_invariants();
+}

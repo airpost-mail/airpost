@@ -681,7 +681,10 @@ impl ReadStore {
             sql.push_str(&format!("calendarId IN ({})", marks(ids.len())));
             binds.extend(ids.iter().map(|i| SqlValue::Text(i.clone())));
         } else {
-            sql.push_str(&format!("accountId IN ({})", marks(filter.account_ids.len())));
+            sql.push_str(&format!(
+                "accountId IN ({})",
+                marks(filter.account_ids.len())
+            ));
             binds.extend(filter.account_ids.iter().map(|i| SqlValue::Text(i.clone())));
         }
         sql.push_str(&format!(

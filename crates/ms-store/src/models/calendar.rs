@@ -330,7 +330,8 @@ impl Model for Event {
     fn before_save(&mut self, store: &Store) -> Result<()> {
         if self.has_search_content() {
             let id = self.id().to_owned();
-            super::search_row::assign(store, "EventSearch", &id, &mut self.data)?;
+            let is_new = self.version() <= 1;
+            super::search_row::assign(store, "EventSearch", &id, is_new, &mut self.data)?;
         }
         Ok(())
     }

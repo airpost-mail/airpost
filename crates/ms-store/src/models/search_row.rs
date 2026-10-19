@@ -5,6 +5,9 @@
 //! `EventSearch` and `ContactSearch`, so a `WHERE content_id = ?` scans the whole table; the
 //! rowid is kept on the model as `searchRowId`, as Thread keeps its `ThreadSearch` one.
 //! A row written before that has none, and is found by `content_id` once, on its next save.
+//! A new model never is: `Store::save` inserts it, so no row of its id can exist yet.
+
+use std::cell::Cell;
 
 use ms_core::Result;
 use rusqlite::OptionalExtension;
@@ -15,10 +18,26 @@ use crate::Store;
 
 const KEY: &str = "searchRowId";
 
+thread_local! {
+    static CONTENT_ID_LOOKUPS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// How many `WHERE content_id = ?` scans [`assign`] has run on this thread, for tests.
+#[doc(hidden)]
+pub fn content_id_lookups() -> u64 {
+    CONTENT_ID_LOOKUPS.with(Cell::get)
+}
+
 /// The rowid `data`'s search row has or will get, recorded on `data` before it is written.
 /// A `searchRowId` that names another model's row (JSON copied from elsewhere) is not
-/// trusted.
-pub(crate) fn assign(store: &Store, table: &str, id: &str, data: &mut Value) -> Result<i64> {
+/// trusted. `is_new`: the model is about to be inserted (version 1).
+pub(crate) fn assign(
+    store: &Store,
+    table: &str,
+    id: &str,
+    is_new: bool,
+    data: &mut Value,
+) -> Result<i64> {
     let conn = store.conn();
     let recorded = json_i64(&data[KEY]);
     if recorded > 0 {
@@ -30,10 +49,14 @@ pub(crate) fn assign(store: &Store, table: &str, id: &str, data: &mut Value) -> 
             return Ok(recorded);
         }
     }
-    let existing: Option<i64> = conn
-        .prepare_cached(&format!("SELECT rowid FROM {table} WHERE content_id = ?"))?
-        .query_row([id], |r| r.get(0))
-        .optional()?;
+    let existing: Option<i64> = if is_new {
+        None
+    } else {
+        CONTENT_ID_LOOKUPS.with(|n| n.set(n.get() + 1));
+        conn.prepare_cached(&format!("SELECT rowid FROM {table} WHERE content_id = ?"))?
+            .query_row([id], |r| r.get(0))
+            .optional()?
+    };
     let rowid = match existing {
         Some(r) => r,
         None => conn
