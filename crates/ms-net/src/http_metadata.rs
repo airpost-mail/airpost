@@ -358,7 +358,12 @@ pub fn tracking_target(me: &Me, server_url: &str) -> Option<TrackingTarget> {
     } else {
         public
     };
-    if !ns_ok || ms_wire::check_url(public_url).is_err() {
+    // The URL ends up in HTML and in links; allow only RFC 3986 unreserved, sub-delims, ':',
+    // '/' and '%', which rules out quotes and angle brackets.
+    let url_chars_ok = public_url
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:/%".contains(&b));
+    if !ns_ok || !url_chars_ok || ms_wire::check_url(public_url).is_err() {
         warn!("-X The Tern server offers tracking but its trackingNS or publicURL is unusable; sending untracked");
         return None;
     }
@@ -706,6 +711,50 @@ fn as_retryable(e: Error) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn me(public_url: &str) -> Me {
+        Me {
+            user_id: "u".into(),
+            email: "a@example.com".into(),
+            first_name: String::new(),
+            last_name: String::new(),
+            tracking_ns: "ns_1-A".into(),
+            server_id: "s".into(),
+            public_url: public_url.into(),
+            features: ms_wire::Features {
+                tracking: true,
+                sharing: false,
+            },
+        }
+    }
+
+    #[test]
+    fn tracking_target_checks_the_public_url() {
+        let t = tracking_target(&me("https://t.example/base/"), "https://srv.example").unwrap();
+        assert_eq!(t.public_url, "https://t.example/base");
+        assert_eq!(t.ns, "ns_1-A");
+        let t = tracking_target(&me(""), "https://srv.example").unwrap();
+        assert_eq!(t.public_url, "https://srv.example");
+        for bad in [
+            r#"https://t.example/a"><a/href="https://evil">Pay/now</a><img/src="x"#,
+            "https://t.example/a<b",
+            "https://t.example/a>b",
+            "https://t.example/a\"b",
+            "https://t.example/a`b",
+            "https://t.example/a\\b",
+            "https://t.example/a{b}",
+            "https://t.example/a b",
+            "https://t.example/a?b",
+        ] {
+            assert!(
+                tracking_target(&me(bad), "https://srv.example").is_none(),
+                "{bad}"
+            );
+        }
+        let mut off = me("https://t.example");
+        off.features.tracking = false;
+        assert!(tracking_target(&off, "https://srv.example").is_none());
+    }
 
     #[test]
     fn statuses() {
