@@ -2203,5 +2203,28 @@ Open:
 - The Blink stylesheet notice in NOTICE.md is from the upstream file's header as we know it;
   check it against `html.css`.
 
+Review fixes: `draft.send` and `draft.cancelSend` each run in one write transaction, and the
+executor sends a due draft in one too, re-reading the schedule first (a cleared one isn't sent,
+a later one waits), so an Undo at the end of the window either cancels or is told the mail went,
+and an immediate `draft.send` can't double a due undo send; the pending-bodies file goes only
+after a cancel has won, and the executor now wakes the foreground worker after its transaction
+commits (`Executor::new` takes a wake closure). `draft.send` refuses (`-32602`) a `perRecipient`
+map whose keys aren't exactly the draft's To, Cc and Bcc addresses (case-insensitive, `self`
+ignored, no repeats); the executor fails such a send if the recipients changed in the window.
+`draft.create` keeps the id of an existing reply draft (`prefer-existing`), and finds one by its
+JSON `rthMsgId`: the `replyToHeaderMessageId` column was never written, so `behavior` matched
+nothing. "Send now" in the Undo Send toast keeps the rest of the send-later value (`isUndoSend`,
+`actionKey`, `clientFinalize`), and kept bodies go out when the undo window moved earlier, not
+only at the exact expiration. tern-mcp builds its drafts as HTML whatever `core.composing.html`
+says. Tests: engine unit tests (cancel against the executor on two connections in each order and
+racing, `prefer-existing` on a server-synced draft, a short `perRecipient` refused), executor
+tests (re-read schedule, Send now keeps bodies, changed recipients fail), the pending-sends unit
+tests, a tern-mcp test with `core.composing.html` false, the desktop spec for Send now, and a
+Send now step in `draft-pipeline-undo-send`.
+
+Decision taken, to confirm: the toast's Send now keeps the whole send-later value without the
+pipeline too (the old `{expiration}` dropped `clientFinalize`, so the executor sent untransformed).
+
 Trial pending (not run): on ~/tern-trial, new message, reply, reply all, forward, undo send,
-send with an attachment, and quit inside the undo window then start again (the send goes out).
+Send now from the Undo Send toast, send with an attachment, and quit inside the undo window then
+start again (the send goes out).
