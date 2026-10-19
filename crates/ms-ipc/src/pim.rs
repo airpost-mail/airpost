@@ -82,7 +82,18 @@ pub struct EventsExpandResult {
     pub first: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<Value>>,
+    /// More occurrences overlap the window than one reply carries
+    /// ([`EVENTS_EXPAND_MAX_OCCURRENCES`]); ask for a narrower one.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
 }
+
+/// The most occurrences one `events.expand` reply carries.
+pub const EVENTS_EXPAND_MAX_OCCURRENCES: usize = 10_000;
+/// The most VEVENTs, and series masters (VEVENTs without RECURRENCE-ID), an `events.expand`
+/// `ics` may hold: an invitation is one event with its overrides.
+pub const EVENTS_EXPAND_MAX_VEVENTS: usize = 1000;
+pub const EVENTS_EXPAND_MAX_MASTERS: usize = 20;
 
 /// A guest on an event.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,6 +192,10 @@ pub struct EventsWriteResult {
     /// `events.create`: the new event's UID.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icsuid: Option<String>,
+    /// `events.update`: the account organizes the event and it has other guests, so the
+    /// calendar server mails them the change or cancellation (RFC 6638 section 3.2.1).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub notifies_guests: bool,
 }
 
 /// A counter-proposal's time.
