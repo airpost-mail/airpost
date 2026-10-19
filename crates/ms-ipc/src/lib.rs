@@ -298,6 +298,11 @@ pub mod feature {
     /// `ai.triage.run`, `ai.triage.list`, `ai.triage.progress`, `capabilities.ai.triage`, and
     /// the `core.ai.*` settings keys.
     pub const AI_TRIAGE: &str = "ai-triage";
+    /// AI providers' keys in the secret store (docs/ai-plan.md A3): stored providers read
+    /// `integration:ai-<id>`, the AI calls take `provider` without a key, and a stored
+    /// provider's key goes when `settings.set` removes the provider or points it at another
+    /// kind or server.
+    pub const AI_KEYS: &str = "ai-keys";
     /// Account setup on the socket (desktop-client-plan stage 12): `account.discover`,
     /// `account.oauth.begin|complete`, `account.add` and `account.test` with `secrets`,
     /// `account.setSecrets`, `account.update`, `account.reorder`, `account.remove {revoke,

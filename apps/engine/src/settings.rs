@@ -118,6 +118,14 @@ fn invalid(message: String) -> ErrorObject {
     ErrorObject::new(code::INVALID_PARAMS, message)
 }
 
+/// Refuses the values [`SettingsGuard::set`] would refuse for their keys or shapes.
+pub fn check(values: &Map<String, Value>) -> Result<(), ErrorObject> {
+    match values.iter().find_map(|(k, v)| setting_error(k, v)) {
+        Some(e) => Err(invalid(e)),
+        None => Ok(()),
+    }
+}
+
 impl SettingsGuard<'_> {
     /// The stored values of `keys` (every key when `None`). A key without a value, or one
     /// this engine doesn't keep, is left out. Refused when the file couldn't be read, so a
@@ -148,9 +156,7 @@ impl SettingsGuard<'_> {
     /// cleared key. Nothing is stored when a key or value is invalid or the file can't be
     /// written.
     pub fn set(&mut self, values: Map<String, Value>) -> Result<Map<String, Value>, ErrorObject> {
-        if let Some(e) = values.iter().find_map(|(k, v)| setting_error(k, v)) {
-            return Err(invalid(e));
-        }
+        check(&values)?;
         if let Some(e) = self.unreadable {
             return Err(ErrorObject::new(code::INTERNAL_ERROR, e.to_owned()));
         }

@@ -162,6 +162,11 @@ pub fn run(opts: &Options) -> i32 {
         // An unreadable store holds no key here; `hello.credentials` reports why.
         for_keys.upgrade()?.registered.secret(name).ok().flatten()
     }));
+    let for_forget = Arc::downgrade(&engine);
+    crate::ai_api::on_forget_secret(Box::new(move |name| match for_forget.upgrade() {
+        Some(engine) => engine.registered.forget_secret(name),
+        None => Err("the engine is shutting down".to_owned()),
+    }));
     let for_capabilities = Arc::downgrade(&server);
     crate::ai_triage::on_capabilities_changed(Box::new(move || {
         if let Some(server) = for_capabilities.upgrade() {
@@ -1858,7 +1863,7 @@ impl Engine {
                 p.name
             )));
         }
-        self.registered.delete_secret(&p.name).map_err(internal)?;
+        self.registered.forget_secret(&p.name).map_err(internal)?;
         info!("Secret {} deleted", p.name);
         secret_changed(&p.name);
         Ok(json!({}))

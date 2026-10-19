@@ -302,6 +302,9 @@ pub mod thread {
     pub const AI: &str = "ai";
     /// `serve`: one per account, triaging its new inbox mail and `ai.triage.run` jobs.
     pub const AI_TRIAGE: &str = "aiTriage";
+    /// `serve`: waits for local midnight while a provider is over its daily token cap, to
+    /// send `capabilities.changed` when the cap resets.
+    pub const AI_CAP_RESET: &str = "aiCapReset";
     /// `serve`: the workers running `account.discover`, `account.oauth.complete` and
     /// `account.add` / `account.setSecrets` with a test.
     pub const ACCOUNT_SETUP: &str = "accountSetup";

@@ -444,10 +444,9 @@ fn hello_announces_ai_and_its_capabilities() {
             "{f}"
         );
     }
-    assert!(hello["features"]
-        .as_array()
-        .unwrap()
-        .contains(&json!(feature::AI_TRIAGE)));
+    let features = hello["features"].as_array().unwrap();
+    assert!(features.contains(&json!(feature::AI_TRIAGE)));
+    assert!(features.contains(&json!(feature::AI_KEYS)));
     assert_eq!(
         ai["triage"],
         json!({"available": false, "reason": "not-set-up"})
@@ -1025,22 +1024,36 @@ fn stored_settings_serve_calls_without_config() {
 fn daily_token_cap_refuses_calls_until_midnight() {
     let e = Serve::start();
     let server = ollama(&["Capped."]);
-    let mut c = e.client();
+    let mut c = Recorded::connect(&e, json!({"protocol": 1, "client": "ai-test/1"}));
+    c.call(method::SUBSCRIBE, json!({})).unwrap();
     let mut values = stored(
         &server,
         json!({"summary": {"enabled": true, "provider": "local"}}),
     );
     values["core.ai.limits"] = json!({"dailyTokens": {"local": 1}});
-    store_settings(&mut c, values);
+    c.call(method::SETTINGS_SET, json!({ "values": values }))
+        .unwrap();
+    let summary = |c: &mut Recorded| loop {
+        let n = c.notification();
+        if n.method == method::CAPABILITIES_CHANGED {
+            return n.params["ai"]["summary"].clone();
+        }
+    };
+    assert_eq!(summary(&mut c)["available"], true);
     let bare = json!({"accountId": ACCOUNT_ID, "threadId": "t1"});
     c.call(method::AI_SUMMARIZE, bare.clone()).unwrap();
-    let err = rpc_error(
-        c.call(
+    // The call that used up the cap says so, so a client doesn't offer the feature again.
+    assert_eq!(
+        summary(&mut c),
+        json!({"available": false, "provider": "local", "local": true,
+               "reason": "quota-exceeded"})
+    );
+    let err = c
+        .call(
             method::AI_SUMMARIZE,
             json!({"accountId": ACCOUNT_ID, "threadId": "t1", "refresh": true}),
         )
-        .unwrap_err(),
-    );
+        .unwrap_err();
     let data = err.data.unwrap();
     assert_eq!(data["key"], "quota-exceeded");
     assert!(data["retryAfter"].as_u64().unwrap() <= 25 * 3600);
@@ -1671,4 +1684,71 @@ fn engine_held_keys_serve_triage_and_relayed_calls() {
     c.assert_never_carried(KEY);
     c.assert_never_carried("sk-set-later");
     relayed.assert_never_carried(KEY);
+}
+
+/// A stored key belongs to its provider's server: `settings.set` pointing the provider at
+/// another server, or removing it, deletes the key first, so no client can send it elsewhere
+/// by rewriting `core.ai.providers`.
+#[test]
+fn a_provider_moved_or_removed_loses_its_key() {
+    let e = Serve::start();
+    let server = provider(ProviderKind::Anthropic, &["x", "x"]);
+    let listener = provider(ProviderKind::Anthropic, &["x"]);
+    let mut c = Recorded::connect(&e, json!({"protocol": 1, "client": "ai-test/1"}));
+    let at = |url: String| {
+        json!({"core.ai.providers": [{"id": "claude", "kind": "anthropic", "url": url,
+                                      "model": "m-1"}]})
+    };
+    let has = |c: &mut Recorded| {
+        c.call(
+            method::SECRETS_HAS,
+            json!({"names": ["integration:ai-claude"]}),
+        )
+        .unwrap()["integration:ai-claude"]
+            == true
+    };
+    c.call(method::SETTINGS_SET, json!({ "values": at(server.url()) }))
+        .unwrap();
+    c.call(
+        method::SECRETS_SET,
+        json!({"name": "integration:ai-claude", "value": KEY}),
+    )
+    .unwrap();
+    c.call(method::AI_TEST, json!({"provider": "claude"}))
+        .unwrap();
+    assert_eq!(server.last().header("x-api-key"), Some(KEY));
+
+    // Another model on the same server keeps it; a refused write deletes nothing.
+    let mut same = at(format!("{}/", server.url()));
+    same["core.ai.providers"][0]["model"] = json!("m-2");
+    c.call(method::SETTINGS_SET, json!({ "values": same }))
+        .unwrap();
+    let mut keyed = at(listener.url());
+    keyed["core.ai.providers"][0]["apiKey"] = json!("sk-inline");
+    let refused = c.call(method::SETTINGS_SET, json!({ "values": keyed }));
+    assert_eq!(refused.unwrap_err().code, code::INVALID_PARAMS);
+    assert!(has(&mut c));
+
+    c.call(
+        method::SETTINGS_SET,
+        json!({ "values": at(listener.url()) }),
+    )
+    .unwrap();
+    assert!(!has(&mut c));
+    let moved = c.call(method::AI_TEST, json!({"provider": "claude"}));
+    assert_eq!(moved.unwrap_err().data.unwrap()["key"], "not-configured");
+    assert_eq!(listener.count(), 0);
+
+    c.call(
+        method::SECRETS_SET,
+        json!({"name": "integration:ai-claude", "value": KEY}),
+    )
+    .unwrap();
+    c.call(
+        method::SETTINGS_SET,
+        json!({"values": {"core.ai.providers": []}}),
+    )
+    .unwrap();
+    assert!(!has(&mut c));
+    c.assert_never_carried(KEY);
 }

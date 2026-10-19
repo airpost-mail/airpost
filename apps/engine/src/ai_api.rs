@@ -25,8 +25,9 @@ use std::time::Duration;
 use chrono::{Local, TimeZone};
 use ms_ai::{
     Ai, AiError, CancelToken, ContextMessage, DraftOpts, Feature, MailContext, Options, Person,
-    ProviderConfig, ReplyOpts, Sink, SummaryOpts, UsageRecord,
+    ProviderConfig, ProviderKind, ReplyOpts, Sink, SummaryOpts, UsageRecord,
 };
+use ms_core::constants::thread;
 use ms_integrations::Secret;
 use ms_ipc::{
     ai_feature, capability_reason, code, method, AccountStatus, AiCancelParams, AiDraftReplyParams,
@@ -35,7 +36,7 @@ use ms_ipc::{
 };
 use ms_store::read::{CategoryTable, ReadStore};
 use serde_json::{json, Map, Value};
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::ai_triage::Job as TriageJob;
 
@@ -140,6 +141,58 @@ pub fn on_secret(f: SecretSource) {
 
 fn stored_secret(name: &str) -> Option<String> {
     SECRETS.get().and_then(|f| f(name))
+}
+
+type SecretForget = Box<dyn Fn(&str) -> Result<(), String> + Send + Sync>;
+
+static FORGET: OnceLock<SecretForget> = OnceLock::new();
+
+/// How [`forget_unbound_keys`] deletes a key from `serve`'s secret store. Without it (`sync`
+/// mode) there are none to delete.
+pub fn on_forget_secret(f: SecretForget) {
+    let _ = FORGET.set(f);
+}
+
+/// A stored provider's kind and base URL, `None` when it doesn't read as a provider.
+fn origins(providers: Option<&Value>) -> BTreeMap<String, Option<(ProviderKind, String)>> {
+    let Some(Value::Array(list)) = providers else {
+        return BTreeMap::new();
+    };
+    list.iter()
+        .filter_map(|p| {
+            let id = p["id"].as_str()?.to_owned();
+            let origin = serde_json::from_value::<ProviderConfig>(p.clone())
+                .ok()
+                .and_then(|c| Some((c.kind, c.base_url().ok()?)));
+            Some((id, origin))
+        })
+        .collect()
+}
+
+/// The ids of the stored providers whose key no longer applies once `core.ai.providers`
+/// goes from `before` to `after`: removed, or now of another kind or server. A key was
+/// given for one server and must never go to another.
+pub fn unbound_keys(before: Option<&Value>, after: Option<&Value>) -> Vec<String> {
+    let after = origins(after);
+    origins(before)
+        .into_iter()
+        .filter(|(id, old)| old.is_none() || after.get(id) != Some(old))
+        .map(|(id, _)| id)
+        .collect()
+}
+
+/// Deletes the keys of [`unbound_keys`] before `settings.set` writes `after`; an error
+/// means a key that may still be read is still there, and the write must not happen.
+pub fn forget_unbound_keys(before: Option<&Value>, after: Option<&Value>) -> Result<(), String> {
+    let Some(forget) = FORGET.get() else {
+        return Ok(());
+    };
+    for id in unbound_keys(before, after) {
+        let name = ms_secrets::names::ai_provider(&id);
+        forget(&name).map_err(|e| format!("could not delete {name}: {e}"))?;
+        info!("Secret {name} deleted: its provider was removed or changed server");
+    }
+    Ok(())
 }
 
 /// The `core.ai.*` settings: providers, their keys from the secret store, the switches, the
@@ -312,6 +365,48 @@ pub(crate) fn check_daily_cap(provider_id: &str, cap: Option<u64>) -> Result<(),
     }
 }
 
+/// After a call to `provider_id` that started with `before` tokens used today: when it
+/// used up the daily cap, the capabilities change now (and at midnight, through
+/// [`capabilities`]).
+pub(crate) fn note_usage(provider_id: &str, cap: Option<u64>, before: u64) {
+    if cap.is_some_and(|cap| before < cap && tokens_today(provider_id) >= cap) {
+        crate::ai_triage::capabilities_changed();
+    }
+}
+
+/// The local day whose end a [`thread::AI_CAP_RESET`] thread waits for.
+static CAP_RESET: Mutex<Option<String>> = Mutex::new(None);
+
+/// How often the [`thread::AI_CAP_RESET`] thread looks at the date: a sleeping computer's
+/// clock jumps past midnight.
+const CAP_RESET_POLL: Duration = Duration::from_secs(60);
+
+/// Sends `capabilities.changed` once the local day ends, while a provider is over its daily
+/// cap: the cap resets then and nothing else would say so. One thread per day.
+fn notify_at_midnight() {
+    let today = day_key(0);
+    let mut due = CAP_RESET.lock().unwrap_or_else(|e| e.into_inner());
+    if due.as_deref() == Some(today.as_str()) {
+        return;
+    }
+    let day = today.clone();
+    let spawned = std::thread::Builder::new()
+        .name(thread::AI_CAP_RESET.into())
+        .spawn(move || {
+            while day_key(0) == day {
+                std::thread::sleep(until_midnight().clamp(Duration::from_secs(1), CAP_RESET_POLL));
+            }
+            crate::ai_triage::capabilities_changed();
+        });
+    match spawned {
+        Ok(_) => *due = Some(today),
+        Err(e) => warn!(
+            "-X Could not start the {} thread: {e}",
+            thread::AI_CAP_RESET
+        ),
+    }
+}
+
 fn until_midnight() -> Duration {
     let now = Local::now();
     let midnight = (now.date_naive() + chrono::Duration::days(1))
@@ -360,7 +455,8 @@ impl Prepared {
         if let Some(id) = provider {
             check_daily_cap(id, self.cap).map_err(failed)?;
         }
-        match self.job {
+        let used = provider.map(|id| (id.to_owned(), tokens_today(id)));
+        let reply = match self.job {
             Job::Models(config) => answer(ai.models(&config)),
             Job::Test(config) => answer(ai.test(&config)),
             Job::Summarize(config, context, opts) => {
@@ -372,7 +468,11 @@ impl Prepared {
             Job::Draft(config, context, opts) => {
                 answer(ai.draft_reply(&config, &context, &opts, sink))
             }
+        };
+        if let Some((id, before)) = used {
+            note_usage(&id, self.cap, before);
         }
+        reply
     }
 }
 
@@ -1147,14 +1247,14 @@ fn feature_capability(stored: &StoredAi, feature: &str) -> Capability {
         Err(_) => return unavailable(capability_reason::NOT_SET_UP, Some(&config)),
         Ok(()) => {}
     }
+    let capped = check_daily_cap(&config.id, stored.daily_tokens(&config.id)).is_err();
+    if capped {
+        notify_at_midnight();
+    }
     let paused = (feature == ai_feature::TRIAGE)
         .then(|| crate::ai_triage::paused(&config.id))
         .flatten()
-        .or_else(|| {
-            check_daily_cap(&config.id, stored.daily_tokens(&config.id))
-                .err()
-                .map(|e| e.key())
-        });
+        .or(capped.then_some("quota-exceeded"));
     match paused {
         Some("rate-limited") => unavailable(capability_reason::RATE_LIMITED, Some(&config)),
         Some(_) => unavailable(capability_reason::QUOTA_EXCEEDED, Some(&config)),
@@ -1443,6 +1543,42 @@ mod tests {
             sent(json!({"id": "other", "kind": "anthropic", "model": "m"})),
             None
         );
+    }
+
+    #[test]
+    fn keys_go_with_their_provider_or_its_server() {
+        let providers = json!([
+            {"id": "claude", "kind": "anthropic", "model": "m"},
+            {"id": "openai", "kind": "openai", "url": "https://api.openai.com/v1/", "model": "m"},
+            {"id": "laptop", "kind": "ollama", "model": "m"},
+            {"id": "broken", "kind": "nonsense"},
+        ]);
+        let unbound = |after: Value| unbound_keys(Some(&providers), Some(&after));
+        // The same servers, spelled otherwise, and another model keep every key but the
+        // one that doesn't read as a provider.
+        assert_eq!(
+            unbound(json!([
+                {"id": "claude", "kind": "anthropic", "url": "https://api.anthropic.com/v1",
+                 "model": "other"},
+                {"id": "openai", "kind": "openai", "model": "m"},
+                {"id": "laptop", "kind": "ollama", "url": "http://127.0.0.1:11434", "model": "m"},
+                {"id": "broken", "kind": "nonsense"},
+            ])),
+            ["broken"]
+        );
+        assert_eq!(
+            unbound(json!([
+                {"id": "claude", "kind": "anthropic", "url": "http://127.0.0.1:9999",
+                 "model": "m"},
+                {"id": "openai", "kind": "anthropic", "url": "https://api.openai.com/v1"},
+            ])),
+            ["broken", "claude", "laptop", "openai"]
+        );
+        assert_eq!(
+            unbound_keys(Some(&providers), None),
+            ["broken", "claude", "laptop", "openai"]
+        );
+        assert!(unbound_keys(None, Some(&providers)).is_empty());
     }
 
     #[test]

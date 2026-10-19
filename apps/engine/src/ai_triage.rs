@@ -577,7 +577,10 @@ impl Worker {
                         return Flow::Stop;
                     }
                 };
-                ai.triage_until(&config, &context, Some(token))
+                let before = ai_api::tokens_today(&config.id);
+                let answer = ai.triage_until(&config, &context, Some(token));
+                ai_api::note_usage(&config.id, stored.daily_tokens(&config.id), before);
+                answer
             };
             return match answer {
                 Ok(answer) => self.save(thread_id, &latest, &answer),

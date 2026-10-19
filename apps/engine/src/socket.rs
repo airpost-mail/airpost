@@ -1057,6 +1057,9 @@ fn features(server: &Server) -> Vec<String> {
         out.push(feature::CAPABILITIES.to_owned());
         out.push(feature::AI.to_owned());
         out.push(feature::AI_TRIAGE.to_owned());
+        if server.accounts.credentials().is_some() {
+            out.push(feature::AI_KEYS.to_owned());
+        }
     }
     out
 }
@@ -1126,6 +1129,16 @@ fn settings_call(
                 .keys()
                 .any(|k| is_capability_setting(k) || k.starts_with("core.ai."))
                 .then(|| capabilities_of(&guard));
+            // A provider's key goes before the write that removes or re-points the
+            // provider; a write that would be refused deletes nothing.
+            if let Some(after) = p.values.get(ai_api::PROVIDERS_KEY) {
+                crate::settings::check(&p.values)?;
+                let key = [ai_api::PROVIDERS_KEY.to_owned()];
+                let before = guard.get(Some(&key))?;
+                let after = Some(after).filter(|v| !v.is_null());
+                ai_api::forget_unbound_keys(before.get(ai_api::PROVIDERS_KEY), after)
+                    .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))?;
+            }
             let changed = guard.set(p.values)?;
             if !changed.is_empty() {
                 server.hub.settings_changed(&changed, origin);

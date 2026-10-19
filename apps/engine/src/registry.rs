@@ -241,6 +241,19 @@ impl Registry {
         self.store()?.delete(name).map_err(|e| e.to_string())
     }
 
+    /// [`Registry::delete_secret`], except that a store that can't be opened or read
+    /// counts as holding nothing: the engine can't read a value from it to send anywhere,
+    /// and refusing would leave the client unable to drop what the secret was for.
+    pub fn forget_secret(&self, name: &str) -> Result<(), String> {
+        match self.delete_secret(name) {
+            Err(e) if self.secret(name).is_err() => {
+                warn!("-X Could not delete the secret {name} from a store that can't be read: {e}");
+                Ok(())
+            }
+            r => r,
+        }
+    }
+
     pub fn has_secrets(&self, names: &[String]) -> Result<BTreeMap<String, bool>, String> {
         self.store()?
             .has(names.iter().map(String::as_str))
@@ -727,5 +740,26 @@ mod tests {
         let r = registry(dir.path());
         assert!(r.accounts().is_empty());
         assert!(!dir.path().join(ACCOUNTS_FILE).exists());
+    }
+
+    #[test]
+    fn forgetting_needs_a_store_only_when_it_can_be_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let closed = Registry::with_selection(dir.path(), Err("access denied".to_owned()));
+        assert!(closed.delete_secret("integration:ai-claude").is_err());
+        assert!(closed.forget_secret("integration:ai-claude").is_ok());
+
+        let r = registry(dir.path());
+        r.set_secret("integration:ai-claude", "sk-synthetic")
+            .unwrap();
+        r.forget_secret("integration:ai-claude").unwrap();
+        assert_eq!(r.secret("integration:ai-claude").unwrap(), None);
+
+        // A store whose file no longer reads.
+        let broken = tempfile::tempdir().unwrap();
+        std::fs::write(broken.path().join(ms_secrets::FILE_NAME), b"not a keyset").unwrap();
+        let broken = registry(broken.path());
+        assert!(broken.secret("integration:ai-claude").is_err());
+        assert!(broken.forget_secret("integration:ai-claude").is_ok());
     }
 }
