@@ -51,7 +51,9 @@ pub fn build(
 ) -> Result<Value, ToolError> {
     let aid = account.account_id.as_str();
     if ctx.backend.has_feature(aid, feature::DRAFT_PIPELINE) {
-        let mut params = json!({"accountId": aid, "kind": kind, "fields": fields, "save": false});
+        // The tools' bodies are HTML, whatever the composer's default is.
+        let mut params =
+            json!({"accountId": aid, "kind": kind, "fields": fields, "save": false, "html": true});
         if let Some(m) = message {
             params["messageId"] = m["id"].clone();
         }
@@ -72,7 +74,7 @@ pub fn build(
     let c = ComposeCtx {
         settings: &settings,
         accounts: &identities,
-        html: settings.html,
+        html: true,
         now: chrono::Utc::now().timestamp(),
     };
     let built = match (kind, message) {

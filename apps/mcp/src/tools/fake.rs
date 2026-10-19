@@ -300,11 +300,14 @@ impl Backend for Fake {
                     .map(|a| json!({"id": a.account_id, "name": "Me", "emailAddress": a.email}))
                     .collect();
                 let identities = ms_compose::Identities::from_accounts_json(&accounts);
-                let settings = ms_compose::ComposeSettings::default();
+                let settings = ms_compose::ComposeSettings::from_values(
+                    |k| self.settings.get(k).cloned(),
+                    ms_compose::ComposeSettings::default().tz,
+                );
                 let ctx = ms_compose::draft::Ctx {
                     settings: &settings,
                     accounts: &identities,
-                    html: true,
+                    html: params["html"].as_bool().unwrap_or(settings.html),
                     now: 1_700_000_000,
                 };
                 let fields = params["fields"].as_object().cloned().unwrap_or_default();

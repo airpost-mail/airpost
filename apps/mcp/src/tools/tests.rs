@@ -1090,3 +1090,42 @@ fn an_engine_with_the_draft_pipeline_builds_and_sends_the_drafts() {
     );
     assert_eq!(f.queued.len(), queued, "the engine queues the send itself");
 }
+
+/// The tools' bodies are HTML: drafts stay HTML when the composer's default is plaintext, with
+/// the pipeline and without.
+#[test]
+fn drafts_are_html_when_the_composer_default_is_plaintext() {
+    for pipeline in [false, true] {
+        let mut f = fake();
+        f.features.push(ms_ipc::feature::SETTINGS.into());
+        f.settings
+            .insert("core.composing.html".into(), json!(false));
+        if pipeline {
+            f.features.push(ms_ipc::feature::DRAFT_PIPELINE.into());
+        }
+        json_of(&run(
+            &mut f,
+            &rw(),
+            "create_draft",
+            json!({"to": [{"email": "bob@y.test"}], "subject": "Hi", "body": "<p>Hello</p>"}),
+        ));
+        json_of(&run(
+            &mut f,
+            &rw(),
+            "reply_to_thread",
+            json!({"threadId": "t1", "body": "<p>Sounds good</p>"}),
+        ));
+        for queued in &f.queued {
+            let draft = &queued["draft"];
+            assert_eq!(draft["plaintext"], false, "pipeline {pipeline}: {draft}");
+            assert!(
+                draft["body"].as_str().unwrap().starts_with("<p>"),
+                "pipeline {pipeline}: {draft}"
+            );
+        }
+        if pipeline {
+            let (_, params) = f.actions.last().unwrap();
+            assert_eq!(params["html"], true);
+        }
+    }
+}
