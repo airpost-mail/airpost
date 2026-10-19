@@ -18,7 +18,8 @@ use ms_ipc::{
     ContactsGetParams, ContactsImportParams, ContactsImportResult, ContactsUpdateParams,
     ErrorObject, EventWrite, EventsCreateParams, EventsExpandParams, EventsExpandResult,
     EventsRsvpParams, EventsRsvpResult, EventsUpdateParams, EventsWriteResult,
-    Request as RpcRequest,
+    Request as RpcRequest, EVENTS_EXPAND_MAX_MASTERS, EVENTS_EXPAND_MAX_OCCURRENCES,
+    EVENTS_EXPAND_MAX_VEVENTS,
 };
 use ms_pim::edit::{self, Doc, Guest, NewEvent, Person, Rid};
 use ms_pim::occurrence::{self, EventRow, Owners};
@@ -224,6 +225,17 @@ fn expand(session: &mut Session, p: EventsExpandParams) -> Reply {
 
     if let Some(ics) = &p.ics {
         let doc = Doc::parse(ics).map_err(refused)?;
+        let vevents = doc.vevents().count();
+        let masters = doc.vevents().filter(|v| !v.has("RECURRENCE-ID")).count();
+        if vevents > EVENTS_EXPAND_MAX_VEVENTS || masters > EVENTS_EXPAND_MAX_MASTERS {
+            return Err(refused(ms_pim::Error::new(
+                "too-large",
+                format!(
+                    "the ICS holds {vevents} events and {masters} series; at most \
+                     {EVENTS_EXPAND_MAX_VEVENTS} and {EVENTS_EXPAND_MAX_MASTERS} are expanded"
+                ),
+            )));
+        }
         let row = EventRow {
             id: String::new(),
             account_id: account_ids.first().cloned().unwrap_or_default(),
@@ -235,8 +247,14 @@ fn expand(session: &mut Session, p: EventsExpandParams) -> Reply {
             ics: ics.clone(),
             ..Default::default()
         };
-        result.occurrences =
-            occurrence::occurrences(std::slice::from_ref(&row), p.start, p.end, &owners, &env);
+        (result.occurrences, result.truncated) = occurrence::occurrences_up_to(
+            std::slice::from_ref(&row),
+            p.start,
+            p.end,
+            &owners,
+            &env,
+            EVENTS_EXPAND_MAX_OCCURRENCES,
+        );
         if let Some(focus) = &p.focus {
             let times = |t: Option<(i64, i64, Option<i64>, bool)>| match t {
                 Some((start, end, rid, all_day)) => {
@@ -266,7 +284,14 @@ fn expand(session: &mut Session, p: EventsExpandParams) -> Reply {
         .iter()
         .filter_map(EventRow::from_json)
         .collect();
-    result.occurrences = occurrence::occurrences(&rows, p.start, p.end, &owners, &env);
+    (result.occurrences, result.truncated) = occurrence::occurrences_up_to(
+        &rows,
+        p.start,
+        p.end,
+        &owners,
+        &env,
+        EVENTS_EXPAND_MAX_OCCURRENCES,
+    );
     if let Some(focus) = &p.focus {
         result.focused = Some(
             occurrence::focused(&rows, focus.now, focus.recurrence_id_start, &owners, &env)
@@ -493,6 +518,7 @@ impl Here<'_> {
         to_reply(EventsWriteResult {
             writes: vec![out],
             icsuid: Some(uid),
+            notifies_guests: false,
         })
     }
 
@@ -530,6 +556,7 @@ impl Here<'_> {
             occurrence,
         };
         let organizer = self.organizer();
+        let notifies_guests = self.notifies_guests(&row.ics, &patch, Some(&cal));
         let writes =
             plan::plan_update(&target, scope, &patch, Some(&organizer), &env).map_err(refused)?;
         let queue = p.queue.unwrap_or(true);
@@ -540,11 +567,38 @@ impl Here<'_> {
         to_reply(EventsWriteResult {
             writes: out,
             icsuid: None,
+            notifies_guests,
         })
     }
 
-    /// Our copy of an emailed invitation: the master row with its UID on our calendars.
-    fn stored_copy(&self, ics: &str) -> Result<Option<Event>, ErrorObject> {
+    /// Whether the calendar server mails guests an update to the event in `ics`: the
+    /// account organizes it (or will, once `patch` gives it guests) and somebody else is on
+    /// its guest list, before or after the patch.
+    fn notifies_guests(&self, ics: &str, patch: &Patch, cal: Option<&Calendar>) -> bool {
+        let Ok(doc) = Doc::parse(ics) else {
+            return false;
+        };
+        let mine = |e: &str| self.is_mine(e, cal);
+        let organizer = edit::organizer_email(&doc);
+        let others_now = doc.vevents().any(|v| {
+            v.props_named("ATTENDEE")
+                .any(|a| ms_pim::email_from_participant_uri(&a.value).is_some_and(|e| !mine(&e)))
+        });
+        let others_after = patch
+            .attendees
+            .as_ref()
+            .is_some_and(|list| list.iter().any(|g| !mine(&g.email)));
+        match organizer {
+            Some(o) => mine(&o) && (others_now || others_after),
+            None => others_after,
+        }
+    }
+
+    /// Our copy of an emailed invitation (`resolveRSVPTarget`). One UID can sit on our
+    /// calendar, a room's and a colleague's at once, so a copy is ours only when it is on a
+    /// writable calendar the server doesn't call somebody else's, and that calendar is ours,
+    /// or the only such one; never a guess between several.
+    fn stored_copy(&self, ics: &str) -> Result<StoredCopy, ErrorObject> {
         let uid = Doc::parse(ics)
             .map_err(refused)?
             .first()
@@ -552,7 +606,7 @@ impl Here<'_> {
             .unwrap_or_default()
             .to_owned();
         if uid.is_empty() {
-            return Ok(None);
+            return Ok(StoredCopy::None);
         }
         let rows = self
             .store
@@ -562,31 +616,91 @@ impl Here<'_> {
                     .equal("icsuid", uid.as_str()),
             )
             .map_err(internal)?;
-        Ok(rows
+        if rows.is_empty() {
+            return Ok(StoredCopy::None);
+        }
+        let calendars: HashMap<String, Calendar> = self
+            .store
+            .find_all::<Calendar>(&Query::new().equal("accountId", self.account.id()))
+            .map_err(internal)?
+            .into_iter()
+            .map(|c| (c.id().to_owned(), c))
+            .collect();
+        let mut candidates: Vec<&str> = Vec::new();
+        for e in &rows {
+            if let Some(c) = calendars.get(e.calendar_id()) {
+                if Self::writable(c) && !candidates.contains(&c.id()) {
+                    candidates.push(c.id());
+                }
+            }
+        }
+        let own: Vec<&str> = candidates
             .iter()
-            .find(|e| e.recurrence_id().is_empty())
-            .or_else(|| rows.first())
-            .cloned())
+            .copied()
+            .filter(|id| calendars.get(*id).is_some_and(|c| self.is_own_calendar(c)))
+            .collect();
+        let chosen = match (own.as_slice(), candidates.as_slice()) {
+            ([one], _) => *one,
+            ([], [only]) => *only,
+            _ => return Ok(StoredCopy::NotOurs),
+        };
+        // The master carries every occurrence's guest list; an exception answers only itself.
+        Ok(rows
+            .into_iter()
+            .find(|e| e.calendar_id() == chosen && e.recurrence_id().is_empty())
+            .map_or(StoredCopy::NotOurs, StoredCopy::Ours))
     }
 
-    /// The account's first calendar an invitation may be added to.
+    /// `isOwnCalendar`: the server says it is ours, or says nothing and the calendar is
+    /// named after one of the account's addresses.
+    fn is_own_calendar(&self, cal: &Calendar) -> bool {
+        match cal.ownership() {
+            "mine" => true,
+            "other" => false,
+            _ => self
+                .account
+                .own_addresses()
+                .any(|a| ms_pim::same_address(a, cal.name())),
+        }
+    }
+
+    /// Whether an emailed invitation may be stored on our calendars (`mayBeAddedToCalendar`):
+    /// stored with us as ORGANIZER, a scheduling server (RFC 6638 section 3.2.1) would mail
+    /// its guests from us.
+    fn may_be_added(&self, ics: &str) -> bool {
+        Doc::parse(ics)
+            .ok()
+            .and_then(|d| edit::organizer_email(&d))
+            .is_some_and(|o| !self.is_mine(&o, None))
+    }
+
+    /// The account's first calendar an invitation may be added to: one it owns, else the
+    /// first writable one not somebody else's.
     fn default_calendar(&self) -> Result<Option<String>, ErrorObject> {
         let mut cals = self
             .store
             .find_all::<Calendar>(&Query::new().equal("accountId", self.account.id()))
             .map_err(internal)?;
         cals.sort_by_key(|c| c.order());
-        Ok(cals
-            .into_iter()
-            .find(Self::writable)
+        let writable: Vec<&Calendar> = cals.iter().filter(|c| Self::writable(c)).collect();
+        Ok(writable
+            .iter()
+            .find(|c| self.is_own_calendar(c))
+            .or_else(|| writable.first())
             .map(|c| c.id().to_owned()))
     }
 
     fn rsvp(&self, p: EventsRsvpParams) -> Reply {
         let env = env_for(p.tz.as_deref())?;
-        let stored_event = match (&p.event_id, &p.ics) {
-            (Some(id), _) => Some(self.event(id)?),
-            (None, Some(ics)) => self.stored_copy(ics)?,
+        // Without eventId, a copy that is not certainly ours is left alone, and so is adding
+        // the invitation: only the REPLY goes.
+        let (stored_event, no_copy) = match (&p.event_id, &p.ics) {
+            (Some(id), _) => (Some(self.event(id)?), false),
+            (None, Some(ics)) => match self.stored_copy(ics)? {
+                StoredCopy::Ours(e) => (Some(e), false),
+                StoredCopy::None => (None, true),
+                StoredCopy::NotOurs => (None, false),
+            },
             (None, None) => return Err(invalid("events.rsvp needs eventId or ics")),
         };
         let row = stored_event
@@ -639,13 +753,20 @@ impl Here<'_> {
             });
         }
 
-        let add_to = match (&p.calendar_id, &stored_event) {
-            (Some(id), None) => {
+        let addable = no_copy && p.ics.as_deref().is_some_and(|i| self.may_be_added(i));
+        let add_to = match (&p.calendar_id, addable) {
+            (Some(id), _) if no_copy => {
                 let c = self.calendar(id)?;
                 self.check_writable(&c)?;
+                if !addable {
+                    return Err(refused(ms_pim::Error::new(
+                        "own-invitation",
+                        "an invitation this account organizes is not added to a calendar",
+                    )));
+                }
                 Some(id.clone())
             }
-            (None, None) => self.default_calendar()?,
+            (None, true) => self.default_calendar()?,
             _ => None,
         };
         let writable = cal.as_ref().is_some_and(Self::writable);
@@ -656,6 +777,7 @@ impl Here<'_> {
             add_to: add_to.as_deref(),
             status: &p.status,
             occurrence,
+            comment: p.comment.as_deref(),
             reply: p.reply.unwrap_or(true),
             write: p.write.unwrap_or(true),
             retried: p.retried.unwrap_or(false),
@@ -773,6 +895,16 @@ impl Here<'_> {
         }
         to_reply(result)
     }
+}
+
+/// What `events.rsvp` from an emailed invitation finds of it on our calendars.
+enum StoredCopy {
+    /// A copy that is certainly ours.
+    Ours(Event),
+    /// None at all: the invitation may be added.
+    None,
+    /// Copies, none certainly ours: nothing is written.
+    NotOurs,
 }
 
 /// Our address on an event's guest list, for a counter-proposal's answer.

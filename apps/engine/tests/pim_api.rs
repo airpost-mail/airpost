@@ -202,6 +202,31 @@ impl Engine {
         .collect()
     }
 
+    fn tasks(&self, class: &str) -> Vec<Value> {
+        let db = self.db();
+        let mut stmt = db.prepare("SELECT data FROM Task ORDER BY rowid").unwrap();
+        let rows = stmt
+            .query_map([], |r| {
+                r.get::<_, Vec<u8>>(0)
+                    .or_else(|_| r.get::<_, String>(0).map(String::into_bytes))
+            })
+            .unwrap();
+        rows.map(|b| serde_json::from_slice::<Value>(&b.unwrap()).unwrap())
+            .filter(|v| v["__cls"] == class)
+            .collect()
+    }
+
+    fn add_calendar(&self, id: &str, name: &str, read_only: bool, owner: &str) {
+        let data = json!({"id": id, "aid": ACCOUNT_ID, "__cls": "Calendar", "v": 1,
+            "path": format!("/cal/{id}/"), "name": name, "read_only": read_only, "owner": owner});
+        self.db()
+            .execute(
+                "INSERT INTO Calendar (id, data, accountId) VALUES (?, ?, ?)",
+                params![id, data.to_string(), ACCOUNT_ID],
+            )
+            .unwrap();
+    }
+
     fn stop(mut self) {
         assert!(self.child.try_wait().unwrap().is_none(), "exited early");
         self.child.kill().unwrap();
@@ -311,6 +336,47 @@ fn events_expand_and_edit() {
         "{ics}"
     );
 
+    // An occurrenceStart that is no occurrence: the moved standup's new start, an hour off.
+    for occ in [MAR9 + 3600, MAR23 + 3600] {
+        let err = c
+            .call(
+                method::EVENTS_UPDATE,
+                json!({"accountId": ACCOUNT_ID, "eventId": "ev-standup", "scope": "this",
+                       "occurrenceStart": occ, "patch": {"summary": "x"}}),
+            )
+            .unwrap_err();
+        assert_eq!(err.code(), Some(code::INVALID_PARAMS));
+        assert_eq!(key(&err).as_deref(), Some("not-an-occurrence"), "{err}");
+    }
+    let err = c
+        .call(
+            method::EVENTS_UPDATE,
+            json!({"accountId": ACCOUNT_ID, "eventId": "ev-standup", "scope": "following",
+                   "occurrenceStart": MAR23 - 60, "patch": {"deleted": true}}),
+        )
+        .unwrap_err();
+    assert_eq!(key(&err).as_deref(), Some("not-an-occurrence"), "{err}");
+    assert!(!e.event_ics("ev-standup").unwrap().contains("UNTIL"));
+
+    // A change to a meeting the account organizes is mailed to its guests by the server;
+    // one to an invitation is not.
+    let r = c
+        .call(
+            method::EVENTS_UPDATE,
+            json!({"accountId": ACCOUNT_ID, "eventId": "ev-standup", "patch": {"deleted": true},
+                   "queue": false}),
+        )
+        .unwrap();
+    assert_eq!(r["notifiesGuests"], true, "{r}");
+    let r = c
+        .call(
+            method::EVENTS_UPDATE,
+            json!({"accountId": ACCOUNT_ID, "eventId": "ev-review", "patch": {"summary": "x"},
+                   "queue": false}),
+        )
+        .unwrap();
+    assert!(r.get("notifiesGuests").is_none(), "{r}");
+
     // queue:false only describes the writes.
     let before = e.task_classes().len();
     let r = c
@@ -396,6 +462,44 @@ fn events_expand_and_edit() {
         )
         .unwrap_err();
     assert_eq!(err.code(), Some(code::FORBIDDEN_RELAYED));
+
+    // The reads are bounded: a reply carries so many occurrences, an ICS so many series.
+    let minutely = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:m@test\r\nDTSTART:20260302T000000Z\r\nDTEND:20260302T000030Z\r\nRRULE:FREQ=MINUTELY\r\nSUMMARY:Tick\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+    let out = r
+        .call(
+            method::EVENTS_EXPAND,
+            json!({"ics": minutely, "start": 0, "end": 2_000_000_000}),
+        )
+        .unwrap();
+    assert_eq!(out["truncated"], true);
+    assert_eq!(
+        out["occurrences"].as_array().unwrap().len(),
+        ms_ipc::EVENTS_EXPAND_MAX_OCCURRENCES
+    );
+    let one = minutely
+        .trim_start_matches("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n")
+        .trim_end_matches("END:VCALENDAR\r\n");
+    let many = format!(
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n{}END:VCALENDAR\r\n",
+        (0..=ms_ipc::EVENTS_EXPAND_MAX_MASTERS)
+            .map(|i| one.replace("UID:m@test", &format!("UID:m{i}@test")))
+            .collect::<String>()
+    );
+    let err = r
+        .call(
+            method::EVENTS_EXPAND,
+            json!({"ics": many, "start": 0, "end": 2_000_000_000}),
+        )
+        .unwrap_err();
+    assert_eq!(err.code(), Some(code::INVALID_PARAMS));
+    assert_eq!(key(&err).as_deref(), Some("too-large"), "{err}");
+    let out = r
+        .call(
+            method::EVENTS_EXPAND,
+            json!({"start": MAR2 - 3600, "end": MAR2 + 3600}),
+        )
+        .unwrap();
+    assert!(out.get("truncated").is_none(), "{out}");
     e.stop();
 }
 
@@ -406,10 +510,14 @@ fn rsvp_and_counter() {
     let r = c
         .call(
             method::EVENTS_RSVP,
-            json!({"accountId": ACCOUNT_ID, "eventId": "ev-review", "status": "ACCEPTED"}),
+            json!({"accountId": ACCOUNT_ID, "eventId": "ev-review", "status": "ACCEPTED",
+                   "comment": "See you there"}),
         )
         .unwrap();
     assert_eq!(r["email"], "me@example.com", "{r}");
+    let replies = e.tasks("EventRSVPTask");
+    assert_eq!(replies.len(), 1);
+    assert_eq!(replies[0]["comment"], "See you there", "{}", replies[0]);
     assert!(r["replyTaskId"].is_string(), "{r}");
     assert_eq!(r["write"]["kind"], "update");
     let ics = e.event_ics("ev-review").unwrap();
@@ -429,10 +537,11 @@ fn rsvp_and_counter() {
         .call(
             method::EVENTS_RSVP,
             json!({"accountId": ACCOUNT_ID, "ics": invite_ics(), "status": "DECLINED",
-                   "messageId": "m1", "subject": "Can't make it"}),
+                   "messageId": "m1", "subject": "Can't make it", "comment": "Sorry"}),
         )
         .unwrap();
     assert_eq!(r["write"]["eventId"], "ev-review", "{r}");
+    assert_eq!(e.tasks("EventRSVPTask")[1]["comment"], "Sorry");
     assert!(e
         .event_ics("ev-review")
         .unwrap()
@@ -456,6 +565,117 @@ fn rsvp_and_counter() {
         )
         .unwrap_err();
     assert_eq!(key(&err).as_deref(), Some("not-invited"), "{err}");
+    e.stop();
+}
+
+/// From an emailed invitation, without eventId: only a copy certainly ours is answered, and
+/// an invitation the account organizes is never added to a calendar.
+#[test]
+fn rsvp_from_mail_answers_only_our_copy() {
+    let e = Engine::start();
+    e.add_calendar("cal-team-a", "Team A", false, "");
+    e.add_calendar("cal-team-b", "Team B", false, "");
+    let shared = invite_ics().replace("review@test", "shared@test");
+    {
+        let db = e.db();
+        for (id, cal) in [("sh-a", "cal-team-a"), ("sh-b", "cal-team-b")] {
+            insert_event(
+                &db,
+                id,
+                cal,
+                "shared@test",
+                &shared,
+                1_772_636_400,
+                1_772_640_000,
+            );
+        }
+        // On our own calendar and a colleague's: ours is answered.
+        let mixed = invite_ics().replace("review@test", "mixed@test");
+        for (id, cal) in [("mx-team", "cal-team-a"), ("mx-work", "cal-work")] {
+            insert_event(
+                &db,
+                id,
+                cal,
+                "mixed@test",
+                &mixed,
+                1_772_636_400,
+                1_772_640_000,
+            );
+        }
+    }
+    let mut c = e.hello();
+
+    // Two writable calendars, neither identifiably ours: nothing written, the REPLY goes.
+    let r = c
+        .call(
+            method::EVENTS_RSVP,
+            json!({"accountId": ACCOUNT_ID, "ics": shared, "status": "ACCEPTED"}),
+        )
+        .unwrap();
+    assert!(r.get("write").is_none(), "{r}");
+    assert!(r["replyTaskId"].is_string(), "{r}");
+    for id in ["sh-a", "sh-b"] {
+        assert!(e.event_ics(id).unwrap().contains("PARTSTAT=NEEDS-ACTION"));
+    }
+    assert_eq!(e.tasks("SyncbackEventTask").len(), 0);
+
+    let r = c
+        .call(
+            method::EVENTS_RSVP,
+            json!({"accountId": ACCOUNT_ID, "ics": invite_ics().replace("review@test", "mixed@test"),
+                   "status": "ACCEPTED"}),
+        )
+        .unwrap();
+    assert_eq!(r["write"]["eventId"], "mx-work", "{r}");
+    assert!(e
+        .event_ics("mx-team")
+        .unwrap()
+        .contains("PARTSTAT=NEEDS-ACTION"));
+
+    // Only on somebody else's calendar: left alone, and not added either.
+    let r = c
+        .call(
+            method::EVENTS_RSVP,
+            json!({"accountId": ACCOUNT_ID,
+                   "ics": series_ics().replace("standup@test", "holiday@test")
+                       .replace("ORGANIZER;CN=Me:mailto:me@example.com", "ORGANIZER:mailto:boss@example.org"),
+                   "status": "ACCEPTED"}),
+        )
+        .unwrap();
+    assert!(r.get("write").is_none(), "{r}");
+
+    // An invitation we organize and have no copy of.
+    let ours = invite_ics().replace("review@test", "ours@test").replace(
+        "ORGANIZER;CN=Boss:mailto:boss@example.org",
+        "ORGANIZER:mailto:me@example.com",
+    );
+    let r = c
+        .call(
+            method::EVENTS_RSVP,
+            json!({"accountId": ACCOUNT_ID, "ics": ours, "status": "ACCEPTED", "reply": false}),
+        )
+        .unwrap();
+    assert!(r.get("write").is_none(), "{r}");
+    let err = c
+        .call(
+            method::EVENTS_RSVP,
+            json!({"accountId": ACCOUNT_ID, "ics": ours, "status": "ACCEPTED",
+                   "calendarId": "cal-work", "reply": false}),
+        )
+        .unwrap_err();
+    assert_eq!(key(&err).as_deref(), Some("own-invitation"), "{err}");
+
+    // One we don't organize and have no copy of: added to our own calendar.
+    let new = invite_ics().replace("review@test", "new@test");
+    let r = c
+        .call(
+            method::EVENTS_RSVP,
+            json!({"accountId": ACCOUNT_ID, "ics": new, "status": "ACCEPTED", "reply": false}),
+        )
+        .unwrap();
+    assert_eq!(r["write"]["kind"], "create", "{r}");
+    assert_eq!(r["write"]["calendarId"], "cal-work", "{r}");
+    assert_eq!(e.tasks("SyncbackEventTask").len(), 2);
     e.stop();
 }
 
