@@ -239,6 +239,7 @@ impl Dispatcher<'_> {
             account: &self.ctx.account,
             config_dir: &self.ctx.config_dir,
             queue: self,
+            metadata: &*self.ctx.metadata,
         }
     }
 

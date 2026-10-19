@@ -1083,6 +1083,7 @@ fn features(server: &Server) -> Vec<String> {
         out.push(feature::AI.to_owned());
         out.push(feature::AI_TRIAGE.to_owned());
         out.push(feature::DRAFT_PIPELINE.to_owned());
+        out.push(feature::TRACKING.to_owned());
         out.push(feature::RULES.to_owned());
         if server.accounts.credentials().is_some() {
             out.push(feature::AI_KEYS.to_owned());
@@ -1155,6 +1156,7 @@ fn capabilities(server: &Server) -> Option<Capabilities> {
 fn capabilities_of(guard: &SettingsGuard<'_>) -> Capabilities {
     let values = guard.get(None).unwrap_or_default();
     let mut caps = integrations_api::capabilities(&values);
+    integrations_api::apply_server(&mut caps, crate::server_features::tracking());
     caps.ai = ai_api::capabilities(&StoredAi::from_values(&values));
     caps
 }

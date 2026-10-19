@@ -764,6 +764,7 @@ impl Worker {
             account: &ctx.account,
             config_dir: &ctx.config_dir,
             queue: &queue,
+            metadata: &*ctx.metadata,
         };
         let sent = here.create(call).and_then(|draft| {
             let hmid = draft["hMsgId"].as_str().unwrap_or("").to_owned();

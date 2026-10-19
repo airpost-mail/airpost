@@ -269,6 +269,27 @@ pub fn capabilities(settings: &Map<String, Value>) -> Capabilities {
     caps
 }
 
+/// The server features the engine serves once a server is connected: open and link tracking
+/// when `tracking` (the server's `features.tracking`, `None` without a server) is on, done
+/// by the engine's tracking transforms (T22). The others stay as [`capabilities`] left them.
+pub fn apply_server(caps: &mut Capabilities, tracking: Option<bool>) {
+    for feature in [server_feature::READ_RECEIPTS, server_feature::LINK_TRACKING] {
+        let reason = match tracking {
+            None => Some(capability_reason::NEEDS_TERN_SERVER),
+            Some(false) => Some(capability_reason::NOT_ON_SERVER),
+            Some(true) => None,
+        };
+        caps.server.insert(
+            feature.to_owned(),
+            Capability {
+                available: reason.is_none(),
+                reason: reason.map(str::to_owned),
+                ..Capability::default()
+            },
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,6 +297,24 @@ mod tests {
 
     fn caps(settings: Value) -> Value {
         serde_json::to_value(capabilities(settings.as_object().unwrap())).unwrap()
+    }
+
+    #[test]
+    fn tracking_follows_the_connected_server() {
+        let with = |tracking| {
+            let mut c = capabilities(&Map::new());
+            apply_server(&mut c, tracking);
+            serde_json::to_value(c).unwrap()["server"].clone()
+        };
+        let none = with(None);
+        assert_eq!(none["readReceipts"]["reason"], "needs-tern-server");
+        assert_eq!(none["linkTracking"]["available"], false);
+        let off = with(Some(false));
+        assert_eq!(off["linkTracking"]["reason"], "not-on-server");
+        let on = with(Some(true));
+        assert_eq!(on["readReceipts"], json!({"available": true}));
+        assert_eq!(on["linkTracking"], json!({"available": true}));
+        assert_eq!(on["threadSharing"]["reason"], "needs-tern-server");
     }
 
     #[test]

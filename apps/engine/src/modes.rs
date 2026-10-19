@@ -299,6 +299,7 @@ pub(crate) fn metadata_backend(
     let on_refresh = Box::new(move || deltas.send_identity_refresh_needed());
     match HttpMetadataBackend::new(server, account.id(), config_dir, on_refresh) {
         Ok(b) => {
+            let b = b.with_me_listener(Box::new(crate::server_features::reported));
             tracing::info!("{}", metadata_backend_tern(&host));
             Arc::new(b)
         }

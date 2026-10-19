@@ -34,6 +34,7 @@ mod restart;
 mod rules;
 #[cfg(unix)]
 mod serve;
+mod server_features;
 #[cfg(unix)]
 mod settings;
 #[cfg(unix)]

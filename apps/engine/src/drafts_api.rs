@@ -19,10 +19,11 @@ use ms_ipc::{
     code, draft_kind, method, DraftCancelSendParams, DraftCancelSendResult, DraftCreateParams,
     DraftSendParams, DraftSendResult, DraftValidateParams, ErrorObject, Request as RpcRequest,
 };
+use ms_net::{MetadataBackend, TrackingTarget};
 use ms_store::{Message, Model, Query, Store, Task, Thread};
 use ms_sync::expiration_executor::{
-    archive_task, finalise_draft, send_later_expiration, send_task_json, stored_body, SEND_ACTIONS,
-    SEND_LATER, SNOOZE_BODY_EN, SNOOZE_BODY_KEY,
+    apply_tracking, archive_task, finalise_draft, send_later_expiration, send_task_json,
+    stored_body, SEND_ACTIONS, SEND_LATER, SNOOZE_BODY_EN, SNOOZE_BODY_KEY,
 };
 use ms_sync::pending_sends::{recipient_mismatch, PendingBodies, PendingSends};
 use serde_json::{json, Map, Value};
@@ -185,6 +186,8 @@ pub struct Here<'a> {
     pub account: &'a Account,
     pub config_dir: &'a std::path::Path,
     pub queue: &'a dyn QueueTask,
+    /// The account's metadata backend: where tracked sends point.
+    pub metadata: &'a dyn MetadataBackend,
 }
 
 /// Runs a task's local phase and wakes the foreground worker (`Dispatcher::queue_task`).
@@ -474,7 +477,15 @@ impl Here<'_> {
 
     pub fn send(&self, p: DraftSendParams) -> Reply {
         let pending = PendingSends::new(self.config_dir, self.account.id());
-        let (reply, draft_id) = self.atomically("draft.send", || self.send_in_transaction(p))?;
+        // A delayed send is tracked when it fires. Asked before the transaction: it may make a
+        // request to the server.
+        let tracking = match p.delay_ms.unwrap_or(0) {
+            0 => self.tracking_target(&p.header_message_id),
+            _ => None,
+        };
+        let (reply, draft_id) = self.atomically("draft.send", || {
+            self.send_in_transaction(p, tracking.as_ref())
+        })?;
         if let Some(id) = draft_id {
             // Sent now: any bodies kept for an earlier undo window are spent.
             pending.remove(&id);
@@ -482,10 +493,19 @@ impl Here<'_> {
         Ok(reply)
     }
 
+    /// Where the draft's tracking URLs point, when it tracks anything and the server offers
+    /// tracking.
+    fn tracking_target(&self, header_message_id: &str) -> Option<TrackingTarget> {
+        let draft = self.draft(header_message_id).ok()?;
+        ms_compose::tracking::kinds_of(&draft.data)?;
+        self.metadata.tracking()
+    }
+
     /// `draft.send`'s reply, and the draft's id when it was queued to send now.
     fn send_in_transaction(
         &self,
         p: DraftSendParams,
+        tracking: Option<&TrackingTarget>,
     ) -> Result<(Value, Option<String>), ErrorObject> {
         let draft = self.draft(&p.header_message_id)?;
         if self.send_pending(&p.header_message_id)? {
@@ -566,6 +586,9 @@ impl Here<'_> {
                 per_recipient: bodies.per_recipient.clone(),
             };
             data["perRecipientBodies"] = per.per_recipient_json(&finalised.body);
+        }
+        if let Some(target) = tracking {
+            apply_tracking(&mut data, target);
         }
         let task_id = self.queue_task("SendDraftTask", &data)?;
         if after == "send-and-archive" {
@@ -678,6 +701,15 @@ mod tests {
     }
 
     fn with_here<T>(dir: &Path, store: &Store, f: impl FnOnce(&Here) -> T) -> T {
+        with_backend(dir, store, &ms_net::LocalOnly, f)
+    }
+
+    fn with_backend<T>(
+        dir: &Path,
+        store: &Store,
+        metadata: &dyn MetadataBackend,
+        f: impl FnOnce(&Here) -> T,
+    ) -> T {
         let account = account();
         let local = Local(TaskProcessor::new(account.clone(), store).with_config_dir(dir));
         f(&Here {
@@ -685,7 +717,84 @@ mod tests {
             account: &account,
             config_dir: dir,
             queue: &local,
+            metadata,
         })
+    }
+
+    /// A server that offers tracking; counts how often it is asked.
+    #[derive(Default)]
+    struct Tracking(std::sync::atomic::AtomicUsize);
+
+    impl MetadataBackend for Tracking {
+        fn push(&self, _: &ms_net::MetadataPush) -> ms_core::Result<()> {
+            Ok(())
+        }
+        fn pull(
+            &self,
+            cursor: Option<&str>,
+            _: &dyn Fn() -> bool,
+            _: &mut dyn FnMut(ms_net::MetadataDelta),
+        ) -> ms_core::Result<String> {
+            Ok(cursor.unwrap_or("0").to_owned())
+        }
+        fn tracking(&self) -> Option<TrackingTarget> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Some(TrackingTarget {
+                public_url: "https://t.example".into(),
+                ns: "nsnsnsnsnsnsnsnsnsnsns".into(),
+            })
+        }
+    }
+
+    fn send_task(store: &Store, hmid: &str) -> Task {
+        store
+            .find_all::<Task>(&Query::new().equal("accountId", ACCOUNT))
+            .unwrap()
+            .into_iter()
+            .find(|t| t.class() == "SendDraftTask" && t.data["headerMessageId"] == hmid)
+            .unwrap()
+    }
+
+    #[test]
+    fn send_now_tracks_a_tracked_draft_and_a_delayed_one_waits_for_the_executor() {
+        let (dir, store) = setup();
+        let tracked = |hmid: &str| {
+            let mut d = draft(hmid);
+            d["metadata"] = json!([{"pluginId": "open-tracking", "v": 1,
+                                     "value": {"open_count": 0, "open_data": []}}]);
+            d
+        };
+        save_draft(dir.path(), &store, tracked("tr-1@example.com"));
+        save_draft(dir.path(), &store, tracked("tr-2@example.com"));
+        save_draft(dir.path(), &store, draft("plain-1@example.com"));
+        let server = Tracking::default();
+        for (hmid, delay) in [
+            ("tr-1@example.com", None),
+            ("tr-2@example.com", Some(5000)),
+            ("plain-1@example.com", None),
+        ] {
+            with_backend(dir.path(), &store, &server, |h| {
+                h.send(params(json!({
+                    "accountId": ACCOUNT, "headerMessageId": hmid, "delayMs": delay,
+                })))
+            })
+            .unwrap();
+        }
+        // Asked for the tracked send now only.
+        assert_eq!(server.0.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let task = send_task(&store, "tr-1@example.com");
+        let bodies = task.data["perRecipientBodies"].as_object().unwrap();
+        assert_eq!(bodies["self"], "<p>Hi</p>");
+        for who in ["ann@example.net", "bob@example.net"] {
+            assert!(bodies[who]
+                .as_str()
+                .unwrap()
+                .contains(r#"<img alt="" src="https://t.example/t/o/nsnsnsnsnsnsnsnsnsnsns/"#));
+        }
+        let open = ms_store::model::metadata_value(&task.data["draft"], "open-tracking").unwrap();
+        assert_eq!(open["recipients"].as_object().unwrap().len(), 2);
+        assert!(send_task(&store, "plain-1@example.com").data["perRecipientBodies"].is_null());
+        assert_eq!(send_tasks(&store, "tr-2@example.com"), 0);
     }
 
     fn save_draft(dir: &Path, store: &Store, draft: Value) {

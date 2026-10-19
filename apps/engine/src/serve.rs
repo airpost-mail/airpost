@@ -1934,6 +1934,8 @@ impl Engine {
             self.registered.clear_server().map_err(internal)?;
             info!("Tern server cleared; metadata syncs locally");
         }
+        // The restarted accounts' backends report the new server's features.
+        crate::server_features::reported(None);
         // The server replaces the identity clients passed to account.add.
         *self.identity_lock() = Value::Null;
         let restarted = self.restart_running(Some(self.server_identity()))?;
