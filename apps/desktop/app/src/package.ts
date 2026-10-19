@@ -124,6 +124,17 @@ export default class Package {
     return Array.isArray(list) ? list.filter((m) => typeof m === 'string') : [];
   }
 
+  /** `tern.service`: the background program `tern service install` runs as a user unit
+   * (docs/desktop-client-plan.md T19). Only its presence is checked here; tern validates it. */
+  serviceManifest(): { bin: unknown; args?: unknown } | null {
+    const service = this.json.tern?.service;
+    return service && typeof service === 'object' && !Array.isArray(service) ? service : null;
+  }
+
+  version(): string | null {
+    return typeof this.json.version === 'string' ? this.json.version : null;
+  }
+
   getStylesheetsPath() {
     return path.join(this.directory, 'styles');
   }

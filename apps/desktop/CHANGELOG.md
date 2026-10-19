@@ -5,6 +5,8 @@
 Plugin API 1.27.0:
 
 - New `Engine` export (`request`, `subscribe`, `features`, `has`, `capabilities`, `connected`, `onDidChange`) and the `tern.engineMethods` manifest field. See PLUGIN_SYSTEM_ARCHITECTURE.md.
+- `tern.service` manifest block: a plugin's background program, installed from Preferences > Plugins (`tern service install`) as a launchd or systemd user unit that runs after the engine, also while Tern is closed. See PLUGIN_SYSTEM_ARCHITECTURE.md, Service Plugins.
+- Preferences > Plugins lists third-party plugins with where they were installed from and a hash of what was installed.
 - Breaking for plugins that read `document`: message bodies render in a sandboxed cross-origin frame, so `MessageViewExtension.renderedMessageBodyIntoDocument` gets `body` (a `MessageBody`) instead, and reading `document` throws. Plugins with `engines.mailspring` `^1.26.0` still load.
 
 ## 1.26.0 (10/1/2026)

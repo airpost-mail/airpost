@@ -1,0 +1,71 @@
+@import 'ui-variables';
+
+.container-plugins {
+  max-width: 720px;
+  margin: 0 auto;
+
+  .plugins-note {
+    color: @text-color-subtle;
+  }
+
+  .plugin {
+    padding: 10px 0;
+    border-bottom: 1px solid @border-color-divider;
+  }
+
+  .plugin-name {
+    font-weight: @font-weight-semi-bold;
+  }
+
+  .plugin-version,
+  .plugin-inactive,
+  .plugin-detail {
+    color: @text-color-subtle;
+    font-weight: normal;
+  }
+
+  .plugin-detail {
+    font-size: @font-size-smaller;
+    overflow-wrap: anywhere;
+  }
+
+  .plugin-service .item,
+  .plugin-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+
+    .btn {
+      margin: 0;
+    }
+  }
+
+  .plugin-service-status {
+    font-size: @font-size-smaller;
+    overflow-wrap: anywhere;
+  }
+
+  .plugin-service-plan p {
+    overflow-wrap: anywhere;
+  }
+
+  .plugin-unit {
+    font-size: @font-size-smaller;
+    max-height: 240px;
+    overflow: auto;
+    white-space: pre;
+    user-select: text;
+  }
+
+  .plugin-result {
+    font-size: @font-size-smaller;
+    overflow-wrap: anywhere;
+    &.ok {
+      color: @color-success;
+    }
+    &.failed {
+      color: @color-error;
+    }
+  }
+}

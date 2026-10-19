@@ -101,7 +101,11 @@ my-plugin/
   "theme": false,
 
   "tern": {
-    "engineMethods": ["engine.logs.tail"]
+    "engineMethods": ["engine.logs.tail"],
+    "service": {
+      "bin": { "darwin-arm64": "bin/mac/my-service", "linux-x64": "bin/linux/my-service" },
+      "args": ["--quiet"]
+    }
   }
 }
 ```
@@ -122,6 +126,7 @@ my-plugin/
 | `syncInit` | No | If true, loads immediately during startup |
 | `theme` | No | Set to `"ui"` for theme plugins |
 | `tern.engineMethods` | No | The local-only engine methods the plugin calls through `Engine.request` (see [Engine](#engine)) |
+| `tern.service` | No | A background program the OS runs beside the engine (see [Service Plugins](#service-plugins)) |
 
 ### Window Types
 
@@ -418,6 +423,33 @@ first call asks, a yes is kept in `core.plugins.engineMethodApprovals`, a no las
 app restarts. The calling plugin is found from the call's stack; a call from code outside the
 app that belongs to no installed package is refused.
 
+### Service Plugins
+
+Logic that must run while the desktop is closed (send something at a time, act on new mail)
+goes in a service: a separate program on the engine socket, like `tern` and `tern-mcp`, run
+by launchd (macOS) or systemd `--user` (Linux). No plugin code runs inside the engine.
+
+- `tern.service.bin` is a path inside the package, or an object keyed by Node's
+  `<platform>-<arch>` (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`).
+  `tern.service.args` is an optional list of arguments.
+- Preferences > Plugins offers "Install service…", which runs the bundled
+  `tern service install <package>`. Before anything is written it shows the binary, its
+  SHA-256, the copy it will run and the exact unit text; the install then refuses a binary
+  whose hash changed in between. `tern service uninstall <package>` removes it.
+- Installing copies that one file to `<profile>/services/<package>/` and the unit runs the
+  copy, so the binary must be self-contained (a compiled program, or a single script). An
+  update of the plugin changes nothing until the service is installed again. Source, binary,
+  hash and unit are recorded in `<profile>/services.json` (`tern service list`).
+- The unit sets `TERN_CONFIG_DIR` (the profile) and `TERN_SERVICE_PACKAGE` (the package name,
+  which is also the plugin id for its metadata). The engine unit (`serve --detached`) is
+  installed first when it is missing; on systemd the service starts after it, on launchd it
+  has no start order, so a service waits for the engine's socket and reconnects when the
+  engine restarts. Units restart after a failed exit, not after a clean one.
+- Due work comes from `metadata-expiration` deltas for the plugin's id (sent on every scan
+  until the expiration is cleared), new mail from `mail.new`, lists from `metadata.list`.
+  `crates/tern-client` finds and talks to the engine for Rust services.
+- `examples/service-plugin` in the repo is a complete sample.
+
 ### Other Registries
 
 | Registry | Purpose | Key Methods |
@@ -500,13 +532,18 @@ plugin API is a security boundary. The `tern.engineMethods` check and its prompt
 plugin from calling a method that writes accounts or secrets or touches the engine by accident
 or without the user knowing (docs/tech-debt.md TD29). Install only plugins you trust.
 
+A service plugin is a program that runs at login with the user's rights and the engine's
+local methods, whether Tern is open or not. Preferences > Plugins shows what will run before
+it installs it and records each plugin's install source and hash, but that is information,
+not a sandbox.
+
 ---
 
 ## Current Limitations
 
 | Limitation | Impact |
 |------------|--------|
-| No plugin management UI | Users must manually copy folders or use dev console |
+| Plugin management UI | Preferences > Plugins lists third-party plugins with their install source and hash, installs plugins and services; no enable/disable yet |
 | No marketplace/store | No central discovery for community plugins |
 | No enable/disable UI | Plugins require config file editing (themes have UI) |
 | No update mechanism | Manual updates only |

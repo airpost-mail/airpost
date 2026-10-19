@@ -4,6 +4,7 @@ import { shell } from 'electron';
 import { localized } from './intl';
 import Package, { isValidPackageName } from './package';
 import { PLUGIN_API_VERSION } from './plugin-api-version';
+import { recordPluginInstall } from './plugin-install-record';
 
 export default class PackageManager {
   packageDirectories: string[] = [];
@@ -274,6 +275,7 @@ export default class PackageManager {
     try {
       fs.cpSync(packagePath, packageFinalDir, { recursive: true });
       pkg = new Package(packageFinalDir);
+      recordPluginInstall(pkg.name, path.resolve(packagePath), packageFinalDir);
     } catch (err) {
       try {
         fs.rmSync(packageFinalDir, { recursive: true, force: true });
