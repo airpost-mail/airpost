@@ -395,9 +395,12 @@ Shipped in the tarballs under `deploy/`:
   `LoadCredential` for the engine key and `RuntimeDirectory=tern` for the socket.
 - `com.ternmail.engine.plist` for a Mac mini used as a server.
 
-`tern service install` (stage 19) writes these for service plugins and could write the
-engine unit too. This plan provides the templates and the files in the tarballs; stage 19
-reuses them instead of generating its own.
+`tern service install` and `tern engine install` (stage 19, `apps/cli/src/service.rs`)
+generate per-user units instead: a LaunchAgent or a systemd `--user` unit with the
+profile's absolute paths, the bundled engine and a service binary copied into the profile,
+which a static template can't carry. The templates here stay for server installs (system
+units, `DynamicUser`, `LoadCredential`), and should match the generated engine unit's command
+(`mailsync --mode serve --detached`, `CONFIG_DIR_PATH`, restart on failure only).
 
 ## 6. Scenario 4: hosted by us
 

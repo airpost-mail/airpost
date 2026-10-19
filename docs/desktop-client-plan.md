@@ -799,9 +799,10 @@ Plugins can't define new Task classes (the engine rejects unknown `__cls`), whic
 true today.
 
 **Background logic.** Service plugins (T19, stage 19): a package may declare `tern.service`
-(a binary speaking the engine protocol); Preferences offers "install service", which runs
-`tern service install <package>` to write a user unit (launchd LaunchAgent, systemd
-`--user`) started after the detached engine. Their due work comes from
+(a binary speaking the engine protocol); Preferences > Plugins offers "install service", which
+runs the bundled `tern service install <package>` to copy the binary into the profile and
+write a user unit (launchd LaunchAgent, systemd `--user`) started after the detached engine,
+whose unit `tern engine install` writes (and `tern service install` when it is missing). Their due work comes from
 `metadata-expiration` for their plugin id, new mail from `mail.new`, and their lists from
 `metadata.list`. Until stage 19, third-party background logic runs in the desktop as
 today, and only while it is open.
@@ -2480,3 +2481,85 @@ Nothing for tern-web.
 Trial pending (not run): the stage 14 steps above (rules move out of localStorage, a rule that
 labels or moves arriving mail, one that forwards to an address of the user's, a broken expression
 disabled with the notification, "Process entire inbox" with Stop).
+
+2026-10-19, stage 19 delivered (service plugins), branch `roadmap/client-next`, not merged.
+CLI (`apps/cli/src/service.rs`, `units.rs`): `tern service install <package>` reads
+`tern.service` from the plugin's package.json (`bin`: a path inside the package, or one per
+Node `<platform>-<arch>` key; optional `args`), refuses a binary outside the package (symlinks
+resolved) or not executable, copies it to `<config>/services/<package>/` and writes a unit that
+runs the copy with `TERN_CONFIG_DIR` and `TERN_SERVICE_PACKAGE`: a LaunchAgent
+(`com.ternmail.tern.service.<package>`, RunAtLoad, KeepAlive on a failed exit only,
+ThrottleInterval 10, log in the service's directory) or a systemd `--user` unit
+(`tern-service-<package>`, `After=`/`Wants=` the engine unit, `Restart=on-failure`). The engine
+unit (`com.ternmail.tern.engine` / `tern-engine`: `mailsync --mode serve --detached` with
+`CONFIG_DIR_PATH`, optional `TERN_ENGINE_KEY_FILE`) is written first when missing, from
+`--engine-bin` or the `mailsync-rs`/`mailsync` beside `tern`; `tern engine install|uninstall`
+manage it alone (uninstall refused while services are installed). Units of a profile other
+than the desktop's default get a profile tag in their names. `--dry-run` prints the binary,
+its SHA-256, the copy, and both unit texts; `--expect-sha256` refuses a binary whose hash
+changed, checked again on the bytes copied. `<config>/services.json` records each service's
+source directory, binary, copy, hash, unit and time, and the engine unit's binary and hash;
+`tern service list` adds whether the unit file is there and the copy unchanged. `tern service
+uninstall` stops the unit, removes it, the copy and the record. Units are loaded
+(`launchctl bootout` + `bootstrap gui/<uid>`, `systemctl --user daemon-reload`, `enable`,
+`restart`) only when written to the manager's own directory: `--unit-dir`, `--no-load` or
+`TERN_SERVICE_NO_LOAD` load nothing, and the loader refuses to run under `cfg(test)`.
+Sample: `examples/service-plugin` (crate `tern-sample-service`, workspace member, and a plugin
+package.json with `tern.service`), a "remind me" service on `tern-client`: it waits for an
+engine, subscribes to Thread and Message deltas, and on a `metadata-expiration` delta whose
+`tern-sample-service` row is due stars the thread, marks it unread and clears the expiration
+(each model and expiration once), reconnecting when the engine goes; `tern-client` gains
+`tasks::syncback_thread_metadata`. Desktop: Preferences > Plugins (new tab) lists third-party
+plugins with their directory, active state and install record, and for a plugin with
+`tern.service` runs the bundled `tern service install --dry-run` and shows the binary, hash,
+copy and unit texts before an Install button that passes `--expect-sha256`; installed services
+show their copy and hash (and a missing unit or changed copy), with Uninstall. The engine unit
+gets this build's engine and, in unpackaged runs, `<config>/engine-dev.key`.
+`installPackageFromPath` records `core.plugins.installs[name] = {source, sha256, installedAt}`
+(SHA-256 over sorted relative paths and file hashes, symlinks by target). Packaging:
+`build-release.sh` builds and installs `tern` next to `tern-mcp` (asar-unpacked, the linux-arm64
+workflow copies it, `make desktop` links the debug build); its crates are a subset of
+tern-mcp's, so tern-mcp's notices cover it. TD29's remaining items are done (tech-debt.md).
+Checks: `cargo test -p tern -p tern-client -p tern-sample-service` (unit generation for both
+managers into temp dirs, escaping, manifest refusals, install/uninstall/list with a fake
+loader, the load rule), fmt, clippy, `cargo deny check licenses bans`; harness
+`test_service_plugin.py` (the sample against a serve engine on the fake server: waits with no
+engine, acts on its own due row only, leaves another plugin's) and `test_cli.py` with debug
+binaries (3 passed); desktop lint, typecheck and the preferences, package-manager,
+plugin-install-record and engine-api specs (81 passing), including a spec that drives the pane
+with the real `tern` into a temp unit dir (plan shown before writing, install, uninstall, a
+binary swapped after review refused). CI's harness job builds `tern-sample-service` and sets
+`SAMPLE_SERVICE_BIN`; the test skips without the binary unless CI or `REQUIRE_SAMPLE_SERVICE`.
+No unit was loaded on this machine.
+
+Decisions taken, to confirm: the unit runs a copy of the service binary in the profile, not
+the file in the package, so a plugin update needs a reinstall and the binary must be
+self-contained (one file). `tern service install` installs the engine unit when it is missing
+rather than refusing, and the pane shows both units; `tern engine install` was added here
+(stage 11 left it open). launchd has no start order, so the service unit doesn't name the
+engine there; services wait for the socket and reconnect. Both units restart only after a
+failed exit (the engine exits 0 on `engine.shutdown`). The service's plugin id is its package
+name (`TERN_SERVICE_PACKAGE`); no subscribe filter by plugin id was added, a service filters
+`metadata-expiration` deltas itself. Units for a non-default profile carry
+`profile-<8 hex of sha256(config dir)>` in their names. The per-user units are generated, not
+taken from deployment-plan section 5's templates, which don't exist yet and are system units;
+section 5 now says so. Plugin install records live in `core.plugins.installs` in config.json;
+plugins copied into `packages/` by hand have none.
+
+Open:
+- While the desktop runs its own (non-detached) engine, an installed engine unit fails to bind
+  the socket and launchd/systemd retry it every 10 s until the desktop quits; the desktop
+  joins it at the next launch (stage 11). The supervisor could hand over to the unit's engine
+  instead of spawning its own when an engine unit is installed.
+- Uninstalling the plugin in the desktop doesn't uninstall its service (the pane lists such a
+  service under its package name with Uninstall).
+- The pane doesn't refresh after "Install a plugin…" (the dialog has no callback); reopening
+  Preferences shows it. Deprecation warnings (stage 14) and engine-method approvals (TD30) are
+  still not shown in the pane.
+- Windows has no units (`tern service install` says so).
+- `lang/en.json` has no entries for the new strings.
+- Nothing for tern-web.
+Trial pending (not run): on ~/tern-trial, build the sample into `examples/service-plugin/bin`,
+install it from Preferences > Plugins (check the binary, hash and units shown), give a thread a
+`tern-sample-service` reminder a minute out, quit the desktop, and see the thread starred and
+unread; then uninstall the service and the engine unit.

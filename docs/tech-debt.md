@@ -762,8 +762,15 @@ refused) and refuses a T13 local-only method (`account.*` writes, `secrets.*`, `
 `engine.shutdown`) unless the package's `tern.engineMethods` lists it and the user allowed it.
 The user is asked on the first call, not at install (no install step reads the manifest yet); a yes
 is kept in `core.plugins.engineMethodApprovals`, a no for the session. The app's own code and
-bundled packages are never asked. Still open: showing the binary and unit before
-`tern service install` (stage 19), and recording install source and hash (TD30).
+bundled packages are never asked. Stage 19 (roadmap/client-next) did the rest: Preferences >
+Plugins runs `tern service install --dry-run` and shows the binary, its SHA-256, the copy that
+will run and the exact unit text before anything is written, and the install refuses a binary
+whose hash changed since (`--expect-sha256`); the unit runs a copy in the profile, so a later
+plugin update changes nothing until the next install. `<config>/services.json` records each
+service's source, binary, hash and unit, and `core.plugins.installs` each plugin installed
+through Tern with its source directory and a SHA-256 over its files, shown in the pane. Still
+open: plugins copied into `packages/` by hand have no record, and approvals for
+`tern.engineMethods` can't be seen or revoked in the pane (TD30).
 
 ### TD30. Plugins can't be disabled from the UI; dead and placeholder plugins (stage 2)
 
