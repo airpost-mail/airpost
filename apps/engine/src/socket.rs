@@ -36,9 +36,10 @@ use ms_ipc::{
     BodiesFetchParams, CalendarSyncParams, Capabilities, CredentialsStatus, DisconnectParams,
     EngineStatusResult, ErrorObject, FrameError, HelloParams, HelloResult, LogsTailParams,
     LogsTailResult, MailNewParams, Notification, RelayDevice, Request as RpcRequest, Response,
+    RulesCancelParams, RulesDisabledParams, RulesProgressParams, RulesReprocessParams,
     SettingsGetParams, SettingsValues, SubscribeParams, SyncWakeParams, TaskCancelParams,
     TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES,
-    LOGS_TAIL_MAX_BYTES, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    LOGS_TAIL_MAX_BYTES, MAIL_RULES_KEY, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use serde_json::{json, Value};
@@ -427,6 +428,26 @@ impl Hub {
             );
             self.publish_to(account_id, None, ms_ipc::encode(&n).into(), false);
         }
+    }
+
+    /// Sends `rules.disabled` to every subscriber whatever its filter; nothing is kept for a
+    /// later subscriber, which finds the rule disabled in `mailRules`.
+    fn rules_disabled(&self, params: &RulesDisabledParams) {
+        let n = Notification::new(
+            method::RULES_DISABLED,
+            serde_json::to_value(params).unwrap_or(Value::Null),
+        );
+        let note: Arc<[u8]> = ms_ipc::encode(&n).into();
+        self.lock()
+            .subscribers
+            .retain(|s| match s.outbox.push(note.clone()) {
+                Ok(()) => true,
+                Err(PushError::Closed) => false,
+                Err(PushError::Full) => {
+                    drop_slow(s.conn, &s.outbox);
+                    false
+                }
+            });
     }
 
     /// Sends `settings.changed` to every subscriber but `origin`, the connection that made
@@ -1061,6 +1082,7 @@ fn features(server: &Server) -> Vec<String> {
         out.push(feature::AI.to_owned());
         out.push(feature::AI_TRIAGE.to_owned());
         out.push(feature::DRAFT_PIPELINE.to_owned());
+        out.push(feature::RULES.to_owned());
         if server.accounts.credentials().is_some() {
             out.push(feature::AI_KEYS.to_owned());
         }
@@ -1080,6 +1102,40 @@ fn stored_ai(server: &Server) -> StoredAi {
 
 /// Sends `capabilities.changed` with the current capabilities: an AI triage pause began or
 /// ended.
+/// Disables a failing mail rule in `mailRules` and sends `settings.changed` (to every
+/// subscriber: the engine made the change) and `rules.disabled`. False when the rule is gone,
+/// disabled already, or the store can't be written.
+pub fn disable_rule(server: &Server, rule_id: &str, error: &str) -> bool {
+    let Some(store) = &server.settings else {
+        return false;
+    };
+    let key = [MAIL_RULES_KEY.to_owned()];
+    let mut guard = store.lock();
+    let Ok(mut current) = guard.get(Some(&key)) else {
+        return false;
+    };
+    let Some(values) =
+        crate::rules::disabled_values(current.remove(&key[0]).as_ref(), rule_id, error)
+    else {
+        return false;
+    };
+    match guard.set(values) {
+        Ok(changed) if !changed.is_empty() => {
+            server.hub.settings_changed(&changed, None);
+            server.hub.rules_disabled(&RulesDisabledParams {
+                rule_id: rule_id.to_owned(),
+                error: error.to_owned(),
+            });
+            true
+        }
+        Ok(_) => false,
+        Err(e) => {
+            warn!("-X Could not disable mail rule {rule_id}: {}", e.message);
+            false
+        }
+    }
+}
+
 pub fn publish_capabilities(server: &Server) {
     if let Some(caps) = capabilities(server) {
         server.hub.capabilities_changed(&caps);
@@ -1143,7 +1199,10 @@ fn settings_call(
                 ai_api::forget_unbound_keys(before.get(ai_api::PROVIDERS_KEY), after)
                     .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))?;
             }
-            let changed = guard.set(p.values)?;
+            let mut changed = guard.set(p.values)?;
+            let now_ms = ms_core::Clock::now(&ms_core::SystemClock).saturating_mul(1000);
+            let since = crate::rules::set_auto_since(&mut guard, &changed, now_ms);
+            changed.extend(since);
             if !changed.is_empty() {
                 server.hub.settings_changed(&changed, origin);
             }
@@ -1436,6 +1495,15 @@ impl Connection {
                     Err(e) => Err(e),
                 }
             }
+            method::RULES_REPROCESS if self.session.server.settings.is_some() => {
+                match self.rules_reprocess(&req) {
+                    Ok(()) => return None,
+                    Err(e) => Err(e),
+                }
+            }
+            method::RULES_CANCEL if self.session.server.settings.is_some() => req
+                .params_as::<RulesCancelParams>()
+                .and_then(crate::rules::cancel),
             method::AI_TRIAGE_LIST if self.session.server.settings.is_some() => {
                 let stored = stored_ai(&self.session.server);
                 crate::ai_triage::list(
@@ -1615,6 +1683,42 @@ impl Connection {
         )?;
         self.ai_streams.add_job(&job);
         Ok(())
+    }
+
+    /// `rules.reprocess`: queues the job on the account's rules thread and answers; its
+    /// `rules.progress` notifications come after the answer, to this connection only.
+    fn rules_reprocess(&mut self, req: &RpcRequest) -> Result<(), ErrorObject> {
+        let p = req.params_as::<RulesReprocessParams>()?;
+        let (conn, outbox, hub) = (
+            self.id,
+            self.outbox.clone(),
+            self.session.server.hub.clone(),
+        );
+        let progress: crate::rules::Progress = Box::new(move |p: &RulesProgressParams| {
+            let n = Notification::new(
+                method::RULES_PROGRESS,
+                serde_json::to_value(p).unwrap_or(Value::Null),
+            );
+            if let Err(PushError::Full) = outbox.push(ms_ipc::encode(&n).into()) {
+                drop_slow(conn, &outbox);
+                hub.unsubscribe(conn);
+            }
+        });
+        let id = req.id.clone();
+        let (answer_outbox, answer_hub) = (self.outbox.clone(), self.session.server.hub.clone());
+        let respond = move |result: Value| {
+            let Some(id) = id else {
+                return;
+            };
+            let line = ms_ipc::encode(&Response::ok(Some(id), result));
+            if let Err(PushError::Full) = answer_outbox.push(line.into()) {
+                drop_slow(conn, &answer_outbox);
+                answer_hub.unsubscribe(conn);
+            }
+        };
+        let accounts = self.session.server.accounts.clone();
+        let reads = self.session.reads.store()?;
+        crate::rules::reprocess(p, reads, &*accounts, progress, respond)
     }
 
     fn on_first_hello(&mut self, req: &RpcRequest) {

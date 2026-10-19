@@ -1089,6 +1089,60 @@ fn logs_tail_reads_the_end_of_a_log() {
 }
 
 #[test]
+fn storing_rules_sets_their_auto_since_once() {
+    let mut e = Serve::start();
+    let mut writer = e.hello();
+    let mut watcher = e.hello();
+    let status = writer.call(method::ENGINE_STATUS, json!({})).unwrap();
+    assert!(status["features"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(ms_ipc::feature::RULES)));
+    watcher
+        .call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
+        .unwrap();
+    let before = ms_core::Clock::now(&ms_core::SystemClock) * 1000;
+    let rules = json!([{ "id": "r1", "accountId": "a1", "conditions": [], "actions": [] }]);
+    writer
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { ms_ipc::MAIL_RULES_KEY: rules } }),
+        )
+        .unwrap();
+    let n = next_matching(&mut watcher, |v| v["method"] == method::SETTINGS_CHANGED);
+    let since = n["params"]["values"][ms_ipc::MAIL_RULES_AUTO_SINCE_KEY]
+        .as_i64()
+        .unwrap();
+    assert!(since >= before, "{since} < {before}");
+    assert_eq!(n["params"]["values"][ms_ipc::MAIL_RULES_KEY], rules);
+    // Kept when the rules change again, and a client's own value wins.
+    writer
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { ms_ipc::MAIL_RULES_KEY: [], ms_ipc::MAIL_RULES_AUTO_SINCE_KEY: 5 } }),
+        )
+        .unwrap();
+    writer
+        .call(
+            method::SETTINGS_SET,
+            json!({ "values": { ms_ipc::MAIL_RULES_KEY: rules } }),
+        )
+        .unwrap();
+    let got = writer.call(method::SETTINGS_GET, json!({})).unwrap();
+    assert_eq!(got["values"][ms_ipc::MAIL_RULES_AUTO_SINCE_KEY], json!(5));
+
+    let unknown = writer
+        .call(method::RULES_REPROCESS, json!({ "accountId": "nope" }))
+        .unwrap_err();
+    assert_eq!(unknown.code(), Some(code::UNKNOWN_ACCOUNT));
+    let cancelled = writer
+        .call(method::RULES_CANCEL, json!({ "jobId": "none" }))
+        .unwrap();
+    assert_eq!(cancelled, json!({ "cancelled": false }));
+    e.stop();
+}
+
+#[test]
 fn settings_round_trip_and_notify_the_other_connections() {
     let mut e = Serve::start();
     let mut writer = e.hello();

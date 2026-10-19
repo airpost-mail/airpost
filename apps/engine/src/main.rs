@@ -31,6 +31,8 @@ mod registry;
 #[cfg(unix)]
 mod restart;
 #[cfg(unix)]
+mod rules;
+#[cfg(unix)]
 mod serve;
 #[cfg(unix)]
 mod settings;

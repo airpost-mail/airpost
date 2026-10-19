@@ -173,6 +173,11 @@ pub fn run(opts: &Options) -> i32 {
             socket::publish_capabilities(&server);
         }
     }));
+    let for_rules = Arc::downgrade(&server);
+    crate::rules::on_disable(Box::new(move |rule_id, error| match for_rules.upgrade() {
+        Some(server) => socket::disable_rule(&server, rule_id, error),
+        None => false,
+    }));
     socket::serve(listener, server.clone());
     info!(
         "{}",
@@ -210,6 +215,8 @@ struct Slot {
     deltas: Arc<DeltaStream>,
     /// The account's AI triage queue, closed when it stops.
     triage: Arc<crate::ai_triage::Feed>,
+    /// The account's mail rules queue, closed when it stops.
+    rules: Arc<crate::rules::Feed>,
     runtime: Option<Arc<Runtime>>,
     /// The `accountStop` thread is joining the account's threads after a failure.
     stopping: bool,
@@ -797,7 +804,7 @@ impl Engine {
             "{}",
             ms_core::logmsg::starting_sync(account.email_address())
         );
-        let (ctx, deltas, triage) = self.context(account.clone(), parsed, generation);
+        let (ctx, deltas, triage, rules) = self.context(account.clone(), parsed, generation);
         let slot = Slot {
             account,
             identity,
@@ -806,6 +813,7 @@ impl Engine {
             error: None,
             deltas,
             triage: triage.clone(),
+            rules: rules.clone(),
             runtime: None,
             stopping: false,
             removing: false,
@@ -832,6 +840,7 @@ impl Engine {
         // finds it to stop.
         let runtime = Arc::new(AccountRuntime::start(ctx, Some(dispatcher)));
         crate::ai_triage::start(runtime.context(), triage);
+        crate::rules::start(runtime.context(), rules);
         if let Some(slot) = reg.current(&id, generation) {
             slot.runtime = Some(runtime);
         }
@@ -856,22 +865,29 @@ impl Engine {
     }
 
     /// The account's context: its own delta stream into the hub (secrets to stdout) through
-    /// its AI triage feed, token manager, metadata backend and failure handler.
+    /// its mail rules and AI triage feeds, token manager, metadata backend and failure
+    /// handler.
     fn context(
         &self,
         account: Arc<Account>,
         identity: crate::modes::IdentityLine,
         generation: u64,
-    ) -> (WorkerContext, Arc<DeltaStream>, Arc<crate::ai_triage::Feed>) {
+    ) -> (
+        WorkerContext,
+        Arc<DeltaStream>,
+        Arc<crate::ai_triage::Feed>,
+        Arc<crate::rules::Feed>,
+    ) {
         let id = account.id().to_owned();
         let triage = crate::ai_triage::Feed::register(&id);
-        let deltas = DeltaStream::with_sink(triage.tap(self.hub.sink(
+        let rules = crate::rules::Feed::register(&id);
+        let deltas = DeltaStream::with_sink(rules.tap(triage.tap(self.hub.sink(
             &id,
             Box::new(ParentSink {
                 account_id: id.clone(),
                 detached: self.detached,
             }),
-        )));
+        ))));
         let metadata =
             crate::modes::metadata_backend(&self.config_dir, &account, identity, &deltas);
         let for_tokens = deltas.clone();
@@ -925,7 +941,7 @@ impl Engine {
         );
         ctx.verbose = now_ms() < self.verbose_until.load(Ordering::SeqCst);
         ctx.settings = Some(self.settings.clone());
-        (ctx, deltas, triage)
+        (ctx, deltas, triage, rules)
     }
 
     /// The account's `main` thread opened the database and is taking commands.
@@ -956,6 +972,7 @@ impl Engine {
         slot.stopping = true;
         let runtime = slot.runtime.clone();
         slot.triage.close();
+        slot.rules.close();
         drop(reg);
         self.changed.notify_all();
 
@@ -1165,6 +1182,7 @@ impl Engine {
         let (runtime, deltas) = match reg.get_mut(&id) {
             Some(s) => {
                 s.triage.close();
+                s.rules.close();
                 (s.runtime.take(), s.deltas.clone())
             }
             None => return Ok(Vec::new()),
