@@ -3,8 +3,9 @@
 
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { KeyManager } from 'mailspring-exports';
-import PreferencesAI from '../lib/preferences-ai';
+import { AccountStore, KeyManager } from 'mailspring-exports';
+import { ProviderCard } from 'mailspring-component-kit';
+import PreferencesAI, { ProviderSection } from '../lib/preferences-ai';
 import {
   ACCOUNT_ID,
   ENGINE_KEYS,
@@ -30,6 +31,29 @@ function byId(renderer: TestRenderer.ReactTestRenderer, id: string) {
 
 function button(renderer: TestRenderer.ReactTestRenderer, label: string) {
   return renderer.root.find((n) => n.type === 'button' && n.props.children === label);
+}
+
+function toggle(renderer: TestRenderer.ReactTestRenderer, label: string) {
+  return renderer.root
+    .find((n) => n.type === 'div' && n.props.role === 'switch' && n.props['aria-label'] === label)
+    .props.onClick();
+}
+
+function accountName(accountId: string) {
+  const account = AccountStore.accountForId(accountId);
+  return account.label && account.label !== account.emailAddress
+    ? account.label
+    : account.emailAddress;
+}
+
+/** Opens a saved provider's card, which starts closed once it has a model. */
+async function openProvider(renderer: TestRenderer.ReactTestRenderer, id: string) {
+  const section = renderer.root.find(
+    (n) => n.type === ProviderSection && n.props.provider.id === id
+  );
+  await act(async () => {
+    section.findByType(ProviderCard).props.onToggle(true);
+  });
 }
 
 async function type(renderer: TestRenderer.ReactTestRenderer, id: string, value: string) {
@@ -70,7 +94,7 @@ describe('Preferences > AI', () => {
       });
     });
     await act(async () => {
-      await button(renderer, 'Save Key').props.onClick();
+      await button(renderer, 'Save key').props.onClick();
     });
 
     expect(KeyManager.replacePassword).toHaveBeenCalledWith(
@@ -91,7 +115,7 @@ describe('Preferences > AI', () => {
     expect(JSON.stringify(AppEnv.config.get('core'))).not.toContain(SYNTHETIC_KEY);
     expect(byId(renderer, 'ai-provider-anthropic-key').props.value).toBe('');
     expect(textOf(renderer)).not.toContain(SYNTHETIC_KEY);
-    expect(textOf(renderer)).toContain('Sent to api.anthropic.com');
+    expect(textOf(renderer)).toContain('go to api.anthropic.com when you use a feature');
     renderer.unmount();
   });
 
@@ -99,14 +123,14 @@ describe('Preferences > AI', () => {
     fakeEngine({});
     const renderer = await render();
     await addAnthropic(renderer);
-    await act(async () => byId(renderer, 'ai-feature-summary').props.onChange());
-    await act(async () => byId(renderer, `ai-account-${ACCOUNT_ID}`).props.onChange());
+    await act(async () => toggle(renderer, 'Thread summaries'));
+    await act(async () => toggle(renderer, accountName(ACCOUNT_ID)));
     const settings = AppEnv.config.get('core.ai');
     expect(settings.features.summary.enabled).toBe(true);
     expect(settings.features.reply.enabled).toBe(false);
     expect(settings.accounts).toEqual([ACCOUNT_ID]);
     expect(settings.includeAddresses).toBe(false);
-    await act(async () => byId(renderer, 'ai-include-addresses').props.onChange());
+    await act(async () => toggle(renderer, 'Include email addresses'));
     expect(AppEnv.config.get('core.ai').includeAddresses).toBe(true);
     renderer.unmount();
   });
@@ -132,7 +156,7 @@ describe('Preferences > AI', () => {
       });
     });
     await act(async () => {
-      await button(renderer, 'Load Models').props.onClick();
+      await button(renderer, 'Load models').props.onClick();
     });
     expect(sent[0]).toEqual({
       method: 'ai.models',
@@ -175,7 +199,7 @@ describe('Preferences > AI', () => {
     expect(keys['integration-ai-openai-key']).toBeUndefined();
     expect(AppEnv.config.get('core.ai').providers[0].url).toBe('http://192.168.1.20:1234/v1');
     expect(textOf(renderer)).toContain('The server changed, so the saved API key was removed.');
-    expect(textOf(renderer)).toContain('Sent to 192.168.1.20 (your network)');
+    expect(textOf(renderer)).toContain('go to 192.168.1.20 on your network');
 
     await act(async () => {
       await button(renderer, 'Test').props.onClick();
@@ -203,6 +227,12 @@ describe('Preferences > AI', () => {
   it('shows what is sent', async () => {
     fakeEngine({});
     const renderer = await render();
+    expect(textOf(renderer)).not.toContain('When you click Summarize');
+    await act(async () => {
+      renderer.root
+        .find((n) => n.type === 'button' && n.props.className === 'ai-disclosure')
+        .props.onClick();
+    });
     expect(textOf(renderer)).toContain('When you click Summarize');
     expect(textOf(renderer)).toContain('Attachments are never sent');
     renderer.unmount();
@@ -234,13 +264,14 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     withProvider('anthropic');
     const sent = engine();
     const renderer = await render();
+    await openProvider(renderer, 'anthropic');
     await act(async () => {
       byId(renderer, 'ai-provider-anthropic-key').props.onChange({
         target: { value: SYNTHETIC_KEY },
       });
     });
     await act(async () => {
-      await button(renderer, 'Save Key').props.onClick();
+      await button(renderer, 'Save key').props.onClick();
     });
     expect(secrets).toEqual({ 'integration:ai-anthropic': SYNTHETIC_KEY });
     expect(KeyManager.replacePassword).not.toHaveBeenCalled();
@@ -248,11 +279,12 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     expect(textOf(renderer)).not.toContain(SYNTHETIC_KEY);
 
     await act(async () => {
-      await button(renderer, 'Forget Key').props.onClick();
+      await button(renderer, 'Forget key').props.onClick();
     });
     expect(secrets).toEqual({});
     expect(sent.map((s) => s.method)).toContain('secrets.delete');
-    expect(sent.some((s) => s.method.startsWith('ai.'))).toBe(false);
+    // ai.usage reads the counters and carries no key.
+    expect(sent.some((s) => s.method.startsWith('ai.') && s.method !== 'ai.usage')).toBe(false);
     renderer.unmount();
   });
 
@@ -261,6 +293,7 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     secrets['integration:ai-anthropic'] = SYNTHETIC_KEY;
     engine();
     const renderer = await render();
+    await openProvider(renderer, 'anthropic');
     expect(byId(renderer, 'ai-provider-anthropic-key').props.placeholder).toBe(
       'Saved. Type a new key to replace it.'
     );
@@ -272,6 +305,7 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     secrets['integration:ai-openai'] = SYNTHETIC_KEY;
     engine();
     const renderer = await render();
+    await openProvider(renderer, 'openai');
     await type(renderer, 'ai-provider-openai-url', 'http://192.168.1.20:1234/v1');
     expect(secrets).toEqual({});
     expect(textOf(renderer)).toContain('The server changed, so the saved API key was removed.');
@@ -291,6 +325,7 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     fakeEngine(secretAnswers(secrets), { hasAi: false });
     spyOn(AppEnv, 'showErrorDialog');
     const renderer = await render();
+    await openProvider(renderer, 'openai');
     await type(renderer, 'ai-provider-openai-url', 'http://192.168.1.20:1234/v1');
     expect(AppEnv.config.get('core.ai').providers[0].url).toBeUndefined();
     expect(textOf(renderer)).toContain('The sync engine is not connected.');
@@ -300,6 +335,38 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     expect(AppEnv.showErrorDialog).toHaveBeenCalled();
     expect(AppEnv.config.get('core.ai').providers.length).toBe(1);
     expect(secrets).toEqual({ 'integration:ai-openai': SYNTHETIC_KEY });
+    renderer.unmount();
+  });
+
+  it("shows today's usage and the provider's daily cap", async () => {
+    withProvider('anthropic');
+    AppEnv.config.set('core.ai.limits', { dailyTokens: { anthropic: 50000 } });
+    const pad = (n: number) => `${n}`.padStart(2, '0');
+    const now = new Date();
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    engine({
+      'ai.usage': () => [
+        {
+          day: today,
+          provider: 'anthropic',
+          feature: 'summary',
+          inputTokens: 1000,
+          outputTokens: 200,
+          requests: 3,
+        },
+        {
+          day: '2000-01-01',
+          provider: 'anthropic',
+          feature: 'summary',
+          inputTokens: 9,
+          outputTokens: 9,
+          requests: 9,
+        },
+      ],
+    });
+    const renderer = await render();
+    expect(textOf(renderer)).toContain('3 requests · 1,200 tokens');
+    expect(textOf(renderer)).toContain('Anthropic: 1,200 of 50,000 tokens a day.');
     renderer.unmount();
   });
 
@@ -313,6 +380,7 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
     });
     spyOn(AppEnv, 'showErrorDialog');
     const renderer = await render();
+    await openProvider(renderer, 'anthropic');
     await act(async () => {
       await button(renderer, 'Remove').props.onClick();
     });

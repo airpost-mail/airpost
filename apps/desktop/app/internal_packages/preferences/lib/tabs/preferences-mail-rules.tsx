@@ -1,5 +1,5 @@
 import React from 'react';
-import _ from 'underscore';
+import classNames from 'classnames';
 
 import {
   localized,
@@ -12,23 +12,63 @@ import {
 } from 'mailspring-exports';
 
 import {
-  Flexbox,
-  EditableList,
-  RetinaImg,
-  ScrollRegion,
   ScenarioEditor,
+  SettingsPage,
+  SettingsSection,
+  SettingsRow,
+  SettingsSwitch,
+  SettingsField,
+  StatusPill,
 } from 'mailspring-component-kit';
 
 const { ActionTemplatesForAccount, ConditionTemplatesForAccount } = MailRulesTemplates;
 
+type MailRule = ReturnType<typeof MailRulesStore.rulesForAccountId>[0];
+type Templates = ReturnType<typeof ActionTemplatesForAccount>;
+
 interface PreferencesMailRulesState {
   accounts: Account[];
   currentAccount: Account;
-  rules: ReturnType<typeof MailRulesStore.rulesForAccountId>;
-  selectedRule?: ReturnType<typeof MailRulesStore.rulesForAccountId>[0];
+  rules: MailRule[];
+  editingRuleId?: string;
   reprocessing?: ReturnType<typeof MailRulesStore.reprocessState>;
-  actionTemplates: ReturnType<typeof ActionTemplatesForAccount>;
-  conditionTemplates: ReturnType<typeof ConditionTemplatesForAccount>;
+  actionTemplates: Templates;
+  conditionTemplates: Templates;
+}
+
+/** One line for a rule's row: its conditions, an arrow, its actions. */
+function summarize(rule: MailRule, conditionTemplates: Templates, actionTemplates: Templates) {
+  const describe = (
+    instance: { templateKey: string; comparatorKey?: string; value?: string; valueName?: string },
+    templates: Templates
+  ) => {
+    const template = templates.find((t) => t.key === instance.templateKey);
+    if (!template) return null;
+    const comparator = instance.comparatorKey && template.comparators[instance.comparatorKey];
+    let value = instance.valueName || instance.value;
+    if (Array.isArray(template.values)) {
+      const option = template.values.find((v) => v.value === instance.value);
+      if (option) value = option.name;
+    }
+    if (template.type === 'None') return template.name;
+    if (template.type === 'Enum' && !comparator) {
+      return value ? `${template.name}: ${value}` : template.name;
+    }
+    return [template.name, comparator && comparator.name, value ? `"${value}"` : null]
+      .filter(Boolean)
+      .join(' ');
+  };
+
+  const joiner = rule.conditionMode === 'any' ? ` ${localized('or')} ` : ` ${localized('and')} `;
+  const conditions = (rule.conditions || [])
+    .map((c) => describe(c, conditionTemplates))
+    .filter(Boolean)
+    .join(joiner);
+  const actions = (rule.actions || [])
+    .map((a) => describe(a, actionTemplates))
+    .filter(Boolean)
+    .join(', ');
+  return conditions && actions ? `${conditions} → ${actions}` : conditions || actions;
 }
 
 class PreferencesMailRules extends React.Component<
@@ -60,17 +100,11 @@ class PreferencesMailRules extends React.Component<
       currentAccount = accounts[0];
     }
 
-    const rules = MailRulesStore.rulesForAccountId(currentAccount.id);
-    const selectedRule =
-      this.state && this.state.selectedRule
-        ? rules.find((r) => r.id === this.state.selectedRule.id)
-        : rules[0];
-
     return {
       accounts: accounts,
       currentAccount: currentAccount,
-      rules: rules,
-      selectedRule: selectedRule,
+      rules: currentAccount ? MailRulesStore.rulesForAccountId(currentAccount.id) : [],
+      editingRuleId: this.state ? this.state.editingRuleId : undefined,
       reprocessing: MailRulesStore.reprocessState(),
       actionTemplates: ActionTemplatesForAccount(currentAccount),
       conditionTemplates: ConditionTemplatesForAccount(currentAccount),
@@ -80,7 +114,7 @@ class PreferencesMailRules extends React.Component<
   _onSelectAccount = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const accountId = event.target.value;
     const currentAccount = this.state.accounts.find((acct) => acct.id === accountId);
-    this.setState({ currentAccount: currentAccount }, () => {
+    this.setState({ currentAccount: currentAccount, editingRuleId: undefined }, () => {
       this.setState(this._getStateFromStores());
     });
   };
@@ -130,238 +164,262 @@ class PreferencesMailRules extends React.Component<
     Actions.addMailRule({ accountId: this.state.currentAccount.id });
   };
 
-  _onSelectRule = (rule: ReturnType<typeof MailRulesStore.rulesForAccountId>[0]) => {
-    this.setState({ selectedRule: rule });
+  _onToggleEditing = (rule: MailRule) => {
+    this.setState({ editingRuleId: this.state.editingRuleId === rule.id ? undefined : rule.id });
   };
 
-  _onReorderRule = (
-    rule: ReturnType<typeof MailRulesStore.rulesForAccountId>[0],
-    startIdx: number,
-    endIdx: number
-  ) => {
-    Actions.reorderMailRule(rule.id, endIdx);
+  /** Moves a rule past its neighbour in this account's list; the store orders all accounts' rules together. */
+  _onMoveRule = (rule: MailRule, by: -1 | 1) => {
+    const { rules } = this.state;
+    const neighbour = rules[rules.findIndex((r) => r.id === rule.id) + by];
+    if (!neighbour) return;
+    const all = MailRulesStore.rules();
+    Actions.reorderMailRule(
+      rule.id,
+      all.findIndex((r) => r.id === neighbour.id)
+    );
   };
 
-  _onDeleteRule = (rule: ReturnType<typeof MailRulesStore.rulesForAccountId>[0]) => {
+  _onDeleteRule = (rule: MailRule) => {
     Actions.deleteMailRule(rule.id);
   };
 
-  _onRuleNameEdited = (
-    newName: string,
-    rule: ReturnType<typeof MailRulesStore.rulesForAccountId>[0]
-  ) => {
-    Actions.updateMailRule(rule.id, { name: newName });
+  _onRuleNameEdited = (newName: string, rule: MailRule) => {
+    if (newName !== rule.name) {
+      Actions.updateMailRule(rule.id, { name: newName });
+    }
   };
 
-  _onRuleConditionModeEdited = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    Actions.updateMailRule(this.state.selectedRule.id, { conditionMode: event.target.value });
-  };
-
-  _onRuleEnabled = () => {
-    Actions.updateMailRule(this.state.selectedRule.id, { disabled: false, disabledReason: null });
+  _onSetRuleEnabled = (rule: MailRule, enabled: boolean) => {
+    Actions.updateMailRule(
+      rule.id,
+      enabled ? { disabled: false, disabledReason: null } : { disabled: true }
+    );
   };
 
   _onRulesChanged = () => {
     const next = this._getStateFromStores();
-    const nextRules = next.rules;
     const prevRules = this.state.rules ? this.state.rules : [];
 
-    const added = _.difference(nextRules, prevRules);
-    if (added.length === 1) {
-      next.selectedRule = added[0];
+    const added = next.rules.filter((r) => !prevRules.some((p) => p.id === r.id));
+    if (added.length === 1 && prevRules.length + 1 === next.rules.length) {
+      next.editingRuleId = added[0].id;
     }
 
     this.setState(next);
   };
 
   _renderAccountPicker() {
-    const options = this.state.accounts.map((account) => (
-      <option value={account.id} key={account.id}>
-        {account.label}
-      </option>
-    ));
-
+    if (this.state.accounts.length < 2) return null;
     return (
-      <>
-        <label htmlFor="mail-rules-account" className="sr-only">
-          {localized('Account')}
-        </label>
-        <select
-          id="mail-rules-account"
-          value={this.state.currentAccount.id}
-          onChange={this._onSelectAccount}
-          style={{ margin: 0, minWidth: 200 }}
+      <SettingsSection>
+        <SettingsRow
+          label={localized('Account')}
+          description={localized('Each account has its own rules.')}
         >
-          {options}
-        </select>
-      </>
+          <select
+            className="settings-select"
+            aria-label={localized('Account')}
+            value={this.state.currentAccount.id}
+            onChange={this._onSelectAccount}
+          >
+            {this.state.accounts.map((account) => (
+              <option value={account.id} key={account.id}>
+                {account.label}
+              </option>
+            ))}
+          </select>
+        </SettingsRow>
+      </SettingsSection>
     );
   }
 
-  _renderMailRules() {
-    if (this.state.rules.length === 0) {
-      return (
-        <div className="empty-list">
-          <RetinaImg
-            className="icon-mail-rules"
-            name="rules-big.png"
-            mode={RetinaImg.Mode.ContentDark}
-          />
-          <h2>{localized('No rules')}</h2>
-          <button className="btn btn-small" onClick={this._onAddRule}>
-            {localized('Create a new Rule')}
-          </button>
-        </div>
-      );
-    }
+  _renderRule = (rule: MailRule, idx: number) => {
+    const editing = this.state.editingRuleId === rule.id;
+    const summary = summarize(rule, this.state.conditionTemplates, this.state.actionTemplates);
     return (
-      <Flexbox>
-        <EditableList
-          showEditIcon
-          className="rule-list"
-          items={this.state.rules}
-          itemContent={this._renderListItemContent}
-          onCreateItem={this._onAddRule}
-          onReorderItem={this._onReorderRule}
-          onDeleteItem={this._onDeleteRule}
-          onItemEdited={this._onRuleNameEdited}
-          selected={this.state.selectedRule}
-          onSelectItem={this._onSelectRule}
-        />
-        {this._renderDetail()}
-      </Flexbox>
+      <div key={rule.id} className={classNames('mail-rule', { editing, disabled: rule.disabled })}>
+        <SettingsRow label={rule.name} description={summary}>
+          {rule.disabled && rule.disabledReason && (
+            <StatusPill kind="bad">{localized('Stopped')}</StatusPill>
+          )}
+          <button className="btn" onClick={() => this._onToggleEditing(rule)}>
+            {editing ? localized('Done') : localized('Edit')}
+          </button>
+          <SettingsSwitch
+            checked={!rule.disabled}
+            label={localized('Turn on %@', rule.name)}
+            onChange={(on) => this._onSetRuleEnabled(rule, on)}
+          />
+        </SettingsRow>
+        {editing && this._renderEditor(rule, idx)}
+      </div>
     );
-  }
+  };
 
-  _renderListItemContent(rule) {
-    if (rule.disabled) {
-      return <div className="item-rule-disabled">{rule.name}</div>;
-    }
-    return rule.name;
-  }
-
-  _renderDetail() {
-    const rule = this.state.selectedRule;
-
-    if (rule) {
-      return (
-        <ScrollRegion className="rule-detail">
-          {this._renderDetailDisabledNotice()}
-          <div className="inner">
+  _renderEditor(rule: MailRule, idx: number) {
+    return (
+      <div className="rule-detail">
+        {rule.disabled && rule.disabledReason && (
+          <div className="disabled-reason">
+            <div>
+              {localized(
+                'This rule stopped because of an error. Check the actions below, then turn it back on.'
+              )}
+              <div className="disabled-reason-detail">{rule.disabledReason}</div>
+            </div>
+            <button className="btn" onClick={() => this._onSetRuleEnabled(rule, true)}>
+              {localized('Turn on')}
+            </button>
+          </div>
+        )}
+        <div className="inner">
+          <SettingsField label={localized('Name')} htmlFor={`mail-rule-name-${rule.id}`}>
+            <input
+              type="text"
+              id={`mail-rule-name-${rule.id}`}
+              key={rule.id}
+              defaultValue={rule.name}
+              onBlur={(e) => this._onRuleNameEdited(e.target.value, rule)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+            />
+          </SettingsField>
+          <div className="mail-rule-label">
             {localizedReactFragment(
               'If %@ of the following conditions are met:',
-              <select value={rule.conditionMode} onChange={this._onRuleConditionModeEdited}>
+              <select
+                value={rule.conditionMode}
+                onChange={(e) =>
+                  Actions.updateMailRule(rule.id, {
+                    conditionMode: e.target.value as MailRule['conditionMode'],
+                  })
+                }
+              >
                 <option value="any">{localized('Any')}</option>
                 <option value="all">{localized('All')}</option>
               </select>
             )}
-            <ScenarioEditor
-              instances={rule.conditions}
-              templates={this.state.conditionTemplates}
-              onChange={(conditions) => Actions.updateMailRule(rule.id, { conditions })}
-              className="well well-matchers"
-            />
-            <span>{localized('Perform these actions:')}</span>
-            <ScenarioEditor
-              instances={rule.actions}
-              templates={this.state.actionTemplates}
-              onChange={(actions) => Actions.updateMailRule(rule.id, { actions })}
-              className="well well-actions"
-            />
           </div>
-        </ScrollRegion>
-      );
-    }
-
-    return (
-      <div className="rule-detail">
-        <div className="no-selection">
-          {localized('Create a rule or select one to get started')}
+          <ScenarioEditor
+            instances={rule.conditions}
+            templates={this.state.conditionTemplates}
+            onChange={(conditions) => Actions.updateMailRule(rule.id, { conditions })}
+            className="well well-matchers"
+          />
+          <div className="mail-rule-label">{localized('Perform these actions:')}</div>
+          <ScenarioEditor
+            instances={rule.actions}
+            templates={this.state.actionTemplates}
+            onChange={(actions) => Actions.updateMailRule(rule.id, { actions })}
+            className="well well-actions"
+          />
+          <div className="settings-actions">
+            <button className="btn" disabled={idx === 0} onClick={() => this._onMoveRule(rule, -1)}>
+              {localized('Move up')}
+            </button>
+            <button
+              className="btn"
+              disabled={idx === this.state.rules.length - 1}
+              onClick={() => this._onMoveRule(rule, 1)}
+            >
+              {localized('Move down')}
+            </button>
+            <span className="spacer" />
+            <button className="btn btn-danger" onClick={() => this._onDeleteRule(rule)}>
+              {localized('Delete rule')}
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  _renderDetailDisabledNotice() {
-    if (!this.state.selectedRule.disabled) return false;
+  _renderRules() {
+    const note = localizedReactFragment(
+      'Rules run on this computer while Tern is open, in the order shown. To run them after you close the window, %@.',
+      <a onClick={() => Actions.switchPreferencesTab('General')}>
+        {localized('keep Tern running')}
+      </a>
+    );
     return (
-      <div className="disabled-reason">
-        <button className="btn" onClick={this._onRuleEnabled}>
-          {localized('Enable')}
-        </button>
-        {localized(
-          'This rule has been disabled. Make sure the actions below are valid and re-enable the rule.'
+      <SettingsSection className="mail-rules-list" note={note}>
+        {this.state.rules.length === 0 && (
+          <div className="mail-rules-empty">{localized('No rules for this account yet.')}</div>
         )}
-        <div>({this.state.selectedRule.disabledReason})</div>
-      </div>
+        {this.state.rules.map(this._renderRule)}
+        <button className="mail-rules-new" onClick={this._onAddRule}>
+          {localized('+ New rule')}
+        </button>
+      </SettingsSection>
     );
   }
 
-  _renderTasks() {
+  _renderReprocessing() {
+    const { reprocessing, currentAccount } = this.state;
     return (
-      <div style={{ flex: 1, paddingLeft: 20 }}>
-        {Object.keys(this.state.reprocessing).map((accountId) => {
-          const { count } = this.state.reprocessing[accountId];
+      <SettingsSection title={localized('Mail you already have')}>
+        <SettingsRow
+          label={localized('Run rules on your inbox')}
+          description={localized(
+            'Rules only apply to new mail as it arrives. Running them on your whole inbox can take a long time and slow Tern down.'
+          )}
+        >
+          <button
+            className="btn"
+            disabled={!!reprocessing[currentAccount.id]}
+            onClick={this._onReprocessRules}
+          >
+            {localized('Run now')}
+          </button>
+        </SettingsRow>
+        {Object.keys(reprocessing).map((accountId) => {
+          const { count, total } = reprocessing[accountId];
+          const account = AccountStore.accountForId(accountId);
           return (
-            <Flexbox key={accountId} style={{ alignItems: 'baseline' }}>
-              <div style={{ paddingRight: '12px' }}>
-                <RetinaImg
-                  name="sending-spinner.gif"
-                  width={18}
-                  mode={RetinaImg.Mode.ContentPreserve}
-                />
-              </div>
-              <div>
-                <strong>{AccountStore.accountForId(accountId).emailAddress}</strong>
-                {` — ${Number(count).toLocaleString()} ${localized(`processed`)}`}
-              </div>
-              <div style={{ flex: 1 }} />
-              <button
-                className="btn btn-sm"
-                onClick={() => Actions.stopReprocessingMailRules(accountId)}
-              >
+            <SettingsRow
+              key={accountId}
+              label={account ? account.emailAddress : accountId}
+              description={
+                total
+                  ? localized(
+                      '%@ of %@ processed',
+                      Number(count).toLocaleString(),
+                      Number(total).toLocaleString()
+                    )
+                  : localized('Starting…')
+              }
+            >
+              <button className="btn" onClick={() => Actions.stopReprocessingMailRules(accountId)}>
                 {localized('Stop')}
               </button>
-            </Flexbox>
+            </SettingsRow>
           );
         })}
-      </div>
+      </SettingsSection>
     );
   }
 
   render() {
     return (
-      <div className="container-mail-rules">
-        <section>
-          <Flexbox className="container-dropdown">
-            <div>{localized('Account')}:</div>
-            <div className="dropdown">{this._renderAccountPicker()}</div>
-          </Flexbox>
-          <p>{localized('Rules only apply to the selected account.')}</p>
-
-          {this._renderMailRules()}
-
-          <Flexbox style={{ marginTop: 40, maxWidth: 600 }}>
-            <div>
-              <button
-                disabled={!!this.state.reprocessing[this.state.currentAccount.id]}
-                className="btn"
-                style={{ float: 'right' }}
-                onClick={this._onReprocessRules}
-              >
-                {localized('Process entire inbox')}
-              </button>
-            </div>
-            {this._renderTasks()}
-          </Flexbox>
-
-          <p style={{ marginTop: 10 }}>
-            {localized(
-              'By default, mail rules are only applied to new mail as it arrives. Applying rules to your entire inbox may take a long time and degrade performance.'
-            )}
-          </p>
-        </section>
-      </div>
+      <SettingsPage
+        title={localized('Rules')}
+        description={localized('Sort mail automatically as it arrives.')}
+        className="container-mail-rules"
+      >
+        {this.state.currentAccount ? (
+          <>
+            {this._renderAccountPicker()}
+            {this._renderRules()}
+            {this._renderReprocessing()}
+          </>
+        ) : (
+          <SettingsSection>
+            <div className="mail-rules-empty">{localized('Add an account to make rules.')}</div>
+          </SettingsSection>
+        )}
+      </SettingsPage>
     );
   }
 }

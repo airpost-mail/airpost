@@ -1,105 +1,66 @@
-/* eslint global-require: 0*/
 import React from 'react';
 import { localized } from 'mailspring-exports';
-import ConfigSchemaItem from './config-schema-item';
-import WorkspaceSection from './workspace-section';
-import SendingSection from './sending-section';
-import LanguageSection from './language-section';
+import { SettingsPage, SettingsSection, ConfigSwitchRow } from 'mailspring-component-kit';
+import { DefaultMailClientRow, LaunchOnStartRow } from './startup-rows';
+import LanguageRow from './language-row';
 import { ConfigLike, ConfigSchemaLike } from '../types';
 
-class PreferencesGeneral extends React.Component<{
-  config: ConfigLike;
-  configSchema: ConfigSchemaLike;
-}> {
-  static displayName = 'PreferencesGeneral';
-
-  _onResetEmailsThatIgnoreWarnings = () => {
-    localStorage.removeItem('recipientWarningBlacklist');
-  };
-
-  // Main confirms, stops the engine, empties the profile and relaunches.
-  _onResetAccountsAndSettings = () => {
-    const ipc = require('electron').ipcRenderer;
-    ipc.send('command', 'application:reset-profile');
-  };
-
-  _onResetEmailCache = () => {
-    const ipc = require('electron').ipcRenderer;
-    ipc.send('command', 'application:reset-database', {});
-  };
-
-  render() {
+/** On macOS Tern always outlives its window, so the setting only shows or hides the menu bar
+ * icon; elsewhere the tray icon is what keeps Tern running after the window closes
+ * (`MailspringWindow`'s close handler). */
+export function BackgroundRow() {
+  if (process.platform === 'darwin') {
     return (
-      <div className="container-general">
-        <div className="two-columns-flexbox">
-          <div style={{ flex: 1 }}>
-            <WorkspaceSection config={this.props.config} configSchema={this.props.configSchema} />
-            <LanguageSection config={this.props.config} configSchema={this.props.configSchema} />
-          </div>
-          <div style={{ width: 30 }} />
-          <div style={{ flex: 1 }}>
-            <ConfigSchemaItem
-              configSchema={this.props.configSchema.properties.reading}
-              keyName={localized('Reading')}
-              keyPath="core.reading"
-              config={this.props.config}
-            />
-          </div>
-        </div>
-        <div className="two-columns-flexbox" style={{ paddingTop: 30 }}>
-          <div style={{ flex: 1 }}>
-            <SendingSection config={this.props.config} configSchema={this.props.configSchema} />
-            <div
-              className="btn"
-              onClick={this._onResetEmailsThatIgnoreWarnings}
-              style={{ marginLeft: 0, marginTop: 5 }}
-            >
-              {localized('Reset Emails that Ignore Warnings')}
-            </div>
-          </div>
-          <div style={{ width: 30 }} />
-          <div style={{ flex: 1 }}>
-            <ConfigSchemaItem
-              configSchema={this.props.configSchema.properties.composing}
-              keyName={localized('Composing')}
-              keyPath="core.composing"
-              config={this.props.config}
-            />
-          </div>
-        </div>
-
-        <div className="two-columns-flexbox" style={{ paddingTop: 30 }}>
-          <div style={{ flex: 1 }}>
-            <ConfigSchemaItem
-              configSchema={this.props.configSchema.properties.notifications}
-              keyName={localized('Notifications')}
-              keyPath="core.notifications"
-              config={this.props.config}
-            />
-          </div>
-          <div style={{ width: 30 }} />
-          <div style={{ flex: 1 }}>
-            <ConfigSchemaItem
-              configSchema={this.props.configSchema.properties.attachments}
-              keyName={localized('Attachments')}
-              keyPath="core.attachments"
-              config={this.props.config}
-            />
-          </div>
-        </div>
-
-        <div className="local-data">
-          <h6>{localized('Local Data')}</h6>
-          <div className="btn" onClick={this._onResetEmailCache} style={{ marginLeft: 0 }}>
-            {localized('Reset Cache')}
-          </div>
-          <div className="btn" onClick={this._onResetAccountsAndSettings}>
-            {localized('Reset Accounts and Settings')}
-          </div>
-        </div>
-      </div>
+      <ConfigSwitchRow
+        keyPath="core.workspace.systemTray"
+        label={localized('Show Tern in the menu bar')}
+        description={localized(
+          'Tern keeps running after you close the window, so scheduled sends go out and agents keep working.'
+        )}
+      />
     );
   }
+  return (
+    <ConfigSwitchRow
+      keyPath="core.workspace.systemTray"
+      label={localized('Keep Tern running in the system tray')}
+      description={
+        process.platform === 'linux'
+          ? localized(
+              'Closing the window leaves Tern running, so scheduled sends go out and agents keep working. The tray icon may need libappindicator; turning it off takes effect after a restart.'
+            )
+          : localized(
+              'Closing the window leaves Tern running, so scheduled sends go out and agents keep working. Quit from the tray icon.'
+            )
+      }
+    />
+  );
 }
 
-export default PreferencesGeneral;
+export default function PreferencesGeneral(props: {
+  config: ConfigLike;
+  configSchema: ConfigSchemaLike;
+}) {
+  return (
+    <SettingsPage title={localized('General')} description={localized('How Tern starts and runs.')}>
+      <SettingsSection title={localized('Startup')}>
+        <LaunchOnStartRow />
+        <BackgroundRow />
+      </SettingsSection>
+
+      <SettingsSection title={localized('Default mail app')}>
+        <DefaultMailClientRow />
+      </SettingsSection>
+
+      <SettingsSection title={localized('Language and time')}>
+        <LanguageRow config={props.config} />
+        <ConfigSwitchRow
+          keyPath="core.workspace.use24HourClock"
+          label={localized('Use 24-hour time')}
+        />
+      </SettingsSection>
+    </SettingsPage>
+  );
+}
+
+PreferencesGeneral.displayName = 'PreferencesGeneral';

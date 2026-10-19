@@ -10,21 +10,13 @@ describe('PreferencesAppearance', function () {
   // The schema ConfigPropContainer passes: the `core` subtree.
   const schema = configSchema.core as any;
 
-  const render = (values: { [key: string]: unknown }) => {
-    const config = {
-      get: (key: string) => values[key] as string,
-      set: jasmine.createSpy('set'),
-      toggle: jasmine.createSpy('toggle'),
-    };
-    const renderer = TestRenderer.create(
-      <PreferencesAppearance config={config} configSchema={schema} />
-    );
-    return { renderer, config };
-  };
-
   it('offers the email colour modes next to the theme picker', () => {
-    const { renderer, config } = render({ [KEY]: 'auto' });
-    const select = renderer.root.find((node) => node.type === 'select' && node.props.id === KEY);
+    AppEnv.config.set(KEY, 'auto');
+    spyOn(AppEnv.config, 'set').andCallThrough();
+    const renderer = TestRenderer.create(<PreferencesAppearance />);
+    const select = renderer.root.find(
+      (node) => node.type === 'select' && node.props['aria-label'] === 'Message colours'
+    );
     expect(select.props.value).toBe('auto');
     expect(select.findAllByType('option').map((o) => o.props.value)).toEqual([
       'auto',
@@ -32,8 +24,9 @@ describe('PreferencesAppearance', function () {
       'original',
     ]);
 
-    select.props.onChange({ target: { value: 'original', blur: () => {} } });
-    expect(config.set).toHaveBeenCalledWith(KEY, 'original');
+    select.props.onChange({ target: { value: 'original' } });
+    expect(AppEnv.config.set).toHaveBeenCalledWith(KEY, 'original');
+    renderer.unmount();
   });
 
   it('is not also listed under Reading', () => {

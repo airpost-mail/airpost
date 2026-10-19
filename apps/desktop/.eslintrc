@@ -119,7 +119,6 @@
         "app/internal_packages/notifications/lib/items/update-notification.tsx",
         "app/internal_packages/notifications/specs/update-notification-spec.tsx",
         "app/internal_packages/onboarding/lib/decorators/create-page-for-form.tsx",
-        "app/internal_packages/preferences/lib/tabs/language-section.tsx",
         "app/internal_packages/preferences/lib/tabs/mcp/tern-mcp.ts",
         "app/internal_packages/preferences/lib/tabs/preferences-account-details.tsx",
         "app/internal_packages/preferences/lib/tabs/preferences-appearance.tsx",

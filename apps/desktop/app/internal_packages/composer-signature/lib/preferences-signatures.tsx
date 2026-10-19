@@ -13,7 +13,8 @@ import {
   InlineStyleTransformer,
   SanitizeTransformer,
 } from 'mailspring-exports';
-import { Flexbox, EditableList } from 'mailspring-component-kit';
+import classNames from 'classnames';
+import { SettingsPage, SettingsCard, SettingsField } from 'mailspring-component-kit';
 
 import { ResolveSignatureData, RenderSignatureData, DataShape } from './constants';
 import SignatureAccountDefaultPicker from './signature-account-default-picker';
@@ -27,9 +28,7 @@ interface SignatureEditorProps {
   accountsAndAliases: IAliasSet;
 }
 
-interface SignatureEditorState {}
-
-class SignatureEditor extends React.Component<SignatureEditorProps, SignatureEditorState> {
+class SignatureEditor extends React.Component<SignatureEditorProps> {
   _onTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const sig = this.props.signature;
     Actions.upsertSignature({ ...sig, title: event.target.value }, sig.id);
@@ -127,28 +126,13 @@ class SignatureEditor extends React.Component<SignatureEditorProps, SignatureEdi
   };
 
   render() {
-    const { accountsAndAliases, defaults } = this.props;
-
-    let signature = this.props.signature;
-    let empty = false;
-    if (!signature) {
-      signature = {
-        id: '',
-        body: '',
-        title: '',
-        data: { title: '', templateName: Templates[0].name },
-      };
-      empty = true;
-    }
+    const { accountsAndAliases, defaults, signature } = this.props;
     const data = signature.data || {};
     const resolvedData = ResolveSignatureData(data);
 
     return (
-      <div className={`signature-wrap ${empty && 'empty'}`}>
-        <div className="section basic-info">
-          <label htmlFor="signature-title" className="sr-only">
-            {localized('Signature Name')}
-          </label>
+      <div className="settings-split-editor signature-wrap">
+        <SettingsField label={localized('Name')} htmlFor="signature-title">
           <input
             type="text"
             id="signature-title"
@@ -156,75 +140,76 @@ class SignatureEditor extends React.Component<SignatureEditorProps, SignatureEdi
             value={signature.title || ''}
             onChange={this._onTitleChange}
           />
-          <div style={{ flex: 1 }} />
+        </SettingsField>
+        <SettingsField label={localized('Default for')}>
           <SignatureAccountDefaultPicker
             signature={signature}
             accountsAndAliases={accountsAndAliases}
             defaults={defaults}
           />
-        </div>
+        </SettingsField>
 
-        <div className="section preview">
-          <div className="label">{localized('Preview')}</div>
-          {/* Sanitized like a message body: signatures can come from other clients through
-          the engine's settings, and this window runs with Node. */}
-          <div
-            className="preview"
-            dangerouslySetInnerHTML={{ __html: SanitizeTransformer.runSync(signature.body || '') }}
-          />
-        </div>
+        {/* Sanitized like a message body: signatures can come from other clients through
+        the engine's settings, and this window runs with Node. */}
+        <div
+          className="signature-preview"
+          dangerouslySetInnerHTML={{ __html: SanitizeTransformer.runSync(signature.body || '') }}
+        />
 
-        <div className="section">
-          <SignatureTemplatePicker resolvedData={resolvedData} onChange={this._onDataFieldChange} />
-        </div>
+        <div className="signature-subhead">{localized('Style')}</div>
+        <SignatureTemplatePicker resolvedData={resolvedData} onChange={this._onDataFieldChange} />
 
-        {!resolvedData.templateName
-          ? [
-              <div key="header" className="section-header">
-                {localized('Raw Source')}
-              </div>,
-              <label key="body-label" htmlFor="signature-body" className="sr-only">
-                {localized('Signature HTML')}
-              </label>,
-              <textarea
-                id="signature-body"
-                key={`textarea ${signature.id}`}
-                className="section raw-html"
-                spellCheck={false}
-                onChange={this._onRawBodyChange}
-                onPaste={this._onRawBodyPaste}
-                defaultValue={signature.body || ''}
-              />,
-              <div key="body-note" className="section-note">
-                {localized(
-                  'Moving from another mail app? Select your existing signature in an email and copy-paste it into the box above.'
-                )}
-              </div>,
-            ]
-          : [
-              <div key="header" className="section-header">
-                {localized('Information')}
-              </div>,
-              <div key="section" className="section information">
-                {DataShape.map((item) => (
-                  <div className="field" key={item.key}>
-                    <label htmlFor={item.key}>{item.label}</label>
-                    <input
-                      type="text"
-                      onChange={this._onDataFieldChange}
-                      placeholder={item.placeholder}
-                      id={item.key}
-                      value={data[item.key] || ''}
-                    />
-                  </div>
-                ))}
-                <SignaturePhotoPicker
-                  data={data}
-                  resolvedURL={resolvedData.photoURL}
-                  onChange={this._onDataFieldChange}
-                />
-              </div>,
-            ]}
+        {!resolvedData.templateName ? (
+          <>
+            <label htmlFor="signature-body" className="signature-subhead">
+              {localized('HTML')}
+            </label>
+            <textarea
+              id="signature-body"
+              key={`textarea ${signature.id}`}
+              className="raw-html"
+              spellCheck={false}
+              onChange={this._onRawBodyChange}
+              onPaste={this._onRawBodyPaste}
+              defaultValue={signature.body || ''}
+            />
+            <div className="signature-note">
+              {localized(
+                'Moving from another mail app? Select your existing signature in an email and copy-paste it into the box above.'
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="signature-subhead">{localized('Details')}</div>
+            <div className="signature-information">
+              {DataShape.map((item) => (
+                <div className="field" key={item.key}>
+                  <label htmlFor={item.key}>{item.label}</label>
+                  <input
+                    type="text"
+                    onChange={this._onDataFieldChange}
+                    placeholder={item.placeholder}
+                    id={item.key}
+                    value={data[item.key] || ''}
+                  />
+                </div>
+              ))}
+              <SignaturePhotoPicker
+                data={data}
+                resolvedURL={resolvedData.photoURL}
+                onChange={this._onDataFieldChange}
+              />
+            </div>
+          </>
+        )}
+
+        <div className="settings-actions">
+          <span className="spacer" />
+          <button className="btn btn-danger" onClick={() => Actions.removeSignature(signature)}>
+            {localized('Delete')}
+          </button>
+        </div>
       </div>
     );
   }
@@ -294,49 +279,45 @@ export default class PreferencesSignatures extends React.Component<
     Actions.selectSignature(id);
   };
 
-  _onDeleteSignature = (signature: ISignature) => {
-    Actions.removeSignature(signature);
-  };
-
-  _onEditSignatureTitle = (nextTitle: string) => {
-    const { title, ...rest } = this.state.selectedSignature;
-    Actions.upsertSignature({ title: nextTitle, ...rest }, rest.id);
-  };
-
-  _onSelectSignature = (sig: ISignature) => {
-    Actions.selectSignature(sig.id);
-  };
-
-  _renderSignatures() {
-    const sigArr = Object.values(this.state.signatures);
-
-    return (
-      <Flexbox>
-        <EditableList
-          showEditIcon
-          className="signature-list"
-          items={sigArr}
-          itemContent={(sig) => sig.title}
-          onCreateItem={this._onAddSignature}
-          onDeleteItem={this._onDeleteSignature}
-          onItemEdited={this._onEditSignatureTitle}
-          onSelectItem={this._onSelectSignature}
-          selected={this.state.selectedSignature}
-        />
-        <SignatureEditor
-          signature={this.state.selectedSignature}
-          defaults={this.state.defaults}
-          accountsAndAliases={this.state.accountsAndAliases}
-        />
-      </Flexbox>
-    );
-  }
-
   render() {
+    const { signatures, selectedSignature } = this.state;
+    const isSelected = (sig: ISignature) => !!selectedSignature && sig.id === selectedSignature.id;
     return (
-      <div className="preferences-signatures-container">
-        <section>{this._renderSignatures()}</section>
-      </div>
+      <SettingsPage
+        title={localized('Signatures')}
+        description={localized('Added to the end of your messages.')}
+        className="preferences-signatures-container"
+      >
+        <SettingsCard className="settings-split">
+          <div className="settings-split-list signature-list" role="listbox">
+            {Object.values(signatures).map((sig) => (
+              <button
+                key={sig.id}
+                role="option"
+                aria-selected={isSelected(sig)}
+                className={classNames('list-item', { selected: isSelected(sig) })}
+                onClick={() => Actions.selectSignature(sig.id)}
+              >
+                {sig.title || localized('Untitled')}
+              </button>
+            ))}
+            <button className="settings-split-new" onClick={this._onAddSignature}>
+              {localized('+ New signature')}
+            </button>
+          </div>
+          {selectedSignature ? (
+            <SignatureEditor
+              signature={selectedSignature}
+              defaults={this.state.defaults}
+              accountsAndAliases={this.state.accountsAndAliases}
+            />
+          ) : (
+            <div className="settings-split-empty">
+              {localized('Make a signature to add it to the end of your messages.')}
+            </div>
+          )}
+        </SettingsCard>
+      </SettingsPage>
     );
   }
 }

@@ -1,7 +1,10 @@
 import React from 'react';
+import { ipcRenderer } from 'electron';
 import { localized, getAvailableLanguages } from 'mailspring-exports';
+import { SettingsRow } from 'mailspring-component-kit';
 
-const LanguageSection = ({ config }: { config?: any; configSchema?: any }) => {
+/** The interface language, with a Relaunch button when the choice differs from the running one. */
+const LanguageRow = ({ config }: { config: any }) => {
   const { automatic, current, verified, experimental } = getAvailableLanguages();
 
   const configValue = config.get('core.intl.language');
@@ -9,63 +12,46 @@ const LanguageSection = ({ config }: { config?: any; configSchema?: any }) => {
   const relaunchRequiredToUnset = !configValue && current.key !== automatic.key;
   const relaunchRequired = relaunchRequiredToSet || relaunchRequiredToUnset;
 
-  const onChangeValue = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    config.set('core.intl.language', event.target.value);
-    event.target.blur();
-  };
-
   return (
-    <section>
-      <h6>{localized('Interface Language')}</h6>
-
-      <div className="item">
-        <label htmlFor="interface-language" className="sr-only">
-          {localized('Interface Language')}
-        </label>
-        <select
-          id="interface-language"
-          onChange={onChangeValue}
-          value={configValue}
-          style={{ marginLeft: 0, marginRight: 0 }}
-        >
-          <option key="auto" value="">
-            {localized('Automatic')} ({automatic.name})
+    <SettingsRow
+      label={localized('Language')}
+      description={localized('Tern restarts to switch language.')}
+    >
+      {relaunchRequired && (
+        <button className="btn" onClick={() => ipcRenderer.send('command', 'application:relaunch')}>
+          {localized('Relaunch')}
+        </button>
+      )}
+      <select
+        className="settings-select"
+        aria-label={localized('Language')}
+        onChange={(e) => config.set('core.intl.language', e.target.value)}
+        value={configValue || ''}
+      >
+        <option key="auto" value="">
+          {localized('Automatic')} ({automatic.name})
+        </option>
+        <option key="sep1" disabled />
+        <option key="subtitle1" disabled>
+          {localized('Contributed:')}
+        </option>
+        {verified.map(({ key, name }) => (
+          <option key={key} value={key}>
+            {name}
           </option>
-          <option key="sep1" disabled />
-          <option key="subtitle1" disabled>
-            {localized('Contributed:')}
+        ))}
+        <option key="sep2" disabled />
+        <option key="subtitle2" disabled>
+          {localized('Experimental:')}
+        </option>
+        {experimental.map(({ key, name }) => (
+          <option key={key} value={key}>
+            {name}
           </option>
-          {verified.map(({ key, name }) => (
-            <option key={key} value={key}>
-              {name}
-            </option>
-          ))}
-          <option key="sep2" disabled />
-          <option key="subtitle2" disabled>
-            {localized('Experimental:')}
-          </option>
-          {experimental.map(({ key, name }) => (
-            <option key={key} value={key}>
-              {name}
-            </option>
-          ))}
-        </select>
-        {relaunchRequired && (
-          <div
-            className="btn btn-small"
-            style={{ marginLeft: 9, marginRight: 9 }}
-            onClick={() => {
-              console.log('lang section relaunch');
-              require('@electron/remote').app.relaunch();
-              require('@electron/remote').app.quit();
-            }}
-          >
-            {localized('Relaunch')}
-          </div>
-        )}
-      </div>
-    </section>
+        ))}
+      </select>
+    </SettingsRow>
   );
 };
 
-export default LanguageSection;
+export default LanguageRow;

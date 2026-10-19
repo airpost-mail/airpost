@@ -242,12 +242,14 @@ describe('AI triage', () => {
         { features: TRIAGE_FEATURES }
       );
       const progress: Array<[number, number]> = [];
+      // Stores that mailspring-exports loads in the background listen for 'gone' too.
+      const goneListeners = Engine.events.listenerCount('gone');
       const run = triageInbox(ACCOUNT_ID, (done, total) => progress.push([done, total]));
       await run.started;
       run.dispose();
       Engine.events.notification('ai.triage.progress', { jobId: 'j6', done: 1, total: 2 });
       expect(progress).toEqual([]);
-      expect(Engine.events.listenerCount('gone')).toBe(0);
+      expect(Engine.events.listenerCount('gone')).toBe(goneListeners);
     });
 
     it('asks for a model when triage has none', async () => {

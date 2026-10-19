@@ -8,9 +8,9 @@ import {
   Actions,
   ChangeRoleMappingTask,
   Folder,
+  imapUtf7,
 } from 'mailspring-exports';
-
-import CategorySelection from './category-selection';
+import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
 
 const SELECTABLE_ROLES = ['inbox', 'sent', 'drafts', 'spam', 'archive', 'trash'];
 
@@ -81,54 +81,89 @@ export default class PreferencesCategoryMapper extends React.Component<
     Actions.updateContainerFolderDefault(this.state.containerFolderDefault);
   };
 
-  _renderRoleSection = (account: Account, role: string) => {
-    if (!account) return false;
-
-    const assignments = this.state.assignments[account.id];
-    if (!assignments) {
-      // Account may not have completed an initial sync yet
-      return false;
-    }
+  _renderRoleRow = (account: Account, role: string) => {
     if (account.provider === 'gmail' && role === 'archive') {
       return false;
     }
 
-    let all = this.state.all[account.id];
     const allowLabels = account.usesLabels() && role !== 'trash' && role !== 'spam';
-    if (!allowLabels) all = all.filter((c) => c instanceof Folder);
+    const choices = (this.state.all[account.id] || [])
+      .filter((c) => allowLabels || c instanceof Folder)
+      .map((c) => ({ category: c, path: imapUtf7.decode(c.path) }))
+      .sort((a, b) => a.path.toUpperCase().localeCompare(b.path.toUpperCase()));
+    const current = this.state.assignments[account.id][role];
+    const label = Category.LocalizedStringForRole[role];
 
     return (
-      <div className="role-section" key={`${account.id}-${role}`}>
-        <div className="col-left">{Category.LocalizedStringForRole[role]}:</div>
-        <div className="col-right">
-          <CategorySelection
-            all={all}
-            current={assignments[role]}
-            onSelect={(category) => this._onCategorySelection(account, role, category)}
-            allowLabels={allowLabels}
+      <SettingsRow key={role} label={label}>
+        <select
+          className="settings-select"
+          aria-label={label}
+          value={current ? current.id : ''}
+          onChange={(e) => {
+            const picked = choices.find((c) => c.category.id === e.target.value);
+            if (picked) this._onCategorySelection(account, role, picked.category);
+          }}
+        >
+          {!current && (
+            <option value="" disabled>
+              {localized('None')}
+            </option>
+          )}
+          {choices.map(({ category, path }) => (
+            <option key={category.id} value={category.id}>
+              {path}
+            </option>
+          ))}
+        </select>
+      </SettingsRow>
+    );
+  };
+
+  _renderAccount = (account: Account) => {
+    // An account that hasn't finished its first sync has no folders with roles yet.
+    const synced = !!this.state.assignments[account.id];
+    return (
+      <SettingsSection key={account.id} title={account.label}>
+        {synced ? (
+          SELECTABLE_ROLES.map((role) => this._renderRoleRow(account, role))
+        ) : (
+          <SettingsRow
+            label={localized('Not synced yet')}
+            description={localized('The folders show up here once Tern has synced this account.')}
           />
-        </div>
-      </div>
+        )}
+      </SettingsSection>
     );
   };
 
   render() {
     return (
-      <div className="category-mapper-container">
-        <h6>{localized('Default Container Folder (folder/subfolder)')}</h6>
-        <input
-          type="text"
-          value={this.state.containerFolderDefault}
-          onBlur={(e) => this._updateContainerFolderDefault()}
-          onChange={(e) => this.setState({ containerFolderDefault: e.target.value })}
-        />
-        {AccountStore.accounts().map((account) => (
-          <div key={account.id}>
-            <div className="account-section-title">{account.label}</div>
-            {SELECTABLE_ROLES.map((role) => this._renderRoleSection(account, role))}
-          </div>
-        ))}
-      </div>
+      <SettingsPage
+        title={localized('Folders')}
+        description={localized(
+          'Which folder each account uses for your inbox, sent mail, drafts, archive, spam and trash.'
+        )}
+      >
+        {AccountStore.accounts().map(this._renderAccount)}
+        <SettingsSection title={localized('New accounts')}>
+          <SettingsRow
+            label={localized("Folder for Tern's folders")}
+            description={localized(
+              'Tern keeps the folders it makes, like Snoozed, inside this folder in accounts you add from now on. Use folder/subfolder for a subfolder.'
+            )}
+          >
+            <input
+              type="text"
+              className="category-mapper-container-folder"
+              aria-label={localized("Folder for Tern's folders")}
+              value={this.state.containerFolderDefault}
+              onBlur={this._updateContainerFolderDefault}
+              onChange={(e) => this.setState({ containerFolderDefault: e.target.value })}
+            />
+          </SettingsRow>
+        </SettingsSection>
+      </SettingsPage>
     );
   }
 }

@@ -22,5 +22,10 @@
  * edits events and vCards. `ICSEventHelpers` is deprecated (every function throws), so are
  * the `CalendarUtils` VTIMEZONE helpers `resolveIanaZone` and `createVTIMEZONEString` (they
  * throw), all removed in 2.0.0; SyncbackEventTask gains `restore` and `tz`.
+ *
+ * 1.33.0: the Preferences building blocks in `mailspring-component-kit` (`SettingsPage`,
+ * `SettingsSection`, `SettingsRow`, `ConfigSwitchRow`, `ProviderCard` and the rest of
+ * src/components/settings.tsx); `PreferencesUIStore.TabItem` takes `group` and `keywords` for
+ * the sidebar. Tabs that name no group are listed under "From plugins".
  */
-export const PLUGIN_API_VERSION = '1.32.0';
+export const PLUGIN_API_VERSION = '1.33.0';

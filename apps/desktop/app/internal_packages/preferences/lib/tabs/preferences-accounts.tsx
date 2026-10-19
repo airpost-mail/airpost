@@ -1,6 +1,14 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
-import { AccountStore, Actions, Account, OnlineStatusStore } from 'mailspring-exports';
+import {
+  AccountStore,
+  Actions,
+  Account,
+  FolderSyncProgressStore,
+  OnlineStatusStore,
+  localized,
+} from 'mailspring-exports';
+import { SettingsPage, SettingsSection } from 'mailspring-component-kit';
 import PreferencesAccountList from './preferences-account-list';
 import PreferencesAccountDetails from './preferences-account-details';
 
@@ -8,6 +16,7 @@ interface PreferencesAccountsState {
   accounts: Account[];
   selected: Account;
   offlineAccountIds: string[];
+  syncingAccountIds: string[];
 }
 
 class PreferencesAccounts extends React.Component<
@@ -27,6 +36,7 @@ class PreferencesAccounts extends React.Component<
     this.unsubscribers = [
       AccountStore.listen(this._onAccountsChanged),
       OnlineStatusStore.listen(this._onAccountsChanged),
+      FolderSyncProgressStore.listen(this._onAccountsChanged),
     ];
   }
 
@@ -49,6 +59,9 @@ class PreferencesAccounts extends React.Component<
       accounts,
       selected: selectedAccount,
       offlineAccountIds: OnlineStatusStore.offlineAccountIds(),
+      syncingAccountIds: accounts
+        .filter((a) => FolderSyncProgressStore.isSyncingAccount(a.id))
+        .map((a) => a.id),
     };
   }
 
@@ -56,7 +69,6 @@ class PreferencesAccounts extends React.Component<
     this.setState(this.getStateFromStores(this.state));
   };
 
-  // Update account list actions
   _onAddAccount() {
     ipcRenderer.send('command', 'application:add-account');
   }
@@ -73,33 +85,50 @@ class PreferencesAccounts extends React.Component<
     Actions.removeAccount(account.id);
   }
 
-  // Update account actions
   _onAccountUpdated(account: Account, updates: Partial<Account>) {
     Actions.updateAccount(account.id, updates);
   }
 
   render() {
+    const { accounts, selected, offlineAccountIds, syncingAccountIds } = this.state;
     return (
-      <div className="container-accounts">
-        <div className="accounts-content">
+      <SettingsPage
+        className="preferences-accounts"
+        title={localized('Accounts')}
+        description={localized('Mail accounts on this computer.')}
+      >
+        <SettingsSection
+          bare
+          note={
+            <>
+              <a onClick={this._onAddAccount}>{localized('Add account…')}</a>
+              {accounts.length > 1 && (
+                <span className="account-list-hint">
+                  {localized('Drag an account to change its place in the sidebar.')}
+                </span>
+              )}
+            </>
+          }
+        >
           <PreferencesAccountList
-            accounts={this.state.accounts}
-            selected={this.state.selected}
-            offlineAccountIds={this.state.offlineAccountIds}
-            onAddAccount={this._onAddAccount}
+            accounts={accounts}
+            selected={selected}
+            offlineAccountIds={offlineAccountIds}
+            syncingAccountIds={syncingAccountIds}
             onReorderAccount={this._onReorderAccount}
             onSelectAccount={this._onSelectAccount}
+          />
+        </SettingsSection>
+        {selected && (
+          <PreferencesAccountDetails
+            key={selected.id}
+            account={selected}
+            isOffline={offlineAccountIds.includes(selected.id)}
+            onAccountUpdated={this._onAccountUpdated}
             onRemoveAccount={this._onRemoveAccount}
           />
-          {this.state.selected && (
-            <PreferencesAccountDetails
-              account={this.state.selected}
-              isOffline={this.state.offlineAccountIds.includes(this.state.selected.id)}
-              onAccountUpdated={this._onAccountUpdated}
-            />
-          )}
-        </div>
-      </div>
+        )}
+      </SettingsPage>
     );
   }
 }

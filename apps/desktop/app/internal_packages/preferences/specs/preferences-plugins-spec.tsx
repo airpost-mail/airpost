@@ -111,7 +111,7 @@ describe('Preferences > Plugins', function () {
     await act(async () => {
       renderer = TestRenderer.create(<PluginsSection plugins={[plugin]} unitDir={units} />);
     });
-    await waitFor(() => textOf(renderer).includes('not installed'), 'the service row');
+    await waitFor(() => textOf(renderer).includes('not set up'), 'the service row');
 
     await act(async () => byId(renderer, `plugin-review-${SERVICE}`).props.onClick());
     await waitFor(() => textOf(renderer).includes('plugin-plan'), 'the plan');
@@ -136,7 +136,7 @@ describe('Preferences > Plugins', function () {
     const records = JSON.parse(fs.readFileSync(path.join(profile, 'services.json'), 'utf8'));
     expect(records.services[SERVICE].sha256).toBe(plan.sha256);
     expect(records.services[SERVICE].source).toBe(plugin.directory);
-    await waitFor(() => textOf(renderer).includes('Uninstall service'), 'the installed row');
+    await waitFor(() => textOf(renderer).includes('Remove service'), 'the installed row');
 
     await act(async () => byId(renderer, `plugin-uninstall-${SERVICE}`).props.onClick());
     await waitFor(() => textOf(renderer).includes('Service removed'), 'the removal');
@@ -150,7 +150,7 @@ describe('Preferences > Plugins', function () {
     await act(async () => {
       renderer = TestRenderer.create(<PluginsSection plugins={[plugin]} unitDir={units} />);
     });
-    await waitFor(() => textOf(renderer).includes('not installed'), 'the service row');
+    await waitFor(() => textOf(renderer).includes('not set up'), 'the service row');
     await act(async () => byId(renderer, `plugin-review-${SERVICE}`).props.onClick());
     await waitFor(() => textOf(renderer).includes('plugin-plan'), 'the plan');
 
@@ -167,7 +167,7 @@ describe('Preferences > Plugins', function () {
     await act(async () => {
       renderer = TestRenderer.create(<PluginsSection plugins={[plugin]} unitDir={units} />);
     });
-    await waitFor(() => textOf(renderer).includes('not installed'), 'the service row');
+    await waitFor(() => textOf(renderer).includes('not set up'), 'the service row');
     await act(async () => byId(renderer, `plugin-review-${SERVICE}`).props.onClick());
     await waitFor(() => textOf(renderer).includes('plugin-plan'), 'the plan');
     const plan = (renderer.root.findByType(PluginsSection).instance as PluginsSection).state.plan;

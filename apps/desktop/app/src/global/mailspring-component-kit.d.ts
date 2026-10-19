@@ -3,6 +3,7 @@ export * from '../components/drop-zone';
 export * from '../components/spinner';
 export * from '../components/contact-profile-photo';
 export const Switch: typeof import('../components/switch').default;
+export * from '../components/settings';
 export const FixedPopover: typeof import('../components/fixed-popover').default;
 export const DatePickerPopover: typeof import('../components/date-picker-popover').default;
 export const Modal: typeof import('../components/modal').default;

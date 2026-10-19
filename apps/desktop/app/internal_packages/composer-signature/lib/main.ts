@@ -13,6 +13,9 @@ export function activate() {
     tabId: 'Signatures',
     displayName: localized('Signatures'),
     componentClassFn: () => require('./preferences-signatures').default, // eslint-disable-line
+    order: 13,
+    group: 'mail',
+    keywords: 'signature'.split(' '),
   });
 
   ExtensionRegistry.Composer.register(SignatureComposerExtension);

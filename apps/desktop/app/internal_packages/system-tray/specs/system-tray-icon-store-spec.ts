@@ -70,6 +70,10 @@ describe('SystemTrayIconStore', function systemTrayIconStore() {
   });
 
   describe('updating the icon based on focus and blur', () => {
+    beforeEach(() => {
+      spyOn(BadgeStore, 'unread').andReturn(1);
+    });
+
     it('always shows inbox full icon when the window gets focused', () => {
       spyOn(BadgeStore, 'total').andReturn(1);
       this.iconStore._onWindowFocus();

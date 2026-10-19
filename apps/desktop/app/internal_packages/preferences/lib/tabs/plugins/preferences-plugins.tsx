@@ -1,5 +1,15 @@
 import React from 'react';
 import { localized } from 'mailspring-exports';
+import {
+  SettingsPage,
+  SettingsSection,
+  SettingsRow,
+  SettingsField,
+  StatusPill,
+  ProviderCard,
+  ProviderLogo,
+  PrivacyNote,
+} from 'mailspring-component-kit';
 
 import { pluginInstallRecord } from '../../../../../src/plugin-install-record';
 import {
@@ -39,6 +49,7 @@ interface State {
   busy: string | null;
   plan: ServicePlan | null;
   results: { [pkg: string]: { ok: boolean; message: string } };
+  open: { [pkg: string]: boolean };
 }
 
 export function thirdPartyPlugins(): PluginRow[] {
@@ -61,12 +72,27 @@ function shortHash(hash: string) {
   return hash.slice(0, 12);
 }
 
+const LOGO_COLORS = ['#e8467f', '#5d6472', '#3b7dd8', '#10a37f', '#c96442', '#7b2ff7', '#d08a00'];
+
+function logoFor(name: string) {
+  let n = 0;
+  for (const c of name) n = (n * 31 + c.charCodeAt(0)) >>> 0;
+  return <ProviderLogo text={name.slice(0, 1).toUpperCase()} color={LOGO_COLORS[n % 7]} />;
+}
+
 export class PluginsSection extends React.Component<Props, State> {
   static displayName = 'PluginsSection';
 
   _mounted = false;
 
-  state: State = { services: null, listError: null, busy: null, plan: null, results: {} };
+  state: State = {
+    services: null,
+    listError: null,
+    busy: null,
+    plan: null,
+    results: {},
+    open: {},
+  };
 
   componentDidMount() {
     this._mounted = true;
@@ -97,14 +123,17 @@ export class PluginsSection extends React.Component<Props, State> {
 
   _result(pkg: string, ok: boolean, message: string) {
     if (!this._mounted) return;
-    this.setState({ results: { ...this.state.results, [pkg]: { ok, message } } });
+    this.setState({
+      results: { ...this.state.results, [pkg]: { ok, message } },
+      open: { ...this.state.open, [pkg]: true },
+    });
   }
 
   _onReview = async (pkg: string) => {
     this.setState({ busy: pkg, plan: null });
     try {
       const plan = await planServiceInstall(pkg, this._unitOptions());
-      if (this._mounted) this.setState({ plan });
+      if (this._mounted) this.setState({ plan, open: { ...this.state.open, [pkg]: true } });
     } catch (err) {
       this._result(pkg, false, err.message);
     } finally {
@@ -123,7 +152,7 @@ export class PluginsSection extends React.Component<Props, State> {
         true,
         done.load
           ? localized('Service installed and started.')
-          : localized('Service installed (not loaded).')
+          : localized('Service installed. It starts the next time you log in.')
       );
       if (this._mounted) this.setState({ plan: null });
     } catch (err) {
@@ -163,7 +192,7 @@ export class PluginsSection extends React.Component<Props, State> {
           <>
             <p>
               {localized(
-                'First it installs the engine unit %1$@, which runs %2$@ in the background:',
+                'So that it can reach your mail while Tern is closed, Tern first sets up %1$@ to run %2$@ in the background:',
                 plan.engine.path,
                 plan.engine.bin
               )}
@@ -171,9 +200,9 @@ export class PluginsSection extends React.Component<Props, State> {
             <pre className="plugin-unit">{plan.engine.text}</pre>
           </>
         )}
-        <p>{localized('The service unit %@:', plan.unit.path)}</p>
+        <p>{localized('The service itself is set up in %@:', plan.unit.path)}</p>
         <pre className="plugin-unit">{plan.unit.text}</pre>
-        <div className="plugin-actions">
+        <div className="settings-actions">
           <button
             className="btn btn-emphasis"
             id={`plugin-install-${plan.package}`}
@@ -190,77 +219,124 @@ export class PluginsSection extends React.Component<Props, State> {
     );
   }
 
-  _renderService(plugin: PluginRow, record: ServiceRecord | undefined) {
-    const { busy, plan } = this.state;
-    const result = this.state.results[plugin.name];
+  _serviceProblems(record: ServiceRecord | undefined) {
     const problems = [];
     if (record && !record.unitPresent) problems.push(localized('its unit file is missing'));
-    if (record && !record.binUnchanged) problems.push(localized('its binary changed'));
+    if (record && !record.binUnchanged) problems.push(localized('its program changed'));
+    return problems;
+  }
+
+  _serviceButton(name: string, record: ServiceRecord | undefined) {
+    const { busy, plan } = this.state;
+    if (record) {
+      return (
+        <button
+          className="btn"
+          id={`plugin-uninstall-${name}`}
+          disabled={busy === name}
+          onClick={() => this._onUninstall(name)}
+        >
+          {localized('Remove service')}
+        </button>
+      );
+    }
+    if (plan?.package === name) return null;
     return (
-      <div className="plugin-service">
-        {record ? (
-          <div className="item">
-            <span className="plugin-service-status">
-              {localized('Service: %1$@ (SHA-256 %2$@)', record.bin, shortHash(record.sha256))}
-              {problems.length > 0 && ` - ${problems.join(', ')}`}
-            </span>
-            <button
-              className="btn btn-small"
-              id={`plugin-uninstall-${plugin.name}`}
-              disabled={busy === plugin.name}
-              onClick={() => this._onUninstall(plugin.name)}
-            >
-              {localized('Uninstall service')}
-            </button>
-          </div>
-        ) : (
-          plan?.package !== plugin.name && (
-            <div className="item">
-              <span className="plugin-service-status">
-                {localized('Has a background service, not installed.')}
-              </span>
-              <button
-                className="btn btn-small"
-                id={`plugin-review-${plugin.name}`}
-                disabled={busy === plugin.name || !ternBinary()}
-                onClick={() => this._onReview(plugin.name)}
-              >
-                {localized('Install service…')}
-              </button>
-            </div>
-          )
-        )}
-        {plan?.package === plugin.name && this._renderPlan(plan)}
-        {result && (
-          <span className={`plugin-result ${result.ok ? 'ok' : 'failed'}`}>{result.message}</span>
-        )}
-      </div>
+      <button
+        className="btn"
+        id={`plugin-review-${name}`}
+        disabled={busy === name || !ternBinary()}
+        onClick={() => this._onReview(name)}
+      >
+        {localized('Set up service…')}
+      </button>
     );
   }
 
   _renderPlugin(plugin: PluginRow) {
     const record = pluginInstallRecord(plugin.name);
     const service = this.state.services?.services.find((s) => s.package === plugin.name);
+    const hasService = plugin.hasService || !!service;
+    const problems = this._serviceProblems(service);
+    const result = this.state.results[plugin.name];
+    const { plan } = this.state;
+
+    const subtitle = [plugin.version && localized('Version %@', plugin.version)];
+    if (hasService) {
+      subtitle.push(
+        service
+          ? localized('background service installed')
+          : localized('background service not set up')
+      );
+    }
+
+    let status: React.ReactNode = null;
+    if (problems.length) {
+      status = <StatusPill kind="warn">{localized('Service needs attention')}</StatusPill>;
+    } else if (!plugin.active) {
+      status = <StatusPill kind="off">{localized('Not active')}</StatusPill>;
+    }
+
     return (
-      <div key={plugin.name} className="plugin" id={`plugin-${plugin.name}`}>
-        <div className="plugin-name">
-          {plugin.displayName}
-          {plugin.version && <span className="plugin-version"> {plugin.version}</span>}
-          {!plugin.active && <span className="plugin-inactive"> ({localized('not active')})</span>}
+      <ProviderCard
+        key={plugin.name}
+        logo={logoFor(plugin.displayName || plugin.name)}
+        title={plugin.displayName}
+        subtitle={subtitle.filter(Boolean).join(' · ')}
+        status={status}
+        actions={hasService && this._serviceButton(plugin.name, service)}
+        open={!!this.state.open[plugin.name]}
+        onToggle={(open) => this.setState({ open: { ...this.state.open, [plugin.name]: open } })}
+      >
+        <div id={`plugin-${plugin.name}`}>
+          <SettingsField label={localized('Folder')}>
+            <span className="plugin-detail">{plugin.directory}</span>
+          </SettingsField>
+          <SettingsField label={localized('Installed from')}>
+            <span className="plugin-detail">
+              {record
+                ? localized(
+                    '%1$@ on %2$@, SHA-256 %3$@',
+                    record.source,
+                    new Date(record.installedAt).toLocaleDateString(),
+                    shortHash(record.sha256)
+                  )
+                : localized('Not installed through Tern: no source or hash recorded.')}
+            </span>
+          </SettingsField>
+          {service && (
+            <SettingsField label={localized('Service')}>
+              <span className="plugin-detail">
+                {localized('%1$@ (SHA-256 %2$@)', service.bin, shortHash(service.sha256))}
+                {problems.length > 0 && ` - ${problems.join(', ')}`}
+              </span>
+            </SettingsField>
+          )}
+          {plan?.package === plugin.name && this._renderPlan(plan)}
+          {result && (
+            <div className={`plugin-result ${result.ok ? 'ok' : 'failed'}`}>{result.message}</div>
+          )}
         </div>
-        <div className="plugin-detail">{plugin.directory}</div>
-        <div className="plugin-detail">
-          {record
-            ? localized(
-                'Installed from %1$@ on %2$@, SHA-256 %3$@',
-                record.source,
-                new Date(record.installedAt).toLocaleDateString(),
-                shortHash(record.sha256)
-              )
-            : localized('Not installed through Tern: no source or hash recorded.')}
-        </div>
-        {(plugin.hasService || service) && this._renderService(plugin, service)}
-      </div>
+      </ProviderCard>
+    );
+  }
+
+  _renderOrphan(record: ServiceRecord) {
+    const result = this.state.results[record.package];
+    return (
+      <SettingsRow
+        key={record.package}
+        label={localized('%@ (plugin removed)', record.package)}
+        description={
+          result ? (
+            <span className={`plugin-result ${result.ok ? 'ok' : 'failed'}`}>{result.message}</span>
+          ) : (
+            localized('Its service still runs %@.', record.bin)
+          )
+        }
+      >
+        {this._serviceButton(record.package, record)}
+      </SettingsRow>
     );
   }
 
@@ -268,53 +344,73 @@ export class PluginsSection extends React.Component<Props, State> {
     const plugins = this._plugins();
     const listed = new Set(plugins.map((p) => p.name));
     const orphans = (this.state.services?.services || []).filter((s) => !listed.has(s.package));
+    const tern = !!ternBinary();
     return (
-      <section className="plugins-section">
-        <h6>{localized('Plugins')}</h6>
-        <p className="plugins-note">
-          {localized(
-            'Plugins run as part of Tern with full access to your mail and files. Only install plugins you trust.'
+      <div className="plugins-section">
+        <SettingsSection
+          note={
+            <a onClick={() => AppEnv.packages.installPackageManually()}>
+              {localized('Install from a folder…')}
+            </a>
+          }
+        >
+          {plugins.length === 0 ? (
+            <SettingsRow
+              label={localized('No plugins installed')}
+              description={localized('Plugins you install show up here.')}
+            />
+          ) : (
+            plugins.map((p) => this._renderPlugin(p))
           )}
-        </p>
-        {!ternBinary() && (
-          <p className="plugins-note">
-            {localized('Installing services needs the tern command, which is not in this build.')}
-          </p>
-        )}
-        {this.state.listError && <p className="plugin-result failed">{this.state.listError}</p>}
-        {plugins.length === 0 ? (
-          <p className="plugins-note">{localized('No plugins installed.')}</p>
-        ) : (
-          plugins.map((p) => this._renderPlugin(p))
-        )}
-        {orphans.map((s) =>
-          this._renderPlugin({
-            name: s.package,
-            displayName: s.package,
-            version: null,
-            directory: s.source,
-            active: false,
-            hasService: true,
-          })
-        )}
-        <div className="plugin-actions">
-          <button className="btn" onClick={() => AppEnv.packages.installPackageManually()}>
-            {localized('Install a plugin…')}
-          </button>
-        </div>
-      </section>
-    );
-  }
-}
+        </SettingsSection>
+        <PrivacyNote kind="warn">
+          {localized(
+            'Plugins run inside Tern and can read all of your mail and files. Only install plugins from people you trust.'
+          )}
+        </PrivacyNote>
 
-export default class PreferencesPlugins extends React.Component {
-  static displayName = 'PreferencesPlugins';
-
-  render() {
-    return (
-      <div className="container-plugins">
-        <PluginsSection />
+        <SettingsSection title={localized('Background services')}>
+          <SettingsRow
+            label={localized('Some plugins run a small program in the background')}
+            description={
+              tern
+                ? localized(
+                    'It keeps running while Tern is closed, with the same access to your mail as Tern. Set one up from its plugin above.'
+                  )
+                : localized(
+                    'This copy of Tern can’t set them up because it doesn’t include the tern command. Install Tern from the official download to use them.'
+                  )
+            }
+          >
+            {!tern && <StatusPill kind="off">{localized('Not available')}</StatusPill>}
+          </SettingsRow>
+          {this.state.listError && (
+            <SettingsRow
+              label={localized('Tern couldn’t list the services')}
+              description={<span className="plugin-result failed">{this.state.listError}</span>}
+            >
+              <button className="btn" onClick={this._refresh}>
+                {localized('Try again')}
+              </button>
+            </SettingsRow>
+          )}
+          {orphans.map((s) => this._renderOrphan(s))}
+        </SettingsSection>
       </div>
     );
   }
 }
+
+export default function PreferencesPlugins() {
+  return (
+    <SettingsPage
+      title={localized('Plugins')}
+      description={localized('Add features to Tern.')}
+      className="preferences-plugins"
+    >
+      <PluginsSection />
+    </SettingsPage>
+  );
+}
+
+PreferencesPlugins.displayName = 'PreferencesPlugins';

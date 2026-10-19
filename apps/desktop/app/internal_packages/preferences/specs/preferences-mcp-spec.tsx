@@ -4,6 +4,7 @@ import path from 'path';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { AccountStore, CategoryStore } from 'mailspring-exports';
+import { SettingsSwitch } from 'mailspring-component-kit';
 
 import { McpSection } from '../lib/tabs/mcp/mcp-section';
 import { migrateCoreMcpConfig, readAuditLog } from '../lib/tabs/mcp/mcp-policy';
@@ -14,6 +15,7 @@ import { isStableInstall, runTernMcp, ternMcpBinary } from '../lib/tabs/mcp/tern
 
 let dir: string;
 let coreMcp: any;
+let systemTray: boolean;
 
 function readJSON(file: string) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -35,6 +37,17 @@ function byId(renderer: TestRenderer.ReactTestRenderer, id: string) {
   return renderer.root.find((node) => node.props.id === id);
 }
 
+function switchLabelled(renderer: TestRenderer.ReactTestRenderer, label: string) {
+  return renderer.root.find((node) => node.type === SettingsSwitch && node.props.label === label);
+}
+
+async function flip(renderer: TestRenderer.ReactTestRenderer, label: string) {
+  const sw = switchLabelled(renderer, label);
+  await act(async () => {
+    sw.props.onChange(!sw.props.checked);
+  });
+}
+
 function section(renderer: TestRenderer.ReactTestRenderer): McpSection {
   return renderer.root.findByType(McpSection).instance;
 }
@@ -50,15 +63,21 @@ function textOf(renderer: TestRenderer.ReactTestRenderer) {
   return JSON.stringify(renderer.toJSON());
 }
 
-describe('Preferences > Integrations > AI assistants', function () {
+describe('Preferences > Agents', function () {
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-mcp-pane-'));
     coreMcp = undefined;
+    systemTray = true;
     spyOn(AppEnv, 'getConfigDirPath').andReturn(dir);
     const realGet = AppEnv.config.get.bind(AppEnv.config);
-    spyOn(AppEnv.config, 'get').andCallFake((key: string) =>
-      key === 'core.mcp' ? coreMcp : realGet(key)
-    );
+    spyOn(AppEnv.config, 'get').andCallFake((key: string) => {
+      if (key === 'core.mcp') return coreMcp;
+      if (key === 'core.workspace.systemTray') return systemTray;
+      return realGet(key);
+    });
+    spyOn(AppEnv.config, 'set').andCallFake((key: string, value: any) => {
+      if (key === 'core.workspace.systemTray') systemTray = value;
+    });
     spyOn(AppEnv.config, 'unset').andCallFake((key: string) => {
       if (key === 'core.mcp') coreMcp = undefined;
     });
@@ -129,9 +148,7 @@ describe('Preferences > Integrations > AI assistants', function () {
     expect(mcpJSON().accessLevel).toBe('read-write');
 
     // Turning one account off lists the others as enabled, since an empty map means all.
-    await act(async () => {
-      byId(renderer, 'mcp-account-a2').props.onChange();
-    });
+    await flip(renderer, 'Home');
     expect(mcpJSON().enabledAccounts).toEqual({
       a1: { enabled: true, excludedFolderIds: [] },
       a2: { enabled: false, excludedFolderIds: [] },
@@ -145,9 +162,7 @@ describe('Preferences > Integrations > AI assistants', function () {
       excludedFolderIds: ['f-private'],
     });
 
-    await act(async () => {
-      byId(renderer, 'mcp-http-enabled').props.onChange();
-    });
+    await flip(renderer, 'Allow apps that connect over HTTP');
     await act(async () => {
       byId(renderer, 'mcp-http-port').props.onChange({ target: { value: '3000' } });
     });
@@ -167,9 +182,35 @@ describe('Preferences > Integrations > AI assistants', function () {
     expect(byId(renderer, 'mcp-http-port').props.value).toBe('3000');
 
     expect(mcpJSON().futureKey).toEqual({ x: 1 });
+    expect(mcpJSON().enabled).toBe(undefined);
     if (process.platform !== 'win32') {
       expect(fs.statSync(path.join(dir, 'mcp.json')).mode & 0o777).toBe(0o600);
     }
+  });
+
+  it('turns every app off and on, keeping Tern running in the background when on', async () => {
+    fs.writeFileSync(
+      path.join(dir, 'mcp.json'),
+      JSON.stringify({ accessLevel: 'read-write', enabledAccounts: { a1: { enabled: true } } })
+    );
+    systemTray = false;
+    const renderer = await render();
+    const master = 'Let apps on this computer use Tern';
+    expect(switchLabelled(renderer, master).props.checked).toBe(true);
+    expect(renderer.root.findAll((n) => n.props.className === 'agents-body off').length).toBe(0);
+
+    await flip(renderer, master);
+    expect(mcpJSON().enabled).toBe(false);
+    expect(mcpJSON().accessLevel).toBe('read-write');
+    expect(mcpJSON().enabledAccounts.a1.enabled).toBe(true);
+    expect(switchLabelled(renderer, master).props.checked).toBe(false);
+    expect(renderer.root.findAll((n) => n.props.className === 'agents-body off').length).toBe(2);
+    expect(systemTray).toBe(false);
+
+    await flip(renderer, master);
+    expect(mcpJSON().enabled).toBe(true);
+    expect(systemTray).toBe(true);
+    expect(textOf(renderer)).toContain('Change in General');
   });
 
   it('keeps nested keys it does not know and edits made while the pane is open', async () => {
@@ -187,9 +228,7 @@ describe('Preferences > Integrations > AI assistants', function () {
     changed.enabledAccounts.a2 = { enabled: true };
     fs.writeFileSync(path.join(dir, 'mcp.json'), JSON.stringify(changed));
 
-    await act(async () => {
-      byId(renderer, 'mcp-http-enabled').props.onChange();
-    });
+    await flip(renderer, 'Allow apps that connect over HTTP');
     const saved = mcpJSON();
     expect(saved.http).toEqual({ enabled: true, port: 2600, host: '127.0.0.1' });
     expect(saved.accessLevel).toBe('read-write');
@@ -349,7 +388,7 @@ describe('Preferences > Integrations > AI assistants', function () {
         await section(renderer)._refreshStatus();
       });
       expect(section(renderer).state.status.engines).toEqual([]);
-      expect(textOf(renderer)).toContain('No engine running');
+      expect(textOf(renderer)).toContain("Apps can't reach your mail right now");
     });
   });
 });

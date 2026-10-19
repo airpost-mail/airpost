@@ -24,12 +24,12 @@ test('Cmd+, opens preferences panel', async () => {
 test('preferences shows all expected tabs', async () => {
   const tabs = ['General', 'Accounts', 'Appearance', 'Shortcuts', 'Mail Rules', 'Folders', 'Signatures', 'Templates'];
   for (const tab of tabs) {
-    await expect(mainWindow.locator(`.preferences-tabs .item:has-text("${tab}")`)).toBeVisible();
+    await expect(mainWindow.locator(`.preferences-sidebar-item:has-text("${tab}")`)).toBeVisible();
   }
 });
 
 test('clicking Shortcuts tab shows shortcut preferences', async () => {
-  await mainWindow.locator('.preferences-tabs .item:has-text("Shortcuts")').click();
+  await mainWindow.locator('.preferences-sidebar-item:has-text("Shortcuts")').click();
   await expect(mainWindow.locator('text=Shortcut set')).toBeVisible({ timeout: 3_000 });
 });
 

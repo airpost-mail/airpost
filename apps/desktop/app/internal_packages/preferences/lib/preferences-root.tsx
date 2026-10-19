@@ -8,7 +8,7 @@ import {
   ConfigPropContainer,
 } from 'mailspring-component-kit';
 import { PreferencesUIStore } from 'mailspring-exports';
-import PreferencesTabsBar from './preferences-tabs-bar';
+import PreferencesSidebar from './preferences-sidebar';
 
 const stopPropagation = (e: CustomEvent) => {
   e.stopPropagation();
@@ -41,8 +41,6 @@ class PreferencesRoot extends React.Component<{ tab: any; tabs: any[]; selection
     'core:print-thread': stopPropagation,
   };
 
-  _contentComponent: ConfigPropContainer;
-
   componentDidMount() {
     (ReactDOM.findDOMNode(this) as HTMLElement).focus();
     this._focusContent();
@@ -51,21 +49,16 @@ class PreferencesRoot extends React.Component<{ tab: any; tabs: any[]; selection
   componentDidUpdate(oldProps: { tab: any; tabs: any[]; selection: any }) {
     if (oldProps.tab !== this.props.tab) {
       const scrollRegion = document.querySelector('.preferences-content .scroll-region-content');
-      scrollRegion.scrollTop = 0;
+      if (scrollRegion) scrollRegion.scrollTop = 0;
       this._focusContent();
     }
   }
 
-  // Focus the first thing with a tabindex when we update.
-  // inside the content area. This makes it way easier to interact with prefs.
+  // Focus the selected sidebar item, so the arrow keys move between tabs and Tab reaches the
+  // page. Focusing the page's first control instead lit up its focus ring on every click.
   _focusContent() {
-    const contentEl = ReactDOM.findDOMNode(this._contentComponent) as HTMLElement;
-    const node = contentEl.querySelector(
-      'input, select, textarea, [tabindex="0"], button'
-    ) as HTMLElement;
-    if (node) {
-      node.focus();
-    }
+    const root = ReactDOM.findDOMNode(this) as HTMLElement;
+    root?.querySelector<HTMLElement>('.preferences-sidebar [aria-selected="true"]')?.focus();
   }
 
   render() {
@@ -78,14 +71,10 @@ class PreferencesRoot extends React.Component<{ tab: any; tabs: any[]; selection
         tabIndex={0}
         localHandlers={this._localHandlers}
       >
-        <Flexbox direction="column">
-          <PreferencesTabsBar tabs={tabs} selection={selection} />
+        <Flexbox direction="row">
+          <PreferencesSidebar tabs={tabs} selection={selection} />
           <ScrollRegion className="preferences-content">
-            <ConfigPropContainer
-              ref={(el) => {
-                this._contentComponent = el;
-              }}
-            >
+            <ConfigPropContainer>
               {tab ? <TabComponent accountId={selection.accountId} /> : null}
             </ConfigPropContainer>
           </ScrollRegion>

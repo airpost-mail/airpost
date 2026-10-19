@@ -1,6 +1,16 @@
 import path from 'path';
 import React from 'react';
-import { localized, AccountStore, CategoryStore, Account } from 'mailspring-exports';
+import classNames from 'classnames';
+import { localized, AccountStore, CategoryStore, Account, Actions } from 'mailspring-exports';
+import {
+  SettingsSection,
+  SettingsRow,
+  SettingsSwitch,
+  SettingsNote,
+  StatusPill,
+  ProviderCard,
+  ProviderLogo,
+} from 'mailspring-component-kit';
 
 import {
   ACCESS_LEVELS,
@@ -25,15 +35,78 @@ import {
   ternMcpStatus,
   uninstallClient,
 } from './tern-mcp';
+import { ternBinary } from '../plugins/tern-cli';
 
-// Preferences > Integrations > AI assistants: the policy tern-mcp reads (mcp.json), its
-// status, client registration through the bundled tern-mcp, and its audit log.
+// Preferences > Agents: the policy tern-mcp reads (mcp.json), client registration through
+// the bundled tern-mcp, its audit log and status, and the bundled `tern` command.
 
-const ACCESS_LEVEL_LABELS: { [level in (typeof ACCESS_LEVELS)[number]]: string } = {
-  'read-only': 'Read only',
-  'read-write': 'Read and change (drafts, archive, labels)',
-  'read-write-send': 'Read, change and send',
+type AccessLevel = (typeof ACCESS_LEVELS)[number];
+
+const ACCESS_LEVEL_LABELS: { [level in AccessLevel]: string } = {
+  'read-only': 'Read mail',
+  'read-write': 'Read and draft',
+  'read-write-send': 'Read, draft and send',
 };
+
+const ACCESS_LEVEL_DESCRIPTIONS: { [level in AccessLevel]: string } = {
+  'read-only': "Apps can search and read your mail. They can't change anything.",
+  'read-write':
+    "Apps can also write drafts, archive, move, label and snooze mail, and edit events and contacts. They can't send.",
+  'read-write-send': 'Apps can also send mail, unsubscribe and answer invitations.',
+};
+
+const CLIENT_LOGOS: { [client in McpClientId]: { text: string; color: string } } = {
+  'claude-desktop': { text: 'C', color: '#c96442' },
+  'claude-code': { text: 'CC', color: '#d97757' },
+  codex: { text: 'Cx', color: '#10a37f' },
+};
+
+// The MCP `clientInfo.name` each app sends, which tern-mcp writes to the audit log.
+const CLIENT_INFO_NAMES: { [client in McpClientId]: RegExp } = {
+  'claude-desktop': /^claude-ai\b/,
+  'claude-code': /^claude-code\b/,
+  codex: /^codex/,
+};
+
+const TOOL_PHRASES: { [tool: string]: string } = {
+  list_accounts: 'listed your accounts',
+  list_folders: 'listed your folders',
+  search_mail: 'searched your mail',
+  list_threads: 'listed conversations',
+  get_thread: 'read a conversation',
+  get_message: 'read a message',
+  get_message_tracking: 'checked if a message was opened',
+  list_tracked_messages: 'listed tracked messages',
+  get_top_links: 'listed the most clicked links',
+  list_scheduled_sends: 'listed scheduled messages',
+  get_attachment: 'opened an attachment',
+  'resources/read': 'opened an attachment',
+  create_draft: 'wrote a draft',
+  reply_to_thread: 'drafted a reply',
+  update_draft: 'changed a draft',
+  delete_draft: 'deleted a draft',
+  archive_threads: 'archived mail',
+  trash_threads: 'moved mail to the trash',
+  move_to_folder: 'moved mail to a folder',
+  set_labels: 'changed labels',
+  set_unread: 'marked mail read or unread',
+  set_starred: 'starred or unstarred mail',
+  send_draft: 'sent a message',
+  schedule_send: 'scheduled a message',
+  cancel_scheduled_send: 'cancelled a scheduled message',
+  snooze_threads: 'snoozed mail',
+  unsnooze_threads: 'unsnoozed mail',
+  unsubscribe: 'unsubscribed from a list',
+  list_events: 'listed calendar events',
+  create_event: 'created an event',
+  update_event: 'changed an event',
+  respond_to_event: 'answered an invitation',
+  get_contact: 'looked up a contact',
+  create_contact: 'added a contact',
+  update_contact: 'changed a contact',
+};
+
+const ACTIVITY_SHOWN = 10;
 
 interface Props {
   /** Edits these files instead of the clients' own configs; specs always give them. */
@@ -43,6 +116,8 @@ interface Props {
 interface ClientResult {
   ok: boolean;
   message: string;
+  /** Whether the app has Tern after this action; null when the action failed. */
+  connected: boolean | null;
   /** The client has a `tern` entry tern-mcp didn't write; offer to replace it. */
   canForce: boolean;
 }
@@ -58,6 +133,8 @@ interface State {
   results: { [client in McpClientId]?: ClientResult };
   expanded: { [accountId: string]: boolean };
   audit: AuditEntry[];
+  showAllActivity: boolean;
+  trayTurnedOn: boolean;
 }
 
 export function configDir() {
@@ -70,6 +147,57 @@ function formatTime(ts: number) {
   if (diff < 3600) return localized('%@m ago', Math.floor(diff / 60));
   if (diff < 86400) return localized('%@h ago', Math.floor(diff / 3600));
   return new Date(ts).toLocaleDateString();
+}
+
+function clientForEntry(entry: AuditEntry) {
+  const name = entry.client || '';
+  return MCP_CLIENTS.find((c) => CLIENT_INFO_NAMES[c.id].test(name));
+}
+
+function errorText(entry: AuditEntry) {
+  return (entry.resultSummary || '').replace(/^error: /, '');
+}
+
+/** tern-mcp's refusals (policy.rs `check_access`) in the pane's words. */
+function blockedText(entry: AuditEntry) {
+  const error = errorText(entry);
+  if (error.includes('not allowed to use Tern')) return localized('apps were turned off.');
+  const needed = /require access level '([\w-]+)'/.exec(error)?.[1] as AccessLevel | undefined;
+  if (needed && ACCESS_LEVEL_LABELS[needed]) {
+    return localized('it needs “%@” access.', localized(ACCESS_LEVEL_LABELS[needed]));
+  }
+  return error;
+}
+
+/** The call's arguments as plain values, e.g. a search query; tern-mcp has already
+ * shortened bodies to their length. */
+function paramsText(params: string | undefined) {
+  if (!params) return null;
+  try {
+    const parsed = JSON.parse(params);
+    if (!parsed || typeof parsed !== 'object') return params;
+    const values = Object.values(parsed).filter(
+      (v) => typeof v === 'string' || typeof v === 'number'
+    );
+    return values.length ? values.join(' · ') : null;
+  } catch (err) {
+    return params;
+  }
+}
+
+/** Turns inertness on and off on the wrapped element: React 17 doesn't pass `inert`. */
+function Dimmed(props: { off: boolean; children: React.ReactNode }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!ref.current) return;
+    if (props.off) ref.current.setAttribute('inert', '');
+    else ref.current.removeAttribute('inert');
+  }, [props.off]);
+  return (
+    <div ref={ref} className={classNames('agents-body', { off: props.off })}>
+      {props.children}
+    </div>
+  );
 }
 
 export class McpSection extends React.Component<Props, State> {
@@ -90,6 +218,8 @@ export class McpSection extends React.Component<Props, State> {
       results: {},
       expanded: {},
       audit: [],
+      showAllActivity: false,
+      trayTurnedOn: false,
     };
   }
 
@@ -140,17 +270,34 @@ export class McpSection extends React.Component<Props, State> {
   /** Applies `change` to the file as it is now, so edits made elsewhere while the pane is
    * open aren't reverted. */
   _save(change: (policy: McpPolicy) => McpPolicy) {
-    if (this.state.policyError) return;
+    if (this.state.policyError) return false;
     const current = this._reloadPolicy();
-    if (!current) return;
+    if (!current) return false;
     try {
       writePolicy(configDir(), change(current));
     } catch (err) {
       this.setState({ policyError: err.message, policyErrorFile: policyPath(configDir()) });
-      return;
+      return false;
     }
     this._reloadPolicy();
+    return true;
   }
+
+  _isOn() {
+    return this.state.policy.enabled !== false;
+  }
+
+  /** Apps only reach mail while the engine runs, and off macOS the tray icon is what keeps
+   * Tern running once the window closes (product-model.md section 3). */
+  _onToggleAccess = (on: boolean) => {
+    if (!this._save((p) => ({ ...p, enabled: on }))) return;
+    if (on && !AppEnv.config.get('core.workspace.systemTray')) {
+      AppEnv.config.set('core.workspace.systemTray', true);
+      this.setState({ trayTurnedOn: true });
+    } else if (!on) {
+      this.setState({ trayTurnedOn: false });
+    }
+  };
 
   _onAccessLevel = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const accessLevel = event.target.value;
@@ -228,119 +375,211 @@ export class McpSection extends React.Component<Props, State> {
       result = {
         ok: run.ok,
         message,
+        connected: run.ok ? action === 'install' : null,
         canForce: !run.ok && action === 'install' && message.includes('--force'),
       };
     } catch (err) {
-      result = { ok: false, message: err.message, canForce: false };
+      result = { ok: false, message: err.message, connected: null, canForce: false };
     }
     if (!this._mounted) return;
     this.setState({ busyClient: null, results: { ...this.state.results, [client]: result } });
   };
 
-  _renderStatus() {
-    const { status, statusError } = this.state;
-    if (!ternMcpBinary()) {
-      return (
-        <p className="mcp-status">
-          {localized(
-            'tern-mcp is not in this build of Tern. Build it with `cargo build --release -p tern-mcp` and set TERN_MCP_BIN.'
-          )}
-        </p>
-      );
-    }
-    let text = localized('Checking…');
-    if (statusError) text = statusError;
-    if (status) {
-      const accounts = status.engines.reduce((n, e) => n + e.accounts.length, 0);
-      text =
-        status.engines.length === 0
-          ? localized('No engine running. Assistants can reach your mail while Tern is open.')
-          : localized('Engines found: %1$@, with %2$@ accounts.', status.engines.length, accounts);
-      if (status.policy?.error) text += ` ${status.policy.error}`;
-    }
+  _renderHero() {
+    const { policyError, trayTurnedOn } = this.state;
+    const on = this._isOn();
+    const label = localized('Let apps on this computer use Tern');
     return (
-      <div className="item mcp-status-row">
-        <span className="mcp-status">{text}</span>
-        <button className="btn btn-small" onClick={this._refreshStatus}>
-          {localized('Refresh')}
-        </button>
-      </div>
+      <>
+        <div className={classNames('agents-hero', { on })}>
+          <div>
+            <b>{label}</b>
+            <p>
+              {localized(
+                'Claude, Codex and other AI apps can read your mail and act on it, with the access you choose below.'
+              )}
+            </p>
+          </div>
+          <SettingsSwitch
+            checked={on && !policyError}
+            disabled={!!policyError}
+            label={label}
+            onChange={this._onToggleAccess}
+          />
+        </div>
+        {trayTurnedOn && (
+          <SettingsNote>
+            {process.platform === 'darwin'
+              ? localized('Tern now shows in the menu bar, so you can see that it is running.')
+              : localized(
+                  'Tern now keeps running in the system tray after you close the window, so apps keep working.'
+                )}{' '}
+            <a onClick={() => Actions.switchPreferencesTab('General')}>
+              {localized('Change in General')}
+            </a>
+          </SettingsNote>
+        )}
+      </>
     );
   }
 
-  _renderClients() {
-    const { busyClient, results } = this.state;
+  _lastUsed(client: McpClientId) {
+    return this.state.audit.find((e) => clientForEntry(e)?.id === client);
+  }
+
+  _renderClient({ id, name }: { id: McpClientId; name: string }) {
+    const { busyClient } = this.state;
+    const result = this.state.results[id];
     const available = !!ternMcpBinary();
-    return MCP_CLIENTS.map(({ id, name }) => {
-      const result = results[id];
-      return (
-        <div key={id} className="item mcp-client">
-          <span className="mcp-client-name">{name}</span>
-          <button
-            className="btn btn-small"
-            disabled={!available || !!busyClient}
-            onClick={() => this._onRunClient(id, 'install')}
-          >
-            {localized('Add')}
-          </button>
-          <button
-            className="btn btn-small"
-            disabled={!available || !!busyClient}
-            onClick={() => this._onRunClient(id, 'uninstall')}
-          >
-            {localized('Remove')}
-          </button>
-          {result?.canForce && (
-            <button
-              className="btn btn-small"
-              disabled={!!busyClient}
-              onClick={() => this._onRunClient(id, 'install', true)}
-            >
-              {localized('Replace It')}
-            </button>
-          )}
-          {result && (
-            <span className={`mcp-client-result ${result.ok ? 'ok' : 'failed'}`}>
-              {result.message}
-            </span>
-          )}
-        </div>
+    const lastUsed = this._lastUsed(id);
+    const connected = result?.connected ?? null;
+
+    let subtitle: React.ReactNode = lastUsed
+      ? localized('Used %@', formatTime(lastUsed.timestamp))
+      : localized('Not used yet');
+    if (result) {
+      subtitle = (
+        <span className={`agents-client-result ${result.ok ? 'ok' : 'failed'}`}>
+          {result.message}
+        </span>
       );
-    });
+    }
+
+    const disabled = !available || !!busyClient;
+    return (
+      <ProviderCard
+        key={id}
+        logo={<ProviderLogo {...CLIENT_LOGOS[id]} />}
+        title={name}
+        subtitle={subtitle}
+        status={
+          connected !== null && (
+            <StatusPill kind={connected ? 'ok' : 'off'}>
+              {connected ? localized('Connected') : localized('Not connected')}
+            </StatusPill>
+          )
+        }
+        actions={
+          <>
+            {result?.canForce && (
+              <button
+                className="btn"
+                disabled={!!busyClient}
+                onClick={() => this._onRunClient(id, 'install', true)}
+              >
+                {localized('Replace It')}
+              </button>
+            )}
+            {connected !== true && (
+              <button
+                className="btn"
+                disabled={disabled}
+                onClick={() => this._onRunClient(id, 'install')}
+              >
+                {localized('Connect')}
+              </button>
+            )}
+            {connected !== false && (
+              <button
+                className="btn"
+                disabled={disabled}
+                onClick={() => this._onRunClient(id, 'uninstall')}
+              >
+                {localized('Disconnect')}
+              </button>
+            )}
+          </>
+        }
+      />
+    );
+  }
+
+  _renderApps() {
+    return (
+      <SettingsSection
+        title={localized('Apps')}
+        note={
+          ternMcpBinary()
+            ? localized(
+                'Connecting adds Tern to the app’s own settings. Tern can’t tell whether an app is still connected after this window closes.'
+              )
+            : localized(
+                'This copy of Tern can’t connect apps because it doesn’t include the part that does it. Install Tern from the official download to use this.'
+              )
+        }
+      >
+        {MCP_CLIENTS.map((c) => this._renderClient(c))}
+      </SettingsSection>
+    );
+  }
+
+  _renderAccessLevel() {
+    const { policy } = this.state;
+    const known = ACCESS_LEVELS.includes(policy.accessLevel as AccessLevel);
+    const level = (known ? policy.accessLevel : 'read-only') as AccessLevel;
+    return (
+      <SettingsSection title={localized('What apps can do')}>
+        <SettingsRow
+          label={localized('Access')}
+          description={
+            localized(ACCESS_LEVEL_DESCRIPTIONS[level]) +
+            ' ' +
+            localized('Every connected app gets the same access.')
+          }
+        >
+          <select
+            id="mcp-access-level"
+            className="settings-select"
+            aria-label={localized('Access')}
+            value={policy.accessLevel}
+            onChange={this._onAccessLevel}
+          >
+            {!known && <option value={policy.accessLevel}>{localized('Read mail')}</option>}
+            {ACCESS_LEVELS.map((l) => (
+              <option key={l} value={l}>
+                {localized(ACCESS_LEVEL_LABELS[l])}
+              </option>
+            ))}
+          </select>
+        </SettingsRow>
+      </SettingsSection>
+    );
   }
 
   _renderAccount(account: Account) {
     const enabled = this._isAccountEnabled(account.id);
     const excluded = this.state.policy.enabledAccounts[account.id]?.excludedFolderIds || [];
-    const expanded = !!this.state.expanded[account.id];
-    const id = `mcp-account-${account.id}`;
+    const expanded = enabled && !!this.state.expanded[account.id];
+    const name = account.label || account.emailAddress;
+    let description: string = null;
+    if (enabled) {
+      description = excluded.length
+        ? localized('%@ folders hidden', excluded.length)
+        : localized('Every folder');
+    }
     return (
-      <div key={account.id} className="mcp-account">
-        <div className="item">
-          <input
-            id={id}
-            type="checkbox"
-            checked={enabled}
-            onChange={() => this._onToggleAccount(account.id)}
-          />
-          <label htmlFor={id}>{account.label || account.emailAddress}</label>
+      <React.Fragment key={account.id}>
+        <SettingsRow label={name} description={description}>
           {enabled && (
             <button
-              className="btn btn-small"
+              className="btn"
               onClick={() =>
                 this.setState({ expanded: { ...this.state.expanded, [account.id]: !expanded } })
               }
             >
-              {excluded.length
-                ? localized('Folders (%@ hidden)', excluded.length)
-                : localized('Folders')}
+              {expanded ? localized('Done') : localized('Choose folders')}
             </button>
           )}
-        </div>
-        {enabled && expanded && (
-          <div className="mcp-folders">
+          <SettingsSwitch
+            checked={enabled}
+            label={name}
+            onChange={() => this._onToggleAccount(account.id)}
+          />
+        </SettingsRow>
+        {expanded && (
+          <div className="agents-folders">
             {CategoryStore.categories(account.id).map((cat) => (
-              <label key={cat.id} className="mcp-folder">
+              <label key={cat.id} className="agents-folder">
                 <input
                   type="checkbox"
                   checked={!excluded.includes(cat.id)}
@@ -351,125 +590,233 @@ export class McpSection extends React.Component<Props, State> {
             ))}
           </div>
         )}
+      </React.Fragment>
+    );
+  }
+
+  _renderAccounts() {
+    const accounts = AccountStore.accounts();
+    return (
+      <SettingsSection title={localized('Mail apps can see')}>
+        {accounts.length === 0 ? (
+          <SettingsRow label={localized('No accounts yet')} />
+        ) : (
+          accounts.map((a) => this._renderAccount(a))
+        )}
+      </SettingsSection>
+    );
+  }
+
+  _renderActivityEntry(entry: AuditEntry, i: number) {
+    const client = clientForEntry(entry);
+    const who = client ? client.name : (entry.client || localized('An app')).split(' ')[0];
+    const what = TOOL_PHRASES[entry.toolName]
+      ? localized(TOOL_PHRASES[entry.toolName])
+      : localized('used %@', entry.toolName);
+    const outcome = entry.outcome || 'ok';
+    let detail: React.ReactNode = paramsText(entry.params);
+    if (outcome === 'denied') detail = localized('Blocked: %@', blockedText(entry));
+    if (outcome === 'error') detail = localized('Failed: %@', errorText(entry));
+    let summary = `${who} ${what}`;
+    if (outcome === 'denied') summary = localized('%@ was blocked', who);
+    if (outcome === 'error') summary = localized('%@ ran into a problem', who);
+    const logo = client ? CLIENT_LOGOS[client.id] : { text: who.slice(0, 1), color: '#5d6472' };
+    return (
+      <div key={i} className={`agents-activity outcome-${outcome}`}>
+        {outcome === 'ok' ? (
+          <span className="agents-activity-dot" style={{ background: logo.color }} aria-hidden>
+            {logo.text}
+          </span>
+        ) : (
+          <span className="agents-activity-dot bad" aria-hidden>
+            !
+          </span>
+        )}
+        <div className="agents-activity-text">
+          <b title={entry.toolName}>{summary}</b>
+          {detail && (
+            <small className="agents-activity-detail" title={entry.params}>
+              {detail}
+            </small>
+          )}
+        </div>
+        <time title={new Date(entry.timestamp).toLocaleString()}>
+          {formatTime(entry.timestamp)}
+        </time>
       </div>
     );
   }
 
-  _renderAudit() {
-    const { audit } = this.state;
+  _renderActivity() {
+    const { audit, showAllActivity } = this.state;
+    const shown = showAllActivity ? audit : audit.slice(0, ACTIVITY_SHOWN);
     return (
-      <div className="mcp-audit">
-        <div className="item mcp-audit-header">
-          <span>{localized('Recent activity')}</span>
-          <button className="btn btn-small" onClick={this._reloadAudit}>
+      <SettingsSection
+        title={localized('Activity')}
+        aside={
+          <a className="agents-refresh" onClick={this._reloadAudit}>
             {localized('Refresh')}
-          </button>
-        </div>
+          </a>
+        }
+        note={
+          audit.length > ACTIVITY_SHOWN && (
+            <a onClick={() => this.setState({ showAllActivity: !showAllActivity })}>
+              {showAllActivity ? localized('Show less') : localized('Show all activity')}
+            </a>
+          )
+        }
+      >
         {audit.length === 0 ? (
-          <p className="mcp-audit-empty">{localized('No tool calls recorded yet.')}</p>
+          <SettingsRow
+            label={localized('Nothing yet')}
+            description={localized('What apps do with your mail shows up here.')}
+          />
         ) : (
-          <table className="mcp-audit-table">
-            <tbody>
-              {audit.map((entry, i) => (
-                <tr key={i} className={`outcome-${entry.outcome || 'ok'}`}>
-                  <td title={new Date(entry.timestamp).toLocaleString()}>
-                    {formatTime(entry.timestamp)}
-                  </td>
-                  <td>{entry.toolName}</td>
-                  <td>{entry.outcome}</td>
-                  <td className="mcp-audit-params" title={entry.params}>
-                    {entry.resultSummary || entry.params}
-                  </td>
-                  <td>{entry.client}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          shown.map((e, i) => this._renderActivityEntry(e, i))
         )}
-      </div>
+      </SettingsSection>
+    );
+  }
+
+  _renderCommandLine() {
+    const tern = ternBinary();
+    return (
+      <SettingsSection title={localized('Command line')}>
+        <SettingsRow
+          label={localized('tern command')}
+          description={
+            tern
+              ? localized(
+                  'Search, read and send mail from the terminal and your own scripts. It comes with Tern, at %@, and the switch above doesn’t apply to it.',
+                  tern
+                )
+              : localized(
+                  'Search, read and send mail from the terminal and your own scripts. This copy of Tern doesn’t include it; the official download does.'
+                )
+          }
+        >
+          <StatusPill kind={tern ? 'ok' : 'off'}>
+            {tern ? localized('Included') : localized('Not included')}
+          </StatusPill>
+        </SettingsRow>
+      </SettingsSection>
+    );
+  }
+
+  _renderStatusRow() {
+    const { status, statusError } = this.state;
+    if (!ternMcpBinary()) {
+      return (
+        <SettingsRow
+          label={localized('Connection to your mail')}
+          description={localized(
+            'tern-mcp is not in this build of Tern. Build it with `cargo build --release -p tern-mcp` and set TERN_MCP_BIN.'
+          )}
+        />
+      );
+    }
+    let text = localized('Checking…');
+    if (statusError) text = statusError;
+    if (status) {
+      const accounts = status.engines.reduce((n, e) => n + e.accounts.length, 0);
+      if (status.engines.length === 0) {
+        text = localized("Apps can't reach your mail right now. They can while Tern is open.");
+      } else if (status.engines.length === 1) {
+        text = accounts
+          ? localized('Apps can reach %@ accounts.', accounts)
+          : localized('Tern is running, with no accounts apps can reach yet.');
+      } else {
+        text = localized(
+          '%1$@ copies of Tern are running, with %2$@ accounts.',
+          status.engines.length,
+          accounts
+        );
+      }
+      if (status.policy?.error) text += ` ${status.policy.error}`;
+    }
+    return (
+      <SettingsRow label={localized('Connection to your mail')} description={text}>
+        <button className="btn" onClick={this._refreshStatus}>
+          {localized('Check again')}
+        </button>
+      </SettingsRow>
+    );
+  }
+
+  _renderAdvanced() {
+    const { policy, policyError, portInput } = this.state;
+    const httpLabel = localized('Allow apps that connect over HTTP');
+    return (
+      <SettingsSection title={localized('Advanced')}>
+        {this._renderStatusRow()}
+        {!policyError && (
+          <>
+            <SettingsRow
+              label={httpLabel}
+              description={localized(
+                'For apps that can’t start Tern themselves. Only programs on this computer can connect.'
+              )}
+            >
+              <SettingsSwitch
+                checked={policy.http.enabled}
+                label={httpLabel}
+                onChange={this._onToggleHttp}
+              />
+            </SettingsRow>
+            {policy.http.enabled && (
+              <SettingsRow
+                label={localized('Port')}
+                description={localized(
+                  'Start the server with `tern-mcp http`. Apps send the access key in %@.',
+                  path.join(configDir(), TOKEN_FILE)
+                )}
+              >
+                <input
+                  id="mcp-http-port"
+                  className="agents-port"
+                  type="text"
+                  inputMode="numeric"
+                  aria-label={localized('Port')}
+                  value={portInput}
+                  onChange={(e) => this.setState({ portInput: e.target.value })}
+                  onBlur={this._onCommitPort}
+                  onKeyDown={(e) => e.key === 'Enter' && this._onCommitPort()}
+                />
+              </SettingsRow>
+            )}
+          </>
+        )}
+      </SettingsSection>
     );
   }
 
   render() {
-    const { policy, policyError, policyErrorFile, portInput } = this.state;
-    const dir = configDir();
+    const { policyError, policyErrorFile } = this.state;
+    const off = !this._isOn();
     return (
-      <section className="integrations-section integrations-mcp">
-        <h6>{localized('AI assistants')}</h6>
-        <p className="integrations-privacy">
-          {localized(
-            'Claude, Codex and other MCP clients can use your mail through tern-mcp, with the access you choose here. Each tool call is logged below.'
-          )}
-        </p>
-        {this._renderStatus()}
-        {this._renderClients()}
-        {policyError ? (
-          <p className="integrations-status">
-            {localized(
-              '%1$@ is not valid (%2$@). Fix or delete it.',
-              policyErrorFile || policyPath(dir),
-              policyError
-            )}
-          </p>
-        ) : (
-          <>
-            <div className="item integrations-field">
-              <label htmlFor="mcp-access-level">{localized('Access')}:</label>
-              <select
-                id="mcp-access-level"
-                value={policy.accessLevel}
-                onChange={this._onAccessLevel}
-              >
-                {!ACCESS_LEVELS.includes(policy.accessLevel as any) && (
-                  <option value={policy.accessLevel}>{localized('Read only')}</option>
-                )}
-                {ACCESS_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {localized(ACCESS_LEVEL_LABELS[level])}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mcp-accounts">
-              {AccountStore.accounts().map((a) => this._renderAccount(a))}
-            </div>
-            <div className="item">
-              <input
-                id="mcp-http-enabled"
-                type="checkbox"
-                checked={policy.http.enabled}
-                onChange={this._onToggleHttp}
-              />
-              <label htmlFor="mcp-http-enabled">
-                {localized('Allow HTTP clients on 127.0.0.1')}
-              </label>
-            </div>
-            {policy.http.enabled && (
-              <>
-                <div className="item integrations-field">
-                  <label htmlFor="mcp-http-port">{localized('Port')}:</label>
-                  <input
-                    id="mcp-http-port"
-                    type="text"
-                    inputMode="numeric"
-                    value={portInput}
-                    onChange={(e) => this.setState({ portInput: e.target.value })}
-                    onBlur={this._onCommitPort}
-                    onKeyDown={(e) => e.key === 'Enter' && this._onCommitPort()}
-                  />
-                </div>
-                <p className="integrations-privacy">
-                  {localized(
-                    'Start the server with `tern-mcp http`. Clients send the bearer token in %@.',
-                    path.join(dir, TOKEN_FILE)
-                  )}
-                </p>
-              </>
-            )}
-          </>
+      <div className="agents-section">
+        {this._renderHero()}
+        {policyError && (
+          <SettingsSection danger>
+            <SettingsRow
+              label={localized('Tern can’t read the settings for apps')}
+              description={localized(
+                '%1$@ is not valid (%2$@). Fix or delete it.',
+                policyErrorFile || policyPath(configDir()),
+                policyError
+              )}
+            />
+          </SettingsSection>
         )}
-        {this._renderAudit()}
-      </section>
+        <Dimmed off={off}>
+          {this._renderApps()}
+          {!policyError && this._renderAccessLevel()}
+          {!policyError && this._renderAccounts()}
+          {this._renderActivity()}
+        </Dimmed>
+        {this._renderCommandLine()}
+        <Dimmed off={off}>{this._renderAdvanced()}</Dimmed>
+      </div>
     );
   }
 }

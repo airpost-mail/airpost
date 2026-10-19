@@ -12,10 +12,24 @@ import {
   AiProvider,
   AiProviderKind,
   AiSettings,
+  AiUsageRow,
   Engine,
 } from 'mailspring-exports';
 import {
-  destinationNote,
+  SettingsPage,
+  SettingsSection,
+  SettingsCard,
+  SettingsNote,
+  SettingsRow,
+  SettingsSwitch,
+  SettingsField,
+  StatusPill,
+  StatusKind,
+  ProviderCard,
+  ProviderLogo,
+  PrivacyNote,
+} from 'mailspring-component-kit';
+import {
   errorMessage,
   forgetKey,
   hasSavedKey,
@@ -32,14 +46,37 @@ import { TRIAGE_ENGINE_FEATURE, TriageRun, triageInbox } from './triage';
 
 const KIND_ORDER: AiProviderKind[] = ['anthropic', 'openai', 'ollama'];
 
+const LOGO_COLORS: { [kind in AiProviderKind]: string } = {
+  anthropic: '#c96442',
+  openai: '#10a37f',
+  ollama: '#3a3d45',
+};
+
 const FEATURES: {
   feature: AiFeature;
   label: () => string;
+  description: () => string;
   capability: 'ai-summary' | 'ai-reply' | 'ai-triage';
 }[] = [
-  { feature: 'summary', label: () => localized('Thread summaries'), capability: 'ai-summary' },
-  { feature: 'reply', label: () => localized('Reply suggestions'), capability: 'ai-reply' },
-  { feature: 'triage', label: () => localized('Inbox triage'), capability: 'ai-triage' },
+  {
+    feature: 'summary',
+    label: () => localized('Thread summaries'),
+    description: () => localized('A Summarize button above long threads.'),
+    capability: 'ai-summary',
+  },
+  {
+    feature: 'reply',
+    label: () => localized('Reply suggestions'),
+    description: () => localized('Suggested replies, or a draft written from a few words.'),
+    capability: 'ai-reply',
+  },
+  {
+    feature: 'triage',
+    label: () => localized('Inbox sorting'),
+    description: () =>
+      localized('Tags new inbox mail as Needs reply, Important, Newsletter and so on.'),
+    capability: 'ai-triage',
+  },
 ];
 
 function urlPlaceholder(kind: AiProviderKind) {
@@ -56,6 +93,36 @@ function serverOf(provider: AiProvider) {
   }
 }
 
+/** Where the provider runs, in words: "On this computer", a host on the network, or a host. */
+function placeOf(provider: AiProvider) {
+  if (AI.isLoopback(provider)) return localized('On this computer');
+  const host = AI.hostOf(provider) || AI.KINDS[provider.kind].name;
+  return AI.isLocal(provider) ? localized('%@ on your network', host) : host;
+}
+
+function PrivacyFor({ provider }: { provider: AiProvider }) {
+  if (AI.isLoopback(provider)) {
+    return <PrivacyNote kind="local">{localized('Mail stays on this computer.')}</PrivacyNote>;
+  }
+  const host = AI.hostOf(provider) || AI.providerName(provider);
+  const where = AI.isLocal(provider)
+    ? localized(
+        'The parts of mail listed under "What is sent to the model" go to %@ on your network when you use a feature.',
+        host
+      )
+    : localized(
+        'The parts of mail listed under "What is sent to the model" go to %@ when you use a feature.',
+        host
+      );
+  return (
+    <PrivacyNote kind="network">
+      {where}
+      {provider.kind !== 'ollama' &&
+        ` ${localized('The key is stored encrypted, like your passwords.')}`}
+    </PrivacyNote>
+  );
+}
+
 interface ProviderProps {
   provider: AiProvider;
   onChange: (provider: AiProvider) => void;
@@ -64,8 +131,11 @@ interface ProviderProps {
 
 interface ProviderState {
   draft: AiProvider;
+  open: boolean;
   keyInput: string;
   hasKey: boolean;
+  /** Whether hasKey was read; unknown while the engine is not connected. */
+  keyKnown: boolean;
   /** Why the saved key went away, shown until a key is saved again. */
   keyNotice: string;
   models: AiModelInfo[];
@@ -86,8 +156,11 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     super(props);
     this.state = {
       draft: props.provider,
+      // A provider just added has no model yet and opens to be set up.
+      open: !props.provider.model,
       keyInput: '',
       hasKey: false,
+      keyKnown: false,
       keyNotice: '',
       models: [],
       loadingModels: false,
@@ -121,12 +194,14 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
 
   _loadKeyPresence = async () => {
     let hasKey = false;
+    let keyKnown = true;
     try {
       hasKey = await hasSavedKey(this.props.provider.id);
     } catch (err) {
-      // Unknown: offer Save Key, not Forget Key.
+      // Unknown: offer Save key, not Forget key.
+      keyKnown = false;
     }
-    if (this._mounted) this.setState({ hasKey });
+    if (this._mounted) this.setState({ hasKey, keyKnown });
   };
 
   _keyFailed(err: any) {
@@ -189,7 +264,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     this.setState({ keyInput: event.target.value, testResult: null });
   };
 
-  /** Saves the typed key on Save Key or Enter only, never on blur: Test must not store a key
+  /** Saves the typed key on Save key or Enter only, never on blur: Test must not store a key
    * before it was tested. */
   _onSaveKey = async () => {
     const value = this.state.keyInput.trim();
@@ -201,7 +276,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
       return;
     }
     if (this._mounted && this.state.keyInput.trim() === value) {
-      this.setState({ keyInput: '', hasKey: true, keyNotice: '' });
+      this.setState({ keyInput: '', hasKey: true, keyKnown: true, keyNotice: '' });
     }
   };
 
@@ -270,23 +345,30 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     }
   };
 
-  _renderText(field: 'name' | 'url' | 'model', label: string, placeholder: string, list?: string) {
-    const value = this.state.draft[field];
+  _status(): [StatusKind, string] | null {
+    const { draft, hasKey, keyKnown, testResult, modelsError } = this.state;
+    if ((testResult && !testResult.ok) || modelsError) return ['bad', localized('Error')];
+    if (AI.keyRequired(draft) && !hasKey) {
+      return keyKnown ? ['warn', localized('Needs a key')] : null;
+    }
+    if (!(draft.model || '').trim()) return ['warn', localized('Needs a model')];
+    return ['ok', localized('Ready')];
+  }
+
+  _renderText(field: 'name' | 'url', label: string, placeholder: string) {
     return (
-      <div className="item ai-field">
-        <label htmlFor={this._id(field)}>{label}:</label>
+      <SettingsField label={label} htmlFor={this._id(field)}>
         <input
           id={this._id(field)}
           type={field === 'url' ? 'url' : 'text'}
           spellCheck={false}
-          value={value || ''}
+          value={this.state.draft[field] || ''}
           placeholder={placeholder}
-          list={list}
           onChange={this._onChangeField(field)}
           onBlur={this._onCommit}
           onKeyDown={(e) => e.key === 'Enter' && this._onCommit()}
         />
-      </div>
+      </SettingsField>
     );
   }
 
@@ -295,56 +377,66 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     let placeholder = AI.keyRequired(draft) ? localized('Required') : localized('Optional');
     if (hasKey) placeholder = localized('Saved. Type a new key to replace it.');
     return (
-      <div className="item ai-field">
-        <label htmlFor={this._id('key')}>{localized('API key')}:</label>
-        <input
-          id={this._id('key')}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={keyInput}
-          placeholder={placeholder}
-          onChange={this._onChangeKey}
-          onKeyDown={(e) => e.key === 'Enter' && this._onSaveKey()}
-        />
-        {!!keyInput.trim() && (
-          <button className="btn btn-small" onClick={this._onSaveKey}>
-            {localized('Save Key')}
-          </button>
-        )}
-        {hasKey && !keyInput && (
-          <button className="btn btn-small" onClick={this._onForgetKey}>
-            {localized('Forget Key')}
-          </button>
-        )}
-        {keyNotice && <span className="ai-key-notice">{keyNotice}</span>}
-      </div>
+      <SettingsField label={localized('API key')} htmlFor={this._id('key')}>
+        <div className="ai-inline">
+          <input
+            id={this._id('key')}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={keyInput}
+            placeholder={placeholder}
+            onChange={this._onChangeKey}
+            onKeyDown={(e) => e.key === 'Enter' && this._onSaveKey()}
+          />
+          {!!keyInput.trim() && (
+            <button className="btn btn-emphasis" onClick={this._onSaveKey}>
+              {localized('Save key')}
+            </button>
+          )}
+          {hasKey && !keyInput && (
+            <button className="btn" onClick={this._onForgetKey}>
+              {localized('Forget key')}
+            </button>
+          )}
+        </div>
+        {keyNotice && <div className="ai-field-note">{keyNotice}</div>}
+      </SettingsField>
     );
   }
 
-  render() {
-    const { draft, models, loadingModels, modelsError, testing, testResult } = this.state;
+  _renderModel() {
+    const { draft, models, loadingModels } = this.state;
     const modelsList = this._id('models');
     return (
-      <section className={`ai-provider ai-provider-${draft.kind}`}>
-        <h6>
-          {AI.providerName(draft)}
-          <span className="ai-provider-kind">{AI.KINDS[draft.kind].name}</span>
-        </h6>
-        {this._renderText('name', localized('Name'), AI.KINDS[draft.kind].name)}
-        {this._renderText('url', localized('Server URL'), urlPlaceholder(draft.kind))}
-        {draft.kind !== 'ollama' && this._renderKey()}
-        {this._renderText('model', localized('Model'), localized('Required'), modelsList)}
-        <datalist id={modelsList}>
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </datalist>
+      <>
+        <SettingsField label={localized('Model')} htmlFor={this._id('model')}>
+          <div className="ai-inline">
+            <input
+              id={this._id('model')}
+              type="text"
+              spellCheck={false}
+              value={draft.model || ''}
+              placeholder={localized('Required')}
+              list={modelsList}
+              onChange={this._onChangeField('model')}
+              onBlur={this._onCommit}
+              onKeyDown={(e) => e.key === 'Enter' && this._onCommit()}
+            />
+            <button className="btn" onClick={this._onLoadModels} disabled={loadingModels}>
+              {loadingModels ? localized('Loading…') : localized('Load models')}
+            </button>
+          </div>
+          <datalist id={modelsList}>
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </datalist>
+        </SettingsField>
         {models.length > 0 && (
-          <div className="item ai-field">
-            <label htmlFor={this._id('model-picker')}>{localized('Available models')}:</label>
+          <SettingsField label={localized('Available models')} htmlFor={this._id('model-picker')}>
             <select id={this._id('model-picker')} value={draft.model} onChange={this._onPickModel}>
               <option value="">{localized('Choose…')}</option>
               {models.map((m) => (
@@ -353,41 +445,67 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
                 </option>
               ))}
             </select>
-          </div>
+          </SettingsField>
         )}
-        <div className="item ai-field">
-          <label htmlFor={this._id('contextTokens')}>{localized('Context window')}:</label>
-          <input
-            id={this._id('contextTokens')}
-            type="number"
-            min={1024}
-            step={1024}
-            value={draft.contextTokens || ''}
-            placeholder={draft.kind === 'ollama' ? '8192' : '16384'}
-            onChange={this._onChangeField('contextTokens')}
-            onBlur={this._onCommit}
+      </>
+    );
+  }
+
+  render() {
+    const { draft, open, modelsError, testing, testResult } = this.state;
+    const status = this._status();
+    const model = (this.props.provider.model || '').trim();
+    return (
+      <ProviderCard
+        logo={
+          <ProviderLogo
+            text={AI.providerName(draft).charAt(0).toUpperCase()}
+            color={LOGO_COLORS[draft.kind]}
           />
-          <span className="ai-field-unit">{localized('tokens')}</span>
-        </div>
-        <div className="item ai-actions">
-          <button className="btn" onClick={this._onLoadModels} disabled={loadingModels}>
-            {loadingModels ? localized('Loading…') : localized('Load Models')}
-          </button>
+        }
+        title={AI.providerName(draft)}
+        subtitle={model ? `${placeOf(draft)} · ${model}` : placeOf(draft)}
+        status={status && <StatusPill kind={status[0]}>{status[1]}</StatusPill>}
+        open={open}
+        onToggle={(next) => this.setState({ open: next })}
+      >
+        {this._renderText('name', localized('Name'), AI.KINDS[draft.kind].name)}
+        {this._renderText('url', localized('Address'), urlPlaceholder(draft.kind))}
+        {draft.kind !== 'ollama' && this._renderKey()}
+        {this._renderModel()}
+        <SettingsField label={localized('Context window')} htmlFor={this._id('contextTokens')}>
+          <div className="ai-inline">
+            <input
+              id={this._id('contextTokens')}
+              className="ai-tokens"
+              type="number"
+              min={1024}
+              step={1024}
+              value={draft.contextTokens || ''}
+              placeholder={draft.kind === 'ollama' ? '8192' : '16384'}
+              onChange={this._onChangeField('contextTokens')}
+              onBlur={this._onCommit}
+            />
+            <span className="ai-field-unit">{localized('tokens')}</span>
+          </div>
+        </SettingsField>
+        <div className="settings-actions">
           <button className="btn" onClick={this._onTest} disabled={testing}>
             {testing ? localized('Testing…') : localized('Test')}
           </button>
-          <button className="btn" onClick={this.props.onRemove}>
-            {localized('Remove')}
-          </button>
-          {modelsError && <span className="ai-test-result failed">{modelsError}</span>}
+          {modelsError && <span className="ai-result failed">{modelsError}</span>}
           {testResult && (
-            <span className={`ai-test-result ${testResult.ok ? 'ok' : 'failed'}`}>
+            <span className={`ai-result ${testResult.ok ? 'ok' : 'failed'}`}>
               {testResult.message}
             </span>
           )}
+          <span className="spacer" />
+          <button className="btn btn-danger" onClick={this.props.onRemove}>
+            {localized('Remove')}
+          </button>
         </div>
-        <p className="ai-privacy">{destinationNote(draft)}</p>
-      </section>
+        <PrivacyFor provider={draft} />
+      </ProviderCard>
     );
   }
 }
@@ -401,36 +519,71 @@ interface TriageProgress {
 
 interface State {
   settings: AiSettings;
-  /** "Triage inbox" by account id. */
+  /** "Sort now" by account id. */
   triage: { [accountId: string]: TriageProgress };
+  /** `ai.usage` for the last 7 days; null when the engine doesn't keep it. */
+  usage: AiUsageRow[] | null;
+  showSent: boolean;
+}
+
+/** The local day as the engine keys usage: YYYY-MM-DD. */
+function dayKey(date: Date) {
+  const pad = (n: number) => `${n}`.padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** `core.ai.limits.dailyTokens`, set with `tern settings set`; the engine enforces it. */
+function dailyCap(providerId: string): number | null {
+  const caps = AppEnv.config.get('core.ai.limits.dailyTokens');
+  const cap = caps && typeof caps === 'object' ? caps[providerId] : undefined;
+  return typeof cap === 'number' && cap > 0 ? cap : null;
 }
 
 export default class PreferencesAI extends React.Component<Record<string, unknown>, State> {
   static displayName = 'PreferencesAI';
 
+  _mounted = false;
   _unlisten: Array<() => void> = [];
 
-  state: State = { settings: AI.readSettings(), triage: {} };
+  state: State = { settings: AI.readSettings(), triage: {}, usage: null, showSent: false };
 
   _runs = new Map<string, TriageRun>();
 
   componentDidMount() {
+    this._mounted = true;
     const config = AppEnv.config.onDidChange(AI.CONFIG_KEY, () =>
       this.setState({ settings: AI.readSettings() })
     );
+    Engine.events.on('connected', this._loadUsage);
     this._unlisten = [
       () => config.dispose(),
+      () => Engine.events.removeListener('connected', this._loadUsage),
       CapabilityStore.listen(() => this.forceUpdate()),
       AccountStore.listen(() => this.forceUpdate()),
     ];
+    this._loadUsage();
   }
 
   componentWillUnmount() {
+    this._mounted = false;
     for (const unlisten of this._unlisten) unlisten();
     // A job runs on in the engine; only its progress stops showing.
     for (const run of this._runs.values()) run.dispose();
     this._runs.clear();
   }
+
+  // The engine answers ai.usage only with its settings store, which comes with ai-triage.
+  _loadUsage = async () => {
+    if (!Engine.has(TRIAGE_ENGINE_FEATURE)) return;
+    let rows: AiUsageRow[] | null = null;
+    try {
+      const reply = await Engine.request<AiUsageRow[]>('ai.usage', { days: 7 });
+      if (Array.isArray(reply)) rows = reply;
+    } catch (err) {
+      // No usage to show.
+    }
+    if (this._mounted && rows) this.setState({ usage: rows });
+  };
 
   _setTriage(accountId: string, next: (current: TriageProgress) => TriageProgress) {
     if (!this._runs.has(accountId)) return;
@@ -562,14 +715,38 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
   _renderProviders() {
     const { providers } = this.state.settings;
     return (
-      <section className="ai-section ai-providers">
-        <h6>{localized('Models')}</h6>
+      <SettingsSection
+        title={localized('Models')}
+        note={
+          <div className="ai-add-model">
+            <select
+              id="ai-add-provider"
+              className="settings-select"
+              aria-label={localized('Add a model')}
+              value=""
+              onChange={this._onAddProvider}
+            >
+              <option value="">{localized('+ Add a model')}</option>
+              {KIND_ORDER.map((kind) => (
+                <option key={kind} value={kind}>
+                  {AI.KINDS[kind].name}
+                </option>
+              ))}
+            </select>
+            <span>
+              {localized(
+                'Anthropic, OpenAI, any OpenAI-compatible server like LM Studio, or Ollama'
+              )}
+            </span>
+          </div>
+        }
+      >
         {providers.length === 0 && (
-          <p>
+          <div className="ai-empty">
             {localized(
-              'Add a provider: a cloud API with your own key, or a model running on this computer with Ollama, LM Studio or llama.cpp.'
+              'No model yet. Add a cloud model with your own API key, or one that runs on this computer with Ollama, LM Studio or llama.cpp.'
             )}
-          </p>
+          </div>
         )}
         {providers.map((p) => (
           <ProviderSection
@@ -579,210 +756,295 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
             onRemove={() => this._onRemoveProvider(p)}
           />
         ))}
-        <div className="item ai-field">
-          <label htmlFor="ai-add-provider">{localized('Add provider')}:</label>
-          <select id="ai-add-provider" value="" onChange={this._onAddProvider}>
-            <option value="">{localized('Choose…')}</option>
-            {KIND_ORDER.map((kind) => (
-              <option key={kind} value={kind}>
-                {AI.KINDS[kind].name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
+      </SettingsSection>
     );
   }
 
   _renderFeatures() {
     const { settings } = this.state;
     return (
-      <section className="ai-section ai-features">
-        <h6>{localized('Features')}</h6>
-        {FEATURES.map(({ feature, label, capability }) => {
+      <SettingsSection title={localized('Features')}>
+        {FEATURES.map(({ feature, label, description, capability }) => {
           const f = settings.features[feature];
           const status = CapabilityStore.get(capability);
           return (
-            <div key={feature} className="ai-feature">
-              <div className="item ai-field">
-                <input
-                  id={`ai-feature-${feature}`}
-                  type="checkbox"
-                  checked={f.enabled}
-                  onChange={() => this._onToggleFeature(feature)}
-                />
-                <label htmlFor={`ai-feature-${feature}`}>{label()}</label>
-                <select
-                  id={`ai-feature-${feature}-provider`}
-                  aria-label={localized('Model for %@', label())}
-                  value={f.provider || ''}
-                  onChange={(e) => this._onFeatureProvider(feature, e.target.value)}
-                >
-                  <option value="">{localized('No model')}</option>
-                  {settings.providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.model ? `${AI.providerName(p)}: ${p.model}` : AI.providerName(p)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {f.enabled && !status.available && status.reason && (
-                <p className="ai-status">{status.reason}.</p>
-              )}
-            </div>
+            <SettingsRow
+              key={feature}
+              label={label()}
+              description={
+                <>
+                  {description()}
+                  {f.enabled && !status.available && status.reason && (
+                    <span className="ai-status">{status.reason}.</span>
+                  )}
+                </>
+              }
+            >
+              <select
+                id={`ai-feature-${feature}-provider`}
+                className="settings-select"
+                aria-label={localized('Model for %@', label())}
+                value={f.provider || ''}
+                onChange={(e) => this._onFeatureProvider(feature, e.target.value)}
+              >
+                <option value="">{localized('No model')}</option>
+                {settings.providers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.model ? `${AI.providerName(p)}: ${p.model}` : AI.providerName(p)}
+                  </option>
+                ))}
+              </select>
+              <SettingsSwitch
+                checked={f.enabled}
+                label={label()}
+                onChange={() => this._onToggleFeature(feature)}
+              />
+            </SettingsRow>
           );
         })}
-      </section>
+        {this._renderTriageRows()}
+      </SettingsSection>
     );
   }
 
-  _renderTriage() {
+  _renderTriageRows() {
     const { settings, triage } = this.state;
     if (!settings.features.triage.enabled || !Engine.has(TRIAGE_ENGINE_FEATURE)) return null;
     const accounts = AccountStore.accounts().filter((a) => settings.accounts.includes(a.id));
-    return (
-      <section className="ai-section ai-triage">
-        <h6>{localized('Triage')}</h6>
-        <p>
-          {localized(
-            'New mail in the inbox of the accounts below is sorted as it arrives. Threads that need a reply or look important get a chip in the list; click it to change the category.'
+    return accounts.map((account) => {
+      const progress = triage[account.id];
+      let progressText = '';
+      if (progress) {
+        progressText =
+          progress.error ||
+          (progress.running
+            ? localized('%1$@ of %2$@', `${progress.done}`, `${progress.total}`)
+            : localized('%@ threads sorted', `${progress.done}`));
+      }
+      return (
+        <SettingsRow
+          key={`triage-${account.id}`}
+          className="ai-triage-account"
+          label={
+            accounts.length > 1
+              ? localized('Sort the last 7 days in %@', account.emailAddress)
+              : localized('Sort the last 7 days')
+          }
+          description={localized(
+            'One pass over inbox mail that arrived before you turned sorting on. Your own changes are kept.'
           )}
-        </p>
-        {accounts.map((account) => {
-          const progress = triage[account.id];
-          return (
-            <div key={account.id} className="item ai-field ai-triage-account">
-              <label>{account.emailAddress}</label>
-              {progress && progress.running ? (
-                <button className="btn" onClick={() => this._onStopTriage(account.id)}>
-                  {localized('Stop')}
-                </button>
-              ) : (
-                <button className="btn" onClick={() => this._onTriageInbox(account.id)}>
-                  {localized('Triage inbox')}
-                </button>
-              )}
-              {progress && (
-                <span className="ai-triage-progress">
-                  {progress.error ||
-                    (progress.running
-                      ? localized('%1$@ of %2$@', `${progress.done}`, `${progress.total}`)
-                      : localized('%@ threads triaged', `${progress.done}`))}
-                </span>
-              )}
-            </div>
-          );
-        })}
-        <p className="ai-hint">
-          {localized(
-            'Triage inbox sorts the inbox threads of the last 7 days. Your own changes are kept.'
+        >
+          {progressText && <span className="ai-triage-progress">{progressText}</span>}
+          {progress && progress.running ? (
+            <button className="btn" onClick={() => this._onStopTriage(account.id)}>
+              {localized('Stop')}
+            </button>
+          ) : (
+            <button className="btn" onClick={() => this._onTriageInbox(account.id)}>
+              {localized('Sort now')}
+            </button>
           )}
-        </p>
-      </section>
-    );
+        </SettingsRow>
+      );
+    });
   }
 
   _renderAccounts() {
     const { settings } = this.state;
-    const accounts = AccountStore.accounts();
     return (
-      <section className="ai-section ai-accounts">
-        <h6>{localized('Accounts')}</h6>
-        <p>{localized('Mail is only sent to a model from the accounts you turn on here.')}</p>
-        {accounts.map((account) => (
-          <div key={account.id} className="item">
-            <input
-              id={`ai-account-${account.id}`}
-              type="checkbox"
-              checked={settings.accounts.includes(account.id)}
-              onChange={() => this._onToggleAccount(account.id)}
-            />
-            <label htmlFor={`ai-account-${account.id}`}>
-              {account.label && account.label !== account.emailAddress
-                ? `${account.label} (${account.emailAddress})`
-                : account.emailAddress}
-            </label>
-          </div>
-        ))}
-        <div className="item">
-          <input
-            id="ai-include-addresses"
-            type="checkbox"
-            checked={settings.includeAddresses}
-            onChange={this._onToggleAddresses}
-          />
-          <label htmlFor="ai-include-addresses">{localized('Include email addresses')}</label>
-        </div>
-        <p className="ai-hint">
-          {localized(
+      <SettingsSection
+        title={localized('Which mail')}
+        note={localized(
+          'Mail is only sent to a model from the accounts you turn on here, and only for the features you turn on.'
+        )}
+      >
+        {AccountStore.accounts().map((account) => {
+          const named = account.label && account.label !== account.emailAddress;
+          const name = named ? account.label : account.emailAddress;
+          return (
+            <SettingsRow
+              key={account.id}
+              label={name}
+              description={named ? account.emailAddress : undefined}
+            >
+              <SettingsSwitch
+                checked={settings.accounts.includes(account.id)}
+                label={name}
+                onChange={() => this._onToggleAccount(account.id)}
+              />
+            </SettingsRow>
+          );
+        })}
+        <SettingsRow
+          label={localized('Include email addresses')}
+          description={localized(
             'Off: the model sees names instead of email addresses, in the people list and in the text.'
           )}
-        </p>
-      </section>
+        >
+          <SettingsSwitch
+            checked={settings.includeAddresses}
+            label={localized('Include email addresses')}
+            onChange={this._onToggleAddresses}
+          />
+        </SettingsRow>
+      </SettingsSection>
     );
   }
 
-  _renderPrivacy() {
+  _renderUsage() {
+    const { usage, settings } = this.state;
+    if (!usage) return null;
+    const today = dayKey(new Date());
+    const days: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(dayKey(d));
+    }
+    const tokensByDay = new Map<string, number>();
+    const byProvider = new Map<string, { tokens: number; requests: number }>();
+    let requests = 0;
+    let tokens = 0;
+    for (const r of usage) {
+      const t = r.inputTokens + r.outputTokens;
+      tokensByDay.set(r.day, (tokensByDay.get(r.day) || 0) + t);
+      if (r.day !== today) continue;
+      requests += r.requests;
+      tokens += t;
+      const p = byProvider.get(r.provider) || { tokens: 0, requests: 0 };
+      p.tokens += t;
+      p.requests += r.requests;
+      byProvider.set(r.provider, p);
+    }
+    const peak = Math.max(1, ...days.map((d) => tokensByDay.get(d) || 0));
+    const nameOf = (id: string) => {
+      const provider = settings.providers.find((p) => p.id === id);
+      return provider ? AI.providerName(provider) : id;
+    };
+    // Providers with a cap show it even before their first request of the day.
+    for (const p of settings.providers) {
+      if (dailyCap(p.id) && !byProvider.has(p.id)) byProvider.set(p.id, { tokens: 0, requests: 0 });
+    }
+    const perProvider = [...byProvider].map(([id, p]) => {
+      const cap = dailyCap(id);
+      return cap
+        ? localized(
+            '%1$@: %2$@ of %3$@ tokens a day.',
+            nameOf(id),
+            p.tokens.toLocaleString(),
+            cap.toLocaleString()
+          )
+        : localized('%1$@: %2$@ tokens.', nameOf(id), p.tokens.toLocaleString());
+    });
     return (
-      <section className="ai-section ai-privacy-table">
-        <h6>{localized('What is sent')}</h6>
-        <table>
-          <thead>
-            <tr>
-              <th>{localized('Feature')}</th>
-              <th>{localized('What leaves Tern')}</th>
-              <th>{localized('When')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>{localized('Summary')}</td>
-              <td>
-                {localized(
-                  "The thread's subject, sender names, dates and the plain text of its messages, without quoted replies and signatures"
-                )}
-              </td>
-              <td>{localized('When you click Summarize')}</td>
-            </tr>
-            <tr>
-              <td>{localized('Reply suggestions')}</td>
-              <td>{localized('The same, plus what you ask for and your name')}</td>
-              <td>{localized('When you click Get Suggestions or Write, or pick a suggestion')}</td>
-            </tr>
-            <tr>
-              <td>{localized('Inbox triage')}</td>
-              <td>
-                {localized(
-                  "The subject, sender names and the plain text of the thread's newest message you received"
-                )}
-              </td>
-              <td>{localized('When new mail arrives in the inbox, or you click Triage inbox')}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p className="ai-hint">
-          {localized(
-            'Mail goes from this computer to the model you chose, and nowhere else. Attachments are never sent, only their file names. Spam, Trash, drafts and encrypted messages are always left out. Summaries are kept in memory only, and triage results on this computer only.'
+      <SettingsSection title={localized('Usage today')}>
+        <SettingsRow
+          label={localized(
+            '%1$@ requests · %2$@ tokens',
+            requests.toLocaleString(),
+            tokens.toLocaleString()
           )}
-        </p>
-      </section>
+          description={perProvider.length ? perProvider.join(' ') : undefined}
+        >
+          <div className="ai-usage-bars" aria-label={localized('Tokens a day, last 7 days')}>
+            {days.map((d) => (
+              <i
+                key={d}
+                title={`${d}: ${(tokensByDay.get(d) || 0).toLocaleString()}`}
+                style={{ height: `${Math.max(6, ((tokensByDay.get(d) || 0) / peak) * 100)}%` }}
+              />
+            ))}
+          </div>
+        </SettingsRow>
+      </SettingsSection>
+    );
+  }
+
+  _renderSent() {
+    const { showSent } = this.state;
+    return (
+      <SettingsSection
+        bare
+        className="ai-sent"
+        title={
+          <button
+            className="ai-disclosure"
+            aria-expanded={showSent}
+            onClick={() => this.setState({ showSent: !showSent })}
+          >
+            <span className="settings-chevron" aria-hidden />
+            {localized('What is sent to the model')}
+          </button>
+        }
+      >
+        {showSent && (
+          <>
+            <SettingsCard>
+              <table className="ai-sent-table">
+                <thead>
+                  <tr>
+                    <th>{localized('Feature')}</th>
+                    <th>{localized('What leaves Tern')}</th>
+                    <th>{localized('When')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{localized('Summary')}</td>
+                    <td>
+                      {localized(
+                        "The thread's subject, sender names, dates and the plain text of its messages, without quoted replies and signatures"
+                      )}
+                    </td>
+                    <td>{localized('When you click Summarize')}</td>
+                  </tr>
+                  <tr>
+                    <td>{localized('Reply suggestions')}</td>
+                    <td>{localized('The same, plus what you ask for and your name')}</td>
+                    <td>
+                      {localized('When you click Get Suggestions or Write, or pick a suggestion')}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>{localized('Inbox sorting')}</td>
+                    <td>
+                      {localized(
+                        "The subject, sender names and the plain text of the thread's newest message you received"
+                      )}
+                    </td>
+                    <td>
+                      {localized('When new mail arrives in the inbox, or you click Sort now')}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </SettingsCard>
+            <SettingsNote>
+              {localized(
+                'Mail goes from this computer to the model you chose, and nowhere else. Attachments are never sent, only their file names. Spam, Trash, drafts and encrypted messages are always left out. Summaries are kept in memory only, and sorting results on this computer only.'
+              )}
+            </SettingsNote>
+          </>
+        )}
+      </SettingsSection>
     );
   }
 
   render() {
     return (
-      <div className="container-ai">
-        <p className="ai-intro">
-          {localized(
-            'Tern can summarize threads, suggest replies and sort new mail with a model you choose. Nothing is sent until you turn on a feature and an account. API keys are stored encrypted, like your account passwords.'
-          )}
-        </p>
+      <SettingsPage
+        className="preferences-ai"
+        title={localized('AI')}
+        description={localized(
+          'Summaries, reply suggestions and inbox sorting with a model you choose. Nothing is sent until you turn on a feature and an account.'
+        )}
+      >
         {this._renderProviders()}
         {this._renderFeatures()}
         {this._renderAccounts()}
-        {this._renderTriage()}
-        {this._renderPrivacy()}
-      </div>
+        {this._renderUsage()}
+        {this._renderSent()}
+      </SettingsPage>
     );
   }
 }

@@ -15,6 +15,9 @@ export function activate(state = {}) {
     tabId: 'Templates',
     displayName: localized('Templates'),
     componentClassFn: () => require('./preferences-templates').default,
+    order: 14,
+    group: 'mail',
+    keywords: 'templates canned responses'.split(' '),
   });
   ComponentRegistry.register(TemplatePicker, { role: 'Composer:ActionButton' });
   ComponentRegistry.register(TemplateStatusBar, { role: 'Composer:Footer' });

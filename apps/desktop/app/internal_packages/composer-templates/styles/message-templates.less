@@ -55,93 +55,90 @@
   }
 }
 
-// Styles for Preferences Signatures
+// Preferences > Templates: a list beside the editor. The same split is in
+// composer-signature/styles/composer-signature.less.
+@tpl-line: color-mix(in srgb, @text-color 9%, transparent);
+
 .preferences-templates-container {
-  max-width: 800px;
-  margin: 0 auto;
+  .settings-split {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    min-height: 320px;
+  }
 
-  .template-list {
-    position: relative;
-    height: inherit;
-    width: inherit;
-
-    .items-wrapper {
-      min-width: 200px;
-      height: 262px;
+  .settings-split-list {
+    border-right: 1px solid @tpl-line;
+    display: flex;
+    flex-direction: column;
+    button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      color: @text-color;
+      padding: 9px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid @tpl-line;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      &:hover {
+        background: color-mix(in srgb, @text-color 5%, transparent);
+      }
+      &.selected {
+        background: color-mix(in srgb, @accent-primary 16%, transparent);
+        font-weight: 550;
+      }
+      &:focus-visible {
+        outline: none;
+        box-shadow: inset 0 0 0 2px @accent-primary;
+      }
     }
-    .editable-item {
-      padding: 8px 10px;
+    .settings-split-new {
+      color: @text-color-link;
+      font-weight: 500;
       border-bottom: none;
-    }
-    .btn-editable-list {
-      height: 37px;
-      width: 37px;
-      line-height: 37px;
-      font-size: 1em;
     }
   }
 
-  .template-wrap {
+  .settings-split-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: @text-color-subtle;
+  }
+
+  .settings-split-editor {
+    padding: 14px;
+    min-width: 0;
     display: flex;
-    position: relative;
-    margin-left: @padding-base-horizontal;
     flex-direction: column;
-    min-height: 200px;
-    width: 100%;
-
-    &.empty {
-      opacity: 0.5;
-      pointer-events: none;
+    > .settings-field:first-child {
+      margin-top: 0;
     }
+  }
 
-    .section {
-      margin-bottom: 10px;
-      &.fields {
-        display: flex;
-
-        .field {
-          display: flex;
-          &.name {
-            flex: 0 1 240px;
-            margin-right: 6px;
-          }
-          &.subject {
-            flex: 1 1 auto;
-          }
-          input {
-            width: 100%;
-          }
-        }
-      }
-      &.editor {
-        display: flex;
-        flex: 1;
-        margin-bottom: 0;
-      }
-      &.note {
-        font-size: 0.9em;
-        margin-top: 8px;
-        color: @text-color-very-subtle;
-      }
-    }
-
-    textarea.raw-html {
-      font-family: @font-family-monospace;
-      font-size: 0.9em;
-      width: 100%;
-      height: 240px;
-      padding: @padding-base-horizontal;
-      flex: 1;
-      background: @background-primary;
-      border: 1px solid @border-color-divider;
-    }
-
+  .template-editor {
+    display: flex;
+    flex: 1;
+    min-height: 180px;
+    margin-top: 12px;
+    cursor: text;
     .RichEditor-root {
       flex: 1;
-      background: @background-primary;
-      padding: 10px;
-      padding-top: 2px;
-      border: 1px solid @border-color-divider;
+      padding: 4px 12px 10px;
+      border: 1px solid @input-border-color;
+      border-radius: 7px;
+      background: @input-bg;
+    }
+  }
+
+  .template-note {
+    margin-top: 8px;
+    font-size: 12px;
+    color: @text-color-subtle;
+    a {
+      color: @text-color-link;
     }
   }
 }

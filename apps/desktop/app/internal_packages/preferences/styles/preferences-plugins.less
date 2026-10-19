@@ -1,53 +1,23 @@
 @import 'ui-variables';
 
-.container-plugins {
-  max-width: 720px;
-  margin: 0 auto;
-
-  .plugins-note {
-    color: @text-color-subtle;
-  }
-
-  .plugin {
-    padding: 10px 0;
-    border-bottom: 1px solid @border-color-divider;
-  }
-
-  .plugin-name {
-    font-weight: @font-weight-semi-bold;
-  }
-
-  .plugin-version,
-  .plugin-inactive,
-  .plugin-detail {
-    color: @text-color-subtle;
-    font-weight: normal;
+.preferences-plugins {
+  .settings-privacy {
+    margin-top: 14px;
   }
 
   .plugin-detail {
-    font-size: @font-size-smaller;
+    color: @text-color-subtle;
+    font-size: 12px;
     overflow-wrap: anywhere;
+    user-select: text;
   }
 
-  .plugin-service .item,
-  .plugin-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 6px;
-
-    .btn {
-      margin: 0;
+  .plugin-service-plan {
+    margin-top: 12px;
+    p {
+      overflow-wrap: anywhere;
+      margin: 0 0 6px;
     }
-  }
-
-  .plugin-service-status {
-    font-size: @font-size-smaller;
-    overflow-wrap: anywhere;
-  }
-
-  .plugin-service-plan p {
-    overflow-wrap: anywhere;
   }
 
   .plugin-unit {
@@ -59,13 +29,17 @@
   }
 
   .plugin-result {
-    font-size: @font-size-smaller;
+    margin-top: 10px;
+    font-size: 12px;
     overflow-wrap: anywhere;
     &.ok {
       color: @color-success;
     }
     &.failed {
-      color: @color-error;
+      color: @color-danger;
     }
+  }
+  .settings-row-description .plugin-result {
+    margin-top: 0;
   }
 }

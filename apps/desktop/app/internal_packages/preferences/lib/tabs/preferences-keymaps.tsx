@@ -2,7 +2,7 @@ import React from 'react';
 import path from 'path';
 import fs from 'fs';
 
-import { Flexbox } from 'mailspring-component-kit';
+import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
 
 import displayedKeybindings from './keymaps/displayed-keybindings';
@@ -71,9 +71,9 @@ export default class PreferencesKeymaps extends React.Component<
   _onDeleteUserKeymap() {
     const chosen = require('@electron/remote').dialog.showMessageBoxSync({
       type: 'info',
-      message: localized('Are you sure?'),
-      detail: localized('Delete your custom key bindings and reset to the template defaults?'),
-      buttons: [localized('Cancel'), localized('Reset')],
+      message: localized('Restore the shortcut set?'),
+      detail: localized('Every shortcut you changed goes back to what the set uses.'),
+      buttons: [localized('Cancel'), localized('Restore')],
     });
 
     if (chosen === 1) {
@@ -82,79 +82,64 @@ export default class PreferencesKeymaps extends React.Component<
     }
   }
 
-  _renderBindingsSection = (section: { title: string; items: string[][] }) => {
-    return (
-      <section key={`section-${section.title}`}>
-        <div className="shortcut-section-title">{section.title}</div>
-        {section.items.map(([command, label]) => {
-          return (
-            <CommandItem
-              key={command}
-              command={command}
-              label={label}
-              bindings={this.state.bindings[command]}
-            />
-          );
-        })}
-      </section>
-    );
-  };
-
   render() {
+    const template = this.props.config.get('core.keymapTemplate');
     return (
-      <div className="container-keymaps">
-        <section>
-          <Flexbox className="container-dropdown">
-            <div>{localized('Shortcuts')}</div>
-            <div className="dropdown">
-              <select
-                style={{ margin: 0 }}
-                value={this.props.config.get('core.keymapTemplate')}
-                onChange={(event) =>
-                  this.props.config.set('core.keymapTemplate', event.target.value)
-                }
-              >
-                {this.state.templates.map((template) => {
-                  return (
-                    <option key={template} value={template}>
-                      {template}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-            <div style={{ flex: 1 }} />
-            <button className="btn" onClick={this._onDeleteUserKeymap}>
-              {localized('Restore Defaults')}
+      <SettingsPage
+        className="preferences-shortcuts"
+        title={localized('Shortcuts')}
+        description={localized('Start from a set you know, then change any key.')}
+      >
+        <SettingsSection
+          note={localized(
+            'To change a shortcut, click it and press the new keys. Two keys pressed one after the other also work, like G then I.'
+          )}
+        >
+          <SettingsRow
+            label={localized('Shortcut set')}
+            description={localized('Uses the keys of a mail app you already know.')}
+          >
+            <select
+              className="settings-select"
+              aria-label={localized('Shortcut set')}
+              value={template}
+              onChange={(event) => this.props.config.set('core.keymapTemplate', event.target.value)}
+            >
+              {this.state.templates.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </SettingsRow>
+          <SettingsRow
+            label={localized('Your changes')}
+            description={localized(
+              'Shortcuts you change are saved in a file on top of the set. You can also edit that file yourself.'
+            )}
+          >
+            <button className="btn" onClick={this._onShowUserKeymaps}>
+              {localized('Edit in a file')}
             </button>
-          </Flexbox>
-          <p style={{ maxWidth: 600 }}>
-            {localized(
-              'You can choose a shortcut set to use keyboard shortcuts of familiar email clients. To edit a shortcut, click it in the list below and enter a replacement on the keyboard.'
-            )}
-          </p>
-          <div className="two-columns-flexbox">
-            <div style={{ flex: 1 }}>
-              {displayedKeybindings.slice(0, 3).map(this._renderBindingsSection)}
-            </div>
-            <div style={{ width: 30 }} />
-            <div style={{ flex: 1 }}>
-              {displayedKeybindings.slice(3).map(this._renderBindingsSection)}
-            </div>
-          </div>
-        </section>
-        <section>
-          <h2>{localized('Customization')}</h2>
-          <p>
-            {localized(
-              'Click shortcuts above to edit them. For even more control, you can edit the shortcuts file directly below.'
-            )}
-          </p>
-          <button className="btn" onClick={this._onShowUserKeymaps}>
-            {localized('Edit custom shortcuts')}
-          </button>
-        </section>
-      </div>
+            <button className="btn" onClick={this._onDeleteUserKeymap}>
+              {localized('Restore the set')}
+            </button>
+          </SettingsRow>
+        </SettingsSection>
+
+        {displayedKeybindings.map((section) => (
+          <SettingsSection key={section.title} title={section.title}>
+            {section.items.map(([command, label]) => (
+              <CommandItem
+                key={command}
+                command={command}
+                label={label}
+                bindings={this.state.bindings[command]}
+              />
+            ))}
+          </SettingsSection>
+        ))}
+      </SettingsPage>
     );
   }
 }

@@ -1,6 +1,7 @@
 /* eslint quote-props: 0 */
 import ReactTestUtils from 'react-dom/test-utils';
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { SignatureStore, Actions } from 'mailspring-exports';
 import PreferencesSignatures from '../lib/preferences-signatures';
 
@@ -40,8 +41,9 @@ describe('PreferencesSignatures', function preferencesSignatures() {
       spyOn(SignatureStore, 'selectedSignature').andReturn(sig);
       spyOn(SignatureStore, 'getDefaults').andReturn({});
       const component = makeComponent() as any;
-      const preview = ReactTestUtils.scryRenderedDOMComponentsWithClass(component, 'preview').find(
-        (el) => el.tagName === 'DIV' && !el.classList.contains('section')
+      const preview = ReactTestUtils.findRenderedDOMComponentWithClass(
+        component,
+        'signature-preview'
       );
       expect(preview.innerHTML).toContain('<b>Ann</b>');
       expect(preview.innerHTML).not.toContain('onerror');
@@ -56,23 +58,27 @@ describe('PreferencesSignatures', function preferencesSignatures() {
       spyOn(SignatureStore, 'getDefaults').andReturn(DEFAULTS);
       this.component = makeComponent();
     });
-    it('should add a signature when you click the plus button', () => {
+    it('should add a signature when you click New signature', () => {
       spyOn(Actions, 'upsertSignature');
-      this.plus = ReactTestUtils.scryRenderedDOMComponentsWithClass(
+      spyOn(Actions, 'selectSignature');
+      const add = ReactTestUtils.findRenderedDOMComponentWithClass(
         this.component,
-        'btn-editable-list'
-      )[0];
-      ReactTestUtils.Simulate.click(this.plus);
+        'settings-split-new'
+      );
+      ReactTestUtils.Simulate.click(add);
       expect(Actions.upsertSignature).toHaveBeenCalled();
+      const id = (Actions.upsertSignature as unknown as jasmine.Spy).mostRecentCall.args[1];
+      expect(Actions.selectSignature).toHaveBeenCalledWith(id);
     });
-    it('should delete a signature when you click the minus button', () => {
+    it('should delete the selected signature when you click Delete', () => {
       spyOn(Actions, 'removeSignature');
-      this.minus = ReactTestUtils.scryRenderedDOMComponentsWithClass(
-        this.component,
-        'btn-editable-list'
-      )[1];
-      ReactTestUtils.Simulate.click(this.minus);
+      const del = ReactTestUtils.findRenderedDOMComponentWithClass(this.component, 'btn-danger');
+      ReactTestUtils.Simulate.click(del);
       expect(Actions.removeSignature).toHaveBeenCalledWith(SIGNATURES['1']);
+    });
+    it('should mark the selected signature in the list', () => {
+      const items = ReactTestUtils.scryRenderedDOMComponentsWithClass(this.component, 'list-item');
+      expect(items.map((el) => el.classList.contains('selected'))).toEqual([true, false]);
     });
     it('should set the selected signature when you click on one that is not currently selected', () => {
       spyOn(Actions, 'selectSignature');
@@ -82,9 +88,15 @@ describe('PreferencesSignatures', function preferencesSignatures() {
     });
     it('should modify the signature title when edited', () => {
       spyOn(Actions, 'upsertSignature');
-      const newTitle = 'Changed';
-      this.component._onEditSignatureTitle(newTitle);
-      expect(Actions.upsertSignature).toHaveBeenCalled();
+      const input = (ReactDOM.findDOMNode(this.component) as HTMLElement).querySelector(
+        '#signature-title'
+      ) as HTMLInputElement;
+      input.value = 'Changed';
+      ReactTestUtils.Simulate.change(input);
+      const [sig, id] = (Actions.upsertSignature as unknown as jasmine.Spy).mostRecentCall.args;
+      expect(id).toBe('1');
+      expect(sig.title).toBe('Changed');
+      expect(sig.body).toBe(SIGNATURES['1'].body);
     });
   });
 
@@ -106,10 +118,10 @@ describe('PreferencesSignatures', function preferencesSignatures() {
     });
 
     it('renders the signature through SanitizeTransformer', () => {
-      const preview = ReactTestUtils.scryRenderedDOMComponentsWithClass(
+      const preview = ReactTestUtils.findRenderedDOMComponentWithClass(
         this.component,
-        'preview'
-      ).find((el) => el.tagName === 'DIV' && el.parentElement.classList.contains('section'));
+        'signature-preview'
+      );
       expect(preview.querySelector('#kept').textContent).toBe('Ann');
       expect(preview.innerHTML).not.toContain('onerror');
       expect(preview.innerHTML).not.toContain('<script');

@@ -53,6 +53,13 @@ function button(renderer: TestRenderer.ReactTestRenderer, label: string) {
   return renderer.root.find((node) => node.type === 'button' && node.props.children === label);
 }
 
+/** Opens a card that is off, as Set up does; its fields stay hidden until then. */
+async function setUp(renderer: TestRenderer.ReactTestRenderer) {
+  await act(async () => {
+    button(renderer, 'Set up').props.onClick();
+  });
+}
+
 function section(renderer: TestRenderer.ReactTestRenderer): IntegrationSection {
   return renderer.root.findByType(IntegrationSection).instance;
 }
@@ -74,13 +81,14 @@ describe('Preferences > Integrations', () => {
 
   it('saves the DeepL key to the keyset and never to config', async () => {
     const renderer = await render('translation');
+    await setUp(renderer);
     await act(async () => {
       byId(renderer, 'integrations-translation-provider').props.onChange({
         target: { value: 'deepl' },
       });
     });
     await act(async () => {
-      byId(renderer, 'integrations-translation-enabled').props.onChange();
+      button(renderer, 'Turn on').props.onClick();
     });
     await typeKey(renderer, 'integrations-translation-key', SYNTHETIC_KEY);
 
@@ -99,6 +107,7 @@ describe('Preferences > Integrations', () => {
 
   it('keeps the LanguageTool URL and username in config and the API key in the keyset', async () => {
     const renderer = await render('grammar');
+    await setUp(renderer);
     await type(renderer, 'integrations-grammar-url', 'https://lt.example.test');
     await type(renderer, 'integrations-grammar-username', 'me@example.test');
     await typeKey(renderer, 'integrations-grammar-key', SYNTHETIC_KEY);
@@ -166,7 +175,7 @@ describe('Preferences > Integrations', () => {
     AppEnv.config.set('core.integrations.enrichment', { enabled: true });
     const renderer = await render('enrichment');
     await act(async () => {
-      byId(renderer, 'integrations-enrichment-enabled').props.onChange();
+      button(renderer, 'Turn off').props.onClick();
     });
     expect(AppEnv.config.get('core.integrations.enrichment').enabled).toBe(false);
     expect(keys['integration-peopledatalabs-key']).toBe(SYNTHETIC_KEY);
@@ -187,7 +196,7 @@ describe('Preferences > Integrations', () => {
     expect(byId(renderer, 'integrations-translation-key').props.value).toBe(SYNTHETIC_KEY);
 
     await act(async () => {
-      await button(renderer, 'Save Key').props.onClick();
+      await button(renderer, 'Save key').props.onClick();
     });
     expect(keys['integration-deepl-key']).toBe(SYNTHETIC_KEY);
     expect(byId(renderer, 'integrations-translation-key').props.value).toBe('');
@@ -258,14 +267,29 @@ describe('Preferences > Integrations', () => {
     keys['integration-libretranslate-key'] = 'libre-synthetic';
     AppEnv.config.set('core.integrations.translation', { provider: 'libretranslate' });
     const renderer = await render('translation');
+    await setUp(renderer);
     await act(async () => {
       byId(renderer, 'integrations-translation-provider').props.onChange({ target: { value: '' } });
     });
     await act(async () => {
-      await button(renderer, 'Remove Saved Keys').props.onClick();
+      await button(renderer, 'Remove saved keys').props.onClick();
     });
     expect(keys['integration-libretranslate-key']).toBeUndefined();
-    expect(textOf(renderer)).not.toContain('Remove Saved Keys');
+    expect(textOf(renderer)).not.toContain('Remove saved keys');
+    renderer.unmount();
+  });
+
+  it('keeps the fields of an integration that is off hidden until Set up', async () => {
+    const renderer = await render('grammar');
+    expect(renderer.root.findAll((n) => n.props.id === 'integrations-grammar-url').length).toBe(0);
+    expect(textOf(renderer)).toContain('Off');
+    await setUp(renderer);
+    expect(byId(renderer, 'integrations-grammar-url')).toBeDefined();
+    await act(async () => {
+      button(renderer, 'Turn on').props.onClick();
+    });
+    expect(AppEnv.config.get('core.integrations.grammar').enabled).toBe(true);
+    expect(textOf(renderer)).toContain('Turn off');
     renderer.unmount();
   });
 

@@ -1,7 +1,14 @@
 import fs from 'fs';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Flexbox, EditableList, ComposerEditor, ComposerSupport } from 'mailspring-component-kit';
+import classNames from 'classnames';
+import {
+  ComposerEditor,
+  ComposerSupport,
+  SettingsPage,
+  SettingsCard,
+  SettingsField,
+} from 'mailspring-component-kit';
 import { Actions, localized, localizedReactFragment } from 'mailspring-exports';
 import { Value } from 'slate';
 
@@ -15,40 +22,32 @@ const {
 interface TemplateEditorProps {
   template: TemplateItem;
   onEditTitle: (title: string) => void;
+  onDelete: () => void;
 }
 class TemplateEditor extends React.Component<
   TemplateEditorProps,
-  { readOnly: boolean; editorState: Value; subject: string }
+  { editorState: Value; subject: string }
 > {
   _composer: ComposerEditor;
 
   constructor(props) {
     super(props);
 
-    if (this.props.template) {
-      const { subject, body } = parseTemplate(fs.readFileSync(props.template.path).toString());
-      this.state = {
-        editorState: convertFromHTML(body),
-        subject,
-        readOnly: false,
-      };
-    } else {
-      this.state = {
-        editorState: convertFromHTML(''),
-        subject: '',
-        readOnly: true,
-      };
+    let parsed = { subject: '', body: '' };
+    try {
+      parsed = parseTemplate(fs.readFileSync(props.template.path).toString());
+    } catch (err) {
+      // The templates folder can hold a subfolder or an unreadable file; show it empty.
     }
+    this.state = { editorState: convertFromHTML(parsed.body), subject: parsed.subject };
   }
 
   _onSave = () => {
-    if (!this.state.readOnly) {
-      const outHTML = stringifyTemplate({
-        subject: this.state.subject,
-        body: convertToHTML(this.state.editorState),
-      });
-      fs.writeFileSync(this.props.template.path, outHTML);
-    }
+    const outHTML = stringifyTemplate({
+      subject: this.state.subject,
+      body: convertToHTML(this.state.editorState),
+    });
+    fs.writeFileSync(this.props.template.path, outHTML);
   };
 
   _onSubjectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,51 +61,40 @@ class TemplateEditor extends React.Component<
   };
 
   render() {
-    const { onEditTitle, template } = this.props;
-    const { readOnly, editorState, subject } = this.state;
+    const { onEditTitle, onDelete, template } = this.props;
+    const { editorState, subject } = this.state;
 
     return (
-      <div className={`template-wrap ${readOnly && 'empty'}`}>
-        <div className="section fields">
-          <div className="field name">
-            <label htmlFor="template-title" className="sr-only">
-              {localized('Template Name')}
-            </label>
-            <input
-              type="text"
-              id="template-title"
-              placeholder={localized('Name')}
-              disabled={readOnly}
-              defaultValue={template ? template.name : ''}
-              onBlur={(e) => onEditTitle(e.target.value)}
-            />
-          </div>
-          <div className="field subject">
-            <label htmlFor="template-subject" className="sr-only">
-              {localized('Subject')}
-            </label>
-            <input
-              type="text"
-              id="template-subject"
-              placeholder={localized('Subject (optional)')}
-              disabled={readOnly}
-              value={subject}
-              onChange={this._onSubjectChange}
-              onBlur={this._onSave}
-            />
-          </div>
-        </div>
-        <div className="section editor" onClick={this._onFocusEditor}>
+      <div className="settings-split-editor template-wrap">
+        <SettingsField label={localized('Name')} htmlFor="template-title">
+          <input
+            type="text"
+            id="template-title"
+            placeholder={localized('Name')}
+            defaultValue={template.name}
+            onBlur={(e) => onEditTitle(e.target.value)}
+          />
+        </SettingsField>
+        <SettingsField label={localized('Subject')} htmlFor="template-subject">
+          <input
+            type="text"
+            id="template-subject"
+            placeholder={localized('Optional')}
+            value={subject}
+            onChange={this._onSubjectChange}
+            onBlur={this._onSave}
+          />
+        </SettingsField>
+        <div className="template-editor" onClick={this._onFocusEditor}>
           <ComposerEditor
             ref={(c) => (this._composer = c)}
             value={editorState}
-            readOnly={readOnly}
             propsForPlugins={{ inTemplateEditor: true }}
             onChange={(change) => this.setState({ editorState: change.value })}
             onBlur={this._onSave}
           />
         </div>
-        <div className="section note">
+        <div className="template-note">
           {localized(
             'The subject is filled into your draft when you use the template. Leave it blank to keep the subject you already have.'
           )}{' '}
@@ -114,6 +102,22 @@ class TemplateEditor extends React.Component<
             'Changes are saved automatically. View the %@ for tips and tricks.',
             <a href="https://github.com/ternmail/ternmail#readme">{localized('Templates Guide')}</a>
           )}
+        </div>
+        <div className="settings-actions">
+          <button
+            className="btn"
+            onClick={() =>
+              require('@electron/remote').shell.showItemInFolder(TemplateStore.directory())
+            }
+          >
+            {process.platform === 'darwin'
+              ? localized('Show in Finder')
+              : localized('Show templates folder')}
+          </button>
+          <span className="spacer" />
+          <button className="btn btn-danger" onClick={onDelete}>
+            {localized('Delete')}
+          </button>
         </div>
       </div>
     );
@@ -146,21 +150,21 @@ export default class PreferencesTemplates extends React.Component<
   }
 
   _getStateFromStores() {
-    let lastSelName = null;
-    let lastSelIndex = null;
-    if (this.state) {
-      lastSelName = this.state.selected && this.state.selected.name;
-      lastSelIndex = this.state.templates.findIndex((t) => t.name === lastSelName);
-    }
-
     const templates = TemplateStore.items();
-    const selected =
-      templates.find((t) => t.name === lastSelName) || templates[lastSelIndex] || null;
+    const prev = this.state ? this.state.templates : [];
+    const lastSelName = this.state && this.state.selected && this.state.selected.name;
+    const lastSelIndex = prev.findIndex((t) => t.name === lastSelName);
 
-    return {
-      templates,
-      selected,
-    };
+    // A single name that wasn't there before is a template just made or renamed here.
+    const added = prev.length ? templates.filter((t) => !prev.some((p) => p.name === t.name)) : [];
+    const selected =
+      (added.length === 1 && added[0]) ||
+      templates.find((t) => t.name === lastSelName) ||
+      templates[lastSelIndex] ||
+      templates[0] ||
+      null;
+
+    return { templates, selected };
   }
 
   _onAdd = () => {
@@ -178,52 +182,46 @@ export default class PreferencesTemplates extends React.Component<
     Actions.renameTemplate(this.state.selected.name, newName);
   };
 
-  _onSelect = (item: TemplateItem) => {
-    this.setState({ selected: item });
-  };
-
   render() {
-    const { selected } = this.state;
+    const { selected, templates } = this.state;
 
     return (
-      <div className="preferences-templates-container">
-        <section>
-          <Flexbox>
-            <div>
-              <EditableList
-                showEditIcon
-                className="template-list"
-                items={this.state.templates}
-                itemContent={(template) => template.name}
-                onCreateItem={this._onAdd}
-                onDeleteItem={this._onDelete}
-                onItemEdited={this._onEditTitle}
-                onSelectItem={this._onSelect}
-                selected={this.state.selected}
-              />
-              <a
-                style={{
-                  display: 'block',
-                  fontSize: '0.9em',
-                  padding: 6,
-                  margin: -6,
-                  marginTop: 4,
-                }}
-                onClick={() =>
-                  require('@electron/remote').shell.showItemInFolder(TemplateStore.directory())
-                }
+      <SettingsPage
+        title={localized('Templates')}
+        description={localized('Messages you send often. Insert one from the composer.')}
+        className="preferences-templates-container"
+      >
+        <SettingsCard className="settings-split">
+          <div className="settings-split-list template-list" role="listbox">
+            {templates.map((t) => (
+              <button
+                key={t.name}
+                role="option"
+                aria-selected={t === selected}
+                className={classNames('list-item', { selected: t === selected })}
+                onClick={() => this.setState({ selected: t })}
               >
-                {localized('Show Templates Folder...')}
-              </a>
-            </div>
+                {t.name}
+              </button>
+            ))}
+            <button className="settings-split-new" onClick={this._onAdd}>
+              {localized('+ New template')}
+            </button>
+          </div>
+          {selected ? (
             <TemplateEditor
-              onEditTitle={this._onEditTitle}
-              key={selected ? selected.name : 'empty'}
+              key={selected.name}
               template={selected}
+              onEditTitle={this._onEditTitle}
+              onDelete={this._onDelete}
             />
-          </Flexbox>
-        </section>
-      </div>
+          ) : (
+            <div className="settings-split-empty">
+              {localized('Make a template to insert it from the composer.')}
+            </div>
+          )}
+        </SettingsCard>
+      </SettingsPage>
     );
   }
 }

@@ -1,6 +1,8 @@
 import React from 'react';
 import {
+  Actions,
   localized,
+  localizedReactFragment,
   KeyManager,
   CapabilityStore,
   CapabilityFeature,
@@ -10,7 +12,17 @@ import {
   IntegrationSettings,
   ProviderConfig,
 } from 'mailspring-exports';
-import { McpSection } from './mcp/mcp-section';
+import {
+  SettingsPage,
+  SettingsSection,
+  SettingsNote,
+  SettingsField,
+  StatusPill,
+  StatusKind,
+  ProviderCard,
+  ProviderLogo,
+  PrivacyNote,
+} from 'mailspring-component-kit';
 
 // Preferences > Integrations (docs/integrations-plan.md, section 2). Settings go to config under
 // core.integrations.<kind>; API keys to the engine's secret store (the keyset for an engine
@@ -61,15 +73,44 @@ export function privacyNote(kind: IntegrationKind, settings: IntegrationSettings
   return localized('Email addresses of people you view are sent to People Data Labs.');
 }
 
-function sectionTitle(kind: IntegrationKind) {
-  switch (kind) {
-    case 'translation':
-      return localized('Translation');
-    case 'grammar':
-      return localized('Grammar');
-    default:
-      return localized('Contact info');
+const LOOKS: {
+  [kind in IntegrationKind]: {
+    title: () => string;
+    logo: (provider: IntegrationProvider | null) => { text: string; color: string };
+  };
+} = {
+  translation: {
+    title: () => localized('Translation'),
+    logo: (provider) =>
+      provider === 'libretranslate'
+        ? { text: 'L', color: '#1f6f8b' }
+        : { text: 'D', color: '#1d4f80' },
+  },
+  grammar: {
+    title: () => localized('Grammar'),
+    logo: () => ({ text: 'LT', color: '#3b7dd8' }),
+  },
+  enrichment: {
+    title: () => localized('Contact details'),
+    logo: () => ({ text: 'P', color: '#7b2ff7' }),
+  },
+};
+
+/** The provider, and the server it talks to when that can differ. */
+function subtitle(kind: IntegrationKind, settings: IntegrationSettings, hasKey: boolean) {
+  const { provider } = settings;
+  if (kind === 'enrichment') {
+    return localized('People Data Labs: job titles, companies and profiles');
   }
+  if (!provider) return localized('DeepL or LibreTranslate');
+  const name = Integrations.PROVIDERS[provider].name;
+  if (provider === 'languagetool') {
+    return `${name} · ${hostOf(languageToolUrl(settings, hasKey), name)}`;
+  }
+  if (provider === 'libretranslate' && settings.url) {
+    return `${name} · ${hostOf(settings.url, name)}`;
+  }
+  return name;
 }
 
 interface SectionProps {
@@ -85,6 +126,8 @@ interface SectionState {
   hasLeftoverKey: boolean;
   testing: boolean;
   testResult: { ok: boolean; message: string } | null;
+  /** Fields stay hidden until Set up, or while the card is closed. */
+  open: boolean;
 }
 
 export class IntegrationSection extends React.Component<SectionProps, SectionState> {
@@ -97,13 +140,15 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
 
   constructor(props: SectionProps) {
     super(props);
+    const settings = Integrations.readSettings(props.kind);
     this.state = {
-      settings: Integrations.readSettings(props.kind),
+      settings,
       keyInput: '',
       hasKey: false,
       hasLeftoverKey: false,
       testing: false,
       testResult: null,
+      open: settings.enabled,
     };
   }
 
@@ -262,37 +307,37 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     let placeholder = required ? localized('Required') : localized('Optional');
     if (hasKey) placeholder = localized('Saved. Type a new key to replace it.');
     return (
-      <div className="item integrations-field">
-        <label htmlFor={id}>{label}:</label>
-        <input
-          id={id}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={keyInput}
-          placeholder={placeholder}
-          onChange={this._onChangeKey}
-          onKeyDown={(e) => e.key === 'Enter' && this._onSaveKey()}
-        />
-        {!!keyInput.trim() && (
-          <button className="btn btn-small" onClick={this._onSaveKey}>
-            {localized('Save Key')}
-          </button>
-        )}
-        {hasKey && !keyInput && (
-          <button className="btn btn-small" onClick={this._onForgetKey}>
-            {localized('Forget Key')}
-          </button>
-        )}
-      </div>
+      <SettingsField label={label} htmlFor={id}>
+        <div className="integrations-inline">
+          <input
+            id={id}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={keyInput}
+            placeholder={placeholder}
+            onChange={this._onChangeKey}
+            onKeyDown={(e) => e.key === 'Enter' && this._onSaveKey()}
+          />
+          {!!keyInput.trim() && (
+            <button className="btn btn-emphasis" onClick={this._onSaveKey}>
+              {localized('Save key')}
+            </button>
+          )}
+          {hasKey && !keyInput && (
+            <button className="btn" onClick={this._onForgetKey}>
+              {localized('Forget key')}
+            </button>
+          )}
+        </div>
+      </SettingsField>
     );
   }
 
   _renderTextField(field: 'url' | 'username', label: string, placeholder: string) {
     const id = `integrations-${this.props.kind}-${field}`;
     return (
-      <div className="item integrations-field">
-        <label htmlFor={id}>{label}:</label>
+      <SettingsField label={label} htmlFor={id}>
         <input
           id={id}
           type={field === 'url' ? 'url' : 'text'}
@@ -303,7 +348,7 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
           onBlur={this._onCommitField}
           onKeyDown={(e) => e.key === 'Enter' && this._onCommitField()}
         />
-      </div>
+      </SettingsField>
     );
   }
 
@@ -313,7 +358,7 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
       case 'libretranslate':
         return (
           <>
-            {this._renderTextField('url', localized('Server URL'), 'https://libretranslate.com')}
+            {this._renderTextField('url', localized('Server'), 'https://libretranslate.com')}
             {this._renderKeyField(localized('API key'), false)}
           </>
         );
@@ -324,12 +369,12 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
           <>
             {this._renderTextField(
               'url',
-              localized('Server URL'),
+              localized('Server'),
               Integrations.LANGUAGETOOL_DEFAULT_URL
             )}
             {this._renderTextField(
               'username',
-              localized('Premium username'),
+              localized('Premium account'),
               localized('Optional, the email of your LanguageTool account')
             )}
             {this._renderKeyField(localized('Premium API key'), false)}
@@ -342,102 +387,143 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     }
   }
 
-  render() {
+  _renderServiceField() {
+    const { kind } = this.props;
+    const choices = Integrations.PROVIDERS_FOR_KIND[kind];
+    if (choices.length < 2) return null;
+    const id = `integrations-${kind}-provider`;
+    return (
+      <SettingsField label={localized('Service')} htmlFor={id}>
+        <select
+          id={id}
+          value={this.state.settings.provider || ''}
+          onChange={this._onChangeProvider}
+        >
+          <option value="">{localized('None')}</option>
+          {choices.map((p) => (
+            <option key={p} value={p}>
+              {Integrations.PROVIDERS[p].name}
+            </option>
+          ))}
+        </select>
+      </SettingsField>
+    );
+  }
+
+  _renderBody() {
     const { kind } = this.props;
     const { settings, testing, testResult, hasKey, hasLeftoverKey, keyInput } = this.state;
-    const choices = Integrations.PROVIDERS_FOR_KIND[kind];
     const capability = CapabilityStore.get(FEATURE_FOR_KIND[kind]);
-    const enabledId = `integrations-${kind}-enabled`;
-
-    return (
-      <section className={`integrations-section integrations-${kind}`}>
-        <h6>{sectionTitle(kind)}</h6>
-        {choices.length > 1 ? (
-          <div className="item integrations-field">
-            <label htmlFor={`integrations-${kind}-provider`}>{localized('Provider')}:</label>
-            <select
-              id={`integrations-${kind}-provider`}
-              value={settings.provider || ''}
-              onChange={this._onChangeProvider}
-            >
-              <option value="">{localized('None')}</option>
-              {choices.map((id) => (
-                <option key={id} value={id}>
-                  {Integrations.PROVIDERS[id].name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="item integrations-provider-name">
-            {Integrations.PROVIDERS[choices[0]].name}
-          </div>
-        )}
-        {!settings.provider && hasLeftoverKey && (
-          <div className="item integrations-actions">
-            <button className="btn" onClick={this._onRemove}>
-              {localized('Remove Saved Keys')}
-            </button>
-          </div>
-        )}
-        {settings.provider && (
-          <>
-            <div className="item">
-              <input
-                id={enabledId}
-                type="checkbox"
-                checked={settings.enabled}
-                onChange={this._onToggleEnabled}
-              />
-              <label htmlFor={enabledId}>
-                {localized('Use %@', Integrations.PROVIDERS[settings.provider].name)}
-              </label>
-            </div>
-            {this._renderFields()}
-            <div className="item integrations-actions">
-              <button className="btn" onClick={this._onTest} disabled={testing}>
-                {testing ? localized('Testing…') : localized('Test')}
+    if (!settings.provider) {
+      return (
+        <>
+          {this._renderServiceField()}
+          {hasLeftoverKey && (
+            <div className="settings-actions">
+              <button className="btn" onClick={this._onRemove}>
+                {localized('Remove saved keys')}
               </button>
-              {(hasKey || settings.url || settings.username || settings.enabled) && (
-                <button className="btn" onClick={this._onRemove}>
-                  {localized('Remove')}
-                </button>
-              )}
-              {testResult && (
-                <span className={`integrations-test-result ${testResult.ok ? 'ok' : 'failed'}`}>
-                  {testResult.message}
-                </span>
-              )}
             </div>
-            {settings.enabled && !capability.available && capability.reason && (
-              <p className="integrations-status">{capability.reason}.</p>
-            )}
-            <p className="integrations-privacy">
-              {privacyNote(kind, settings, hasKey || !!keyInput.trim())}
-            </p>
-          </>
+          )}
+        </>
+      );
+    }
+    return (
+      <>
+        {this._renderServiceField()}
+        {this._renderFields()}
+        <div className="settings-actions">
+          {settings.enabled ? (
+            <button className="btn" onClick={this._onToggleEnabled}>
+              {localized('Turn off')}
+            </button>
+          ) : (
+            <button className="btn btn-emphasis" onClick={this._onToggleEnabled}>
+              {localized('Turn on')}
+            </button>
+          )}
+          <button className="btn" onClick={this._onTest} disabled={testing}>
+            {testing ? localized('Testing…') : localized('Test')}
+          </button>
+          {testResult && (
+            <span className={`integrations-test-result ${testResult.ok ? 'ok' : 'failed'}`}>
+              {testResult.message}
+            </span>
+          )}
+          <span className="spacer" />
+          {(hasKey || settings.url || settings.username || settings.enabled) && (
+            <button className="btn btn-danger" onClick={this._onRemove}>
+              {localized('Remove')}
+            </button>
+          )}
+        </div>
+        {settings.enabled && !capability.available && capability.reason && (
+          <div className="integrations-status">{capability.reason}.</div>
         )}
-      </section>
+        <PrivacyNote kind="network">
+          {privacyNote(kind, settings, hasKey || !!keyInput.trim())}
+        </PrivacyNote>
+      </>
+    );
+  }
+
+  render() {
+    const { kind } = this.props;
+    const { settings, testResult, open } = this.state;
+    const look = LOOKS[kind];
+    let status: [StatusKind, string] = ['off', localized('Off')];
+    if (testResult && !testResult.ok) status = ['bad', localized('Error')];
+    else if (settings.enabled) status = ['ok', localized('On')];
+    return (
+      <ProviderCard
+        logo={<ProviderLogo {...look.logo(settings.provider)} />}
+        title={look.title()}
+        subtitle={subtitle(kind, settings, this.state.hasKey)}
+        status={<StatusPill kind={status[0]}>{status[1]}</StatusPill>}
+        actions={
+          !open &&
+          !settings.enabled && (
+            <button className="btn" onClick={() => this.setState({ open: true })}>
+              {localized('Set up')}
+            </button>
+          )
+        }
+        open={open}
+        onToggle={(next) => this.setState({ open: next })}
+      >
+        {this._renderBody()}
+      </ProviderCard>
     );
   }
 }
 
-export default class PreferencesIntegrations extends React.Component {
-  static displayName = 'PreferencesIntegrations';
-
-  render() {
-    return (
-      <div className="container-integrations">
-        <p className="integrations-intro">
-          {localized(
-            'These features call a provider you choose. API keys are stored encrypted, like your account passwords.'
-          )}
-        </p>
+export default function PreferencesIntegrations() {
+  return (
+    <SettingsPage
+      className="preferences-integrations"
+      title={localized('Integrations')}
+      description={localized(
+        'Services Tern can call for translation, grammar and contact details. API keys are stored encrypted, like your account passwords.'
+      )}
+    >
+      <SettingsSection>
         <IntegrationSection kind="translation" />
         <IntegrationSection kind="grammar" />
         <IntegrationSection kind="enrichment" />
-        <McpSection />
-      </div>
-    );
-  }
+      </SettingsSection>
+      <SettingsNote>
+        {localizedReactFragment(
+          'AI models are set up in %@. Apps that use your mail, like Claude, are in %@.',
+          <a key="ai" onClick={() => Actions.switchPreferencesTab('AI')}>
+            {localized('AI')}
+          </a>,
+          <a key="agents" onClick={() => Actions.switchPreferencesTab('Agents')}>
+            {localized('Agents')}
+          </a>
+        )}
+      </SettingsNote>
+    </SettingsPage>
+  );
 }
+
+PreferencesIntegrations.displayName = 'PreferencesIntegrations';

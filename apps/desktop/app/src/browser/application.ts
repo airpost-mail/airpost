@@ -570,6 +570,7 @@ export default class Application extends EventEmitter {
 
     this.on('application:reset-database', this._resetDatabaseAndRelaunch);
     this.on('application:reset-profile', this._resetProfileAndRelaunch);
+    this.on('application:relaunch', () => this._relaunch());
 
     this.on('application:quit', () => {
       app.quit();

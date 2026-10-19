@@ -1,0 +1,348 @@
+@import 'ui-variables';
+
+// Preferences building blocks (src/components/settings.tsx). Colours come from the theme
+// variables so every theme gets them; soft fills are color-mix() because the accent is a
+// CSS variable that LESS can't fade.
+
+@settings-line: color-mix(in srgb, @text-color 9%, transparent);
+@settings-soft: color-mix(in srgb, @text-color 5%, transparent);
+@settings-radius: 10px;
+
+.settings-page {
+  max-width: 720px;
+  padding: 26px 40px 48px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: @text-color;
+}
+
+.settings-page-header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 18px;
+  h1 {
+    font-size: 20px;
+    font-weight: 650;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: @text-color-heading;
+  }
+  p {
+    margin: 2px 0 0;
+    color: @text-color-subtle;
+    font-size: 13px;
+  }
+}
+
+.settings-section {
+  margin-top: 20px;
+  &:first-of-type {
+    margin-top: 0;
+  }
+}
+.settings-page-header + .settings-section {
+  margin-top: 4px;
+}
+
+.settings-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: @text-color-subtle;
+  margin: 0 4px 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-card {
+  background: @background-primary;
+  border: 1px solid @settings-line;
+  border-radius: @settings-radius;
+  overflow: hidden;
+  &.danger {
+    border-color: color-mix(in srgb, @color-danger 40%, transparent);
+  }
+}
+
+.settings-note {
+  color: @text-color-subtle;
+  font-size: 12px;
+  margin: 8px 4px 0;
+  a {
+    color: @text-color-link;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 14px;
+  min-height: 44px;
+  & + & {
+    border-top: 1px solid @settings-line;
+  }
+  &.disabled .settings-row-label,
+  &.disabled .settings-row-control > :not(.settings-pill) {
+    opacity: 0.5;
+  }
+}
+.settings-row-title {
+  font-weight: 500;
+}
+.settings-row-description {
+  color: @text-color-subtle;
+  font-size: 12px;
+  margin-top: 1px;
+  max-width: 470px;
+  a {
+    color: @text-color-link;
+    cursor: pointer;
+  }
+}
+.settings-row-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.settings-select {
+  height: 26px;
+  border-radius: 6px;
+  padding: 0 24px 0 9px;
+  margin: 0;
+  max-width: 260px;
+}
+
+.slide-switch.settings-switch {
+  height: 20px;
+  width: 34px;
+  box-shadow: none;
+  background-color: color-mix(in srgb, @text-color 18%, transparent);
+  flex: none;
+  cursor: pointer;
+  transition: background-color 150ms;
+  .handle {
+    width: 16px;
+    height: 16px;
+    top: 2px;
+    left: 2px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    background-color: #fff;
+  }
+  &.active {
+    background-color: @accent-primary;
+    .handle {
+      left: 16px;
+    }
+  }
+  &.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  &:focus {
+    outline: none;
+    box-shadow: none;
+  }
+  &:focus-visible {
+    outline: 2px solid @accent-primary;
+    outline-offset: 2px;
+  }
+}
+
+.settings-segmented {
+  display: inline-flex;
+  background: color-mix(in srgb, @text-color 8%, transparent);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+  button {
+    border: none;
+    background: transparent;
+    padding: 3px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    color: @text-color-subtle;
+    font-weight: 500;
+    font-size: 12.5px;
+    &.on {
+      background: @background-primary;
+      color: @text-color;
+      box-shadow: 0 0 0 1px color-mix(in srgb, @text-color 16%, transparent),
+        0 1px 2px rgba(0, 0, 0, 0.14);
+    }
+    &:disabled {
+      cursor: not-allowed;
+    }
+    &:focus-visible {
+      outline: 2px solid @accent-primary;
+    }
+  }
+}
+
+.settings-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  &.ok {
+    color: @color-success;
+    background: color-mix(in srgb, @color-success 14%, transparent);
+  }
+  &.warn {
+    color: darken(@color-warning, 12%);
+    background: color-mix(in srgb, @color-warning 18%, transparent);
+  }
+  &.bad {
+    color: @color-danger;
+    background: color-mix(in srgb, @color-danger 12%, transparent);
+  }
+  &.off {
+    color: @text-color-subtle;
+    background: @settings-soft;
+  }
+  &.server {
+    color: @accent-primary;
+    background: color-mix(in srgb, @accent-primary 12%, transparent);
+    &::before {
+      display: none;
+    }
+  }
+}
+
+.settings-provider {
+  & + & {
+    border-top: 1px solid @settings-line;
+  }
+}
+.settings-provider-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 14px;
+  outline: none;
+  .settings-provider.expandable & {
+    cursor: pointer;
+    &:hover {
+      background: @settings-soft;
+    }
+    &:focus-visible {
+      box-shadow: inset 0 0 0 2px @accent-primary;
+    }
+  }
+}
+.settings-provider-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: #fff;
+  flex: none;
+}
+.settings-provider-title {
+  font-weight: 550;
+}
+.settings-provider-subtitle {
+  color: @text-color-subtle;
+  font-size: 12px;
+}
+.settings-provider-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.settings-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid @text-color-very-subtle;
+  border-bottom: 1.6px solid @text-color-very-subtle;
+  transform: rotate(-45deg);
+  margin: 0 4px 0 2px;
+  transition: transform 150ms;
+  .settings-provider.open & {
+    transform: rotate(45deg);
+  }
+}
+.settings-provider-body {
+  padding: 0 14px 14px 58px;
+}
+
+.settings-field {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+  > label {
+    color: @text-color-subtle;
+    margin: 0;
+  }
+  input[type='text'],
+  input[type='password'],
+  input[type='url'],
+  select {
+    width: 100%;
+    margin: 0;
+  }
+}
+
+.settings-privacy {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: @settings-soft;
+  color: @text-color-subtle;
+  font-size: 12px;
+  .settings-privacy-icon {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: @text-color-very-subtle;
+  }
+  &.local .settings-privacy-icon {
+    background: @color-success;
+  }
+  &.warn .settings-privacy-icon {
+    background: @color-warning;
+  }
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  .spacer {
+    flex: 1;
+  }
+}

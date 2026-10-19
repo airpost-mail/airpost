@@ -795,6 +795,7 @@ added later through it, instead of importing `MailsyncProcess`.
 | 9 | search in the engine | `structuredSearch(ast)` deprecated in favour of `Query.searchText`; date terms outside the documented subset fail |
 | 13 | draft pipeline in the engine | send hooks don't run for CLI, MCP or engine-executed sends (documented) |
 | 18 (1.32.0) | calendar and contacts in the engine | `ICSEventHelpers` deprecated (every function throws) and its types gone except `CalendarConflict`, now the engine's; `CalendarUtils.resolveIanaZone` and `createVTIMEZONEString` deprecated (they throw), all three removed in 2.0.0; `SyncbackEventTask` gains `restore` and `tz` |
+| Preferences (1.33.0) | sidebar in place of the tab strip | tabs that pass no `group` are listed under "From plugins"; the `.container-preference-tabs` / `.preferences-tabs` markup is gone, so theme or plugin CSS that targeted it no longer applies; content padding moves to `SettingsPage`, older tabs keep theirs |
 | 2.0.0 | removals | `MailsyncProcess`, `KeyManager`, `MailRulesProcessor`, `IMAPSearchQueryBackend`, `QuerySubscriptionPool` internals, `MailspringTestUtils`, `ICSEventHelpers` |
 
 Plugins can't define new Task classes (the engine rejects unknown `__cls`), which is already

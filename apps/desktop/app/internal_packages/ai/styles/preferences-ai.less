@@ -1,0 +1,144 @@
+@import 'ui-variables';
+
+@ai-line: color-mix(in srgb, @text-color 9%, transparent);
+
+.preferences-ai {
+  .ai-inline {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    input {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+    }
+    input.ai-tokens {
+      flex: none;
+      width: 110px;
+    }
+    .btn {
+      margin: 0;
+      flex: none;
+    }
+  }
+  .ai-field-unit,
+  .ai-field-note {
+    color: @text-color-subtle;
+    font-size: 12px;
+  }
+  .ai-field-note {
+    margin-top: 4px;
+  }
+
+  .settings-actions {
+    flex-wrap: wrap;
+    .btn {
+      margin: 0;
+    }
+  }
+  .ai-result {
+    font-size: 12px;
+    &.ok {
+      color: @color-success;
+    }
+    &.failed {
+      color: @color-danger;
+    }
+  }
+
+  .ai-empty {
+    padding: 14px;
+    color: @text-color-subtle;
+  }
+
+  .ai-add-model {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    select.settings-select {
+      field-sizing: content;
+      appearance: none;
+      background-image: none;
+      padding: 0;
+      border: none;
+      box-shadow: none;
+      background-color: transparent;
+      color: @text-color-link;
+      font-weight: 500;
+      cursor: pointer;
+    }
+  }
+
+  .ai-status {
+    display: block;
+    color: darken(@color-warning, 12%);
+  }
+
+  .ai-triage-progress {
+    color: @text-color-subtle;
+    font-size: 12px;
+  }
+
+  .ai-usage-bars {
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    height: 26px;
+    i {
+      width: 6px;
+      border-radius: 2px;
+      background: color-mix(in srgb, @accent-primary 55%, transparent);
+      &:last-child {
+        background: @accent-primary;
+      }
+    }
+  }
+
+  .ai-disclosure {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    .settings-chevron {
+      margin: 0 2px;
+      transform: rotate(-45deg);
+    }
+    &[aria-expanded='true'] .settings-chevron {
+      transform: rotate(45deg);
+    }
+    &:focus-visible {
+      outline: 2px solid @accent-primary;
+      outline-offset: 2px;
+    }
+  }
+
+  .ai-sent-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: 9px 14px;
+    }
+    th {
+      color: @text-color-subtle;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    tr + tr td,
+    tbody tr:first-child td {
+      border-top: 1px solid @ai-line;
+    }
+    td:first-child {
+      font-weight: 500;
+      white-space: nowrap;
+    }
+  }
+}

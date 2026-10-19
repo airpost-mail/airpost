@@ -29,14 +29,14 @@ function readConfig(): any {
 // --- Signatures ---
 
 test('creating a signature persists it to config.json', async () => {
-  await mainWindow.locator('.preferences-tabs .item:has-text("Signatures")').click();
+  await mainWindow.locator('.preferences-sidebar-item:has-text("Signatures")').click();
   await mainWindow.waitForTimeout(500);
 
-  // Click the + button to add a new signature
+  // Click "+ New signature" to add a new signature
   const sigContainer = mainWindow.locator('.preferences-signatures-container');
   await expect(sigContainer).toBeVisible({ timeout: 3_000 });
 
-  const addButton = sigContainer.locator('.signature-list .btn-editable-list').first();
+  const addButton = sigContainer.locator('.signature-list .settings-split-new');
   await addButton.click();
   await mainWindow.waitForTimeout(500);
 
@@ -51,7 +51,7 @@ test('creating a signature persists it to config.json', async () => {
   await mainWindow.waitForTimeout(500);
 
   // Fill in the Name field in the Information section
-  const nameField = sigContainer.locator('.section.information #name');
+  const nameField = sigContainer.locator('.signature-information #name');
   if (await nameField.count() > 0) {
     await nameField.fill('');
     await nameField.type('Jane Doe');
@@ -75,14 +75,14 @@ test('creating a signature persists it to config.json', async () => {
 // --- Templates ---
 
 test('creating a template persists it as an HTML file and renaming updates the file', async () => {
-  await mainWindow.locator('.preferences-tabs .item:has-text("Templates")').click();
+  await mainWindow.locator('.preferences-sidebar-item:has-text("Templates")').click();
   await mainWindow.waitForTimeout(500);
 
   const templatesContainer = mainWindow.locator('.preferences-templates-container');
   await expect(templatesContainer).toBeVisible({ timeout: 3_000 });
 
-  // Click the + button to create a new template
-  const addButton = templatesContainer.locator('.template-list .btn-editable-list').first();
+  // Click "+ New template" to create a new template
+  const addButton = templatesContainer.locator('.template-list .settings-split-new');
   await addButton.click();
   await mainWindow.waitForTimeout(1_000);
 
@@ -128,8 +128,7 @@ test("a template's subject line is saved into the template file", async () => {
   const templatesContainer = mainWindow.locator('.preferences-templates-container');
   await expect(templatesContainer).toBeVisible({ timeout: 3_000 });
 
-  // Creating a template does not select it, so select the renamed one to
-  // enable the editor, then give it a subject line.
+  // Select the renamed template, then give it a subject line.
   await templatesContainer
     .locator('.template-list .list-item:has-text("My Test Template")')
     .click();
@@ -156,29 +155,22 @@ test("a template's subject line is saved into the template file", async () => {
 // --- Mail Rules ---
 
 test('creating a mail rule stores it in the mailRules config key', async () => {
-  await mainWindow.locator('.preferences-tabs .item:has-text("Mail Rules")').click();
+  await mainWindow.locator('.preferences-sidebar-item:has-text("Rules")').click();
   await mainWindow.waitForTimeout(500);
 
   const rulesContainer = mainWindow.locator('.container-mail-rules');
   await expect(rulesContainer).toBeVisible({ timeout: 3_000 });
 
-  // Create a new rule — either via the empty state button or the + button
-  const emptyButton = rulesContainer.locator('.empty-list .btn:has-text("Create a new Rule")');
-  const addButton = rulesContainer.locator('.rule-list .btn-editable-list').first();
-
-  if (await emptyButton.count() > 0) {
-    await emptyButton.click();
-  } else {
-    await addButton.click();
-  }
+  // Create a new rule
+  await rulesContainer.locator('.mail-rules-new').click();
   await mainWindow.waitForTimeout(500);
 
-  // A new "Untitled Rule" should appear and be selected
-  const selectedItem = rulesContainer.locator('.rule-list .list-item.selected');
-  await expect(selectedItem).toBeVisible({ timeout: 3_000 });
+  // A new "Untitled Rule" should appear with its editor open
+  const editingRule = rulesContainer.locator('.mail-rule.editing:has-text("Untitled Rule")');
+  await expect(editingRule).toBeVisible({ timeout: 3_000 });
 
   // The rule detail panel should show condition and action editors
-  const ruleDetail = rulesContainer.locator('.rule-detail .inner');
+  const ruleDetail = editingRule.locator('.rule-detail .inner');
   await expect(ruleDetail).toBeVisible({ timeout: 3_000 });
 
   // Edit the condition: set the value input to a test email

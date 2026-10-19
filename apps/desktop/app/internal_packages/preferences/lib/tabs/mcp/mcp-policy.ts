@@ -17,6 +17,9 @@ export interface AccountPolicy {
 }
 
 export interface McpPolicy {
+  /** False refuses every tool call. Absent means on, as for tern-mcp, so it is only written
+   * once the user flips the switch. */
+  enabled?: boolean;
   accessLevel: string;
   /** Empty means every account. */
   enabledAccounts: { [accountId: string]: AccountPolicy };
@@ -38,6 +41,10 @@ const isObject = (v: unknown): v is { [key: string]: unknown } =>
 export function parsePolicy(raw: unknown): McpPolicy {
   if (!isObject(raw)) throw new Error('not a JSON object');
   const policy = defaultPolicy();
+  if (raw.enabled !== undefined) {
+    if (typeof raw.enabled !== 'boolean') throw new Error('enabled is not true or false');
+    policy.enabled = raw.enabled;
+  }
   if (raw.accessLevel !== undefined && raw.accessLevel !== null) {
     if (typeof raw.accessLevel !== 'string') throw new Error('accessLevel is not a string');
     policy.accessLevel = raw.accessLevel;

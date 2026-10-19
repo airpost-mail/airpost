@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Flexbox } from 'mailspring-component-kit';
+import classnames from 'classnames';
 import { localized } from 'mailspring-exports';
 import fs from 'fs';
 
@@ -94,21 +94,40 @@ export default class CommandKeybinding extends React.Component<
       .join('+');
   }
 
+  /** "⌘⇧C" or "Ctrl+Shift+C" as one chip per key. */
+  _keyParts(formatted: string) {
+    if (process.platform !== 'darwin') return formatted.split(/\+(?!$)/);
+    const parts = [];
+    let rest = formatted;
+    while (rest.length > 1 && '⌘⌥⇧^'.includes(rest[0])) {
+      parts.push(rest[0]);
+      rest = rest.slice(1);
+    }
+    return [...parts, rest];
+  }
+
   _renderKeystrokes = (keystrokes: string, idx: number) => {
     const elements = [];
     const splitKeystrokes = keystrokes.split(' ');
     splitKeystrokes.forEach((keystroke, kidx) => {
-      elements.push(<span key={kidx}>{this._formatKeystrokes(keystroke)}</span>);
+      for (const [pidx, part] of this._keyParts(this._formatKeystrokes(keystroke)).entries()) {
+        elements.push(
+          <kbd key={`${kidx}-${pidx}`} className="shortcut-key">
+            {part.length === 1 ? part.toUpperCase() : part}
+          </kbd>
+        );
+      }
       if (kidx < splitKeystrokes.length - 1) {
         elements.push(
           <span className="then" key={`then${kidx}`}>
-            {` ${localized('then')} `}
+            {localized('then')}
           </span>
         );
       }
     });
     return (
       <span key={`keystrokes-${idx}`} className="shortcut-value">
+        {idx > 0 && <span className="or">{localized('or')}</span>}
         {elements}
       </span>
     );
@@ -188,8 +207,10 @@ export default class CommandKeybinding extends React.Component<
     const { editing, editingBinding } = this.state;
     const bindings = editingBinding ? [editingBinding] : this.props.bindings;
 
-    let value: React.ReactChild | React.ReactChild[] = 'None';
-    if (bindings.length > 0) {
+    let value: React.ReactNode = <span className="shortcut-none">{localized('None')}</span>;
+    if (editing && !editingBinding) {
+      value = <span className="shortcut-prompt">{localized('Press the new keys')}</span>;
+    } else if (bindings.length > 0) {
       // Templates may list mod+a and ctrl+a for one command; they are the same key
       // on Windows and Linux, so dedupe by what the user would actually press.
       const mod = process.platform === 'darwin' ? 'command' : 'ctrl';
@@ -197,24 +218,21 @@ export default class CommandKeybinding extends React.Component<
       value = [...byKey.values()].map(this._renderKeystrokes);
     }
 
-    let classnames = 'shortcut';
-    if (editing) {
-      classnames += ' editing';
-    }
     return (
-      <Flexbox
-        className={classnames}
+      <div
+        className={classnames('settings-row shortcut-row', { editing })}
         tabIndex={-1}
+        aria-label={localized('Change the shortcut for %@', this.props.label)}
         onKeyDown={this._onKey}
         onKeyPress={this._onKey}
         onFocus={this._onEdit}
         onBlur={this._onFinishedEditing}
       >
-        <div className="col-left shortcut-name">{this.props.label}</div>
-        <div className="col-right">
-          <div className="values">{value}</div>
+        <div className="settings-row-label">
+          <div className="settings-row-title">{this.props.label}</div>
         </div>
-      </Flexbox>
+        <div className="settings-row-control shortcut-values">{value}</div>
+      </div>
     );
   }
 }

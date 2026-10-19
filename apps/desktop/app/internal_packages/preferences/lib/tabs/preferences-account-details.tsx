@@ -1,46 +1,58 @@
 /* eslint global-require: 0 */
 import fs from 'fs';
 import React, { Component } from 'react';
-import { shell, ipcRenderer } from 'electron';
-import { EditableList } from 'mailspring-component-kit';
+import classnames from 'classnames';
+import { ipcRenderer } from 'electron';
+import { SettingsSection, SettingsRow, SettingsCard } from 'mailspring-component-kit';
 import { localized, RegExpUtils, Account, AccountAutoaddress } from 'mailspring-exports';
 import { developerToolsAvailable } from '../../../../src/developer-tools';
 
-interface AutoaddressControlProps {
-  autoaddress: AccountAutoaddress;
-  onChange: (obj: AccountAutoaddress) => void;
-  onSaveChanges: () => void;
-}
+/** One address the account sends from, shown as text until the user edits it. */
+class AliasRow extends Component<
+  { alias: string; onSave: (value: string) => void; onRemove: () => void },
+  { editing: boolean; value: string }
+> {
+  state = { editing: false, value: this.props.alias };
 
-class AutoaddressControl extends Component<AutoaddressControlProps> {
+  _save = () => {
+    const value = this.state.value.trim();
+    this.setState({ editing: false });
+    if (value && value !== this.props.alias) this.props.onSave(value);
+  };
+
   render() {
-    const { autoaddress, onChange, onSaveChanges } = this.props;
-
-    return (
-      <div>
-        <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 3 }}>
-          {localized('When composing, automatically')}
-          <select
-            aria-label={localized('Automatically CC or BCC recipients')}
-            style={{ marginTop: 0, marginLeft: 8 }}
-            value={autoaddress.type}
-            onChange={(e) => onChange({ ...autoaddress, type: e.target.value as 'cc' | 'bcc' })}
-            onBlur={onSaveChanges}
-          >
-            <option value="cc">{localized('Cc')}</option>
-            <option value="bcc">{localized('Bcc')}</option>
-          </select>
-          :
+    const { alias, onRemove } = this.props;
+    if (this.state.editing) {
+      return (
+        <div className="settings-row alias-input-row">
+          <input
+            type="text"
+            autoFocus
+            aria-label={localized('Address')}
+            value={this.state.value}
+            onChange={(e) => this.setState({ value: e.target.value })}
+            onBlur={this._save}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') this._save();
+              if (e.key === 'Escape') this.setState({ editing: false, value: alias });
+            }}
+          />
         </div>
-        <input
-          type="text"
-          aria-label={localized('Comma-separated email addresses to automatically CC or BCC')}
-          value={autoaddress.value}
-          onChange={(e) => onChange({ ...autoaddress, value: e.target.value })}
-          onBlur={onSaveChanges}
-          placeholder={localized('Comma-separated email addresses')}
-        />
-      </div>
+      );
+    }
+    return (
+      <SettingsRow label={<span dir="auto">{alias}</span>}>
+        <button
+          className="btn"
+          onClick={() => this.setState({ editing: true, value: alias })}
+          aria-label={localized('Edit %@', alias)}
+        >
+          {localized('Edit')}
+        </button>
+        <button className="btn" onClick={onRemove} aria-label={localized('Remove %@', alias)}>
+          {localized('Remove')}
+        </button>
+      </SettingsRow>
     );
   }
 }
@@ -50,14 +62,16 @@ class PreferencesAccountDetails extends Component<
     account: Account;
     isOffline: boolean;
     onAccountUpdated: (account: Account, newAccount: Account) => void;
+    onRemoveAccount?: (account: Account) => void;
   },
   {
     account: Account;
+    newAlias: string;
   }
 > {
   constructor(props) {
     super(props);
-    this.state = { account: props.account.clone() };
+    this.state = { account: props.account.clone(), newAlias: '' };
   }
 
   componentDidUpdate(prevProps: {
@@ -147,6 +161,13 @@ class PreferencesAccountDetails extends Component<
     this._setStateAndSave({ aliases, defaultAlias });
   };
 
+  _onAddAlias = () => {
+    const value = this.state.newAlias.trim();
+    if (!value) return;
+    this.setState({ newAlias: '' });
+    this._onAccountAliasCreated(value);
+  };
+
   _onDefaultAliasSelected = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const defaultAlias = event.target.value === 'None' ? null : event.target.value;
     this._setStateAndSave({ defaultAlias });
@@ -191,8 +212,19 @@ class PreferencesAccountDetails extends Component<
     this._saveChanges();
   };
 
-  _onContactSupport = () => {
-    shell.openExternal('https://github.com/ternmail/ternmail/issues');
+  _onRemoveAccount = () => {
+    const { account } = this.props;
+    const chosen = require('@electron/remote').dialog.showMessageBoxSync({
+      type: 'warning',
+      message: localized('Remove %@?', account.emailAddress),
+      detail: localized(
+        "Its mail is deleted from this computer. Your mail stays on your provider's server."
+      ),
+      buttons: [localized('Cancel'), localized('Remove')],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (chosen === 1) this.props.onRemoveAccount?.(account);
   };
 
   _onShowErrorDetails = async () => {
@@ -239,22 +271,30 @@ class PreferencesAccountDetails extends Component<
 
   // Renderers
 
-  _renderErrorDetail(
-    message,
-    actions: { text: string; action: () => void }[],
-    { offline }: { offline?: boolean } = {}
+  _renderBanner(
+    kind: 'bad' | 'warn',
+    title: string,
+    detail: string,
+    primary: { text: string; action: () => void }
   ) {
     return (
-      <div className={`account-error-detail${offline ? ' offline' : ''}`}>
-        <div className="message">{message}</div>
-        <div style={{ display: 'flex', flexShrink: 0 }}>
-          {actions.map(({ text, action }) => (
-            <a className="action" onClick={action} key={text}>
-              {text}
-            </a>
-          ))}
+      <SettingsCard className={`account-banner ${kind}`}>
+        <div className="account-banner-icon" aria-hidden>
+          !
         </div>
-      </div>
+        <div className="account-banner-text" role="alert">
+          <div className="account-banner-title">{title}</div>
+          <div className="account-banner-detail">{detail}</div>
+        </div>
+        <div className="account-banner-actions">
+          <button className="btn" onClick={this._onShowErrorDetails}>
+            {localized('Error details')}
+          </button>
+          <button className="btn btn-emphasis" onClick={primary.action}>
+            {primary.text}
+          </button>
+        </div>
+      </SettingsCard>
     );
   }
 
@@ -263,144 +303,240 @@ class PreferencesAccountDetails extends Component<
 
     switch (account.syncState) {
       case Account.SYNC_STATE_AUTH_FAILED:
-        return this._renderErrorDetail(
+        return this._renderBanner(
+          'bad',
+          localized("Tern can't sign in to %@", account.emailAddress),
           localized(
-            `Tern can no longer authenticate with %@. The password or authentication may have changed.`,
-            account.emailAddress
+            'The password or sign-in may have changed. Mail for this account has stopped syncing until you reconnect.'
           ),
-          [
-            { text: localized('Reconnect'), action: this._onReconnect },
-            { text: localized('Error Details...'), action: this._onShowErrorDetails },
-          ]
+          { text: localized('Reconnect'), action: this._onReconnect }
         );
       case Account.SYNC_STATE_ERROR:
-        return this._renderErrorDetail(
+        return this._renderBanner(
+          'bad',
+          localized('Mail for %@ stopped syncing', account.emailAddress),
           localized(
-            `Tern encountered errors syncing this account. Crash reports have been sent to the Tern team and we'll work to fix these errors in the next release.`
+            'Tern ran into an error it could not get past. Reconnecting often fixes it; if it keeps happening, rebuild the account below.'
           ),
-          [
-            { text: localized('Reconnect'), action: this._onReconnect },
-            { text: localized('Error Details...'), action: this._onShowErrorDetails },
-          ]
+          { text: localized('Reconnect'), action: this._onReconnect }
         );
       default:
         if (!this.props.isOffline) {
           return null;
         }
-        return this._renderErrorDetail(
+        return this._renderBanner(
+          'warn',
+          localized("Tern can't reach %@", account.settings.imap_host || account.emailAddress),
           localized(
-            `Tern can't connect to %@ and will keep retrying. This usually means your computer is offline. If your internet connection is working, your mail provider may be having trouble.`,
-            account.settings.imap_host || account.emailAddress
+            'It will keep trying. Your computer may be offline, or your mail provider may be having trouble.'
           ),
-          [
-            {
-              text: localized('Try now'),
-              action: () => AppEnv.mailsyncBridge.sendSyncMailNow(),
-            },
-            { text: localized('Error Details...'), action: this._onShowErrorDetails },
-          ],
-          { offline: true }
+          { text: localized('Try now'), action: () => AppEnv.mailsyncBridge.sendSyncMailNow() }
         );
     }
   }
 
-  render() {
+  _renderConnectionRow() {
     const { account } = this.state;
+    if (account.usesOAuth()) {
+      return (
+        <SettingsRow
+          label={localized('Signed in with %@', account.displayProvider())}
+          description={localized('Sign in again if Tern stops getting your mail.')}
+        >
+          <button className="btn" onClick={this._onReconnect}>
+            {localized('Sign in again…')}
+          </button>
+        </SettingsRow>
+      );
+    }
+    const host = account.settings.imap_host;
+    return (
+      <SettingsRow
+        label={
+          host
+            ? localized('Connected to %@', host)
+            : localized('Connected with %@', account.displayProvider())
+        }
+        description={localized('Change the password, servers or ports Tern uses.')}
+      >
+        <button className="btn" onClick={this._onReconnect}>
+          {localized('Update connection settings…')}
+        </button>
+      </SettingsRow>
+    );
+  }
+
+  render() {
+    const { account, newAlias } = this.state;
     const aliasPlaceholder = this._makeAlias(`alias@${account.emailAddress.split('@')[1]}`);
     const aliases = account.aliases;
     const defaultAlias = account.defaultAlias || 'None';
+    const { autoaddress } = account;
 
     return (
       <div className="account-details">
         {this._renderSyncErrorDetails()}
-        <label htmlFor="account-label">
-          <h6>{localized('Account Label')}</h6>
-        </label>
-        <input
-          id="account-label"
-          type="text"
-          value={account.label}
-          onBlur={this._saveChanges}
-          onChange={(e) => this._setState({ label: e.target.value })}
-        />
-        <label htmlFor="account-sender-name">
-          <h6>{localized('Sender Name')}</h6>
-        </label>
-        <input
-          id="account-sender-name"
-          type="text"
-          value={account.name}
-          onBlur={this._saveChanges}
-          onChange={(e) => this._setState({ name: e.target.value })}
-        />
-        <h6>{localized('Automatic CC / BCC')}</h6>
-        <AutoaddressControl
-          autoaddress={account.autoaddress}
-          onChange={this._onAccountAutoaddressUpdated}
-          onSaveChanges={this._saveChanges}
-        />
-        <h6>{localized('Aliases')}</h6>
-        <div className="platform-note">
-          {localized(
-            'You may need to configure aliases with your mail provider (Outlook, Gmail) before using them.'
-          )}
-        </div>
-        <EditableList
-          showEditIcon
-          items={account.aliases}
-          createInputProps={{ placeholder: aliasPlaceholder }}
-          onItemCreated={this._onAccountAliasCreated}
-          onItemEdited={this._onAccountAliasUpdated}
-          onDeleteItem={this._onAccountAliasRemoved}
-        />
-        {aliases.length > 0 ? (
-          <div className="default-alias-selector">
-            <div>{localized('Default for new messages:')}</div>
-            <select value={defaultAlias} onChange={this._onDefaultAliasSelected}>
-              <option value="None">{`${account.name} <${account.emailAddress}>`}</option>
-              {aliases.map((alias, idx) => (
-                <option key={`alias-${idx}`} value={alias}>
-                  {alias}
-                </option>
-              ))}
+
+        <SettingsSection title={<span dir="auto">{account.label}</span>}>
+          <SettingsRow label={localized('Name in the sidebar')}>
+            <input
+              id="account-label"
+              type="text"
+              aria-label={localized('Name in the sidebar')}
+              value={account.label}
+              onBlur={this._saveChanges}
+              onChange={(e) => this._setState({ label: e.target.value })}
+            />
+          </SettingsRow>
+          <SettingsRow label={localized('Your name on sent mail')}>
+            <input
+              id="account-sender-name"
+              type="text"
+              aria-label={localized('Your name on sent mail')}
+              value={account.name}
+              onBlur={this._saveChanges}
+              onChange={(e) => this._setState({ name: e.target.value })}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={localized('Colour')}
+            description={localized('Marks this account in the sidebar and message list.')}
+          >
+            <input
+              id="account-color"
+              type="color"
+              aria-label={localized('Colour')}
+              className={classnames({ unset: !account.color })}
+              value={account.color || '#000000'}
+              onBlur={this._saveChanges}
+              onChange={(e) => this._onSetColor({ color: e.target.value })}
+            />
+            {account.color ? (
+              <button className="btn" onClick={this._onResetColor}>
+                {localized('No colour')}
+              </button>
+            ) : (
+              <span className="account-color-none">{localized('None')}</span>
+            )}
+          </SettingsRow>
+          <SettingsRow
+            label={localized('Always copy')}
+            description={localized('Adds these addresses to every message you write.')}
+            className="autoaddress-row"
+          >
+            <select
+              className="settings-select"
+              aria-label={localized('Cc or Bcc')}
+              value={autoaddress.type}
+              onChange={(e) =>
+                this._setStateAndSave({
+                  autoaddress: { ...autoaddress, type: e.target.value as 'cc' | 'bcc' },
+                })
+              }
+            >
+              <option value="cc">{localized('Cc')}</option>
+              <option value="bcc">{localized('Bcc')}</option>
             </select>
-          </div>
-        ) : undefined}
-        <label htmlFor="account-color">
-          <h6>{localized('Account Color')}</h6>
-        </label>
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <input
-            id="account-color"
-            type="color"
-            value={account.color}
-            onBlur={this._saveChanges}
-            onChange={(e) => this._onSetColor({ color: e.target.value })}
-          />
-          <div className="btn" style={{ marginLeft: 6 }} onClick={this._onResetColor}>
-            {localized('Reset Account Color')}
-          </div>
-        </div>
-        <h6>{localized('Account Settings')}</h6>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          <div className="btn" onClick={this._onManageContacts}>
-            {localized('Manage Contacts')}
-          </div>
-          <div className="btn" onClick={this._onReconnect}>
-            {account.provider === 'gmail'
-              ? localized('Re-authenticate...')
-              : localized('Update Connection Settings...')}
-          </div>
-          {account.provider === 'office365' && (
-            <div className="btn" onClick={this._onAddSharedMailbox}>
-              {localized('Add Shared Mailbox...')}
-            </div>
+            <input
+              type="text"
+              aria-label={localized('Addresses to copy, separated by commas')}
+              value={autoaddress.value}
+              onChange={(e) =>
+                this._onAccountAutoaddressUpdated({ ...autoaddress, value: e.target.value })
+              }
+              onBlur={this._saveChanges}
+              placeholder={localized('Addresses, comma-separated')}
+            />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection
+          title={localized('Other addresses you send from')}
+          note={localized(
+            'Most providers only send from an address you have set up with them first.'
           )}
-        </div>
-        <h6>{localized('Local Data')}</h6>
-        <div className="btn" onClick={this._onResetCache}>
-          {localized('Rebuild Cache...')}
-        </div>
+        >
+          {aliases.map((alias, idx) => (
+            <AliasRow
+              key={`${idx}-${alias}`}
+              alias={alias}
+              onSave={(value) => this._onAccountAliasUpdated(value, alias, idx)}
+              onRemove={() => this._onAccountAliasRemoved(alias, idx)}
+            />
+          ))}
+          <div className="settings-row alias-input-row">
+            <input
+              type="text"
+              aria-label={localized('New address')}
+              placeholder={aliasPlaceholder}
+              value={newAlias}
+              onChange={(e) => this.setState({ newAlias: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && this._onAddAlias()}
+            />
+            <button className="btn" disabled={!newAlias.trim()} onClick={this._onAddAlias}>
+              {localized('Add')}
+            </button>
+          </div>
+          {aliases.length > 0 && (
+            <SettingsRow label={localized('New messages from')}>
+              <select
+                className="settings-select"
+                aria-label={localized('New messages from')}
+                value={defaultAlias}
+                onChange={this._onDefaultAliasSelected}
+              >
+                <option value="None">{`${account.name} <${account.emailAddress}>`}</option>
+                {aliases.map((alias, idx) => (
+                  <option key={`alias-${idx}`} value={alias}>
+                    {alias}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+          )}
+        </SettingsSection>
+
+        <SettingsSection title={localized('Connection')}>
+          {this._renderConnectionRow()}
+          {account.provider === 'office365' && (
+            <SettingsRow
+              label={localized('Shared mailbox')}
+              description={localized('Add a mailbox other people in your organisation share.')}
+            >
+              <button className="btn" onClick={this._onAddSharedMailbox}>
+                {localized('Add shared mailbox…')}
+              </button>
+            </SettingsRow>
+          )}
+          <SettingsRow label={localized('Contacts')}>
+            <button className="btn" onClick={this._onManageContacts}>
+              {localized('Manage contacts')}
+            </button>
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title={localized('On this computer')}>
+          <SettingsRow
+            label={localized('Rebuild this account')}
+            description={localized(
+              'Downloads its mail again. Use it when mail is missing or looks wrong. It can take a while for a large mailbox.'
+            )}
+          >
+            <button className="btn" onClick={this._onResetCache}>
+              {localized('Rebuild…')}
+            </button>
+          </SettingsRow>
+          <SettingsRow
+            label={localized('Remove this account')}
+            description={localized(
+              "Deletes its mail from this computer. Your mail stays on your provider's server."
+            )}
+          >
+            <button className="btn btn-danger" onClick={this._onRemoveAccount}>
+              {localized('Remove…')}
+            </button>
+          </SettingsRow>
+        </SettingsSection>
       </div>
     );
   }

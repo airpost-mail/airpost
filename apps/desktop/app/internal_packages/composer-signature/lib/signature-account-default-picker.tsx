@@ -20,19 +20,25 @@ export default class SignatureAccountDefaultPicker extends React.Component<Signa
       defaults[accountOrAlias.email] === signature.id;
     const checked = accountsAndAliases.filter(isChecked);
 
-    const noun = checked.length === 1 ? localized('Account') : localized('Accounts');
+    let buttonText: string;
+    if (checked.length === 0) {
+      buttonText = localized('No accounts');
+    } else if (checked.length === 1) {
+      buttonText = checked[0].email;
+    } else {
+      buttonText = `${checked.length} ${localized('accounts')}`;
+    }
 
     return (
       <div className="account-picker">
-        {localized('Default for:')}{' '}
         <MultiselectDropdown
           className="account-dropdown"
           items={accountsAndAliases}
           itemChecked={isChecked}
           itemContent={(accountOrAlias) => accountOrAlias.email}
           itemKey={(a) => a.id}
-          attachment={'right'}
-          buttonText={`${checked.length} ${noun}`}
+          attachment={'left'}
+          buttonText={buttonText}
           onToggleItem={this._onToggleAccount}
         />
       </div>

@@ -61,7 +61,10 @@ export function activate() {
     tabId: 'AI',
     displayName: localized('AI'),
     componentClassFn: () => require('./preferences-ai').default,
-    order: 3.5,
+    order: 20,
+    group: 'connected',
+    keywords:
+      'ai model summary summaries triage reply suggestions ollama anthropic openai llm'.split(' '),
   });
   PreferencesUIStore.registerPreferencesTab(preferencesTab);
   ComponentRegistry.register(ThreadSummary, { role: 'MessageListHeaders' });

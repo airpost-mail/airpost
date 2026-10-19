@@ -2,7 +2,7 @@ import React from 'react';
 import { localized, DefaultClientHelper, SystemStartService } from 'mailspring-exports';
 import { shell } from 'electron';
 
-import ConfigSchemaItem from './config-schema-item';
+import { SettingsRow, SettingsSwitch } from 'mailspring-component-kit';
 
 interface DefaultMailClientItemState {
   defaultClient: boolean | 'unknown';
@@ -13,17 +13,15 @@ const DELAY_FOR_SHEET_ANIMATION = 25;
 const helper = new DefaultClientHelper();
 const service = new SystemStartService();
 
-class DefaultMailClientItem extends React.Component<
+export class DefaultMailClientRow extends React.Component<
   Record<string, unknown>,
   DefaultMailClientItemState
 > {
   _mounted = false;
-
   state: DefaultMailClientItemState = { defaultClient: helper.available() ? false : 'unknown' };
 
   async componentDidMount() {
     this._mounted = true;
-
     if (helper.available()) {
       await Promise.delay(DELAY_FOR_SHEET_ANIMATION);
       if (!this._mounted) return;
@@ -38,48 +36,46 @@ class DefaultMailClientItem extends React.Component<
     this._mounted = false;
   }
 
-  toggleDefaultMailClient = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (this.state.defaultClient) {
-      this.setState({ defaultClient: false });
-      helper.resetURLScheme('mailto');
-    } else {
-      this.setState({ defaultClient: true });
-      helper.registerForURLScheme('mailto');
+  _onMakeDefault = () => {
+    if (this.state.defaultClient === 'unknown') {
+      if (process.platform === 'win32') {
+        helper.registerForURLScheme('mailto');
+      } else {
+        shell.openExternal('https://github.com/ternmail/ternmail#readme');
+      }
+      return;
     }
-    event.target.blur();
+    this.setState({ defaultClient: true });
+    helper.registerForURLScheme('mailto');
+  };
+
+  _onReset = () => {
+    this.setState({ defaultClient: false });
+    helper.resetURLScheme('mailto');
   };
 
   render() {
-    if (this.state.defaultClient === 'unknown') {
+    if (this.state.defaultClient === true) {
       return (
-        <div className="item">
-          <div
-            style={{ marginBottom: 12 }}
-            className="btn btn-small"
-            onClick={() => {
-              if (process.platform === 'win32') {
-                helper.registerForURLScheme('mailto');
-              } else {
-                shell.openExternal('https://github.com/ternmail/ternmail#readme');
-              }
-            }}
-          >
-            {localized('Use Tern as default mail client')}
-          </div>
-        </div>
+        <SettingsRow
+          label={localized('Tern is your default mail app')}
+          description={localized('Mail links in other apps open in Tern.')}
+        >
+          <button className="btn" onClick={this._onReset}>
+            {localized('Stop using Tern')}
+          </button>
+        </SettingsRow>
       );
     }
-
     return (
-      <div className="item">
-        <input
-          type="checkbox"
-          id="default-client"
-          checked={this.state.defaultClient}
-          onChange={this.toggleDefaultMailClient}
-        />
-        <label htmlFor="default-client">{localized('Use Tern as default mail client')}</label>
-      </div>
+      <SettingsRow
+        label={localized("Tern isn't your default mail app")}
+        description={localized('Mail links in other apps open in another mail app.')}
+      >
+        <button className="btn" onClick={this._onMakeDefault}>
+          {localized('Make Tern the default')}
+        </button>
+      </SettingsRow>
     );
   }
 }
@@ -88,24 +84,21 @@ interface LaunchSystemStartItemState {
   launchOnStart: boolean | 'unavailable';
 }
 
-class LaunchSystemStartItem extends React.Component {
-  _service = new SystemStartService();
-
+export class LaunchOnStartRow extends React.Component<
+  Record<string, unknown>,
+  LaunchSystemStartItemState
+> {
+  _mounted = false;
   state: LaunchSystemStartItemState = { launchOnStart: 'unavailable' };
-
-  _mounted: boolean;
 
   async componentDidMount() {
     this._mounted = true;
-
     const available = await service.checkAvailability();
-    if (!this._mounted) return;
-
-    if (available) {
+    if (available && this._mounted) {
       const launchOnStart = await service.doesLaunchOnSystemStart();
       if (!this._mounted) return;
       this.setState({ launchOnStart: launchOnStart });
-    } else {
+    } else if (this._mounted) {
       this.setState({ launchOnStart: 'unavailable' });
     }
   }
@@ -114,80 +107,32 @@ class LaunchSystemStartItem extends React.Component {
     this._mounted = false;
   }
 
-  _toggleLaunchOnStart = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (this.state.launchOnStart) {
-      this.setState({ launchOnStart: false });
-      service.dontLaunchOnSystemStart();
-    } else {
-      this.setState({ launchOnStart: true });
+  _toggle = (next: boolean) => {
+    this.setState({ launchOnStart: next });
+    if (next) {
       service.configureToLaunchOnSystemStart();
+    } else {
+      service.dontLaunchOnSystemStart();
     }
-    event.target.blur();
   };
 
   render() {
-    if (this.state.launchOnStart === 'unavailable') return false;
-
+    if (this.state.launchOnStart === 'unavailable') return null;
     return (
-      <div className="item">
-        <input
-          type="checkbox"
-          id="launch-on-start"
+      <SettingsRow
+        label={localized('Open Tern when you log in')}
+        description={
+          process.platform === 'linux'
+            ? localized('Works in XDG-compliant desktop environments.')
+            : undefined
+        }
+      >
+        <SettingsSwitch
           checked={this.state.launchOnStart}
-          onChange={this._toggleLaunchOnStart}
+          label={localized('Open Tern when you log in')}
+          onChange={this._toggle}
         />
-        <label htmlFor="launch-on-start">{localized('Launch on system start')}</label>
-      </div>
+      </SettingsRow>
     );
   }
 }
-
-const WorkspaceSection = (props: { config: any; configSchema: any }) => {
-  return (
-    <section>
-      <DefaultMailClientItem />
-
-      <LaunchSystemStartItem />
-
-      <ConfigSchemaItem
-        configSchema={props.configSchema.properties.workspace.properties.systemTray}
-        keyPath="core.workspace.systemTray"
-        config={props.config}
-      />
-
-      <ConfigSchemaItem
-        configSchema={props.configSchema.properties.workspace.properties.showImportant}
-        keyPath="core.workspace.showImportant"
-        config={props.config}
-      />
-
-      <ConfigSchemaItem
-        configSchema={props.configSchema.properties.workspace.properties.showUnreadForAllCategories}
-        keyPath="core.workspace.showUnreadForAllCategories"
-        config={props.config}
-      />
-
-      <ConfigSchemaItem
-        configSchema={props.configSchema.properties.workspace.properties.use24HourClock}
-        keyPath="core.workspace.use24HourClock"
-        config={props.config}
-      />
-
-      <ConfigSchemaItem
-        configSchema={props.configSchema.properties.workspace.properties.interfaceZoom}
-        keyPath="core.workspace.interfaceZoom"
-        config={props.config}
-      />
-
-      {process.platform === 'linux' && (
-        <div className="platform-note">
-          {localized(
-            `"Launch on system start" only works in XDG-compliant desktop environments. To enable the Tern icon in the system tray, you may need to install libappindicator or libayatana-appindicator.`
-          )}
-        </div>
-      )}
-    </section>
-  );
-};
-
-export default WorkspaceSection;
