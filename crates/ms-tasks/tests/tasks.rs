@@ -27,6 +27,9 @@ use serde_json::{json, Value};
 const ACCOUNT: &str = "acc1";
 const T0: i64 = 1_700_000_000;
 
+#[path = "../../ms-net/tests/common/mod.rs"]
+mod common;
+
 // -- An in-memory server ------------------------------------------------------------------
 
 #[derive(Default)]
@@ -2865,4 +2868,217 @@ mod mail_actions {
             Err(ActionError::NotFound(_))
         ));
     }
+}
+
+// -- Tracking and claims with a Tern server (docs/backend-plan.md 3.6, 3.8) ------------------
+
+const NS: &str = "nsnsnsnsnsnsnsnsnsnsns";
+
+/// A Tern server: `/tern/v1/me` with tracking on or off, claims answered `claim_status`.
+fn tern_server(tracking: bool, claim_status: u16) -> common::MockServer {
+    common::MockServer::start(move |r: &common::Request| match r.path() {
+        "/tern/v1/me" => common::Reply::json(
+            200,
+            json!({"userId": "u1", "email": "me@example.com", "trackingNS": NS, "serverId": "s1",
+                   "publicURL": "https://t.example", "features": {"tracking": tracking}}),
+        ),
+        p if p.starts_with("/tern/v1/claim/") => common::Reply::json(claim_status, json!({})),
+        _ => common::Reply::json(404, json!({})),
+    })
+}
+
+fn http_backend(url: &str, dir: &std::path::Path) -> Arc<dyn ms_net::MetadataBackend> {
+    let server = ms_net::TernServer {
+        url: url.to_owned(),
+        token: "tern_t".into(),
+        user_id: "u1".into(),
+        server_id: "s1".into(),
+    };
+    Arc::new(ms_net::HttpMetadataBackend::new(server, ACCOUNT, dir, Box::new(|| {})).unwrap())
+}
+
+fn claims(server: &common::MockServer) -> Vec<String> {
+    server
+        .requests()
+        .iter()
+        .filter(|r| r.path().starts_with("/tern/v1/claim/"))
+        .map(|r| format!("{} {}", r.method, r.path()))
+        .collect()
+}
+
+/// The text of a submission with quoted-printable soft breaks and `=3D` undone.
+fn decoded(sub: &Submission) -> String {
+    sub.text().replace("=\r\n", "").replace("=3D", "=")
+}
+
+impl Env {
+    fn tracked_draft(&self, hmid: &str, body: &str) -> String {
+        let id = self.scheduled_draft(hmid, json!({"body": body}), json!({"expiration": T0}));
+        for (plugin, value) in [
+            ("open-tracking", json!({"open_count": 0, "open_data": []})),
+            ("link-tracking", json!({"tracked": true})),
+        ] {
+            self.queue(
+                "SyncbackMetadataTask",
+                json!({"modelId": id, "modelClassName": "message",
+                       "modelHeaderMessageId": hmid, "pluginId": plugin, "value": value}),
+            );
+        }
+        id
+    }
+}
+
+#[test]
+fn executor_claims_then_sends_a_tracked_draft_with_a_body_per_recipient() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let server = tern_server(true, 200);
+    let body = r#"<p>Hi <a href="https://a.example/x">a</a></p><blockquote class="gmail_quote"><a href="https://q.example">q</a></blockquote>"#;
+    let id = e.tracked_draft("track-1@example.test", body);
+    let backend = http_backend(&server.url(), e._dir.path());
+    let executor = e.executor(json!({})).0.with_metadata(backend);
+    assert_eq!(
+        executor.handle("Message", &id, "send-later", T0).unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    assert_eq!(
+        claims(&server),
+        [format!(
+            "POST /tern/v1/claim/acc1/track-1@example.test/send-later/{T0}"
+        )]
+    );
+
+    let sends = e.tasks_of("SendDraftTask");
+    assert_eq!(sends.len(), 1);
+    let data = &sends[0].data;
+    let bodies = data["perRecipientBodies"].as_object().unwrap();
+    let keys: Vec<&String> = bodies.keys().collect();
+    assert_eq!(keys, ["bob@example.net", "boss@example.net", "self"]);
+    assert_eq!(bodies["self"], body, "the sent copy stays untracked");
+    let open = ms_store::model::metadata_value(&data["draft"], "open-tracking").unwrap();
+    let link = ms_store::model::metadata_value(&data["draft"], "link-tracking").unwrap();
+    let tid = open["trackingId"].as_str().unwrap().to_owned();
+    assert_eq!(link["trackingId"], tid);
+    assert_eq!(
+        link["links"],
+        json!([{"url": "https://a.example/x", "click_count": 0, "click_data": []}])
+    );
+    let rids: BTreeMap<String, String> = open["recipients"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(rid, email)| (email.as_str().unwrap().to_owned(), rid.clone()))
+        .collect();
+    assert_eq!(rids.len(), 2);
+    let bob = bodies["bob@example.net"].as_str().unwrap();
+    let rid = &rids["bob@example.net"];
+    assert!(bob.contains(&format!(
+        r#"<img alt="" src="https://t.example/t/o/{NS}/{tid}.{rid}.png"><blockquote class="gmail_quote"><a href="https://q.example">q</a>"#
+    )));
+    assert!(bob.contains(&format!(
+        r#"href="https://t.example/t/l/{NS}/{tid}/0.{rid}?u=https%3A%2F%2Fa.example%2Fx""#
+    )));
+
+    // On the wire: one submission per recipient, each with its own ids.
+    let mut send = sends[0].clone();
+    e.remote(&mut send);
+    assert!(send.data["error"].is_null(), "{}", send.data);
+    let subs = e.imap.outbox.submissions();
+    assert_eq!(subs.len(), 2);
+    for sub in &subs {
+        let (_, to) = sub.envelope.clone().unwrap();
+        assert_eq!(to.len(), 1);
+        let text = decoded(sub);
+        assert!(
+            text.contains(&format!("/t/o/{NS}/{tid}.{}.png", rids[&to[0]])),
+            "{text}"
+        );
+    }
+    // The values with the ids go to the sent message, which pushes them to the server.
+    let pushed: Vec<Task> = e
+        .tasks_of("SyncbackMetadataTask")
+        .into_iter()
+        .filter(|t| t.data["pluginId"] == "open-tracking" && t.data["modelId"] != id)
+        .collect();
+    assert_eq!(pushed.len(), 1);
+    assert_eq!(pushed[0].data["value"]["trackingId"], tid);
+}
+
+#[test]
+fn executor_sends_untracked_when_the_server_has_no_tracking() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let server = tern_server(false, 200);
+    let id = e.tracked_draft("track-2@example.test", "<p>Hi</p>");
+    let executor = e
+        .executor(json!({}))
+        .0
+        .with_metadata(http_backend(&server.url(), e._dir.path()));
+    assert_eq!(
+        executor.handle("Message", &id, "send-later", T0).unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    let sends = e.tasks_of("SendDraftTask");
+    assert!(sends[0].data["perRecipientBodies"].is_null());
+    let open = ms_store::model::metadata_value(&sends[0].data["draft"], "open-tracking").unwrap();
+    assert!(open.get("trackingId").is_none());
+}
+
+#[test]
+fn executor_leaves_a_snooze_another_device_claimed() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let snoozed = e.folder("Snoozed", "snoozed");
+    let first = e.deliver(&snoozed, 3, MessageFlags::SEEN);
+    let thread = e.thread_of(&first);
+    e.set_thread_metadata(thread.id(), "thread-snooze", json!({"expiration": T0}));
+    let server = tern_server(true, 409);
+    let executor = e
+        .executor(json!({}))
+        .0
+        .with_metadata(http_backend(&server.url(), e._dir.path()));
+    for _ in 0..2 {
+        assert_eq!(
+            executor
+                .handle("Thread", thread.id(), "thread-snooze", T0)
+                .unwrap(),
+            Outcome::Done
+        );
+    }
+    drop(executor);
+    // Keyed on the thread's oldest message, asked once.
+    assert_eq!(
+        claims(&server),
+        [format!("POST /tern/v1/claim/acc1/m3@x/thread-snooze/{T0}")]
+    );
+    assert!(e.tasks_of("ChangeFolderTask").is_empty());
+    assert!(e.tasks_of("SendDraftTask").is_empty());
+    assert_eq!(
+        e.metadata_of::<Thread>(thread.id(), "thread-snooze")["expiration"],
+        T0
+    );
+}
+
+#[test]
+fn executor_acts_when_the_claim_gets_no_answer() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let snoozed = e.folder("Snoozed", "snoozed");
+    let first = e.deliver(&snoozed, 3, MessageFlags::SEEN);
+    let thread = e.thread_of(&first);
+    e.set_thread_metadata(thread.id(), "thread-snooze", json!({"expiration": T0}));
+    let executor = e
+        .executor(json!({}))
+        .0
+        .with_metadata(http_backend(&common::closed_port_url(), e._dir.path()));
+    assert_eq!(
+        executor
+            .handle("Thread", thread.id(), "thread-snooze", T0)
+            .unwrap(),
+        Outcome::Done
+    );
+    drop(executor);
+    assert_eq!(e.tasks_of("ChangeFolderTask").len(), 1);
 }

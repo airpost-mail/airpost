@@ -26,14 +26,23 @@
 //!
 //! Metadata changes go through `SyncbackMetadataTask`'s local phase, as a client's would, so
 //! they reach the metadata backend. Every other plugin id is emitted as before.
+//!
+//! With a Tern server connected (T22, docs/backend-plan.md 3.6 and 3.8):
+//! - Before acting on a due row the executor claims it ([`MetadataBackend::claim`]), keyed on
+//!   the Message-ID of the draft, or of the thread's oldest message, which every device of the
+//!   user's has in common; a claim another device won leaves the row to that device. A server
+//!   that can't answer lets this device act (D2), accepting a possible duplicate.
+//! - A scheduled draft with `open-tracking` or `link-tracking` on is sent tracked when the
+//!   server offers tracking ([`apply_tracking`]).
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use ms_core::constants::{EXECUTOR_INCOMPLETE_DRAFT_WAITS, FILES_DIR};
 use ms_core::{Account, Error, Result};
+use ms_net::{Claim, LocalOnly, MetadataBackend, TrackingTarget};
 use ms_store::model::{json_str, metadata_value};
 use ms_store::{File, Folder, Label, Message, Model, Query, Store, Task, Thread};
 
@@ -102,6 +111,10 @@ pub struct Executor<'a> {
     pending: PendingSends,
     /// Scheduled drafts waiting to be complete: looks taken so far, next look.
     waiting: RefCell<HashMap<String, (usize, i64)>>,
+    /// The account's metadata backend: claims and the tracking target.
+    metadata: Arc<dyn MetadataBackend>,
+    /// `(model id, plugin id, expiration)` claims another device won.
+    lost: RefCell<HashSet<(String, String, i64)>>,
 }
 
 impl<'a> Executor<'a> {
@@ -126,11 +139,20 @@ impl<'a> Executor<'a> {
             queued: Cell::new(false),
             pending,
             waiting: RefCell::new(HashMap::new()),
+            metadata: Arc::new(LocalOnly),
+            lost: RefCell::new(HashSet::new()),
         };
         if let Err(e) = executor.sweep_pending() {
             warn!("-X Could not look over the pending sends: {e}");
         }
         executor
+    }
+
+    /// Claims due rows and tracks sends through `metadata`, the account's backend. Without
+    /// it (or with [`LocalOnly`]) nothing is claimed and nothing tracked.
+    pub fn with_metadata(mut self, metadata: Arc<dyn MetadataBackend>) -> Self {
+        self.metadata = metadata;
+        self
     }
 
     /// Removes the pending bodies of drafts that are gone or no longer wait to be sent in the
@@ -156,16 +178,29 @@ impl<'a> Executor<'a> {
     /// Acts on `plugin_id`'s due row on model `id` of `class`. A failure other than a
     /// database error is logged and the row left to the client.
     pub fn handle(&self, class: &str, id: &str, plugin_id: &str, now: i64) -> Result<Outcome> {
+        let known = matches!(
+            (class, plugin_id),
+            ("Message", SEND_LATER) | ("Thread", THREAD_SNOOZE) | ("Thread", SEND_REMINDERS)
+        );
+        if !known {
+            return Ok(Outcome::Declined);
+        }
+        // Requests to the server happen here, outside the transaction below.
+        if !self.claimed(class, id, plugin_id, now)? {
+            return Ok(Outcome::Done);
+        }
         let result = match (class, plugin_id) {
             // One write transaction from reading the draft to queuing its send, so a
             // `draft.cancelSend` or `draft.send` (each one transaction too) on another
             // connection comes wholly before or after it.
-            ("Message", SEND_LATER) => self
-                .store
-                .transaction("expirationSendLater", |_| self.send_later(id, now)),
+            ("Message", SEND_LATER) => {
+                let target = self.tracking_target(id)?;
+                self.store.transaction("expirationSendLater", |_| {
+                    self.send_later(id, now, target.as_ref())
+                })
+            }
             ("Thread", THREAD_SNOOZE) => self.unsnooze(id),
-            ("Thread", SEND_REMINDERS) => self.remind(id, now),
-            _ => return Ok(Outcome::Declined),
+            _ => self.remind(id, now),
         };
         if self.queued.replace(false) {
             (self.wake)();
@@ -179,9 +214,94 @@ impl<'a> Executor<'a> {
         }
     }
 
+    // -- claims and tracking -------------------------------------------------------------
+
+    /// Whether this device acts on the row: true unless another device holds the claim on
+    /// it. Rows the handler leaves to the client or finds not due aren't claimed.
+    fn claimed(&self, class: &str, id: &str, plugin_id: &str, now: i64) -> Result<bool> {
+        let (data, object) = if class == "Message" {
+            let Some(m) = self.store.find::<Message>(&Query::new().equal("id", id))? else {
+                return Ok(true);
+            };
+            let hmid = m.header_message_id().to_owned();
+            (m.data, hmid)
+        } else {
+            let Some(t) = self.store.find::<Thread>(&Query::new().equal("id", id))? else {
+                return Ok(true);
+            };
+            (t.data, self.oldest_header_message_id(id)?)
+        };
+        let Some(value) = metadata_value(&data, plugin_id) else {
+            return Ok(true);
+        };
+        let Some(expiration) = value
+            .get("expiration")
+            .and_then(Value::as_f64)
+            .map(|e| e as i64)
+        else {
+            return Ok(true);
+        };
+        let declined = plugin_id == SEND_LATER
+            && (value.get("clientFinalize").and_then(Value::as_bool) == Some(true)
+                || !SEND_ACTIONS.contains(
+                    &value
+                        .get("actionKey")
+                        .and_then(Value::as_str)
+                        .unwrap_or(SEND_ACTIONS[0]),
+                ));
+        if declined || expiration > now || object.is_empty() {
+            return Ok(true);
+        }
+        let key = (id.to_owned(), plugin_id.to_owned(), expiration);
+        if self.lost.borrow().contains(&key) {
+            return Ok(false);
+        }
+        match self.metadata.claim(&object, plugin_id, expiration) {
+            Claim::Lost => {
+                info!(
+                    "-- Another device claimed {plugin_id} of {class} {id}; leaving it to that one"
+                );
+                self.lost.borrow_mut().insert(key);
+                Ok(false)
+            }
+            Claim::Won => {
+                info!("-- Claimed {plugin_id} of {class} {id}");
+                Ok(true)
+            }
+            Claim::NoServer | Claim::Unreachable => Ok(true),
+        }
+    }
+
+    /// The Message-ID of the thread's oldest message: the same on every device that synced
+    /// the thread, where thread ids and anchors may differ.
+    fn oldest_header_message_id(&self, thread_id: &str) -> Result<String> {
+        Ok(self
+            .store
+            .find::<Message>(
+                &Query::new()
+                    .equal("threadId", thread_id)
+                    .equal("draft", false)
+                    .order_by("date", true)
+                    .limit(1),
+            )?
+            .map(|m| m.header_message_id().to_owned())
+            .unwrap_or_default())
+    }
+
+    /// The tracking target when draft `id` tracks anything.
+    fn tracking_target(&self, id: &str) -> Result<Option<TrackingTarget>> {
+        let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", id))? else {
+            return Ok(None);
+        };
+        if ms_compose::tracking::kinds_of(&draft.data).is_none() {
+            return Ok(None);
+        }
+        Ok(self.metadata.tracking())
+    }
+
     // -- send-later ---------------------------------------------------------------------
 
-    fn send_later(&self, id: &str, now: i64) -> Result<Outcome> {
+    fn send_later(&self, id: &str, now: i64, tracking: Option<&TrackingTarget>) -> Result<Outcome> {
         let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", id))? else {
             return Ok(Outcome::Done);
         };
@@ -250,6 +370,9 @@ impl<'a> Executor<'a> {
         let mut data = send_task_json(&draft, &finalised, false);
         if let Some(p) = &pending {
             data["perRecipientBodies"] = p.per_recipient_json(&finalised.body);
+        }
+        if let Some(target) = tracking {
+            apply_tracking(&mut data, target);
         }
         self.queue_task("SendDraftTask", &data)?;
         if action == "send-and-archive" {
@@ -573,6 +696,55 @@ pub fn send_task_json(draft: &Message, finalised: &FinalDraft, silent: bool) -> 
         "silent": silent,
         RETRY_WHEN_ONLINE_KEY: true,
     })
+}
+
+/// Tracks a `SendDraftTask` (its JSON, as [`send_task_json`] builds it) whose draft has
+/// `open-tracking` or `link-tracking` on: every recipient gets a body with their own pixel and
+/// links, the sent copy stays untracked, and the draft's tracking values gain `trackingId`,
+/// `recipients` and `links`, which the send moves to the sent message and pushes to the
+/// server (docs/backend-plan.md 3.6). The bodies already in `perRecipientBodies` (a client's
+/// send hooks) are tracked in place of the draft's. A body that can't be rewritten goes out
+/// untracked. Returns whether it tracked.
+pub fn apply_tracking(data: &mut Value, target: &TrackingTarget) -> bool {
+    let draft = &data["draft"];
+    let given = data["perRecipientBodies"].as_object();
+    let self_body = given
+        .and_then(|b| b.get("self"))
+        .or_else(|| draft.get("body"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let per_recipient: BTreeMap<String, String> = given
+        .map(|b| {
+            b.iter()
+                .filter(|(k, _)| k.as_str() != "self")
+                .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                .collect()
+        })
+        .unwrap_or_default();
+    let target = ms_compose::tracking::Target {
+        public_url: target.public_url.clone(),
+        ns: target.ns.clone(),
+    };
+    let hmid = json_str(draft, "hMsgId").to_owned();
+    match ms_compose::tracking::track_send(draft, &self_body, &per_recipient, &target) {
+        None => false,
+        Some(Err(e)) => {
+            warn!("-X Could not add tracking to draft {hmid}; sending it untracked: {e}");
+            false
+        }
+        Some(Ok(sent)) => {
+            info!(
+                "-- Tracking draft {hmid} for {} recipients",
+                sent.bodies.len() - 1
+            );
+            data["perRecipientBodies"] = Value::Object(sent.bodies);
+            for (plugin_id, value) in sent.values {
+                ms_compose::tracking::set_plugin_value(&mut data["draft"], plugin_id, value);
+            }
+            true
+        }
+    }
 }
 
 /// The stored body of message `id`.
