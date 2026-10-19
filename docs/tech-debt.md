@@ -52,7 +52,7 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD36 | Store graph held together by the `mailspring-exports` barrel and require order | architecture | high | M | before stage 6 |
 | TD37 | `AppEnv` is an undeclared plugin API; stage 6 changes `mailsyncBridge` under plugins | architecture | medium | S | stage 6 |
 | TD38 | Deltas fan out unbatched through four event systems | architecture | low | S / M | stage 6; rx-lite after 8 |
-| TD39 | Folder identity is a path hash; rename is delete + create | engine | medium | ~1 week | stage 3, before 14 |
+| TD39 | Folder identity is a path hash; rename is delete + create (done for renames) | engine | medium | ~1 week | stage 3, before 14 |
 | TD40 | MessageStore reloads every body on each delta and expands every unread message | perf | medium | ~150 TS | before stage 8 flip |
 | TD41 | Every thread row subscribes to ComponentRegistry three times | perf | medium | ~80 TS | before stage 8 |
 | TD42 | ThreadSearch is one append-only FTS row per thread | engine | high | ~1–1.5 weeks | before stage 9 |
@@ -1015,6 +1015,29 @@ the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with 
   with the rename `RenameFolderTask` recorded, and keep the id with the new path. Longer term,
   random stable ids with path as a column.
 - Size: ~1 week with Gmail labels and scenarios.
+- Status (2026-10-18, roadmap/client-next): done for renames; random ids are later. Folder sync
+  matches rows to LIST by path, and before removing a row the listing no longer shows, pairs
+  it with a newly listed path of the same kind: by a rename `SyncbackCategoryTask` recorded
+  (`_State` `folderRenames-<accountId>`, written before the RENAME, kept an hour, children
+  follow their parent, either direction), else by a UIDVALIDITY (with UIDNEXT not going
+  backwards) checked against the newest three stored copies, whose ids must match at the same
+  UIDs under the new path; a value several folders share is settled by those messages, and a
+  label pairs only on a unique value. A paired row keeps its id, role and `localStatus`, so no
+  header is fetched again. Labels record their UIDVALIDITY in `localStatus` (25 STATUS per pass
+  until each has one; stripped from thread snapshots). The task finds its row by path, keeps the
+  id and renames children locally. After a rename the X-GM-LABELS name on the copies and the
+  thread snapshots are rewritten in chunks, queued in `_State` `folderRenameRefresh-<accountId>`
+  in the same transaction so a quit resumes it. A new folder at a path whose hash a renamed row
+  holds gets `hash(accountId:path#n)` (`ms_core::ids::free_folder_id`). Code in
+  `ms_sync::folder_identity`, `Background::pair_renamed`, `ms_tasks` folders.rs. Desktop:
+  `FocusedPerspectiveStore` swaps in the renamed category in place. Scenarios
+  `folder-renamed-in-tern`, `folder-renamed-on-server`, `folder-replaced-with-same-uidvalidity`,
+  `gmail-label-renamed`; conformance probe `probe_rename_keeps_uidvalidity` (Dovecot keeps
+  UIDVALIDITY, UIDs and children across RENAME). Open: whether Gmail keeps a label's
+  UIDVALIDITY and bumps MODSEQ on rename is unrecorded; servers that change UIDVALIDITY on
+  RENAME pair only through the task's record (the id survives, headers are refetched); mail
+  rules' `valueName` fallback is not refreshed after a rename; random stable ids with path as a
+  column are later.
 
 ### TD40. MessageStore reloads every body on each delta (before stage 8's flip)
 
@@ -1228,6 +1251,10 @@ Python harness.
   (`draft.send` queues the existing `SendDraftTask`; the shared finalisation is
   `ms_sync::expiration_executor::finalise_draft`), so the split stays with the next stage that
   changes the send body.
+- Status (2026-10-18, TD39): `sync_folders_and_labels` lost the LIST and helper-folder step
+  (`list_remote_folders`) and role assignment (`assign_roles`); rename pairing is
+  `Background::pair_renamed` over unit-tested functions in `ms_sync::folder_identity`.
+  `sync_now` is unchanged.
 
 ### TD50. EventSearch and ContactSearch updated by an UNINDEXED column (before stage 18)
 

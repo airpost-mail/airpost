@@ -2282,3 +2282,46 @@ Open from the review (low):
 Trial pending (not run): on ~/tern-trial, new message, reply, reply all, forward, undo send,
 Send now from the Undo Send toast, send with an attachment, and quit inside the undo window then
 start again (the send goes out).
+
+2026-10-18, TD39 (stable folder identity across renames), branch `roadmap/client-next`:
+delivered, not merged. Engine: folder sync matches LIST to rows by path (repeated paths
+dropped), then pairs each row the listing no longer shows with a newly listed path of the same
+kind before anything is detached: first by a rename the `SyncbackCategoryTask` recorded
+(`_State` `folderRenames-<accountId>`, written before the RENAME, dropped if the server refuses
+it, kept an hour; children follow the parent; either direction, for a listing taken just
+before the RENAME), then by UIDVALIDITY with UIDNEXT not going backwards, checked for folders
+by fetching the newest three stored UIDs under the new path and comparing message ids (a value
+several folders share is settled by those messages; labels need a unique value). A paired row
+keeps its id, role and `localStatus`, so messages, threads, rule targets and settings keep
+pointing at it and no header is refetched. Gmail labels record their UIDVALIDITY in
+`localStatus` (25 STATUS per pass until each has one; left out of thread snapshots). The task
+finds its row by path, keeps the id and renames children locally. After any rename the
+X-GM-LABELS name on the copies (Gmail) and the thread snapshots are rewritten in chunks; the
+work is queued in `_State` `folderRenameRefresh-<accountId>` in the transaction that changes
+the path, so a quit resumes it on the next pass. A folder created at a path whose hash a
+renamed row holds gets `hash(accountId:path#n)`. Import-legacy finds a draft's folder by path.
+`sync_folders_and_labels` lost the LIST step and role assignment to their own functions (TD49).
+Desktop: `FocusedPerspectiveStore` swaps the renamed category into the current perspective in
+place (title and sidebar selection follow; the open thread and sheet stay). Tests:
+`ms_sync::folder_identity` unit tests, `ms_core::ids::free_folder_id`, four `ms-tasks` tests
+(folder rename with child and thread snapshot, second rename by path, new folder at the old
+path; refused rename leaves no record; Gmail label rename on copies, message and thread; a
+queued refresh survives until run), the focused-perspective spec, harness scenarios
+`folder-renamed-in-tern` and `folder-renamed-on-server` (fake ×2 and Dovecot),
+`folder-replaced-with-same-uidvalidity`, `gmail-label-renamed`, a `server.rename_mailbox` step
+(Gmail fake renames the label on its messages without a MODSEQ bump) and conformance probe
+`probe_rename_keeps_uidvalidity` (Dovecot keeps UIDVALIDITY, UIDs and children). Quick tier
+passes on stdio and serve with a debug build.
+Decisions taken, to confirm: pairing needs one candidate on each side (or one whose messages
+match); a record lives an hour; a renamed row keeps its role; servers that change UIDVALIDITY
+on RENAME pair only through the task's record (the id survives, headers are refetched by the
+UIDVALIDITY reset); a kind switch (folder to label at one path) now gets a new id instead of
+sharing the old row's; mail rules' `valueName` fallback isn't rewritten after a rename (the id
+resolves first). Later: random stable ids with path as a column (no migration in this pass).
+Open: whether Gmail keeps a label's UIDVALIDITY and bumps MODSEQ on rename is unrecorded
+(`gmail-label-renamed` marks it NEEDS-RECORDING); no harness scenario stages the race where a
+listing lands between the RENAME and the task's save (unit tests cover the pairing).
+Trial pending (not run): on ~/tern-trial, rename a folder holding mail in Tern and in another
+client (webmail), rename a Gmail label in Tern and in the Gmail web UI, and check the folder
+keeps its mail without a resync, the open folder's title follows, and a mail rule moving into
+it still works.
