@@ -10,8 +10,8 @@ describe('Link tracking and the capability store', () => {
     expect(trackingUnavailableReason()).toBe('Link tracking: Needs a Tern server');
   });
 
-  it('needs a tracking URL as well as the server capability', () => {
+  it('follows the server capability the engine reports', () => {
     spyOn(CapabilityStore, 'isAvailable').andReturn(true);
-    expect(isTrackingServerAvailable()).toBe(false);
+    expect(isTrackingServerAvailable()).toBe(true);
   });
 });

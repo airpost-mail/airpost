@@ -1,5 +1,6 @@
 import { CapabilityStoreClass } from '../../src/flux/stores/capability-store';
 import { Integrations, IntegrationsTransport } from '../../src/integrations';
+import { EngineEvents } from '../../src/engine-events';
 
 const engineTransport: IntegrationsTransport = { available: true, send: async () => ({}) };
 
@@ -50,6 +51,21 @@ describe('CapabilityStore', () => {
       });
     }
     expect(store.unavailableMessage('read-receipts')).toBe('Open tracking: Needs a Tern server');
+  });
+
+  it('turns tracking on when the engine reports a server that offers it', () => {
+    store = new CapabilityStoreClass({ autoStart: false });
+    const events = new EngineEvents();
+    store.engineEvents = events;
+    events.connected([], async () => ({}), {
+      server: {
+        readReceipts: { available: true },
+        linkTracking: { available: false, reason: 'not-on-server' },
+      },
+    });
+    expect(store.get('read-receipts')).toEqual({ available: true, source: 'server' });
+    expect(store.unavailableMessage('read-receipts')).toBe(null);
+    expect(store.get('link-tracking').reason).toBe('Your Tern server doesn’t offer it');
   });
 
   it('points unconfigured integrations at Preferences > Integrations without reading the keyset', async () => {

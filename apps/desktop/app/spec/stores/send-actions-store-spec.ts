@@ -214,34 +214,17 @@ describe('SendActionsStore', function describeBlock() {
     class OwnTransform extends Inherits {
       static applyTransformsForSending() {}
     }
-    class OpenTrackingComposerExtension extends Inherits {
-      static active = false;
-      static needsPerRecipientBodies() {
-        return this.active;
-      }
-      static applyTransformsForSending() {}
-    }
     class Plain extends Inherits {}
 
-    afterEach(() => {
-      OpenTrackingComposerExtension.active = false;
-    });
-
     it('leaves the engine actions without transforms to the engine', () => {
-      spyOn(ExtensionRegistry.Composer, 'extensions').andReturn([
-        Plain,
-        OpenTrackingComposerExtension,
-        GoodExtension,
-      ]);
+      spyOn(ExtensionRegistry.Composer, 'extensions').andReturn([Plain, GoodExtension]);
       expect(SendActionsStore.needsClientFinalize(this.draft)).toBe(false);
       expect(SendActionsStore.needsClientFinalize(this.draft, 'send-and-archive')).toBe(false);
     });
 
-    it('needs the client for another action, a third-party transform or active tracking', () => {
-      spyOn(ExtensionRegistry.Composer, 'extensions').andReturn([OpenTrackingComposerExtension]);
+    it('needs the client for another action or a transform of its own', () => {
+      spyOn(ExtensionRegistry.Composer, 'extensions').andReturn([Plain]);
       expect(SendActionsStore.needsClientFinalize(this.draft, 'send-action-1')).toBe(true);
-      OpenTrackingComposerExtension.active = true;
-      expect(SendActionsStore.needsClientFinalize(this.draft)).toBe(true);
       (ExtensionRegistry.Composer.extensions as jasmine.Spy).andReturn([OwnTransform]);
       expect(SendActionsStore.needsClientFinalize(this.draft)).toBe(true);
     });

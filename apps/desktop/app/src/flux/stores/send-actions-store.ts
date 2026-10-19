@@ -18,8 +18,6 @@ const DefaultSendActionKey = 'send';
 // The send actions an engine performs when it sends a scheduled draft itself (ms-sync
 // expiration_executor SEND_ACTIONS).
 const ENGINE_SEND_ACTION_KEYS = [DefaultSendActionKey, 'send-and-archive'];
-// Built-in send transforms that change nothing unless tracking is on for the draft.
-const BUILT_IN_SEND_TRANSFORMS = ['OpenTrackingComposerExtension', 'LinkTrackingComposerExtension'];
 const DefaultSendAction: ISendAction = {
   title: 'Send',
   iconUrl: null,
@@ -92,15 +90,14 @@ class _SendActionsStore extends MailspringStore {
   // Whether a scheduled send of `draft` with `actionKey` must be finalized by a window
   // (docs/desktop-client-plan.md T9): an action the engine doesn't perform, or a composer
   // extension that transforms the body for sending, which only a window can run. Such a
-  // send-later row is marked `clientFinalize` and the engine leaves it to the client.
+  // send-later row is marked `clientFinalize` and the engine leaves it to the client. Open and
+  // link tracking are the engine's own transforms (T22).
   needsClientFinalize(draft: Message, actionKey: string = DefaultSendActionKey) {
     if (!this.enginePerformsSendAction(actionKey)) return true;
-    return ExtensionRegistry.Composer.extensions().some((ext) => {
-      // Every ComposerExtension subclass inherits the base class's no-op.
-      if (!Object.prototype.hasOwnProperty.call(ext, 'applyTransformsForSending')) return false;
-      if (!BUILT_IN_SEND_TRANSFORMS.includes(ext.name)) return true;
-      return !!(ext.needsPerRecipientBodies && ext.needsPerRecipientBodies(draft));
-    });
+    // Every ComposerExtension subclass inherits the base class's no-op.
+    return ExtensionRegistry.Composer.extensions().some((ext) =>
+      Object.prototype.hasOwnProperty.call(ext, 'applyTransformsForSending')
+    );
   }
 
   orderedSendActionsForDraft(draft: Message) {

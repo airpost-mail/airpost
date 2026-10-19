@@ -182,6 +182,9 @@ export const Feature = {
   // `draft.create`, `draft.send` (with the send hooks' `bodies`), `draft.cancelSend`,
   // `draft.validate`, and the `composing.quoteTexts` setting.
   DraftPipeline: 'draft-pipeline',
+  // Drafts with open or link tracking on are sent tracked by the engine, and due expirations
+  // are claimed on the Tern server first; clients don't transform tracked drafts.
+  Tracking: 'tracking',
   // The engine runs the mail rules (`mailRules`, `mailRulesAutoSince`), with rules.reprocess,
   // rules.cancel, rules.progress and rules.disabled.
   Rules: 'rules',
@@ -342,6 +345,8 @@ export const CapabilityReason = {
   NotSetUp: 'not-set-up',
   MissingUrl: 'missing-url',
   NeedsTernServer: 'needs-tern-server',
+  // A Tern server is connected but doesn't offer the feature.
+  NotOnServer: 'not-on-server',
   // AI triage in the background: the provider needs a key the engine doesn't hold yet.
   NeedsEngineKey: 'needs-engine-key',
   RateLimited: 'rate-limited',

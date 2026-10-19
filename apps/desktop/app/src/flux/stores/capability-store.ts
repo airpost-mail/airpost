@@ -367,6 +367,8 @@ function engineReason(capability: EngineCapability, provider: IntegrationProvide
         : localized('Set up a provider in Preferences > Integrations');
     case CapabilityReason.NeedsTernServer:
       return serverReason();
+    case CapabilityReason.NotOnServer:
+      return localized('Your Tern server doesn’t offer it');
     default:
       return localized('Not available from the sync engine');
   }
