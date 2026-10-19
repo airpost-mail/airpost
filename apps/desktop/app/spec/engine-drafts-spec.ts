@@ -6,6 +6,7 @@ import {
   AccountStore,
   Actions,
   Contact,
+  DatabaseStore,
   DraftStore,
   ExtensionRegistry,
   Message,
@@ -18,6 +19,7 @@ import EngineEvents from '../src/engine-events';
 import { Feature, Method } from '../src/engine-protocol';
 import { isEngineBuilt } from '../src/engine-drafts';
 import DraftFactory from '../src/flux/stores/draft-factory';
+import { sendMessageNow } from '../internal_packages/undo-redo/lib/undo-redo-toast';
 
 const ME = { name: 'Me', email: 'me@example.com' };
 const ALICE = { name: 'Alice', email: 'alice@example.com' };
@@ -262,6 +264,28 @@ describe('the draft pipeline in the windows', function draftPipeline() {
       // The engine writes the metadata; no task of the window's undoes it.
       expect(Actions.queueTasks).not.toHaveBeenCalled();
       expect(AppEnv.showErrorDialog).not.toHaveBeenCalled();
+    });
+
+    it('keeps the undo send and its after-send action on Send now', async function () {
+      spyOn(Actions, 'queueUndoOnlyTask').andCallFake((task) =>
+        UndoRedoStore._onQueueUndoOnly(
+          new SyncbackMetadataTask(JSON.parse(JSON.stringify(task.toJSON())))
+        )
+      );
+      await DraftStore._sendWithEngine(this.draft, { delay: 5000, actionKey: 'send-and-archive' });
+      const stored = new Message({ ...this.draft, id: 'draft-id' });
+      spyOn(DatabaseStore, 'find').andReturn(Promise.resolve(stored));
+      let moved = null;
+      spyOn(Actions, 'queueTask').andCallFake((task) => {
+        moved = task;
+      });
+      const before = Math.floor(Date.now() / 1000);
+      expect(await sendMessageNow(UndoRedoStore.getMostRecent())).toBe(true);
+      expect(moved.pluginId).toBe('send-later');
+      expect(moved.value.isUndoSend).toBe(true);
+      expect(moved.value.actionKey).toBe('send-and-archive');
+      expect(moved.value.expiration).not.toBeLessThan(before);
+      expect(moved.value.expiration).toBeLessThan(2000000000);
     });
 
     it('says so when the send had gone out before the undo', async function () {

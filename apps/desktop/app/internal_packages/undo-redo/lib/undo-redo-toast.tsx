@@ -19,7 +19,10 @@ function isUndoSend(block) {
   );
 }
 
-async function sendMessageNow(block) {
+// Moves the undo window to now. The rest of the value stays: with the draft pipeline the
+// engine sends the bodies draft.send kept only while `isUndoSend` is set, and `actionKey`
+// (send and archive) and `clientFinalize` still decide what happens after.
+export async function sendMessageNow(block) {
   if (isUndoSend(block)) {
     const message = await DatabaseStore.find<Message>(
         Message,
@@ -38,6 +41,7 @@ async function sendMessageNow(block) {
         model: message,
         pluginId: PLUGIN_ID,
         value: {
+          ...block.tasks[0].value,
           expiration: newExpiry,
         },
       })
