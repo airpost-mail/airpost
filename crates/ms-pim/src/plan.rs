@@ -134,6 +134,34 @@ pub fn exception_slot(row: &EventRow, env: &Env) -> Option<i64> {
     found
 }
 
+/// Whether `occ` is an occurrence of the series in `doc`: a slot its rules draw and no
+/// EXDATE removes, or the RECURRENCE-ID of one of its overrides, wherever that moved it.
+pub fn is_occurrence(doc: &Doc, occ: i64, env: &Env) -> Result<bool> {
+    if doc.exception_at(occ, &doc.zones(env)).is_some() {
+        return Ok(true);
+    }
+    Ok(crate::expand::expand(doc, None, occ, occ, env)?
+        .iter()
+        .any(|o| o.recurrence_id == Some(occ)))
+}
+
+/// Refuses an `occurrenceStart` that names no occurrence of the series (a moved
+/// occurrence's new start, a time off by a zone): an override, EXDATE or split there would
+/// change nothing the user sees, or add an event.
+fn check_occurrence(doc: &Doc, occ: i64, env: &Env) -> Result<()> {
+    if is_occurrence(doc, occ, env)? {
+        Ok(())
+    } else {
+        Err(Error::new(
+            "not-an-occurrence",
+            format!(
+                "{} is not the start of an occurrence of the series",
+                utc_naive(occ).format("%Y-%m-%dT%H:%M:%SZ")
+            ),
+        ))
+    }
+}
+
 /// A new event (`events.create`).
 pub fn plan_create(ev: &NewEvent, calendar_id: &str, env: &Env) -> (String, Write) {
     let doc = edit::create(ev, env);
@@ -165,6 +193,9 @@ pub fn plan_update(
     let recurring = is_recurring(&doc);
     let scope = if recurring { scope } else { Scope::All };
     let occurrence = target.occurrence;
+    if let (true, Some(occ)) = (recurring, occurrence) {
+        check_occurrence(&doc, occ, env)?;
+    }
     let need_occurrence = || {
         occurrence.ok_or_else(|| {
             Error::invalid("occurrenceStart is needed to change one occurrence of a series")
@@ -611,6 +642,8 @@ pub struct Rsvp<'a> {
     pub status: &'a str,
     /// The occurrence of a stored series to answer alone.
     pub occurrence: Option<Rid>,
+    /// A note to the organizer, sent with the REPLY.
+    pub comment: Option<&'a str>,
     pub reply: bool,
     pub write: bool,
     pub retried: bool,
@@ -692,7 +725,7 @@ pub fn plan_rsvp(r: &Rsvp<'_>, is_mine: impl Fn(&str) -> bool, env: &Env) -> Res
                         ics: edit::reply(&invite, &me, &status),
                         method: "REPLY",
                         status: Some(status.clone()),
-                        comment: None,
+                        comment: r.comment.map(str::to_owned),
                     });
                 }
             }
@@ -704,6 +737,9 @@ pub fn plan_rsvp(r: &Rsvp<'_>, is_mine: impl Fn(&str) -> bool, env: &Env) -> Res
             let this_only = r
                 .occurrence
                 .filter(|_| is_recurring(&doc) && !row.is_exception());
+            if let Some(rid) = &this_only {
+                check_occurrence(&doc, rid.ts(env), env)?;
+            }
             let answered = match &this_only {
                 Some(rid) => occurrence_ics(&doc, rid, env)?,
                 None => doc.clone(),
@@ -734,7 +770,7 @@ pub fn plan_rsvp(r: &Rsvp<'_>, is_mine: impl Fn(&str) -> bool, env: &Env) -> Res
                         ics: edit::reply(&answered, &me, &status),
                         method: "REPLY",
                         status: Some(status.clone()),
-                        comment: None,
+                        comment: r.comment.map(str::to_owned),
                     });
                 }
             }
@@ -777,6 +813,9 @@ pub fn plan_counter(
         )
     })?;
     let rid = occurrence.filter(|_| is_recurring(&doc) || row.is_exception());
+    if let (Some(r), true) = (&rid, is_recurring(&doc) && !row.is_exception()) {
+        check_occurrence(&doc, r.ts(env), env)?;
+    }
     let ics = counter_proposal(&doc, &me, start, end, comment, rid.as_ref(), env)?
         .ok_or_else(not_invited)?;
     Ok(Message {
@@ -985,6 +1024,154 @@ mod tests {
         assert!(msg.ics.contains("DTSTART:20260309T150000Z\r\n"));
         assert!(msg.ics.contains("COMMENT:later?\r\n"));
         assert!(!msg.ics.contains("RRULE"));
+    }
+
+    #[test]
+    fn an_occurrence_start_must_name_an_occurrence() {
+        let env = env();
+        let row = weekly();
+        let key = |r: Result<Vec<Write>>| r.unwrap_err().code;
+        let patch = Patch {
+            summary: Some("x".into()),
+            ..Default::default()
+        };
+        let del = Patch {
+            deleted: true,
+            ..Default::default()
+        };
+        // An hour off the slot (a zone read wrong), before the series, after its COUNT.
+        for bad in [MAR9 + 3600, MAR9 - 7 * 86400 - 3600, MAR9 + 70 * 86400] {
+            let target = Target {
+                row: &row,
+                occurrence: Some(bad),
+            };
+            for scope in [Scope::This, Scope::Following, Scope::All] {
+                assert_eq!(
+                    key(plan_update(&target, scope, &patch, None, &env)),
+                    "not-an-occurrence"
+                );
+                assert_eq!(
+                    key(plan_update(&target, scope, &del, None, &env)),
+                    "not-an-occurrence"
+                );
+            }
+        }
+
+        // Moved an hour later: the override is named by its slot, not by its new start.
+        let target = Target {
+            row: &row,
+            occurrence: Some(MAR9),
+        };
+        let moved = Patch {
+            start: Some(MAR9 + 3600),
+            end: Some(MAR9 + 7200),
+            ..Default::default()
+        };
+        let Write::Update { ics, .. } =
+            &plan_update(&target, Scope::This, &moved, None, &env).unwrap()[0]
+        else {
+            panic!()
+        };
+        let row2 = EventRow {
+            ics: ics.clone(),
+            ..row.clone()
+        };
+        let at = |occ| Target {
+            row: &row2,
+            occurrence: Some(occ),
+        };
+        assert!(plan_update(&at(MAR9), Scope::This, &patch, None, &env).is_ok());
+        assert_eq!(
+            key(plan_update(
+                &at(MAR9 + 3600),
+                Scope::This,
+                &patch,
+                None,
+                &env
+            )),
+            "not-an-occurrence"
+        );
+
+        // A deleted occurrence is gone.
+        let Write::Update { ics, .. } =
+            &plan_update(&at(MAR9 + 7 * 86400), Scope::This, &del, None, &env).unwrap()[0]
+        else {
+            panic!()
+        };
+        let row3 = EventRow {
+            ics: ics.clone(),
+            ..row.clone()
+        };
+        let target = Target {
+            row: &row3,
+            occurrence: Some(MAR9 + 7 * 86400),
+        };
+        assert_eq!(
+            key(plan_update(&target, Scope::This, &patch, None, &env)),
+            "not-an-occurrence"
+        );
+
+        // An RSVP or counter for one occurrence alike.
+        let mut invited = weekly();
+        invited.ics = invited
+            .ics
+            .replace("ORGANIZER:mailto:me@x.com", "ORGANIZER:mailto:boss@x.com");
+        let r = Rsvp {
+            stored: Some(&invited),
+            writable: true,
+            status: "ACCEPTED",
+            occurrence: Some(Rid::At(MAR9 + 60)),
+            reply: true,
+            write: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            plan_rsvp(&r, |e| e == "g@x.com", &env).unwrap_err().code,
+            "not-an-occurrence"
+        );
+        let err = plan_counter(
+            &invited,
+            MAR9,
+            MAR9 + 3600,
+            None,
+            Some(Rid::At(MAR9 + 60)),
+            |e| e == "g@x.com",
+            &env,
+        )
+        .unwrap_err();
+        assert_eq!(err.code, "not-an-occurrence");
+    }
+
+    #[test]
+    fn rsvp_comment_goes_with_the_reply() {
+        let env = env();
+        let mut row = weekly();
+        row.ics = row
+            .ics
+            .replace("ORGANIZER:mailto:me@x.com", "ORGANIZER:mailto:boss@x.com");
+        let r = Rsvp {
+            stored: Some(&row),
+            writable: true,
+            status: "TENTATIVE",
+            comment: Some("Might be late"),
+            reply: true,
+            write: true,
+            ..Default::default()
+        };
+        let plan = plan_rsvp(&r, |e| e == "g@x.com", &env).unwrap();
+        assert_eq!(
+            plan.message.unwrap().comment.as_deref(),
+            Some("Might be late")
+        );
+        let from_mail = Rsvp {
+            invite: Some(OCCURRENCE_INVITE),
+            ..r
+        };
+        let plan = plan_rsvp(&from_mail, |e| e == "g@x.com", &env).unwrap();
+        assert_eq!(
+            plan.message.unwrap().comment.as_deref(),
+            Some("Might be late")
+        );
     }
 
     // An invitation to one moved occurrence, answered from the mail view (event-header-spec's

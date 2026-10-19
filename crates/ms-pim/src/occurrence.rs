@@ -254,11 +254,27 @@ pub fn occurrences(
     owners: &Owners,
     env: &Env,
 ) -> Vec<Value> {
+    occurrences_up_to(rows, start, end, owners, env, usize::MAX).0
+}
+
+/// [`occurrences`], stopping at `limit`; true when some were left out.
+pub fn occurrences_up_to(
+    rows: &[EventRow],
+    start: i64,
+    end: i64,
+    owners: &Owners,
+    env: &Env,
+    limit: usize,
+) -> (Vec<Value>, bool) {
     let mut groups: Vec<(&str, Vec<&EventRow>)> = Vec::new();
+    let mut by_uid: HashMap<&str, usize> = HashMap::new();
     for row in rows {
-        match groups.iter_mut().find(|(uid, _)| *uid == row.icsuid) {
-            Some((_, g)) => g.push(row),
-            None => groups.push((&row.icsuid, vec![row])),
+        match by_uid.get(row.icsuid.as_str()) {
+            Some(&i) => groups[i].1.push(row),
+            None => {
+                by_uid.insert(&row.icsuid, groups.len());
+                groups.push((&row.icsuid, vec![row]));
+            }
         }
     }
     let mut out = Vec::new();
@@ -275,6 +291,9 @@ pub fn occurrences(
                 Ok((doc, occs)) => {
                     let recurring = is_recurring(&doc);
                     for o in &occs {
+                        if out.len() >= limit {
+                            return (out, true);
+                        }
                         expanded_starts.push(o.start);
                         out.push(occurrence_json(
                             Built {
@@ -292,6 +311,9 @@ pub fn occurrences(
                 }
                 Err(err) => {
                     tracing::warn!(event = %master.id, error = %err, "could not expand an event");
+                    if out.len() >= limit {
+                        return (out, true);
+                    }
                     if let Some(v) = error_occurrence(master, env) {
                         out.push(v);
                     }
@@ -317,6 +339,9 @@ pub fn occurrences(
             if et < start || st > end {
                 continue;
             }
+            if out.len() >= limit {
+                return (out, true);
+            }
             let o = Occ {
                 start: st,
                 end: et,
@@ -340,7 +365,7 @@ pub fn occurrences(
             ));
         }
     }
-    out
+    (out, false)
 }
 
 fn error_occurrence(master: &EventRow, env: &Env) -> Option<Value> {
@@ -608,5 +633,37 @@ mod tests {
         assert_eq!(o["myStatus"], "NEEDS-ACTION");
         assert_eq!(o["attendees"][0]["email"], "Me@x.com");
         assert_eq!(o["organizer"]["email"], "boss@x.com");
+    }
+
+    #[test]
+    fn occurrences_stop_at_the_limit() {
+        let env = Env::new(chrono_tz::UTC, 0);
+        let row = EventRow {
+            id: "e1".into(),
+            account_id: "a1".into(),
+            calendar_id: "c1".into(),
+            icsuid: "u".into(),
+            ics: "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:u\r\nDTSTART:20260302T150000Z\r\nDTEND:20260302T160000Z\r\nRRULE:FREQ=DAILY;COUNT=30\r\nSUMMARY:Daily\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n".into(),
+            ..Default::default()
+        };
+        let owners = Owners::default();
+        let (all, cut) = occurrences_up_to(
+            std::slice::from_ref(&row),
+            0,
+            2_000_000_000,
+            &owners,
+            &env,
+            30,
+        );
+        assert_eq!((all.len(), cut), (30, false));
+        let (some, cut) = occurrences_up_to(
+            std::slice::from_ref(&row),
+            0,
+            2_000_000_000,
+            &owners,
+            &env,
+            10,
+        );
+        assert_eq!((some.len(), cut), (10, true));
     }
 }
