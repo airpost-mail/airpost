@@ -1,10 +1,11 @@
 @import 'ui-variables';
 
+// Tinted with the theme's warning colour so the banner keeps its hue on light and dark surfaces.
 .autoload-images-header {
-  background-color: color-mix(in srgb, @background-primary 80%, #ffcc11);
-  border: 1px solid color-mix(in srgb, @black 25%, color-mix(in srgb, @background-primary 50%, #ffcc11));
+  background-color: color-mix(in srgb, var(--warning) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
   border-radius: @border-radius-base;
-  color: color-mix(in srgb, @text-color-subtle 40%, #ffcc11);
+  color: color-mix(in srgb, var(--warning) 50%, var(--foreground));
   margin: @padding-base-vertical 0;
   padding: @padding-base-vertical @padding-base-horizontal;
   white-space: nowrap;
@@ -12,9 +13,9 @@
   text-overflow: ellipsis;
 
   .option {
-    color: ~"rgb(from color-mix(in srgb, @{text-color-subtle} 80%, #ffcc11) r g b / 70%)";
+    color: color-mix(in srgb, var(--warning) 50%, var(--foreground));
   }
   .option:hover {
-    color: color-mix(in srgb, @black 25%, color-mix(in srgb, @text-color-subtle 80%, #ffcc11));
+    color: var(--foreground);
   }
 }
