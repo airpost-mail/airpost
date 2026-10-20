@@ -57,7 +57,7 @@ fn insert_event(c: &Connection, id: &str, cal: &str, uid: &str, ics: &str, rs: i
 }
 
 fn seed(config: &Path) {
-    let c = Connection::open(config.join("edgehill.db")).unwrap();
+    let c = Connection::open(config.join("tern.db")).unwrap();
     for (id, read_only, owner) in [("cal-work", false, "mine"), ("cal-holidays", true, "other")] {
         let data = json!({"id": id, "aid": ACCOUNT_ID, "__cls": "Calendar", "v": 1,
             "path": format!("/cal/{id}/"), "name": id, "read_only": read_only, "owner": owner});
@@ -167,7 +167,7 @@ impl Engine {
     }
 
     fn db(&self) -> Connection {
-        Connection::open(self.dir.path().join("edgehill.db")).unwrap()
+        Connection::open(self.dir.path().join("tern.db")).unwrap()
     }
 
     fn event_ics(&self, id: &str) -> Option<String> {

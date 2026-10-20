@@ -211,7 +211,7 @@ pub struct MetadataFilter<'a> {
 }
 
 impl ReadStore {
-    /// Opens `$CONFIG_DIR_PATH/edgehill.db` read-only, with the engine's busy timeout. The
+    /// Opens `$CONFIG_DIR_PATH/tern.db` read-only, with the engine's busy timeout. The
     /// database must exist; WAL lets these reads run while a writer holds the lock.
     pub fn open(config_dir: &Path) -> Result<ReadStore> {
         let conn = Connection::open_with_flags(

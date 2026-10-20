@@ -62,7 +62,7 @@ fn migrate_creates_v12() {
     let stdout = String::from_utf8(out.stdout).unwrap();
     assert!(stdout.ends_with("\n{\"error\":null}"), "{stdout:?}");
     assert!(out.stderr.is_empty());
-    let conn = rusqlite::Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = rusqlite::Connection::open(dir.path().join("tern.db")).unwrap();
     let v: i32 = conn
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
@@ -90,16 +90,16 @@ fn import_legacy_one_shot_output() {
     };
 
     // Before migrate, with a legacy database: the new database must exist first.
-    std::fs::write(dir.path().join("edgehill.legacy.db"), "").unwrap();
+    std::fs::write(dir.path().join("tern.legacy.db"), "").unwrap();
     let (code, stdout) = run(dir.path());
     assert_eq!(code, Some(1));
     assert!(
         stdout.ends_with(
-            "\n{\"error\":\"edgehill.db does not exist; run --mode migrate before --mode import-legacy\"}"
+            "\n{\"error\":\"tern.db does not exist; run --mode migrate before --mode import-legacy\"}"
         ),
         "{stdout:?}"
     );
-    std::fs::remove_file(dir.path().join("edgehill.legacy.db")).unwrap();
+    std::fs::remove_file(dir.path().join("tern.legacy.db")).unwrap();
 
     let migrated = mailsync(dir.path())
         .args(["--mode", "migrate"])

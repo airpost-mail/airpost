@@ -61,7 +61,7 @@ Without Docker, Dovecot runs as a local process if `dovecot`/`doveadm` are insta
 Artifacts go to `test/runs/session-<pid>/<scenario>-<server>/` (one pid per xdist worker;
 `HARNESS_RUNS_DIR` overrides), and are kept for failed and xfailed cases: `report.txt` (what
 happened, when), `config/mailsync-*.log` (engine log with every IMAP line, per thread),
-`config/edgehill.db`, `server.log` (server transcript). `--keep` / `HARNESS_KEEP=1` keeps
+`config/tern.db`, `server.log` (server transcript). `--keep` / `HARNESS_KEEP=1` keeps
 passing runs too. `run.py --server kind:profile` uses the scenario's own entry for it.
 
 ### Tiers
@@ -145,7 +145,7 @@ built.
 ### Several accounts
 
 A scenario can hold more accounts than its own (`multi-account-*`). They share its config
-dir and `edgehill.db`, as the client's accounts do: on `serve` they are added to the same
+dir and `tern.db`, as the client's accounts do: on `serve` they are added to the same
 engine, on `stdio` and `socket` each runs in its own process (as the desktop ran them
 before phase C), started without another `--mode migrate`.
 
@@ -215,7 +215,7 @@ The other services are populated the same way, before mailsync starts:
 | `people: {groups: [{name}], contacts: [{name, email, groups} \| {count: n}]}` | contacts and user groups in the fake People API (needs `people: true` on a `fake` entry) |
 | `calendars: {name: {create, display_name, components, events: [spec \| {count: n}]}}` | CalDAV collections and events (`default` is the seeded calendar; others are created with MKCALENDAR when `create: true`); event specs are `harness/davgen.py`'s: uid, summary, start (`"+2d"`, ISO), minutes, all_day, rrule, overrides, attendees |
 | `addressbooks: {default: {contacts: [spec \| {count: n}], groups: [{uid, name, members: [emails or uids], version}]}}` | CardDAV cards; contact specs: uid, name, email(s), phone, org, version `"3.0"`/`"4.0"`; group cards are vCard 3 `X-ADDRESSBOOKSERVER-KIND:group` or vCard 4 `KIND:group` |
-| `legacy_db: {wal, folders, messages, metadata, state, files, sql}` | an `edgehill.db` as the C++ engine leaves it, written before the first `--mode migrate` (`harness/legacy.py`); `wal: true` leaves the writes in the `-wal` file; a draft's `reply_to: <message key>` makes it a reply saved in that message's thread |
+| `legacy_db: {wal, folders, messages, metadata, state, files, sql}` | a database as the C++ engine leaves it, at `tern.db` where Import from Mailspring puts Mailspring's `edgehill.db`, written before the first `--mode migrate` (`harness/legacy.py`); `wal: true` leaves the writes in the `-wal` file; a draft's `reply_to: <message key>` makes it a reply saved in that message's thread |
 | `import_legacy: true` | run `--mode import-legacy` between migrate and sync, as the client does on every launch (also `restart: {import_legacy: true}`) |
 | `slow: true` / `slow: {kind[:profile]: true}` | the case is in the slow tier (see "Tiers") |
 | `backend: {}` / `backend: {user: email, identity: null \| {field: value}}` | start the Tern server for this run (see "The Tern server" below); the engine gets the `engine` device's identity on every launch, `null` with `identity: null`, or that identity with the given fields replaced (`backend-identity-invalid`) |
@@ -275,7 +275,7 @@ A scenario may also start on another build with a top-level `binary: ab/mailsync
 (relative to `test/`) and `restart` onto the build under test (`rules-ready-pre-upgrade-messages`).
 `--mailsync` still sets the build under test that a `restart` with no `binary:` lands on. The
 harness runs `--mode migrate` on every launch, as the client does. The Rust engine never
-upgrades a C++ database: it moves it to `edgehill.legacy.db*` and starts fresh
+upgrades a C++ database: it moves it to `tern.legacy.db*` and starts fresh
 (`fresh-db-replaces-legacy`), so a C++ database is handed to it with `legacy_db:`, or by
 starting on the C++ engine with `binary: cpp` and restarting onto the build under test
 (`import-legacy-from-cpp-engine`). `cpp` is `MAILSYNC_CPP_BIN`, else the engine an
@@ -324,7 +324,7 @@ Expectations for contacts, calendars, metadata and whole-database state (`harnes
 | `metadata: [{threads\|messages: selector, plugin, value: {subset}, expiration: bool, absent: bool}]` | the model's metadata entry and its ModelPluginMetadata row |
 | `metadata_expiration: [{threads\|messages: selector, plugin, count, since: mark}]` | how many `metadata-expiration` deltas carried the model; none may arrive before the expiration it names |
 | `changed_since: {mark, Table: {key, where, persist: [keys], unpersist: [keys]}}` | exactly which models were streamed after a `mark`, by `key` (default `id`): what proves a pass was incremental |
-| `sql: [{db: main\|legacy\|<file>, query, equals}]` | a query against the engine's database, `edgehill.legacy.db`, or another database file in the config dir such as `edgehill.legacy-imported.db` (read from a copy, so the check never checkpoints its WAL) |
+| `sql: [{db: main\|legacy\|<file>, query, equals}]` | a query against the engine's database, `tern.legacy.db`, or another database file in the config dir such as `tern.legacy-imported.db` (read from a copy, so the check never checkpoints its WAL) |
 | `config_files: {present, absent, empty}` | paths under `CONFIG_DIR_PATH`; `empty` directories may also be missing |
 
 **Invariants** run after every scenario's expectations, on every server, without being
@@ -609,7 +609,7 @@ it lists `dovecot:plain`), except `proton-all-mail-duplicates`; four also list
 | status-uidnext-zero-new-mail | STATUS UIDNEXT 0 (hMailServer): new mail found from the message count on the next pass | fake |
 | list-refused-transiently | O365 `NO Server Unavailable` to LIST: offline and retried, not a crash | fake |
 | ingest-panic-quarantines-uid | a message whose processing panics (`TERN_ENGINE_TEST_PANIC_SUBJECT`) is quarantined by UID and skipped; the rest syncs and the account keeps running (serve) | fake |
-| fresh-db-replaces-legacy | a C++ database (writes still in its WAL) is moved to `edgehill.legacy.db*`, a fresh V12 is created, `files/` emptied, "Running Migration" printed; nothing imported; no migration on the next launch | fake |
+| fresh-db-replaces-legacy | a C++ database (writes still in its WAL) is moved to `tern.legacy.db*`, a fresh V12 is created, `files/` emptied, "Running Migration" printed; nothing imported; no migration on the next launch | fake |
 | import-legacy-carries-metadata | `--mode import-legacy` carries snooze/reminder metadata (re-keyed by headerMessageId), a local draft with body and file, and `_State` cursors | fake |
 | import-legacy-from-cpp-engine | the same from a database the C++ engine wrote (`binary: cpp`): the draft's attachment survives migrate, metadata attaches as sync ingests mail, the imported snooze and send-later fire as `metadata-expiration`; People sync tokens are not carried | fake (slow) |
 | import-legacy-twice | the imported draft sends with its attachment; later launches' imports change nothing (the sent draft stays sent, no metadata row duplicated) | fake +smtp (slow) |

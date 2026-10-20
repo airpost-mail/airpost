@@ -8,13 +8,14 @@ import path from 'path';
  * crash dumps, single-instance locks, engine logs and the compile cache are skipped. The database
  * is copied with SQLite's online backup, since Mailspring.app may have it open in WAL mode, and
  * config.json is written last: its presence is what marks a Tern profile as set up, so a launch
- * that dies part-way retries next time. The copied C++ database is then handled by the normal
- * startup (MailsyncProcess.migrate moves it aside and import-legacy carries drafts and metadata
- * over).
+ * that dies part-way retries next time. Mailspring's database, edgehill.db, becomes Tern's
+ * tern.db, which the normal startup then handles (MailsyncProcess.migrate moves the C++ database
+ * aside and import-legacy carries drafts and metadata over).
  */
 
 const CONFIG_FILE = 'config.json';
-const DATABASE_FILE = 'edgehill.db';
+const MAILSPRING_DATABASE_FILE = 'edgehill.db';
+const DATABASE_FILE = 'tern.db';
 
 // Written by "Reset Accounts and Settings" (src/main/profile/reset.ts) into the emptied
 // profile, so the relaunch starts empty instead of copying the Mailspring profile in again.
@@ -42,7 +43,7 @@ function isSkipped(name: string) {
 // Top-level entries copied file by file. The database (with its -wal/-shm) and config.json are
 // copied separately.
 function isCopiedEntry(name: string) {
-  return name !== CONFIG_FILE && !name.startsWith(DATABASE_FILE) && !isSkipped(name);
+  return name !== CONFIG_FILE && !name.startsWith(MAILSPRING_DATABASE_FILE) && !isSkipped(name);
 }
 
 export function shouldImportMailspringProfile(from: string, to: string) {
@@ -112,7 +113,7 @@ export function importMailspringProfile(from: string, to: string): Promise<boole
     return fail(err);
   }
 
-  const database = path.join(from, DATABASE_FILE);
+  const database = path.join(from, MAILSPRING_DATABASE_FILE);
   const copyDatabase = fs.existsSync(database)
     ? backupDatabase(database, path.join(to, DATABASE_FILE))
     : Promise.resolve();

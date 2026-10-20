@@ -77,8 +77,9 @@ class PimMixin:
             if entry is None:
                 raise ScenarioFailure(f"legacy_db names {mailbox} UID {uid}, which the server does not have")
             return {"message_id": entry["message_id"]}
-        written = legacy.write_legacy_database(self.ms.config_dir, spec, self.ms.account["id"], resolve)
-        self._note(f"wrote a C++-era edgehill.db{' (writes left in the WAL)' if spec.get('wal') else ''} "
+        written = legacy.write_legacy_database(self.ms.config_dir, spec, self.ms.account["id"], resolve,
+                                               database=self.ms.db_path.name)
+        self._note(f"wrote a C++-era {self.ms.db_path.name}{' (writes left in the WAL)' if spec.get('wal') else ''} "
                    f"and {len(written['files'])} files under files/")
 
     # -- services ------------------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 //! `SyncbackMetadataTask`, so without it a lost push would leave this device's version above
 //! the server's and it would ignore every later echo.
 //!
-//! A Tern table in `edgehill.db`, created on first use, so a migrated database keeps the V12
+//! A Tern table in `tern.db`, created on first use, so a migrated database keeps the V12
 //! schema the C++ engine wrote. The latest value per (account, object, plugin) wins: a push
 //! replaces whatever is queued for its key under a new row id (AUTOINCREMENT, so ids are
 //! never reused), and removing a sent entry by id never drops a newer one.
@@ -41,7 +41,7 @@ pub struct Outbox {
 }
 
 impl Outbox {
-    /// Opens the outbox in `config_dir`'s `edgehill.db`.
+    /// Opens the outbox in `config_dir`'s `tern.db`.
     pub fn open(config_dir: &Path) -> Result<Outbox> {
         let conn = Connection::open(config_dir.join(DATABASE_FILE))?;
         conn.busy_timeout(Duration::from_millis(SQLITE_BUSY_TIMEOUT_MS))?;

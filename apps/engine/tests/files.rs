@@ -43,7 +43,7 @@ fn insert_file(c: &Connection, id: &str, message: &str, name: &str, size: i64) {
 }
 
 fn seed(config: &Path) {
-    let c = Connection::open(config.join("edgehill.db")).unwrap();
+    let c = Connection::open(config.join("tern.db")).unwrap();
     insert_file(&c, "filedisk1", "m-1", "a.pdf", ON_DISK.len() as i64);
     // Its message has no copy on any server, so the fetch never writes it.
     insert_file(&c, "filegone1", "m-2", "b.pdf", 99);

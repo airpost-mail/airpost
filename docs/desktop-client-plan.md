@@ -85,7 +85,7 @@ Deduplicated from the five readers. Recommended answer first.
     boundary for local clients? *Yes*; otherwise the CLI can never add or reconnect an
     account. Until this is confirmed and stage 12 lands, `account.test` and `account.add`
     stay on `serve`'s stdin.
-14. **Registry location.** `accounts.json` beside the database, not a table in `edgehill.db`?
+14. **Registry location.** `accounts.json` beside the database, not a table in `tern.db`?
     *accounts.json*, so Reset and Rebuild keep the accounts.
 15. **Headless Linux without Secret Service.** AES-GCM file keyed from systemd-creds or a 0600
     key file, documented as weaker than a keyring, plaintext refused? *Yes.*
@@ -126,7 +126,7 @@ Deduplicated from the five readers. Recommended answer first.
   safeStorage through `@electron/remote`) and decides which accounts to add by diffing the
   renderer's `AccountStore` (`engine-client.ts:196-209`). `account.add` with secrets is
   stdin-only and the socket refuses it (`apps/engine/src/serve.rs:8-13`) (V).
-- **Reads.** Every window opens `edgehill.db` read-only with better-sqlite3
+- **Reads.** Every window opens `tern.db` read-only with better-sqlite3
   (`src/flux/stores/database-store.ts:51-73`) and compiles queries in JS (`query.ts` 564
   lines, `matcher.ts` 365). 66 non-spec files reference `DatabaseStore` (V); about 120
   call-site lines (106 single-line matches plus multi-line chains), about 23 of them in
@@ -145,7 +145,7 @@ Deduplicated from the five readers. Recommended answer first.
 - **Writes.** Only through `Actions.queueTask` to `task.queue`; the renderer writes no rows.
   `queueTask`/`queueTasks` are main-window actions (`actions.ts:112,120`), so `ActionBridge`
   forwards a composer's tasks to the main window, where `TaskQueue` and `UndoRedoStore` see
-  them (V). The main process still deletes `edgehill.db*` (`src/main/application.ts:344-371`)
+  them (V). The main process still deletes `tern.db*` (`src/main/application.ts:344-371`)
   and opens it read-write for the C++ switch (`mailsync-process.ts:206-268`) (V).
 - **Logic in the desktop.** Send later (`send-later/lib/main.ts:26-63`), undo send
   (`draft-store.ts:512-646` via send-later metadata), snooze (`snooze-store.ts:72-102`,
@@ -507,7 +507,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
   it, as `engine-client.ts:60-120` does); `account.state` gains `retryAt` and `authFailed`;
   auth failures are classified in the engine, not by string matching in the desktop. ~200
   Rust.
-- **Lifecycle**: `engine.resetDatabase` (stop accounts, delete `edgehill.db*`, restart),
+- **Lifecycle**: `engine.resetDatabase` (stop accounts, delete `tern.db*`, restart),
   `engine.logs.tail {accountId?, bytes}`, `engine.setLogLevel {verboseUntil}`. ~200 Rust.
 
 ### 3.7 Integrations
@@ -573,7 +573,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
    flag says. The default flips to `engine` once the parity tests pass on the trial profile
    and stage 9 has shipped, since search needs the grammar.
    **Reconnect contract.** Today reads keep working while the engine respawns or has given
-   up, because each window opens `edgehill.db` itself; over the socket they don't. So: a read
+   up, because each window opens `tern.db` itself; over the socket they don't. So: a read
    issued while the connection is down waits for it, up to 10 s, then rejects with an
    `EngineUnavailable` error; on reconnect `EngineConnection` re-sends `hello` and
    `subscribe`, `QuerySubscriptionPool` re-runs every live subscription and
@@ -594,7 +594,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
    removed the C++ engine and the per-account and stdio fallbacks (none of them answer
    `query`, and per-account processes can't page a unified inbox across accounts). Specs
    move to a mock engine that answers `query` from fixtures (`database-store.ts:75-81` opens
-   `edgehill.test.db` today). Subscription keys move to `JSON.stringify(query.toJSON())`
+   `tern.test.db` today). Subscription keys move to `JSON.stringify(query.toJSON())`
    first (section 2).
 6. **Call-site moves** are optional after that: `thread-list-data-source.ts`'s per-thread
    subscriptions and the bulk message read are the hot path and the first candidates for a
@@ -1095,7 +1095,7 @@ sample service, quit the desktop, see it act.
   scheduled send fires at the next start (T10).
 - **Version skew.** Today the main process runs the one-shot `migrate` at every launch
   (`src/main/application.ts:97-101`) while an engine from the previous run may still hold
-  `edgehill.db` for up to 30 s after its stdin closed; with a detached engine the gap is
+  `tern.db` for up to 30 s after its stdin closed; with a detached engine the gap is
   unbounded. Stage 6 waits for a live engine's pid to exit before migrating; stage 11 moves
   `migrate` into `serve` startup and compares `build`/`protocol` before reusing.
 - **Gateway exposure.** `apps/gateway` is a same-uid socket client for remote callers; without
@@ -1107,7 +1107,7 @@ sample service, quit the desktop, see it act.
   blacklist in localStorage, web signatures in browser storage: one store, no data lost.
 - **Scheduled sends across devices.** Rebuilding from the synced draft (T9) means any engine
   holding the draft and metadata can send it; claims decide which.
-- **Specs.** The desktop specs read `edgehill.test.db`; they need a mock engine before the
+- **Specs.** The desktop specs read `tern.test.db`; they need a mock engine before the
   SQLite path is deleted.
 
 Open items:
@@ -1212,7 +1212,7 @@ the main window only. The supervisor's `EngineClient` drops stage 1's hello, gon
 delivered. Engine: on `serve`'s stdin `account.test {account}` (`--mode test`'s object as the
 result, from `test_auth::result`; a rotated refresh token is in its `account` only),
 `account.reset {accountId}` (forgets a held account, waits 10 s for stragglers, deletes its
-rows), `engine.resetDatabase` (forgets every account, deletes `edgehill.db*`, migrates a new
+rows), `engine.resetDatabase` (forgets every account, deletes `tern.db*`, migrates a new
 one in-process; socket read sessions reopen it through a database generation) and
 `engine.setLogLevel {verboseUntil}` (restarts running accounts with their current secrets);
 `engine.logs.tail {accountId?, bytes?}` on the socket (64 KiB default, 1 MiB cap). These four

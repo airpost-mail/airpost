@@ -118,7 +118,7 @@ fn insert_message(c: &Connection, m: Msg<'_>) {
 /// oldest first, an inline-PGP message, one longer than a small window's read cap and a
 /// short one with a longer signature.
 fn seed(config: &Path) {
-    let c = Connection::open(config.join("edgehill.db")).unwrap();
+    let c = Connection::open(config.join("tern.db")).unwrap();
     insert_folder(&c, "f-inbox", "inbox");
     insert_folder(&c, "f-spam", "spam");
     insert_folder(&c, "f-drafts", "drafts");

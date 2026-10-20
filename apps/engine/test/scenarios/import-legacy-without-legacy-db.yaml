@@ -1,7 +1,7 @@
 name: import-legacy-without-legacy-db
 description: >
   A new install has no C++ database, and the client still runs `--mode import-legacy`
-  after migrate on every launch. With no edgehill.legacy.db it reports success, writes
+  after migrate on every launch. With no tern.legacy.db it reports success, writes
   nothing (not even the record that an import ran, so a legacy database moved aside later
   is still imported), and sync starts as usual.
 source: "docs/engine-port-plan.md section 9 (import-legacy)"
@@ -17,7 +17,7 @@ expect:
   counts: {INBOX: 2, total: 2}
   db_matches_server: {}
   config_files:
-    absent: [edgehill.legacy.db, files.legacy]
+    absent: [tern.legacy.db, files.legacy]
   sql:
     - {db: main, query: "SELECT count(*) FROM _State WHERE id = 'legacy-import'", equals: 0}
     - {db: main, query: "SELECT count(*) FROM DetatchedPluginMetadata", equals: 0}

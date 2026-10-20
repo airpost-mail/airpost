@@ -100,12 +100,14 @@ describe('importMailspringProfile', function () {
       'compile-cache',
       'SingletonCookie',
       'Local Storage/Cache',
+      'edgehill.db',
       'edgehill.db-wal',
+      'tern.db-wal',
     ]) {
       expect(fs.existsSync(path.join(to, rel))).toBe(false);
     }
 
-    const copy = new Sqlite3(path.join(to, 'edgehill.db'), { readonly: true });
+    const copy = new Sqlite3(path.join(to, 'tern.db'), { readonly: true });
     expect(copy.prepare('SELECT subject FROM Thread WHERE id = ?').get('t1')).toEqual({
       subject: 'in the WAL',
     });
@@ -157,13 +159,13 @@ describe('importMailspringProfile', function () {
     }
     expect(await importMailspringProfile(from, to)).toBe(true);
     expect(fs.existsSync(path.join(to, 'config.json'))).toBe(true);
-    expect(fs.existsSync(path.join(to, 'edgehill.db'))).toBe(false);
+    expect(fs.existsSync(path.join(to, 'tern.db'))).toBe(false);
   });
 
   it('removes what it copied when the database copy fails, so the next launch retries', async function () {
     // Something already in the Tern profile (eg. the single-instance lock) stays.
     write(path.join(to, 'SingletonLock'), 'ours');
-    fs.mkdirSync(path.join(to, 'edgehill.db'));
+    fs.mkdirSync(path.join(to, 'tern.db'));
 
     let error = null;
     try {

@@ -240,11 +240,12 @@ struct Legacy {
     dir: tempfile::TempDir,
 }
 
-/// A config dir holding a C++ `edgehill.db` (written by `write`) and `files/` with the
-/// draft's attachment and a stray body file.
+/// A config dir holding a C++ database at `tern.db` (written by `write`), where the desktop's
+/// Import from Mailspring puts it, and `files/` with the draft's attachment and a stray body
+/// file.
 fn legacy(write: fn(&Connection), keep_wal: bool) -> Legacy {
     let dir = tempfile::tempdir().unwrap();
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     let _: String = conn
         .query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))
         .unwrap();
@@ -253,7 +254,7 @@ fn legacy(write: fn(&Connection), keep_wal: bool) -> Legacy {
     }
     write(&conn);
     if keep_wal {
-        // Never closed, so the frames stay in edgehill.db-wal as a killed engine leaves them.
+        // Never closed, so the frames stay in tern.db-wal as a killed engine leaves them.
         std::mem::forget(conn);
     } else {
         drop(conn);
@@ -322,13 +323,13 @@ fn file_hashes(dir: &Path) -> Vec<(String, Vec<u8>)> {
         .filter(|e| {
             e.file_name()
                 .to_string_lossy()
-                .starts_with("edgehill.legacy")
+                .starts_with("tern.legacy")
         })
         .map(|e| {
             (
                 e.file_name()
                     .to_string_lossy()
-                    .replace(LEGACY_IMPORTED_DATABASE_FILE, "edgehill.legacy.db"),
+                    .replace(LEGACY_IMPORTED_DATABASE_FILE, "tern.legacy.db"),
                 fs::read(e.path()).unwrap(),
             )
         })
@@ -392,7 +393,7 @@ fn migrate_sets_draft_files_aside_and_import_restores_them() {
         before,
         "the legacy database changed"
     );
-    assert!(!l.dir.path().join("edgehill.legacy.db").exists());
+    assert!(!l.dir.path().join("tern.legacy.db").exists());
     assert!(l.dir.path().join(LEGACY_IMPORTED_DATABASE_FILE).is_file());
     assert_eq!(counts.drafts, 1);
     assert_eq!(counts.files, 1);
@@ -539,11 +540,11 @@ fn a_second_import_changes_nothing() {
     let dir = f.dir.path();
     fs::copy(
         dir.join(LEGACY_IMPORTED_DATABASE_FILE),
-        dir.join("edgehill.legacy.db"),
+        dir.join("tern.legacy.db"),
     )
     .unwrap();
     assert_eq!(import(dir), ImportOutcome::AlreadyImported);
-    assert!(!dir.join("edgehill.legacy.db").exists());
+    assert!(!dir.join("tern.legacy.db").exists());
     assert_eq!(count(&f, "SELECT count(*) FROM Message"), 0);
     assert_eq!(
         count(&f, "SELECT count(*) FROM DetatchedPluginMetadata"),
@@ -562,9 +563,9 @@ fn a_recreated_database_does_not_import_again() {
     let l = legacy(write_v12, false);
     migrate(l.dir.path());
     assert!(matches!(import(l.dir.path()), ImportOutcome::Imported(_)));
-    // The user deletes edgehill.db* to force a resync.
+    // The user deletes tern.db* to force a resync.
     for suffix in ["", "-wal", "-shm"] {
-        let _ = fs::remove_file(l.dir.path().join(format!("edgehill.db{suffix}")));
+        let _ = fs::remove_file(l.dir.path().join(format!("tern.db{suffix}")));
     }
     let out = migrate(l.dir.path());
     assert!(out.contains("Running Setup"), "{out}");
@@ -698,13 +699,13 @@ fn nothing_to_import_without_a_legacy_database() {
 fn import_before_migrate_fails() {
     let l = legacy(write_v12, false);
     fs::rename(
-        l.dir.path().join("edgehill.db"),
-        l.dir.path().join("edgehill.legacy.db"),
+        l.dir.path().join("tern.db"),
+        l.dir.path().join("tern.legacy.db"),
     )
     .unwrap();
     let err = import_legacy(l.dir.path(), DeltaStream::new(Box::new(std::io::sink()))).unwrap_err();
     assert!(err.to_string().contains("--mode migrate"), "{err}");
-    assert!(!l.dir.path().join("edgehill.db").exists());
+    assert!(!l.dir.path().join("tern.db").exists());
 }
 
 fn walk(dir: &Path) -> Vec<String> {

@@ -5,8 +5,9 @@
 //! Mailspring-Sync `MailStore::migrate` and `MailStore::resetForAccount`, Copyright © 2017
 //! Foundry 376, GPL-3.0. See NOTICE.md.
 //!
-//! The Rust engine does not upgrade C++ databases. A database the C++ engine wrote is moved
-//! aside to `edgehill.legacy.db` (for `import-legacy`) and a fresh V12 database is created;
+//! The Rust engine does not upgrade C++ databases. A database the C++ engine wrote (Mailspring's
+//! `edgehill.db`, which the desktop's Import from Mailspring copies to `tern.db`) is moved
+//! aside to `tern.legacy.db` (for `import-legacy`) and a fresh V12 database is created;
 //! mail, contacts and events resync from the server.
 
 use std::fs;
@@ -25,7 +26,7 @@ use crate::schema;
 /// What [`migrate`] did, for tests and the log.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MigrateOutcome {
-    /// A database from another engine was moved to `edgehill.legacy.db`.
+    /// A database from another engine was moved to `tern.legacy.db`.
     pub moved_legacy: bool,
     /// A new V12 database was created.
     pub created: bool,
@@ -81,7 +82,7 @@ pub fn migrate(
         clear_dir_contents(&config_dir.join(FILES_DIR))?;
     } else if version < SCHEMA_VERSION {
         return Err(Error::other(format!(
-            "edgehill.db is marked as written by this engine but has schema version {version}"
+            "tern.db is marked as written by this engine but has schema version {version}"
         )));
     }
     // Note: a version above SCHEMA_VERSION comes from a newer build; leave it alone, as the
@@ -141,7 +142,7 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// Moves `edgehill.db`, `-wal` and `-shm` to `edgehill.legacy.db*` together, so a WAL that
+/// Moves `tern.db`, `-wal` and `-shm` to `tern.legacy.db*` together, so a WAL that
 /// was not checkpointed stays with its database. An older legacy copy is replaced.
 fn move_legacy_database(config_dir: &Path) -> Result<()> {
     let from = config_dir.join(DATABASE_FILE);

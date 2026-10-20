@@ -84,8 +84,8 @@ expect:
       where: {draft: true}
       count: 0
   config_files:
-    present: [edgehill.legacy-imported.db]
-    absent: [edgehill.legacy.db, files.legacy]
+    present: [tern.legacy-imported.db]
+    absent: [tern.legacy.db, files.legacy]
   sql:
     - {db: main, query: "SELECT count(*) FROM Message WHERE headerMessageId = 'cpp-draft-2@example.test'", equals: 1}
     - {db: main, query: "SELECT count(*) FROM ModelPluginMetadata", equals: 2}

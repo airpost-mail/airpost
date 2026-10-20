@@ -126,7 +126,7 @@ Everything else stays, including:
   - Other delta types: `metadata-expiration`.
 
 **Database**
-- **File:** `$CONFIG_DIR_PATH/edgehill.db`, shared by all accounts.
+- **File:** `$CONFIG_DIR_PATH/tern.db`, shared by all accounts.
 - **Pragmas:** WAL, `page_size=4096`, `cache_size=10000`, `synchronous=NORMAL`, 60 s busy timeout, SQLite temp dir = `CONFIG_DIR_PATH`.
 - **Connections:** one connection per worker thread. The client reads the same file read-only with better-sqlite3.
 - **Schema:** exactly the C++ V12 final schema, with the same table, column and index names, including the partial-index `WHERE` clauses (the placement `ON CONFLICT` target depends on them).
@@ -635,13 +635,13 @@ their gates.
 ## 9. Fresh database and legacy import
 
 - `migrate` mode, run once by the client at startup:
-  - If `edgehill.db` exists and `_State.engine` is not `rust`, move `edgehill.db`, `-wal` and `-shm` to `edgehill.legacy.db*`. Print `Running Migration` so the client shows its progress window.
+  - If `tern.db` exists and `_State.engine` is not `rust` (a C++ database, which Import from Mailspring copies there from Mailspring's `edgehill.db`), move `tern.db`, `-wal` and `-shm` to `tern.legacy.db*`. Print `Running Migration` so the client shows its progress window.
   - Then create the V12 schema directly (one DDL set, not a V1→V12 replay), set `user_version = 12` and `_State.engine = rust`.
   - Delete `$CONFIG_DIR_PATH/files/` contents only after the new DB is created: bodies and attachments are re-downloaded.
     Local drafts' files exist nowhere else, so before emptying `files/` migrate moves their
     directories to `files.legacy/` (`ms_store::legacy_import::set_aside_draft_files`);
     import-legacy, a later process, copies them back and removes `files.legacy/`.
-- `import-legacy` mode (P6) reads `edgehill.legacy.db` read-only and imports:
+- `import-legacy` mode (P6) reads `tern.legacy.db` read-only and imports:
   - `ModelPluginMetadata` for messages and threads, re-keyed by `headerMessageId` into
     `DetatchedPluginMetadata` pending rows (`objectId` `<hMsgId>` for a message,
     `t:<hMsgId>` + U+001F + legacy thread id for each message of a thread) that attach on
@@ -660,9 +660,9 @@ their gates.
   - Trigger: the client runs it after `migrate` on every launch, before any account
     process, with no `--account`. It is a no-op without a legacy DB or once `_State`
     `legacy-import` is set (written in the import's transaction), so a draft the user
-    deleted or sent is never imported twice. After the commit `edgehill.legacy.db*` is
-    renamed to `edgehill.legacy-imported.db*` (an older copy is replaced), so a new database
-    created without a new legacy move (the user deleted `edgehill.db*` to resync) imports
+    deleted or sent is never imported twice. After the commit `tern.legacy.db*` is
+    renamed to `tern.legacy-imported.db*` (an older copy is replaced), so a new database
+    created without a new legacy move (the user deleted `tern.db*` to resync) imports
     nothing. Output is the one-shot `{"error":…}`; a failure exits 1 and the client launches
     anyway (`MailsyncProcess.migrate` in apps/desktop/src/shared/engine-process.ts runs it
     when the Rust engine is selected).
@@ -756,4 +756,5 @@ Engine strings that look like branding but are functional need a decision:
 - The `Mailspring/Snoozed` server folder and the `[Mailspring]/X` role convention exist on
   users' servers already. Keep recognising them, and choose whether new installs create
   `Tern/Snoozed` instead.
-- `edgehill.db` and the `mailsync` binary name are internal and can stay.
+- The database is `tern.db` (the C++ engine's is `edgehill.db`; the desktop's Import from
+  Mailspring copies it to `tern.db`). The `mailsync` binary name is internal and can stay.

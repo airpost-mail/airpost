@@ -28,23 +28,4 @@ describe('ConfigMigrator', function () {
   it('leaves the new setting alone when there is nothing to move', () => {
     expect(migrate(undefined)).toEqual({ 'core.reading.emailRenderMode': undefined });
   });
-
-  describe('the calendar settings of an older profile', () => {
-    it('keeps the hidden calendars', () => {
-      AppEnv.config.set('mailspring.disabledCalendars', ['cal-work', 'cal-birthdays']);
-      new ConfigMigrator(AppEnv.config).migrate();
-      expect(AppEnv.config.get('core.calendar.disabledCalendars')).toEqual([
-        'cal-work',
-        'cal-birthdays',
-      ]);
-      expect(AppEnv.config.get('mailspring.disabledCalendars')).toBeUndefined();
-    });
-
-    it('keeps the calendar view', () => {
-      AppEnv.config.set('mailspring.calendarView', 'month');
-      new ConfigMigrator(AppEnv.config).migrate();
-      expect(AppEnv.config.get('core.calendar.view')).toBe('month');
-      expect(AppEnv.config.get('mailspring.calendarView')).toBeUndefined();
-    });
-  });
 });

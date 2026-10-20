@@ -215,7 +215,7 @@ fn captured() -> Vec<Value> {
 fn engine_parses_and_finds_what_the_desktop_does() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     let dates = DateContext::utc(Some(1_710_000_000));
     let (mut compared, mut non_empty) = (0, 0);
     for q in captured() {

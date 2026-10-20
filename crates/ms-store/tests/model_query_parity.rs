@@ -654,7 +654,7 @@ fn engine_returns_what_the_desktop_reads() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
     let store = ReadStore::open(dir.path()).unwrap();
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     let queries = captured();
     assert!(queries.len() >= 60, "{} queries captured", queries.len());
     for c in &queries {
@@ -684,7 +684,7 @@ fn plan(conn: &Connection, sql: &str, params: &[rusqlite::types::Value]) -> Stri
 /// Statistics shaped like a large mailbox: a few hundred thousand category rows over a
 /// few dozen categories.
 fn large_mailbox_stats(dir: &Path) {
-    let conn = Connection::open(dir.join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.join("tern.db")).unwrap();
     conn.execute_batch(
         "ANALYZE;
          DELETE FROM sqlite_stat1 WHERE tbl IN ('ThreadCategory', 'Thread');
@@ -703,7 +703,7 @@ fn thread_list_plan_matches_the_desktop() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
     let plans = |name: &str| {
-        let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+        let conn = Connection::open(dir.path().join("tern.db")).unwrap();
         let c = captured().into_iter().find(|c| c.name == name).unwrap();
         let q: ModelQuery = serde_json::from_value(c.query.clone()).unwrap();
         let compiled = compile(&q).unwrap();
@@ -741,7 +741,7 @@ fn thread_list_plan_matches_the_desktop() {
     }
     // The web's lists, by cursor and per account, keep that plan: the deduped subselect and
     // the account narrowing don't scan Thread or ThreadCategory.
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     for accounts in [Value::Null, json!(["a2"])] {
         let q: ModelQuery = serde_json::from_value(json!({
             "class": "Thread", "accounts": accounts,
@@ -872,7 +872,7 @@ fn accounts_and_cursor_pages() {
             None => break,
         }
     }
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     let want: Vec<String> = conn
         .prepare(
             "SELECT id FROM Thread WHERE starred != 0 ORDER BY lastMessageReceivedTimestamp ASC",
@@ -892,7 +892,7 @@ fn overlapping_categories_and_accounts_page_fully() {
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
     let store = ReadStore::open(dir.path()).unwrap();
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     let rows = |v: Value| {
         let q: ModelQuery = serde_json::from_value(v).unwrap();
         match store.model_query(&q).unwrap() {
@@ -1007,7 +1007,7 @@ fn allowlist_matches_the_schema() {
     use ms_store::model_query::{allowlist, AttrDef};
     let dir = tempfile::tempdir().unwrap();
     build(dir.path());
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     let columns = |table: &str| -> Vec<String> {
         conn.prepare(&format!("PRAGMA table_info(`{table}`)"))
             .unwrap()

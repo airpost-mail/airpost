@@ -34,7 +34,7 @@ fn migrated_schema() -> (tempfile::TempDir, Vec<Value>) {
     let clock = ManualClock::new(1_700_000_000);
     let outcome = ms_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert!(outcome.created && !outcome.moved_legacy);
-    let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
     let version: i32 = conn
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
@@ -142,7 +142,7 @@ fn matches_live_replay_of_cpp_migrations() {
 #[test]
 fn legacy_database_is_moved_aside() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("edgehill.db");
+    let db = dir.path().join("tern.db");
     {
         let conn = Connection::open(&db).unwrap();
         conn.execute_batch(
@@ -158,7 +158,7 @@ fn legacy_database_is_moved_aside() {
     let outcome = ms_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
     assert!(outcome.moved_legacy && outcome.created);
     assert_eq!(String::from_utf8(out).unwrap(), "\nRunning Migration");
-    assert!(dir.path().join("edgehill.legacy.db").exists());
+    assert!(dir.path().join("tern.legacy.db").exists());
     assert!(dir.path().join("files").exists());
     assert_eq!(
         std::fs::read_dir(dir.path().join("files")).unwrap().count(),

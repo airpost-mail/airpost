@@ -35,7 +35,7 @@ fn mailsync(config: &Path) -> Command {
 }
 
 fn db(config: &Path) -> Connection {
-    let c = Connection::open(config.join("edgehill.db")).unwrap();
+    let c = Connection::open(config.join("tern.db")).unwrap();
     c.busy_timeout(Duration::from_secs(60)).unwrap();
     c
 }

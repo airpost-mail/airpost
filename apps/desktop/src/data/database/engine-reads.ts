@@ -5,7 +5,7 @@
 Where DatabaseStore reads in this window (docs/desktop-client-plan.md 4.1 step 2). With
 `core.engine.reads: "engine"` a ModelQuery goes to the engine's `query` over the window's own
 connection as Query.toJSON(); otherwise, and whenever the engine's hello doesn't list `query`,
-it runs as Query.sql() on the read-only edgehill.db.
+it runs as Query.sql() on the read-only tern.db.
 
 Reconnect contract. A read issued while the connection is down, or dropped while it was out,
 waits for the next hello up to READ_WAIT_MS and then rejects with EngineUnavailableError. Deltas

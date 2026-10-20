@@ -454,7 +454,7 @@ engine restarts, and the row is left for the winning device's change to sync in.
   - `push`: the POST in 3.5, Basic auth. On a retryable error (connect, timeout, 429, 5xx) or
     401/403 it writes the record to the outbox and returns success, so the task semantics stay
     as they are.
-  - **Outbox:** a `MetadataOutbox` table in `edgehill.db` (account, object type and id,
+  - **Outbox:** a `MetadataOutbox` table in `tern.db` (account, object type and id,
     plugin, version, value, header Message-ID, backfill flag; latest per key wins), created by
     `ms_net::Outbox` on first use so a migrated database keeps the C++ V12 schema. Ids are
     AUTOINCREMENT so removing a sent entry never drops a newer push for the same key. A push

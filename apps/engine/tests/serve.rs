@@ -967,7 +967,7 @@ fn reset_database_starts_over_and_sessions_reopen_it() {
     c.call(method::TASKS_GET, json!({ "accountId": A, "id": "t-a" }))
         .unwrap();
     // Metadata waiting for its message is carried into the new database (TD32).
-    let db = e.dir.path().join("edgehill.db");
+    let db = e.dir.path().join("tern.db");
     rusqlite::Connection::open(&db)
         .unwrap()
         .execute(
@@ -995,7 +995,7 @@ fn reset_database_starts_over_and_sessions_reopen_it() {
     let stopped = |id: &str| (id.to_owned(), "stopped".to_owned());
     assert_eq!(states(&status), [stopped(A), stopped(B)]);
     assert_eq!(e.discovery()["accounts"], json!([]));
-    assert!(e.dir.path().join("edgehill.db").exists());
+    assert!(e.dir.path().join("tern.db").exists());
 
     assert_eq!(e.parent.add(account(A))["state"], "running");
     let gone = c

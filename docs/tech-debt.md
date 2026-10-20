@@ -421,7 +421,7 @@ defaults (0644 under the usual umask) at predictable names and never removed:
 `<temp>/<message.id>` (`message-controls.tsx:159-162`); sync logs
 (`preferences-account-details.tsx:205-207`, `onboarding/lib/form-error-message.tsx:23`).
 
-The engine creates `edgehill.db`, logs and attachments at the default umask
+The engine creates `tern.db`, logs and attachments at the default umask
 (`crates/ms-sync/src/mail_processor.rs:712-721`, `crates/ms-core/src/log.rs:146`,
 `crates/ms-store/src/schema.rs:114`); only `run/` is private (`apps/engine/src/platform.rs:153-166`).
 Today the desktop chmods the config dir to 0700 (`src/main/config-persistence-manager.ts:37-45`),

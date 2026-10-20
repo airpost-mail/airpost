@@ -147,8 +147,10 @@ pub const VACUUM_TIME_KEY: &str = "VACUUM_TIME";
 /// Task data: when (Unix seconds) a remote phase put back after a retryable error runs
 /// again; the foreground worker skips the task before then (TD43).
 pub const TASK_NEXT_ATTEMPT_KEY: &str = "_nextAttemptAt";
-pub const DATABASE_FILE: &str = "edgehill.db";
-pub const LEGACY_DATABASE_FILE: &str = "edgehill.legacy.db";
+/// The engine's database in the config dir. The C++ engine and Mailspring use `edgehill.db`.
+pub const DATABASE_FILE: &str = "tern.db";
+/// Where `migrate` moves a database the C++ engine wrote, for `import-legacy`.
+pub const LEGACY_DATABASE_FILE: &str = "tern.legacy.db";
 pub const FILES_DIR: &str = "files";
 pub const SQLITE_BUSY_TIMEOUT_MS: u64 = 60 * 1000;
 

@@ -51,7 +51,7 @@ To iterate on a single case:
 ```bash
 python3 test/run.py test/scenarios/remote-move-to-archive.yaml --server dovecot:qresync --keep
 # then read test/runs/<name>/report.txt, config/mailsync-*.log (grep Tombstoning|Unlinking|
-# syncFolderUIDRange|Marking|Sync loop complete|recv \* VANISHED), config/edgehill.db
+# syncFolderUIDRange|Marking|Sync loop complete|recv \* VANISHED), config/tern.db
 ```
 
 ## 2. What the baseline says, and what the refactor changed

@@ -123,6 +123,27 @@ class MailsyncError(RuntimeError):
     pass
 
 
+# The engine's database in its config dir: the Rust engine's is tern.db, the C++ engine's
+# edgehill.db. The desktop's Import from Mailspring copies a C++ database to tern.db, where the
+# Rust engine's migrate moves it aside.
+RUST_DATABASE = "tern.db"
+CPP_DATABASE = "edgehill.db"
+
+
+def is_cpp_engine(binary: Optional[Path]) -> bool:
+    """Whether `binary` is the C++ engine: MAILSYNC_CPP_BIN, or a build in legacy/mailsync-cpp,
+    Xcode's MailSync-* DerivedData or a Mailspring.app bundle."""
+    if binary is None:
+        return False
+    path = Path(binary).expanduser().resolve()
+    cpp = os.environ.get("MAILSYNC_CPP_BIN")
+    if cpp and Path(cpp).expanduser().resolve() == path:
+        return True
+    parts = path.parts
+    return ("mailsync-cpp" in parts or any(p.endswith(".app") and p.startswith("Mailspring") for p in parts)
+            or any(p.startswith("MailSync-") for p in parts))
+
+
 def find_binary() -> Path:
     """MAILSYNC_BIN, else the Rust release build, else the C++ engine's Linux cmake output,
     else Xcode's."""
@@ -1253,7 +1274,7 @@ class MailsyncProcess:
 
     @property
     def db_path(self) -> Path:
-        return self.config_dir / "edgehill.db"
+        return self.config_dir / (CPP_DATABASE if is_cpp_engine(self.binary) else RUST_DATABASE)
 
     def db(self, scoped: Optional[bool] = None):
         """`with proc.db() as conn:` - closed on exit (sqlite3's own context manager only

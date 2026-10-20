@@ -98,7 +98,7 @@ current mailbox, and pass its contents as the `setup-js` (after the view has loa
 `scripts/seed-tracking-metadata.py` writes fake open/click metadata onto real sent
 messages. Pattern for any similar seeding:
 
-1. Stop the app **and** mailsync-rs; `cp edgehill.db edgehill.db.bak-<reason>`.
+1. Stop the app **and** mailsync-rs; `cp tern.db tern.db.bak-<reason>`.
 2. Write both places the UI reads from — the model's JSON blob (`Message.data`,
    `metadata` array) and the join table (`ModelPluginMetadata`) that queries filter on.
 3. Keep timestamps relative to the message's own date so "N days after sending" and

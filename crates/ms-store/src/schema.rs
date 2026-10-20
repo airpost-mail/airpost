@@ -108,7 +108,7 @@ pub const ACCOUNT_RESET_QUERIES: &[&str] = &[
     "DELETE FROM `Account` WHERE `id` = ?",
 ];
 
-/// Opens `$CONFIG_DIR_PATH/edgehill.db` with the connection settings every C++ `MailStore`
+/// Opens `$CONFIG_DIR_PATH/tern.db` with the connection settings every C++ `MailStore`
 /// applied: 60 s busy timeout, WAL, `page_size` 4096, `cache_size` 10000, `synchronous`
 /// NORMAL. These are per connection, so they are set on every open.
 pub fn open_connection(config_dir: &Path) -> Result<Connection> {

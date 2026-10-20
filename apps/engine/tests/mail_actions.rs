@@ -96,7 +96,7 @@ fn insert_message(c: &Connection, id: &str, unsub: Option<&str>, post: Option<&s
 }
 
 fn seed(config: &Path, base: &str) {
-    let c = Connection::open(config.join("edgehill.db")).unwrap();
+    let c = Connection::open(config.join("tern.db")).unwrap();
     let one_click = format!("<mailto:leave@lists.example.net>, <{base}/ok?u=1>");
     insert_message(
         &c,

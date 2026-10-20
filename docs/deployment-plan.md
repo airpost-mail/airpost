@@ -278,7 +278,7 @@ One compose file, four services, two images:
                                                     ▼  (shared profile volume)
                                               mailsync --mode serve --detached
                                                       profile volume: run/engine.json,
-                                                      accounts.json, secrets.enc, edgehill.db,
+                                                      accounts.json, secrets.enc, tern.db,
                                                       gateway/ (devices.json, control.sock)
 ```
 
@@ -353,9 +353,9 @@ One compose file, four services, two images:
 
 - Engine data that can't be rebuilt from the mail server: `accounts.json`, `secrets.enc`
   and the key, `settings.json`, `mcp.json`, local drafts, send-later and other local
-  metadata in `edgehill.db`. Bodies and the rest of `edgehill.db` can be re-synced but take
+  metadata in `tern.db`. Bodies and the rest of `tern.db` can be re-synced but take
   hours.
-- Add `tern engine backup <dir>`: SQLite online backup of `edgehill.db` plus copies of the
+- Add `tern engine backup <dir>`: SQLite online backup of `tern.db` plus copies of the
   JSON files and `secrets.enc` (never the key), 0600. The scheduled backup option mirrors
   the backend's (`[backup]` in the engine's settings, or the same env names).
 - Restore: stop the engine, put the files back, start. The key must be the same one.

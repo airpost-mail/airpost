@@ -37,7 +37,8 @@ from . import invariants
 from . import mailgen
 from . import pim
 from .assertions import TRACKED_FLAGS, compare_placements, placement_changes
-from .mailsync import MailsyncError, MailsyncProcess, account_json, default_transport, describe_exit
+from .mailsync import (CPP_DATABASE, RUST_DATABASE, MailsyncError, MailsyncProcess, account_json,
+                       default_transport, describe_exit, find_binary, is_cpp_engine)
 from .scenario_backend import BackendMixin
 from .scenario_pim import PimMixin, ScenarioFailure
 from .servers.base import Server, normalize_message_id
@@ -701,6 +702,18 @@ class ScenarioRun(PimMixin, BackendMixin):
             with self._as_account(name):
                 self.ms.wait_quiescent(timeout=float(opts.get("timeout", 180)), ignore_busy=self.ignore_busy)
 
+    def _import_cpp_database(self):
+        """Moves a C++ engine's edgehill.db (with its -wal and -shm) to tern.db, as the
+        desktop's Import from Mailspring does, before a Rust engine starts on the profile."""
+        config = self.ms.config_dir
+        if not (config / CPP_DATABASE).exists() or (config / RUST_DATABASE).exists():
+            return
+        for suffix in ("", "-wal", "-shm"):
+            source = config / f"{CPP_DATABASE}{suffix}"
+            if source.exists():
+                source.rename(config / f"{RUST_DATABASE}{suffix}")
+        self._note(f"moved {CPP_DATABASE} to {RUST_DATABASE} for the Rust engine")
+
     def _restart(self, arg: dict):
         if self.accounts:
             raise ScenarioFailure("restart is not supported in a scenario with several accounts")
@@ -716,6 +729,8 @@ class ScenarioRun(PimMixin, BackendMixin):
         # Without `binary:` the restart lands on the build under test, whatever the scenario
         # started on. Relative paths resolve against test/, like the top-level `binary:`.
         binary = self._binary_path(arg["binary"]) if arg.get("binary") else self.binary
+        if not is_cpp_engine(binary or find_binary()):
+            self._import_cpp_database()
         modes = ["import-legacy"] if arg.get("import_legacy") else []
         self.ms = MailsyncProcess(account, self.work, binary=binary, verbose=True, env=self._engine_env(),
                                   pre_sync_modes=modes, transport=self._transport_for(binary))

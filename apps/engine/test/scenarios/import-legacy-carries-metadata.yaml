@@ -52,8 +52,8 @@ expect:
       count: 1
       match: [{filename: notes.txt}]
   config_files:
-    present: [edgehill.legacy-imported.db]
-    absent: [edgehill.legacy.db, files.legacy]
+    present: [tern.legacy-imported.db]
+    absent: [tern.legacy.db, files.legacy]
   sql:
     - {db: main, query: "SELECT count(*) FROM MessageBody b JOIN Message m ON m.id = b.id WHERE m.headerMessageId = 'local-draft-1@example.test'", equals: 1}
     - {db: main, query: "SELECT value FROM _State WHERE id = 'cursor-c0ffee-harness'", equals: "42"}

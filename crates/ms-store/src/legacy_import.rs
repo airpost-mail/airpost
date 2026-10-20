@@ -24,7 +24,7 @@
 //! the rows, so a second run (or a run after the user deleted an imported draft) changes
 //! nothing. After the commit the legacy database is renamed to
 //! [`LEGACY_IMPORTED_DATABASE_FILE`], so a new database created later without a new legacy
-//! move (the user deleted `edgehill.db*` to resync) does not import it again.
+//! move (the user deleted `tern.db*` to resync) does not import it again.
 
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
@@ -51,7 +51,7 @@ pub const LEGACY_FILES_DIR: &str = "files.legacy";
 
 /// Where the legacy database (with its `-wal` and `-shm`) goes once imported. Kept rather
 /// than deleted, for support; an older copy is replaced.
-pub const LEGACY_IMPORTED_DATABASE_FILE: &str = "edgehill.legacy-imported.db";
+pub const LEGACY_IMPORTED_DATABASE_FILE: &str = "tern.legacy-imported.db";
 
 /// `_State` key holding the time `import-legacy` committed. Present means the legacy
 /// database has been imported into this one.
@@ -119,7 +119,7 @@ pub fn import_legacy(config_dir: &Path, deltas: Arc<DeltaStream>) -> Result<Impo
     }
     if !config_dir.join(DATABASE_FILE).is_file() {
         return Err(Error::other(
-            "edgehill.db does not exist; run --mode migrate before --mode import-legacy",
+            "tern.db does not exist; run --mode migrate before --mode import-legacy",
         ));
     }
     let store = Store::open(config_dir, deltas)?;
@@ -176,7 +176,7 @@ pub fn import_legacy(config_dir: &Path, deltas: Arc<DeltaStream>) -> Result<Impo
     Ok(ImportOutcome::Imported(counts))
 }
 
-/// Renames `edgehill.legacy.db*` to [`LEGACY_IMPORTED_DATABASE_FILE`]`*`, replacing an older
+/// Renames `tern.legacy.db*` to [`LEGACY_IMPORTED_DATABASE_FILE`]`*`, replacing an older
 /// copy. A failure is logged and left for the next launch, which finds the import recorded.
 fn retire_legacy_database(config_dir: &Path) {
     let from = config_dir.join(LEGACY_DATABASE_FILE);
@@ -215,7 +215,7 @@ fn check_rust_database(store: &Store) -> Result<()> {
     let engine = store.get_key_value(STATE_ENGINE_KEY)?;
     if version < SCHEMA_VERSION || engine.as_deref() != Some(STATE_ENGINE_RUST) {
         return Err(Error::other(
-            "edgehill.db was not created by this engine; run --mode migrate before --mode import-legacy",
+            "tern.db was not created by this engine; run --mode migrate before --mode import-legacy",
         ));
     }
     Ok(())
@@ -798,7 +798,7 @@ struct LegacyMessage {
     data: Value,
 }
 
-/// A C++ `edgehill.db`, read-only. `placements` is false before the V10 migration, when a
+/// A database the C++ engine wrote (`tern.legacy.db`), read-only. `placements` is false before the V10 migration, when a
 /// message's single location was `Message.remoteFolderId` / `remoteUID`.
 struct LegacyDb {
     conn: Connection,

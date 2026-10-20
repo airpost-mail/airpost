@@ -20,7 +20,7 @@ CPP_NO_OVERRIDES = ("The C++ binary does not read the harness endpoint overrides
                     "the DAV servers (docs/engine-port-status.md P1-H, 'What P6 needs').")
 CPP_NO_IMPORT = ("`--mode import-legacy` exists only in the Rust engine (docs/engine-port-plan.md section 9); "
                  "the C++ binary rejects the mode.")
-FRESH_DB = ("The Rust `migrate` moves a C++ edgehill.db aside and starts a fresh V12 database "
+FRESH_DB = ("The Rust `migrate` moves a C++ database aside and starts a fresh V12 database "
             "(docs/engine-port-plan.md section 9, D-fresh DB); C++ keeps and upgrades it.")
 SNIPPET = ("Snippet/body/search-text drift from replacing libtidy+libxml2 with html5ever "
            "(docs/engine-port-plan.md section 2 table and section 10).")

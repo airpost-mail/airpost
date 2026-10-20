@@ -1,6 +1,6 @@
 """
-A binary-neutral picture of what an engine left behind after a scenario: every table of
-edgehill.db and the set of models it streamed, with engine ids replaced by keys both engines
+A binary-neutral picture of what an engine left behind after a scenario: every table of its
+database and the set of models it streamed, with engine ids replaced by keys both engines
 agree on, so two runs of the same scenario on different binaries can be diffed
 (docs/engine-port-plan.md section 7 "A/B": ids differ by design, compare by headerMessageId).
 

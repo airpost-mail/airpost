@@ -56,7 +56,7 @@ struct CategoryCache<T> {
     value: Rc<T>,
 }
 
-/// One thread's view of `edgehill.db`. Not `Send`: each thread opens its own, which is
+/// One thread's view of `tern.db`. Not `Send`: each thread opens its own, which is
 /// what `MailStore::assertCorrectThread` checked at runtime.
 pub struct Store {
     conn: Connection,
@@ -70,7 +70,7 @@ pub struct Store {
 }
 
 impl Store {
-    /// Opens `$CONFIG_DIR_PATH/edgehill.db` with the engine's connection settings and points
+    /// Opens `$CONFIG_DIR_PATH/tern.db` with the engine's connection settings and points
     /// SQLite's temp files at the config dir, which `main.cpp` did for every mode before
     /// dispatch. The schema must already exist (`migrate` runs first, in its own process).
     pub fn open(config_dir: &Path, deltas: Arc<DeltaStream>) -> Result<Store> {

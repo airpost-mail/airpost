@@ -29,8 +29,8 @@ describe('resetProfileDirectory', function () {
     tern = path.join(root, 'Tern');
     write(path.join(mailspring, 'config.json'), '{"*":{"accounts":[{"id":"a"}]}}');
     write(path.join(tern, 'config.json'), '{"*":{"accounts":[{"id":"a"}]}}');
-    write(path.join(tern, 'edgehill.db'), 'db');
-    write(path.join(tern, 'edgehill.db-wal'), 'wal');
+    write(path.join(tern, 'tern.db'), 'db');
+    write(path.join(tern, 'tern.db-wal'), 'wal');
     write(path.join(tern, 'files', 'ab', 'cd', 'attachment.pdf'), 'pdf');
     write(path.join(tern, 'packages', 'theme', 'package.json'), '{}');
     write(path.join(tern, 'run', 'engine.json'), '{"pid":1}');
@@ -73,10 +73,10 @@ describe('resetProfileDirectory', function () {
   it('reports what it could not delete and still writes the marker', function () {
     const realRmSync = fs.rmSync;
     spyOn(fs, 'rmSync').andCallFake((entry: string, options: fs.RmOptions) => {
-      if (path.basename(entry) === 'edgehill.db') throw new Error('EBUSY');
+      if (path.basename(entry) === 'tern.db') throw new Error('EBUSY');
       realRmSync(entry, options);
     });
-    expect(resetProfileDirectory(tern)).toEqual([path.join(tern, 'edgehill.db')]);
+    expect(resetProfileDirectory(tern)).toEqual([path.join(tern, 'tern.db')]);
     expect(fs.existsSync(path.join(tern, SKIP_MAILSPRING_IMPORT_MARKER))).toBe(true);
   });
 

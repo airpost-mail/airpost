@@ -96,7 +96,7 @@ Phase C (section 4, as built): `account.list` on both channels; `account.add`,
 {account}` (`--mode test`'s object as the result; a rotated refresh token is in its `account`),
 `account.reset {accountId}` (forgets the account if held, waits for its stragglers, deletes its
 rows; the client adds it again), `engine.resetDatabase` (forgets every account, deletes and
-recreates `edgehill.db`; socket sessions reopen it) and `engine.setLogLevel {verboseUntil}`
+recreates `tern.db`; socket sessions reopen it) and `engine.setLogLevel {verboseUntil}`
 (restarts running accounts); and `engine.logs.tail {accountId?, bytes?}` on the socket. The
 slow ones run on their own threads, so their responses can come out of order. The one-shot
 `test` and `reset` modes stay for the harness and scripts.

@@ -38,7 +38,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo test -p mailsync -- --ignored            # the 30 s stdin-closed exit test
 cargo deny check
-python3 apps/engine/tools/schema_check.py check <edgehill.db>  # compare against the C++ V12 replay
+python3 apps/engine/tools/schema_check.py check <tern.db>  # compare against the C++ V12 replay
 MAILSYNC_BIN=target/release/mailsync python3 -m pytest apps/engine/test -n 0 -k <scenario>
 python3 -m pytest apps/engine/test             # quick tier: fake server, no Docker, ~3 min
 python3 -m pytest apps/engine/test --all       # both tiers, every server kind, ~12 min

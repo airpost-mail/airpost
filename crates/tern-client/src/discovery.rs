@@ -184,7 +184,7 @@ mod tests {
             assert!(dirs[0].ends_with("Library/Application Support/Tern"));
         }
         if cfg!(target_os = "linux") {
-            assert!(dirs[1].ends_with("snap/mailspring/common"));
+            assert!(dirs[1].ends_with("snap/tern/common"));
         }
         assert!(default_config_dir().is_some_and(|d| dirs.contains(&d)));
     }

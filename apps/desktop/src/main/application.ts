@@ -532,9 +532,9 @@ export default class Application extends EventEmitter {
   }
 
   _deleteDatabase = (callback) => {
-    this.deleteFileWithRetry(path.join(this.configDirPath, 'edgehill.db'), callback);
-    this.deleteFileWithRetry(path.join(this.configDirPath, 'edgehill.db-wal'));
-    this.deleteFileWithRetry(path.join(this.configDirPath, 'edgehill.db-shm'));
+    this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db'), callback);
+    this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db-wal'));
+    this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db-shm'));
   };
 
   // Registers basic application commands, non-idempotent.

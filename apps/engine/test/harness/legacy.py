@@ -1,9 +1,11 @@
 """
 A database as the C++ engine leaves it, for the scenarios that hand one to the Rust engine
 (fresh-db-replaces-legacy, import-legacy-carries-metadata; docs/engine-port-plan.md
-section 9). The Rust engine never reads such a database in place: `--mode migrate` moves
-`edgehill.db` and its `-wal`/`-shm` to `edgehill.legacy.db*`, creates a fresh V12 database and
-clears `files/`; `--mode import-legacy` later reads the moved copy.
+section 9). It is written at `tern.db`, where the desktop's Import from Mailspring puts
+Mailspring's `edgehill.db` (or at `edgehill.db` for the C++ engine itself). The Rust engine
+never reads such a database in place: `--mode migrate` moves `tern.db` and its `-wal`/`-shm` to
+`tern.legacy.db*`, creates a fresh V12 database and clears `files/`; `--mode import-legacy`
+later reads the moved copy.
 
 The schema is the C++ fresh-database replay (`apps/engine/tools/schema_check.py`, from
 `legacy/mailsync-cpp/MailSync/constants.h`), or, once the C++ tree is gone, the V12 fixture
@@ -12,7 +14,7 @@ the Rust store is checked against. Rows are written the way the C++ models seria
 by design (D4), so anything carried over has to be re-keyed by headerMessageId.
 
     legacy_db:
-      wal: true                 # leave the writes in edgehill.db-wal, as a killed engine does
+      wal: true                 # leave the writes in the -wal file, as a killed engine does
       folders: {Drafts: drafts, INBOX: inbox}
       messages:
         m1: {mailbox: INBOX, uid: 2, thread: t1}           # a message the server also has
@@ -41,8 +43,8 @@ SCHEMA_CHECK = ENGINE_DIR / "tools" / "schema_check.py"
 CONSTANTS_H = REPO_ROOT / "legacy" / "mailsync-cpp" / "MailSync" / "constants.h"
 V12_FIXTURE = REPO_ROOT / "crates" / "ms-store" / "tests" / "fixtures" / "v12_schema.json"
 
-DATABASE = "edgehill.db"
-LEGACY_DATABASE = "edgehill.legacy.db"
+DATABASE = "tern.db"
+LEGACY_DATABASE = "tern.legacy.db"
 FTS_SHADOW_SUFFIXES = ("_config", "_content", "_data", "_docsize", "_idx")
 
 # ResolveMessage(mailbox, uid) -> {"message_id", "subject", "date"} for a message on the server.
@@ -218,7 +220,7 @@ def _write(db_path: str, spec: dict, account_id: str, resolved: dict, keep_wal: 
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content if isinstance(content, bytes) else str(content).encode())
     if keep_wal:
-        # Exit without closing: the committed frames stay in edgehill.db-wal with its -shm,
+        # Exit without closing: the committed frames stay in the -wal file with its -shm,
         # which is what a C++ engine killed mid-run leaves for migrate to move.
         sys.stdout.flush()
         os._exit(0)
@@ -226,12 +228,12 @@ def _write(db_path: str, spec: dict, account_id: str, resolved: dict, keep_wal: 
 
 
 def write_legacy_database(config_dir: Path, spec: dict, account_id: str,
-                          resolve: Optional[ResolveMessage] = None) -> dict:
-    """Writes `config_dir/edgehill.db` as the C++ engine would have left it. Returns what was
+                          resolve: Optional[ResolveMessage] = None, database: str = DATABASE) -> dict:
+    """Writes `config_dir/<database>` as the C++ engine would have left it. Returns what was
     written: {"messages": {key: id}, "files": [relative paths]}."""
     config_dir = Path(config_dir)
     config_dir.mkdir(parents=True, exist_ok=True)
-    db_path = config_dir / DATABASE
+    db_path = config_dir / database
     if db_path.exists():
         raise FileExistsError(f"{db_path} already exists")
     resolved = {}
