@@ -1,5 +1,5 @@
 {
-  "generatedBy": "apps/desktop/spec/search-query-capture-spec.ts",
+  "generatedBy": "apps/desktop/spec/services/search/search-query-capture-spec.ts",
   "queries": [
     {
       "text": "blah",

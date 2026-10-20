@@ -117,6 +117,7 @@
         "features/main-calendar/specs/calendar-delete-exception-spec.ts",
         "features/main-calendar/specs/calendar-rsvp-spec.ts",
         "features/main-calendar/specs/calendar-selection-follows-move-spec.tsx",
+        "features/main-calendar/specs/recurring-event-actions-spec.ts",
         "features/message-list/lib/message-controls.tsx",
         "features/message-list/lib/message-item-body.tsx",
         "features/message-list/lib/message-list.tsx",

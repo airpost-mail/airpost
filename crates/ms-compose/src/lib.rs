@@ -13,7 +13,7 @@
 //! Rust libraries: DOMPurify with the desktop's allowlist becomes ammonia ([`sanitize`]), juice
 //! with Chromium's user-agent stylesheet becomes css-inline ([`inline_style`]). The output is
 //! the same document, not the same bytes; `tests/corpus.rs` compares it with what the desktop
-//! makes of the same inputs (`apps/desktop/spec/draft-corpus-capture-spec.ts`) and lists
+//! makes of the same inputs (`apps/desktop/spec/integration/draft-corpus-capture-spec.ts`) and lists
 //! where the two differ.
 //!
 //! Everything here works on JSON values (the Message and Account JSON the engine stores) and

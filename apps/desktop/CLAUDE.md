@@ -66,7 +66,7 @@ All three package dirs sit at the same depth, so packages import core code as `.
 
 > **IMPORTANT:** Application source code lives in `src/`, `features/` and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
-- **`spec/`** - Jasmine test specs
+- **`spec/`** - Jasmine specs for `src/`, laid out like it (`spec/main/` tests `src/main/`, `spec/flux/stores/` tests `src/flux/stores/`). Specs that also load package code go in `spec/integration/`; a spec for one package goes in that package's `specs/`. `spec/spec-runner/`, `spec/fixtures/`, `spec/test-utils.ts` (the plugin API's `MailspringTestUtils`) and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`) sit at the top.
 
 Code outside `src/main/` and `src/shared/` runs in the windows and must not import `src/main/`; `src/main/` and `src/shared/` must not import window code, except `flux/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
 

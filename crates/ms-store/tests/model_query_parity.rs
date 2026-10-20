@@ -3,7 +3,7 @@
 
 //! The `query` parity suite (docs/desktop-client-plan.md stage 7): every query in
 //! `fixtures/model_queries.json`, captured from the desktop's call sites by
-//! `apps/desktop/spec/model-query-capture-spec.ts`, runs as the desktop's own SQL
+//! `apps/desktop/spec/flux/models/model-query-capture-spec.ts`, runs as the desktop's own SQL
 //! (`Query.sql()`) and through the engine's compiler on one fixture database, and the two
 //! must return the same rows in the same order. The ids the desktop queries name are the
 //! ones [`build`] writes.

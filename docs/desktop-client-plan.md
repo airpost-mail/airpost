@@ -1356,7 +1356,7 @@ id tiebreak); `search.grammar: false` is `.search(text)`'s FTS prefix match and 
 refused with `INVALID_PARAMS`, `data: {"unsupported": "search-grammar"}`. `query` is a read
 method on the socket, in the relayed Open class, announced as `hello.features: "query"`;
 `tern-client` has `Engine::query`. Desktop: `Query.toJSON()` and `Matcher.toJSON()`, plus
-`spec/model-query-capture-spec.ts`, which regenerates and checks the allowlist and about 60
+`spec/flux/models/model-query-capture-spec.ts`, which regenerates and checks the allowlist and about 60
 queries from the call sites (`toJSON()` and `sql()` each). `tests/model_query_parity.rs`
 runs both against one fixture database and compares rows and order, and checks the
 allowlist against the schema. Deviations: the desktop SQL runs on rusqlite, not
@@ -1551,7 +1551,7 @@ term outside that, or a relative one without `now`, is `INVALID_PARAMS`. `query.
 local zone and clock, one call per engine across its accounts, and exits 2 on a query the engine
 refuses; tern-mcp's `search_mail` passes the query through and keeps only the access policy
 filter (its own parser stays for engines without the feature). Tests: the parser spec cases as
-Rust tests; `apps/desktop/spec/search-query-capture-spec.ts` writes
+Rust tests; `apps/desktop/spec/services/search/search-query-capture-spec.ts` writes
 `crates/ms-store/tests/fixtures/search_queries.json` (AST and desktop WHERE for 68 queries),
 and `tests/search_grammar_parity.rs` checks the engine builds the same AST (or fails where the
 desktop fails) and finds the same threads for each date-free query on a fixture database;
@@ -2150,7 +2150,7 @@ against an older engine. TD48 done, TD33's composer half done (see docs/tech-deb
 touched (the send body wasn't edited).
 
 Tests: the corpus (`crates/ms-compose/tests/corpus.rs` against
-`tests/fixtures/draft_corpus.json`, written by `spec/draft-corpus-capture-spec.ts` from the
+`tests/fixtures/draft_corpus.json`, written by `spec/integration/draft-corpus-capture-spec.ts` from the
 desktop's own DraftFactory, quoting and signature code: dates, quoting, reply/forward/mailto
 drafts, signatures, tracking pixels, wrapping, send warnings; HTML compared as tokens, with the
 known drift listed in the test), ms-compose unit tests, the harness scenarios
@@ -2423,7 +2423,7 @@ typechecked, not run (it launches Electron with the app's keychain-backed key st
 Open:
 - No `tern rules` CLI command.
 - Deprecation warnings go to the console only; Preferences > Plugins doesn't show them.
-- `spec/model-query-capture-spec.ts` keeps its `mail-rules-inbox` site names, which point at removed
+- `spec/flux/models/model-query-capture-spec.ts` keeps its `mail-rules-inbox` site names, which point at removed
   code (the queries are still valid parity cases; renaming means regenerating the fixture).
 - Preferences still refuses to reprocess rules with body conditions; the engine could run them.
 - A desktop write of `mailRules` in flight when the engine disables a rule can overwrite the
@@ -2945,7 +2945,7 @@ Open from the review (low):
   Again. The kill-the-engine check in the stage text and the trial step below ("re-reads after
   the respawn") hold only for SIGKILL or a crash; the trial step should use `kill -9`, and SIGTERM
   needs either a respawn or a state that says so.
-- `apps/desktop/spec/stores/database-store-spec.ts` and the other existing subscription specs:
+- `apps/desktop/spec/flux/stores/database-store-spec.ts` and the other existing subscription specs:
   the review fixes run `database-store-spec`, `query-subscription-spec`,
   `query-subscription-pool-spec`, `unread-query-subscription-spec` and `message-store-spec` on
   both transports for selected cases (`forEachTransport`), but most existing subscription
