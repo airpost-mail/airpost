@@ -13,12 +13,12 @@
     "displayName": "Darkside Custom",
 
 > **Edit the colours**  
-> Open `styles/tokens.css`. The whole theme follows two colours: `--sidebar-background` and the fallback in `--primary` (`var(--system-accent, …)`, so the "use the system accent colour" setting still applies). Replace them with one of the palettes listed at the top of the file, or your own. Update `styles/theme-colors.less` to match so the theme preview shows your colours.
+> Open `styles/tokens.css`. The whole theme follows two colours: `--sidebar-background` and `--primary`. Replace them with one of the palettes listed at the top of the file, or your own. Update `styles/theme-colors.less` to match so the theme preview shows your colours.
 
 ```css
 :root {
-  --primary: var(--system-accent, #f18260);
-  --sidebar-background: #313042;
+  --primary: #f18260;
+  --sidebar-background: #15171d;
 }
 ```
 

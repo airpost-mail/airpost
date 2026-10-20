@@ -78,6 +78,11 @@
       padding: 0 10px;
       margin: 0;
       font-size: 13px;
+      background: var(--sidebar-control);
+      color: var(--sidebar-control-foreground);
+      &::placeholder {
+        color: var(--sidebar-control-placeholder);
+      }
     }
   }
   .preferences-sidebar-nav {
@@ -94,7 +99,7 @@
   }
   .preferences-sidebar-separator {
     height: 1px;
-    background: var(--sidebar-border);
+    background: var(--sidebar-separator);
     margin: 10px 8px;
   }
   .preferences-sidebar-item {

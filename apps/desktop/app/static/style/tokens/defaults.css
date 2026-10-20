@@ -67,6 +67,13 @@
   --sidebar-toolbar-background: transparent;
   --thread-list-toolbar-background: transparent;
   --message-list-toolbar-background: transparent;
+  /* Buttons and icons in the sidebar's part of the toolbar (compose, activity), so a theme whose
+     sidebar is darker than the rest of the toolbar can draw them for it. Fill on macOS only;
+     Linux and Windows draw these buttons as tints. */
+  --sidebar-toolbar-button: var(--background);
+  --sidebar-toolbar-foreground: var(--heading-foreground);
+  /* The activity icon; the literal is the grey it was drawn in (@gray). */
+  --sidebar-toolbar-muted-foreground: #586069;
 
   /* ---- Surface: nav rail ---- */
   --rail-background: var(--toolbar-background);
@@ -75,6 +82,10 @@
   --rail-hover: color-mix(in srgb, var(--foreground) 6%, transparent);
   --rail-selected: var(--background);
   --rail-selected-foreground: var(--sidebar-selected-foreground);
+  /* 1 sets the sheets beside the rail as an inset card (4px margin, 1px border, 6px corners); 0
+     joins them flush to the rail and toolbar, for a theme whose rail and sidebar are one surface.
+     A number so it can scale the card's lengths. */
+  --rail-card-inset: 1;
 
   /* ---- Surface: sidebar (folder list, calendar list, preferences and contacts sidebars) ---- */
   --sidebar-background: #f1f3f7;
@@ -82,11 +93,18 @@
   --sidebar-inset-background: color-mix(in srgb, var(--sidebar-background) 50%, var(--background));
   --sidebar-foreground: var(--subtle-foreground);
   --sidebar-muted-foreground: var(--muted-foreground);
+  /* The sidebar's edge against the content. */
   --sidebar-border: var(--border);
+  /* Dividers inside the sidebar. */
+  --sidebar-separator: var(--sidebar-border);
   --sidebar-hover: var(--hover);
   /* Light selects by text colour only. */
   --sidebar-selected: var(--sidebar-background);
   --sidebar-selected-foreground: var(--selected);
+  /* Text fields in the sidebar (Preferences search). The placeholder literal is Chromium's. */
+  --sidebar-control: var(--control);
+  --sidebar-control-foreground: var(--foreground);
+  --sidebar-control-placeholder: #757575;
 
   /* ---- Surface: thread list (every ListTabular list) ---- */
   --thread-list-background: var(--background);

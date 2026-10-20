@@ -102,8 +102,8 @@
 }
 
 .nav-rail-content {
-  margin: 0 4px 4px 0;
-  border: 1px solid color-mix(in srgb, @text-color 7%, transparent);
-  border-radius: 6px;
+  margin: 0 calc(4px * var(--rail-card-inset)) calc(4px * var(--rail-card-inset)) 0;
+  border: calc(1px * var(--rail-card-inset)) solid color-mix(in srgb, @text-color 7%, transparent);
+  border-radius: calc(6px * var(--rail-card-inset));
   overflow: hidden;
 }

@@ -227,6 +227,17 @@ body.is-blurred {
   .btn-toolbar:only-of-type {
     margin-right: 6px;
   }
+  // :where() keeps these at the specificity of the two rules above; they win by order.
+  :where(.toolbar-RootSidebar, .toolbar-CalendarSidebar) .btn-toolbar {
+    img.content-mask {
+      background-color: color-mix(in srgb, var(--sidebar-toolbar-foreground) 80%, transparent);
+    }
+  }
+  :where(.toolbar-RootSidebar, .toolbar-CalendarSidebar) .btn-toolbar:active {
+    img.content-mask {
+      background-color: color-mix(in srgb, var(--sidebar-toolbar-foreground) 90%, transparent);
+    }
+  }
 
   .button-group {
     display: flex;
@@ -506,6 +517,20 @@ body.is-blurred {
       }
       &.btn-disabled:hover {
         background: @toolbar-btn-fill-darwin;
+      }
+    }
+    // The same capsule drawn from the sidebar's toolbar tokens.
+    :where(.toolbar-RootSidebar, .toolbar-CalendarSidebar) .btn-toolbar {
+      background: color-mix(in srgb, var(--sidebar-toolbar-button) 85%, transparent);
+      box-shadow: inset 0 1px 0 ~"hsl(from var(--sidebar-toolbar-button) h s min(l + 10, 100))",
+        inset 0 -1px 0 ~"hsl(from var(--sidebar-toolbar-button) h s min(l + 10, 100))",
+        0 0 0 0.5px fade(@black, 7%), 0 1px 4px fade(@black, 5%);
+      &:hover,
+      &.btn-disabled:hover {
+        background: var(--sidebar-toolbar-button);
+      }
+      &:active {
+        background: color-mix(in srgb, @text-color 10%, var(--sidebar-toolbar-button));
       }
     }
 

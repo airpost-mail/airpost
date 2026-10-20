@@ -102,8 +102,9 @@ Every surface token defaults to a base or state token, except where Light uses i
 |---|---|
 | Toolbar: the window toolbar strip and the frame around the nav-rail card | `--toolbar-background`: `var(--sidebar-background)` on macOS, `var(--background)` on Linux and Windows. `--toolbar-foreground`: `var(--heading-foreground)`. `--toolbar-muted-foreground`: `var(--subtle-foreground)`. `--toolbar-border`: `color-mix(--foreground 10%)`, 12% on Linux |
 | Toolbar above each column | `--sidebar-toolbar-background`, `--thread-list-toolbar-background`, `--message-list-toolbar-background`, all `transparent`: painted over the toolbar, so the toolbar shows through unless a theme sets them. `var(--toolbar-background)` would cover the blurred-window gradient and LESS themes that paint `.sheet-toolbar-container` |
-| Nav rail | `--rail-background`: `var(--toolbar-background)`. `--rail-foreground` (icons): `var(--subtle-foreground)`. `--rail-border` (divider): `color-mix(--foreground 12%)`. `--rail-hover`: `color-mix(--foreground 6%)`. `--rail-selected`: `var(--background)`. `--rail-selected-foreground`: `var(--sidebar-selected-foreground)` |
-| Sidebar: folder list, calendar list, preferences and contacts sidebars | `--sidebar-background`: `#f1f3f7`. `--sidebar-inset-background` (sidebar inside the nav-rail card): `color-mix(--sidebar-background 50%, --background)`. `--sidebar-foreground`: `var(--subtle-foreground)`. `--sidebar-muted-foreground`: `var(--muted-foreground)`. `--sidebar-border`: `var(--border)`. `--sidebar-hover`: `var(--hover)`. `--sidebar-selected`: `var(--sidebar-background)` (Light selects by text colour only). `--sidebar-selected-foreground`: `var(--selected)` |
+| Buttons in the sidebar's part of the toolbar (compose, activity) | `--sidebar-toolbar-button` (capsule fill on macOS; hover is the full colour, rest 85%): `var(--background)`. `--sidebar-toolbar-foreground` (button icons, at 80%, 90% pressed): `var(--heading-foreground)`. `--sidebar-toolbar-muted-foreground` (activity icon): `#586069`. For a sidebar darker than the rest of the toolbar (Darkside); Linux and Windows draw these buttons as tints, so only the icon tokens apply there |
+| Nav rail | `--rail-background`: `var(--toolbar-background)`. `--rail-foreground` (icons): `var(--subtle-foreground)`. `--rail-border` (divider): `color-mix(--foreground 12%)`. `--rail-hover`: `color-mix(--foreground 6%)`. `--rail-selected`: `var(--background)`. `--rail-selected-foreground`: `var(--sidebar-selected-foreground)`. `--rail-card-inset`: `1`, a number that scales the inset card the sheets sit in beside the rail (4px margin, 1px border, 6px corners); `0` joins them flush to the rail and toolbar, for a theme whose rail and sidebar are one surface |
+| Sidebar: folder list, calendar list, preferences and contacts sidebars | `--sidebar-background`: `#f1f3f7`. `--sidebar-inset-background` (sidebar inside the nav-rail card): `color-mix(--sidebar-background 50%, --background)`. `--sidebar-foreground`: `var(--subtle-foreground)`. `--sidebar-muted-foreground`: `var(--muted-foreground)`. `--sidebar-border` (edge against the content): `var(--border)`. `--sidebar-separator` (dividers inside the sidebar): `var(--sidebar-border)`. `--sidebar-hover`: `var(--hover)`. `--sidebar-selected`: `var(--sidebar-background)` (Light selects by text colour only). `--sidebar-selected-foreground`: `var(--selected)`. `--sidebar-control` / `-control-foreground` / `-control-placeholder` (text fields in the sidebar, the Preferences search): `var(--control)` / `var(--foreground)` / `#757575`, Chromium's placeholder grey |
 | Thread list: every ListTabular list | `--thread-list-background`: `var(--background)`. `--thread-list-foreground`: `var(--foreground)`. `--thread-list-muted-foreground`: `var(--muted-foreground)`. `--thread-list-border`: `#dcdfe5`. `--thread-list-hover`: `hsl(from --thread-list-background, l − 5)`. `--thread-list-unread` / `-unread-foreground`: `var(--background)` / `var(--thread-list-foreground)`. `--thread-list-read-foreground` (read threads in the thread list only; Dark dims them): `var(--thread-list-foreground)`. `--thread-list-selected` / `-selected-foreground` / `-selected-border` (multi-selection, or the open thread while the list isn't focused): `color-mix(--selected 17%, --thread-list-background)` / `var(--thread-list-foreground)` / `color-mix(--selected 50%, --thread-list-background)`. `--thread-list-focused` / `-focused-foreground` / `-focused-border` (keyboard cursor row): `var(--selected)` / `var(--selected-foreground)` / `var(--thread-list-focused)`. `--thread-list-cursor` (4px stripe on the keyboard-cursor row): `var(--thread-list-focused)`. `--thread-list-focused-icon-whiten`: `1`, a number that scales the filters whitening image icons and hover actions on focused rows; a theme with a pale `--thread-list-focused` sets `0` |
 | Reading pane: message list and its participant sidebar | `--message-list-background`: `var(--secondary)`. `--message-list-foreground`, `--message-list-muted-foreground`, `--message-list-border`: foreground, muted-foreground, border |
 | Composer | `--composer-background`: `var(--background)`. `--composer-foreground`, `--composer-muted-foreground`, `--composer-border`: foreground, muted-foreground, border |
@@ -237,10 +238,14 @@ token, so a theme can recolour the surface alone:
 - Column toolbars: `.toolbar-RootSidebar`, `.toolbar-CalendarSidebar` → `--sidebar-toolbar-background`;
   `.toolbar-ThreadList` → `--thread-list-toolbar-background`; `.toolbar-MessageList`,
   `.toolbar-MessageListSidebar` → `--message-list-toolbar-background`.
+  Inside `.toolbar-RootSidebar` and `.toolbar-CalendarSidebar`, `.btn-toolbar` icon masks →
+  `--sidebar-toolbar-foreground` and the macOS capsule → `--sidebar-toolbar-button`; the activity
+  icon (`activity/styles/list.less`, was `@gray`) → `--sidebar-toolbar-muted-foreground`.
 - Nav rail (`nav-rail.less`): `.nav-rail` → `--rail-background`; item mask → `--rail-foreground`;
   hover → `--rail-hover`; `.active` background → `--rail-selected`; `.active` mask →
   `--rail-selected-foreground`; `.nav-rail-divider` → `--rail-border`; `.nav-rail-restore` uses
-  `--sidebar-foreground` and `--sidebar-hover`, since it sits over the sidebar.
+  `--sidebar-foreground` and `--sidebar-hover`, since it sits over the sidebar; `.nav-rail-content`
+  margin, border width and radius scale with `--rail-card-inset`.
 - Sidebar (`outline-view.less`): `.item` text and mask (`@text-color-subtle`) → `--sidebar-foreground`;
   `.heading` (`@text-color-very-subtle`) → `--sidebar-muted-foreground`. This closes the gap where
   a dark sidebar got dark text.
@@ -254,7 +259,8 @@ token, so a theme can recolour the surface alone:
 - Other sidebars: `.preferences-sidebar`, `.contacts-perspective-list` and `.calendar-source-list`
   read `--sidebar-background`, `--sidebar-foreground`, `--sidebar-muted-foreground` (labels,
   subtitles), `--sidebar-border`, `--sidebar-hover` and `--sidebar-selected-foreground` (active
-  Preferences item). In Light the Preferences items go from `@text-color` to the sidebar's 85%
+  Preferences item). The Preferences separator reads `--sidebar-separator` and the search field
+  `--sidebar-control`, `--sidebar-control-foreground` and `--sidebar-control-placeholder`. In Light the Preferences items go from `@text-color` to the sidebar's 85%
   text, the server card subtitle from 85% to 60%, and the active item from `--link` to `--selected`.
 - Image icons: under `body.theme-scheme-dark`, `img.content-dark`, `img.content-light`
   (`extra.less`) and thread icons other than the unread dot and star (`thread-list.less`) are
@@ -296,5 +302,5 @@ Darkside as tokens: `--sidebar-background: #313042`, `--sidebar-foreground: #9f9
 `--primary: #f18260` (no system accent: the old theme used its coral directly), `--thread-list-focused: #fef3ef`,
 `--thread-list-focused-foreground: #313042`, `--thread-list-focused-icon-whiten: 0`,
 `--thread-list-cursor: var(--primary)`, plus the prototype's border and status values.
-The nav-rail card's 4px inset and border are not tokens, so Darkside keeps that frame. That is one
-of the accepted losses.
+The nav-rail card's inset and border are `--rail-card-inset`, which Darkside sets to `0` so the
+rail and sidebar read as one column. `themes/ui-darkside/styles/tokens.css` has the shipped values.

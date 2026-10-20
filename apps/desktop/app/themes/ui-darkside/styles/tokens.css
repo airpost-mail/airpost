@@ -2,11 +2,11 @@
    with a coral accent. Tokens only; app/static/style/tokens/defaults.css has the rest at the Light
    values, and docs/desktop/theme-tokens.md lists every token.
 
-   The look comes from two colours, --sidebar-background and --primary; everything
-   below derives from them the way the LESS theme did (tint() is a color-mix() with white, fade() a
-   color-mix() with transparent). To make your own variant, change those two. Palettes from the
-   original theme:
-     Default  #313042 / #f18260     Luna     #202c46 / #39dff8     Zond   #333333 / #f6d49c
+   The look comes from two colours, --sidebar-background and --primary; everything below derives
+   from them, so the light greys carry the sidebar's hue and the text colours are opaque. To make
+   your own variant, change those two. The default sidebar is near-black with a faint tint of
+   Tern's navy (the app icon's hue). Palettes from the original theme:
+     Original #313042 / #f18260     Luna     #202c46 / #39dff8     Zond   #333333 / #f6d49c
      Gemini   #00203c / #f6b312     Mercury  #555555 / #999999     Apollo #3a1e15 / #f6aa1c */
 :root {
   /* The accent is part of the palette, so Darkside ignores the "use the system accent colour"
@@ -14,32 +14,62 @@
   --primary: #f18260;
   --selected: color-mix(in srgb, var(--primary), black 10%);
   --unread: var(--primary);
-  --info: var(--primary);
+  /* The accent at a lightness that holds 4.5:1 for links on the light surfaces and for white
+     text on info banners. */
+  --link: hsl(from var(--primary) h calc(s * 0.72) 44);
+  --link-hover: hsl(from var(--primary) h calc(s * 0.72) 36);
+  --info: var(--link);
+  /* Deeper than Light's amber so the images banner text keeps 4.5:1 on the reading pane. */
+  --warning: #e09a3a;
 
-  /* ---- Sidebar (folder list, calendar list) ---- */
-  --sidebar-background: #313042;
+  /* ---- Content: greys from the sidebar colour ---- */
+  --secondary: color-mix(in srgb, var(--sidebar-background) 5%, var(--background));
+  /* Popovers sit on the off-white reading pane, so they're white. */
+  --popover: var(--background);
+  --muted-foreground: color-mix(in srgb, var(--foreground) 68%, var(--background));
+  --heading-foreground: var(--sidebar-background);
+  --border: color-mix(in srgb, var(--sidebar-background) 12%, transparent);
+  --input: color-mix(in srgb, var(--sidebar-background) 20%, transparent);
+  --modal-overlay: color-mix(in srgb, var(--sidebar-background) 40%, transparent);
+
+  /* ---- Sidebar (folder list, calendar list, Preferences) ---- */
+  --sidebar-background: #15171d;
   --sidebar-inset-background: var(--sidebar-background);
-  /* desaturate(lighten(@sidebar, 40%), 75%): #9f9f9f for the default palette. */
-  --sidebar-foreground: hsl(from var(--sidebar-background) h max(s - 75, 0) min(l + 40, 100));
-  --sidebar-muted-foreground: color-mix(in srgb, var(--sidebar-foreground) 50%, transparent);
-  --sidebar-hover: rgba(255, 255, 255, 0.1);
+  /* The sidebar's lightness plus 62 (text) and 48 (headings, counts) at a third of its saturation:
+     #b4b5bb and #8e9199 for the default palette, 8.8:1 and 5.7:1 (7.3:1 and 4.7:1 on hover). */
+  --sidebar-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 62, 100));
+  --sidebar-muted-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 48, 100));
+  --sidebar-hover: rgba(255, 255, 255, 0.07);
   /* Selection by text colour only, as before. */
   --sidebar-selected: var(--sidebar-background);
   --sidebar-selected-foreground: #ffffff;
-  --sidebar-border: color-mix(in srgb, var(--sidebar-foreground) 20%, transparent);
+  /* No edge against the content; the dark/light step is the edge. Dividers inside the sidebar
+     keep a hairline. */
+  --sidebar-border: transparent;
+  --sidebar-separator: rgba(255, 255, 255, 0.08);
+  /* Preferences search: a field one step lighter than the sidebar. */
+  --sidebar-control: color-mix(in srgb, var(--sidebar-background), white 8%);
+  --sidebar-control-foreground: #ffffff;
+  --sidebar-control-placeholder: var(--sidebar-muted-foreground);
 
-  /* ---- Nav rail: joins the sidebar column ---- */
+  /* ---- Nav rail: joins the sidebar column with no card between them; the active item lifts
+     one step ---- */
+  --rail-card-inset: 0;
   --rail-background: var(--sidebar-background);
   --rail-foreground: var(--sidebar-foreground);
-  --rail-hover: rgba(255, 255, 255, 0.1);
+  --rail-hover: rgba(255, 255, 255, 0.07);
+  --rail-selected: color-mix(in srgb, var(--sidebar-background), white 12%);
   --rail-selected-foreground: var(--primary);
-  --rail-border: color-mix(in srgb, var(--sidebar-foreground) 20%, transparent);
+  --rail-border: rgba(255, 255, 255, 0.08);
 
   /* ---- Toolbar: flat, no hairline. Each column's part matches the column below it; the rest
      (Preferences, single-pane message view, popout windows) is tint(@sidebar, 90%). ---- */
   --toolbar-background: color-mix(in srgb, var(--sidebar-background) 10%, var(--background));
   --toolbar-border: transparent;
   --sidebar-toolbar-background: var(--sidebar-background);
+  --sidebar-toolbar-button: color-mix(in srgb, var(--sidebar-background), white 12%);
+  --sidebar-toolbar-foreground: #ffffff;
+  --sidebar-toolbar-muted-foreground: var(--sidebar-foreground);
   --thread-list-toolbar-background: var(--thread-list-background);
   --message-list-toolbar-background: var(--message-list-background);
 
@@ -57,7 +87,7 @@
   --thread-list-focused-icon-whiten: 0;
   --thread-list-cursor: var(--primary);
 
-  /* ---- Reading pane: tint(@sidebar, 95%) ---- */
-  --message-list-background: color-mix(in srgb, var(--sidebar-background) 5%, var(--background));
-  --message-list-border: color-mix(in srgb, var(--sidebar-background) 10%, transparent);
+  /* ---- Reading pane: tint(@sidebar, 95%), the same step as --secondary ---- */
+  --message-list-background: var(--secondary);
+  --message-list-border: var(--border);
 }

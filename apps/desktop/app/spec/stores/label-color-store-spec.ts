@@ -78,7 +78,7 @@ const BASE_COLORS = [
 // The backgrounds dots sit on in the bundled themes: list and pane backgrounds and sidebars of
 // ui-light, Taiga and Less is More (light); ui-dark and Darkside's sidebar (dark).
 const LIGHT_SURFACES = ['#ffffff', '#f1f3f7', '#f4f6f9', '#fdfdfd'];
-const DARK_SURFACES = ['#31343a', '#212121', '#111318', '#313042'];
+const DARK_SURFACES = ['#31343a', '#212121', '#111318', '#15171d'];
 
 describe('LabelColorStore', () => {
   // A store per spec: each spec gets a fresh AppEnv.config (master-before-each).
