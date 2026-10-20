@@ -1,7 +1,12 @@
 import React from 'react';
-import classnames from 'classnames';
 import { localized } from 'mailspring-exports';
-import { DropdownMenu, SegmentedControl } from 'mailspring-component-kit';
+import {
+  DropdownMenu,
+  SegmentedControl,
+  Button,
+  Checkbox,
+  TextField,
+} from 'mailspring-component-kit';
 import { eventCountLabel } from '../events';
 
 export type EventKind = 'all' | 'open' | 'click';
@@ -35,7 +40,7 @@ export function ActivityFeedToolbar({
   ];
   return (
     <div className="activity-toolbar">
-      <input
+      <TextField
         type="search"
         className="toolbar-search"
         placeholder={localized('Search by recipient, subject, or link…')}
@@ -66,21 +71,17 @@ export function ActivityFeedToolbar({
         />
       </div>
       <label className="toolbar-checkbox">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={collapseRepeats}
-          onChange={(e) => onChange({ collapseRepeats: e.target.checked })}
+          onCheckedChange={(checked) => onChange({ collapseRepeats: checked === true })}
         />
         {localized('Collapse repeated events')}
       </label>
       <div className="spacer" />
       <div className="event-count">{eventCountLabel(eventCount)}</div>
-      <div
-        className={classnames('btn', { 'btn-disabled': eventCount === 0 })}
-        onClick={eventCount === 0 ? undefined : onExport}
-      >
+      <Button variant="outline" disabled={eventCount === 0} onClick={onExport}>
         {localized('Export CSV')}
-      </div>
+      </Button>
     </div>
   );
 }

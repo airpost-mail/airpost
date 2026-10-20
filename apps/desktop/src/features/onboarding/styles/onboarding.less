@@ -90,15 +90,20 @@
     margin-bottom: 14px;
   }
 
-  .close {
+  // IconButtons sized by their image, as in the window's corner.
+  .close,
+  .back {
     position: fixed;
+    width: auto;
+    height: auto;
+  }
+  .close {
     z-index: 100;
     top: 1px;
     left: 6px;
   }
 
   .back {
-    position: fixed;
     top: 15px;
     left: 15px;
     padding: 10px;
@@ -129,8 +134,11 @@
       margin-bottom: 0;
     }
   }
-  select {
+  [data-slot='select-trigger'] {
     margin-bottom: 8px;
+  }
+  [data-slot='checkbox'] {
+    margin-inline-end: 5px;
   }
 
   input {
@@ -145,11 +153,6 @@
 
     &::-webkit-input-placeholder {
       color: #c6c6c6;
-    }
-
-    &[type='checkbox'] {
-      width: initial;
-      margin-right: 5px;
     }
 
     &:disabled {
@@ -442,17 +445,6 @@
 }
 
 body.platform-win32 {
-  .page.welcome,
-  .page.tutorial {
-    .footer {
-      .btn-continue {
-        color: white;
-        &:hover {
-          background-color: rgba(0, 0, 0, 0.3);
-        }
-      }
-    }
-  }
   .page-frame {
     .alpha-fade-enter {
       transition: all 0.01s ease-out;
@@ -465,6 +457,11 @@ body.platform-win32 {
 
 // Individual Components
 
+.appearance-mode-switch[data-slot='radio-group'] {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0;
+}
 .appearance-mode {
   background-color: #f7f9f9;
   border-radius: 10px;

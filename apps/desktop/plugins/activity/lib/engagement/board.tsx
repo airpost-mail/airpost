@@ -1,7 +1,12 @@
 import React from 'react';
-import classnames from 'classnames';
 import { localized, AccountStore } from 'mailspring-exports';
-import { ScrollRegion, SegmentedControl } from 'mailspring-component-kit';
+import {
+  ScrollRegion,
+  SegmentedControl,
+  Button,
+  Checkbox,
+  TextField,
+} from 'mailspring-component-kit';
 
 import LoadingCover from '../dashboard/loading-cover';
 import { Timespan, timespanEndsNow } from '../timespan';
@@ -239,7 +244,7 @@ export default class EngagementBoard extends React.Component<
     return (
       <div className="engagement-board">
         <div className="activity-toolbar">
-          <input
+          <TextField
             type="search"
             className="toolbar-search"
             placeholder={localized('Search by name, email, or domain…')}
@@ -265,10 +270,9 @@ export default class EngagementBoard extends React.Component<
             ]}
           />
           <label className="toolbar-checkbox">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={hideColleagues}
-              onChange={(e) => this.setState({ hideColleagues: e.target.checked })}
+              onCheckedChange={(checked) => this.setState({ hideColleagues: checked === true })}
             />
             {localized('Hide colleagues')}
           </label>
@@ -278,12 +282,13 @@ export default class EngagementBoard extends React.Component<
               ? localized('1 recipient')
               : localized('%@ recipients', entries.length)}
           </div>
-          <div
-            className={classnames('btn', { 'btn-disabled': entries.length === 0 })}
-            onClick={entries.length === 0 ? undefined : () => this._onExport(entries)}
+          <Button
+            variant="outline"
+            disabled={entries.length === 0}
+            onClick={() => this._onExport(entries)}
           >
             {localized('Export CSV')}
-          </div>
+          </Button>
         </div>
         <div className="engagement-body">
           <LoadingCover active={loading} />

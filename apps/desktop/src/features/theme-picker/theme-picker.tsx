@@ -8,6 +8,14 @@ import {
   DARK_THEME_NAME,
 } from '../../packages/theme-manager';
 import ThemeOption, { toSelector } from './theme-option';
+import { RadioGroup } from '../../components/kit/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/kit/select';
 import { Disposable } from 'event-kit';
 
 // Sort order for built-in themes; community themes not in this list sort last.
@@ -96,13 +104,30 @@ class ThemePicker extends React.Component<
 
   _renderThemeOptions() {
     return sortThemes(this.state.themes).map((theme) => (
-      <ThemeOption
-        key={theme.name}
-        theme={theme}
-        active={this.state.activeTheme === theme.name}
-        onSelect={() => this._setActiveTheme(theme.name)}
-      />
+      <ThemeOption key={theme.name} theme={theme} active={this.state.activeTheme === theme.name} />
     ));
+  }
+
+  _renderThemeSelect(
+    themes: { name: string; displayName: string }[],
+    value: string,
+    label: string,
+    onChange: (name: string) => void
+  ) {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger size="sm" aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {themes.map((t) => (
+            <SelectItem key={t.name} value={t.name}>
+              {t.displayName}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
   }
 
   _renderAutoSlots() {
@@ -117,29 +142,18 @@ class ThemePicker extends React.Component<
             <span className="auto-theme-icon">☀</span>
             {localized('When light')}
           </label>
-          <select
-            value={this.state.lightTheme}
-            onChange={(e) => this._setLightTheme(e.target.value)}
-          >
-            {sorted.map((t) => (
-              <option key={t.name} value={t.name}>
-                {t.displayName}
-              </option>
-            ))}
-          </select>
+          {this._renderThemeSelect(sorted, this.state.lightTheme, localized('When light'), (name) =>
+            this._setLightTheme(name)
+          )}
         </div>
         <div className="auto-theme-selector">
           <label>
             <span className="auto-theme-icon">☾</span>
             {localized('When dark')}
           </label>
-          <select value={this.state.darkTheme} onChange={(e) => this._setDarkTheme(e.target.value)}>
-            {sorted.map((t) => (
-              <option key={t.name} value={t.name}>
-                {t.displayName}
-              </option>
-            ))}
-          </select>
+          {this._renderThemeSelect(sorted, this.state.darkTheme, localized('When dark'), (name) =>
+            this._setDarkTheme(name)
+          )}
         </div>
       </div>
     );
@@ -155,13 +169,15 @@ class ThemePicker extends React.Component<
           </div>
           <ScrollRegion style={{ margin: '10px 5px 0 5px', height: '300px' }}>
             {this._renderAutoSlots()}
-            <Flexbox
-              direction="row"
-              height="auto"
-              style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}
+            <RadioGroup
+              className="theme-options"
+              orientation="horizontal"
+              aria-label={localized('Themes')}
+              value={this.state.activeTheme}
+              onValueChange={(name) => this._setActiveTheme(name)}
             >
               {this._renderThemeOptions()}
-            </Flexbox>
+            </RadioGroup>
           </ScrollRegion>
           <div className="create-theme">
             <a

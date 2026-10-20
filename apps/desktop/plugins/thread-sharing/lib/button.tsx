@@ -1,6 +1,12 @@
 import React from 'react';
 import { Thread, CapabilityStore } from 'mailspring-exports';
-import { RetinaImg, BindGlobalCommands } from 'mailspring-component-kit';
+import {
+  BindGlobalCommands,
+  IconButton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from 'mailspring-component-kit';
 
 // Sharing uploads the thread to a Tern server that hosts the public page. Until the capability
 // store reports one, the button stays visible but disabled.
@@ -27,15 +33,23 @@ export default class ThreadSharingButton extends React.Component<{ items: any[];
           'core:copy-mailbox-link': () => this._onCopyMailboxLink(),
         }}
       >
-        <button
-          className="btn btn-toolbar thread-sharing-button"
-          title={unavailable}
-          aria-label={unavailable}
-          disabled
-          style={{ marginRight: 0 }}
-        >
-          <RetinaImg name="ic-toolbar-native-share.png" mode={RetinaImg.Mode.ContentIsMask} />
-        </button>
+        <Tooltip>
+          {/* The span is the trigger: a disabled button takes no pointer events, and the
+              tooltip says why it is disabled. */}
+          <TooltipTrigger asChild>
+            <span className="thread-sharing-button">
+              <IconButton
+                variant="toolbar"
+                icon="ic-toolbar-native-share.png"
+                label={unavailable}
+                tooltip={false}
+                disabled
+                style={{ marginRight: 0 }}
+              />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{unavailable}</TooltipContent>
+        </Tooltip>
       </BindGlobalCommands>
     );
   }

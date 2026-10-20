@@ -33,6 +33,15 @@ import {
   RSVPTargetResolution,
 } from './rsvp-target';
 import { answerEvent, editEvent, expandEvents, refusalKey } from '../../engine/client/pim';
+import { Button } from '../../components/kit/button';
+import { IconButton } from '../../components/kit/icon-button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/kit/select';
 import type { EventTimes } from '../../engine/protocol';
 
 import { findOneIana } from 'windows-iana';
@@ -462,9 +471,14 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     return (
       <div className="event-wrapper">
         <div className="event-header">
-          <div className="event-download" onClick={() => Actions.fetchAndOpenFile(this.props.file)}>
-            <RetinaImg name="icon-attachment-download.png" mode={RetinaImg.Mode.ContentIsMask} />
-          </div>
+          <IconButton
+            className="event-download"
+            variant="outline"
+            size="sm"
+            icon="icon-attachment-download.png"
+            label={localized('Open')}
+            onClick={() => Actions.fetchAndOpenFile(this.props.file)}
+          />
           <RetinaImg name="icon-RSVP-calendar-mini@2x.png" mode={RetinaImg.Mode.ContentPreserve} />
           <span className="event-title-text">{localized('Event')}: </span>
           <span className="event-title">{icsEvent.summary}</span>
@@ -570,9 +584,9 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
         ) : (
           <>
             <div className="event-rsvp-buttons">
-              <div className="btn btn-large" onClick={this._onAcceptProposedTime}>
+              <Button variant="outline" size="lg" onClick={this._onAcceptProposedTime}>
                 {localized('Move event to this time')}
-              </div>
+              </Button>
             </div>
             <div className="event-rsvp-destination">
               {localized('Your response will be saved to %@', rsvp.target.calendar.name)}
@@ -675,9 +689,11 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
       <div className="event-actions">
         <div className="event-rsvp-buttons">
           {actions.map(([actionStatus, actionLabel]) => (
-            <div
+            <Button
               key={actionStatus}
-              className={`btn btn-large btn-rsvp ${status === actionStatus ? actionStatus : ''}`}
+              variant="outline"
+              size="lg"
+              className={`btn-rsvp ${status === actionStatus ? actionStatus : ''}`}
               onClick={() => this._onRSVP(actionStatus)}
             >
               {actionStatus === status || actionStatus !== inflight ? (
@@ -689,7 +705,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
                   mode={RetinaImg.Mode.ContentPreserve}
                 />
               )}
-            </div>
+            </Button>
           ))}
         </div>
         {this._renderRSVPDestination()}
@@ -716,20 +732,25 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
         <div className="event-rsvp-destination">
           <span>{localized('Accepting will add this event to')}</span>
           {choices.length > 1 ? (
-            <select
-              className="event-rsvp-calendar-picker"
+            <Select
               value={addTo.id}
-              aria-label={localized('Calendar to add this event to')}
-              onChange={(e) =>
-                this.setState({ addTo: choices.find((c) => c.id === e.target.value) })
-              }
+              onValueChange={(id) => this.setState({ addTo: choices.find((c) => c.id === id) })}
             >
-              {choices.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                size="sm"
+                className="event-rsvp-calendar-picker"
+                aria-label={localized('Calendar to add this event to')}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {choices.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
             <span>{addTo.name}</span>
           )}

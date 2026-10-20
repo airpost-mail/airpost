@@ -1,6 +1,6 @@
 import React from 'react';
 import { localized, Actions } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { RetinaImg, Button } from 'mailspring-component-kit';
 
 const OPEN_ICON = 'mailspring://open-tracking/assets/icon-composer-eye@2x.png';
 
@@ -56,9 +56,9 @@ export function ActivityFeedEmptyState({ hasTrackedMessages }: { hasTrackedMessa
           'Tern remembers the last setting you chose for new messages. Plain-text messages cannot be tracked, and free accounts include a limited number of tracked messages.'
         )}
       </p>
-      <div className="btn btn-emphasis" onClick={() => Actions.composeNewBlankDraft()}>
+      <Button onClick={() => Actions.composeNewBlankDraft()}>
         {localized('Compose a message')}
-      </div>
+      </Button>
     </div>
   );
 }

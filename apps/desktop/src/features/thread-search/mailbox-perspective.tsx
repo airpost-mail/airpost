@@ -7,6 +7,7 @@ import {
   Actions,
 } from 'mailspring-exports';
 import SearchQuerySubscription from './query-subscription';
+import { Button } from '../../components/kit/button';
 
 class SearchMailboxPerspective extends MailboxPerspective {
   searchQuery: string;
@@ -38,15 +39,15 @@ class SearchMailboxPerspective extends MailboxPerspective {
         {localized('No search results')}
         {!inTrash && (
           <div>
-            <a
-              className="btn"
+            <Button
+              variant="outline"
               style={{ fontWeight: 'normal' }}
               onClick={() =>
                 Actions.searchQuerySubmitted(`${this.searchQuery} (in:trash OR in:spam)`)
               }
             >
               {localized('Search messages in trash and spam')}
-            </a>
+            </Button>
           </div>
         )}
       </span>

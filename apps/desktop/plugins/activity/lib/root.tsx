@@ -1,7 +1,14 @@
 import React from 'react';
-import classnames from 'classnames';
-import { ScrollRegion, ListensToFluxStore } from 'mailspring-component-kit';
+import {
+  ScrollRegion,
+  ListensToFluxStore,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from 'mailspring-component-kit';
 import { localized, AccountStore, FocusedPerspectiveStore } from 'mailspring-exports';
+import { ownKeys } from '../../../src/components/kit/keys';
 
 import ActivityFeed from './feed/feed';
 import ActivityReports from './dashboard/root';
@@ -18,42 +25,8 @@ const TABS: { id: ActivityTabId; label: () => string }[] = [
   { id: 'reports', label: () => localized('Reports') },
 ];
 
-function ActivityTabs({
-  selected,
-  onSelect,
-}: {
-  selected: ActivityTabId;
-  onSelect: (id: ActivityTabId) => void;
-}) {
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    const idx = TABS.findIndex((t) => t.id === selected);
-    if (e.key === 'ArrowRight') {
-      onSelect(TABS[(idx + 1) % TABS.length].id);
-    } else if (e.key === 'ArrowLeft') {
-      onSelect(TABS[(idx - 1 + TABS.length) % TABS.length].id);
-    } else {
-      return;
-    }
-    e.preventDefault();
-  };
-
-  return (
-    <div className="activity-tabs hidden-on-web" role="tablist" onKeyDown={onKeyDown}>
-      {TABS.map((tab) => (
-        <div
-          key={tab.id}
-          role="tab"
-          aria-selected={tab.id === selected}
-          tabIndex={tab.id === selected ? 0 : -1}
-          className={classnames('tab', { active: tab.id === selected })}
-          onClick={() => onSelect(tab.id)}
-        >
-          {tab.label()}
-        </div>
-      ))}
-    </div>
-  );
-}
+// The keys the tab list acts on don't also reach the global keymap (core:move-left, …).
+const ownTabKeys = ownKeys(['ArrowLeft', 'ArrowRight', 'Home', 'End', ' ', 'Enter']);
 
 class Root extends React.Component<
   { accountIds: string[] },
@@ -106,18 +79,36 @@ class Root extends React.Component<
           </div>
           <TimespanSelector timespan={timespan} onChange={this._onChangeTimespan} />
         </div>
-        <ActivityTabs selected={tab} onSelect={this._onSelectTab} />
-        <div className="activity-tab-panel hidden-on-web" hidden={tab !== 'feed'}>
-          <ActivityFeed accountIds={accountIds} timespan={timespan} />
-        </div>
-        <div className="activity-tab-panel hidden-on-web" hidden={tab !== 'engagement'}>
-          <EngagementBoard accountIds={accountIds} timespan={timespan} />
-        </div>
-        <div className="activity-tab-panel reports" hidden={tab !== 'reports'}>
-          <ScrollRegion className="activity-reports-scroll">
-            <ActivityReports accountIds={accountIds} timespan={timespan} />
-          </ScrollRegion>
-        </div>
+        <Tabs
+          className="activity-tabs-root"
+          value={tab}
+          onValueChange={(id) => this._onSelectTab(id as ActivityTabId)}
+        >
+          <TabsList
+            className="activity-tabs hidden-on-web"
+            aria-label={localized('Activity')}
+            onKeyDown={ownTabKeys}
+          >
+            {TABS.map((t) => (
+              <TabsTrigger key={t.id} value={t.id}>
+                {t.label()}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {/* Every panel stays mounted so Reports doesn't recompute on each switch;
+              data-state="inactive" hides the others. */}
+          <TabsContent value="feed" forceMount className="activity-tab-panel hidden-on-web">
+            <ActivityFeed accountIds={accountIds} timespan={timespan} />
+          </TabsContent>
+          <TabsContent value="engagement" forceMount className="activity-tab-panel hidden-on-web">
+            <EngagementBoard accountIds={accountIds} timespan={timespan} />
+          </TabsContent>
+          <TabsContent value="reports" forceMount className="activity-tab-panel reports">
+            <ScrollRegion className="activity-reports-scroll">
+              <ActivityReports accountIds={accountIds} timespan={timespan} />
+            </ScrollRegion>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }

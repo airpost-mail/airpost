@@ -6,11 +6,12 @@ import path from 'path';
 import { EventedIFrame } from 'mailspring-component-kit';
 import Package from '../../packages/package';
 import LessCompileCache from '../../packages/compile-cache-less';
+import { RadioGroupItem } from '../../components/kit/radio-group';
 
+// One tile in the theme picker's RadioGroup; its value is the theme name.
 interface ThemeOptionProps {
   theme: Package;
   active: boolean;
-  onSelect: () => void;
 }
 
 export function toSelector(themeName: string) {
@@ -101,7 +102,11 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
 
   render() {
     return (
-      <div className="clickable-theme-option" onMouseDown={this.props.onSelect}>
+      <RadioGroupItem
+        value={this.props.theme.name}
+        aria-label={this.props.theme.displayName}
+        className="clickable-theme-option"
+      >
         <EventedIFrame
           ref={(cm) => {
             this._iframeComponent = cm;
@@ -111,7 +116,7 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
           width="115px"
           height="70px"
         />
-      </div>
+      </RadioGroupItem>
     );
   }
 }

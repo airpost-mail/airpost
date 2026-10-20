@@ -22,7 +22,20 @@ describe('ThemePicker', function themePicker() {
     const themeOption = ReactDOM.findDOMNode(
       ReactTestUtils.scryRenderedDOMComponentsWithClass(this.component, 'clickable-theme-option')[1]
     );
-    ReactTestUtils.Simulate.mouseDown(themeOption as any);
-    expect(ThemePicker.prototype._setActiveTheme).toHaveBeenCalled();
+    expect((themeOption as HTMLElement).getAttribute('role')).toBe('radio');
+    ReactTestUtils.Simulate.click(themeOption as any);
+    expect(ThemePicker.prototype._setActiveTheme).toHaveBeenCalledWith(dark.name);
+  });
+
+  it('is a radio group with the active theme checked', () => {
+    const node = ReactDOM.findDOMNode(this.component) as HTMLElement;
+    const group = node.querySelector('[role="radiogroup"]');
+    expect(group.getAttribute('aria-label')).toBe('Themes');
+    const options = Array.from(group.querySelectorAll('[role="radio"]'));
+    expect(options.map((o) => o.getAttribute('aria-label'))).toEqual([
+      light.displayName,
+      dark.displayName,
+    ]);
+    expect(options.map((o) => o.getAttribute('aria-checked'))).toEqual(['true', 'false']);
   });
 });

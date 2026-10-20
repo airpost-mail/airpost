@@ -14,11 +14,14 @@
   .scroll-region-content {
     background: none;
   }
+  .theme-options[data-slot='radio-group'] {
+    gap: 0;
+    align-items: flex-start;
+  }
   .clickable-theme-option {
     width: 115px;
     height: 70px;
     margin: 2px;
-    top: -20px;
     iframe {
       pointer-events: none;
       position: relative;
@@ -49,13 +52,8 @@
         cursor: default;
       }
 
-      select {
+      [data-slot='select-trigger'] {
         width: 100%;
-        font-size: @font-size-smaller;
-        background:white;
-        border: 1px solid #ccc;
-        border-radius: 2px;
-        color: #111;
       }
     }
   }
@@ -75,9 +73,6 @@
   .theme-picker {
     .theme-picker-x {
       margin: 12px;
-    }
-    .clickable-theme-option {
-      top: -10px;
     }
   }
 }

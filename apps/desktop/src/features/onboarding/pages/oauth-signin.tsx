@@ -5,6 +5,7 @@ import { CopyButton, RetinaImg } from 'mailspring-component-kit';
 
 import FormErrorMessage from '../form-error-message';
 import AccountProviders from '../account-providers';
+import { Button } from '../../../components/kit/button';
 import { accountFromSignIn } from '../helpers';
 import * as EngineAccounts from '../../../engine/client/accounts';
 import { OAuthBeginResult } from '../../../engine/protocol';
@@ -171,9 +172,9 @@ export default class OAuthSignInPage extends React.Component<
         <div className="error-region">
           <FormErrorMessage message={this.state.errorMessage} log={this.state.errorLog} />
           {note && <div className="message empty note">{note}</div>}
-          <div className="btn" style={{ marginTop: 20 }} onClick={this.props.onTryAgain}>
+          <Button variant="outline" style={{ marginTop: 20 }} onClick={this.props.onTryAgain}>
             {localized('Try Again')}
-          </div>
+          </Button>
         </div>
       </div>
     );

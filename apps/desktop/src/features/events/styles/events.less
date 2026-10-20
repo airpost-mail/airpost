@@ -33,11 +33,7 @@
     }
     .event-download {
       float: right;
-      border-radius: @border-radius-base;
-      border: 1px solid @border-color-divider;
-      padding: 0 4px;
       img {
-        background: @text-color-very-subtle;
         margin: 0;
       }
     }
@@ -92,14 +88,6 @@
         margin-right: 10.5px;
         margin-top: 5px;
         min-width: 85px;
-        text-align: center;
-
-        &:hover {
-          background: color-mix(in srgb, @background-primary 95%, @text-color);
-        }
-        &:active {
-          background: color-mix(in srgb, @background-primary 92%, @text-color);
-        }
 
         &.DECLINED {
           background: @color-error;
@@ -150,22 +138,7 @@
         margin-top: 6px;
 
         .event-rsvp-calendar-picker {
-          background: @background-primary;
-          border: 1px solid @border-color-divider;
-          border-radius: @border-radius-base;
-          color: @text-color;
-          font-size: inherit;
           max-width: 240px;
-          padding: 2px 6px;
-
-          &:hover {
-            background: @background-secondary;
-          }
-
-          &:focus {
-            border-color: @accent-primary;
-            outline: none;
-          }
         }
       }
     }
@@ -174,12 +147,5 @@
 body.platform-win32 {
   .event-wrapper {
     border-radius: 0;
-    .event-body {
-      .event-actions {
-        .btn-rsvp {
-          border-radius: 0;
-        }
-      }
-    }
   }
 }

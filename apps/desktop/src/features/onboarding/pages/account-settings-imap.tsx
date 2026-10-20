@@ -3,6 +3,14 @@ import React from 'react';
 import { localized, Account } from 'mailspring-exports';
 import CreatePageForForm from './create-page-for-form';
 import FormField from '../form-field';
+import { Checkbox } from '../../../components/kit/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/kit/select';
 import {
   MailProtocol,
   cleartextConsentKey,
@@ -14,6 +22,8 @@ import {
 
 const StandardIMAPPorts = [143, 993];
 const StandardSMTPPorts = [25, 465, 587];
+// The port select's Custom item; Radix Select values are non-empty strings.
+const CUSTOM_PORT = 'custom';
 
 interface AccountIMAPSettingsFormProps {
   account: Account;
@@ -24,7 +34,7 @@ interface AccountIMAPSettingsFormProps {
     event: { target: { id: string; value: any; type?: string; checked?: boolean } },
     opts?: { afterSetState: () => void }
   ) => void;
-  onFieldKeyPress: () => void;
+  onFieldKeyPress: (e: React.KeyboardEvent) => void;
 }
 
 export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettingsFormProps> {
@@ -90,7 +100,6 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
     const field = `${protocol}_port`;
     const values = protocol === 'imap' ? StandardIMAPPorts : StandardSMTPPorts;
     const isStandard = Number.isInteger(settings[field]) && values.includes(settings[field]);
-    const customValue = isStandard ? '0' : settings[field];
 
     // When you change the port, automatically switch the security setting to
     // the standard for that port. Lots of people don't update that field and
@@ -114,22 +123,30 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
     return (
       <span>
         <label htmlFor={`settings.${field}`}>{localized('Port')}:</label>
-        <select
-          id={`settings.${field}`}
-          tabIndex={0}
-          value={settings[field]}
+        <Select
+          value={isStandard ? `${settings[field]}` : CUSTOM_PORT}
           disabled={submitting}
-          onChange={onPortChange}
+          onValueChange={(value) =>
+            // Picking Custom sets port 0, which shows the custom port field.
+            onPortChange({
+              target: { value: value === CUSTOM_PORT ? '0' : value, id: `settings.${field}` },
+            })
+          }
         >
-          {values.map((v) => (
-            <option value={v} key={v}>
-              {v}
-            </option>
-          ))}
-          <option value={customValue} key="custom">
-            {localized('Custom')}
-          </option>
-        </select>
+          <SelectTrigger id={`settings.${field}`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {values.map((v) => (
+              <SelectItem value={`${v}`} key={v}>
+                {v}
+              </SelectItem>
+            ))}
+            <SelectItem value={CUSTOM_PORT} key="custom">
+              {localized('Custom')}
+            </SelectItem>
+          </SelectContent>
+        </Select>
         {!isStandard && (
           <>
             <label htmlFor={`settings.${field}_custom`} className="sr-only">
@@ -173,33 +190,45 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
       <div>
         <span>
           <label htmlFor={`settings.${protocol}_security`}>{localized('Security')}:</label>
-          <select
-            id={`settings.${protocol}_security`}
-            tabIndex={0}
+          <Select
             value={settings[`${protocol}_security`]}
             disabled={submitting}
-            onKeyPress={onFieldKeyPress}
-            onChange={onFieldChange}
+            onValueChange={(value) =>
+              onFieldChange({ target: { value, id: `settings.${protocol}_security` } })
+            }
           >
-            <option value="SSL / TLS" key="SSL / TLS">
-              SSL / TLS
-            </option>
-            <option value="STARTTLS" key="STARTTLS">
-              STARTTLS
-            </option>
-            <option value="none" key="none">
-              {localized('None')}
-            </option>
-          </select>
+            <SelectTrigger id={`settings.${protocol}_security`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="SSL / TLS" key="SSL / TLS">
+                SSL / TLS
+              </SelectItem>
+              <SelectItem value="STARTTLS" key="STARTTLS">
+                STARTTLS
+              </SelectItem>
+              <SelectItem value="none" key="none">
+                {localized('None')}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </span>
         <span style={{ paddingLeft: '20px', paddingTop: '10px' }}>
-          <input
-            type="checkbox"
+          <Checkbox
             id={`settings.${protocol}_allow_insecure_ssl`}
             disabled={submitting}
             checked={settings[`${protocol}_allow_insecure_ssl`] || false}
-            onKeyPress={onFieldKeyPress}
-            onChange={onFieldChange}
+            onKeyDown={onFieldKeyPress}
+            onCheckedChange={(checked) =>
+              onFieldChange({
+                target: {
+                  id: `settings.${protocol}_allow_insecure_ssl`,
+                  type: 'checkbox',
+                  value: checked === true,
+                  checked: checked === true,
+                },
+              })
+            }
           />
           <label htmlFor={`settings.${protocol}_allow_insecure_ssl`} className="checkbox">
             {localized('Allow insecure SSL')}
@@ -207,17 +236,16 @@ export class AccountIMAPSettingsForm extends React.Component<AccountIMAPSettings
         </span>
         {askConsent && (
           <div style={{ paddingTop: '6px' }}>
-            <input
-              type="checkbox"
+            <Checkbox
               id={`settings.${consentKey}`}
               disabled={submitting}
               checked={hasCleartextConsent(settings, protocol)}
-              onKeyPress={onFieldKeyPress}
-              onChange={(e) =>
+              onKeyDown={onFieldKeyPress}
+              onCheckedChange={(checked) =>
                 onFieldChange({
                   target: {
-                    id: e.target.id,
-                    value: e.target.checked ? `${settings[`${protocol}_host`]}`.trim() : false,
+                    id: `settings.${consentKey}`,
+                    value: checked === true ? `${settings[`${protocol}_host`]}`.trim() : false,
                   },
                 })
               }

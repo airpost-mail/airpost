@@ -1,37 +1,37 @@
 import React from 'react';
 import path from 'path';
 import fs from 'fs';
-import { RetinaImg, Flexbox, ConfigPropContainer } from 'mailspring-component-kit';
+import classnames from 'classnames';
+import { RetinaImg, ConfigPropContainer } from 'mailspring-component-kit';
 import { localized, AccountStore, Account } from 'mailspring-exports';
+import { Button } from '../../../components/kit/button';
+import { RadioGroup, RadioGroupItem } from '../../../components/kit/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/kit/select';
 
-// NOTE: Temporarily copied from preferences module
-class AppearanceModeOption extends React.Component<{
-  mode: string;
-  active: boolean;
-  onClick: (e: React.MouseEvent<any>) => void;
-}> {
-  render() {
-    let classname = 'appearance-mode';
-    if (this.props.active) {
-      classname += ' active';
-    }
+// One tile of the layout choice; `active` stays on the checked tile for themes.
+const AppearanceModeOption = (props: { mode: string; active: boolean }) => {
+  const label = {
+    list: localized('Reading Pane Off'),
+    split: localized('Reading Pane On'),
+  }[props.mode];
 
-    const label = {
-      list: localized('Reading Pane Off'),
-      split: localized('Reading Pane On'),
-    }[this.props.mode];
-
-    return (
-      <div className={classname} onClick={this.props.onClick}>
-        <RetinaImg
-          name={`appearance-mode-${this.props.mode}.png`}
-          mode={RetinaImg.Mode.ContentIsMask}
-        />
-        <div>{label}</div>
-      </div>
-    );
-  }
-}
+  return (
+    <RadioGroupItem
+      value={props.mode}
+      aria-label={label}
+      className={classnames('appearance-mode', { active: props.active })}
+    >
+      <RetinaImg name={`appearance-mode-${props.mode}.png`} mode={RetinaImg.Mode.ContentIsMask} />
+      <div>{label}</div>
+    </RadioGroupItem>
+  );
+};
 
 class InitialPreferencesOptions extends React.Component<
   { account: Account; config?: any },
@@ -105,16 +105,21 @@ class InitialPreferencesOptions extends React.Component<
           <p>
             {localized('Do you prefer a single panel layout (like Gmail) or a two panel layout?')}
           </p>
-          <Flexbox direction="row" style={{ alignItems: 'center' }}>
+          <RadioGroup
+            className="appearance-mode-switch"
+            orientation="horizontal"
+            aria-label={localized('Layout')}
+            value={this.props.config.get('core.workspace.mode')}
+            onValueChange={(mode) => this.props.config.set('core.workspace.mode', mode)}
+          >
             {['list', 'split'].map((mode) => (
               <AppearanceModeOption
                 mode={mode}
                 key={mode}
                 active={this.props.config.get('core.workspace.mode') === mode}
-                onClick={() => this.props.config.set('core.workspace.mode', mode)}
               />
             ))}
-          </Flexbox>
+          </RadioGroup>
         </div>
         <div
           key="divider"
@@ -126,17 +131,21 @@ class InitialPreferencesOptions extends React.Component<
               `We've picked a set of keyboard shortcuts based on your email account and platform. You can also pick another set:`
             )}
           </p>
-          <select
-            style={{ margin: 0 }}
+          <Select
             value={this.props.config.get('core.keymapTemplate')}
-            onChange={(event) => this.props.config.set('core.keymapTemplate', event.target.value)}
+            onValueChange={(template) => this.props.config.set('core.keymapTemplate', template)}
           >
-            {this.state.templates.map((template) => (
-              <option key={template} value={template}>
-                {template}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger aria-label={localized('Shortcuts')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {this.state.templates.map((template) => (
+                <SelectItem key={template} value={template}>
+                  {template}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
     );
@@ -181,9 +190,9 @@ class InitialPreferencesPage extends React.Component<
         <ConfigPropContainer>
           <InitialPreferencesOptions account={this.state.account} />
         </ConfigPropContainer>
-        <button className="btn btn-large" style={{ marginBottom: 60 }} onClick={this._onFinished}>
+        <Button variant="outline" size="lg" style={{ marginBottom: 60 }} onClick={this._onFinished}>
           {localized(`Looks Good!`)}
-        </button>
+        </Button>
       </div>
     );
   }

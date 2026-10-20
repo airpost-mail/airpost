@@ -10,6 +10,7 @@ import {
 } from 'mailspring-exports';
 import SearchStore from './store';
 import TokenizingContenteditable from './tokenizing-contenteditable';
+import { IconButton } from '../../components/kit/icon-button';
 
 import {
   LearnMoreURL,
@@ -366,10 +367,13 @@ class ThreadSearchBar extends Component<ThreadSearchBarProps, ThreadSearchBarSta
           aria-autocomplete="list"
         />
         {showX && (
-          <RetinaImg
-            name="searchclear.png"
+          // Out of the tab order, and acts on mousedown so the field doesn't blur first.
+          <IconButton
+            tabIndex={-1}
             className="search-accessory clear"
+            icon="searchclear.png"
             mode={RetinaImg.Mode.ContentDark}
+            label={localized('Clear search')}
             onMouseDown={this._onClearSearchQuery}
           />
         )}

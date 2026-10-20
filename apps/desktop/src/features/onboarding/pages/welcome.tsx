@@ -1,5 +1,6 @@
 import { localized, React } from 'mailspring-exports';
 import * as OnboardingActions from '../actions';
+import { Button } from '../../../components/kit/button';
 
 export default class WelcomePage extends React.Component {
   static displayName = 'WelcomePage';
@@ -25,9 +26,15 @@ export default class WelcomePage extends React.Component {
           </div>
         </div>
         <div className="footer">
-          <button key="next" className="btn btn-large btn-continue" onClick={this._onContinue}>
+          <Button
+            key="next"
+            variant="outline"
+            size="lg"
+            className="btn-continue"
+            onClick={this._onContinue}
+          >
             {localized('Get Started')}
-          </button>
+          </Button>
         </div>
       </div>
     );

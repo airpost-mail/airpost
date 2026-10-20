@@ -23,6 +23,7 @@ import {
 import { EventHeader, renderLocation } from '../../src/features/events/header';
 import type { EventConflictJSON, EventTimes } from '../../src/engine/protocol';
 import { fakePimEngine, refusal } from '../support/fake-pim-engine';
+import { getPortalContainer } from '../../src/components/kit/portal';
 
 // A LOCATION as Zoom rooms write it: the join URL, then the rooms booked for the meeting.
 const ZOOM_WITH_ROOMS =
@@ -509,12 +510,18 @@ describe('EventHeader answering an invitation', function () {
   it('offers only calendars that could be ours when the invitation has not synced', function () {
     mount({ events: [], calendars: [theirs, holidays, shared, mine] });
     runs(() => {
-      const picker = destination().querySelector('select') as HTMLSelectElement;
-      expect(picker.value).toBe(mine.id);
-      expect(Array.from(picker.options).map((o) => o.textContent)).toEqual([
-        'US On Call',
-        'brian@example.com',
-      ]);
+      const picker = destination().querySelector('[data-slot="select-trigger"]');
+      expect(picker.getAttribute('aria-label')).toBe('Calendar to add this event to');
+      expect(picker.textContent).toBe(mine.name);
+      ReactTestUtils.Simulate.keyDown(picker, { key: 'Enter' });
+      const items = Array.from(
+        getPortalContainer().querySelectorAll(
+          '[data-slot="select-content"][data-state="open"] [data-slot="select-item"]'
+        )
+      );
+      expect(items.map((o) => o.textContent)).toEqual(['US On Call', 'brian@example.com']);
+      expect(items[1].getAttribute('aria-selected')).toBe('true');
+      ReactTestUtils.Simulate.keyDown(items[1], { key: 'Enter' });
       click('Accept');
     });
     runs(() => {
@@ -530,7 +537,7 @@ describe('EventHeader answering an invitation', function () {
         'Accepting will add this event to',
         'brian@example.com',
       ]);
-      expect(destination().querySelector('select')).toBe(null);
+      expect(destination().querySelector('[data-slot="select-trigger"]')).toBe(null);
       expect(
         ReactTestUtils.scryRenderedDOMComponentsWithClass(header, 'event-view-in-calendar').length
       ).toBe(0);

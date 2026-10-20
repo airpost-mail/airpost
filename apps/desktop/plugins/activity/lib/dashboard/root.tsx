@@ -1,7 +1,7 @@
 import React from 'react';
 import moment from 'moment';
 import { shell } from 'electron';
-import { RetinaImg } from 'mailspring-component-kit';
+import { RetinaImg, Button } from 'mailspring-component-kit';
 import {
   localized,
   localizedReactFragment,
@@ -795,12 +795,12 @@ export default class ActivityReports extends React.Component<RootProps, RootStat
         </div>
 
         <div className="report-actions hidden-on-web">
-          <div className="btn" onClick={this._onLearnMore}>
+          <Button variant="outline" onClick={this._onLearnMore}>
             {localized('Learn More')}
-          </div>
-          <div className="btn" onClick={this._onExport}>
+          </Button>
+          <Button variant="outline" onClick={this._onExport}>
             {localized('Export Raw Data')}
-          </div>
+          </Button>
           <ShareButton />
         </div>
       </div>

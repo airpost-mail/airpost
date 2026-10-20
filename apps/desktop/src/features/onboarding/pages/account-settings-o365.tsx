@@ -7,6 +7,7 @@ import OAuthSignInPage, { reconnectingAccountId } from './oauth-signin';
 import FormErrorMessage from '../form-error-message';
 import * as OnboardingActions from '../actions';
 import AccountProviders from '../account-providers';
+import { Button } from '../../../components/kit/button';
 
 interface AccountSettingsPageO365State {
   sharedMailbox: string;
@@ -95,12 +96,14 @@ export default class AccountSettingsPageO365 extends React.Component<
           </span>
         </form>
         <div>
-          <button
-            className="btn btn-large btn-gradient btn-add-account"
+          <Button
+            variant="outline"
+            size="lg"
+            className="btn-add-account"
             onClick={this._onSubmitSharedMailbox}
           >
             {localized('Continue')}
-          </button>
+          </Button>
         </div>
         <div style={{ marginTop: 20 }}>
           <a

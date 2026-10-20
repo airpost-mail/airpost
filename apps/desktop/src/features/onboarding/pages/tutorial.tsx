@@ -1,5 +1,6 @@
 import { localized, React } from 'mailspring-exports';
 import * as OnboardingActions from '../actions';
+import { Button } from '../../../components/kit/button';
 
 const Features = [
   {
@@ -57,20 +58,24 @@ export default class TutorialPage extends React.Component<
           ))}
         </div>
         <div className="footer">
-          <button
+          <Button
             key="prev"
-            className="btn btn-large btn-prev"
+            variant="outline"
+            size="lg"
+            className="btn-prev"
             onClick={() => OnboardingActions.moveToPreviousPage()}
           >
             {localized('Back')}
-          </button>
-          <button
+          </Button>
+          <Button
             key="next"
-            className="btn btn-large btn-next"
+            variant="outline"
+            size="lg"
+            className="btn-next"
             onClick={() => OnboardingActions.moveToPage('account-choose')}
           >
             {localized('Get Started')}
-          </button>
+          </Button>
         </div>
       </div>
     );

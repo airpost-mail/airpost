@@ -4,6 +4,21 @@
   order: 100;
   position: relative;
 
+  // A kit ghost Button laid out as a bare icon with its badge, in its place in the sidebar
+  // toolbar.
+  &[data-slot='button'][data-variant='ghost'] {
+    display: block;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    &,
+    &:hover,
+    &:active {
+      background: transparent;
+    }
+  }
+
   .unread-count {
     display: none;
     &.active {

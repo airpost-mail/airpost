@@ -1,32 +1,14 @@
 @import 'ui-variables';
 
 .activity-dashboard {
+  // The kit Tabs (src/components/kit/tabs.tsx): the root holds the list and the panels.
+  .activity-tabs-root {
+    flex: 1;
+    min-height: 0;
+    gap: 0;
+  }
   .activity-tabs {
-    display: flex;
     margin: 0 20px;
-    border-bottom: 1px solid @border-color-divider;
-
-    .tab {
-      cursor: default;
-      padding: @padding-base-vertical @padding-base-horizontal * 1.5;
-      margin-bottom: -1px;
-      border-bottom: 2px solid transparent;
-      color: @text-color-subtle;
-      font-size: @font-size-base * 1.1;
-      font-weight: 500;
-
-      &:hover {
-        color: @text-color;
-      }
-      &.active {
-        color: @text-color;
-        border-bottom-color: @accent-primary;
-      }
-      &:focus-visible {
-        outline: 2px solid @accent-primary;
-        outline-offset: -2px;
-      }
-    }
   }
 }
 
@@ -59,9 +41,6 @@
       white-space: nowrap;
       margin: 0;
       font-weight: normal;
-      input {
-        margin: 0;
-      }
     }
     .group-by .dropdown-menu .menu {
       width: 140px;
@@ -70,53 +49,6 @@
       font-size: @font-size-small;
       color: @text-color-very-subtle;
       white-space: nowrap;
-    }
-  }
-
-  // The kit's SegmentedControl, sized and outlined like .btn so it sits flush with the other
-  // controls. Both classes so these win over the kit's Preferences look.
-  .segmented-control.settings-segmented {
-    display: inline-flex;
-    gap: 0;
-    padding: 0;
-    border-radius: @border-radius-base;
-    background: @background-primary;
-    font-size: @font-size-small;
-    box-shadow:
-      0 0.5px 0 @btn-border-color,
-      0 -0.5px 0 @btn-border-color,
-      0.5px 0 0 @btn-border-color,
-      -0.5px 0 0 @btn-border-color,
-      0 0.5px 1px @btn-border-color;
-
-    button {
-      cursor: default;
-      height: 1.9em;
-      line-height: 1.9em;
-      padding: 0 0.8em;
-      border-radius: 0;
-      box-shadow: none;
-      color: @btn-default-text-color;
-      font-size: inherit;
-      font-weight: inherit;
-      white-space: nowrap;
-      &:first-child {
-        border-radius: @border-radius-base 0 0 @border-radius-base;
-      }
-      &:last-child {
-        border-radius: 0 @border-radius-base @border-radius-base 0;
-      }
-      & + button {
-        box-shadow: -0.5px 0 0 @btn-border-color;
-      }
-      &.on {
-        background: @accent-primary;
-        color: @text-color-inverse;
-      }
-      &:focus-visible {
-        outline: 2px solid @accent-primary;
-        outline-offset: -2px;
-      }
     }
   }
 

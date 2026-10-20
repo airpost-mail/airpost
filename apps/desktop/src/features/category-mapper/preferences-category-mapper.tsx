@@ -11,6 +11,14 @@ import {
   imapUtf7,
 } from 'mailspring-exports';
 import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/kit/select';
+import { TextField } from '../../components/kit/text-field';
 
 const SELECTABLE_ROLES = ['inbox', 'sent', 'drafts', 'spam', 'archive', 'trash'];
 
@@ -96,26 +104,25 @@ export default class PreferencesCategoryMapper extends React.Component<
 
     return (
       <SettingsRow key={role} label={label}>
-        <select
-          className="settings-select"
-          aria-label={label}
+        {/* No folder has the role yet: the empty value shows None until one is picked. */}
+        <Select
           value={current ? current.id : ''}
-          onChange={(e) => {
-            const picked = choices.find((c) => c.category.id === e.target.value);
+          onValueChange={(id) => {
+            const picked = choices.find((c) => c.category.id === id);
             if (picked) this._onCategorySelection(account, role, picked.category);
           }}
         >
-          {!current && (
-            <option value="" disabled>
-              {localized('None')}
-            </option>
-          )}
-          {choices.map(({ category, path }) => (
-            <option key={category.id} value={category.id}>
-              {path}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger aria-label={label}>
+            <SelectValue placeholder={localized('None')} />
+          </SelectTrigger>
+          <SelectContent>
+            {choices.map(({ category, path }) => (
+              <SelectItem key={category.id} value={category.id}>
+                {path}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </SettingsRow>
     );
   };
@@ -153,8 +160,7 @@ export default class PreferencesCategoryMapper extends React.Component<
               'Tern keeps the folders it makes, like Snoozed, inside this folder in accounts you add from now on. Use folder/subfolder for a subfolder.'
             )}
           >
-            <input
-              type="text"
+            <TextField
               className="category-mapper-container-folder"
               aria-label={localized("Folder for Tern's folders")}
               value={this.state.containerFolderDefault}

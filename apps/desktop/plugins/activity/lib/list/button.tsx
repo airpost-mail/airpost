@@ -1,9 +1,19 @@
 import React from 'react';
 import { Actions, ReactDOM, localized } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import {
+  RetinaImg,
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from 'mailspring-component-kit';
+import { ownKeys } from '../../../../src/components/kit/keys';
 
 import ActivityList from './list';
 import ActivityEventStore from '../event-store';
+
+// Space and Enter click the button and don't also reach the keymap.
+const ownClickKeys = ownKeys([' ', 'Enter']);
 
 class ActivityListButton extends React.Component<
   Record<string, unknown>,
@@ -52,28 +62,28 @@ class ActivityListButton extends React.Component<
       ? localized('View activity (%@)', this.state.unreadCount)
       : localized('View activity');
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        className="toolbar-activity"
-        title={localized('View activity')}
-        aria-label={ariaLabel}
-        onClick={this.onClick}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            this.onClick();
-          }
-        }}
-      >
-        <div className={unreadCountClass}>{this.state.unreadCount}</div>
-        <RetinaImg
-          name="icon-toolbar-activity.png"
-          className={iconClass}
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* The trigger's own data-slot would replace the button's. */}
+          <Button
+            data-slot="button"
+            variant="ghost"
+            className="toolbar-activity"
+            aria-label={ariaLabel}
+            onClick={this.onClick}
+            onKeyDown={ownClickKeys}
+          >
+            <div className={unreadCountClass}>{this.state.unreadCount}</div>
+            <RetinaImg
+              name="icon-toolbar-activity.png"
+              className={iconClass}
+              mode={RetinaImg.Mode.ContentIsMask}
+              aria-hidden="true"
+            />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{localized('View activity')}</TooltipContent>
+      </Tooltip>
     );
   }
 }

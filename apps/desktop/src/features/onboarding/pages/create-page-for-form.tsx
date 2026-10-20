@@ -9,6 +9,7 @@ import { finalizeAndValidateAccount } from '../helpers';
 import FormErrorMessage from '../form-error-message';
 import AccountProviders from '../account-providers';
 import { UIProvider } from '../../../components/kit/provider';
+import { Button } from '../../../components/kit/button';
 
 let didWarnAboutGmailIMAP = false;
 
@@ -51,7 +52,11 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
     }
 
     _applyFocus() {
-      const anyInputFocused = document.activeElement && document.activeElement.nodeName === 'INPUT';
+      // The kit checkbox is a <button role="checkbox">, and keeps focus after a toggle as the
+      // native checkbox does.
+      const active = document.activeElement;
+      const anyInputFocused =
+        active && (active.nodeName === 'INPUT' || active.getAttribute('role') === 'checkbox');
       if (anyInputFocused) {
         return;
       }
@@ -226,7 +231,7 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
       // We're not on the last page.
       if (submitting) {
         return (
-          <button className="btn btn-large btn-disabled btn-add-account spinning">
+          <Button variant="outline" size="lg" className="btn-add-account spinning" disabled>
             <RetinaImg
               name="sending-spinner.gif"
               width={15}
@@ -234,22 +239,20 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
               mode={RetinaImg.Mode.ContentPreserve}
             />
             {localized('Adding account')}&hellip;
-          </button>
-        );
-      }
-
-      if (!this._isValid()) {
-        return (
-          <button className="btn btn-large btn-gradient btn-disabled btn-add-account">
-            {buttonLabel}
-          </button>
+          </Button>
         );
       }
 
       return (
-        <button className="btn btn-large btn-gradient btn-add-account" onClick={this.onSubmit}>
+        <Button
+          variant="outline"
+          size="lg"
+          className="btn-add-account"
+          disabled={!this._isValid()}
+          onClick={this.onSubmit}
+        >
           {buttonLabel}
-        </button>
+        </Button>
       );
     }
 
@@ -331,9 +334,9 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
             onConnect={this.onConnect}
           />
           <div>
-            <div className="btn btn-large btn-gradient" onClick={this.onBack}>
+            <Button variant="outline" size="lg" onClick={this.onBack}>
               {localized('Back')}
-            </div>
+            </Button>
             {this._renderButton()}
           </div>
         </div>
