@@ -22,7 +22,7 @@ describe('EventAttendeesInput token validity', function () {
 
   it('does not mark well-formed attendees invalid', function () {
     const tokens = renderTokens([
-      attendee('ben@mailspring.com'),
+      attendee('ben@example.com'),
       attendee('evan@example.com', 'Evan Morikawa'),
     ]);
     expect(tokens.length).toBe(2);
@@ -34,7 +34,7 @@ describe('EventAttendeesInput token validity', function () {
     const tokens = renderTokens([
       attendee('not-an-address'),
       attendee(''),
-      attendee('ben@mailspring.com and friends'),
+      attendee('ben@example.com and friends'),
     ]);
     expect(tokens.length).toBe(3);
     expect(tokens[0].classList.contains('invalid')).toBe(true);
@@ -44,7 +44,7 @@ describe('EventAttendeesInput token validity', function () {
 
   it('accepts the plus-addressed and subdomain forms that appear in real invitations', function () {
     const tokens = renderTokens([
-      attendee('ben+calendar@mailspring.com'),
+      attendee('ben+calendar@example.com'),
       attendee('ben@mail.corp.example.co.uk'),
     ]);
     expect(tokens[0].classList.contains('invalid')).toBe(false);

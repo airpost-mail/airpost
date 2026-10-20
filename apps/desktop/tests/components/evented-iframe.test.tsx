@@ -41,11 +41,11 @@ describe('EventedIFrame', () =>
 
     it('works for acceptable link types', function () {
       const hrefs = [
-        'http://mailspring.com',
-        'https://www.mailspring.com',
-        'mailto:evan@mailspring.com',
+        'http://example.com',
+        'https://www.example.com',
+        'mailto:evan@example.com',
         'tel:8585311718',
-        'custom:www.mailspring.com',
+        'custom:www.example.com',
       ];
       for (let i = 0; i < hrefs.length; i++) {
         const href = hrefs[i];
@@ -60,7 +60,7 @@ describe('EventedIFrame', () =>
     });
 
     it('corrects relative uris', function () {
-      const hrefs = ['mailspring.com', 'www.mailspring.com'];
+      const hrefs = ['example.com', 'www.example.com'];
       for (let i = 0; i < hrefs.length; i++) {
         const href = hrefs[i];
         this.frame._onIFrameClick(this.fakeEvent(href));
@@ -71,7 +71,7 @@ describe('EventedIFrame', () =>
     });
 
     it('corrects protocol-relative uris', function () {
-      const hrefs = ['//mailspring.com', '//www.mailspring.com'];
+      const hrefs = ['//example.com', '//www.example.com'];
       for (let i = 0; i < hrefs.length; i++) {
         const href = hrefs[i];
         this.frame._onIFrameClick(this.fakeEvent(href));

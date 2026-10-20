@@ -23,7 +23,7 @@ export interface AccountAutoaddress {
  * `provider`: {AttributeString} The Account's mail provider  (ie: `gmail`)
  *
  * `emailAddress`: {AttributeString} The Account's email address
- * (ie: `ben@mailspring.com`). Queryable.
+ * (ie: `ben@example.com`). Queryable.
  *
  * This class also inherits attributes from {Model}
  *

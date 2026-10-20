@@ -4,22 +4,22 @@ import { Contact } from '../../src/data/models/contact';
 
 const evan = new Contact({
   name: 'Evan Morikawa',
-  email: 'evan@mailspring.com',
+  email: 'evan@example.com',
 });
 const ben = new Contact({
   name: 'Ben Gotow',
-  email: 'ben@mailspring.com',
+  email: 'ben@example.com',
 });
 const team = new Contact({
-  name: 'Mailspring Team',
-  email: 'team@mailspring.com',
+  name: 'Tern Team',
+  email: 'team@example.com',
 });
 const edgehill = new Contact({
-  name: 'Edgehill',
-  email: 'edgehill@mailspring.com',
+  name: 'Westfield',
+  email: 'edgehill@example.com',
 });
 const noEmail = new Contact({
-  name: 'Edgehill',
+  name: 'Westfield',
   email: null,
 });
 const me = new Contact({
@@ -28,7 +28,7 @@ const me = new Contact({
 });
 const almost_me = new Contact({
   name: TEST_ACCOUNT_NAME,
-  email: 'tester+12345@mailspring.com',
+  email: 'tester+12345@example.com',
 });
 
 describe('Message', function () {

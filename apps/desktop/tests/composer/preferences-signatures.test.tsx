@@ -19,8 +19,8 @@ const SIGNATURES = {
 };
 
 const DEFAULTS = {
-  'one@mailspring.com': '1',
-  'two@mailspring.com': '2',
+  'one@example.com': '1',
+  'two@example.com': '2',
 };
 
 const makeComponent = (props = {}) => {
