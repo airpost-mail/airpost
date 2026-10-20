@@ -328,7 +328,15 @@ function LabelColorSchemeRows() {
 
 function InterfaceScaleRow() {
   const keyPath = 'core.workspace.interfaceZoom';
-  const value = Number(AppEnv.config.get(keyPath)) || 1;
+  const saved = Number(AppEnv.config.get(keyPath)) || 1;
+  // Zooming rescales the slider under the pointer, so applying it mid-drag makes the thumb
+  // jump. Hold the value while dragging and apply it on release.
+  const [dragging, setDragging] = React.useState<number | null>(null);
+  const value = dragging ?? saved;
+  const commit = () => {
+    if (dragging !== null && dragging !== saved) AppEnv.config.set(keyPath, dragging);
+    setDragging(null);
+  };
   return (
     <SettingsRow
       label={localized('Interface size')}
@@ -348,7 +356,10 @@ function InterfaceScaleRow() {
         step={0.05}
         value={value}
         aria-label={localized('Interface size')}
-        onChange={(e) => AppEnv.config.set(keyPath, e.target.value)}
+        onChange={(e) => setDragging(Number(e.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
       />
       <span className="scale-glyph large" aria-hidden>
         A

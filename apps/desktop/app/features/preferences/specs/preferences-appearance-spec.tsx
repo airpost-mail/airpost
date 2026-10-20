@@ -1,5 +1,5 @@
 import React from 'react';
-import TestRenderer from 'react-test-renderer';
+import TestRenderer, { act } from 'react-test-renderer';
 
 import configSchema from '../../../src/config-schema';
 import PreferencesAppearance from '../lib/tabs/preferences-appearance';
@@ -26,6 +26,20 @@ describe('PreferencesAppearance', function () {
 
     select.props.onChange({ target: { value: 'original' } });
     expect(AppEnv.config.set).toHaveBeenCalledWith(KEY, 'original');
+    renderer.unmount();
+  });
+
+  it('applies the interface size when the slider is released, not while dragging', () => {
+    spyOn(AppEnv.config, 'set');
+    const renderer = TestRenderer.create(<PreferencesAppearance />);
+    const slider = () => renderer.root.find((node) => node.props.id === 'interface-zoom-slider');
+
+    act(() => slider().props.onChange({ target: { value: '1.2' } }));
+    expect(AppEnv.config.set).not.toHaveBeenCalled();
+    expect(slider().props.value).toBe(1.2);
+
+    act(() => slider().props.onPointerUp());
+    expect(AppEnv.config.set).toHaveBeenCalledWith('core.workspace.interfaceZoom', 1.2);
     renderer.unmount();
   });
 
