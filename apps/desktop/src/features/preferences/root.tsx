@@ -66,10 +66,11 @@ class PreferencesRoot extends React.Component<{ tab: any; tabs: any[]; selection
     const { tab, selection, tabs } = this.props;
     const TabComponent = tab && tab.componentClassFn();
 
+    // The wrapper takes focus on mount and on clicks in blank space, but is not a Tab stop.
     return (
       <KeyCommandsRegion
         className="preferences-wrap"
-        tabIndex={0}
+        tabIndex={-1}
         localHandlers={this._localHandlers}
       >
         <Flexbox direction="row">

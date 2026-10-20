@@ -11,7 +11,7 @@ import { RepeatSelector } from '../../src/features/main-calendar/event/repeat-se
 import { CalendarSourceList } from '../../src/features/main-calendar/source-list';
 import { EventSearchBar } from '../../src/features/main-calendar/search-bar';
 import { QuickEventButton } from '../../src/features/main-calendar/quick-event-button';
-import { wait } from '../support/kit-helpers';
+import { wait, pressRealKey } from '../support/kit-helpers';
 
 describe('Calendar kit controls', function () {
   beforeEach(() => {
@@ -80,6 +80,66 @@ describe('Calendar kit controls', function () {
         expect(onDocumentKeyDown).toHaveBeenCalled();
       } finally {
         document.removeEventListener('keydown', onDocumentKeyDown);
+      }
+    });
+  });
+
+  describe('HeaderControls in views that each draw their own', function () {
+    // Like DayView, WeekView and MonthView: a different component per view, so choosing a
+    // view mounts a new header.
+    const views = [CalendarView.DAY, CalendarView.WEEK, CalendarView.MONTH, CalendarView.AGENDA];
+    const viewComponents = views.map((view) => {
+      const View = (props: { onChangeView: (view: CalendarView) => void }) => (
+        <div className={`fake-view-${view}`}>
+          <HeaderControls
+            title={view}
+            nextAction={() => {}}
+            prevAction={() => {}}
+            onChangeView={props.onChangeView}
+            disabledViewButton={view}
+          />
+        </div>
+      );
+      View.displayName = `FakeView${view}`;
+      return View;
+    });
+    class Views extends React.Component<unknown, { view: number }> {
+      state = { view: 1 };
+      render() {
+        const View = viewComponents[this.state.view];
+        return <View onChangeView={(view) => this.setState({ view: views.indexOf(view) })} />;
+      }
+    }
+
+    const chosen = () =>
+      document.querySelector('[data-slot="segmented-control"] [aria-checked="true"]');
+
+    it('keeps focus on the chosen segment as the arrows switch views', async function () {
+      const { container } = render(<Views />);
+      (chosen() as HTMLElement).focus();
+      await pressRealKey('Right');
+      expect(container.querySelector(`.fake-view-${CalendarView.MONTH}`)).not.toBe(null);
+      expect(document.activeElement).toBe(chosen());
+      await pressRealKey('Right');
+      expect(container.querySelector(`.fake-view-${CalendarView.AGENDA}`)).not.toBe(null);
+      await pressRealKey('Left');
+      await pressRealKey('Left');
+      expect(container.querySelector(`.fake-view-${CalendarView.WEEK}`)).not.toBe(null);
+      expect(document.activeElement).toBe(chosen());
+      expect(document.activeElement.textContent).toBe('Week');
+    });
+
+    it('leaves focus alone when the view changes from elsewhere', function () {
+      const outside = document.createElement('button');
+      document.body.appendChild(outside);
+      try {
+        const ref = React.createRef<Views>();
+        render(<Views ref={ref} />);
+        outside.focus();
+        act(() => ref.current.setState({ view: 2 }));
+        expect(document.activeElement).toBe(outside);
+      } finally {
+        outside.remove();
       }
     });
   });

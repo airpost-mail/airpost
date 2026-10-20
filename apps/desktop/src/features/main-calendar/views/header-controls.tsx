@@ -13,6 +13,10 @@ const VIEW_LABELS: { [V in CalendarView]: () => string } = {
 
 const VIEWS = [CalendarView.DAY, CalendarView.WEEK, CalendarView.MONTH, CalendarView.AGENDA];
 
+// Each view draws its own header, so choosing a view mounts a new switcher. Set while the
+// switcher had focus when the view changed, so the new one takes it.
+let focusSwitcherOnMount = false;
+
 export class HeaderControls extends React.Component<{
   title: string;
   nextAction: () => void;
@@ -55,8 +59,22 @@ export class HeaderControls extends React.Component<{
     );
   }
 
+  _viewControls: HTMLDivElement | null = null;
+
+  componentDidMount() {
+    if (!focusSwitcherOnMount) return;
+    focusSwitcherOnMount = false;
+    this._viewControls?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+  }
+
+  componentDidUpdate() {
+    // The view changed without a new header, so the switcher kept its own focus.
+    focusSwitcherOnMount = false;
+  }
+
   _changeView = (newView: CalendarView) => {
     if (newView === this.props.disabledViewButton) return;
+    focusSwitcherOnMount = !!this._viewControls?.contains(document.activeElement);
     this.props.onChangeView(newView);
   };
 
@@ -76,7 +94,11 @@ export class HeaderControls extends React.Component<{
           {this._renderNextAction()}
         </div>
         <div className="side-controls">
-          <div className="view-controls" onKeyDown={this._onViewControlsKeyDown}>
+          <div
+            ref={(el) => (this._viewControls = el)}
+            className="view-controls"
+            onKeyDown={this._onViewControlsKeyDown}
+          >
             <SegmentedControl<CalendarView>
               label={localized('Calendar view')}
               value={this.props.disabledViewButton as CalendarView}

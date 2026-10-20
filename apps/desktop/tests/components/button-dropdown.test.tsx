@@ -2,7 +2,8 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import { ButtonDropdown } from '../../src/components/button-dropdown';
-import { wait, pressRealKey } from '../support/kit-helpers';
+import { Menu } from '../../src/components/menu';
+import { wait, pressRealKey, watchPlainKeyCommands } from '../support/kit-helpers';
 import { trackCommands } from '../support/kit-layer-helpers';
 
 const MenuBody = (props: { onPick?: () => void }) => (
@@ -92,6 +93,68 @@ describe('ButtonDropdown on the UI kit', function () {
     const menu = container.querySelector('.secondary-items');
     expect(menu.className).toContain('secondary-items left');
     expect(menu.getAttribute('data-align')).toBe('start');
+  });
+
+  describe('keys on the picker while the menu is open', function () {
+    const withMenu = (onSelect: (item: string) => void, closeOnMenuClick = true) =>
+      render(
+        <ButtonDropdown
+          primaryItem={<span>Send</span>}
+          primaryTitle="Send"
+          primaryClick={() => {}}
+          closeOnMenuClick={closeOnMenuClick}
+          menu={
+            <Menu
+              items={['Later', 'Archive', 'Snooze']}
+              itemKey={(item) => item}
+              itemContent={(item) => item}
+              onSelect={onSelect}
+            />
+          }
+        />
+      ).container;
+    const selected = (container: Element) =>
+      container.querySelector('.secondary-items .item.selected')?.textContent;
+
+    it('move the highlight with the arrows, outside the keymap, and pick with Enter', async () => {
+      const commands = watchPlainKeyCommands();
+      try {
+        const onSelect = jasmine.createSpy('onSelect');
+        const container = withMenu(onSelect);
+        const picker = container.querySelector<HTMLElement>('.secondary-picker');
+        picker.focus();
+        fireEvent.click(picker);
+        await wait(10);
+        expect(selected(container)).toBe('Later');
+        await pressRealKey('Down');
+        expect(selected(container)).toBe('Archive');
+        await pressRealKey('Down');
+        await pressRealKey('Up');
+        expect(selected(container)).toBe('Archive');
+        expect(commands.counts['core:next-item']).toBe(0);
+        expect(commands.counts['core:previous-item']).toBe(0);
+        expect(document.activeElement).toBe(picker);
+        await pressRealKey('Enter');
+        expect(onSelect).toHaveBeenCalledWith('Archive');
+        expect(container.querySelector('.secondary-items')).toBe(null);
+      } finally {
+        commands.dispose();
+      }
+    });
+
+    it('leave the menu open after Enter without closeOnMenuClick, and open it when closed', async () => {
+      const onSelect = jasmine.createSpy('onSelect');
+      const container = withMenu(onSelect, false);
+      const picker = container.querySelector<HTMLElement>('.secondary-picker');
+      picker.focus();
+      await pressRealKey('Enter');
+      await wait(10);
+      expect(selected(container)).toBe('Later');
+      expect(onSelect).not.toHaveBeenCalled();
+      await pressRealKey('Enter');
+      expect(onSelect).toHaveBeenCalledWith('Later');
+      expect(container.querySelector('.secondary-items')).not.toBe(null);
+    });
   });
 
   describe('Escape', function () {

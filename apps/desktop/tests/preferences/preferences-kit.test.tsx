@@ -97,6 +97,51 @@ describe('Preferences slots', function () {
   });
 });
 
+describe('Preferences Tab order', function () {
+  afterEach(cleanup);
+
+  const tabbable = (root: Element) =>
+    Array.from(
+      root.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]')
+    ).filter((el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled);
+
+  it('has only the sidebar and the page as Tab stops, not the wrapper around them', function () {
+    const Page = () => (
+      <div>
+        <button className="first-control">First</button>
+        <button className="second-control">Second</button>
+      </div>
+    );
+    Page.displayName = 'FakeTabOrderPage';
+    const tab = new PreferencesUIStore.TabItem({
+      tabId: 'Fake Tab Order',
+      displayName: 'Fake tab order',
+      componentClassFn: () => Page,
+    });
+    const before = PreferencesUIStore.selection().tabId;
+    PreferencesUIStore.registerPreferencesTab(tab);
+    PreferencesUIStore.switchPreferencesTab('Fake Tab Order');
+    try {
+      const { container } = render(<PreferencesRoot />);
+      const wrap = container.querySelector<HTMLElement>('.preferences-wrap');
+      expect(wrap.tabIndex).toBe(-1);
+      const stops = tabbable(container);
+      const outside = stops.filter(
+        (el) => !el.closest('.preferences-sidebar, .preferences-content, .sheet-title-bar')
+      );
+      expect(outside).toEqual([]);
+      const page = stops.filter((el) => el.closest('.preferences-content'));
+      expect(page.map((el) => el.className)).toEqual(['first-control', 'second-control']);
+      // The selected sidebar tab takes focus on mount, so Tab goes on from there into the page.
+      expect(document.activeElement.getAttribute('data-tab-id')).toBe('Fake Tab Order');
+    } finally {
+      cleanup();
+      PreferencesUIStore.unregisterPreferencesTab(tab);
+      PreferencesUIStore.switchPreferencesTab(before);
+    }
+  });
+});
+
 describe('Preferences on the UI kit', function () {
   beforeEach(() => {
     // Radix Select uses delay-less timeouts, which the spec clock never fires.

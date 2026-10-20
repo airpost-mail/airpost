@@ -5,6 +5,8 @@ import { localized } from 'mailspring-exports';
 import classnames from 'classnames';
 import { Popover, PopoverAnchor, PopoverContent } from './kit/popover';
 
+const MENU_KEYS = ['ArrowUp', 'ArrowDown', 'Enter'];
+
 type ButtonDropdownState = {
   open: 'up' | 'down' | false;
 };
@@ -54,6 +56,7 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
         <div
           ref={this._setRoot}
           onBlur={this._onBlur}
+          onKeyDown={this._onRootKeyDown}
           tabIndex={-1}
           className={`${classes} ${this.props.className || ''}`}
           style={this.props.style}
@@ -83,6 +86,7 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
             className="secondary-picker"
             onClick={this.toggleDropdown}
             onKeyDown={(e) => {
+              if (this._forwardKeyToMenu(e)) return;
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 this.toggleDropdown();
@@ -99,6 +103,7 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
         <div
           ref={this._setRoot}
           onBlur={this._onBlur}
+          onKeyDown={this._onRootKeyDown}
           tabIndex={-1}
           className={`${classes} ${this.props.className || ''}`}
           style={this.props.style}
@@ -162,6 +167,36 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
         {this.props.menu}
       </PopoverContent>
     );
+  }
+
+  // The one-item variant's button isn't focusable, so a click leaves focus on the root.
+  _onRootKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target === this._root) this._forwardKeyToMenu(event);
+  };
+
+  /* While the menu is open, focus stays on the button that opened it, so the arrows and Enter
+     pressed there are handed to the menu, which has its own keyboard handling (Menu); Enter picks
+     like a click does. They stop here, so they don't also reach the global keymap
+     (core:next-item and the like). */
+  _forwardKeyToMenu(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (this.state.open === false || !MENU_KEYS.includes(event.key) || !this._root) return false;
+    const content = this._root.querySelector('[data-slot="popover-content"]');
+    if (!content || content.contains(event.target as Node)) return false;
+    const target = content.querySelector('[data-slot="menu"]') || content.firstElementChild;
+    if (!target) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: event.key,
+        code: event.nativeEvent.code,
+        shiftKey: event.shiftKey,
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    if (event.key === 'Enter' && this.props.closeOnMenuClick) this.setState({ open: false });
+    return true;
   }
 
   _onOpenChange = (open: boolean) => {
