@@ -1,9 +1,10 @@
 import React from 'react';
 import { Menu } from 'mailspring-component-kit';
+import { TextField, TextFieldProps } from '../../components/kit/text-field';
 
-interface TypeaheadFreeInputProps extends React.HTMLProps<HTMLInputElement> {
+type TypeaheadFreeInputProps = TextFieldProps & {
   suggestions: string[];
-}
+};
 
 interface TypeaheadFreeInputState {
   focused: boolean;
@@ -49,9 +50,8 @@ export class TypeaheadFreeInput extends React.Component<
         itemKey={(item) => item}
         itemContent={(item) => item}
         headerComponents={[
-          <input
+          <TextField
             key="input"
-            type="text"
             onFocus={() => this.setState({ focused: true })}
             onBlur={() => this.setState({ focused: false })}
             onKeyDown={(e) => {

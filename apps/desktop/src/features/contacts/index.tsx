@@ -10,7 +10,6 @@ import { ContactDetailToolbar } from './detail-toolbar';
 import { AddContactToolbar } from './add-contact-toolbar';
 import { ContactList, ContactListSearch } from './list';
 import { ContactDetail } from './detail';
-import { FoundInMailEnabledBar } from './found-in-mail-enabled-bar';
 import { Store } from './store';
 import { exportContactsToFile, importContactsFromFile } from './files';
 
@@ -108,10 +107,6 @@ export function activate() {
   ComponentRegistry.register(ContactPerspectivesList, {
     location: WorkspaceStore.Location.ContactsSidebar,
   });
-  ComponentRegistry.register(FoundInMailEnabledBar, {
-    location: WorkspaceStore.Location.ContactsList,
-  });
-
   ComponentRegistry.register(ContactList, {
     location: WorkspaceStore.Location.ContactsList,
   });
@@ -132,7 +127,6 @@ export function activate() {
 export function deactivate() {
   ComponentRegistry.unregister(ContactPerspectivesList);
   ComponentRegistry.unregister(ContactList);
-  ComponentRegistry.unregister(FoundInMailEnabledBar);
   ComponentRegistry.unregister(ContactListSearch);
   ComponentRegistry.unregister(ContactDetail);
   ComponentRegistry.unregister(ContactDetailToolbar);

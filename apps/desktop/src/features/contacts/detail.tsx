@@ -7,6 +7,7 @@ import { ContactDetailRead } from './detail-read';
 import { ContactDetailEdit } from './detail-edit';
 import { Store, ContactsPerspective } from './store';
 import { getContact, saveContact } from '../../engine/client/pim';
+import { Button } from '../../components/kit/button';
 
 interface ContactDetailProps {
   editing: string | 'new' | false;
@@ -167,13 +168,11 @@ class ContactDetailWithFocus extends React.Component<ContactDetailProps, Contact
         </ScrollRegion>
         {editing && (
           <div className="contact-edit-footer">
-            <button className={`btn`} onClick={this.onCancel}>
+            <Button variant="outline" onClick={this.onCancel}>
               {localized('Cancel')}
-            </button>
+            </Button>
             <div style={{ flex: 1 }} />
-            <button className={`btn btn-emphasis`} onClick={this.onSaveChanges}>
-              {localized('Save Changes')}
-            </button>
+            <Button onClick={this.onSaveChanges}>{localized('Save Changes')}</Button>
           </div>
         )}
       </>

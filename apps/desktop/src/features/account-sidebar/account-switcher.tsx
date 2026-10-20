@@ -1,7 +1,7 @@
 import React from 'react';
 import { Account, localized, Actions } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
 import { ipcRenderer } from 'electron';
+import { IconButton } from '../../components/kit/icon-button';
 import * as AccountCommands from './account-commands';
 
 export default class AccountSwitcher extends React.Component<{
@@ -38,6 +38,8 @@ export default class AccountSwitcher extends React.Component<{
     menu.popup({});
   };
 
+  // The native menu opens on mouse down, like a menu bar item; Enter and Space open it from the
+  // keyboard, and preventDefault keeps the button's own click from opening it twice.
   _onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -47,22 +49,16 @@ export default class AccountSwitcher extends React.Component<{
 
   render() {
     return (
-      <div
+      <IconButton
         className="account-switcher"
-        role="button"
-        tabIndex={0}
-        aria-label={localized('Account switcher')}
+        size="sm"
+        icon="account-switcher-dropdown.png"
+        label={localized('Account switcher')}
+        tooltip={false}
         aria-haspopup="menu"
         onMouseDown={this._onShowMenu}
         onKeyDown={this._onKeyDown}
-      >
-        <RetinaImg
-          style={{ width: 13, height: 14 }}
-          name="account-switcher-dropdown.png"
-          mode={RetinaImg.Mode.ContentDark}
-          alt=""
-        />
-      </div>
+      />
     );
   }
 }

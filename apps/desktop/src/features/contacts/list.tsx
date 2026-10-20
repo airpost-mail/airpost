@@ -13,6 +13,9 @@ import {
 import { ContactsPerspective, Store } from './store';
 import { writeContactsToTempVCF, importContactsFromPaths } from './files';
 import { ContactListContextMenu } from './list-context-menu';
+import { FoundInMailEnabledBar } from './found-in-mail-enabled-bar';
+import { TextField } from '../../components/kit/text-field';
+import { IconButton } from '../../components/kit/icon-button';
 
 const ContactColumn = new ListTabular.Column({
   name: 'Item',
@@ -173,6 +176,7 @@ class ContactListWithData extends React.Component<ContactListProps, ContactListS
         onDragOver={this._onFileDragOver}
         onDrop={this._onFileDrop}
       >
+        <FoundInMailEnabledBar />
         {draggingFiles && (
           <div className="vcf-drop-overlay">
             <div className="vcf-drop-overlay-label">{localized('Drop to Import VCards')}</div>
@@ -228,8 +232,7 @@ const ContactListSearchWithData = (props: ContactListSearchWithDataProps) => {
         mode={RetinaImg.Mode.ContentDark}
         onClick={() => searchEl.current?.focus()}
       />
-      <input
-        type="text"
+      <TextField
         ref={searchEl}
         value={props.search}
         placeholder={`${localized('Search')} ${
@@ -238,11 +241,15 @@ const ContactListSearchWithData = (props: ContactListSearchWithDataProps) => {
         onChange={(e) => props.setSearch(e.currentTarget.value)}
       />
       {props.search.length > 0 && (
-        <RetinaImg
-          name="searchclear.png"
+        <IconButton
+          size="sm"
+          icon="searchclear.png"
           className="search-accessory clear"
-          mode={RetinaImg.Mode.ContentDark}
-          onMouseDown={() => props.setSearch('')}
+          label={localized('Clear search')}
+          tooltip={false}
+          // Keeps focus in the search field.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => props.setSearch('')}
         />
       )}
     </div>

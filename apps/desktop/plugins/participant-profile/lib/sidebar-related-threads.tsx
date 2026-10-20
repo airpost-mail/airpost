@@ -8,6 +8,7 @@ import {
   DatabaseStore,
   SearchQueryParser,
 } from 'mailspring-exports';
+import { Button } from 'mailspring-component-kit';
 
 function emailFor(contact: Contact | undefined) {
   return (contact || { email: '' }).email;
@@ -115,9 +116,14 @@ class RelatedThreadsWithData extends React.Component<{
           </div>
         ))}
         {showToggle && (
-          <div className="toggle" onClick={() => this.setState({ expanded: !this.state.expanded })}>
+          <Button
+            variant="link"
+            className="toggle"
+            aria-expanded={this.state.expanded}
+            onClick={() => this.setState({ expanded: !this.state.expanded })}
+          >
             {this.state.expanded ? localized('Collapse') : localized('Show more')}
-          </div>
+          </Button>
         )}
       </div>
     );

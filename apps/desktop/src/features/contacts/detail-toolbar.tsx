@@ -3,9 +3,10 @@ import {
   FocusContainer,
   ListensToFluxStore,
   ListDataSource,
-  RetinaImg,
   BindGlobalCommands,
 } from 'mailspring-component-kit';
+import { Button } from '../../components/kit/button';
+import { IconButton } from '../../components/kit/icon-button';
 import { Store, ContactsPerspective } from './store';
 import {
   localized,
@@ -103,49 +104,34 @@ class ContactDetailToolbarWithData extends React.Component<ContactDetailToolbarP
       <BindGlobalCommands key={Object.keys(commands).join(',')} commands={commands}>
         <div style={{ display: 'flex', order: 1000, marginRight: 10 }}>
           {perspective.type === 'group' && (
-            <button
+            <Button
+              variant="toolbar"
               tabIndex={-1}
-              title={localized('Remove from Group')}
-              className={`btn btn-toolbar ${actionSet.length === 0 && 'btn-disabled'}`}
-              onClick={actionSet.length > 0 ? this._onRemoveFromSource : undefined}
+              disabled={actionSet.length === 0}
+              onClick={this._onRemoveFromSource}
             >
               {localized('Remove from Group')}
-            </button>
+            </Button>
           )}
-          <button
+          <IconButton
+            variant="toolbar"
             tabIndex={-1}
-            title={localized('Delete')}
-            aria-label={localized('Delete')}
-            className={`btn btn-toolbar ${actionSet.length === 0 && 'btn-disabled'}`}
-            onClick={actionSet.length > 0 ? this._onDelete : undefined}
-          >
-            <RetinaImg
-              name="toolbar-trash.png"
-              mode={RetinaImg.Mode.ContentIsMask}
-              aria-hidden="true"
-            />
-          </button>
-          <button
+            icon="toolbar-trash.png"
+            label={localized('Delete')}
+            disabled={actionSet.length === 0}
+            onClick={this._onDelete}
+          />
+          <IconButton
+            variant="toolbar"
             tabIndex={-1}
-            title={localized('Export vCard')}
-            aria-label={localized('Export vCard')}
-            className={`btn btn-toolbar ${actionSet.length === 0 && 'btn-disabled'}`}
-            onClick={actionSet.length > 0 ? () => exportContactsToFile(actionSet) : undefined}
-          >
-            <RetinaImg
-              name="toolbar-export-contact.png"
-              mode={RetinaImg.Mode.ContentIsMask}
-              aria-hidden="true"
-            />
-          </button>
-          <button
-            tabIndex={-1}
-            title={localized('Edit')}
-            className={`btn btn-toolbar ${!editable && 'btn-disabled'}`}
-            onClick={editable ? this._onEdit : undefined}
-          >
+            icon="toolbar-export-contact.png"
+            label={localized('Export vCard')}
+            disabled={actionSet.length === 0}
+            onClick={() => exportContactsToFile(actionSet)}
+          />
+          <Button variant="toolbar" tabIndex={-1} disabled={!editable} onClick={this._onEdit}>
             {localized('Edit')}
-          </button>
+          </Button>
         </div>
       </BindGlobalCommands>
     );

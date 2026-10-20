@@ -4,6 +4,8 @@ import { localized, Actions, AccountStore } from 'mailspring-exports';
 import * as Icons from './svg-icons';
 import { ListensToFluxStore, BindGlobalCommands } from 'mailspring-component-kit';
 import { showGPeopleReadonlyNotice } from './google-support';
+import { Button } from '../../components/kit/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/kit/tooltip';
 
 interface AddContactToolbarProps {
   editing: string | 'new' | false;
@@ -34,6 +36,9 @@ class AddContactToolbarWithData extends React.Component<AddContactToolbarProps> 
       perspective.accountId &&
       perspective.type !== 'found-in-mail';
     const acct = 'accountId' in perspective && AccountStore.accountForId(perspective.accountId);
+    const label = acct
+      ? localized('New contact in %@', acct.label)
+      : localized('Select an account to add a contact.');
 
     return (
       <div style={{ display: 'flex', order: 1000 }}>
@@ -41,18 +46,24 @@ class AddContactToolbarWithData extends React.Component<AddContactToolbarProps> 
           key={`${enabled}`}
           commands={enabled ? { 'core:add-item': this.onAdd } : {}}
         >
-          <button
-            disabled={!enabled}
-            className={`btn btn-toolbar btn-new-contact ${!enabled && 'btn-disabled'}`}
-            title={
-              acct
-                ? localized('New contact in %@', acct.label)
-                : localized('Select an account to add a contact.')
-            }
-            onClick={enabled ? this.onAdd : undefined}
-          >
-            <Icons.NewPerson />
-          </button>
+          <Tooltip>
+            {/* The span is the trigger: a disabled button takes no pointer events, and the
+                tooltip explains why it is disabled. */}
+            <TooltipTrigger asChild>
+              <span className="btn-new-contact-wrap">
+                <Button
+                  variant="toolbar"
+                  disabled={!enabled}
+                  className="btn-new-contact"
+                  aria-label={label}
+                  onClick={this.onAdd}
+                >
+                  <Icons.NewPerson />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{label}</TooltipContent>
+          </Tooltip>
         </BindGlobalCommands>
       </div>
     );

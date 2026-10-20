@@ -1,4 +1,5 @@
 import React from 'react';
+import { TextField } from '../../components/kit/text-field';
 
 interface YYMMDD {
   year: number;
@@ -31,7 +32,7 @@ export class YYMMDDInput extends React.Component<YYMMDDInputProps> {
         <legend>Birthday</legend>
         <div className="yymmdd-inputs" style={{ display: 'flex' }}>
           <div className="contact-edit-field">
-            <input
+            <TextField
               ref={this._year}
               type="number"
               aria-label="Year"
@@ -45,7 +46,7 @@ export class YYMMDDInput extends React.Component<YYMMDDInputProps> {
             /
           </span>
           <div className="contact-edit-field">
-            <input
+            <TextField
               max={12}
               min={1}
               ref={this._month}
@@ -61,7 +62,7 @@ export class YYMMDDInput extends React.Component<YYMMDDInputProps> {
             /
           </span>
           <div className="contact-edit-field">
-            <input
+            <TextField
               max={31}
               min={1}
               ref={this._day}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ListensToFluxStore } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
+import { Button } from '../../components/kit/button';
 
 import { Store, ContactsPerspective } from './store';
 
@@ -45,9 +46,9 @@ class FoundInMailEnabledBarWithData extends React.Component<FoundInMailEnabledBa
             `Contacts you've emailed appear here and Tern can suggest them when composing new messages.`
           )}
         </div>
-        <div className="btn" onClick={this._onToggle}>
+        <Button variant="outline" size="sm" onClick={this._onToggle}>
           {disabled ? localized(`Enable`) : localized(`Disable`)}
-        </div>
+        </Button>
       </div>
     );
   }

@@ -2,6 +2,7 @@ import React from 'react';
 import { Account, Contact, AccountStore, ContactGroup } from 'mailspring-exports';
 import { ContactProfilePhoto, RetinaImg } from 'mailspring-component-kit';
 import * as Icons from './svg-icons';
+import { Button } from '../../components/kit/button';
 import { Store } from './store';
 import { ContactBase, ContactInteractorMetadata } from './types';
 
@@ -27,8 +28,10 @@ export const ContactDetailRead = ({
           const group = groups.find((g) => g.id === gid);
           const label = group ? group.name : gid;
           return (
-            <div
+            <Button
               key={gid}
+              variant="secondary"
+              size="sm"
               className="group-membership"
               onClick={() => {
                 Store.setPerspective({
@@ -39,13 +42,9 @@ export const ContactDetailRead = ({
                 });
               }}
             >
-              <RetinaImg
-                name="label.png"
-                style={{ marginRight: 5 }}
-                mode={RetinaImg.Mode.ContentDark}
-              />
+              <RetinaImg name="label.png" mode={RetinaImg.Mode.ContentIsMask} />
               {label}
-            </div>
+            </Button>
           );
         })}
       </div>
