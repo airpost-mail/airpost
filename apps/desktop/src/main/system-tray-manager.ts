@@ -90,6 +90,7 @@ class SystemTrayManager {
 
     return path.join(
       this._application.resourcePath,
+      'src',
       'features',
       'system-tray',
       'assets',

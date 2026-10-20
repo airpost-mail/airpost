@@ -10,7 +10,7 @@ import DefaultEngineEvents, { EngineEvents } from '../../src/engine/engine-event
 import { EngineConnection } from '../../src/engine/engine-connection';
 import { Feature } from '../../src/shared/engine-protocol';
 import { applyDeltas, feedEngineEvents } from '../../src/flux/engine-bridge';
-import { Notifier } from '../../features/unread-notifications/lib/main';
+import { Notifier } from '../../src/features/unread-notifications/index';
 import { EngineStatus } from '../../src/shared/supervisor-channels';
 import { FakeEngine, until } from '../fake-serve-engine';
 import { EngineReads } from '../../src/flux/stores/engine-reads';

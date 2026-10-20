@@ -286,10 +286,12 @@ describe('Engine.request and local-only methods (TD29)', function () {
   it('finds the calling package from the stack', () => {
     const resourcePath = AppEnv.getLoadSettings().resourcePath;
     const third = '/tmp/tern-spec-packages/third';
-    const bundled = path.join(resourcePath, 'features', 'composer');
+    const bundled = path.join(resourcePath, 'plugins', 'send-later');
+    const feature = path.join(resourcePath, 'src', 'features', 'composer');
     spyOn(AppEnv.packages, 'getAvailablePackages').andReturn([
       { name: 'third', directory: third, engineMethods: () => ['secrets.set'] },
-      { name: 'composer', directory: bundled, engineMethods: () => [] },
+      { name: 'send-later', directory: bundled, engineMethods: () => [] },
+      { name: 'composer', directory: feature, engineMethods: () => [] },
     ] as any);
     const stack = (file: string) =>
       [
@@ -305,6 +307,8 @@ describe('Engine.request and local-only methods (TD29)', function () {
       engineMethods: ['secrets.set'],
     });
     expect(callerPackageFromStack(stack(`${bundled}/lib/main.js`)).bundled).toBe(true);
+    // Built-in features are app code under src/: their frames are passed over like any other.
+    expect(callerPackageFromStack(stack(`${feature}/index.ts`))).toBe(null);
     // Outside the app and in no package: an unknown caller, with no local-only methods.
     expect(callerPackageFromStack(stack('/somewhere/else.js'))).toEqual({
       name: '/somewhere/else.js',

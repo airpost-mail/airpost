@@ -36,10 +36,19 @@ Plugins are discovered from these directories in order:
 
 | Directory | Purpose | Notes |
 |-----------|---------|-------|
-| `<resourcePath>/features/`, `plugins/`, `themes/` | Built-in packages | Core features, optional plugins (`isOptional`) and the `ui-*` themes; discovered as one name-sorted list |
+| `<resourcePath>/src/features/`, `plugins/`, `themes/` | Built-in | Core features (app code, see below), optional plugins (`isOptional`) and the `ui-*` themes; discovered as one name-sorted list |
 | `<configDirPath>/packages/` | User-installed plugins | Skipped in safe mode |
 | `<configDirPath>/dev/packages/` | Developer mode plugins | Only loaded in dev mode |
 | `<resourcePath>/spec/fixtures/packages/` | Test packages | Only in spec mode |
+
+Built-in features are not packages: they are app code in `src/features/<dir>/`, with no
+`package.json`, listed in `src/features/index.ts` with their package name, `windowTypes`,
+`syncInit` and a lazy `require` of `index.ts`. `PackageManager` wraps each in a
+`BuiltinFeature` (`src/plugin-host/builtin-feature.ts`) and merges them by directory name with
+the bundled plugins and themes, so they share one activation order and stay in
+`AppEnv.packages` under their names. A user package with a feature's name still replaces it.
+The directory name is also the `mailspring://<dir>/` host for the feature's assets. Features
+are not loaded in spec mode and are never listed in Preferences > Plugins.
 
 ### Platform-Specific Config Directories
 
@@ -508,7 +517,7 @@ Themes are plugins with special handling:
 
 ### Theme Picker
 
-Located in `features/theme-picker/`:
+Located in `src/features/theme-picker/`:
 - Accessible via Preferences > Appearance > "Change Theme..."
 - Lists all discovered theme packages
 - Supports live switching without restart
@@ -601,6 +610,8 @@ Optional plugins can be disabled via config:
 |------|---------|
 | `src/plugin-host/package-manager.ts` | Package discovery and activation |
 | `src/plugin-host/package.ts` | Package class implementation |
+| `src/plugin-host/builtin-feature.ts` | Built-in feature, held like a package |
+| `src/features/index.ts` | The built-in feature list |
 | `src/window/app-env.ts` | AppEnv singleton, initializes PackageManager |
 | `src/registries/component-registry.ts` | UI component registration |
 | `src/registries/extension-registry.ts` | Extension registration |
@@ -608,4 +619,4 @@ Optional plugins can be disabled via config:
 | `src/extensions/message-view-extension.ts` | MessageViewExtension base class |
 | `src/components/injected-component.tsx` | Renders registered components |
 | `src/plugin-api/mailspring-exports.ts` | Global API exports |
-| `features/theme-picker/` | Theme selection UI (reference for plugin UI) |
+| `src/features/theme-picker/` | Theme selection UI (reference for plugin UI) |

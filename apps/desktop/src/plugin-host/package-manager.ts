@@ -3,7 +3,9 @@ import fs from 'fs';
 import { shell } from 'electron';
 import { localized } from '../shared/intl';
 import Package, { isValidPackageName } from './package';
-import { bundledPackagePaths, bundledPackageRoots } from '../shared/bundled-packages';
+import BuiltinFeature from './builtin-feature';
+import { bundledPackagePaths, bundledPackageRoots, compareNames } from '../shared/bundled-packages';
+import { FEATURES, FeatureManifest } from '../features';
 import { PLUGIN_API_VERSION } from './plugin-api-version';
 import { recordPluginInstall } from './plugin-install-record';
 
@@ -46,12 +48,24 @@ export default class PackageManager {
     this.discoverPackages();
   }
 
-  // The bundled roots are discovered as one name-sorted list; later directories override
-  // earlier ones, so user packages still win over bundled ones of the same name.
-  _packagePaths() {
+  // The built-in features and the bundled roots are discovered as one name-sorted list (by
+  // feature `dir` and package directory name); later directories override earlier ones, so
+  // user packages still win over built-in ones of the same name and take their place.
+  _packageEntries(): ({ path: string } | { feature: FeatureManifest })[] {
     const bundledRoots = bundledPackageRoots(this.resourcePath);
     const hasBundled = this.packageDirectories.some((dir) => bundledRoots.includes(dir));
-    const packagePaths = hasBundled ? bundledPackagePaths(this.resourcePath) : [];
+    const entries: ({ path: string } | { feature: FeatureManifest })[] = [];
+    if (hasBundled) {
+      const bundled = [
+        ...FEATURES.map((feature) => ({ key: feature.dir, entry: { feature } })),
+        ...bundledPackagePaths(this.resourcePath).map((p) => ({
+          key: path.basename(p),
+          entry: { path: p },
+        })),
+      ];
+      bundled.sort((a, b) => compareNames(a.key, b.key));
+      entries.push(...bundled.map((b) => b.entry));
+    }
     for (const dir of this.packageDirectories) {
       if (bundledRoots.includes(dir)) continue;
       let filenames = [];
@@ -60,13 +74,19 @@ export default class PackageManager {
       } catch (err) {
         continue;
       }
-      packagePaths.push(...filenames.map((filename) => path.join(dir, filename)));
+      entries.push(...filenames.map((filename) => ({ path: path.join(dir, filename) })));
     }
-    return packagePaths;
+    return entries;
   }
 
   discoverPackages() {
-    for (const packagePath of this._packagePaths()) {
+    for (const entry of this._packageEntries()) {
+      if ('feature' in entry) {
+        const feature = new BuiltinFeature(this.resourcePath, entry.feature);
+        this.available[feature.name] = feature;
+        continue;
+      }
+      const packagePath = entry.path;
       let pkg = null;
       try {
         pkg = new Package(packagePath);

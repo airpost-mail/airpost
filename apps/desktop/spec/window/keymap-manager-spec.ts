@@ -72,7 +72,9 @@ describe('KeymapManager', function () {
   it('adds package keymaps on top of a template even when they were loaded first', function () {
     // In the main window, packages activate (and load their keymaps) before
     // loadKeymaps() runs, and a template chosen in Preferences loads last of all.
-    manager.loadKeymap(path.join(resourcePath, 'features', 'composer', 'keymaps', 'composer.json'));
+    manager.loadKeymap(
+      path.join(resourcePath, 'src', 'features', 'composer', 'keymaps', 'composer.json')
+    );
     manager.loadKeymap(path.join(keymapsDir, 'base.json'), { layer: 'base' });
     manager.loadKeymap(path.join(keymapsDir, 'templates', 'Outlook.json'), { layer: 'template' });
 

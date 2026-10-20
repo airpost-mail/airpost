@@ -40,7 +40,7 @@ The app icon tile needed no cleanup beyond zeroing RGB under transparency. Windo
 
 ### Tray states
 
-These mirror the four states in `apps/desktop/features/system-tray` (see `lib/system-tray-icon-store.ts`) and reuse the old colours from its `assets/build-win32-ico.py`.
+These mirror the four states in `apps/desktop/src/features/system-tray` (see `system-tray-icon-store.ts`) and reuse the old colours from its `assets/build-win32-ico.py`.
 
 | Old name | New name | Look |
 | --- | --- | --- |
@@ -73,7 +73,7 @@ Paths relative to `apps/desktop`. The old Mailspring files listed under "Replace
 | `windows/tern-150px.png`, `tern-75px.png` | `build/resources/win/mailspring-150px.png`, `mailspring-75px.png` | `tern.VisualElementsManifest.xml` (background `#0A1A3D`). |
 | `linux/tern-<n>.png` | `build/resources/linux/icons/<n>.png` (now `tern-<n>.png`) | Installed as `hicolor/<n>x<n>/apps/com.ternmail.tern.png` by `build/resources/linux/redhat/tern.spec.in` and `build/mkdeb`; `tern-512.png` also goes to `/usr/share/pixmaps/tern.png`. |
 | `linux/tern-512.png` | `static/images/mailspring.png` (now `tern.png`) | Window icon on Linux (`src/main/app-window.ts`), native notifications (`src/platform/native-notifications.ts`), update notification (`src/main/autoupdate-manager.ts`). |
-| `tray/darwin/*`, `tray/linux/*`, `tray/win32/*` | `features/system-tray/assets/{darwin,linux,win32}/MenuItem-Inbox-*` | `features/system-tray/lib/system-tray-icon-store.ts` and `_defaultIconPath` in `src/main/system-tray-manager.ts`. The old `build-win32-ico.py` and `.psd` files are removed. |
-| `web/tern-bird-on-dark-256.png` | (new) `features/onboarding/assets/tern-bird-on-dark-256.png` | Mark above the title on the onboarding welcome screen (`lib/page-welcome.tsx`); the generic icon pattern `icons-bg@2x.png` stays as its background. |
+| `tray/darwin/*`, `tray/linux/*`, `tray/win32/*` | `src/features/system-tray/assets/{darwin,linux,win32}/MenuItem-Inbox-*` | `src/features/system-tray/system-tray-icon-store.ts` and `_defaultIconPath` in `src/main/system-tray-manager.ts`. The old `build-win32-ico.py` and `.psd` files are removed. |
+| `web/tern-bird-on-dark-256.png` | (new) `src/features/onboarding/assets/tern-bird-on-dark-256.png` | Mark above the title on the onboarding welcome screen (`page-welcome.tsx`); the generic icon pattern `icons-bg@2x.png` stays as its background. |
 
 Not covered here: a document icon (Mailspring's unused `build/resources/mac/file.icns` was removed), a macOS 26 Icon Composer icon (`tern.icon`, needs layered vector artwork; Mailspring's `mailspring.icon` was removed, so macOS 26 shows `tern.icns`) and `build/resources/win/loading.gif` (the Windows installer animation).

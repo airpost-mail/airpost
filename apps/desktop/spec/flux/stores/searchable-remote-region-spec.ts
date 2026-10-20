@@ -5,6 +5,9 @@ describe('SearchableComponentStore with a remote region', function () {
   let element: HTMLDivElement;
 
   beforeEach(() => {
+    // An earlier spec that unmounted an EmailFrame leaves the debounce holding a fake timer the
+    // clock reset dropped; until it's cancelled the store never recalculates.
+    (SearchableComponentStore as any)._recalculateMatches.cancel();
     element = document.createElement('div');
     element.style.position = 'absolute';
     element.style.top = '100px';

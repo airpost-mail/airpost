@@ -171,7 +171,7 @@ const ACCOUNT_ID_SETTINGS: [&str; 4] = ["imap_username", "imap_host", "smtp_user
 
 /// The id of a new account: the first 8 hex digits of `sha256(email + JSON)`, where the JSON is
 /// `{"imap_username":…,"imap_host":…,"smtp_username":…,"smtp_host":…}` as the desktop's
-/// `idForAccount` (`features/onboarding/lib/onboarding-helpers.ts`) builds it with
+/// `idForAccount` (`src/features/onboarding/onboarding-helpers.ts`) builds it with
 /// `JSON.stringify`: keys in that order, a missing key left out, a null kept. Ports, security
 /// and the rest don't count, so changing them keeps the account (and its metadata). Values
 /// serialize as serde_json writes them, which matches `JSON.stringify` for the strings these

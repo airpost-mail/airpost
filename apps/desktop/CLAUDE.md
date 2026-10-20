@@ -39,7 +39,7 @@ npm run build
 
 ## Architecture Overview
 
-Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript and LESS are compiled at runtime; there is no bundler. It uses a plugin architecture where features are implemented as internal packages. Plugin API names keep their Mailspring spelling (`mailspring-exports`, `engines.mailspring`, `window.$m`, `AppEnv`) because third-party plugins depend on them.
+Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript and LESS are compiled at runtime; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. Plugin API names keep their Mailspring spelling (`mailspring-exports`, `engines.mailspring`, `window.$m`, `AppEnv`) because third-party plugins depend on them.
 
 ### Key Directories
 
@@ -56,23 +56,23 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
   - `components/` - Reusable React UI components, including the sheets (`components/sheets/`) and the higher-order components (`components/decorators/`)
   - `services/` - Application services (search, sanitization, etc.)
   - `registries/` - Extension registries (components, extensions, database objects)
+  - `features/` - The built-in features that always load (composer, message-list, thread-list, preferences, main-calendar, etc.), one directory each, listed in `features/index.ts`
 
-- **`features/`** - Built-in packages that always load (composer, message-list, thread-list, preferences, main-calendar, etc.)
 - **`plugins/`** - Bundled optional packages (`isOptional: true`, can be turned off via `core.disabledPackages`), e.g. activity, send-later, translation
 - **`themes/`** - The `ui-*` themes
 - **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/quickpreview/renderer.html`
 
-All three package dirs sit at the same depth, so packages import core code as `../../../src/...`. `src/shared/bundled-packages.ts` lists them for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
+Plugins and themes import core code as `../../../src/...`. `src/shared/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
 
-> **IMPORTANT:** Application source code lives in `src/`, `features/` and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
+> **IMPORTANT:** Application source code lives in `src/` (including `src/features/`) and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
-- **`spec/`** - Jasmine specs for `src/`, laid out like it (`spec/main/` tests `src/main/`, `spec/flux/stores/` tests `src/flux/stores/`). Specs that also load package code go in `spec/integration/`; a spec for one package goes in that package's `specs/`. `spec/spec-runner/`, `spec/fixtures/`, `spec/test-utils.ts` (the plugin API's `MailspringTestUtils`) and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`) sit at the top.
+- **`spec/`** - Jasmine specs for `src/`, laid out like it (`spec/main/` tests `src/main/`, `spec/flux/stores/` tests `src/flux/stores/`). Feature specs mirror it too (`spec/features/composer/` tests `src/features/composer/`). Specs that load code from several places go in `spec/integration/`; a spec for one plugin goes in that plugin's `specs/`. `spec/spec-runner/`, `spec/fixtures/`, `spec/test-utils.ts` (the plugin API's `MailspringTestUtils`) and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`) sit at the top.
 
 Code outside `src/main/` and `src/shared/` runs in the windows and must not import `src/main/`; `src/main/` and `src/shared/` must not import window code, except `flux/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
 
 ### Dependencies and packaging
 
-There is one `package.json` and one `node_modules`. Runtime code goes in `dependencies` (or `optionalDependencies`); tests and tooling go in `devDependencies`, which the packager prunes. `import/no-extraneous-dependencies` (with `packageDir: "."`, so run eslint from this directory) fails a runtime import of a devDependency in `src/`, `features/`, `plugins/` or `themes/`; `spec/` and package `specs/` dirs may use them. Only the top-level entries listed in `shippedTopLevel` in `build/build.js` are packaged, so a new top-level runtime dir has to be added there or it silently won't ship. Package `specs/` dirs never ship.
+There is one `package.json` and one `node_modules`. Runtime code goes in `dependencies` (or `optionalDependencies`); tests and tooling go in `devDependencies`, which the packager prunes. `import/no-extraneous-dependencies` (with `packageDir: "."`, so run eslint from this directory) fails a runtime import of a devDependency in `src/`, `plugins/` or `themes/`; `spec/` and package `specs/` dirs may use them. Only the top-level entries listed in `shippedTopLevel` in `build/build.js` are packaged, so a new top-level runtime dir has to be added there or it silently won't ship. Package `specs/` dirs never ship.
 
 ### Core Modules
 
@@ -88,12 +88,14 @@ There is one `package.json` and one `node_modules`. Runtime code goes in `depend
 
 ### Plugin Structure
 
-Each package in `features/`, `plugins/` and `themes/` has:
+Each package in `plugins/` and `themes/` has:
 - `package.json` - Metadata with `windowTypes` specifying where plugin loads
 - `lib/main.ts` - Entry point with `activate()` and `deactivate()` lifecycle hooks
 - `lib/` - Plugin source code
 - `styles/` - LESS stylesheets
 - `keymaps/` - Keyboard shortcut definitions
+
+A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in `src/features/index.ts` gives its package name (`list-unsubscribe` is `unsubscribe`), `windowTypes`, `syncInit` and a lazy `require` of its `index.ts` (which exports `activate()`/`deactivate()`). Source files sit in the feature folder; `styles/`, `keymaps/` and asset folders are subfolders loaded as for a package. `PackageManager` wraps each one in a `BuiltinFeature` and sorts features and bundled plugins together by directory name, so the activation order, and with it the order toolbar buttons, message headers and composer extensions register in, stays what it was (`spec/plugin-host/builtin-features-spec.ts` pins it). The directory name is the `mailspring://<dir>/` asset host, so don't rename one.
 
 ## Core Data Flow: Sync Engine, Tasks, and Observable Database
 
@@ -251,4 +253,4 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Claude Hooks
 
-A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/src`, `features`, `plugins` or `themes`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.
+A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/src`, `plugins`, `themes` or `spec/features`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.

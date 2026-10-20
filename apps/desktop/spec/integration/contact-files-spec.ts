@@ -11,7 +11,7 @@ import { exportContacts, saveContact } from '../../src/engine/engine-pim';
 import {
   importContactsFromPaths,
   writeContactsToTempVCF,
-} from '../../features/contacts/lib/ContactFiles';
+} from '../../src/features/contacts/ContactFiles';
 import { fakePimEngine, flush } from '../fake-pim-engine';
 
 const CARD = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ada\r\nEND:VCARD\r\n';

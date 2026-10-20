@@ -47,7 +47,7 @@ The Mailspring composer is built on several layers:
 ┌──────────────────────────────────────────────────────────┐
 │  Composer:ActionButton   Composer:Footer   ...           │  ← Injected via ComponentRegistry
 ├──────────────────────────────────────────────────────────┤
-│  ComposerView  (features/composer/)         │  ← Renders InjectedComponentSets
+│  ComposerView  (src/features/composer/)     │  ← Renders InjectedComponentSets
 ├──────────────────────────────────────────────────────────┤
 │  ComposerEditor (Slate v0 rich-text editor)              │  ← Slate plugins for editor behavior
 ├──────────────────────────────────────────────────────────┤
@@ -167,7 +167,7 @@ interface ComposerInjectedProps {
 }
 ```
 
-Source: `features/composer/lib/composer-view.tsx`
+Source: `src/features/composer/composer-view.tsx`
 
 ### Toolbar Buttons (Composer:ActionButton)
 

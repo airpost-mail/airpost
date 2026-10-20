@@ -5,6 +5,10 @@ this file's git history.
 
 ## Unreleased (Tern)
 
+No plugin API change:
+
+- The built-in features moved from `<resourcePath>/features/<dir>/lib/` to `<resourcePath>/src/features/<dir>/` and have no `package.json` any more. `AppEnv.packages` lists them under the same names, they activate in the same order, and `mailspring://<dir>/…` asset URLs are unchanged. A plugin that requires a feature's files by path has to use the new path.
+
 Plugin API 1.32.0:
 
 - The engine expands, creates and edits calendar events and contacts (`events.expand`, `events.create`, `events.update`, `events.rsvp`, `contacts.get`, `contacts.create`, `contacts.update`, `contacts.import`, `contacts.export`; features `calendar-editing` and `contact-editing`). Call them with `Engine.request`.

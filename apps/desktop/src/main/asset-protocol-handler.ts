@@ -1,7 +1,7 @@
 import { protocol } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { bundledPackageRoots } from '../shared/bundled-packages';
+import { bundledAssetRoots } from '../shared/bundled-packages';
 
 // Handles requests with 'mailspring' protocol.
 //
@@ -12,7 +12,7 @@ import { bundledPackageRoots } from '../shared/bundled-packages';
 //   * <config-dir>/assets
 //   * <config-dir>/dev/packages (unless in safe mode)
 //   * <config-dir>/packages
-//   * RESOURCE_PATH/{features,plugins,themes}
+//   * RESOURCE_PATH/src/features, then RESOURCE_PATH/{plugins,themes}
 //
 const FontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
 
@@ -24,7 +24,7 @@ export default class MailspringProtocolHandler {
       this.loadPaths.push(path.resolve(path.join(configDirPath, 'dev', 'packages')));
     }
     this.loadPaths.push(path.resolve(path.join(configDirPath, 'packages')));
-    for (const root of bundledPackageRoots(resourcePath)) {
+    for (const root of bundledAssetRoots(resourcePath)) {
       this.loadPaths.push(path.resolve(root));
     }
 

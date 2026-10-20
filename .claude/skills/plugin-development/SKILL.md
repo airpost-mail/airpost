@@ -1,6 +1,6 @@
 ---
 name: plugin-development
-description: Context for work on the desktop app's plugin system (apps/desktop) — creating, modifying or debugging plugins and themes, PackageManager/Package loading, discovery and activation, ComponentRegistry/ExtensionRegistry and the other registries, Preferences > Plugins, or anything in apps/desktop/features/, plugins/ or themes/. Read before changing plugin-related code.
+description: Context for work on the desktop app's plugin system (apps/desktop) — creating, modifying or debugging plugins and themes, PackageManager/Package loading, discovery and activation, ComponentRegistry/ExtensionRegistry and the other registries, Preferences > Plugins, or anything in apps/desktop/src/features/, plugins/ or themes/. Read before changing plugin-related code.
 ---
 
 # Plugin development
@@ -12,7 +12,7 @@ Use this skill when working on code related to the desktop app's plugin system, 
 - Working with ComponentRegistry, ExtensionRegistry, or other registries
 - Plugin management UI (Preferences > Plugins)
 - Working with themes (which are a type of plugin)
-- Modifying code in `apps/desktop/features/`, `plugins/` or `themes/`
+- Modifying code in `apps/desktop/src/features/`, `plugins/` or `themes/`
 
 ## Required Reading
 
@@ -37,6 +37,9 @@ Paths are relative to `apps/desktop/`.
 |------|---------|
 | `src/plugin-host/package-manager.ts` | Package discovery, validation, and activation |
 | `src/plugin-host/package.ts` | Package class representing individual plugins |
+| `src/plugin-host/builtin-feature.ts` | A built-in feature held in PackageManager like a package |
+| `src/plugin-host/package-resources.ts` | Keymap, menu and stylesheet loading shared by both |
+| `src/features/index.ts` | The built-in feature list: name, window types, `syncInit`, lazy `require` |
 | `src/window/app-env.ts` | AppEnv singleton that initializes PackageManager |
 | `src/plugin-host/plugin-api-version.ts` | The plugin API version matched against `engines.mailspring` |
 | `src/registries/component-registry.ts` | UI component registration |
@@ -44,7 +47,7 @@ Paths are relative to `apps/desktop/`.
 | `src/extensions/composer-extension.ts` | ComposerExtension base class |
 | `src/extensions/message-view-extension.ts` | MessageViewExtension base class |
 | `src/components/injected-component.tsx` | Renders registered components |
-| `features/theme-picker/` | Theme UI (reference for plugin management UI) |
+| `src/features/theme-picker/` | Theme UI (reference for plugin management UI) |
 
 ## Development Guidelines
 
@@ -53,6 +56,7 @@ Paths are relative to `apps/desktop/`.
 3. **Clean Deactivation**: Always unregister components/extensions in `deactivate()`
 4. **Window Types**: Consider which window types a plugin should load in
 5. **Optional Plugins**: Use `isOptional: true` for user-disableable plugins
+6. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `spec/plugin-host/builtin-features-spec.ts`). Its directory name is the `mailspring://` asset host and its place in the activation order, which features share with the bundled plugins
 
 ## Testing Plugin Changes
 

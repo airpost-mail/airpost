@@ -1,0 +1,498 @@
+/* eslint global-require: 0 */
+import fs from 'fs';
+import path from 'path';
+import React from 'react';
+import classnames from 'classnames';
+import {
+  LabelColorizer,
+  SettingsPage,
+  SettingsSection,
+  SettingsRow,
+  SegmentedControl,
+  ConfigSwitchRow,
+  ConfigSelectRow,
+} from 'mailspring-component-kit';
+import { Actions, localized } from 'mailspring-exports';
+import { isWaylandSession } from '../../../shared/is-wayland';
+import {
+  LABEL_COLOR_SCHEMES,
+  LABEL_COLOR_SCHEME_NAMES,
+} from '../../../flux/stores/label-color-store';
+import LessCompileCache from '../../../plugin-host/compile-cache-less';
+import {
+  AUTOMATIC_THEME_NAME,
+  LIGHT_THEME_NAME,
+  DARK_THEME_NAME,
+} from '../../../plugin-host/theme-manager';
+
+const THEME_ORDER = [
+  LIGHT_THEME_NAME,
+  DARK_THEME_NAME,
+  AUTOMATIC_THEME_NAME,
+  'ui-less-is-more',
+  'ui-taiga',
+  'ui-darkside',
+];
+
+interface ThemePackage {
+  name: string;
+  displayName: string;
+  getStylesheetsPath: () => string;
+}
+
+interface ThemeColors {
+  sidebar: string;
+  content: string;
+  accent: string;
+  text: string;
+}
+
+const PREVIEW_VARIABLES: [keyof ThemeColors, string][] = [
+  ['sidebar', '@source-list-bg'],
+  ['content', '@background-primary'],
+  ['accent', '@accent-primary'],
+  ['text', '@text-color'],
+];
+
+const previewColors = new Map<string, ThemeColors | null>();
+let previewCompiler: LessCompileCache = null;
+
+/** A theme's own colours, compiled from its LESS variables the way the theme manager does. */
+function colorsForTheme(theme: ThemePackage): ThemeColors | null {
+  if (previewColors.has(theme.name)) return previewColors.get(theme.name);
+  let colors: ThemeColors | null = null;
+  try {
+    const { configDirPath, resourcePath } = AppEnv.getLoadSettings();
+    previewCompiler = previewCompiler || new LessCompileCache({ configDirPath, resourcePath });
+    const dir = theme.getStylesheetsPath();
+    let less = `@import "base/ui-variables";\n`;
+    for (const file of ['ui-variables.less', 'theme-colors.less']) {
+      if (fs.existsSync(path.join(dir, file))) less += `@import "${path.join(dir, file)}";\n`;
+    }
+    for (const [key, variable] of PREVIEW_VARIABLES) {
+      less += `.tern-preview-${key} { color: ${variable}; }\n`;
+    }
+    const css: string = previewCompiler.cssForFile(path.join(dir, 'tern-theme-preview.less'), less);
+    const read = (key: string) =>
+      (css.match(new RegExp(`\\.tern-preview-${key}\\s*\\{\\s*color:\\s*([^;}]+)`)) || [])[1];
+    const entries = PREVIEW_VARIABLES.map(([key]) => [key, read(key)]);
+    if (entries.every(([, value]) => value)) colors = Object.fromEntries(entries);
+  } catch (err) {
+    console.warn(`Could not preview the theme ${theme.name}: ${err.message}`);
+  }
+  previewColors.set(theme.name, colors);
+  return colors;
+}
+
+function ThemeMiniature({ colors }: { colors: ThemeColors | null }) {
+  if (!colors) return <div className="theme-miniature blank" />;
+  return (
+    <div className="theme-miniature" style={{ background: colors.content }}>
+      <div className="sidebar" style={{ background: colors.sidebar }} />
+      <div className="lines">
+        <i style={{ background: colors.accent }} />
+        <i style={{ background: colors.text }} />
+        <i style={{ background: colors.text }} />
+      </div>
+    </div>
+  );
+}
+
+function themeLabel(theme: ThemePackage) {
+  if (theme.name === LIGHT_THEME_NAME) return localized('Light');
+  if (theme.name === DARK_THEME_NAME) return localized('Dark');
+  if (theme.name === AUTOMATIC_THEME_NAME) return localized('Match system');
+  return theme.displayName || theme.name;
+}
+
+class ThemeChooser extends React.Component<
+  Record<string, unknown>,
+  { themes: ThemePackage[]; colors: { [name: string]: ThemeColors | null } }
+> {
+  static displayName = 'ThemeChooser';
+
+  _mounted = false;
+  _timer: NodeJS.Timeout = null;
+
+  constructor(props) {
+    super(props);
+    const themes: ThemePackage[] = AppEnv.themes.getAvailableThemes();
+    const rank = (t: ThemePackage) =>
+      THEME_ORDER.includes(t.name) ? THEME_ORDER.indexOf(t.name) : THEME_ORDER.length;
+    themes.sort((a, b) => rank(a) - rank(b));
+    const colors = {};
+    for (const t of themes) {
+      if (previewColors.has(t.name)) colors[t.name] = previewColors.get(t.name);
+    }
+    this.state = { themes, colors };
+  }
+
+  componentDidMount() {
+    this._mounted = true;
+    this._compileNext();
+  }
+
+  componentWillUnmount() {
+    this._mounted = false;
+    clearTimeout(this._timer);
+  }
+
+  // One theme per tick: compiling a theme's LESS the first time takes long enough to drop frames.
+  _compileNext = () => {
+    const next = this.state.themes.find(
+      (t) => t.name !== AUTOMATIC_THEME_NAME && !(t.name in this.state.colors)
+    );
+    if (!next || !this._mounted) return;
+    this._timer = setTimeout(() => {
+      if (!this._mounted) return;
+      const colors = colorsForTheme(next);
+      this.setState((s) => ({ colors: { ...s.colors, [next.name]: colors } }), this._compileNext);
+    }, 0);
+  };
+
+  _renderTile(theme: ThemePackage, active: string) {
+    const { colors } = this.state;
+    let preview: React.ReactNode;
+    if (theme.name === AUTOMATIC_THEME_NAME) {
+      preview = (
+        <div className="theme-miniature split">
+          <ThemeMiniature colors={colors[AppEnv.themes.getConfiguredLightThemeName()]} />
+          <ThemeMiniature colors={colors[AppEnv.themes.getConfiguredDarkThemeName()]} />
+        </div>
+      );
+    } else {
+      preview = <ThemeMiniature colors={colors[theme.name]} />;
+    }
+    const on = active === theme.name;
+    return (
+      <div
+        key={theme.name}
+        role="radio"
+        aria-checked={on}
+        tabIndex={on ? 0 : -1}
+        className={classnames('theme-tile', { on })}
+        onClick={() => AppEnv.themes.setActiveTheme(theme.name)}
+        onKeyDown={(e) => this._onTileKeyDown(e, theme)}
+      >
+        {preview}
+        <span className="theme-tile-name">{themeLabel(theme)}</span>
+      </div>
+    );
+  }
+
+  _onTileKeyDown = (e: React.KeyboardEvent<HTMLElement>, theme: ThemePackage) => {
+    const { themes } = this.state;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      AppEnv.themes.setActiveTheme(theme.name);
+    } else if (step) {
+      e.preventDefault();
+      const next = themes[(themes.indexOf(theme) + step + themes.length) % themes.length];
+      AppEnv.themes.setActiveTheme(next.name);
+      const tiles = e.currentTarget.parentElement.children;
+      (tiles[themes.indexOf(next)] as HTMLElement)?.focus();
+    }
+  };
+
+  _renderSystemThemeSelect(label: string, value: string, onChange: (name: string) => void) {
+    const choices = this.state.themes.filter((t) => t.name !== AUTOMATIC_THEME_NAME);
+    return (
+      <SettingsRow label={label}>
+        <select
+          className="settings-select"
+          aria-label={label}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {choices.map((t) => (
+            <option key={t.name} value={t.name}>
+              {themeLabel(t)}
+            </option>
+          ))}
+        </select>
+      </SettingsRow>
+    );
+  }
+
+  render() {
+    const active = AppEnv.themes.getActiveThemeSetting().name;
+    return (
+      <>
+        <div className="theme-tiles" role="radiogroup" aria-label={localized('Theme')}>
+          {this.state.themes.map((theme) => this._renderTile(theme, active))}
+        </div>
+        {active === AUTOMATIC_THEME_NAME && (
+          <>
+            {this._renderSystemThemeSelect(
+              localized('When the system is light'),
+              AppEnv.themes.getConfiguredLightThemeName(),
+              (name) => AppEnv.themes.setLightTheme(name)
+            )}
+            {this._renderSystemThemeSelect(
+              localized('When the system is dark'),
+              AppEnv.themes.getConfiguredDarkThemeName(),
+              (name) => AppEnv.themes.setDarkTheme(name)
+            )}
+          </>
+        )}
+      </>
+    );
+  }
+}
+
+type LayoutMode = 'list' | 'split' | 'splitVertical';
+
+/** Switching layout pops back to the mailbox, so the choice waits for Apply. */
+class ReadingPaneRow extends React.Component<Record<string, unknown>, { value: LayoutMode }> {
+  static displayName = 'ReadingPaneRow';
+
+  state = { value: AppEnv.config.get('core.workspace.mode') as LayoutMode };
+
+  _onApply = () => {
+    // The command carries `off` because that is its name while the mode is not the current one.
+    AppEnv.commands.dispatch(`navigation:${this.state.value}-mode-off`);
+  };
+
+  render() {
+    const changed = this.state.value !== AppEnv.config.get('core.workspace.mode');
+    return (
+      <SettingsRow
+        label={localized('Reading pane')}
+        description={changed ? localized('Applying it takes you back to your mail.') : undefined}
+      >
+        <SegmentedControl<LayoutMode>
+          label={localized('Reading pane')}
+          value={this.state.value}
+          options={[
+            ['list', localized('Off')],
+            ['split', localized('Right')],
+            ['splitVertical', localized('Below')],
+          ]}
+          onChange={(value) => this.setState({ value })}
+        />
+        {changed && (
+          <button className="btn btn-emphasis" onClick={this._onApply}>
+            {localized('Apply')}
+          </button>
+        )}
+      </SettingsRow>
+    );
+  }
+}
+
+const LABEL_SCHEME_NAMES = () => ({
+  automatic: localized('Automatic'),
+  bright: localized('Bright'),
+  pastel: localized('Pastel'),
+  muted: localized('Muted'),
+  earth: localized('Earth'),
+});
+
+function LabelColorSchemeRows() {
+  const keyPath = 'core.appearance.labelColorScheme';
+  const value = AppEnv.config.get(keyPath) || 'automatic';
+  const names = LABEL_SCHEME_NAMES();
+  const hues = Array.from({ length: 12 }, (_, i) => `hsl(${i * 30}, 62%, 47%)`);
+  return (
+    <div role="radiogroup" aria-label={localized('Label colours')}>
+      {LABEL_COLOR_SCHEME_NAMES.map((name) => (
+        <div
+          key={name}
+          role="radio"
+          tabIndex={0}
+          aria-checked={value === name}
+          className={classnames('settings-row label-scheme-row', { on: value === name })}
+          onClick={() => AppEnv.config.set(keyPath, name)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              AppEnv.config.set(keyPath, name);
+            }
+          }}
+        >
+          <div className="settings-row-label">
+            <span className="label-scheme-check" aria-hidden />
+            <span className="settings-row-title">{names[name]}</span>
+          </div>
+          <div className="label-scheme-swatches" aria-hidden>
+            {(name === 'automatic' ? hues : LABEL_COLOR_SCHEMES[name]).map((color) => (
+              <i key={color} style={{ backgroundColor: LabelColorizer.dotColorFor(color) }} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InterfaceScaleRow() {
+  const keyPath = 'core.workspace.interfaceZoom';
+  const saved = Number(AppEnv.config.get(keyPath)) || 1;
+  // Zooming rescales the slider under the pointer, so applying it mid-drag makes the thumb
+  // jump. Hold the value while dragging and apply it on release.
+  const [dragging, setDragging] = React.useState<number | null>(null);
+  const value = dragging ?? saved;
+  const commit = () => {
+    if (dragging !== null && dragging !== saved) AppEnv.config.set(keyPath, dragging);
+    setDragging(null);
+  };
+  return (
+    <SettingsRow
+      label={localized('Interface size')}
+      description={localized(
+        'Scales text, icons and dividers in Tern. Mail you send keeps its own size. Very small sizes make some controls hard to click.'
+      )}
+      className="interface-scale-row"
+    >
+      <span className="scale-glyph small" aria-hidden>
+        A
+      </span>
+      <input
+        id="interface-zoom-slider"
+        type="range"
+        min={0.8}
+        max={1.4}
+        step={0.05}
+        value={value}
+        aria-label={localized('Interface size')}
+        onChange={(e) => setDragging(Number(e.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+        onBlur={commit}
+      />
+      <span className="scale-glyph large" aria-hidden>
+        A
+      </span>
+      <span className="scale-value">{`${Math.round(value * 100)}%`}</span>
+    </SettingsRow>
+  );
+}
+
+function WindowControlsRows() {
+  if (process.platform !== 'linux') return null;
+  const keyPath = 'core.workspace.menubarStyle';
+  const options: [string, string][] = [
+    ['default', localized('System title bar and menu bar')],
+    ['autohide', localized('System title bar, menu bar hidden until you press Alt')],
+    ['hamburger', localized("Tern's own title bar with a menu button")],
+  ];
+  const value = AppEnv.config.get(keyPath);
+  let description = localized('Relaunch Tern to apply.');
+  if (value === 'default' && isWaylandSession()) {
+    description = localized(
+      'The menu bar may not show on Wayland; Tern adds a menu button instead. Relaunch Tern to apply.'
+    );
+  } else if (value === 'autohide') {
+    description = localized('Needs a window manager that supports it. Relaunch Tern to apply.');
+  }
+  return (
+    <SettingsSection title={localized('Window')}>
+      <ConfigSelectRow
+        keyPath={keyPath}
+        label={localized('Title bar and menus')}
+        description={description}
+        options={options}
+      />
+      <SettingsRow label={localized('Relaunch Tern')}>
+        <button
+          className="btn"
+          onClick={() => {
+            require('@electron/remote').app.relaunch();
+            require('@electron/remote').app.quit();
+          }}
+        >
+          {localized('Relaunch')}
+        </button>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+function TrayIconRows() {
+  const isMac = process.platform === 'darwin';
+  return (
+    <SettingsSection title={isMac ? localized('Menu bar icon') : localized('Tray icon')}>
+      <ConfigSelectRow
+        keyPath="core.workspace.trayIconStyle"
+        label={localized('Unread mail')}
+        description={localized('How the icon shows that you have unread mail.')}
+        options={[
+          ['blue', localized('Blue for new and unread mail')],
+          ['red', localized('Red for new mail, blue for older unread mail')],
+          ['none', localized("Don't show unread mail")],
+        ]}
+      />
+      {process.platform === 'linux' && (
+        <ConfigSelectRow
+          keyPath="core.workspace.traySystemTheme"
+          label={localized('Tray background')}
+          description={localized(
+            'Pick the one that matches your panel so the icon stays visible. Automatic follows the system theme and assumes a dark panel on GNOME and Unity.'
+          )}
+          options={[
+            ['automatic', localized('Automatic')],
+            ['light', localized('Light, use dark icons')],
+            ['dark', localized('Dark, use light icons')],
+          ]}
+        />
+      )}
+    </SettingsSection>
+  );
+}
+
+export default function PreferencesAppearance() {
+  return (
+    <SettingsPage
+      className="preferences-appearance"
+      title={localized('Appearance')}
+      description={localized('Theme, layout and colours.')}
+    >
+      <SettingsSection
+        title={localized('Theme')}
+        note={
+          <>
+            {localized('More themes come from plugins.')}{' '}
+            <a onClick={() => Actions.switchPreferencesTab('Plugins')}>
+              {localized('Browse plugins')}
+            </a>
+          </>
+        }
+      >
+        <ThemeChooser />
+        <ConfigSwitchRow
+          keyPath="core.appearance.useSystemAccent"
+          label={localized('Use the system accent colour')}
+          description={localized('Buttons and highlights follow the colour set in your system.')}
+        />
+        <ConfigSelectRow
+          keyPath="core.appearance.emailRenderMode"
+          label={localized('Message colours')}
+          description={localized('Dark backgrounds can change the colours senders chose.')}
+          options={[
+            ['auto', localized('Dark when the theme is dark')],
+            ['dark', localized('Always dark')],
+            ['original', localized("Sender's colours")],
+          ]}
+        />
+      </SettingsSection>
+
+      <SettingsSection title={localized('Layout')}>
+        <ReadingPaneRow />
+        <InterfaceScaleRow />
+      </SettingsSection>
+
+      <SettingsSection
+        title={localized('Label colours')}
+        note={localized('Right-click a label in the sidebar to give it a colour of its own.')}
+      >
+        <LabelColorSchemeRows />
+      </SettingsSection>
+
+      <WindowControlsRows />
+      <TrayIconRows />
+    </SettingsPage>
+  );
+}
+
+PreferencesAppearance.displayName = 'PreferencesAppearance';

@@ -238,7 +238,7 @@ SOFTWARE.
 ## MailTrackerBlocker
 
 The tracker rules in
-`apps/desktop/features/remove-tracking-pixels/lib/mail-tracker-blocker-rules.ts` are
+`apps/desktop/src/features/remove-tracking-pixels/mail-tracker-blocker-rules.ts` are
 ported from MailTrackerBlocker (https://github.com/apparition47/MailTrackerBlocker,
 `Source/MTBBlockedMessage.m`, commit `7463682a3`). The engine's draft pipeline keeps a copy of
 the vendor rules in `crates/ms-compose/src/desktop_data.json` (`trackerRules`).

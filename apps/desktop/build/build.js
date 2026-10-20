@@ -41,18 +41,18 @@ function macMainEntitlementsPath() {
 }
 
 const sourceGlobs = [
-  '{features,plugins,themes}/**/*.ts',
-  '{features,plugins,themes}/**/*.tsx',
-  '{features,plugins,themes}/**/*.jsx',
+  '{plugins,themes}/**/*.ts',
+  '{plugins,themes}/**/*.tsx',
+  '{plugins,themes}/**/*.jsx',
   'src/**/*.ts',
   'src/**/*.tsx',
   'src/**/*.jsx',
   '!src/**/node_modules/**/*.ts',
   '!src/**/node_modules/**/*.tsx',
   '!src/**/node_modules/**/*.jsx',
-  '!{features,plugins,themes}/**/node_modules/**/*.ts',
-  '!{features,plugins,themes}/**/node_modules/**/*.tsx',
-  '!{features,plugins,themes}/**/node_modules/**/*.jsx',
+  '!{plugins,themes}/**/node_modules/**/*.ts',
+  '!{plugins,themes}/**/node_modules/**/*.tsx',
+  '!{plugins,themes}/**/node_modules/**/*.jsx',
   // Workspace packages from the repo's packages/ dir, linked in as TypeScript source.
   'node_modules/@tern/*/src/**/*.ts',
 ];
@@ -80,7 +80,7 @@ const symlinkedPackages = [];
 
 function resolveRealSymlinkPaths() {
   console.log('---> Resolving symlinks');
-  const dirs = ['features', 'plugins', 'themes', 'src', 'spec', 'node_modules'];
+  const dirs = ['plugins', 'themes', 'src', 'spec', 'node_modules'];
   dirs.forEach((dir) => {
     const absoluteDir = path.join(appDir, dir);
     const entries = fs.readdirSync(absoluteDir).flatMap((name) => {
@@ -189,7 +189,6 @@ const shippedTopLevel = [
   'package.json',
   'tsconfig.json', // compile-cache-ts.js reads its compilerOptions
   'default-profile',
-  'features',
   'keymaps',
   'lang',
   'menus',
@@ -273,7 +272,7 @@ function buildPackagerOptions() {
       // prune only removes devDependencies from node_modules, so ship listed top-level entries only.
       topLevelAllowlist,
       // Package specs only run in dev.
-      /^\/(features|plugins|themes)\/[^/]+\/specs(\/|$)/,
+      /^\/(plugins|themes)\/[^/]+\/specs(\/|$)/,
       // The C++ engine (legacy/mailsync-cpp) is never packaged, even if a local build left one
       // in the desktop dir: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
       // GPL-compatible or have no licence. Only mailsync-rs ships.

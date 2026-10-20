@@ -64,7 +64,7 @@ export const ENGINE_METHOD_APPROVALS_KEY = 'core.plugins.engineMethodApprovals';
 
 export interface CallerPackage {
   name: string;
-  // Shipped with the app (features/, plugins/, themes/), never asked about.
+  // Shipped with the app (src/features/, plugins/, themes/), never asked about.
   bundled: boolean;
   // `tern.engineMethods` from its package.json.
   engineMethods: string[];

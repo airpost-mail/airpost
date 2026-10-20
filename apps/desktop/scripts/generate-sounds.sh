@@ -5,7 +5,7 @@
 set -euo pipefail
 
 desktop="$(cd "$(dirname "$0")/.." && pwd)"
-sounds="$desktop/features/custom-sounds/sounds"
+sounds="$desktop/src/features/custom-sounds/sounds"
 mkdir -p "$sounds"
 
 # A 5 ms linear attack keeps the tone onset from clicking.

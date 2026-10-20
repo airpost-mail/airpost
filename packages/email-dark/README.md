@@ -45,6 +45,6 @@ How it works:
 
 Tests: `npm test` (transpiles with the TypeScript in `apps/desktop/node_modules`, runs
 `node --test`). The DOM pass is covered by the desktop's Electron spec,
-`apps/desktop/features/message-list/specs/email-dark-spec.ts`.
+`apps/desktop/spec/features/message-list/email-dark-spec.ts`.
 
 Licence: GPL-3.0-only.

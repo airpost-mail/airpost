@@ -32,12 +32,12 @@ import { AllowedAttributes, AllowedTags } from '../../src/services/sanitize-tran
 import { quoteTexts } from '../../src/shared/date-format';
 import { wrapPlaintext } from '../../src/components/composer-editor/plaintext';
 import userAgentStylesheet from '../../src/services/chrome-user-agent-stylesheet-string';
-import { applySignature } from '../../features/composer-signature/lib/signature-utils';
+import { applySignature } from '../../src/features/composer-signature/signature-utils';
 import {
   AdditionalRules,
   removeTrackingPixelsFromDraft,
-} from '../../features/remove-tracking-pixels/lib/main';
-import { MailTrackerBlockerRules } from '../../features/remove-tracking-pixels/lib/mail-tracker-blocker-rules';
+} from '../../src/features/remove-tracking-pixels/index';
+import { MailTrackerBlockerRules } from '../../src/features/remove-tracking-pixels/mail-tracker-blocker-rules';
 import TemplatesComposerExtension from '../../plugins/composer-templates/lib/template-composer-extension';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');

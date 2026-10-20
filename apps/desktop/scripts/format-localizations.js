@@ -28,7 +28,6 @@ function writeTerms(terms, destPath) {
 }
 
 collectFiles(__dirname + '/../src');
-collectFiles(__dirname + '/../features');
 collectFiles(__dirname + '/../plugins');
 collectFiles(__dirname + '/../themes');
 collectFiles(__dirname + '/../menus');

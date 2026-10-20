@@ -11,7 +11,7 @@ import {
 } from 'mailspring-exports';
 
 import DraftFactory from '../../src/flux/stores/draft-factory';
-import SignatureComposerExtension from '../../features/composer-signature/lib/signature-composer-extension';
+import SignatureComposerExtension from '../../src/features/composer-signature/signature-composer-extension';
 
 // Answers queries from an in-memory set of models, honouring where, order and limit.
 function runAgainst(models: any[]) {

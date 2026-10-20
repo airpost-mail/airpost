@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import semver from 'semver';
 import { PLUGIN_API_VERSION } from './plugin-api-version';
+import { applyModuleConfig, loadKeymaps, loadMenus, loadStylesheets } from './package-resources';
 
 class NoPackageJSONError extends Error {}
 class InvalidPackageNameError extends Error {}
@@ -30,20 +31,24 @@ export default class Package {
   public windowTypes: { [windowName: string]: boolean };
   private json: any;
 
-  constructor(dir: string) {
+  // `json` stands in for the directory's package.json (built-in features have none).
+  constructor(dir: string, json?: object) {
     this.directory = dir;
 
-    let jsonString = null;
-    try {
-      jsonString = fs.readFileSync(path.join(dir, 'package.json')).toString();
-    } catch (err) {
-      // silently fail, not a file
+    if (json) {
+      this.json = json;
+    } else {
+      let jsonString = null;
+      try {
+        jsonString = fs.readFileSync(path.join(dir, 'package.json')).toString();
+      } catch (err) {
+        // silently fail, not a file
+      }
+      if (!jsonString) {
+        throw new NoPackageJSONError();
+      }
+      this.json = JSON.parse(jsonString);
     }
-    if (!jsonString) {
-      throw new NoPackageJSONError();
-    }
-
-    this.json = JSON.parse(jsonString);
     if (!isValidPackageName(this.json.name)) {
       throw new InvalidPackageNameError(
         `Plugin in ${dir} has an invalid or missing "name" field. Names must match /^[a-zA-Z0-9._-]+$/.`
@@ -67,15 +72,7 @@ export default class Package {
       const module = require(root); // eslint-disable-line
 
       module.activate();
-
-      if (module.config && typeof module.config === 'object') {
-        AppEnv.config.setSchema(this.name, { type: 'object', properties: module.config });
-      } else if (module.configDefaults && typeof module.configDefaults === 'object') {
-        AppEnv.config.setDefaults(this.name, module.configDefaults);
-      }
-      if (module.activateConfig) {
-        module.activateConfig();
-      }
+      applyModuleConfig(this.name, module);
     }
 
     // Uncomment to enable timing inspection
@@ -152,68 +149,14 @@ export default class Package {
   }
 
   loadKeymaps() {
-    let keymapPaths = [];
-    const keymapsRoot = path.join(this.directory, 'keymaps');
-    try {
-      keymapPaths = fs
-        .readdirSync(keymapsRoot)
-        .filter((fn) => fn.endsWith('.json'))
-        .map((fn) => path.join(keymapsRoot, fn));
-    } catch (err) {
-      // no menus
-    }
-
-    for (const keymapPath of keymapPaths) {
-      this.disposables.push(AppEnv.keymaps.loadKeymap(keymapPath));
-    }
+    loadKeymaps(this.directory, this.disposables);
   }
 
   loadStylesheets() {
-    let stylesheets = [];
-    const stylesRoot = this.getStylesheetsPath();
-    try {
-      const filenames = fs.readdirSync(stylesRoot);
-      const index = filenames.find((fn) => fn.startsWith('index.'));
-      if (index) {
-        stylesheets = [path.join(stylesRoot, index)];
-      } else {
-        stylesheets = filenames
-          // ThemeManager loads a theme's tokens itself, ahead of its other stylesheets.
-          .filter((fn) => fn.endsWith('ss') && !(this.isTheme() && fn === 'tokens.css'))
-          .map((fn) => path.join(stylesRoot, fn));
-      }
-    } catch (err) {
-      // styles directory not found
-    }
-    for (const sourcePath of stylesheets) {
-      const content = AppEnv.themes.cssContentsOfStylesheet(sourcePath);
-      this.disposables.push(
-        AppEnv.styles.addStyleSheet(content, {
-          sourcePath,
-          priority: this.isTheme() ? 1 : 0,
-        })
-      );
-    }
+    loadStylesheets(this.getStylesheetsPath(), { isTheme: this.isTheme() }, this.disposables);
   }
 
   loadMenus() {
-    const menusRoot = path.join(this.directory, 'menus');
-    let menuPaths = [];
-
-    try {
-      menuPaths = fs
-        .readdirSync(menusRoot)
-        .filter((fn) => fn.endsWith('.json'))
-        .map((fn) => path.join(menusRoot, fn));
-    } catch (err) {
-      // no menus
-    }
-
-    for (const menuPath of menuPaths) {
-      const content = JSON.parse(fs.readFileSync(menuPath).toString());
-      if (content.menu) {
-        this.disposables.push(AppEnv.menu.add(content.menu));
-      }
-    }
+    loadMenus(this.directory, this.disposables);
   }
 }
