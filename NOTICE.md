@@ -151,7 +151,7 @@ THE SOFTWARE.
 
 ## AngularJS
 
-`encodeHTMLEntities` in `apps/desktop/src/flux/models/utils.ts` is taken from AngularJS's
+`encodeHTMLEntities` in `apps/desktop/src/data/models/utils.ts` is taken from AngularJS's
 `ngSanitize` (https://github.com/angular/angular.js, `src/ngSanitize/sanitize.js`).
 
 ```
@@ -277,7 +277,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Blink default stylesheet
 
-`apps/desktop/src/services/chrome-user-agent-stylesheet-string.ts`, and its copy in
+`apps/desktop/src/mail/body/chrome-user-agent-stylesheet.ts`, and its copy in
 `crates/ms-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
 stylesheet of Chromium's Blink engine (`Source/core/css/html.css`), which comes from KHTML and
 WebKit: Copyright (C) 2000 Lars Knoll, Copyright (C) 2003-2011 Apple Inc. The upstream file is

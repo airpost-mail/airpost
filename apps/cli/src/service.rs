@@ -136,7 +136,7 @@ pub fn platform_key() -> String {
     format!("{os}-{arch}")
 }
 
-/// The desktop's rule for package names (`isValidPackageName` in `src/plugin-host/package.ts`).
+/// The desktop's rule for package names (`isValidPackageName` in `src/packages/package.ts`).
 pub fn valid_package_name(name: &str) -> bool {
     !name.is_empty()
         && name != "."

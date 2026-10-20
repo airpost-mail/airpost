@@ -309,7 +309,7 @@ export interface ContactsSearchResult {
   contacts: ContactJSON[];
 }
 
-/** `query` operators (desktop `src/flux/attributes/matcher.ts`). */
+/** `query` operators (desktop `src/data/attributes/matcher.ts`). */
 export type QueryOp =
   | '='
   | '!='

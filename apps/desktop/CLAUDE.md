@@ -44,11 +44,11 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 ### Key Directories
 
 - **`src/`** - Core application source code, one directory per domain
-  - `main/` - Main process code, grouped into `engine/` (the engine host and supervisor), `windows/`, `frame/` (the message frame scheme), `protocols/` (the `mailspring:` and `tern-file:` schemes), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
-  - `shared/` - Modules both the main process and the windows load (intl, the engine binary and protocol types in `engine/`, IPC channel names, compile cache)
+  - `main/` - Main process code, grouped into `windows/`, `frame/` (the message frame scheme), `protocols/` (the `mailspring:` and `tern-file:` schemes), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
+  - `shared/` - Modules both the main process and the windows load (intl, date formats, the file and URL guards, external fetch, the CSP, the compile caches, the error logger)
   - `config/` - The config store, keys, schema and IPC channels; `migrator.ts` and `persistence-manager.ts` are main-process only
   - `window/` - Window startup and window-level managers (AppEnv, the bootstraps, keymaps, menus, commands, spellchecker, the KeyManager facade), with OS integration in `window/platform/` (native notifications, do-not-disturb, Linux themes, start at login)
-  - `engine/` - The windows' side of the engine: the socket connection, `Engine` (`engine/client/api.ts`), the bridge, engine events, accounts, drafts, PIM, integrations, AI
+  - `engine/` - Everything that talks to the sync engine. The root files load in both processes: the protocol types (`protocol.ts`), the engine binary and error mapping (`process.ts`) and the supervisor's IPC channels (`channels.ts`). `engine/supervisor/` is main-process only: it starts and supervises the engine process (host, supervisor, systemd/launchd unit, settings). `engine/client/` is the windows' side: the socket connection, `Engine` (`engine/client/api.ts`), the bridge, engine events, accounts, drafts, PIM, integrations, AI
   - `data/` - The local data layer: actions, models, attributes, queries (`data/query/`), stores, the database (`data/database/`), drafts (`data/drafts/`), tasks, mailbox perspectives, mail rule templates
   - `mail/` - Message content: body processing (`mail/body/`), the sandboxed message frame (`mail/frame/`), search queries (`mail/search/`), attachment previews (`mail/quick-preview/`), .eml and .mbox
   - `components/` - Reusable React UI components, including the UI kit (`components/kit/`), the sheets, lists, injected components and the higher-order components (`components/decorators/`)
@@ -66,7 +66,7 @@ Plugins and themes import core code as `../../../src/...`. `src/shared/bundled-p
 
 - **`tests/`** - Jasmine tests, `tests/<area>/<subject>.test.ts(x)`. Areas are coarse and don't mirror `src/`: one per `src/` domain (`main/`, `shared/`, `config/`, `window/`, `engine/`, `data/`, `mail/`, `components/`, `packages/`, `utils/`) and, for the built-in features, product areas (`calendar/`, `composer/`, `mailbox/`, `preferences/`, `onboarding/`, `notifications/`). Tests that load code from several places go in `tests/integration/`; a test for one bundled plugin or theme goes in that package's `tests/`. `tests/support/` is never loaded as tests: the runner and loader (`runner/`), `fixtures/`, the jasmine and spec-env globals (`types/`), `test-utils.ts` (the plugin API's `TestUtils`), the kit helpers and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`).
 
-Code outside `src/main/`, `src/shared/` and `src/config/` runs in the windows and must not import `src/main/`, `src/config/migrator.ts` or `src/config/persistence-manager.ts`; `src/main/`, `src/shared/` and `src/config/` must not import window code, except `data/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
+Main-process code is `src/main/`, `src/engine/supervisor/`, `src/config/migrator.ts` and `src/config/persistence-manager.ts`; code outside them runs in the windows and must not import them. The main process loads only those, `src/shared/`, `src/config/` and the `src/engine/` root files, so none of these may import window code (including `src/engine/client/`), except `data/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
 
 ### Dependencies and packaging
 
@@ -242,7 +242,7 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Development Notes
 
-- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code in `src/main` needs a full restart. `Cmd/Ctrl+R` is Reply
+- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code (`src/main`, `src/engine/supervisor`) needs a full restart. `Cmd/Ctrl+R` is Reply
 - Dev tools accessible via Menu > Developer > Toggle Developer Tools
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
 - Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/main/profile/mailspring-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import

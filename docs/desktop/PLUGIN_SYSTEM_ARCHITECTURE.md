@@ -396,7 +396,7 @@ minor version.
 
 ### Engine
 
-`Engine` (in `mailspring-exports`, `src/engine/api.ts`) is the plugin API's way to the sync
+`Engine` (in `mailspring-exports`, `src/engine/client/api.ts`) is the plugin API's way to the sync
 engine. Each window has its own connection to the engine; requests made while it is down reject.
 
 | Member | Does |

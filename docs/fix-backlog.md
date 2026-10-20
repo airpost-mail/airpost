@@ -28,7 +28,7 @@ The user runs Mailspring 1.26.0, which already has the upstream Sent-copy rewrit
      stripped copy, `apps/engine/test/fakeimap/smtp.py:193-196`).
 2. **Quit mid-send leaves the draft row.** `_performRemoteRan` is saved before SMTP; the draft
    row is removed 4–12 s later (`crates/ms-tasks/src/send.rs:173-177`). Quitting kills the engine
-   (`src/flux/engine-bridge.ts:563-567`); on relaunch the task completes early and the draft stays.
+   (`src/engine/client/bridge.ts:563-567`); on relaunch the task completes early and the draft stays.
    - Fix: engine removes the draft row in the early-return branch; client delays quit while a
      SendDraftTask is in flight.
    - Scenario: kill the engine during the Sent poll, restart.
@@ -36,7 +36,7 @@ The user runs Mailspring 1.26.0, which already has the upstream Sent-copy rewrit
    written). Fix: key cleanup on `_asc` presence with a multi-day expiry, small indexed table.
 4. Hypothesis only: providers rewriting Message-ID/Date/recipients. Needs a pair of real copies.
 5. Optional client safety net after the engine fixes: collapse same-`headerMessageId` rows in a
-   thread (`src/flux/stores/message-store.ts:280-312`).
+   thread (`src/data/stores/message.ts:280-312`).
 
 Engine half done 2026-10-15 (items 1-3; plan section 5 and section 6 "Send" record the
 divergences; scenarios `sent-copy-bcc`, `sent-copy-send-interrupted`,
@@ -90,8 +90,8 @@ since 2015 when drafts opened only in popouts (Mailspring #1718, #1396). Proposa
   double-click still pops out, Enter focuses the composer.
 - List mode: single click / Enter pushes a `Draft` sheet with a back button.
 - Changes: `draft-list` (main, new `draft-preview.tsx`, list columns, store re-resolving focus by
-  `headerMessageId`), `src/flux/stores/workspace-store.ts` (`'draft'` focus branch), a key-order
-  fix in `src/components/multiselect-list.tsx`, two opt-out props on the composer
+  `headerMessageId`), `src/data/stores/workspace.ts` (`'draft'` focus branch), a key-order
+  fix in `src/components/multiselect/list.tsx`, two opt-out props on the composer
   (`src/components/decorators/inflates-draft-client-id.tsx`, `composer/lib/composer-view.tsx`: no
   delete-if-empty on unmount, no focus steal), styles and strings. ~450 LOC.
 - Risks: draft id changes when From changes (track by `headerMessageId`); same draft open in

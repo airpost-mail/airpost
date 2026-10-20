@@ -85,13 +85,13 @@ Findings the spec pins down:
 
 ## 3. Layout and imports
 
-- Components: `src/components/ui/<name>.tsx`, one per component, kebab-case (`button.tsx`,
+- Components: `src/components/kit/<name>.tsx`, one per component, kebab-case (`button.tsx`,
   `icon-button.tsx`, `switch.tsx`, `checkbox.tsx`, `radio-group.tsx`, `select.tsx`,
   `segmented-control.tsx`, `text-field.tsx`, `textarea.tsx`, `dialog.tsx`, `popover.tsx`,
   `dropdown-menu.tsx`, `tooltip.tsx`, `tabs.tsx`). Shared pieces: `portal.ts`, `layer.ts` (Escape and
-  layer marking), `provider.tsx` (`UIProvider`), `cn.ts` if `classnames` isn't enough. No barrel
-  file: core code imports the file it needs (`import { Button } from '../components/ui/button'`), so
-  nothing requires all of Radix.
+  layer marking), `provider.tsx` (`UIProvider`), `cn.ts` if `classnames` isn't enough. `index.ts`
+  re-exports them all, but core code imports the file it needs
+  (`import { Button } from '../components/kit/button'`), so nothing requires all of Radix.
 - Specs: `tests/components/kit-<name>.test.tsx`.
 - Styles: `static/styles/kit/<name>.css` (section 5).
 - Every component is a `React.forwardRef` function (React 17 doesn't pass `ref` as a prop), sets
@@ -106,7 +106,7 @@ Findings the spec pins down:
 
 ### 4.1 Portal container
 
-`getPortalContainer(doc = document)` in `src/components/ui/portal.ts` returns one
+`getPortalContainer(doc = document)` in `src/components/kit/portal.ts` returns one
 `<div id="ui-portal-root" data-ui-portal-root>` per window, created on first use as the last
 child of `<body>`. It gets `dir="rtl"` when `isRTL` (`src/shared/intl`). `<html>` already carries
 `dir` in RTL (`src/window/app-env.ts` `initializeReactRoot`), so the container sits inside the
@@ -126,7 +126,7 @@ content; the empty container may stay.
 
 ### 4.2 Providers on every React root
 
-`UIProvider` (`src/components/ui/provider.tsx`) renders
+`UIProvider` (`src/components/kit/provider.tsx`) renders
 `<DirectionProvider dir={isRTL ? 'rtl' : 'ltr'}>`. It wraps the four `ReactDOM.render` roots:
 
 | Root | File |
@@ -385,7 +385,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Markup: unchanged roles and ARIA, plus `data-slot="segmented-control"` on the group and
   `data-slot="segmented-control-item" data-state="on|off"` on each segment.
 - Legacy classes: kept, `settings-segmented` on the group and `on` on the chosen segment.
-- Moves to `src/components/ui/segmented-control.tsx`; `settings.tsx` re-exports it, so the
+- Moves to `src/components/kit/segmented-control.tsx`; `settings.tsx` re-exports it, so the
   `SegmentedControl` export and `ConfigSegmentedRow` are unchanged. Its rules move from
   `static/styles/components/settings.less` to `static/styles/kit/segmented-control.css`.
 - Not changed: arrows don't mirror in RTL today and still won't. Changing that is a behaviour change
@@ -541,7 +541,7 @@ dropped at plugin API 2.0.0, together with the compat LESS path.
 
 ## 9. Stage 2 checklist
 
-- `src/components/ui/*` per section 6, `static/styles/kit/*.css` per section 5, `KIT_STYLESHEETS` in
+- `src/components/kit/*` per section 6, `static/styles/kit/*.css` per section 5, `KIT_STYLESHEETS` in
   ThemeManager, `:where(:not([data-slot]))` guards on the core rules each component would match.
 - `UIProvider` on the four roots; the `ReactDOM.render` allowlist spec.
 - `consumeEscape` and `data-ui-layer` on every focus-taking layer; the `withinUILayer` rule in
