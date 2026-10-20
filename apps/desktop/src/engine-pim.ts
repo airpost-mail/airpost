@@ -31,7 +31,7 @@ import {
   EventsWriteResult,
   EventWriteJSON,
   Method,
-} from './engine-protocol';
+} from './shared/engine-protocol';
 import { localTimeZone } from './engine-drafts';
 import * as Actions from './flux/actions';
 import DatabaseStore from './flux/stores/database-store';

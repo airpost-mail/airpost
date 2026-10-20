@@ -23,7 +23,7 @@ class AutoloadImagesStore extends MailspringStore {
   }
 
   // The regexes only decide whether to show the "images blocked" banner. Blocking itself is
-  // the message document's CSP (src/content-security-policy.ts), and "Show Images" lifts it
+  // the message document's CSP (src/shared/content-security-policy.ts), and "Show Images" lifts it
   // only for http(s) URLs, so that is all these count (cid: and data: images load either
   // way). Matches an http(s) URL right after
   // - src= / background= / srcset= / poster= ... (quoted or not)

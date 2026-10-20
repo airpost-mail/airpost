@@ -79,7 +79,7 @@ These are cheap, independent of the plan's stages, or block something the plan d
 ### TD1. Attachments open with no quarantine or Mark-of-the-Web
 
 Done (roadmap/security, df38be698). `extra.plist` sets `LSFileQuarantineEnabled`. The new
-`src/attachment-safety.ts` tags a file as downloaded, with `/usr/bin/xattr -w com.apple.quarantine
+`src/shared/attachment-safety.ts` tags a file as downloaded, with `/usr/bin/xattr -w com.apple.quarantine
 0081;<hex epoch>;Tern;<uuid>` via `execFile` on macOS (in `files/` an existing attribute is
 kept, so an approved file isn't re-checked; saved copies always get a fresh value, since a file
 overwritten in place keeps the old file's xattrs) and a `Zone.Identifier` stream (`ZoneId=3`) on Windows. It runs
@@ -123,7 +123,7 @@ own.
 ### TD2. Remote-image blocking is a regex; the message iframe has no CSP
 
 Done (roadmap/security, f3bd26b43). The reading pane, clipped-message, show-original and print
-documents start with a CSP meta from `src/content-security-policy.ts` (`img-src`/`font-src` get
+documents start with a CSP meta from `src/shared/content-security-policy.ts` (`img-src`/`font-src` get
 `https: http:` only when allowed; `form-action 'none'`). Inline cid images are served as
 `tern-file:` from `<config>/files` with traversal and symlink escape rejected. MessageBodyProcessor
 returns `remoteImages` from the new `MessageViewExtension.allowsRemoteImages` hook (the autoload
@@ -147,7 +147,7 @@ Verified (regex run in node). "Block remote images" rewrites HTML with the patte
 (`src/services/sanitize-transformer.ts:93`, `:223`) and only strips `@import` (`:250-273`).
 `email-frame.tsx:113-118` `doc.write`s the body into an `about:blank` iframe with no CSP, so it
 inherits the app policy `default-src *; img-src * data: mailspring: file:`
-(`static/index.html:6`, `src/browser/main.js:466-467`). `font-src` falls back to `default-src *`,
+(`static/index.html:6`, `src/main/main.js:466-467`). `font-src` falls back to `default-src *`,
 so remote `@font-face` is a second path. cid images are rewritten to `file://`
 (`message-item-body.tsx:161`). Quick preview of attachments sets `img-src 'self' data: https:
 http:` and never checks the setting (`src/quickpreview/index.ts:25-33`).
@@ -183,7 +183,7 @@ hiding (the message CSP still blocks all of these when images are off), and the 
 editor's user-chosen Gravatar photo. The per-sender allowlist keys on the unauthenticated From
 address; checking Authentication-Results needs headers the desktop doesn't have.
 
-Verified. `core.reading.autoloadImages` defaults to `true` (`src/config-schema.ts:146-150`). The
+Verified. `core.reading.autoloadImages` defaults to `true` (`src/window/config-schema.ts:146-150`). The
 `remove-tracking-pixels` plugin applies its 25-entry, circa-2017 list (Sidekick, RelateIQ, Banana
 Tag, LaunchBit, Mandrill; `features/remove-tracking-pixels/lib/main.ts:9-135`) only when
 `message.isFromMe()` (`:158-169`), and has no 1x1 or hidden-image rule. Spam is the one exception
@@ -261,7 +261,7 @@ with a detail text that names the directory and lists what goes, stops `config.j
 destroys the windows, stops the engine through `EngineSupervisor.shutdown()` (serve's
 `engine.shutdown`, killed after the grace period), clears the default session's storage, then
 deletes everything in the config dir except the running instance's `Singleton*` lock
-(`src/browser/profile-reset.ts`) and writes `skip-mailspring-import` last.
+(`src/main/profile-reset.ts`) and writes `skip-mailspring-import` last.
 `shouldImportMailspringProfile` returns false while that marker exists. The dir is whatever
 `main.js` resolved (`Tern`, `Tern-dev`, `--config-dir-path`, snap); the filesystem root, the home
 folder and `appData` are refused. Entries that can't be deleted are listed and the app relaunches
@@ -269,7 +269,7 @@ anyway. Not done: an "Import from Mailspring again?" choice. The supervisor and 
 named under Size already exist, so nothing waits on stages 6 or 10.
 
 Review fixes (roadmap/security, a5d05e112). Reset only empties a dir carrying `.tern-profile`
-(`src/browser/profile-marker.ts`), which `main.js` writes for the default dir and for a
+(`src/main/profile-marker.ts`), which `main.js` writes for the default dir and for a
 `--config-dir-path` it created or found empty; an existing custom dir from before this can't be
 reset. Paths are compared after `realpath`, case-folded on macOS and Windows, and the dir may not
 equal or contain home or `appData`. Windows' `lockfile` is kept, and Chromium storage that fails to
@@ -280,10 +280,10 @@ the database reset too.
 Verified, except the engine-still-running part, which is inferred from the code path.
 `features/preferences/lib/tabs/preferences-general.tsx:29-49` asks only "Are you sure?",
 then runs `fs.rm(configDir, {recursive})` from the renderer and relaunches. Nothing tells main or
-the engine first; compare `src/browser/application.ts:349`, which at least destroys windows before
+the engine first; compare `src/main/application.ts:349`, which at least destroys windows before
 deleting the database. On relaunch `config.json` is missing, `main.js:56-60` points the importer
 at `~/Library/Application Support/Mailspring`, and `shouldImportMailspringProfile()`
-(`src/browser/mailspring-profile-import.ts:44-46`) returns true with no marker, so the Mailspring
+(`src/main/mailspring-profile-import.ts:44-46`) returns true with no marker, so the Mailspring
 profile, accounts and database are copied in again (`main.js:404`).
 
 - Cost: for anyone who also has Mailspring installed, reset does nothing visible. Deleting while
@@ -366,7 +366,7 @@ Inferred from code; not run. The message iframe allows forms
 allow-same-origin"`), the sanitizer keeps `form`, `button`, `action` and `method`
 (`src/services/sanitize-transformer.ts:3-6` and `AllowedAttributes`), `EventedIFrame` has no
 submit handler, and `will-navigate` guards only the top frame
-(`src/browser/app-window.ts:363-369`).
+(`src/main/app-window.ts:363-369`).
 
 - Cost: a submit button styled as a link loads the attacker's page inside Tern's chrome ("re-enter
   your password to view this message") and receives what the user types. That page also loads
@@ -389,7 +389,7 @@ Save Image fetch hosts from user data, so they go through `ExternalFetch` (main-
 every static page. In a file: window `script-src 'self'` still matches any local file, which the
 `app://` move would fix.
 
-Verified. The header policy (`src/browser/main.js:456-470`) and the meta tag
+Verified. The header policy (`src/main/main.js:456-470`) and the meta tag
 (`static/index.html:6`) are meant to match but the header adds `'unsafe-inline'`, so only the meta
 tag blocks inline handlers. `default-src *` leaves `connect-src` and `frame-src` open. The app
 loads from `file://`, so `script-src 'self'` matches any local file, including attachments under
@@ -424,7 +424,7 @@ defaults (0644 under the usual umask) at predictable names and never removed:
 The engine creates `edgehill.db`, logs and attachments at the default umask
 (`crates/ms-sync/src/mail_processor.rs:712-721`, `crates/ms-core/src/log.rs:146`,
 `crates/ms-store/src/schema.rs:114`); only `run/` is private (`apps/engine/src/platform.rs:153-166`).
-Today the desktop chmods the config dir to 0700 (`src/browser/config-persistence-manager.ts:37-45`),
+Today the desktop chmods the config dir to 0700 (`src/main/config-persistence-manager.ts:37-45`),
 which covers those files, so the engine half matters when the engine creates its own directory
 (stage 11 `--detached`, `--config-dir-path`, hosted).
 
@@ -488,7 +488,7 @@ runs `removeQuotedHTML` (parse plus serialize) on every write, including every t
 ### TD16. Localisation: placeholder off-by-one, drifting keys, no plurals
 
 Verified.
-1. `localizedReactFragment` maps `%1$@` to `subs[1]` (`src/intl.ts:253`) while `localized` maps
+1. `localizedReactFragment` maps `%1$@` to `subs[1]` (`src/shared/intl.ts:253`) while `localized` maps
    it to `subs[0]` (`:219-233`). zh-CN "Sign in with %@ in %@ your browser." uses `%2$@…%1$@`, so
    onboarding renders without the provider name (`onboarding/lib/oauth-signin-page.tsx:206-209`).
 2. The extractor collapses whitespace in keys (`apps/desktop/scripts/format-localizations.js:46`),
@@ -516,7 +516,7 @@ Office 365 and Yahoo IMAP and app passwords (`onboarding/lib/account-providers.t
 `create-page-for-form.tsx:267`, `:270`), search syntax (`thread-search/lib/search-bar-util.ts:19`),
 templates (`composer-templates/lib/preferences-templates.tsx:115`), workspace and default client
 (`preferences/lib/tabs/workspace-section.tsx:63`), activity (`activity/lib/dashboard/root.tsx:597`),
-and Help > Help (`src/browser/application.ts:473`).
+and Help > Help (`src/main/application.ts:473`).
 
 - Cost: users stuck at the commonest failures (app passwords, tenant-disabled O365 IMAP) get
   nothing, and file issues instead.
@@ -527,7 +527,7 @@ and Help > Help (`src/browser/application.ts:473`).
 
 ### TD18. No update check at all
 
-Verified. `UPDATE_FEED_BASE_URL` is `''` (`src/browser/autoupdate-manager.ts:20-23`, `:49-52`), the
+Verified. `UPDATE_FEED_BASE_URL` is `''` (`src/main/autoupdate-manager.ts:20-23`, `:49-52`), the
 manager stays `unsupported`, update menu items are hidden, and `docs/backend-plan.md:49` defers a
 feed.
 
@@ -591,7 +591,7 @@ threads, `LIMIT 1` with no `ORDER BY` picks one and they're never merged. Inheri
 ### TD22. Desktop specs need a release engine build
 
 Inferred; the fix is untested. Spec mode boots the full app, which runs `mailsync.migrate()`
-(`src/browser/application.ts:105-107`) before any spec loads, so `desktop-test.yml:66` builds the
+(`src/main/application.ts:105-107`) before any spec loads, so `desktop-test.yml:66` builds the
 engine in release first. Without an engine the run exits 0 having run nothing, which is why CI
 greps for "N passing". The runner is a 2668-line `@ts-nocheck` fork of Jasmine 1.3
 (`spec/spec-runner/jasmine.js`) with async wrappers (`spec-runner.ts:44`). The root has
@@ -607,7 +607,7 @@ greps for "N passing". The runner is a 2668-line `@ts-nocheck` fork of Jasmine 1
 
 ### TD23. No permission handlers; `--harmony`
 
-Done (roadmap/security, 560387678). `main.js` installs `src/browser/permission-policy.ts` on every
+Done (roadmap/security, 560387678). `main.js` installs `src/main/permission-policy.ts` on every
 session as it is created (`session-created`, plus the default session at `ready`), which covers
 default, `quickpreview`, `in-memory-only` and any plugin partition. Request and check handlers
 allow only `notifications` and `clipboard-sanitized-write` (CopyButton, thread sharing), only to
@@ -620,7 +620,7 @@ Review fix (a5d05e112): the main frame of the bundled pdf.js viewer in quick pre
 
 Verified. No `setPermissionRequestHandler` or `setPermissionCheckHandler` on the default,
 `quickpreview` or `in-memory-only` sessions, so Electron grants media, geolocation, clipboard-read
-and display capture by default. `src/browser/main.js:369-370` passes `--js-flags=--harmony`
+and display capture by default. `src/main/main.js:369-370` passes `--js-flags=--harmony`
 (staged V8 features in Node-enabled renderers) and an autoplay-without-gesture switch.
 
 - Fix: deny-by-default handler on every session, allowing notifications only for
@@ -629,7 +629,7 @@ and display capture by default. `src/browser/main.js:369-370` passes `--js-flags
 
 ### TD24. Abandoned single-use dependencies
 
-Verified. `optimist` 0.4.0 with an argument-swallowing workaround (`src/browser/main.js:120`,
+Verified. `optimist` 0.4.0 with an argument-swallowing workaround (`src/main/main.js:120`,
 `:139-144`). `getmac` shells out at startup in every process for an empty Sentry DSN
 (`src/error-logger-extensions/sentry-error-reporter.js:2`, `:177`). `tld` 0.0.2 ships an old
 public-suffix list, so newer gTLDs probably resolve to null and the reply-to warning never fires
@@ -649,8 +649,8 @@ Root `package.json` carries unused `chalk`, `temp`, `targz`, `license-extractor`
 
 Verified. Two of three first-run slides promise "LinkedIn profiles, Twitter bios" and open/click
 tracking (`features/onboarding/lib/page-tutorial.tsx:5-25`), both inert without a backend.
-General > Notifications shows repeated opens/clicks (`src/config-schema.ts:359-363`). The config
-load-error dialog says "continue using N1" (`src/browser/config-persistence-manager.ts:64`). The
+General > Notifications shows repeated opens/clicks (`src/window/config-schema.ts:359-363`). The config
+load-error dialog says "continue using N1" (`src/main/config-persistence-manager.ts:64`). The
 shortcut presets offer "Inbox by Gmail" (`keymaps/templates/Inbox by Gmail.json`), shut down in
 2019.
 
@@ -665,7 +665,7 @@ Ordered by the stage they belong to.
 
 ### TD26. Engine protocol types hand-copied in desktop and web (before stage 1)
 
-Verified. `src/engine-protocol.ts:4-8` says its types are hand-written from `crates/ms-ipc` and
+Verified. `src/shared/engine-protocol.ts:4-8` says its types are hand-written from `crates/ms-ipc` and
 generation waits until "the surface grows". `apps/web/src/engine/rpc.ts` (279 lines) has its own
 envelope, `PROTOCOL_VERSION` and method map, and `apps/web/src/engine/types.ts` (421 lines) copies
 the model JSON. `docs/engine-protocol-plan.md:175-176` deferred generation to roadmap step 3, which
@@ -697,7 +697,7 @@ uses a flat config.
   `Engine` export) gets 2017-era checking; unawaited promises, the typical bug when calls become
   async RPC, go unflagged even though type info is configured.
 - Fix: `tsconfig.strict.json` with `strict: true` and an explicit include list (`src/engine-*.ts`,
-  `src/browser/engine-supervisor.ts`, the stage 8 transport, the `Engine` export), run as a second
+  `src/main/engine-supervisor.ts`, the stage 8 transport, the `Engine` export), run as a second
   `tsc --noEmit` in CI; each stage adds what it rewrites. ESLint 9 flat config with typescript-eslint
   8; `react-hooks`, `no-floating-promises`, `no-misused-promises`, `react/no-string-refs`,
   `react/no-find-dom-node`, warn on legacy files and error on strict-listed ones; check-only `lint`.
@@ -788,13 +788,13 @@ disabled toolbar button (`thread-sharing/lib/thread-sharing-button.tsx`).
 ### TD31. `webviewTag` on every window for a component nothing renders (stage 2)
 
 Verified. The only `<Webview>` user was the Mailspring ID sign-in (removed in 27f713bf6), but
-`src/browser/app-window.ts:128` still enables the tag in every Node-enabled window, the
+`src/main/app-window.ts:128` still enables the tag in every Node-enabled window, the
 `will-attach-webview` comment (`:163-167`) names an onboarding guest that's gone, and the component
 is exported to plugins (`src/global/mailspring-component-kit.js:70`). `webview.tsx:152-161` opens
 any http(s) URL a guest logs to the console, with no user gesture. Also dead:
 `onboarding/lib/page-top-bar.tsx:12-14`, `chromium-net-errors` (only used by `webview.tsx`), the
-`changePluginStateFromUrl` route with no listener (`src/browser/application.ts:1061-1062`), and the
-protocol handler serving `dev/packages` outside dev mode (`src/browser/mailspring-protocol-handler.ts:20-22`,
+`changePluginStateFromUrl` route with no listener (`src/main/application.ts:1061-1062`), and the
+protocol handler serving `dev/packages` outside dev mode (`src/main/mailspring-protocol-handler.ts:20-22`,
 unlike `package-manager.ts:36-39`).
 
 - Fix: deprecate the `Webview` export through `deprecate()` in stage 2 and remove at 2.0.0. Set
@@ -808,7 +808,7 @@ Verified, except that thread ids change after resync, which is inferred. `reset_
 (`crates/ms-store/src/migrate.rs:101-108`) runs `DELETE FROM ModelPluginMetadata` and
 `DetatchedPluginMetadata` (`crates/ms-store/src/schema.rs:106-107`) and sets the metadata cursor to
 0 "so metadata is fetched again on resync". Under D3 LocalOnly is the default and nothing is
-fetched. The whole-database delete after a database error (`src/browser/application.ts:349-374`)
+fetched. The whole-database delete after a database error (`src/main/application.ts:349-374`)
 and per-account Reset in Preferences (`preferences-account-details.tsx:168` →
 `mailsync-bridge.ts:231` → `--mode reset`) both hit this today. Thread ids are `t:<first message
 inserted>` (`crates/ms-core/src/ids.rs:126-128`), so reattaching by thread id wouldn't work anyway.
@@ -865,7 +865,7 @@ composer for a draft the user never wrote.
 
 Done (roadmap/client-next). The reading pane's message bodies render in the message frame
 (`src/message-frame`): an iframe on `tern-message://frame/message.html`, a standard secure scheme
-the main process serves (`browser/message-frame-protocol-handler.ts`), sandboxed with
+the main process serves (`main/message-frame-protocol-handler.ts`), sandboxed with
 `allow-scripts allow-forms` and no `allow-same-origin`, so it is cross-origin to the app window and
 Chromium runs it in its own sandboxed renderer process without Node (checked from the spec with
 `getAppMetrics`). Its CSP (TD2's message policy plus `script-src` for the frame's one script and
@@ -873,7 +873,7 @@ Chromium runs it in its own sandboxed renderer process without Node (checked fro
 second page URL, and `will-frame-navigate` only lets the app window, never the frame itself, load
 either. The frame script is the app's own DOM code (darkening, colour detection, autolink, image
 sizing, find-in-thread highlighting, form interception) packed by a small CommonJS bundler that
-refuses Node modules (`src/frame-script-bundler.ts`). EmailFrame posts `render` and `search`;
+refuses Node modules (`src/main/frame-script-bundler.ts`). EmailFrame posts `render` and `search`;
 the frame posts its height, links, forms, keys, mouse events, the context-menu target, focus and
 search match boxes, which the app checks before acting on. `SearchableComponentStore` takes remote
 regions (boxes instead of DOM matches). Printing and translation's language detection read the
@@ -889,7 +889,7 @@ print and quick-preview windows and the composer's quoted body still render in N
 documents (with TD2's CSP); keyboard events reach the app as re-dispatched copies, as before.
 
 Verified. Every window is an `AppWindow` with `nodeIntegration: true`,
-`contextIsolation: false`, no sandbox (`src/browser/app-window.ts:124-128`). The message
+`contextIsolation: false`, no sandbox (`src/main/app-window.ts:124-128`). The message
 body is a same-origin `about:blank` iframe in that renderer (`email-frame.tsx:222`). Its sandbox
 has no `allow-scripts`, so scripts in mail don't run, and the app CSP blocks injected script, but
 remote images, fonts and CSS from mail are decoded in that process. `renderedMessageBodyIntoDocument`
@@ -907,11 +907,11 @@ hands extensions the live same-origin document (`email-frame.tsx:155-167`); only
 
 ### TD35. `@electron/remote` is the renderer-to-main channel (stages 3 and 6, then any order)
 
-Verified. `src/browser/main.js:364` initialises remote and `app-window.ts:180-181` enables it
+Verified. `src/main/main.js:364` initialises remote and `app-window.ts:180-181` enables it
 per webContents. 130 references in 62 files (126 lines in 58 `.ts`/`.tsx`; 35 files in
 `features/` and `plugins/`). Ten sites call `getGlobal('application')` for `configPersistenceManager`,
 `windowManager`, `autoUpdateManager`, `applicationMenu`, `openUrl` and `isQuitting`
-(`src/config.ts:17-19`, `src/app-env.ts:898-902`, `src/window-event-handler.ts:311`, `:368`,
+(`src/shared/config.ts:17-19`, `src/app-env.ts:898-902`, `src/window-event-handler.ts:311`, `:368`,
 `src/sheet-toolbar.tsx:182`, `update-notification.tsx:36`, `unsubscribe-service.ts:145`). Every
 `AppEnv.config.set` is a sync remote call (`config.ts:747`), as is the initial read (`:735`). About
 20 renderer-side `showMessageBoxSync` calls go through remote, including `AppEnv.showErrorDialog`
@@ -934,7 +934,7 @@ composer HTML (sanitised by hand because of this, `composer-editor.tsx:287-289`,
   composer and popout windows.
 - Size: M–L, ~60 files, mostly mechanical; Config and `showErrorDialog` are the delicate parts.
 - Progress (stage 3, 2026-10-18): Config's initial read and writes go over `ConfigChannel`
-  (`src/config-channels.ts`, `sendSync`); `.eslintrc` bans `@electron/remote` imports and
+  (`src/shared/config-channels.ts`, `sendSync`); `.eslintrc` bans `@electron/remote` imports and
   requires outside an allowlist of the 56 files that still use it. Dialogs, `openUrl`,
   `isQuitting`, window count, menu and updater remain.
 
@@ -1232,7 +1232,7 @@ hard-coded `h:mm A` in eight places (`calendar-event-popover.tsx:971-976`,
   attribution line (localised template, locale and 24h from settings) and store template and
   locale in the engine settings store, as the plan does for resurfacing texts.
 - Size: ~150 TS plus ~15 call sites.
-- Status (2026-10-18, stage 13, roadmap/client-next): done. `src/date-format.ts` has
+- Status (2026-10-18, stage 13, roadmap/client-next): done. `src/shared/date-format.ts` has
   `formatTime`, `formatShortTime`, `formatDate`, `formatDateTime` and `hourCycle` on
   Intl.DateTimeFormat; the hard-coded `h:mm A`/`h:mma` sites, the `LT` checks and renders
   (time picker, calendar helpers, popover, drag preview, search bar, agenda, day and week
@@ -1369,7 +1369,7 @@ Inferred: nothing is sent today. The DSN is empty
 SHA-256 of the MAC via getmac as `user.id` (`:175-186`), the same scheme as Mailspring's, so
 installs link across apps, plus `extra` sent verbatim (`:201-238`) with home paths, addresses and
 hostnames. The `report-error` IPC accepts arbitrary JSON from renderers
-(`src/browser/application.ts:867-913`). "Contact support" already pre-fills a public GitHub issue
+(`src/main/application.ts:867-913`). "Contact support" already pre-fills a public GitHub issue
 with the account's full `syncError` JSON (`notifications/lib/items/account-error-notif.tsx:36-49`).
 
 - Fix: a random install id stored in config, no getmac (TD24). A scrub pass (emails, home paths,

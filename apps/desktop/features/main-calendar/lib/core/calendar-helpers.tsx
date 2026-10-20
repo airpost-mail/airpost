@@ -1,5 +1,5 @@
 import moment from 'moment';
-import { formatShortTime as shortTime } from '../../../../src/date-format';
+import { formatShortTime as shortTime } from '../../../../src/shared/date-format';
 import {
   Utils,
   Calendar,
@@ -367,7 +367,7 @@ export function newEventOccurrence(id: string, draft: NewEventDraft): EventOccur
   return { ...shared, isAllDay: false, start, end, ...coveredDates(start, end, false) };
 }
 
-/** A time as compact as the clock allows (src/date-format.ts formatShortTime). */
+/** A time as compact as the clock allows (src/shared/date-format.ts formatShortTime). */
 export function formatShortTime(unix: number): string {
   return shortTime(new Date(unix * 1000));
 }

@@ -1,7 +1,7 @@
 /* eslint global-require:0 */
 import _ from 'underscore';
 import ReactTestUtils from 'react-dom/test-utils';
-import Config from '../../src/config';
+import Config from '../../src/shared/config';
 import SpecLoader from './spec-loader';
 import TimeReporter from './time-reporter';
 import * as GuiReporter from './gui-reporter';

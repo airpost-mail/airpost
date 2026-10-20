@@ -1,9 +1,9 @@
 import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';
-import { localized } from './intl';
+import { localized } from './shared/intl';
 import Package, { isValidPackageName } from './package';
-import { bundledPackagePaths, bundledPackageRoots } from './bundled-packages';
+import { bundledPackagePaths, bundledPackageRoots } from './shared/bundled-packages';
 import { PLUGIN_API_VERSION } from './plugin-api-version';
 import { recordPluginInstall } from './plugin-install-record';
 

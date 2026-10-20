@@ -3,7 +3,7 @@ import path from 'path';
 import LessCache from 'less-cache';
 import rtlcss from 'rtlcss';
 
-import { isRTL } from './intl';
+import { isRTL } from './shared/intl';
 
 // {LessCache} wrapper used by {ThemeManager} to read stylesheets.
 export default class LessCompileCache {

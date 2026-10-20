@@ -6,7 +6,7 @@ import {
   lookupFailureIsRetryable,
   mailspringKeychain,
   MigrationError,
-} from '../src/browser/mailspring-keychain-migration';
+} from '../src/main/mailspring-keychain-migration';
 
 // Synthetic secrets only: these specs never reach a real keychain.
 const SECRET = 'c3ludGhldGljLW1haWxzcHJpbmc=';

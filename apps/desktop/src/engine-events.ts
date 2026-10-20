@@ -14,8 +14,13 @@ Events: 'connected' (features) after each hello, 'gone' when the connection drop
 'notification' ({method, params}) for every notification but deltas, mail.new included.
 */
 import { EventEmitter } from 'events';
-import { EngineCapabilities, MailNewParams, Method, ThreadCountsRow } from './engine-protocol';
-import type { EngineStatus } from './supervisor-channels';
+import {
+  EngineCapabilities,
+  MailNewParams,
+  Method,
+  ThreadCountsRow,
+} from './shared/engine-protocol';
+import type { EngineStatus } from './shared/supervisor-channels';
 
 type Requester = (method: string, params: unknown) => Promise<unknown>;
 

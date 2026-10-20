@@ -642,7 +642,7 @@ PIM oracles) pass.
   names, at import if it is synced, otherwise through a `DraftThread` pending row when that
   message is first saved.
 
-### Client engine (`apps/desktop/src/mailsync-process.ts`)
+### Client engine (`apps/desktop/src/shared/mailsync-process.ts`)
 
 - The desktop runs only the Rust engine, `mailsync-rs` in `app.asar.unpacked` (desktop-client
   stage 10 removed `core.sync.engine`, `MAILSYNC_ENGINE` and the C++ paths).
@@ -728,7 +728,7 @@ failed, 42 ignored; fmt and clippy (`-D warnings`) clean.
   them.
 - **Packaging:** macOS signing and notarization of `target/release/mailsync`, and Linux
   packages. The client finds the binary at `<resources>/mailsync` under `app.asar.unpacked`
-  (`apps/desktop/src/mailsync-process.ts:135`). `cargo deny` is clean today; keep the
+  (`apps/desktop/src/shared/mailsync-process.ts:135`). `cargo deny` is clean today; keep the
   reqwest/rustls (ring) stack free of OpenSSL and aws-lc-rs.
 - **Client engine setting:** a setting that picks the C++ or Rust binary. `migrate` already
   moves a C++ `edgehill.db` aside when `_State.engine` is not `rust`. C++ opens a

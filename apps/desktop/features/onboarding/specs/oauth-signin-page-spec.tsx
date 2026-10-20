@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { ipcRenderer, shell } from 'electron';
 import { AccountStore } from 'mailspring-exports';
 import EngineEvents from '../../../src/engine-events';
-import { Feature } from '../../../src/engine-protocol';
+import { Feature } from '../../../src/shared/engine-protocol';
 import AccountProviders from '../lib/account-providers';
 import OAuthSignInPage from '../lib/oauth-signin-page';
 

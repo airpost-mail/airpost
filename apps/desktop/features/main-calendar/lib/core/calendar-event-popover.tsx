@@ -1,5 +1,5 @@
 import moment, { Moment } from 'moment';
-import { formatShortTime, momentZone } from '../../../../src/date-format';
+import { formatShortTime, momentZone } from '../../../../src/shared/date-format';
 import React from 'react';
 import {
   Actions,
@@ -48,7 +48,7 @@ import { TimeZoneSelector } from './timezone-selector';
 import { parseEventIdFromOccurrence } from './calendar-drag-utils';
 import { showRecurringEventDialog } from './recurring-event-dialog';
 import { editEvent } from '../../../../src/engine-pim';
-import type { EventPatch } from '../../../../src/engine-protocol';
+import type { EventPatch } from '../../../../src/shared/engine-protocol';
 
 /**
  * Convert a RepeatOption UI value to an RRULE string (or null for 'none').

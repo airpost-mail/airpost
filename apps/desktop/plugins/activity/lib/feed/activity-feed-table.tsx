@@ -3,7 +3,7 @@ import moment from 'moment';
 import { shell } from 'electron';
 import { localized, DateUtils, Actions, Contact } from 'mailspring-exports';
 import { RetinaImg } from 'mailspring-component-kit';
-import { hourCycle } from '../../../../src/date-format';
+import { hourCycle } from '../../../../src/shared/date-format';
 
 import ActivityEventStore from '../activity-event-store';
 import { ActivityEvent, eventCountLabel } from '../activity-events';

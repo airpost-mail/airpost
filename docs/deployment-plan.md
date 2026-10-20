@@ -73,12 +73,12 @@ Where it fails today:
 |---|---|---|
 | 1 | No DMG, no GitHub release for the desktop; builds go to an S3 bucket by commit (`desktop-build-macos.yml:141-156`) | DMG target; release workflow (section 8.3) |
 | 2 | Signing and notarisation skip without secrets; notarisation uses Apple ID + app password only (`build.js:361-368`) while the engine uses an API key | Add secrets (user); move the desktop to `notarytool` with the API key, like `engine-release.yml` |
-| 3 | `core.sync.engine` defaults to `cpp` (`src/mailsync-process.ts:170`) and the CI builds bundle only `mailsync-rs` | No public release before stage 10 deletes the C++ engine, or flip the default first (question Q1) |
+| 3 | `core.sync.engine` defaults to `cpp` (`src/shared/mailsync-process.ts:170`) and the CI builds bundle only `mailsync-rs` | No public release before stage 10 deletes the C++ engine, or flip the default first (question Q1) |
 | 3 | Windows ships no engine at all (`desktop-build-windows.yml:3-6`); the engine needs a named pipe and a DPAPI store | Out of this plan: engine work. Windows builds stay internal until then |
 | 4 | `tern` is not bundled; `tern-mcp` is bundled by stage 2 (client-s2, unmerged); nothing on PATH on macOS or Windows; the deb/rpm `/usr/bin/ternmail` is the Electron app | Bundle `tern`; install command (2.3); deb/rpm symlinks |
 | 4 | CLI and tern-mcp look for the snap profile under `~/snap/mailspring` (`apps/cli/src/discovery.rs:29`, `apps/mcp/src/config.rs:15`) | One-line fix each, after stage 1 lands in `apps/cli` |
 | 4 | The CLI only works while the desktop runs: `serve` exits 141 when its parent goes (`apps/engine/src/serve.rs:13`) | Stage 11 (`--detached`, engine reuse). Until then `tern` says the desktop isn't running |
-| 5 | Auto-update is off: `UPDATE_FEED_BASE_URL = ''` (`src/browser/autoupdate-manager.ts:20-23`); the URL format left in place is Mailspring's update server protocol | Static feed (2.4) |
+| 5 | Auto-update is off: `UPDATE_FEED_BASE_URL = ''` (`src/main/autoupdate-manager.ts:20-23`); the URL format left in place is Mailspring's update server protocol | Static feed (2.4) |
 
 Also: `win32metadata.CompanyName: 'Foundry 376, LLC'` and the copyright string in
 `build.js` (lines 28, 367) are Mailspring leftovers.

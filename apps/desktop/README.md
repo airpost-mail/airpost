@@ -37,7 +37,7 @@ npm run build        # package for the host platform into dist/
 
 ## Layout
 
-- `src/` holds the core: main process in `browser/`, Flux stores, models and tasks in `flux/`, the plugin API in `global/`.
+- `src/` holds the core: main process in `main/`, code both processes load in `shared/`, Flux stores, models and tasks in `flux/`, the plugin API in `global/`.
 - `features/` (core, always loaded), `plugins/` (bundled, can be turned off) and `themes/` (`ui-*`) hold the built-in packages, loaded as plugins.
 - `vendor/` holds the quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify).
 - `spec/` holds the specs.

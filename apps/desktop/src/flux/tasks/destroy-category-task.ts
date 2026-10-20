@@ -1,7 +1,7 @@
 import { imapUtf7 } from '../../utils/imap-utf7';
 import { Task } from './task';
 import * as Attributes from '../attributes';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 import { AttributeValues } from '../models/model';
 
 export class DestroyCategoryTask extends Task {

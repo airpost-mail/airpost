@@ -3,11 +3,15 @@
 
 /*
 The windows' KeyManager: the same methods as before, answered by the main process's
-KeyManager (browser/key-manager.ts), which owns safeStorage, the keyset in config.json and the
+KeyManager (main/key-manager.ts), which owns safeStorage, the keyset in config.json and the
 Mailspring keychain migration. Exported to plugins as `KeyManager`.
 */
 import { Account } from './flux/models/account';
-import { KEY_MANAGER_CHANNEL, KeyManagerMethod, KeyManagerReply } from './supervisor-channels';
+import {
+  KEY_MANAGER_CHANNEL,
+  KeyManagerMethod,
+  KeyManagerReply,
+} from './shared/supervisor-channels';
 
 interface KeySet {
   [key: string]: string;

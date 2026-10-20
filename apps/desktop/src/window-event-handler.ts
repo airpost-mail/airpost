@@ -1,8 +1,8 @@
 /* eslint global-require: 0 */
 import { shell, ipcRenderer } from 'electron';
 import url from 'url';
-import { localized } from './intl';
-import { developerToolsAvailable } from './developer-tools';
+import { localized } from './shared/intl';
+import { developerToolsAvailable } from './shared/developer-tools';
 
 let ComponentRegistry = null;
 

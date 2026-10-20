@@ -3,7 +3,7 @@
 
 /*
 One window's socket connection to the `serve` engine the main process supervises
-(browser/engine-supervisor.ts). It follows the supervisor's EngineStatus: it connects when the
+(main/engine-supervisor.ts). It follows the supervisor's EngineStatus: it connects when the
 status names a ready engine, says hello, subscribes to the deltas and emits them as 'deltas'
 (delta params as JSON text, the shape MailsyncBridge reads), and connects again to the next
 engine after a respawn.
@@ -42,8 +42,8 @@ import {
   SubscribeParams,
   deltaParamsText,
   requestForCommand,
-} from './engine-protocol';
-import { EngineStatus } from './supervisor-channels';
+} from './shared/engine-protocol';
+import { EngineStatus } from './shared/supervisor-channels';
 
 // Reconnects to the same engine after its socket dropped us back off up to this.
 export const RECONNECT_MAX_DELAY_MS = 10000;

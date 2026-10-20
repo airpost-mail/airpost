@@ -4,13 +4,13 @@ import path from 'path';
 import {
   SKIP_MAILSPRING_IMPORT_MARKER,
   shouldImportMailspringProfile,
-} from '../src/browser/mailspring-profile-import';
+} from '../src/main/mailspring-profile-import';
 import {
   canResetProfileDirectory,
   profileResetDetail,
   resetProfileDirectory,
-} from '../src/browser/profile-reset';
-import { TERN_PROFILE_MARKER, markTernProfile } from '../src/browser/profile-marker';
+} from '../src/main/profile-reset';
+import { TERN_PROFILE_MARKER, markTernProfile } from '../src/main/profile-marker';
 
 function write(file: string, contents = 'x') {
   fs.mkdirSync(path.dirname(file), { recursive: true });

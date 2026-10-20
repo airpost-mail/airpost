@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Message } from 'mailspring-exports';
 import EmailFrame from '../lib/email-frame';
-import { messageFrameContentSecurityPolicy } from '../../../src/content-security-policy';
+import { messageFrameContentSecurityPolicy } from '../../../src/shared/content-security-policy';
 import { messageFrameContent } from '../../../src/message-frame/message-frame-bridge';
-import { messageFrameURL } from '../../../src/message-frame/message-frame-protocol';
+import { messageFrameURL } from '../../../src/shared/message-frame-protocol';
 
 const BODY = '<p>Hello</p><img src="https://tracker.example.com/open.gif">';
 

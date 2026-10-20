@@ -12,7 +12,7 @@ const noSleep = () => Promise.resolve();
 
 function loadModule() {
   execFileSpy = jasmine.createSpy('execFile');
-  const mod = proxyquire('../src/browser/sni-host', {
+  const mod = proxyquire('../src/main/sni-host', {
     child_process: { execFile: execFileSpy, '@noCallThru': false },
   });
   waitForStatusNotifierHost = mod.waitForStatusNotifierHost;

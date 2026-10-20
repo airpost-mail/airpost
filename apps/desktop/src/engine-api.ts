@@ -20,12 +20,12 @@ everyone: a second `subscribe` would replace the app's own subscription.
 */
 import fs from 'fs';
 import path from 'path';
-import { localized } from './intl';
+import { localized } from './shared/intl';
 import EngineEvents, {
   EngineEvents as EngineEventsType,
   EngineNotification,
 } from './engine-events';
-import { EngineCapabilities, ErrorCode, Feature } from './engine-protocol';
+import { EngineCapabilities, ErrorCode, Feature } from './shared/engine-protocol';
 import {
   Integrations,
   IntegrationError,

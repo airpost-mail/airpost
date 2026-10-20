@@ -23,7 +23,7 @@ const SNAP_NAME: &str = "tern";
 pub const ENGINE_FILE: &str = "engine.json";
 
 /// Where the desktop keeps its profile on this OS (`setupConfigDir` in the desktop's
-/// `src/browser/main.js`): Electron's appData plus `Tern`, then on Linux the snap's
+/// `src/main/main.js`): Electron's appData plus `Tern`, then on Linux the snap's
 /// directory.
 pub fn default_config_dirs() -> Vec<PathBuf> {
     let env = |k: &str| {

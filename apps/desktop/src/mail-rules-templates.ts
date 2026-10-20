@@ -1,6 +1,6 @@
 import { Categories } from 'mailspring-observables';
 import { Template } from './components/scenario-editor-models';
-import { localized } from './intl';
+import { localized } from './shared/intl';
 
 export const ConditionTemplates = [
   new Template('from', Template.Type.String, {

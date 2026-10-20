@@ -2,13 +2,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import vm from 'vm';
-import { bundleScript } from '../src/frame-script-bundler';
+import { bundleScript } from '../src/main/frame-script-bundler';
 import {
   messageFramePage,
   messageFrameResponse,
   messageFrameScript,
-} from '../src/browser/message-frame-protocol-handler';
-import { messageFrameContentSecurityPolicy } from '../src/content-security-policy';
+} from '../src/main/message-frame-protocol-handler';
+import { messageFrameContentSecurityPolicy } from '../src/shared/content-security-policy';
 import { startMessageFrame, normalizeHref } from '../src/message-frame/frame-runtime';
 import {
   MessageBody,
@@ -19,8 +19,8 @@ import {
   FrameToAppMessage,
   RenderMessage,
   messageFrameURL,
-} from '../src/message-frame/message-frame-protocol';
-import { shouldBlockFrameNavigation } from '../src/browser/frame-navigation';
+} from '../src/shared/message-frame-protocol';
+import { shouldBlockFrameNavigation } from '../src/main/frame-navigation';
 
 const resourcePath = () => AppEnv.getLoadSettings().resourcePath;
 

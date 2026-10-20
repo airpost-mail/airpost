@@ -6,7 +6,7 @@ import {
   messageContentSecurityPolicy,
   printContentSecurityPolicy,
   quickPreviewContentSecurityPolicy,
-} from '../src/content-security-policy';
+} from '../src/shared/content-security-policy';
 
 const resourcePath = () => AppEnv.getLoadSettings().resourcePath;
 
@@ -67,7 +67,7 @@ describe('Content-Security-Policy', function () {
       }
 
       // main.js sends the constant rather than a copy of it.
-      const main = fs.readFileSync(path.join(resourcePath(), 'src', 'browser', 'main.js'), 'utf8');
+      const main = fs.readFileSync(path.join(resourcePath(), 'src', 'main', 'main.js'), 'utf8');
       expect(main).toContain("'Content-Security-Policy': [AppContentSecurityPolicy]");
       expect(main).not.toContain('default-src');
     });

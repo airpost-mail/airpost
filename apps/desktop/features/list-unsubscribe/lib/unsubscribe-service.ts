@@ -1,11 +1,11 @@
-import { ExternalFetch } from '../../../src/external-fetch';
+import { ExternalFetch } from '../../../src/shared/external-fetch';
 import EngineEvents from '../../../src/engine-events';
 import {
   Feature,
   Method,
   MessagesUnsubscribeParams,
   MessagesUnsubscribeResult,
-} from '../../../src/engine-protocol';
+} from '../../../src/shared/engine-protocol';
 
 const { shell } = require('electron');
 

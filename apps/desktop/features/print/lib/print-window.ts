@@ -4,11 +4,11 @@ import { pathToFileURL } from 'url';
 
 import { localized } from 'mailspring-exports';
 import { escapeHTML } from 'underscore.string';
-import { developerToolsAvailable } from '../../../src/developer-tools';
+import { developerToolsAvailable } from '../../../src/shared/developer-tools';
 import {
   contentSecurityPolicyMetaTag,
   printContentSecurityPolicy,
-} from '../../../src/content-security-policy';
+} from '../../../src/shared/content-security-policy';
 
 const { app, BrowserWindow, dialog } = require('@electron/remote');
 

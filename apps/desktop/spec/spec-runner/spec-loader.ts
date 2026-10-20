@@ -3,7 +3,7 @@
 import _ from 'underscore';
 import fs from 'fs';
 import path from 'path';
-import { bundledPackagePaths } from '../../src/bundled-packages';
+import { bundledPackagePaths } from '../../src/shared/bundled-packages';
 
 class N1SpecLoader {
   jasmineEnv: any;

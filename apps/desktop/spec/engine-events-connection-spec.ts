@@ -8,10 +8,10 @@ import DatabaseStore from '../src/flux/stores/database-store';
 import { ThreadCountsStore } from '../src/flux/stores/thread-counts-store';
 import DefaultEngineEvents, { EngineEvents } from '../src/engine-events';
 import { EngineConnection } from '../src/engine-connection';
-import { Feature } from '../src/engine-protocol';
+import { Feature } from '../src/shared/engine-protocol';
 import { applyDeltas, feedEngineEvents } from '../src/flux/mailsync-bridge';
 import { Notifier } from '../features/unread-notifications/lib/main';
-import { EngineStatus } from '../src/supervisor-channels';
+import { EngineStatus } from '../src/shared/supervisor-channels';
 import { FakeEngine, until } from './fake-serve-engine';
 import { EngineReads } from '../src/flux/stores/engine-reads';
 

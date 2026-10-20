@@ -24,7 +24,7 @@ import {
   DraftSendResult,
   Feature,
   Method,
-} from './engine-protocol';
+} from './shared/engine-protocol';
 import { Message } from './flux/models/message';
 import { Task } from './flux/tasks/task';
 import { SyncbackMetadataTask } from './flux/tasks/syncback-metadata-task';

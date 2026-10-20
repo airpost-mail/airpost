@@ -9,7 +9,7 @@
 // `integration-<provider>-key`), read per request and never logged.
 
 import { EventEmitter } from 'events';
-import { localized } from './intl';
+import { localized } from './shared/intl';
 
 export type IntegrationKind = 'translation' | 'grammar' | 'enrichment';
 export type IntegrationProvider = 'libretranslate' | 'deepl' | 'languagetool' | 'peopledatalabs';

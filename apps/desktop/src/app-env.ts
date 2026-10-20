@@ -5,11 +5,11 @@ import path from 'path';
 import { ipcRenderer } from 'electron';
 import { Emitter } from 'event-kit';
 import { mapSourcePosition } from 'source-map-support';
-import { localized, isRTL, initializeLocalization } from './intl';
+import { localized, isRTL, initializeLocalization } from './shared/intl';
 
 import { APIError } from './flux/errors';
 import WindowEventHandler from './window-event-handler';
-import { isWaylandSession } from './browser/is-wayland';
+import { isWaylandSession } from './shared/is-wayland';
 
 function ensureInteger(f: number, fallback: number) {
   let int = f;
@@ -29,7 +29,7 @@ export default class AppEnvConstructor {
 
   emitter = new Emitter();
   loadTime: number = null;
-  config: import('./config').default;
+  config: import('./shared/config').default;
   keymaps: import('./keymap-manager').default;
   commands: import('./registries/command-registry').default;
   packages: import('./package-manager').default;
@@ -69,7 +69,7 @@ export default class AppEnvConstructor {
     const globalPath = path.join(resourcePath, 'src', 'global');
     require('app-module-path').addPath(globalPath);
 
-    const Config = require('./config').default;
+    const Config = require('./shared/config').default;
     const KeymapManager = require('./keymap-manager').default;
     const CommandRegistry = require('./registries/command-registry').default;
     const PackageManager = require('./package-manager').default;
@@ -152,7 +152,7 @@ export default class AppEnvConstructor {
   // to the window and the Bluebird Promise library, converting things
   // back through the sourcemap as necessary.
   setupErrorLogger() {
-    const ErrorLogger = require('./error-logger');
+    const ErrorLogger = require('./shared/error-logger');
     this.errorLogger = new ErrorLogger({
       inSpecMode: this.inSpecMode(),
       inDevMode: this.inDevMode(),
@@ -765,7 +765,7 @@ export default class AppEnvConstructor {
     }
   }
 
-  // Launches a new window via the browser/WindowLauncher.
+  // Launches a new window via the main/WindowLauncher.
   //
   // If you pass a `windowKey` in the options, and that windowKey already
   // exists, it'll show that window instead of spawing a new one. This is
@@ -773,7 +773,7 @@ export default class AppEnvConstructor {
   // simply display the draft instead of spawning a whole new window for
   // the same draft.
   //
-  // `options` are documented in browser/WindowLauncher
+  // `options` are documented in main/WindowLauncher
   newWindow(options = {}) {
     return ipcRenderer.send('new-window', options);
   }
@@ -850,7 +850,7 @@ export default class AppEnvConstructor {
   loadConfig() {
     this.config.setSchema(null, {
       type: 'object',
-      properties: _.clone(require('./config-schema').default),
+      properties: _.clone(require('./window/config-schema').default),
     });
     this.config.load();
   }
@@ -977,7 +977,7 @@ export default class AppEnvConstructor {
   // work and then call finishUnload. We do not support cancelling quit!
   // https://phab.mailspring.com/D1932#inline-11722
   //
-  // Also see logic in browser/AppWindow::handleEvents where we listen
+  // Also see logic in main/AppWindow::handleEvents where we listen
   // to the browserWindow.on 'close' event to catch "unclosable" windows.
   onBeforeUnload(callback) {
     return this.windowEventHandler.addUnloadCallback(callback);

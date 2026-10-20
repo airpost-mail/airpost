@@ -1,5 +1,5 @@
 import moment, { Moment } from 'moment-timezone';
-import { hourCycle } from './date-format';
+import { hourCycle } from './shared/date-format';
 
 // Init locale for moment
 moment.locale(navigator.language);

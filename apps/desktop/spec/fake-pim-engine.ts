@@ -9,7 +9,7 @@ desktop corpus they replay.
 */
 import EngineEvents from '../src/engine-events';
 import { EngineConnectionError } from '../src/engine-connection';
-import { ErrorCode, Feature } from '../src/engine-protocol';
+import { ErrorCode, Feature } from '../src/shared/engine-protocol';
 
 export interface PimCall {
   method: string;

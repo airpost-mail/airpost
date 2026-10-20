@@ -5,8 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import ConfigPersistenceManager, {
   registerConfigIPC,
-} from '../src/browser/config-persistence-manager';
-import { EngineSupervisor, SupervisorConfig } from '../src/browser/engine-supervisor';
+} from '../src/main/config-persistence-manager';
+import { EngineSupervisor, SupervisorConfig } from '../src/main/engine-supervisor';
 import {
   COPIED_KEY,
   ENGINE_SETTINGS_KEYS,
@@ -14,11 +14,11 @@ import {
   KEPT_KEY,
   STORE_KEY,
   touchesKey,
-} from '../src/browser/engine-settings';
-import { KeyManager } from '../src/browser/key-manager';
-import { ConfigChannel } from '../src/config-channels';
-import { resurfacingBodies } from '../src/resurfacing';
-import { EngineServeProcess } from '../src/mailsync-process';
+} from '../src/main/engine-settings';
+import { KeyManager } from '../src/main/key-manager';
+import { ConfigChannel } from '../src/shared/config-channels';
+import { resurfacingBodies } from '../src/shared/resurfacing';
+import { EngineServeProcess } from '../src/shared/mailsync-process';
 import { FakeEngine, until } from './fake-serve-engine';
 
 // The supervisor reads only `accounts`, the deleted ones and the log level from the main

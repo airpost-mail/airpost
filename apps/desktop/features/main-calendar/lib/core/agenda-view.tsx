@@ -1,6 +1,6 @@
 import React from 'react';
 import moment, { Moment } from 'moment-timezone';
-import { formatTime } from '../../../../src/date-format';
+import { formatTime } from '../../../../src/shared/date-format';
 import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';
 import { localized, Actions, CalendarDateUtils } from 'mailspring-exports';
 import { MailspringCalendarViewProps } from './calendar-view';

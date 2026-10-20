@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { filesSchemeURL, resolveFilesSchemeURL } from '../src/files-scheme';
+import { filesSchemeURL, resolveFilesSchemeURL } from '../src/shared/files-scheme';
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNikAQAACIAHF/uBd8AAAAASUVORK5CYII=',

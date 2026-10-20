@@ -31,7 +31,7 @@ import { ActionBarPlugins } from './action-bar-plugins';
 import { AttachmentsArea } from './attachments-area';
 import { QuotedTextControl } from './quoted-text-control';
 import Fields from './fields';
-import { FilesScheme, resolveFilesSchemeURL } from '../../../src/files-scheme';
+import { FilesScheme, resolveFilesSchemeURL } from '../../../src/shared/files-scheme';
 
 const { hasBlockquote, hasNonTrailingBlockquote, hideQuotedTextByDefault } =
   ComposerSupport.BaseBlockPlugins;
@@ -66,7 +66,7 @@ export function nonNativeFilePathForDrop(dataTransfer: DataTransfer): string | n
     if (uri.indexOf('file://') === 0) {
       return decodeURI(uri.split('file://')[1]);
     }
-    // Inline images in a message are tern-file: URLs (src/files-scheme.ts).
+    // Inline images in a message are tern-file: URLs (src/shared/files-scheme.ts).
     if (uri.startsWith(`${FilesScheme}:`)) {
       const first = uri.split(/\r?\n/)[0].trim();
       return resolveFilesSchemeURL(path.join(AppEnv.getConfigDirPath(), 'files'), first);

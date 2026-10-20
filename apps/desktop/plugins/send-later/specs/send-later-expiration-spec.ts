@@ -3,7 +3,7 @@
 
 import { DraftStore, Message } from 'mailspring-exports';
 import { EngineEvents } from '../../../src/engine-events';
-import { Feature } from '../../../src/engine-protocol';
+import { Feature } from '../../../src/shared/engine-protocol';
 import { handleMetadataExpiration } from '../lib/main';
 import { PLUGIN_ID } from '../lib/send-later-constants';
 

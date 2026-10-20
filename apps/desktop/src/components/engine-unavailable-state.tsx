@@ -8,12 +8,12 @@ lists that keep their last rows. A short wait (a respawn, a reconnect) shows not
 */
 import React, { useEffect, useState } from 'react';
 import { ipcRenderer } from 'electron';
-import { localized } from '../intl';
+import { localized } from '../shared/intl';
 import EngineReads, {
   ENGINE_READS_KEY,
   EngineReads as EngineReadsType,
 } from '../flux/stores/engine-reads';
-import { SupervisorChannel } from '../supervisor-channels';
+import { SupervisorChannel } from '../shared/supervisor-channels';
 import Notification from './notification';
 
 export const SHOW_WAITING_AFTER_MS = 2000;

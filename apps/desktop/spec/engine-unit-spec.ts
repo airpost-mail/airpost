@@ -4,7 +4,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { installedEngineUnit, runEngineUnit, SERVICES_FILE } from '../src/browser/engine-unit';
+import { installedEngineUnit, runEngineUnit, SERVICES_FILE } from '../src/main/engine-unit';
 
 describe('the engine unit', function () {
   let root: string;

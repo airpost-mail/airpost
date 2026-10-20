@@ -4,7 +4,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { EngineServeProcess, ENGINE_SHUTDOWN_GRACE_MS } from '../src/mailsync-process';
+import { EngineServeProcess, ENGINE_SHUTDOWN_GRACE_MS } from '../src/shared/mailsync-process';
 import {
   AccountJSON,
   EngineClient,
@@ -12,8 +12,8 @@ import {
   ENGINE_IN_USE_RETRIES,
   ENGINE_IN_USE_RETRY_MS,
   RESET_STRAGGLER_WAIT_MS,
-} from '../src/engine-client';
-import { EXIT_SOCKET_IN_USE, serveSocketPath } from '../src/engine-protocol';
+} from '../src/main/engine-host';
+import { EXIT_SOCKET_IN_USE, serveSocketPath } from '../src/shared/engine-protocol';
 import { FakeEngine, tick, until } from './fake-serve-engine';
 
 const accountJSON = (id: string): AccountJSON => ({

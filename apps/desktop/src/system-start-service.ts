@@ -1,9 +1,9 @@
 import path from 'path';
 import fs from 'fs';
-import pkg from './utils/package';
-import { getFirstExistingPath, XDG_CONFIG_PATHS, XDG_DATA_PATHS } from './utils/xdg-paths';
+import pkg from './shared/package';
+import { getFirstExistingPath, XDG_CONFIG_PATHS, XDG_DATA_PATHS } from './shared/xdg-paths';
 import * as portal from 'xdg-portal';
-import { localized } from './intl';
+import { localized } from './shared/intl';
 
 class SystemStartServiceBase {
   checkAvailability(): Promise<boolean> {

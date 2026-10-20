@@ -1,6 +1,6 @@
 import React from 'react';
 import classNames from 'classnames';
-import { localized } from '../intl';
+import { localized } from '../shared/intl';
 import Switch from './switch';
 
 /* Public: The building blocks of a Preferences page: a page header, titled sections of

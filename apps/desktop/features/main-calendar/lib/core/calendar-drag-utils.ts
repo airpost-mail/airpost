@@ -1,5 +1,5 @@
 import moment from 'moment';
-import { formatTime } from '../../../../src/date-format';
+import { formatTime } from '../../../../src/shared/date-format';
 import {
   CalendarContainerType,
   DragConfig,

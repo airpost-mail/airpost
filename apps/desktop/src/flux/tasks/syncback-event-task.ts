@@ -2,7 +2,7 @@ import { Task } from './task';
 import * as Attributes from '../attributes';
 import { Event } from '../models/event';
 import { AttributeValues } from '../models/model';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 import { DatabaseChangeRecord, DatabaseStore, ICSParticipantStatus } from 'mailspring-exports';
 import { answerEvent } from '../../engine-pim';
 import { localTimeZone } from '../../engine-drafts';

@@ -9,7 +9,7 @@ import EngineReads, {
   EngineUnavailableError,
   READ_WAIT_MS,
 } from '../../src/flux/stores/engine-reads';
-import { Feature } from '../../src/engine-protocol';
+import { Feature } from '../../src/shared/engine-protocol';
 import { MockEngine, settle } from '../mock-engine';
 
 const thread = (id: string, ts: number, extra = {}) =>

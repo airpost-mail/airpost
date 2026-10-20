@@ -2,7 +2,7 @@ import MailspringStore from 'mailspring-store';
 import * as Actions from '../actions';
 import { Task } from '../tasks/task';
 import TaskQueue from './task-queue';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 import { cancelSend, draftPipelineAvailable, undoSendTarget } from '../../engine-drafts';
 
 // Tasks with `engineWritesUndoData` can only be reversed exactly with data the engine

@@ -10,11 +10,11 @@ import {
   SupervisorConfig,
   SupervisorTarget,
   waitForEarlierEngine,
-} from '../src/browser/engine-supervisor';
-import { KeyManager, secureStorage } from '../src/browser/key-manager';
+} from '../src/main/engine-supervisor';
+import { KeyManager, secureStorage } from '../src/main/key-manager';
 import { EngineConnection } from '../src/engine-connection';
-import { engineBuildId, EngineServeProcess } from '../src/mailsync-process';
-import { EngineStatus, SupervisorChannel } from '../src/supervisor-channels';
+import { engineBuildId, EngineServeProcess } from '../src/shared/mailsync-process';
+import { EngineStatus, SupervisorChannel } from '../src/shared/supervisor-channels';
 import { FakeEngine, tick, until } from './fake-serve-engine';
 
 // config.json as the main process's Config holds it, with onDidChange.

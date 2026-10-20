@@ -5,7 +5,7 @@ import * as Attributes from '../attributes';
 import * as Utils from './utils';
 import RegExpUtils from '../../regexp-utils';
 import { AccountStore } from '../stores/account-store';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 
 export interface ContactInfoVCF {
   vcf: string;

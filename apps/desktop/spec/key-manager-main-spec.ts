@@ -3,9 +3,9 @@ import {
   KeyManager as MainKeyManager,
   registerKeyManagerIPC,
   secureStorage,
-} from '../src/browser/key-manager';
-import { KEY_MANAGER_CHANNEL } from '../src/supervisor-channels';
-import { mailspringKeychain, MigrationError } from '../src/browser/mailspring-keychain-migration';
+} from '../src/main/key-manager';
+import { KEY_MANAGER_CHANNEL } from '../src/shared/supervisor-channels';
+import { mailspringKeychain, MigrationError } from '../src/main/mailspring-keychain-migration';
 
 const CREDENTIALS_KEY = 'credentials';
 const KEY_OWNER_KEY = 'credentialsKeyOwner';

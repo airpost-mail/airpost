@@ -30,5 +30,5 @@ render "$new_mail" 0.7 "$sounds/new-mail.ogg" -c:a libopus -b:a 64k
 render "$hit_send" 0.15 "$sounds/hit-send.ogg" -c:a libopus -b:a 64k
 render "$send" 0.4 "$sounds/send.ogg" -c:a libopus -b:a 64k
 # macOS plays notification sounds itself and only accepts MP3 from the bundle (see
-# src/browser/notification-ipc.ts).
+# src/main/notification-ipc.ts).
 render "$new_mail" 0.7 "$desktop/build/resources/mac/new-mail.mp3" -c:a libmp3lame -b:a 128k

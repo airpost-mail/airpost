@@ -8,7 +8,7 @@ import SoundRegistry from '../src/registries/sound-registry';
 import OnlineStatusStore from '../src/flux/stores/online-status-store';
 import { EngineConnection } from '../src/engine-connection';
 import MailsyncBridge, { applyDeltas } from '../src/flux/mailsync-bridge';
-import { EngineStatus } from '../src/supervisor-channels';
+import { EngineStatus } from '../src/shared/supervisor-channels';
 import { FakeEngine, tick, until } from './fake-serve-engine';
 
 const status = (

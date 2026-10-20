@@ -1,6 +1,6 @@
 import path from 'path';
 import { ipcRenderer } from 'electron';
-import { localized } from '../intl';
+import { localized } from '../shared/intl';
 
 import { Task } from './tasks/task';
 import TaskQueue from './stores/task-queue';
@@ -14,8 +14,13 @@ import DatabaseObjectRegistry from '../registries/database-object-registry';
 import { EngineConnection } from '../engine-connection';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../engine-events';
 import { wireIntegrationsTransport } from '../engine-api';
-import { LogsTailParams, LogsTailResult, Method, THREAD_COUNTS_CLASS } from '../engine-protocol';
-import { AccountEvent, EngineStatus, SupervisorChannel } from '../supervisor-channels';
+import {
+  LogsTailParams,
+  LogsTailResult,
+  Method,
+  THREAD_COUNTS_CLASS,
+} from '../shared/engine-protocol';
+import { AccountEvent, EngineStatus, SupervisorChannel } from '../shared/supervisor-channels';
 import * as Actions from './actions';
 import * as Utils from './models/utils';
 import { Model } from 'mailspring-exports';
@@ -152,7 +157,7 @@ function runTaskHandlers(record: DatabaseChangeRecord<Model>) {
 
 /*
 The windows' side of the sync engine. The main process supervises the `serve` engine
-(browser/engine-supervisor.ts) and every window reads deltas on its own socket connection; the
+(main/engine-supervisor.ts) and every window reads deltas on its own socket connection; the
 main window also sends its accounts' commands on it and applies the supervisor's account events.
 */
 export default class MailsyncBridge {

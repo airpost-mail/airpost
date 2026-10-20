@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Tern contributors
 
 import { _AccountStore } from '../../src/flux/stores/account-store';
-import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../src/engine-client';
+import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../src/shared/config-keys';
 import { EngineEvents } from '../../src/engine-events';
-import { Feature, Method } from '../../src/engine-protocol';
+import { Feature, Method } from '../../src/shared/engine-protocol';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();

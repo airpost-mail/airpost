@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import moment from 'moment-timezone';
-import { formatTime } from '../../../../src/date-format';
+import { formatTime } from '../../../../src/shared/date-format';
 import {
   Rx,
   Event,

@@ -11,7 +11,7 @@ import {
   TaskFactory,
 } from 'mailspring-exports';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../../src/engine-events';
-import { Feature, MailNewParams } from '../../../src/engine-protocol';
+import { Feature, MailNewParams } from '../../../src/shared/engine-protocol';
 
 const WAIT_FOR_CHANGES_DELAY = 400;
 const NEW_MAIL_SOUND_QUIET_PERIOD = 5000;

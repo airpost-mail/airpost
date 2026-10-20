@@ -1,7 +1,7 @@
 import moment from 'moment';
 import { Actions, SyncbackEventTask, TaskQueue } from 'mailspring-exports';
 import { fakePimEngine, refusal } from '../../../spec/fake-pim-engine';
-import { formatShortTime as shortTime } from '../../../src/date-format';
+import { formatShortTime as shortTime } from '../../../src/shared/date-format';
 // Import directly from the source file; the plugin isn't registered in mailspring-exports.
 import {
   inclusiveAllDayEnd,

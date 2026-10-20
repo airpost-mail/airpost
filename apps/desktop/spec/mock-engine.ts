@@ -14,7 +14,7 @@ connects again, which is how the reconnect specs drive the engine.
 */
 import EngineEvents, { EngineEvents as EngineEventsType } from '../src/engine-events';
 import { EngineConnectionError } from '../src/engine-connection';
-import { ErrorCode, Feature, Method, QueryResult } from '../src/engine-protocol';
+import { ErrorCode, Feature, Method, QueryResult } from '../src/shared/engine-protocol';
 import EngineReads from '../src/flux/stores/engine-reads';
 import { Matcher } from '../src/flux/attributes/matcher';
 import { AttributeJoinedData } from '../src/flux/attributes/attribute-joined-data';

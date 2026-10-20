@@ -6,7 +6,7 @@ import MailRulesStore, {
   RULES_KEY,
 } from '../../src/flux/stores/mail-rules-store';
 import EngineEvents from '../../src/engine-events';
-import { ErrorCode, Method } from '../../src/engine-protocol';
+import { ErrorCode, Method } from '../../src/shared/engine-protocol';
 
 const rule = (id: string, attrs: Record<string, any> = {}) => ({
   id,

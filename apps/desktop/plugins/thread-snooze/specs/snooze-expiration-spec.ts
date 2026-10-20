@@ -2,7 +2,7 @@ import { Actions, Folder, Thread, SyncbackMetadataTask } from 'mailspring-export
 import { SnoozeStore } from '../lib/snooze-store';
 import { PLUGIN_ID } from '../lib/snooze-constants';
 import { EngineEvents } from '../../../src/engine-events';
-import { Feature } from '../../../src/engine-protocol';
+import { Feature } from '../../../src/shared/engine-protocol';
 
 function snoozedThread(id: string, expiration: Date) {
   const snoozed = new Folder({ id: `${id}-folder`, accountId: 'a1', role: 'snoozed' });

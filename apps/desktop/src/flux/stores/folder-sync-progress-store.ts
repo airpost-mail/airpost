@@ -3,7 +3,7 @@ import MailspringStore from 'mailspring-store';
 import { AccountStore } from './account-store';
 import CategoryStore from './category-store';
 import { Folder } from '../models/folder';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 
 /**
  * FolderSyncProgressStore keeps track of the sync state per account, and will

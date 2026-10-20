@@ -98,11 +98,14 @@ const lazyLoadAndRegisterTask = (klassName, path) => {
   DatabaseObjectRegistry.register(klassName, () => exports[klassName]);
 };
 
-lazyLoadWithGetter(`localized`, () => require('../intl').localized);
-lazyLoadWithGetter(`localizedReactFragment`, () => require('../intl').localizedReactFragment);
-lazyLoadWithGetter(`getAvailableLanguages`, () => require('../intl').getAvailableLanguages);
-lazyLoadWithGetter(`getCurrentLocale`, () => require('../intl').getCurrentLocale);
-lazyLoadWithGetter(`isRTL`, () => require('../intl').isRTL);
+lazyLoadWithGetter(`localized`, () => require('../shared/intl').localized);
+lazyLoadWithGetter(
+  `localizedReactFragment`,
+  () => require('../shared/intl').localizedReactFragment
+);
+lazyLoadWithGetter(`getAvailableLanguages`, () => require('../shared/intl').getAvailableLanguages);
+lazyLoadWithGetter(`getCurrentLocale`, () => require('../shared/intl').getCurrentLocale);
+lazyLoadWithGetter(`isRTL`, () => require('../shared/intl').isRTL);
 
 // The plugin API version plugins match `engines.mailspring` against
 lazyLoadWithGetter(`apiVersion`, () => require('../plugin-api-version').PLUGIN_API_VERSION);
@@ -111,7 +114,7 @@ lazyLoadWithGetter(`apiVersion`, () => require('../plugin-api-version').PLUGIN_A
 lazyLoad(`Actions`, 'flux/actions');
 
 // Sync engine
-lazyLoad(`MailsyncProcess`, 'mailsync-process');
+lazyLoad(`MailsyncProcess`, 'shared/mailsync-process');
 // The Database
 lazyLoad(`Matcher`, 'flux/attributes/matcher');
 lazyLoadWithGetter(
@@ -291,7 +294,7 @@ deprecate(
       }
     )
 );
-lazyLoad(`FsUtils`, 'fs-utils');
+lazyLoad(`FsUtils`, 'shared/fs-utils');
 lazyLoad(`CanvasUtils`, 'canvas-utils');
 lazyLoad(`DragDropTypes`, 'drag-drop-types');
 lazyLoad(`RegExpUtils`, 'regexp-utils');
@@ -339,7 +342,7 @@ lazyLoadWithGetter(
 lazyLoadWithGetter(`APIError`, () => require('../flux/errors').APIError);
 
 // Process Internals
-lazyLoad(`DefaultClientHelper`, 'default-client-helper');
+lazyLoad(`DefaultClientHelper`, 'shared/default-client-helper');
 lazyLoad(`SystemStartService`, 'system-start-service');
 
 // Testing

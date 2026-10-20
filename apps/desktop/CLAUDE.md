@@ -44,7 +44,8 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 ### Key Directories
 
 - **`src/`** - Core application source code
-  - `browser/` - Main process code (application lifecycle, window management, auto-updates)
+  - `main/` - Main process code (application lifecycle, window management, auto-updates, the engine supervisor)
+  - `shared/` - Modules both the main process and the windows load (config, intl, the engine binary and protocol types, IPC channel names, compile cache)
   - `flux/` - Flux-based state management (actions, stores, models, tasks)
   - `components/` - Reusable React UI components
   - `services/` - Application services (search, sanitization, etc.)
@@ -56,11 +57,13 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 - **`themes/`** - The `ui-*` themes
 - **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/quickpreview/renderer.html`
 
-All three package dirs sit at the same depth, so packages import core code as `../../../src/...`. `src/bundled-packages.ts` lists them for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
+All three package dirs sit at the same depth, so packages import core code as `../../../src/...`. `src/shared/bundled-packages.ts` lists them for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
 
 > **IMPORTANT:** Application source code lives in `src/`, `features/` and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
 - **`spec/`** - Jasmine test specs
+
+Code outside `src/main/` and `src/shared/` runs in the windows and must not import `src/main/`; `src/main/` and `src/shared/` must not import window code, except `flux/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions (warnings for now).
 
 ### Dependencies and packaging
 
@@ -95,7 +98,7 @@ Each package in `features/`, `plugins/` and `themes/` has:
 
 One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too (docs/engine-protocol-plan.md section 4, docs/desktop-client-plan.md):
 
-1. **Main process → engine, stdin** (`browser/engine-supervisor.ts`, `engine-client.ts`, `mailsync-process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
+1. **Main process → engine, stdin** (`main/engine-supervisor.ts`, `main/engine-host.ts`, `shared/mailsync-process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
 2. **Each window ↔ engine, Unix socket** (`engine-connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
 
 ```
@@ -234,11 +237,11 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Development Notes
 
-- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code in `src/browser` needs a full restart. `Cmd/Ctrl+R` is Reply
+- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code in `src/main` needs a full restart. `Cmd/Ctrl+R` is Reply
 - Dev tools accessible via Menu > Developer > Toggle Developer Tools
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
-- Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/browser/mailspring-profile-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import
-- The app name is Tern, so safeStorage's keychain item is `Tern Safe Storage`. Credentials in an imported profile are encrypted under `Mailspring Safe Storage`; `src/browser/mailspring-keychain-migration.ts` (`OLD_APP_NAME`) reads that item, read-only, and `src/browser/key-manager.ts` re-encrypts them under Tern's
+- Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/main/mailspring-profile-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import
+- The app name is Tern, so safeStorage's keychain item is `Tern Safe Storage`. Credentials in an imported profile are encrypted under `Mailspring Safe Storage`; `src/main/mailspring-keychain-migration.ts` (`OLD_APP_NAME`) reads that item, read-only, and `src/main/key-manager.ts` re-encrypts them under Tern's
 - The interface language is set in Preferences > General (`core.intl.language`) and read at launch, so relaunch to apply it. Arabic, Persian, Hebrew and Kurdish run right-to-left: the workspace gets `dir="rtl"` and every stylesheet goes through `rtlcss`
 
 ## Claude Hooks

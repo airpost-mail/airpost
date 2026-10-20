@@ -1,4 +1,4 @@
-// Runs inside the message frame (bundled by browser/message-frame-protocol-handler.ts). It
+// Runs inside the message frame (bundled by main/message-frame-protocol-handler.ts). It
 // has no Node and no access to the app window: it renders what the app posts and posts back
 // sizes, clicks, keys and search results. Messages from the app are trusted; what it sends
 // back is checked by the app as content from the email.
@@ -15,7 +15,7 @@ import {
   ForwardedKeyEvent,
   ForwardedMouseEvent,
   FrameToAppMessage,
-} from './message-frame-protocol';
+} from '../shared/message-frame-protocol';
 
 const KeyAttrs = [
   'key',

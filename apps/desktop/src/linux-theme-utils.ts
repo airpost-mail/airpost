@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { execFileSync, execSync } from 'child_process';
 import ini from 'ini';
-import { ICON_PATHS } from './utils/xdg-paths';
+import { ICON_PATHS } from './shared/xdg-paths';
 
 const Context = {
   ACTIONS: 'actions',

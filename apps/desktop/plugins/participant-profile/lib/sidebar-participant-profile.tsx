@@ -1,7 +1,7 @@
 import React from 'react';
 import { localized, Contact, DOMUtils, RegExpUtils, Thread } from 'mailspring-exports';
 import { RetinaImg, ContactProfilePhoto } from 'mailspring-component-kit';
-import { formatTime } from '../../../src/date-format';
+import { formatTime } from '../../../src/shared/date-format';
 
 import ParticipantProfileDataSource from './participant-profile-data-source';
 

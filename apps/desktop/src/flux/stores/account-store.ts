@@ -12,14 +12,14 @@ import { Thread } from '../models/thread';
 import { Contact } from '../models/contact';
 import * as Utils from '../models/utils';
 import EngineEvents, { EngineNotification } from '../../engine-events';
-import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../engine-client';
+import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../shared/config-keys';
 import {
   AccountChangedParams,
   AccountListResult,
   ErrorCode,
   Feature,
   Method,
-} from '../../engine-protocol';
+} from '../../shared/engine-protocol';
 
 const configAccountsKey = 'accounts';
 const configVersionKey = 'accountsVersion';

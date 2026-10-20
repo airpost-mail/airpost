@@ -31,7 +31,7 @@ curl -s localhost:9333/json | grep -c webSocketDebuggerUrl   # >0 means ready
   hold the SQLite DB open (a later seed script will silently fail to commit). Match them by
   the profile in their `--socket` path, as above, never by the binary path alone.
 - `location.reload()` does nothing in the renderer. Pick up renderer changes with
-  `AppEnv.commands.dispatch('window:reload')`; main-process changes (`src/browser`)
+  `AppEnv.commands.dispatch('window:reload')`; main-process changes (`src/main`)
   need a full relaunch. Edited LESS can be hot-loaded with `AppEnv.themes.reloadCoreStyles()`.
 - For doc-sized captures, shrink the window first:
   `AppEnv.getCurrentWindow().setSize(1280, 800)`.

@@ -4,7 +4,7 @@
 import DatabaseStore from '../../src/flux/stores/database-store';
 import { ThreadCountsStore } from '../../src/flux/stores/thread-counts-store';
 import { EngineEvents } from '../../src/engine-events';
-import { Feature, Method } from '../../src/engine-protocol';
+import { Feature, Method } from '../../src/shared/engine-protocol';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();

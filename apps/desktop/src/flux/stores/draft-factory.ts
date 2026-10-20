@@ -7,7 +7,7 @@ import ContactStore from './contact-store';
 import { MessageStore } from './message-store';
 import FocusedPerspectiveStore from './focused-perspective-store';
 import FocusedContentStore from './focused-content-store';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 import { Contact } from '../models/contact';
 import { Message } from '../models/message';
 import MessageUtils from '../models/message-utils';
@@ -23,7 +23,7 @@ import {
   convertPlaintextToHTML,
 } from '../../components/composer-editor/plaintext';
 import { buildDraft, draftPipelineAvailable } from '../../engine-drafts';
-import { DraftCreateParams } from '../../engine-protocol';
+import { DraftCreateParams } from '../../shared/engine-protocol';
 
 let DraftStore: typeof import('./draft-store').default = null;
 

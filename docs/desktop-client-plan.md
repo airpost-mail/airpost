@@ -26,7 +26,7 @@ Marks: **V** = read or grepped in this tree; **I** = inferred, to check when the
 | T4 | The renderer's read-only SQLite stays as the transport until `query` passes the parity tests (T2), and whenever the engine lacks `query`. A flag switches it per window; the default flips once the search grammar (stage 9) ships; the SQLite path is deleted only after the C++ engine and the per-account and stdio fallbacks are gone (stage 10). |
 | T5 | `query` supports `offset`/`limit` as well as cursors. The desktop list stays offset-based; `threads.list` keeps its keyset cursor for the CLI. |
 | T6 | The Gmail-style search grammar moves to the engine (`ms-store`), and `query`'s search matcher takes the query text, plus the client's time zone and `now` for date terms (`before:`, `after:`). One parser for desktop, CLI, tern-mcp and web. `SearchQueryParser` stays exported for UI use. |
-| T7 | Engine supervision moves from the main window's renderer (`MailsyncBridge`) to the Electron main process (`src/browser/engine-supervisor.ts`). The supervisor is the one owner of `serve`'s stdin (the parent channel): `KeyManager` moves to main with it (safeStorage is a main-process API that the renderer reaches through `@electron/remote` today), it reads the account list from `config.json` in main, takes `ProcessAccountSecretsUpdated` from `serve`'s stdout, and runs stdin-only calls (`account.add`, `account.test`, `credentials.import`) for any window over IPC. Until stage 11 it always spawns its own engine; reusing an engine found at `run/engine.json` waits for `--detached` and engine-owned credentials. Every window opens its own socket connection for reads and deltas; side effects that must run once (Task completion handlers, `OnlineStatusStore`, account state) stay in the main window, and `Actions.queueTask` keeps going through `ActionBridge` to the main window. The IPC rebroadcast of deltas goes. |
+| T7 | Engine supervision moves from the main window's renderer (`MailsyncBridge`) to the Electron main process (`src/main/engine-supervisor.ts`). The supervisor is the one owner of `serve`'s stdin (the parent channel): `KeyManager` moves to main with it (safeStorage is a main-process API that the renderer reaches through `@electron/remote` today), it reads the account list from `config.json` in main, takes `ProcessAccountSecretsUpdated` from `serve`'s stdout, and runs stdin-only calls (`account.add`, `account.test`, `credentials.import`) for any window over IPC. Until stage 11 it always spawns its own engine; reusing an engine found at `run/engine.json` waits for `--detached` and engine-owned credentials. Every window opens its own socket connection for reads and deltas; side effects that must run once (Task completion handlers, `OnlineStatusStore`, account state) stay in the main window, and `Actions.queueTask` keeps going through `ActionBridge` to the main window. The IPC rebroadcast of deltas goes. |
 | T8 | The engine executes due expirations for the built-in plugin ids `send-later`, `thread-snooze` and `send-reminders` (expiration executor), and announces it as `hello.features: ["expiration-executor"]`. Clients that see the feature stop acting on those rows, except send-later rows marked `clientFinalize` (T9), which the desktop's send-later handler still sends. `metadata-expiration` stays for every other plugin id and for the declined rows. |
 | T9 | A scheduled send is rebuilt from the current draft when it comes due, not prebuilt. After-send actions are a fixed vocabulary (`send`, `send-and-archive`). The desktop marks a draft `clientFinalize: true` in its send-later metadata when its action key is outside that vocabulary or a third-party `ComposerExtension` defines `applyTransformsForSending`; the executor leaves those rows to the client, as today. |
 | T10 | The send pipeline moves to the engine as `draft.send` / `draft.cancelSend` (finalisation, undo delay, built-in tracking transforms) and `draft.create` (DraftFactory). Undo becomes a protocol call. `draft.send` with a delay writes the same send-later `{expiration, isUndoSend, actionKey}` metadata the desktop writes today and the executor fires it, so a pending send is persisted, fires at the next start if the engine quit inside the window, and stays visible to tern-mcp's `ensure_not_sending`. Third-party send hooks run in the desktop for sends it starts and pass their output to `draft.send`; they don't run for CLI, MCP or engine-executed sends, and the plugin docs say so. |
@@ -119,8 +119,8 @@ Deduplicated from the five readers. Recommended answer first.
 ## 1. Today (summary of the readers' maps)
 
 - **Supervision.** `MailsyncBridge` in the main window's renderer spawns and supervises
-  `serve` (`src/flux/mailsync-bridge.ts:66-95`, `src/mailsync-process.ts:1011-1240`,
-  `src/engine-client.ts`), so a window reload restarts the engine (V). It builds the
+  `serve` (`src/flux/mailsync-bridge.ts:66-95`, `src/shared/mailsync-process.ts:1011-1240`,
+  `src/main/engine-host.ts`), so a window reload restarts the engine (V). It builds the
   account JSON with secrets in the renderer (`mailsync-bridge.ts:305-317`, from
   `KeyManager._getKeyHash` and `insertAccountSecrets`; `key-manager.ts:18` reaches
   safeStorage through `@electron/remote`) and decides which accounts to add by diffing the
@@ -145,7 +145,7 @@ Deduplicated from the five readers. Recommended answer first.
 - **Writes.** Only through `Actions.queueTask` to `task.queue`; the renderer writes no rows.
   `queueTask`/`queueTasks` are main-window actions (`actions.ts:112,120`), so `ActionBridge`
   forwards a composer's tasks to the main window, where `TaskQueue` and `UndoRedoStore` see
-  them (V). The main process still deletes `edgehill.db*` (`src/browser/application.ts:344-371`)
+  them (V). The main process still deletes `edgehill.db*` (`src/main/application.ts:344-371`)
   and opens it read-write for the C++ switch (`mailsync-process.ts:206-268`) (V).
 - **Logic in the desktop.** Send later (`send-later/lib/main.ts:26-63`), undo send
   (`draft-store.ts:512-646` via send-later metadata), snooze (`snooze-store.ts:72-102`,
@@ -535,7 +535,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
 
 ### 4.1 Reads off SQLite
 
-1. **Engine connection per window** (T7, stage 6). `EngineSupervisor` in `src/browser/`
+1. **Engine connection per window** (T7, stage 6). `EngineSupervisor` in `src/main/`
    takes over `EngineServeProcess` and the respawn half of `EngineClient`, and owns `serve`'s
    stdin:
    - `KeyManager` moves to the main process (it already calls safeStorage through
@@ -1094,7 +1094,7 @@ sample service, quit the desktop, see it act.
   `--detached` (stage 11), not only the executor. Until then a pending undo send or
   scheduled send fires at the next start (T10).
 - **Version skew.** Today the main process runs the one-shot `migrate` at every launch
-  (`src/browser/application.ts:97-101`) while an engine from the previous run may still hold
+  (`src/main/application.ts:97-101`) while an engine from the previous run may still hold
   `edgehill.db` for up to 30 s after its stdin closed; with a detached engine the gap is
   unbounded. Stage 6 waits for a live engine's pid to exit before migrating; stage 11 moves
   `migrate` into `serve` startup and compares `build`/`protocol` before reusing.
@@ -1180,9 +1180,9 @@ are documented, not removed; an entry pointing at a moved tern-mcp isn't repaire
 in the Linux packages; stage 5 decides whether `apiVersion` becomes 1.27.0.
 
 2026-10-16, stage 6 (supervisor and connections), branch `roadmap/client-s6`: delivered.
-`EngineSupervisor` (`src/browser/engine-supervisor.ts`) runs `serve` from main and is the one
+`EngineSupervisor` (`src/main/engine-supervisor.ts`) runs `serve` from main and is the one
 writer to its stdin; accounts come from `config.json`, secrets from `KeyManager`, now a
-main-process class (`src/browser/key-manager.ts`) with a renderer facade over IPC that keeps
+main-process class (`src/main/key-manager.ts`) with a renderer facade over IPC that keeps
 the old API; the Mailspring keychain migration moved with it unchanged.
 `ProcessAccountSecretsUpdated` is stored in main. Each window has its own socket connection
 (`src/engine-connection.ts`); the main window keeps Task handlers, `OnlineStatusStore` and
@@ -1277,7 +1277,7 @@ connections may call both, but without the admin scope `settings.set` takes only
 HTML composing, default signatures), checked by the engine with `relayed_request_allowed`.
 `tern settings get [key…]` and `tern settings set <key> <json|text>`. tern-mcp takes the default
 sending account from `settings.get` when an engine keeps settings (unset there means none), else
-from `config.json`. Desktop: `src/browser/engine-settings.ts` mirrors the six keys the desktop
+from `config.json`. Desktop: `src/main/engine-settings.ts` mirrors the six keys the desktop
 holds today (`core.sending.undoSend`, `core.sending.defaultAccountIdForSend`,
 `core.notifications.unsnoozeToTop`, `core.composing.html`, `signatures`, `defaultSignatures`)
 over the supervisor's connection: `settings.get` first; a store whose `storeId` differs from
@@ -1431,7 +1431,7 @@ expiration/database handlers are off (the reminder focus handler stays);
 `SendActionsStore.needsClientFinalize` marks undo-send and send-later-button rows (an action
 outside `send`/`send-and-archive`, a composer extension with its own `applyTransformsForSending`,
 or the built-in tracking extensions when they would transform the draft); the draft list shows a
-send-later `error`; `SendDraftTask.onError` only logs for silent tasks; `src/resurfacing.ts`
+send-later `error`; `SendDraftTask.onError` only logs for silent tasks; `src/shared/resurfacing.ts`
 builds both bodies (the snooze one's broken markup fixed) for the window and for the settings
 mirror, which writes them in the configured language (`intl.localizerFor`) to an engine with the
 executor after each sync and when `core.intl.language` changes. tern-mcp's `schedule_send` says
@@ -1993,7 +1993,7 @@ at run time, else the same variables at build time, else the current ids as defa
 desktop no longer passes `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET` to the engine. Desktop:
 onboarding, reconnect and remove go through the window's own connection
 (`src/engine-accounts.ts`); the redirect receiver runs in main on 127.0.0.1
-(`src/browser/oauth-receiver.ts`); integration keys go through `secrets.set` (a keyset copy
+(`src/main/oauth-receiver.ts`); integration keys go through `secrets.set` (a keyset copy
 is moved over on the next save and still read for an engine without account setup); the
 supervisor's `testAccount` and the onboarding OAuth code with the client secret are gone. CLI:
 `tern account add` for IMAP (discovery, flags, `--password-stdin` or a no-echo prompt) and for
@@ -2270,7 +2270,7 @@ Open from the review (low):
   `_onSendDraft` still calls `AppEnv.close()` in a composer window. The session is already torn
   down, so the user loses the composer and has to find the draft in Drafts. The JS path keeps the
   composer open on the `ensureCorrectAccount` failure.
-- `apps/desktop/src/browser/engine-settings.ts`: the engine's quote date uses
+- `apps/desktop/src/main/engine-settings.ts`: the engine's quote date uses
   `core.intl.language` as its locale (main process), while the desktop's `formatQuoteDate` and
   `replyAttributionLine` use `navigator.language` (`date-format.ts` `appLocale`), and the app
   never sets Chromium's locale from the language setting. With an en-US system and a German UI,
@@ -2524,7 +2524,7 @@ copy and unit texts before an Install button that passes `--expect-sha256` and
 `--expect-plan`; installed services
 show their copy and hash (and a missing unit or changed copy), with Uninstall. The engine unit
 gets this build's engine and, in unpackaged runs, `<config>/engine-dev.key`. Supervisor
-(`src/browser/engine-unit.ts`): with an engine unit installed (the services.json record and its
+(`src/main/engine-unit.ts`): with an engine unit installed (the services.json record and its
 unit file), a launch that finds the unit's detached engine of another build or protocol (after
 an update the unit's path holds the new build) runs `tern engine restart`, waits up to 30 s for
 the restarted engine in run/engine.json and joins it; one still not joinable is stopped as
@@ -2939,7 +2939,7 @@ Open from the review (low):
   collapsed: the inline composer the user is typing in unmounts and remounts after the body
   read, losing focus and the cursor on every engine respawn. Keep the open draft's body (or its
   expanded state) across a resync.
-- `apps/desktop/src/engine-client.ts`: an engine killed from outside with SIGTERM isn't
+- `apps/desktop/src/main/engine-host.ts`: an engine killed from outside with SIGTERM isn't
   respawned until the next `ensure()`. With reads on the engine the window then shows "Waiting
   for the sync engine" indefinitely, and the state doesn't say that nothing happens without Try
   Again. The kill-the-engine check in the stage text and the trial step below ("re-reads after

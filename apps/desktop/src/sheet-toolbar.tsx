@@ -10,7 +10,7 @@ import { RetinaImg } from './components/retina-img';
 import { RovingTabIndexToolbar } from './components/roving-tab-index-toolbar';
 import * as Utils from './flux/models/utils';
 import { Disposable } from 'rx-core';
-import { isWaylandSession } from './browser/is-wayland';
+import { isWaylandSession } from './shared/is-wayland';
 import { SheetDepthContext } from './sheet-context';
 
 let Category = null;

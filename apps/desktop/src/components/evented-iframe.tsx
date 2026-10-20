@@ -13,9 +13,9 @@ import _ from 'underscore';
 import path from 'path';
 import fs from 'fs';
 import { ipcRenderer } from 'electron';
-import { FilesScheme, resolveFilesSchemeURL } from '../files-scheme';
-import { markFileFromInternet } from '../attachment-safety';
-import { ExternalFetch } from '../external-fetch';
+import { FilesScheme, resolveFilesSchemeURL } from '../shared/files-scheme';
+import { markFileFromInternet } from '../shared/attachment-safety';
+import { ExternalFetch } from '../shared/external-fetch';
 import { FormSubmissionTarget, formSubmissionTarget } from '../message-frame/form-submission';
 
 // The bytes behind an image src in a message, for Save Image.

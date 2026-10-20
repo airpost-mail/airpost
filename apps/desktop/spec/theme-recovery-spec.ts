@@ -2,7 +2,7 @@ import {
   resetThemeForRecovery,
   SAFE_THEME_SETTINGS,
   themeCompileCachePaths,
-} from '../src/browser/theme-recovery';
+} from '../src/main/theme-recovery';
 
 describe('theme recovery', () => {
   it('restores bundled automatic, light, and dark theme selections', () => {

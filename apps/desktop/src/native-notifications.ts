@@ -3,10 +3,10 @@ import { ipcRenderer } from 'electron';
 import { convertToPNG, getIcon, Context } from './linux-theme-utils';
 import { getDoNotDisturb as getLinuxDoNotDisturb } from './dnd-utils-linux';
 import { getDoNotDisturb as getWindowsDoNotDisturb } from './dnd-utils-windows';
-import pkg from './utils/package';
+import pkg from './shared/package';
 import path from 'path';
 import fs from 'fs';
-import { XDG_DATA_PATHS } from './utils/xdg-paths';
+import { XDG_DATA_PATHS } from './shared/xdg-paths';
 
 const platform = process.platform;
 const DEFAULT_ICON = path.resolve(

@@ -3,7 +3,7 @@
 
 import { CapabilityStoreClass } from '../../../src/flux/stores/capability-store';
 import { EngineEvents } from '../../../src/engine-events';
-import { EngineCapabilities } from '../../../src/engine-protocol';
+import { EngineCapabilities } from '../../../src/shared/engine-protocol';
 import { SYNTHETIC_KEY, setUpAi } from './fake-engine';
 
 describe('AI features in the capability store', () => {

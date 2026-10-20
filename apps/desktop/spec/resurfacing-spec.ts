@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 import { Actions, Message, SendDraftTask } from 'mailspring-exports';
-import { localizerFor } from '../src/intl';
-import { resurfacingBodies } from '../src/resurfacing';
+import { localizerFor } from '../src/shared/intl';
+import { resurfacingBodies } from '../src/shared/resurfacing';
 
 describe('the resurfacing messages', function () {
   it('are, untranslated, the engine fallbacks (ms-sync expiration_executor)', function () {

@@ -14,11 +14,11 @@ import {
 } from 'mailspring-exports';
 import { RetinaImg, ButtonDropdown, Menu } from 'mailspring-component-kit';
 import { escapeHTML } from 'underscore.string';
-import { developerToolsAvailable } from '../../../src/developer-tools';
+import { developerToolsAvailable } from '../../../src/shared/developer-tools';
 import {
   contentSecurityPolicyMetaTag,
   messageContentSecurityPolicy,
-} from '../../../src/content-security-policy';
+} from '../../../src/shared/content-security-policy';
 import { OriginalColors, darkeningApplies, themeBackgroundAt } from './email-render-mode';
 
 interface MessageControlsProps {

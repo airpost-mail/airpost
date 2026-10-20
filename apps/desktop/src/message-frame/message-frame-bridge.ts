@@ -3,7 +3,7 @@ import {
   BodyOperation,
   FrameRect,
   FrameToAppMessage,
-} from './message-frame-protocol';
+} from '../shared/message-frame-protocol';
 import type { BodyElementInfo } from './frame-document';
 
 const RequestTimeout = 10000;

@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { EngineEvents } from '../src/engine-events';
 import { EngineConnection } from '../src/engine-connection';
-import { ErrorCode, Feature, Method } from '../src/engine-protocol';
+import { ErrorCode, Feature, Method } from '../src/shared/engine-protocol';
 import {
   CallerPackage,
   ENGINE_METHOD_APPROVALS_KEY,
@@ -18,7 +18,7 @@ import {
 import { Integrations, IntegrationError } from '../src/integrations';
 import { CapabilityStoreClass } from '../src/flux/stores/capability-store';
 import { feedEngineEvents } from '../src/flux/mailsync-bridge';
-import { EngineStatus } from '../src/supervisor-channels';
+import { EngineStatus } from '../src/shared/supervisor-channels';
 import { FakeEngine, until } from './fake-serve-engine';
 
 const capabilities = (translation: object) => ({

@@ -2,10 +2,10 @@ import { ipcRenderer } from 'electron';
 import { Emitter, Disposable } from 'event-kit';
 import path from 'path';
 import fs from 'fs';
-import { localized } from './intl';
+import { localized } from './shared/intl';
 import LessCompileCache from './compile-cache-less';
 import PackageManager from './package-manager';
-import { bundledPackageRoots } from './bundled-packages';
+import { bundledPackageRoots } from './shared/bundled-packages';
 
 const CONFIG_THEME_KEY = 'core.theme';
 const CONFIG_USE_SYSTEM_ACCENT_KEY = 'core.appearance.useSystemAccent';

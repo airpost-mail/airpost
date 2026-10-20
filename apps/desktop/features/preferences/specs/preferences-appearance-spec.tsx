@@ -1,7 +1,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import configSchema from '../../../src/config-schema';
+import configSchema from '../../../src/window/config-schema';
 import PreferencesAppearance from '../lib/tabs/preferences-appearance';
 
 const KEY = 'core.appearance.emailRenderMode';

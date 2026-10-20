@@ -7,9 +7,9 @@ import DraftStore from './draft-store';
 import * as Actions from '../actions';
 import { File } from '../models/file';
 import * as Utils from '../models/utils';
-import { localized } from '../../intl';
-import { filesSchemeURL } from '../../files-scheme';
-import { confirmOpeningFile, markFileFromInternet } from '../../attachment-safety';
+import { localized } from '../../shared/intl';
+import { filesSchemeURL } from '../../shared/files-scheme';
+import { confirmOpeningFile, markFileFromInternet } from '../../shared/attachment-safety';
 import {
   generatePreview,
   canPossiblyPreviewExtension,
@@ -76,7 +76,7 @@ class AttachmentStore extends MailspringStore {
     return filePath;
   }
 
-  // The tern-file: URL message documents use to show the file (src/files-scheme.ts).
+  // The tern-file: URL message documents use to show the file (src/shared/files-scheme.ts).
   fileSchemeURLForFile(file: File) {
     const filePath = this.pathForFile(file);
     return filePath ? filesSchemeURL(this._filesDirectory, filePath) : null;

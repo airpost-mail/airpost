@@ -1,6 +1,6 @@
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
-import { localizedReactFragment } from '../src/intl';
+import { localizedReactFragment } from '../src/shared/intl';
 
 const text = (node: React.ReactNode) => TestRenderer.create(<div>{node}</div>).toJSON() as any;
 

@@ -18,7 +18,7 @@ Emits 'resync' and 'state' (when unavailable() may have changed).
 */
 import { EventEmitter } from 'events';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine-events';
-import { Feature, Method, QueryResult } from '../../engine-protocol';
+import { Feature, Method, QueryResult } from '../../shared/engine-protocol';
 import type { ModelQueryJSON } from '../models/query';
 
 export const ENGINE_READS_KEY = 'core.engine.reads';

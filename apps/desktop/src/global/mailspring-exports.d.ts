@@ -1,12 +1,12 @@
-export type localized = typeof import('../intl').localized;
+export type localized = typeof import('../shared/intl').localized;
 export const localized: localized;
-export type getCurrentLocale = typeof import('../intl').getCurrentLocale;
+export type getCurrentLocale = typeof import('../shared/intl').getCurrentLocale;
 export const getCurrentLocale: getCurrentLocale;
-export type localizedReactFragment = typeof import('../intl').localizedReactFragment;
+export type localizedReactFragment = typeof import('../shared/intl').localizedReactFragment;
 export const localizedReactFragment: localizedReactFragment;
-export type getAvailableLanguages = typeof import('../intl').getAvailableLanguages;
+export type getAvailableLanguages = typeof import('../shared/intl').getAvailableLanguages;
 export const getAvailableLanguages: getAvailableLanguages;
-export type isRTL = typeof import('../intl').isRTL;
+export type isRTL = typeof import('../shared/intl').isRTL;
 export const isRTL: isRTL;
 
 /** The plugin API version, matched as semver against a plugin's `engines.mailspring`. */
@@ -17,7 +17,7 @@ export type Actions = typeof import('../flux/actions');
 export const Actions: Actions;
 
 // Sync engine
-export * from '../mailsync-process';
+export * from '../shared/mailsync-process';
 
 // The Database
 export * from '../flux/attributes/matcher';
@@ -226,9 +226,9 @@ export { CalendarDate } from '../calendar-date';
  * `'events.create'`, `'events.update'` or `'events.rsvp'`.
  */
 export const ICSEventHelpers: { [name: string]: (...args: unknown[]) => never };
-export type { EventConflictJSON as CalendarConflict } from '../engine-protocol';
+export type { EventConflictJSON as CalendarConflict } from '../shared/engine-protocol';
 
-export type FsUtils = typeof import('../fs-utils');
+export type FsUtils = typeof import('../shared/fs-utils');
 export const FsUtils: FsUtils;
 export type CanvasUtils = typeof import('../canvas-utils');
 export const CanvasUtils: CanvasUtils;
@@ -279,7 +279,7 @@ export type {
   AiUsageRow,
   RulesReprocessResult,
   RulesProgressParams,
-} from '../engine-protocol';
+} from '../shared/engine-protocol';
 export type AI = typeof import('../ai').default;
 export const AI: AI;
 export type {
@@ -339,7 +339,7 @@ export type GrammarCheckStoreAPI =
 export * from '../flux/errors';
 
 // Process Internals
-export * from '../default-client-helper';
+export * from '../shared/default-client-helper';
 export type SystemStartService = typeof import('../system-start-service').default;
 export const SystemStartService: SystemStartService;
 

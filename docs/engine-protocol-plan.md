@@ -408,7 +408,7 @@ Delivered:
 - Harness: `MAILSYNC_TRANSPORT=socket` (`test/harness/mailsync.py`). Scenarios pinning a
   `binary:` run it on stdio.
 - Desktop: `sync()` with the Rust engine uses the socket by default
-  (`src/engine-protocol.ts`, `mailsync-process.ts`), at `run/<accountId>.sock`, or
+  (`src/shared/engine-protocol.ts`, `mailsync-process.ts`), at `run/<accountId>.sock`, or
   `$TMPDIR/tern-<uid>/<hash>.sock` when that path is too long. The bridge is unchanged.
 
 Selecting a transport: the engine uses stdio unless given `--socket`. The harness uses stdio
@@ -551,7 +551,7 @@ Delivered:
   `-fatal-error-isolated`, `-remove-add`, `-task-routing`, on all three transports.
   `test_cli.py` runs against socket and serve.
 - Desktop: `EngineServeProcess` (`mailsync-process.ts`) and `EngineClient`
-  (`src/engine-client.ts`, with `CrashTracker` moved there). `ensure()` diffs
+  (`src/main/engine-host.ts`, with `CrashTracker` moved there). `ensure()` diffs
   AccountStore into `account.add` / `account.remove`; commands route by `accountId` and
   are held until the add answers; `account.state` stopped counts as a crash for that
   account and re-adds it (5 in 5 min, then the error state); an engine exit respawns and

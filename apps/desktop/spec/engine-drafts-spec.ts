@@ -16,7 +16,7 @@ import {
   UndoRedoStore,
 } from 'mailspring-exports';
 import EngineEvents from '../src/engine-events';
-import { Feature, Method } from '../src/engine-protocol';
+import { Feature, Method } from '../src/shared/engine-protocol';
 import { isEngineBuilt } from '../src/engine-drafts';
 import DraftFactory from '../src/flux/stores/draft-factory';
 import { sendMessageNow } from '../features/undo-redo/lib/undo-redo-toast';

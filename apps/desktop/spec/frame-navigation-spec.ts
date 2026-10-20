@@ -1,4 +1,4 @@
-import { shouldBlockFrameNavigation } from '../src/browser/frame-navigation';
+import { shouldBlockFrameNavigation } from '../src/main/frame-navigation';
 
 describe('shouldBlockFrameNavigation', function () {
   it('cancels every top-frame navigation', () => {

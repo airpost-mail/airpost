@@ -2,9 +2,9 @@ import { execFile } from 'child_process';
 import path from 'path';
 import { File } from 'mailspring-exports';
 import { ipcRenderer } from 'electron';
-import { developerToolsAvailable } from '../developer-tools';
-import { quickPreviewContentSecurityPolicy } from '../content-security-policy';
-import { isFileURLWithin } from '../file-url-guard';
+import { developerToolsAvailable } from '../shared/developer-tools';
+import { quickPreviewContentSecurityPolicy } from '../shared/content-security-policy';
+import { isFileURLWithin } from '../shared/file-url-guard';
 
 // Generate token via IPC to ensure it's stored in the main process
 async function generatePreviewToken(previewPath: string): Promise<string> {

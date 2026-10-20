@@ -7,11 +7,11 @@ import FormErrorMessage from './form-error-message';
 import AccountProviders from './account-providers';
 import { accountFromSignIn } from './onboarding-helpers';
 import * as EngineAccounts from '../../../src/engine-accounts';
-import { OAuthBeginResult } from '../../../src/engine-protocol';
+import { OAuthBeginResult } from '../../../src/shared/engine-protocol';
 
 // The sign-in runs through the engine (`account.oauth.begin`/`complete`), which keeps the
 // PKCE verifier, the `state` and the client secret; the main process receives the browser's
-// redirect on 127.0.0.1 (src/browser/oauth-receiver.ts).
+// redirect on 127.0.0.1 (src/main/oauth-receiver.ts).
 interface OAuthSignInPageProps {
   provider: 'gmail' | 'office365' | 'outlook';
   // Reconnect: the account the sign-in renews.

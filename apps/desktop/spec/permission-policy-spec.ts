@@ -1,4 +1,4 @@
-import { installPermissionHandlers, permissionAllowed } from '../src/browser/permission-policy';
+import { installPermissionHandlers, permissionAllowed } from '../src/main/permission-policy';
 
 const AppURL = 'file:///Applications/Tern.app/Contents/Resources/app.asar/static/index.html';
 
@@ -118,7 +118,7 @@ describe('installPermissionHandlers', function () {
 });
 
 describe('isPdfViewerURL', function () {
-  const { isPdfViewerURL } = require('../src/browser/quickpreview-ipc');
+  const { isPdfViewerURL } = require('../src/main/quickpreview-ipc');
   const path = require('path');
   const { pathToFileURL } = require('url');
   const viewer = path.join(__dirname, '..', 'vendor', 'pdfjs-4.3.136', 'web', 'viewer.html');

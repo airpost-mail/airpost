@@ -1,14 +1,14 @@
 import MailspringStore from 'mailspring-store';
 import * as Utils from '../models/utils';
 import * as Actions from '../actions';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 import EngineEvents, { EngineNotification } from '../../engine-events';
 import {
   ErrorCode,
   Method,
   RulesProgressParams,
   RulesReprocessResult,
-} from '../../engine-protocol';
+} from '../../shared/engine-protocol';
 
 import { Template } from '../../components/scenario-editor-models';
 import { ConditionMode, ConditionTemplates, ActionTemplates } from '../../mail-rules-templates';
@@ -16,7 +16,7 @@ import { ConditionMode, ConditionTemplates, ActionTemplates } from '../../mail-r
 /*
 The editor of the mail rules (docs/desktop-client-plan.md 4.2, T12). The rules are the
 `mailRules` setting, which the main process mirrors between config.json and the engine
-(src/browser/engine-settings.ts). The engine applies them to arriving mail, disables a rule
+(src/main/engine-settings.ts). The engine applies them to arriving mail, disables a rule
 that fails (writing `disabled` and `disabledReason` into the setting) and runs "Process entire
 inbox" as `rules.reprocess`, reporting `rules.progress` to this window's connection.
 

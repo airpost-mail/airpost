@@ -13,9 +13,9 @@
 
 import { useEffect, useState } from 'react';
 import MailspringStore from 'mailspring-store';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine-events';
-import { CapabilityReason, EngineCapability, Feature } from '../../engine-protocol';
+import { CapabilityReason, EngineCapability, Feature } from '../../shared/engine-protocol';
 import AI, { AiFeature, AiProvider } from '../../ai';
 import {
   Integrations,

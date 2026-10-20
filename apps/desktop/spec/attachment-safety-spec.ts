@@ -2,7 +2,7 @@ import childProcess from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import * as AttachmentSafety from '../src/attachment-safety';
+import * as AttachmentSafety from '../src/shared/attachment-safety';
 import { AttachmentStore, File } from 'mailspring-exports';
 
 const {

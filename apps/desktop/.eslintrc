@@ -137,22 +137,22 @@
         "plugins/composer-templates/lib/template-store.ts",
         "plugins/translation/lib/message-header.tsx",
         "src/app-env.ts",
-        "src/browser/app-window.ts",
-        "src/browser/auxiliary-window-guard.ts",
         "src/components/attachment-items.tsx",
         "src/components/composer-editor/grammar-check-plugins.tsx",
         "src/components/evented-iframe.tsx",
         "src/components/outline-view-item.tsx",
         "src/components/participants-text-field.tsx",
         "src/components/tokenizing-text-field.tsx",
-        "src/default-client-helper.ts",
         "src/flux/mailsync-bridge.ts",
         "src/flux/stores/attachment-store.ts",
         "src/flux/stores/database-store.ts",
         "src/flux/stores/message-store.ts",
-        "src/mailsync-process.ts",
+        "src/main/app-window.ts",
+        "src/main/auxiliary-window-guard.ts",
         "src/package-manager.ts",
         "src/quickpreview/index.ts",
+        "src/shared/default-client-helper.ts",
+        "src/shared/mailsync-process.ts",
         "src/sheet-toolbar.tsx",
         "src/spellchecker.ts",
         "src/system-start-service.ts",
@@ -173,6 +173,53 @@
             "devDependencies": ["**/spec/**", "**/specs/**"],
             "optionalDependencies": true,
             "peerDependencies": false
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/**", "features/**", "plugins/**", "themes/**"],
+      "excludedFiles": ["src/main/**", "**/specs/**"],
+      "rules": {
+        "import/no-restricted-paths": [
+          "warn",
+          {
+            "zones": [
+              {
+                "target": ".",
+                "from": "./src/main",
+                "message": "src/main/ is main-process code; window code reaches it over IPC. Code both processes load goes in src/shared/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/main/**", "src/shared/**"],
+      "rules": {
+        "import/no-restricted-paths": [
+          "warn",
+          {
+            "zones": [
+              {
+                "target": ".",
+                "from": "./src",
+                "except": [
+                  "./main",
+                  "./shared",
+                  "./flux/models/utils.ts",
+                  "./registries/database-object-registry.ts",
+                  "./registries/serializable-registry.ts"
+                ],
+                "message": "The main process loads src/main/ and src/shared/ only (plus flux/models/utils and the two registries it pulls in)."
+              },
+              {
+                "target": ".",
+                "from": ["./features", "./plugins", "./themes"],
+                "message": "The main process doesn't load packages."
+              }
+            ]
           }
         ]
       }

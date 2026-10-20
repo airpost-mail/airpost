@@ -6,7 +6,7 @@ import { ComponentRegistry, FocusedPerspectiveStore, WorkspaceStore } from 'mail
 
 import SheetContainer from '../src/sheet-container';
 import Sheet from '../src/sheet';
-import Config from '../src/config';
+import Config from '../src/shared/config';
 import { MailNavRailItem, SHOW_NAV_RAIL_CONFIG_KEY } from '../src/components/nav-rail';
 
 const fakeSheet = (id: string) =>

@@ -21,7 +21,7 @@ import {
   Utils,
 } from 'mailspring-exports';
 import { EventHeader, renderLocation } from '../lib/event-header';
-import type { EventConflictJSON, EventTimes } from '../../../src/engine-protocol';
+import type { EventConflictJSON, EventTimes } from '../../../src/shared/engine-protocol';
 import { fakePimEngine, refusal } from '../../../spec/fake-pim-engine';
 
 // A LOCATION as Zoom rooms write it: the join URL, then the rooms booked for the meeting.

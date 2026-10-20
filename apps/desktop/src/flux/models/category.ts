@@ -2,7 +2,7 @@
 import { imapUtf7 } from '../../utils/imap-utf7';
 import { Model, AttributeValues } from './model';
 import * as Attributes from '../attributes';
-import { localized } from '../../intl';
+import { localized } from '../../shared/intl';
 
 // We look for a few standard categories and display them in the Mailboxes
 // portion of the left sidebar. Note that these may not all be present on

@@ -5,7 +5,7 @@ import classnames from 'classnames';
 import { ipcRenderer } from 'electron';
 import { SettingsSection, SettingsRow, SettingsCard } from 'mailspring-component-kit';
 import { localized, RegExpUtils, Account, AccountAutoaddress } from 'mailspring-exports';
-import { developerToolsAvailable } from '../../../../src/developer-tools';
+import { developerToolsAvailable } from '../../../../src/shared/developer-tools';
 
 /** One address the account sends from, shown as text until the user edits it. */
 class AliasRow extends Component<
