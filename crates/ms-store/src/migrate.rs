@@ -9,6 +9,9 @@
 //! `edgehill.db`, which the desktop's Import from Mailspring copies to `tern.db`) is moved
 //! aside to `tern.legacy.db` (for `import-legacy`) and a fresh V12 database is created;
 //! mail, contacts and events resync from the server.
+//!
+//! Tern profiles made before the database was called `tern.db` hold it as `edgehill.db`
+//! (and a moved-aside one as `edgehill.legacy.db`); `migrate` renames those first.
 
 use std::fs;
 use std::io::{self, Write};
@@ -22,6 +25,12 @@ use ms_core::{Clock, Error, Result};
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 
 use crate::schema;
+
+/// The names a Tern profile's databases had before `tern.db` and `tern.legacy.db`.
+const OLD_DATABASE_NAMES: [(&str, &str); 2] = [
+    ("edgehill.db", DATABASE_FILE),
+    ("edgehill.legacy.db", LEGACY_DATABASE_FILE),
+];
 
 /// What [`migrate`] did, for tests and the log.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -47,6 +56,7 @@ pub fn migrate(
     out: &mut dyn Write,
 ) -> Result<MigrateOutcome> {
     let mut outcome = MigrateOutcome::default();
+    rename_old_databases(config_dir)?;
     let db_path = config_dir.join(DATABASE_FILE);
 
     if db_path.exists() && !is_rust_database(&db_path) {
@@ -157,6 +167,26 @@ fn move_legacy_database(config_dir: &Path) -> Result<()> {
         let source = with_suffix(&from, suffix);
         if source.exists() {
             fs::rename(&source, with_suffix(&to, suffix))?;
+        }
+    }
+    Ok(())
+}
+
+/// Renames a database under its old name (with its `-wal` and `-shm`) to the current one,
+/// unless a database already has the current name. The main file goes last, so a rename cut
+/// short is finished by the next run.
+fn rename_old_databases(config_dir: &Path) -> Result<()> {
+    for (old, new) in OLD_DATABASE_NAMES {
+        let from = config_dir.join(old);
+        let to = config_dir.join(new);
+        if !from.exists() || to.exists() {
+            continue;
+        }
+        for suffix in ["-wal", "-shm", ""] {
+            let source = with_suffix(&from, suffix);
+            if source.exists() {
+                fs::rename(&source, with_suffix(&to, suffix))?;
+            }
         }
     }
     Ok(())

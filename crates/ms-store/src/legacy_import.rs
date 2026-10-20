@@ -798,8 +798,9 @@ struct LegacyMessage {
     data: Value,
 }
 
-/// A database the C++ engine wrote (`tern.legacy.db`), read-only. `placements` is false before the V10 migration, when a
-/// message's single location was `Message.remoteFolderId` / `remoteUID`.
+/// A database the C++ engine wrote (`tern.legacy.db`), read-only. `placements` is false
+/// before the V10 migration, when a message's single location was `Message.remoteFolderId` /
+/// `remoteUID`.
 struct LegacyDb {
     conn: Connection,
     placements: bool,

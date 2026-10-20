@@ -635,6 +635,7 @@ their gates.
 ## 9. Fresh database and legacy import
 
 - `migrate` mode, run once by the client at startup:
+  - First, a Tern profile from before the rename keeps `edgehill.db` and `edgehill.legacy.db` (with `-wal` and `-shm`); each is renamed to `tern.db` / `tern.legacy.db` when that name is free.
   - If `tern.db` exists and `_State.engine` is not `rust` (a C++ database, which Import from Mailspring copies there from Mailspring's `edgehill.db`), move `tern.db`, `-wal` and `-shm` to `tern.legacy.db*`. Print `Running Migration` so the client shows its progress window.
   - Then create the V12 schema directly (one DDL set, not a V1→V12 replay), set `user_version = 12` and `_State.engine = rust`.
   - Delete `$CONFIG_DIR_PATH/files/` contents only after the new DB is created: bodies and attachments are re-downloaded.

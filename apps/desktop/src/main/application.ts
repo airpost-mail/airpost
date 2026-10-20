@@ -135,6 +135,12 @@ export default class Application extends EventEmitter {
       app.dock?.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'tern-dock.png'));
     }
 
+    // Before the migration below: its progress window (engine/process.ts) can be the only window
+    // when it closes, and Electron quits on window-all-closed when nothing listens.
+    app.on('window-all-closed', () => {
+      if (this.windowManager) this.windowManager.quitWinLinuxIfNoWindows();
+    });
+
     try {
       // A detached engine with the bundled build is joined, and has migrated the database
       // itself; an engine unit of another build is restarted first, any other is asked to stop.
@@ -810,10 +816,6 @@ export default class Application extends EventEmitter {
           app.quit();
         }
       );
-    });
-
-    app.on('window-all-closed', () => {
-      this.windowManager.quitWinLinuxIfNoWindows();
     });
 
     // Called before the app tries to close any windows.

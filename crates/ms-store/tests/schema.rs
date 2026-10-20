@@ -187,3 +187,61 @@ fn legacy_database_is_moved_aside() {
         .unwrap();
     assert_eq!(limit, 64 * 1024 * 1024);
 }
+
+#[test]
+fn a_database_under_the_old_name_is_renamed() {
+    let clock = ManualClock::new(1_700_000_000);
+
+    // A Rust database keeps its rows under the new name.
+    let dir = tempfile::tempdir().unwrap();
+    ms_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    {
+        let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+        conn.execute("REPLACE INTO `_State` (id, value) VALUES ('kept', '1')", [])
+            .unwrap();
+    }
+    std::fs::rename(dir.path().join("tern.db"), dir.path().join("edgehill.db")).unwrap();
+    std::fs::write(dir.path().join("edgehill.legacy.db"), "legacy").unwrap();
+    let mut out = Vec::new();
+    let outcome = ms_store::migrate::migrate(dir.path(), &clock, &mut out).unwrap();
+    assert_eq!(outcome, Default::default());
+    assert!(out.is_empty());
+    assert!(!dir.path().join("edgehill.db").exists());
+    assert!(!dir.path().join("edgehill.legacy.db").exists());
+    assert_eq!(
+        std::fs::read(dir.path().join("tern.legacy.db")).unwrap(),
+        b"legacy"
+    );
+    let conn = Connection::open(dir.path().join("tern.db")).unwrap();
+    let kept: String = conn
+        .query_row("SELECT value FROM `_State` WHERE id = 'kept'", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(kept, "1");
+
+    // A C++ database is renamed, then moved aside as usual.
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let conn = Connection::open(dir.path().join("edgehill.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE `_State` (id VARCHAR(40) PRIMARY KEY, value TEXT); PRAGMA user_version = 12;",
+        )
+        .unwrap();
+    }
+    let outcome = ms_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    assert!(outcome.moved_legacy && outcome.created);
+    assert!(dir.path().join("tern.legacy.db").exists());
+    assert!(!dir.path().join("edgehill.db").exists());
+
+    // An old-named database never replaces a current one.
+    let dir = tempfile::tempdir().unwrap();
+    ms_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    std::fs::write(dir.path().join("edgehill.db"), "old").unwrap();
+    let outcome = ms_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+    assert_eq!(outcome, Default::default());
+    assert_eq!(
+        std::fs::read(dir.path().join("edgehill.db")).unwrap(),
+        b"old"
+    );
+}

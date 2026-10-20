@@ -320,11 +320,7 @@ fn file_hashes(dir: &Path) -> Vec<(String, Vec<u8>)> {
     let mut out: Vec<_> = fs::read_dir(dir)
         .unwrap()
         .map(|e| e.unwrap())
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .starts_with("tern.legacy")
-        })
+        .filter(|e| e.file_name().to_string_lossy().starts_with("tern.legacy"))
         .map(|e| {
             (
                 e.file_name()
