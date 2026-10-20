@@ -445,9 +445,12 @@ interface PluginEngine {
   answer (decision 6).
 - `engineFeatures` gates activation (section 2.2), so a plugin doesn't have to check
   `has()` in `onload` for what it can't run without.
-- `refresh-on-focus` reaches `AppEnv.mailsyncBridge.sendSyncMailNow()`. Whether the engine has a
-  socket method for "sync now" I'd have to check; if it has, that is the v2 path, and if not it is
-  an engine addition, not a desktop one.
+- `refresh-on-focus` reaches `AppEnv.mailsyncBridge.sendSyncMailNow()`. Its v2 path is
+  `this.engine.request('sync.wake', { accountId? })`: the engine already has the method
+  (`method::SYNC_WAKE` in `crates/ms-ipc`, handled in `apps/engine/src/socket.rs`), it wakes one
+  account or, without `accountId`, every running one, and it is an open method, so it needs no
+  `engineMethods` entry or prompt. `sendSyncMailNow()` sends the same request. Nothing has to be
+  added to the engine.
 
 The prompt is a guard against accidents, not a sandbox: a plugin still has Node (TD29).
 
@@ -595,33 +598,41 @@ These double as the "spec that renders it" for each slot that stays.
 8. Bundled plugin migration (section 13).
 9. Deprecation warnings; 2.0.0 later.
 
-## 15. Decisions for the user
+## 15. Decisions
 
-1. **When v1 starts warning.** Recommendation: when the last bundled plugin is on v2 and the
-   starter is out, not in 1.35.0. Warning before there is a migration path only adds noise.
-2. **Version of the kit exports already in main.** Recommendation: fold them into the 1.35.0
-   entry with v2; give them 1.35.0 of their own (and v2 1.36.0) only if a release goes out first.
-3. **Curated or full `tern` module.** Recommendation: curated (section 4), grown on request, with
-   `mailspring-exports` covering the rest until 2.0.0. The alternative, re-exporting all of v1
-   under new names, makes every store and internal a typed promise we keep through 3.0.0.
-4. **How third-party authors get the types**, given the package isn't published to npm.
-   Recommendation: attach `tern-plugin-api-<apiVersion>.tgz` (`npm pack` of `packages/plugin-api`)
-   to each GitHub release; `npm install <url>` works with it and the starter pins one. The
-   alternative is telling authors to copy `index.d.ts`.
+Settled with the user on 2026-10-20.
+
+1. **When v1 starts warning.** When the last bundled plugin is on v2 and the starter is out, not
+   in 1.35.0. Warning before there is a migration path only adds noise.
+2. **Version of the kit exports already in main.** They go into the 1.35.0 entry with v2. They get
+   1.35.0 of their own (and v2 1.36.0) only if a release goes out first.
+3. **Curated or full `tern` module.** Curated (section 4), grown on request, with
+   `mailspring-exports` covering the rest until 2.0.0. Re-exporting all of v1 under new names
+   would make every store and internal a typed promise kept through 3.0.0.
+4. **How third-party authors get the types**, given the package isn't published to npm. Each
+   GitHub release attaches `tern-plugin-api-<apiVersion>.tgz` (`npm pack` of
+   `packages/plugin-api`); `npm install <url>` works with it and the starter pins one.
 5. **Nav rail entries for plugin sheets.** No plugin uses `NavRail:Item` today; activity reaches
-   its sheet from the account sidebar. Recommendation: offer `navRail` on `registerSheet`, off by
-   default, so a plugin with a screen of its own (activity, a todo list) can sit next to Mail and
-   Calendar.
-6. **Re-asking engine-method approvals on update.** Recommendation: ask again only for methods an
-   update adds to `engineMethods`, not on every update or hash change; Preferences > Plugins
-   already shows the install hash.
-7. **Where v2 settings live.** Recommendation: `config.json` under `plugins.<id>` (cross-window
-   sync, reset and import already handle it) rather than an Obsidian-style `data.json` per plugin.
-8. **Slots nobody uses (section 1.6).** Recommendation: no v2 methods for them now; at 2.0.0 they
-   stop being plugin slots and features render their parts directly. The empty ones that look
-   useful (`MessageActionMenuItem`, `MessageFooterStatus`, the calendar banners, search
-   providers) get a v2 method in a later minor when a plugin asks.
-9. **Module name.** Recommendation: `tern` and `tern/ui`, short like `obsidian`. Nothing in the
-   desktop's `node_modules` is called `tern`; the npm package of that name (a JS code-analysis
-   tool) would only matter to a plugin that bundles it, which esbuild's external list would then
-   have to exclude by path.
+   its sheet from the account sidebar. `registerSheet` offers `navRail`, off by default, so a
+   plugin with a screen of its own (activity, a todo list) can sit next to Mail and Calendar.
+6. **Re-asking engine-method approvals on update.** Only methods an update adds to
+   `engineMethods` ask again, not every update or hash change; Preferences > Plugins already
+   shows the install hash.
+7. **Where v2 settings live.** `config.json` under `plugins.<id>` (cross-window sync, reset and
+   import already handle it), not an Obsidian-style `data.json` per plugin.
+8. **Slots nobody uses (section 1.6).** No v2 methods for them now; at 2.0.0 they stop being
+   plugin slots and features render their parts directly. The empty ones that look useful
+   (`MessageActionMenuItem`, `MessageFooterStatus`, the calendar banners, search providers) get a
+   v2 method in a later minor when a plugin asks.
+9. **Module name.** `tern` and `tern/ui`, short like `obsidian`. Nothing in the desktop's
+   `node_modules` is called `tern`; the npm package of that name (a JS code-analysis tool) would
+   only matter to a plugin that bundles it, which esbuild's external list would then have to
+   exclude by path.
+
+### Open question: "sync now" from a plugin
+
+Answered: no engine addition is needed. The socket method `sync.wake` (`accountId?`, none = all
+accounts; `method::SYNC_WAKE` in `crates/ms-ipc/src/lib.rs`, handled in
+`apps/engine/src/socket.rs`, open class in `crates/ms-ipc/src/policy.rs`) triggers a sync now,
+and `sendSyncMailNow()` already uses it. `refresh-on-focus` moves to
+`this.engine.request('sync.wake', {})` (section 6).
