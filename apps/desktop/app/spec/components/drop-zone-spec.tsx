@@ -2,7 +2,7 @@ import React from 'react';
 import { findRenderedDOMComponentWithClass, Simulate } from 'react-dom/test-utils';
 
 import { DropZone } from '../../src/components/drop-zone';
-import MTestUtils from '../mailspring-test-utils';
+import MTestUtils from '../test-utils';
 
 // A drop target only receives a drop event if something calls preventDefault on
 // dragover. The composer wraps a Slate editor, and drags that begin inside Slate

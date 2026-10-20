@@ -1,4 +1,4 @@
-import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/mailspring-calendar';
+import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/calendar-view';
 import { TimedOccurrence } from '../internal_packages/main-calendar/lib/core/calendar-data-source';
 import { DEFAULT_DRAG_CONFIG } from '../internal_packages/main-calendar/lib/core/calendar-drag-types';
 import * as CalendarDateUtils from '../src/calendar-date';

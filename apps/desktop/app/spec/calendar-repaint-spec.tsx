@@ -4,7 +4,7 @@ import ReactTestUtils from 'react-dom/test-utils';
 import moment from 'moment';
 import Rx from 'rx-lite';
 import { Calendar } from '../src/flux/models/calendar';
-import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/mailspring-calendar';
+import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/calendar-view';
 import { WeekView } from '../internal_packages/main-calendar/lib/core/week-view';
 import { DayView } from '../internal_packages/main-calendar/lib/core/day-view';
 import { WeekViewEventColumn } from '../internal_packages/main-calendar/lib/core/week-view-event-column';

@@ -2,7 +2,7 @@ import React from 'react';
 import moment, { Moment } from 'moment-timezone';
 import { localized } from 'mailspring-exports';
 import { EventOccurrence, isEventSelected } from './calendar-data-source';
-import { EventRendererProps } from './mailspring-calendar';
+import { EventRendererProps } from './calendar-view';
 import { DragState, HitZone } from './calendar-drag-types';
 import { MonthViewDayCell } from './month-view-day-cell';
 import { MonthViewEvent } from './month-view-event';

@@ -272,7 +272,7 @@ token, so a theme can recolour the surface alone:
 ui-dark flips the palette (`@white: #0a0a0a`, greys inverted). After it becomes token-only, these
 call sites need a token if Dark should keep its look: `switch.less` (`@gray-light` track, `@white`
 knob), `spinner.less` and `type.less` (`@gray-light`), `activity/list.less` (`@white`, `@gray`),
-`composer.less` (`@gray-light`, `@gray`), `nylas-calendar.less` (`@gray-lighter`),
+`composer.less` (`@gray-light`, `@gray`), `calendar.less` (`@gray-lighter`),
 `attachment-items.less` (`@white`). Most of them map to `--muted-foreground`, `--control` or
 `--primary-foreground`. Decide per site during the theme conversion.
 

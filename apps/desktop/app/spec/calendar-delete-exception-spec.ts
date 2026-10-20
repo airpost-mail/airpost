@@ -3,7 +3,7 @@
 import { Actions, DatabaseStore, DestroyEventTask, SyncbackEventTask } from 'mailspring-exports';
 import { dialog } from '@electron/remote';
 import { Event as MailspringEvent } from '../src/flux/models/event';
-import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/mailspring-calendar';
+import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/calendar-view';
 import { TimedOccurrence } from '../internal_packages/main-calendar/lib/core/calendar-data-source';
 import { fakePimEngine, refusal } from './fake-pim-engine';
 

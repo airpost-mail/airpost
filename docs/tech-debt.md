@@ -369,7 +369,7 @@ yarn.
 
 Done (roadmap/security, f3bd26b43). `EventedIFrame` cancels every submit in the frame, confirms,
 then opens the GET URL with its fields (POST: the action URL only) through `openLink`. The message
-CSP's `form-action 'none'` covers the gap before its listener attaches, and `MailspringWindow`'s
+CSP's `form-action 'none'` covers the gap before its listener attaches, and `AppWindow`'s
 `will-frame-navigate` handler blocks subframe navigation away from `about:blank`.
 
 Inferred from code; not run. The message iframe allows forms
@@ -377,13 +377,13 @@ Inferred from code; not run. The message iframe allows forms
 allow-same-origin"`), the sanitizer keeps `form`, `button`, `action` and `method`
 (`src/services/sanitize-transformer.ts:3-6` and `AllowedAttributes`), `EventedIFrame` has no
 submit handler, and `will-navigate` guards only the top frame
-(`src/browser/mailspring-window.ts:363-369`).
+(`src/browser/app-window.ts:363-369`).
 
 - Cost: a submit button styled as a link loads the attacker's page inside Tern's chrome ("re-enter
   your password to view this message") and receives what the user types. That page also loads
   remote images whatever the setting.
 - Fix: intercept `submit` in `EventedIFrame` and open the action externally after a confirm, or
-  drop `allow-forms`. Add a `will-frame-navigate` handler in `MailspringWindow` that blocks
+  drop `allow-forms`. Add a `will-frame-navigate` handler in `AppWindow` that blocks
   subframe navigation away from `about:blank`.
 - Size: ~40 TS.
 
@@ -622,7 +622,7 @@ Done (roadmap/security, 560387678). `main.js` installs `src/browser/permission-p
 session as it is created (`session-created`, plus the default session at `ready`), which covers
 default, `quickpreview`, `in-memory-only` and any plugin partition. Request and check handlers
 allow only `notifications` and `clipboard-sanitized-write` (CopyButton, thread sharing), only to
-the main frame of a `MailspringWindow` on a `file:` URL; dev mode logs each denial once.
+the main frame of an `AppWindow` on a `file:` URL; dev mode logs each denial once.
 Tern's own notifications come from main and need no permission, so `notifications` is there for
 plugins. `--js-flags=--harmony` is gone (no staged-feature APIs in the tree, TS targets es2024).
 The autoplay switch stays: new-mail sounds play through an `Audio` element with no user gesture.
@@ -635,7 +635,7 @@ and display capture by default. `src/browser/main.js:369-370` passes `--js-flags
 (staged V8 features in Node-enabled renderers) and an autoplay-without-gesture switch.
 
 - Fix: deny-by-default handler on every session, allowing notifications only for
-  `MailspringWindow` contents. Drop `--harmony`. Keep autoplay only if notification sounds need it.
+  `AppWindow` contents. Drop `--harmony`. Keep autoplay only if notification sounds need it.
 - Size: ~30 lines.
 
 ### TD24. Abandoned single-use dependencies
@@ -779,7 +779,7 @@ Verified. Preferences has no Plugins tab (`internal_packages/preferences/lib/mai
 `core.disabledPackages` is honoured only for `isOptional` packages (`src/package-manager.ts:107-108`),
 so a third-party plugin can't be disabled short of deleting it, and optional built-ins only by
 editing `config.json`. `phishing-detection` ships in the template's `disabledPackages`
-(`dot-mailspring/config.json`) and is marked `isHiddenOnPluginsPage`, which no code reads. The
+(`default-profile/config.json`) and is marked `isHiddenOnPluginsPage`, which no code reads. The
 template also lists five packages that no longer exist (nylas-private-salesforce, keybase,
 composer-markdown, composer-scheduler, composer-mail-merge). `thread-sharing` renders a permanently
 disabled toolbar button (`thread-sharing/lib/thread-sharing-button.tsx`).
@@ -799,7 +799,7 @@ disabled toolbar button (`thread-sharing/lib/thread-sharing-button.tsx`).
 ### TD31. `webviewTag` on every window for a component nothing renders (stage 2)
 
 Verified. The only `<Webview>` user was the Mailspring ID sign-in (removed in 27f713bf6), but
-`src/browser/mailspring-window.ts:128` still enables the tag in every Node-enabled window, the
+`src/browser/app-window.ts:128` still enables the tag in every Node-enabled window, the
 `will-attach-webview` comment (`:163-167`) names an onboarding guest that's gone, and the component
 is exported to plugins (`src/global/mailspring-component-kit.js:70`). `webview.tsx:152-161` opens
 any http(s) URL a guest logs to the console, with no user gesture. Also dead:
@@ -899,8 +899,8 @@ messages that aren't the app window's own strings. Still open: the clipped-messa
 print and quick-preview windows and the composer's quoted body still render in Node-enabled
 documents (with TD2's CSP); keyboard events reach the app as re-dispatched copies, as before.
 
-Verified. Every window is a `MailspringWindow` with `nodeIntegration: true`,
-`contextIsolation: false`, no sandbox (`src/browser/mailspring-window.ts:124-128`). The message
+Verified. Every window is an `AppWindow` with `nodeIntegration: true`,
+`contextIsolation: false`, no sandbox (`src/browser/app-window.ts:124-128`). The message
 body is a same-origin `about:blank` iframe in that renderer (`email-frame.tsx:222`). Its sandbox
 has no `allow-scripts`, so scripts in mail don't run, and the app CSP blocks injected script, but
 remote images, fonts and CSS from mail are decoded in that process. `renderedMessageBodyIntoDocument`
@@ -918,7 +918,7 @@ hands extensions the live same-origin document (`email-frame.tsx:155-167`); only
 
 ### TD35. `@electron/remote` is the renderer-to-main channel (stages 3 and 6, then any order)
 
-Verified. `src/browser/main.js:364` initialises remote and `mailspring-window.ts:180-181` enables it
+Verified. `src/browser/main.js:364` initialises remote and `app-window.ts:180-181` enables it
 per webContents. 130 references in 62 files (126 lines in 58 `.ts`/`.tsx`; 35 files in
 `internal_packages`). Ten sites call `getGlobal('application')` for `configPersistenceManager`,
 `windowManager`, `autoUpdateManager`, `applicationMenu`, `openUrl` and `isQuitting`
@@ -980,7 +980,7 @@ config, packages, themes, commands, spellchecker, menus and the engine bridge. P
 heavily (`AppEnv.config` 257 uses, `showErrorDialog` ~75, `savedState` 47, `commands` 31), but the
 plan's Tier A–D lists cover exports only. Stage 6 moves supervision out of `MailsyncBridge`, yet
 nine built-in sites call `AppEnv.mailsyncBridge` (`events/lib/main.tsx:43`,
-`main-calendar/lib/core/mailspring-calendar.tsx:212`, `:1210`, `account-error-notif.tsx`,
+`main-calendar/lib/core/calendar-view.tsx:212`, `:1210`, `account-error-notif.tsx`,
 `offline-notification.tsx`, `preferences-account-details.tsx`, `src/flux/tasks/event-rsvp-task.ts:168`,
 `destroy-event-task.ts:39`, `syncback-event-task.ts:217`, `:282`), and third-party plugins can too.
 
@@ -1398,7 +1398,7 @@ No item was refuted outright. These sub-claims were checked and removed or corre
 - The clipped-message window loads remote images regardless of the setting: no, it goes through
   `processUnclipped` and the autoload extension (`message-body-processor.ts:132-197`). Only quick
   preview ignores the setting (TD2).
-- github-contact-card is on by default: no, the shipped template `dot-mailspring/config.json`
+- github-contact-card is on by default: no, the shipped template `default-profile/config.json`
   disables it; the schema default `[]` only applies when the key is missing. Gravatar is the real
   default leak (TD3).
 - Engine files at 0644 are readable by other users today: mostly no, the desktop chmods the config

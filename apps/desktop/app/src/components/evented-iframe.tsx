@@ -308,7 +308,7 @@ export class EventedIFrame extends React.Component<
   // Forms in mail never submit in the frame, where the response would load inside Tern
   // (a fake "sign in again" page, say). After a confirm, a GET form opens with its fields in
   // the browser through the same path as links; a POST form's page opens without its fields.
-  // The message CSP's form-action 'none' and MailspringWindow's will-frame-navigate guard
+  // The message CSP's form-action 'none' and AppWindow's will-frame-navigate guard
   // stop the submission too if this listener isn't attached yet.
   _onIFrameSubmit = (e: SubmitEvent) => {
     e.preventDefault();

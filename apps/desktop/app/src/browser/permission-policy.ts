@@ -30,7 +30,7 @@ export const PdfViewerPermissions: ReadonlySet<string> = new Set([
 
 export interface PermissionAsk {
   permission: string;
-  // The asking webContents is one of Tern's windows (isMailspringWindowContents).
+  // The asking webContents is one of Tern's windows (isAppWindowContents).
   appWindow: boolean;
   // The asking frame shows the bundled pdf.js viewer (isPdfViewerURL).
   pdfViewer?: boolean;

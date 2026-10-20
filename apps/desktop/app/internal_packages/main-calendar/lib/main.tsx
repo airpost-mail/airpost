@@ -10,7 +10,7 @@ import {
 } from 'mailspring-exports';
 import { NavRailItem } from 'mailspring-component-kit';
 import { QuickEventButton } from './quick-event-button';
-import { MailspringCalendar } from './core/mailspring-calendar';
+import { MailspringCalendar } from './core/calendar-view';
 import { CalendarSidebar } from './core/calendar-sidebar';
 import { EventSearchBar } from './core/event-search-bar';
 import { focusedEventInfoForEvents } from './core/calendar-data-source';

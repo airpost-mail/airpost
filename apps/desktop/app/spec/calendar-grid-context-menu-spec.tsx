@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
-import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/mailspring-calendar';
+import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/calendar-view';
 import {
   CalendarEventArgs,
   CalendarEventContainer,

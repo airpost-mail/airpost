@@ -10,7 +10,7 @@ import moment from 'moment';
 import Rx from 'rx-lite';
 import * as CalendarDateUtils from '../src/calendar-date';
 import { Calendar } from '../src/flux/models/calendar';
-import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/mailspring-calendar';
+import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/calendar-view';
 import { WeekView } from '../internal_packages/main-calendar/lib/core/week-view';
 import { DayView } from '../internal_packages/main-calendar/lib/core/day-view';
 import { DEFAULT_TIMED_EVENT_DURATION_SECONDS } from '../internal_packages/main-calendar/lib/core/calendar-constants';

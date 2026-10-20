@@ -1,5 +1,5 @@
 import { net } from 'electron';
-import { isMailspringWindowContents } from './mailspring-window';
+import { isAppWindowContents } from './app-window';
 import type { ExternalFetchInit, ExternalFetchResult } from '../external-fetch';
 
 const MaxResponseBytes = 50 * 1024 * 1024;
@@ -13,7 +13,7 @@ export function registerExternalFetchIPC(ipcMain: Electron.IpcMain) {
   ipcMain.handle(
     'external-fetch',
     async (event, url: string, init: ExternalFetchInit = {}): Promise<ExternalFetchResult> => {
-      if (!isMailspringWindowContents(event.sender)) {
+      if (!isAppWindowContents(event.sender)) {
         throw new Error('external-fetch is only available to Tern windows');
       }
       const { protocol } = new URL(url);

@@ -1,0 +1,7 @@
+# Default Profile
+
+Template for a new Tern profile (`~/Library/Application Support/Tern` on
+macOS, the matching config directory on Windows and Linux).
+`src/browser/config-persistence-manager.ts` writes `config.json` into a
+profile that has none, and copies the whole folder only when the profile
+directory doesn't exist yet.

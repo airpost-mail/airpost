@@ -2166,7 +2166,7 @@
     },
     {
       "name": "event-master",
-      "site": "internal_packages/main-calendar/lib/core/mailspring-calendar.tsx _onDelete",
+      "site": "internal_packages/main-calendar/lib/core/calendar-view.tsx _onDelete",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2212,7 +2212,7 @@
     },
     {
       "name": "event-by-id",
-      "site": "DatabaseStore.find(Event) (calendar-rsvp, popovers, mailspring-calendar)",
+      "site": "DatabaseStore.find(Event) (calendar-rsvp, popovers, calendar-view)",
       "query": {
         "class": "Event",
         "accounts": null,

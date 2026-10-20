@@ -344,5 +344,5 @@ export type SystemStartService = typeof import('../system-start-service').defaul
 export const SystemStartService: SystemStartService;
 
 // Testing
-export type MailspringTestUtils = typeof import('../../spec/mailspring-test-utils').default;
+export type MailspringTestUtils = typeof import('../../spec/test-utils').default;
 export const MailspringTestUtils: MailspringTestUtils;

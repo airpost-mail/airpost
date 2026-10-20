@@ -3,7 +3,7 @@ import { Utils } from 'mailspring-exports';
 import { CalendarEvent } from './calendar-event';
 import { EventOccurrence, isEventSelected } from './calendar-data-source';
 import { OverlapByEventId } from './week-view-helpers';
-import { EventRendererProps } from './mailspring-calendar';
+import { EventRendererProps } from './calendar-view';
 import { DragState, HitZone } from './calendar-drag-types';
 
 /*

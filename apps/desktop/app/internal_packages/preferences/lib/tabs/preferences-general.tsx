@@ -7,7 +7,7 @@ import { ConfigLike, ConfigSchemaLike } from '../types';
 
 /** On macOS Tern always outlives its window, so the setting only shows or hides the menu bar
  * icon; elsewhere the tray icon is what keeps Tern running after the window closes
- * (`MailspringWindow`'s close handler). */
+ * (`AppWindow`'s close handler). */
 export function BackgroundRow() {
   if (process.platform === 'darwin') {
     return (

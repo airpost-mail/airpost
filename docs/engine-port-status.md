@@ -42,7 +42,7 @@ Desktop checks (not run here: no `node_modules`, npm was installed with `--ignor
 
 - [ ] In `apps/desktop`: `npm ci`, then `npm run typecheck`, `npm run lint:check`, `npm test`.
   The P6 edits to `app/src/mailsync-process.ts`, `app/src/browser/application.ts`,
-  `app/src/browser/mailspring-window.ts`, `app/src/flux/mailsync-bridge.ts`,
+  `app/src/browser/app-window.ts`, `app/src/flux/mailsync-bridge.ts`,
   `app/src/config-schema.ts` and `app/spec/mailsync-process-spec.ts` were only syntax-checked.
 - [ ] `apps/engine/packaging/build-release.sh macos --install-desktop`, then launch the app on
   a profile that has used C++. Check: the engine is `app.asar.unpacked/mailsync-rs`; the log shows

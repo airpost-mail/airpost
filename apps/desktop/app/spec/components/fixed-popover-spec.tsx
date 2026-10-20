@@ -2,7 +2,7 @@ import React from 'react';
 import { findDOMNode } from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 import FixedPopover from '../../src/components/fixed-popover';
-import MTestUtils from '../mailspring-test-utils';
+import MTestUtils from '../test-utils';
 
 const {
   Directions: { Up, Down, Left, Right },

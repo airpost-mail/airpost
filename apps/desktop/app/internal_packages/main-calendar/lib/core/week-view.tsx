@@ -22,7 +22,7 @@ import {
   TICKS_PER_DAY,
   tickGenerator,
 } from './week-view-helpers';
-import { MailspringCalendarViewProps } from './mailspring-calendar';
+import { MailspringCalendarViewProps } from './calendar-view';
 import { getEventsWithDragPreview, withNewEventPreview } from './calendar-drag-utils';
 
 const BUFFER_DAYS = 7; // in each direction

@@ -1,12 +1,12 @@
 import { BrowserWindow, dialog } from 'electron';
 import { localized } from '../intl';
 import { ConfirmOpenChannel } from '../attachment-safety';
-import { isMailspringWindowContents } from './mailspring-window';
+import { isAppWindowContents } from './app-window';
 
 // The "open this executable?" prompt for src/attachment-safety.ts. Cancel is the default.
 export function registerAttachmentSafetyIPC(ipcMain: Electron.IpcMain) {
   ipcMain.handle(ConfirmOpenChannel, async (event, message: string, detail: string) => {
-    if (!isMailspringWindowContents(event.sender)) {
+    if (!isAppWindowContents(event.sender)) {
       return false;
     }
     const options: Electron.MessageBoxOptions = {

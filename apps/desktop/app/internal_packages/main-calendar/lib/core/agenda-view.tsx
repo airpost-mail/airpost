@@ -3,7 +3,7 @@ import moment, { Moment } from 'moment-timezone';
 import { formatTime } from '../../../../src/date-format';
 import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';
 import { localized, Actions, CalendarDateUtils } from 'mailspring-exports';
-import { MailspringCalendarViewProps } from './mailspring-calendar';
+import { MailspringCalendarViewProps } from './calendar-view';
 import { CalendarView } from './calendar-constants';
 import { HeaderControls } from './header-controls';
 import { CalendarEventPopover } from './calendar-event-popover';

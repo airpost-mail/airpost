@@ -23,11 +23,11 @@ const mailspringWebContents = new WeakSet<Electron.WebContents>();
  * preview, quick preview, "show original") display untrusted content and must not be
  * able to drive the main process.
  */
-export function isMailspringWindowContents(contents: Electron.WebContents) {
+export function isAppWindowContents(contents: Electron.WebContents) {
   return mailspringWebContents.has(contents);
 }
 
-export interface MailspringWindowSettings {
+export interface AppWindowSettings {
   frame?: boolean;
   title?: string;
   width?: number;
@@ -55,12 +55,12 @@ export interface MailspringWindowSettings {
   [key: string]: unknown;
 }
 
-export default class MailspringWindow extends EventEmitter {
+export default class AppWindow extends EventEmitter {
   static includeShellLoadTime = true;
 
   public windowType: string;
   public browserWindow: BrowserWindow & {
-    loadSettings?: MailspringWindowSettings;
+    loadSettings?: AppWindowSettings;
     loadSettingsChangedSinceGetURL?: boolean;
   } = null;
   public devMode: boolean;
@@ -77,7 +77,7 @@ export default class MailspringWindow extends EventEmitter {
 
   private isWindowClosing: boolean;
 
-  constructor(settings: MailspringWindowSettings = {}) {
+  constructor(settings: AppWindowSettings = {}) {
     super();
 
     let frame, height, pathToOpen, resizable, title, width, autoHideMenuBar, titleBarStyle;
@@ -201,8 +201,8 @@ export default class MailspringWindow extends EventEmitter {
     }
 
     // Only send to the first non-spec window created
-    if (MailspringWindow.includeShellLoadTime && !this.isSpec) {
-      MailspringWindow.includeShellLoadTime = false;
+    if (AppWindow.includeShellLoadTime && !this.isSpec) {
+      AppWindow.includeShellLoadTime = false;
       if (loadSettings.shellLoadTime == null) {
         loadSettings.shellLoadTime = Date.now() - global.shellStartTime;
       }
@@ -273,7 +273,7 @@ export default class MailspringWindow extends EventEmitter {
     this.setLoadSettings({ ...this.browserWindow.loadSettings, ...newSettings });
   };
 
-  loadSettings(): MailspringWindowSettings {
+  loadSettings(): AppWindowSettings {
     return this.browserWindow.loadSettings;
   }
 

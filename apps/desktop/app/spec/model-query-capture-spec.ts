@@ -632,7 +632,7 @@ const SITES: Site[] = [
   },
   {
     name: 'event-master',
-    site: 'internal_packages/main-calendar/lib/core/mailspring-calendar.tsx _onDelete',
+    site: 'internal_packages/main-calendar/lib/core/calendar-view.tsx _onDelete',
     build: () =>
       DatabaseStore.findBy<Event>(Event, {
         accountId: A1,
@@ -643,7 +643,7 @@ const SITES: Site[] = [
   },
   {
     name: 'event-by-id',
-    site: 'DatabaseStore.find(Event) (calendar-rsvp, popovers, mailspring-calendar)',
+    site: 'DatabaseStore.find(Event) (calendar-rsvp, popovers, calendar-view)',
     build: () => DatabaseStore.find<Event>(Event, 'e05'),
   },
   {

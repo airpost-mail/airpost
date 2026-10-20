@@ -428,7 +428,7 @@ const start = () => {
   // one, quickpreview's and the <webview> partition, and any a plugin opens.
   const installPermissionHandlers = ses => {
     require('./permission-policy').installPermissionHandlers(ses, {
-      isAppWindow: require('./mailspring-window').isMailspringWindowContents,
+      isAppWindow: require('./app-window').isAppWindowContents,
       isPdfViewer: require('./quickpreview-ipc').isPdfViewerURL,
       logDenials: options.devMode,
     });

@@ -1,6 +1,5 @@
 ##### Node modules
 node_modules
-!app/spec/fixtures/packages/package-with-incompatible-native-module/node_modules
 **/npm-debug.log*
 **/lerna-debug.log*
 

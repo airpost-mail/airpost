@@ -4,7 +4,7 @@ import { findRenderedDOMComponentWithTag, Simulate } from 'react-dom/test-utils'
 import { Message } from 'mailspring-exports';
 
 import MetadataComposerToggleButton from '../../src/components/metadata-composer-toggle-button';
-import MTestUtils from '../mailspring-test-utils';
+import MTestUtils from '../test-utils';
 
 const PLUGIN_ID = 'toggle-spec-plugin';
 

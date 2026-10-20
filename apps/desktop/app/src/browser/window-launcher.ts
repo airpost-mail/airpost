@@ -1,6 +1,6 @@
 import { isWaylandSession } from './is-wayland';
-import MailspringWindow from './mailspring-window';
-import { MailspringWindowSettings } from './mailspring-window';
+import AppWindow from './app-window';
+import { AppWindowSettings } from './app-window';
 
 const DEBUG_SHOW_HOT_WINDOW = process.env.SHOW_HOT_WINDOW === 'true';
 let winNum = 0;
@@ -18,11 +18,11 @@ let winNum = 0;
 export default class WindowLauncher {
   static EMPTY_WINDOW = 'emptyWindow';
 
-  public hotWindow?: MailspringWindow;
+  public hotWindow?: AppWindow;
 
-  private _defaultWindowOpts: MailspringWindowSettings;
+  private _defaultWindowOpts: AppWindowSettings;
   private config: import('../config').default;
-  private onCreatedHotWindow: (win: MailspringWindow) => void;
+  private onCreatedHotWindow: (win: AppWindow) => void;
 
   constructor({
     devMode,
@@ -38,7 +38,7 @@ export default class WindowLauncher {
     specMode: boolean;
     resourcePath: string;
     configDirPath: string;
-    onCreatedHotWindow: (win: MailspringWindow) => void;
+    onCreatedHotWindow: (win: AppWindow) => void;
     config: import('../config').default;
   }) {
     this._defaultWindowOpts = {
@@ -94,7 +94,7 @@ export default class WindowLauncher {
 
     // On Wayland, always use cold windows - see createHotWindow comment above
     if (this._mustUseColdWindow(opts) || isWaylandSession()) {
-      win = new MailspringWindow(opts);
+      win = new AppWindow(opts);
     } else {
       // Check if the hot window has been deleted. This may happen when we are
       // relaunching the app
@@ -140,7 +140,7 @@ export default class WindowLauncher {
       win.showWhenLoaded();
     }
     // On Wayland, windows are shown via the did-finish-load handler in
-    // mailspring-window.ts (at the point where the Wayland activation token
+    // app-window.ts (at the point where the Wayland activation token
     // is still valid). We intentionally skip showWhenLoaded() here to avoid
     // a second browserWindow.focus() call at window:loaded time. By that
     // point React has rendered the composer's contenteditable with
@@ -160,7 +160,7 @@ export default class WindowLauncher {
     // windows instead and show them immediately when loaded.
     if (isWaylandSession()) return;
 
-    this.hotWindow = new MailspringWindow(this._hotWindowOpts());
+    this.hotWindow = new AppWindow(this._hotWindowOpts());
     this.onCreatedHotWindow(this.hotWindow);
     if (DEBUG_SHOW_HOT_WINDOW) {
       this.hotWindow.showWhenLoaded();
@@ -180,7 +180,7 @@ export default class WindowLauncher {
 
   // Some properties, like the `frame` or `toolbar` can't be updated once
   // a window has been setup. If we detect this case we have to bootup a
-  // plain MailspringWindow instead of using a hot window.
+  // plain AppWindow instead of using a hot window.
   _mustUseColdWindow(opts) {
     const { bootstrapScript, frame } = this.createDefaultWindowOpts();
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { DatabaseStore, Event } from 'mailspring-exports';
-import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/mailspring-calendar';
+import { MailspringCalendar } from '../internal_packages/main-calendar/lib/core/calendar-view';
 import { CalendarEvent } from '../internal_packages/main-calendar/lib/core/calendar-event';
 import { MonthViewEvent } from '../internal_packages/main-calendar/lib/core/month-view-event';
 import { TimedOccurrence } from '../internal_packages/main-calendar/lib/core/calendar-data-source';
