@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import * as Actions from '../../src/flux/actions';
 import DraftStore from '../../src/flux/stores/draft-store';
 import { Message } from '../../src/flux/models/message';
-import InflatesDraftClientId from '../../src/decorators/inflates-draft-client-id';
+import InflatesDraftClientId from '../../src/components/decorators/inflates-draft-client-id';
 
 class Dummy extends React.Component<Record<string, unknown>> {
   static displayName = 'Dummy';

@@ -157,7 +157,7 @@ Deduplicated from the five readers. Recommended answer first.
   (`onboarding-helpers.ts:65-575`), the credential keyset (`key-manager.ts`, 346 lines) and
   the account registry (`account-store.ts`, `config.json`). Calendar and contact editing:
   `src/ics-event-helpers.ts` (1,845 lines: `createICSString`, `updateEventTimes`,
-  `createRecurrenceException`, `createCounterProposal`), `src/calendar-utils.ts` (578),
+  `createRecurrenceException`, `createCounterProposal`), `src/utils/calendar-utils.ts` (578),
   `main-calendar/lib/core/calendar-data-source.ts` (580, recurrence expansion),
   `calendar-rsvp.ts` (263), `events/lib/rsvp-target.ts` (261),
   `contacts/lib/ContactInfoMapping.ts` (314, vCard) and `VCFImportExport.ts` (261). The
@@ -176,7 +176,7 @@ stage that touches the code:
 - `snooze-store.ts:84-94` clears the expiration on every thread in the change record
   (`threads.map`), not only the due ones (`unsnooze`). A batch holding a due and a not-yet-due
   snooze drops the second one's expiration and it stays in Snoozed (V by reading, not run).
-- `Package.isEngineSet()` (`src/package.ts:104`) reads `this.json.engines.mailspring` and
+- `Package.isEngineSet()` (`src/plugin-host/package.ts:104`) reads `this.json.engines.mailspring` and
   throws when `engines` is missing; the call is outside the try in `package-manager.ts:112`,
   so one bad third-party `package.json` can stop activation of the packages after it (code V,
   loop effect I).
@@ -494,7 +494,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
   - `account.add {account, secrets, test?}`, `account.setSecrets {accountId, secrets}`
     (reconnect), `account.update {accountId, patch}` (changing an IMAP/SMTP host or username
     clears the stored secrets), `account.reorder {ids}`, `account.remove {accountId, revoke?,
-    deleteData?}` (Google revoke from `src/oauth-revocation.ts`), `account.reset {accountId}`.
+    deleteData?}` (Google revoke from `src/engine/oauth-revocation.ts`), `account.reset {accountId}`.
   - `secrets.set {name, value}`, `secrets.delete {name}`, `secrets.has {names}` → `{name:
     bool}`. No `get`.
   - `server.set {url, userId, serverId}` / `server.clear`; the engine builds its own
@@ -664,7 +664,7 @@ in `crates/ms-ipc/src/lib.rs`. All methods are additive (no `protocol` bump) and
 
 ### 4.4 Integrations on serve
 
-- `Integrations.setTransport` (`src/integrations.ts:407`) is wired to `Engine.request`.
+- `Integrations.setTransport` (`src/engine/integrations.ts:407`) is wired to `Engine.request`.
   Composer and thread-popout windows call it on their own connection (stage 6).
 - `CapabilityStore` reads `capabilities` from `hello` and `capabilities.changed` instead of
   decrypting the keyset; until 3.6 it keeps sending the key per request, read from
@@ -724,7 +724,7 @@ is refused on relayed connections unless the device holds the admin scope.
    `credentialsBeforeEngine`, keeps `accounts` read-only for one release (downgrade), and
    switches `AccountStore` to the engine.
 6. One release later: delete `credentialsBeforeEngine`, `key-manager.ts`,
-   `oauth-revocation.ts`, the `KeyManager` export (`src/global/mailspring-exports.js:200`,
+   `oauth-revocation.ts`, the `KeyManager` export (`src/plugin-api/mailspring-exports.js:200`,
    `.d.ts:236-237`), and the secret handling in onboarding, preferences and notifications.
 7. CLI-only and headless installs have nothing to migrate; they use `tern account add`.
 
@@ -1149,7 +1149,7 @@ account. tern-mcp ports `list_scheduled_sends`, `list_tracked_messages`, `get_to
 its send check uses `tasks.list`; `tern task list` and `tern watch` on `mail.new`
 (`--new-mail`). Desktop: `ThreadCountsStore` on `counts.get` plus deltas (deltas that arrive
 while `counts.get` is out are replayed on its answer), `unread-notifications` on `mail.new`,
-both behind `hello.features` and fed by the serve engine through `src/engine-events.ts`.
+both behind `hello.features` and fed by the serve engine through `src/engine/engine-events.ts`.
 Deviations: socket tests live in `apps/engine/tests/read_api.rs` and `socket.rs` unit tests
 rather than `tests/socket.rs`. Open: per-account engines and the C++ path still read the
 `ThreadCounts` table and notify from message deltas; no `mail.new` for folders whose UIDNEXT is
@@ -1185,7 +1185,7 @@ writer to its stdin; accounts come from `config.json`, secrets from `KeyManager`
 main-process class (`src/main/key-manager.ts`) with a renderer facade over IPC that keeps
 the old API; the Mailspring keychain migration moved with it unchanged.
 `ProcessAccountSecretsUpdated` is stored in main. Each window has its own socket connection
-(`src/engine-connection.ts`); the main window keeps Task handlers, `OnlineStatusStore` and
+(`src/engine/engine-connection.ts`); the main window keeps Task handlers, `OnlineStatusStore` and
 `queueTask` routing and gets account events over IPC with ack and replay across reloads. The
 IPC rebroadcast is gone for `serve` only. No engine reuse; the exit-3 loop is unchanged;
 startup `migrate` waits up to 40 s for a live pid in `run/engine.json`. Deviations: only the
@@ -1624,7 +1624,7 @@ in mailspring-exports (`request`, `subscribe`, `features`, `has`, `capabilities`
 (`wireIntegrationsTransport`), available while the engine lists `integrations`; `CapabilityStore`
 reads the engine's capabilities and still checks the key through the KeyManager facade, which
 the request still sends; `core.integrations.<kind>` is mirrored into the engine store;
-`PLUGIN_API_VERSION` is 1.27.0. TD29: `src/engine-api.ts` says plugins are fully trusted code;
+`PLUGIN_API_VERSION` is 1.27.0. TD29: `src/engine/engine-api.ts` says plugins are fully trusted code;
 `Engine.request` finds the calling package from the stack and refuses a T13 local-only method
 unless `tern.engineMethods` lists it and the user allowed it. Checks: engine
 `tests/integrations.rs` against ms-integrations' mock server (provider calls and error mapping,
@@ -1992,7 +1992,7 @@ OAuth client ids come from `MS_GMAIL_CLIENT_ID`, `MS_GMAIL_CLIENT_SECRET` and `M
 at run time, else the same variables at build time, else the current ids as defaults; the
 desktop no longer passes `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET` to the engine. Desktop:
 onboarding, reconnect and remove go through the window's own connection
-(`src/engine-accounts.ts`); the redirect receiver runs in main on 127.0.0.1
+(`src/engine/engine-accounts.ts`); the redirect receiver runs in main on 127.0.0.1
 (`src/main/oauth-receiver.ts`); integration keys go through `secrets.set` (a keyset copy
 is moved over on the next save and still read for an engine without account setup); the
 supervisor's `testAccount` and the onboarding OAuth code with the client secret are gone. CLI:
@@ -2276,7 +2276,7 @@ Open from the review (low):
   never sets Chromium's locale from the language setting. With an en-US system and a German UI,
   engine-built replies get a German date and JS-fallback replies, Send Again and resurfacing a
   US one. The corpus runs with a single locale, so it doesn't catch this.
-- `apps/desktop/src/engine-drafts.ts`: the engine always adds the signature and removes
+- `apps/desktop/src/engine/engine-drafts.ts`: the engine always adds the signature and removes
   tracking images on drafts it builds. Before, disabling the composer-signature or
   remove-tracking-pixels package turned those off; with the pipeline, disabling either has no
   effect on new, reply, forward and mailto drafts.
@@ -2464,7 +2464,7 @@ Open from the review (low; the job kept running after its connection closed is f
   disables the rule but leaves the draft saved by `draft.create` (`save: true`) in Drafts, where
   it syncs to the server. Tasks from the rule's earlier actions have already run by then; in the
   desktop any action failure meant nothing was queued.
-- `apps/desktop/src/engine-api.ts`: ms-ipc classes `rules.reprocess` and `rules.cancel` as
+- `apps/desktop/src/engine/engine-api.ts`: ms-ipc classes `rules.reprocess` and `rules.cancel` as
   local-only, and reprocess sends forwards over the whole inbox, but the desktop's
   `LOCAL_ONLY_METHODS` (TD29 plugin consent) doesn't list them. Any plugin can start a reprocess,
   forwards included, through `Engine.request` without `tern.engineMethods` or the user's yes, and
@@ -2476,7 +2476,7 @@ Open from the review (low; the job kept running after its connection closed is f
   `rules.cancel` or by an account stop (`rules.progress` with `stopped`); the scenario only cancels
   an unknown job id. The desktop spec's "_applyRuleToMessage ordering" case (a later rule reads
   the thread after an earlier rule's local change) has no engine counterpart.
-- `apps/desktop/src/global/mailspring-exports.js`: the new `deprecate()` helper (section 6:
+- `apps/desktop/src/plugin-api/mailspring-exports.js`: the new `deprecate()` helper (section 6:
   the getter stays a getter, caches the value, warns once per calling package, app code isn't
   warned) has no spec, and nothing tests that `MailRulesProcessor.processMessages` is a resolved
   no-op. Recording the warning in Preferences > Plugins is open (above).
@@ -2638,7 +2638,7 @@ exact unit text") is covered by `--expect-plan`, which the pane passes (review f
   skips it for the rest of the process's life. Separately, for Message rows it rebuilds the
   message as `{id, aid}`, so `modelHeaderMessageId` is null and remote metadata sync loses its
   anchor for other devices. This is the reference code plugin authors will copy.
-- `apps/desktop/src/plugin-api-version.ts`: stage 19 adds `tern.service` and Preferences >
+- `apps/desktop/src/plugin-host/plugin-api-version.ts`: stage 19 adds `tern.service` and Preferences >
   Plugins, but `PLUGIN_API_VERSION` stays 1.30.0 (section 6: additions get a minor bump). The
   CHANGELOG lists them under "Plugin API 1.27.0" and the sample asks for `^1.27.0`, which a
   desktop without the pane satisfies, so a plugin can't require a desktop that installs its
@@ -2654,7 +2654,7 @@ exact unit text") is covered by `--expect-plan`, which the pane passes (review f
   still calls `systemctl --user` (blocked by confinement or no unit found), and the engine path
   embeds the snap revision, which changes on every refresh. Hide the action in the snap or refuse
   in the CLI.
-- `apps/desktop/src/package-manager.ts`: `recordPluginInstall` (hashing every file plus
+- `apps/desktop/src/plugin-host/package-manager.ts`: `recordPluginInstall` (hashing every file plus
   `config.set`) runs inside the same try as `cpSync`. If hashing throws (an unreadable file, a
   readdir EACCES), the catch removes `packageFinalDir`: the fresh copy, and on a reinstall the
   already installed plugin too. Record outside that try.
@@ -2841,7 +2841,7 @@ message and the last draft; "expand all" loads the rest. `DraftStore.newMessageW
 loads the body of a message passed without one. TD41: `ComponentRegistry.listenShared` (one
 registry listener for every `InjectedComponent` and `InjectedComponentSet`, which skip the
 re-render when their components didn't change) and one shared `AccountStore` listener for
-`AccountColorBar`, via `src/global/shared-listener.ts`; the listener count was checked in a spec,
+`AccountColorBar`, via `src/utils/shared-listener.ts`; the listener count was checked in a spec,
 not in devtools on the trial profile. Tests: `spec/mock-engine.ts` answers `query` from fixture
 models (matchers run as the desktop's `Matcher`, order, offset, limit, count, idsOnly, include,
 a substring search) on the window's `EngineEvents`; `database-store-engine-spec`,
@@ -2928,7 +2928,7 @@ Open from the review (low):
   such as `contacts/lib/Store.ts:30` (`findAll(Contact).where(refs>0)`) can get there on large
   profiles, and large replies also fill the outbox toward `SOCKET_QUEUE_BYTES` (`drop_slow`).
   Needs a reply budget in the engine with a distinct error, and paging for the unbounded reads.
-- `apps/desktop/src/engine-connection.ts`: the 10 s bound covers waiting for a hello only. A
+- `apps/desktop/src/engine/engine-connection.ts`: the 10 s bound covers waiting for a hello only. A
   `query` written to a live connection has no timeout, and the engine answers a connection's
   requests in order on its reader thread (`socket.rs` module doc), so a slow or wedged read (a
   long FTS search) leaves every later read in that window pending, with no `EngineUnavailable`
@@ -2982,7 +2982,7 @@ specs made into `ics-event-helpers.ts`, `calendar-utils.ts`, `calendar-data-sour
 America/Chicago), recurrence expansion included; the harness scenario `pim-edit-methods.yaml`
 runs the methods against Radicale. CLI: `tern calendar list|create|update|rsvp` and
 `tern contact get|create|update|import|export`. tern-mcp: event and contact tools (docs/mcp.md).
-Desktop: `src/engine-pim.ts` wraps the methods; the calendar (data source, grid moves, popover
+Desktop: `src/engine/engine-pim.ts` wraps the methods; the calendar (data source, grid moves, popover
 saves, deletes, new events, RSVP), the mail view's invitation header (times, conflicts, RSVP,
 applying a counter) and the contacts package (detail load and save, VCF import, export and drag)
 call them and keep their UI. Gone: `ics-event-helpers.ts`, the VTIMEZONE half of

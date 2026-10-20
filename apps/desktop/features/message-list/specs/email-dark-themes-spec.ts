@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { applyColorScheme, darkenDocument, formatColor, isDarkColor } from '@tern/email-dark';
 import { darkPalette, themeBackgroundAt } from '../lib/email-render-mode';
-import { compatTokensSource } from '../../../src/theme-manager';
+import { compatTokensSource } from '../../../src/plugin-host/theme-manager';
 
 // less comes with less-cache, which compiles the app's stylesheets at runtime.
 // eslint-disable-next-line import/no-extraneous-dependencies

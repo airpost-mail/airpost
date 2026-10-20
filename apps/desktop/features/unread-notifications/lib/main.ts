@@ -10,7 +10,7 @@ import {
   DatabaseChangeRecord,
   TaskFactory,
 } from 'mailspring-exports';
-import EngineEvents, { EngineEvents as EngineEventsType } from '../../../src/engine-events';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../../src/engine/engine-events';
 import { Feature, MailNewParams } from '../../../src/shared/engine-protocol';
 
 const WAIT_FOR_CHANGES_DELAY = 400;

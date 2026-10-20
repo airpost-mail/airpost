@@ -7,7 +7,7 @@ import {
   EventOccurrence,
   coveredDates,
 } from '../features/main-calendar/lib/core/calendar-data-source';
-import { calendarDateFromUnix } from '../src/calendar-date';
+import { calendarDateFromUnix } from '../src/utils/calendar-date';
 import moment from 'moment';
 
 // Built the way MonthView builds a row: seven local midnights, read as dates.

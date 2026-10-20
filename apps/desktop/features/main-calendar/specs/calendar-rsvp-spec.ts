@@ -8,7 +8,7 @@ import {
   proposeNewTimeForCalendarEvent,
   respondToCalendarEvent,
 } from '../lib/core/calendar-rsvp';
-import { parseCalendarDate } from '../../../src/calendar-date';
+import { parseCalendarDate } from '../../../src/utils/calendar-date';
 import { fakePimEngine, refusal } from '../../../spec/fake-pim-engine';
 
 const ME = 'brian@example.com';

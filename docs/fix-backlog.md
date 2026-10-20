@@ -92,7 +92,7 @@ since 2015 when drafts opened only in popouts (Mailspring #1718, #1396). Proposa
 - Changes: `draft-list` (main, new `draft-preview.tsx`, list columns, store re-resolving focus by
   `headerMessageId`), `src/flux/stores/workspace-store.ts` (`'draft'` focus branch), a key-order
   fix in `src/components/multiselect-list.tsx`, two opt-out props on the composer
-  (`src/decorators/inflates-draft-client-id.tsx`, `composer/lib/composer-view.tsx`: no
+  (`src/components/decorators/inflates-draft-client-id.tsx`, `composer/lib/composer-view.tsx`: no
   delete-if-empty on unmount, no focus steal), styles and strings. ~450 LOC.
 - Risks: draft id changes when From changes (track by `headerMessageId`); same draft open in
   preview and popout (Mailspring #2158). Check: Delete with only the keyboard cursor may be a no-op.

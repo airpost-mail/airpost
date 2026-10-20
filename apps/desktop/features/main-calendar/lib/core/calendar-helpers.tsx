@@ -14,7 +14,7 @@ import { ShowAsOption, defaultShowAs } from './show-as-selector';
 import { MIN_EVENT_DURATION_SECONDS } from './calendar-constants';
 import { EventOccurrence, coveredDates, isTimed, occurrenceId } from './calendar-data-source';
 import { dayFraction } from './week-view-helpers';
-import { createEvent } from '../../../../src/engine-pim';
+import { createEvent } from '../../../../src/engine/engine-pim';
 
 // Cache of calendar colors synced from CalDAV servers
 const calendarColorCache: Map<string, string> = new Map();

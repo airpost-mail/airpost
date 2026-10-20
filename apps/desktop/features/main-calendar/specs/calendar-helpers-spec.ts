@@ -16,7 +16,7 @@ import {
   dayStartUnix,
   calendarDateFromUnix,
   calendarDaysBetween,
-} from '../../../src/calendar-date';
+} from '../../../src/utils/calendar-date';
 
 /** Local midnight, as unix seconds — all-day times are built from local date components */
 function localDay(year: number, month1Indexed: number, day: number): number {

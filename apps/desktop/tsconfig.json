@@ -17,7 +17,7 @@
     "baseUrl": ".",
     "skipLibCheck": true,
     "paths": {
-      "*": ["node_modules/*", "src/global/*"]
+      "*": ["node_modules/*", "src/plugin-api/*"]
     }
   },
   "include": ["src/**/*", "features/**/*", "plugins/**/*", "themes/**/*", "spec/**/*"],

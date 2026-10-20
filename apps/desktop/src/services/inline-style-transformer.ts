@@ -2,7 +2,7 @@
 import { ipcRenderer } from 'electron';
 import crypto from 'crypto';
 
-import RegExpUtils from '../regexp-utils';
+import RegExpUtils from '../utils/regexp-utils';
 
 let userAgentDefault = null;
 
@@ -71,7 +71,7 @@ class InlineStyleTransformer {
     }
 
     if (typeof userAgentDefault === 'undefined' || userAgentDefault === null) {
-      userAgentDefault = require('../chrome-user-agent-stylesheet-string').default;
+      userAgentDefault = require('./chrome-user-agent-stylesheet-string').default;
     }
     return `${body.slice(0, i)}<style>${userAgentDefault}</style>${body.slice(i)}`;
   }

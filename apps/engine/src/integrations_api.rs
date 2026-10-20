@@ -196,7 +196,7 @@ pub fn call(req: &RpcRequest) -> Reply {
 }
 
 /// The providers of each kind, the only one first where the kind has one: the desktop
-/// picks it without asking (`readSettings` in src/integrations.ts).
+/// picks it without asking (`readSettings` in src/engine/integrations.ts).
 const KINDS: &[(&str, &[&str])] = &[
     (integration_kind::TRANSLATION, &["libretranslate", "deepl"]),
     (integration_kind::GRAMMAR, &["languagetool"]),

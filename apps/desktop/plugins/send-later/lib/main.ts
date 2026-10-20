@@ -10,7 +10,7 @@ import {
 } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
 
-import EngineEvents from '../../../src/engine-events';
+import EngineEvents from '../../../src/engine/engine-events';
 import { Feature } from '../../../src/shared/engine-protocol';
 import SendLaterButton from './send-later-button';
 import SendLaterStatus from './send-later-status';

@@ -11,7 +11,7 @@ let clearDoNotDisturbCache: () => void;
 
 function loadModule() {
   execFileSpy = jasmine.createSpy('execFile');
-  const mod = proxyquire('../src/dnd-utils-linux', {
+  const mod = proxyquire('../src/platform/dnd-utils-linux', {
     child_process: { execFile: execFileSpy, '@noCallThru': false },
   });
   getDoNotDisturb = mod.getDoNotDisturb;

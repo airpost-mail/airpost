@@ -10,7 +10,7 @@ from KeyManager (in main too), stores the rotated tokens serve reports on stdout
 EngineClient's relaunch rules, and makes the stdin-only calls windows ask for over IPC
 (account.test, account.reset, engine.resetDatabase, engine.setLogLevel).
 
-Windows open their own socket connections (src/engine-connection.ts) once Status names a
+Windows open their own socket connections (src/engine/engine-connection.ts) once Status names a
 ready engine. Its own connection subscribes to no model class, which leaves the deltas and the
 first subscriber's backlog to the windows and still brings it every `account.state` and
 `settings.changed`; it also carries the engine-owned settings (src/main/engine-settings.ts). Account

@@ -1,6 +1,6 @@
 import path from 'path';
 import mousetrap from 'mousetrap';
-import KeymapManager from '../src/keymap-manager';
+import KeymapManager from '../src/window/keymap-manager';
 
 describe('KeymapManager', function () {
   const resourcePath = AppEnv.getLoadSettings().resourcePath;

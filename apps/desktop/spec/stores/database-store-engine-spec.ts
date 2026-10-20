@@ -127,7 +127,7 @@ describe('DatabaseStore on the engine', function () {
       Thread.attributes.subject.ascending()
     );
     spyOn(engine, 'answer').andCallFake(() => {
-      throw new (require('../../src/engine-connection').EngineConnectionError)(
+      throw new (require('../../src/engine/engine-connection').EngineConnectionError)(
         'invalid params: subject is not queryable',
         { code: -32602 }
       );

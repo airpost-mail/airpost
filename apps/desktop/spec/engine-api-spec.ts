@@ -3,8 +3,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { EngineEvents } from '../src/engine-events';
-import { EngineConnection } from '../src/engine-connection';
+import { EngineEvents } from '../src/engine/engine-events';
+import { EngineConnection } from '../src/engine/engine-connection';
 import { ErrorCode, Feature, Method } from '../src/shared/engine-protocol';
 import {
   CallerPackage,
@@ -14,8 +14,8 @@ import {
   callerPackageFromStack,
   stackPaths,
   wireIntegrationsTransport,
-} from '../src/engine-api';
-import { Integrations, IntegrationError } from '../src/integrations';
+} from '../src/engine/engine-api';
+import { Integrations, IntegrationError } from '../src/engine/integrations';
 import { CapabilityStoreClass } from '../src/flux/stores/capability-store';
 import { feedEngineEvents } from '../src/flux/mailsync-bridge';
 import { EngineStatus } from '../src/shared/supervisor-channels';
@@ -294,9 +294,9 @@ describe('Engine.request and local-only methods (TD29)', function () {
     const stack = (file: string) =>
       [
         'Error',
-        `    at EngineAPI.request (${path.join(resourcePath, 'src', 'engine-api.ts')}:10:5)`,
+        `    at EngineAPI.request (${path.join(resourcePath, 'src', 'engine', 'engine-api.ts')}:10:5)`,
         `    at Object.run (file://${file}:3:9)`,
-        `    at ${path.join(resourcePath, 'src', 'app-env.ts')}:1:1`,
+        `    at ${path.join(resourcePath, 'src', 'window', 'app-env.ts')}:1:1`,
       ].join('\n');
     expect(stackPaths(stack(`${third}/lib/main.js`))[1]).toBe(`${third}/lib/main.js`);
     expect(callerPackageFromStack(stack(`${third}/lib/main.js`))).toEqual({
@@ -329,7 +329,7 @@ describe('Engine.request and local-only methods (TD29)', function () {
       // V8 reports the realpath, here with parentheses, called through an app dependency.
       const s = [
         'Error',
-        `    at EngineAPI.request (${path.join(resourcePath, 'src', 'engine-api.ts')}:10:5)`,
+        `    at EngineAPI.request (${path.join(resourcePath, 'src', 'engine', 'engine-api.ts')}:10:5)`,
         `    at later (${path.join(resourcePath, 'node_modules', 'underscore', 'underscore.js')}:1:2)`,
         `    at Object.run (${real}/lib/main.js:3:9)`,
       ].join('\n');

@@ -12,7 +12,7 @@ import {
   focusedEventInfoForEvents,
   EventOccurrence,
 } from '../lib/core/calendar-data-source';
-import { parseCalendarDate } from '../../../src/calendar-date';
+import { parseCalendarDate } from '../../../src/utils/calendar-date';
 import { fakePimEngine, flush } from '../../../spec/fake-pim-engine';
 
 const day = (iso: string) => parseCalendarDate(iso);

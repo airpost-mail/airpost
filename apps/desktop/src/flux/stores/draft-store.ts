@@ -25,7 +25,7 @@ import {
   draftPipelineAvailable,
   isEngineBuilt,
   sendDraft as engineSendDraft,
-} from '../../engine-drafts';
+} from '../../engine/engine-drafts';
 
 interface IThreadMessageModelOrId {
   thread?: Thread;
@@ -541,7 +541,7 @@ class DraftStore extends MailspringStore {
       throw new Error(`Cant find send action ${actionKey} `);
     }
     // The engine sends it (draft.send) and keeps its undo window, unless the action is a
-    // plugin's (src/engine-drafts.ts).
+    // plugin's (src/engine/engine-drafts.ts).
     const viaEngine =
       draftPipelineAvailable() && SendActionsStore.enginePerformsSendAction(actionKey);
 

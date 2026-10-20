@@ -1,4 +1,4 @@
-import DOMWalkers from '../dom-walkers';
+import DOMWalkers from '../utils/dom-walkers';
 import * as Utils from '../flux/models/utils';
 
 function textAndNodesAfterNode(node) {

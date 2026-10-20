@@ -2,7 +2,7 @@ import MailspringStore from 'mailspring-store';
 import * as Utils from '../models/utils';
 import * as Actions from '../actions';
 import { localized } from '../../shared/intl';
-import EngineEvents, { EngineNotification } from '../../engine-events';
+import EngineEvents, { EngineNotification } from '../../engine/engine-events';
 import {
   ErrorCode,
   Method,
@@ -11,7 +11,7 @@ import {
 } from '../../shared/engine-protocol';
 
 import { Template } from '../../components/scenario-editor-models';
-import { ConditionMode, ConditionTemplates, ActionTemplates } from '../../mail-rules-templates';
+import { ConditionMode, ConditionTemplates, ActionTemplates } from '../mail-rules-templates';
 
 /*
 The editor of the mail rules (docs/desktop-client-plan.md 4.2, T12). The rules are the

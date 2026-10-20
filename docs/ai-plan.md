@@ -365,7 +365,7 @@ then. Usage isn't persisted (AI4).
 of mailsync, tern, tern-mcp and tern-gateway, harness quick tier on serve (141 passed, 4
 skipped). Rust only, so no desktop or web gate. Open as above.
 
-2026-10-18, AI3 on `roadmap/ai`: desktop. `src/ai.ts` (exported as `AI`, plugin API 1.28.0)
+2026-10-18, AI3 on `roadmap/ai`: desktop. `src/engine/ai.ts` (exported as `AI`, plugin API 1.28.0)
 reads and writes `core.ai` (`providers`, `features` with a provider id each, `accounts`,
 `includeAddresses`), builds ms-ai's provider config with the key from the keyset
 (`integration-ai-<id>-key`) and the interim `settings`; it mirrors ms-ai's base URL, host,

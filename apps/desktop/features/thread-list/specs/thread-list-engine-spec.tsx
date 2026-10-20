@@ -6,7 +6,7 @@ import ReactDOM from 'react-dom';
 import { ipcRenderer } from 'electron';
 import { Folder, Message, Thread, MailboxPerspective } from 'mailspring-exports';
 import ThreadListDataSource from '../lib/thread-list-data-source';
-import EngineEvents from '../../../src/engine-events';
+import EngineEvents from '../../../src/engine/engine-events';
 import EngineReads, { READ_WAIT_MS } from '../../../src/flux/stores/engine-reads';
 import { SupervisorChannel } from '../../../src/shared/supervisor-channels';
 import {

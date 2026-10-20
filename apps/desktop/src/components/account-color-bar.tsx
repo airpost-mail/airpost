@@ -1,6 +1,6 @@
 import { AccountStore } from 'mailspring-exports';
 import React from 'react';
-import { sharedListener } from '../global/shared-listener';
+import { sharedListener } from '../utils/shared-listener';
 
 // Every thread row has one; they share an AccountStore listener.
 let listenToAccounts: ReturnType<typeof sharedListener> = null;

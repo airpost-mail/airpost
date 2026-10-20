@@ -1,7 +1,7 @@
 import { Actions, Folder, Thread, SyncbackMetadataTask } from 'mailspring-exports';
 import { SnoozeStore } from '../lib/snooze-store';
 import { PLUGIN_ID } from '../lib/snooze-constants';
-import { EngineEvents } from '../../../src/engine-events';
+import { EngineEvents } from '../../../src/engine/engine-events';
 import { Feature } from '../../../src/shared/engine-protocol';
 
 function snoozedThread(id: string, expiration: Date) {

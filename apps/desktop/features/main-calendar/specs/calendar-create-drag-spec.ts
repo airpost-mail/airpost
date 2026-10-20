@@ -8,7 +8,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import moment from 'moment';
 import Rx from 'rx-lite';
-import * as CalendarDateUtils from '../../../src/calendar-date';
+import * as CalendarDateUtils from '../../../src/utils/calendar-date';
 import { Calendar } from '../../../src/flux/models/calendar';
 import { MailspringCalendar } from '../lib/core/calendar-view';
 import { WeekView } from '../lib/core/week-view';

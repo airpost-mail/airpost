@@ -277,7 +277,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Blink default stylesheet
 
-`apps/desktop/src/chrome-user-agent-stylesheet-string.ts`, and its copy in
+`apps/desktop/src/services/chrome-user-agent-stylesheet-string.ts`, and its copy in
 `crates/ms-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
 stylesheet of Chromium's Blink engine (`Source/core/css/html.css`), which comes from KHTML and
 WebKit: Copyright (C) 2000 Lars Knoll, Copyright (C) 2003-2011 Apple Inc. The upstream file is

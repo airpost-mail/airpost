@@ -3,7 +3,7 @@ import _str from 'underscore.string';
 import { Model, AttributeValues } from './model';
 import * as Attributes from '../attributes';
 import * as Utils from './utils';
-import RegExpUtils from '../../regexp-utils';
+import RegExpUtils from '../../utils/regexp-utils';
 import { AccountStore } from '../stores/account-store';
 import { localized } from '../../shared/intl';
 

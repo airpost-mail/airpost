@@ -7,7 +7,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { AccountStore } from 'mailspring-exports';
-import { exportContacts, saveContact } from '../src/engine-pim';
+import { exportContacts, saveContact } from '../src/engine/engine-pim';
 import {
   importContactsFromPaths,
   writeContactsToTempVCF,

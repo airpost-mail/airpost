@@ -47,7 +47,7 @@ import { EventPopoverActions } from './event-popover-actions';
 import { TimeZoneSelector } from './timezone-selector';
 import { parseEventIdFromOccurrence } from './calendar-drag-utils';
 import { showRecurringEventDialog } from './recurring-event-dialog';
-import { editEvent } from '../../../../src/engine-pim';
+import { editEvent } from '../../../../src/engine/engine-pim';
 import type { EventPatch } from '../../../../src/shared/engine-protocol';
 
 /**

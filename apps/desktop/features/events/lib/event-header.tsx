@@ -32,7 +32,7 @@ import {
   CounterProposalProblem,
   RSVPTargetResolution,
 } from './rsvp-target';
-import { answerEvent, editEvent, expandEvents, refusalKey } from '../../../src/engine-pim';
+import { answerEvent, editEvent, expandEvents, refusalKey } from '../../../src/engine/engine-pim';
 import type { EventTimes } from '../../../src/shared/engine-protocol';
 
 import { findOneIana } from 'windows-iana';

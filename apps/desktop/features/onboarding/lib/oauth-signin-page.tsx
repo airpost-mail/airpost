@@ -6,7 +6,7 @@ import { CopyButton, RetinaImg } from 'mailspring-component-kit';
 import FormErrorMessage from './form-error-message';
 import AccountProviders from './account-providers';
 import { accountFromSignIn } from './onboarding-helpers';
-import * as EngineAccounts from '../../../src/engine-accounts';
+import * as EngineAccounts from '../../../src/engine/engine-accounts';
 import { OAuthBeginResult } from '../../../src/shared/engine-protocol';
 
 // The sign-in runs through the engine (`account.oauth.begin`/`complete`), which keeps the

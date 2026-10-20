@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 import { Account } from 'mailspring-exports';
-import { KeyManagerFacade } from '../src/key-manager';
+import { KeyManagerFacade } from '../src/window/key-manager';
 import { KEY_MANAGER_CHANNEL } from '../src/shared/supervisor-channels';
 
 // The windows' KeyManager, answered by a stand-in for the main process: synthetic keys only.

@@ -11,9 +11,9 @@ import DatabaseStore from './stores/database-store';
 import OnlineStatusStore from './stores/online-status-store';
 import { DatabaseChangeRecord } from './stores/database-change-record';
 import DatabaseObjectRegistry from '../registries/database-object-registry';
-import { EngineConnection } from '../engine-connection';
-import EngineEvents, { EngineEvents as EngineEventsType } from '../engine-events';
-import { wireIntegrationsTransport } from '../engine-api';
+import { EngineConnection } from '../engine/engine-connection';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../engine/engine-events';
+import { wireIntegrationsTransport } from '../engine/engine-api';
 import {
   LogsTailParams,
   LogsTailResult,

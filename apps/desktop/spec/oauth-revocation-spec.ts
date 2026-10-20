@@ -1,6 +1,6 @@
 import { Account } from 'mailspring-exports';
-import KeyManager from '../src/key-manager';
-import { revokeOAuthGrant } from '../src/oauth-revocation';
+import KeyManager from '../src/window/key-manager';
+import { revokeOAuthGrant } from '../src/engine/oauth-revocation';
 
 const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 

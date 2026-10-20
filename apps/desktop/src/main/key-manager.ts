@@ -109,7 +109,7 @@ const usesPlaintextFallbackKey = (encrypted: Buffer) =>
  * and every key we want to access.
  *
  * It runs in the main process, which owns safeStorage and the `serve` engine's stdin; windows
- * reach it through the facade in src/key-manager.ts.
+ * reach it through the facade in src/window/key-manager.ts.
  */
 export class KeyManager {
   private _fatalErrorReported = false;
@@ -481,7 +481,7 @@ export class KeyManager {
 }
 
 /*
-Answers the facade in src/key-manager.ts. Errors go back as text, flagged when main already
+Answers the facade in src/window/key-manager.ts. Errors go back as text, flagged when main already
 showed a dialog for them.
 */
 export function registerKeyManagerIPC(ipcMain: Electron.IpcMain, keyManager: KeyManager) {

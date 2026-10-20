@@ -4,8 +4,8 @@ import { ipcRenderer } from 'electron';
 import { Simulate } from 'react-dom/test-utils';
 import { ComponentRegistry, FocusedPerspectiveStore, WorkspaceStore } from 'mailspring-exports';
 
-import SheetContainer from '../src/sheet-container';
-import Sheet from '../src/sheet';
+import SheetContainer from '../src/components/sheets/sheet-container';
+import Sheet from '../src/components/sheets/sheet';
 import Config from '../src/shared/config';
 import { MailNavRailItem, SHOW_NAV_RAIL_CONFIG_KEY } from '../src/components/nav-rail';
 

@@ -14,7 +14,7 @@ import MessageUtils from '../models/message-utils';
 import * as Utils from '../models/utils';
 import InlineStyleTransformer from '../../services/inline-style-transformer';
 import SanitizeTransformer from '../../services/sanitize-transformer';
-import DOMUtils from '../../dom-utils';
+import DOMUtils from '../../utils/dom-utils';
 import { Thread } from '../models/thread';
 import { convertToPlainText, convertFromHTML } from '../../components/composer-editor/conversion';
 import {
@@ -22,7 +22,7 @@ import {
   deepenPlaintextQuote,
   convertPlaintextToHTML,
 } from '../../components/composer-editor/plaintext';
-import { buildDraft, draftPipelineAvailable } from '../../engine-drafts';
+import { buildDraft, draftPipelineAvailable } from '../../engine/engine-drafts';
 import { DraftCreateParams } from '../../shared/engine-protocol';
 
 let DraftStore: typeof import('./draft-store').default = null;
@@ -72,7 +72,7 @@ class DraftFactory {
     return transformed;
   }
 
-  // Builds the draft in the engine when it has the draft pipeline (src/engine-drafts.ts).
+  // Builds the draft in the engine when it has the draft pipeline (src/engine/engine-drafts.ts).
   // `fields` are Message attributes over what the kind builds.
   async _engineDraft(
     params: DraftCreateParams,

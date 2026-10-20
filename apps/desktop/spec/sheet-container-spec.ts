@@ -1,4 +1,4 @@
-import SheetContainer from '../src/sheet-container';
+import SheetContainer from '../src/components/sheets/sheet-container';
 import { WorkspaceStore } from 'mailspring-exports';
 
 describe('SheetContainer', () => {

@@ -4,7 +4,7 @@
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
 import { Folder } from '../../src/flux/models/folder';
-import { MailboxPerspective } from '../../src/mailbox-perspective';
+import { MailboxPerspective } from '../../src/flux/mailbox-perspective';
 
 import CategoryStore from '../../src/flux/stores/category-store';
 import { AccountStore } from '../../src/flux/stores/account-store';

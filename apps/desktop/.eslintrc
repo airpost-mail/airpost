@@ -136,12 +136,12 @@
         "plugins/composer-templates/lib/preferences-templates.tsx",
         "plugins/composer-templates/lib/template-store.ts",
         "plugins/translation/lib/message-header.tsx",
-        "src/app-env.ts",
         "src/components/attachment-items.tsx",
         "src/components/composer-editor/grammar-check-plugins.tsx",
         "src/components/evented-iframe.tsx",
         "src/components/outline-view-item.tsx",
         "src/components/participants-text-field.tsx",
+        "src/components/sheets/sheet-toolbar.tsx",
         "src/components/tokenizing-text-field.tsx",
         "src/flux/mailsync-bridge.ts",
         "src/flux/stores/attachment-store.ts",
@@ -149,14 +149,14 @@
         "src/flux/stores/message-store.ts",
         "src/main/app-window.ts",
         "src/main/auxiliary-window-guard.ts",
-        "src/package-manager.ts",
+        "src/platform/system-start-service.ts",
+        "src/plugin-host/package-manager.ts",
         "src/quickpreview/index.ts",
         "src/shared/default-client-helper.ts",
         "src/shared/mailsync-process.ts",
-        "src/sheet-toolbar.tsx",
-        "src/spellchecker.ts",
-        "src/system-start-service.ts",
-        "src/window-event-handler.ts"
+        "src/window/app-env.ts",
+        "src/window/spellchecker.ts",
+        "src/window/window-event-handler.ts"
       ],
       "rules": {
         "no-restricted-imports": "off",
@@ -182,7 +182,7 @@
       "excludedFiles": ["src/main/**", "**/specs/**"],
       "rules": {
         "import/no-restricted-paths": [
-          "warn",
+          "error",
           {
             "zones": [
               {
@@ -199,7 +199,7 @@
       "files": ["src/main/**", "src/shared/**"],
       "rules": {
         "import/no-restricted-paths": [
-          "warn",
+          "error",
           {
             "zones": [
               {

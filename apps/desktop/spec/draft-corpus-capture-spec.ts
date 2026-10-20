@@ -31,7 +31,7 @@ import InlineStyleTransformer from '../src/services/inline-style-transformer';
 import { AllowedAttributes, AllowedTags } from '../src/services/sanitize-transformer';
 import { quoteTexts } from '../src/shared/date-format';
 import { wrapPlaintext } from '../src/components/composer-editor/plaintext';
-import userAgentStylesheet from '../src/chrome-user-agent-stylesheet-string';
+import userAgentStylesheet from '../src/services/chrome-user-agent-stylesheet-string';
 import { applySignature } from '../features/composer-signature/lib/signature-utils';
 import {
   AdditionalRules,

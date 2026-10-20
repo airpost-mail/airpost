@@ -1,4 +1,5 @@
 /* eslint global-require:0 */
+import path from 'path';
 import _ from 'underscore';
 import ReactTestUtils from 'react-dom/test-utils';
 import Config from '../../src/shared/config';
@@ -110,7 +111,9 @@ class SpecRunner {
 
     AppEnv.restoreWindowDimensions();
     AppEnv.themes.loadStaticStylesheets();
-    AppEnv.themes.requireStylesheet('../static/style/jasmine');
+    AppEnv.themes.requireStylesheet(
+      path.join(AppEnv.getLoadSettings().resourcePath, 'static', 'style', 'jasmine')
+    );
     AppEnv.keymaps.loadKeymaps();
   }
 

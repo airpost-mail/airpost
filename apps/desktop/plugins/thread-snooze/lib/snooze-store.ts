@@ -8,7 +8,7 @@ import {
   Thread,
 } from 'mailspring-exports';
 
-import EngineEvents from '../../../src/engine-events';
+import EngineEvents from '../../../src/engine/engine-events';
 import { Feature } from '../../../src/shared/engine-protocol';
 import { markUnreadOrResurfaceThreads, moveThreads, snoozedUntilMessage } from './snooze-utils';
 import { PLUGIN_ID } from './snooze-constants';

@@ -1,5 +1,5 @@
 import { ExternalFetch } from '../../../src/shared/external-fetch';
-import EngineEvents from '../../../src/engine-events';
+import EngineEvents from '../../../src/engine/engine-events';
 import {
   Feature,
   Method,

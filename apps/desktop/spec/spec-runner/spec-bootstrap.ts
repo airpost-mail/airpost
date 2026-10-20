@@ -2,9 +2,9 @@
 
 // Swap out Node's native Promise for Bluebird, which allows us to
 // do fancy things like handle exceptions inside promise blocks
-import '../../src/promise-extensions';
+import '../../src/window/promise-extensions';
 
-import AppEnvClass from '../../src/app-env';
+import AppEnvClass from '../../src/window/app-env';
 window.AppEnv = new AppEnvClass();
 
 const loadSettings = AppEnv.getLoadSettings();

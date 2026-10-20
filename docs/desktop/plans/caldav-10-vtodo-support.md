@@ -244,7 +244,7 @@ export class CalendarTask extends Model {
 | `mailsync/MailSync/Models/Calendar.hpp/cpp` | Add supportsEvents/supportsTasks |
 | `mailsync/MailSync/DAVWorker.hpp/cpp` | Add runForCalendarTasks |
 | `mailsync/MailSync/TaskProcessor.hpp/cpp` | Add task syncback handlers |
-| `src/global/mailspring-exports.js` | Register new task types |
+| `src/plugin-api/mailspring-exports.js` | Register new task types |
 
 ## Scope Consideration
 

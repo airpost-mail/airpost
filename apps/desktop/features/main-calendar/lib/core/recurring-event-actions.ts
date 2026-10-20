@@ -1,5 +1,5 @@
 import { Event, localized } from 'mailspring-exports';
-import { editEvent } from '../../../../src/engine-pim';
+import { editEvent } from '../../../../src/engine/engine-pim';
 import { showRecurringEventDialog, RecurringEventOperation } from './recurring-event-dialog';
 
 /**

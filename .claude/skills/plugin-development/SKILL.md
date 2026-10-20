@@ -27,7 +27,7 @@ documentation at `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (repo root). It co
 - Theme system implementation
 
 Changes to the plugin API also need a `PLUGIN_API_VERSION` bump in
-`apps/desktop/src/plugin-api-version.ts` and an entry in `apps/desktop/CHANGELOG.md`.
+`apps/desktop/src/plugin-host/plugin-api-version.ts` and an entry in `apps/desktop/CHANGELOG.md`.
 
 ## Key Source Files
 
@@ -35,10 +35,10 @@ Paths are relative to `apps/desktop/`.
 
 | File | Purpose |
 |------|---------|
-| `src/package-manager.ts` | Package discovery, validation, and activation |
-| `src/package.ts` | Package class representing individual plugins |
-| `src/app-env.ts` | AppEnv singleton that initializes PackageManager |
-| `src/plugin-api-version.ts` | The plugin API version matched against `engines.mailspring` |
+| `src/plugin-host/package-manager.ts` | Package discovery, validation, and activation |
+| `src/plugin-host/package.ts` | Package class representing individual plugins |
+| `src/window/app-env.ts` | AppEnv singleton that initializes PackageManager |
+| `src/plugin-host/plugin-api-version.ts` | The plugin API version matched against `engines.mailspring` |
 | `src/registries/component-registry.ts` | UI component registration |
 | `src/registries/extension-registry.ts` | Extension registration |
 | `src/extensions/composer-extension.ts` | ComposerExtension base class |

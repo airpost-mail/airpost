@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import mousetrap from 'mousetrap';
-import KeymapManager from '../src/keymap-manager';
+import KeymapManager from '../src/window/keymap-manager';
 
 // Templates replace the base bindings of every command they define, so each one
 // must restate the base keystrokes it wants to keep, base keystroke first so the

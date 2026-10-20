@@ -3,7 +3,7 @@ import * as Actions from '../actions';
 import { Task } from '../tasks/task';
 import TaskQueue from './task-queue';
 import { localized } from '../../shared/intl';
-import { cancelSend, draftPipelineAvailable, undoSendTarget } from '../../engine-drafts';
+import { cancelSend, draftPipelineAvailable, undoSendTarget } from '../../engine/engine-drafts';
 
 // Tasks with `engineWritesUndoData` can only be reversed exactly with data the engine
 // writes onto them during their local phase (ChangeFolderTask.undoPlacements), so their

@@ -3,7 +3,7 @@
   "queries": [
     {
       "name": "inbox-page-1",
-      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -41,7 +41,7 @@
     },
     {
       "name": "inbox-page-2",
-      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -117,7 +117,7 @@
     },
     {
       "name": "unified-inbox",
-      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -156,7 +156,7 @@
     },
     {
       "name": "sent",
-      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)",
+      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -195,7 +195,7 @@
     },
     {
       "name": "trash",
-      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)",
+      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -228,7 +228,7 @@
     },
     {
       "name": "two-categories-distinct",
-      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)",
+      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -267,7 +267,7 @@
     },
     {
       "name": "label",
-      "site": "src/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)",
+      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -305,7 +305,7 @@
     },
     {
       "name": "starred-all-accounts",
-      "site": "src/mailbox-perspective.ts StarredMailboxPerspective.threads",
+      "site": "src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -341,7 +341,7 @@
     },
     {
       "name": "starred-one-account",
-      "site": "src/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)",
+      "site": "src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -382,7 +382,7 @@
     },
     {
       "name": "empty-perspective",
-      "site": "src/mailbox-perspective.ts EmptyMailboxPerspective.threads",
+      "site": "src/flux/mailbox-perspective.ts EmptyMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -1552,7 +1552,7 @@
     },
     {
       "name": "folders",
-      "site": "src/global/mailspring-observables.ts categories",
+      "site": "src/plugin-api/mailspring-observables.ts categories",
       "query": {
         "class": "Folder",
         "accounts": null,
@@ -1570,7 +1570,7 @@
     },
     {
       "name": "labels-for-account",
-      "site": "src/global/mailspring-observables.ts forAccount",
+      "site": "src/plugin-api/mailspring-observables.ts forAccount",
       "query": {
         "class": "Label",
         "accounts": null,

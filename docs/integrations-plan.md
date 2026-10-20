@@ -168,7 +168,7 @@ take up to 30 s.
 
 - `src/flux/stores/capability-store.ts`: `CapabilityStore` and `useCapability`, exported from
   `mailspring-exports` (section 1).
-- `src/integrations.ts`, exported as `Integrations`: provider metadata, `readSettings` /
+- `src/engine/integrations.ts`, exported as `Integrations`: provider metadata, `readSettings` /
   `writeSettings`, `buildProviderConfig`, and `request(method, params, {kind?, config?})`,
   which adds `config` (saved settings plus the key read from the keyset per request, or an
   explicit config for Test) to the params of section 4. A disabled integration is
@@ -179,7 +179,7 @@ take up to 30 s.
 - Transport: `Integrations.setTransport({available, send(method, params)})`. The default is
   `UnavailableTransport` (`available: false`, every call fails with `engine-unavailable`); while
   it is in place the store reports no integration feature as available. Since stage 5 every
-  window sets one over its engine connection (`src/engine-api.ts`), available while the engine
+  window sets one over its engine connection (`src/engine/engine-api.ts`), available while the engine
   lists the `integrations` feature; `-32010` becomes the error in `data`, `-32012` (busy)
   `rate-limited`, a dropped connection `engine-unavailable`.
 - `preferences/lib/tabs/preferences-integrations.tsx`: the tab of section 2, order 3.
@@ -200,7 +200,7 @@ take up to 30 s.
 ## 6. Open
 
 - The Test button's host and usage output is untested against a real provider through
-  `integrations.test` (the engine transport landed in stage 5, `src/engine-api.ts`).
+  `integrations.test` (the engine transport landed in stage 5, `src/engine/engine-api.ts`).
 - Moving keys from the desktop keyset to the engine (with the engine owning credentials
   generally), after which `config` in section 4 drops the key.
 - DeepL marks `/v2/languages` deprecated for `/v3/languages` (no sunset date yet).

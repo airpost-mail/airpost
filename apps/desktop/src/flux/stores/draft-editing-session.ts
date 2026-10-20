@@ -2,7 +2,7 @@ import * as Immutable from 'immutable';
 import MailspringStore from 'mailspring-store';
 import { Editor, Value, Block, Text } from 'slate';
 
-import RegExpUtils from '../../regexp-utils';
+import RegExpUtils from '../../utils/regexp-utils';
 import { localized } from '../../shared/intl';
 
 import TaskQueue from './task-queue';

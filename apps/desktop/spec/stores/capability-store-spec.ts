@@ -1,6 +1,6 @@
 import { CapabilityStoreClass } from '../../src/flux/stores/capability-store';
-import { Integrations, IntegrationsTransport } from '../../src/integrations';
-import { EngineEvents } from '../../src/engine-events';
+import { Integrations, IntegrationsTransport } from '../../src/engine/integrations';
+import { EngineEvents } from '../../src/engine/engine-events';
 
 const engineTransport: IntegrationsTransport = { available: true, send: async () => ({}) };
 

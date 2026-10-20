@@ -6,7 +6,7 @@ import {
   hashPackageDir,
   pluginInstallRecord,
   recordPluginInstall,
-} from '../src/plugin-install-record';
+} from '../src/plugin-host/plugin-install-record';
 
 describe('plugin install records', () => {
   let dir: string;

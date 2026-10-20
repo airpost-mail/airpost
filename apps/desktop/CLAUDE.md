@@ -46,11 +46,16 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 - **`src/`** - Core application source code
   - `main/` - Main process code (application lifecycle, window management, auto-updates, the engine supervisor)
   - `shared/` - Modules both the main process and the windows load (config, intl, the engine binary and protocol types, IPC channel names, compile cache)
-  - `flux/` - Flux-based state management (actions, stores, models, tasks)
-  - `components/` - Reusable React UI components
+  - `plugin-api/` - The plugin API barrels (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`), on the module path as bare names
+  - `window/` - Window startup and window-level managers (AppEnv, the bootstraps, keymaps, menus, spellchecker, the KeyManager facade)
+  - `plugin-host/` - Package discovery and loading, themes and styles (PackageManager, Package, ThemeManager, the plugin API version)
+  - `engine/` - The windows' side of the engine: the socket connection, `Engine` (engine-api), engine events, accounts, drafts, PIM, integrations, AI
+  - `platform/` - OS integration (native notifications, do-not-disturb, Linux themes, start at login)
+  - `utils/` - DOM, date, calendar, regexp, canvas and backoff helpers
+  - `flux/` - Flux-based state management (actions, stores, models, tasks, mailbox perspectives, mail rule templates)
+  - `components/` - Reusable React UI components, including the sheets (`components/sheets/`) and the higher-order components (`components/decorators/`)
   - `services/` - Application services (search, sanitization, etc.)
   - `registries/` - Extension registries (components, extensions, database objects)
-  - `global/` - Global exports (`mailspring-exports`, `mailspring-component-kit`)
 
 - **`features/`** - Built-in packages that always load (composer, message-list, thread-list, preferences, main-calendar, etc.)
 - **`plugins/`** - Bundled optional packages (`isOptional: true`, can be turned off via `core.disabledPackages`), e.g. activity, send-later, translation
@@ -63,7 +68,7 @@ All three package dirs sit at the same depth, so packages import core code as `.
 
 - **`spec/`** - Jasmine test specs
 
-Code outside `src/main/` and `src/shared/` runs in the windows and must not import `src/main/`; `src/main/` and `src/shared/` must not import window code, except `flux/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions (warnings for now).
+Code outside `src/main/` and `src/shared/` runs in the windows and must not import `src/main/`; `src/main/` and `src/shared/` must not import window code, except `flux/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
 
 ### Dependencies and packaging
 

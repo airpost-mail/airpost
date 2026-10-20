@@ -10,7 +10,7 @@ const appDir = path.resolve(__dirname, '..');
 const barrels = process.argv.slice(2).length
   ? process.argv.slice(2).map((file) => path.resolve(file))
   : ['mailspring-exports.d.ts', 'mailspring-component-kit.d.ts'].map((file) =>
-      path.join(appDir, 'src', 'global', file)
+      path.join(appDir, 'src', 'plugin-api', file)
     );
 
 const configPath = path.join(appDir, 'tsconfig.json');

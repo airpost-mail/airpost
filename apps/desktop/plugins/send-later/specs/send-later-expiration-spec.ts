@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 import { DraftStore, Message } from 'mailspring-exports';
-import { EngineEvents } from '../../../src/engine-events';
+import { EngineEvents } from '../../../src/engine/engine-events';
 import { Feature } from '../../../src/shared/engine-protocol';
 import { handleMetadataExpiration } from '../lib/main';
 import { PLUGIN_ID } from '../lib/send-later-constants';

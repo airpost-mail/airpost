@@ -18,12 +18,12 @@ import {
   LABEL_COLOR_SCHEMES,
   LABEL_COLOR_SCHEME_NAMES,
 } from '../../../../src/flux/stores/label-color-store';
-import LessCompileCache from '../../../../src/compile-cache-less';
+import LessCompileCache from '../../../../src/plugin-host/compile-cache-less';
 import {
   AUTOMATIC_THEME_NAME,
   LIGHT_THEME_NAME,
   DARK_THEME_NAME,
-} from '../../../../src/theme-manager';
+} from '../../../../src/plugin-host/theme-manager';
 
 const THEME_ORDER = [
   LIGHT_THEME_NAME,

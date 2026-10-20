@@ -5,9 +5,9 @@ import childProcess, { ChildProcess } from 'child_process';
 import { LRUCache } from 'lru-cache';
 import Sqlite3 from 'better-sqlite3';
 
-import { ExponentialBackoffScheduler } from '../../backoff-schedulers';
+import { ExponentialBackoffScheduler } from '../../utils/backoff-schedulers';
 import { Model } from '../models/model';
-import MailspringStore from '../../global/mailspring-store';
+import MailspringStore from '../../plugin-api/mailspring-store';
 import * as Utils from '../models/utils';
 import Query, { ModelQueryJSON } from '../models/query';
 import EngineReads from './engine-reads';

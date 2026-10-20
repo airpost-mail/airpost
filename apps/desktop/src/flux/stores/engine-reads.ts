@@ -17,7 +17,7 @@ same deltas.
 Emits 'resync' and 'state' (when unavailable() may have changed).
 */
 import { EventEmitter } from 'events';
-import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine-events';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/engine-events';
 import { Feature, Method, QueryResult } from '../../shared/engine-protocol';
 import type { ModelQueryJSON } from '../models/query';
 

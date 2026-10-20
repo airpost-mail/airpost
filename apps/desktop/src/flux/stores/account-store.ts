@@ -3,15 +3,15 @@
 import _ from 'underscore';
 
 import MailspringStore from 'mailspring-store';
-import KeyManager from '../../key-manager';
-import { revokeOAuthGrant } from '../../oauth-revocation';
-import * as EngineAccounts from '../../engine-accounts';
+import KeyManager from '../../window/key-manager';
+import { revokeOAuthGrant } from '../../engine/oauth-revocation';
+import * as EngineAccounts from '../../engine/engine-accounts';
 import * as Actions from '../actions';
 import { Account } from '../models/account';
 import { Thread } from '../models/thread';
 import { Contact } from '../models/contact';
 import * as Utils from '../models/utils';
-import EngineEvents, { EngineNotification } from '../../engine-events';
+import EngineEvents, { EngineNotification } from '../../engine/engine-events';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../shared/config-keys';
 import {
   AccountChangedParams,

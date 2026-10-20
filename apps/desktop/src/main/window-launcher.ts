@@ -58,7 +58,7 @@ export default class WindowLauncher {
       safeMode,
       resizable: true,
       windowType: WindowLauncher.EMPTY_WINDOW,
-      bootstrapScript: require.resolve('../secondary-window-bootstrap'),
+      bootstrapScript: require.resolve('../window/secondary-window-bootstrap'),
       resourcePath,
       configDirPath,
     };

@@ -5,7 +5,7 @@ import { Thread } from '../models/thread';
 import EngineEvents, {
   EngineEvents as EngineEventsType,
   ThreadCountsDelta,
-} from '../../engine-events';
+} from '../../engine/engine-events';
 import { CountsGetResult, Feature, Method } from '../../shared/engine-protocol';
 
 interface ThreadCountRow {

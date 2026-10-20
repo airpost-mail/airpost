@@ -269,7 +269,7 @@ export default class WindowManager {
       // The toolbar's menu button is the only menu access on Windows; Linux follows
       // core.workspace.menubarStyle via WindowLauncher.createDefaultWindowOpts.
       neverClose: true,
-      bootstrapScript: require.resolve('../window-bootstrap'),
+      bootstrapScript: require.resolve('../window/window-bootstrap'),
       mainWindow: true,
       width: 900, // Gets changed based on previous settings
       height: 600, // Gets changed based on previous settings

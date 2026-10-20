@@ -119,7 +119,7 @@ const SITES: Site[] = [
   // Thread lists: MailboxPerspective.threads(), paged by QuerySubscription._getQueryForRange.
   {
     name: 'inbox-page-1',
-    site: 'src/mailbox-perspective.ts CategoryMailboxPerspective.threads',
+    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox'])])
@@ -129,7 +129,7 @@ const SITES: Site[] = [
   },
   {
     name: 'inbox-page-2',
-    site: 'src/mailbox-perspective.ts CategoryMailboxPerspective.threads',
+    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox'])])
@@ -150,7 +150,7 @@ const SITES: Site[] = [
   },
   {
     name: 'unified-inbox',
-    site: 'src/mailbox-perspective.ts CategoryMailboxPerspective.threads',
+    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox', 'f-a2-inbox'])])
@@ -160,7 +160,7 @@ const SITES: Site[] = [
   },
   {
     name: 'sent',
-    site: 'src/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)',
+    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-sent', 'f-a2-sent'])])
@@ -171,7 +171,7 @@ const SITES: Site[] = [
   },
   {
     name: 'trash',
-    site: 'src/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)',
+    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-trash'])])
@@ -180,7 +180,7 @@ const SITES: Site[] = [
   },
   {
     name: 'two-categories-distinct',
-    site: 'src/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)',
+    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox', 'f-a1-work'])])
@@ -191,7 +191,7 @@ const SITES: Site[] = [
   },
   {
     name: 'label',
-    site: 'src/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)',
+    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['l-a2-travel'])])
@@ -201,7 +201,7 @@ const SITES: Site[] = [
   },
   {
     name: 'starred-all-accounts',
-    site: 'src/mailbox-perspective.ts StarredMailboxPerspective.threads',
+    site: 'src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.starred.equal(true), Thread.attributes.inAllMail.equal(true)])
@@ -210,7 +210,7 @@ const SITES: Site[] = [
   },
   {
     name: 'starred-one-account',
-    site: 'src/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)',
+    site: 'src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.starred.equal(true), Thread.attributes.inAllMail.equal(true)])
@@ -220,7 +220,7 @@ const SITES: Site[] = [
   },
   {
     name: 'empty-perspective',
-    site: 'src/mailbox-perspective.ts EmptyMailboxPerspective.threads',
+    site: 'src/flux/mailbox-perspective.ts EmptyMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread).where({ lastMessageReceivedTimestamp: -1 }).limit(0),
   },
@@ -493,12 +493,12 @@ const SITES: Site[] = [
   // Categories and tasks.
   {
     name: 'folders',
-    site: 'src/global/mailspring-observables.ts categories',
+    site: 'src/plugin-api/mailspring-observables.ts categories',
     build: () => DatabaseStore.findAll<Folder>(Folder),
   },
   {
     name: 'labels-for-account',
-    site: 'src/global/mailspring-observables.ts forAccount',
+    site: 'src/plugin-api/mailspring-observables.ts forAccount',
     build: () => DatabaseStore.findAll<Label>(Label).where({ accountId: A2 }),
   },
   {

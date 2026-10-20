@@ -1,4 +1,4 @@
-import MenuManager from '../src/menu-manager';
+import MenuManager from '../src/window/menu-manager';
 
 describe('MenuManager', function () {
   let menu = null;

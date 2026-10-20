@@ -3,7 +3,7 @@ import path from 'path';
 import { Model, AttributeValues } from './model';
 import * as Attributes from '../attributes';
 import { localized } from '../../shared/intl';
-import RegExpUtils from '../../regexp-utils';
+import RegExpUtils from '../../utils/regexp-utils';
 
 /**
 Public: File model represents an email attachment.

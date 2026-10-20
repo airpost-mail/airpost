@@ -1,7 +1,7 @@
 import { MailspringCalendar } from '../lib/core/calendar-view';
 import { TimedOccurrence } from '../lib/core/calendar-data-source';
 import { DEFAULT_DRAG_CONFIG } from '../lib/core/calendar-drag-types';
-import * as CalendarDateUtils from '../../../src/calendar-date';
+import * as CalendarDateUtils from '../../../src/utils/calendar-date';
 import * as CalendarRsvp from '../lib/core/calendar-rsvp';
 import { CalendarView } from '../lib/core/calendar-constants';
 

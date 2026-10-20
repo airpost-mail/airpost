@@ -3,7 +3,7 @@
 
 import { _AccountStore } from '../../src/flux/stores/account-store';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../src/shared/config-keys';
-import { EngineEvents } from '../../src/engine-events';
+import { EngineEvents } from '../../src/engine/engine-events';
 import { Feature, Method } from '../../src/shared/engine-protocol';
 
 const flush = async () => {

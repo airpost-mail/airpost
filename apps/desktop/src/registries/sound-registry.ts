@@ -1,5 +1,5 @@
 import path from 'path';
-import NativeNotifications from '../native-notifications';
+import NativeNotifications from '../platform/native-notifications';
 
 class SoundRegistry {
   private _sounds = {};

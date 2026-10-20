@@ -9,7 +9,7 @@ import {
   readSettings,
   toIntegrationError,
   IntegrationErrorKey,
-} from '../src/integrations';
+} from '../src/engine/integrations';
 
 // Synthetic keys only: the keyset is a plain object here and the real KeyManager is never used.
 function fakeKeys(keys: { [name: string]: string }) {

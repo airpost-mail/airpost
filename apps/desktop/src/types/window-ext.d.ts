@@ -1,7 +1,7 @@
 export {};
 
 declare global {
-  const AppEnv: import('../app-env').default;
+  const AppEnv: import('../window/app-env').default;
 
   // Extensions to globalThis for main process
   // eslint-disable-next-line no-var
@@ -11,7 +11,7 @@ declare global {
 
   interface Window {
     $m: any;
-    AppEnv: import('../app-env').default;
+    AppEnv: import('../window/app-env').default;
     jasmine: any;
     // requestIdleCallback and cancelIdleCallback are now built-in to TypeScript's DOM lib
   }

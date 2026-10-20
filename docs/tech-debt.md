@@ -498,7 +498,7 @@ Verified.
    The extractor hasn't run since the Tern additions, and rebrand edits change English keys and
    drop their translations.
 4. No plurals; counts are concatenated (`activity-list-item-container.tsx:45-51`).
-5. moment's locale comes from `navigator.language` (`src/date-utils.ts:4`), UI strings from
+5. moment's locale comes from `navigator.language` (`src/utils/date-utils.ts:4`), UI strings from
    `core.intl.language`.
 
 - Cost: broken strings in zh-CN; close to half the UI untranslated in de/fr/ja/es unnoticed.
@@ -728,7 +728,7 @@ a second app instance (inferred).
 ### TD29. No plugin trust model before the `Engine` export and service plugins (before stage 2)
 
 Inferred from the plan and code. Plugins load from `<config>/packages` with full Node
-(`src/package-manager.ts:35-40`) after a warning dialog (`:167-178`). `Engine.request` (stage 5)
+(`src/plugin-host/package-manager.ts:35-40`) after a warning dialog (`:167-178`). `Engine.request` (stage 5)
 goes over the desktop's own local connection, so T13's local-only class never applies to plugin
 calls: a plugin can call `account.setSecrets`, `engine.logs.tail` or `engine.resetDatabase`. Stage 19
 lets a manifest install a launchd or systemd unit. Packages record no source or hash.
@@ -741,7 +741,7 @@ lets a manifest install a launchd or systemd unit. Packages record no source or 
   `tern service install`. Record install source and hash in Preferences > Plugins (TD30).
 - Size: ~200 TS plus docs. Before stage 2 sets `PLUGIN_API_VERSION` and the `tern` block.
 
-Done in part (roadmap/client-next, stage 5). `src/engine-api.ts` and
+Done in part (roadmap/client-next, stage 5). `src/engine/engine-api.ts` and
 `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (Trust Model) say plugins are fully trusted code and
 that the check below is no security boundary. `Engine.request` finds the calling package from the
 call's stack (the first frame outside the app's `src/` and `node_modules`, matched to a loaded
@@ -765,7 +765,7 @@ open: plugins copied into `packages/` by hand have no record, and approvals for
 ### TD30. Plugins can't be disabled from the UI; dead and placeholder plugins (stage 2)
 
 Verified. Preferences has no Plugins tab (`features/preferences/lib/main.tsx:14-55`).
-`core.disabledPackages` is honoured only for `isOptional` packages (`src/package-manager.ts:107-108`),
+`core.disabledPackages` is honoured only for `isOptional` packages (`src/plugin-host/package-manager.ts:107-108`),
 so a third-party plugin can't be disabled short of deleting it, and optional built-ins only by
 editing `config.json`. `phishing-detection` ships in the template's `disabledPackages`
 (`default-profile/config.json`) and is marked `isHiddenOnPluginsPage`, which no code reads. The
@@ -790,7 +790,7 @@ disabled toolbar button (`thread-sharing/lib/thread-sharing-button.tsx`).
 Verified. The only `<Webview>` user was the Mailspring ID sign-in (removed in 27f713bf6), but
 `src/main/app-window.ts:128` still enables the tag in every Node-enabled window, the
 `will-attach-webview` comment (`:163-167`) names an onboarding guest that's gone, and the component
-is exported to plugins (`src/global/mailspring-component-kit.js:70`). `webview.tsx:152-161` opens
+is exported to plugins (`src/plugin-api/mailspring-component-kit.js:70`). `webview.tsx:152-161` opens
 any http(s) URL a guest logs to the console, with no user gesture. Also dead:
 `onboarding/lib/page-top-bar.tsx:12-14`, `chromium-net-errors` (only used by `webview.tsx`), the
 `changePluginStateFromUrl` route with no listener (`src/main/application.ts:1061-1062`), and the
@@ -911,8 +911,8 @@ Verified. `src/main/main.js:364` initialises remote and `app-window.ts:180-181` 
 per webContents. 130 references in 62 files (126 lines in 58 `.ts`/`.tsx`; 35 files in
 `features/` and `plugins/`). Ten sites call `getGlobal('application')` for `configPersistenceManager`,
 `windowManager`, `autoUpdateManager`, `applicationMenu`, `openUrl` and `isQuitting`
-(`src/shared/config.ts:17-19`, `src/app-env.ts:898-902`, `src/window-event-handler.ts:311`, `:368`,
-`src/sheet-toolbar.tsx:182`, `update-notification.tsx:36`, `unsubscribe-service.ts:145`). Every
+(`src/shared/config.ts:17-19`, `src/window/app-env.ts:898-902`, `src/window/window-event-handler.ts:311`, `:368`,
+`src/components/sheets/sheet-toolbar.tsx:182`, `update-notification.tsx:36`, `unsubscribe-service.ts:145`). Every
 `AppEnv.config.set` is a sync remote call (`config.ts:747`), as is the initial read (`:735`). About
 20 renderer-side `showMessageBoxSync` calls go through remote, including `AppEnv.showErrorDialog`
 (~75 call lines). The exposed HTML that actually lands in the main document is pasted or dropped
@@ -941,10 +941,10 @@ composer HTML (sanitised by hand because of this, `composer-editor.tsx:287-289`,
 ### TD36. Store graph held together by the barrel and require order (before stage 6)
 
 Verified. 77 non-spec files in `src/` import the plugin barrel `mailspring-exports`, which lazily
-requires those files back (`src/global/mailspring-exports.js:1-48`). About 38 function-scope
+requires those files back (`src/plugin-api/mailspring-exports.js:1-48`). About 38 function-scope
 `require('./…')` calls break cycles (e.g. `src/flux/models/account.ts:150`, `:220`;
 `message-store.ts:92`; `query-subscription-pool.ts:110`). The barrel resolves through
-`app-module-path` (`src/app-env.ts:70`), and `.eslintrc` lists it under `import/core-modules`, so
+`app-module-path` (`src/window/app-env.ts:70`), and `.eslintrc` lists it under `import/core-modules`, so
 `import/no-cycle` never sees these cycles. 27 `load()` entries (24 stores plus DraftEditingSession,
 DraftFactory, MessageBodyProcessor; `:129-155`) are touched on nextTick (`:234-240`) in every window,
 so composer, popout and onboarding build the whole graph; 13 `isMainWindow()` checks in
@@ -964,7 +964,7 @@ so composer, popout and onboarding build the whole graph; 13 `isMainWindow()` ch
 
 ### TD37. `AppEnv` is an undeclared plugin API (stage 6)
 
-Verified. `src/app-env.ts` (1,002 lines, ~90 members) mixes geometry, dialogs, error reporting,
+Verified. `src/window/app-env.ts` (1,002 lines, ~90 members) mixes geometry, dialogs, error reporting,
 config, packages, themes, commands, spellchecker, menus and the engine bridge. Plugins use it
 heavily (`AppEnv.config` 257 uses, `showErrorDialog` ~75, `savedState` 47, `commands` 31), but the
 plan's Tier A–D lists cover exports only. Stage 6 moves supervision out of `MailsyncBridge`, yet
@@ -984,8 +984,8 @@ nine built-in sites call `AppEnv.mailsyncBridge` (`events/lib/main.tsx:43`,
 
 ### TD38. Deltas fan out unbatched through four event systems (stage 6; rx-lite after stage 8)
 
-Verified. Actions use Reflux (TD24), stores their own emitter (`src/global/mailspring-store.ts`),
-queries rx-lite 4.0.8 (deprecated since 2016, 23 files, `src/global/mailspring-observables.ts`),
+Verified. Actions use Reflux (TD24), stores their own emitter (`src/plugin-api/mailspring-store.ts`),
+queries rx-lite 4.0.8 (deprecated since 2016, 23 files, `src/plugin-api/mailspring-observables.ts`),
 Atom-era code event-kit (16 files). `DatabaseStore.trigger` fires once per incoming delta record
 (`src/flux/mailsync-bridge.ts:499`, `:524`).
 
@@ -1067,7 +1067,7 @@ registry listener (`ComponentRegistry.listenShared`) and `AccountColorBar` one A
 listener; checked in `spec/components/shared-store-listeners-spec.tsx`, not yet in devtools.
 
 Inferred: the warning's source isn't confirmed in devtools. `MailspringStore` caps listeners at 250
-(`src/global/mailspring-store.ts:96-104`), so the "251 trigger listeners" warning comes from a
+(`src/plugin-api/mailspring-store.ts:96-104`), so the "251 trigger listeners" warning comes from a
 `MailspringStore` subclass. Every `InjectedComponent` and `InjectedComponentSet` adds its own
 `ComponentRegistry.listen` (`src/components/injected-component.tsx:86`,
 `injected-component-set.tsx:116-119`), and each thread row has three
@@ -1214,7 +1214,7 @@ timeout, and the code's own comment says ~30 s (`onboarding-helpers.ts:65-76`).
 
 ### TD48. Three 12/24-hour rules; English 12-hour reply attribution (before stage 13)
 
-Verified. 12/24h comes from `core.workspace.use24HourClock` (`src/date-utils.ts:400-500`), moment's
+Verified. 12/24h comes from `core.workspace.use24HourClock` (`src/utils/date-utils.ts:400-500`), moment's
 `LT` (`src/components/time-picker.tsx:144`, `main-calendar/lib/core/calendar-helpers.tsx:377`), or
 hard-coded `h:mm A` in eight places (`calendar-event-popover.tsx:971-976`,
 `calendar-drag-utils.ts:495-496`, `event-search-bar.tsx:209-214`,
@@ -1286,7 +1286,7 @@ row. Inherited.
 ### TD51. Three timezone databases, two copies of ical.js (after stage 18)
 
 Verified. moment and moment-timezone 0.6 (34 and 14 files) bring their own tz data; the lock has
-ical.js 2.2.1 at the top level and 1.5.0 nested under ical-expander; `src/calendar-utils.ts:78`
+ical.js 2.2.1 at the top level and 1.5.0 nested under ical-expander; `src/utils/calendar-utils.ts:78`
 registers VTIMEZONEs only on 2.2.1. The engine uses chrono-tz.
 
 - Cost: zone fixes have to be made in two places, and desktop and engine can disagree on
@@ -1301,7 +1301,7 @@ registers VTIMEZONEs only on 2.2.1. The engine uses chrono-tz.
 Verified. React and react-dom 17.0.2 (`apps/desktop/package.json:59`, `:61`), react-test-renderer 17 and
 `@testing-library/react` 12 to match. `findDOMNode` 148 hits in 69 files (e.g.
 `src/components/fixed-popover.tsx:78`, `:81`), string refs 37 in 17 files, `this.refs` 44,
-`ReactDOM.render` 12 in 8 files (`src/app-env.ts:839`, `modal-store.tsx:23`, `popover-store.tsx:22`,
+`ReactDOM.render` 12 in 8 files (`src/window/app-env.ts:839`, `modal-store.tsx:23`, `popover-store.tsx:22`,
 `create-page-for-form.tsx:203`), `createRoot` 0. No `UNSAFE_` lifecycles remain. 244 class
 components against 7 hook uses.
 

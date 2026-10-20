@@ -49,7 +49,7 @@ export const ENGINE_SETTINGS_KEYS = [
   'core.integrations.translation',
   'core.integrations.grammar',
   'core.integrations.enrichment',
-  // The AI providers (without keys), switches and opted-in accounts (src/ai.ts); background
+  // The AI providers (without keys), switches and opted-in accounts (src/engine/ai.ts); background
   // triage reads them from the engine's store. `core.ai.limits` has no UI yet.
   'core.ai.providers',
   'core.ai.features',

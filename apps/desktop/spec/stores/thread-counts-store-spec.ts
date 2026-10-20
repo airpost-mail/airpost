@@ -3,7 +3,7 @@
 
 import DatabaseStore from '../../src/flux/stores/database-store';
 import { ThreadCountsStore } from '../../src/flux/stores/thread-counts-store';
-import { EngineEvents } from '../../src/engine-events';
+import { EngineEvents } from '../../src/engine/engine-events';
 import { Feature, Method } from '../../src/shared/engine-protocol';
 
 const flush = async () => {

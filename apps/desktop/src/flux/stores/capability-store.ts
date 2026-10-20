@@ -14,9 +14,9 @@
 import { useEffect, useState } from 'react';
 import MailspringStore from 'mailspring-store';
 import { localized } from '../../shared/intl';
-import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine-events';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/engine-events';
 import { CapabilityReason, EngineCapability, Feature } from '../../shared/engine-protocol';
-import AI, { AiFeature, AiProvider } from '../../ai';
+import AI, { AiFeature, AiProvider } from '../../engine/ai';
 import {
   Integrations,
   IntegrationKind,
@@ -25,7 +25,7 @@ import {
   keyName,
   missingSetting,
   readSettings,
-} from '../../integrations';
+} from '../../engine/integrations';
 
 export type CapabilitySource = 'local' | 'integration' | 'ai' | 'server';
 
@@ -284,7 +284,7 @@ export class CapabilityStoreClass extends MailspringStore {
   }
 
   private _keys(): KeySource {
-    return this.keySource || require('../../key-manager').default;
+    return this.keySource || require('../../window/key-manager').default;
   }
 
   // Only reads the keyset when an integration is turned on, so a profile without integrations
