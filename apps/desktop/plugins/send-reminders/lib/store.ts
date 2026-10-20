@@ -9,8 +9,8 @@ import {
 } from 'mailspring-exports';
 import BaseStore from 'mailspring-store';
 
-import EngineEvents from '../../../src/engine/events';
-import { Feature } from '../../../src/shared/engine/protocol';
+import EngineEvents from '../../../src/engine/client/events';
+import { Feature } from '../../../src/engine/protocol';
 import { resurfacingBodies } from '../../../src/shared/resurfacing';
 import { PLUGIN_ID } from './constants';
 import { updateReminderMetadata } from './utils';

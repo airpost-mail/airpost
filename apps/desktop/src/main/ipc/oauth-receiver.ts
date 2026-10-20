@@ -16,7 +16,7 @@ import http from 'http';
 import crypto from 'crypto';
 import url from 'url';
 import { localized } from '../../shared/intl';
-import { OAuthReceiverChannel, OAuthRedirect } from '../../shared/engine/supervisor-channels';
+import { OAuthReceiverChannel, OAuthRedirect } from '../../engine/channels';
 
 export const OAUTH_RECEIVER_HOST = '127.0.0.1';
 // How long a sign-in may wait for the browser.

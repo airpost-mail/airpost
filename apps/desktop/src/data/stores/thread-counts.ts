@@ -5,8 +5,8 @@ import { Thread } from '../models/thread';
 import EngineEvents, {
   EngineEvents as EngineEventsType,
   ThreadCountsDelta,
-} from '../../engine/events';
-import { CountsGetResult, Feature, Method } from '../../shared/engine/protocol';
+} from '../../engine/client/events';
+import { CountsGetResult, Feature, Method } from '../../engine/protocol';
 
 interface ThreadCountRow {
   categoryId: string;

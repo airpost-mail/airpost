@@ -10,10 +10,10 @@ from KeyManager (in main too), stores the rotated tokens serve reports on stdout
 EngineClient's relaunch rules, and makes the stdin-only calls windows ask for over IPC
 (account.test, account.reset, engine.resetDatabase, engine.setLogLevel).
 
-Windows open their own socket connections (src/engine/connection.ts) once Status names a
+Windows open their own socket connections (src/engine/client/connection.ts) once Status names a
 ready engine. Its own connection subscribes to no model class, which leaves the deltas and the
 first subscriber's backlog to the windows and still brings it every `account.state` and
-`settings.changed`; it also carries the engine-owned settings (src/main/engine/settings.ts). Account
+`settings.changed`; it also carries the engine-owned settings (src/engine/supervisor/settings.ts). Account
 events (launched, exited, too many failures) go to the main window, which updates AccountStore
 and OnlineStatusStore; it acks them, and those not acked are handed to its next renderer.
 
@@ -42,8 +42,13 @@ import {
   EngineServeProcess,
   MailsyncProcessExit,
   ResetOptions,
-} from '../../shared/engine/process';
-import { AccountSecretsJSON, isAccountSecretKey, KeyManager, KeySet } from '../profile/key-manager';
+} from '../process';
+import {
+  AccountSecretsJSON,
+  isAccountSecretKey,
+  KeyManager,
+  KeySet,
+} from '../../main/profile/key-manager';
 import {
   CredentialsImportParams,
   Feature,
@@ -51,14 +56,9 @@ import {
   Method,
   PROTOCOL_VERSION,
   SettingsValues,
-} from '../../shared/engine/protocol';
+} from '../protocol';
 import type { EngineSettingsMirror } from './settings';
-import {
-  AccountEvent,
-  EngineAccountRoute,
-  EngineStatus,
-  SupervisorChannel,
-} from '../../shared/engine/supervisor-channels';
+import { AccountEvent, EngineAccountRoute, EngineStatus, SupervisorChannel } from '../channels';
 
 const VERBOSE_UNTIL_KEY = 'core.sync.verboseUntil';
 const SECRETS_UPDATED = 'ProcessAccountSecretsUpdated';

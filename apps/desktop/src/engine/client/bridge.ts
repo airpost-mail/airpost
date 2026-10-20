@@ -1,32 +1,23 @@
 import path from 'path';
 import { ipcRenderer } from 'electron';
-import { localized } from '../shared/intl';
+import { localized } from '../../shared/intl';
 
-import { Task } from '../data/tasks/task';
-import TaskQueue from '../data/stores/task-queue';
+import { Task } from '../../data/tasks/task';
+import TaskQueue from '../../data/stores/task-queue';
 
-import { Account } from '../data/models/account';
-import { AccountStore } from '../data/stores/account';
-import DatabaseStore from '../data/database/store';
-import OnlineStatusStore from '../data/stores/online-status';
-import { DatabaseChangeRecord } from '../data/database/change-record';
-import DatabaseObjectRegistry from '../data/database-object-registry';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
+import DatabaseStore from '../../data/database/store';
+import OnlineStatusStore from '../../data/stores/online-status';
+import { DatabaseChangeRecord } from '../../data/database/change-record';
+import DatabaseObjectRegistry from '../../data/database-object-registry';
 import { EngineConnection } from './connection';
 import EngineEvents, { EngineEvents as EngineEventsType } from './events';
 import { wireIntegrationsTransport } from './api';
-import {
-  LogsTailParams,
-  LogsTailResult,
-  Method,
-  THREAD_COUNTS_CLASS,
-} from '../shared/engine/protocol';
-import {
-  AccountEvent,
-  EngineStatus,
-  SupervisorChannel,
-} from '../shared/engine/supervisor-channels';
-import * as Actions from '../data/actions';
-import * as Utils from '../data/models/utils';
+import { LogsTailParams, LogsTailResult, Method, THREAD_COUNTS_CLASS } from '../protocol';
+import { AccountEvent, EngineStatus, SupervisorChannel } from '../channels';
+import * as Actions from '../../data/actions';
+import * as Utils from '../../data/models/utils';
 import { Model } from 'mailspring-exports';
 
 const VERBOSE_UNTIL_KEY = 'core.sync.verboseUntil';
@@ -161,7 +152,7 @@ function runTaskHandlers(record: DatabaseChangeRecord<Model>) {
 
 /*
 The windows' side of the sync engine. The main process supervises the `serve` engine
-(main/engine/supervisor.ts) and every window reads deltas on its own socket connection; the
+(engine/supervisor/supervisor.ts) and every window reads deltas on its own socket connection; the
 main window also sends its accounts' commands on it and applies the supervisor's account events.
 */
 export default class MailsyncBridge {

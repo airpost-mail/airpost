@@ -6,12 +6,12 @@ import net from 'net';
 import { ipcRenderer } from 'electron';
 import DatabaseStore from '../../src/data/database/store';
 import { ThreadCountsStore } from '../../src/data/stores/thread-counts';
-import DefaultEngineEvents, { EngineEvents } from '../../src/engine/events';
-import { EngineConnection } from '../../src/engine/connection';
-import { Feature } from '../../src/shared/engine/protocol';
-import { applyDeltas, feedEngineEvents } from '../../src/engine/bridge';
+import DefaultEngineEvents, { EngineEvents } from '../../src/engine/client/events';
+import { EngineConnection } from '../../src/engine/client/connection';
+import { Feature } from '../../src/engine/protocol';
+import { applyDeltas, feedEngineEvents } from '../../src/engine/client/bridge';
 import { Notifier } from '../../src/features/unread-notifications';
-import { EngineStatus } from '../../src/shared/engine/supervisor-channels';
+import { EngineStatus } from '../../src/engine/channels';
 import { FakeEngine, until } from '../support/fake-serve-engine';
 import { EngineReads } from '../../src/data/database/engine-reads';
 

@@ -1,5 +1,5 @@
-import KeyManager from '../window/key-manager';
-import { Account } from '../data/models/account';
+import KeyManager from '../../window/key-manager';
+import { Account } from '../../data/models/account';
 
 // https://developers.google.com/identity/protocols/oauth2#tokenrevoke
 const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';

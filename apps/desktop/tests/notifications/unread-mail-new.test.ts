@@ -11,8 +11,8 @@ import {
 } from 'mailspring-exports';
 
 import { Notifier } from '../../src/features/unread-notifications';
-import { EngineEvents } from '../../src/engine/events';
-import { Feature } from '../../src/shared/engine/protocol';
+import { EngineEvents } from '../../src/engine/client/events';
+import { Feature } from '../../src/engine/protocol';
 
 describe('UnreadNotifications on mail.new', function () {
   beforeEach(function () {

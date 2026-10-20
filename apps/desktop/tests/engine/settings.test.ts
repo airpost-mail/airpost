@@ -4,7 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 import ConfigPersistenceManager, { registerConfigIPC } from '../../src/config/persistence-manager';
-import { EngineSupervisor, SupervisorConfig } from '../../src/main/engine/supervisor';
+import { EngineSupervisor, SupervisorConfig } from '../../src/engine/supervisor/supervisor';
 import {
   COPIED_KEY,
   ENGINE_SETTINGS_KEYS,
@@ -12,11 +12,11 @@ import {
   KEPT_KEY,
   STORE_KEY,
   touchesKey,
-} from '../../src/main/engine/settings';
+} from '../../src/engine/supervisor/settings';
 import { KeyManager } from '../../src/main/profile/key-manager';
 import { ConfigChannel } from '../../src/config/channels';
 import { resurfacingBodies } from '../../src/shared/resurfacing';
-import { EngineServeProcess } from '../../src/shared/engine/process';
+import { EngineServeProcess } from '../../src/engine/process';
 import { FakeEngine, until } from '../support/fake-serve-engine';
 
 // The supervisor reads only `accounts`, the deleted ones and the log level from the main

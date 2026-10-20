@@ -7,7 +7,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { AccountStore } from 'mailspring-exports';
-import { exportContacts, saveContact } from '../../src/engine/pim';
+import { exportContacts, saveContact } from '../../src/engine/client/pim';
 import { importContactsFromPaths, writeContactsToTempVCF } from '../../src/features/contacts/files';
 import { fakePimEngine, flush } from '../support/fake-pim-engine';
 

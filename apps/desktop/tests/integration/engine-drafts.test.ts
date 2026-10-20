@@ -15,9 +15,9 @@ import {
   Thread,
   UndoRedoStore,
 } from 'mailspring-exports';
-import EngineEvents from '../../src/engine/events';
-import { Feature, Method } from '../../src/shared/engine/protocol';
-import { isEngineBuilt } from '../../src/engine/drafts';
+import EngineEvents from '../../src/engine/client/events';
+import { Feature, Method } from '../../src/engine/protocol';
+import { isEngineBuilt } from '../../src/engine/client/drafts';
 import DraftFactory from '../../src/data/drafts/factory';
 import { sendMessageNow } from '../../src/features/undo-redo/toast';
 

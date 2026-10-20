@@ -47,8 +47,8 @@ import { EventPopoverActions } from './popover-actions';
 import { TimeZoneSelector } from './timezone-selector';
 import { parseEventIdFromOccurrence } from '../drag-utils';
 import { showRecurringEventDialog } from './recurring-dialog';
-import { editEvent } from '../../../engine/pim';
-import type { EventPatch } from '../../../shared/engine/protocol';
+import { editEvent } from '../../../engine/client/pim';
+import type { EventPatch } from '../../../engine/protocol';
 
 /**
  * Convert a RepeatOption UI value to an RRULE string (or null for 'none').

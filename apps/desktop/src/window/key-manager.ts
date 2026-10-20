@@ -7,11 +7,7 @@ KeyManager (main/profile/key-manager.ts), which owns safeStorage, the keyset in 
 Mailspring keychain migration. Exported to plugins as `KeyManager`.
 */
 import { Account } from '../data/models/account';
-import {
-  KEY_MANAGER_CHANNEL,
-  KeyManagerMethod,
-  KeyManagerReply,
-} from '../shared/engine/supervisor-channels';
+import { KEY_MANAGER_CHANNEL, KeyManagerMethod, KeyManagerReply } from '../engine/channels';
 
 interface KeySet {
   [key: string]: string;

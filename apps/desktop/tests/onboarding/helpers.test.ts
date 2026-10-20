@@ -1,6 +1,6 @@
 import { Account, AccountStore } from 'mailspring-exports';
-import EngineEvents from '../../src/engine/events';
-import { ErrorCode, Feature } from '../../src/shared/engine/protocol';
+import EngineEvents from '../../src/engine/client/events';
+import { ErrorCode, Feature } from '../../src/engine/protocol';
 import {
   expandAccountWithCommonSettings,
   finalizeAndValidateAccount,

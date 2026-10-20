@@ -6,9 +6,9 @@ import ReactDOM from 'react-dom';
 import { ipcRenderer } from 'electron';
 import { Folder, Message, Thread, MailboxPerspective } from 'mailspring-exports';
 import ThreadListDataSource from '../../src/features/thread-list/data-source';
-import EngineEvents from '../../src/engine/events';
+import EngineEvents from '../../src/engine/client/events';
 import EngineReads, { READ_WAIT_MS } from '../../src/data/database/engine-reads';
-import { SupervisorChannel } from '../../src/shared/engine/supervisor-channels';
+import { SupervisorChannel } from '../../src/engine/channels';
 import {
   EngineUnavailableState,
   SHOW_WAITING_AFTER_MS,

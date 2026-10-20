@@ -139,7 +139,7 @@
         "src/features/print/window.ts",
         "src/features/system-tray/icon-store.ts",
         "src/features/thread-list/context-menu.ts",
-        "src/engine/bridge.ts",
+        "src/engine/client/bridge.ts",
         "src/data/stores/attachment.ts",
         "src/data/database/store.ts",
         "src/data/stores/message.ts",
@@ -149,7 +149,7 @@
         "src/packages/manager.ts",
         "src/mail/quick-preview/index.ts",
         "src/shared/default-client-helper.ts",
-        "src/shared/engine/process.ts",
+        "src/engine/process.ts",
         "src/window/app-env.ts",
         "src/window/spellchecker.ts",
         "src/window/event-handler.ts"
@@ -177,6 +177,7 @@
       "files": ["src/**", "plugins/**", "themes/**"],
       "excludedFiles": [
         "src/main/**",
+        "src/engine/supervisor/**",
         "src/config/migrator.ts",
         "src/config/persistence-manager.ts",
         "**/tests/**"
@@ -188,8 +189,13 @@
             "zones": [
               {
                 "target": ".",
-                "from": ["./src/main", "./src/config/migrator.ts", "./src/config/persistence-manager.ts"],
-                "message": "src/main/ and the config migrator and persistence manager are main-process code; window code reaches them over IPC. Code both processes load goes in src/shared/ or src/config/."
+                "from": [
+                  "./src/main",
+                  "./src/engine/supervisor",
+                  "./src/config/migrator.ts",
+                  "./src/config/persistence-manager.ts"
+                ],
+                "message": "src/main/, src/engine/supervisor/ and the config migrator and persistence manager are main-process code; window code reaches them over IPC. Code both processes load goes in src/shared/, src/config/ or the src/engine/ root."
               }
             ]
           }
@@ -197,7 +203,7 @@
       }
     },
     {
-      "files": ["src/main/**", "src/shared/**", "src/config/**"],
+      "files": ["src/main/**", "src/shared/**", "src/config/**", "src/engine/*.ts", "src/engine/supervisor/**"],
       "rules": {
         "import/no-restricted-paths": [
           "error",
@@ -210,11 +216,15 @@
                   "./main",
                   "./shared",
                   "./config",
+                  "./engine/protocol.ts",
+                  "./engine/process.ts",
+                  "./engine/channels.ts",
+                  "./engine/supervisor",
                   "./data/models/utils.ts",
                   "./data/database-object-registry.ts",
                   "./data/serializable-registry.ts"
                 ],
-                "message": "The main process loads src/main/, src/shared/ and src/config/ only (plus data/models/utils and the two registries it pulls in)."
+                "message": "The main process loads src/main/, src/shared/, src/config/, src/engine/supervisor/ and the src/engine/ root files only (plus data/models/utils and the two registries it pulls in)."
               },
               {
                 "target": ".",

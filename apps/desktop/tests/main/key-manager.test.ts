@@ -4,7 +4,7 @@ import {
   registerKeyManagerIPC,
   secureStorage,
 } from '../../src/main/profile/key-manager';
-import { KEY_MANAGER_CHANNEL } from '../../src/shared/engine/supervisor-channels';
+import { KEY_MANAGER_CHANNEL } from '../../src/engine/channels';
 import { mailspringKeychain, MigrationError } from '../../src/main/profile/mailspring-keychain';
 
 const CREDENTIALS_KEY = 'credentials';

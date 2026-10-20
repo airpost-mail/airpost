@@ -10,8 +10,8 @@ import path from 'path';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import net from 'net';
-import { localized } from '../intl';
-import { developerToolsAvailable } from '../developer-tools';
+import { localized } from '../shared/intl';
+import { developerToolsAvailable } from '../shared/developer-tools';
 import {
   AccountAddResult,
   AccountChangedParams,
@@ -265,7 +265,7 @@ export class MailsyncProcess extends EventEmitter {
   _nextRequestId = 1;
   _killed = false;
   // What the socket connection subscribes to. The main process's supervisor takes no model
-  // class, which still brings it every account.state (src/main/engine/supervisor.ts).
+  // class, which still brings it every account.state (src/engine/supervisor/supervisor.ts).
   subscription: SubscribeParams = { accounts: null, classes: null };
 
   verbose: boolean;

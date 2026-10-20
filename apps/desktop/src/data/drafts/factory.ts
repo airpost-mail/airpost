@@ -22,8 +22,8 @@ import {
   deepenPlaintextQuote,
   convertPlaintextToHTML,
 } from '../../components/composer-editor/plaintext';
-import { buildDraft, draftPipelineAvailable } from '../../engine/drafts';
-import { DraftCreateParams } from '../../shared/engine/protocol';
+import { buildDraft, draftPipelineAvailable } from '../../engine/client/drafts';
+import { DraftCreateParams } from '../../engine/protocol';
 
 let DraftStore: typeof import('./store').default = null;
 
@@ -72,7 +72,7 @@ class DraftFactory {
     return transformed;
   }
 
-  // Builds the draft in the engine when it has the draft pipeline (src/engine/drafts.ts).
+  // Builds the draft in the engine when it has the draft pipeline (src/engine/client/drafts.ts).
   // `fields` are Message attributes over what the kind builds.
   async _engineDraft(
     params: DraftCreateParams,

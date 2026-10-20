@@ -14,9 +14,9 @@
 import { useEffect, useState } from 'react';
 import BaseStore from 'mailspring-store';
 import { localized } from '../../shared/intl';
-import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/events';
-import { CapabilityReason, EngineCapability, Feature } from '../../shared/engine/protocol';
-import AI, { AiFeature, AiProvider } from '../../engine/ai';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
+import { CapabilityReason, EngineCapability, Feature } from '../../engine/protocol';
+import AI, { AiFeature, AiProvider } from '../../engine/client/ai';
 import {
   Integrations,
   IntegrationKind,
@@ -25,7 +25,7 @@ import {
   keyName,
   missingSetting,
   readSettings,
-} from '../../engine/integrations';
+} from '../../engine/client/integrations';
 
 export type CapabilitySource = 'local' | 'integration' | 'ai' | 'server';
 

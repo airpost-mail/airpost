@@ -6,7 +6,7 @@ import { ContactBase, ContactInteractorMetadata } from './types';
 import { ContactDetailRead } from './detail-read';
 import { ContactDetailEdit } from './detail-edit';
 import { Store, ContactsPerspective } from './store';
-import { getContact, saveContact } from '../../engine/pim';
+import { getContact, saveContact } from '../../engine/client/pim';
 
 interface ContactDetailProps {
   editing: string | 'new' | false;

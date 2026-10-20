@@ -24,10 +24,10 @@ import {
   DraftSendResult,
   Feature,
   Method,
-} from '../shared/engine/protocol';
-import { Message } from '../data/models/message';
-import { Task } from '../data/tasks/task';
-import { SyncbackMetadataTask } from '../data/tasks/syncback-metadata';
+} from '../protocol';
+import { Message } from '../../data/models/message';
+import { Task } from '../../data/tasks/task';
+import { SyncbackMetadataTask } from '../../data/tasks/syncback-metadata';
 
 // The built-in prepareNewDraft hooks `draft.create` already ran.
 export const ENGINE_PREPARED_EXTENSIONS = [

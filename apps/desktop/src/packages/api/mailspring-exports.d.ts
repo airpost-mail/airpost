@@ -17,7 +17,7 @@ export type Actions = typeof import('../../data/actions');
 export const Actions: Actions;
 
 // Sync engine
-export * from '../../shared/engine/process';
+export * from '../../engine/process';
 
 // The Database
 export * from '../../data/attributes/matcher';
@@ -218,7 +218,7 @@ export { CalendarDate } from '../../utils/calendar-date';
  * `'events.create'`, `'events.update'` or `'events.rsvp'`.
  */
 export const ICSEventHelpers: { [name: string]: (...args: unknown[]) => never };
-export type { EventConflictJSON as CalendarConflict } from '../../shared/engine/protocol';
+export type { EventConflictJSON as CalendarConflict } from '../../engine/protocol';
 
 export type FsUtils = typeof import('../../shared/fs-utils');
 export const FsUtils: FsUtils;
@@ -250,17 +250,17 @@ export const MessageUtils: MessageUtils;
 export * from '../../mail/body/autolinker';
 export type KeyManager = typeof import('../../window/key-manager').default;
 export const KeyManager: KeyManager;
-export type Integrations = typeof import('../../engine/integrations').default;
+export type Integrations = typeof import('../../engine/client/integrations').default;
 export const Integrations: Integrations;
-export type Engine = typeof import('../../engine/api').default;
+export type Engine = typeof import('../../engine/client/api').default;
 export const Engine: Engine;
 export type {
   CallerPackage,
   Disposable as EngineDisposable,
   EngineRequestRefused,
   EngineSubscribeFilter,
-} from '../../engine/api';
-export type { EngineNotification } from '../../engine/events';
+} from '../../engine/client/api';
+export type { EngineNotification } from '../../engine/client/events';
 export type {
   EngineCapabilities,
   EngineCapability,
@@ -276,8 +276,8 @@ export type {
   AiUsageRow,
   RulesReprocessResult,
   RulesProgressParams,
-} from '../../shared/engine/protocol';
-export type AI = typeof import('../../engine/ai').default;
+} from '../../engine/protocol';
+export type AI = typeof import('../../engine/client/ai').default;
 export const AI: AI;
 export type {
   AiProvider,
@@ -286,7 +286,7 @@ export type {
   AiFeature,
   AiFeatureSettings,
   AiSettings,
-} from '../../engine/ai';
+} from '../../engine/client/ai';
 export type {
   IntegrationKind,
   IntegrationProvider,
@@ -300,7 +300,7 @@ export type {
   Person,
   Company,
   TestReport,
-} from '../../engine/integrations';
+} from '../../engine/client/integrations';
 export type SoundRegistry = typeof import('../sound-registry').default;
 export const SoundRegistry: SoundRegistry;
 export type MailRulesTemplates = typeof import('../../data/mail-rules-templates');

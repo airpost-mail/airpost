@@ -4,14 +4,14 @@ import _ from 'underscore';
 
 import BaseStore from 'mailspring-store';
 import KeyManager from '../../window/key-manager';
-import { revokeOAuthGrant } from '../../engine/oauth-revocation';
-import * as EngineAccounts from '../../engine/accounts';
+import { revokeOAuthGrant } from '../../engine/client/oauth-revocation';
+import * as EngineAccounts from '../../engine/client/accounts';
 import * as Actions from '../actions';
 import { Account } from '../models/account';
 import { Thread } from '../models/thread';
 import { Contact } from '../models/contact';
 import * as Utils from '../models/utils';
-import EngineEvents, { EngineNotification } from '../../engine/events';
+import EngineEvents, { EngineNotification } from '../../engine/client/events';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../config/keys';
 import {
   AccountChangedParams,
@@ -19,7 +19,7 @@ import {
   ErrorCode,
   Feature,
   Method,
-} from '../../shared/engine/protocol';
+} from '../../engine/protocol';
 
 const configAccountsKey = 'accounts';
 const configVersionKey = 'accountsVersion';

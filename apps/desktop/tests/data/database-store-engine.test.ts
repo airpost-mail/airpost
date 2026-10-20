@@ -9,7 +9,7 @@ import EngineReads, {
   EngineUnavailableError,
   READ_WAIT_MS,
 } from '../../src/data/database/engine-reads';
-import { Feature } from '../../src/shared/engine/protocol';
+import { Feature } from '../../src/engine/protocol';
 import { MockEngine, settle } from '../support/mock-engine';
 
 const thread = (id: string, ts: number, extra = {}) =>
@@ -127,7 +127,7 @@ describe('DatabaseStore on the engine', function () {
       Thread.attributes.subject.ascending()
     );
     spyOn(engine, 'answer').andCallFake(() => {
-      throw new (require('../../src/engine/connection').EngineConnectionError)(
+      throw new (require('../../src/engine/client/connection').EngineConnectionError)(
         'invalid params: subject is not queryable',
         { code: -32602 }
       );

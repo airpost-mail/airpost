@@ -6,9 +6,9 @@ import fs from 'fs';
 import { Actions, Message, SendDraftTask } from 'mailspring-exports';
 import SoundRegistry from '../../src/packages/sound-registry';
 import OnlineStatusStore from '../../src/data/stores/online-status';
-import { EngineConnection } from '../../src/engine/connection';
-import MailsyncBridge, { applyDeltas } from '../../src/engine/bridge';
-import { EngineStatus } from '../../src/shared/engine/supervisor-channels';
+import { EngineConnection } from '../../src/engine/client/connection';
+import MailsyncBridge, { applyDeltas } from '../../src/engine/client/bridge';
+import { EngineStatus } from '../../src/engine/channels';
 import { FakeEngine, tick, until } from '../support/fake-serve-engine';
 
 const status = (

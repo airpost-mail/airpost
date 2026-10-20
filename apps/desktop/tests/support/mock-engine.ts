@@ -12,9 +12,9 @@ install() connects it to the window's EngineEvents and turns `core.engine.reads`
 kill() drops the connection (requests out fail as a closed socket fails them) and start()
 connects again, which is how the reconnect specs drive the engine.
 */
-import EngineEvents, { EngineEvents as EngineEventsType } from '../../src/engine/events';
-import { EngineConnectionError } from '../../src/engine/connection';
-import { ErrorCode, Feature, Method, QueryResult } from '../../src/shared/engine/protocol';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../src/engine/client/events';
+import { EngineConnectionError } from '../../src/engine/client/connection';
+import { ErrorCode, Feature, Method, QueryResult } from '../../src/engine/protocol';
 import EngineReads from '../../src/data/database/engine-reads';
 import { Matcher } from '../../src/data/attributes/matcher';
 import { AttributeJoinedData } from '../../src/data/attributes/joined-data';

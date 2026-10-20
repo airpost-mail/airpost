@@ -1,6 +1,6 @@
 import { CapabilityStoreClass } from '../../src/data/stores/capability';
-import { Integrations, IntegrationsTransport } from '../../src/engine/integrations';
-import { EngineEvents } from '../../src/engine/events';
+import { Integrations, IntegrationsTransport } from '../../src/engine/client/integrations';
+import { EngineEvents } from '../../src/engine/client/events';
 
 const engineTransport: IntegrationsTransport = { available: true, send: async () => ({}) };
 

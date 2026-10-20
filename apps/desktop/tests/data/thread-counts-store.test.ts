@@ -3,8 +3,8 @@
 
 import DatabaseStore from '../../src/data/database/store';
 import { ThreadCountsStore } from '../../src/data/stores/thread-counts';
-import { EngineEvents } from '../../src/engine/events';
-import { Feature, Method } from '../../src/shared/engine/protocol';
+import { EngineEvents } from '../../src/engine/client/events';
+import { Feature, Method } from '../../src/engine/protocol';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();

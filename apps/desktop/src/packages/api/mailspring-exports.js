@@ -32,7 +32,7 @@ A deprecated export (docs/desktop-client-plan.md section 6). Its getter stays a 
 package that reads it is warned once; the app's own code isn't.
 */
 const warnDeprecated = (prop, { since, replacement, removeIn }, warned) => {
-  const caller = require('../../engine/api').callerPackageFromStack(new Error().stack);
+  const caller = require('../../engine/client/api').callerPackageFromStack(new Error().stack);
   if (caller && !warned.has(caller.name)) {
     warned.add(caller.name);
     console.warn(
@@ -117,7 +117,7 @@ lazyLoadWithGetter(`apiVersion`, () => require('../api-version').PLUGIN_API_VERS
 lazyLoad(`Actions`, 'data/actions');
 
 // Sync engine
-lazyLoad(`MailsyncProcess`, 'shared/engine/process');
+lazyLoad(`MailsyncProcess`, 'engine/process');
 // The Database
 lazyLoad(`Matcher`, 'data/attributes/matcher');
 lazyLoadWithGetter(
@@ -329,9 +329,9 @@ lazyLoad(`MessageUtils`, 'data/models/message-utils');
 lazyLoad(`EmlUtils`, 'mail/eml');
 lazyLoad(`MboxUtils`, 'mail/mbox');
 lazyLoad(`KeyManager`, 'window/key-manager');
-lazyLoad(`Integrations`, 'engine/integrations');
-lazyLoad(`AI`, 'engine/ai');
-lazyLoad(`Engine`, 'engine/api');
+lazyLoad(`Integrations`, 'engine/client/integrations');
+lazyLoad(`AI`, 'engine/client/ai');
+lazyLoad(`Engine`, 'engine/client/api');
 lazyLoad(`SoundRegistry`, 'packages/sound-registry');
 lazyLoad(`MailRulesTemplates`, 'data/mail-rules-templates');
 deprecate(

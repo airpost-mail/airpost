@@ -6,11 +6,7 @@ import {
   decryptWithMailspringKey,
   MigrationError,
 } from './mailspring-keychain';
-import {
-  KEY_MANAGER_CHANNEL,
-  KeyManagerMethod,
-  KeyManagerReply,
-} from '../../shared/engine/supervisor-channels';
+import { KEY_MANAGER_CHANNEL, KeyManagerMethod, KeyManagerReply } from '../../engine/channels';
 
 export interface KeySet {
   [key: string]: string;

@@ -4,8 +4,8 @@ import { Event } from '../models/event';
 import { AttributeValues } from '../models/model';
 import { localized } from '../../shared/intl';
 import { DatabaseChangeRecord, DatabaseStore, ICSParticipantStatus } from 'mailspring-exports';
-import { answerEvent } from '../../engine/pim';
-import { localTimeZone } from '../../engine/drafts';
+import { answerEvent } from '../../engine/client/pim';
+import { localTimeZone } from '../../engine/client/drafts';
 
 /**
  * Snapshot of event data for undo/redo support.

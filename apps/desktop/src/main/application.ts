@@ -37,9 +37,9 @@ import { registerMessageFrameProtocol } from './frame/protocol-handler';
 import { registerExternalFetchIPC } from './ipc/external-fetch';
 import { registerAttachmentSafetyIPC } from './ipc/attachment-safety';
 import ConfigPersistenceManager, { registerConfigIPC } from '../config/persistence-manager';
-import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from './engine/settings';
+import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from '../engine/supervisor/settings';
 import moveToApplications from './platform/move-to-applications';
-import { MailsyncProcess } from '../shared/engine/process';
+import { MailsyncProcess } from '../engine/process';
 import Config from '../config/config';
 import { registerQuickpreviewIPCHandlers } from './ipc/quick-preview';
 import { guardAuxiliaryWindowNavigation } from './windows/auxiliary-guard';
@@ -62,9 +62,9 @@ import {
   registerEngineSupervisorIPC,
   waitForEarlierEngine,
   detachedEngineToReuse,
-} from './engine/supervisor';
+} from '../engine/supervisor/supervisor';
 import { registerOAuthReceiverIPC } from './ipc/oauth-receiver';
-import { installedEngineUnit, runEngineUnit } from './engine/unit';
+import { installedEngineUnit, runEngineUnit } from '../engine/supervisor/unit';
 
 // The application's singleton class.
 //

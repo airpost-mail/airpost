@@ -13,7 +13,7 @@ import EngineReads, {
   ENGINE_READS_KEY,
   EngineReads as EngineReadsType,
 } from '../data/database/engine-reads';
-import { SupervisorChannel } from '../shared/engine/supervisor-channels';
+import { SupervisorChannel } from '../engine/channels';
 import Notification from './notification';
 
 export const SHOW_WAITING_AFTER_MS = 2000;

@@ -6,7 +6,7 @@ import {
   lastJSONResponse,
   MailsyncProcess,
   stripSecretKeys,
-} from '../../src/shared/engine/process';
+} from '../../src/engine/process';
 import { FakeEngine, until } from '../support/fake-serve-engine';
 
 describe('lastJSONResponse', function () {

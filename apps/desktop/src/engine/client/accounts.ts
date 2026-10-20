@@ -9,7 +9,7 @@ keeps every secret (none comes back) and starts the accounts it stores; config.j
 `accounts` follows with the account's public JSON.
 */
 import { ipcRenderer } from 'electron';
-import { localized } from '../shared/intl';
+import { localized } from '../../shared/intl';
 import EngineEvents from './events';
 import {
   AccountAddResult,
@@ -23,9 +23,9 @@ import {
   OAuthBeginParams,
   OAuthBeginResult,
   OAuthCompleteResult,
-} from '../shared/engine/protocol';
-import { errorFromEngineResult, stripSecretKeys } from '../shared/engine/process';
-import { OAuthReceiverChannel, OAuthRedirect } from '../shared/engine/supervisor-channels';
+} from '../protocol';
+import { errorFromEngineResult, stripSecretKeys } from '../process';
+import { OAuthReceiverChannel, OAuthRedirect } from '../channels';
 
 // How long a window waits for its connection's hello before giving up on a call.
 const CONNECT_WAIT_MS = 20000;

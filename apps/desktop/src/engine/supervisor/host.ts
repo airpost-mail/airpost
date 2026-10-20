@@ -22,11 +22,7 @@ account the engine has that the host doesn't list is left alone: another client 
 add`, the web) may have added it. Only the ids the host says it deleted (`removedAccounts`, kept
 across launches for a delete made while the engine was down) are removed once it says hello.
 */
-import type {
-  EngineServeProcess,
-  MailsyncProcessExit,
-  ResetOptions,
-} from '../../shared/engine/process';
+import type { EngineServeProcess, MailsyncProcessExit, ResetOptions } from '../process';
 import {
   AccountAddResult,
   AccountState,
@@ -35,7 +31,7 @@ import {
   EXIT_SOCKET_IN_USE,
   Feature,
   SyncErrorJSON,
-} from '../../shared/engine/protocol';
+} from '../protocol';
 
 const MAX_CRASH_HISTORY = 10;
 const CRASH_WINDOW_MS = 5 * 60 * 1000;

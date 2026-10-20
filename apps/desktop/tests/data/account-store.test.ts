@@ -3,8 +3,8 @@
 
 import { _AccountStore } from '../../src/data/stores/account';
 import { CONFIG_ACCOUNTS_TO_REMOVE_KEY } from '../../src/config/keys';
-import { EngineEvents } from '../../src/engine/events';
-import { Feature, Method } from '../../src/shared/engine/protocol';
+import { EngineEvents } from '../../src/engine/client/events';
+import { Feature, Method } from '../../src/engine/protocol';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();

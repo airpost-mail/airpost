@@ -5,8 +5,8 @@ import MailRulesStore, {
   LEGACY_RULES_KEY,
   RULES_KEY,
 } from '../../src/data/stores/mail-rules';
-import EngineEvents from '../../src/engine/events';
-import { ErrorCode, Method } from '../../src/shared/engine/protocol';
+import EngineEvents from '../../src/engine/client/events';
+import { ErrorCode, Method } from '../../src/engine/protocol';
 
 const rule = (id: string, attrs: Record<string, any> = {}) => ({
   id,

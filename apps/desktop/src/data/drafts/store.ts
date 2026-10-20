@@ -25,7 +25,7 @@ import {
   draftPipelineAvailable,
   isEngineBuilt,
   sendDraft as engineSendDraft,
-} from '../../engine/drafts';
+} from '../../engine/client/drafts';
 
 interface IThreadMessageModelOrId {
   thread?: Thread;
@@ -540,7 +540,7 @@ class DraftStore extends BaseStore {
       throw new Error(`Cant find send action ${actionKey} `);
     }
     // The engine sends it (draft.send) and keeps its undo window, unless the action is a
-    // plugin's (src/engine/drafts.ts).
+    // plugin's (src/engine/client/drafts.ts).
     const viaEngine =
       draftPipelineAvailable() && SendActionsStore.enginePerformsSendAction(actionKey);
 
@@ -683,7 +683,7 @@ class DraftStore extends BaseStore {
 
   // draft.send with this window's send transforms as `bodies`. With a delay the engine writes
   // the send-later metadata; the Undo Send entry (queued in the main window, which may not be
-  // this one) calls draft.cancelSend (UndoRedoStore, engine/drafts.ts undoSendTarget).
+  // this one) calls draft.cancelSend (UndoRedoStore, engine/client/drafts.ts undoSendTarget).
   async _sendWithEngine(
     draft: Message,
     { delay, actionKey }: { delay: number; actionKey: string }

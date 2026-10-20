@@ -6,8 +6,8 @@ import { CopyButton, RetinaImg } from 'mailspring-component-kit';
 import FormErrorMessage from '../form-error-message';
 import AccountProviders from '../account-providers';
 import { accountFromSignIn } from '../helpers';
-import * as EngineAccounts from '../../../engine/accounts';
-import { OAuthBeginResult } from '../../../shared/engine/protocol';
+import * as EngineAccounts from '../../../engine/client/accounts';
+import { OAuthBeginResult } from '../../../engine/protocol';
 
 // The sign-in runs through the engine (`account.oauth.begin`/`complete`), which keeps the
 // PKCE verifier, the `state` and the client secret; the main process receives the browser's

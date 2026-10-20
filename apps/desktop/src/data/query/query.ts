@@ -5,7 +5,7 @@ import { QueryRange } from './range';
 import { QueryExpression } from '../../mail/search/ast';
 import * as Utils from '../models/utils';
 import { Model } from '../models/model';
-import type { QueryResult } from '../../shared/engine/protocol';
+import type { QueryResult } from '../../engine/protocol';
 
 type DB = typeof import('mailspring-exports').DatabaseStore;
 

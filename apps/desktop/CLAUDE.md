@@ -45,10 +45,10 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 
 - **`src/`** - Core application source code, one directory per domain
   - `main/` - Main process code, grouped into `engine/` (the engine host and supervisor), `windows/`, `frame/` (the message frame scheme), `protocols/` (the `mailspring:` and `tern-file:` schemes), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
-  - `shared/` - Modules both the main process and the windows load (intl, the engine binary and protocol types in `shared/engine/`, IPC channel names, compile cache)
+  - `shared/` - Modules both the main process and the windows load (intl, the engine binary and protocol types in `engine/`, IPC channel names, compile cache)
   - `config/` - The config store, keys, schema and IPC channels; `migrator.ts` and `persistence-manager.ts` are main-process only
   - `window/` - Window startup and window-level managers (AppEnv, the bootstraps, keymaps, menus, commands, spellchecker, the KeyManager facade), with OS integration in `window/platform/` (native notifications, do-not-disturb, Linux themes, start at login)
-  - `engine/` - The windows' side of the engine: the socket connection, `Engine` (`engine/api.ts`), the bridge, engine events, accounts, drafts, PIM, integrations, AI
+  - `engine/` - The windows' side of the engine: the socket connection, `Engine` (`engine/client/api.ts`), the bridge, engine events, accounts, drafts, PIM, integrations, AI
   - `data/` - The local data layer: actions, models, attributes, queries (`data/query/`), stores, the database (`data/database/`), drafts (`data/drafts/`), tasks, mailbox perspectives, mail rule templates
   - `mail/` - Message content: body processing (`mail/body/`), the sandboxed message frame (`mail/frame/`), search queries (`mail/search/`), attachment previews (`mail/quick-preview/`), .eml and .mbox
   - `components/` - Reusable React UI components, including the UI kit (`components/kit/`), the sheets, lists, injected components and the higher-order components (`components/decorators/`)
@@ -103,8 +103,8 @@ A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in 
 
 One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too (docs/engine-protocol-plan.md section 4, docs/desktop-client-plan.md):
 
-1. **Main process → engine, stdin** (`main/engine/supervisor.ts`, `main/engine/host.ts`, `shared/engine/process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
-2. **Each window ↔ engine, Unix socket** (`engine/connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
+1. **Main process → engine, stdin** (`engine/supervisor/supervisor.ts`, `engine/supervisor/host.ts`, `engine/process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
+2. **Each window ↔ engine, Unix socket** (`engine/client/connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
 
 ```
 ┌──────────────┐   stdin/stdout (JSON-RPC)   ┌──────────────────┐
@@ -115,7 +115,7 @@ One engine process (`mailsync-rs --mode serve`) runs every account, started by t
 └──────────────┘                             └──────────────────┘
 ```
 
-Windows reach the stdin-only calls over IPC (`shared/engine/supervisor-channels.ts`). The `MailsyncBridge` in the main window listens to `Actions.queueTask` and sends tasks on its connection; every window applies the deltas it reads.
+Windows reach the stdin-only calls over IPC (`engine/channels.ts`). The `MailsyncBridge` in the main window listens to `Actions.queueTask` and sends tasks on its connection; every window applies the deltas it reads.
 
 ### Task System (`data/tasks/`)
 

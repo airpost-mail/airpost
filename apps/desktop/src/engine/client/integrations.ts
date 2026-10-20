@@ -9,7 +9,7 @@
 // `integration-<provider>-key`), read per request and never logged.
 
 import { EventEmitter } from 'events';
-import { localized } from '../shared/intl';
+import { localized } from '../../shared/intl';
 
 export type IntegrationKind = 'translation' | 'grammar' | 'enrichment';
 export type IntegrationProvider = 'libretranslate' | 'deepl' | 'languagetool' | 'peopledatalabs';
@@ -437,7 +437,7 @@ class IntegrationsClient {
   }
 
   private _keys(): KeySource {
-    return this.keySource || require('../window/key-manager').default;
+    return this.keySource || require('../../window/key-manager').default;
   }
 
   private _secrets(): SecretSource {

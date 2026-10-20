@@ -31,14 +31,14 @@ import {
   EventsWriteResult,
   EventWriteJSON,
   Method,
-} from '../shared/engine/protocol';
+} from '../protocol';
 import { localTimeZone } from './drafts';
-import * as Actions from '../data/actions';
-import DatabaseStore from '../data/database/store';
-import { Event } from '../data/models/event';
-import { Task } from '../data/tasks/task';
-import { SyncbackEventTask } from '../data/tasks/syncback-event';
-import { DestroyEventTask } from '../data/tasks/destroy-event';
+import * as Actions from '../../data/actions';
+import DatabaseStore from '../../data/database/store';
+import { Event } from '../../data/models/event';
+import { Task } from '../../data/tasks/task';
+import { SyncbackEventTask } from '../../data/tasks/syncback-event';
+import { DestroyEventTask } from '../../data/tasks/destroy-event';
 
 export function refusalKey(err: any): string | null {
   const key = err && err.data && err.data.key;

@@ -13,7 +13,7 @@ import {
   Event,
   DatabaseChangeRecord,
 } from 'mailspring-exports';
-import { editEvent } from '../../engine/pim';
+import { editEvent } from '../../engine/client/pim';
 import { KeyCommandsRegion } from 'mailspring-component-kit';
 import { CalendarMenuCommands } from './commands';
 import { DayView } from './views/day';

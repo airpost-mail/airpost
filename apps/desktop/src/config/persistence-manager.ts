@@ -10,7 +10,7 @@ import {
   LANGUAGE_KEY,
   SettingsHost,
   touchesKey,
-} from '../main/engine/settings';
+} from '../engine/supervisor/settings';
 import { USE_24_HOUR_KEY } from '../shared/date-format';
 
 let _ = require('underscore');
@@ -31,7 +31,7 @@ export default class ConfigPersistenceManager implements SettingsHost {
   configFilePath: string;
   resourcePath: string;
   lastSaveTimestamp?: number;
-  // Set by the application when a `serve` engine is supervised (src/main/engine/settings.ts).
+  // Set by the application when a `serve` engine is supervised (src/engine/supervisor/settings.ts).
   engineSettings: EngineSettingsMirror | null = null;
   onChange: ChangeListener;
 

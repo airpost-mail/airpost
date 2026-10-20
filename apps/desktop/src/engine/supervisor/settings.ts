@@ -31,7 +31,7 @@ doesn't list it, so an older engine that refuses or doesn't know the key never c
 applied before that set, and is skipped: the local write wins.
 */
 import _ from 'underscore';
-import { Feature, Method, SettingsValues } from '../../shared/engine/protocol';
+import { Feature, Method, SettingsValues } from '../protocol';
 import { localizerFor } from '../../shared/intl';
 import { REMINDER_BODY_KEY, SNOOZE_BODY_KEY, resurfacingBodies } from '../../shared/resurfacing';
 import { QUOTE_TEXTS_KEY, USE_24_HOUR_KEY, hourCycle, quoteTexts } from '../../shared/date-format';
@@ -49,7 +49,7 @@ export const ENGINE_SETTINGS_KEYS = [
   'core.integrations.translation',
   'core.integrations.grammar',
   'core.integrations.enrichment',
-  // The AI providers (without keys), switches and opted-in accounts (src/engine/ai.ts); background
+  // The AI providers (without keys), switches and opted-in accounts (src/engine/client/ai.ts); background
   // triage reads them from the engine's store. `core.ai.limits` has no UI yet.
   'core.ai.providers',
   'core.ai.features',

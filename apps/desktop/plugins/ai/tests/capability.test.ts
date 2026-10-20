@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Tern contributors
 
 import { CapabilityStoreClass } from '../../../src/data/stores/capability';
-import { EngineEvents } from '../../../src/engine/events';
-import { EngineCapabilities } from '../../../src/shared/engine/protocol';
+import { EngineEvents } from '../../../src/engine/client/events';
+import { EngineCapabilities } from '../../../src/engine/protocol';
 import { SYNTHETIC_KEY, setUpAi } from './fake-engine';
 
 describe('AI features in the capability store', () => {

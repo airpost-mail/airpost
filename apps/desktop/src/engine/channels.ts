@@ -3,7 +3,7 @@
 
 /*
 IPC between the main process, which owns the `serve` engine and the keyset
-(main/engine/supervisor.ts, main/profile/key-manager.ts), and the windows. Imported from both
+(engine/supervisor/supervisor.ts, main/profile/key-manager.ts), and the windows. Imported from both
 sides, so it holds only names and shapes.
 */
 

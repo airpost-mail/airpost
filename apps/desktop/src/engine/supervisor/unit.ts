@@ -14,7 +14,7 @@ directory or under TERN_SERVICE_NO_LOAD.
 import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
-import { ternBinaryPath } from '../../shared/engine/process';
+import { ternBinaryPath } from '../process';
 
 // Written by tern (apps/cli/src/service.rs, RECORDS_FILE).
 export const SERVICES_FILE = 'services.json';

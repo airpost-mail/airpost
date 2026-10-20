@@ -6,7 +6,7 @@ import * as Attributes from '../attributes';
 import { Message } from '../models/message';
 import SoundRegistry from '../../packages/sound-registry';
 import { Composer as ComposerExtensionRegistry } from '../../packages/extension-registry';
-import { LocalizedErrorStrings } from '../../shared/engine/process';
+import { LocalizedErrorStrings } from '../../engine/process';
 import { localized } from '../../shared/intl';
 import { AttributeValues } from '../models/model';
 import { Contact } from '../models/contact';
