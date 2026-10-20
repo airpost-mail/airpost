@@ -36,7 +36,7 @@ cd "$desktop" || exit 0
 target="$file"
 case "$file" in "$desktop"/*) target="${file#"$desktop"/}" ;; esac
 
-if ! output=$("./node_modules/.bin/eslint" --fix -c .eslintrc "$target" 2>&1); then
+if ! output=$("./node_modules/.bin/eslint" --fix -c .eslintrc --rulesdir scripts/eslint-rules "$target" 2>&1); then
   printf 'eslint found problems it could not fix in %s:\n%s\n' "$file" "$output" >&2
   exit 2
 fi

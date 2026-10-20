@@ -13,7 +13,9 @@ npm ci
 # Run the app in development mode (uses --dev flag, data stored in Tern-dev folder)
 npm start
 
-# Run linting (prettier runs as an eslint rule); lint:check reports without fixing
+# Run linting (prettier runs as an eslint rule); lint:check reports without fixing. Both pass
+# --rulesdir scripts/eslint-rules for raw-controls, which warns on raw <button>, <select>,
+# checkbox/radio inputs and .btn classes outside src/components/kit; run eslint by hand with it too.
 npm run lint
 npm run lint:check
 

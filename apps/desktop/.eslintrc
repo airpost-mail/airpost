@@ -269,6 +269,13 @@
       }
     },
     {
+      "files": ["src/**/*.tsx", "plugins/**/*.tsx", "themes/**/*.tsx"],
+      "excludedFiles": ["src/components/kit/**", "**/tests/**"],
+      "rules": {
+        "raw-controls": "warn"
+      }
+    },
+    {
       "files": ["tests/support/runner/**"],
       "rules": {
         "@typescript-eslint/no-this-alias": "off"
