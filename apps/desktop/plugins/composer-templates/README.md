@@ -1,7 +1,7 @@
 # Composer Templates
 
-Create templates you can use to pre-fill the N1 composer - never type the same
-email again! Templates live in the templates folder inside the Mailspring config folder.
+Create templates you can use to pre-fill the composer - never type the same
+email again! Templates live in the templates folder inside the Tern config folder.
 
 Each template is an HTML file - the name of the file is the name of the template,
 and it's contents are the default message body.
@@ -16,7 +16,7 @@ very top of the file:
 
 When you insert the template, the subject is filled into your draft. Templates
 without the meta tag leave the draft's subject alone, and the subject of a reply or
-a forward is never overwritten. If your draft already has a subject, Mailspring
+a forward is never overwritten. If your draft already has a subject, Tern
 asks before replacing it. The same rule applies in reverse: saving a reply or a
 forward with "Save Draft as Template" keeps the body but not the subject.
 

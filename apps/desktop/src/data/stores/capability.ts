@@ -12,7 +12,7 @@
 // capabilities it decides from config alone.
 
 import { useEffect, useState } from 'react';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { localized } from '../../shared/intl';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/events';
 import { CapabilityReason, EngineCapability, Feature } from '../../shared/engine/protocol';
@@ -128,7 +128,7 @@ interface KeySource {
   getPassword(name: string): Promise<string | undefined>;
 }
 
-export class CapabilityStoreClass extends MailspringStore {
+export class CapabilityStoreClass extends BaseStore {
   /** Whether the keyset holds each provider's key. Never the key itself. */
   private _hasKey: { [provider: string]: boolean } = {};
   private _keyRead: Promise<void> = Promise.resolve();

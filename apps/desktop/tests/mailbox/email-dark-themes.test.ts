@@ -47,24 +47,24 @@ function themeCss(theme: string) {
   const compat = AppEnv.themes.usesCompatTokens({ getStylesheetsPath: () => stylesDir });
   const paths = [
     stylesDir,
-    ...(compat ? [path.join(resourcePath, 'static', 'style', 'compat')] : []),
-    path.join(resourcePath, 'static', 'style'),
-    path.join(resourcePath, 'static', 'style', 'base'),
+    ...(compat ? [path.join(resourcePath, 'static', 'styles', 'compat')] : []),
+    path.join(resourcePath, 'static', 'styles'),
+    path.join(resourcePath, 'static', 'styles', 'base'),
   ];
   const tokensFile = path.join(stylesDir, 'tokens.css');
   const tokens = [
-    fs.readFileSync(path.join(resourcePath, 'static', 'style', 'tokens', 'defaults.css'), 'utf8'),
+    fs.readFileSync(path.join(resourcePath, 'static', 'styles', 'tokens', 'defaults.css'), 'utf8'),
     fs.existsSync(tokensFile) ? fs.readFileSync(tokensFile, 'utf8') : '',
     compat
       ? compile(
-          path.join(resourcePath, 'static', 'style', 'compat', 'theme.less'),
+          path.join(resourcePath, 'static', 'styles', 'compat', 'theme.less'),
           paths,
           compatTokensSource(resourcePath, stylesDir)
         )
       : '',
   ].join('\n');
   const app = [
-    path.join(resourcePath, 'static', 'style', 'index.less'),
+    path.join(resourcePath, 'static', 'styles', 'index.less'),
     path.join(resourcePath, 'src', 'features', 'message-list', 'styles', 'message-list.less'),
   ];
   const own = fs
@@ -74,7 +74,7 @@ function themeCss(theme: string) {
   return {
     tokens,
     app: [...app, ...own].map((f) => compile(f, paths)).join('\n'),
-    emailFrame: compile(path.join(resourcePath, 'static', 'style', 'email-frame.less'), paths),
+    emailFrame: compile(path.join(resourcePath, 'static', 'styles', 'email-frame.less'), paths),
   };
 }
 

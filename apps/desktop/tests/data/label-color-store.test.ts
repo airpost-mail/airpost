@@ -57,7 +57,7 @@ const clamp = (min: number, v: number, max: number) => Math.min(max, Math.max(mi
 function bounds(mixin: string, dark: boolean): Record<string, number> {
   const file = path.join(
     AppEnv.getLoadSettings().resourcePath,
-    'static/style/mixins/label-colors.less'
+    'static/styles/mixins/label-colors.less'
   );
   const less = fs.readFileSync(file).toString();
   const start = less.indexOf(`.${mixin}-${dark ? 'dark' : 'light'}() {`);

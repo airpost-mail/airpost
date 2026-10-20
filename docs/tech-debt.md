@@ -547,7 +547,7 @@ errors aren't announced. About 25 `<div className="btn" onClick>` controls have 
 tabIndex (Reset Cache, Reconnect, Try Again, onboarding Back:
 `preferences-general.tsx:118`, `:121`; `preferences-account-details.tsx:385-406`;
 `oauth-signin-page.tsx:234`; `create-page-for-form.tsx:333`). No pane-cycling shortcut.
-`@text-color-very-subtle` (`static/style/base/ui-variables.less:71-72`) is ~3.2:1 on white, used
+`@text-color-very-subtle` (`static/styles/base/ui-variables.less:71-72`) is ~3.2:1 on white, used
 in 129 places. No `prefers-reduced-motion` rule outside vendored pdf.js.
 
 - Cost: keyboard and screen-reader users can't operate snooze, move/label pickers, account
@@ -1066,9 +1066,9 @@ Done (roadmap/client-next, stage 8). `InjectedComponent` and `InjectedComponentS
 registry listener (`ComponentRegistry.listenShared`) and `AccountColorBar` one AccountStore
 listener; checked in `spec/components/shared-store-listeners-spec.tsx`, not yet in devtools.
 
-Inferred: the warning's source isn't confirmed in devtools. `MailspringStore` caps listeners at 250
+Inferred: the warning's source isn't confirmed in devtools. `BaseStore` caps listeners at 250
 (`src/plugin-api/mailspring-store.ts:96-104`), so the "251 trigger listeners" warning comes from a
-`MailspringStore` subclass. Every `InjectedComponent` and `InjectedComponentSet` adds its own
+`BaseStore` subclass. Every `InjectedComponent` and `InjectedComponentSet` adds its own
 `ComponentRegistry.listen` (`src/components/injected-component.tsx:86`,
 `injected-component-set.tsx:116-119`), and each thread row has three
 (`features/thread-list/lib/thread-list-columns.tsx:74`, `:140`, `:155`, narrow `:203`,

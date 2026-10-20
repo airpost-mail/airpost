@@ -1,11 +1,11 @@
 import { localized, AccountStore, Account } from 'mailspring-exports';
 import { ipcRenderer } from 'electron';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 
 import * as OnboardingActions from './actions';
 import { repairStoredSecurity } from './connection-security';
 
-class OnboardingStore extends MailspringStore {
+class OnboardingStore extends BaseStore {
   _account: Account;
   _pageStack: string[];
 

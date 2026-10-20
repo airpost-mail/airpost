@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 
-import { Thread, Contact, Message, MessageStore, MailspringTestUtils } from 'mailspring-exports';
+import { Thread, Contact, Message, MessageStore, TestUtils } from 'mailspring-exports';
 
 import MessageParticipants from '../../src/features/message-list/message-participants';
 import MessageItemContainer from '../../src/features/message-list/message-item-container';
@@ -178,7 +178,7 @@ describe('MessageList', function () {
       MessageStore._expandItemsToDefault();
       MessageStore.trigger(MessageStore);
       this.messageList.setState({ currentThread: testThread });
-      MailspringTestUtils.loadKeymap('keymaps/base');
+      TestUtils.loadKeymap('keymaps/base');
     });
 
     it('renders all the correct number of messages', function () {

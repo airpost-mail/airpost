@@ -5,24 +5,24 @@ import { localized, DatabaseStore, Thread, Matcher, Actions } from 'mailspring-e
 
 const DATE_EPSILON = 60; // Seconds
 
-interface MailspringLinkParams {
+interface PermalinkParams {
   subject: string;
   lastDate?: number;
   date?: number;
 }
 
-const _parseOpenThreadUrl = (mailspringUrlString: string) => {
-  const parsedUrl = url.parse(mailspringUrlString);
+const _parseOpenThreadUrl = (urlString: string) => {
+  const parsedUrl = url.parse(urlString);
   const params = querystring.parse(parsedUrl.query) as any;
   return {
     subject: params.subject,
     date: params.date ? parseInt(params.date, 10) : undefined,
     lastDate: params.lastDate ? parseInt(params.lastDate, 10) : undefined,
-  } as MailspringLinkParams;
+  } as PermalinkParams;
 };
 
 const _findCorrespondingThread = (
-  { subject, lastDate, date }: MailspringLinkParams,
+  { subject, lastDate, date }: PermalinkParams,
   dateEpsilon = DATE_EPSILON
 ) => {
   const fromUnix = (seconds: number) => new Date(seconds * 1000);
@@ -50,8 +50,8 @@ const _findCorrespondingThread = (
   ]);
 };
 
-const _onOpenThreadFromWeb = (event: Electron.IpcRendererEvent, mailspringUrl: string) => {
-  const params = _parseOpenThreadUrl(mailspringUrl);
+const _onOpenThreadFromWeb = (event: Electron.IpcRendererEvent, permalink: string) => {
+  const params = _parseOpenThreadUrl(permalink);
 
   _findCorrespondingThread(params)
     .then((thread) => {

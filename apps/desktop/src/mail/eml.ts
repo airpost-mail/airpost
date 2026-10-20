@@ -68,6 +68,10 @@ export async function newestExportableMessagesForThreadIds(
   return messages.filter((m) => m !== null);
 }
 
+const STAGING_DIR_PREFIX = 'tern-eml-';
+// Directories an older build staged under its own prefix are still ours to remove.
+const STAGING_DIR_PREFIXES = [STAGING_DIR_PREFIX, 'mailspring-eml-'];
+
 /**
  * Ask the sync engine for the raw RFC2822 source of each message and write it
  * to a temporary .eml file on disk.
@@ -93,7 +97,7 @@ export async function stageMessagesAsEml(
 
   const staged = messages.map((message) => {
     const token = crypto.randomBytes(4).toString('hex');
-    const dir = path.join(os.tmpdir(), `mailspring-eml-${message.id}-${token}`);
+    const dir = path.join(os.tmpdir(), `${STAGING_DIR_PREFIX}${message.id}-${token}`);
     const basename = filename || defaultEmlFilename(message.subject);
     return { message, dir, filePath: path.join(dir, basename) };
   });
@@ -159,12 +163,11 @@ export function discardStagedEml(filePath: string) {
   removeStagingDirectory(path.dirname(filePath));
 }
 
-const STAGING_DIR_PREFIX = 'mailspring-eml-';
-
 function removeStagingDirectory(dir: string) {
   // Guard against deleting anything we didn't create ourselves — callers hand
   // us paths, and a wrong one shouldn't take a real directory with it.
-  if (!path.basename(dir).startsWith(STAGING_DIR_PREFIX)) {
+  const name = path.basename(dir);
+  if (!STAGING_DIR_PREFIXES.some((prefix) => name.startsWith(prefix))) {
     return;
   }
   try {

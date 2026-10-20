@@ -105,7 +105,7 @@ export const LocalizedErrorStrings = {
 };
 
 // LocalizedErrorStrings codes that, despite being "classified" by mailsync,
-// can also indicate a genuine Mailspring defect rather than a server/user
+// can also indicate a genuine engine defect rather than a server/user
 // condition - a malformed-response parser regression. These should keep
 // reaching error reporting instead of being treated as expected,
 // user-actionable failures.

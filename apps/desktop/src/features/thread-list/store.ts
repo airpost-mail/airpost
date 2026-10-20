@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 
 import {
   Rx,
@@ -13,7 +13,7 @@ import {
 import { ListTabular, ListDataSource } from 'mailspring-component-kit';
 import ThreadListDataSource from './data-source';
 
-class ThreadListStore extends MailspringStore {
+class ThreadListStore extends BaseStore {
   _dataSource?: ListDataSource;
   _dataSourceUnlisten: () => void;
   _perspectiveKey: string | null = null;

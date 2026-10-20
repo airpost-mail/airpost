@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { AccountStore } from './account';
 import WorkspaceStore from './workspace';
 import DatabaseStore from '../database/store';
@@ -49,7 +49,7 @@ _onFocusChanged: =>
 
 Section: Stores
 */
-class FocusedContentStore extends MailspringStore {
+class FocusedContentStore extends BaseStore {
   _focused: {
     [view: string]: Model | null;
   };

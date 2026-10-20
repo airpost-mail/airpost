@@ -27,5 +27,9 @@
  * `SettingsSection`, `SettingsRow`, `ConfigSwitchRow`, `ProviderCard` and the rest of
  * src/components/settings.tsx); `PreferencesUIStore.TabItem` takes `group` and `keywords` for
  * the sidebar. Tabs that name no group are listed under "From plugins".
+ *
+ * 1.34.0: `TestUtils`, `RegExpUtils.signatureRegex` and `RegExpUtils.commandRegex`; the old
+ * names `MailspringTestUtils`, `mailspringSignatureRegex` and `mailspringCommandRegex` are
+ * deprecated aliases, removed in 2.0.0.
  */
-export const PLUGIN_API_VERSION = '1.33.0';
+export const PLUGIN_API_VERSION = '1.34.0';

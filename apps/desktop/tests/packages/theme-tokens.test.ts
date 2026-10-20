@@ -106,7 +106,7 @@ describe('theme tokens', function () {
     });
 
     it('derives what it leaves unset from the literal defaults and its own values', () => {
-      // @text-color-subtle is fadeout(@text-color, 15%) in compat/base/ui-variables.less.
+      // @text-color-subtle is fadeout(@text-color, 15%) in static/styles/compat/base/ui-variables.less.
       expect(colorOf('var(--subtle-foreground)')).toBe('rgba(236, 239, 244, 0.85)');
       expect(colorOf('var(--warning)')).toBe('rgb(240, 173, 78)');
       expect(colorOf('var(--link)')).toBe('rgb(31, 112, 236)');

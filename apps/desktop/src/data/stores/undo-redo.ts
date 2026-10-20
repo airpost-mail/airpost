@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import * as Actions from '../actions';
 import { Task } from '../tasks/task';
 import TaskQueue from './task-queue';
@@ -22,7 +22,7 @@ interface UndoBlock {
   redo?: () => void;
 }
 
-class UndoRedoStore extends MailspringStore {
+class UndoRedoStore extends BaseStore {
   _undo: UndoBlock[] = [];
   _redo: UndoBlock[] = [];
   _mostRecentBlock: UndoBlock | null = null;

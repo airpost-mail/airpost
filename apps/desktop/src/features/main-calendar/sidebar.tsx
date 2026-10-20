@@ -7,7 +7,7 @@ import { CalendarSourceList } from './source-list';
 import { setCalendarColors } from './helpers';
 import FocusedMomentStore from './focused-moment-store';
 
-const DISABLED_CALENDARS = 'mailspring.disabledCalendars';
+const DISABLED_CALENDARS = 'core.calendar.disabledCalendars';
 
 interface CalendarSidebarState {
   accounts: Account[];

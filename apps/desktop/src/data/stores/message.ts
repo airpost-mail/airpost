@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import * as Actions from '../actions';
 import { Message } from '../models/message';
 import { Thread } from '../models/thread';
@@ -23,7 +23,7 @@ type MessageChange = { type: string; objects: Message[] };
 const byDate = (a: Message, b: Message) =>
   (a.date ? a.date.getTime() : 0) - (b.date ? b.date.getTime() : 0);
 
-class _MessageStore extends MailspringStore {
+class _MessageStore extends BaseStore {
   FolderNamesHiddenByDefault = FolderNamesHiddenByDefault;
 
   _showingHiddenItems = false;

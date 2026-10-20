@@ -7,7 +7,7 @@ describe('EmailFrameStylesStore', () => {
 
   beforeEach(() => {
     coreSheet = document.createElement('style');
-    coreSheet.setAttribute('source-path', '/static/style/email-frame.less');
+    coreSheet.setAttribute('source-path', '/static/styles/email-frame.less');
     coreSheet.innerText = '.ignore-in-parent-frame body { font-family: test; }';
     document.head.appendChild(coreSheet);
 

@@ -142,9 +142,9 @@ const declareOptions = argv => {
       'safe',
       'Do not load packages from the settings `packages` or `dev/packages` folders.'
     );
-  // The options --enable-crashpad and --allow-file-access-from-files are added to the command line options by electron when opening a second instance of Mailspring.
+  // The options --enable-crashpad and --allow-file-access-from-files are added to the command line options by electron when opening a second instance of Tern.
   // If they are not defined as boolean options here, they will "swallow" every argument that is passed after them. This leads to the "Send To" functionality not working
-  // if mailspring is already running.
+  // if Tern is already running.
   options.boolean('enable-crashpad');
   options.boolean('allow-file-access-from-files');
   options.boolean('source-app-id');
@@ -300,10 +300,10 @@ const handleStartupEventWithSquirrel = () => {
       // Squirrel runs the NEW version with this flag after applying an update.
       // Per Squirrel.Windows conventions, we should update shortcuts and exit
       // quickly — NOT restart the app. The restart happens later when the user
-      // triggers "Install Update" via the UI, which calls restartMailspring().
-      // Previously this called restartMailspring() which spawned a new instance
-      // that would be killed by requestSingleInstanceLock() (the original app
-      // is still running), wasting time and risking Squirrel's 15s timeout.
+      // triggers "Install Update" via the UI, which calls restartApp().
+      // Calling restartApp() here would spawn a new instance that
+      // requestSingleInstanceLock() kills (the original app is still
+      // running), wasting time and risking Squirrel's 15s timeout.
       WindowsUpdater.handleSquirrelUpdated(app);
       return true;
     case '--squirrel-uninstall':

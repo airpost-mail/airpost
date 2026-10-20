@@ -9,6 +9,11 @@ No plugin API change:
 
 - The built-in features moved from `<resourcePath>/features/<dir>/lib/` to `<resourcePath>/src/features/<dir>/` and have no `package.json` any more. `AppEnv.packages` lists them under the same names, they activate in the same order, and `mailspring://<dir>/…` asset URLs are unchanged. A plugin that requires a feature's files by path has to use the new path.
 
+Plugin API 1.34.0:
+
+- `TestUtils` replaces `MailspringTestUtils`, and `RegExpUtils.signatureRegex()` and `RegExpUtils.commandRegex()` replace `mailspringSignatureRegex()` and `mailspringCommandRegex()`. The old names keep working, are deprecated (a package that reads them is warned once) and are removed in 2.0.0.
+- The Linux background portal is forced with `TERN_FORCE_BACKGROUND_PORTAL=true`; `MAILSPRING_FORCE_BACKGROUND_PORTAL` is read when it is unset.
+
 Plugin API 1.32.0:
 
 - The engine expands, creates and edits calendar events and contacts (`events.expand`, `events.create`, `events.update`, `events.rsvp`, `contacts.get`, `contacts.create`, `contacts.update`, `contacts.import`, `contacts.export`; features `calendar-editing` and `contact-editing`). Call them with `Engine.request`.

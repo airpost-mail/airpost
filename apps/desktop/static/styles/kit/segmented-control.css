@@ -1,5 +1,5 @@
 /* SegmentedControl (src/components/kit/segmented-control.tsx, docs/desktop/ui-kit.md 6.7).
-   Ported from .settings-segmented in components/settings.less; tokens only. */
+   Ported from .settings-segmented in static/styles/components/settings.less; tokens only. */
 
 [data-slot='segmented-control'] {
   display: inline-flex;

@@ -6,10 +6,10 @@ import {
   ContactBook,
   MutableQuerySubscription,
 } from 'mailspring-exports';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { ListTabular } from 'mailspring-component-kit';
 
-class ContactsWindowStore extends MailspringStore {
+class ContactsWindowStore extends BaseStore {
   _perspective: ContactsPerspective = { type: 'unified' };
   _listSource = new ListTabular.DataSource.DumbArrayDataSource<Contact>();
 

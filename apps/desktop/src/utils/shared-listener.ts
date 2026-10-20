@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 /*
-One listener on a store for any number of subscribers. MailspringStore warns past 250 listeners
+One listener on a store for any number of subscribers. BaseStore warns past 250 listeners
 (mailspring-store.ts), and the thread list mounts a few components per visible row that each
 follow ComponentRegistry or AccountStore, so a tall window passed it.
 */

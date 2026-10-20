@@ -8,7 +8,7 @@ import {
   RegExpUtils,
 } from 'mailspring-exports';
 
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import path from 'path';
 import fs from 'fs';
 
@@ -25,7 +25,7 @@ export interface TemplateItem {
   subject: string;
 }
 
-class TemplateStore extends MailspringStore {
+class TemplateStore extends BaseStore {
   private _items: TemplateItem[] = [];
   private _templatesDir = path.join(AppEnv.getConfigDirPath(), 'templates');
   private _watcher = null;
@@ -157,7 +157,7 @@ class TemplateStore extends MailspringStore {
     const draftName = draftSubject.replace(INVALID_TEMPLATE_NAME_REGEX, '');
 
     let draftContents = QuotedHTMLTransformer.removeQuotedHTML(draft.body);
-    const sigIndex = draftContents.search(RegExpUtils.mailspringSignatureRegex());
+    const sigIndex = draftContents.search(RegExpUtils.signatureRegex());
     draftContents = sigIndex > -1 ? draftContents.substr(0, sigIndex) : draftContents;
 
     if (!draftName || draftName.length === 0) {

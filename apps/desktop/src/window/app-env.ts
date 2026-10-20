@@ -120,7 +120,7 @@ export default class AppEnvConstructor {
     // require of mailspring-observables
     require('mailspring-observables');
 
-    // Mailspring exports is designed to provide a lazy-loaded set of globally
+    // mailspring-exports is designed to provide a lazy-loaded set of globally
     // accessible objects to all packages. Upon require, mailspring-exports will
     // fill the StoreRegistry, and DatabaseObjectRegistries
     // with various constructors.
@@ -357,7 +357,7 @@ export default class AppEnvConstructor {
     return this.getLoadSettings().isSpec;
   }
 
-  // Public: Get the version of Mailspring.
+  // Public: Get the version of Tern.
   //
   // Returns the version text {String}.
   private appVersion;
@@ -374,7 +374,7 @@ export default class AppEnvConstructor {
     return !/\w{7}/.test(this.getVersion());
   }
 
-  // Public: Get the directory path to Mailspring's configuration area.
+  // Public: Get the directory path to Tern's configuration area.
   getConfigDirPath() {
     return this.getLoadSettings().configDirPath;
   }
@@ -398,7 +398,7 @@ export default class AppEnvConstructor {
   }
 
   /*
-  Section: Managing The Mailspring Window
+  Section: Managing The Tern Window
   */
 
   // Essential: Close the current window.

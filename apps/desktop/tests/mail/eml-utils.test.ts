@@ -322,17 +322,20 @@ describe('stageMessagesAsEml', function () {
 
 describe('discardStagedEml', function () {
   it('removes the file and the staging directory around it', () => {
-    const dir = path.join(os.tmpdir(), 'mailspring-eml-spec-discard');
-    const filePath = path.join(dir, 'Hello.eml');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(filePath, 'raw');
+    // tern-eml- is the current prefix, mailspring-eml- the one older builds staged under.
+    for (const name of ['tern-eml-spec-discard', 'mailspring-eml-spec-discard']) {
+      const dir = path.join(os.tmpdir(), name);
+      const filePath = path.join(dir, 'Hello.eml');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(filePath, 'raw');
 
-    discardStagedEml(filePath);
-    expect(fs.existsSync(dir)).toBe(false);
+      discardStagedEml(filePath);
+      expect(fs.existsSync(dir)).toBe(false);
+    }
   });
 
   it('refuses to touch a directory it did not create', () => {
-    const dir = path.join(os.tmpdir(), 'mailspring-spec-not-staging');
+    const dir = path.join(os.tmpdir(), 'tern-spec-not-staging');
     const filePath = path.join(dir, 'Hello.eml');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(filePath, 'raw');
@@ -344,7 +347,7 @@ describe('discardStagedEml', function () {
 
   it('does not throw when the file is already gone', () => {
     expect(() =>
-      discardStagedEml(path.join(os.tmpdir(), 'mailspring-eml-spec-absent', 'Hello.eml'))
+      discardStagedEml(path.join(os.tmpdir(), 'tern-eml-spec-absent', 'Hello.eml'))
     ).not.toThrow();
   });
 });

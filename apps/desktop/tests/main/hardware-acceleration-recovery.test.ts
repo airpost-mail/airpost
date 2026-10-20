@@ -7,7 +7,7 @@ import {
   softwareRenderingMarkerPath,
 } from '../../src/main/windows/hardware-acceleration-recovery';
 
-const CONFIG_DIR = '/tmp/mailspring-profile';
+const CONFIG_DIR = '/tmp/tern-profile';
 
 describe('hardware acceleration recovery', () => {
   beforeEach(() => resetRecoveryStateForTests());

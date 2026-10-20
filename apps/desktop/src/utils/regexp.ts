@@ -74,7 +74,7 @@ const RegExpUtils = {
   },
 
   // tern: links, and mailspring: ones from before the rename.
-  mailspringCommandRegex() {
+  commandRegex() {
     return new RegExp(/\b(?:tern|mailspring):\S+/i);
   },
 
@@ -213,7 +213,7 @@ const RegExpUtils = {
     return new RegExp(/(<a.*?href\s*?=\s*?['"])((?!mailto).+?)(['"].*?>)([\s\S]*?)(<\/a>)/gim);
   },
 
-  mailspringSignatureRegex() {
+  signatureRegex() {
     return /<signature id="([A-Za-z0-9-/\\]+)">[^]*<\/signature>/;
   },
 

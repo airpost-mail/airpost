@@ -634,7 +634,7 @@ describe('EventHeader answering an invitation', function () {
     beforeEach(function () {
       const original = AppEnv.config.get;
       spyOn(AppEnv.config, 'get').andCallFake((key: string) =>
-        key === 'mailspring.disabledCalendars' ? ['cal-off'] : original.call(AppEnv.config, key)
+        key === 'core.calendar.disabledCalendars' ? ['cal-off'] : original.call(AppEnv.config, key)
       );
       engine.expand.conflicts = () => [conflict('Standup', '20260301T143000Z', '20260301T150000Z')];
     });

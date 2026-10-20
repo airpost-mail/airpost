@@ -26,7 +26,7 @@ Public: The Message model represents an email message or draft.
 Messages are a sub-object of threads. The content of a message === immutable (with the
 exception being drafts). A message may have a physical copy in more than one IMAP folder at
 once (a self-addressed message lives in both Inbox and Sent); `folders` lists every folder
-that currently holds a copy. Mailspring has no UI for moving || deleting individual messages;
+that currently holds a copy. Tern has no UI for moving || deleting individual messages;
 those operations are performed on the message's thread.
 All messages are part of a thread, even if that thread has only one message.
 

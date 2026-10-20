@@ -2,7 +2,7 @@
 // which builds the ICS; the window queues the writes itself so they can be undone. The ICS edits
 // are crates/ms-pim's tests.
 import { Actions, SyncbackEventTask } from 'mailspring-exports';
-import { Event as MailspringEvent } from '../../src/data/models/event';
+import { Event as EventModel } from '../../src/data/models/event';
 import {
   modifySimpleEvent,
   createOccurrenceException,
@@ -20,8 +20,8 @@ const T_OCC2_START = Date.UTC(2026, 2, 2, 6) / 1000;
 const T_NEW_START = Date.UTC(2026, 2, 2, 8) / 1000;
 const T_NEW_END = Date.UTC(2026, 2, 2, 9) / 1000;
 
-function makeEvent(overrides: Partial<MailspringEvent> = {}): MailspringEvent {
-  return new MailspringEvent({
+function makeEvent(overrides: Partial<EventModel> = {}): EventModel {
+  return new EventModel({
     id: 'event-id-1',
     accountId: 'account-id-1',
     calendarId: 'calendar-id-1',

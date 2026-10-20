@@ -134,7 +134,7 @@ body.platform-win32 {
   }
 }
 
-.mailspring-calendar {
+.main-calendar {
   height: 100%;
   display: flex;
   color: @text-color;
@@ -1049,8 +1049,8 @@ body.platform-win32 {
 // Below this width Today, the date and the view switcher cannot share a row, so each takes one.
 // Top level because LESS does not nest parent selectors into @container the way it does @media.
 @container (max-width: 640px) {
-  .mailspring-calendar .header-controls .side-controls,
-  .mailspring-calendar .header-controls .center-controls {
+  .main-calendar .header-controls .side-controls,
+  .main-calendar .header-controls .center-controls {
     grid-column: ~'1 / -1';
     justify-content: center;
   }

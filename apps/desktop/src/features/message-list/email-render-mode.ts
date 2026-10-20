@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import {
   Palette,
   RGBA,
@@ -68,7 +68,7 @@ export function darkPalette(themeBackground: RGBA, text: string, link: string): 
 }
 
 // Messages the user switched back to the sender's colours, for this session.
-class OriginalColorsStore extends MailspringStore {
+class OriginalColorsStore extends BaseStore {
   _ids = new Set<string>();
 
   isShowingOriginal(messageId: string) {

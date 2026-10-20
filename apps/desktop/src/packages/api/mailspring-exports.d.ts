@@ -226,7 +226,12 @@ export type CanvasUtils = typeof import('../../utils/canvas');
 export const CanvasUtils: CanvasUtils;
 export type DragDropTypes = typeof import('../../utils/drag-drop-types');
 export const DragDropTypes: DragDropTypes;
-export type RegExpUtils = typeof import('../../utils/regexp').default;
+export type RegExpUtils = typeof import('../../utils/regexp').default & {
+  /** @deprecated since plugin API 1.34.0, removed in 2.0.0: use `RegExpUtils.signatureRegex()`. */
+  mailspringSignatureRegex: (typeof import('../../utils/regexp').default)['signatureRegex'];
+  /** @deprecated since plugin API 1.34.0, removed in 2.0.0: use `RegExpUtils.commandRegex()`. */
+  mailspringCommandRegex: (typeof import('../../utils/regexp').default)['commandRegex'];
+};
 export const RegExpUtils: RegExpUtils;
 export type MenuHelpers = typeof import('../../window/menu-helpers');
 export const MenuHelpers: MenuHelpers;
@@ -340,5 +345,9 @@ export type SystemStartService =
 export const SystemStartService: SystemStartService;
 
 // Testing
-export type MailspringTestUtils = typeof import('../../../tests/support/test-utils').default;
-export const MailspringTestUtils: MailspringTestUtils;
+export type TestUtils = typeof import('../../../tests/support/test-utils').default;
+export const TestUtils: TestUtils;
+/** @deprecated since plugin API 1.34.0, removed in 2.0.0: use `TestUtils`. */
+export type MailspringTestUtils = TestUtils;
+/** @deprecated since plugin API 1.34.0, removed in 2.0.0: use `TestUtils`. */
+export const MailspringTestUtils: TestUtils;

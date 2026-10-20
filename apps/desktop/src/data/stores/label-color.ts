@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 
 export type LabelColorSchemeName = 'automatic' | 'bright' | 'pastel' | 'muted' | 'earth';
 
@@ -94,7 +94,7 @@ function nameKey(label: ColorableLabel) {
  * scheme's, else (Automatic) the hue derived from the name. Both settings are per device and
  * keyed by lowercased display name, so a label has one colour in every account.
  */
-export class LabelColorStoreClass extends MailspringStore {
+export class LabelColorStoreClass extends BaseStore {
   private _scheme: LabelColorSchemeName = 'automatic';
   private _colors: Record<string, string> = {};
 

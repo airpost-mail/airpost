@@ -12,7 +12,7 @@ import {
   CategoryStore,
   FocusedPerspectiveStore,
   MailboxPerspective,
-  MailspringTestUtils,
+  TestUtils,
   TaskQueue,
 } from 'mailspring-exports';
 
@@ -45,7 +45,7 @@ describe('MovePickerPopover', function () {
       accountId: TEST_ACCOUNT_ID,
     });
 
-    const observable = MailspringTestUtils.mockObservable(
+    const observable = TestUtils.mockObservable(
       [this.inboxCategory, this.archiveCategory, this.userCategory],
       {}
     );

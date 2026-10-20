@@ -1,5 +1,5 @@
 import { Actions } from 'mailspring-exports';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import _ from 'underscore';
 
 export interface IDefaultSignatures {
@@ -20,7 +20,7 @@ export interface ISignatureSet {
   [key: string]: ISignature;
 }
 
-class _SignatureStore extends MailspringStore {
+class _SignatureStore extends BaseStore {
   signatures: ISignatureSet;
   defaultSignatures: IDefaultSignatures;
   selectedSignatureId: string;

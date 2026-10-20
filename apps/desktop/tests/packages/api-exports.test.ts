@@ -20,4 +20,12 @@ describe('plugin API barrels', () => {
       expect(failures).toEqual([]);
     });
   }
+
+  it('keeps the old names of renamed exports as aliases', () => {
+    const exportsObject = require('mailspring-exports');
+    expect(exportsObject.MailspringTestUtils).toBe(exportsObject.TestUtils);
+    const { RegExpUtils } = exportsObject;
+    expect(RegExpUtils.mailspringSignatureRegex).toBe(RegExpUtils.signatureRegex);
+    expect(RegExpUtils.mailspringCommandRegex).toBe(RegExpUtils.commandRegex);
+  });
 });

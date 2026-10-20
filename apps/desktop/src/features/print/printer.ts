@@ -9,7 +9,7 @@ class Printer {
     if (!thread) throw new Error('Printing: No thread active!');
     const account = AccountStore.accountForId(thread.accountId);
 
-    // Get the <mailspring-styles> tag present in the document
+    // The <managed-styles> tag that holds the window's stylesheets
     const styleTag = document.getElementsByTagName('managed-styles')[0];
     // The message frames of the focused thread (email-frame.tsx).
     const iframes = Array.from(document.getElementsByTagName('iframe')).filter((iframe) =>

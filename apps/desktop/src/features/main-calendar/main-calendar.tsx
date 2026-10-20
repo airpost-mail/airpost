@@ -66,8 +66,8 @@ import {
 import { showRecurringEventDialog } from './event/recurring-dialog';
 import { modifyEventWithRecurringSupport, EventTimeChangeOptions } from './event/recurring-actions';
 
-const DISABLED_CALENDARS = 'mailspring.disabledCalendars';
-const CALENDAR_VIEW = 'mailspring.calendarView';
+const DISABLED_CALENDARS = 'core.calendar.disabledCalendars';
+const CALENDAR_VIEW = 'core.calendar.view';
 
 const VIEWS = {
   [CalendarView.DAY]: DayView,
@@ -122,7 +122,7 @@ export interface CalendarViewProps extends EventRendererProps {
 }
 
 /*
- * Mailspring Calendar
+ * Main calendar
  */
 interface MainCalendarProps {}
 
@@ -1206,7 +1206,7 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
         hasSelectedEvents={this.state.selectedEvents.length > 0}
       >
         <KeyCommandsRegion
-          className="mailspring-calendar"
+          className="main-calendar"
           localHandlers={{
             'core:remove-from-view': this._onDeleteSelectedEvents,
             'calendar:move-event-up': () => this._onMoveSelectedEvent('up', false),

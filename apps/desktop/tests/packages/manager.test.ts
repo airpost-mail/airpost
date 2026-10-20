@@ -77,7 +77,7 @@ describe('PackageManager engines check', function () {
 
   it('exports the plugin API version', () => {
     expect(apiVersion).toBe(PLUGIN_API_VERSION);
-    expect(apiVersion).toBe('1.33.0');
+    expect(apiVersion).toBe('1.34.0');
   });
 
   it('reads tern.engineMethods, keeping only strings', () => {

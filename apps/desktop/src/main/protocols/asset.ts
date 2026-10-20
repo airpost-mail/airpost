@@ -16,7 +16,7 @@ import { bundledAssetRoots } from '../../shared/bundled-packages';
 //
 const FontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
 
-export default class MailspringProtocolHandler {
+export default class AssetProtocolHandler {
   loadPaths: string[] = [];
 
   constructor({ configDirPath, resourcePath, safeMode }) {
@@ -31,7 +31,7 @@ export default class MailspringProtocolHandler {
     this.registerProtocol();
   }
 
-  // Creates the 'Mailspring' custom protocol handler.
+  // Creates the `mailspring:` asset protocol handler.
   registerProtocol() {
     const scheme = 'mailspring';
 

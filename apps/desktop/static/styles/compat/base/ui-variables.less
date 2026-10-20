@@ -1,10 +1,10 @@
 // Literal values for the variables that base/ui-variables.less maps to theme
 // tokens, as they were before the tokens. A theme that ships only a
 // ui-variables.less (no styles/tokens.css) compiles against this file:
-// ThemeManager puts static/style/compat ahead of static/style in the import
+// ThemeManager puts static/styles/compat ahead of static/styles in the import
 // path, so the theme's `@import 'base/ui-variables'` lands here. The theme's
 // overrides then stay LESS colours, LESS colour functions on any of these keep
-// working, and compat/tokens.less turns the result into tokens.
+// working, and static/styles/compat/tokens.less turns the result into tokens.
 //
 // Needs synchronous imports (less-cache uses syncImport): with async imports,
 // LESS may keep base/ui-variables.less where ui-mixins.less imports it, after

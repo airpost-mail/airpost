@@ -2,7 +2,7 @@
 // writes (the override dropped, the slot excluded, SEQUENCE bumped) is crates/ms-pim's tests.
 import { Actions, DatabaseStore, DestroyEventTask, SyncbackEventTask } from 'mailspring-exports';
 import { dialog } from '@electron/remote';
-import { Event as MailspringEvent } from '../../src/data/models/event';
+import { Event as EventModel } from '../../src/data/models/event';
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';
 import { fakePimEngine, refusal } from '../support/fake-pim-engine';
@@ -39,7 +39,7 @@ const MOVED_START = Date.UTC(2026, 2, 2, 8, 0, 0) / 1000;
 const MOVED_SLOT = Date.UTC(2026, 2, 2, 6, 0, 0) / 1000;
 
 const master = () =>
-  new MailspringEvent({
+  new EventModel({
     id: 'master-row',
     accountId: 'a',
     calendarId: 'c',
@@ -51,7 +51,7 @@ const master = () =>
   } as any);
 
 const exceptionRow = (recurrenceId: string) =>
-  new MailspringEvent({
+  new EventModel({
     id: 'exception-row',
     accountId: 'a',
     calendarId: 'c',
@@ -99,7 +99,7 @@ const update = () => engine.callsTo('events.update')[0];
 describe('deleting a moved occurrence from the calendar', function () {
   let calendar: any;
 
-  function stubRows(exception: MailspringEvent, masterRow: MailspringEvent | null) {
+  function stubRows(exception: EventModel, masterRow: EventModel | null) {
     spyOn(DatabaseStore, 'find').andReturn(Promise.resolve(exception));
     spyOn(DatabaseStore, 'findBy').andReturn(Promise.resolve(masterRow));
   }

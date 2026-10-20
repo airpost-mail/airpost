@@ -1,6 +1,6 @@
 import _ from 'underscore';
 import Rx from 'rx-lite';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 
 import * as Utils from '../models/utils';
 import { Thread } from '../models/thread';
@@ -13,7 +13,7 @@ import DatabaseStore from '../database/store';
 import { SearchQueryParser } from '../../mail/search/parser';
 
 // A store that handles the focuses collections of and individual contacts
-class FocusedContactsStore extends MailspringStore {
+class FocusedContactsStore extends BaseStore {
   _unsubFocusedContact?: Rx.Disposable;
   _contactScores: { [key: string]: { score: number; contact: Contact } } = {};
   _currentContacts = [];

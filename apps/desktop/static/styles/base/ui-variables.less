@@ -33,11 +33,11 @@
 
 //== Color Descriptors
 // The themeable colours, radii and fonts read the theme tokens on :root
-// (tokens/defaults.css, docs/desktop/theme-tokens.md), so LESS follows whatever a theme
+// (static/styles/tokens/defaults.css, docs/desktop/theme-tokens.md), so LESS follows whatever a theme
 // sets there. That makes them CSS values rather than LESS colours: LESS colour
 // functions and guards can't take them, so use color-mix() / relative colours.
 // A theme that still overrides these in its own ui-variables.less compiles
-// against compat/base/ui-variables.less instead (ThemeManager), which keeps the
+// against static/styles/compat/base/ui-variables.less instead (ThemeManager), which keeps the
 // literal values for it.
 @accent-primary: var(--primary);
 @accent-primary-dark: var(--selected);

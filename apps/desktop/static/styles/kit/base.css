@@ -1,5 +1,5 @@
 /* Shared rules for the UI kit (docs/desktop/ui-kit.md 5). Plain CSS, loaded raw after
-   static/style/index.less by ThemeManager (KIT_STYLESHEETS); never @import it from LESS. */
+   static/styles/index.less by ThemeManager (KIT_STYLESHEETS); never @import it from LESS. */
 
 /* The container every kit layer portals into (src/components/kit/portal.ts). Above the legacy
    modal container (z-index 1000) and FixedPopover (40). */

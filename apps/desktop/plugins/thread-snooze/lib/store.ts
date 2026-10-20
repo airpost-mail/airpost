@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 
 import {
   localized,
@@ -14,7 +14,7 @@ import { markUnreadOrResurfaceThreads, moveThreads, snoozedUntilMessage } from '
 import { PLUGIN_ID } from './constants';
 import * as SnoozeActions from './actions';
 
-class _SnoozeStore extends MailspringStore {
+class _SnoozeStore extends BaseStore {
   unsubscribers: Array<() => void>;
 
   activate() {

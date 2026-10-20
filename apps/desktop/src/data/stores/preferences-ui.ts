@@ -1,6 +1,6 @@
 import { ipcRenderer } from 'electron';
 import _ from 'underscore';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import WorkspaceStore from './workspace';
 import FocusedPerspectiveStore from './focused-perspective';
 import * as Actions from '../actions';
@@ -36,7 +36,7 @@ export class PreferencesUIStoreTab {
   }
 }
 
-class _PreferencesUIStore extends MailspringStore {
+class _PreferencesUIStore extends BaseStore {
   _tabs: PreferencesUIStoreTab[] = [];
   _selection = {
     tabId: null,

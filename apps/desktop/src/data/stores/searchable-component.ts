@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import DOMUtils from '../../utils/dom';
 import * as Actions from '../actions';
 import { MAX_MATCHES, CHAR_THRESHOLD } from '../../components/searchable/constants';
@@ -19,7 +19,7 @@ function isRemoteRegion(region: HTMLElement | RemoteSearchRegion): region is Rem
   return !!region && !(region instanceof Node) && 'element' in region;
 }
 
-class SearchableComponentStore extends MailspringStore {
+class SearchableComponentStore extends BaseStore {
   currentMatch = null;
   matches = [];
   globalIndex = null; // null means nothing is selected

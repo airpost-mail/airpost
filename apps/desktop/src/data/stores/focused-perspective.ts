@@ -1,13 +1,13 @@
 import _ from 'underscore';
 import { ipcRenderer } from 'electron';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { AccountStore } from './account';
 import WorkspaceStore from './workspace';
 import { MailboxPerspective } from '../mailbox-perspective';
 import CategoryStore from './category';
 import * as Actions from '../actions';
 
-class FocusedPerspectiveStore extends MailspringStore {
+class FocusedPerspectiveStore extends BaseStore {
   _current: MailboxPerspective = MailboxPerspective.forNothing();
   _initialized = false;
 

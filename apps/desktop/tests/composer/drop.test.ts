@@ -43,7 +43,7 @@ describe('Composer drops from inside the app', function () {
     ).toEqual('/tmp/a b.png');
     expect(
       nonNativeFilePathForDrop(
-        transfer({ 'text/mailspring-file-url': 'image/png:a.png:file:///tmp/a.png' })
+        transfer({ 'text/tern-file-url': 'image/png:a.png:file:///tmp/a.png' })
       )
     ).toEqual('/tmp/a.png');
   });

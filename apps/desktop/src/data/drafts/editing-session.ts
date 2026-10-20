@@ -1,5 +1,5 @@
 import * as Immutable from 'immutable';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { Editor, Value, Block, Text } from 'slate';
 
 import RegExpUtils from '../../utils/regexp';
@@ -191,7 +191,7 @@ that display Draft objects or allow for interactive editing of Drafts.
 
 Section: Drafts
 */
-export class DraftEditingSession extends MailspringStore {
+export class DraftEditingSession extends BaseStore {
   static DraftChangeSet = DraftChangeSet;
 
   _draft: MessageWithEditorState = null;
@@ -288,7 +288,7 @@ export class DraftEditingSession extends MailspringStore {
     }
 
     let cleaned = QuotedHTMLTransformer.removeQuotedHTML(this._draft.body.trim());
-    const sigIndex = cleaned.search(RegExpUtils.mailspringSignatureRegex());
+    const sigIndex = cleaned.search(RegExpUtils.signatureRegex());
     cleaned = sigIndex > -1 ? cleaned.substr(0, sigIndex) : cleaned;
 
     const signatureIndex = cleaned.indexOf('<signature>');
@@ -356,7 +356,7 @@ export class DraftEditingSession extends MailspringStore {
     }
 
     let cleaned = QuotedHTMLTransformer.removeQuotedHTML(this._draft.body.trim());
-    const sigIndex = cleaned.search(RegExpUtils.mailspringSignatureRegex());
+    const sigIndex = cleaned.search(RegExpUtils.signatureRegex());
     cleaned = sigIndex > -1 ? cleaned.substr(0, sigIndex) : cleaned;
 
     const signatureIndex = cleaned.indexOf('<signature>');

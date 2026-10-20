@@ -7,7 +7,7 @@ import {
   DraftFactory,
   DatabaseChangeRecord,
 } from 'mailspring-exports';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 
 import EngineEvents from '../../../src/engine/events';
 import { Feature } from '../../../src/shared/engine/protocol';
@@ -15,7 +15,7 @@ import { resurfacingBodies } from '../../../src/shared/resurfacing';
 import { PLUGIN_ID } from './constants';
 import { updateReminderMetadata } from './utils';
 
-class SendRemindersStore extends MailspringStore {
+class SendRemindersStore extends BaseStore {
   _lastFocusedThread = null;
   _unsubscribers: (() => void)[] = [];
 

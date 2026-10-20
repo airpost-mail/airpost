@@ -184,10 +184,10 @@ class SystemStartServiceLinuxBackgroundPortal extends SystemStartServiceBase {
 }
 
 function usePortal(): boolean {
-  return (
-    process.env.FLATPAK_ID !== undefined ||
-    process.env.MAILSPRING_FORCE_BACKGROUND_PORTAL === 'true'
-  );
+  // MAILSPRING_FORCE_BACKGROUND_PORTAL is the old name, read when the new one is unset.
+  const force =
+    process.env.TERN_FORCE_BACKGROUND_PORTAL ?? process.env.MAILSPRING_FORCE_BACKGROUND_PORTAL;
+  return process.env.FLATPAK_ID !== undefined || force === 'true';
 }
 
 /* eslint import/no-mutable-exports: 0*/

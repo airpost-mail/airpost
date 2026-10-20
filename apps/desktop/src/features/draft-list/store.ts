@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import {
   Rx,
   Actions,
@@ -20,7 +20,7 @@ The preview follows the focused draft by headerMessageId, not by id: changing th
 account recreates the draft under a new id (DraftEditingSession.ensureCorrectAccount), and
 FocusedContentStore drops focus when the old id is unpersisted.
 */
-class DraftListStore extends MailspringStore {
+class DraftListStore extends BaseStore {
   constructor() {
     super();
     this.listenTo(FocusedPerspectiveStore, this._onPerspectiveChanged);

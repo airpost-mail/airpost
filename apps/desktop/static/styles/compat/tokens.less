@@ -1,10 +1,10 @@
 // Theme tokens for a theme that ships only LESS variables (styles/ui-variables.less,
 // no styles/tokens.css). ThemeManager.compatTokensSource() imports the theme's
-// variables ahead of this file, with static/style/compat ahead of static/style in
-// the import path, and loads the result at theme priority after tokens/defaults.css.
+// variables ahead of this file, with static/styles/compat ahead of static/styles in
+// the import path, and loads the result at theme priority after static/styles/tokens/defaults.css.
 // On its own it compiles to the Light values.
 //
-// Every variable has a literal value here (compat/base/ui-variables.less), so a
+// Every variable has a literal value here (static/styles/compat/base/ui-variables.less), so a
 // token never ends up as var(--itself). Tokens with no LESS source keep their
 // defaults.css derivation and so follow the tokens set below.
 @import (reference) 'base/ui-variables';

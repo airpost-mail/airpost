@@ -93,7 +93,7 @@ Findings the spec pins down:
   file: core code imports the file it needs (`import { Button } from '../components/ui/button'`), so
   nothing requires all of Radix.
 - Specs: `tests/components/kit-<name>.test.tsx`.
-- Styles: `static/style/kit/<name>.css` (section 5).
+- Styles: `static/styles/kit/<name>.css` (section 5).
 - Every component is a `React.forwardRef` function (React 17 doesn't pass `ref` as a prop), sets
   `displayName`, spreads the rest props onto the DOM part that carries `data-slot`, and merges
   `className` after its own classes. Files `import React from 'react'` (classic JSX runtime).
@@ -201,19 +201,19 @@ is non-modal by default.
 
 ## 5. CSS
 
-- **Files.** `static/style/kit/<name>.css`, plain CSS, one per component, plus `kit/base.css` for
+- **Files.** `static/styles/kit/<name>.css`, plain CSS, one per component, plus `static/styles/kit/base.css` for
   shared rules (focus ring, the portal container, reduced motion).
 - **Loading.** `ThemeManager.loadStaticStylesheets()` (`src/packages/theme-manager.ts`) loads
-  them after `static/style/index.less` through `requireStylesheet(<path>.css)`, from a fixed list
+  them after `static/styles/index.less` through `requireStylesheet(<path>.css)`, from a fixed list
   in that file (`KIT_STYLESHEETS`, in dependency order). `.css` is read raw at priority -1. It skips
   LESS and rtlcss, and the theme-switch reload loop re-reads it like the rest of `static/`. Order:
-  `tokens/defaults.css` (-1), `index.less` (-1), kit (-1), package styles (0), theme tokens (1). On a
+  `static/styles/tokens/defaults.css` (-1), `index.less` (-1), kit (-1), package styles (0), theme tokens (1). On a
   specificity tie the kit beats core LESS, and plugins and themes beat the kit.
 - **Not through LESS.** Kit CSS is never `@import`ed from a `.less` file. LESS 3.13 does arithmetic
   on bare slashes (`aspect-ratio: 16 / 9` compiles to `1.77777778`, so `grid-area: 1 / 2` and
   `font: 13px/1.4` break), and rtlcss would mirror physical properties a second time.
 - **Tokens only.** Colours, radii, fonts and density come from `var(--…)` tokens in
-  `static/style/tokens/defaults.css`. Derived shades use `color-mix()` or relative colour syntax
+  `static/styles/tokens/defaults.css`. Derived shades use `color-mix()` or relative colour syntax
   (`hsl(from var(--x) h s calc(l - 5))`). No LESS variables, no LESS colour functions, no new
   tokens, no colour literals other than `transparent` and `currentColor`. Shape follows the
   Preferences redesign: controls use `calc(var(--radius) * 2)` (6px at the default 3px), menus,
@@ -230,15 +230,15 @@ is non-modal by default.
   specificity.
 - **Legacy global rules.** `inputs.less` (`input[type='text']`, … and their `:focus`),
   `dropdowns.less` (`select`), `buttons.less` (`.btn`, `.btn-icon`, `.btn-toolbar`),
-  `components/switch.less` (`.slide-switch`), `components/menu.less` (`.menu`, `.item`),
-  `components/modal.less` and `components/fixed-popover.less` would leak into kit elements, either
+  `static/styles/components/switch.less` (`.slide-switch`), `static/styles/components/menu.less` (`.menu`, `.item`),
+  `static/styles/components/modal.less` and `static/styles/components/fixed-popover.less` would leak into kit elements, either
   because they match the element or because the kit renders the legacy class (section 7). In the
   stage-2 commit that introduces a kit component, the core rules it would match get the guard
   `:where(:not([data-slot]))` on their root selector, e.g. `.btn:where(:not([data-slot]))`,
   `input[type='text']:where(:not([data-slot]))`. `:where()` adds no specificity, so every legacy
   element still matches with the same weight and nothing legacy changes. Kit elements always have
   `data-slot`, so they drop out. LESS 3.13 and rtlcss pass the guard through unchanged (checked).
-  Guards go in core `static/style/` only. Theme rules stay unguarded on purpose (section 7).
+  Guards go in core `static/styles/` only. Theme rules stay unguarded on purpose (section 7).
   Feature LESS that styles `.btn` in context (`.some-toolbar .btn`) is cleaned up by the batch
   that migrates that screen.
 - **Motion.** `[data-state='open']` and `[data-state='closed']` get 120-150 ms fade/zoom keyframes.
@@ -387,7 +387,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Legacy classes: kept, `settings-segmented` on the group and `on` on the chosen segment.
 - Moves to `src/components/ui/segmented-control.tsx`; `settings.tsx` re-exports it, so the
   `SegmentedControl` export and `ConfigSegmentedRow` are unchanged. Its rules move from
-  `components/settings.less` to `kit/segmented-control.css`.
+  `static/styles/components/settings.less` to `static/styles/kit/segmented-control.css`.
 - Not changed: arrows don't mirror in RTL today and still won't. Changing that is a behaviour change
   for a later stage.
 
@@ -541,7 +541,7 @@ dropped at plugin API 2.0.0, together with the compat LESS path.
 
 ## 9. Stage 2 checklist
 
-- `src/components/ui/*` per section 6, `static/style/kit/*.css` per section 5, `KIT_STYLESHEETS` in
+- `src/components/ui/*` per section 6, `static/styles/kit/*.css` per section 5, `KIT_STYLESHEETS` in
   ThemeManager, `:where(:not([data-slot]))` guards on the core rules each component would match.
 - `UIProvider` on the four roots; the `ReactDOM.render` allowlist spec.
 - `consumeEscape` and `data-ui-layer` on every focus-taking layer; the `withinUILayer` rule in

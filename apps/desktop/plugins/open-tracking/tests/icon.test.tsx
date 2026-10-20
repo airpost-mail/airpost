@@ -2,11 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { findRenderedDOMComponentWithClass } from 'react-dom/test-utils';
 
-import { Message, MailspringTestUtils } from 'mailspring-exports';
+import { Message, TestUtils } from 'mailspring-exports';
 import OpenTrackingIcon from '../lib/icon';
 import { PLUGIN_ID } from '../lib/constants';
 
-const { renderIntoDocument } = MailspringTestUtils;
+const { renderIntoDocument } = TestUtils;
 
 function makeIcon(thread, props = {}) {
   return renderIntoDocument(<OpenTrackingIcon {...props} thread={thread} />);

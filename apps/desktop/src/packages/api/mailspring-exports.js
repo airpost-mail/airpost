@@ -61,7 +61,7 @@ const deprecate = (prop, info, getter) => {
 
 /*
 An export some of whose members are deprecated: each of them warns as deprecate() does, once
-per package that reads it, and is `stub` from then on.
+per package that reads it, and is `stub` from then on (a stand-in, or the member that replaces it).
 */
 const withDeprecatedMembers = (prop, value, members) => {
   const out = Object.assign({}, value);
@@ -303,7 +303,23 @@ deprecate(
 lazyLoad(`FsUtils`, 'shared/fs-utils');
 lazyLoad(`CanvasUtils`, 'utils/canvas');
 lazyLoad(`DragDropTypes`, 'utils/drag-drop-types');
-lazyLoad(`RegExpUtils`, 'utils/regexp');
+lazyLoadWithGetter(`RegExpUtils`, () => {
+  const RegExpUtils = require('../../utils/regexp').default;
+  return withDeprecatedMembers('RegExpUtils', RegExpUtils, {
+    mailspringSignatureRegex: {
+      since: '1.34.0',
+      removeIn: '2.0.0',
+      replacement: 'use RegExpUtils.signatureRegex()',
+      stub: RegExpUtils.signatureRegex,
+    },
+    mailspringCommandRegex: {
+      since: '1.34.0',
+      removeIn: '2.0.0',
+      replacement: 'use RegExpUtils.commandRegex()',
+      stub: RegExpUtils.commandRegex,
+    },
+  });
+});
 lazyLoad(`MenuHelpers`, 'window/menu-helpers');
 lazyLoad(`VirtualDOMUtils`, 'utils/virtual-dom');
 lazyLoad(`Spellchecker`, 'window/spellchecker');
@@ -352,7 +368,12 @@ lazyLoad(`DefaultClientHelper`, 'shared/default-client-helper');
 lazyLoad(`SystemStartService`, 'window/platform/system-start-service');
 
 // Testing
-lazyLoadWithGetter(`MailspringTestUtils`, () => require('../../../tests/support/test-utils').default);
+lazyLoadWithGetter(`TestUtils`, () => require('../../../tests/support/test-utils').default);
+deprecate(
+  `MailspringTestUtils`,
+  { since: '1.34.0', removeIn: '2.0.0', replacement: 'use TestUtils' },
+  () => require('../../../tests/support/test-utils').default
+);
 
 process.nextTick(() => {
   let c = 0;

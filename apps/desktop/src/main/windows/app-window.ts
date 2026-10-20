@@ -16,15 +16,15 @@ import { shouldBlockFrameNavigation } from '../frame/navigation';
 let WindowIconPath = null;
 let idNum = 0;
 
-const mailspringWebContents = new WeakSet<Electron.WebContents>();
+const appWebContents = new WeakSet<Electron.WebContents>();
 
 /**
- * True for the renderers of Mailspring's own windows. Other top-level windows (print
+ * True for the renderers of Tern's own windows. Other top-level windows (print
  * preview, quick preview, "show original") display untrusted content and must not be
  * able to drive the main process.
  */
 export function isAppWindowContents(contents: Electron.WebContents) {
-  return mailspringWebContents.has(contents);
+  return appWebContents.has(contents);
 }
 
 export interface AppWindowSettings {
@@ -159,7 +159,7 @@ export default class AppWindow extends EventEmitter {
     }
 
     this.browserWindow = new BrowserWindow(browserWindowOptions);
-    mailspringWebContents.add(this.browserWindow.webContents);
+    appWebContents.add(this.browserWindow.webContents);
 
     // Constrain every <webview> guest to low-privilege preferences regardless of
     // the attributes on the tag, and strip any preload it requests. The only
@@ -243,7 +243,7 @@ export default class AppWindow extends EventEmitter {
     // When --background is requested on Wayland we must still show briefly to commit the
     // Wayland surface (otherwise show() silently fails). Once the window finishes
     // initializing (window:loaded) we hide it again so the net effect matches what the
-    // user asked for: Mailspring running silently in the background.
+    // user asked for: Tern running silently in the background.
     if (isWaylandSession()) {
       this.browserWindow.webContents.once('did-finish-load', () => {
         if (!this.browserWindow.isDestroyed() && !this.browserWindow.isVisible()) {
@@ -313,7 +313,7 @@ export default class AppWindow extends EventEmitter {
 
       const isLastWindow = global.application.windowManager.getVisibleWindowCount() === 1;
       // The configuration value may be `undefined` when it has not been manually set to true in the preferences
-      // This check against false prevents that Mailspring is closed when configuring the first mail account
+      // This check against false prevents that Tern is closed when configuring the first mail account
       const isTrayEnabled = global.application.config.get('core.workspace.systemTray') !== false;
       const runWithoutWindowsOpen = isTrayEnabled || process.platform === 'darwin';
 

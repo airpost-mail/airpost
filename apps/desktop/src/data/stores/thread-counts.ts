@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import DatabaseStore from '../database/store';
 import { Thread } from '../models/thread';
 import EngineEvents, {
@@ -22,7 +22,7 @@ answers `counts.get` once per connection and sends every change after it as a Th
 delta; without one (an older engine, or before the first hello) the counts are read from the
 ThreadCounts table whenever threads change.
 */
-export class ThreadCountsStore extends MailspringStore {
+export class ThreadCountsStore extends BaseStore {
   _counts: Counts = {};
   _engine: EngineEventsType;
   // The counts come from the engine rather than the table.

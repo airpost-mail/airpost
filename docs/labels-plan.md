@@ -573,7 +573,7 @@ dot:        oklch(from <base> clamp(var(--label-dot-lmin), l, var(--label-dot-lm
 
 - A chip is a tint of the label's hue with text in a deep shade of it on light themes, as today,
   and the reverse on dark ones. The bounds come from LESS guards on the theme's own background
-  lightness (`static/style/mixins/label-colors.less`): chips from `@list-bg`, dots from
+  lightness (`static/styles/mixins/label-colors.less`): chips from `@list-bg`, dots from
   `@background-primary`, sidebar dots from `@source-list-bg`, and Darkside's dark sidebar from
   `@sidebar`. No theme carries colour lists; a new theme gets the right bounds from its
   variables.

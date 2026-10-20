@@ -1,12 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import * as Actions from '../actions';
 import _ from 'underscore';
 import { UIProvider } from '../../components/kit/provider';
 import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from '../../components/kit/popover';
 
-const CONTAINER_ID = 'mailspring-popover-container';
+const CONTAINER_ID = 'tern-popover-container';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 type OriginRect = {
@@ -110,7 +110,7 @@ function createContainer(id) {
   return element;
 }
 
-class PopoverStore extends MailspringStore {
+class PopoverStore extends BaseStore {
   isOpen = false;
   container: HTMLElement;
 

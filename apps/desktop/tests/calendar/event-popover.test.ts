@@ -3,7 +3,7 @@
 // or RDATEs kept, EXDATEs rezoned, one SEQUENCE bump, ORGANIZER on the first guest, TRANSP per
 // VEVENT) is crates/ms-pim's desktop corpus, recorded from this spec.
 import { Actions, DatabaseStore, SyncbackEventTask } from 'mailspring-exports';
-import { Event as MailspringEvent } from '../../src/data/models/event';
+import { Event as EventModel } from '../../src/data/models/event';
 import { CalendarEventPopover } from '../../src/features/main-calendar/event/popover';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';
 import { AllDayToggle } from '../../src/features/main-calendar/event/all-day-toggle';
@@ -21,7 +21,7 @@ const START = Date.UTC(2026, 2, 3, 14, 0, 0) / 1000;
 const END = Date.UTC(2026, 2, 3, 15, 0, 0) / 1000;
 
 function makeEvent() {
-  return new MailspringEvent({
+  return new EventModel({
     id: 'event-1',
     accountId: 'account-1',
     calendarId: 'calendar-1',

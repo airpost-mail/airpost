@@ -2,7 +2,7 @@
 
 import _ from 'underscore';
 
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import KeyManager from '../../window/key-manager';
 import { revokeOAuthGrant } from '../../engine/oauth-revocation';
 import * as EngineAccounts from '../../engine/accounts';
@@ -43,7 +43,7 @@ one last added, which may be older. Accounts deleted here stay out (accountsToRe
 
 Section: Stores
 */
-export class _AccountStore extends MailspringStore {
+export class _AccountStore extends BaseStore {
   private _version: number;
   private _engine: typeof EngineEvents;
   private _accounts: Account[];
@@ -282,7 +282,7 @@ export class _AccountStore extends MailspringStore {
   }
 
   /**
-   * When an account is removed from Mailspring, the AccountStore
+   * When an account is removed from Tern, the AccountStore
    * triggers. The local-sync/src/local-sync-worker/index.js listens to
    * the AccountStore and runs `ensureK2Consistency`. This will actually
    * delete the Account on the local sync side.

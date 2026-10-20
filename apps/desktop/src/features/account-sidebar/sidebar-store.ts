@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import {
   Actions,
   Account,
@@ -24,7 +24,7 @@ const Sections = {
   User: 'User',
 };
 
-class SidebarStore extends MailspringStore {
+class SidebarStore extends BaseStore {
   _sections: {
     Standard: ISidebarSection;
     User: ISidebarSection[];

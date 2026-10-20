@@ -18,8 +18,8 @@ export const TOKEN_DEFAULTS_SOURCE_PATH = 'tokens:defaults';
 export const THEME_TOKENS_SOURCE_PATH = 'tokens:theme';
 const THEME_TOKENS_FILE = 'tokens.css';
 const THEME_VARIABLES_FILE = 'ui-variables.less';
-// The UI kit's plain-CSS sheets in static/style/kit, in dependency order. Loaded raw after
-// static/style/index.less at the same priority, so on a specificity tie the kit beats core LESS
+// The UI kit's plain-CSS sheets in static/styles/kit, in dependency order. Loaded raw after
+// static/styles/index.less at the same priority, so on a specificity tie the kit beats core LESS
 // and package and theme styles beat the kit (docs/desktop/ui-kit.md section 5).
 const KIT_STYLESHEETS = [
   'base',
@@ -54,10 +54,10 @@ function buildSystemAccentCSS(color: string): string {
 /**
  * LESS for a LESS-variables theme's tokens: the literal base, then the theme's variables, then
  * the token mapping, so the theme's values win even if its file doesn't import the base.
- * Compile it with static/style/compat ahead of static/style in the import path.
+ * Compile it with static/styles/compat ahead of static/styles in the import path.
  */
 export function compatTokensSource(resourcePath: string, themeStylesPath: string) {
-  const compat = path.join(resourcePath, 'static', 'style', 'compat');
+  const compat = path.join(resourcePath, 'static', 'styles', 'compat');
   const lessPath = (p: string) => JSON.stringify(p.split(path.sep).join('/'));
   return [
     `@import (reference) ${lessPath(path.join(compat, 'base', 'ui-variables.less'))};`,
@@ -78,11 +78,11 @@ function parseScheme(value: unknown): ThemeScheme | null {
  * new theme.
  *
  * Themes are theme tokens: CSS custom properties on :root (docs/desktop/theme-tokens.md).
- * static/style/tokens/defaults.css loads at core priority with the Light values;
+ * static/styles/tokens/defaults.css loads at core priority with the Light values;
  * the active theme's styles/tokens.css loads after it at theme priority. A theme
- * with only a styles/ui-variables.less gets its tokens from compat/tokens.less,
+ * with only a styles/ui-variables.less gets its tokens from static/styles/compat/tokens.less,
  * compiled against its variables, and its LESS compiles against the literal
- * compat/base/ui-variables.less. The theme's scheme (package.json `scheme` and
+ * static/styles/compat/base/ui-variables.less. The theme's scheme (package.json `scheme` and
  * `sidebarScheme`, or for a LESS-variables theme the lightness of its
  * backgrounds) becomes the theme-scheme-* and theme-sidebar-scheme-* body classes.
  *
@@ -310,14 +310,14 @@ export default class ThemeManager {
     const paths = [this.getBaseTheme().getStylesheetsPath()];
     const active = this.getActiveTheme();
     if (active) {
-      // Ahead of static/style, so the theme's `@import 'base/ui-variables'` gets the literals.
+      // Ahead of static/styles, so the theme's `@import 'base/ui-variables'` gets the literals.
       if (this.usesCompatTokens(active)) paths.unshift(this.compatStylesPath());
       paths.unshift(active.getStylesheetsPath());
     }
     return paths;
   }
 
-  /** A theme that sets LESS variables and no tokens, so its tokens come from compat/tokens.less. */
+  /** A theme that sets LESS variables and no tokens, so its tokens come from static/styles/compat/tokens.less. */
   usesCompatTokens(theme) {
     const styles = theme.getStylesheetsPath();
     return (
@@ -327,7 +327,7 @@ export default class ThemeManager {
   }
 
   private compatStylesPath() {
-    return path.join(this.resourcePath, 'static', 'style', 'compat');
+    return path.join(this.resourcePath, 'static', 'styles', 'compat');
   }
 
   /** The theme's tokens as CSS: its styles/tokens.css, or the compat tokens. Empty for neither. */
@@ -403,16 +403,18 @@ export default class ThemeManager {
   }
 
   loadStaticStylesheets() {
-    const defaults = path.join(this.resourcePath, 'static', 'style', 'tokens', 'defaults.css');
+    const defaults = path.join(this.resourcePath, 'static', 'styles', 'tokens', 'defaults.css');
     this.styleSheetDisposablesBySourcePath[TOKEN_DEFAULTS_SOURCE_PATH] =
       AppEnv.styles.addStyleSheet(fs.readFileSync(defaults, 'utf8'), {
         sourcePath: TOKEN_DEFAULTS_SOURCE_PATH,
         priority: -1,
       });
-    this.requireStylesheet(path.join(this.resourcePath, 'static', 'style', 'index'));
-    this.requireStylesheet(path.join(this.resourcePath, 'static', 'style', 'email-frame'));
+    this.requireStylesheet(path.join(this.resourcePath, 'static', 'styles', 'index'));
+    this.requireStylesheet(path.join(this.resourcePath, 'static', 'styles', 'email-frame'));
     for (const name of KIT_STYLESHEETS) {
-      this.requireStylesheet(path.join(this.resourcePath, 'static', 'style', 'kit', `${name}.css`));
+      this.requireStylesheet(
+        path.join(this.resourcePath, 'static', 'styles', 'kit', `${name}.css`)
+      );
     }
   }
 

@@ -194,7 +194,7 @@ describe('TokenizingTextField', function () {
       tokenEl.dispatchEvent(dragStartEvt);
 
       expect(dragStartEventData).toEqual({
-        'mailspring-token-items':
+        'tern-token-items':
           '[{"id":"2","name":"Mailspring Burger Basket","h":false,"s":"mail","email":"burgers@mailspring.com","gis":[],"__cls":"Contact"}]',
         'text/plain': 'Mailspring Burger Basket <burgers@mailspring.com>',
       });

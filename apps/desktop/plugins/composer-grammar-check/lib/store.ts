@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { CapabilityStore } from 'mailspring-exports';
 import { GrammarError, LanguageToolBackend } from './service';
 
@@ -7,7 +7,7 @@ interface BlockCheckResult {
   errors: GrammarError[];
 }
 
-class _GrammarCheckStore extends MailspringStore {
+class _GrammarCheckStore extends BaseStore {
   private _enabled = false;
   private _checking: Map<string, boolean> = new Map();
   private _errorsByDraft: Map<string, Map<string, BlockCheckResult>> = new Map();

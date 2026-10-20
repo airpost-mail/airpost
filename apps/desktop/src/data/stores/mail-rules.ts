@@ -1,4 +1,4 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import * as Utils from '../models/utils';
 import * as Actions from '../actions';
 import { localized } from '../../shared/intl';
@@ -67,7 +67,7 @@ export interface ReprocessState {
 
 const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
-class MailRulesStore extends MailspringStore {
+class MailRulesStore extends BaseStore {
   _reprocessing: { [accountId: string]: ReprocessState } = {};
   _rules: MailRule[] = [];
 

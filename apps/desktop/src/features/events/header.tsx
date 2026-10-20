@@ -309,7 +309,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
     const window = await this._conflictWindowFor(copy);
     const busy = conflictCalendarIds(
       calendars,
-      AppEnv.config.get('mailspring.disabledCalendars') || []
+      AppEnv.config.get('core.calendar.disabledCalendars') || []
     );
     let conflicts: CalendarConflict[] = [];
     if (window && busy.length) {

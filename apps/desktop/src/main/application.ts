@@ -31,7 +31,7 @@ import SystemAccentWatcher from './platform/accent-watcher';
 import SystemTrayManager from './platform/system-tray';
 import { DefaultClientHelper } from '../shared/default-client-helper';
 import { developerToolsAvailable } from '../shared/developer-tools';
-import MailspringProtocolHandler from './protocols/asset';
+import AssetProtocolHandler from './protocols/asset';
 import { registerFilesProtocol } from './protocols/files';
 import { registerMessageFrameProtocol } from './frame/protocol-handler';
 import { registerExternalFetchIPC } from './ipc/external-fetch';
@@ -82,7 +82,7 @@ export default class Application extends EventEmitter {
   configPersistenceManager: ConfigPersistenceManager;
   fileListCache: FileListCache;
   applicationMenu: ApplicationMenu;
-  mailspringProtocolHandler: MailspringProtocolHandler;
+  assetProtocolHandler: AssetProtocolHandler;
   windowManager: WindowManager;
   autoUpdateManager: AutoUpdateManager;
   systemAccentWatcher: SystemAccentWatcher;
@@ -113,7 +113,7 @@ export default class Application extends EventEmitter {
     this.safeMode = safeMode;
 
     this.fileListCache = new FileListCache();
-    this.mailspringProtocolHandler = new MailspringProtocolHandler({
+    this.assetProtocolHandler = new AssetProtocolHandler({
       configDirPath,
       resourcePath,
       safeMode,
@@ -1303,9 +1303,8 @@ export default class Application extends EventEmitter {
       );
     }
 
-    // Important: Use .mailspring-spec instead of .mailspring-mail to avoid overwriting the
-    // user's real email config!
-    const configDirPath = path.join(app.getPath('home'), '.mailspring-spec');
+    // Specs get their own config dir so they never touch the user's real profile.
+    const configDirPath = path.join(app.getPath('home'), '.tern-spec');
 
     specWindowOptions.resourcePath = resourcePath;
     specWindowOptions.configDirPath = configDirPath;

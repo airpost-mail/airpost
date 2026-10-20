@@ -6,7 +6,7 @@ import {
   Thread,
   Folder,
   Label,
-  Event as MailspringEvent,
+  Event as EventModel,
 } from 'mailspring-exports';
 import { parseICSString } from '../../src/utils/calendar';
 
@@ -28,8 +28,8 @@ function makeThread(id: string, accountId: string, folders: Folder[] = []): Thre
   return t;
 }
 
-function makeEvent(overrides: Partial<MailspringEvent> = {}): MailspringEvent {
-  return new MailspringEvent({
+function makeEvent(overrides: Partial<EventModel> = {}): EventModel {
+  return new EventModel({
     id: 'event-id-1',
     accountId: 'test-account-id',
     calendarId: 'calendar-id-1',

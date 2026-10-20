@@ -14,7 +14,7 @@ import { RetinaImg, KeyCommandsRegion, BindGlobalCommands } from 'mailspring-com
 import { EventOccurrence, occurrencesForEvents, occurrenceStartUnix } from './data-source';
 import { Disposable } from 'rx-core';
 
-const DISABLED_CALENDARS = 'mailspring.disabledCalendars';
+const DISABLED_CALENDARS = 'core.calendar.disabledCalendars';
 
 interface EventSearchBarState {
   query: string;

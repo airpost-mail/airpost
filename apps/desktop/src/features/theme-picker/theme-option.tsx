@@ -26,13 +26,13 @@ class ThemeOption extends React.Component<ThemeOptionProps> {
   }
 
   // Previews are drawn from LESS variables in an iframe without the theme tokens, so they
-  // compile against the literal variables in static/style/compat, like a LESS-variables theme.
+  // compile against the literal variables in static/styles/compat, like a LESS-variables theme.
   _getImportPaths() {
     const { resourcePath } = AppEnv.getLoadSettings();
     return [
       ...new Set([
         this.props.theme.getStylesheetsPath(),
-        path.join(resourcePath, 'static', 'style', 'compat'),
+        path.join(resourcePath, 'static', 'styles', 'compat'),
         AppEnv.themes.getBaseTheme().getStylesheetsPath(),
       ]),
     ];

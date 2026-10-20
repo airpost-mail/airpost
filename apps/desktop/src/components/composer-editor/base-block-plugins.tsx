@@ -400,7 +400,7 @@ export function hideQuotedTextByDefault(draft: MessageWithEditorState) {
 
 // plugins
 
-const MailspringBaseBlockPlugin: ComposerEditorPlugin = {
+const BaseBlockPlugin: ComposerEditorPlugin = {
   toolbarComponents: Object.values(BLOCK_CONFIG)
     .filter((config) => config.button)
     .map(BuildToggleButton),
@@ -445,7 +445,7 @@ const MailspringBaseBlockPlugin: ComposerEditorPlugin = {
 const plugins: ComposerEditorPlugin[] = [
   // Base implementation of BLOCK_CONFIG block types,
   // the "block" toolbar section, and serialization
-  MailspringBaseBlockPlugin,
+  BaseBlockPlugin,
 
   // Slate's drop handler splits dropped text on `\n` alone and inserts each line with
   // insertText, so CRLF text dragged in from Windows apps leaves a `\r` on every line.

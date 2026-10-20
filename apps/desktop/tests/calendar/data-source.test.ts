@@ -1,7 +1,7 @@
 // The engine expands the occurrences (events.expand); its rules, the desktop corpus they were
 // checked against and the fixture calendar are crates/ms-pim's tests. Here: what the calendar
 // asks for, and the helpers that read the answer.
-import { Event as MailspringEvent } from '../../src/data/models/event';
+import { Event as EventModel } from '../../src/data/models/event';
 import { Calendar } from '../../src/data/models/calendar';
 import { DatabaseStore } from 'mailspring-exports';
 import {
@@ -119,7 +119,7 @@ describe('occurrencesForEvents', function () {
   it('asks the engine for the rows by id', async function () {
     const engine = fakePimEngine();
     engine.answers['events.expand'] = () => ({ occurrences: [allDay('2026-06-22', '2026-06-22')] });
-    const event = new MailspringEvent({ id: 'e-1', accountId: 'a' } as any);
+    const event = new EventModel({ id: 'e-1', accountId: 'a' } as any);
     const found = await occurrencesForEvents([event], { startUnix: 1, endUnix: 2 });
     expect(found.length).toBe(1);
     const [params] = engine.callsTo('events.expand');
@@ -140,7 +140,7 @@ describe('focusedEventInfoForEvents', function () {
         end: 6,
       },
     });
-    const event = new MailspringEvent({ id: 'e-1', accountId: 'a' } as any);
+    const event = new EventModel({ id: 'e-1', accountId: 'a' } as any);
     expect(await focusedEventInfoForEvents([event], 1000.5, 7)).toEqual({ id: 'e-1-e5', start: 5 });
     expect(engine.callsTo('events.expand')[0].focus).toEqual({ now: 1000, recurrenceIdStart: 7 });
   });

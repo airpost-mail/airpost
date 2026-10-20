@@ -1,12 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Modal } from 'mailspring-component-kit';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { UIProvider } from '../../components/kit/provider';
 
 import * as Actions from '../actions';
 
-const CONTAINER_ID = 'mailspring-modal-container';
+const CONTAINER_ID = 'tern-modal-container';
 
 function createContainer(id) {
   const element = document.createElement(id);
@@ -14,7 +14,7 @@ function createContainer(id) {
   return element;
 }
 
-class ModalStore extends MailspringStore {
+class ModalStore extends BaseStore {
   isOpen = false;
   container: HTMLElement;
 

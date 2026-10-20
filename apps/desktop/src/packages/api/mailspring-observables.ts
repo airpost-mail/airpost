@@ -6,7 +6,7 @@ import DatabaseStore from '../../data/database/store';
 import { QuerySubscription } from '../../data/query/subscription';
 import { Model } from '../../data/models/model';
 import ModelQuery from '../../data/query/query';
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { Category } from '../../data/models/category';
 import { QueryResultSet } from '../../data/query/result-set';
 
@@ -173,8 +173,8 @@ Rx.Observable.fromNamedQuerySubscription = <T extends Model>(
 declare global {
   namespace Rx {
     export interface ObservableStatic {
-      fromStore<T extends MailspringStore>(store: T): Observable<T>;
-      fromListSelection<T>(store: MailspringStore & { dataSource(): any }): Observable<T[]>;
+      fromStore<T extends BaseStore>(store: T): Observable<T>;
+      fromListSelection<T>(store: BaseStore & { dataSource(): any }): Observable<T[]>;
       fromConfig<T>(configKey: string): Observable<T>;
       fromAction<T>(action: any): Observable<T>;
       fromQuery<T extends Model | Model[]>(query: ModelQuery<T>): Observable<T>;

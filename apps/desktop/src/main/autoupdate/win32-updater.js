@@ -264,7 +264,7 @@ function copyVisualElements() {
 // launching the new one. Without the Wait variant, the new instance can start
 // before the old one exits, hit the single-instance lock, and immediately quit
 // — leaving no running instance. See: https://github.com/electron/electron/pull/6037
-exports.restartMailspring = (app) => {
+exports.restartApp = (app) => {
   app.once('will-quit', () => {
     spawnDetached(updateDotExe, ['--processStartAndWait', exeName]);
   });

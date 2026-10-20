@@ -52,8 +52,8 @@ interface ComposerViewState {
 
 // The disk path behind a drag from inside the app: an attachment chip or an image in a message.
 export function nonNativeFilePathForDrop(dataTransfer: DataTransfer): string | null {
-  if (dataTransfer.types.includes('text/mailspring-file-url')) {
-    const downloadURL = dataTransfer.getData('text/mailspring-file-url');
+  if (dataTransfer.types.includes('text/tern-file-url')) {
+    const downloadURL = dataTransfer.getData('text/tern-file-url');
     const downloadFilePath = downloadURL.split('file://')[1];
     if (downloadFilePath) {
       return downloadFilePath;

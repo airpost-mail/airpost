@@ -1,11 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import { Message, MailspringTestUtils } from 'mailspring-exports';
+import { Message, TestUtils } from 'mailspring-exports';
 import OpenTrackingMessageStatus from '../lib/message-status';
 import { PLUGIN_ID } from '../lib/constants';
 
-const { renderIntoDocument } = MailspringTestUtils;
+const { renderIntoDocument } = TestUtils;
 
 function makeIcon(message, props = {}) {
   return renderIntoDocument(

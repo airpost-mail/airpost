@@ -1,6 +1,6 @@
 import { Actions } from 'mailspring-exports';
 import moment from 'moment';
-import { Event as MailspringEvent } from '../../src/data/models/event';
+import { Event as EventModel } from '../../src/data/models/event';
 import { CalendarEventPopover } from '../../src/features/main-calendar/event/popover';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';
 import { fakePimEngine } from '../support/fake-pim-engine';
@@ -23,7 +23,7 @@ END:VEVENT
 END:VCALENDAR`;
 
 function makeEvent() {
-  return new MailspringEvent({
+  return new EventModel({
     id: 'event-1',
     accountId: 'account-1',
     calendarId: 'calendar-1',

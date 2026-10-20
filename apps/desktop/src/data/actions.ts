@@ -17,7 +17,7 @@ You can listen to an Action, or invoke it as a function to fire it.
 
 ## Action Scopes
 
-Mailspring is a multi-window application. The `scope` of an Action dictates
+Tern is a multi-window application. The `scope` of an Action dictates
 how it propogates between windows.
 
 - **Global**: These actions can be listened to from any window and fired from any
@@ -89,7 +89,7 @@ export const mainWindowActions = scopes.main;
 export const globalActions = scopes.global;
 
 /*
-  Public: Fired when the Mailspring API Connector receives new data from the API.
+  Public: Fired when the API connector receives new data from the API.
 
   *Scope: Global*
 

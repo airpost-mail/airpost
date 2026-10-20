@@ -1,9 +1,9 @@
 # Theme tokens
 
 Themes are CSS custom properties on `:root`. The defaults, at the Light theme's values, are in
-`static/style/tokens/defaults.css`. A bundled theme sets tokens and nothing else. Kit components
+`static/styles/tokens/defaults.css`. A bundled theme sets tokens and nothing else. Kit components
 are plain CSS reading `var(--…)`; legacy LESS keeps compiling and reads the tokens through the
-variables in `static/style/base/ui-variables.less` (mapping below). Community themes that only set
+variables in `static/styles/base/ui-variables.less` (mapping below). Community themes that only set
 LESS variables get their tokens derived from those variables (the compat path).
 
 Rules the defaults follow:
@@ -23,12 +23,12 @@ Rules the defaults follow:
 
 ## Loading
 
-ThemeManager (`src/packages/theme-manager.ts`) loads `tokens/defaults.css` at core priority (-1), then the
+ThemeManager (`src/packages/theme-manager.ts`) loads `static/styles/tokens/defaults.css` at core priority (-1), then the
 active theme's tokens at theme priority (1), before the theme's other stylesheets. A theme's tokens
 are its `styles/tokens.css`, read as plain CSS. A theme declares its scheme in `package.json`:
 `"scheme": "light" | "dark"`, and `"sidebarScheme"` when its sidebar differs (Darkside). ThemeManager
 puts `theme-scheme-light|dark` and `theme-sidebar-scheme-light|dark` on `body`; core LESS that used
-to branch on a colour's lightness (the label colour bounds in `components/extra.less`) branches on
+to branch on a colour's lightness (the label colour bounds in `static/styles/components/extra.less`) branches on
 those classes. Without a declaration the scheme is light.
 
 The email iframe gets the token sheets with `email-frame.less` (`EmailFrameStylesStore`), so
@@ -37,11 +37,11 @@ The email iframe gets the token sheets with `email-frame.less` (`EmailFrameStyle
 ### Compat path for LESS-variables themes
 
 A theme with `styles/ui-variables.less` and no `styles/tokens.css` is a LESS-variables theme. For it,
-ThemeManager puts `static/style/compat` ahead of `static/style` in the LESS import path, so the
-theme's `@import 'base/ui-variables'` lands on `compat/base/ui-variables.less`: the var()-based
+ThemeManager puts `static/styles/compat` ahead of `static/styles` in the LESS import path, so the
+theme's `@import 'base/ui-variables'` lands on `static/styles/compat/base/ui-variables.less`: the var()-based
 base, then the literal values the variables had before tokens. All LESS then compiles against
 literals as before, and LESS colour functions on any variable keep working. Its tokens come from
-`compat/tokens.less`, compiled after the literal base and the theme's file
+`static/styles/compat/tokens.less`, compiled after the literal base and the theme's file
 (`compatTokensSource()`), which sets each token from its source variable (the mapping below), so
 an unset variable gives the literal default and never `var(--itself)`. Tokens with no LESS source
 keep their `defaults.css` derivation. The scheme comes from the lightness of `@background-primary`

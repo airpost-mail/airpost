@@ -1,7 +1,7 @@
-import MailspringStore from 'mailspring-store';
+import BaseStore from 'mailspring-store';
 import { EMAIL_RENDER_MODE_KEY } from './email-render-mode';
 
-class EmailFrameStylesStore extends MailspringStore {
+class EmailFrameStylesStore extends BaseStore {
   _styles?: string;
   _themeColors?: { text: string; link: string };
   _mutationObserver: MutationObserver;
