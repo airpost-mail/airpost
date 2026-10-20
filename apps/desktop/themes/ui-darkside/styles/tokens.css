@@ -1,5 +1,5 @@
 /* Darkside: a dark sidebar and nav rail beside a white thread list and an off-white reading pane,
-   with a coral accent. Tokens only; app/static/style/tokens/defaults.css has the rest at the Light
+   with a coral accent. Tokens only; static/style/tokens/defaults.css has the rest at the Light
    values, and docs/desktop/theme-tokens.md lists every token.
 
    The look comes from two colours, --sidebar-background and --primary; everything below derives

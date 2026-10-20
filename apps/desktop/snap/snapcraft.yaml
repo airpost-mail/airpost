@@ -15,7 +15,7 @@ parts:
   tern:
     plugin: nil
     override-pull: |
-      deb="$(ls $CRAFT_PROJECT_DIR/app/dist/tern-*.deb)"
+      deb="$(ls $CRAFT_PROJECT_DIR/dist/tern-*.deb)"
       craftctl set version="$(basename "$deb" | grep -Eo "[0-9]+.[0-9]+.[0-9]+")"
       dpkg -x "$deb" "$CRAFT_PART_SRC"
     override-build: |
@@ -24,7 +24,7 @@ parts:
       sed -i 's|Icon=com.ternmail.tern|Icon=/usr/share/pixmaps/tern\.png|' \
         $CRAFT_PART_INSTALL/usr/share/applications/com.ternmail.tern.desktop
       # GPLv3 6(d): the snap is published to the Store, so the source offer travels inside it.
-      install -Dm644 "$CRAFT_PROJECT_DIR/app/dist/SOURCE.txt" \
+      install -Dm644 "$CRAFT_PROJECT_DIR/dist/SOURCE.txt" \
         "$CRAFT_PART_INSTALL/usr/share/doc/tern/SOURCE.txt"
     prime:
       - -usr/share/tern/chrome-sandbox

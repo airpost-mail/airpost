@@ -123,9 +123,7 @@ export default class Application extends EventEmitter {
 
     // Dev and spec runs are Electron.app, whose bundle icon is Electron's; packaged builds use tern.icns.
     if (process.platform === 'darwin' && (devMode || specMode)) {
-      app.dock?.setIcon(
-        path.join(resourcePath, '..', 'build', 'resources', 'mac', 'tern-dock.png')
-      );
+      app.dock?.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'tern-dock.png'));
     }
 
     try {
@@ -149,7 +147,7 @@ export default class Application extends EventEmitter {
       let buttons = [localized('Quit')];
       if (err.toString().includes('ENOENT')) {
         message = localized(
-          `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p mailsync\` and copy target/release/mailsync to apps/desktop/app/mailsync-rs.`
+          `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p mailsync\` and copy target/release/mailsync to apps/desktop/mailsync-rs.`
         );
       } else if (err.toString().includes('spawn')) {
         message = localized(`Tern could not spawn the mailsync process. %@`, err.toString());

@@ -151,7 +151,7 @@ THE SOFTWARE.
 
 ## AngularJS
 
-`encodeHTMLEntities` in `apps/desktop/app/src/flux/models/utils.ts` is taken from AngularJS's
+`encodeHTMLEntities` in `apps/desktop/src/flux/models/utils.ts` is taken from AngularJS's
 `ngSanitize` (https://github.com/angular/angular.js, `src/ngSanitize/sanitize.js`).
 
 ```
@@ -180,7 +180,7 @@ THE SOFTWARE.
 
 ## slate-html-serializer
 
-`TEXT_RULE_IMPROVED` in `apps/desktop/app/src/components/composer-editor/conversion.tsx` is
+`TEXT_RULE_IMPROVED` in `apps/desktop/src/components/composer-editor/conversion.tsx` is
 adapted from slate-html-serializer (https://github.com/ianstormtaylor/slate).
 
 ```
@@ -238,7 +238,7 @@ SOFTWARE.
 ## MailTrackerBlocker
 
 The tracker rules in
-`apps/desktop/app/features/remove-tracking-pixels/lib/mail-tracker-blocker-rules.ts` are
+`apps/desktop/features/remove-tracking-pixels/lib/mail-tracker-blocker-rules.ts` are
 ported from MailTrackerBlocker (https://github.com/apparition47/MailTrackerBlocker,
 `Source/MTBBlockedMessage.m`, commit `7463682a3`). The engine's draft pipeline keeps a copy of
 the vendor rules in `crates/ms-compose/src/desktop_data.json` (`trackerRules`).
@@ -277,7 +277,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Blink default stylesheet
 
-`apps/desktop/app/src/chrome-user-agent-stylesheet-string.ts`, and its copy in
+`apps/desktop/src/chrome-user-agent-stylesheet-string.ts`, and its copy in
 `crates/ms-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
 stylesheet of Chromium's Blink engine (`Source/core/css/html.css`), which comes from KHTML and
 WebKit: Copyright (C) 2000 Lars Knoll, Copyright (C) 2003-2011 Apple Inc. The upstream file is

@@ -4,7 +4,7 @@ Draft, 2026-10-16; S8, the integrations order and the phase B read API confirmed
 user the same day. Roadmap steps 1 and 2 (memory: tern-roadmap-after-parity): replace the
 engine's stdin/stdout channel with a local socket, ship a CLI client as standalone binaries,
 then run one engine process for every account. Engine paths are relative to the repo root;
-desktop paths to `apps/desktop/app/`.
+desktop paths to `apps/desktop/`.
 
 The frozen client contract (engine-port-plan D5) held until parity and is lifted by this
 plan. The stdio contract in engine-port-plan section 3 stays as the legacy transport for as
@@ -408,7 +408,7 @@ Delivered:
 - Harness: `MAILSYNC_TRANSPORT=socket` (`test/harness/mailsync.py`). Scenarios pinning a
   `binary:` run it on stdio.
 - Desktop: `sync()` with the Rust engine uses the socket by default
-  (`app/src/engine-protocol.ts`, `mailsync-process.ts`), at `run/<accountId>.sock`, or
+  (`src/engine-protocol.ts`, `mailsync-process.ts`), at `run/<accountId>.sock`, or
   `$TMPDIR/tern-<uid>/<hash>.sock` when that path is too long. The bridge is unchanged.
 
 Selecting a transport: the engine uses stdio unless given `--socket`. The harness uses stdio
@@ -551,7 +551,7 @@ Delivered:
   `-fatal-error-isolated`, `-remove-add`, `-task-routing`, on all three transports.
   `test_cli.py` runs against socket and serve.
 - Desktop: `EngineServeProcess` (`mailsync-process.ts`) and `EngineClient`
-  (`app/src/engine-client.ts`, with `CrashTracker` moved there). `ensure()` diffs
+  (`src/engine-client.ts`, with `CrashTracker` moved there). `ensure()` diffs
   AccountStore into `account.add` / `account.remove`; commands route by `accountId` and
   are held until the add answers; `account.state` stopped counts as a crash for that
   account and re-adds it (5 in 5 min, then the error state); an engine exit respawns and
@@ -559,7 +559,7 @@ Delivered:
   exit 3 respawns every 1 s up to 30 times without counting a crash. Reset Cache removes
   the account, waits up to 10 s when `stillRunning` isn't empty, runs the one-shot
   `reset`, then adds it back. Secrets the client added are redacted from engine errors.
-  Spec: `app/spec/engine-client-spec.ts`.
+  Spec: `spec/engine-client-spec.ts`.
 
 Selecting a process model:
 - Engine: `--mode serve` runs every account in one process; `--mode sync` (stdio, or
@@ -619,5 +619,5 @@ Open (phase C):
 - Multi-account scenarios use the fake server only; `durations.json` isn't refreshed for
   them.
 - `--mode sync` still exits 1 on a socket collision.
-- Desktop specs need an engine binary at `apps/desktop/app/mailsync-rs` in the worktree, or
+- Desktop specs need an engine binary at `apps/desktop/mailsync-rs` in the worktree, or
   the runner prints nothing.

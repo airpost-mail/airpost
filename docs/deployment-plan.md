@@ -498,11 +498,11 @@ existing scripts:
 | Target | Does |
 |---|---|
 | `make setup` | Checks Rust (rust-toolchain.toml pins 1.92), Node (new `.node-version`: 22), Python 3, Docker (optional); `npm ci` in `apps/desktop` and `apps/web`; Python deps for the harness; `cargo build` with `CARGO_PROFILE_DEV_DEBUG=0` |
-| `make desktop` | Builds `mailsync`, `tern`, `tern-mcp` in debug, links them into `apps/desktop/app/`, starts the desktop on a sandbox profile under `.dev/profile` (never the user's real profile) |
+| `make desktop` | Builds `mailsync`, `tern`, `tern-mcp` in debug, links them into `apps/desktop/`, starts the desktop on a sandbox profile under `.dev/profile` (never the user's real profile) |
 | `make web` | Vite dev server against the mock, or `ENGINE=local` against the dev stack's gateway |
 | `make stack` / `make stack-down` | The local stack (8.2) |
 | `make test` | Workspace tests and the harness quick tier on the debug binaries |
-| `make test-desktop` | The desktop's Jasmine specs (`SPEC=<regex>` picks spec files); links the debug engine only when `apps/desktop/app/mailsync-rs` is missing |
+| `make test-desktop` | The desktop's Jasmine specs (`SPEC=<regex>` picks spec files); links the debug engine only when `apps/desktop/mailsync-rs` is missing |
 | `make lint` | fmt, clippy, cargo deny, desktop `lint:check`, web lint and typecheck |
 | `make gate` | The merge gate: fmt, clippy, test, deny, release builds, harness quick tier on serve. No JS steps; `desktop-test.yml` runs the desktop ones in CI |
 

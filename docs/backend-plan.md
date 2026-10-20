@@ -8,8 +8,8 @@ workflow. Read `docs/engine-port-plan.md` (D2, D3, D10–D12, sections 3 and 12)
 `docs/engine-port-status.md` first.
 
 The Mailspring server is closed source. Every server behaviour here is reconstructed from the
-client (`apps/desktop/app`), the C++ engine (`legacy/mailsync-cpp/MailSync/`) and the Rust
-engine. Desktop paths are relative to `apps/desktop/app/`.
+client (`apps/desktop`), the C++ engine (`legacy/mailsync-cpp/MailSync/`) and the Rust
+engine. Desktop paths are relative to `apps/desktop/`.
 
 ## 0. Inherited decisions, and the ones this plan changes
 
@@ -509,7 +509,7 @@ engine restarts, and the row is left for the winning device's change to sync in.
   `MetadataWorker::cursor` doc says a reset clears the cursor, but it writes `"0"`.
 - Unchanged: workers, tasks and the expiration worker.
 
-### 4.2 Client (`apps/desktop/app`)
+### 4.2 Client (`apps/desktop`)
 
 Needed for the backend (all B1-C):
 - **Server URL.** Preferences gets a "Tern server" section: URL field, Sign in, Sign out,

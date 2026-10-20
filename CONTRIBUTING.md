@@ -44,7 +44,7 @@ fake IMAP and SMTP accounts without Docker, and `make stack` runs them in Docker
 | Path | Contents |
 |---|---|
 | `apps/desktop/` | Electron client; see its README.md and CLAUDE.md |
-| `apps/engine/` | Rust sync engine (`mailsync`), run by the desktop as `app/mailsync-rs` |
+| `apps/engine/` | Rust sync engine (`mailsync`), run by the desktop as `apps/desktop/mailsync-rs` |
 | `apps/cli/`, `apps/mcp/` | The `tern` command and the MCP server `tern-mcp` |
 | `apps/backend/`, `apps/gateway/` | The Tern server |
 | `apps/web/` | Web client |
@@ -71,7 +71,7 @@ changes; main-process code needs a restart.
 
 The language is set in Preferences > General. Left on automatic, `--lang` picks one:
 `npm start -- --lang=de`. Translations are in
-`apps/desktop/app/lang`; see [docs/desktop/LOCALIZATION.md](docs/desktop/LOCALIZATION.md).
+`apps/desktop/lang`; see [docs/desktop/LOCALIZATION.md](docs/desktop/LOCALIZATION.md).
 Plugins and themes are covered in
 [docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md](docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md).
 

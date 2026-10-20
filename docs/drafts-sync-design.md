@@ -2,7 +2,7 @@
 
 Status: proposal, 2026-10-15. Lands after engine parity (plan D5), behind a gate that defaults
 off. Backlog item F4 in `docs/fix-backlog.md`. C++ paths relative to `legacy/mailsync-cpp/`,
-desktop paths relative to `apps/desktop/app/`.
+desktop paths relative to `apps/desktop/`.
 
 ## 1. Today (C++ and Rust behave the same)
 

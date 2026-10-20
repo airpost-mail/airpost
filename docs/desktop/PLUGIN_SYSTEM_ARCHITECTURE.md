@@ -23,10 +23,10 @@ Mailspring uses a robust plugin architecture where features are implemented as "
 
 | File | Purpose |
 |------|---------|
-| `app/src/package-manager.ts` | Discovers, validates, and activates packages |
-| `app/src/package.ts` | Represents individual plugin instances |
+| `src/package-manager.ts` | Discovers, validates, and activates packages |
+| `src/package.ts` | Represents individual plugin instances |
 
-The `PackageManager` is instantiated as part of the `AppEnv` singleton during application startup (see `app/src/app-env.ts`).
+The `PackageManager` is instantiated as part of the `AppEnv` singleton during application startup (see `src/app-env.ts`).
 
 ---
 
@@ -117,7 +117,7 @@ my-plugin/
 | `name` | Yes | Package identifier (kebab-case) |
 | `version` | Yes | Semantic version |
 | `main` | Yes* | Entry point path (required for non-theme plugins) |
-| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `app/src/plugin-api-version.ts`, 1.27.0). `*` matches any |
+| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `src/plugin-api-version.ts`, 1.27.0). `*` matches any |
 | `displayName` | No | Human-readable name for UI |
 | `description` | No | Plugin description |
 | `windowTypes` | No | Which window types load this plugin |
@@ -370,7 +370,7 @@ class MyMessageExtension extends MessageViewExtension {
 }
 ```
 
-`MessageBody` (`app/src/message-frame/message-frame-bridge.ts`):
+`MessageBody` (`src/message-frame/message-frame-bridge.ts`):
 
 | Method | Does |
 |--------|------|
@@ -387,7 +387,7 @@ minor version.
 
 ### Engine
 
-`Engine` (in `mailspring-exports`, `app/src/engine-api.ts`) is the plugin API's way to the sync
+`Engine` (in `mailspring-exports`, `src/engine-api.ts`) is the plugin API's way to the sync
 engine. Each window has its own connection to the engine; requests made while it is down reject.
 
 | Member | Does |
@@ -599,13 +599,13 @@ Optional plugins can be disabled via config:
 
 | File | Purpose |
 |------|---------|
-| `app/src/package-manager.ts` | Package discovery and activation |
-| `app/src/package.ts` | Package class implementation |
-| `app/src/app-env.ts` | AppEnv singleton, initializes PackageManager |
-| `app/src/registries/component-registry.ts` | UI component registration |
-| `app/src/registries/extension-registry.ts` | Extension registration |
-| `app/src/extensions/composer-extension.ts` | ComposerExtension base class |
-| `app/src/extensions/message-view-extension.ts` | MessageViewExtension base class |
-| `app/src/components/injected-component.tsx` | Renders registered components |
-| `app/src/global/mailspring-exports.ts` | Global API exports |
-| `app/features/theme-picker/` | Theme selection UI (reference for plugin UI) |
+| `src/package-manager.ts` | Package discovery and activation |
+| `src/package.ts` | Package class implementation |
+| `src/app-env.ts` | AppEnv singleton, initializes PackageManager |
+| `src/registries/component-registry.ts` | UI component registration |
+| `src/registries/extension-registry.ts` | Extension registration |
+| `src/extensions/composer-extension.ts` | ComposerExtension base class |
+| `src/extensions/message-view-extension.ts` | MessageViewExtension base class |
+| `src/components/injected-component.tsx` | Renders registered components |
+| `src/global/mailspring-exports.ts` | Global API exports |
+| `features/theme-picker/` | Theme selection UI (reference for plugin UI) |

@@ -12,7 +12,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { createWindowsInstaller } = require('electron-winstaller');
 
-const appDir = path.join(__dirname, '..', 'app');
+const appDir = path.join(__dirname, '..');
 const { version } = require(path.join(appDir, 'package.json'));
 
 const signToolPath = process.env.WINDOWS_SIGNTOOL_PATH;

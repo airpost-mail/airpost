@@ -6,7 +6,7 @@ The Tern name, the bird mark and the app and tray icons are the Tern project's t
 covers the image files in this directory (`source/`, `masters/`, `macos/`, `windows/`, `linux/`,
 `tray/`, `web/`, `preview.png`) and their copies elsewhere in the repository and in Tern's
 packages, such as the icons in `apps/desktop/build/resources/` and
-`apps/desktop/app/features/system-tray/assets/`.
+`apps/desktop/features/system-tray/assets/`.
 
 The logos are not covered by the GNU General Public License that applies to Tern's code, and no
 licence to use them is granted beyond referring to Tern itself. If you distribute a fork or any

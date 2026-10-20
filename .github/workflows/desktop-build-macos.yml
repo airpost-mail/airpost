@@ -1,6 +1,6 @@
 name: desktop-build-macos
 
-# Builds the macOS desktop app with the Rust engine (app/mailsync-rs) for arm64 and x64.
+# Builds the macOS desktop app with the Rust engine (apps/desktop/mailsync-rs) for arm64 and x64.
 #
 # Secrets (all optional; without APPLE_CODESIGN_P12 the app is built unsigned and not
 # notarized, and the S3 upload is skipped without the AWS secrets):
@@ -73,8 +73,7 @@ jobs:
         with:
           path: |
             apps/desktop/node_modules
-            apps/desktop/app/node_modules
-          key: ${{ matrix.os }}-${{ runner.arch }}-deps-${{ hashFiles('apps/desktop/package-lock.json') }}-${{ hashFiles('apps/desktop/app/package-lock.json') }}
+          key: ${{ matrix.os }}-${{ runner.arch }}-deps-${{ hashFiles('apps/desktop/package-lock.json') }}
 
       - name: Install Dependencies
         run: npm ci
@@ -120,14 +119,14 @@ jobs:
       - name: Rename artifacts
         if: matrix.arch == 'arm64'
         run: |
-          mv app/dist/Tern.zip app/dist/Tern-AppleSilicon.zip
+          mv dist/Tern.zip dist/Tern-AppleSilicon.zip
 
       # GPLv3 section 6(d): a tag pins the source and SOURCE.txt, published next to every
       # package, points to it.
       - name: Source offer
         run: |
-          tag="desktop-$(node -p "require('./app/package.json').version")-$(git rev-parse --short=8 HEAD)"
-          ../../.github/scripts/source-offer.sh "$tag" app/dist "the Tern desktop app"
+          tag="desktop-$(node -p "require('./package.json').version")-$(git rev-parse --short=8 HEAD)"
+          ../../.github/scripts/source-offer.sh "$tag" dist "the Tern desktop app"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -135,8 +134,8 @@ jobs:
         with:
           name: desktop-macos-${{ matrix.arch }}
           path: |
-            apps/desktop/app/dist/*.zip
-            apps/desktop/app/dist/SOURCE.txt
+            apps/desktop/dist/*.zip
+            apps/desktop/dist/SOURCE.txt
 
       - name: Setup AWS CLI
         if: env.HAVE_AWS == 'true'
@@ -149,7 +148,7 @@ jobs:
       - name: Sync artifacts to S3 bucket
         if: env.HAVE_AWS == 'true'
         run: |
-          aws s3 sync app/dist/ "s3://$BUCKET/client/$(git rev-parse --short=8 HEAD)/osx" \
+          aws s3 sync dist/ "s3://$BUCKET/client/$(git rev-parse --short=8 HEAD)/osx" \
             --acl public-read \
             --exclude "*" --include "*.zip" --include "SOURCE.txt"
         env:

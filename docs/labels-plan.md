@@ -2,7 +2,7 @@
 
 Draft, 2026-10-16. The user confirmed the recommended answers in 0.1 the same day. The user wants Gmail-style labels on every
 account, not only Gmail. Written against `main` at 1e7274c23 (branch `docs/labels`). Engine
-paths are relative to the repo root, desktop paths to `apps/desktop/app/`. Background:
+paths are relative to the repo root, desktop paths to `apps/desktop/`. Background:
 `docs/architecture.md` (the backend holds metadata, never mail), `docs/backend-plan.md` 3.5
 and 4.1 (metadata protocol, outbox), `docs/engine-protocol-plan.md` (read API) and
 `docs/desktop-client-plan.md` (stages this work has to fit around).

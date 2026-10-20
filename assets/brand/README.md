@@ -40,7 +40,7 @@ The app icon tile needed no cleanup beyond zeroing RGB under transparency. Windo
 
 ### Tray states
 
-These mirror the four states in `apps/desktop/app/features/system-tray` (see `lib/system-tray-icon-store.ts`) and reuse the old colours from its `assets/build-win32-ico.py`.
+These mirror the four states in `apps/desktop/features/system-tray` (see `lib/system-tray-icon-store.ts`) and reuse the old colours from its `assets/build-win32-ico.py`.
 
 | Old name | New name | Look |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ The script wipes and rewrites `masters/` (with `--masters`), `macos/`, `windows/
 
 ## Where each asset goes in apps/desktop
 
-Paths relative to `apps/desktop/app`, except `build/`, which is `apps/desktop/build`. The old Mailspring files listed under "Replaces" are gone; the copies carry the new names.
+Paths relative to `apps/desktop`. The old Mailspring files listed under "Replaces" are gone; the copies carry the new names.
 
 | Asset | Replaces | Used by |
 | --- | --- | --- |

@@ -52,10 +52,10 @@ function section(renderer: TestRenderer.ReactTestRenderer): McpSection {
   return renderer.root.findByType(McpSection).instance;
 }
 
-/** Copy target/release/tern-mcp to app/tern-mcp (or set TERN_MCP_BIN) to run these. */
+/** Copy target/release/tern-mcp to apps/desktop/tern-mcp (or set TERN_MCP_BIN) to run these. */
 function noBinary() {
   if (ternMcpBinary()) return false;
-  console.warn('Skipping: tern-mcp is not in app/ and TERN_MCP_BIN is not set');
+  console.warn('Skipping: tern-mcp is not in apps/desktop and TERN_MCP_BIN is not set');
   return true;
 }
 

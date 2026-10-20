@@ -2,8 +2,8 @@
 # shellcheck disable=SC2329  # build_* are called as build_$platform
 # Builds the release engine (`mailsync`), the MCP server (`tern-mcp`, apps/mcp) and the CLI
 # (`tern`, apps/cli) for macOS and Linux and optionally places them where the desktop build
-# picks them up (apps/desktop/app/mailsync-rs, apps/desktop/app/tern-mcp and
-# apps/desktop/app/tern, unpacked from the asar by apps/desktop/build/build.js).
+# picks them up (apps/desktop/mailsync-rs, apps/desktop/tern-mcp and
+# apps/desktop/tern, unpacked from the asar by apps/desktop/build/build.js).
 #
 #   build-release.sh [macos] [linux] [--install-desktop[=ARCH]]
 #
@@ -27,9 +27,9 @@
 # bullseye container (glibc 2.31, older than any distro the desktop's Linux packages
 # support). Linux debug info is split into mailsync.debug next to each binary.
 #
-# --install-desktop copies one mailsync to apps/desktop/app/mailsync-rs and its tern-mcp and
-# tern to apps/desktop/app/tern-mcp and apps/desktop/app/tern, and the notices to
-# apps/desktop/app/mailsync-rs.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
+# --install-desktop copies one mailsync to apps/desktop/mailsync-rs and its tern-mcp and
+# tern to apps/desktop/tern-mcp and apps/desktop/tern, and the notices to
+# apps/desktop/mailsync-rs.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
 # universal (macOS only); the default is the arch build.js packages for: x64 when
 # OVERRIDE_TO_INTEL is set, else the host's.
 #
@@ -44,7 +44,7 @@ case "$TARGET_DIR" in /*) ;; *) TARGET_DIR="$REPO_ROOT/$TARGET_DIR" ;; esac
 export CARGO_TARGET_DIR="$TARGET_DIR"
 OUT_DIR="${OUT_DIR:-$TARGET_DIR/engine-dist}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$PWD/$OUT_DIR" ;; esac
-DESKTOP_APP_DIR="$REPO_ROOT/apps/desktop/app"
+DESKTOP_DIR="$REPO_ROOT/apps/desktop"
 BINARIES=(mailsync tern-mcp tern)
 LINUX_IMAGE="${LINUX_IMAGE:-rust:$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$REPO_ROOT/rust-toolchain.toml")-bullseye}"
 # Electron 44's floor; also above arm64's 11.0 minimum.
@@ -236,18 +236,18 @@ install_desktop() {
   for b in "${BINARIES[@]}"; do
     [ -f "$OUT_DIR/$target/$b" ] || die "$OUT_DIR/$target/$b was not built"
   done
-  install -m 755 "$OUT_DIR/$target/mailsync" "$DESKTOP_APP_DIR/mailsync-rs"
-  install -m 755 "$OUT_DIR/$target/tern-mcp" "$DESKTOP_APP_DIR/tern-mcp"
+  install -m 755 "$OUT_DIR/$target/mailsync" "$DESKTOP_DIR/mailsync-rs"
+  install -m 755 "$OUT_DIR/$target/tern-mcp" "$DESKTOP_DIR/tern-mcp"
   # Preferences > Plugins runs it for `tern service install`.
-  install -m 755 "$OUT_DIR/$target/tern" "$DESKTOP_APP_DIR/tern"
-  log "Installed $target into $DESKTOP_APP_DIR/mailsync-rs, $DESKTOP_APP_DIR/tern-mcp and $DESKTOP_APP_DIR/tern"
+  install -m 755 "$OUT_DIR/$target/tern" "$DESKTOP_DIR/tern"
+  log "Installed $target into $DESKTOP_DIR/mailsync-rs, $DESKTOP_DIR/tern-mcp and $DESKTOP_DIR/tern"
   if [ -f "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" \
-      "$DESKTOP_APP_DIR/mailsync-rs.THIRD-PARTY-NOTICES.txt"
+      "$DESKTOP_DIR/mailsync-rs.THIRD-PARTY-NOTICES.txt"
   fi
   if [ -f "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" \
-      "$DESKTOP_APP_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
+      "$DESKTOP_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
   fi
 }
 

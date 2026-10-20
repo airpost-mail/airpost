@@ -582,7 +582,7 @@ function onChange(editor: Editor, next: () => void) {
 
 // --- Public API consumed by the composer-grammar-check internal package ---
 // Exported here and re-exported via mailspring-exports so the package can import
-// without a fragile relative path back into app/src/.
+// without a fragile relative path back into src/.
 export const GrammarCheckPluginAPI = {
   setGrammarCheckStore,
   clearGrammarCheckStore,

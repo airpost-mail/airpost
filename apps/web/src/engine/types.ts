@@ -1,5 +1,5 @@
 // Wire types for the engine's model JSON. Field names are the JSON keys the engine writes
-// (crates/ms-store/src/models/*.rs) and the desktop parses (apps/desktop/app/src/flux/models),
+// (crates/ms-store/src/models/*.rs) and the desktop parses (apps/desktop/src/flux/models),
 // so the mock and the real engine share one set of types. Timestamps are unix seconds.
 
 export type ModelClass =

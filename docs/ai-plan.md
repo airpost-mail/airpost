@@ -2,7 +2,7 @@
 
 2026-10-18 (tern-ai). Bring-your-own-key cloud models and local models through Ollama,
 used for thread summaries, reply suggestions and inbox triage. Section 10's recommendations
-were agreed with the user on 2026-10-18. Desktop paths are relative to `apps/desktop/app/`.
+were agreed with the user on 2026-10-18. Desktop paths are relative to `apps/desktop/`.
 
 ## 0. Decisions
 

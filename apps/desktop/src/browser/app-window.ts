@@ -164,7 +164,7 @@ export default class AppWindow extends EventEmitter {
     // Constrain every <webview> guest to low-privilege preferences regardless of
     // the attributes on the tag, and strip any preload it requests. The only
     // legitimate guest (the onboarding sign-in view in
-    // app/src/components/webview.tsx) displays remote web content and needs none
+    // src/components/webview.tsx) displays remote web content and needs none
     // of these privileges. Do not relax this. See GHSA-x8wg-258g-v28h.
     this.browserWindow.webContents.on('will-attach-webview', (_event, webPreferences, params) => {
       delete (webPreferences as any).preload;

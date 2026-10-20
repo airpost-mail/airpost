@@ -4,8 +4,8 @@
 # Run from anywhere: scripts/generate-sounds.sh
 set -euo pipefail
 
-app="$(cd "$(dirname "$0")/../app" && pwd)"
-sounds="$app/features/custom-sounds/sounds"
+desktop="$(cd "$(dirname "$0")/.." && pwd)"
+sounds="$desktop/features/custom-sounds/sounds"
 mkdir -p "$sounds"
 
 # A 5 ms linear attack keeps the tone onset from clicking.
@@ -31,4 +31,4 @@ render "$hit_send" 0.15 "$sounds/hit-send.ogg" -c:a libopus -b:a 64k
 render "$send" 0.4 "$sounds/send.ogg" -c:a libopus -b:a 64k
 # macOS plays notification sounds itself and only accepts MP3 from the bundle (see
 # src/browser/notification-ipc.ts).
-render "$new_mail" 0.7 "$app/../build/resources/mac/new-mail.mp3" -c:a libmp3lame -b:a 128k
+render "$new_mail" 0.7 "$desktop/build/resources/mac/new-mail.mp3" -c:a libmp3lame -b:a 128k

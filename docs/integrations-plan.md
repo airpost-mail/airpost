@@ -4,7 +4,7 @@ Draft, 2026-10-16; the design in sections 0-2 was agreed with the user on 2026-1
 Pro features that Mailspring served from its own servers either run locally, call a
 provider the user configures, or wait for a Tern server. Provider logic lives in the engine
 (`crates/ms-integrations`); Electron stays thin. Desktop paths are relative to
-`apps/desktop/app/`.
+`apps/desktop/`.
 
 ## 0. Decisions
 

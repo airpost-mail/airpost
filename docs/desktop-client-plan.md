@@ -5,7 +5,7 @@ tern-roadmap-after-parity): turn `apps/desktop` into a client of the engine prot
 `apps/cli` and `apps/mcp` already are, with plugins kept first-class. Written against branch
 `roadmap/desktop-client` (main + engine phase C `serve` + rebrand + integrations UI +
 tern-mcp, head fa9b69a79). Engine paths are relative to the repo root, desktop paths to
-`apps/desktop/app/`.
+`apps/desktop/`.
 
 The goal set by the user: the engine holds the logic, Electron holds the UI and the plugins'
 UI. No new logic goes into Electron; when a feature needs logic that a desktop store runs
@@ -1551,7 +1551,7 @@ term outside that, or a relative one without `now`, is `INVALID_PARAMS`. `query.
 local zone and clock, one call per engine across its accounts, and exits 2 on a query the engine
 refuses; tern-mcp's `search_mail` passes the query through and keeps only the access policy
 filter (its own parser stays for engines without the feature). Tests: the parser spec cases as
-Rust tests; `apps/desktop/app/spec/search-query-capture-spec.ts` writes
+Rust tests; `apps/desktop/spec/search-query-capture-spec.ts` writes
 `crates/ms-store/tests/fixtures/search_queries.json` (AST and desktop WHERE for 68 queries),
 and `tests/search_grammar_parity.rs` checks the engine builds the same AST (or fails where the
 desktop fails) and finds the same threads for each date-free query on a fixture database;
@@ -1992,8 +1992,8 @@ OAuth client ids come from `MS_GMAIL_CLIENT_ID`, `MS_GMAIL_CLIENT_SECRET` and `M
 at run time, else the same variables at build time, else the current ids as defaults; the
 desktop no longer passes `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET` to the engine. Desktop:
 onboarding, reconnect and remove go through the window's own connection
-(`app/src/engine-accounts.ts`); the redirect receiver runs in main on 127.0.0.1
-(`app/src/browser/oauth-receiver.ts`); integration keys go through `secrets.set` (a keyset copy
+(`src/engine-accounts.ts`); the redirect receiver runs in main on 127.0.0.1
+(`src/browser/oauth-receiver.ts`); integration keys go through `secrets.set` (a keyset copy
 is moved over on the next save and still read for an engine without account setup); the
 supervisor's `testAccount` and the onboarding OAuth code with the client secret are gone. CLI:
 `tern account add` for IMAP (discovery, flags, `--password-stdin` or a no-echo prompt) and for
@@ -2265,18 +2265,18 @@ Open from the review (low):
   reply with an empty quote (the local `ms-compose` fallback still does, `unwrap_or_default`);
   now `draft.create` answers NOT_FOUND ("body isn't downloaded yet") and the tool fails with
   "The engine could not build the draft".
-- `apps/desktop/app/src/flux/stores/draft-store.ts`: when `draft.send` is refused or the
+- `apps/desktop/src/flux/stores/draft-store.ts`: when `draft.send` is refused or the
   window's engine connection is down, `_sendWithEngine` shows the error and returns, but
   `_onSendDraft` still calls `AppEnv.close()` in a composer window. The session is already torn
   down, so the user loses the composer and has to find the draft in Drafts. The JS path keeps the
   composer open on the `ensureCorrectAccount` failure.
-- `apps/desktop/app/src/browser/engine-settings.ts`: the engine's quote date uses
+- `apps/desktop/src/browser/engine-settings.ts`: the engine's quote date uses
   `core.intl.language` as its locale (main process), while the desktop's `formatQuoteDate` and
   `replyAttributionLine` use `navigator.language` (`date-format.ts` `appLocale`), and the app
   never sets Chromium's locale from the language setting. With an en-US system and a German UI,
   engine-built replies get a German date and JS-fallback replies, Send Again and resurfacing a
   US one. The corpus runs with a single locale, so it doesn't catch this.
-- `apps/desktop/app/src/engine-drafts.ts`: the engine always adds the signature and removes
+- `apps/desktop/src/engine-drafts.ts`: the engine always adds the signature and removes
   tracking images on drafts it builds. Before, disabling the composer-signature or
   remove-tracking-pixels package turned those off; with the pipeline, disabling either has no
   effect on new, reply, forward and mailto drafts.
@@ -2464,19 +2464,19 @@ Open from the review (low; the job kept running after its connection closed is f
   disables the rule but leaves the draft saved by `draft.create` (`save: true`) in Drafts, where
   it syncs to the server. Tasks from the rule's earlier actions have already run by then; in the
   desktop any action failure meant nothing was queued.
-- `apps/desktop/app/src/engine-api.ts`: ms-ipc classes `rules.reprocess` and `rules.cancel` as
+- `apps/desktop/src/engine-api.ts`: ms-ipc classes `rules.reprocess` and `rules.cancel` as
   local-only, and reprocess sends forwards over the whole inbox, but the desktop's
   `LOCAL_ONLY_METHODS` (TD29 plugin consent) doesn't list them. Any plugin can start a reprocess,
   forwards included, through `Engine.request` without `tern.engineMethods` or the user's yes, and
   the `MailRulesProcessor` deprecation text points plugins at that call. Add both methods.
-- `apps/desktop/app/src/flux/stores/mail-rules-store.ts`: Stop clears the local reprocess state at
+- `apps/desktop/src/flux/stores/mail-rules-store.ts`: Stop clears the local reprocess state at
   once, but the engine only checks the cancel flag before its next batch of 50 threads. Process
   clicked right after Stop gets ENGINE_BUSY and shows the raw engine message in an error dialog.
 - `apps/engine/test/scenarios/mail-rules.yaml`: nothing covers a running job stopped by
   `rules.cancel` or by an account stop (`rules.progress` with `stopped`); the scenario only cancels
   an unknown job id. The desktop spec's "_applyRuleToMessage ordering" case (a later rule reads
   the thread after an earlier rule's local change) has no engine counterpart.
-- `apps/desktop/app/src/global/mailspring-exports.js`: the new `deprecate()` helper (section 6:
+- `apps/desktop/src/global/mailspring-exports.js`: the new `deprecate()` helper (section 6:
   the getter stays a getter, caches the value, warns once per calling package, app code isn't
   warned) has no spec, and nothing tests that `MailRulesProcessor.processMessages` is a resolved
   no-op. Recording the warning in Preferences > Plugins is open (above).
@@ -2638,7 +2638,7 @@ exact unit text") is covered by `--expect-plan`, which the pane passes (review f
   skips it for the rest of the process's life. Separately, for Message rows it rebuilds the
   message as `{id, aid}`, so `modelHeaderMessageId` is null and remote metadata sync loses its
   anchor for other devices. This is the reference code plugin authors will copy.
-- `apps/desktop/app/src/plugin-api-version.ts`: stage 19 adds `tern.service` and Preferences >
+- `apps/desktop/src/plugin-api-version.ts`: stage 19 adds `tern.service` and Preferences >
   Plugins, but `PLUGIN_API_VERSION` stays 1.30.0 (section 6: additions get a minor bump). The
   CHANGELOG lists them under "Plugin API 1.27.0" and the sample asks for `^1.27.0`, which a
   desktop without the pane satisfies, so a plugin can't require a desktop that installs its
@@ -2654,7 +2654,7 @@ exact unit text") is covered by `--expect-plan`, which the pane passes (review f
   still calls `systemctl --user` (blocked by confinement or no unit found), and the engine path
   embeds the snap revision, which changes on every refresh. Hide the action in the snap or refuse
   in the CLI.
-- `apps/desktop/app/src/package-manager.ts`: `recordPluginInstall` (hashing every file plus
+- `apps/desktop/src/package-manager.ts`: `recordPluginInstall` (hashing every file plus
   `config.set`) runs inside the same try as `cpSync`. If hashing throws (an unreadable file, a
   readdir EACCES), the catch removes `packageFinalDir`: the fresh copy, and on a reinstall the
   already installed plugin too. Record outside that try.
@@ -2782,7 +2782,7 @@ Open from the review (low):
   `linkTracking` stay available with no server connected: the toggles are enabled but sends go
   out untracked until the engine restarts. Tag reports with a server generation and drop stale
   ones.
-- `apps/desktop/app/src/flux/stores/draft-store.ts`: tracking is applied only in `draft.send` and
+- `apps/desktop/src/flux/stores/draft-store.ts`: tracking is applied only in `draft.send` and
   the executor. A tracked draft sent through a plugin's own send action (not send or
   send-and-archive, so `viaEngine` is false and `sendAction.performSendAction({draft})` queues a
   plain `SendDraftTask.forSending`) goes out untracked without warning while the toggle shows
@@ -2798,7 +2798,7 @@ Open from the review (low):
   which this stage removed, and `docs/plugins-inventory.md` (lines 183-184) still describes
   open-tracking and link-tracking as ExtensionRegistry.Composer users that inject the pixel and
   rewrite links; the engine does both now.
-- `apps/desktop/app/plugins/link-tracking/lib/types.ts`: `LinkTrackingMetadata` still
+- `apps/desktop/plugins/link-tracking/lib/types.ts`: `LinkTrackingMetadata` still
   types `links` as `[{url, redirect_url}]`; the engine writes `{url, click_count, click_data}` with
   no `redirect_url`, plus `tracked`, `trackingId`, `recipients` and `uid`.
   `link-tracking-message-extension.tsx` still indexes `links[link.redirect_url]`, now always
@@ -2914,13 +2914,13 @@ dispose, three SystemTrayIconStore focus/blur). No code changed in this step. No
 the ones in the stage 8 and stage 8 review fixes entries still need confirming.
 
 Open from the review (low):
-- `apps/desktop/app/src/flux/stores/engine-reads.ts`: after `_waitForHello` resolves, the fallback
+- `apps/desktop/src/flux/stores/engine-reads.ts`: after `_waitForHello` resolves, the fallback
   check is `!this._events.has(Feature.Query)`. If the connection drops again between the hello
   and the continuation, `features` is null, `has()` is false and the read goes to SQLite silently
   although the flag is `"engine"` and the engine answers `query`. That mixes transports in one
   session, and becomes a wrong result once the SQLite path is removed. Decide from the hello that
   resolved the wait, not from the current state.
-- `apps/desktop/app/src/flux/stores/engine-reads.ts`: an oversized `query` reply counts as a
+- `apps/desktop/src/flux/stores/engine-reads.ts`: an oversized `query` reply counts as a
   connection drop. The engine has no reply-size budget (`read_api.rs` query, `model_query.rs`),
   and the desktop drops the socket on a line over `MAX_LINE_BYTES` (`engine-connection.ts:300`).
   EngineReads then retries up to three times, each drop sets `_missedDeltas`, and each reconnect
@@ -2928,24 +2928,24 @@ Open from the review (low):
   such as `contacts/lib/Store.ts:30` (`findAll(Contact).where(refs>0)`) can get there on large
   profiles, and large replies also fill the outbox toward `SOCKET_QUEUE_BYTES` (`drop_slow`).
   Needs a reply budget in the engine with a distinct error, and paging for the unbounded reads.
-- `apps/desktop/app/src/engine-connection.ts`: the 10 s bound covers waiting for a hello only. A
+- `apps/desktop/src/engine-connection.ts`: the 10 s bound covers waiting for a hello only. A
   `query` written to a live connection has no timeout, and the engine answers a connection's
   requests in order on its reader thread (`socket.rs` module doc), so a slow or wedged read (a
   long FTS search) leaves every later read in that window pending, with no `EngineUnavailable`
   and no engine state shown.
-- `apps/desktop/app/src/flux/stores/message-store.ts`: on `resync` (every reconnect, on the SQLite
+- `apps/desktop/src/flux/stores/message-store.ts`: on `resync` (every reconnect, on the SQLite
   transport too) `_fetchFromCache` keeps shown bodies for non-drafts only. The open draft's body
   becomes undefined, `itemsExpandedState()` drops it, and `MessageItemContainer` renders it
   collapsed: the inline composer the user is typing in unmounts and remounts after the body
   read, losing focus and the cursor on every engine respawn. Keep the open draft's body (or its
   expanded state) across a resync.
-- `apps/desktop/app/src/engine-client.ts`: an engine killed from outside with SIGTERM isn't
+- `apps/desktop/src/engine-client.ts`: an engine killed from outside with SIGTERM isn't
   respawned until the next `ensure()`. With reads on the engine the window then shows "Waiting
   for the sync engine" indefinitely, and the state doesn't say that nothing happens without Try
   Again. The kill-the-engine check in the stage text and the trial step below ("re-reads after
   the respawn") hold only for SIGKILL or a crash; the trial step should use `kill -9`, and SIGTERM
   needs either a respawn or a state that says so.
-- `apps/desktop/app/spec/stores/database-store-spec.ts` and the other existing subscription specs:
+- `apps/desktop/spec/stores/database-store-spec.ts` and the other existing subscription specs:
   the review fixes run `database-store-spec`, `query-subscription-spec`,
   `query-subscription-pool-spec`, `unread-query-subscription-spec` and `message-store-spec` on
   both transports for selected cases (`forEachTransport`), but most existing subscription
@@ -3044,7 +3044,7 @@ Decisions taken, to confirm:
   `notifiesGuests`; tern-mcp at read-write asks it with `queue: false` first and refuses
   with the send level when the server would mail guests. The RSVP `comment` goes on the
   EventRSVPTask of a REPLY too.
-Open: `ical-expander` and `vcf` are unused in `apps/desktop/app/package.json` now; removing them
+Open: `ical-expander` and `vcf` are unused in `apps/desktop/package.json` now; removing them
 needs a lockfile update, left for a dependency pass.
 Open for tern-web: the web review of event and contact tasks and writes for relayed devices
 (writes are local-only for now), and the web client calling `events.*` and `contacts.*` for
@@ -3104,7 +3104,7 @@ Open from the review (low):
   `ContactsImportParams` doc (`crates/ms-ipc/src/pim.rs`) says "as new CardDAV contacts", but the
   engine also imports into Google People, as the stage 18 entry says.
 Also open, from the stage 18 entry: `ical-expander` and `vcf` unused in
-`apps/desktop/app/package.json` (lockfile update, left for a dependency pass).
+`apps/desktop/package.json` (lockfile update, left for a dependency pass).
 Open for tern-web: the web review of event and contact tasks and writes for relayed devices
 (writes are local-only for now), and the web client calling `events.*` and `contacts.*` for
 editing (apps/web).

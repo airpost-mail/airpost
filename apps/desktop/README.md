@@ -2,7 +2,7 @@
 
 The Electron client of Tern (React 17, TypeScript and LESS compiled at runtime, no bundler),
 forked from Mailspring. Mail sync runs in the Rust engine (`apps/engine`), which the app
-starts as `app/mailsync-rs`.
+starts as `mailsync-rs` from this directory.
 
 ## Run from source
 
@@ -11,10 +11,10 @@ Install the Node version in the repo's `.node-version` and the Rust toolchain in
 
 ```bash
 make setup     # npm ci here and in apps/web, debug builds of the Rust binaries
-make desktop   # links the debug engine, tern and tern-mcp into app/, starts on .dev/profile
+make desktop   # links the debug engine, tern and tern-mcp into this dir, starts on .dev/profile
 ```
 
-Or from this directory, with an engine installed as `app/mailsync-rs`
+Or from this directory, with an engine installed as `mailsync-rs`
 (`../engine/packaging/build-release.sh --install-desktop` builds and copies one):
 
 ```bash
@@ -28,21 +28,22 @@ npm start -- --config-dir-path=/tmp/tern-profile
 ```bash
 npm run lint:check   # eslint with prettier as a rule; `npm run lint` fixes
 npm run typecheck
-npm test             # Jasmine specs; needs app/mailsync-rs
+npm test             # Jasmine specs; needs ./mailsync-rs
 npm test -- --spec-file-pattern='calendar'
-npm run build        # package for the host platform into app/dist
+npm run build        # package for the host platform into dist/
 ```
 
 `make test-desktop` from the repo root runs the specs too.
 
 ## Layout
 
-- `app/` is the app itself, with its own `package.json` for runtime dependencies built against Electron.
-- `app/src/` holds the core: main process in `browser/`, Flux stores, models and tasks in `flux/`, the plugin API in `global/`.
-- `app/features/` (core, always loaded), `app/plugins/` (bundled, can be turned off) and `app/themes/` (`ui-*`) hold the built-in packages, loaded as plugins.
-- `app/vendor/` holds the quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify).
-- `app/spec/` holds the specs.
-- `package.json` here holds the dev and build tooling.
+- `src/` holds the core: main process in `browser/`, Flux stores, models and tasks in `flux/`, the plugin API in `global/`.
+- `features/` (core, always loaded), `plugins/` (bundled, can be turned off) and `themes/` (`ui-*`) hold the built-in packages, loaded as plugins.
+- `vendor/` holds the quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify).
+- `spec/` holds the specs.
+- `build/`, `scripts/` and `snap/` hold the build and dev tooling; they don't ship.
+- One `package.json`: runtime deps in `dependencies` (native ones rebuilt for Electron by the
+  postinstall), tooling in `devDependencies`.
 
 ## Docs
 

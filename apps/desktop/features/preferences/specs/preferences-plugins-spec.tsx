@@ -22,7 +22,7 @@ function builtTern() {
   const fromEnv = process.env.TERN_BIN;
   if (fromEnv) return fs.existsSync(fromEnv) ? fromEnv : null;
   const resourcePath = AppEnv.getLoadSettings().resourcePath;
-  const debug = path.resolve(resourcePath, '..', '..', '..', 'target', 'debug', 'tern');
+  const debug = path.resolve(resourcePath, '..', '..', 'target', 'debug', 'tern');
   return fs.existsSync(debug) ? debug : null;
 }
 

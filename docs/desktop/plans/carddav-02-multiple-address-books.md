@@ -206,7 +206,7 @@ string MailUtils::idForContactBook(string accountId, string url) {
 
 ### Phase 6: Update TypeScript ContactBook Model
 
-**File: `app/src/flux/models/contact-book.ts`** (if exists)
+**File: `src/flux/models/contact-book.ts`** (if exists)
 
 Add `name` attribute:
 ```typescript

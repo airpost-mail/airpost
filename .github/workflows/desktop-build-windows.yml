@@ -45,8 +45,7 @@ jobs:
         with:
           path: |
             apps/desktop/node_modules
-            apps/desktop/app/node_modules
-          key: windows-2022-deps-${{ hashFiles('apps/desktop/package-lock.json') }}-${{ hashFiles('apps/desktop/app/package-lock.json') }}
+          key: windows-2022-deps-${{ hashFiles('apps/desktop/package-lock.json') }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -55,7 +54,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             apps/desktop/package-lock.json
-            apps/desktop/app/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
@@ -63,7 +61,7 @@ jobs:
       - name: Refuse a C++ engine or OpenSSL DLLs
         shell: bash
         run: |
-          found="$(find app -path app/node_modules -prune -o -type f \( -iname 'mailsync.exe' \
+          found="$(find . -path ./node_modules -prune -o -type f \( -iname 'mailsync.exe' \
             -o -iname 'libcrypto*.dll' -o -iname 'libssl*.dll' -o -iname 'libeay32*.dll' \
             -o -iname 'ssleay32*.dll' \) -print)"
           if [ -n "$found" ]; then
@@ -90,7 +88,7 @@ jobs:
           endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           trusted-signing-account-name: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ vars.AZURE_TRUSTED_SIGNING_CERT_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\apps\desktop\app\dist\Tern-win32-x64
+          files-folder: ${{ github.workspace }}\apps\desktop\dist\Tern-win32-x64
           files-folder-filter: exe,dll,node
           files-folder-recurse: true
           file-digest: SHA256
@@ -153,7 +151,7 @@ jobs:
           endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
           trusted-signing-account-name: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
           certificate-profile-name: ${{ vars.AZURE_TRUSTED_SIGNING_CERT_PROFILE_NAME }}
-          files-folder: ${{ github.workspace }}\apps\desktop\app\dist
+          files-folder: ${{ github.workspace }}\apps\desktop\dist
           files-folder-filter: exe
           files-folder-recurse: false
           file-digest: SHA256
@@ -169,8 +167,8 @@ jobs:
       - name: Source offer
         shell: bash
         run: |
-          tag="desktop-$(node -p "require('./app/package.json').version")-$(git rev-parse --short=8 HEAD)"
-          ../../.github/scripts/source-offer.sh "$tag" app/dist "the Tern desktop app"
+          tag="desktop-$(node -p "require('./package.json').version")-$(git rev-parse --short=8 HEAD)"
+          ../../.github/scripts/source-offer.sh "$tag" dist "the Tern desktop app"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -178,10 +176,10 @@ jobs:
         with:
           name: desktop-windows-x64
           path: |
-            apps/desktop/app/dist/TernSetup.exe
-            apps/desktop/app/dist/*.nupkg
-            apps/desktop/app/dist/RELEASES
-            apps/desktop/app/dist/SOURCE.txt
+            apps/desktop/dist/TernSetup.exe
+            apps/desktop/dist/*.nupkg
+            apps/desktop/dist/RELEASES
+            apps/desktop/dist/SOURCE.txt
 
       - name: Setup AWS CLI
         if: env.HAVE_AWS == 'true'
@@ -198,7 +196,7 @@ jobs:
           BUCKET: ${{ vars.BUILDS_S3_BUCKET }}
         run: |
           $commit = git rev-parse --short=8 HEAD
-          aws s3 sync app/dist/ "s3://$env:BUCKET/client/$commit/win-x64" `
+          aws s3 sync dist/ "s3://$env:BUCKET/client/$commit/win-x64" `
             --acl public-read `
             --exclude "*" `
             --include "TernSetup.exe" `

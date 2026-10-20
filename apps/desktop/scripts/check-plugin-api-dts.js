@@ -6,7 +6,7 @@
 const path = require('path');
 const ts = require('typescript');
 
-const appDir = path.resolve(__dirname, '..', 'app');
+const appDir = path.resolve(__dirname, '..');
 const barrels = process.argv.slice(2).length
   ? process.argv.slice(2).map((file) => path.resolve(file))
   : ['mailspring-exports.d.ts', 'mailspring-component-kit.d.ts'].map((file) =>

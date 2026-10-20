@@ -5,7 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Install dependencies (also installs app/'s runtime dependencies against Electron)
+# Install dependencies; postinstall rebuilds the native runtime deps for Electron.
+# Use `npm ci` (or `npm install`), never a bare `npm rebuild`: that puts better-sqlite3 back
+# on Node's ABI.
 npm ci
 
 # Run the app in development mode (uses --dev flag, data stored in Tern-dev folder)
@@ -41,7 +43,7 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 
 ### Key Directories
 
-- **`app/src/`** - Core application source code
+- **`src/`** - Core application source code
   - `browser/` - Main process code (application lifecycle, window management, auto-updates)
   - `flux/` - Flux-based state management (actions, stores, models, tasks)
   - `components/` - Reusable React UI components
@@ -49,16 +51,20 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
   - `registries/` - Extension registries (components, extensions, database objects)
   - `global/` - Global exports (`mailspring-exports`, `mailspring-component-kit`)
 
-- **`app/features/`** - Built-in packages that always load (composer, message-list, thread-list, preferences, main-calendar, etc.)
-- **`app/plugins/`** - Bundled optional packages (`isOptional: true`, can be turned off via `core.disabledPackages`), e.g. activity, send-later, translation
-- **`app/themes/`** - The `ui-*` themes
-- **`app/vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/quickpreview/renderer.html`
+- **`features/`** - Built-in packages that always load (composer, message-list, thread-list, preferences, main-calendar, etc.)
+- **`plugins/`** - Bundled optional packages (`isOptional: true`, can be turned off via `core.disabledPackages`), e.g. activity, send-later, translation
+- **`themes/`** - The `ui-*` themes
+- **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/quickpreview/renderer.html`
 
 All three package dirs sit at the same depth, so packages import core code as `../../../src/...`. `src/bundled-packages.ts` lists them for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
 
-> **IMPORTANT:** Application source code lives in `app/src/`, `app/features/` and `app/plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `app/src/` will miss a large portion of the codebase and lead to incomplete changes.
+> **IMPORTANT:** Application source code lives in `src/`, `features/` and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
-- **`app/spec/`** - Jasmine test specs
+- **`spec/`** - Jasmine test specs
+
+### Dependencies and packaging
+
+There is one `package.json` and one `node_modules`. Runtime code goes in `dependencies` (or `optionalDependencies`); tests and tooling go in `devDependencies`, which the packager prunes. `import/no-extraneous-dependencies` (with `packageDir: "."`, so run eslint from this directory) fails a runtime import of a devDependency in `src/`, `features/`, `plugins/` or `themes/`; `spec/` and package `specs/` dirs may use them. Only the top-level entries listed in `shippedTopLevel` in `build/build.js` are packaged, so a new top-level runtime dir has to be added there or it silently won't ship. Package `specs/` dirs never ship.
 
 ### Core Modules
 
@@ -83,7 +89,7 @@ Each package in `features/`, `plugins/` and `themes/` has:
 
 ## Core Data Flow: Sync Engine, Tasks, and Observable Database
 
-**Important:** The UI is read-only with respect to the database. All database modifications happen in the Rust sync engine (`apps/engine`, bundled as `app/mailsync-rs`). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
+**Important:** The UI is read-only with respect to the database. All database modifications happen in the Rust sync engine (`apps/engine`, bundled as `mailsync-rs` next to `package.json`). The Electron app requests changes via Tasks, and the sync engine streams entity changes back to create a real-time UI.
 
 ### Sync Engine Communication
 
@@ -228,7 +234,7 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Development Notes
 
-- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code in `app/src/browser` needs a full restart. `Cmd/Ctrl+R` is Reply
+- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code in `src/browser` needs a full restart. `Cmd/Ctrl+R` is Reply
 - Dev tools accessible via Menu > Developer > Toggle Developer Tools
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
 - Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/browser/mailspring-profile-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import
@@ -237,4 +243,4 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Claude Hooks
 
-A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/app/src`, `app/features`, `app/plugins` or `app/themes`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.
+A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/src`, `features`, `plugins` or `themes`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.

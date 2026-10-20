@@ -30,7 +30,7 @@ describe('file URL guard', function () {
   });
 
   it('a protocol-relative src in a file: document resolves to a hosted file: URL', () => {
-    const base = pathToFileURL(path.resolve('/app/src/quickpreview/renderer.html')).toString();
+    const base = pathToFileURL(path.resolve('/desktop/src/quickpreview/renderer.html')).toString();
     expect(isHostedFileURL(new URL('//attacker.example/share/p.png', base).toString())).toBe(true);
     expect(isHostedFileURL(new URL('\\\\attacker.example\\share\\p.png', base).toString())).toBe(
       true

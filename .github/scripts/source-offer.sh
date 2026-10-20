@@ -56,8 +56,8 @@ The complete corresponding source code for this build is the tag $tag:
   $repo_url/tree/$tag
   $repo_url/archive/refs/tags/$tag.tar.gz
 
-The Rust and npm dependencies are pinned by Cargo.lock, apps/desktop/package-lock.json and
-apps/desktop/app/package-lock.json in that tree. Engine releases also carry an archive of the
+The Rust and npm dependencies are pinned by Cargo.lock and apps/desktop/package-lock.json in
+that tree. Engine releases also carry an archive of the
 source with every crate vendored.
 EOF
 echo "---> $out/SOURCE.txt ($tag)" >&2

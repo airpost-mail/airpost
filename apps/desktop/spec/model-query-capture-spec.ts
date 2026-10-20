@@ -41,7 +41,7 @@ import { Calendar } from '../src/flux/models/calendar';
 import { File } from '../src/flux/models/file';
 import { Task } from '../src/flux/tasks/task';
 
-const REPO = path.resolve(__dirname, '..', '..', '..', '..');
+const REPO = path.resolve(__dirname, '..', '..', '..');
 const ALLOWLIST = path.join(REPO, 'crates', 'ms-store', 'src', 'model_query_allowlist.json');
 const QUERIES = path.join(REPO, 'crates', 'ms-store', 'tests', 'fixtures', 'model_queries.json');
 const WRITE = !!process.env.TERN_WRITE_QUERY_FIXTURES;
@@ -101,7 +101,7 @@ function allowlist() {
     };
   }
   return {
-    generatedBy: 'apps/desktop/app/spec/model-query-capture-spec.ts',
+    generatedBy: 'apps/desktop/spec/model-query-capture-spec.ts',
     classes,
   };
 }
@@ -668,7 +668,7 @@ function capture() {
   // ran first.
   Matcher.muid = 0;
   return {
-    generatedBy: 'apps/desktop/app/spec/model-query-capture-spec.ts',
+    generatedBy: 'apps/desktop/spec/model-query-capture-spec.ts',
     queries: SITES.map(({ name, site, build }) => {
       const json = build().toJSON();
       const sql = build().sql();

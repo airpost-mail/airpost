@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
-const PATH_TO_LANG = path.resolve(__dirname, '..', 'app', 'lang');
+const PATH_TO_LANG = path.resolve(__dirname, '..', 'lang');
 
 const getLanguage = () => {
 	return new Promise(resolve => {
@@ -18,7 +18,7 @@ const getLanguage = () => {
 			}
 			const PATH = `${PATH_TO_LANG}/${LANG}.json`;
 			if (!fs.existsSync(PATH)) {
-				console.log(`\napp/lang/${path.basename(PATH)} not found!`);
+				console.log(`\nlang/${path.basename(PATH)} not found!`);
 				process.exit();
 			}
 			resolve(LANG);
@@ -128,8 +128,8 @@ ${index + 1}/${length} > `,
 	fs.writeFileSync(`${PATH_TO_LANG}/${LANG}.json`, JSON.stringify(sortedLocalization, null, 2));
 
 	if (ASK) {
-		console.log(`\napp/lang/${LANG}.json improved with ${nbImproved} key(s)!`);
+		console.log(`\nlang/${LANG}.json improved with ${nbImproved} key(s)!`);
 	} else {
-		console.log(`\nYou need to remplace all null value in app/lang/${LANG}.json!`);
+		console.log(`\nYou need to remplace all null value in lang/${LANG}.json!`);
 	}
 })();

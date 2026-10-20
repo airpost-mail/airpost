@@ -3,7 +3,7 @@
 
 //! The draft pipeline corpus: inputs and what the desktop made of them
 //! (`fixtures/draft_corpus.json`, written by
-//! `apps/desktop/app/spec/draft-corpus-capture-spec.ts`), run through this crate.
+//! `apps/desktop/spec/draft-corpus-capture-spec.ts`), run through this crate.
 //!
 //! Text, recipients, subjects, signatures, plaintext, mailto drafts and send warnings must match
 //! exactly. HTML that went through the sanitizer and the style inliner is compared as a

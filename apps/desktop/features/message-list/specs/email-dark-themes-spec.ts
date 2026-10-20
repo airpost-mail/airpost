@@ -4,6 +4,8 @@ import { applyColorScheme, darkenDocument, formatColor, isDarkColor } from '@ter
 import { darkPalette, themeBackgroundAt } from '../lib/email-render-mode';
 import { compatTokensSource } from '../../../src/theme-manager';
 
+// less comes with less-cache, which compiles the app's stylesheets at runtime.
+// eslint-disable-next-line import/no-extraneous-dependencies
 const less = require('less');
 
 // Each bundled theme's stylesheets, compiled as ThemeManager would, around a copy of the message

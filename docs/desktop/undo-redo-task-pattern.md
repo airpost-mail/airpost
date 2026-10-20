@@ -42,7 +42,7 @@ export class ChangeStarredTask extends ChangeMailTask {
 
 ### Pattern 2: State Snapshot (SyncbackMetadataTask, SyncbackEventTask)
 
-For operations where the inverse isn't a simple toggle, snapshot the state on the task. See `SyncbackEventTask` (`app/src/flux/tasks/syncback-event-task.ts`):
+For operations where the inverse isn't a simple toggle, snapshot the state on the task. See `SyncbackEventTask` (`src/flux/tasks/syncback-event-task.ts`):
 
 - `forUpdating({ event, undoData, description })` takes `undoData`, the state from *before* the edit, and snapshots the state being written as `newData`.
 - The constructor sets `this.canBeUndone = !!this.undoData`, so a task built without `undoData` (creation, for example) is not undoable.
@@ -185,9 +185,9 @@ event.ics = newIcs;  // Now modify
 
 ## Related Files
 
-- `app/src/flux/stores/undo-redo-store.ts` - UndoRedoStore implementation
-- `app/src/flux/tasks/task.ts` - Base Task class
-- `app/src/flux/tasks/change-mail-task.ts` - Base class for mail changes
-- `app/src/flux/tasks/syncback-metadata-task.ts` - Example of snapshot pattern
-- `app/src/flux/tasks/syncback-event-task.ts` - Calendar event undo implementation
-- `app/src/flux/tasks/change-folder-task.ts` - Engine-written snapshot (`undoPlacements`)
+- `src/flux/stores/undo-redo-store.ts` - UndoRedoStore implementation
+- `src/flux/tasks/task.ts` - Base Task class
+- `src/flux/tasks/change-mail-task.ts` - Base class for mail changes
+- `src/flux/tasks/syncback-metadata-task.ts` - Example of snapshot pattern
+- `src/flux/tasks/syncback-event-task.ts` - Calendar event undo implementation
+- `src/flux/tasks/change-folder-task.ts` - Engine-written snapshot (`undoPlacements`)

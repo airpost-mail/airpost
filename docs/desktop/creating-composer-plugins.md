@@ -47,7 +47,7 @@ The Mailspring composer is built on several layers:
 ┌──────────────────────────────────────────────────────────┐
 │  Composer:ActionButton   Composer:Footer   ...           │  ← Injected via ComponentRegistry
 ├──────────────────────────────────────────────────────────┤
-│  ComposerView  (app/features/composer/)         │  ← Renders InjectedComponentSets
+│  ComposerView  (features/composer/)         │  ← Renders InjectedComponentSets
 ├──────────────────────────────────────────────────────────┤
 │  ComposerEditor (Slate v0 rich-text editor)              │  ← Slate plugins for editor behavior
 ├──────────────────────────────────────────────────────────┤
@@ -70,7 +70,7 @@ Most composer plugins use (1) and (2). Plugins that need to introduce new inline
 ## Plugin File Structure
 
 ```
-app/plugins/my-composer-plugin/
+plugins/my-composer-plugin/
 ├── package.json
 ├── lib/
 │   ├── main.ts              # activate() / deactivate() lifecycle
@@ -167,7 +167,7 @@ interface ComposerInjectedProps {
 }
 ```
 
-Source: `app/features/composer/lib/composer-view.tsx`
+Source: `features/composer/lib/composer-view.tsx`
 
 ### Toolbar Buttons (Composer:ActionButton)
 
@@ -306,7 +306,7 @@ session.changes.commit();
 
 **Body synchronization**: When you write to `body` (an HTML string), the system automatically converts it to a Slate `Value` for the editor via `convertFromHTML()`. If the editor is mounted, the conversion preserves undo history by using Slate's `replaceNodeByKey` and `insertFragment` operations.
 
-Source: `app/src/flux/stores/draft-editing-session.ts`, `app/src/flux/stores/draft-change-set.ts`
+Source: `src/flux/stores/draft-editing-session.ts`, `src/flux/stores/draft-change-set.ts`
 
 ### Working with Plugin Metadata
 
@@ -331,7 +331,7 @@ This is useful for tracking plugin state (e.g., "link tracking is enabled for th
 
 `ComposerExtension` provides static hooks into the draft lifecycle. Subclass it and register via `ExtensionRegistry.Composer.register()`.
 
-Source: `app/src/extensions/composer-extension.ts`
+Source: `src/extensions/composer-extension.ts`
 
 ### prepareNewDraft
 
@@ -429,7 +429,7 @@ This is the most powerful and complex extension point. The composer uses **Slate
 
 ### Editor Plugin Architecture
 
-The editor loads plugins from `app/src/components/composer-editor/conversion.tsx`:
+The editor loads plugins from `src/components/composer-editor/conversion.tsx`:
 
 ```typescript
 export const plugins: ComposerEditorPlugin[] = [
@@ -464,7 +464,7 @@ export const schema = {
 
 ### The ComposerEditorPlugin Interface
 
-Source: `app/src/components/composer-editor/types.ts`
+Source: `src/components/composer-editor/types.ts`
 
 ```typescript
 interface ComposerEditorPlugin {
@@ -716,7 +716,7 @@ const MyToolbarButton = ({ value, editor, className }) => {
 };
 ```
 
-Source: `app/src/components/composer-editor/toolbar-component-factories.tsx`
+Source: `src/components/composer-editor/toolbar-component-factories.tsx`
 
 ### Top-Level Components (Floating UI)
 
@@ -813,7 +813,7 @@ AutoReplace({
 
 ### Registering Your Editor Plugin
 
-Editor plugins are loaded statically from `app/src/components/composer-editor/conversion.tsx`. To add yours, import it and add it to the `plugins` array:
+Editor plugins are loaded statically from `src/components/composer-editor/conversion.tsx`. To add yours, import it and add it to the `plugins` array:
 
 ```typescript
 // In conversion.tsx
@@ -851,7 +851,7 @@ export const schema = {
 
 The translation plugin adds a toolbar button that opens a language picker popover and replaces the draft body with a translated version.
 
-**Key files**: `app/plugins/translation/`
+**Key files**: `plugins/translation/`
 
 ```typescript
 // main.tsx — Lifecycle

@@ -30,7 +30,7 @@ import {
   UnreadStatusQueryExpression,
 } from '../src/services/search/search-query-ast';
 
-const REPO = path.resolve(__dirname, '..', '..', '..', '..');
+const REPO = path.resolve(__dirname, '..', '..', '..');
 const FIXTURE = path.join(REPO, 'crates', 'ms-store', 'tests', 'fixtures', 'search_queries.json');
 const WRITE = !!process.env.TERN_WRITE_QUERY_FIXTURES;
 
@@ -150,7 +150,7 @@ function capture() {
     }
     return { text, ast, where };
   });
-  return { generatedBy: 'apps/desktop/app/spec/search-query-capture-spec.ts', queries };
+  return { generatedBy: 'apps/desktop/spec/search-query-capture-spec.ts', queries };
 }
 
 describe('Search grammar capture for the engine', () => {

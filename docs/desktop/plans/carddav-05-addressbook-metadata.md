@@ -135,7 +135,7 @@ abSetContentsDoc->evaluateXPath("//D:response[.//carddav:addressbook]", ([&](xml
 
 ### Phase 4: Update TypeScript Model
 
-**File: `app/src/flux/models/contact-book.ts`** (if exists, or create)
+**File: `src/flux/models/contact-book.ts`** (if exists, or create)
 
 ```typescript
 import { Model } from './model';
@@ -199,7 +199,7 @@ Update contact-related UI to show:
 |------|---------|
 | `mailsync/MailSync/Models/ContactBook.hpp/cpp` | Add name, description, readOnly fields |
 | `mailsync/MailSync/DAVWorker.cpp` | Update PROPFIND, parse metadata |
-| `app/src/flux/models/contact-book.ts` | Add TS attributes |
+| `src/flux/models/contact-book.ts` | Add TS attributes |
 
 ## Testing
 

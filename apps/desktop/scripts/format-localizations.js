@@ -3,7 +3,7 @@ const path = require('path');
 
 let files = [];
 
-const PATH_TO_LANG = __dirname + '/../app/lang';
+const PATH_TO_LANG = __dirname + '/../lang';
 const PATH_TO_ENGLISH = `${PATH_TO_LANG}/en.json`;
 
 function collectFiles(dir) {
@@ -27,11 +27,11 @@ function writeTerms(terms, destPath) {
 	fs.writeFileSync(destPath, JSON.stringify(ordered, null, 2));
 }
 
-collectFiles(__dirname + '/../app/src');
-collectFiles(__dirname + '/../app/features');
-collectFiles(__dirname + '/../app/plugins');
-collectFiles(__dirname + '/../app/themes');
-collectFiles(__dirname + '/../app/menus');
+collectFiles(__dirname + '/../src');
+collectFiles(__dirname + '/../features');
+collectFiles(__dirname + '/../plugins');
+collectFiles(__dirname + '/../themes');
+collectFiles(__dirname + '/../menus');
 
 let sourceTerms = [];
 let found = 0;

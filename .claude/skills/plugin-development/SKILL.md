@@ -1,6 +1,6 @@
 ---
 name: plugin-development
-description: Context for work on the desktop app's plugin system (apps/desktop) — creating, modifying or debugging plugins and themes, PackageManager/Package loading, discovery and activation, ComponentRegistry/ExtensionRegistry and the other registries, Preferences > Plugins, or anything in app/features/, app/plugins/ or app/themes/. Read before changing plugin-related code.
+description: Context for work on the desktop app's plugin system (apps/desktop) — creating, modifying or debugging plugins and themes, PackageManager/Package loading, discovery and activation, ComponentRegistry/ExtensionRegistry and the other registries, Preferences > Plugins, or anything in apps/desktop/features/, plugins/ or themes/. Read before changing plugin-related code.
 ---
 
 # Plugin development
@@ -12,7 +12,7 @@ Use this skill when working on code related to the desktop app's plugin system, 
 - Working with ComponentRegistry, ExtensionRegistry, or other registries
 - Plugin management UI (Preferences > Plugins)
 - Working with themes (which are a type of plugin)
-- Modifying code in `apps/desktop/app/features/`, `app/plugins/` or `app/themes/`
+- Modifying code in `apps/desktop/features/`, `plugins/` or `themes/`
 
 ## Required Reading
 
@@ -27,7 +27,7 @@ documentation at `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (repo root). It co
 - Theme system implementation
 
 Changes to the plugin API also need a `PLUGIN_API_VERSION` bump in
-`apps/desktop/app/src/plugin-api-version.ts` and an entry in `apps/desktop/CHANGELOG.md`.
+`apps/desktop/src/plugin-api-version.ts` and an entry in `apps/desktop/CHANGELOG.md`.
 
 ## Key Source Files
 
@@ -35,16 +35,16 @@ Paths are relative to `apps/desktop/`.
 
 | File | Purpose |
 |------|---------|
-| `app/src/package-manager.ts` | Package discovery, validation, and activation |
-| `app/src/package.ts` | Package class representing individual plugins |
-| `app/src/app-env.ts` | AppEnv singleton that initializes PackageManager |
-| `app/src/plugin-api-version.ts` | The plugin API version matched against `engines.mailspring` |
-| `app/src/registries/component-registry.ts` | UI component registration |
-| `app/src/registries/extension-registry.ts` | Extension registration |
-| `app/src/extensions/composer-extension.ts` | ComposerExtension base class |
-| `app/src/extensions/message-view-extension.ts` | MessageViewExtension base class |
-| `app/src/components/injected-component.tsx` | Renders registered components |
-| `app/features/theme-picker/` | Theme UI (reference for plugin management UI) |
+| `src/package-manager.ts` | Package discovery, validation, and activation |
+| `src/package.ts` | Package class representing individual plugins |
+| `src/app-env.ts` | AppEnv singleton that initializes PackageManager |
+| `src/plugin-api-version.ts` | The plugin API version matched against `engines.mailspring` |
+| `src/registries/component-registry.ts` | UI component registration |
+| `src/registries/extension-registry.ts` | Extension registration |
+| `src/extensions/composer-extension.ts` | ComposerExtension base class |
+| `src/extensions/message-view-extension.ts` | MessageViewExtension base class |
+| `src/components/injected-component.tsx` | Renders registered components |
+| `features/theme-picker/` | Theme UI (reference for plugin management UI) |
 
 ## Development Guidelines
 

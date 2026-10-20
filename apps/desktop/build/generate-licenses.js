@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
-const appDir = path.resolve(__dirname, '..', 'app');
+const appDir = path.resolve(__dirname, '..');
 const licensesDir = path.join(__dirname, 'resources', 'licenses');
 
 const LICENSE_FILE = /^((MIT|BSD|APACHE)[-._])?(LICEN[CS]E|COPYING|NOTICE|OFL)([-._][\w.-]*)?$/i;

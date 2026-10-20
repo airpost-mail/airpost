@@ -18,20 +18,20 @@ certs
 **/#emacs
 
 # Built client
-app/dist
+/dist
 
 # Python
 *.pyc
 
-/app/mailsync
-/app/mailsync-rs
-/app/mailsync-rs.THIRD-PARTY-NOTICES.txt
-/app/tern-mcp
-/app/tern
-/app/tern.exe
-/app/tern-mcp.exe
-/app/tern-mcp.THIRD-PARTY-NOTICES.txt
-/app/mailsync.dSYM.zip
+/mailsync
+/mailsync-rs
+/mailsync-rs.THIRD-PARTY-NOTICES.txt
+/tern-mcp
+/tern
+/tern.exe
+/tern-mcp.exe
+/tern-mcp.THIRD-PARTY-NOTICES.txt
+/mailsync.dSYM.zip
 /snap/snapcraft.yml
 /snap/.snapcraft/
 
@@ -39,6 +39,6 @@ app/dist
 **.bin
 **.tar.gz
 **.dll
-/app/mailsync.exe
-/app/mailsync.dSYM
+/mailsync.exe
+/mailsync.dSYM
 .idea

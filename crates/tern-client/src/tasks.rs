@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! Tasks: the JSON the desktop queues for the same actions (`Task.toJSON()` of the classes
-//! in `apps/desktop/app/src/flux/tasks`), with attribute keys as their `jsonKey` (`aid`, `v`),
+//! in `apps/desktop/src/flux/tasks`), with attribute keys as their `jsonKey` (`aid`, `v`),
 //! undefined attributes left out, `status: "local"` as the bridge sets it before queueing,
 //! and `__cls`; and the check a client waiting on a task makes. A task is done when a `Task`
 //! delta shows it `complete` or `cancelled`, as the desktop's `TaskQueue` decides; its

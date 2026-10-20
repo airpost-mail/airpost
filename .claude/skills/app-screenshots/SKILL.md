@@ -17,17 +17,21 @@ Only one instance per profile can run at a time, so check first. If one is runni
 didn't start, it is probably the user's: ask before closing it.
 
 ```bash
-pgrep -fl "[Ee]lectron ./app"   # anything listed will be closed by the next line
-pkill -f "[Ee]lectron ./app"; pkill -f "app/mailsync-rs --mode"; sleep 2
-(./node_modules/.bin/electron ./app --enable-logging --dev --remote-debugging-port=9333 > /tmp/app.log 2>&1 &)
+pgrep -fl "[Ee]lectron \. "   # every dev instance; one without --config-dir-path uses Tern-dev
+# Closes only an instance this skill launched (port 9333) and the Tern-dev engine. Don't widen
+# these: the user's trial runs `electron . --config-dir-path=~/tern-trial` from the main checkout.
+pkill -f "[Ee]lectron \. --enable-logging --dev --remote-debugging-port=9333"
+pkill -f "mailsync-rs --mode serve --socket $HOME/Library/Application Support/Tern-dev/"; sleep 2
+(./node_modules/.bin/electron . --enable-logging --dev --remote-debugging-port=9333 > /tmp/app.log 2>&1 &)
 sleep 18   # window + plugins + first sync
 curl -s localhost:9333/json | grep -c webSocketDebuggerUrl   # >0 means ready
 ```
 
 - Always kill orphaned `mailsync-rs` processes too; they outlive the Electron process and
-  hold the SQLite DB open (a later seed script will silently fail to commit).
+  hold the SQLite DB open (a later seed script will silently fail to commit). Match them by
+  the profile in their `--socket` path, as above, never by the binary path alone.
 - `location.reload()` does nothing in the renderer. Pick up renderer changes with
-  `AppEnv.commands.dispatch('window:reload')`; main-process changes (`app/src/browser`)
+  `AppEnv.commands.dispatch('window:reload')`; main-process changes (`src/browser`)
   need a full relaunch. Edited LESS can be hot-loaded with `AppEnv.themes.reloadCoreStyles()`.
 - For doc-sized captures, shrink the window first:
   `AppEnv.getCurrentWindow().setSize(1280, 800)`.

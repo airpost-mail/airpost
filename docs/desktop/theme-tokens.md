@@ -1,7 +1,7 @@
 # Theme tokens
 
 Themes are CSS custom properties on `:root`. The defaults, at the Light theme's values, are in
-`app/static/style/tokens/defaults.css`. A bundled theme sets tokens and nothing else. Kit components
+`static/style/tokens/defaults.css`. A bundled theme sets tokens and nothing else. Kit components
 are plain CSS reading `var(--…)`; legacy LESS keeps compiling and reads the tokens through the
 variables in `static/style/base/ui-variables.less` (mapping below). Community themes that only set
 LESS variables get their tokens derived from those variables (the compat path).

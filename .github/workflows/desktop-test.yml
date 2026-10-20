@@ -1,9 +1,9 @@
 name: desktop-test
 
 # Lint, typecheck and the Jasmine specs for apps/desktop, with the Rust engine built and
-# installed as app/mailsync-rs. The app runs `mailsync-rs --mode migrate` before loading any
-# spec; without an engine (or with one that refuses to start) it quits with status 0 having
-# run nothing, so the spec step also fails when the runner reports no passing specs.
+# installed as apps/desktop/mailsync-rs. The app runs `mailsync-rs --mode migrate` before
+# loading any spec; without an engine (or with one that refuses to start) it quits with status 0
+# having run nothing, so the spec step also fails when the runner reports no passing specs.
 
 on:
   push:
@@ -80,7 +80,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             apps/desktop/package-lock.json
-            apps/desktop/app/package-lock.json
 
       - name: Install dependencies
         run: npm ci

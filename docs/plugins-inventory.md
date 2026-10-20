@@ -2,7 +2,7 @@
 
 This document catalogs the Mailspring plugin ecosystem to inform the Tern project's plugin architecture design. It covers community plugins, built-in plugins, and the API surface they depend on.
 
-**Research methodology**: GitHub repository search for "mailspring plugin", "mailspring-plugin" topic, manual code inspection of top plugins by stars. Search conducted October 2026. All API usage verified by reading actual plugin source code. Built-in counts are packages under `apps/desktop/app/{features,plugins,themes}` whose `lib/` names the symbol, recounted 2026-10-16 after the `mcp-server` plugin was removed (tern-mcp, `docs/mcp.md`, replaces it).
+**Research methodology**: GitHub repository search for "mailspring plugin", "mailspring-plugin" topic, manual code inspection of top plugins by stars. Search conducted October 2026. All API usage verified by reading actual plugin source code. Built-in counts are packages under `apps/desktop/{features,plugins,themes}` whose `lib/` names the symbol, recounted 2026-10-16 after the `mcp-server` plugin was removed (tern-mcp, `docs/mcp.md`, replaces it).
 
 ---
 
@@ -132,7 +132,7 @@ This document catalogs the Mailspring plugin ecosystem to inform the Tern projec
 
 ---
 
-## 2. Built-In Plugins (apps/desktop/app/{features,plugins,themes})
+## 2. Built-In Plugins (apps/desktop/{features,plugins,themes})
 
 ### Core UI Components (Not Pro)
 

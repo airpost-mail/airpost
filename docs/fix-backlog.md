@@ -3,7 +3,7 @@
 User-reported issues, root-caused on 2026-10-15 by read-only investigation. Fixes go into the Rust
 engine and `apps/desktop`; the C++ engine stays as the A/B reference, so engine fixes that
 change behaviour are recorded as deliberate divergences in `docs/engine-port-plan.md` section 6.
-Paths: C++ relative to `legacy/mailsync-cpp/`, desktop relative to `apps/desktop/app/`.
+Paths: C++ relative to `legacy/mailsync-cpp/`, desktop relative to `apps/desktop/`.
 
 | # | Issue | Layer | Size | When |
 |---|---|---|---|---|

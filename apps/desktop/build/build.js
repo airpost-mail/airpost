@@ -17,7 +17,7 @@ const { writeLicenses } = require('./generate-licenses');
 
 const platform = process.platform;
 const buildDir = __dirname;
-const appDir = path.resolve(buildDir, '..', 'app');
+const appDir = path.resolve(buildDir, '..');
 const outputDir = path.join(appDir, 'dist');
 const tmpdir = path.resolve(os.tmpdir(), 'tern-build');
 const packageJSON = require(path.join(appDir, 'package.json'));
@@ -95,8 +95,10 @@ function resolveRealSymlinkPaths() {
     entries.forEach((packageName) => {
       const relativePackageDir = path.join(dir, packageName);
       const absolutePackageDir = path.join(absoluteDir, packageName);
-      const realPackagePath = fs.realpathSync(absolutePackageDir).replace('/private/', '/');
-      if (realPackagePath !== absolutePackageDir) {
+      const realPackagePath = fs.realpathSync(absolutePackageDir);
+      // Compare against the real parent, so a checkout under a symlinked dir (/tmp on macOS)
+      // doesn't count every entry as a link.
+      if (realPackagePath !== path.join(fs.realpathSync(absoluteDir), packageName)) {
         console.log(`  ---> Resolving '${relativePackageDir}' to '${realPackagePath}'`);
         symlinkedPackages.push({ realPackagePath, relativePackageDir });
       }
@@ -163,7 +165,7 @@ function runTranspilers({ buildPath }) {
       if (/node_modules/.test(tsPath) && !/node_modules[/\\]@tern[/\\]/.test(tsPath)) return;
       if (tsPath.endsWith('.d.ts')) return;
       const outPath = tsPath.replace(path.extname(tsPath), '.js');
-      console.log(`  ---> Compiling ${tsPath.slice(tsPath.indexOf('/app') + 4)}`);
+      console.log(`  ---> Compiling ${path.relative(buildPath, tsPath)}`);
       const res = TypeScript.transpileModule(tsCode, { compilerOptions, fileName: tsPath });
       writeFileEnsureDir(outPath, res.outputText);
       if (res.sourceMapText) {
@@ -180,6 +182,36 @@ function runRemoveSourceMaps({ buildPath }) {
   mapFiles.forEach((relPath) => fs.unlinkSync(path.join(buildPath, relPath)));
   console.log(`---> Removed ${mapFiles.length} source map files`);
 }
+
+// Top-level entries of the desktop dir that ship. Anything else there is tooling. A new top-level
+// runtime dir must be added here, or it silently won't ship.
+const shippedTopLevel = [
+  'package.json',
+  'tsconfig.json', // compile-cache-ts.js reads its compilerOptions
+  'default-profile',
+  'features',
+  'keymaps',
+  'lang',
+  'menus',
+  'node_modules',
+  'plugins',
+  'src',
+  'static',
+  'themes',
+  'vendor',
+  // Placed by apps/engine/packaging/build-release.sh --install-desktop.
+  'mailsync-rs',
+  'mailsync-rs.exe',
+  'mailsync-rs.THIRD-PARTY-NOTICES.txt',
+  'tern-mcp',
+  'tern-mcp.exe',
+  'tern-mcp.THIRD-PARTY-NOTICES.txt',
+  'tern',
+  'tern.exe',
+];
+const topLevelAllowlist = new RegExp(
+  `^/(?!(?:${shippedTopLevel.map((n) => n.replace(/[.]/g, '\\.')).join('|')})(?:/|$))`
+);
 
 function buildPackagerOptions() {
   // See: https://github.com/electron-userland/electron-packager/blob/master/usage.txt
@@ -237,12 +269,13 @@ function buildPackagerOptions() {
         '}',
     },
     ignore: [
-      // top level dirs we never want
-      /^\/dist.*/,
-      /^\/docs.*/,
-      /^\/spec.*/,
+      // The desktop dir also holds dev and build tooling (build/, scripts/, docs, dotfiles) and
+      // prune only removes devDependencies from node_modules, so ship listed top-level entries only.
+      topLevelAllowlist,
+      // Package specs only run in dev.
+      /^\/(features|plugins|themes)\/[^/]+\/specs(\/|$)/,
       // The C++ engine (legacy/mailsync-cpp) is never packaged, even if a local build left one
-      // in app/: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
+      // in the desktop dir: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
       // GPL-compatible or have no licence. Only mailsync-rs ships.
       /^\/mailsync(\.exe|\.bin|\.dSYM.*)?$/,
       // better-sqlite3's test fixture; postinstall deletes it, this catches a stale tree.

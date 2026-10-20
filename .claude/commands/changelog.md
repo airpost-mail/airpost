@@ -4,18 +4,18 @@ Add the entry for a plugin API change to `apps/desktop/CHANGELOG.md`.
 
 Tern's desktop changelog is the plugin API log: one `Plugin API X.Y.Z:` block per version
 under `## Unreleased (Tern)`, newest first. App release numbering isn't decided yet, so don't
-bump `apps/desktop/app/package.json`, its lockfile or the Linux metainfo
+bump `apps/desktop/package.json`, its lockfile or the Linux metainfo
 (`apps/desktop/build/resources/linux/com.ternmail.tern.metainfo.xml.in`).
 
 ## Instructions
 
-1. Read `PLUGIN_API_VERSION` and its doc comment in `apps/desktop/app/src/plugin-api-version.ts`.
+1. Read `PLUGIN_API_VERSION` and its doc comment in `apps/desktop/src/plugin-api-version.ts`.
    The comment lists what each version added; the changelog needs a block for each version
    it has no block for yet.
 
 2. Find what changed for plugins since the last logged version:
    ```bash
-   git log --oneline -- apps/desktop/app/src/plugin-api-version.ts apps/desktop/app/src/global
+   git log --oneline -- apps/desktop/src/plugin-api-version.ts apps/desktop/src/global
    ```
    Read the diffs of the commits that moved the version.
 

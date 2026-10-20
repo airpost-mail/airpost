@@ -96,10 +96,13 @@ fi
 
 log "building the Rust engine"
 (cd "$repo" && cargo build --release -p mailsync)
-cp "$repo/target/release/mailsync" "$repo/apps/desktop/app/mailsync-rs"
+cp "$repo/target/release/mailsync" "$repo/apps/desktop/mailsync-rs"
 
-if [ ! -d "$repo/apps/desktop/node_modules" ]; then
-  log "installing desktop dependencies (npm ci, first run only)"
+# A checkout from before the flatten still has the tooling-only node_modules (no react, and a
+# Node-built better-sqlite3), so test for the app's runtime deps rather than the dir.
+if [ ! -d "$repo/apps/desktop/node_modules/react" ] ||
+  ! (cd "$repo/apps/desktop" && node scripts/check-native-abi.js >/dev/null 2>&1); then
+  log "installing desktop dependencies (npm ci)"
   (cd "$repo/apps/desktop" && npm ci)
 fi
 

@@ -4,7 +4,7 @@ section 8 "Latency"): the reads the desktop sends while scrolling the inbox, rep
 socket against an engine that synced about 1,500 threads.
 
 The reads are the captured `Query.toJSON()` forms in
-crates/ms-store/tests/fixtures/model_queries.json (apps/desktop/app/spec/model-query-capture-spec.ts),
+crates/ms-store/tests/fixtures/model_queries.json (apps/desktop/spec/model-query-capture-spec.ts),
 with the fixture's ids replaced by the synced ones. Each page is what one 25-row scroll step
 sends (thread-list-engine-spec): the ids of the new rows (`inbox-ids`), their threads
 (`missing-models`) and their messages (`messages-of-threads`), one after the other.

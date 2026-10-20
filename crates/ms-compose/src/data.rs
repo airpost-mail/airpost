@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The lists the engine copies from the desktop, in `desktop_data.json`, which
-//! `apps/desktop/app/spec/draft-corpus-capture-spec.ts` writes and checks: the sanitizer's
+//! `apps/desktop/spec/draft-corpus-capture-spec.ts` writes and checks: the sanitizer's
 //! allowlist (`sanitize-transformer.ts`), the draft tracker rules (`remove-tracking-pixels`,
 //! from MailTrackerBlocker, BSD-3-Clause, Copyright (c) 2020 Aaron Lee; see NOTICE.md,
 //! "MailTrackerBlocker"), Blink's default stylesheet (`chrome-user-agent-stylesheet-string.ts`,

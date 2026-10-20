@@ -198,7 +198,7 @@ Create SyncbackTaskTask and DestroyTaskTask following the same pattern as events
 
 ### Phase 7: TypeScript Models
 
-**File: `app/src/flux/models/calendar-task.ts`**
+**File: `src/flux/models/calendar-task.ts`**
 
 ```typescript
 export class CalendarTask extends Model {
@@ -233,9 +233,9 @@ export class CalendarTask extends Model {
 |------|-------------|
 | `mailsync/MailSync/Models/CalendarTask.hpp` | Task model header |
 | `mailsync/MailSync/Models/CalendarTask.cpp` | Task model implementation |
-| `app/src/flux/models/calendar-task.ts` | TypeScript task model |
-| `app/src/flux/tasks/syncback-task-task.ts` | Create/update task |
-| `app/src/flux/tasks/destroy-task-task.ts` | Delete task |
+| `src/flux/models/calendar-task.ts` | TypeScript task model |
+| `src/flux/tasks/syncback-task-task.ts` | Create/update task |
+| `src/flux/tasks/destroy-task-task.ts` | Delete task |
 
 ## Files to Modify
 
@@ -244,7 +244,7 @@ export class CalendarTask extends Model {
 | `mailsync/MailSync/Models/Calendar.hpp/cpp` | Add supportsEvents/supportsTasks |
 | `mailsync/MailSync/DAVWorker.hpp/cpp` | Add runForCalendarTasks |
 | `mailsync/MailSync/TaskProcessor.hpp/cpp` | Add task syncback handlers |
-| `app/src/global/mailspring-exports.js` | Register new task types |
+| `src/global/mailspring-exports.js` | Register new task types |
 
 ## Scope Consideration
 

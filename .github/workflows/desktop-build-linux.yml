@@ -1,6 +1,6 @@
 name: desktop-build-linux
 
-# Builds the x64 .deb and .rpm with the Rust engine (app/mailsync-rs), builds the snap from
+# Builds the x64 .deb and .rpm with the Rust engine (apps/desktop/mailsync-rs), builds the snap from
 # the .deb, and installs the packages on several distros.
 #
 # Secrets (all optional): AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY with the
@@ -80,7 +80,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             apps/desktop/package-lock.json
-            apps/desktop/app/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
@@ -95,8 +94,8 @@ jobs:
       # package, points to it.
       - name: Source offer
         run: |
-          tag="desktop-$(node -p "require('./app/package.json').version")-$(git rev-parse --short=8 HEAD)"
-          ../../.github/scripts/source-offer.sh "$tag" app/dist "the Tern desktop app"
+          tag="desktop-$(node -p "require('./package.json').version")-$(git rev-parse --short=8 HEAD)"
+          ../../.github/scripts/source-offer.sh "$tag" dist "the Tern desktop app"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -111,7 +110,7 @@ jobs:
       - name: Sync Artifacts to S3
         if: env.HAVE_AWS == 'true'
         run: |
-          aws s3 sync app/dist/ "s3://$BUCKET/client/$(git rev-parse --short=8 HEAD)/linux" \
+          aws s3 sync dist/ "s3://$BUCKET/client/$(git rev-parse --short=8 HEAD)/linux" \
             --acl public-read \
             --exclude "*" --include "*.deb" --include "*.rpm" --include "SOURCE.txt"
         env:
@@ -122,8 +121,8 @@ jobs:
         with:
           name: tern-deb
           path: |
-            apps/desktop/app/dist/*.deb
-            apps/desktop/app/dist/SOURCE.txt
+            apps/desktop/dist/*.deb
+            apps/desktop/dist/SOURCE.txt
           retention-days: 1
 
       - name: Upload RPM artifact for testing
@@ -131,8 +130,8 @@ jobs:
         with:
           name: tern-rpm
           path: |
-            apps/desktop/app/dist/*.rpm
-            apps/desktop/app/dist/SOURCE.txt
+            apps/desktop/dist/*.rpm
+            apps/desktop/dist/SOURCE.txt
           retention-days: 1
 
   build-snap:
@@ -147,7 +146,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: tern-deb
-          path: apps/desktop/app/dist/
+          path: apps/desktop/dist/
 
       - uses: snapcore/action-build@v1
         id: build-snap

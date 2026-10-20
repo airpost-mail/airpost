@@ -5,7 +5,7 @@ underway. Found on 2026-10-16 by read-only audit of `docs/tech-debt` (same tree 
 checked item by item. Work that `docs/desktop-client-plan.md`, `docs/fix-backlog.md`,
 `docs/engine-port-plan.md`, `docs/architecture.md` or `docs/plugins-inventory.md` already
 schedules is left out; where an item overlaps a plan, it says so in one line. "Stage N" means the
-desktop-client-plan stage table (section 7). Desktop paths are relative to `apps/desktop/app/`,
+desktop-client-plan stage table (section 7). Desktop paths are relative to `apps/desktop/`,
 Rust paths to the repo root. Each item says whether it was verified in the tree or is inferred.
 
 Items are grouped by when to do them, and ranked by impact over size inside each group.
@@ -347,23 +347,12 @@ Verified (EXPLAIN on the V12 schema). Nothing in `crates/ms-store/src` or `apps/
 
 ### TD9. `npm ci` runs `npm install` and `npm dedupe` in `app/`
 
-Verified. Every desktop workflow (`desktop-test.yml:80`, `desktop-build-{macos,windows,linux,
-linux-arm64}.yml`) runs `npm ci` in `apps/desktop`, whose postinstall
-(`apps/desktop/scripts/postinstall.js`) wipes `app/node_modules` when the Electron version changes
-(`:53-57`), then runs `npm install` (`:78`) and `npm dedupe` (`:81`) in `app/` with `npm_config_*`
-Electron env (`:12-21`). `app/package-lock.json` is tracked and pins slate-react to a SHA
-(`:4582-4584`), so the lock usually holds, but install and dedupe can rewrite the tree and the
-lock without failing CI. `apps/desktop/package.json:93` declares `packageManager: yarn@4.17.1` and
-`:15` has yarn-style `resolutions`, which npm ignores; there's no `yarn.lock` and nothing uses
-yarn.
-
-- Cost: CI and signed release artifacts can contain a tree that differs from the reviewed lock.
-  The dead yarn config misleads contributors and tools (corepack breakage is inferred, not shown).
-  Every dependency bump is two steps across two lockfiles.
-- Fix: `npm ci` in `app/` when the lock exists, drop dedupe, remove `packageManager`, turn
-  `resolutions` into `overrides` or delete it, pin git deps by SHA in `package.json`. Optionally
-  move to npm workspaces with one lock.
-- Size: 0.5–1 day. Before stage 2 changes the build and signing pipeline.
+Done (flatten stage 1). `app/` is gone: `apps/desktop` has one `package.json` and one
+`package-lock.json`, and `npm ci` installs exactly that lock. The postinstall
+(`apps/desktop/scripts/postinstall.js`) only rebuilds the native runtime deps for Electron
+(`npm rebuild better-sqlite3 windows-focus-assist` with the `npm_config_*` Electron env), then runs
+the nanosleep and ABI checks. No install or dedupe runs after the lock is applied. The yarn
+`packageManager` and `resolutions` were removed earlier; `overrides` holds the pins.
 
 ### TD10. Forms in mail can navigate the reading pane
 
@@ -965,7 +954,7 @@ so composer, popout and onboarding build the whole graph; 13 `isMainWindow()` ch
 - Cost: load-order crashes recur whenever a module is required earlier than expected, and stages
   1, 5, 6 and 8 add EngineConnection, the `Engine` export, capabilities and a new transport to this
   graph. Secondary windows pay startup time and memory for stores they don't use.
-- Fix: ban `mailspring-exports` and `mailspring-component-kit` inside `app/src/**` with
+- Fix: ban `mailspring-exports` and `mailspring-component-kit` inside `src/**` with
   `no-restricted-imports` and rewrite the 77 imports as relative. Drop the barrel from
   `import/core-modules` and enable `import/no-cycle` as a warning baseline, then ratchet. Replace
   the nextTick eager resolve with a per-window-type store list called from AppEnv, so new
@@ -1309,7 +1298,7 @@ registers VTIMEZONEs only on 2.2.1. The engine uses chrono-tz.
 
 ### TD52. React 17 with APIs React 19 removes
 
-Verified. React and react-dom 17.0.2 (`app/package.json:44`, `:46`), react-test-renderer 17 and
+Verified. React and react-dom 17.0.2 (`apps/desktop/package.json:59`, `:61`), react-test-renderer 17 and
 `@testing-library/react` 12 to match. `findDOMNode` 148 hits in 69 files (e.g.
 `src/components/fixed-popover.tsx:78`, `:81`), string refs 37 in 17 files, `this.refs` 44,
 `ReactDOM.render` 12 in 8 files (`src/app-env.ts:839`, `modal-store.tsx:23`, `popover-store.tsx:22`,
@@ -1327,8 +1316,8 @@ components against 7 hook uses.
 
 Verified, except the fork's last-commit date. `slate` `github:bengotow/slate#cd6f40e8`,
 `slate-react` `#0.45.1-react` (0.21.12), `@bengotow/slate-edit-list#b868e108`
-(`app/package.json:15`, `:51`, `:57`; lock `:115`, `:4480`, `:4584`), plus a fourth personal fork,
-`debug` from `emorikawa/debug` (lock `:1078`). Immutable 3 exists only for it.
+(`apps/desktop/package.json:32`, `:67`, `:73`; lock `:160`, `:8076`, `:8180`), plus a fourth personal
+fork, `debug` from `emorikawa/debug` (lock `:2549`). Immutable 3 exists only for it.
 `src/flux/stores/draft-store.ts:76-84` calls `require('slate').resetMemoization()` every five
 minutes because Slate's caches leak. slate-react uses `findDOMNode`. The plan keeps the composer,
 DraftEditingSession and DraftChangeSet in Electron (`desktop-client-plan.md:199`), so nothing else

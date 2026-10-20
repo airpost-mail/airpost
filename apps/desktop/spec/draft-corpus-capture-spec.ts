@@ -40,7 +40,7 @@ import {
 import { MailTrackerBlockerRules } from '../features/remove-tracking-pixels/lib/mail-tracker-blocker-rules';
 import TemplatesComposerExtension from '../plugins/composer-templates/lib/template-composer-extension';
 
-const REPO = path.resolve(__dirname, '..', '..', '..', '..');
+const REPO = path.resolve(__dirname, '..', '..', '..');
 const DATA = path.join(REPO, 'crates', 'ms-compose', 'src', 'desktop_data.json');
 const CORPUS = path.join(REPO, 'crates', 'ms-compose', 'tests', 'fixtures', 'draft_corpus.json');
 const WRITE = !!process.env.TERN_WRITE_DRAFT_CORPUS;

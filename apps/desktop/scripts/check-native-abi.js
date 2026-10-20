@@ -30,7 +30,7 @@ module.exports = { checkNativeAbi };
 
 if (require.main === module) {
   const modulesPath = path.resolve(
-    process.argv[2] || path.join(__dirname, '..', 'app', 'node_modules')
+    process.argv[2] || path.join(__dirname, '..', 'node_modules')
   );
   const failure = checkNativeAbi(modulesPath);
   if (failure) {

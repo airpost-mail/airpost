@@ -43,7 +43,7 @@ use serde::Serialize;
 use crate::search_dates::{self, DateContext};
 
 /// A parsed query, in the desktop's `QueryExpression` shapes. The JSON form is the one
-/// `apps/desktop/app/spec/search-query-capture-spec.ts` writes for the desktop's AST.
+/// `apps/desktop/spec/search-query-capture-spec.ts` writes for the desktop's AST.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Expr {

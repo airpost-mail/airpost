@@ -8,7 +8,7 @@ const electron = require('electron');
 // override, so `TZ=America/Santiago npm test` still works for chasing a zone-specific bug.
 const DEFAULT_TZ = 'America/Chicago';
 
-const child = spawn(electron, ['./app', '--enable-logging', ...process.argv.slice(2)], {
+const child = spawn(electron, ['.', '--enable-logging', ...process.argv.slice(2)], {
   stdio: 'inherit',
   env: Object.assign({ TZ: DEFAULT_TZ }, process.env),
 });

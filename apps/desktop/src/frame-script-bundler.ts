@@ -22,6 +22,8 @@ const CompilerOptions = {
 function transpile(filePath: string) {
   const source = fs.readFileSync(filePath, 'utf8');
   if (!/\.tsx?$/.test(filePath)) return source;
+  // Dev only: packaged builds ship .js, so the pruned devDependency is never needed there.
+  // eslint-disable-next-line import/no-extraneous-dependencies
   const TypeScript = require('typescript');
   return TypeScript.transpileModule(source, {
     compilerOptions: CompilerOptions,
