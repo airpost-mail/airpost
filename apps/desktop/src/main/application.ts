@@ -121,8 +121,11 @@ export default class Application extends EventEmitter {
     registerFilesProtocol(configDirPath);
     registerMessageFrameProtocol(resourcePath);
 
-    // Dev and spec runs are Electron.app, whose bundle icon is Electron's; packaged builds use tern.icns.
-    if (process.platform === 'darwin' && (devMode || specMode)) {
+    // Spec runs stay out of the Dock and never take focus from the app the user is in.
+    if (process.platform === 'darwin' && specMode) {
+      app.setActivationPolicy('accessory');
+    } else if (process.platform === 'darwin' && devMode) {
+      // Dev runs are Electron.app, whose bundle icon is Electron's; packaged builds use tern.icns.
       app.dock?.setIcon(path.join(resourcePath, 'build', 'resources', 'mac', 'tern-dock.png'));
     }
 
