@@ -1,6 +1,6 @@
 import React from 'react';
 import { localized, DateUtils } from 'mailspring-exports';
-import { DatePickerPopover } from 'mailspring-component-kit';
+import { Button, DatePickerPopover } from 'mailspring-component-kit';
 
 const SendLaterOptions = {
   [localized('In 1 hour')]: DateUtils.in1Hour,
@@ -24,9 +24,9 @@ function SendLaterPopover(props: {
     footer = [
       <div key="divider-unschedule" className="divider" />,
       <div className="section" key="cancel-section">
-        <button className="btn btn-cancel" onClick={onCancelSendLater}>
+        <Button variant="outline" className="btn-cancel" onClick={onCancelSendLater}>
           {localized('Unschedule Send')}
-        </button>
+        </Button>
       </div>,
     ];
   }

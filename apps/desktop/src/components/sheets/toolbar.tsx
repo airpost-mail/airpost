@@ -12,6 +12,9 @@ import * as Utils from '../../data/models/utils';
 import { Disposable } from 'rx-core';
 import { isWaylandSession } from '../../platform/linux-desktop';
 import { SheetDepthContext } from './context';
+import { Button } from '../kit/button';
+import { IconButton } from '../kit/icon-button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../kit/tooltip';
 
 let Category = null;
 let FocusedPerspectiveStore = null;
@@ -92,15 +95,28 @@ class ToolbarBack extends React.Component<Record<string, unknown>, { categoryNam
     } else {
       title = this.state.categoryName;
     }
+    const label = localized(`Return to %@`, title);
     return (
-      <div className="item-back" onClick={this._onClick} title={localized(`Return to %@`, title)}>
-        <RetinaImg
-          name="sheet-back.png"
-          mode={RetinaImg.Mode.ContentIsMask}
-          style={isRTL ? { transform: `scaleX(-1)` } : {}}
-        />
-        <div className="item-back-title">{title}</div>
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* The trigger's own data-slot would replace the button's. */}
+          <Button
+            data-slot="button"
+            variant="ghost"
+            className="item-back"
+            aria-label={label}
+            onClick={this._onClick}
+          >
+            <RetinaImg
+              name="sheet-back.png"
+              mode={RetinaImg.Mode.ContentIsMask}
+              style={isRTL ? { transform: `scaleX(-1)` } : {}}
+            />
+            <div className="item-back-title">{title}</div>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     );
   }
 }
@@ -152,6 +168,7 @@ class ToolbarWindowControls extends React.Component<Record<string, unknown>, { a
         label={localized('Window Controls')}
         className={`toolbar-window-controls alt-${this.state.alt}`}
       >
+        {/* eslint-disable raw-controls -- the window's traffic lights are drawn by their own CSS */}
         <button
           tabIndex={-1}
           className="close"
@@ -170,6 +187,7 @@ class ToolbarWindowControls extends React.Component<Record<string, unknown>, { a
           aria-label={localized('Maximize window')}
           onClick={this._onMaximize}
         />
+        {/* eslint-enable raw-controls */}
       </RovingTabIndexToolbar>
     );
   }
@@ -198,37 +216,37 @@ class ToolbarMenuControl extends React.Component {
 
     return (
       <div className="toolbar-menu-control">
-        <button
-          tabIndex={0}
-          className="btn btn-toolbar"
-          aria-label={localized('Application menu')}
+        <IconButton
+          variant="toolbar"
+          label={localized('Application menu')}
+          icon="windows-menu-icon.png"
           onClick={this._onOpenMenu}
-        >
-          <RetinaImg
-            name="windows-menu-icon.png"
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </button>
+        />
       </div>
     );
   }
 }
 
+type ToolbarItem = typeof React.Component & { displayName?: string };
+
 // macOS and other platforms do not flip the corner that the window controls
 // appear in when displaying the UI RTL, but Chrome flips our whole UI. We need
 // to intentionally undo the flip.
-ComponentRegistry.register(ToolbarWindowControls, {
-  location: isRTL
-    ? WorkspaceStore.Sheet.Global.Toolbar.Right
-    : WorkspaceStore.Sheet.Global.Toolbar.Left,
-});
+const GLOBAL_START_ITEMS = [isRTL ? ToolbarMenuControl : ToolbarWindowControls] as ToolbarItem[];
+const GLOBAL_END_ITEMS = [isRTL ? ToolbarWindowControls : ToolbarMenuControl] as ToolbarItem[];
 
-ComponentRegistry.register(ToolbarMenuControl, {
-  location: isRTL
-    ? WorkspaceStore.Sheet.Global.Toolbar.Left
-    : WorkspaceStore.Sheet.Global.Toolbar.Right,
-});
+/* The items every sheet's toolbar starts and ends with: the window controls or menu button, then
+   what plugins register at Sheet.Global.Toolbar.Left and .Right. */
+function globalToolbarItems(side: 'start' | 'end', mode: string): ToolbarItem[] {
+  const location =
+    side === 'start'
+      ? WorkspaceStore.Sheet.Global.Toolbar.Left
+      : WorkspaceStore.Sheet.Global.Toolbar.Right;
+  return [
+    ...(side === 'start' ? GLOBAL_START_ITEMS : GLOBAL_END_ITEMS),
+    ...ComponentRegistry.findComponentsMatching({ location, mode }),
+  ];
+}
 
 /*
 Double-clicking a title bar zooms the window, as macOS does for native title bars. A frameless
@@ -299,14 +317,11 @@ export function SheetTitleBar({ side }: SheetTitleBarProps) {
   const components =
     side === 'start'
       ? [
-          ...find(WorkspaceStore.Sheet.Global.Toolbar.Left),
+          ...globalToolbarItems('start', mode),
           ...(sheet ? find(sheet.Toolbar.Left) : []),
           ...(depth > 0 ? [ToolbarBack] : []),
         ]
-      : [
-          ...(sheet ? find(sheet.Toolbar.Right) : []),
-          ...find(WorkspaceStore.Sheet.Global.Toolbar.Right),
-        ];
+      : [...(sheet ? find(sheet.Toolbar.Right) : []), ...globalToolbarItems('end', mode)];
 
   return (
     <div
@@ -468,25 +483,26 @@ export default class Toolbar extends React.Component<ToolbarProps, ToolbarState>
 
     // Add left items registered to the Sheet instead of to a Region
     if (state.columns.length > 0) {
-      for (const loc of [WorkspaceStore.Sheet.Global, props.data]) {
-        const entries = ComponentRegistry.findComponentsMatching({
-          location: loc.Toolbar.Left,
+      state.columns[0].push(...globalToolbarItems('start', state.mode));
+      state.columns[0].push(
+        ...ComponentRegistry.findComponentsMatching({
+          location: props.data.Toolbar.Left,
           mode: state.mode,
-        });
-        state.columns[0].push(...entries);
-      }
+        })
+      );
       if (props.depth > 0) {
         state.columns[0].push(ToolbarBack);
       }
 
       // Add right items registered to the Sheet instead of to a Region
-      for (const loc of [WorkspaceStore.Sheet.Global, props.data]) {
-        const entries = ComponentRegistry.findComponentsMatching({
-          location: loc.Toolbar.Right,
+      const last = state.columns[state.columns.length - 1];
+      last.push(...globalToolbarItems('end', state.mode));
+      last.push(
+        ...ComponentRegistry.findComponentsMatching({
+          location: props.data.Toolbar.Right,
           mode: state.mode,
-        });
-        state.columns[state.columns.length - 1].push(...entries);
-      }
+        })
+      );
 
       if (state.mode === 'popout') {
         state.columns[0].push(WindowTitle);

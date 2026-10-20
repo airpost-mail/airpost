@@ -6,6 +6,7 @@ import {
 } from 'mailspring-component-kit';
 
 import DraftListStore from './store';
+import { DraftDeleteButton } from './toolbar-buttons';
 import { Message } from 'mailspring-exports';
 
 function getObservable() {
@@ -30,12 +31,14 @@ class DraftListToolbar extends Component<{ items: Message[] }> {
     const { selection } = DraftListStore.dataSource();
     const { items } = this.props;
 
-    // Keep all of the exposed props from deprecated regions that now map to this one
+    // The delete button is built in; the role stays for plugins' buttons.
     const toolbarElement = (
       <InjectedComponentSet
         matching={{ role: 'DraftActionsToolbarButton' }}
         exposedProps={{ selection, items }}
-      />
+      >
+        <DraftDeleteButton selection={selection} />
+      </InjectedComponentSet>
     );
 
     return (

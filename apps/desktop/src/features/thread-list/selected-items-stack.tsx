@@ -2,6 +2,7 @@ import _ from 'underscore';
 import React, { Component } from 'react';
 import { ListensToObservable } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
+import { Button } from '../../components/kit/button';
 import ThreadListStore from './store';
 
 function getObservable() {
@@ -61,9 +62,9 @@ class SelectedItemsStack extends Component<{ selectionCount: number }> {
           <div className="count-info">
             <div className="count">{selectionCount}</div>
             <div className="count-message">{localized('Selected Messages')}</div>
-            <div className="clear btn" onClick={this.onClearSelection}>
+            <Button variant="outline" className="clear" onClick={this.onClearSelection}>
               {localized('Clear Selection')}
-            </div>
+            </Button>
           </div>
         </div>
       </div>

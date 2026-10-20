@@ -1,6 +1,6 @@
 import React from 'react';
-import { RetinaImg } from 'mailspring-component-kit';
 import { localized, Actions } from 'mailspring-exports';
+import { IconButton } from '../../components/kit/icon-button';
 
 export class DraftDeleteButton extends React.Component<{ selection: any }> {
   static displayName = 'DraftDeleteButton';
@@ -8,19 +8,13 @@ export class DraftDeleteButton extends React.Component<{ selection: any }> {
 
   render() {
     return (
-      <button
+      <IconButton
+        variant="toolbar"
         style={{ order: -100 }}
-        className="btn btn-toolbar"
-        title={localized('Delete')}
-        aria-label={localized('Delete')}
+        label={localized('Delete')}
+        icon="icon-composer-trash.png"
         onClick={this._onDestroySelected}
-      >
-        <RetinaImg
-          name="icon-composer-trash.png"
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-      </button>
+      />
     );
   }
 

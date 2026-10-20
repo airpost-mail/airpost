@@ -1,12 +1,13 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
+import classNames from 'classnames';
 import { localized, Actions, DatabaseStore, Message, Thread } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { IconButton } from 'mailspring-component-kit';
 import SendRemindersPopover from './popover';
 import { updateReminderMetadata, reminderDateFor } from './utils';
 
 export default class SendRemindersPopoverButton extends Component<{
-  className: string;
+  className?: string;
   thread: Thread;
   direction: string;
   getBoundingClientRect: (me: SendRemindersPopoverButton) => ClientRect;
@@ -15,7 +16,6 @@ export default class SendRemindersPopoverButton extends Component<{
 
   static defaultProps = {
     direction: 'down',
-    className: 'btn btn-toolbar',
     getBoundingClientRect: (inst) =>
       (ReactDOM.findDOMNode(inst) as HTMLElement).getBoundingClientRect(),
   };
@@ -62,15 +62,15 @@ export default class SendRemindersPopoverButton extends Component<{
     const reminderDate = reminderDateFor(thread);
     const title = reminderDate ? localized('Edit Reminder') : localized('Set Reminder');
     return (
-      <button
-        title={title}
+      <IconButton
+        variant="toolbar"
         tabIndex={-1}
-        className={`send-reminders-toolbar-button ${className}`}
+        label={title}
+        icon="ic-toolbar-native-reminder.png"
+        className={classNames('send-reminders-toolbar-button', className)}
         style={{ order: -109 }}
         onClick={this.onClick}
-      >
-        <RetinaImg name="ic-toolbar-native-reminder.png" mode={RetinaImg.Mode.ContentIsMask} />
-      </button>
+      />
     );
   }
 }

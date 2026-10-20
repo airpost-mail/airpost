@@ -16,6 +16,7 @@ import {
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
 import { Categories } from 'mailspring-observables';
+import { TextField } from '../../components/kit/text-field';
 import { CategoryData } from './types';
 
 interface MovePickerPopoverProps {
@@ -252,8 +253,7 @@ export default class MovePickerPopover extends Component<
 
   render() {
     const headerComponents = [
-      <input
-        type="text"
+      <TextField
         autoFocus
         key="textfield"
         className="search"

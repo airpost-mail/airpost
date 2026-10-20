@@ -1,6 +1,6 @@
 import { localized, WorkspaceStore, Actions } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
 import React from 'react';
+import { IconButton } from '../../components/kit/icon-button';
 
 export default class ModeToggle extends React.Component<
   Record<string, unknown>,
@@ -54,20 +54,16 @@ export default class ModeToggle extends React.Component<
   };
 
   render() {
+    const label = this.state.hidden ? localized('Show Sidebar') : localized('Hide Sidebar');
     return (
-      <button
-        className={`btn btn-toolbar mode-toggle mode-${this.state.hidden}`}
+      <IconButton
+        variant="toolbar"
+        className={`mode-toggle mode-${this.state.hidden}`}
         style={{ order: 500 }}
-        title={this.state.hidden ? localized('Show Sidebar') : localized('Hide Sidebar')}
-        aria-label={this.state.hidden ? localized('Show Sidebar') : localized('Hide Sidebar')}
+        label={label}
+        icon="toolbar-person-sidebar.png"
         onClick={this._onToggleMode}
-      >
-        <RetinaImg
-          name="toolbar-person-sidebar.png"
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-      </button>
+      />
     );
   }
 }

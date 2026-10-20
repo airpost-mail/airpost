@@ -6,6 +6,44 @@ import {
   TaskFactory,
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
+import { Button } from '../../components/kit/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/kit/tooltip';
+import { ownKeys } from '../../components/kit/keys';
+
+// Space and Enter click the row's buttons and don't also reach the keymap.
+const ownClickKeys = ownKeys([' ', 'Enter']);
+
+/* A hover action on a thread row. The icon is the `action-<name>` class's background image, which
+   themes and plugins (thread-snooze's `action-snooze`) style. */
+function ThreadQuickActionButton({
+  name,
+  label,
+  order,
+  onClick,
+}: {
+  name: string;
+  label: string;
+  order?: number;
+  onClick: (event: React.MouseEvent) => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* The trigger's own data-slot would replace the button's. */}
+        <Button
+          data-slot="button"
+          variant="outline"
+          aria-label={label}
+          style={{ order }}
+          className={`action action-${name}`}
+          onClick={onClick}
+          onKeyDown={ownClickKeys}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 const sameThreadId = (prev: { thread: Thread }, next: { thread: Thread }) =>
   prev.thread.id === next.thread.id;
@@ -16,7 +54,7 @@ export const ThreadArchiveQuickAction: React.FC<{ thread: Thread }> = React.memo
     return <span />;
   }
 
-  const onArchive = (event: React.MouseEvent | React.KeyboardEvent) => {
+  const onArchive = (event: React.MouseEvent) => {
     const tasks = TaskFactory.tasksForArchiving({
       source: 'Quick Actions: Thread List',
       threads: [thread],
@@ -27,21 +65,11 @@ export const ThreadArchiveQuickAction: React.FC<{ thread: Thread }> = React.memo
   };
 
   return (
-    <div
-      key="archive"
-      role="button"
-      tabIndex={0}
-      title={localized('Archive')}
-      aria-label={localized('Archive')}
-      style={{ order: 100 }}
-      className="btn action action-archive"
+    <ThreadQuickActionButton
+      name="archive"
+      label={localized('Archive')}
+      order={100}
       onClick={onArchive}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onArchive(e);
-        }
-      }}
     />
   );
 }, sameThreadId);
@@ -53,7 +81,7 @@ export const ThreadTrashQuickAction: React.FC<{ thread: Thread }> = React.memo((
     return <span />;
   }
 
-  const onRemove = (event: React.MouseEvent | React.KeyboardEvent) => {
+  const onRemove = (event: React.MouseEvent) => {
     const tasks = TaskFactory.tasksForMovingToTrash({
       source: 'Quick Actions: Thread List',
       threads: [thread],
@@ -63,21 +91,11 @@ export const ThreadTrashQuickAction: React.FC<{ thread: Thread }> = React.memo((
   };
 
   return (
-    <div
-      key="remove"
-      role="button"
-      tabIndex={0}
-      title={localized('Trash')}
-      aria-label={localized('Trash')}
-      style={{ order: 110 }}
-      className="btn action action-trash"
+    <ThreadQuickActionButton
+      name="trash"
+      label={localized('Trash')}
+      order={110}
       onClick={onRemove}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onRemove(e);
-        }
-      }}
     />
   );
 }, sameThreadId);

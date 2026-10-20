@@ -1,7 +1,13 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
 import { localized, Actions, Message, DraftEditingSession } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import {
+  Button,
+  RetinaImg,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from 'mailspring-component-kit';
 import moment from 'moment';
 
 import SendRemindersPopover from './popover';
@@ -66,33 +72,52 @@ export default class SendRemindersComposerButton extends Component<
   };
 
   render() {
-    let className = 'btn btn-toolbar btn-send-reminder';
+    let className = 'btn-send-reminder';
+    let label: string;
+    let content: React.ReactNode;
 
     if (this.state.saving) {
-      return (
-        <button className={className} title={localized('Saving reminder...')} tabIndex={-1}>
-          <RetinaImg
-            name="inline-loading-spinner.gif"
-            mode={RetinaImg.Mode.ContentDark}
-            style={{ width: 14, height: 14 }}
-          />
-        </button>
+      label = localized('Saving reminder...');
+      content = (
+        <RetinaImg
+          name="inline-loading-spinner.gif"
+          mode={RetinaImg.Mode.ContentDark}
+          style={{ width: 14, height: 14 }}
+        />
+      );
+    } else {
+      const reminderDate = reminderDateFor(this.props.draft);
+      label = localized('Set Reminder');
+      if (reminderDate) {
+        className += ' btn-enabled';
+        label = localized(`Reminder set for %@ from now`, moment(reminderDate).fromNow(true));
+      }
+      content = (
+        <>
+          <RetinaImg name="icon-composer-reminders.png" mode={RetinaImg.Mode.ContentIsMask} />
+          <span>&nbsp;</span>
+          <RetinaImg name="icon-composer-dropdown.png" mode={RetinaImg.Mode.ContentIsMask} />
+        </>
       );
     }
 
-    const reminderDate = reminderDateFor(this.props.draft);
-    let reminderLabel = localized('Set Reminder');
-    if (reminderDate) {
-      className += ' btn-enabled';
-      reminderLabel = localized(`Reminder set for %@ from now`, moment(reminderDate).fromNow(true));
-    }
-
     return (
-      <button tabIndex={-1} className={className} title={reminderLabel} onClick={this.onClick}>
-        <RetinaImg name="icon-composer-reminders.png" mode={RetinaImg.Mode.ContentIsMask} />
-        <span>&nbsp;</span>
-        <RetinaImg name="icon-composer-dropdown.png" mode={RetinaImg.Mode.ContentIsMask} />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* The trigger's own data-slot would replace the button's. */}
+          <Button
+            data-slot="button"
+            variant="toolbar"
+            tabIndex={-1}
+            className={className}
+            aria-label={label}
+            onClick={this.state.saving ? undefined : this.onClick}
+          >
+            {content}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     );
   }
 }

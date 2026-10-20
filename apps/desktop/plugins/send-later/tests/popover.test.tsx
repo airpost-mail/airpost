@@ -24,7 +24,9 @@ describe('SendLaterPopover', function sendLaterPopover() {
     it('renders cancel button if scheduled', () => {
       const onCancelSendLater = jasmine.createSpy('onCancelSendLater');
       const container = makePopover({ onCancelSendLater, sendLaterDate: new Date() });
-      fireEvent.click(container.querySelector('.btn-cancel'));
+      const button = container.querySelector('.btn-cancel');
+      expect(button.getAttribute('data-slot')).toBe('button');
+      fireEvent.click(button);
       expect(onCancelSendLater).toHaveBeenCalled();
     });
   });

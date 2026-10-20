@@ -8,7 +8,13 @@ import {
   DraftEditingSession,
   SendActionsStore,
 } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import {
+  Button,
+  RetinaImg,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from 'mailspring-component-kit';
 
 import SendLaterPopover from './popover';
 import { PLUGIN_ID } from './constants';
@@ -111,53 +117,64 @@ class SendLaterButton extends Component<SendLaterButtonProps, SendLaterButtonSta
   };
 
   render() {
-    let className = 'btn btn-toolbar btn-send-later';
+    let className = 'btn-send-later';
+    let label: string;
+    let content: React.ReactNode;
 
     if (this.state.saving) {
-      return (
-        <button
-          className={className}
-          title={localized('Saving send date...')}
-          tabIndex={-1}
-          style={{ order: -99 }}
-        >
-          <RetinaImg
-            name="inline-loading-spinner.gif"
-            mode={RetinaImg.Mode.ContentDark}
-            style={{ width: 14, height: 14 }}
-          />
-        </button>
+      label = localized('Saving send date...');
+      content = (
+        <RetinaImg
+          name="inline-loading-spinner.gif"
+          mode={RetinaImg.Mode.ContentDark}
+          style={{ width: 14, height: 14 }}
+        />
+      );
+    } else {
+      label = localized('Send Later') + '…';
+      let sendLaterLabel: JSX.Element = null;
+      const sendLaterDate = sendLaterDateForDraft(this.props.draft);
+
+      if (sendLaterDate) {
+        className += ' btn-enabled';
+        if (sendLaterDate > new Date()) {
+          sendLaterLabel = (
+            <span className="at">
+              {localized('Sending in %@', moment(sendLaterDate).fromNow(true))}
+            </span>
+          );
+        } else {
+          sendLaterLabel = <span className="at">{localized('Sending now')}</span>;
+        }
+      }
+      content = (
+        <>
+          <RetinaImg name="icon-composer-sendlater.png" mode={RetinaImg.Mode.ContentIsMask} />
+          {sendLaterLabel}
+          <span>&nbsp;</span>
+          <RetinaImg name="icon-composer-dropdown.png" mode={RetinaImg.Mode.ContentIsMask} />
+        </>
       );
     }
 
-    let sendLaterLabel: JSX.Element = null;
-    const sendLaterDate = sendLaterDateForDraft(this.props.draft);
-
-    if (sendLaterDate) {
-      className += ' btn-enabled';
-      if (sendLaterDate > new Date()) {
-        sendLaterLabel = (
-          <span className="at">
-            {localized('Sending in %@', moment(sendLaterDate).fromNow(true))}
-          </span>
-        );
-      } else {
-        sendLaterLabel = <span className="at">{localized('Sending now')}</span>;
-      }
-    }
     return (
-      <button
-        className={className}
-        title={localized('Send Later') + '…'}
-        onClick={this.onClick}
-        tabIndex={-1}
-        style={{ order: -99 }}
-      >
-        <RetinaImg name="icon-composer-sendlater.png" mode={RetinaImg.Mode.ContentIsMask} />
-        {sendLaterLabel}
-        <span>&nbsp;</span>
-        <RetinaImg name="icon-composer-dropdown.png" mode={RetinaImg.Mode.ContentIsMask} />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* The trigger's own data-slot would replace the button's. */}
+          <Button
+            data-slot="button"
+            variant="toolbar"
+            className={className}
+            aria-label={label}
+            onClick={this.state.saving ? undefined : this.onClick}
+            tabIndex={-1}
+            style={{ order: -99 }}
+          >
+            {content}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     );
   }
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import classNames from 'classnames';
-import { RetinaImg, BindGlobalCommands, RovingTabIndexToolbar } from 'mailspring-component-kit';
+import { BindGlobalCommands, RovingTabIndexToolbar } from 'mailspring-component-kit';
 import {
   localized,
   Actions,
@@ -12,6 +12,8 @@ import {
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
 
+import { IconButton } from '../../components/kit/icon-button';
+import { ownKeys } from '../../components/kit/keys';
 import ThreadListStore from './store';
 
 export class ArchiveButton extends React.Component<{ items: Thread[] }> {
@@ -40,19 +42,13 @@ export class ArchiveButton extends React.Component<{ items: Thread[] }> {
 
     return (
       <BindGlobalCommands commands={{ 'core:archive-item': () => this._onArchive() }}>
-        <button
+        <IconButton
+          variant="toolbar"
           tabIndex={-1}
-          className="btn btn-toolbar"
-          title={localized('Archive')}
-          aria-label={localized('Archive')}
+          label={localized('Archive')}
+          icon="toolbar-archive.png"
           onClick={this._onArchive}
-        >
-          <RetinaImg
-            name="toolbar-archive.png"
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </button>
+        />
       </BindGlobalCommands>
     );
   }
@@ -83,19 +79,13 @@ export class TrashButton extends React.Component<{ items: Thread[] }> {
 
     return (
       <BindGlobalCommands commands={{ 'core:delete-item': () => this._onRemove() }}>
-        <button
+        <IconButton
+          variant="toolbar"
           tabIndex={-1}
-          className="btn btn-toolbar"
-          title={localized('Move to Trash')}
-          aria-label={localized('Move to Trash')}
+          label={localized('Move to Trash')}
+          icon="toolbar-trash.png"
           onClick={this._onRemove}
-        >
-          <RetinaImg
-            name="toolbar-trash.png"
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </button>
+        />
       </BindGlobalCommands>
     );
   }
@@ -230,19 +220,13 @@ export class MarkAsSpamButton extends React.Component<{ items: Thread[] }> {
           key="not-spam"
           commands={{ 'core:report-not-spam': () => this._onNotSpam() }}
         >
-          <button
+          <IconButton
+            variant="toolbar"
             tabIndex={-1}
-            className="btn btn-toolbar"
-            title={localized('Not Spam')}
-            aria-label={localized('Not Spam')}
+            label={localized('Not Spam')}
+            icon="toolbar-not-spam.png"
             onClick={this._onNotSpam}
-          >
-            <RetinaImg
-              name="toolbar-not-spam.png"
-              mode={RetinaImg.Mode.ContentIsMask}
-              aria-hidden="true"
-            />
-          </button>
+          />
         </BindGlobalCommands>
       );
     }
@@ -256,19 +240,13 @@ export class MarkAsSpamButton extends React.Component<{ items: Thread[] }> {
         key="spam"
         commands={{ 'core:report-as-spam': () => this._onMarkAsSpam() }}
       >
-        <button
+        <IconButton
+          variant="toolbar"
           tabIndex={-1}
-          className="btn btn-toolbar"
-          title={localized('Mark as Spam')}
-          aria-label={localized('Mark as Spam')}
+          label={localized('Mark as Spam')}
+          icon="toolbar-spam.png"
           onClick={this._onMarkAsSpam}
-        >
-          <RetinaImg
-            name="toolbar-spam.png"
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </button>
+        />
       </BindGlobalCommands>
     );
   }
@@ -298,15 +276,13 @@ export class ToggleStarredButton extends React.Component<{ items: Thread[] }> {
 
     return (
       <BindGlobalCommands commands={{ 'core:star-item': () => this._onStar() }}>
-        <button
+        <IconButton
+          variant="toolbar"
           tabIndex={-1}
-          className="btn btn-toolbar"
-          title={title}
-          aria-label={title}
+          label={title}
+          icon={imageName}
           onClick={this._onStar}
-        >
-          <RetinaImg name={imageName} mode={RetinaImg.Mode.ContentIsMask} aria-hidden="true" />
-        </button>
+        />
       </BindGlobalCommands>
     );
   }
@@ -349,23 +325,20 @@ export class ToggleUnreadButton extends React.Component<{ items: Thread[] }> {
             : { 'core:mark-as-read': () => this._onChangeUnread(false) }
         }
       >
-        <button
+        <IconButton
+          variant="toolbar"
           tabIndex={-1}
-          className="btn btn-toolbar"
-          title={label}
-          aria-label={label}
+          label={label}
+          icon={`toolbar-markas${key}.png`}
           onClick={this._onClick}
-        >
-          <RetinaImg
-            name={`toolbar-markas${key}.png`}
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </button>
+        />
       </BindGlobalCommands>
     );
   }
 }
+
+// Space and Enter click the arrows and don't also reach the keymap.
+const ownClickKeys = ownKeys([' ', 'Enter']);
 
 interface ThreadArrowButtonState {
   disabled: boolean;
@@ -397,19 +370,11 @@ class ThreadArrowButton extends React.Component<
     this._unsubscribe_focus();
   }
 
-  _onClick = (e?: React.KeyboardEvent | React.MouseEvent) => {
+  _onClick = () => {
     if (this.state.disabled) {
       return;
     }
     AppEnv.commands.dispatch(this.props.command);
-    return;
-  };
-
-  _onKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.key === 'Enter' || e.key === ' ') && !this.state.disabled) {
-      e.preventDefault();
-      this._onClick(e);
-    }
   };
 
   _onStoreChange = () => {
@@ -419,29 +384,15 @@ class ThreadArrowButton extends React.Component<
   render() {
     const { direction, title } = this.props;
     const { disabled } = this.state;
-    const classes = classNames({
-      'btn-icon': true,
-      'message-toolbar-arrow': true,
-      disabled: disabled,
-    });
-
     return (
-      <div
-        className={`${classes} ${direction}`}
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        aria-label={title}
-        aria-disabled={disabled}
+      <IconButton
+        className={classNames('message-toolbar-arrow', direction, { disabled })}
+        disabled={disabled}
+        label={title}
+        icon={`toolbar-${direction}-arrow.png`}
         onClick={this._onClick}
-        onKeyDown={this._onKeyDown}
-        title={title}
-      >
-        <RetinaImg
-          name={`toolbar-${direction}-arrow.png`}
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-      </div>
+        onKeyDown={ownClickKeys}
+      />
     );
   }
 }

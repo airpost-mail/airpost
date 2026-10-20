@@ -1,5 +1,6 @@
 import React from 'react';
 import { localized } from 'mailspring-exports';
+import { Button } from '../../components/kit/button';
 import DraftListStore from './store';
 
 const MAX_CARDS = 5;
@@ -29,9 +30,13 @@ export default function DraftSelectedItemsStack({ selectionCount }: { selectionC
         <div className="count-info">
           <div className="count">{selectionCount}</div>
           <div className="count-message">{localized('Selected Drafts')}</div>
-          <div className="clear btn" onClick={() => DraftListStore.dataSource().selection.clear()}>
+          <Button
+            variant="outline"
+            className="clear"
+            onClick={() => DraftListStore.dataSource().selection.clear()}
+          >
             {localized('Clear Selection')}
-          </div>
+          </Button>
         </div>
       </div>
     </div>

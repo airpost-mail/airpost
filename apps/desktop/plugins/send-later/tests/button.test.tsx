@@ -78,7 +78,7 @@ xdescribe('SendLaterButton', function sendLaterButton() {
   describe('render', () => {
     it('renders spinner if saving', () => {
       const button = ReactDOM.findDOMNode(makeButton({ saving: true }, null)) as HTMLElement;
-      expect(button.title).toEqual('Saving send date...');
+      expect(button.getAttribute('aria-label')).toEqual('Saving send date...');
     });
 
     it('renders date if message is scheduled', () => {

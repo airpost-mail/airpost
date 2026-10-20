@@ -1,6 +1,6 @@
 import React from 'react';
 import moment from 'moment';
-import { RetinaImg } from 'mailspring-component-kit';
+import { Button, RetinaImg } from 'mailspring-component-kit';
 import { localized, DateUtils, Thread, Message } from 'mailspring-exports';
 
 import { updateReminderMetadata } from './utils';
@@ -60,9 +60,9 @@ export function ScheduledReminderThreadHeader({
       <span className="reminder-date">
         {` ${moment(metadata.expiration).format(DateUtils.DATE_FORMAT_LONG_NO_YEAR)}`}
       </span>
-      <span className="clear-reminder" onClick={onClearReminder}>
+      <Button variant="link" className="clear-reminder" onClick={onClearReminder}>
         {localized('Cancel')}
-      </span>
+      </Button>
     </div>
   );
 }

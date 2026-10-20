@@ -9,6 +9,7 @@ import {
   FocusedPerspectiveStore,
   ThreadCountsStore,
 } from 'mailspring-exports';
+import { Button } from '../../components/kit/button';
 
 interface ThreadListEmptyFolderBarProps {
   role: string;
@@ -49,17 +50,17 @@ class ThreadListEmptyFolderBar extends React.Component<ThreadListEmptyFolderBarP
             : localized(`Showing 1 thread with %@ messages`, term)}
         </div>
         {busy ? (
-          <div className="btn">
+          <Button variant="outline" disabled>
             <RetinaImg
               style={{ width: 16, height: 16 }}
               name="inline-loading-spinner.gif"
               mode={RetinaImg.Mode.ContentPreserve}
             />
-          </div>
+          </Button>
         ) : (
-          <div className="btn" onClick={this._onClick}>
+          <Button variant="outline" onClick={this._onClick}>
             {localized(`Empty %@ now`, role)}
-          </div>
+          </Button>
         )}
       </div>
     );

@@ -1,7 +1,7 @@
 import React from 'react';
 import moment from 'moment';
 import { localized, DateUtils } from 'mailspring-exports';
-import { DatePickerPopover } from 'mailspring-component-kit';
+import { Button, DatePickerPopover } from 'mailspring-component-kit';
 
 const SendRemindersOptions = {
   [localized('In 3 Hours')]: () => DateUtils.minutesFromNow(180),
@@ -34,9 +34,9 @@ function SendRemindersPopover(props: {
             </span>
           </span>
         </div>
-        <button className="btn btn-cancel" onClick={onCancelReminder}>
+        <Button variant="outline" className="btn-cancel" onClick={onCancelReminder}>
           {localized('Clear reminder')}
-        </button>
+        </Button>
       </div>
     );
   }

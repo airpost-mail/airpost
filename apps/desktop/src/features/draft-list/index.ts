@@ -3,7 +3,6 @@ import DraftList from './draft-list';
 import DraftListToolbar from './toolbar';
 import DraftListSendStatus from './send-status';
 import DraftPreview from './preview';
-import { DraftDeleteButton } from './toolbar-buttons';
 
 export function activate() {
   WorkspaceStore.defineSheet(
@@ -28,7 +27,6 @@ export function activate() {
     location: WorkspaceStore.Location.DraftList.Toolbar,
   });
   ComponentRegistry.register(DraftPreview, { location: WorkspaceStore.Location.DraftPreview });
-  ComponentRegistry.register(DraftDeleteButton, { role: 'DraftActionsToolbarButton' });
   ComponentRegistry.register(DraftListSendStatus, { role: 'DraftList:DraftStatus' });
 }
 
@@ -36,6 +34,5 @@ export function deactivate() {
   ComponentRegistry.unregister(DraftList);
   ComponentRegistry.unregister(DraftListToolbar);
   ComponentRegistry.unregister(DraftPreview);
-  ComponentRegistry.unregister(DraftDeleteButton);
   ComponentRegistry.unregister(DraftListSendStatus);
 }

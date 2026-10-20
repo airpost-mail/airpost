@@ -1,7 +1,15 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
-import { Actions, FocusedPerspectiveStore, Thread } from 'mailspring-exports';
-import { RetinaImg, BindGlobalCommands, RovingTabIndexToolbar } from 'mailspring-component-kit';
+import { localized, Actions, FocusedPerspectiveStore, Thread } from 'mailspring-exports';
+import {
+  BindGlobalCommands,
+  Button,
+  IconButton,
+  RovingTabIndexToolbar,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from 'mailspring-component-kit';
 import SnoozePopover from './popover';
 
 interface BoundingRect {
@@ -14,18 +22,18 @@ interface BoundingRect {
 }
 
 interface SnoozeButtonProps {
-  className: string;
   threads: Thread[];
   direction: string;
-  shouldRenderIconImg: boolean;
+  /** `toolbar` is the toolbar's icon button; `quick-action` is the thread row's hover action,
+   * whose icon is the `action-snooze` class's background image. */
+  variant: 'toolbar' | 'quick-action';
   getBoundingClientRect: (inst?: any) => BoundingRect;
 }
 
 class SnoozeButton extends Component<SnoozeButtonProps> {
   static defaultProps = {
-    className: 'btn btn-toolbar',
     direction: 'down',
-    shouldRenderIconImg: true,
+    variant: 'toolbar',
     getBoundingClientRect: (inst) =>
       (ReactDOM.findDOMNode(inst) as HTMLElement).getBoundingClientRect(),
   };
@@ -43,17 +51,33 @@ class SnoozeButton extends Component<SnoozeButtonProps> {
   };
 
   render() {
+    const label = localized('Snooze');
+    if (this.props.variant === 'quick-action') {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {/* The trigger's own data-slot would replace the button's. */}
+            <Button
+              data-slot="button"
+              variant="outline"
+              aria-label={label}
+              className="snooze-button action action-snooze"
+              onClick={this.onClick}
+            />
+          </TooltipTrigger>
+          <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+      );
+    }
     return (
-      <button
-        title="Snooze"
+      <IconButton
+        variant="toolbar"
         tabIndex={-1}
-        className={`snooze-button ${this.props.className}`}
+        label={label}
+        icon="toolbar-snooze.png"
+        className="snooze-button"
         onClick={this.onClick}
-      >
-        {this.props.shouldRenderIconImg ? (
-          <RetinaImg name="toolbar-snooze.png" mode={RetinaImg.Mode.ContentIsMask} />
-        ) : null}
-      </button>
+      />
     );
   }
 }
@@ -81,8 +105,7 @@ export class QuickActionSnooze extends Component<{ thread: Thread }> {
       <SnoozeButton
         direction="left"
         threads={[this.props.thread]}
-        className="btn action action-snooze"
-        shouldRenderIconImg={false}
+        variant="quick-action"
         getBoundingClientRect={this.getBoundingClientRect}
       />
     );

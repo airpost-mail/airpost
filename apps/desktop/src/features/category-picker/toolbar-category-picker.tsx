@@ -7,7 +7,8 @@ import {
   SheetDepthContext,
   Thread,
 } from 'mailspring-exports';
-import { RetinaImg, KeyCommandsRegion, RovingTabIndexToolbar } from 'mailspring-component-kit';
+import { KeyCommandsRegion, RovingTabIndexToolbar } from 'mailspring-component-kit';
+import { IconButton } from '../../components/kit/icon-button';
 
 import MovePickerPopover from './move-picker-popover';
 import LabelPickerPopover from './label-picker-popover';
@@ -59,35 +60,25 @@ const MovePicker: React.FC<{ items: Thread[] }> & { containerRequired?: boolean 
       style={{ order: -103 }}
     >
       <KeyCommandsRegion globalHandlers={handlers}>
-        <button
+        <IconButton
+          variant="toolbar"
           tabIndex={-1}
           ref={moveEl}
-          title={localized('Move to Folder')}
-          aria-label={localized('Move to Folder')}
+          label={localized('Move to Folder')}
+          icon="toolbar-movetofolder.png"
           onClick={onOpenMovePopover}
-          className={'btn btn-toolbar btn-category-picker'}
-        >
-          <RetinaImg
-            name={'toolbar-movetofolder.png'}
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </button>
+          className="btn-category-picker"
+        />
         {account.usesLabels() && (
-          <button
+          <IconButton
+            variant="toolbar"
             tabIndex={-1}
             ref={labelEl}
-            title={localized('Apply Label')}
-            aria-label={localized('Apply Label')}
+            label={localized('Apply Label')}
+            icon="toolbar-tag.png"
             onClick={onOpenLabelsPopover}
-            className={'btn btn-toolbar btn-category-picker'}
-          >
-            <RetinaImg
-              name={'toolbar-tag.png'}
-              mode={RetinaImg.Mode.ContentIsMask}
-              aria-hidden="true"
-            />
-          </button>
+            className="btn-category-picker"
+          />
         )}
       </KeyCommandsRegion>
     </RovingTabIndexToolbar>

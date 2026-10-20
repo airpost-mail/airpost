@@ -2,6 +2,8 @@ import React from 'react';
 import { InjectedComponentSet } from 'mailspring-component-kit';
 import { WorkspaceStore } from 'mailspring-exports';
 import { ResizableRegion, ResizableHandle } from '../../components/resizable-region';
+import { Flexbox } from '../../components/flexbox';
+import ThreadList from './thread-list';
 
 class ThreadListVertical extends React.Component<
   Record<string, unknown>,
@@ -21,7 +23,9 @@ class ThreadListVertical extends React.Component<
           handle={ResizableHandle.Bottom}
           onResize={(h) => this._onResize(h)}
         >
-          <InjectedComponentSet matching={{ role: 'ThreadList' }} />
+          <Flexbox direction="row">
+            <ThreadList />
+          </Flexbox>
         </ResizableRegion>
         <div style={{ flex: '1 1 0%' }}>
           <div className="thread-list-vertical">

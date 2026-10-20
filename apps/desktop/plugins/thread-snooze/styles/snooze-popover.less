@@ -23,11 +23,19 @@
       flex-direction: column;
       align-items: center;
 
+      // Kit ghost buttons (docs/desktop/ui-kit.md 6.1) laid out as tiles.
+      height: auto;
+      gap: 0;
       padding: 15px 0;
+      border: 0;
+      border-radius: 0;
       cursor: default;
       width: 105px;
+      font-size: inherit;
+      font-weight: inherit;
       line-height: initial;
       text-align: initial;
+      white-space: normal;
 
       img {
         background-color: color-mix(in srgb, @btn-default-text-color 80%, transparent);

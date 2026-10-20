@@ -243,6 +243,17 @@ body.is-blurred {
   .btn-toolbar:only-of-type {
     margin-right: 6px;
   }
+  // Kit toolbar icon buttons (docs/desktop/ui-kit.md 6.2) render .btn-toolbar and take the bar's
+  // button shape from the rules here, so they give up the kit's square size and border.
+  [data-slot='icon-button'].btn-toolbar {
+    width: auto;
+    padding: 0 13px;
+    border-color: transparent;
+  }
+  // Other kit buttons (the back button, the thread arrows) have a fixed height; centre them.
+  .item-container > :is([data-slot='button'], [data-slot='icon-button']):not(.btn-toolbar) {
+    align-self: center;
+  }
   // :where() keeps these at the specificity of the two rules above; they win by order.
   :where(.toolbar-RootSidebar, .toolbar-CalendarSidebar) .btn-toolbar {
     img.content-mask {

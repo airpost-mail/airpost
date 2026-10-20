@@ -13,6 +13,7 @@ import {
   Thread,
 } from 'mailspring-exports';
 import { Categories } from 'mailspring-observables';
+import { TextField } from '../../components/kit/text-field';
 import { CategoryData } from './types';
 
 interface LabelPickerPopoverProps {
@@ -239,8 +240,7 @@ export default class LabelPickerPopover extends Component<
 
   render() {
     const headerComponents = [
-      <input
-        type="text"
+      <TextField
         autoFocus
         key="textfield"
         className="search"

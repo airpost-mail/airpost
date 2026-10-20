@@ -9,7 +9,7 @@ import {
   TaskQueue,
   SendDraftTask,
 } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { IconButton, RetinaImg } from 'mailspring-component-kit';
 import { PLUGIN_ID } from './constants';
 
 const { DATE_FORMAT_SHORT } = DateUtils;
@@ -85,11 +85,11 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
       return (
         <div className="send-later-status send-later-error" title={metadata.error}>
           <span className="time">{localized('Not sent: %@', metadata.error)}</span>
-          <RetinaImg
-            name="image-cancel-button.png"
-            title={localized('Dismiss')}
-            onClick={this.onCancelSendLater}
+          <IconButton
+            icon="image-cancel-button.png"
             mode={RetinaImg.Mode.ContentPreserve}
+            label={localized('Dismiss')}
+            onClick={this.onCancelSendLater}
           />
         </div>
       );
@@ -116,11 +116,11 @@ export default class SendLaterStatus extends Component<SendLaterStatusProps, Sen
     return (
       <div className="send-later-status">
         <span className="time">{label}</span>
-        <RetinaImg
-          name="image-cancel-button.png"
-          title={localized('Cancel Send Later')}
-          onClick={this.onCancelSendLater}
+        <IconButton
+          icon="image-cancel-button.png"
           mode={RetinaImg.Mode.ContentPreserve}
+          label={localized('Cancel Send Later')}
+          onClick={this.onCancelSendLater}
         />
       </div>
     );

@@ -8,6 +8,7 @@ import {
   TaskFactory,
   MailboxPerspective,
   FocusedPerspectiveStore,
+  FocusedContentStore,
   Folder,
 } from 'mailspring-exports';
 import {
@@ -15,7 +16,9 @@ import {
   ToggleStarredButton,
   ToggleUnreadButton,
   MarkAsSpamButton,
+  DownButton,
 } from '../../src/features/thread-list/toolbar-buttons';
+import ThreadListStore from '../../src/features/thread-list/store';
 
 const test_thread = new Thread({}).fromJSON({
   id: 'thread_12345',
@@ -37,6 +40,39 @@ describe('ThreadToolbarButtons', function () {
     spyOn(Actions, 'queueTasks');
     spyOn(TaskFactory, 'taskForInvertingStarred').andCallThrough();
     spyOn(TaskFactory, 'taskForSettingUnread').andCallThrough();
+  });
+
+  describe('Markup', function () {
+    it('draws the action buttons as kit toolbar icon buttons labelled by their action', function () {
+      const button = ReactTestUtils.renderIntoDocument(
+        <ToggleStarredButton items={[test_thread]} />
+      ) as any;
+      const node = ReactDOM.findDOMNode(button) as HTMLElement;
+      expect(node.getAttribute('data-slot')).toBe('icon-button');
+      expect(node.getAttribute('data-variant')).toBe('toolbar');
+      expect(node.classList.contains('btn-toolbar')).toBe(true);
+      expect(node.getAttribute('aria-label')).toBe('Star');
+      expect(node.getAttribute('title')).toBeNull();
+    });
+
+    it('draws the thread arrows as kit icon buttons, disabled at the end of the list', function () {
+      spyOn(FocusedContentStore, 'focusedId').andReturn('last');
+      spyOn(ThreadListStore, 'dataSource').andReturn({
+        count: () => 2,
+        get: (idx) => ({ id: idx === 1 ? 'last' : 'first' }),
+      } as any);
+      spyOn(AppEnv.commands, 'dispatch');
+      const container = document.createElement('div');
+      ReactDOM.render(<DownButton />, container);
+      const node = container.querySelector('button');
+      expect(node.getAttribute('data-slot')).toBe('icon-button');
+      expect(node.classList.contains('message-toolbar-arrow')).toBe(true);
+      expect(node.classList.contains('down')).toBe(true);
+      expect(node.classList.contains('disabled')).toBe(true);
+      expect(node.disabled).toBe(true);
+      expect(node.getAttribute('aria-label')).toBe('Next thread');
+      ReactDOM.unmountComponentAtNode(container);
+    });
   });
 
   describe('Starring', function () {

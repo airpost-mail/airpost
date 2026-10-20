@@ -1,6 +1,12 @@
 import React from 'react';
 import { localized, Actions, TaskFactory, ExtensionRegistry } from 'mailspring-exports';
+import { Button } from '../../components/kit/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/kit/tooltip';
+import { ownKeys } from '../../components/kit/keys';
 import { ThreadWithMessagesMetadata } from './types';
+
+// Space and Enter toggle the star and don't also reach the keymap.
+const ownClickKeys = ownKeys([' ', 'Enter']);
 
 function nonDraftMessages(thread: ThreadWithMessagesMetadata) {
   const msgs = thread.__messages;
@@ -49,7 +55,7 @@ const ThreadListIcon: React.FC<{ thread: ThreadWithMessagesMetadata }> = React.m
     const starred = thread && thread.starred;
     const ariaLabel = starred ? localized('Unstar') : localized('Star');
 
-    const onToggleStar = (event: React.MouseEvent | React.KeyboardEvent) => {
+    const onToggleStar = (event: React.MouseEvent) => {
       Actions.queueTask(
         TaskFactory.taskForInvertingStarred({
           threads: [thread],
@@ -59,24 +65,26 @@ const ThreadListIcon: React.FC<{ thread: ThreadWithMessagesMetadata }> = React.m
       event.stopPropagation();
     };
 
-    const onKeyDown = (event: React.KeyboardEvent) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        onToggleStar(event);
-      }
-    };
-
+    // The icon is the thread-icon-* class's background image (extensions add their own classes
+    // through cssClassNamesForThreadListIcon). The link variant draws no box and no hover
+    // background, so those images stay.
     return (
-      <div
-        className={`thread-icon ${iconClassNames(thread)}`}
-        role="button"
-        tabIndex={-1}
-        aria-label={ariaLabel}
-        aria-pressed={starred || false}
-        title={ariaLabel}
-        onClick={onToggleStar}
-        onKeyDown={onKeyDown}
-      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* The trigger's own data-slot would replace the button's. */}
+          <Button
+            data-slot="button"
+            variant="link"
+            className={`thread-icon ${iconClassNames(thread)}`}
+            tabIndex={-1}
+            aria-label={ariaLabel}
+            aria-pressed={starred || false}
+            onClick={onToggleStar}
+            onKeyDown={ownClickKeys}
+          />
+        </TooltipTrigger>
+        <TooltipContent>{ariaLabel}</TooltipContent>
+      </Tooltip>
     );
   },
   (prev, next) => prev.thread === next.thread
