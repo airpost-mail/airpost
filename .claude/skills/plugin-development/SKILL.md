@@ -56,7 +56,7 @@ Paths are relative to `apps/desktop/`.
 3. **Clean Deactivation**: Always unregister components/extensions in `deactivate()`
 4. **Window Types**: Consider which window types a plugin should load in
 5. **Optional Plugins**: Use `isOptional: true` for user-disableable plugins
-6. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `spec/plugin-host/builtin-features-spec.ts`). Its directory name is the `mailspring://` asset host and its place in the activation order, which features share with the bundled plugins
+6. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `tests/packages/builtin-features.test.ts`). Its directory name is the `mailspring://` asset host and its place in the activation order, which features share with the bundled plugins
 
 ## Testing Plugin Changes
 

@@ -9,7 +9,7 @@
 //! (`matcher.ts`, `attribute-*.ts`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 //!
 //! Classes and attributes come from `model_query_allowlist.json`, generated from the desktop
-//! models' `queryable` attributes by `apps/desktop/spec/flux/models/model-query-capture-spec.ts`,
+//! models' `queryable` attributes by `apps/desktop/tests/integration/model-query-capture.test.ts`,
 //! which fails when the two differ. Nothing outside that table reaches the SQL text, and
 //! every value is a bound parameter. `tests/model_query_parity.rs` runs the queries the
 //! desktop's call sites build through both compilers on one database.

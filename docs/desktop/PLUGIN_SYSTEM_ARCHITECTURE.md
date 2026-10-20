@@ -39,7 +39,7 @@ Plugins are discovered from these directories in order:
 | `<resourcePath>/src/features/`, `plugins/`, `themes/` | Built-in | Core features (app code, see below), optional plugins (`isOptional`) and the `ui-*` themes; discovered as one name-sorted list |
 | `<configDirPath>/packages/` | User-installed plugins | Skipped in safe mode |
 | `<configDirPath>/dev/packages/` | Developer mode plugins | Only loaded in dev mode |
-| `<resourcePath>/spec/fixtures/packages/` | Test packages | Only in spec mode |
+| `<resourcePath>/tests/support/fixtures/packages/` | Test packages | Only in spec mode |
 
 Built-in features are not packages: they are app code in `src/features/<dir>/`, with no
 `package.json`, listed in `src/features/index.ts` with their package name, `windowTypes`,
@@ -78,7 +78,7 @@ my-plugin/
 ├── menus/               # Optional - menu definitions (auto-loaded)
 │   └── my-plugin.json
 ├── assets/              # Optional - images, sounds, etc.
-└── spec/                # Optional - Jasmine test specs
+└── tests/               # Optional - Jasmine tests (*.test.ts; specs/*-spec.ts also runs)
 ```
 
 ### package.json Schema

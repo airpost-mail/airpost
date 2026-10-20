@@ -20,6 +20,6 @@
       "*": ["node_modules/*", "src/packages/api/*"]
     }
   },
-  "include": ["src/**/*", "plugins/**/*", "themes/**/*", "spec/**/*"],
-  "exclude": ["spec/spec-runner/jasmine.js"]
+  "include": ["src/**/*", "plugins/**/*", "themes/**/*", "tests/**/*"],
+  "exclude": ["tests/support/runner/jasmine.js"]
 }

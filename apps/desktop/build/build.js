@@ -80,7 +80,7 @@ const symlinkedPackages = [];
 
 function resolveRealSymlinkPaths() {
   console.log('---> Resolving symlinks');
-  const dirs = ['plugins', 'themes', 'src', 'spec', 'node_modules'];
+  const dirs = ['plugins', 'themes', 'src', 'tests', 'node_modules'];
   dirs.forEach((dir) => {
     const absoluteDir = path.join(appDir, dir);
     const entries = fs.readdirSync(absoluteDir).flatMap((name) => {
@@ -271,8 +271,8 @@ function buildPackagerOptions() {
       // The desktop dir also holds dev and build tooling (build/, scripts/, docs, dotfiles) and
       // prune only removes devDependencies from node_modules, so ship listed top-level entries only.
       topLevelAllowlist,
-      // Package specs only run in dev.
-      /^\/(plugins|themes)\/[^/]+\/specs(\/|$)/,
+      // Package tests only run in dev.
+      /^\/(plugins|themes)\/[^/]+\/(specs|tests)(\/|$)/,
       // The C++ engine (legacy/mailsync-cpp) is never packaged, even if a local build left one
       // in the desktop dir: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
       // GPL-compatible or have no licence. Only mailsync-rs ships.

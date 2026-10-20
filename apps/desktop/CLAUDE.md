@@ -23,7 +23,7 @@ npm run typecheck
 # Check that better-sqlite3 is built for Electron (postinstall runs it too)
 npm run check:native
 
-# Run all tests, or only spec files whose path matches a regex
+# Run all tests, or only the test files whose path matches a regex (--test-file-pattern works too)
 npm test
 npm test -- --spec-file-pattern='calendar'
 
@@ -60,17 +60,17 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 - **`themes/`** - The `ui-*` themes
 - **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/mail/quick-preview/renderer.html`
 
-Plugins and themes import core code as `../../../src/...`. `src/shared/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
+Plugins and themes import core code as `../../../src/...`. `src/shared/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `mailspring:` protocol handler, ThemeManager and the test loader.
 
 > **IMPORTANT:** Application source code lives in `src/` (including `src/features/`) and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
-- **`spec/`** - Jasmine specs for `src/`, laid out like it (`spec/main/` tests `src/main/`, `spec/engine/` tests `src/engine/`). Feature specs mirror it too (`spec/features/composer/` tests `src/features/composer/`). Specs that load code from several places go in `spec/integration/`; a spec for one plugin goes in that plugin's `specs/`. `spec/spec-runner/`, `spec/fixtures/`, `spec/test-utils.ts` (the plugin API's `MailspringTestUtils`) and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`) sit at the top.
+- **`tests/`** - Jasmine tests, `tests/<area>/<subject>.test.ts(x)`. Areas are coarse and don't mirror `src/`: one per `src/` domain (`main/`, `shared/`, `config/`, `window/`, `engine/`, `data/`, `mail/`, `components/`, `packages/`, `utils/`) and, for the built-in features, product areas (`calendar/`, `composer/`, `mailbox/`, `preferences/`, `onboarding/`, `notifications/`). Tests that load code from several places go in `tests/integration/`; a test for one bundled plugin or theme goes in that package's `tests/`. `tests/support/` is never loaded as tests: the runner and loader (`runner/`), `fixtures/`, the jasmine and spec-env globals (`types/`), `test-utils.ts` (the plugin API's `MailspringTestUtils`), the kit helpers and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`).
 
 Code outside `src/main/`, `src/shared/` and `src/config/` runs in the windows and must not import `src/main/`, `src/config/migrator.ts` or `src/config/persistence-manager.ts`; `src/main/`, `src/shared/` and `src/config/` must not import window code, except `data/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
 
 ### Dependencies and packaging
 
-There is one `package.json` and one `node_modules`. Runtime code goes in `dependencies` (or `optionalDependencies`); tests and tooling go in `devDependencies`, which the packager prunes. `import/no-extraneous-dependencies` (with `packageDir: "."`, so run eslint from this directory) fails a runtime import of a devDependency in `src/`, `plugins/` or `themes/`; `spec/` and package `specs/` dirs may use them. Only the top-level entries listed in `shippedTopLevel` in `build/build.js` are packaged, so a new top-level runtime dir has to be added there or it silently won't ship. Package `specs/` dirs never ship.
+There is one `package.json` and one `node_modules`. Runtime code goes in `dependencies` (or `optionalDependencies`); tests and tooling go in `devDependencies`, which the packager prunes. `import/no-extraneous-dependencies` (with `packageDir: "."`, so run eslint from this directory) fails a runtime import of a devDependency in `src/`, `plugins/` or `themes/`; `tests/` and package `tests/` dirs may use them. Only the top-level entries listed in `shippedTopLevel` in `build/build.js` are packaged, so a new top-level runtime dir has to be added there or it silently won't ship. `tests/` and package `tests/` dirs never ship.
 
 ### Core Modules
 
@@ -93,7 +93,7 @@ Each package in `plugins/` and `themes/` has:
 - `styles/` - LESS stylesheets
 - `keymaps/` - Keyboard shortcut definitions
 
-A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in `src/features/index.ts` gives its package name (`list-unsubscribe` is `unsubscribe`), `windowTypes`, `syncInit` and a lazy `require` of its `index.ts` (which exports `activate()`/`deactivate()`). Source files sit in the feature folder; `styles/`, `keymaps/` and asset folders are subfolders loaded as for a package. `PackageManager` wraps each one in a `BuiltinFeature` and sorts features and bundled plugins together by directory name, so the activation order, and with it the order toolbar buttons, message headers and composer extensions register in, stays what it was (`spec/plugin-host/builtin-features-spec.ts` pins it). The directory name is the `mailspring://<dir>/` asset host, so don't rename one.
+A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in `src/features/index.ts` gives its package name (`list-unsubscribe` is `unsubscribe`), `windowTypes`, `syncInit` and a lazy `require` of its `index.ts` (which exports `activate()`/`deactivate()`). Source files sit in the feature folder; `styles/`, `keymaps/` and asset folders are subfolders loaded as for a package. `PackageManager` wraps each one in a `BuiltinFeature` and sorts features and bundled plugins together by directory name, so the activation order, and with it the order toolbar buttons, message headers and composer extensions register in, stays what it was (`tests/packages/builtin-features.test.ts` pins it). The directory name is the `mailspring://<dir>/` asset host, so don't rename one.
 
 ## Core Data Flow: Sync Engine, Tasks, and Observable Database
 
@@ -251,4 +251,4 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Claude Hooks
 
-A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/src`, `plugins`, `themes` or `spec/features`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.
+A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/src`, `plugins`, `themes` or `tests`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.

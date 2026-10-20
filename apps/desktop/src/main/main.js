@@ -163,13 +163,16 @@ const declareOptions = argv => {
   options
     .alias('s', 'spec-directory')
     .string('s')
-    .describe('s', 'Override the directory from which to run package specs');
+    .describe(
+      's',
+      "Run the tests in this directory (*.test.* and *-spec.* files) instead of the app's"
+    );
   options
-    .alias('f', 'spec-file-pattern')
+    .alias('f', ['spec-file-pattern', 'test-file-pattern'])
     .string('f')
     .describe(
       'f',
-      'Override the default file regex to determine which tests should run (defaults to "-spec.(js|jsx|es6|es)$" )'
+      'Only run the test files whose path (relative to the app, or to --spec-directory) matches this regex'
     );
   options
     .alias('v', 'version')

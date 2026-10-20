@@ -102,11 +102,6 @@
         "plugins/composer-templates/lib/preferences-templates.tsx",
         "plugins/composer-templates/lib/store.ts",
         "plugins/translation/lib/message-header.tsx",
-        "spec/features/main-calendar/calendar-delete-exception-spec.ts",
-        "spec/features/main-calendar/calendar-rsvp-spec.ts",
-        "spec/features/main-calendar/calendar-selection-follows-move-spec.tsx",
-        "spec/features/main-calendar/recurring-event-actions-spec.ts",
-        "spec/features/notifications/update-notification-spec.tsx",
         "src/components/attachment-items.tsx",
         "src/components/composer-editor/grammar-check-plugins.tsx",
         "src/components/evented-iframe.tsx",
@@ -165,13 +160,13 @@
       }
     },
     {
-      "files": ["src/**", "plugins/**", "themes/**"],
+      "files": ["src/**", "plugins/**", "themes/**", "tests/**"],
       "rules": {
         "import/no-extraneous-dependencies": [
           "error",
           {
             "packageDir": ".",
-            "devDependencies": ["**/spec/**", "**/specs/**"],
+            "devDependencies": ["tests/**", "**/tests/**", "**/specs/**"],
             "optionalDependencies": true,
             "peerDependencies": false
           }
@@ -184,7 +179,7 @@
         "src/main/**",
         "src/config/migrator.ts",
         "src/config/persistence-manager.ts",
-        "**/specs/**"
+        "**/tests/**"
       ],
       "rules": {
         "import/no-restricted-paths": [
@@ -229,6 +224,19 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "files": ["tests/**", "plugins/*/tests/**"],
+      "rules": {
+        "no-restricted-imports": "off",
+        "no-restricted-syntax": "off"
+      }
+    },
+    {
+      "files": ["tests/support/runner/**"],
+      "rules": {
+        "@typescript-eslint/no-this-alias": "off"
       }
     }
   ]

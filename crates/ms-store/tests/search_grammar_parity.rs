@@ -3,7 +3,7 @@
 
 //! The search grammar parity suite (docs/desktop-client-plan.md stage 9). Every query in
 //! `fixtures/search_queries.json`, captured from the desktop's `SearchQueryParser` and
-//! `LocalSearchQueryBackend` by `apps/desktop/spec/services/search/search-query-capture-spec.ts`, must
+//! `LocalSearchQueryBackend` by `apps/desktop/tests/mail/search-query-capture.test.ts`, must
 //! parse to the same AST here (or fail on both sides), and its desktop WHERE clause and the
 //! engine's must find the same threads on one fixture database. Date terms, which the engine
 //! reads on its own terms, are checked here against two zones.

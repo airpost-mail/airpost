@@ -40,7 +40,7 @@ npm run build        # package for the host platform into dist/
 - `src/` holds the core, one directory per domain: main process in `main/`, code both processes load in `shared/`, config in `config/`, window startup in `window/`, the windows' engine client in `engine/`, stores, models and tasks in `data/`, message content in `mail/`, shared UI in `components/`, package loading and the plugin API barrels (`packages/api/`) in `packages/`.
 - `src/features/` holds the built-in features (always loaded, app code); `plugins/` (bundled, can be turned off) and `themes/` (`ui-*`) hold the bundled packages.
 - `vendor/` holds the quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify).
-- `spec/` holds the specs.
+- `tests/` holds the tests (`tests/<area>/*.test.ts`, helpers and fixtures in `tests/support/`).
 - `build/`, `scripts/` and `snap/` hold the build and dev tooling; they don't ship.
 - One `package.json`: runtime deps in `dependencies` (native ones rebuilt for Electron by the
   postinstall), tooling in `devDependencies`.

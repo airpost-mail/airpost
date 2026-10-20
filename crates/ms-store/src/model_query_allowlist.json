@@ -1,5 +1,5 @@
 {
-  "generatedBy": "apps/desktop/spec/flux/models/model-query-capture-spec.ts",
+  "generatedBy": "apps/desktop/tests/integration/model-query-capture.test.ts",
   "classes": {
     "Thread": {
       "attributes": {

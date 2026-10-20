@@ -1295,11 +1295,11 @@ export default class Application extends EventEmitter {
     let bootstrapScript = null;
     try {
       bootstrapScript = require.resolve(
-        path.resolve(this.resourcePath, 'spec', 'spec-runner', 'spec-bootstrap')
+        path.resolve(this.resourcePath, 'tests', 'support', 'runner', 'bootstrap')
       );
     } catch (error) {
       bootstrapScript = require.resolve(
-        path.resolve(__dirname, '..', '..', 'spec', 'spec-runner', 'spec-bootstrap')
+        path.resolve(__dirname, '..', '..', 'tests', 'support', 'runner', 'bootstrap')
       );
     }
 

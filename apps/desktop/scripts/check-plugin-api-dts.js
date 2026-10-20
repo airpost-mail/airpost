@@ -25,7 +25,7 @@ const options = { ...parsed.options, skipLibCheck: false, noEmit: true };
 // The ambient declarations (AppEnv, the jasmine and window globals) are roots too, so the
 // barrels see the same globals as the app.
 const ambientRoots = [
-  path.join(appDir, 'src', 'types') + path.sep,
+  path.join(appDir, 'tests', 'support', 'types') + path.sep,
   path.join(appDir, 'src', 'window', 'globals.d.ts'),
   path.join(appDir, 'src', 'window', 'react.d.ts'),
   path.join(appDir, 'src', 'main', 'global.d.ts'),

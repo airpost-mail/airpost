@@ -34,7 +34,9 @@ export default class PackageManager {
     this.configDirPath = configDirPath;
 
     if (specMode) {
-      this.packageDirectories.push(path.join(resourcePath, 'spec', 'fixtures', 'packages'));
+      this.packageDirectories.push(
+        path.join(resourcePath, 'tests', 'support', 'fixtures', 'packages')
+      );
     } else {
       this.packageDirectories.push(...bundledPackageRoots(resourcePath));
       if (!safeMode) {

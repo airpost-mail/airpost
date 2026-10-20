@@ -3,7 +3,7 @@
 Design for the desktop's component kit: Radix primitives, shadcn-like props and markup, plain CSS
 reading the theme tokens (`docs/desktop/theme-tokens.md`). This is the spec stage 2 builds from;
 nothing here is implemented yet except the dependencies and the compatibility spec
-`spec/components/ui/radix-react17-spec.tsx`. Paths are relative to `apps/desktop/` unless they
+`tests/components/radix-react17.test.tsx`. Paths are relative to `apps/desktop/` unless they
 start with `docs/`.
 
 Settled before this doc (stage 0, `/tmp/tern-shots/ui-kit-stage0.md`): Radix per-primitive
@@ -49,7 +49,7 @@ what it renders.
   `strict` and `skipLibCheck: false` against `@types/react` 17.0.93, type-checks clean. A wrong prop
   type in the probe fails, so the `.d.ts` are really checked. The project `npm run typecheck`
   passes with the new spec.
-- Runtime: `spec/components/ui/radix-react17-spec.tsx` (12 specs, Electron renderer, React 17.0.2)
+- Runtime: `tests/components/radix-react17.test.tsx` (12 specs, Electron renderer, React 17.0.2)
   requires every package and renders Slot, Switch, Checkbox (indeterminate), RadioGroup (LTR and
   RTL arrows), Select (into a given portal container, picks a value), Dialog (title ids with no
   `React.useId`, no console errors), DropdownMenu (checkbox item, select closes), Tooltip, Tabs and
@@ -79,9 +79,9 @@ Findings the spec pins down:
    and the root has `tabindex=0`; focusing the root forwards to the checked item. Arrow keys move
    focus in a `setTimeout()`, and the item checks itself on that focus.
 5. **The spec clock never fires `setTimeout(fn)` with no delay.** `TimeOverride._fakeSetTimeout`
-   (`spec/spec-runner/time-override.ts`) stores `now + undefined` = `NaN`. Radix uses delay-less
+   (`tests/support/runner/time-override.ts`) stores `now + undefined` = `NaN`. Radix uses delay-less
    timeouts (roving focus, menus, select). Kit specs call `jasmine.unspy(window, 'setTimeout')` and
-   wait with `window.originalSetTimeout`, or use the helper stage 2 adds to `spec/test-utils.ts`.
+   wait with `window.originalSetTimeout`, or use the helper stage 2 adds to `tests/support/test-utils.ts`.
 
 ## 3. Layout and imports
 
@@ -92,7 +92,7 @@ Findings the spec pins down:
   layer marking), `provider.tsx` (`UIProvider`), `cn.ts` if `classnames` isn't enough. No barrel
   file: core code imports the file it needs (`import { Button } from '../components/ui/button'`), so
   nothing requires all of Radix.
-- Specs: `spec/components/ui/<name>-spec.tsx`, mirroring `src/`.
+- Specs: `tests/components/kit-<name>.test.tsx`.
 - Styles: `static/style/kit/<name>.css` (section 5).
 - Every component is a `React.forwardRef` function (React 17 doesn't pass `ref` as a prop), sets
   `displayName`, spreads the rest props onto the DOM part that carries `data-slot`, and merges
@@ -376,7 +376,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Package: none. The current implementation in `src/components/settings.tsx` already does what's
   needed (`role="radiogroup"`, roving `tabIndex` with the chosen segment as the only tab stop, arrow
   keys that move the choice, focus follows once the parent applies the value), and
-  `spec/components/settings-spec.tsx` pins it. Radix RadioGroup would change the tab stop, make
+  `tests/components/settings.test.tsx` pins it. Radix RadioGroup would change the tab stop, make
   arrows asynchronous and force string values (findings 4 and 5), so the segmented control stays
   hand-written.
 - Props: unchanged, `{ value: T; options: [T, string][]; onChange(value: T): void; disabled?:
@@ -546,7 +546,7 @@ dropped at plugin API 2.0.0, together with the compat LESS path.
 - `UIProvider` on the four roots; the `ReactDOM.render` allowlist spec.
 - `consumeEscape` and `data-ui-layer` on every focus-taking layer; the `withinUILayer` rule in
   `stopCallback`; flip finding 2's spec.
-- A spec per component under `spec/components/ui/`, covering markup (`data-slot`, `data-state`,
+- A spec per component under `tests/components/`, covering markup (`data-slot`, `data-state`,
   legacy classes), keyboard, the portal container, RTL, and Escape against `core:pop-sheet`.
 - Rebuild `settings.tsx` on the kit (`SettingsSwitch`, `ConfigSelectRow`, `SegmentedControl` move),
   then ModalStore and PopoverStore on Dialog and Popover behind their actions. Both behind the same
