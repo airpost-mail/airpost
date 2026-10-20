@@ -14,6 +14,9 @@ import MessageParticipants from './message-participants';
 import MessageItemBody from './message-item-body';
 import MessageTimestamp from './message-timestamp';
 import MessageControls from './message-controls';
+import MessageAttachments from '../attachments/message-attachments';
+import { Button } from '../../components/kit/button';
+import { IconButton } from '../../components/kit/icon-button';
 
 interface MessageItemProps {
   thread: Thread;
@@ -111,16 +114,21 @@ export default class MessageItem extends React.Component<MessageItemProps, Messa
           <span>{`${this.props.message.files.length} ${localized('attachments')}`}</span>
         </div>
         <div className="separator">-</div>
-        <div className="download-all-action" onClick={this._onDownloadAll}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="download-all-action"
+          onClick={this._onDownloadAll}
+        >
           <RetinaImg name="ic-attachments-download-all.png" mode={RetinaImg.Mode.ContentIsMask} />
           <span>{localized('Download All')}</span>
-        </div>
+        </Button>
       </div>
     );
   }
 
   _renderAttachments() {
-    const { files = [], body, id } = this.props.message;
+    const { files = [], body, headerMessageId } = this.props.message;
     const { filePreviewPaths, downloads } = this.state;
     let attachedFiles = files.filter(
       (f) => !f.contentId || !(body || '').includes(`cid:${f.contentId}`)
@@ -139,15 +147,12 @@ export default class MessageItem extends React.Component<MessageItemProps, Messa
         {files.length > 1 ? this._renderDownloadAllButton() : null}
         {attachedFiles.length > 0 && (
           <div className="attachments-area">
-            <InjectedComponent
-              matching={{ role: 'MessageAttachments' }}
-              exposedProps={{
-                files: attachedFiles,
-                messageId: id,
-                downloads,
-                filePreviewPaths,
-                canRemoveAttachments: false,
-              }}
+            <MessageAttachments
+              files={attachedFiles}
+              headerMessageId={headerMessageId}
+              downloads={downloads}
+              filePreviewPaths={filePreviewPaths}
+              canRemoveAttachments={false}
             />
           </div>
         )}
@@ -226,35 +231,21 @@ export default class MessageItem extends React.Component<MessageItemProps, Messa
     if (this.props.pending) {
       return null;
     }
-    if (this.state.detailedHeaders) {
-      return (
-        <div
-          className="header-toggle-control"
-          style={{ top: 18, left: -14 }}
-          onClick={(e) => {
-            this.setState({ detailedHeaders: false });
-            e.stopPropagation();
-          }}
-        >
-          <RetinaImg
-            name={'message-disclosure-triangle-active.png'}
-            mode={RetinaImg.Mode.ContentIsMask}
-          />
-        </div>
-      );
-    }
-
+    const detailed = this.state.detailedHeaders;
     return (
-      <div
-        className="header-toggle-control inactive"
-        style={{ top: 18 }}
+      <IconButton
+        className={detailed ? 'header-toggle-control' : 'header-toggle-control inactive'}
+        size="sm"
+        icon={
+          detailed ? 'message-disclosure-triangle-active.png' : 'message-disclosure-triangle.png'
+        }
+        label={detailed ? localized('Hide Details') : localized('Show Details')}
+        tabIndex={-1}
         onClick={(e) => {
-          this.setState({ detailedHeaders: true });
+          this.setState({ detailedHeaders: !detailed });
           e.stopPropagation();
         }}
-      >
-        <RetinaImg name={'message-disclosure-triangle.png'} mode={RetinaImg.Mode.ContentIsMask} />
-      </div>
+      />
     );
   }
 

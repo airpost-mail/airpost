@@ -1,7 +1,9 @@
 import React from 'react';
 import classnames from 'classnames';
 import { localized, Actions, MessageStore, SearchableComponentStore } from 'mailspring-exports';
-import { RetinaImg, KeyCommandsRegion } from 'mailspring-component-kit';
+import { KeyCommandsRegion } from 'mailspring-component-kit';
+import { IconButton } from '../../components/kit/icon-button';
+import { TextField } from '../../components/kit/text-field';
 
 interface FindInThreadProps {
   searchTerm: string;
@@ -67,7 +69,7 @@ export default class FindInThread extends React.Component<
 
   _selectionText() {
     if (this.state.globalIndex !== null && this.state.resultsLength > 0) {
-      return `${this.state.globalIndex + 1} of ${this.state.resultsLength}`;
+      return localized('%1$@ of %2$@', this.state.globalIndex + 1, this.state.resultsLength);
     }
     return '';
   }
@@ -103,7 +105,6 @@ export default class FindInThread extends React.Component<
       'find-in-thread': true,
       enabled: this.state.searchTerm !== null,
     });
-    const btnCls = 'btn btn-find-in-thread';
     return (
       <div className={rootCls} onClick={this._focusSearch}>
         <KeyCommandsRegion globalHandlers={this._globalKeymapHandlers}>
@@ -114,8 +115,7 @@ export default class FindInThread extends React.Component<
             }}
           >
             <div className="input-wrap">
-              <input
-                type="text"
+              <TextField
                 ref={(el) => {
                   this._searchBoxEl = el;
                 }}
@@ -129,41 +129,32 @@ export default class FindInThread extends React.Component<
               <div className="selection-progress">{this._selectionText()}</div>
 
               <div className="btn-wrap">
-                <button
-                  className={btnCls}
-                  aria-label={localized('Previous result')}
+                <IconButton
+                  className="btn-find-in-thread"
+                  size="sm"
+                  icon="ic-findinthread-previous.png"
+                  label={localized('Previous result')}
                   disabled={!this._navEnabled()}
                   onClick={this._onPrevResult}
-                >
-                  <RetinaImg
-                    name="ic-findinthread-previous.png"
-                    mode={RetinaImg.Mode.ContentIsMask}
-                    aria-hidden="true"
-                  />
-                </button>
-
-                <button
-                  className={btnCls}
-                  aria-label={localized('Next result')}
+                />
+                <IconButton
+                  className="btn-find-in-thread"
+                  size="sm"
+                  icon="ic-findinthread-next.png"
+                  label={localized('Next result')}
                   disabled={!this._navEnabled()}
                   onClick={this._onNextResult}
-                >
-                  <RetinaImg
-                    name="ic-findinthread-next.png"
-                    mode={RetinaImg.Mode.ContentIsMask}
-                    aria-hidden="true"
-                  />
-                </button>
+                />
               </div>
             </div>
 
-            <button className={btnCls} aria-label={localized('Close')} onClick={this._clearSearch}>
-              <RetinaImg
-                name="ic-findinthread-close.png"
-                mode={RetinaImg.Mode.ContentIsMask}
-                aria-hidden="true"
-              />
-            </button>
+            <IconButton
+              className="btn-find-in-thread"
+              size="sm"
+              icon="ic-findinthread-close.png"
+              label={localized('Close')}
+              onClick={this._clearSearch}
+            />
           </div>
         </KeyCommandsRegion>
       </div>

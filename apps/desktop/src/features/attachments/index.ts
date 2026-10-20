@@ -1,10 +1,6 @@
-import { ComponentRegistry } from 'mailspring-exports';
-import MessageAttachments from './message-attachments';
+// The message attachment list (message-attachments.tsx) is imported directly by
+// message-list/message-item.tsx. The feature stays so its directory keeps its place in the
+// activation order and the `mailspring://attachments/` asset host.
+export function activate() {}
 
-export function activate() {
-  ComponentRegistry.register(MessageAttachments, { role: 'MessageAttachments' });
-}
-
-export function deactivate() {
-  ComponentRegistry.unregister(MessageAttachments);
-}
+export function deactivate() {}

@@ -13,6 +13,7 @@ import {
   ComponentRegistry,
 } from 'mailspring-exports';
 import { RetinaImg, ButtonDropdown, Menu } from 'mailspring-component-kit';
+import { IconButton } from '../../components/kit/icon-button';
 import { escapeHTML } from 'underscore.string';
 import { developerToolsAvailable } from '../../platform/developer-tools';
 import {
@@ -123,28 +124,17 @@ export default class MessageControls extends React.Component<MessageControlsProp
     );
   };
 
-  _onShowActionsMenu = () => {
-    const SystemMenu = require('@electron/remote').Menu;
-    const SystemMenuItem = require('@electron/remote').MenuItem;
-
-    // Todo: refactor this so that message actions are provided
-    // dynamically. Waiting to see if this will be used often.
-    const menu = new SystemMenu();
-    menu.append(new SystemMenuItem({ label: localized('Log Data'), click: this._onLogData }));
-    menu.append(
-      new SystemMenuItem({ label: localized('Show Original'), click: this._onShowOriginal })
-    );
+  _actionsMenuTemplate() {
+    const template: Electron.MenuItemConstructorOptions[] = [
+      { label: localized('Log Data'), click: this._onLogData },
+      { label: localized('Show Original'), click: this._onShowOriginal },
+    ];
     const colorsItem = this._originalColorsMenuItem();
-    if (colorsItem) menu.append(new SystemMenuItem(colorsItem));
-    menu.append(
-      new SystemMenuItem({
-        label: localized('Copy Debug Info to Clipboard'),
-        click: this._onCopyToClipboard,
-      })
-    );
-    menu.append(new SystemMenuItem({ type: 'separator' }));
-    menu.append(
-      new SystemMenuItem({ label: localized('Download as .eml'), click: this._onDownloadEml })
+    if (colorsItem) template.push(colorsItem);
+    template.push(
+      { label: localized('Copy Debug Info to Clipboard'), click: this._onCopyToClipboard },
+      { type: 'separator' },
+      { label: localized('Download as .eml'), click: this._onDownloadEml }
     );
 
     const actionItems = ComponentRegistry.findComponentsMatching({
@@ -153,14 +143,18 @@ export default class MessageControls extends React.Component<MessageControlsProp
       getMenuItem: (props: MessageControlsProps) => { label: string; click: () => void };
     }>;
     if (actionItems.length > 0) {
-      menu.append(new SystemMenuItem({ type: 'separator' }));
+      template.push({ type: 'separator' });
       for (const ActionItem of actionItems) {
         const item = ActionItem.getMenuItem(this.props);
-        menu.append(new SystemMenuItem({ label: item.label, click: item.click }));
+        template.push({ label: item.label, click: item.click });
       }
     }
+    return template;
+  }
 
-    menu.popup({});
+  _onShowActionsMenu = () => {
+    const { Menu: SystemMenu } = require('@electron/remote');
+    SystemMenu.buildFromTemplate(this._actionsMenuTemplate()).popup({});
   };
 
   // Offered only when the theme and setting darken emails.
@@ -270,23 +264,14 @@ export default class MessageControls extends React.Component<MessageControlsProp
             menu={this._dropdownMenu(items.slice(1))}
           />
         )}
-        <div
+        <IconButton
           className="message-actions-ellipsis"
+          size="sm"
+          icon="message-actions-ellipsis.png"
+          label={localized('More Actions')}
           tabIndex={-1}
           onClick={this._onShowActionsMenu}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              this._onShowActionsMenu();
-            }
-          }}
-        >
-          <RetinaImg
-            name={'message-actions-ellipsis.png'}
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </div>
+        />
       </div>
     );
   }

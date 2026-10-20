@@ -16,7 +16,15 @@ import {
   translationDestination,
   AllLanguages,
 } from './service';
-import { Menu, ButtonDropdown, RetinaImg } from 'mailspring-component-kit';
+import {
+  RetinaImg,
+  Button,
+  DropdownMenuRoot,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from 'mailspring-component-kit';
 import { messageFrameContent } from '../../../src/mail/frame/bridge';
 
 interface TranslateMessageHeaderProps {
@@ -289,9 +297,9 @@ export class TranslateMessageHeader extends React.Component<
             </div>
           </div>
           <div className="actions">
-            <button className="action" tabIndex={0} onClick={this._onToggleTranslate}>
+            <Button variant="ghost" className="action" onClick={this._onToggleTranslate}>
               <span>{localized('Show Original')}</span>
-            </button>
+            </Button>
           </div>
         </div>
       );
@@ -344,49 +352,36 @@ export class TranslateMessageHeader extends React.Component<
           </div>
         </div>
         <div className="actions">
-          <button className="action" tabIndex={0} onClick={() => this._onTranslate('manual')}>
+          <Button variant="ghost" className="action" onClick={() => this._onTranslate('manual')}>
             {this.state.translating === 'manual' ? spinner : <span>{localized('Translate')}</span>}
-          </button>
-          <ButtonDropdown
-            bordered={false}
-            attachment="right"
-            closeOnMenuClick={true}
-            primaryItem={<span>{localized('Options')}</span>}
-            className="action"
-            menu={
-              <Menu
-                items={[
-                  prefs.automatic.includes(this.state.detected)
-                    ? {
-                        key: 'always',
-                        label: localized('Stop translating %@', fromLanguage),
-                        select: this._onDisableAlwaysForLanguage,
-                      }
-                    : {
-                        key: 'always',
-                        label: localized('Always translate %@', fromLanguage),
-                        select: this._onAlwaysForLanguage,
-                      },
-                  {
-                    key: 'never',
-                    label: localized('Never translate %@', fromLanguage),
-                    select: this._onNeverForLanguage,
-                  },
-                  { key: 'divider' },
-                  {
-                    key: 'reset',
-                    label: localized('Reset translation settings'),
-                    select: this._onReset,
-                  },
-                ]}
-                itemKey={(item) => item.key}
-                itemContent={(item) =>
-                  item.label ? item.label : <Menu.Item key={item.key} divider={true} />
-                }
-                onSelect={(item) => item.select()}
-              />
-            }
-          />
+          </Button>
+          <DropdownMenuRoot>
+            <DropdownMenuTrigger asChild>
+              {/* data-slot is set again because the trigger's own data-slot would replace it. */}
+              <Button variant="ghost" data-slot="button" className="action action-options">
+                <span>{localized('Options')}</span>
+                <RetinaImg name="icon-thread-disclosure.png" mode={RetinaImg.Mode.ContentIsMask} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {prefs.automatic.includes(this.state.detected) ? (
+                <DropdownMenuItem onSelect={this._onDisableAlwaysForLanguage}>
+                  {localized('Stop translating %@', fromLanguage)}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onSelect={this._onAlwaysForLanguage}>
+                  {localized('Always translate %@', fromLanguage)}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={this._onNeverForLanguage}>
+                {localized('Never translate %@', fromLanguage)}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={this._onReset}>
+                {localized('Reset translation settings')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenuRoot>
         </div>
       </div>
     );

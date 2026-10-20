@@ -39,10 +39,29 @@
   width: 15px;
   margin: 0 2px;
 }
+// The opened icon is a kit button sized to its image.
+.open-tracking-icon[data-slot='button'] {
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  gap: 0;
+  &:hover,
+  &:active {
+    background: transparent;
+  }
+}
 
 .open-tracking-message-status {
   color: @text-color-very-subtle;
   margin-left: 10px;
+  &[data-slot='button'] {
+    gap: 0;
+    height: auto;
+    padding: 0 2px;
+    font: inherit;
+    color: var(--muted-foreground);
+  }
   &.unopened {
     img.content-mask {
       background-color: @text-color-very-subtle;

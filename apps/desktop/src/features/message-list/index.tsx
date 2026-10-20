@@ -50,4 +50,5 @@ export function deactivate() {
   ComponentRegistry.unregister(MessageList);
   ComponentRegistry.unregister(SidebarPluginContainer);
   ComponentRegistry.unregister(SidebarParticipantPicker);
+  ComponentRegistry.unregister(MessageListHiddenMessagesToggle);
 }

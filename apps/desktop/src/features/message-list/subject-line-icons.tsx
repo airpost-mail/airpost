@@ -1,6 +1,6 @@
 import React from 'react';
-import { RetinaImg } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
+import { IconButton } from '../../components/kit/icon-button';
 import EmailFrameStylesStore from './email-frame-styles-store';
 import {
   EMAIL_RENDER_MODE_KEY,
@@ -31,7 +31,7 @@ class OriginalColorsToggle extends React.Component<
   { messageIds: string[] },
   OriginalColorsToggleState
 > {
-  _el: HTMLDivElement | null = null;
+  _el: HTMLButtonElement | null = null;
   _disposables: Array<() => void> = [];
 
   state = { applies: false, original: false };
@@ -73,30 +73,17 @@ class OriginalColorsToggle extends React.Component<
     const title = original ? localized('Show Dark Colors') : localized('Show Original Colors');
 
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={title}
-        title={title}
+      <IconButton
+        className="original-colors-toggle"
+        size="sm"
+        icon={original ? 'toolbar-bulb-off.png' : 'toolbar-bulb-on.png'}
+        label={title}
         style={applies ? undefined : { display: 'none' }}
         ref={(el) => {
           this._el = el;
         }}
         onClick={this._onToggle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            this._onToggle();
-          }
-        }}
-      >
-        <RetinaImg
-          name={original ? 'toolbar-bulb-off.png' : 'toolbar-bulb-on.png'}
-          mode={RetinaImg.Mode.ContentIsMask}
-          style={{ width: 16, height: 16 }}
-          aria-hidden="true"
-        />
-      </div>
+      />
     );
   }
 }
@@ -104,78 +91,34 @@ class OriginalColorsToggle extends React.Component<
 export const SubjectLineIcons: React.FunctionComponent<SubjectLineIconsProps> = (props) => (
   <div className="message-icons-wrap">
     {props.canCollapse && (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={props.hasCollapsedItems ? localized('Expand All') : localized('Collapse All')}
-        title={props.hasCollapsedItems ? localized('Expand All') : localized('Collapse All')}
+      <IconButton
+        size="sm"
+        icon={props.hasCollapsedItems ? 'expand.png' : 'collapse.png'}
+        label={props.hasCollapsedItems ? localized('Expand All') : localized('Collapse All')}
         onClick={props.onToggleAllExpanded}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            props.onToggleAllExpanded();
-          }
-        }}
-      >
-        <RetinaImg
-          name={props.hasCollapsedItems ? 'expand.png' : 'collapse.png'}
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-      </div>
+      />
     )}
-    <div
-      role="button"
-      tabIndex={0}
-      aria-label={localized('Print Thread')}
-      title={localized('Print Thread')}
+    <IconButton
+      size="sm"
+      icon="print.png"
+      label={localized('Print Thread')}
       onClick={props.onPrint}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          props.onPrint();
-        }
-      }}
-    >
-      <RetinaImg name="print.png" mode={RetinaImg.Mode.ContentIsMask} aria-hidden="true" />
-    </div>
+    />
     <OriginalColorsToggle messageIds={props.messageIds} />
     {AppEnv.isThreadWindow() ? (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={localized('Pop thread in')}
-        title={localized('Pop thread in')}
+      <IconButton
+        size="sm"
+        icon="thread-popin.png"
+        label={localized('Pop thread in')}
         onClick={props.onPopIn}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            props.onPopIn();
-          }
-        }}
-      >
-        <RetinaImg name="thread-popin.png" mode={RetinaImg.Mode.ContentIsMask} aria-hidden="true" />
-      </div>
+      />
     ) : (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={localized('Popout thread')}
-        title={localized('Popout thread')}
+      <IconButton
+        size="sm"
+        icon="thread-popout.png"
+        label={localized('Popout thread')}
         onClick={props.onPopOut}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            props.onPopOut();
-          }
-        }}
-      >
-        <RetinaImg
-          name="thread-popout.png"
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-      </div>
+      />
     )}
   </div>
 );

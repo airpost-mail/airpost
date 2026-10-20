@@ -32,12 +32,8 @@ body.platform-win32 {
     font-size: 12px;
   }
 
-  .btn.btn-find-in-thread {
-    border: 0;
-    box-shadow: 0 0 0;
-    border-radius: 0;
-    background: transparent;
-    display: inline-block;
+  .controls-wrap > .btn-find-in-thread {
+    vertical-align: middle;
   }
   .input-wrap {
     display: inline-block;
@@ -49,7 +45,11 @@ body.platform-win32 {
       font-size: 12px;
     }
     .btn-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
       min-width: 54px;
+      height: 26px;
       position: absolute;
       top: 0;
       right: 0;

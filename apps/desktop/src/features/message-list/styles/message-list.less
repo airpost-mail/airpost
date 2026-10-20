@@ -223,17 +223,15 @@ body.platform-win32 {
   }
   .message-icons-wrap {
     flex-shrink: 0;
-    cursor: pointer;
     user-select: none;
     margin-left: auto;
     display: flex;
     align-items: center;
+    gap: 2px;
 
-    img {
-      background: @text-color-subtle;
-    }
-    div + div {
-      margin-left: @padding-small-horizontal;
+    .original-colors-toggle img {
+      width: 16px;
+      height: 16px;
     }
   }
   .thread-injected-mail-labels {
@@ -445,7 +443,6 @@ body.platform-win32 {
     }
 
     .message-actions-ellipsis {
-      display: block;
       float: left;
     }
 
@@ -531,21 +528,27 @@ body.platform-win32 {
     top: 0;
   }
 
+  // Sized to its triangle, so it sits in the header's left margin.
   .header-toggle-control {
     &.inactive {
       display: none;
     }
     z-index: 3;
     position: absolute;
-    top: 0;
+    top: 18px;
     left: -1 * 13px;
-    img {
-      background: @text-color-very-subtle;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: 0;
+    color: var(--muted-foreground);
+    &:not(.inactive) {
+      left: -1 * 14px;
     }
   }
   .message-item-wrap:hover {
     .header-toggle-control.inactive {
-      display: block;
+      display: inline-flex;
     }
   }
 
@@ -612,6 +615,15 @@ body.platform-win32 {
     background-color: @download-btn-color;
   }
 
+  .download-all-action {
+    gap: 0;
+    height: auto;
+    padding-inline: 4px;
+    margin-inline-start: -4px;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+  }
   .download-all-action:hover {
     color: @download-hover-color;
     img {
@@ -802,8 +814,7 @@ body.platform-win32 {
 .sidebar-participant-picker {
   padding: 10px 5px 20px 5px;
   text-align: right;
-  select {
-    max-width: 100%;
+  [data-slot='select-trigger'] {
     width: 100%;
   }
 }

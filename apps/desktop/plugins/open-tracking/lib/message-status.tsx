@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { localized, Actions, Message } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { RetinaImg, Button } from 'mailspring-component-kit';
 import OpenTrackingMessagePopover from './message-popover';
 import { PLUGIN_ID } from './constants';
 
@@ -50,21 +50,35 @@ export default class OpenTrackingMessageStatus extends React.Component<{ message
     }
 
     const text = opened ? `${count} ${noun.toLocaleLowerCase()}` : localized('No opens');
-    return (
-      <span
-        className={`open-tracking-message-status ${opened ? 'opened' : 'unopened'}`}
-        onMouseDown={opened ? this.onMouseDown : null}
-      >
-        {
-          <RetinaImg
-            className={opened ? 'opened' : 'unopened'}
-            style={{ position: 'relative', top: -1 }}
-            url="mailspring://open-tracking/assets/InMessage-opened@2x.png"
-            mode={RetinaImg.Mode.ContentIsMask}
-          />
-        }
+    const content = (
+      <>
+        <RetinaImg
+          className={opened ? 'opened' : 'unopened'}
+          style={{ position: 'relative', top: -1 }}
+          url="mailspring://open-tracking/assets/InMessage-opened@2x.png"
+          mode={RetinaImg.Mode.ContentIsMask}
+        />
         &nbsp;&nbsp;{text}
-      </span>
+      </>
+    );
+    if (!opened) {
+      return <span className="open-tracking-message-status unopened">{content}</span>;
+    }
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="open-tracking-message-status opened"
+        onMouseDown={this.onMouseDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.onMouseDown();
+          }
+        }}
+      >
+        {content}
+      </Button>
     );
   }
 }

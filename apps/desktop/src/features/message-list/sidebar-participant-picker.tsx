@@ -1,5 +1,12 @@
 import React from 'react';
-import { Actions, FocusedContactsStore, Contact } from 'mailspring-exports';
+import { localized, Actions, FocusedContactsStore, Contact } from 'mailspring-exports';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/kit/select';
 
 const SPLIT_KEY = '---splitvalue---';
 
@@ -45,9 +52,9 @@ export class SidebarParticipantPicker extends React.Component<
     return contact.email + SPLIT_KEY + contact.name;
   }
 
-  _onSelectContact = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  _onSelectContact = (value: string) => {
     const { sortedContacts } = this.state;
-    const [email, name] = event.target.value.split(SPLIT_KEY);
+    const [email, name] = value.split(SPLIT_KEY);
     const contact = sortedContacts.find(
       (c) => (c.name === name || typeof c.name === 'undefined') && c.email === email
     );
@@ -59,9 +66,9 @@ export class SidebarParticipantPicker extends React.Component<
       const key = this._getKeyForContact(contact);
 
       return (
-        <option value={key} key={key}>
+        <SelectItem value={key} key={key}>
           {contact.displayName({ includeAccountLabel: true, forceAccountLabel: true })}
-        </option>
+        </SelectItem>
       );
     });
   }
@@ -74,9 +81,12 @@ export class SidebarParticipantPicker extends React.Component<
     }
     return (
       <div className="sidebar-participant-picker">
-        <select tabIndex={-1} value={value} onChange={this._onSelectContact}>
-          {this._renderSortedContacts()}
-        </select>
+        <Select value={value} onValueChange={this._onSelectContact}>
+          <SelectTrigger tabIndex={-1} aria-label={localized('Contact')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>{this._renderSortedContacts()}</SelectContent>
+        </Select>
       </div>
     );
   }

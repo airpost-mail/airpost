@@ -8,7 +8,14 @@ import {
   CapabilityStore,
 } from 'mailspring-exports';
 
-import { Menu, RetinaImg } from 'mailspring-component-kit';
+import {
+  Menu,
+  RetinaImg,
+  Button,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from 'mailspring-component-kit';
 import { TranslatePopupOptions, translateMessageBody } from './service';
 
 type Props = { draft: Message; session: DraftEditingSession };
@@ -52,22 +59,30 @@ const TranslateComposerButtonInner: React.FC<Props> = ({ draft, session }) => {
     ? localized('Translate email body…')
     : CapabilityStore.unavailableMessage('translation');
   return (
-    <button
-      ref={buttonRef}
-      tabIndex={-1}
-      className="btn btn-toolbar btn-translate pull-right"
-      onClick={onClickTranslateButton}
-      disabled={!available}
-      title={title}
-      aria-label={title}
-    >
-      <RetinaImg
-        mode={RetinaImg.Mode.ContentIsMask}
-        url="mailspring://translation/assets/icon-composer-translate@2x.png"
-      />
-      &nbsp;
-      <RetinaImg name="icon-composer-dropdown.png" mode={RetinaImg.Mode.ContentIsMask} />
-    </button>
+    <Tooltip>
+      {/* The span is the trigger: a disabled button takes no pointer events, and the tooltip
+          says why it is disabled. */}
+      <TooltipTrigger asChild>
+        <span className="btn-translate-wrap pull-right">
+          <Button
+            ref={buttonRef}
+            variant="toolbar"
+            tabIndex={-1}
+            className="btn-translate"
+            onClick={onClickTranslateButton}
+            disabled={!available}
+            aria-label={title}
+          >
+            <RetinaImg
+              mode={RetinaImg.Mode.ContentIsMask}
+              url="mailspring://translation/assets/icon-composer-translate@2x.png"
+            />
+            <RetinaImg name="icon-composer-dropdown.png" mode={RetinaImg.Mode.ContentIsMask} />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   );
 };
 // Our render method doesn't use the provided `draft`, and the draft changes
