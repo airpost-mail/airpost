@@ -5,6 +5,7 @@ import fs from 'fs';
 import { localized } from './intl';
 import LessCompileCache from './compile-cache-less';
 import PackageManager from './package-manager';
+import { bundledPackageRoots } from './bundled-packages';
 
 const CONFIG_THEME_KEY = 'core.theme';
 const CONFIG_USE_SYSTEM_ACCENT_KEY = 'core.appearance.useSystemAccent';
@@ -171,7 +172,7 @@ export default class ThemeManager {
   }
 
   reloadCoreStyles() {
-    console.log('Reloading /static and /internal_packages to incorporate LESS changes');
+    console.log('Reloading /static and the bundled packages to incorporate LESS changes');
     const reloadStylesIn = (folder: string) => {
       (fs.readdirSync(folder, { recursive: true }) as string[])
         .map((f) => path.join(folder, f))
@@ -182,7 +183,9 @@ export default class ThemeManager {
         });
     };
     reloadStylesIn(`${this.resourcePath}/static`);
-    reloadStylesIn(`${this.resourcePath}/internal_packages`);
+    for (const root of bundledPackageRoots(this.resourcePath)) {
+      reloadStylesIn(root);
+    }
     if (this.activeThemePackage) this.loadThemeTokens(this.activeThemePackage);
   }
 

@@ -47,7 +47,7 @@ The Mailspring composer is built on several layers:
 ┌──────────────────────────────────────────────────────────┐
 │  Composer:ActionButton   Composer:Footer   ...           │  ← Injected via ComponentRegistry
 ├──────────────────────────────────────────────────────────┤
-│  ComposerView  (app/internal_packages/composer/)         │  ← Renders InjectedComponentSets
+│  ComposerView  (app/features/composer/)         │  ← Renders InjectedComponentSets
 ├──────────────────────────────────────────────────────────┤
 │  ComposerEditor (Slate v0 rich-text editor)              │  ← Slate plugins for editor behavior
 ├──────────────────────────────────────────────────────────┤
@@ -70,7 +70,7 @@ Most composer plugins use (1) and (2). Plugins that need to introduce new inline
 ## Plugin File Structure
 
 ```
-app/internal_packages/my-composer-plugin/
+app/plugins/my-composer-plugin/
 ├── package.json
 ├── lib/
 │   ├── main.ts              # activate() / deactivate() lifecycle
@@ -167,7 +167,7 @@ interface ComposerInjectedProps {
 }
 ```
 
-Source: `app/internal_packages/composer/lib/composer-view.tsx`
+Source: `app/features/composer/lib/composer-view.tsx`
 
 ### Toolbar Buttons (Composer:ActionButton)
 
@@ -851,7 +851,7 @@ export const schema = {
 
 The translation plugin adds a toolbar button that opens a language picker popover and replaces the draft body with a translated version.
 
-**Key files**: `app/internal_packages/translation/`
+**Key files**: `app/plugins/translation/`
 
 ```typescript
 // main.tsx — Lifecycle

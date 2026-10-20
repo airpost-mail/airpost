@@ -28,7 +28,9 @@ function writeTerms(terms, destPath) {
 }
 
 collectFiles(__dirname + '/../app/src');
-collectFiles(__dirname + '/../app/internal_packages');
+collectFiles(__dirname + '/../app/features');
+collectFiles(__dirname + '/../app/plugins');
+collectFiles(__dirname + '/../app/themes');
 collectFiles(__dirname + '/../app/menus');
 
 let sourceTerms = [];

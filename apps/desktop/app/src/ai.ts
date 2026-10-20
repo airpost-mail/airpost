@@ -11,7 +11,7 @@ provider; with an older engine the key is read from the keyset (KeyManager) as
 `integration-ai-<providerId>-key` (keyName) and goes with each request. Keys are never in config
 and never logged.
 
-The requests themselves are made by internal_packages/ai through the Engine export; this module
+The requests themselves are made by plugins/ai through the Engine export; this module
 is shared with the CapabilityStore, which needs the settings to say whether a feature is set up.
 */
 

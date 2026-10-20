@@ -59,8 +59,8 @@
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
     "start": "electron ./app --enable-logging --dev",
-    "lint": "eslint --fix -c .eslintrc \"app/src/**/*.{ts,tsx}\" \"app/internal_packages/**/*.{ts,tsx}\"",
-    "lint:check": "eslint -c .eslintrc \"app/src/**/*.{ts,tsx}\" \"app/internal_packages/**/*.{ts,tsx}\"",
+    "lint": "eslint --fix -c .eslintrc \"app/src/**/*.{ts,tsx}\" \"app/{features,plugins,themes}/**/*.{ts,tsx}\"",
+    "lint:check": "eslint -c .eslintrc \"app/src/**/*.{ts,tsx}\" \"app/{features,plugins,themes}/**/*.{ts,tsx}\"",
     "typecheck": "./node_modules/.bin/tsc -p app/tsconfig.json --noEmit",
     "test": "node scripts/test.js --test",
     "test-window": "node scripts/test.js --test=window",

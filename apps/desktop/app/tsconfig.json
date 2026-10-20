@@ -20,6 +20,6 @@
       "*": ["node_modules/*", "src/global/*"]
     }
   },
-  "include": ["src/**/*", "internal_packages/**/*", "spec/**/*"],
+  "include": ["src/**/*", "features/**/*", "plugins/**/*", "themes/**/*", "spec/**/*"],
   "exclude": ["spec/spec-runner/jasmine.js"]
 }

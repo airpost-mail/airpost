@@ -30,7 +30,7 @@ const QuickPreviewPartition = 'quickpreview';
 // bundled preview code and downloaded attachments. That keeps attachment content (markdown
 // or docx with <img src="//host/share/x">) off UNC paths, which Windows opens over SMB.
 function applyQuickPreviewCSP(session: Electron.Session) {
-  const fileRoots = [filesRoot, path.join(AppEnv.getConfigDirPath(), 'files')];
+  const fileRoots = [filesRoot, vendorRoot, path.join(AppEnv.getConfigDirPath(), 'files')];
   session.webRequest.onBeforeRequest((details, callback) => {
     const isFile = /^file:/i.test(details.url);
     callback({ cancel: isFile && !isFileURLWithin(details.url, fileRoots) });
@@ -55,13 +55,15 @@ let captureWindowInUse = false;
 const captureQueue = [];
 
 const filesRoot = __dirname.replace('app.asar', 'app.asar.unpacked');
+// pdf.js, Prism, SheetJS and DOMPurify, which renderer.html loads by relative path.
+const vendorRoot = path.resolve(filesRoot, '..', '..', 'vendor');
 
 const FileSizeLimit = 5 * 1024 * 1024;
 const ThumbnailWidth = 320 * (11 / 8.5);
 // Budget for generating a single thumbnail, shared by both strategies.
 const PreviewTimeout = 5000;
 const QuicklookIsAvailable = process.platform === 'darwin';
-const PDFJSRoot = path.join(filesRoot, 'pdfjs-4.3.136');
+const PDFJSRoot = path.join(vendorRoot, 'pdfjs-4.3.136');
 
 const QuicklookBlacklist = [
   'jpg',

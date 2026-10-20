@@ -1015,7 +1015,7 @@ deletes SQLite after 10. 10 to 12 move credentials, which is the prerequisite fo
   and `::1` (Proton Bridge); the engine refuses `none` for any other host unless that key
   matches the host, so every client (desktop, web, CLI) has to ask. `ms-providers` ports the
   cleaned `mailspring-provider-settings.json`, which has no `none` entry; the desktop rules
-  are in `internal_packages/onboarding/lib/connection-security.ts` (copied in
+  are in `features/onboarding/lib/connection-security.ts` (copied in
   `apps/web/src/features/settings/accounts/account-draft.ts`).
 - Tests: id derivation vectors; OAuth against a mock provider; discovery tables (no `none`
   anywhere); a relayed connection refused on every local-only method.
@@ -2798,7 +2798,7 @@ Open from the review (low):
   which this stage removed, and `docs/plugins-inventory.md` (lines 183-184) still describes
   open-tracking and link-tracking as ExtensionRegistry.Composer users that inject the pixel and
   rewrite links; the engine does both now.
-- `apps/desktop/app/internal_packages/link-tracking/lib/types.ts`: `LinkTrackingMetadata` still
+- `apps/desktop/app/plugins/link-tracking/lib/types.ts`: `LinkTrackingMetadata` still
   types `links` as `[{url, redirect_url}]`; the engine writes `{url, click_count, click_data}` with
   no `redirect_url`, plus `tracked`, `trackingId`, `recipients` and `uid`.
   `link-tracking-message-extension.tsx` still indexes `links[link.redirect_url]`, now always

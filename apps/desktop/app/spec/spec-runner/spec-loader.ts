@@ -3,6 +3,7 @@
 import _ from 'underscore';
 import fs from 'fs';
 import path from 'path';
+import { bundledPackagePaths } from '../../src/bundled-packages';
 
 class N1SpecLoader {
   jasmineEnv: any;
@@ -28,10 +29,8 @@ class N1SpecLoader {
 
     const fixturesPackagesPath = path.join(__dirname, 'fixtures', 'packages');
 
-    // EDGEHILL_CORE: Look in internal_packages instead of node_modules
     let packagePathsList: string[] = [];
-    const pkgsDir = path.join(resourcePath, 'internal_packages');
-    const iterable = fs.readdirSync(pkgsDir).map((f) => path.join(pkgsDir, f));
+    const iterable = bundledPackagePaths(resourcePath);
     for (let i = 0; i < iterable.length; i++) {
       const packagePath = iterable[i];
       if (fs.statSync(packagePath).isDirectory()) {

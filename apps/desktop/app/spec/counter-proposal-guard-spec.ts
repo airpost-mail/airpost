@@ -1,4 +1,4 @@
-import { counterProposalProblem } from '../internal_packages/events/lib/rsvp-target';
+import { counterProposalProblem } from '../features/events/lib/rsvp-target';
 
 /*
 A COUNTER arrives as an email attachment, so everything in it - the UID, the ORGANIZER, the

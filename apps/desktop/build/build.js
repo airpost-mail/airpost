@@ -41,18 +41,18 @@ function macMainEntitlementsPath() {
 }
 
 const sourceGlobs = [
-  'internal_packages/**/*.ts',
-  'internal_packages/**/*.tsx',
-  'internal_packages/**/*.jsx',
+  '{features,plugins,themes}/**/*.ts',
+  '{features,plugins,themes}/**/*.tsx',
+  '{features,plugins,themes}/**/*.jsx',
   'src/**/*.ts',
   'src/**/*.tsx',
   'src/**/*.jsx',
   '!src/**/node_modules/**/*.ts',
   '!src/**/node_modules/**/*.tsx',
   '!src/**/node_modules/**/*.jsx',
-  '!internal_packages/**/node_modules/**/*.ts',
-  '!internal_packages/**/node_modules/**/*.tsx',
-  '!internal_packages/**/node_modules/**/*.jsx',
+  '!{features,plugins,themes}/**/node_modules/**/*.ts',
+  '!{features,plugins,themes}/**/node_modules/**/*.tsx',
+  '!{features,plugins,themes}/**/node_modules/**/*.jsx',
   // Workspace packages from the repo's packages/ dir, linked in as TypeScript source.
   'node_modules/@tern/*/src/**/*.ts',
 ];
@@ -80,7 +80,7 @@ const symlinkedPackages = [];
 
 function resolveRealSymlinkPaths() {
   console.log('---> Resolving symlinks');
-  const dirs = ['internal_packages', 'src', 'spec', 'node_modules'];
+  const dirs = ['features', 'plugins', 'themes', 'src', 'spec', 'node_modules'];
   dirs.forEach((dir) => {
     const absoluteDir = path.join(appDir, dir);
     const entries = fs.readdirSync(absoluteDir).flatMap((name) => {

@@ -1,0 +1,545 @@
+/* eslint global-require: 0 */
+import fs from 'fs';
+import React, { Component } from 'react';
+import classnames from 'classnames';
+import { ipcRenderer } from 'electron';
+import { SettingsSection, SettingsRow, SettingsCard } from 'mailspring-component-kit';
+import { localized, RegExpUtils, Account, AccountAutoaddress } from 'mailspring-exports';
+import { developerToolsAvailable } from '../../../../src/developer-tools';
+
+/** One address the account sends from, shown as text until the user edits it. */
+class AliasRow extends Component<
+  { alias: string; onSave: (value: string) => void; onRemove: () => void },
+  { editing: boolean; value: string }
+> {
+  state = { editing: false, value: this.props.alias };
+
+  _save = () => {
+    const value = this.state.value.trim();
+    this.setState({ editing: false });
+    if (value && value !== this.props.alias) this.props.onSave(value);
+  };
+
+  render() {
+    const { alias, onRemove } = this.props;
+    if (this.state.editing) {
+      return (
+        <div className="settings-row alias-input-row">
+          <input
+            type="text"
+            autoFocus
+            aria-label={localized('Address')}
+            value={this.state.value}
+            onChange={(e) => this.setState({ value: e.target.value })}
+            onBlur={this._save}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') this._save();
+              if (e.key === 'Escape') this.setState({ editing: false, value: alias });
+            }}
+          />
+        </div>
+      );
+    }
+    return (
+      <SettingsRow label={<span dir="auto">{alias}</span>}>
+        <button
+          className="btn"
+          onClick={() => this.setState({ editing: true, value: alias })}
+          aria-label={localized('Edit %@', alias)}
+        >
+          {localized('Edit')}
+        </button>
+        <button className="btn" onClick={onRemove} aria-label={localized('Remove %@', alias)}>
+          {localized('Remove')}
+        </button>
+      </SettingsRow>
+    );
+  }
+}
+
+class PreferencesAccountDetails extends Component<
+  {
+    account: Account;
+    isOffline: boolean;
+    onAccountUpdated: (account: Account, newAccount: Account) => void;
+    onRemoveAccount?: (account: Account) => void;
+  },
+  {
+    account: Account;
+    newAlias: string;
+  }
+> {
+  constructor(props) {
+    super(props);
+    this.state = { account: props.account.clone(), newAlias: '' };
+  }
+
+  componentDidUpdate(prevProps: {
+    account: Account;
+    onAccountUpdated: (account: Account, newAccount: Account) => void;
+  }) {
+    if (prevProps.account !== this.props.account) {
+      this.setState({ account: this.props.account.clone() });
+    }
+  }
+
+  componentWillUnmount() {
+    this._saveChanges();
+  }
+
+  // Helpers
+
+  /**
+   * @private Will transform any user input into alias format.
+   * It will ignore any text after an email, if one is entered.
+   * If no email is entered, it will use the account's email.
+   * It will treat the text before the email as the name for the alias.
+   * If no name is entered, it will use the account's name value.
+   * @param {string} str - The string the user entered on the alias input
+   * @param {object} [account=this.props.account] - The account object
+   */
+  _makeAlias(str: string, account = this.props.account) {
+    const emailRegex = RegExpUtils.emailRegex();
+    const match = emailRegex.exec(str);
+    if (!match) {
+      return `${str || account.name} <${account.emailAddress}>`;
+    }
+    const email = match[0];
+    let name = str.slice(0, Math.max(0, match.index - 1));
+    if (!name) {
+      name = account.name || localized('No name provided');
+    }
+    name = name.trim();
+    // TODO Sanitize the name string
+    return `${name} <${email}>`;
+  }
+
+  _saveChanges = () => {
+    this.props.onAccountUpdated(this.props.account, this.state.account);
+  };
+
+  _setState = (updates, callback = () => {}) => {
+    const account = Object.assign(this.state.account.clone(), updates);
+    this.setState({ account }, callback);
+  };
+
+  _setStateAndSave = (updates: Partial<Account>) => {
+    this._setState(updates, () => {
+      this._saveChanges();
+    });
+  };
+
+  // Handlers
+  _onAccountAutoaddressUpdated = (autoaddress: AccountAutoaddress) => {
+    this._setState({ autoaddress });
+  };
+
+  _onAccountAliasCreated = (newAlias: string) => {
+    const coercedAlias = this._makeAlias(newAlias);
+    const aliases = this.state.account.aliases.concat([coercedAlias]);
+    this._setStateAndSave({ aliases });
+  };
+
+  _onAccountAliasUpdated = (newAlias: string, alias: string, idx: number) => {
+    const coercedAlias = this._makeAlias(newAlias);
+    const aliases = this.state.account.aliases.slice();
+    let defaultAlias = this.state.account.defaultAlias;
+    if (defaultAlias === alias) {
+      defaultAlias = coercedAlias;
+    }
+    aliases[idx] = coercedAlias;
+    this._setStateAndSave({ aliases, defaultAlias });
+  };
+
+  _onAccountAliasRemoved = (alias: string, idx: number) => {
+    const aliases = this.state.account.aliases.slice();
+    let defaultAlias = this.state.account.defaultAlias;
+    if (defaultAlias === alias) {
+      defaultAlias = null;
+    }
+    aliases.splice(idx, 1);
+    this._setStateAndSave({ aliases, defaultAlias });
+  };
+
+  _onAddAlias = () => {
+    const value = this.state.newAlias.trim();
+    if (!value) return;
+    this.setState({ newAlias: '' });
+    this._onAccountAliasCreated(value);
+  };
+
+  _onDefaultAliasSelected = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const defaultAlias = event.target.value === 'None' ? null : event.target.value;
+    this._setStateAndSave({ defaultAlias });
+  };
+
+  // The engine keeps the secrets: onboarding asks for new ones (account.setSecrets).
+  _onReconnect = () => {
+    ipcRenderer.send('command', 'application:add-account', {
+      reconnectAccountId: this.state.account.id,
+    });
+  };
+
+  _onResetCache = () => {
+    AppEnv.mailsyncBridge.resetCacheForAccount(this.state.account);
+  };
+
+  _onAddSharedMailbox = () => {
+    // Intentionally omits account secrets — the shared mailbox flow runs a fresh
+    // OAuth sign-in and only needs the provider to route to the right settings page.
+    ipcRenderer.send('command', 'application:add-account', {
+      existingAccountJSON: this.state.account.toJSON(),
+      o365SharedMailbox: true,
+    });
+  };
+
+  _onManageContacts = () => {
+    ipcRenderer.send('command', 'application:show-contacts', {});
+  };
+
+  _onSetColor = (colorChanged: Partial<Account>) => {
+    // TODO: Ensure that the account color is updated in all places where it is displayed:
+    // - features/composer/lib/account-contict-field.tsx
+    // - features/contacts/lib/ContactsList.tsx
+    // - features/preferences/lib/preferences-account-list.tsx
+    // - features/thread-list/lib/thread-lib-participants.tsx
+    // - src/components/outline-view.tsx
+    this._setState(colorChanged);
+  };
+
+  _onResetColor = () => {
+    this.state.account.color = '';
+    this._saveChanges();
+  };
+
+  _onRemoveAccount = () => {
+    const { account } = this.props;
+    const chosen = require('@electron/remote').dialog.showMessageBoxSync({
+      type: 'warning',
+      message: localized('Remove %@?', account.emailAddress),
+      detail: localized(
+        "Its mail is deleted from this computer. Your mail stays on your provider's server."
+      ),
+      buttons: [localized('Cancel'), localized('Remove')],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (chosen === 1) this.props.onRemoveAccount?.(account);
+  };
+
+  _onShowErrorDetails = async () => {
+    const { id, syncState, settings, provider } = this.props.account;
+    const filepath = require('path').join(
+      require('@electron/remote').app.getPath('temp'),
+      `error-details-${id}-${Date.now()}.html`
+    );
+
+    try {
+      const logs = await AppEnv.mailsyncBridge.tailClientLog(id);
+      const result = [
+        `Tern Version: ${AppEnv.getVersion()}`,
+        `Platform: ${process.platform}`,
+        `Account State: ${syncState}`,
+        `Account Provider: ${provider}`,
+        `IMAP Server: ${settings.imap_host}`,
+        `SMTP Server: ${settings.smtp_host}`,
+        `--------------------------------------------`,
+        logs,
+      ].join('\n');
+
+      fs.writeFileSync(
+        filepath,
+        `<div style="white-space: pre-wrap; font-family: monospace;">${result}</div>`
+      );
+    } catch (err) {
+      AppEnv.showErrorDialog({ title: 'Error', message: `Could not retrieve sync logs. ${err}` });
+      return;
+    }
+    const { BrowserWindow } = require('@electron/remote');
+    const win = new BrowserWindow({
+      width: 800,
+      height: 600,
+      title: `Account ${id} - Recent Logs`,
+      webPreferences: {
+        javascript: false,
+        nodeIntegration: false,
+        devTools: developerToolsAvailable(),
+      },
+    });
+    win.loadURL(`file://${filepath}`);
+  };
+
+  // Renderers
+
+  _renderBanner(
+    kind: 'bad' | 'warn',
+    title: string,
+    detail: string,
+    primary: { text: string; action: () => void }
+  ) {
+    return (
+      <SettingsCard className={`account-banner ${kind}`}>
+        <div className="account-banner-icon" aria-hidden>
+          !
+        </div>
+        <div className="account-banner-text" role="alert">
+          <div className="account-banner-title">{title}</div>
+          <div className="account-banner-detail">{detail}</div>
+        </div>
+        <div className="account-banner-actions">
+          <button className="btn" onClick={this._onShowErrorDetails}>
+            {localized('Error details')}
+          </button>
+          <button className="btn btn-emphasis" onClick={primary.action}>
+            {primary.text}
+          </button>
+        </div>
+      </SettingsCard>
+    );
+  }
+
+  _renderSyncErrorDetails() {
+    const { account } = this.state;
+
+    switch (account.syncState) {
+      case Account.SYNC_STATE_AUTH_FAILED:
+        return this._renderBanner(
+          'bad',
+          localized("Tern can't sign in to %@", account.emailAddress),
+          localized(
+            'The password or sign-in may have changed. Mail for this account has stopped syncing until you reconnect.'
+          ),
+          { text: localized('Reconnect'), action: this._onReconnect }
+        );
+      case Account.SYNC_STATE_ERROR:
+        return this._renderBanner(
+          'bad',
+          localized('Mail for %@ stopped syncing', account.emailAddress),
+          localized(
+            'Tern ran into an error it could not get past. Reconnecting often fixes it; if it keeps happening, rebuild the account below.'
+          ),
+          { text: localized('Reconnect'), action: this._onReconnect }
+        );
+      default:
+        if (!this.props.isOffline) {
+          return null;
+        }
+        return this._renderBanner(
+          'warn',
+          localized("Tern can't reach %@", account.settings.imap_host || account.emailAddress),
+          localized(
+            'It will keep trying. Your computer may be offline, or your mail provider may be having trouble.'
+          ),
+          { text: localized('Try now'), action: () => AppEnv.mailsyncBridge.sendSyncMailNow() }
+        );
+    }
+  }
+
+  _renderConnectionRow() {
+    const { account } = this.state;
+    if (account.usesOAuth()) {
+      return (
+        <SettingsRow
+          label={localized('Signed in with %@', account.displayProvider())}
+          description={localized('Sign in again if Tern stops getting your mail.')}
+        >
+          <button className="btn" onClick={this._onReconnect}>
+            {localized('Sign in again…')}
+          </button>
+        </SettingsRow>
+      );
+    }
+    const host = account.settings.imap_host;
+    return (
+      <SettingsRow
+        label={
+          host
+            ? localized('Connected to %@', host)
+            : localized('Connected with %@', account.displayProvider())
+        }
+        description={localized('Change the password, servers or ports Tern uses.')}
+      >
+        <button className="btn" onClick={this._onReconnect}>
+          {localized('Update connection settings…')}
+        </button>
+      </SettingsRow>
+    );
+  }
+
+  render() {
+    const { account, newAlias } = this.state;
+    const aliasPlaceholder = this._makeAlias(`alias@${account.emailAddress.split('@')[1]}`);
+    const aliases = account.aliases;
+    const defaultAlias = account.defaultAlias || 'None';
+    const { autoaddress } = account;
+
+    return (
+      <div className="account-details">
+        {this._renderSyncErrorDetails()}
+
+        <SettingsSection title={<span dir="auto">{account.label}</span>}>
+          <SettingsRow label={localized('Name in the sidebar')}>
+            <input
+              id="account-label"
+              type="text"
+              aria-label={localized('Name in the sidebar')}
+              value={account.label}
+              onBlur={this._saveChanges}
+              onChange={(e) => this._setState({ label: e.target.value })}
+            />
+          </SettingsRow>
+          <SettingsRow label={localized('Your name on sent mail')}>
+            <input
+              id="account-sender-name"
+              type="text"
+              aria-label={localized('Your name on sent mail')}
+              value={account.name}
+              onBlur={this._saveChanges}
+              onChange={(e) => this._setState({ name: e.target.value })}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={localized('Colour')}
+            description={localized('Marks this account in the sidebar and message list.')}
+          >
+            <input
+              id="account-color"
+              type="color"
+              aria-label={localized('Colour')}
+              className={classnames({ unset: !account.color })}
+              value={account.color || '#000000'}
+              onBlur={this._saveChanges}
+              onChange={(e) => this._onSetColor({ color: e.target.value })}
+            />
+            {account.color ? (
+              <button className="btn" onClick={this._onResetColor}>
+                {localized('No colour')}
+              </button>
+            ) : (
+              <span className="account-color-none">{localized('None')}</span>
+            )}
+          </SettingsRow>
+          <SettingsRow
+            label={localized('Always copy')}
+            description={localized('Adds these addresses to every message you write.')}
+            className="autoaddress-row"
+          >
+            <select
+              className="settings-select"
+              aria-label={localized('Cc or Bcc')}
+              value={autoaddress.type}
+              onChange={(e) =>
+                this._setStateAndSave({
+                  autoaddress: { ...autoaddress, type: e.target.value as 'cc' | 'bcc' },
+                })
+              }
+            >
+              <option value="cc">{localized('Cc')}</option>
+              <option value="bcc">{localized('Bcc')}</option>
+            </select>
+            <input
+              type="text"
+              aria-label={localized('Addresses to copy, separated by commas')}
+              value={autoaddress.value}
+              onChange={(e) =>
+                this._onAccountAutoaddressUpdated({ ...autoaddress, value: e.target.value })
+              }
+              onBlur={this._saveChanges}
+              placeholder={localized('Addresses, comma-separated')}
+            />
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection
+          title={localized('Other addresses you send from')}
+          note={localized(
+            'Most providers only send from an address you have set up with them first.'
+          )}
+        >
+          {aliases.map((alias, idx) => (
+            <AliasRow
+              key={`${idx}-${alias}`}
+              alias={alias}
+              onSave={(value) => this._onAccountAliasUpdated(value, alias, idx)}
+              onRemove={() => this._onAccountAliasRemoved(alias, idx)}
+            />
+          ))}
+          <div className="settings-row alias-input-row">
+            <input
+              type="text"
+              aria-label={localized('New address')}
+              placeholder={aliasPlaceholder}
+              value={newAlias}
+              onChange={(e) => this.setState({ newAlias: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && this._onAddAlias()}
+            />
+            <button className="btn" disabled={!newAlias.trim()} onClick={this._onAddAlias}>
+              {localized('Add')}
+            </button>
+          </div>
+          {aliases.length > 0 && (
+            <SettingsRow label={localized('New messages from')}>
+              <select
+                className="settings-select"
+                aria-label={localized('New messages from')}
+                value={defaultAlias}
+                onChange={this._onDefaultAliasSelected}
+              >
+                <option value="None">{`${account.name} <${account.emailAddress}>`}</option>
+                {aliases.map((alias, idx) => (
+                  <option key={`alias-${idx}`} value={alias}>
+                    {alias}
+                  </option>
+                ))}
+              </select>
+            </SettingsRow>
+          )}
+        </SettingsSection>
+
+        <SettingsSection title={localized('Connection')}>
+          {this._renderConnectionRow()}
+          {account.provider === 'office365' && (
+            <SettingsRow
+              label={localized('Shared mailbox')}
+              description={localized('Add a mailbox other people in your organisation share.')}
+            >
+              <button className="btn" onClick={this._onAddSharedMailbox}>
+                {localized('Add shared mailbox…')}
+              </button>
+            </SettingsRow>
+          )}
+          <SettingsRow label={localized('Contacts')}>
+            <button className="btn" onClick={this._onManageContacts}>
+              {localized('Manage contacts')}
+            </button>
+          </SettingsRow>
+        </SettingsSection>
+
+        <SettingsSection title={localized('On this computer')}>
+          <SettingsRow
+            label={localized('Rebuild this account')}
+            description={localized(
+              'Downloads its mail again. Use it when mail is missing or looks wrong. It can take a while for a large mailbox.'
+            )}
+          >
+            <button className="btn" onClick={this._onResetCache}>
+              {localized('Rebuild…')}
+            </button>
+          </SettingsRow>
+          <SettingsRow
+            label={localized('Remove this account')}
+            description={localized(
+              "Deletes its mail from this computer. Your mail stays on your provider's server."
+            )}
+          >
+            <button className="btn btn-danger" onClick={this._onRemoveAccount}>
+              {localized('Remove…')}
+            </button>
+          </SettingsRow>
+        </SettingsSection>
+      </div>
+    );
+  }
+}
+
+export default PreferencesAccountDetails;

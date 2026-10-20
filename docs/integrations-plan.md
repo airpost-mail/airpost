@@ -47,7 +47,7 @@ reads the keyset only when an integration is turned on.
 
 ## 2. Preferences > Integrations
 
-A new tab in `internal_packages/preferences` (`tabs/preferences-integrations.tsx`). One
+A new tab in `features/preferences` (`tabs/preferences-integrations.tsx`). One
 section per provider, each with an enable toggle, a Test button (`integrations.test`, shows
 the host and, for DeepL, the characters used) and a one-line privacy note:
 

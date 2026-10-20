@@ -3,6 +3,7 @@ import fs from 'fs';
 import { shell } from 'electron';
 import { localized } from './intl';
 import Package, { isValidPackageName } from './package';
+import { bundledPackagePaths, bundledPackageRoots } from './bundled-packages';
 import { PLUGIN_API_VERSION } from './plugin-api-version';
 import { recordPluginInstall } from './plugin-install-record';
 
@@ -33,7 +34,7 @@ export default class PackageManager {
     if (specMode) {
       this.packageDirectories.push(path.join(resourcePath, 'spec', 'fixtures', 'packages'));
     } else {
-      this.packageDirectories.push(path.join(resourcePath, 'internal_packages'));
+      this.packageDirectories.push(...bundledPackageRoots(resourcePath));
       if (!safeMode) {
         this.packageDirectories.push(path.join(configDirPath, 'packages'));
         if (devMode) {
@@ -45,33 +46,47 @@ export default class PackageManager {
     this.discoverPackages();
   }
 
-  discoverPackages() {
+  // The bundled roots are discovered as one name-sorted list; later directories override
+  // earlier ones, so user packages still win over bundled ones of the same name.
+  _packagePaths() {
+    const bundledRoots = bundledPackageRoots(this.resourcePath);
+    const hasBundled = this.packageDirectories.some((dir) => bundledRoots.includes(dir));
+    const packagePaths = hasBundled ? bundledPackagePaths(this.resourcePath) : [];
     for (const dir of this.packageDirectories) {
+      if (bundledRoots.includes(dir)) continue;
       let filenames = [];
       try {
         filenames = fs.readdirSync(dir);
       } catch (err) {
         continue;
       }
+      packagePaths.push(...filenames.map((filename) => path.join(dir, filename)));
+    }
+    return packagePaths;
+  }
 
-      for (const filename of filenames) {
-        let pkg = null;
-        try {
-          pkg = new Package(path.join(dir, filename));
-          this.available[pkg.name] = pkg;
-        } catch (err) {
-          if (err instanceof Package.NoPackageJSONError) {
-            continue;
-          }
-          if (err instanceof Package.InvalidPackageNameError) {
-            console.error(err.message);
-            continue;
-          }
-          const wrapped = new Error(
-            localized(`Unable to read package.json for %@: %@`, filename, err.toString())
-          );
-          AppEnv.reportError(wrapped);
+  discoverPackages() {
+    for (const packagePath of this._packagePaths()) {
+      let pkg = null;
+      try {
+        pkg = new Package(packagePath);
+        this.available[pkg.name] = pkg;
+      } catch (err) {
+        if (err instanceof Package.NoPackageJSONError) {
+          continue;
         }
+        if (err instanceof Package.InvalidPackageNameError) {
+          console.error(err.message);
+          continue;
+        }
+        const wrapped = new Error(
+          localized(
+            `Unable to read package.json for %@: %@`,
+            path.basename(packagePath),
+            err.toString()
+          )
+        );
+        AppEnv.reportError(wrapped);
       }
     }
   }

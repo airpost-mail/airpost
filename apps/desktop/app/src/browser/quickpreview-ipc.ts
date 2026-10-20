@@ -38,7 +38,8 @@ const normalizeForComparison = (filePath: string) => {
 const pdfViewerPath = path.join(
   __dirname.replace('app.asar', 'app.asar.unpacked'),
   '..',
-  'quickpreview',
+  '..',
+  'vendor',
   'pdfjs-4.3.136',
   'web',
   'viewer.html'

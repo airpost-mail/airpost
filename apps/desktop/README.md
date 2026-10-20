@@ -39,7 +39,8 @@ npm run build        # package for the host platform into app/dist
 
 - `app/` is the app itself, with its own `package.json` for runtime dependencies built against Electron.
 - `app/src/` holds the core: main process in `browser/`, Flux stores, models and tasks in `flux/`, the plugin API in `global/`.
-- `app/internal_packages/` holds the features and bundled themes, loaded as plugins.
+- `app/features/` (core, always loaded), `app/plugins/` (bundled, can be turned off) and `app/themes/` (`ui-*`) hold the built-in packages, loaded as plugins.
+- `app/vendor/` holds the quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify).
 - `app/spec/` holds the specs.
 - `package.json` here holds the dev and build tooling.
 

@@ -135,8 +135,7 @@ those two properties yet.
 
 ## Mapping from LESS variables
 
-Uses are occurrences and files across non-theme LESS (`static/`, `internal_packages/` without
-`ui-*`), counted on 2026-10-19 while other LESS edits were in progress, so treat them as rough
+Uses are occurrences and files across non-theme LESS (`static/`, `features/` and `plugins/`), counted on 2026-10-19 while other LESS edits were in progress, so treat them as rough
 sizes. "≈" means the Light value shifts by an amount you can't see. Where several variables map to
 one token, the compat path derives the token from the one marked "source".
 

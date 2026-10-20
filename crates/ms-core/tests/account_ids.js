@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 // Writes account_ids.json: `idForAccount` copied from
-// apps/desktop/app/internal_packages/onboarding/lib/onboarding-helpers.ts as it was before the
+// apps/desktop/app/features/onboarding/lib/onboarding-helpers.ts as it was before the
 // engine derived ids, run on the cases below. Run with `node account_ids.js` from this directory.
 const crypto = require('crypto');
 const fs = require('fs');

@@ -121,15 +121,7 @@ describe('isPdfViewerURL', function () {
   const { isPdfViewerURL } = require('../src/browser/quickpreview-ipc');
   const path = require('path');
   const { pathToFileURL } = require('url');
-  const viewer = path.join(
-    __dirname,
-    '..',
-    'src',
-    'quickpreview',
-    'pdfjs-4.3.136',
-    'web',
-    'viewer.html'
-  );
+  const viewer = path.join(__dirname, '..', 'vendor', 'pdfjs-4.3.136', 'web', 'viewer.html');
 
   it('matches the bundled viewer with its query, and nothing else', function () {
     const url = pathToFileURL(viewer).href;

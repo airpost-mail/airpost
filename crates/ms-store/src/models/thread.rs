@@ -25,7 +25,7 @@ use crate::model::{
 };
 use crate::{Label, Message, MessageSnapshot, Model, Store};
 
-/// The send-reminders plugin's id (`internal_packages/send-reminders`).
+/// The send-reminders plugin's id (`plugins/send-reminders`).
 pub const SEND_REMINDERS_PLUGIN: &str = "send-reminders";
 
 /// `fmt` of a thread with no dated message yet (`INT_MAX`).

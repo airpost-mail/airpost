@@ -51,7 +51,7 @@ ICONSET = [(16, 1), (16, 2), (32, 1), (32, 2), (128, 1), (128, 2), (256, 1), (25
 # Tray .ico frames for 100..400 % scaling, as in the existing system-tray build-win32-ico.py.
 TRAY_ICO_SIZES = [16, 20, 24, 28, 32, 40, 48, 64]
 
-# Tray states, mirroring internal_packages/system-tray/assets (MenuItem-Inbox-*).
+# Tray states, mirroring features/system-tray/assets (MenuItem-Inbox-*).
 # Colours are the ones the existing tray icons use.
 GREY, WHITE = (52, 57, 64), (255, 255, 255)
 TRAY_STATES = {

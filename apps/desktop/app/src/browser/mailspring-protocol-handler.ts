@@ -1,6 +1,7 @@
 import { protocol } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { bundledPackageRoots } from '../bundled-packages';
 
 // Handles requests with 'mailspring' protocol.
 //
@@ -11,7 +12,7 @@ import path from 'path';
 //   * <config-dir>/assets
 //   * <config-dir>/dev/packages (unless in safe mode)
 //   * <config-dir>/packages
-//   * RESOURCE_PATH/node_modules
+//   * RESOURCE_PATH/{features,plugins,themes}
 //
 const FontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
 
@@ -23,7 +24,9 @@ export default class MailspringProtocolHandler {
       this.loadPaths.push(path.resolve(path.join(configDirPath, 'dev', 'packages')));
     }
     this.loadPaths.push(path.resolve(path.join(configDirPath, 'packages')));
-    this.loadPaths.push(path.resolve(path.join(resourcePath, 'internal_packages')));
+    for (const root of bundledPackageRoots(resourcePath)) {
+      this.loadPaths.push(path.resolve(root));
+    }
 
     this.registerProtocol();
   }

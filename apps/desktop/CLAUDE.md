@@ -46,9 +46,14 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
   - `registries/` - Extension registries (components, extensions, database objects)
   - `global/` - Global exports (`mailspring-exports`, `mailspring-component-kit`)
 
-- **`app/internal_packages/`** - Built-in plugins implementing features (composer, message-list, thread-list, preferences, themes, etc.)
+- **`app/features/`** - Built-in packages that always load (composer, message-list, thread-list, preferences, main-calendar, etc.)
+- **`app/plugins/`** - Bundled optional packages (`isOptional: true`, can be turned off via `core.disabledPackages`), e.g. activity, send-later, translation
+- **`app/themes/`** - The `ui-*` themes
+- **`app/vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/quickpreview/renderer.html`
 
-> **IMPORTANT:** Application source code lives in **both** `app/src/` and `app/internal_packages/`. When searching for usages of a module, symbol, or pattern, always search both directories. Searching only `app/src/` will miss a large portion of the codebase and lead to incomplete changes.
+All three package dirs sit at the same depth, so packages import core code as `../../../src/...`. `src/bundled-packages.ts` lists them for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
+
+> **IMPORTANT:** Application source code lives in `app/src/`, `app/features/` and `app/plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `app/src/` will miss a large portion of the codebase and lead to incomplete changes.
 
 - **`app/spec/`** - Jasmine test specs
 
@@ -66,7 +71,7 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 
 ### Plugin Structure
 
-Each plugin in `internal_packages/` has:
+Each package in `features/`, `plugins/` and `themes/` has:
 - `package.json` - Metadata with `windowTypes` specifying where plugin loads
 - `lib/main.ts` - Entry point with `activate()` and `deactivate()` lifecycle hooks
 - `lib/` - Plugin source code
@@ -229,4 +234,4 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Claude Hooks
 
-A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/app/src` or `apps/desktop/app/internal_packages`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.
+A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/app/src`, `app/features`, `app/plugins` or `app/themes`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.

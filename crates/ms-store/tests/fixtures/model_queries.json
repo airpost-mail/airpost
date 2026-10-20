@@ -501,7 +501,7 @@
     },
     {
       "name": "mark-all-read",
-      "site": "internal_packages/account-sidebar/lib/sidebar-item.ts onMarkAllAsRead",
+      "site": "features/account-sidebar/lib/sidebar-item.ts onMarkAllAsRead",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -544,7 +544,7 @@
     },
     {
       "name": "permalink-date",
-      "site": "internal_packages/thread-list/lib/thread-permalink-handler.ts (date)",
+      "site": "features/thread-list/lib/thread-permalink-handler.ts (date)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -589,7 +589,7 @@
     },
     {
       "name": "permalink-last-date",
-      "site": "internal_packages/thread-list/lib/thread-permalink-handler.ts (lastDate)",
+      "site": "features/thread-list/lib/thread-permalink-handler.ts (lastDate)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -729,7 +729,7 @@
     },
     {
       "name": "search-result-ids",
-      "site": "internal_packages/thread-search/lib/search-query-subscription.ts _onSearchResults",
+      "site": "features/thread-search/lib/search-query-subscription.ts _onSearchResults",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -796,7 +796,7 @@
     },
     {
       "name": "thread-findby-id-limit",
-      "site": "internal_packages/thread-list/lib/thread-list-context-menu.ts copyPermalink",
+      "site": "features/thread-list/lib/thread-list-context-menu.ts copyPermalink",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -827,7 +827,7 @@
     },
     {
       "name": "threads-by-ids",
-      "site": "internal_packages/unread-notifications/lib/main.ts _threadsForMessages",
+      "site": "features/unread-notifications/lib/main.ts _threadsForMessages",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -998,7 +998,7 @@
     },
     {
       "name": "thread-messages-no-body",
-      "site": "internal_packages/thread-list/lib/thread-list-data-source.ts _observableForThreadMessages",
+      "site": "features/thread-list/lib/thread-list-data-source.ts _observableForThreadMessages",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1029,7 +1029,7 @@
     },
     {
       "name": "messages-of-threads",
-      "site": "internal_packages/thread-list/lib/thread-list-data-source.ts (missingIds)",
+      "site": "features/thread-list/lib/thread-list-data-source.ts (missingIds)",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1307,7 +1307,7 @@
     },
     {
       "name": "draft-list",
-      "site": "internal_packages/draft-list/lib/draft-list-store.ts _onPerspectiveChanged",
+      "site": "features/draft-list/lib/draft-list-store.ts _onPerspectiveChanged",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1340,7 +1340,7 @@
     },
     {
       "name": "draft-list-one-account",
-      "site": "internal_packages/draft-list/lib/draft-list-store.ts (accountId)",
+      "site": "features/draft-list/lib/draft-list-store.ts (accountId)",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1378,7 +1378,7 @@
     },
     {
       "name": "messages-by-ids",
-      "site": "internal_packages/unread-notifications/lib/main.ts _onNewMessages",
+      "site": "features/unread-notifications/lib/main.ts _onNewMessages",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1412,7 +1412,7 @@
     },
     {
       "name": "activity",
-      "site": "internal_packages/activity/lib/activity-data-source.ts buildQuery",
+      "site": "plugins/activity/lib/activity-data-source.ts buildQuery",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1451,7 +1451,7 @@
     },
     {
       "name": "activity-accounts-dates",
-      "site": "internal_packages/activity/lib/activity-data-source.ts buildQuery (filters)",
+      "site": "plugins/activity/lib/activity-data-source.ts buildQuery (filters)",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1508,7 +1508,7 @@
     },
     {
       "name": "message-scan",
-      "site": "internal_packages/activity/lib/message-scan.ts",
+      "site": "plugins/activity/lib/message-scan.ts",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1728,7 +1728,7 @@
     },
     {
       "name": "contacts-list",
-      "site": "internal_packages/contacts/lib/Store.ts",
+      "site": "features/contacts/lib/Store.ts",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1764,7 +1764,7 @@
     },
     {
       "name": "contacts-not-mail",
-      "site": "internal_packages/contacts/lib/Store.ts (source)",
+      "site": "features/contacts/lib/Store.ts (source)",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1898,7 +1898,7 @@
     },
     {
       "name": "contact-books",
-      "site": "internal_packages/contacts/lib/Store.ts",
+      "site": "features/contacts/lib/Store.ts",
       "query": {
         "class": "ContactBook",
         "accounts": null,
@@ -1921,7 +1921,7 @@
     },
     {
       "name": "calendars",
-      "site": "internal_packages/main-calendar/lib/core/calendar-sidebar.tsx",
+      "site": "features/main-calendar/lib/core/calendar-sidebar.tsx",
       "query": {
         "class": "Calendar",
         "accounts": null,
@@ -1939,7 +1939,7 @@
     },
     {
       "name": "calendars-for-account",
-      "site": "internal_packages/events/lib/event-header.tsx",
+      "site": "features/events/lib/event-header.tsx",
       "query": {
         "class": "Calendar",
         "accounts": null,
@@ -1965,7 +1965,7 @@
     },
     {
       "name": "calendar-by-id",
-      "site": "internal_packages/main-calendar/lib/core/calendar-rsvp.ts",
+      "site": "features/main-calendar/lib/core/calendar-rsvp.ts",
       "query": {
         "class": "Calendar",
         "accounts": null,
@@ -1991,7 +1991,7 @@
     },
     {
       "name": "events-in-range",
-      "site": "internal_packages/main-calendar/lib/core/calendar-data-source.ts buildObservable",
+      "site": "features/main-calendar/lib/core/calendar-data-source.ts buildObservable",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2089,7 +2089,7 @@
     },
     {
       "name": "events-by-uid",
-      "site": "internal_packages/main-calendar/lib/main.tsx, events/lib/event-header.tsx",
+      "site": "features/main-calendar/lib/main.tsx, events/lib/event-header.tsx",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2125,7 +2125,7 @@
     },
     {
       "name": "events-nearby",
-      "site": "internal_packages/events/lib/event-header.tsx (conflicts)",
+      "site": "features/events/lib/event-header.tsx (conflicts)",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2166,7 +2166,7 @@
     },
     {
       "name": "event-master",
-      "site": "internal_packages/main-calendar/lib/core/calendar-view.tsx _onDelete",
+      "site": "features/main-calendar/lib/core/calendar-view.tsx _onDelete",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2243,7 +2243,7 @@
     },
     {
       "name": "event-search",
-      "site": "internal_packages/main-calendar/lib/core/event-search-bar.tsx",
+      "site": "features/main-calendar/lib/core/event-search-bar.tsx",
       "query": {
         "class": "Event",
         "accounts": null,

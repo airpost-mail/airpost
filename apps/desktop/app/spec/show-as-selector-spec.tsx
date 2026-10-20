@@ -1,9 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import {
-  ShowAsSelector,
-  defaultShowAs,
-} from '../internal_packages/main-calendar/lib/core/show-as-selector';
+import { ShowAsSelector, defaultShowAs } from '../features/main-calendar/lib/core/show-as-selector';
 
 describe('defaultShowAs', function () {
   it('starts an all-day event Free and a timed one Busy', function () {

@@ -141,7 +141,7 @@ composer's quoted body renders in the main window without the message CSP, so it
 load even when blocking is on.
 
 Verified (regex run in node). "Block remote images" rewrites HTML with the pattern in
-`internal_packages/message-autoload-images/lib/autoload-images-store.ts:25-35`. It misses
+`features/message-autoload-images/lib/autoload-images-store.ts:25-35`. It misses
 `background:#fff url(https://…)`, `background:no-repeat url(…)`, CSS escapes like `\75rl(`, and
 `image-set("https://…" 1x)`. The sanitizer keeps the `style` attribute and `<style>`
 (`src/services/sanitize-transformer.ts:93`, `:223`) and only strips `@import` (`:250-273`).
@@ -185,7 +185,7 @@ address; checking Authentication-Results needs headers the desktop doesn't have.
 
 Verified. `core.reading.autoloadImages` defaults to `true` (`src/config-schema.ts:146-150`). The
 `remove-tracking-pixels` plugin applies its 25-entry, circa-2017 list (Sidekick, RelateIQ, Banana
-Tag, LaunchBit, Mandrill; `internal_packages/remove-tracking-pixels/lib/main.ts:9-135`) only when
+Tag, LaunchBit, Mandrill; `features/remove-tracking-pixels/lib/main.ts:9-135`) only when
 `message.isFromMe()` (`:158-169`), and has no 1x1 or hidden-image rule. Spam is the one exception
 (`autoload-images-store.ts:47`). Every profile photo also loads
 `gravatar.com/avatar/<sha256(email)>` whatever the setting (`src/components/contact-profile-photo.tsx:18-26`).
@@ -235,7 +235,7 @@ same way (`account-draft.ts`). Harness: `account-security-refused` adds a remote
 with a bare `true`; `account_json` stores the host consent for its `none` accounts.
 
 Verified. Typing port 143 sets IMAP security to `none`, port 25 does the same for SMTP
-(`internal_packages/onboarding/lib/page-account-settings-imap.tsx:90-98`). Discovery picks `none`
+(`features/onboarding/lib/page-account-settings-imap.tsx:90-98`). Discovery picks `none`
 for any IMAP port other than 993 and any SMTP port other than 465/587 (`onboarding-helpers.ts:185`,
 `:194`). 135 of the 1064 entries in `mailspring-provider-settings.json` ship `none` (105
 plala/wind `.jp`, plus nifty.com, goo.jp, terra.es, telefonica.net, versatel.de, tiscali.cz,
@@ -278,7 +278,7 @@ no windows and `QuitGate` defers launches (Dock, second instance, mailto:) into 
 the database reset too.
 
 Verified, except the engine-still-running part, which is inferred from the code path.
-`internal_packages/preferences/lib/tabs/preferences-general.tsx:29-49` asks only "Are you sure?",
+`features/preferences/lib/tabs/preferences-general.tsx:29-49` asks only "Are you sure?",
 then runs `fs.rm(configDir, {recursive})` from the renderer and relaunches. Nothing tells main or
 the engine first; compare `src/browser/application.ts:349`, which at least destroys windows before
 deleting the database. On relaunch `config.json` is missing, `main.js:56-60` points the importer
@@ -373,7 +373,7 @@ CSP's `form-action 'none'` covers the gap before its listener attaches, and `App
 `will-frame-navigate` handler blocks subframe navigation away from `about:blank`.
 
 Inferred from code; not run. The message iframe allows forms
-(`internal_packages/message-list/lib/email-frame.tsx:222`, `sandbox="allow-forms
+(`features/message-list/lib/email-frame.tsx:222`, `sandbox="allow-forms
 allow-same-origin"`), the sanitizer keeps `form`, `button`, `action` and `method`
 (`src/services/sanitize-transformer.ts:3-6` and `AllowedAttributes`), `EventedIFrame` has no
 submit handler, and `will-navigate` guards only the top frame
@@ -405,7 +405,7 @@ Verified. The header policy (`src/browser/main.js:456-470`) and the meta tag
 tag blocks inline handlers. `default-src *` leaves `connect-src` and `frame-src` open. The app
 loads from `file://`, so `script-src 'self'` matches any local file, including attachments under
 `<config>/files`. The signature preview injects raw `signature.body`
-(`internal_packages/composer-signature/lib/preferences-signatures.tsx:169`).
+(`features/composer-signature/lib/preferences-signatures.tsx:169`).
 
 - Cost: drop the meta tag, or open a window without it, and inline handlers run in a
   Node-enabled renderer. Once settings live in the engine (stage 3) and web or MCP can write
@@ -427,8 +427,8 @@ The desktop half (`/tmp` names) is open.
 Verified. On Linux `app.getPath('temp')` is `/tmp`. These are written with `writeFileSync`
 defaults (0644 under the usual umask) at predictable names and never removed:
 `print.html` and `print.messages.js`, which the print window loads as a `<script>`
-(`internal_packages/print/lib/print-window.ts:19-20`, `:73`, `:79`, `:125-126`); `<message.id>.html`
-(`internal_packages/message-list/lib/message-item-body.tsx:112-115`); raw RFC822 at
+(`features/print/lib/print-window.ts:19-20`, `:73`, `:79`, `:125-126`); `<message.id>.html`
+(`features/message-list/lib/message-item-body.tsx:112-115`); raw RFC822 at
 `<temp>/<message.id>` (`message-controls.tsx:159-162`); sync logs
 (`preferences-account-details.tsx:205-207`, `onboarding/lib/form-error-message.tsx:23`).
 
@@ -449,7 +449,7 @@ which covers those files, so the engine half matters when the engine creates its
 
 ### TD13. Outdated vendored parsers run on attachments
 
-Verified. Quick preview uses copied-in `src/quickpreview/xlsx-0.18.5`, `prism-1.15.0` (2018),
+Verified. Quick preview uses copied-in `vendor/xlsx-0.18.5`, `prism-1.15.0` (2018),
 `pdfjs-4.3.136` and a second copy of DOMPurify (`src/quickpreview/index.ts:63-99`, thumbnails in a
 hidden window at `:333`). No package manager or audit tool sees them. SheetJS 0.18.5 predates
 CVE-2023-30533 (prototype pollution, fixed 0.19.3) and CVE-2024-22363 (ReDoS, fixed 0.20.2).
@@ -485,7 +485,7 @@ debug PNGs are committed under `playwright/test-results`.
 
 Verified. `MessageBodyProcessor` clips at 300,000 chars (`src/flux/stores/message-body-processor.ts:162`),
 but `ConditionalQuotedTextControl` passes the raw `message.body` to `hasQuotedHTML`
-(`internal_packages/message-list/lib/message-item-body.tsx:206-209`), which builds a full
+(`features/message-list/lib/message-item-body.tsx:206-209`), which builds a full
 `DOMParser` document (`src/services/quoted-html-transformer.ts:31-36`). `EmailFrame._writeContent`
 runs `removeQuotedHTML` (parse plus serialize) on every write, including every theme change
 (`email-frame.tsx:41`, `:86-89`). Neither is cached.
@@ -504,7 +504,7 @@ Verified.
    onboarding renders without the provider name (`onboarding/lib/oauth-signin-page.tsx:206-209`).
 2. The extractor collapses whitespace in keys (`apps/desktop/scripts/format-localizations.js:46`),
    the runtime looks up the raw string, so multi-line template literals never match
-   (`internal_packages/activity/lib/dashboard/root.tsx:686-689`).
+   (`plugins/activity/lib/dashboard/root.tsx:686-689`).
 3. `lang/en.json` has 902 keys while ~514 source strings are missing from it; de.json lacks ~43%.
    The extractor hasn't run since the Tern additions, and rebrand edits change English keys and
    drop their translations.
@@ -644,7 +644,7 @@ Verified. `optimist` 0.4.0 with an argument-swallowing workaround (`src/browser/
 `:139-144`). `getmac` shells out at startup in every process for an empty Sentry DSN
 (`src/error-logger-extensions/sentry-error-reporter.js:2`, `:177`). `tld` 0.0.2 ships an old
 public-suffix list, so newer gTLDs probably resolve to null and the reply-to warning never fires
-(inferred; `internal_packages/phishing-detection/lib/main.tsx:12`, `:69`). Reflux 0.1.13 is used
+(inferred; `plugins/phishing-detection/lib/main.tsx:12`, `:69`). Reflux 0.1.13 is used
 only for `createAction` with `sync = true` set by hand on every action (`src/flux/actions.ts:79-85`).
 Root `package.json` carries unused `chalk`, `temp`, `targz`, `license-extractor`, `devtron`,
 `electron-playwright-helpers`, jasmine 2.x and `node-gyp`, and deprecated `glob` 7, `rimraf` 2,
@@ -659,7 +659,7 @@ Root `package.json` carries unused `chalk`, `temp`, `targz`, `license-extractor`
 ### TD25. First-run tutorial and settings advertise features that can't work
 
 Verified. Two of three first-run slides promise "LinkedIn profiles, Twitter bios" and open/click
-tracking (`internal_packages/onboarding/lib/page-tutorial.tsx:5-25`), both inert without a backend.
+tracking (`features/onboarding/lib/page-tutorial.tsx:5-25`), both inert without a backend.
 General > Notifications shows repeated opens/clicks (`src/config-schema.ts:359-363`). The config
 load-error dialog says "continue using N1" (`src/browser/config-persistence-manager.ts:64`). The
 shortcut presets offer "Inbox by Gmail" (`keymaps/templates/Inbox by Gmail.json`), shut down in
@@ -775,7 +775,7 @@ open: plugins copied into `packages/` by hand have no record, and approvals for
 
 ### TD30. Plugins can't be disabled from the UI; dead and placeholder plugins (stage 2)
 
-Verified. Preferences has no Plugins tab (`internal_packages/preferences/lib/main.tsx:14-55`).
+Verified. Preferences has no Plugins tab (`features/preferences/lib/main.tsx:14-55`).
 `core.disabledPackages` is honoured only for `isOptional` packages (`src/package-manager.ts:107-108`),
 so a third-party plugin can't be disabled short of deleting it, and optional built-ins only by
 editing `config.json`. `phishing-detection` ships in the template's `disabledPackages`
@@ -920,7 +920,7 @@ hands extensions the live same-origin document (`email-frame.tsx:155-167`); only
 
 Verified. `src/browser/main.js:364` initialises remote and `app-window.ts:180-181` enables it
 per webContents. 130 references in 62 files (126 lines in 58 `.ts`/`.tsx`; 35 files in
-`internal_packages`). Ten sites call `getGlobal('application')` for `configPersistenceManager`,
+`features/` and `plugins/`). Ten sites call `getGlobal('application')` for `configPersistenceManager`,
 `windowManager`, `autoUpdateManager`, `applicationMenu`, `openUrl` and `isQuitting`
 (`src/config.ts:17-19`, `src/app-env.ts:898-902`, `src/window-event-handler.ts:311`, `:368`,
 `src/sheet-toolbar.tsx:182`, `update-notification.tsx:36`, `unsubscribe-service.ts:145`). Every
@@ -1082,7 +1082,7 @@ Inferred: the warning's source isn't confirmed in devtools. `MailspringStore` ca
 `MailspringStore` subclass. Every `InjectedComponent` and `InjectedComponentSet` adds its own
 `ComponentRegistry.listen` (`src/components/injected-component.tsx:86`,
 `injected-component-set.tsx:116-119`), and each thread row has three
-(`internal_packages/thread-list/lib/thread-list-columns.tsx:74`, `:140`, `:155`, narrow `:203`,
+(`features/thread-list/lib/thread-list-columns.tsx:74`, `:140`, `:155`, narrow `:203`,
 `:221`), plus one AccountStore listener per row from `AccountColorBar`
 (`thread-list-participants.tsx:156`). ListTabular renders `innerHeight/itemHeight + 4` rows
 (`list-tabular.tsx:311-321`), ~49 on a 1600px window, so the count scales with window height.
@@ -1212,7 +1212,7 @@ Verified; WAL growth inferred. Every 30 days `migrate` runs a full VACUUM before
 
 ### TD47. Provider presets: dead entries, three copies, unbounded MX lookup (stage 12)
 
-Verified. `internal_packages/onboarding/lib/mailcore-provider-settings.json` still matches
+Verified. `features/onboarding/lib/mailcore-provider-settings.json` still matches
 Facebook (fb.com mapped to O365), MobileMe and Openmailbox; the 1064-domain table is an old ISPDB
 snapshot; tiles say "Gmail or G Suite", "Office 365", "FastMail" (`account-providers.tsx:6`, `:12`,
 `:88`); `apps/web/src/features/settings/accounts/presets.ts` is a third copy. `dns.resolveMx` has no

@@ -1,5 +1,5 @@
 <body style="padding:0; border:0; margin: 15px; background-color: white;" tabindex="1">
-  <script src="./dompurify/purify.min.js"></script>
+  <script src="../../vendor/dompurify/purify.min.js"></script>
   <script>
     // Sanitization config matching SanitizeTransformer
     const SanitizeConfig = {
@@ -118,11 +118,11 @@
       const context = canvas.getContext('2d');
       const el = document.createElement('script');
       el.onload = async () => {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = './pdfjs-4.3.136/build/pdf.worker.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '../../vendor/pdfjs-4.3.136/build/pdf.worker.mjs';
 
         const buffer = await window.electronAPI.previewFileAsBuffer();
         const pdf = await (pdfjsLib.getDocument(buffer, {
-          cMapUrl: './pdfjs-4.3.136/web/cmaps',
+          cMapUrl: '../../vendor/pdfjs-4.3.136/web/cmaps',
           cMapPacked: true,
         }).promise);
 
@@ -160,7 +160,7 @@
       };
 
       el.type="module";
-      el.src = `pdfjs-4.3.136/build/pdf.mjs`;
+      el.src = `../../vendor/pdfjs-4.3.136/build/pdf.mjs`;
       document.body.appendChild(el);
     }
 
@@ -219,7 +219,7 @@
           showTab(workbook.SheetNames[0]);
         }
       };
-      xlsx.src = './xlsx-0.18.5/xlsx.full.min.js';
+      xlsx.src = '../../vendor/xlsx-0.18.5/xlsx.full.min.js';
       document.body.appendChild(xlsx);
     }
 
@@ -266,7 +266,7 @@
       // Attach Prism CSS
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = './prism-1.15.0/prism.css';
+      link.href = '../../vendor/prism-1.15.0/prism.css';
       document.body.appendChild(link);
       document.body.style.margin = '0';
 
@@ -300,7 +300,7 @@
 
       const script = document.createElement('script');
       script.onload = finish;
-      script.src = './prism-1.15.0/prism.js';
+      script.src = '../../vendor/prism-1.15.0/prism.js';
       document.body.appendChild(script);
     }
 

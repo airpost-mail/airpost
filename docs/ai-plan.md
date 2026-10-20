@@ -212,7 +212,7 @@ triage pauses. Engines before AI6 sent `summary` and `reply` as `{available: tru
 
 ## 7. UX
 
-**Desktop** (one internal package `internal_packages/ai`, on the `Engine` export of T18):
+**Desktop** (one internal package `plugins/ai`, on the `Engine` export of T18):
 - *Preferences > AI* (new tab; MCP's "AI assistants" stays in Integrations): a list of
   providers (kind, URL, key with Save Key and Forget Key as in integrations section 2, model
   picker from `ai.models`, Test), which provider each feature uses, feature switches, the
@@ -374,7 +374,7 @@ reads and writes `core.ai` (`providers`, `features` with a provider id each, `ac
 `host` and `local`): "Set up a model in Preferences > AI" without a provider or model, "Add your
 … API key" for Anthropic or OpenAI's own API without a saved key, "Waiting for engine support"
 without `hello.features` `ai`, and the engine's word when it reports a feature unavailable.
-`internal_packages/ai`: `ai-client.ts` makes the calls through `Engine.request`, checks the
+`plugins/ai`: `ai-client.ts` makes the calls through `Engine.request`, checks the
 switches before reading the key, collects `ai.delta` for its own streamId through
 `Engine.subscribe`, maps `-32011` data to `AiError` and short messages, and cancels with
 `ai.cancel`. Preferences > AI (tab after Integrations): providers with name, URL, key (Save Key,
@@ -448,7 +448,7 @@ CLI: `tern ai summarize <thread> [--refresh]` streams `ai.delta` to stdout, `ter
 `tern ai usage [--days]`; no provider config is sent, so they use the engine's stored providers.
 Desktop (plugin API 1.29.0): the mirror carries `core.ai.*` with an engine that lists
 `ai-triage` (`writeSettings` keeps `limits`); CapabilityStore has `ai-triage` with the engine's
-reasons; `internal_packages/ai` adds the chip (`Thread:MailLabel`, needs-reply and important
+reasons; `plugins/ai` adds the chip (`Thread:MailLabel`, needs-reply and important
 only) with a correction menu that files `source: "user"`, "Needs reply" in the sidebar for each
 account with triage on (a perspective over `ai.triage.list`, asked again on Thread changes; the
 sidebar now skips an extension's null item and rebuilds when an extension registers), and

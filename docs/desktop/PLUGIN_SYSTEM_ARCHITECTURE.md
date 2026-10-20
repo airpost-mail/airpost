@@ -36,7 +36,7 @@ Plugins are discovered from these directories in order:
 
 | Directory | Purpose | Notes |
 |-----------|---------|-------|
-| `<resourcePath>/internal_packages/` | Built-in plugins | 51 packages bundled with Mailspring |
+| `<resourcePath>/features/`, `plugins/`, `themes/` | Built-in packages | Core features, optional plugins (`isOptional`) and the `ui-*` themes; discovered as one name-sorted list |
 | `<configDirPath>/packages/` | User-installed plugins | Skipped in safe mode |
 | `<configDirPath>/dev/packages/` | Developer mode plugins | Only loaded in dev mode |
 | `<resourcePath>/spec/fixtures/packages/` | Test packages | Only in spec mode |
@@ -508,7 +508,7 @@ Themes are plugins with special handling:
 
 ### Theme Picker
 
-Located in `internal_packages/theme-picker/`:
+Located in `features/theme-picker/`:
 - Accessible via Preferences > Appearance > "Change Theme..."
 - Lists all discovered theme packages
 - Supports live switching without restart
@@ -608,4 +608,4 @@ Optional plugins can be disabled via config:
 | `app/src/extensions/message-view-extension.ts` | MessageViewExtension base class |
 | `app/src/components/injected-component.tsx` | Renders registered components |
 | `app/src/global/mailspring-exports.ts` | Global API exports |
-| `app/internal_packages/theme-picker/` | Theme selection UI (reference for plugin UI) |
+| `app/features/theme-picker/` | Theme selection UI (reference for plugin UI) |

@@ -90,7 +90,7 @@ class SystemTrayManager {
 
     return path.join(
       this._application.resourcePath,
-      'internal_packages',
+      'features',
       'system-tray',
       'assets',
       'linux',

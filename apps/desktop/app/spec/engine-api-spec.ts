@@ -286,7 +286,7 @@ describe('Engine.request and local-only methods (TD29)', function () {
   it('finds the calling package from the stack', () => {
     const resourcePath = AppEnv.getLoadSettings().resourcePath;
     const third = '/tmp/tern-spec-packages/third';
-    const bundled = path.join(resourcePath, 'internal_packages', 'composer');
+    const bundled = path.join(resourcePath, 'features', 'composer');
     spyOn(AppEnv.packages, 'getAvailablePackages').andReturn([
       { name: 'third', directory: third, engineMethods: () => ['secrets.set'] },
       { name: 'composer', directory: bundled, engineMethods: () => [] },

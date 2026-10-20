@@ -1,6 +1,6 @@
 ---
 name: plugin-development
-description: Context for work on the desktop app's plugin system (apps/desktop) — creating, modifying or debugging plugins and themes, PackageManager/Package loading, discovery and activation, ComponentRegistry/ExtensionRegistry and the other registries, Preferences > Plugins, or anything in app/internal_packages/. Read before changing plugin-related code.
+description: Context for work on the desktop app's plugin system (apps/desktop) — creating, modifying or debugging plugins and themes, PackageManager/Package loading, discovery and activation, ComponentRegistry/ExtensionRegistry and the other registries, Preferences > Plugins, or anything in app/features/, app/plugins/ or app/themes/. Read before changing plugin-related code.
 ---
 
 # Plugin development
@@ -12,7 +12,7 @@ Use this skill when working on code related to the desktop app's plugin system, 
 - Working with ComponentRegistry, ExtensionRegistry, or other registries
 - Plugin management UI (Preferences > Plugins)
 - Working with themes (which are a type of plugin)
-- Modifying code in `apps/desktop/app/internal_packages/`
+- Modifying code in `apps/desktop/app/features/`, `app/plugins/` or `app/themes/`
 
 ## Required Reading
 
@@ -44,7 +44,7 @@ Paths are relative to `apps/desktop/`.
 | `app/src/extensions/composer-extension.ts` | ComposerExtension base class |
 | `app/src/extensions/message-view-extension.ts` | MessageViewExtension base class |
 | `app/src/components/injected-component.tsx` | Renders registered components |
-| `app/internal_packages/theme-picker/` | Theme UI (reference for plugin management UI) |
+| `app/features/theme-picker/` | Theme UI (reference for plugin management UI) |
 
 ## Development Guidelines
 

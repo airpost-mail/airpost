@@ -30,19 +30,19 @@ const VENDORED = [
   },
   {
     name: 'DOMPurify 3.3.1',
-    where: 'src/quickpreview/dompurify/',
+    where: 'vendor/dompurify/',
     license: 'Apache-2.0 OR MPL-2.0',
     file: 'dompurify.txt',
   },
   {
     name: 'Prism 1.15.0',
-    where: 'src/quickpreview/prism-1.15.0/',
+    where: 'vendor/prism-1.15.0/',
     license: 'MIT',
     file: 'prism.txt',
   },
   {
     name: 'SheetJS Community Edition 0.18.5',
-    where: 'src/quickpreview/xlsx-0.18.5/',
+    where: 'vendor/xlsx-0.18.5/',
     license: 'Apache-2.0',
     file: 'sheetjs.txt',
   },

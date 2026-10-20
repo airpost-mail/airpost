@@ -82,7 +82,7 @@ chip.
 
 ## F3. Reading pane for drafts
 
-The Drafts sheet only defines a `list` layout (`internal_packages/draft-list/lib/main.ts`), unchanged
+The Drafts sheet only defines a `list` layout (`features/draft-list/lib/main.ts`), unchanged
 since 2015 when drafts opened only in popouts (Mailspring #1718, #1396). Proposal:
 
 - Split mode: a `DraftPreview` column with the inline `Composer` role component (as reply drafts

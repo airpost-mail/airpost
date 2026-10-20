@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
 
-import { EventAttendeesInput } from '../internal_packages/main-calendar/lib/core/event-attendees-input';
-import { EventAttendee } from '../internal_packages/main-calendar/lib/core/calendar-data-source';
+import { EventAttendeesInput } from '../features/main-calendar/lib/core/event-attendees-input';
+import { EventAttendee } from '../features/main-calendar/lib/core/calendar-data-source';
 
 const attendee = (email: string, name?: string): EventAttendee => ({
   email,

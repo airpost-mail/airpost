@@ -74,7 +74,7 @@ These projects modify or replace Mailspring's backend services:
 To create your own plugin, see:
 - [Mailspring-Plugin-Starter](https://github.com/Foundry376/Mailspring-Plugin-Starter) - Official template
 - [Creating Composer Plugins](./creating-composer-plugins.md) - Guide in this repo
-- Built-in plugins in `app/internal_packages/` for reference (e.g., `composer-templates`, `phishing-detection`)
+- Built-in plugins in `app/plugins/` and `app/features/` for reference (e.g., `composer-templates`, `phishing-detection`)
 
 ### Plugin Installation
 

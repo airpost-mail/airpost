@@ -2,11 +2,11 @@
 import {
   firstVisibleBarIds,
   layoutWeekBars,
-} from '../internal_packages/main-calendar/lib/core/month-view-helpers';
+} from '../features/main-calendar/lib/core/month-view-helpers';
 import {
   EventOccurrence,
   coveredDates,
-} from '../internal_packages/main-calendar/lib/core/calendar-data-source';
+} from '../features/main-calendar/lib/core/calendar-data-source';
 import { calendarDateFromUnix } from '../src/calendar-date';
 import moment from 'moment';
 
