@@ -56,7 +56,7 @@ const captureQueue = [];
 
 const filesRoot = __dirname.replace('app.asar', 'app.asar.unpacked');
 // pdf.js, Prism, SheetJS and DOMPurify, which renderer.html loads by relative path.
-const vendorRoot = path.resolve(filesRoot, '..', '..', 'vendor');
+const vendorRoot = path.resolve(filesRoot, '..', '..', '..', 'vendor');
 
 const FileSizeLimit = 5 * 1024 * 1024;
 const ThumbnailWidth = 320 * (11 / 8.5);
