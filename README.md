@@ -12,4 +12,6 @@ A desktop email client with a sync engine written in Rust, forked from Mailsprin
 | `packages/` | TS libraries shared across apps |
 | `legacy/mailsync-cpp/` | The C++ sync engine: the reference and A/B baseline until the Rust engine reaches parity |
 
+To build and run from source, see CONTRIBUTING.md; to report a vulnerability, SECURITY.md.
+
 Licensed under GPL-3.0-only; see LICENSE.md and NOTICE.md.

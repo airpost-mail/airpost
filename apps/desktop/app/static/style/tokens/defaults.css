@@ -1,5 +1,5 @@
 /* Theme tokens at the Light theme's values. A theme overrides tokens on :root and nothing else;
-   docs/theme-tokens.md lists every token and the LESS variable each one replaces.
+   docs/desktop/theme-tokens.md lists every token and the LESS variable each one replaces.
 
    Where ui-variables.less derives one variable from another, the token is derived the same way
    (var(), color-mix(), relative colours), so overriding a base token moves everything that

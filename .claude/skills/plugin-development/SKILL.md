@@ -1,40 +1,44 @@
-# Plugin Development Skill
+---
+name: plugin-development
+description: Context for work on the desktop app's plugin system (apps/desktop) — creating, modifying or debugging plugins and themes, PackageManager/Package loading, discovery and activation, ComponentRegistry/ExtensionRegistry and the other registries, Preferences > Plugins, or anything in app/internal_packages/. Read before changing plugin-related code.
+---
 
-Use this skill when working on code related to Mailspring's plugin system, including:
+# Plugin development
+
+Use this skill when working on code related to the desktop app's plugin system, including:
 - Creating, modifying, or debugging plugins/packages
 - Working with the PackageManager or Package classes
 - Modifying plugin loading, discovery, or activation logic
 - Working with ComponentRegistry, ExtensionRegistry, or other registries
-- Implementing plugin marketplace or plugin management UI features
+- Plugin management UI (Preferences > Plugins)
 - Working with themes (which are a type of plugin)
-- Modifying code in `app/internal_packages/`
+- Modifying code in `apps/desktop/app/internal_packages/`
 
 ## Required Reading
 
-Before making changes to plugin-related code, you MUST read the plugin system architecture documentation:
-
-```
-/home/user/Mailspring/PLUGIN_SYSTEM_ARCHITECTURE.md
-```
-
-This document contains comprehensive information about:
+Before making changes to plugin-related code, read the plugin system architecture
+documentation at `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (repo root). It covers:
 - Plugin directory locations and discovery
 - Plugin structure and package.json schema
 - Plugin lifecycle (activate/deactivate)
 - Extension points and registries (ComponentRegistry, ExtensionRegistry, etc.)
-- User plugin installation mechanisms
+- The `Engine` export, `tern.engineMethods` and service plugins
+- User plugin installation mechanisms and the trust model
 - Theme system implementation
-- Current limitations and opportunities
+
+Changes to the plugin API also need a `PLUGIN_API_VERSION` bump in
+`apps/desktop/app/src/plugin-api-version.ts` and an entry in `apps/desktop/CHANGELOG.md`.
 
 ## Key Source Files
 
-When working on plugin functionality, these are the primary files to understand:
+Paths are relative to `apps/desktop/`.
 
 | File | Purpose |
 |------|---------|
 | `app/src/package-manager.ts` | Package discovery, validation, and activation |
 | `app/src/package.ts` | Package class representing individual plugins |
 | `app/src/app-env.ts` | AppEnv singleton that initializes PackageManager |
+| `app/src/plugin-api-version.ts` | The plugin API version matched against `engines.mailspring` |
 | `app/src/registries/component-registry.ts` | UI component registration |
 | `app/src/registries/extension-registry.ts` | Extension registration |
 | `app/src/extensions/composer-extension.ts` | ComposerExtension base class |
@@ -52,7 +56,7 @@ When working on plugin functionality, these are the primary files to understand:
 
 ## Testing Plugin Changes
 
-- Use `npm start` to run in dev mode (uses `Mailspring-dev` config directory)
-- Hot reload with `Ctrl+R` / `Cmd+R`
+- `npm start` in `apps/desktop` runs in dev mode on the `Tern-dev` profile; `make desktop` from the repo root runs on `.dev/profile` instead
+- Reload the window with Developer > Reload (`Cmd+Option+L` on macOS, `Ctrl+Alt+L` on Linux, `Ctrl+Shift+R` on Windows); `Cmd/Ctrl+R` is Reply
 - Access `$m` in dev console for `mailspring-exports`
-- User plugins go in `~/.config/Mailspring-dev/packages/` during development
+- User plugins go in `<profile>/packages/`, e.g. `~/Library/Application Support/Tern-dev/packages/` or `~/.config/Tern-dev/packages/` during development

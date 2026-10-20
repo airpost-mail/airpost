@@ -1,5 +1,5 @@
 /* Taiga: white surfaces, slate-grey text, a sky-blue accent, light blue multi-selection.
-   Tokens only; docs/theme-tokens.md lists what each token covers. */
+   Tokens only; docs/desktop/theme-tokens.md lists what each token covers. */
 :root {
   --foreground: #697278;
   --subtle-foreground: #9da4aa;

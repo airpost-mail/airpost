@@ -1,29 +1,30 @@
 ---
 name: app-screenshots
-description: Capture screenshots of the running Mailspring dev app for docs, PRs, or visual verification — launching with a CDP port, driving the UI, anonymizing or seeding data, and clipping to an element. Use whenever a task needs a picture of the app.
+description: Capture screenshots of the running Tern desktop dev app (apps/desktop) for docs, PRs, or visual verification — launching with a CDP port, driving the UI, anonymizing or seeding data, and clipping to an element. Use whenever a task needs a picture of the app.
 ---
 
 # Screenshots of the running app
 
 `screencapture` is blocked in this environment (no Screen Recording permission), and
 the app has no test-id hooks. The reliable path is Chrome DevTools Protocol against a
-dev build launched with a remote-debugging port. Everything below runs from the repo
-root unless noted. Scripts live in `.claude/skills/app-screenshots/scripts/`.
+dev build launched with a remote-debugging port. The commands below run from `apps/desktop`
+unless noted. The scripts live in `.claude/skills/app-screenshots/scripts/` at the repo root
+(`$CLAUDE_PROJECT_DIR/.claude/skills/app-screenshots/scripts/`).
 
 ## 1. Launch
 
-Only one instance can run at a time, so check first. If one is running that you didn't
-start, it is probably the user's: ask before closing it.
+Only one instance per profile can run at a time, so check first. If one is running that you
+didn't start, it is probably the user's: ask before closing it.
 
 ```bash
 pgrep -fl "[Ee]lectron ./app"   # anything listed will be closed by the next line
-pkill -f "[Ee]lectron ./app"; pkill -f "app/mailsync --mode sync"; sleep 2
+pkill -f "[Ee]lectron ./app"; pkill -f "app/mailsync-rs --mode"; sleep 2
 (./node_modules/.bin/electron ./app --enable-logging --dev --remote-debugging-port=9333 > /tmp/app.log 2>&1 &)
 sleep 18   # window + plugins + first sync
 curl -s localhost:9333/json | grep -c webSocketDebuggerUrl   # >0 means ready
 ```
 
-- Always kill orphaned `mailsync` processes too; they outlive the Electron process and
+- Always kill orphaned `mailsync-rs` processes too; they outlive the Electron process and
   hold the SQLite DB open (a later seed script will silently fail to commit).
 - `location.reload()` does nothing in the renderer. Pick up renderer changes with
   `AppEnv.commands.dispatch('window:reload')`; main-process changes (`app/src/browser`)
@@ -38,7 +39,7 @@ curl -s localhost:9333/json | grep -c webSocketDebuggerUrl   # >0 means ready
 whole window or dispatches a real mouse click:
 
 ```bash
-node --experimental-websocket scripts/eval.mjs "<js>" [out.png] [clickX clickY]
+node --experimental-websocket "$CLAUDE_PROJECT_DIR/.claude/skills/app-screenshots/scripts/eval.mjs" "<js>" [out.png] [clickX clickY]
 ```
 
 Useful snippets inside the JS:
@@ -59,7 +60,7 @@ Useful snippets inside the JS:
 `Page.captureScreenshot` with a `clip` in CSS px:
 
 ```bash
-node --experimental-websocket scripts/shoot.mjs "<setup-js>" "<selector>" out.png [pad] [maxHeight]
+node --experimental-websocket "$CLAUDE_PROJECT_DIR/.claude/skills/app-screenshots/scripts/shoot.mjs" "<setup-js>" "<selector>" out.png [pad] [maxHeight]
 ```
 
 - `scale: 1` already yields device pixels (2x on retina). Don't pass `scale: 2` — that
@@ -93,7 +94,7 @@ current mailbox, and pass its contents as the `setup-js` (after the view has loa
 `scripts/seed-tracking-metadata.py` writes fake open/click metadata onto real sent
 messages. Pattern for any similar seeding:
 
-1. Stop the app **and** mailsync; `cp edgehill.db edgehill.db.bak-<reason>`.
+1. Stop the app **and** mailsync-rs; `cp edgehill.db edgehill.db.bak-<reason>`.
 2. Write both places the UI reads from — the model's JSON blob (`Message.data`,
    `metadata` array) and the join table (`ModelPluginMetadata`) that queries filter on.
 3. Keep timestamps relative to the message's own date so "N days after sending" and

@@ -501,11 +501,16 @@ existing scripts:
 | `make desktop` | Builds `mailsync`, `tern`, `tern-mcp` in debug, links them into `apps/desktop/app/`, starts the desktop on a sandbox profile under `.dev/profile` (never the user's real profile) |
 | `make web` | Vite dev server against the mock, or `ENGINE=local` against the dev stack's gateway |
 | `make stack` / `make stack-down` | The local stack (8.2) |
-| `make test`, `make gate` | Unit tests; the full merge gate from the handoff (fmt, clippy, test, deny, harness quick tier on serve, JS lint and tests) |
-| `make release-local` | `build-release.sh` plus the desktop package for the host platform, unsigned |
+| `make test` | Workspace tests and the harness quick tier on the debug binaries |
+| `make test-desktop` | The desktop's Jasmine specs (`SPEC=<regex>` picks spec files); links the debug engine only when `apps/desktop/app/mailsync-rs` is missing |
+| `make lint` | fmt, clippy, cargo deny, desktop `lint:check`, web lint and typecheck |
+| `make gate` | The merge gate: fmt, clippy, test, deny, release builds, harness quick tier on serve. No JS steps; `desktop-test.yml` runs the desktop ones in CI |
 
-Also: `packageManager: yarn@4.17.1` in `apps/desktop/package.json` contradicts the `npm ci`
-CI uses; drop it.
+There is no `make release-local`. A local desktop package for the host platform is
+`apps/engine/packaging/build-release.sh --install-desktop`, then `npm run build` in `apps/desktop`.
+
+`apps/desktop/package.json` no longer has the `packageManager: yarn@4.17.1` field that
+contradicted the `npm ci` CI uses.
 
 ### 8.2 Local stack
 

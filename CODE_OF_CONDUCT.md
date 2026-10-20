@@ -39,34 +39,6 @@ Examples of unacceptable behavior include:
 * Other conduct which could reasonably be considered inappropriate in a
   professional setting
 
-## Content Policy
-
-So we can spend more time discussing and less time cleaning, please make an
-effort to contribute quality content.
-
-Please make a good-faith effort to add value to the conversation. Get to know
-the categories and tags, and use them as appropriate for your content to the
-best of your ability. Reply to existing threads about a given topic where
-possible, rather than starting duplicate conversations.
-
-* Use the like button rather than only posting something like "+1" or "Agreed".
-* Don't cross-post the same essential thing in multiple topics.
-* Don't divert a topic by changing it midstream.
-* Don't post anything that belongs to someone else without permission.
-* Don't post descriptions of, links to, or methods for stealing someone's
-  intellectual property (software, video, audio, images), or for breaking any
-  other law.
-* Don't sign your posts — every post has your profile information attached to.
-* Remember to *debate ideas, never people.*
-* Don't "bump" conversations or tag individuals/groups with the sole purposes
-  of speeding up response times.
-
-Additionally, **no spam**. Do not post any content which is intended primarily
-for promotional purposes or creating backlinks. The one exception to this rule
-is promoting Mailspring plugins and themes, in the appropriate dedicated
-category, or in response to a question, issue, or feature request as
-appropriate.
-
 ## Enforcement Responsibilities
 
 Everyone is responsible for flagging and reporting violations of this Code of Conduct.
@@ -94,9 +66,9 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement either through
-the flag feature on our Discourse, or by sending an email to
-`conduct@getmailspring.com`. All complaints will be reviewed and investigated
+reported privately to the maintainers of
+[github.com/ternmail/ternmail](https://github.com/ternmail/ternmail). There is no
+dedicated conduct address yet. All complaints will be reviewed and investigated
 promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the
@@ -153,8 +125,6 @@ the community.
 This Code of Conduct is adapted from the [Contributor Covenant][homepage],
 version 2.0, available at
 [https://www.contributor-covenant.org/version/2/0/code_of_conduct.html][v2.0].
-
-The Content Policy is inspired by the [Discourse FAQ](https://meta.discourse.org/faq).
 
 Community Impact Guidelines were inspired by
 [Mozilla's code of conduct enforcement ladder][Mozilla CoC].

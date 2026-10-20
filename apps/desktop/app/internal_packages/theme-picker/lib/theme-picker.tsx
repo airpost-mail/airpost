@@ -165,7 +165,7 @@ class ThemePicker extends React.Component<
           </ScrollRegion>
           <div className="create-theme">
             <a
-              href="https://github.com/Foundry376/Mailspring-Theme-Starter"
+              href="https://github.com/ternmail/ternmail/blob/main/docs/desktop/theme-tokens.md"
               style={{ color: '#3187e1' }}
             >
               {localized('Create a Theme')}

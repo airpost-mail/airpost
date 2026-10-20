@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build and Development Commands
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies (also installs app/'s runtime dependencies against Electron)
+npm ci
 
 # Run the app in development mode (uses --dev flag, data stored in Tern-dev folder)
 npm start
@@ -25,9 +25,6 @@ npm test -- --spec-file-pattern='calendar'
 # Run window-specific tests
 npm run test-window
 
-# Run Playwright end-to-end tests
-npm run test:e2e
-
 # TypeScript type checking in watch mode
 npm run tsc-watch
 
@@ -37,7 +34,7 @@ npm run build
 
 ## Architecture Overview
 
-Mailspring is an Electron-based email client written in TypeScript with React. It uses a plugin architecture where features are implemented as internal packages.
+Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript and LESS are compiled at runtime; there is no bundler. It uses a plugin architecture where features are implemented as internal packages. Plugin API names keep their Mailspring spelling (`mailspring-exports`, `engines.mailspring`, `window.$m`, `AppEnv`) because third-party plugins depend on them.
 
 ### Key Directories
 
@@ -137,7 +134,7 @@ event.ics = newIcs;  // Modify after capturing
 Actions.queueTask(SyncbackEventTask.forUpdating({ event, undoData, description: 'Edit event' }));
 ```
 
-See `docs/undo-redo-task-pattern.md` for detailed implementation guide.
+See `docs/desktop/undo-redo-task-pattern.md` (repo root) for detailed implementation guide.
 
 ### Task Queue (`flux/stores/task-queue.ts`)
 
@@ -197,10 +194,10 @@ Adapts QuerySubscription for virtualized list components (MultiselectList), supp
 ### Data Flow Summary
 
 ```
-User Action → Actions.queueTask() → MailsyncBridge → stdin → Sync Engine
-                                                              │
-                                                              ▼
-UI Updates ← QuerySubscription ← DatabaseStore.trigger() ← stdout deltas
+User Action → Actions.queueTask() → MailsyncBridge → socket (task.queue) → Sync Engine
+                                                                          │
+                                                                          ▼
+UI Updates ← QuerySubscription ← DatabaseStore.trigger() ← socket delta notifications
 ```
 
 ## Comment Style
@@ -226,9 +223,10 @@ smaller functions over commentary; a comment that restates the code should be de
 - Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file contents); main-process code in `app/src/browser` needs a full restart. `Cmd/Ctrl+R` is Reply
 - Dev tools accessible via Menu > Developer > Toggle Developer Tools
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
-- Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides. On first launch an empty `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/browser/mailspring-profile-import.ts`), which is only read. The app name stays Mailspring so the `Mailspring Safe Storage` keychain item, and the saved credentials, carry over
+- Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/browser/mailspring-profile-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import
+- The app name is Tern, so safeStorage's keychain item is `Tern Safe Storage`. Credentials in an imported profile are encrypted under `Mailspring Safe Storage`; `src/browser/mailspring-keychain-migration.ts` (`OLD_APP_NAME`) reads that item, read-only, and `src/browser/key-manager.ts` re-encrypts them under Tern's
 - The interface language is set in Preferences > General (`core.intl.language`) and read at launch, so relaunch to apply it. Arabic, Persian, Hebrew and Kurdish run right-to-left: the workspace gets `dir="rtl"` and every stylesheet goes through `rtlcss`
 
 ## Claude Hooks
 
-A `PostToolUse` hook in `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `app/src` or `app/internal_packages`. It runs `eslint --fix` on that one file and reports anything it couldn't fix.
+A `PostToolUse` hook in the repo root's `.claude/settings.json` runs `.claude/hooks/lint-edited-file.sh` after each edit to a `.ts`/`.tsx` file under `apps/desktop/app/src` or `apps/desktop/app/internal_packages`. It runs `eslint --fix` on that one file and reports anything it couldn't fix. The root `.claude/skills/` has `app-screenshots` (CDP captures of the dev app) and `plugin-development`.

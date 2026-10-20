@@ -56,7 +56,7 @@ function parseScheme(value: unknown): ThemeScheme | null {
  * empties it's LESSCache and rebuilds all less stylesheets against the
  * new theme.
  *
- * Themes are theme tokens: CSS custom properties on :root (docs/theme-tokens.md).
+ * Themes are theme tokens: CSS custom properties on :root (docs/desktop/theme-tokens.md).
  * static/style/tokens/defaults.css loads at core priority with the Light values;
  * the active theme's styles/tokens.css loads after it at theme priority. A theme
  * with only a styles/ui-variables.less gets its tokens from compat/tokens.less,

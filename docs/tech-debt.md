@@ -753,7 +753,7 @@ lets a manifest install a launchd or systemd unit. Packages record no source or 
 - Size: ~200 TS plus docs. Before stage 2 sets `PLUGIN_API_VERSION` and the `tern` block.
 
 Done in part (roadmap/client-next, stage 5). `src/engine-api.ts` and
-`apps/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (Trust Model) say plugins are fully trusted code and
+`docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (Trust Model) say plugins are fully trusted code and
 that the check below is no security boundary. `Engine.request` finds the calling package from the
 call's stack (the first frame outside the app's `src/` and `node_modules`, matched to a loaded
 package's directory or its realpath; a frame outside the app in no package is an unknown caller,

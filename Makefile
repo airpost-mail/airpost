@@ -53,6 +53,7 @@ release: ## Release builds of the same
 desktop: build ## Run the desktop on .dev/profile with the debug engine
 	ln -sf ../../../target/debug/mailsync apps/desktop/app/mailsync-rs
 	ln -sf ../../../target/debug/tern apps/desktop/app/tern
+	ln -sf ../../../target/debug/tern-mcp apps/desktop/app/tern-mcp
 	mkdir -p $(PROFILE_DIR)
 	cd apps/desktop && TERN_ENGINE_KEY_FILE="$(abspath $(PROFILE_DIR))/engine-dev.key" npm start -- --config-dir-path="$(PROFILE_DIR)"
 
@@ -91,6 +92,13 @@ test: $(VENV) ## Workspace tests and the harness quick tier (debug engine)
 	cargo build -p mailsync -p tern -p tern-mcp -p tern-gateway -p tern-sample-service
 	MAILSYNC_BIN=target/debug/mailsync TERN_BIN=target/debug/tern TERN_MCP_BIN=target/debug/tern-mcp \
 		TERN_GATEWAY_BIN=target/debug/tern-gateway SAMPLE_SERVICE_BIN=target/debug/tern-sample-service $(PY) -m pytest apps/engine/test -q
+
+# Leaves an existing app/mailsync-rs alone (a release engine from build-release.sh or
+# trial-desktop.sh); links the debug engine only when there is none.
+.PHONY: test-desktop
+test-desktop: ## Desktop Jasmine specs: make test-desktop SPEC=calendar runs the matching spec files
+	@[ -e apps/desktop/app/mailsync-rs ] || { cargo build -p mailsync && ln -sf ../../../target/debug/mailsync apps/desktop/app/mailsync-rs; }
+	cd apps/desktop && npm test $(if $(SPEC),-- --spec-file-pattern='$(SPEC)')
 
 .PHONY: lint
 lint: ## fmt, clippy, cargo deny, and the JS linters

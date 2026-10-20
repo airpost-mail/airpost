@@ -11,7 +11,10 @@ on:
     paths:
       - "apps/desktop/**"
       - "apps/engine/**"
+      - "apps/mcp/**"
+      - "apps/cli/**"
       - "crates/**"
+      - "packages/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -20,7 +23,10 @@ on:
     paths:
       - "apps/desktop/**"
       - "apps/engine/**"
+      - "apps/mcp/**"
+      - "apps/cli/**"
       - "crates/**"
+      - "packages/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"

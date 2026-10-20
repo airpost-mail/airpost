@@ -1656,7 +1656,7 @@ code or bundled packages. `Engine.subscribe` gets the window connection's notifi
 deltas (DatabaseStore has those), filtered by method and `accountId`. 1.27.0 is a minor bump
 although `renderedMessageBodyIntoDocument` no longer gets `document`: that breaks plugins within
 their semver range (`^1.26.0` matches 1.27.0 and they still activate; their hook throws on each
-render). The section 6 table, `PLUGIN_SYSTEM_ARCHITECTURE.md` and `apps/desktop/CHANGELOG.md`
+render). The section 6 table, `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` and `apps/desktop/CHANGELOG.md`
 say so; the alternative is 2.0.0.
 
 Open: tern-web: the gateway and `apps/web` don't relay `integrations.*` to non-admin devices
@@ -1679,7 +1679,7 @@ cleared, and the `core.integrations.*` keys are mirrored only with an engine tha
 call arrives, so time queued on the files lane counts against it. `Engine.request` refuses `hello`
 and `subscribe`. The caller lookup also matches a package's realpath, walks past the app's
 `node_modules`, parses paths with parentheses, and refuses local-only methods to a caller
-outside the app that is in no package. `PLUGIN_SYSTEM_ARCHITECTURE.md` covers 1.27.0, `MessageBody`,
+outside the app that is in no package. `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` covers 1.27.0, `MessageBody`,
 `Engine`, `tern.engineMethods` and the trust model. Checks: `engine-settings-spec`,
 `engine-api-spec`, `files.rs` unit tests, desktop lint and typecheck. Decisions taken, to
 confirm: an unknown caller is named by its file path in the refusal; the integration keys a
@@ -2203,7 +2203,7 @@ Open:
 - `bodies` stay with the engine that got `draft.send`. Another device's engine that sees the
   synced send-later metadata has no bodies and would send the stored body, until claims (T22,
   stage 17) decide which engine fires. A plugin's transform doesn't run for sends started outside
-  the app (documented in `apps/desktop/docs/creating-composer-plugins.md`).
+  the app (documented in `docs/desktop/creating-composer-plugins.md`).
 - TD49's send-function split isn't done.
 - The Blink stylesheet notice in NOTICE.md is from the upstream file's header as we know it;
   check it against `html.css`.

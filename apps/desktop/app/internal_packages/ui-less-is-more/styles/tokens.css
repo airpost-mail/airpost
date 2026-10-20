@@ -1,5 +1,5 @@
 /* Less Is More: one white surface everywhere, slate text in lists, no dividers.
-   Tokens only; docs/theme-tokens.md lists what each token covers. */
+   Tokens only; docs/desktop/theme-tokens.md lists what each token covers. */
 :root {
   --toolbar-background: var(--background);
   --toolbar-border: transparent;

@@ -125,7 +125,7 @@ export default class PackageManager {
           localized(
             `This plugin or theme %@ does not list "mailspring" in it's package.json's "engines" field. Ask the developer to test the plugin with Tern and add it, or follow the instructions here: %@`,
             pkg.name,
-            `https://github.com/ternmail/ternmail/blob/main/apps/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
+            `https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
           )
         );
         return;
@@ -238,7 +238,7 @@ export default class PackageManager {
         new Error(
           localized(
             `The plugin or theme you selected has not been upgraded to support Tern. If you're the developer, update the package.json's engines field to include "mailspring".\n\nFor more information, see this migration guide: %@`,
-            `https://github.com/ternmail/ternmail/blob/main/apps/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
+            `https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md`
           )
         )
       );
@@ -303,6 +303,8 @@ export default class PackageManager {
   }
 
   createPackageManually() {
-    shell.openExternal('https://github.com/Foundry376/Mailspring-Plugin-Starter');
+    shell.openExternal(
+      'https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md'
+    );
   }
 }
