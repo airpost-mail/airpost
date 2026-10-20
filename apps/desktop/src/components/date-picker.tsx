@@ -1,7 +1,7 @@
 import moment, { Moment } from 'moment';
 import classnames from 'classnames';
 import React from 'react';
-import { DateUtils } from 'mailspring-exports';
+import { DateUtils, localized } from 'mailspring-exports';
 import { MiniMonthView, TabGroupContext } from 'mailspring-component-kit';
 
 type DatePickerProps = {
@@ -93,7 +93,7 @@ export class DatePicker extends React.Component<DatePickerProps, DatePickerState
     });
 
     const val = this.value();
-    let dayTxt = 'Click to set date';
+    let dayTxt = localized('Click to set date');
     if (val) {
       dayTxt = this.value().format(DateUtils.DATE_FORMAT_llll_NO_TIME);
     }

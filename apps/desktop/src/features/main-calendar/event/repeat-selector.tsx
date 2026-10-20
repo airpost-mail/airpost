@@ -1,6 +1,7 @@
 import React from 'react';
 import { localized } from 'mailspring-exports';
 import { EventPropertyRow } from './property-row';
+import { PropertySelect } from './property-select';
 
 export type RepeatOption = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
@@ -20,17 +21,13 @@ const REPEAT_OPTIONS: { value: RepeatOption; label: string }[] = [
 export const RepeatSelector: React.FC<RepeatSelectorProps> = ({ value, onChange }) => {
   return (
     <EventPropertyRow label={localized('repeat:')}>
-      <select
+      <PropertySelect
         className="repeat-select"
+        label={localized('Repeat')}
         value={value}
-        onChange={(e) => onChange(e.target.value as RepeatOption)}
-      >
-        {REPEAT_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        options={REPEAT_OPTIONS}
+        onChange={onChange}
+      />
     </EventPropertyRow>
   );
 };

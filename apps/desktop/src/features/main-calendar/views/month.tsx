@@ -1,10 +1,11 @@
 import React from 'react';
 import moment, { Moment } from 'moment-timezone';
 import { InjectedComponentSet } from 'mailspring-component-kit';
-import { CalendarDateUtils } from 'mailspring-exports';
+import { CalendarDateUtils, localized } from 'mailspring-exports';
 import { CalendarViewProps } from '../main-calendar';
 import { CalendarEventContainer } from '../event/container';
 import { CalendarView } from '../constants';
+import { Button } from '../../../components/kit/button';
 import { HeaderControls } from './header-controls';
 import { EventOccurrence } from '../data-source';
 import { Disposable } from 'rx-core';
@@ -189,9 +190,9 @@ export class MonthView extends React.Component<CalendarViewProps, MonthViewState
             onChangeView={this.props.onChangeView}
             disabledViewButton={CalendarView.MONTH}
           >
-            <button key="today" className="btn" onClick={this._onClickToday}>
-              Today
-            </button>
+            <Button key="today" variant="outline" onClick={this._onClickToday}>
+              {localized('Today')}
+            </Button>
           </HeaderControls>
 
           <div className="month-view-grid-container">

@@ -1,4 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
+import { localized } from 'mailspring-exports';
+import { Button } from '../../../components/kit/button';
+import { Popover, PopoverContent, PopoverTrigger } from '../../../components/kit/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../components/kit/tooltip';
 
 interface CalendarColorPickerProps {
   color: string; // Current color hex value (e.g., "#d93f35")
@@ -23,53 +27,49 @@ export const CalendarColorPicker: React.FC<CalendarColorPickerProps> = ({
   colors,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
   const availableColors = colors || DEFAULT_COLORS;
-
-  const toggleDropdown = () => {
-    setIsOpen(!isOpen);
-  };
 
   const handleColorSelect = (selectedColor: string) => {
     onChange(selectedColor);
     setIsOpen(false);
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [isOpen]);
-
   return (
-    <div className="calendar-color-picker" ref={containerRef}>
-      <div className="color-picker-trigger" onClick={toggleDropdown}>
-        <div className="color-dot" style={{ backgroundColor: color }} />
-        <div className="color-picker-chevron">▾</div>
-      </div>
-      {isOpen && (
-        <div className="color-picker-dropdown">
+    <div className="calendar-color-picker">
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          {/* The triggers' own data-slot would replace the buttons'. */}
+          <Button
+            variant="ghost"
+            data-slot="button"
+            className="color-picker-trigger"
+            aria-label={localized('Color')}
+          >
+            <span className="color-dot" style={{ backgroundColor: color }} />
+            <span className="color-picker-chevron" aria-hidden="true">
+              ▾
+            </span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="color-picker-dropdown">
           {availableColors.map((c) => (
-            <div
-              key={c}
-              className={`color-option ${c === color ? 'selected' : ''}`}
-              style={{ backgroundColor: c }}
-              onClick={() => handleColorSelect(c)}
-              title={c}
-            />
+            <Tooltip key={c}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  data-slot="button"
+                  aria-label={c}
+                  aria-pressed={c === color}
+                  className={`color-option ${c === color ? 'selected' : ''}`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => handleColorSelect(c)}
+                />
+              </TooltipTrigger>
+              <TooltipContent>{c}</TooltipContent>
+            </Tooltip>
           ))}
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };

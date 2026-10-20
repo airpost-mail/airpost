@@ -1,6 +1,15 @@
 import React from 'react';
 import moment, { Moment } from 'moment';
 import classnames from 'classnames';
+import { localized } from '../intl/localize';
+import { Button } from './kit/button';
+
+// The month arrows don't take focus, by click or Tab: DatePicker shows this view only while its
+// own field has focus, so a focused arrow would close it.
+const NAV_BUTTON_PROPS = {
+  tabIndex: -1,
+  onMouseDown: (e: React.MouseEvent) => e.preventDefault(),
+};
 
 interface MiniMonthViewProps {
   value: Moment;
@@ -130,8 +139,15 @@ export class MiniMonthView extends React.Component<MiniMonthViewProps, MiniMonth
     return (
       <div className="mini-month-view">
         <div className="header">
-          <div className="btn btn-icon" onClick={() => onChangeMonth(-1)}>
-            <svg width="8" height="12" viewBox="0 0 8 12" fill="none">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mini-month-nav prev"
+            aria-label={localized('Previous month')}
+            {...NAV_BUTTON_PROPS}
+            onClick={() => onChangeMonth(-1)}
+          >
+            <svg width="8" height="12" viewBox="0 0 8 12" fill="none" aria-hidden="true">
               <path
                 d="M7 1L2 6l5 5"
                 stroke="currentColor"
@@ -140,10 +156,17 @@ export class MiniMonthView extends React.Component<MiniMonthViewProps, MiniMonth
                 strokeLinejoin="round"
               />
             </svg>
-          </div>
+          </Button>
           <span className="month-title">{month.format('MMMM YYYY')}</span>
-          <div className="btn btn-icon" onClick={() => onChangeMonth(1)}>
-            <svg width="8" height="12" viewBox="0 0 8 12" fill="none">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mini-month-nav next"
+            aria-label={localized('Next month')}
+            {...NAV_BUTTON_PROPS}
+            onClick={() => onChangeMonth(1)}
+          >
+            <svg width="8" height="12" viewBox="0 0 8 12" fill="none" aria-hidden="true">
               <path
                 d="M1 1l5 5-5 5"
                 stroke="currentColor"
@@ -152,7 +175,7 @@ export class MiniMonthView extends React.Component<MiniMonthViewProps, MiniMonth
                 strokeLinejoin="round"
               />
             </svg>
-          </div>
+          </Button>
         </div>
         <div className="legend">
           {[0, 1, 2, 3, 4, 5, 6].map((i) => (

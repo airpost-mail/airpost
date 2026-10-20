@@ -11,10 +11,14 @@ import {
   CalendarDateUtils,
 } from 'mailspring-exports';
 import { RetinaImg, KeyCommandsRegion, BindGlobalCommands } from 'mailspring-component-kit';
+import { IconButton } from '../../components/kit/icon-button';
+import { TextField } from '../../components/kit/text-field';
 import { EventOccurrence, occurrencesForEvents, occurrenceStartUnix } from './data-source';
 import { Disposable } from 'rx-core';
 
 const DISABLED_CALENDARS = 'core.calendar.disabledCalendars';
+
+let searchBarCount = 0;
 
 interface EventSearchBarState {
   query: string;
@@ -31,6 +35,7 @@ export class EventSearchBar extends Component<Record<string, unknown>, EventSear
 
   private _searchTimeout: ReturnType<typeof setTimeout> | null = null;
   private _inputRef = React.createRef<HTMLInputElement>();
+  private _inputId = `event-search-input-${++searchBarCount}`;
   private _disposable?: Disposable;
 
   constructor(props: Record<string, unknown>) {
@@ -248,24 +253,27 @@ export class EventSearchBar extends Component<Record<string, unknown>, EventSear
     return (
       <BindGlobalCommands commands={{ 'core:focus-search': this._focusSearch }}>
         <KeyCommandsRegion className={`event-search-bar ${focused ? 'focused' : ''}`} tabIndex={-1}>
-          {loading ? (
-            <RetinaImg
-              className="search-accessory search loading"
-              name="inline-loading-spinner.gif"
-              mode={RetinaImg.Mode.ContentPreserve}
-            />
-          ) : (
-            <RetinaImg
-              className="search-accessory search"
-              name="searchloupe.png"
-              mode={RetinaImg.Mode.ContentDark}
-              onClick={() => this._inputRef.current?.focus()}
-            />
-          )}
-          <input
+          {/* A label, so a click on the loupe focuses the field. */}
+          <label htmlFor={this._inputId} className="search-accessory-label">
+            {loading ? (
+              <RetinaImg
+                className="search-accessory search loading"
+                name="inline-loading-spinner.gif"
+                mode={RetinaImg.Mode.ContentPreserve}
+              />
+            ) : (
+              <RetinaImg
+                className="search-accessory search"
+                name="searchloupe.png"
+                mode={RetinaImg.Mode.ContentDark}
+              />
+            )}
+          </label>
+          <TextField
             ref={this._inputRef}
-            type="text"
+            id={this._inputId}
             className="event-search-input"
+            aria-label={localized('Search events')}
             placeholder={showPlaceholder ? localized('Search events') : ''}
             value={query}
             onChange={this._onInputChange}
@@ -274,11 +282,17 @@ export class EventSearchBar extends Component<Record<string, unknown>, EventSear
             onKeyDown={this._onKeyDown}
           />
           {showX && (
-            <RetinaImg
-              name="searchclear.png"
+            <IconButton
+              tabIndex={-1}
               className="search-accessory clear"
+              icon="searchclear.png"
               mode={RetinaImg.Mode.ContentDark}
-              onMouseDown={this._onClearSearch}
+              label={localized('Clear search')}
+              onMouseDown={(e) => {
+                // Keeps focus in the field, so typing carries on after the clear.
+                e.preventDefault();
+                this._onClearSearch();
+              }}
             />
           )}
           {suggestions.length > 0 && focused && (

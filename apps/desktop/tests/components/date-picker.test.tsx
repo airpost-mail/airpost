@@ -26,7 +26,8 @@ describe('DatePicker', function datePicker() {
     fireEvent.focus(picker);
     const day = moment(`${target} 00:00`, 'YYYY-MM-DD HH:mm');
     const shown = () => moment(container.querySelector('.month-title').textContent, 'MMMM YYYY');
-    const [prev, next] = Array.from(container.querySelectorAll('.btn-icon'));
+    const prev = container.querySelector('.mini-month-nav.prev');
+    const next = container.querySelector('.mini-month-nav.next');
     while (!shown().isSame(day, 'month')) {
       fireEvent.click(shown().isBefore(day) ? next : prev);
     }
@@ -77,6 +78,18 @@ describe('DatePicker', function datePicker() {
     pickDay(container, picker, '2026-11-01');
 
     expect(lastEmitted(onChange).valueOf()).toBe(Date.UTC(2026, 10, 1, 6, 30));
+  });
+
+  it('stays open when a month arrow is pressed, which never takes focus from the field', () => {
+    const { container, picker } = renderPicker();
+    fireEvent.focus(picker);
+    const next = container.querySelector('.mini-month-nav.next') as HTMLButtonElement;
+    expect(next.getAttribute('data-slot')).toBe('button');
+    expect(next.getAttribute('aria-label')).toBe('Next month');
+    expect(next.tabIndex).toBe(-1);
+    expect(fireEvent.mouseDown(next)).toBe(false);
+    fireEvent.click(next);
+    expect(container.querySelector('.mini-month-view')).not.toBe(null);
   });
 
   it('keeps the clock time when an arrow key moves the day', () => {

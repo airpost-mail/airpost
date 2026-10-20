@@ -1,6 +1,7 @@
 import classnames from 'classnames';
 import React, { Component } from 'react';
 import { localized, DateUtils } from 'mailspring-exports';
+import { TextField } from './kit/text-field';
 
 type DateInputProps = {
   className?: string;
@@ -84,9 +85,9 @@ class DateInput extends Component<DateInputProps, DateInputState> {
 
     return (
       <div className={classes}>
-        <input
+        <TextField
           tabIndex={0}
-          type="text"
+          aria-label={localized('Custom date')}
           value={inputValue}
           placeholder={localized("Or, 'next Monday at 2PM'")}
           onKeyDown={this.onInputKeyDown}

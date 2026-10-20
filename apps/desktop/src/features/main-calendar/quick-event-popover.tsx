@@ -1,6 +1,7 @@
 import React from 'react';
 import { Actions, Calendar, DatabaseStore, DateUtils, localized } from 'mailspring-exports';
 import { Moment } from 'moment';
+import { TextField } from '../../components/kit/text-field';
 import { getEditableCalendars, showNoEditableCalendarsError, createCalendarEvent } from './helpers';
 
 interface QuickEventPopoverState {
@@ -69,18 +70,22 @@ export class QuickEventPopover extends React.Component<
     if (this.state.start) {
       dateInterpretation = (
         <span className="date-interpretation">
-          Title: {this.state.leftoverText} <br />
-          Start: {DateUtils.format(this.state.start, DateUtils.DATE_FORMAT_SHORT)} <br />
-          End: {DateUtils.format(this.state.end, DateUtils.DATE_FORMAT_SHORT)}
+          {localized('Title: %@', this.state.leftoverText || '')} <br />
+          {localized(
+            'Start: %@',
+            DateUtils.format(this.state.start, DateUtils.DATE_FORMAT_SHORT)
+          )}{' '}
+          <br />
+          {localized('End: %@', DateUtils.format(this.state.end, DateUtils.DATE_FORMAT_SHORT))}
         </span>
       );
     }
 
     return (
       <div className="quick-event-popover nylas-date-input">
-        <input
+        <TextField
           tabIndex={0}
-          type="text"
+          aria-label={localized('New Event')}
           placeholder={localized("Coffee next Monday at 9AM'")}
           onKeyDown={this.onInputKeyDown}
           onChange={this.onInputChange}

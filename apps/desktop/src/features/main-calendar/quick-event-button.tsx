@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Actions, localized } from 'mailspring-exports';
-import { RetinaImg, BindGlobalCommands } from 'mailspring-component-kit';
+import { BindGlobalCommands } from 'mailspring-component-kit';
+import { IconButton } from '../../components/kit/icon-button';
 import { QuickEventPopover } from './quick-event-popover';
 
 export class QuickEventButton extends React.Component<Record<string, unknown>> {
@@ -22,19 +23,14 @@ export class QuickEventButton extends React.Component<Record<string, unknown>> {
   render() {
     return (
       <BindGlobalCommands commands={{ 'core:add-item': this._openPopover }}>
-        <button
+        <IconButton
+          variant="toolbar"
           tabIndex={-1}
-          className="btn btn-toolbar item-compose"
-          title={localized('Create new event')}
-          aria-label={localized('Create new event')}
+          className="item-compose"
+          icon="toolbar-compose.png"
+          label={localized('Create new event')}
           onClick={this.onClick}
-        >
-          <RetinaImg
-            name="toolbar-compose.png"
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-        </button>
+        />
       </BindGlobalCommands>
     );
   }

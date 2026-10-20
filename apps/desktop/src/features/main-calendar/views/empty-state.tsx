@@ -1,5 +1,6 @@
 import React from 'react';
 import { Actions, localized } from 'mailspring-exports';
+import { Button } from '../../../components/kit/button';
 
 export function CalendarEmptyState() {
   const onOpenAccountPreferences = () => {
@@ -16,9 +17,9 @@ export function CalendarEmptyState() {
             'None of your connected accounts provide calendars. Tern supports calendars from Gmail and other providers with CalDAV support.'
           )}
         </p>
-        <button className="btn btn-large btn-emphasis" onClick={onOpenAccountPreferences}>
+        <Button size="lg" onClick={onOpenAccountPreferences}>
           {localized('Add a Calendar Account')}
-        </button>
+        </Button>
       </div>
     </div>
   );

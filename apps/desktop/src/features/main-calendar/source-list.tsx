@@ -1,17 +1,16 @@
-/* eslint jsx-a11y/label-has-for: 0 */
 import _ from 'underscore';
-import classnames from 'classnames';
 import React from 'react';
 
 import { calcColor } from './helpers';
 import { Calendar, Account } from 'mailspring-exports';
+import { Checkbox } from '../../components/kit/checkbox';
 
 const DISABLED_CALENDARS = 'core.calendar.disabledCalendars';
 
 function renderCalendarToggles(calendars: Calendar[], disabledCalendars: string[]) {
   return calendars.map((calendar) => {
     const calendarId = calendar.id;
-    const onClick = () => {
+    const onToggle = () => {
       const cals = AppEnv.config.get(DISABLED_CALENDARS) || [];
       if (cals.includes(calendarId)) {
         cals.splice(cals.indexOf(calendarId), 1);
@@ -22,23 +21,19 @@ function renderCalendarToggles(calendars: Calendar[], disabledCalendars: string[
     };
 
     const checked = !disabledCalendars.includes(calendar.id);
-    const checkboxClass = classnames({
-      'colored-checkbox': true,
-      checked: checked,
-    });
-    const bgColor = checked ? calcColor(calendar.id) : 'transparent';
+    // The checked box fills with the calendar's colour.
+    const style = { '--primary': calcColor(calendar.id) } as React.CSSProperties;
+    // The whole row is the label, so a click anywhere on it toggles the calendar.
     return (
-      <div
-        title={calendar.name}
-        onClick={onClick}
-        className="toggle-wrap"
-        key={`check-${calendar.id}`}
-      >
-        <div className={checkboxClass}>
-          <div className="bg-color" style={{ backgroundColor: bgColor }} />
-        </div>
-        <label>{calendar.name}</label>
-      </div>
+      <label title={calendar.name} className="toggle-wrap" key={`check-${calendar.id}`}>
+        <Checkbox
+          className="colored-checkbox"
+          checked={checked}
+          onCheckedChange={onToggle}
+          style={style}
+        />
+        <span className="calendar-name">{calendar.name}</span>
+      </label>
     );
   });
 }

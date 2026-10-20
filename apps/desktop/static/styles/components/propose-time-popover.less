@@ -91,26 +91,9 @@
   .propose-time-comment {
     // Small but never absent: on a short window the note is what gives, not the controls.
     min-height: 44px;
-    background: @background-primary;
-    border: 1px solid @border-color-divider;
-    border-radius: @border-radius-base;
-    box-sizing: border-box;
-    color: @text-color;
-    font-family: inherit;
-    font-size: inherit;
     margin-bottom: 12px;
-    padding: 6px 8px;
     // Vertical only: a horizontal drag would leave the field wider than the popover.
     resize: vertical;
-    width: 100%;
-
-    &::placeholder {
-      color: @text-color-very-subtle;
-    }
-    &:focus {
-      border-color: @accent-primary;
-      outline: none;
-    }
   }
 
   .propose-time-actions {

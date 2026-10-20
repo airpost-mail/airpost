@@ -1,5 +1,6 @@
 import React from 'react';
 import { localized } from 'mailspring-exports';
+import { Button } from '../../../components/kit/button';
 
 interface EventPopoverActionsProps {
   onSave: () => void;
@@ -16,12 +17,12 @@ export const EventPopoverActions: React.FC<EventPopoverActionsProps> = ({
 }) => {
   return (
     <div className="event-popover-actions">
-      <button className="btn" onClick={onCancel}>
+      <Button variant="outline" onClick={onCancel}>
         {localized('Cancel')}
-      </button>
-      <button className="btn btn-emphasis" onClick={onSave} disabled={saveDisabled}>
+      </Button>
+      <Button onClick={onSave} disabled={saveDisabled}>
         {saveLabel || localized('Save')}
-      </button>
+      </Button>
     </div>
   );
 };

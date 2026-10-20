@@ -1,6 +1,7 @@
 import React from 'react';
-import { RetinaImg } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
+import { IconButton } from '../../../components/kit/icon-button';
+import { TextField } from '../../../components/kit/text-field';
 
 interface LocationVideoInputProps {
   value: string; // Current location value
@@ -25,8 +26,7 @@ export const LocationVideoInput: React.FC<LocationVideoInputProps> = ({
 
   return (
     <div className="location-video-input">
-      <input
-        type="text"
+      <TextField
         className="location-input"
         aria-label={localized('Location or Video Call')}
         placeholder={localized('Add Location or Video Call')}
@@ -34,13 +34,12 @@ export const LocationVideoInput: React.FC<LocationVideoInputProps> = ({
         onChange={(e) => onChange(e.target.value)}
       />
       {showVideoButton && (
-        <div
+        <IconButton
           className="video-toggle"
+          icon="ic-eventcard-videocall.png"
+          label={localized('Add Video Call')}
           onClick={handleVideoClick}
-          title={localized('Add Video Call')}
-        >
-          <RetinaImg name="ic-eventcard-videocall.png" mode={RetinaImg.Mode.ContentIsMask} />
-        </div>
+        />
       )}
     </div>
   );

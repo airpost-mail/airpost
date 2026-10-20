@@ -2,8 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import moment from 'moment';
 import { formatTime, hourCycle } from '../intl/date-format';
+import { localized } from '../intl/localize';
 import classnames from 'classnames';
 import { TabGroupContext } from 'mailspring-component-kit';
+import { TextField } from './kit/text-field';
 
 const INTERVAL_MINUTES = 30;
 const INTERVAL: [number, 'minutes'] = [INTERVAL_MINUTES, 'minutes'];
@@ -37,6 +39,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
   };
 
   _gotoScrollStartOnUpdate = false;
+  _inputRef = React.createRef<HTMLInputElement>();
 
   constructor(props) {
     super(props);
@@ -93,7 +96,7 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
   _onFocus = () => {
     this.setState({ focused: true });
     this._gotoScrollStartOnUpdate = true;
-    const el = ReactDOM.findDOMNode(this.refs.input) as HTMLInputElement;
+    const el = this._inputRef.current;
     el.setSelectionRange(0, el.value.length);
   };
 
@@ -239,17 +242,20 @@ export default class TimePicker extends React.Component<TimePickerProps, TimePic
   }
 
   render() {
+    const invalid = !moment(this.state.rawText, 'h:ma').isValid();
     const className = classnames({
       'time-picker': true,
       'no-select-end': true,
-      invalid: !moment(this.state.rawText, 'h:ma').isValid(),
+      invalid,
     });
     return (
       <div className="time-picker-wrap">
-        <input
+        <TextField
+          size="sm"
           className={className}
-          type="text"
-          ref="input"
+          invalid={invalid}
+          aria-label={localized('Time')}
+          ref={this._inputRef}
           value={this.state.rawText}
           onChange={this._onRawTextChange}
           onKeyDown={this._onKeyDown}

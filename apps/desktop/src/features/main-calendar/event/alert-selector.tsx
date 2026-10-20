@@ -1,6 +1,7 @@
 import React from 'react';
 import { localized } from 'mailspring-exports';
 import { EventPropertyRow } from './property-row';
+import { PropertySelect } from './property-select';
 
 export type AlertTiming =
   | 'none'
@@ -35,17 +36,13 @@ const ALERT_OPTIONS: { value: AlertTiming; label: string }[] = [
 export const AlertSelector: React.FC<AlertSelectorProps> = ({ value, onChange }) => {
   return (
     <EventPropertyRow label={localized('alert:')}>
-      <select
+      <PropertySelect
         className="alert-select"
+        label={localized('Alert')}
         value={value}
-        onChange={(e) => onChange(e.target.value as AlertTiming)}
-      >
-        {ALERT_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        options={ALERT_OPTIONS}
+        onChange={onChange}
+      />
     </EventPropertyRow>
   );
 };

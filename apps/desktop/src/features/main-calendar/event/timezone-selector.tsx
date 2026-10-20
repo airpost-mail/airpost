@@ -1,6 +1,7 @@
 import React from 'react';
 import { localized, DateUtils } from 'mailspring-exports';
 import { EventPropertyRow } from './property-row';
+import { PropertySelect } from './property-select';
 import moment from 'moment-timezone';
 
 export interface TimeZoneSelectorProps {
@@ -49,20 +50,19 @@ function formatTimezone(tz: string): string {
 }
 
 export const TimeZoneSelector: React.FC<TimeZoneSelectorProps> = ({ value, onChange }) => {
-  // Ensure current value is in the list
-  const timezones = COMMON_TIMEZONES.includes(value)
-    ? COMMON_TIMEZONES
-    : [value, ...COMMON_TIMEZONES];
+  // The current value is in the list. An empty one has no item: Radix Select reserves "".
+  const timezones =
+    !value || COMMON_TIMEZONES.includes(value) ? COMMON_TIMEZONES : [value, ...COMMON_TIMEZONES];
 
   return (
     <EventPropertyRow label={localized('time zone:')}>
-      <select className="timezone-select" value={value} onChange={(e) => onChange(e.target.value)}>
-        {timezones.map((tz) => (
-          <option key={tz} value={tz}>
-            {formatTimezone(tz)}
-          </option>
-        ))}
-      </select>
+      <PropertySelect
+        className="timezone-select"
+        label={localized('Time zone')}
+        value={value}
+        options={timezones.map((tz) => ({ value: tz, label: formatTimezone(tz) }))}
+        onChange={onChange}
+      />
     </EventPropertyRow>
   );
 };

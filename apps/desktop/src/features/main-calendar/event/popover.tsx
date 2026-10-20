@@ -13,13 +13,11 @@ import {
   CalendarDateUtils,
   Utils,
 } from 'mailspring-exports';
-import {
-  DatePicker,
-  RetinaImg,
-  ScrollRegion,
-  TabGroupRegion,
-  TimePicker,
-} from 'mailspring-component-kit';
+import { DatePicker, ScrollRegion, TabGroupRegion, TimePicker } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
+import { IconButton } from '../../../components/kit/icon-button';
+import { TextField } from '../../../components/kit/text-field';
+import { Textarea } from '../../../components/kit/textarea';
 import { EventAttendeesInput } from './attendees-input';
 import {
   EventOccurrence,
@@ -490,9 +488,8 @@ export class CalendarEventPopover extends React.Component<
         <TabGroupRegion className="popover-form">
           {/* Title row */}
           <div className="title-wrapper">
-            <input
+            <TextField
               className="title"
-              type="text"
               aria-label={localized('Event title')}
               placeholder={localized('New Event')}
               value={title}
@@ -575,12 +572,15 @@ export class CalendarEventPopover extends React.Component<
               <div className="expanded-section">
                 <div className="section-header">
                   <span className="section-title">{localized('Invitees')}</span>
-                  <span
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="section-close"
+                    aria-label={localized('Hide Invitees')}
                     onClick={() => this.setState({ showInvitees: false })}
                   >
                     ×
-                  </span>
+                  </Button>
                 </div>
                 <EventAttendeesInput
                   ref={this.attendeesInputRef}
@@ -590,9 +590,13 @@ export class CalendarEventPopover extends React.Component<
                 />
               </div>
             ) : (
-              <div className="action-link" onClick={() => this.setState({ showInvitees: true })}>
+              <Button
+                variant="ghost"
+                className="action-link"
+                onClick={() => this.setState({ showInvitees: true })}
+              >
                 {localized('Add Invitees')}
-              </div>
+              </Button>
             )}
 
             {/* Notes section - collapsible */}
@@ -600,14 +604,17 @@ export class CalendarEventPopover extends React.Component<
               <div className="expanded-section">
                 <div className="section-header">
                   <span className="section-title">{localized('Notes')}</span>
-                  <span
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="section-close"
+                    aria-label={localized('Hide Notes')}
                     onClick={() => this.setState({ showNotes: false })}
                   >
                     ×
-                  </span>
+                  </Button>
                 </div>
-                <textarea
+                <Textarea
                   ref={this.notesTextareaRef}
                   value={notes}
                   aria-label={localized('Notes')}
@@ -616,9 +623,13 @@ export class CalendarEventPopover extends React.Component<
                 />
               </div>
             ) : (
-              <div className="action-link" onClick={() => this.setState({ showNotes: true })}>
+              <Button
+                variant="ghost"
+                className="action-link"
+                onClick={() => this.setState({ showNotes: true })}
+              >
                 {localized('Add Notes or URL')}
-              </div>
+              </Button>
             )}
           </div>
 
@@ -708,15 +719,15 @@ class CalendarEventPopoverUnenditable extends React.Component<
     }
     return (
       <div className="section propose-time-action">
-        <div
-          className="btn btn-link"
+        <Button
+          variant="link"
           onClick={() => {
             Actions.closePopover();
             openProposeNewTimePopover(event);
           }}
         >
           {localized('Propose a new time') + '...'}
-        </div>
+        </Button>
       </div>
     );
   }
@@ -732,11 +743,10 @@ class CalendarEventPopoverUnenditable extends React.Component<
         <div className="title-wrapper">
           <div className="title">{title}</div>
           {editable && (
-            <RetinaImg
+            <IconButton
               className="edit-icon"
-              name="edit-icon.png"
-              title="Edit Item"
-              mode={RetinaImg.Mode.ContentIsMask}
+              icon="edit-icon.png"
+              label={localized('Edit')}
               onClick={onEdit}
             />
           )}

@@ -4,6 +4,8 @@ import { formatTime, momentZone } from '../../../intl/date-format';
 import classnames from 'classnames';
 import React from 'react';
 import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';
+import { localized } from 'mailspring-exports';
+import { Button } from '../../../components/kit/button';
 import { HeaderControls } from './header-controls';
 import { EventOccurrence } from '../data-source';
 import { centerGridScroll } from '../helpers';
@@ -268,9 +270,9 @@ export class DayView extends React.Component<
             onChangeView={this.props.onChangeView}
             disabledViewButton={CalendarView.DAY}
           >
-            <button key="today" className="btn" onClick={this._onClickToday}>
-              Today
-            </button>
+            <Button key="today" variant="outline" onClick={this._onClickToday}>
+              {localized('Today')}
+            </Button>
           </HeaderControls>
 
           <div className="calendar-body-wrap">

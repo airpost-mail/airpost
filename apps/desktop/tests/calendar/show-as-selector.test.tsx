@@ -1,5 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { fireEvent } from '@testing-library/react';
+import { getPortalContainer } from '../../src/components/kit/portal';
+import { wait } from '../support/kit-helpers';
 import {
   ShowAsSelector,
   defaultShowAs,
@@ -22,15 +25,21 @@ describe('ShowAsSelector', function () {
     ReactDOM.unmountComponentAtNode(host);
   });
 
-  it('offers Busy and Free, as the two TRANSP values', function () {
-    ReactDOM.render(<ShowAsSelector value="OPAQUE" onChange={() => {}} />, host);
-    const options = Array.from(host.querySelectorAll('option')).map((o) => [
-      o.value,
-      o.textContent,
-    ]);
-    expect(options).toEqual([
-      ['OPAQUE', 'Busy'],
-      ['TRANSPARENT', 'Free'],
-    ]);
+  it('offers Busy and Free, as the two TRANSP values', async function () {
+    jasmine.unspy(window, 'setTimeout');
+    const onChange = jasmine.createSpy('onChange');
+    document.body.appendChild(host);
+    ReactDOM.render(<ShowAsSelector value="OPAQUE" onChange={onChange} />, host);
+    const trigger = host.querySelector('[data-slot="select-trigger"]') as HTMLElement;
+    expect(trigger.textContent).toBe('Busy');
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    await wait(50);
+    const items = Array.from(
+      getPortalContainer().querySelectorAll('[data-slot="select-item"]')
+    ) as HTMLElement[];
+    expect(items.map((i) => i.textContent)).toEqual(['Busy', 'Free']);
+    fireEvent.keyDown(items[1], { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('TRANSPARENT');
+    host.remove();
   });
 });

@@ -3,6 +3,8 @@ import moment, { Moment } from 'moment';
 import { Actions, localized } from 'mailspring-exports';
 import { DatePicker, TimePicker } from 'mailspring-component-kit';
 import { formatTime } from '../intl/date-format';
+import { Button } from './kit/button';
+import { Textarea } from './kit/textarea';
 
 // The pickers speak milliseconds; events are passed around in unix seconds.
 const toPicker = (unixSeconds: number) => unixSeconds * 1000;
@@ -159,9 +161,10 @@ export class ProposeTimePopover extends React.Component<
         <div className="propose-time-body">
           {isAllDay ? this._renderAllDay(start, end) : this._renderTimed(start, end)}
 
-          <textarea
+          <Textarea
             className="propose-time-comment"
             rows={3}
+            aria-label={localized('Note for the organizer')}
             value={comment}
             placeholder={localized('Add a note for the organizer (optional)')}
             onChange={(e) => this.setState({ comment: e.target.value })}
@@ -169,17 +172,16 @@ export class ProposeTimePopover extends React.Component<
         </div>
 
         <div className="propose-time-actions">
-          <button className="btn" onClick={() => Actions.closePopover()}>
+          <Button variant="outline" onClick={() => Actions.closePopover()}>
             {localized('Cancel')}
-          </button>
-          <button
-            className="btn btn-emphasis"
+          </Button>
+          <Button
             disabled={unchanged}
             title={unchanged ? localized('Pick a different time first') : undefined}
             onClick={this._onSubmit}
           >
             {localized('Propose')}
-          </button>
+          </Button>
         </div>
       </div>
     );

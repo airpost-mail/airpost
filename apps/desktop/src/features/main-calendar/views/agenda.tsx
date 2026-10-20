@@ -5,6 +5,7 @@ import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';
 import { localized, Actions, CalendarDateUtils } from 'mailspring-exports';
 import { CalendarViewProps } from '../main-calendar';
 import { CalendarView } from '../constants';
+import { Button } from '../../../components/kit/button';
 import { HeaderControls } from './header-controls';
 import { CalendarEventPopover } from '../event/popover';
 import {
@@ -255,9 +256,9 @@ export class AgendaView extends React.Component<CalendarViewProps, AgendaViewSta
           onChangeView={this.props.onChangeView}
           disabledViewButton={CalendarView.AGENDA}
         >
-          <button key="today" className="btn" onClick={this._onClickToday}>
+          <Button key="today" variant="outline" onClick={this._onClickToday}>
             {localized('Today')}
-          </button>
+          </Button>
         </HeaderControls>
 
         <ScrollRegion className="agenda-scroll-region">
