@@ -24,7 +24,7 @@ The logos are trademarks, all rights reserved, and not covered by the GPL; forks
 | `macos/tern.icns` | macOS app icon, full iconset 16..512 @1x/@2x, built with `iconutil`. |
 | `windows/tern.ico` | Windows app icon, frames 16, 24, 32, 48, 64, 128, 256 (PNG-compressed). |
 | `windows/tern-150px.png`, `tern-75px.png` | Start-menu tiles for the VisualElements manifest (full bleed, like the old ones). |
-| `linux/tern-{16,32,64,128,256,512}.png` | Linux hicolor icons, same size set as `apps/desktop/app/build/resources/linux/icons`. |
+| `linux/tern-{16,32,64,128,256,512}.png` | Linux hicolor icons, same size set as `apps/desktop/build/resources/linux/icons`. |
 | `tray/darwin/` | Menu bar icons, 16 px and @2x 32 px. `-Template` files are black + alpha macOS template images. |
 | `tray/linux/` | 32 px tray icons, plain (for light panels) and `-dark` (white, for dark panels). |
 | `tray/win32/` | 16 px and @2x PNGs plus multi-size `.ico` (16..64, BMP frames) for every state, plain and `-dark`. |
@@ -64,16 +64,16 @@ The script wipes and rewrites `masters/` (with `--masters`), `macos/`, `windows/
 
 ## Where each asset goes in apps/desktop
 
-Paths relative to `apps/desktop/app`. The old Mailspring files listed under "Replaces" are gone; the copies carry the new names.
+Paths relative to `apps/desktop/app`, except `build/`, which is `apps/desktop/build`. The old Mailspring files listed under "Replaces" are gone; the copies carry the new names.
 
 | Asset | Replaces | Used by |
 | --- | --- | --- |
 | `macos/tern.icns` | `build/resources/mac/mailspring.icns` (now `tern.icns`) | `build/build.js` (packager `icon.darwin`). Also what the macOS About panel shows (`application:about` calls the standard About panel). |
 | `windows/tern.ico` | `build/resources/win/mailspring-square.ico` and `mailspring.ico` (now `tern.ico`) | `build/build.js` (`icon.win32`), `build/create-signed-windows-installer.js` (`setupIcon`, and `iconUrl` points at this file on GitHub), `src/browser/windows-updater.js` (shortcut icon). |
 | `windows/tern-150px.png`, `tern-75px.png` | `build/resources/win/mailspring-150px.png`, `mailspring-75px.png` | `tern.VisualElementsManifest.xml` (background `#0A1A3D`). |
-| `linux/tern-<n>.png` | `build/resources/linux/icons/<n>.png` (now `tern-<n>.png`) | Installed as `hicolor/<n>x<n>/apps/com.ternmail.tern.png` by `build/resources/linux/redhat/tern.spec.in` and `script/mkdeb`; `tern-512.png` also goes to `/usr/share/pixmaps/tern.png`. |
+| `linux/tern-<n>.png` | `build/resources/linux/icons/<n>.png` (now `tern-<n>.png`) | Installed as `hicolor/<n>x<n>/apps/com.ternmail.tern.png` by `build/resources/linux/redhat/tern.spec.in` and `build/mkdeb`; `tern-512.png` also goes to `/usr/share/pixmaps/tern.png`. |
 | `linux/tern-512.png` | `static/images/mailspring.png` (now `tern.png`) | Window icon on Linux (`src/browser/mailspring-window.ts`), native notifications (`src/native-notifications.ts`), update notification (`src/browser/autoupdate-manager.ts`). |
 | `tray/darwin/*`, `tray/linux/*`, `tray/win32/*` | `internal_packages/system-tray/assets/{darwin,linux,win32}/MenuItem-Inbox-*` | `internal_packages/system-tray/lib/system-tray-icon-store.ts` and `_defaultIconPath` in `src/browser/system-tray-manager.ts`. The old `build-win32-ico.py` and `.psd` files are removed. |
 | `web/tern-bird-on-dark-256.png` | (new) `internal_packages/onboarding/assets/tern-bird-on-dark-256.png` | Mark above the title on the onboarding welcome screen (`lib/page-welcome.tsx`); the generic icon pattern `icons-bg@2x.png` stays as its background. |
 
-Not covered here: a document icon (Mailspring's unused `build/resources/mac/file.icns` was removed), a macOS 26 Icon Composer icon (`tern.icon`, needs layered vector artwork; Mailspring's `mailspring.icon` was removed, so macOS 26 shows `tern.icns`), `build/resources/mac/DMG-Background.png` (unused), and `build/resources/win/loading.gif` (the Windows installer animation).
+Not covered here: a document icon (Mailspring's unused `build/resources/mac/file.icns` was removed), a macOS 26 Icon Composer icon (`tern.icon`, needs layered vector artwork; Mailspring's `mailspring.icon` was removed, so macOS 26 shows `tern.icns`) and `build/resources/win/loading.gif` (the Windows installer animation).

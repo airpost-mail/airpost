@@ -115,9 +115,9 @@ Licences and source (GPLv3 sections 4-6)
 - [ ] Every published binary carries the licence and notices. Engine archives hold `mailsync`
   with `LICENSE.md`, `NOTICE.md` and `THIRD-PARTY-NOTICES.txt` (cargo-about, `about.toml`,
   `apps/engine/packaging/third-party-notices.sh`, which also appends the crates' NOTICE
-  files). The desktop build (`app/build/generate-licenses.js`) writes
+  files). The desktop build (`build/generate-licenses.js`) writes
   `static/all_licenses.html` from the pruned app tree, the engine notices and the vendored
-  assets in `app/build/resources/licenses/`, and puts `LICENSE.md`, `NOTICE.md` and
+  assets in `build/resources/licenses/`, and puts `LICENSE.md`, `NOTICE.md` and
   `THIRD-PARTY-NOTICES-engine.txt` in `resources/`; on macOS also Electron's `LICENSE.electron`
   and `LICENSES.chromium.html`. In CI it fails when the engine ships without notices. The
   backend image has them in `/usr/share/doc/tern-backend`. Check one artifact of each kind
@@ -129,7 +129,7 @@ Licences and source (GPLv3 sections 4-6)
   tags, the repository and the S3 objects available for as long as a build is offered. The
   desktop's npm dependencies are referenced by lockfile, not mirrored.
 - [ ] npm packages that ship no licence file get their text from
-  `app/build/resources/licenses/npm/` (`get-document`: MIT from upstream; `html-attributes`
+  `build/resources/licenses/npm/` (`get-document`: MIT from upstream; `html-attributes`
   and `svg-attributes`: Open Works License 0.9.4, upstream repos gone) or the standard text for
   their declared licence. The build log names any package left without one; keep that list
   empty.

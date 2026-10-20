@@ -65,7 +65,7 @@
     "test": "node scripts/test.js --test",
     "test-window": "node scripts/test.js --test=window",
     "tsc-watch": "tsc -w -p ./app --noEmit",
-    "build": "node app/build/build.js"
+    "build": "node build/build.js"
   },
   "overrides": {
     "tar": "7.5.21"

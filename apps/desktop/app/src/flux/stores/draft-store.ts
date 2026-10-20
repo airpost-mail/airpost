@@ -737,8 +737,7 @@ class DraftStore extends MailspringStore {
     );
     AppEnv.showErrorDialog(msg);
     const err = new Error('Could not find draft after finalizing session for sending.');
-    // Pass diagnostics as `extra` — that's what buildEvent() in sentry-error-reporter.js
-    // reads and puts into event.extra. Own properties on the error object are not forwarded.
+    // Pass diagnostics as `extra`, which reportError logs next to the error.
     AppEnv.reportError(err, { headerMessageId, ...diagnostics });
   };
 

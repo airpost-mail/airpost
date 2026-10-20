@@ -10,7 +10,7 @@
 # unsigned executable memory, no DYLD_* variables, no libraries outside the binary.
 #
 # Inside the desktop app the binary is re-signed by @electron/osx-sign with
-# apps/desktop/app/build/resources/mac/entitlements.child.plist; this script is for the
+# apps/desktop/build/resources/mac/entitlements.child.plist; this script is for the
 # engine shipped on its own and for checking a build before that.
 
 set -euo pipefail

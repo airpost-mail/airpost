@@ -3,7 +3,7 @@
 # Builds the release engine (`mailsync`), the MCP server (`tern-mcp`, apps/mcp) and the CLI
 # (`tern`, apps/cli) for macOS and Linux and optionally places them where the desktop build
 # picks them up (apps/desktop/app/mailsync-rs, apps/desktop/app/tern-mcp and
-# apps/desktop/app/tern, unpacked from the asar by apps/desktop/app/build/build.js).
+# apps/desktop/app/tern, unpacked from the asar by apps/desktop/build/build.js).
 #
 #   build-release.sh [macos] [linux] [--install-desktop[=ARCH]]
 #

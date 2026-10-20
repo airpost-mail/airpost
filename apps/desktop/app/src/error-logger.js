@@ -9,7 +9,6 @@ if (process.type === 'renderer') {
 }
 
 var appVersion = app.getVersion();
-var SentryErrorReporter = require('./error-logger-extensions/sentry-error-reporter');
 
 // A globally available ErrorLogger that can report errors to various
 // sources and enhance error functionality.
@@ -24,8 +23,8 @@ var SentryErrorReporter = require('./error-logger-extensions/sentry-error-report
 // You should almost always use `AppEnv.reportError` in the renderer
 // processes instead of manually accessing the `errorLogger`
 //
-// The errorLogger will report errors to a log file as well as to 3rd
-// party reporting services if enabled.
+// The errorLogger logs errors to the console; the main process also keeps
+// native crash dumps on disk.
 module.exports = ErrorLogger = (function () {
   function ErrorLogger(args) {
     this.reportError = this.reportError.bind(this);
@@ -38,18 +37,6 @@ module.exports = ErrorLogger = (function () {
     this._extendErrorObject();
 
     this._extendNativeConsole();
-
-    this.extensions = [
-      new SentryErrorReporter({
-        inSpecMode: args.inSpecMode,
-        inDevMode: args.inDevMode,
-        resourcePath: args.resourcePath,
-      }),
-    ];
-
-    if (this.inSpecMode) {
-      return;
-    }
   }
 
   /////////////////////////////////////////////////////////////////////
@@ -60,18 +47,13 @@ module.exports = ErrorLogger = (function () {
     if (this.inSpecMode) {
       return;
     }
-    // An error reported without a stack shows up in Sentry attributed to
-    // wherever `new Error()` happened to run to give it one — for JSON
-    // reparsed in the main process's `report-error` IPC handler (see
+    // An error without a stack gets one from wherever `new Error()` runs —
+    // for JSON reparsed in the main process's `report-error` IPC handler (see
     // application.ts), that's the same IPC handler frame for every caller,
-    // regardless of the error's real origin (window.onerror, uncaughtException,
-    // unhandledrejection forwarding a bare rejection reason, or an explicit
-    // reportError() call). Every stackless error, whatever its message,
-    // collapses into one unactionable Sentry issue. Wrap such inputs in a
-    // real Error *here*, in the renderer, before the IPC hop: since callers
-    // differ, this call site's stack differs too, so Sentry attributes and
-    // groups them separately going forward. Keep the original message when
-    // there is one — only the stack is synthetic.
+    // whatever the error's real origin. Wrap such inputs in a real Error
+    // *here*, in the renderer, before the IPC hop, so the stack points at
+    // the caller. Keep the original message when there is one — only the
+    // stack is synthetic.
     var hasMessage =
       error && typeof error.message === 'string' && error.message.length > 0;
     var hasStack = error && typeof error.stack === 'string' && error.stack.length > 0;
@@ -137,8 +119,6 @@ module.exports = ErrorLogger = (function () {
        * it before the window closes.
        */
       ipcRenderer.sendSync('report-error', { errorJSON: errorJSON, extra: extraJSON });
-    } else {
-      this._notifyExtensions('reportError', error, extra);
     }
     // console.error can itself throw (eg. EPIPE writing to a closed
     // stdout/stderr pipe on Linux). Since reportError is called from our
@@ -192,16 +172,6 @@ module.exports = ErrorLogger = (function () {
       },
       configurable: true,
     });
-  };
-
-  ErrorLogger.prototype._notifyExtensions = function () {
-    var command, args;
-    command = arguments[0];
-    args = 2 <= arguments.length ? Array.prototype.slice.call(arguments, 1) : [];
-    for (var i = 0; i < this.extensions.length; i++) {
-      const extension = this.extensions[i];
-      extension[command].apply(extension, args);
-    }
   };
 
   // Create a new console.debug option, which takes `true` (print)

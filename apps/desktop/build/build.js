@@ -16,11 +16,10 @@ const { packager } = require('@electron/packager');
 const { writeLicenses } = require('./generate-licenses');
 
 const platform = process.platform;
-const rootDir = path.resolve(__dirname, '..', '..');
-const appDir = path.resolve(rootDir, 'app');
-const buildDir = path.join(appDir, 'build');
+const buildDir = __dirname;
+const appDir = path.resolve(buildDir, '..', 'app');
 const outputDir = path.join(appDir, 'dist');
-const tmpdir = path.resolve(os.tmpdir(), 'nylas-build');
+const tmpdir = path.resolve(os.tmpdir(), 'tern-build');
 const packageJSON = require(path.join(appDir, 'package.json'));
 const { compilerOptions } = require(path.join(appDir, 'tsconfig.json'));
 
@@ -106,7 +105,7 @@ function resolveRealSymlinkPaths() {
 }
 
 function runCopyPlatformSpecificResources({ buildPath, platform }) {
-  const winResourcesSource = path.resolve(appDir, 'build', 'resources', 'win');
+  const winResourcesSource = path.join(buildDir, 'resources', 'win');
   const winResourcesTarget = path.resolve(buildPath, '..');
   if (platform === 'win32') {
     fsPlus.copySync(winResourcesSource, winResourcesTarget);
@@ -175,55 +174,11 @@ function runTranspilers({ buildPath }) {
   });
 }
 
-async function runUploadSourceMapsToSentry({ buildPath }) {
-  const { SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT } = process.env;
+// Packaged builds ship no source maps, including the ones runTranspilers just wrote.
+function runRemoveSourceMaps({ buildPath }) {
   const mapFiles = glob.sync('**/*.js.map', { cwd: buildPath });
-
-  const cleanup = () => {
-    mapFiles.forEach((relPath) => fs.unlinkSync(path.join(buildPath, relPath)));
-    console.log(`---> Cleaned up ${mapFiles.length} source map files`);
-  };
-
-  if (!SENTRY_AUTH_TOKEN || !SENTRY_ORG || !SENTRY_PROJECT) {
-    console.log(
-      '---> Skipping Sentry source map upload (set SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT to enable)'
-    );
-    cleanup();
-    return;
-  }
-
-  let SentryCli;
-  try {
-    SentryCli = require('@sentry/cli');
-  } catch (e) {
-    console.log('---> @sentry/cli not found, skipping source map upload');
-    cleanup();
-    return;
-  }
-
-  console.log('---> Uploading source maps to Sentry');
-
-  try {
-    const commitHash = execSync('git rev-parse HEAD').toString().trim().substr(0, 8);
-    const version = `${packageJSON.version}-${commitHash}`;
-    const cli = new SentryCli(null, {
-      authToken: SENTRY_AUTH_TOKEN,
-      org: SENTRY_ORG,
-      project: SENTRY_PROJECT,
-    });
-    await cli.releases.new(version);
-    await cli.releases.uploadSourceMaps(version, {
-      include: [buildPath],
-      urlPrefix: 'app:///',
-      rewrite: true,
-    });
-    await cli.releases.finalize(version);
-    console.log(`---> Source maps uploaded to Sentry release ${version}`);
-  } catch (err) {
-    console.error(`---> Sentry source map upload failed: ${err.message}`);
-  } finally {
-    cleanup();
-  }
+  mapFiles.forEach((relPath) => fs.unlinkSync(path.join(buildPath, relPath)));
+  console.log(`---> Removed ${mapFiles.length} source map files`);
 }
 
 function buildPackagerOptions() {
@@ -244,8 +199,8 @@ function buildPackagerOptions() {
       linux: process.arch,
     }[platform],
     icon: {
-      darwin: path.resolve(appDir, 'build', 'resources', 'mac', 'tern.icns'),
-      win32: path.resolve(appDir, 'build', 'resources', 'win', 'tern.ico'),
+      darwin: path.join(buildDir, 'resources', 'mac', 'tern.icns'),
+      win32: path.join(buildDir, 'resources', 'win', 'tern.ico'),
       linux: undefined,
     }[platform],
     name: { darwin: 'Tern', win32: 'Tern', linux: 'tern' }[platform],
@@ -285,11 +240,8 @@ function buildPackagerOptions() {
     },
     ignore: [
       // top level dirs we never want
-      /^\/build.*/,
       /^\/dist.*/,
       /^\/docs.*/,
-      /^\/docs_src.*/,
-      /^\/script.*/,
       /^\/spec.*/,
       // The C++ engine (legacy/mailsync-cpp) is never packaged, even if a local build left one
       // in app/: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
@@ -367,7 +319,7 @@ function buildPackagerOptions() {
         }
       : undefined,
     win32metadata: {
-      CompanyName: 'Foundry 376, LLC',
+      CompanyName: 'Tern',
       FileDescription: 'Tern',
       LegalCopyright: appCopyright,
       ProductName: 'Tern',
@@ -376,11 +328,9 @@ function buildPackagerOptions() {
     // they are manually overridden by electron-packager based on this config:
     //   CFBundleDisplayName, CFBundleExecutable, CFBundleIdentifier, CFBundleName
     // See https://github.com/electron-userland/electron-packager/blob/master/mac.js#L50
-    extendInfo: path.resolve(appDir, 'build', 'resources', 'mac', 'extra.plist'),
+    extendInfo: path.join(buildDir, 'resources', 'mac', 'extra.plist'),
     extraResource:
-      platform === 'darwin'
-        ? [path.resolve(appDir, 'build', 'resources', 'mac', 'new-mail.mp3')]
-        : undefined,
+      platform === 'darwin' ? [path.join(buildDir, 'resources', 'mac', 'new-mail.mp3')] : undefined,
     appBundleId: 'com.ternmail.tern',
     afterCopy: [
       runCopyPlatformSpecificResources,
@@ -389,7 +339,7 @@ function buildPackagerOptions() {
       runCopySymlinkedPackages,
       runWriteLicenses,
       runTranspilers,
-      runUploadSourceMapsToSentry,
+      runRemoveSourceMaps,
     ],
   };
 }
@@ -473,9 +423,9 @@ async function createDebInstaller() {
   writeFromTemplate(path.join(linuxAssetsDir, 'com.ternmail.tern.desktop.in'), data);
   writeFromTemplate(path.join(linuxAssetsDir, 'com.ternmail.tern.metainfo.xml.in'), data);
 
-  const icon = path.join(appDir, 'build', 'resources', 'linux', 'icons', 'tern-512.png');
+  const icon = path.join(linuxAssetsDir, 'icons', 'tern-512.png');
   await spawn({
-    cmd: path.join(appDir, 'script', 'mkdeb'),
+    cmd: path.join(buildDir, 'mkdeb'),
     args: [packageJSON.version, linuxArch, icon, linuxAssetsDir, contentsDir, outputDir],
   });
   console.log(`Created ${outputDir}/tern-${packageJSON.version}-${linuxArch}.deb`);
@@ -507,7 +457,7 @@ async function createRpmInstaller() {
   writeFromTemplate(path.join(linuxAssetsDir, 'com.ternmail.tern.metainfo.xml.in'), templateData);
 
   await spawn({
-    cmd: path.join(appDir, 'script', 'mkrpm'),
+    cmd: path.join(buildDir, 'mkrpm'),
     args: [outputDir, contentsDir, linuxAssetsDir],
   });
   console.log(`Created rpm package in ${rpmDir}`);
@@ -528,7 +478,7 @@ async function main() {
     await createRpmInstaller();
   }
   // win32: the electron-winstaller step is run separately by
-  // app/build/create-signed-windows-installer.js because of path issues.
+  // build/create-signed-windows-installer.js because of path issues.
 }
 
 main().catch((err) => {

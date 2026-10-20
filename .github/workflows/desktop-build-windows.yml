@@ -137,7 +137,7 @@ jobs:
           "WINDOWS_SIGN_PARAMS=/v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib `"$($dlib.FullName)`" /dmdf `"$metadata`"" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Create Windows Installer
-        run: node app/build/create-signed-windows-installer.js
+        run: node build/create-signed-windows-installer.js
         env:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -162,7 +162,7 @@ jobs:
 
       - name: Verify Every Shipped Binary Is Signed
         if: env.HAVE_SIGNING == 'true'
-        run: node app/build/verify-windows-signatures.js
+        run: node build/verify-windows-signatures.js
 
       # GPLv3 section 6(d): a tag pins the source and SOURCE.txt, published next to every
       # package, points to it.

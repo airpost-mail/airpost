@@ -5,7 +5,7 @@ Add the entry for a plugin API change to `apps/desktop/CHANGELOG.md`.
 Tern's desktop changelog is the plugin API log: one `Plugin API X.Y.Z:` block per version
 under `## Unreleased (Tern)`, newest first. App release numbering isn't decided yet, so don't
 bump `apps/desktop/app/package.json`, its lockfile or the Linux metainfo
-(`apps/desktop/app/build/resources/linux/com.ternmail.tern.metainfo.xml.in`).
+(`apps/desktop/build/resources/linux/com.ternmail.tern.metainfo.xml.in`).
 
 ## Instructions
 

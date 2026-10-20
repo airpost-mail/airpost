@@ -13,7 +13,7 @@
  *
  * We manually copy everything in build/resources/win into a 'resources' folder
  * located inside the main app directory. See runCopyPlatformSpecificResources
- * in package-task.js
+ * in build/build.js
  *
  * This means `__dirname` should be:
  * C:\Users\<USERNAME>\AppData\Local\Tern\app-x.x.x\resources

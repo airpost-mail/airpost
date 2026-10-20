@@ -12,7 +12,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { createWindowsInstaller } = require('electron-winstaller');
 
-const appDir = path.join(__dirname, '..');
+const appDir = path.join(__dirname, '..', 'app');
 const { version } = require(path.join(appDir, 'package.json'));
 
 const signToolPath = process.env.WINDOWS_SIGNTOOL_PATH;
@@ -83,16 +83,16 @@ const config = {
   usePackageJson: false,
   outputDirectory: path.join(appDir, 'dist'),
   appDirectory: path.join(appDir, 'dist', 'Tern-win32-x64'),
-  loadingGif: path.join(appDir, 'build', 'resources', 'win', 'loading.gif'),
+  loadingGif: path.join(__dirname, 'resources', 'win', 'loading.gif'),
   // Shown in Add/Remove Programs. Must be an http(s) URL; the raw GitHub file is the repo's own
   // copy of build/resources/win/tern.ico.
   iconUrl:
-    'https://raw.githubusercontent.com/ternmail/ternmail/main/apps/desktop/app/build/resources/win/tern.ico',
+    'https://raw.githubusercontent.com/ternmail/ternmail/main/apps/desktop/build/resources/win/tern.ico',
   description: 'Tern',
   version: version,
   title: 'Tern',
   authors: 'Tern contributors',
-  setupIcon: path.join(appDir, 'build', 'resources', 'win', 'tern.ico'),
+  setupIcon: path.join(__dirname, 'resources', 'win', 'tern.ico'),
   setupExe: 'TernSetup.exe',
   exe: 'tern.exe',
   name: 'Tern',

@@ -162,7 +162,7 @@ function checkArchive(zip, label, unsigned) {
 }
 
 function main() {
-  const distDir = process.argv[2] || path.join(__dirname, '..', 'dist');
+  const distDir = process.argv[2] || path.join(__dirname, '..', 'app', 'dist');
   const setupPath = path.join(distDir, 'TernSetup.exe');
   if (!fs.existsSync(setupPath)) {
     console.error(`No installer found at ${setupPath}`);

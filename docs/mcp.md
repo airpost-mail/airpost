@@ -192,7 +192,7 @@ parentheses and relative dates, and passing `from:`-style values to the search a
 ## The desktop
 
 - The packaged app ships tern-mcp next to the engine, in `app.asar.unpacked/tern-mcp`
-  (`apps/desktop/app/build/build.js`; `apps/engine/packaging/build-release.sh
+  (`apps/desktop/build/build.js`; `apps/engine/packaging/build-release.sh
   --install-desktop` builds and places it). A source checkout sets `TERN_MCP_BIN`.
 - Preferences > Integrations > AI assistants edits `mcp.json` with the semantics above (access
   level, accounts and excluded folders, HTTP on/off and port), and refuses to touch a
