@@ -1,5 +1,5 @@
 import { Account, AccountStore } from 'mailspring-exports';
-import * as EngineAccounts from '../../engine/engine-accounts';
+import * as EngineAccounts from '../../engine/accounts';
 
 // The servers for a new account come from the engine (`account.discover`: the provider
 // tables, MX records and Thunderbird autoconfig, crates/ms-providers). What the user typed

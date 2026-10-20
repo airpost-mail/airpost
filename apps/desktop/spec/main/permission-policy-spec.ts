@@ -118,7 +118,7 @@ describe('installPermissionHandlers', function () {
 });
 
 describe('isPdfViewerURL', function () {
-  const { isPdfViewerURL } = require('../../src/main/quickpreview-ipc');
+  const { isPdfViewerURL } = require('../../src/main/ipc/quick-preview');
   const path = require('path');
   const { pathToFileURL } = require('url');
   const viewer = path.join(__dirname, '..', '..', 'vendor', 'pdfjs-4.3.136', 'web', 'viewer.html');

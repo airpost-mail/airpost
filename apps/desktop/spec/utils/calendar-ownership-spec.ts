@@ -1,5 +1,5 @@
-import { Calendar } from '../../src/flux/models/calendar';
-import { isOwnCalendar, isSomeoneElsesCalendar } from '../../src/utils/calendar-utils';
+import { Calendar } from '../../src/data/models/calendar';
+import { isOwnCalendar, isSomeoneElsesCalendar } from '../../src/utils/calendar';
 
 describe('calendar ownership', () => {
   const addresses = ['me@example.com', 'alias@example.com'];

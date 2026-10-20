@@ -6,7 +6,7 @@ import compose from './decorators/compose';
 import AutoFocuses from './decorators/auto-focuses';
 import ListensToMovementKeys from './decorators/listens-to-movement-keys';
 import Table, { TableProps, TableRowProps, TableRow, TableCell } from './table/table';
-import TableDataSource from './table/table-data-source';
+import TableDataSource from './table/data-source';
 
 /*
 SelectableTable component which renders a {Table} that supports selecting

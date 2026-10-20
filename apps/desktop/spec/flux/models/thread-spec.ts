@@ -1,5 +1,5 @@
-import { Thread } from '../../../src/flux/models/thread';
-import { Folder } from '../../../src/flux/models/folder';
+import { Thread } from '../../../src/data/models/thread';
+import { Folder } from '../../../src/data/models/folder';
 import _ from 'underscore';
 
 describe('Thread', function () {

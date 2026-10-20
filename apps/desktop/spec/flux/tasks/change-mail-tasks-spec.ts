@@ -8,7 +8,7 @@ import {
   Label,
   Event as MailspringEvent,
 } from 'mailspring-exports';
-import { parseICSString } from '../../../src/utils/calendar-utils';
+import { parseICSString } from '../../../src/utils/calendar';
 
 // ---------------------------------------------------------------------------
 // Helpers

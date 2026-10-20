@@ -16,7 +16,7 @@ import {
   stageMessagesAsEml,
   stageThreadAsEml,
   stageThreadsAsEml,
-} from '../../src/services/eml-utils';
+} from '../../src/mail/eml';
 
 describe('defaultEmlFilename', function () {
   describe('normal subjects', () => {

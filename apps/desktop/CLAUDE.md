@@ -43,32 +43,30 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 
 ### Key Directories
 
-- **`src/`** - Core application source code
-  - `main/` - Main process code (application lifecycle, window management, auto-updates, the engine supervisor)
-  - `shared/` - Modules both the main process and the windows load (config, intl, the engine binary and protocol types, IPC channel names, compile cache)
-  - `plugin-api/` - The plugin API barrels (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`), on the module path as bare names
-  - `window/` - Window startup and window-level managers (AppEnv, the bootstraps, keymaps, menus, spellchecker, the KeyManager facade)
-  - `plugin-host/` - Package discovery and loading, themes and styles (PackageManager, Package, ThemeManager, the plugin API version)
-  - `engine/` - The windows' side of the engine: the socket connection, `Engine` (engine-api), engine events, accounts, drafts, PIM, integrations, AI
-  - `platform/` - OS integration (native notifications, do-not-disturb, Linux themes, start at login)
+- **`src/`** - Core application source code, one directory per domain
+  - `main/` - Main process code, grouped into `engine/` (the engine host and supervisor), `windows/`, `frame/` (the message frame scheme), `protocols/` (the `mailspring:` and `tern-file:` schemes), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
+  - `shared/` - Modules both the main process and the windows load (intl, the engine binary and protocol types in `shared/engine/`, IPC channel names, compile cache)
+  - `config/` - The config store, keys, schema and IPC channels; `migrator.ts` and `persistence-manager.ts` are main-process only
+  - `window/` - Window startup and window-level managers (AppEnv, the bootstraps, keymaps, menus, commands, spellchecker, the KeyManager facade), with OS integration in `window/platform/` (native notifications, do-not-disturb, Linux themes, start at login)
+  - `engine/` - The windows' side of the engine: the socket connection, `Engine` (`engine/api.ts`), the bridge, engine events, accounts, drafts, PIM, integrations, AI
+  - `data/` - The local data layer: actions, models, attributes, queries (`data/query/`), stores, the database (`data/database/`), drafts (`data/drafts/`), tasks, mailbox perspectives, mail rule templates
+  - `mail/` - Message content: body processing (`mail/body/`), the sandboxed message frame (`mail/frame/`), search queries (`mail/search/`), attachment previews (`mail/quick-preview/`), .eml and .mbox
+  - `components/` - Reusable React UI components, including the UI kit (`components/kit/`), the sheets, lists, injected components and the higher-order components (`components/decorators/`)
+  - `packages/` - The plugin system: package discovery and loading, themes and styles, the component/extension/service/sound registries, the extension base classes and the plugin API version; `packages/api/` holds only the plugin API barrels (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`), which are on the module path as bare names
   - `utils/` - DOM, date, calendar, regexp, canvas and backoff helpers
-  - `flux/` - Flux-based state management (actions, stores, models, tasks, mailbox perspectives, mail rule templates)
-  - `components/` - Reusable React UI components, including the sheets (`components/sheets/`) and the higher-order components (`components/decorators/`)
-  - `services/` - Application services (search, sanitization, etc.)
-  - `registries/` - Extension registries (components, extensions, database objects)
   - `features/` - The built-in features that always load (composer, message-list, thread-list, preferences, main-calendar, etc.), one directory each, listed in `features/index.ts`
 
 - **`plugins/`** - Bundled optional packages (`isOptional: true`, can be turned off via `core.disabledPackages`), e.g. activity, send-later, translation
 - **`themes/`** - The `ui-*` themes
-- **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/quickpreview/renderer.html`
+- **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/mail/quick-preview/renderer.html`
 
 Plugins and themes import core code as `../../../src/...`. `src/shared/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `mailspring:` protocol handler, ThemeManager and the spec loader.
 
 > **IMPORTANT:** Application source code lives in `src/` (including `src/features/`) and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
-- **`spec/`** - Jasmine specs for `src/`, laid out like it (`spec/main/` tests `src/main/`, `spec/flux/stores/` tests `src/flux/stores/`). Feature specs mirror it too (`spec/features/composer/` tests `src/features/composer/`). Specs that load code from several places go in `spec/integration/`; a spec for one plugin goes in that plugin's `specs/`. `spec/spec-runner/`, `spec/fixtures/`, `spec/test-utils.ts` (the plugin API's `MailspringTestUtils`) and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`) sit at the top.
+- **`spec/`** - Jasmine specs for `src/`, laid out like it (`spec/main/` tests `src/main/`, `spec/engine/` tests `src/engine/`). Feature specs mirror it too (`spec/features/composer/` tests `src/features/composer/`). Specs that load code from several places go in `spec/integration/`; a spec for one plugin goes in that plugin's `specs/`. `spec/spec-runner/`, `spec/fixtures/`, `spec/test-utils.ts` (the plugin API's `MailspringTestUtils`) and the engine fakes (`fake-serve-engine.ts`, `fake-pim-engine.ts`, `mock-engine.ts`) sit at the top.
 
-Code outside `src/main/` and `src/shared/` runs in the windows and must not import `src/main/`; `src/main/` and `src/shared/` must not import window code, except `flux/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
+Code outside `src/main/`, `src/shared/` and `src/config/` runs in the windows and must not import `src/main/`, `src/config/migrator.ts` or `src/config/persistence-manager.ts`; `src/main/`, `src/shared/` and `src/config/` must not import window code, except `data/models/utils` and the two registries it loads (`database-object-registry`, `serializable-registry`), which main uses. `import/no-restricted-paths` in `.eslintrc` checks both directions and fails lint.
 
 ### Dependencies and packaging
 
@@ -80,11 +78,11 @@ There is one `package.json` and one `node_modules`. Runtime code goes in `depend
 - `mailspring-exports` - Core APIs: Actions, Stores, Models, Tasks, Utils, database access
 - `mailspring-component-kit` - Reusable UI components
 
-**Flux Architecture:**
-- **Models** (`flux/models/`) - Data models: Message, Thread, Contact, Account, Folder, Label, etc.
-- **Stores** (`flux/stores/`) - Application state: DatabaseStore, DraftStore, AccountStore, etc.
-- **Tasks** (`flux/tasks/`) - Async operations: SendDraftTask, ChangeFolderTask, etc.
-- **Actions** (`flux/actions.ts`) - Application-wide action dispatcher
+**Data layer:**
+- **Models** (`data/models/`) - Data models: Message, Thread, Contact, Account, Folder, Label, etc.
+- **Stores** (`data/stores/`, `data/database/`, `data/drafts/`) - Application state: DatabaseStore, DraftStore, AccountStore, etc.
+- **Tasks** (`data/tasks/`) - Async operations: SendDraftTask, ChangeFolderTask, etc.
+- **Actions** (`data/actions.ts`) - Application-wide action dispatcher
 
 ### Plugin Structure
 
@@ -105,8 +103,8 @@ A built-in feature in `src/features/<dir>/` has no `package.json`: its entry in 
 
 One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too (docs/engine-protocol-plan.md section 4, docs/desktop-client-plan.md):
 
-1. **Main process → engine, stdin** (`main/engine-supervisor.ts`, `main/engine-host.ts`, `shared/engine-process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
-2. **Each window ↔ engine, Unix socket** (`engine-connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
+1. **Main process → engine, stdin** (`main/engine/supervisor.ts`, `main/engine/host.ts`, `shared/engine/process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
+2. **Each window ↔ engine, Unix socket** (`engine/connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
 
 ```
 ┌──────────────┐   stdin/stdout (JSON-RPC)   ┌──────────────────┐
@@ -117,9 +115,9 @@ One engine process (`mailsync-rs --mode serve`) runs every account, started by t
 └──────────────┘                             └──────────────────┘
 ```
 
-Windows reach the stdin-only calls over IPC (`supervisor-channels.ts`). The `MailsyncBridge` in the main window listens to `Actions.queueTask` and sends tasks on its connection; every window applies the deltas it reads.
+Windows reach the stdin-only calls over IPC (`shared/engine/supervisor-channels.ts`). The `MailsyncBridge` in the main window listens to `Actions.queueTask` and sends tasks on its connection; every window applies the deltas it reads.
 
-### Task System (`flux/tasks/`)
+### Task System (`data/tasks/`)
 
 Tasks represent operations the user wants to perform (send email, star thread, move to folder). They are **persisted models** stored in the database.
 
@@ -130,7 +128,7 @@ Tasks represent operations the user wants to perform (send email, star thread, m
 4. Sync engine persists task status updates and emits deltas
 5. Task completion triggers `onSuccess()` or `onError()` callbacks
 
-**Task States** (`flux/tasks/task.ts`):
+**Task States** (`data/tasks/task.ts`):
 - `local` - Not yet executed
 - `remote` - Local phase complete, waiting for remote
 - `complete` - Finished successfully
@@ -160,7 +158,7 @@ Actions.queueTask(SyncbackEventTask.forUpdating({ event, undoData, description: 
 
 See `docs/desktop/undo-redo-task-pattern.md` (repo root) for detailed implementation guide.
 
-### Task Queue (`flux/stores/task-queue.ts`)
+### Task Queue (`data/stores/task-queue.ts`)
 
 The TaskQueue store observes Task model changes from the database and provides:
 - `queue()` - Active tasks
@@ -170,12 +168,12 @@ The TaskQueue store observes Task model changes from the database and provides:
 
 ### Observable Database Pattern
 
-**Database is read-only in Electron** (`flux/stores/database-store.ts`):
+**Database is read-only in Electron** (`data/database/store.ts`):
 - `DatabaseStore.inTransaction()` throws - writes are not allowed
 - Uses SQLite in WAL mode via better-sqlite3 for concurrent reads
 - The sync engine exclusively handles writes
 
-**Change Records** (`flux/stores/database-change-record.ts`):
+**Change Records** (`data/database/change-record.ts`):
 
 When the sync engine modifies data, it emits JSON deltas that become `DatabaseChangeRecord` objects:
 ```typescript
@@ -187,7 +185,7 @@ When the sync engine modifies data, it emits JSON deltas that become `DatabaseCh
 }
 ```
 
-**Reactive Queries** (`flux/models/query-subscription.ts`):
+**Reactive Queries** (`data/query/subscription.ts`):
 
 `QuerySubscription` provides live-updating query results:
 ```typescript
@@ -208,7 +206,7 @@ Rx.Observable.fromQuery(DatabaseStore.findAll(Thread))
   .subscribe(threads => this.updateUI(threads));
 ```
 
-**ObservableListDataSource** (`flux/stores/observable-list-data-source.ts`):
+**ObservableListDataSource** (`components/list/observable-data-source.ts`):
 
 Adapts QuerySubscription for virtualized list components (MultiselectList), supporting:
 - Windowed/paginated data loading
@@ -247,8 +245,8 @@ smaller functions over commentary; a comment that restates the code should be de
 - Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code in `src/main` needs a full restart. `Cmd/Ctrl+R` is Reply
 - Dev tools accessible via Menu > Developer > Toggle Developer Tools
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
-- Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/main/mailspring-profile-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import
-- The app name is Tern, so safeStorage's keychain item is `Tern Safe Storage`. Credentials in an imported profile are encrypted under `Mailspring Safe Storage`; `src/main/mailspring-keychain-migration.ts` (`OLD_APP_NAME`) reads that item, read-only, and `src/main/key-manager.ts` re-encrypts them under Tern's
+- Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/main/profile/mailspring-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import
+- The app name is Tern, so safeStorage's keychain item is `Tern Safe Storage`. Credentials in an imported profile are encrypted under `Mailspring Safe Storage`; `src/main/profile/mailspring-keychain.ts` (`OLD_APP_NAME`) reads that item, read-only, and `src/main/profile/key-manager.ts` re-encrypts them under Tern's
 - The interface language is set in Preferences > General (`core.intl.language`) and read at launch, so relaunch to apply it. Arabic, Persian, Hebrew and Kurdish run right-to-left: the workspace gets `dir="rtl"` and every stylesheet goes through `rtlcss`
 
 ## Claude Hooks

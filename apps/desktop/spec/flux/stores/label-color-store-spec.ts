@@ -1,10 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Label } from 'mailspring-exports';
-import {
-  LabelColorStoreClass,
-  LABEL_COLOR_SCHEMES,
-} from '../../../src/flux/stores/label-color-store';
+import { LabelColorStoreClass, LABEL_COLOR_SCHEMES } from '../../../src/data/stores/label-color';
 import { LabelColorizer } from '../../../src/components/mail-label';
 
 const label = (path: string) => new Label({ path, accountId: 'a1' });

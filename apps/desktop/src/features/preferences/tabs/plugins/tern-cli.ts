@@ -3,7 +3,7 @@ import {
   devEngineKeyFile,
   engineBinaryPath,
   ternBinaryPath,
-} from '../../../../shared/engine-process';
+} from '../../../../shared/engine/process';
 
 // The bundled `tern` CLI (apps/cli), shipped next to mailsync-rs in app.asar.unpacked.
 // Service plugins are installed and removed by `tern service install|uninstall`, so the

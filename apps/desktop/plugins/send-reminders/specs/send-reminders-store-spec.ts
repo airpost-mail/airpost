@@ -2,8 +2,8 @@ import { Actions, Thread, SyncbackMetadataTask } from 'mailspring-exports';
 
 import SendRemindersStore from '../lib/send-reminders-store';
 import { PLUGIN_ID } from '../lib/send-reminders-constants';
-import { EngineEvents } from '../../../src/engine/engine-events';
-import { Feature } from '../../../src/shared/engine-protocol';
+import { EngineEvents } from '../../../src/engine/events';
+import { Feature } from '../../../src/shared/engine/protocol';
 
 const LAST_RECEIVED = new Date('2026-09-01T12:00:00Z');
 const LAST_RECEIVED_SECONDS = LAST_RECEIVED.getTime() / 1000;

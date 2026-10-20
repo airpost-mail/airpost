@@ -2,7 +2,7 @@
 // writes (the override dropped, the slot excluded, SEQUENCE bumped) is crates/ms-pim's tests.
 import { Actions, DatabaseStore, DestroyEventTask, SyncbackEventTask } from 'mailspring-exports';
 import { dialog } from '@electron/remote';
-import { Event as MailspringEvent } from '../../../src/flux/models/event';
+import { Event as MailspringEvent } from '../../../src/data/models/event';
 import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
 import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
 import { fakePimEngine, refusal } from '../../fake-pim-engine';

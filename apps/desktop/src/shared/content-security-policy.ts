@@ -25,7 +25,7 @@ export const AppContentSecurityPolicy =
     `img-src * data: mailspring: file: ${FilesScheme}:`,
     'font-src * data: mailspring:',
     `connect-src ${ConnectSources.join(' ')}`,
-    // Message bodies render in the sandboxed message frame (src/message-frame). Other
+    // Message bodies render in the sandboxed message frame (src/mail/frame). Other
     // frames are src-less about:blank ones, which frame-src doesn't govern.
     `frame-src ${MessageFrameOrigin}`,
     "object-src 'none'",
@@ -85,7 +85,7 @@ export function quickPreviewContentSecurityPolicy({ remoteImages }: { remoteImag
   const remote = remoteSources(remoteImages);
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'", // the inline script in quickpreview/renderer.html
+    "script-src 'self' 'unsafe-inline'", // the inline script in mail/quick-preview/renderer.html
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data:${remote}`,
     `font-src 'self' data:${remote}`,

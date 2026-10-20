@@ -5,7 +5,7 @@ import {
   resetRecoveryStateForTests,
   shouldRecoverFromEarlyRendererCrash,
   softwareRenderingMarkerPath,
-} from '../../src/main/hardware-acceleration-recovery';
+} from '../../src/main/windows/hardware-acceleration-recovery';
 
 const CONFIG_DIR = '/tmp/mailspring-profile';
 

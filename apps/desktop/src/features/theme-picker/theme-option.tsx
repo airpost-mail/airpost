@@ -4,8 +4,8 @@ import fs from 'fs';
 import path from 'path';
 
 import { EventedIFrame } from 'mailspring-component-kit';
-import Package from '../../plugin-host/package';
-import LessCompileCache from '../../plugin-host/compile-cache-less';
+import Package from '../../packages/package';
+import LessCompileCache from '../../packages/compile-cache-less';
 
 interface ThemeOptionProps {
   theme: Package;

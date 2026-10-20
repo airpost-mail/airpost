@@ -1,5 +1,5 @@
 import fs from 'fs';
-import * as Utils from '../flux/models/utils';
+import * as Utils from '../data/models/utils';
 
 export function atomicWriteFileSync(filepath: string, content: string) {
   const randomId = Utils.generateTempId();

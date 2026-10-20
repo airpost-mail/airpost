@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { ipcRenderer, shell } from 'electron';
 import { AccountStore } from 'mailspring-exports';
-import EngineEvents from '../../../src/engine/engine-events';
-import { Feature } from '../../../src/shared/engine-protocol';
+import EngineEvents from '../../../src/engine/events';
+import { Feature } from '../../../src/shared/engine/protocol';
 import AccountProviders from '../../../src/features/onboarding/account-providers';
 import OAuthSignInPage from '../../../src/features/onboarding/oauth-signin-page';
 

@@ -1,12 +1,12 @@
 import React from 'react';
-import FocusedPerspectiveStore from '../flux/stores/focused-perspective-store';
-import CategoryStore from '../flux/stores/category-store';
-import { MessageStore } from '../flux/stores/message-store';
-import { AccountStore } from '../flux/stores/account-store';
+import FocusedPerspectiveStore from '../data/stores/focused-perspective';
+import CategoryStore from '../data/stores/category';
+import { MessageStore } from '../data/stores/message';
+import { AccountStore } from '../data/stores/account';
 import { MailLabel } from './mail-label';
-import * as Actions from '../flux/actions';
-import { ChangeLabelsTask } from '../flux/tasks/change-labels-task';
-import { InjectedComponentSet } from './injected-component-set';
+import * as Actions from '../data/actions';
+import { ChangeLabelsTask } from '../data/tasks/change-labels';
+import { InjectedComponentSet } from './injected/component-set';
 import { Thread } from 'mailspring-exports';
 
 const LabelComponentCache = {};

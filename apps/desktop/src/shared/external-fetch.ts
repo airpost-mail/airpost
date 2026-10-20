@@ -18,7 +18,7 @@ const NullBodyStatuses = [101, 204, 205, 304];
 
 /**
  * fetch() for http(s) URLs outside the window CSP's connect-src, run in the main process
- * (main/external-fetch-ipc.ts). Sends no cookies.
+ * (main/ipc/external-fetch.ts). Sends no cookies.
  */
 export const ExternalFetch = {
   async fetch(url: string, init: ExternalFetchInit = {}): Promise<Response> {

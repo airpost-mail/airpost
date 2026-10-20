@@ -1,8 +1,8 @@
 // The engine expands the occurrences (events.expand); its rules, the desktop corpus they were
 // checked against and the fixture calendar are crates/ms-pim's tests. Here: what the calendar
 // asks for, and the helpers that read the answer.
-import { Event as MailspringEvent } from '../../../src/flux/models/event';
-import { Calendar } from '../../../src/flux/models/calendar';
+import { Event as MailspringEvent } from '../../../src/data/models/event';
+import { Calendar } from '../../../src/data/models/calendar';
 import { DatabaseStore } from 'mailspring-exports';
 import {
   CalendarDataSource,

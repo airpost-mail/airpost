@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { RetinaImg } from './retina-img';
-import LabelColorStore from '../flux/stores/label-color-store';
+import LabelColorStore from '../data/stores/label-color';
 
 type MailLabelProps = {
   label: {

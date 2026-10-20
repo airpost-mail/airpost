@@ -2,7 +2,7 @@ import _ from 'underscore';
 import React, { Component, CSSProperties } from 'react';
 import { findDOMNode } from 'react-dom';
 
-import * as Actions from '../flux/actions';
+import * as Actions from '../data/actions';
 import compose from './decorators/compose';
 import AutoFocuses from './decorators/auto-focuses';
 

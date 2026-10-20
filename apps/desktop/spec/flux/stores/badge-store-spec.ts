@@ -1,7 +1,7 @@
-import BadgeStore from '../../../src/flux/stores/badge-store';
-import FocusedPerspectiveStore from '../../../src/flux/stores/focused-perspective-store';
-import { AccountStore } from '../../../src/flux/stores/account-store';
-import CategoryStore from '../../../src/flux/stores/category-store';
+import BadgeStore from '../../../src/data/stores/badge';
+import FocusedPerspectiveStore from '../../../src/data/stores/focused-perspective';
+import { AccountStore } from '../../../src/data/stores/account';
+import CategoryStore from '../../../src/data/stores/category';
 
 describe('BadgeStore', function () {
   describe('_setBadgeForCount', () =>

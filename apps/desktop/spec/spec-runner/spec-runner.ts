@@ -2,7 +2,7 @@
 import path from 'path';
 import _ from 'underscore';
 import ReactTestUtils from 'react-dom/test-utils';
-import Config from '../../src/shared/config';
+import Config from '../../src/config/config';
 import SpecLoader from './spec-loader';
 import TimeReporter from './time-reporter';
 import * as GuiReporter from './gui-reporter';

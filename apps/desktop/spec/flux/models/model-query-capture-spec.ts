@@ -15,9 +15,9 @@
 // and run `cargo test -p ms-store --test model_query_parity`.
 import fs from 'fs';
 import path from 'path';
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import ModelQuery from '../../../src/flux/models/query';
-import { Attribute } from '../../../src/flux/attributes/attribute';
+import DatabaseStore from '../../../src/data/database/store';
+import ModelQuery from '../../../src/data/query/query';
+import { Attribute } from '../../../src/data/attributes/attribute';
 import {
   AttributeBoolean,
   AttributeCollection,
@@ -27,19 +27,19 @@ import {
   AttributeObject,
   AttributeString,
   Matcher,
-} from '../../../src/flux/attributes';
-import { Model } from '../../../src/flux/models/model';
-import { Thread } from '../../../src/flux/models/thread';
-import { Message } from '../../../src/flux/models/message';
-import { Folder } from '../../../src/flux/models/folder';
-import { Label } from '../../../src/flux/models/label';
-import { Contact } from '../../../src/flux/models/contact';
-import { ContactGroup } from '../../../src/flux/models/contact-group';
-import { ContactBook } from '../../../src/flux/models/contact-book';
-import { Event } from '../../../src/flux/models/event';
-import { Calendar } from '../../../src/flux/models/calendar';
-import { File } from '../../../src/flux/models/file';
-import { Task } from '../../../src/flux/tasks/task';
+} from '../../../src/data/attributes';
+import { Model } from '../../../src/data/models/model';
+import { Thread } from '../../../src/data/models/thread';
+import { Message } from '../../../src/data/models/message';
+import { Folder } from '../../../src/data/models/folder';
+import { Label } from '../../../src/data/models/label';
+import { Contact } from '../../../src/data/models/contact';
+import { ContactGroup } from '../../../src/data/models/contact-group';
+import { ContactBook } from '../../../src/data/models/contact-book';
+import { Event } from '../../../src/data/models/event';
+import { Calendar } from '../../../src/data/models/calendar';
+import { File } from '../../../src/data/models/file';
+import { Task } from '../../../src/data/tasks/task';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
 const ALLOWLIST = path.join(REPO, 'crates', 'ms-store', 'src', 'model_query_allowlist.json');
@@ -119,7 +119,7 @@ const SITES: Site[] = [
   // Thread lists: MailboxPerspective.threads(), paged by QuerySubscription._getQueryForRange.
   {
     name: 'inbox-page-1',
-    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads',
+    site: 'src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox'])])
@@ -129,7 +129,7 @@ const SITES: Site[] = [
   },
   {
     name: 'inbox-page-2',
-    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads',
+    site: 'src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox'])])
@@ -139,7 +139,7 @@ const SITES: Site[] = [
   },
   {
     name: 'inbox-ids',
-    site: 'src/flux/models/query-subscription.ts _getQueryForRange (idsOnly)',
+    site: 'src/data/query/subscription.ts _getQueryForRange (idsOnly)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox'])])
@@ -150,7 +150,7 @@ const SITES: Site[] = [
   },
   {
     name: 'unified-inbox',
-    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads',
+    site: 'src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox', 'f-a2-inbox'])])
@@ -160,7 +160,7 @@ const SITES: Site[] = [
   },
   {
     name: 'sent',
-    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)',
+    site: 'src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-sent', 'f-a2-sent'])])
@@ -171,7 +171,7 @@ const SITES: Site[] = [
   },
   {
     name: 'trash',
-    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)',
+    site: 'src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-trash'])])
@@ -180,7 +180,7 @@ const SITES: Site[] = [
   },
   {
     name: 'two-categories-distinct',
-    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)',
+    site: 'src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['f-a1-inbox', 'f-a1-work'])])
@@ -191,7 +191,7 @@ const SITES: Site[] = [
   },
   {
     name: 'label',
-    site: 'src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)',
+    site: 'src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.categories.containsAny(['l-a2-travel'])])
@@ -201,7 +201,7 @@ const SITES: Site[] = [
   },
   {
     name: 'starred-all-accounts',
-    site: 'src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads',
+    site: 'src/data/mailbox-perspective.ts StarredMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.starred.equal(true), Thread.attributes.inAllMail.equal(true)])
@@ -210,7 +210,7 @@ const SITES: Site[] = [
   },
   {
     name: 'starred-one-account',
-    site: 'src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)',
+    site: 'src/data/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([Thread.attributes.starred.equal(true), Thread.attributes.inAllMail.equal(true)])
@@ -220,13 +220,13 @@ const SITES: Site[] = [
   },
   {
     name: 'empty-perspective',
-    site: 'src/flux/mailbox-perspective.ts EmptyMailboxPerspective.threads',
+    site: 'src/data/mailbox-perspective.ts EmptyMailboxPerspective.threads',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread).where({ lastMessageReceivedTimestamp: -1 }).limit(0),
   },
   {
     name: 'unread',
-    site: 'src/flux/models/unread-query-subscription.ts buildQuery',
+    site: 'src/data/query/unread-subscription.ts buildQuery',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([
@@ -238,7 +238,7 @@ const SITES: Site[] = [
   },
   {
     name: 'unread-recently-read',
-    site: 'src/flux/models/unread-query-subscription.ts buildQuery (recentlyReadIds)',
+    site: 'src/data/query/unread-subscription.ts buildQuery (recentlyReadIds)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where([
@@ -293,7 +293,7 @@ const SITES: Site[] = [
   },
   {
     name: 'mail-rules-inbox',
-    site: 'src/flux/stores/mail-rules-store.ts _processAllMessages',
+    site: 'src/data/stores/mail-rules.ts _processAllMessages',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread, { accountId: A1 })
         .where(Thread.attributes.categories.contains('f-a1-inbox'))
@@ -302,7 +302,7 @@ const SITES: Site[] = [
   },
   {
     name: 'mail-rules-inbox-before',
-    site: 'src/flux/stores/mail-rules-store.ts _processAllMessages (lastTimestamp)',
+    site: 'src/data/stores/mail-rules.ts _processAllMessages (lastTimestamp)',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread, { accountId: A1 })
         .where(Thread.attributes.categories.contains('f-a1-inbox'))
@@ -335,7 +335,7 @@ const SITES: Site[] = [
   },
   {
     name: 'missing-models',
-    site: 'src/flux/models/query-subscription.ts _fetchMissingModels',
+    site: 'src/data/query/subscription.ts _fetchMissingModels',
     build: () => DatabaseStore.findAll<Thread>(Thread, { id: ['t09', 't10', 't11'] }),
   },
   {
@@ -359,7 +359,7 @@ const SITES: Site[] = [
   // Messages.
   {
     name: 'thread-messages',
-    site: 'src/flux/stores/message-store.ts _fetchFromCache',
+    site: 'src/data/stores/message.ts _fetchFromCache',
     build: () => {
       const q = DatabaseStore.findAll<Message>(Message);
       q.where({ threadId: 't03' });
@@ -379,7 +379,7 @@ const SITES: Site[] = [
   },
   {
     name: 'latest-not-draft',
-    site: 'src/flux/stores/draft-factory.ts createDraftForResurfacing',
+    site: 'src/data/drafts/factory.ts createDraftForResurfacing',
     build: () =>
       DatabaseStore.findBy<Message>(Message, { threadId: 't06' })
         .where(Message.attributes.draft.equal(false))
@@ -388,7 +388,7 @@ const SITES: Site[] = [
   },
   {
     name: 'reply-candidates',
-    site: 'src/flux/stores/draft-store.ts _getMessageAndThread',
+    site: 'src/data/drafts/store.ts _getMessageAndThread',
     build: () =>
       DatabaseStore.findAll<Message>(Message, { threadId: 't06' })
         .where(Message.attributes.draft.equal(false))
@@ -396,7 +396,7 @@ const SITES: Site[] = [
   },
   {
     name: 'eml-latest',
-    site: 'src/services/eml-utils.ts latestMessages',
+    site: 'src/mail/eml.ts latestMessages',
     build: () =>
       DatabaseStore.findAll<Message>(Message, { threadId: 't07', draft: false })
         .order(Message.attributes.date.descending())
@@ -404,12 +404,12 @@ const SITES: Site[] = [
   },
   {
     name: 'message-by-id-with-body',
-    site: 'src/flux/stores/draft-store.ts _getMessageAndThread',
+    site: 'src/data/drafts/store.ts _getMessageAndThread',
     build: () => DatabaseStore.find<Message>(Message, 'm03-2').include(Message.attributes.body),
   },
   {
     name: 'message-pending-body',
-    site: 'src/flux/stores/draft-store.ts (body not fetched yet)',
+    site: 'src/data/drafts/store.ts (body not fetched yet)',
     build: () => DatabaseStore.find<Message>(Message, 'm04-1').include(Message.attributes.body),
   },
   {
@@ -419,7 +419,7 @@ const SITES: Site[] = [
   },
   {
     name: 'draft-by-header',
-    site: 'src/flux/stores/draft-editing-session.ts prepare',
+    site: 'src/data/drafts/editing-session.ts prepare',
     build: () =>
       DatabaseStore.findBy<Message>(Message, {
         headerMessageId: '<d02@x.test>',
@@ -493,24 +493,24 @@ const SITES: Site[] = [
   // Categories and tasks.
   {
     name: 'folders',
-    site: 'src/plugin-api/mailspring-observables.ts categories',
+    site: 'src/packages/api/mailspring-observables.ts categories',
     build: () => DatabaseStore.findAll<Folder>(Folder),
   },
   {
     name: 'labels-for-account',
-    site: 'src/plugin-api/mailspring-observables.ts forAccount',
+    site: 'src/packages/api/mailspring-observables.ts forAccount',
     build: () => DatabaseStore.findAll<Label>(Label).where({ accountId: A2 }),
   },
   {
     name: 'tasks',
-    site: 'src/flux/stores/task-queue.ts',
+    site: 'src/data/stores/task-queue.ts',
     build: () => DatabaseStore.findAll<Task>(Task),
   },
 
   // Contacts.
   {
     name: 'contact-search',
-    site: 'src/flux/stores/contact-store.ts searchContacts',
+    site: 'src/data/stores/contact.ts searchContacts',
     build: () =>
       DatabaseStore.findAll<Contact>(Contact)
         .search('ann')
@@ -521,7 +521,7 @@ const SITES: Site[] = [
   },
   {
     name: 'contact-search-quoted',
-    site: 'src/flux/stores/contact-store.ts searchContacts (quotes)',
+    site: 'src/data/stores/contact.ts searchContacts (quotes)',
     build: () =>
       DatabaseStore.findAll<Contact>(Contact)
         .search(" 'bo")
@@ -532,7 +532,7 @@ const SITES: Site[] = [
   },
   {
     name: 'top-contacts',
-    site: 'src/flux/stores/contact-store.ts topContacts',
+    site: 'src/data/stores/contact.ts topContacts',
     build: () =>
       DatabaseStore.findAll<Contact>(Contact)
         .limit(5 * 2)
@@ -567,12 +567,12 @@ const SITES: Site[] = [
   },
   {
     name: 'focused-contact',
-    site: 'src/flux/stores/focused-contacts-store.ts',
+    site: 'src/data/stores/focused-contacts.ts',
     build: () => DatabaseStore.findBy<Contact>(Contact, { accountId: A1, email: 'c03@x.test' }),
   },
   {
     name: 'contact-groups',
-    site: 'src/flux/stores/contact-store.ts searchContactGroups',
+    site: 'src/data/stores/contact.ts searchContactGroups',
     build: () => DatabaseStore.findAll<ContactGroup>(ContactGroup),
   },
   {

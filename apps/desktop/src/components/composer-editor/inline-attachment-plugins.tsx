@@ -1,7 +1,7 @@
 import React from 'react';
 import { ImageAttachmentItem } from 'mailspring-component-kit';
 import { AttachmentStore } from 'mailspring-exports';
-import { File as MailspringFile } from '../../flux/models/file';
+import { File as MailspringFile } from '../../data/models/file';
 import { isQuoteNode } from './base-block-plugins';
 import { ComposerEditorPlugin } from './types';
 import { Editor, Inline, Node } from 'slate';

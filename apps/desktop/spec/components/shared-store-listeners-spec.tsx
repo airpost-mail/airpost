@@ -3,10 +3,10 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import ComponentRegistry from '../../src/registries/component-registry';
-import { AccountStore } from '../../src/flux/stores/account-store';
-import InjectedComponent from '../../src/components/injected-component';
-import { InjectedComponentSet } from '../../src/components/injected-component-set';
+import ComponentRegistry from '../../src/packages/component-registry';
+import { AccountStore } from '../../src/data/stores/account';
+import InjectedComponent from '../../src/components/injected/component';
+import { InjectedComponentSet } from '../../src/components/injected/component-set';
 import AccountColorBar from '../../src/components/account-color-bar';
 
 const ROWS = 120;

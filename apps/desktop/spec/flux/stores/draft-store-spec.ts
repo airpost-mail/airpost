@@ -13,7 +13,7 @@ import {
   FocusedContentStore,
 } from 'mailspring-exports';
 
-import DraftFactory from '../../../src/flux/stores/draft-factory';
+import DraftFactory from '../../../src/data/drafts/factory';
 
 class TestExtension extends ComposerExtension {
   static prepareNewDraft({ draft }) {

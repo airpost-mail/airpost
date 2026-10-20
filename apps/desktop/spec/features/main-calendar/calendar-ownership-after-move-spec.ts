@@ -1,5 +1,5 @@
 import { DatabaseStore, Event } from 'mailspring-exports';
-import { Calendar } from '../../../src/flux/models/calendar';
+import { Calendar } from '../../../src/data/models/calendar';
 import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
 import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
 import { fakePimEngine } from '../../fake-pim-engine';

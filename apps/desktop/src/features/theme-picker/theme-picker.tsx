@@ -6,7 +6,7 @@ import {
   AUTOMATIC_THEME_NAME,
   LIGHT_THEME_NAME,
   DARK_THEME_NAME,
-} from '../../plugin-host/theme-manager';
+} from '../../packages/theme-manager';
 import ThemeOption, { toSelector } from './theme-option';
 import { Disposable } from 'event-kit';
 

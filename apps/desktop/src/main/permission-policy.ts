@@ -8,7 +8,7 @@ microphone, geolocation, clipboard-read, screen capture) to any frame, message i
 
 - clipboard-sanitized-write: navigator.clipboard.writeText (CopyButton, thread sharing).
 - notifications: the web Notification API, for plugins. Tern's own notifications are shown from
-  main (notification-ipc.ts) and need no permission.
+  main (ipc/notification.ts) and need no permission.
 
 The quick preview window is not one of them, but shows PDFs in the bundled pdf.js viewer, whose
 main frame gets fullscreen (Presentation Mode) and clipboard-sanitized-write (copying a

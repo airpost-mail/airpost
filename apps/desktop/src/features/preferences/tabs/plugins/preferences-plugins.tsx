@@ -11,7 +11,7 @@ import {
   PrivacyNote,
 } from 'mailspring-component-kit';
 
-import { pluginInstallRecord } from '../../../../plugin-host/plugin-install-record';
+import { pluginInstallRecord } from '../../../../packages/install-record';
 import {
   ServiceList,
   ServicePlan,

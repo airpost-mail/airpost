@@ -1,7 +1,7 @@
 import React from 'react';
-import DraftStore from '../../flux/stores/draft-store';
-import * as Actions from '../../flux/actions';
-import * as Utils from '../../flux/models/utils';
+import DraftStore from '../../data/drafts/store';
+import * as Actions from '../../data/actions';
+import * as Utils from '../../data/models/utils';
 import { Message, DraftEditingSession } from 'mailspring-exports';
 
 interface InflatesDraftClientIdProps {

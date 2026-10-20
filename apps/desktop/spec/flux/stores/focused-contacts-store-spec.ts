@@ -1,4 +1,4 @@
-const FocusedContactsStore = require('../../../src/flux/stores/focused-contacts-store');
+const FocusedContactsStore = require('../../../src/data/stores/focused-contacts');
 
 xdescribe('FocusedContactsStore', function () {
   beforeEach(function () {

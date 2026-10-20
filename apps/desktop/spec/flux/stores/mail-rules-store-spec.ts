@@ -4,9 +4,9 @@ import MailRulesStore, {
   LEGACY_MOVED_KEY,
   LEGACY_RULES_KEY,
   RULES_KEY,
-} from '../../../src/flux/stores/mail-rules-store';
-import EngineEvents from '../../../src/engine/engine-events';
-import { ErrorCode, Method } from '../../../src/shared/engine-protocol';
+} from '../../../src/data/stores/mail-rules';
+import EngineEvents from '../../../src/engine/events';
+import { ErrorCode, Method } from '../../../src/shared/engine/protocol';
 
 const rule = (id: string, attrs: Record<string, any> = {}) => ({
   id,

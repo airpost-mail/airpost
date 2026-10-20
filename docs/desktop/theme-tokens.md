@@ -23,7 +23,7 @@ Rules the defaults follow:
 
 ## Loading
 
-ThemeManager (`src/plugin-host/theme-manager.ts`) loads `tokens/defaults.css` at core priority (-1), then the
+ThemeManager (`src/packages/theme-manager.ts`) loads `tokens/defaults.css` at core priority (-1), then the
 active theme's tokens at theme priority (1), before the theme's other stylesheets. A theme's tokens
 are its `styles/tokens.css`, read as plain CSS. A theme declares its scheme in `package.json`:
 `"scheme": "light" | "dark"`, and `"sidebarScheme"` when its sidebar differs (Darkside). ThemeManager

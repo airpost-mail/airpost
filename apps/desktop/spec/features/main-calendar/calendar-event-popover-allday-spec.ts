@@ -1,6 +1,6 @@
 import { Actions } from 'mailspring-exports';
 import moment from 'moment';
-import { Event as MailspringEvent } from '../../../src/flux/models/event';
+import { Event as MailspringEvent } from '../../../src/data/models/event';
 import { CalendarEventPopover } from '../../../src/features/main-calendar/core/calendar-event-popover';
 import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
 import { fakePimEngine } from '../../fake-pim-engine';

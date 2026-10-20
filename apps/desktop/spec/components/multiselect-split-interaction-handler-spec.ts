@@ -1,6 +1,6 @@
-import MultiselectSplitInteractionHandler from '../../src/components/multiselect-split-interaction-handler';
-import WorkspaceStore from '../../src/flux/stores/workspace-store';
-import { Thread } from '../../src/flux/models/thread';
+import MultiselectSplitInteractionHandler from '../../src/components/multiselect/split-interaction-handler';
+import WorkspaceStore from '../../src/data/stores/workspace';
+import { Thread } from '../../src/data/models/thread';
 import _ from 'underscore';
 
 describe('MultiselectSplitInteractionHandler', function () {

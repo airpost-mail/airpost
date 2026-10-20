@@ -1,4 +1,4 @@
-import WindowLauncher from '../../src/main/window-launcher';
+import WindowLauncher from '../../src/main/windows/launcher';
 
 describe('WindowLauncher', () => {
   let originalPlatform;

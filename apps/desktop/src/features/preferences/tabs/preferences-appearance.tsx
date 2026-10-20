@@ -14,16 +14,13 @@ import {
 } from 'mailspring-component-kit';
 import { Actions, localized } from 'mailspring-exports';
 import { isWaylandSession } from '../../../shared/is-wayland';
-import {
-  LABEL_COLOR_SCHEMES,
-  LABEL_COLOR_SCHEME_NAMES,
-} from '../../../flux/stores/label-color-store';
-import LessCompileCache from '../../../plugin-host/compile-cache-less';
+import { LABEL_COLOR_SCHEMES, LABEL_COLOR_SCHEME_NAMES } from '../../../data/stores/label-color';
+import LessCompileCache from '../../../packages/compile-cache-less';
 import {
   AUTOMATIC_THEME_NAME,
   LIGHT_THEME_NAME,
   DARK_THEME_NAME,
-} from '../../../plugin-host/theme-manager';
+} from '../../../packages/theme-manager';
 
 const THEME_ORDER = [
   LIGHT_THEME_NAME,

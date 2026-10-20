@@ -27,7 +27,7 @@ documentation at `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` (repo root). It co
 - Theme system implementation
 
 Changes to the plugin API also need a `PLUGIN_API_VERSION` bump in
-`apps/desktop/src/plugin-host/plugin-api-version.ts` and an entry in `apps/desktop/CHANGELOG.md`.
+`apps/desktop/src/packages/api-version.ts` and an entry in `apps/desktop/CHANGELOG.md`.
 
 ## Key Source Files
 
@@ -35,18 +35,18 @@ Paths are relative to `apps/desktop/`.
 
 | File | Purpose |
 |------|---------|
-| `src/plugin-host/package-manager.ts` | Package discovery, validation, and activation |
-| `src/plugin-host/package.ts` | Package class representing individual plugins |
-| `src/plugin-host/builtin-feature.ts` | A built-in feature held in PackageManager like a package |
-| `src/plugin-host/package-resources.ts` | Keymap, menu and stylesheet loading shared by both |
+| `src/packages/manager.ts` | Package discovery, validation, and activation |
+| `src/packages/package.ts` | Package class representing individual plugins |
+| `src/packages/builtin-feature.ts` | A built-in feature held in PackageManager like a package |
+| `src/packages/resources.ts` | Keymap, menu and stylesheet loading shared by both |
 | `src/features/index.ts` | The built-in feature list: name, window types, `syncInit`, lazy `require` |
 | `src/window/app-env.ts` | AppEnv singleton that initializes PackageManager |
-| `src/plugin-host/plugin-api-version.ts` | The plugin API version matched against `engines.mailspring` |
-| `src/registries/component-registry.ts` | UI component registration |
-| `src/registries/extension-registry.ts` | Extension registration |
-| `src/extensions/composer-extension.ts` | ComposerExtension base class |
-| `src/extensions/message-view-extension.ts` | MessageViewExtension base class |
-| `src/components/injected-component.tsx` | Renders registered components |
+| `src/packages/api-version.ts` | The plugin API version matched against `engines.mailspring` |
+| `src/packages/component-registry.ts` | UI component registration |
+| `src/packages/extension-registry.ts` | Extension registration |
+| `src/packages/composer-extension.ts` | ComposerExtension base class |
+| `src/packages/message-view-extension.ts` | MessageViewExtension base class |
+| `src/components/injected/component.tsx` | Renders registered components |
 | `src/features/theme-picker/` | Theme UI (reference for plugin management UI) |
 
 ## Development Guidelines

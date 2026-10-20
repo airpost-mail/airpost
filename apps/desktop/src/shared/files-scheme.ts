@@ -3,7 +3,7 @@ import path from 'path';
 
 // Downloaded attachments (<configDir>/files) are shown to message documents through this
 // scheme instead of file:, so the message CSP never has to allow file: (which reaches SMB
-// shares on Windows). The main process serves it (main/files-protocol-handler.ts).
+// shares on Windows). The main process serves it (main/protocols/files.ts).
 export const FilesScheme = 'tern-file';
 
 const Prefix = `${FilesScheme}://`;

@@ -132,8 +132,8 @@ content; the empty container may stay.
 | Root | File |
 |---|---|
 | Workspace (`SheetContainer`) | `src/window/app-env.ts` `initializeReactRoot` |
-| Modals | `src/flux/stores/modal-store.tsx` (`renderModal` and the empty `<span />` renders) |
-| Popovers | `src/flux/stores/popover-store.tsx` (same) |
+| Modals | `src/data/stores/modal.tsx` (`renderModal` and the empty `<span />` renders) |
+| Popovers | `src/data/stores/popover.tsx` (same) |
 | Onboarding provider note | `src/features/onboarding/decorators/create-page-for-form.tsx` |
 
 Portals keep React context, so content portalled out of these roots still sees the direction. A
@@ -203,7 +203,7 @@ is non-modal by default.
 
 - **Files.** `static/style/kit/<name>.css`, plain CSS, one per component, plus `kit/base.css` for
   shared rules (focus ring, the portal container, reduced motion).
-- **Loading.** `ThemeManager.loadStaticStylesheets()` (`src/plugin-host/theme-manager.ts`) loads
+- **Loading.** `ThemeManager.loadStaticStylesheets()` (`src/packages/theme-manager.ts`) loads
   them after `static/style/index.less` through `requireStylesheet(<path>.css)`, from a fixed list
   in that file (`KIT_STYLESHEETS`, in dependency order). `.css` is read raw at priority -1. It skips
   LESS and rtlcss, and the theme-switch reload loop re-reads it like the rest of `static/`. Order:
@@ -425,7 +425,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Colours: overlay `--modal-overlay`; content `--modal-background`, `--modal-foreground`,
   `--modal-border`.
 - Legacy classes: overlay `modal-container`, content `modal`, close button `modal-close`.
-- Replaces: `Modal` (`src/components/modal.tsx`) through `ModalStore` (`src/flux/stores/modal-store.tsx`).
+- Replaces: `Modal` (`src/components/modal.tsx`) through `ModalStore` (`src/data/stores/modal.tsx`).
   `Actions.openModal({ component, width, height })` and `Actions.closeModal()` keep their API
   (callers: `src/window/app-env.ts` and `src/features/theme-picker/index.tsx`). ModalStore renders `<Dialog open
   onOpenChange={(o) => !o && Actions.closeModal()}><DialogContent style={{ width, height }}
@@ -445,7 +445,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
   (fixed position, `transform` set by floating-ui).
 - Colours: `--menu-background`, `--menu-foreground`, `--menu-border`, shadow from `--shadow-color`.
 - Legacy classes: content `fixed-popover`; arrow `fixed-popover-pointer`.
-- Replaces: `FixedPopover` through `PopoverStore` (`src/flux/stores/popover-store.tsx`).
+- Replaces: `FixedPopover` through `PopoverStore` (`src/data/stores/popover.tsx`).
   `Actions.openPopover(element, { originRect, direction, fallbackDirection, closeOnAppBlur })`
   keeps its API (24 callers). PopoverStore renders a `Popover open` with a `PopoverAnchor
   virtualRef` whose `getBoundingClientRect()` returns `originRect`. `direction` up/down/left/right

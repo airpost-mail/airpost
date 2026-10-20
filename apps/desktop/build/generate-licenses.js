@@ -48,7 +48,7 @@ const VENDORED = [
   },
   {
     name: 'AngularJS (ngSanitize)',
-    where: 'encodeHTMLEntities in src/flux/models/utils.ts',
+    where: 'encodeHTMLEntities in src/data/models/utils.ts',
     license: 'MIT',
     file: 'angularjs.txt',
   },

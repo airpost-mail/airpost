@@ -1,6 +1,6 @@
-import * as Actions from '../../src/flux/actions';
-import { Message } from '../../src/flux/models/message';
-import ActionBridge from '../../src/flux/action-bridge';
+import * as Actions from '../../src/data/actions';
+import { Message } from '../../src/data/models/message';
+import ActionBridge from '../../src/data/action-bridge';
 
 const ipc = {
   on() {},

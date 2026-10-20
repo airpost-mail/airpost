@@ -1,6 +1,6 @@
-import MultiselectListInteractionHandler from '../../src/components/multiselect-list-interaction-handler';
-import WorkspaceStore from '../../src/flux/stores/workspace-store';
-import { Thread } from '../../src/flux/models/thread';
+import MultiselectListInteractionHandler from '../../src/components/multiselect/list-interaction-handler';
+import WorkspaceStore from '../../src/data/stores/workspace';
+import { Thread } from '../../src/data/models/thread';
 import _ from 'underscore';
 
 describe('MultiselectListInteractionHandler', function () {

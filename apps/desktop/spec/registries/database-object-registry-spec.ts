@@ -1,8 +1,8 @@
 /* eslint quote-props: 0 */
 import _ from 'underscore';
-import { Model } from '../../src/flux/models/model';
-import * as Attributes from '../../src/flux/attributes';
-import DatabaseObjectRegistry from '../../src/registries/database-object-registry';
+import { Model } from '../../src/data/models/model';
+import * as Attributes from '../../src/data/attributes';
+import DatabaseObjectRegistry from '../../src/data/database-object-registry';
 
 class GoodTest extends Model {
   static attributes = {

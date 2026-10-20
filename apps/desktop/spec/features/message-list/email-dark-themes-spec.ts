@@ -5,7 +5,7 @@ import {
   darkPalette,
   themeBackgroundAt,
 } from '../../../src/features/message-list/email-render-mode';
-import { compatTokensSource } from '../../../src/plugin-host/theme-manager';
+import { compatTokensSource } from '../../../src/packages/theme-manager';
 
 // less comes with less-cache, which compiles the app's stylesheets at runtime.
 // eslint-disable-next-line import/no-extraneous-dependencies

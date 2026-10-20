@@ -12,7 +12,7 @@ import fs from 'fs';
 import { debounce } from 'underscore';
 
 import { KeyCommandsRegion } from '../key-commands-region';
-import ComposerEditorToolbar from './composer-editor-toolbar';
+import ComposerEditorToolbar from './toolbar';
 import { schema, plugins, convertFromHTML, convertToHTML, convertToPlainText } from './conversion';
 import { lastUnquotedNode, removeQuotedText, isQuoteNode } from './base-block-plugins';
 import { UNEDITABLE_TYPE } from './uneditable-plugins';

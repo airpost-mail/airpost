@@ -1,6 +1,6 @@
-import QuerySubscriptionPool from '../../../src/flux/models/query-subscription-pool';
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import { Label } from '../../../src/flux/models/label';
+import QuerySubscriptionPool from '../../../src/data/query/subscription-pool';
+import DatabaseStore from '../../../src/data/database/store';
+import { Label } from '../../../src/data/models/label';
 import { forEachTransport, settle } from '../../mock-engine';
 
 describe('QuerySubscriptionPool', function QuerySubscriptionPoolSpecs() {

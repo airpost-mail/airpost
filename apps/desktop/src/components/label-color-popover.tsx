@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { localized, Actions } from 'mailspring-exports';
-import LabelColorStore, { LABEL_COLOR_SCHEMES } from '../flux/stores/label-color-store';
+import LabelColorStore, { LABEL_COLOR_SCHEMES } from '../data/stores/label-color';
 import { LabelColorizer } from './mail-label';
 
 type LabelColorPopoverProps = {

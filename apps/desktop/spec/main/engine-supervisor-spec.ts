@@ -10,11 +10,11 @@ import {
   SupervisorConfig,
   SupervisorTarget,
   waitForEarlierEngine,
-} from '../../src/main/engine-supervisor';
-import { KeyManager, secureStorage } from '../../src/main/key-manager';
-import { EngineConnection } from '../../src/engine/engine-connection';
-import { engineBuildId, EngineServeProcess } from '../../src/shared/engine-process';
-import { EngineStatus, SupervisorChannel } from '../../src/shared/supervisor-channels';
+} from '../../src/main/engine/supervisor';
+import { KeyManager, secureStorage } from '../../src/main/profile/key-manager';
+import { EngineConnection } from '../../src/engine/connection';
+import { engineBuildId, EngineServeProcess } from '../../src/shared/engine/process';
+import { EngineStatus, SupervisorChannel } from '../../src/shared/engine/supervisor-channels';
 import { FakeEngine, tick, until } from '../fake-serve-engine';
 
 // config.json as the main process's Config holds it, with onDidChange.

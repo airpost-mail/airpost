@@ -7,7 +7,7 @@ import {
   transformEmlToMbox,
   appendStagedMessages,
   readMboxExportManifest,
-} from '../../src/services/mbox-utils';
+} from '../../src/mail/mbox';
 
 describe('mbox-utils', function () {
   describe('mboxFromLine', () => {

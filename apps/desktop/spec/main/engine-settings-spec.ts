@@ -3,10 +3,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import ConfigPersistenceManager, {
-  registerConfigIPC,
-} from '../../src/main/config-persistence-manager';
-import { EngineSupervisor, SupervisorConfig } from '../../src/main/engine-supervisor';
+import ConfigPersistenceManager, { registerConfigIPC } from '../../src/config/persistence-manager';
+import { EngineSupervisor, SupervisorConfig } from '../../src/main/engine/supervisor';
 import {
   COPIED_KEY,
   ENGINE_SETTINGS_KEYS,
@@ -14,11 +12,11 @@ import {
   KEPT_KEY,
   STORE_KEY,
   touchesKey,
-} from '../../src/main/engine-settings';
-import { KeyManager } from '../../src/main/key-manager';
-import { ConfigChannel } from '../../src/shared/config-channels';
+} from '../../src/main/engine/settings';
+import { KeyManager } from '../../src/main/profile/key-manager';
+import { ConfigChannel } from '../../src/config/channels';
 import { resurfacingBodies } from '../../src/shared/resurfacing';
-import { EngineServeProcess } from '../../src/shared/engine-process';
+import { EngineServeProcess } from '../../src/shared/engine/process';
 import { FakeEngine, until } from '../fake-serve-engine';
 
 // The supervisor reads only `accounts`, the deleted ones and the log level from the main

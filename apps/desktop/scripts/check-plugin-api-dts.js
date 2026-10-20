@@ -10,7 +10,7 @@ const appDir = path.resolve(__dirname, '..');
 const barrels = process.argv.slice(2).length
   ? process.argv.slice(2).map((file) => path.resolve(file))
   : ['mailspring-exports.d.ts', 'mailspring-component-kit.d.ts'].map((file) =>
-      path.join(appDir, 'src', 'plugin-api', file)
+      path.join(appDir, 'src', 'packages', 'api', file)
     );
 
 const configPath = path.join(appDir, 'tsconfig.json');
@@ -24,8 +24,14 @@ const options = { ...parsed.options, skipLibCheck: false, noEmit: true };
 
 // The ambient declarations (AppEnv, the jasmine and window globals) are roots too, so the
 // barrels see the same globals as the app.
+const ambientRoots = [
+  path.join(appDir, 'src', 'types') + path.sep,
+  path.join(appDir, 'src', 'window', 'globals.d.ts'),
+  path.join(appDir, 'src', 'window', 'react.d.ts'),
+  path.join(appDir, 'src', 'main', 'global.d.ts'),
+];
 const ambient = parsed.fileNames.filter((file) =>
-  file.startsWith(path.join(appDir, 'src', 'types'))
+  ambientRoots.some((root) => file.startsWith(root))
 );
 const program = ts.createProgram([...barrels, ...ambient], options);
 

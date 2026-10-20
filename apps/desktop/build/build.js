@@ -260,7 +260,7 @@ function buildPackagerOptions() {
           // file on disk rather than a copy extracted from the asar on every change.
           '*.ico',
           '**/vendor/**',
-          '**/src/quickpreview/**',
+          '**/src/mail/quick-preview/**',
           '**/static/all_licenses.html',
           '**/static/extensions/**',
           '**/node_modules/spellchecker/**',

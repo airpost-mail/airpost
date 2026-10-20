@@ -79,7 +79,7 @@ export function quarantineValue(now: Date = new Date(), uuid: string = crypto.ra
   return `0081;${epoch};Tern;${uuid.toUpperCase()}`;
 }
 
-// Handled by main/attachment-safety-ipc.ts.
+// Handled by main/ipc/attachment-safety.ts.
 export const ConfirmOpenChannel = 'attachment-safety:confirm-open';
 
 export const ZONE_IDENTIFIER = '[ZoneTransfer]\r\nZoneId=3\r\n';

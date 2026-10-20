@@ -1,5 +1,5 @@
 // Message bodies render in a frame served by the main process on this scheme
-// (main/message-frame-protocol-handler.ts). The frame is sandboxed without
+// (main/frame/protocol-handler.ts). The frame is sandboxed without
 // allow-same-origin, so it is cross-origin to the app window and Chromium puts it in its
 // own sandboxed renderer process, without Node. The app window and the frame talk only
 // through postMessage, with the messages below.

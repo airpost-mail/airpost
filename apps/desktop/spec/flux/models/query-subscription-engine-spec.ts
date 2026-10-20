@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import { Thread } from '../../../src/flux/models/thread';
-import { Folder } from '../../../src/flux/models/folder';
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import { DatabaseChangeRecord } from '../../../src/flux/stores/database-change-record';
-import QuerySubscriptionPool from '../../../src/flux/models/query-subscription-pool';
-import { QuerySubscription } from '../../../src/flux/models/query-subscription';
-import UnreadQuerySubscription from '../../../src/flux/models/unread-query-subscription';
-import { READ_WAIT_MS } from '../../../src/flux/stores/engine-reads';
+import { Thread } from '../../../src/data/models/thread';
+import { Folder } from '../../../src/data/models/folder';
+import DatabaseStore from '../../../src/data/database/store';
+import { DatabaseChangeRecord } from '../../../src/data/database/change-record';
+import QuerySubscriptionPool from '../../../src/data/query/subscription-pool';
+import { QuerySubscription } from '../../../src/data/query/subscription';
+import UnreadQuerySubscription from '../../../src/data/query/unread-subscription';
+import { READ_WAIT_MS } from '../../../src/data/database/engine-reads';
 import { MockEngine, settle } from '../../mock-engine';
 
 const inbox = new Folder({ id: 'inbox', accountId: TEST_ACCOUNT_ID, role: 'inbox', path: 'INBOX' });

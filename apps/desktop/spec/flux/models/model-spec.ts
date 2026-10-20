@@ -1,6 +1,6 @@
 /* eslint quote-props: 0 */
-import { Model } from '../../../src/flux/models/model';
-import * as Attributes from '../../../src/flux/attributes';
+import { Model } from '../../../src/data/models/model';
+import * as Attributes from '../../../src/data/attributes';
 
 describe('Model', function modelSpecs() {
   describe('constructor', () => {

@@ -6,7 +6,7 @@ import {
   SKIP_MAILSPRING_IMPORT_MARKER,
   importMailspringProfile,
   shouldImportMailspringProfile,
-} from '../../src/main/mailspring-profile-import';
+} from '../../src/main/profile/mailspring-import';
 
 function write(file: string, contents = 'x') {
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -3,7 +3,7 @@ import path from 'path';
 import classnames from 'classnames';
 import React, { Component, CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
-import * as Actions from '../flux/actions';
+import * as Actions from '../data/actions';
 import { pickHTMLProps } from 'pick-react-known-prop';
 import { RetinaImg } from './retina-img';
 import { Flexbox } from './flexbox';

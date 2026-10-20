@@ -7,7 +7,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Utils, localized, SearchableComponentStore } from 'mailspring-exports';
-import IFrameSearcher from '../searchable-components/iframe-searcher';
+import IFrameSearcher from './searchable/iframe-searcher';
 import url from 'url';
 import _ from 'underscore';
 import path from 'path';
@@ -16,7 +16,7 @@ import { ipcRenderer } from 'electron';
 import { FilesScheme, resolveFilesSchemeURL } from '../shared/files-scheme';
 import { markFileFromInternet } from '../shared/attachment-safety';
 import { ExternalFetch } from '../shared/external-fetch';
-import { FormSubmissionTarget, formSubmissionTarget } from '../message-frame/form-submission';
+import { FormSubmissionTarget, formSubmissionTarget } from '../mail/frame/form-submission';
 
 // The bytes behind an image src in a message, for Save Image.
 async function imageBytes(src: string): Promise<Buffer> {

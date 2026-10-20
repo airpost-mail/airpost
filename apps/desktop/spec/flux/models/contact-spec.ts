@@ -1,6 +1,6 @@
-import { Contact } from '../../../src/flux/models/contact';
-import { AccountStore } from '../../../src/flux/stores/account-store';
-import { Account } from '../../../src/flux/models/account';
+import { Contact } from '../../../src/data/models/contact';
+import { AccountStore } from '../../../src/data/stores/account';
+import { Account } from '../../../src/data/models/account';
 
 const contact_1 = {
   name: 'Evan Morikawa',

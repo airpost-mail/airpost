@@ -12,8 +12,8 @@
 // and run `cargo test -p ms-store --test search_grammar_parity`.
 import fs from 'fs';
 import path from 'path';
-import { SearchQueryParser } from '../../../src/services/search/search-query-parser';
-import LocalSearchQueryBackend from '../../../src/services/search/search-query-backend-local';
+import { SearchQueryParser } from '../../../src/mail/search/parser';
+import LocalSearchQueryBackend from '../../../src/mail/search/backend-local';
 import {
   AndQueryExpression,
   DateQueryExpression,
@@ -28,7 +28,7 @@ import {
   SubjectQueryExpression,
   ToQueryExpression,
   UnreadStatusQueryExpression,
-} from '../../../src/services/search/search-query-ast';
+} from '../../../src/mail/search/ast';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
 const FIXTURE = path.join(REPO, 'crates', 'ms-store', 'tests', 'fixtures', 'search_queries.json');

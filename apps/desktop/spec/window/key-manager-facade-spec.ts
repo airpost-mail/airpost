@@ -3,7 +3,7 @@
 
 import { Account } from 'mailspring-exports';
 import { KeyManagerFacade } from '../../src/window/key-manager';
-import { KEY_MANAGER_CHANNEL } from '../../src/shared/supervisor-channels';
+import { KEY_MANAGER_CHANNEL } from '../../src/shared/engine/supervisor-channels';
 
 // The windows' KeyManager, answered by a stand-in for the main process: synthetic keys only.
 describe('KeyManager in a window', function () {

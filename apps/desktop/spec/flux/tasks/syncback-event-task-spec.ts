@@ -1,4 +1,4 @@
-import { SyncbackEventTask } from '../../../src/flux/tasks/syncback-event-task';
+import { SyncbackEventTask } from '../../../src/data/tasks/syncback-event';
 
 describe('SyncbackEventTask', () => {
   describe('onError', () => {

@@ -1,5 +1,5 @@
-import { SyncbackEventTask } from '../../../src/flux/tasks/syncback-event-task';
-import { DestroyEventTask } from '../../../src/flux/tasks/destroy-event-task';
+import { SyncbackEventTask } from '../../../src/data/tasks/syncback-event';
+import { DestroyEventTask } from '../../../src/data/tasks/destroy-event';
 
 describe('re-reading the calendar after an event write', () => {
   beforeEach(() => {

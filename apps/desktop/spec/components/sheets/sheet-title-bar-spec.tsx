@@ -7,10 +7,10 @@ import {
   WorkspaceStore,
 } from 'mailspring-exports';
 
-import SheetContainer from '../../../src/components/sheets/sheet-container';
+import SheetContainer from '../../../src/components/sheets/container';
 import Sheet from '../../../src/components/sheets/sheet';
-import { SheetTitleBar } from '../../../src/components/sheets/sheet-toolbar';
-import { SheetDepthContext } from '../../../src/components/sheets/sheet-context';
+import { SheetTitleBar } from '../../../src/components/sheets/toolbar';
+import { SheetDepthContext } from '../../../src/components/sheets/context';
 
 const fakeSheet = (id: string, extra = {}) =>
   ({

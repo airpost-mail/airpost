@@ -1,11 +1,11 @@
-import { Thread } from '../../../src/flux/models/thread';
-import { Model } from '../../../src/flux/models/model';
+import { Thread } from '../../../src/data/models/thread';
+import { Model } from '../../../src/data/models/model';
 import {
   Matcher,
   OrCompositeMatcher,
   AndCompositeMatcher,
-} from '../../../src/flux/attributes/matcher';
-import * as Attributes from '../../../src/flux/attributes';
+} from '../../../src/data/attributes/matcher';
+import * as Attributes from '../../../src/data/attributes';
 
 // Build a simple Attribute and a simple model class for evaluate() tests
 // so we don't depend on Thread's specific attribute names.

@@ -3,7 +3,7 @@
 /* eslint quote-props: 0 */
 const path = require('path');
 const fs = require('fs');
-const { safeExec } = require('./utils/child-process-wrapper.js');
+const { safeExec } = require('./child-process-wrapper.js');
 const { checkNativeAbi } = require('./check-native-abi.js');
 
 // One node_modules serves the dev tooling (run by Node) and the app (run by Electron). npm

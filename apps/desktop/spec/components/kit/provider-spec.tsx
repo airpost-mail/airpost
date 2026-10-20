@@ -5,8 +5,8 @@ import React from 'react';
 import { render, cleanup } from '@testing-library/react';
 import { useDirection } from '@radix-ui/react-direction';
 import * as intl from '../../../src/shared/intl';
-import ModalStore from '../../../src/flux/stores/modal-store';
-import PopoverStore from '../../../src/flux/stores/popover-store';
+import ModalStore from '../../../src/data/stores/modal';
+import PopoverStore from '../../../src/data/stores/popover';
 import { UIProvider } from '../../../src/components/kit/provider';
 
 const appDir = path.resolve(__dirname, '..', '..', '..');
@@ -15,8 +15,8 @@ const appDir = path.resolve(__dirname, '..', '..', '..');
 // to wrap its tree and be listed here.
 const ROOTS = {
   'src/window/app-env.ts': 1,
-  'src/flux/stores/modal-store.tsx': 3,
-  'src/flux/stores/popover-store.tsx': 3,
+  'src/data/stores/modal.tsx': 3,
+  'src/data/stores/popover.tsx': 3,
   'src/features/onboarding/decorators/create-page-for-form.tsx': 1,
 };
 

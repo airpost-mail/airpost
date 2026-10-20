@@ -1,5 +1,5 @@
 import React from 'react';
-import * as Utils from '../flux/models/utils';
+import * as Utils from '../data/models/utils';
 
 export default function BoldedSearchResult({
   query = '',

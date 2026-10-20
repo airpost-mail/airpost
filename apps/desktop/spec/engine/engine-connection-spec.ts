@@ -4,11 +4,11 @@
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import { Actions, Message, SendDraftTask } from 'mailspring-exports';
-import SoundRegistry from '../../src/registries/sound-registry';
-import OnlineStatusStore from '../../src/flux/stores/online-status-store';
-import { EngineConnection } from '../../src/engine/engine-connection';
-import MailsyncBridge, { applyDeltas } from '../../src/flux/engine-bridge';
-import { EngineStatus } from '../../src/shared/supervisor-channels';
+import SoundRegistry from '../../src/packages/sound-registry';
+import OnlineStatusStore from '../../src/data/stores/online-status';
+import { EngineConnection } from '../../src/engine/connection';
+import MailsyncBridge, { applyDeltas } from '../../src/engine/bridge';
+import { EngineStatus } from '../../src/shared/engine/supervisor-channels';
 import { FakeEngine, tick, until } from '../fake-serve-engine';
 
 const status = (

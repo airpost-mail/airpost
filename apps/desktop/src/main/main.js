@@ -52,7 +52,7 @@ const profileDirNames = args => {
 };
 
 // Returns the config dir, the Mailspring profile to import from when the default dir is used, and
-// whether the dir is Tern's own (profile-marker.ts): the default one, or a --config-dir-path
+// whether the dir is Tern's own (profile/marker.ts): the default one, or a --config-dir-path
 // that didn't exist yet or was empty.
 const setupConfigDir = args => {
   const names = profileDirNames(args);
@@ -84,7 +84,7 @@ const setupConfigDir = args => {
 // null, or to the error if the import failed (with nothing copied left behind).
 const startProfileImport = (configDirPath, importFromPath) => {
   if (!importFromPath) return Promise.resolve(null);
-  const { importMailspringProfile } = require('./mailspring-profile-import');
+  const { importMailspringProfile } = require('./profile/mailspring-import');
   return importMailspringProfile(importFromPath, configDirPath).then(() => null, error => error);
 };
 
@@ -285,7 +285,7 @@ const handleStartupEventWithSquirrel = () => {
     return false;
   }
 
-  const WindowsUpdater = require('./windows-updater');
+  const WindowsUpdater = require('./autoupdate/win32-updater');
   const squirrelCommand = process.argv[1];
 
   switch (squirrelCommand) {
@@ -320,7 +320,7 @@ const start = () => {
     // Must be set before setAppUserModelId so RegisterActivator writes it
     // into the Start Menu shortcut. Without this, action/reply notification
     // events are silently dropped (COM server is never registered).
-    const WindowsUpdater = require('./windows-updater');
+    const WindowsUpdater = require('./autoupdate/win32-updater');
     app.setToastActivatorCLSID(WindowsUpdater.TOAST_ACTIVATOR_CLSID);
     app.setAppUserModelId(WindowsUpdater.APP_USER_MODEL_ID);
   }
@@ -351,7 +351,7 @@ const start = () => {
       }
     },
     {
-      // The sandboxed frame message bodies render in (src/message-frame). Standard, so the
+      // The sandboxed frame message bodies render in (src/mail/frame). Standard, so the
       // frame has an origin of its own and runs in its own sandboxed renderer process.
       scheme: 'tern-message',
       privileges: {
@@ -372,7 +372,7 @@ const start = () => {
   // This handles existing installations and ensures registration completes even if
   // the Squirrel install hook's detached processes didn't finish in time.
   if (process.platform === 'win32') {
-    const WindowsUpdater = require('./windows-updater');
+    const WindowsUpdater = require('./autoupdate/win32-updater');
     if (WindowsUpdater.existsSync()) {
       WindowsUpdater.registerAppUserModelId();
       // Register mailto: protocol without elevation or setting as default
@@ -388,7 +388,7 @@ const start = () => {
   // Configure Chromium command line switches before app ready event.
   // These must be set before the ready event for them to take effect.
   // Reference: https://www.electronjs.org/docs/latest/api/command-line-switches
-  // New-mail sounds play with no user gesture (src/registries/sound-registry.ts).
+  // New-mail sounds play with no user gesture (src/packages/sound-registry.ts).
   app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
   const options = parseCommandLine(process.argv);
@@ -422,14 +422,14 @@ const start = () => {
   }
 
   setupCompileCache(configDirPath, options.devMode);
-  if (ownsConfigDir) require('./profile-marker').markTernProfile(configDirPath);
+  if (ownsConfigDir) require('./profile/marker').markTernProfile(configDirPath);
 
   // Every session gets the deny-by-default permission handlers as it is created: the default
   // one, quickpreview's and the <webview> partition, and any a plugin opens.
   const installPermissionHandlers = ses => {
     require('./permission-policy').installPermissionHandlers(ses, {
-      isAppWindow: require('./app-window').isAppWindowContents,
-      isPdfViewer: require('./quickpreview-ipc').isPdfViewerURL,
+      isAppWindow: require('./windows/app-window').isAppWindowContents,
+      isPdfViewer: require('./ipc/quick-preview').isPdfViewerURL,
       logDenials: options.devMode,
     });
   };
@@ -438,7 +438,7 @@ const start = () => {
   const profileImport = startProfileImport(configDirPath, importFromPath);
 
   // Must precede `ready`: disableHardwareAcceleration() has no effect afterward.
-  require('./hardware-acceleration-recovery').applyPersistentSoftwareRendering(
+  require('./windows/hardware-acceleration-recovery').applyPersistentSoftwareRendering(
     app,
     configDirPath
   );

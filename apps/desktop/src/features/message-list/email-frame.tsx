@@ -8,7 +8,7 @@ import {
   SearchableComponentStore,
 } from 'mailspring-exports';
 import { confirmFormSubmission, showFrameContextMenu } from '../../components/evented-iframe';
-import { MessageBody, MessageFrameBridge } from '../../message-frame/message-frame-bridge';
+import { MessageBody, MessageFrameBridge } from '../../mail/frame/bridge';
 import {
   ForwardedKeyEvent,
   ForwardedMouseEvent,
@@ -55,7 +55,7 @@ function hookArguments(body: MessageBody, message: Message, iframe: HTMLIFrameEl
 const finite = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 /**
- * Shows a message body in the sandboxed message frame (src/message-frame): a cross-origin
+ * Shows a message body in the sandboxed message frame (src/mail/frame): a cross-origin
  * frame in its own sandboxed renderer process, so nothing in an email (images, fonts, CSS)
  * is decoded in a process with Node. The frame renders what this component posts and posts
  * back its height, clicks, keys and find-in-thread matches.

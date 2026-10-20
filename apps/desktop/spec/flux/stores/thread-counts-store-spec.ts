@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import { ThreadCountsStore } from '../../../src/flux/stores/thread-counts-store';
-import { EngineEvents } from '../../../src/engine/engine-events';
-import { Feature, Method } from '../../../src/shared/engine-protocol';
+import DatabaseStore from '../../../src/data/database/store';
+import { ThreadCountsStore } from '../../../src/data/stores/thread-counts';
+import { EngineEvents } from '../../../src/engine/events';
+import { Feature, Method } from '../../../src/shared/engine/protocol';
 
 const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();

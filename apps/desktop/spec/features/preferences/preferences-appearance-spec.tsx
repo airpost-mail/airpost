@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 
-import configSchema from '../../../src/window/config-schema';
+import configSchema from '../../../src/config/schema';
 import PreferencesAppearance from '../../../src/features/preferences/tabs/preferences-appearance';
 import { getPortalContainer } from '../../../src/components/kit/portal';
 

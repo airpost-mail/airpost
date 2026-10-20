@@ -54,7 +54,7 @@ export class DefaultClientHelperWindows implements DCH {
 
   registerForURLScheme(scheme: string, callback = (error?: Error) => {}) {
     // Ensure that our registry entires are present
-    const WindowsUpdater = require('@electron/remote').require('./windows-updater');
+    const WindowsUpdater = require('@electron/remote').require('./autoupdate/win32-updater');
     WindowsUpdater.createRegistryEntries(
       {
         allowEscalation: true,

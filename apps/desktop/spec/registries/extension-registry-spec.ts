@@ -1,4 +1,4 @@
-const ExtensionRegistry = require('../../src/registries/extension-registry');
+const ExtensionRegistry = require('../../src/packages/extension-registry');
 
 class TestExtension {}
 

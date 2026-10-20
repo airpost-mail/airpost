@@ -10,8 +10,8 @@ import {
   DatabaseChangeRecord,
   TaskFactory,
 } from 'mailspring-exports';
-import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/engine-events';
-import { Feature, MailNewParams } from '../../shared/engine-protocol';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/events';
+import { Feature, MailNewParams } from '../../shared/engine/protocol';
 
 const WAIT_FOR_CHANGES_DELAY = 400;
 const NEW_MAIL_SOUND_QUIET_PERIOD = 5000;

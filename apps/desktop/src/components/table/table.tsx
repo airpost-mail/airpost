@@ -1,8 +1,8 @@
 import classnames from 'classnames';
 import React, { Component, HTMLProps } from 'react';
 import { pickHTMLProps } from 'pick-react-known-prop';
-import { LazyRenderedList } from '../lazy-rendered-list';
-import TableDataSource from './table-data-source';
+import { LazyRenderedList } from '../list/lazy-rendered-list';
+import TableDataSource from './data-source';
 
 /*
  * Scrollable Table component which supports headers, numbering and lazily rendering rows.

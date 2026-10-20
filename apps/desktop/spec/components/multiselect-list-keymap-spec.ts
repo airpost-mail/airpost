@@ -1,4 +1,4 @@
-import { MultiselectList } from '../../src/components/multiselect-list';
+import { MultiselectList } from '../../src/components/multiselect/list';
 
 describe('MultiselectList keymap handlers', function () {
   it('lets the caller override a default handler', function () {

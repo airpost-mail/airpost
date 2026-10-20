@@ -1,9 +1,9 @@
-import { EventRSVPTask } from '../../../src/flux/tasks/event-rsvp-task';
-import { AccountStore } from '../../../src/flux/stores/account-store';
-import { Message } from '../../../src/flux/models/message';
-import * as Actions from '../../../src/flux/actions';
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import { SyncbackMetadataTask } from '../../../src/flux/tasks/syncback-metadata-task';
+import { EventRSVPTask } from '../../../src/data/tasks/event-rsvp';
+import { AccountStore } from '../../../src/data/stores/account';
+import { Message } from '../../../src/data/models/message';
+import * as Actions from '../../../src/data/actions';
+import DatabaseStore from '../../../src/data/database/store';
+import { SyncbackMetadataTask } from '../../../src/data/tasks/syncback-metadata';
 
 const ACCOUNT_ID = 'acct-1';
 const ME = 'brian@example.com';

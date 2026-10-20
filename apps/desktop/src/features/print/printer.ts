@@ -1,8 +1,5 @@
 import { AccountStore, Actions, Thread } from 'mailspring-exports';
-import {
-  messageFrameBridgeFor,
-  messageFrameContent,
-} from '../../message-frame/message-frame-bridge';
+import { messageFrameBridgeFor, messageFrameContent } from '../../mail/frame/bridge';
 import PrintWindow from './print-window';
 
 class Printer {

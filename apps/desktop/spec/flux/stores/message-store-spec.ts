@@ -1,14 +1,14 @@
-import { Thread } from '../../../src/flux/models/thread';
-import { Folder } from '../../../src/flux/models/folder';
-import { Label } from '../../../src/flux/models/label';
-import { Message } from '../../../src/flux/models/message';
-import FocusedContentStore from '../../../src/flux/stores/focused-content-store';
-import FocusedPerspectiveStore from '../../../src/flux/stores/focused-perspective-store';
-import { MessageStore } from '../../../src/flux/stores/message-store';
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import { ChangeUnreadTask } from '../../../src/flux/tasks/change-unread-task';
-import CategoryStore from '../../../src/flux/stores/category-store';
-import * as Actions from '../../../src/flux/actions';
+import { Thread } from '../../../src/data/models/thread';
+import { Folder } from '../../../src/data/models/folder';
+import { Label } from '../../../src/data/models/label';
+import { Message } from '../../../src/data/models/message';
+import FocusedContentStore from '../../../src/data/stores/focused-content';
+import FocusedPerspectiveStore from '../../../src/data/stores/focused-perspective';
+import { MessageStore } from '../../../src/data/stores/message';
+import DatabaseStore from '../../../src/data/database/store';
+import { ChangeUnreadTask } from '../../../src/data/tasks/change-unread';
+import CategoryStore from '../../../src/data/stores/category';
+import * as Actions from '../../../src/data/actions';
 import { forEachTransport, settle } from '../../mock-engine';
 
 const testThread = new Thread({ id: '123', accountId: TEST_ACCOUNT_ID });

@@ -6,8 +6,8 @@ import {
   CalendarDate,
   Calendar,
 } from 'mailspring-exports';
-import EngineEvents from '../../../engine/engine-events';
-import { expandEvents } from '../../../engine/engine-pim';
+import EngineEvents from '../../../engine/events';
+import { expandEvents } from '../../../engine/pim';
 
 /** Participation status values from iCalendar spec */
 export type ParticipationStatus = 'NEEDS-ACTION' | 'ACCEPTED' | 'DECLINED' | 'TENTATIVE' | string;

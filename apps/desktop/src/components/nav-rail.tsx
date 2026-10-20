@@ -7,7 +7,7 @@ import {
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
 import { RetinaImg } from './retina-img';
-import { InjectedComponentSet } from './injected-component-set';
+import { InjectedComponentSet } from './injected/component-set';
 
 export const SHOW_NAV_RAIL_CONFIG_KEY = 'core.workspace.showNavRail';
 

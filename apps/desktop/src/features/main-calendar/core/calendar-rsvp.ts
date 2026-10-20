@@ -12,7 +12,7 @@ import { ProposeTimePopover } from 'mailspring-component-kit';
 import { EventOccurrence, occurrenceStartUnix, occurrenceEndUnix } from './calendar-data-source';
 import { parseEventIdFromOccurrence } from './calendar-drag-utils';
 import { showRecurringEventDialog } from './recurring-event-dialog';
-import { answerEvent, refusalKey } from '../../../engine/engine-pim';
+import { answerEvent, refusalKey } from '../../../engine/pim';
 
 /** Whether this occurrence is an invitation we can answer, rather than one we sent. */
 export function canRespondToEvent(occurrence: EventOccurrence): boolean {

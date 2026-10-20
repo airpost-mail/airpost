@@ -1,7 +1,7 @@
 import {
   THEME_TOKENS_SOURCE_PATH,
   TOKEN_DEFAULTS_SOURCE_PATH,
-} from '../../src/plugin-host/theme-manager';
+} from '../../src/packages/theme-manager';
 
 // Theme tokens as ThemeManager loads them (docs/desktop/theme-tokens.md), with the fixture themes in
 // spec/fixtures/packages: theme-nord-variables only sets LESS variables, theme-with-tokens ships

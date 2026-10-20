@@ -1,13 +1,13 @@
-import UndoRedoStore from '../../../src/flux/stores/undo-redo-store';
-import TaskQueue from '../../../src/flux/stores/task-queue';
-import CategoryStore from '../../../src/flux/stores/category-store';
-import * as Actions from '../../../src/flux/actions';
-import { ChangeFolderTask } from '../../../src/flux/tasks/change-folder-task';
-import { ChangeStarredTask } from '../../../src/flux/tasks/change-starred-task';
-import { SyncbackMetadataTask } from '../../../src/flux/tasks/syncback-metadata-task';
-import { Folder } from '../../../src/flux/models/folder';
-import { Message } from '../../../src/flux/models/message';
-import { Thread } from '../../../src/flux/models/thread';
+import UndoRedoStore from '../../../src/data/stores/undo-redo';
+import TaskQueue from '../../../src/data/stores/task-queue';
+import CategoryStore from '../../../src/data/stores/category';
+import * as Actions from '../../../src/data/actions';
+import { ChangeFolderTask } from '../../../src/data/tasks/change-folder';
+import { ChangeStarredTask } from '../../../src/data/tasks/change-starred';
+import { SyncbackMetadataTask } from '../../../src/data/tasks/syncback-metadata';
+import { Folder } from '../../../src/data/models/folder';
+import { Message } from '../../../src/data/models/message';
+import { Thread } from '../../../src/data/models/thread';
 
 // Lets a chain of already-resolved promises settle without relying on real timers.
 const flushPromises = () => new Promise<void>((resolve) => window.originalSetTimeout(resolve, 0));

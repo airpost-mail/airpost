@@ -1,6 +1,6 @@
 import React from 'react';
-import { Contact } from '../flux/models/contact';
-import * as Utils from '../flux/models/utils';
+import { Contact } from '../data/models/contact';
+import * as Utils from '../data/models/utils';
 import { RetinaImg } from './retina-img';
 import crypto from 'crypto';
 

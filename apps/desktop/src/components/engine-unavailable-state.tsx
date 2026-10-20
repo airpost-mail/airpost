@@ -12,8 +12,8 @@ import { localized } from '../shared/intl';
 import EngineReads, {
   ENGINE_READS_KEY,
   EngineReads as EngineReadsType,
-} from '../flux/stores/engine-reads';
-import { SupervisorChannel } from '../shared/supervisor-channels';
+} from '../data/database/engine-reads';
+import { SupervisorChannel } from '../shared/engine/supervisor-channels';
 import Notification from './notification';
 
 export const SHOW_WAITING_AFTER_MS = 2000;

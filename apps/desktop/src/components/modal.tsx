@@ -1,6 +1,6 @@
 import _ from 'underscore';
 import React from 'react';
-import * as Actions from '../flux/actions';
+import * as Actions from '../data/actions';
 import { localized } from '../shared/intl';
 import { Dialog, DialogContent } from './kit/dialog';
 

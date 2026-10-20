@@ -185,7 +185,7 @@ export function initializeLocalization({ configDirPath }) {
   locale = automaticLocale;
 
   // Load the user's language choice if they've explicitly set one in settings
-  // Note we can't use our nice Config class becuase the config-schema itself
+  // Note we can't use our nice Config class becuase the config schema itself
   // contains localized strings...
   try {
     const config = JSON.parse(fs.readFileSync(path.join(configDirPath, 'config.json')).toString());

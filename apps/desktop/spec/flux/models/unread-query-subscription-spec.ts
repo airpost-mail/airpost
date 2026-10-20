@@ -1,11 +1,11 @@
-import * as Actions from '../../../src/flux/actions';
-import UnreadQuerySubscription from '../../../src/flux/models/unread-query-subscription';
-import { QuerySubscription } from '../../../src/flux/models/query-subscription';
-import { Thread } from '../../../src/flux/models/thread';
-import { Folder } from '../../../src/flux/models/folder';
-import { ChangeUnreadTask } from '../../../src/flux/tasks/change-unread-task';
-import { ChangeFolderTask } from '../../../src/flux/tasks/change-folder-task';
-import { DatabaseChangeRecord } from '../../../src/flux/stores/database-change-record';
+import * as Actions from '../../../src/data/actions';
+import UnreadQuerySubscription from '../../../src/data/query/unread-subscription';
+import { QuerySubscription } from '../../../src/data/query/subscription';
+import { Thread } from '../../../src/data/models/thread';
+import { Folder } from '../../../src/data/models/folder';
+import { ChangeUnreadTask } from '../../../src/data/tasks/change-unread';
+import { ChangeFolderTask } from '../../../src/data/tasks/change-folder';
+import { DatabaseChangeRecord } from '../../../src/data/database/change-record';
 import { forEachTransport, settle } from '../../mock-engine';
 
 const thread = new Thread({ id: 't1', accountId: 'a1' });

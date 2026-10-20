@@ -1,8 +1,8 @@
 /* eslint no-new-wrappers: 0 */
 /* eslint no-new-object: 0 */
-import * as Utils from '../../../src/flux/models/utils';
-import { Thread } from '../../../src/flux/models/thread';
-import { Contact } from '../../../src/flux/models/contact';
+import * as Utils from '../../../src/data/models/utils';
+import { Thread } from '../../../src/data/models/thread';
+import { Contact } from '../../../src/data/models/contact';
 
 class Foo {
   field: { a: any; b: number };

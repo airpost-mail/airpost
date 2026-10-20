@@ -18,7 +18,7 @@ import {
 } from 'mailspring-exports';
 
 import os from 'os';
-import DraftFactory, { generateHeaderMessageId } from '../../../src/flux/stores/draft-factory';
+import DraftFactory, { generateHeaderMessageId } from '../../../src/data/drafts/factory';
 
 let msgFromMe = null;
 let fakeThread = null;

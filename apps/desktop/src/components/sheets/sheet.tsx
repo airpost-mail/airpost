@@ -1,11 +1,11 @@
 import React, { CSSProperties } from 'react';
 
 import { localized, Utils, ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
-import { InjectedComponentSet } from '../injected-component-set';
+import { InjectedComponentSet } from '../injected/component-set';
 import { ResizableRegion } from '../resizable-region';
 import { Flexbox } from '../flexbox';
-import { SheetDeclaration } from '../../flux/stores/workspace-store';
-import { SheetDepthContext } from './sheet-context';
+import { SheetDeclaration } from '../../data/stores/workspace';
+import { SheetDepthContext } from './context';
 
 const FLEX = 10000;
 

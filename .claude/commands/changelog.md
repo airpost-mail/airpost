@@ -9,13 +9,13 @@ bump `apps/desktop/package.json`, its lockfile or the Linux metainfo
 
 ## Instructions
 
-1. Read `PLUGIN_API_VERSION` and its doc comment in `apps/desktop/src/plugin-host/plugin-api-version.ts`.
+1. Read `PLUGIN_API_VERSION` and its doc comment in `apps/desktop/src/packages/api-version.ts`.
    The comment lists what each version added; the changelog needs a block for each version
    it has no block for yet.
 
 2. Find what changed for plugins since the last logged version:
    ```bash
-   git log --oneline -- apps/desktop/src/plugin-host/plugin-api-version.ts apps/desktop/src/plugin-api
+   git log --oneline -- apps/desktop/src/packages/api-version.ts apps/desktop/src/packages/api
    ```
    Read the diffs of the commits that moved the version.
 

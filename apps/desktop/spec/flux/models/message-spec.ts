@@ -1,6 +1,6 @@
-import * as Utils from '../../../src/flux/models/utils';
-import { Message } from '../../../src/flux/models/message';
-import { Contact } from '../../../src/flux/models/contact';
+import * as Utils from '../../../src/data/models/utils';
+import { Message } from '../../../src/data/models/message';
+import { Contact } from '../../../src/data/models/contact';
 
 const evan = new Contact({
   name: 'Evan Morikawa',

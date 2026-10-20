@@ -9,7 +9,7 @@ import ReactDOM from 'react-dom';
 import moment from 'moment';
 import Rx from 'rx-lite';
 import * as CalendarDateUtils from '../../../src/utils/calendar-date';
-import { Calendar } from '../../../src/flux/models/calendar';
+import { Calendar } from '../../../src/data/models/calendar';
 import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
 import { WeekView } from '../../../src/features/main-calendar/core/week-view';
 import { DayView } from '../../../src/features/main-calendar/core/day-view';

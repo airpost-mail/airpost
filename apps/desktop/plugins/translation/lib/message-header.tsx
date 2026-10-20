@@ -17,7 +17,7 @@ import {
   AllLanguages,
 } from './service';
 import { Menu, ButtonDropdown, RetinaImg } from 'mailspring-component-kit';
-import { messageFrameContent } from '../../../src/message-frame/message-frame-bridge';
+import { messageFrameContent } from '../../../src/mail/frame/bridge';
 
 interface TranslateMessageHeaderProps {
   message: Message;

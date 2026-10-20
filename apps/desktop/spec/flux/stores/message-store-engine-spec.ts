@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import { Thread } from '../../../src/flux/models/thread';
-import { Message } from '../../../src/flux/models/message';
-import FocusedContentStore from '../../../src/flux/stores/focused-content-store';
-import { MessageStore, MAX_DEFAULT_EXPANDED_UNREAD } from '../../../src/flux/stores/message-store';
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import { DatabaseChangeRecord } from '../../../src/flux/stores/database-change-record';
-import * as Actions from '../../../src/flux/actions';
+import { Thread } from '../../../src/data/models/thread';
+import { Message } from '../../../src/data/models/message';
+import FocusedContentStore from '../../../src/data/stores/focused-content';
+import { MessageStore, MAX_DEFAULT_EXPANDED_UNREAD } from '../../../src/data/stores/message';
+import DatabaseStore from '../../../src/data/database/store';
+import { DatabaseChangeRecord } from '../../../src/data/database/change-record';
+import * as Actions from '../../../src/data/actions';
 import { MockEngine, settle } from '../../mock-engine';
 
 const thread = new Thread({ id: 'th', accountId: TEST_ACCOUNT_ID, subject: 'Long thread' });

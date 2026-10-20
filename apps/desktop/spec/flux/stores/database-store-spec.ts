@@ -1,8 +1,8 @@
 /* eslint quote-props: 0 */
-import { Thread } from '../../../src/flux/models/thread';
+import { Thread } from '../../../src/data/models/thread';
 import TestModel from '../../fixtures/db-test-model';
-import ModelQuery from '../../../src/flux/models/query';
-import DatabaseStore from '../../../src/flux/stores/database-store';
+import ModelQuery from '../../../src/data/query/query';
+import DatabaseStore from '../../../src/data/database/store';
 import { forEachTransport } from '../../mock-engine';
 
 const testMatchers = { id: 'b' };

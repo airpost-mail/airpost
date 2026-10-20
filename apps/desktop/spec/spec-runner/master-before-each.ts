@@ -7,8 +7,8 @@ import {
   MailboxPerspective,
   FocusedPerspectiveStore,
 } from 'mailspring-exports';
-import Config from '../../src/shared/config';
-import * as configUtils from '../../src/shared/config-utils';
+import Config from '../../src/config/config';
+import * as configUtils from '../../src/config/utils';
 import TimeOverride from './time-override';
 import TestConstants from './test-constants';
 import * as jasmineExtensions from './jasmine-extensions';

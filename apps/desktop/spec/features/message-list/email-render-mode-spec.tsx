@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Message } from 'mailspring-exports';
 import EmailFrame from '../../../src/features/message-list/email-frame';
-import { MessageFrameBridge } from '../../../src/message-frame/message-frame-bridge';
-import { renderMessageDocument } from '../../../src/message-frame/frame-document';
+import { MessageFrameBridge } from '../../../src/mail/frame/bridge';
+import { renderMessageDocument } from '../../../src/mail/frame/document';
 import { RenderMessage } from '../../../src/shared/message-frame-protocol';
 import {
   DEFAULT_DARK_PALETTE,
@@ -66,7 +66,7 @@ describe('email render mode', function () {
     expect(darkPalette({ r: 255, g: 255, b: 255, a: 1 }, 'x', 'y')).toEqual(DEFAULT_DARK_PALETTE);
   });
 
-  // EmailFrame decides the colours and the frame applies them (frame-document.ts); the spec
+  // EmailFrame decides the colours and the frame applies them (mail/frame/document.ts); the spec
   // takes what EmailFrame posts and renders it into a same-origin frame it can inspect.
   describe('in the email frame', () => {
     let container: HTMLDivElement;

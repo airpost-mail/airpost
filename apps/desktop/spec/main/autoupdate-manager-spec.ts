@@ -1,4 +1,4 @@
-import AutoUpdateManager from '../../src/main/autoupdate-manager';
+import AutoUpdateManager from '../../src/main/autoupdate/manager';
 
 describe('AutoUpdateManager', function () {
   beforeEach(function () {

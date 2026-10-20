@@ -12,18 +12,18 @@ install() connects it to the window's EngineEvents and turns `core.engine.reads`
 kill() drops the connection (requests out fail as a closed socket fails them) and start()
 connects again, which is how the reconnect specs drive the engine.
 */
-import EngineEvents, { EngineEvents as EngineEventsType } from '../src/engine/engine-events';
-import { EngineConnectionError } from '../src/engine/engine-connection';
-import { ErrorCode, Feature, Method, QueryResult } from '../src/shared/engine-protocol';
-import EngineReads from '../src/flux/stores/engine-reads';
-import { Matcher } from '../src/flux/attributes/matcher';
-import { AttributeJoinedData } from '../src/flux/attributes/attribute-joined-data';
-import DatabaseObjectRegistry from '../src/registries/database-object-registry';
-import type ModelQuery from '../src/flux/models/query';
-import type { ModelQueryJSON } from '../src/flux/models/query';
-import DatabaseStore from '../src/flux/stores/database-store';
-import type { MatcherJSON } from '../src/flux/attributes/matcher';
-import { Model } from '../src/flux/models/model';
+import EngineEvents, { EngineEvents as EngineEventsType } from '../src/engine/events';
+import { EngineConnectionError } from '../src/engine/connection';
+import { ErrorCode, Feature, Method, QueryResult } from '../src/shared/engine/protocol';
+import EngineReads from '../src/data/database/engine-reads';
+import { Matcher } from '../src/data/attributes/matcher';
+import { AttributeJoinedData } from '../src/data/attributes/joined-data';
+import DatabaseObjectRegistry from '../src/data/database-object-registry';
+import type ModelQuery from '../src/data/query/query';
+import type { ModelQueryJSON } from '../src/data/query/query';
+import DatabaseStore from '../src/data/database/store';
+import type { MatcherJSON } from '../src/data/attributes/matcher';
+import { Model } from '../src/data/models/model';
 
 type Pending = { reject: (err: Error) => void };
 

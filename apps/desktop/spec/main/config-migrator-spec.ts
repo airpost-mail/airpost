@@ -1,4 +1,4 @@
-import ConfigMigrator from '../../src/main/config-migrator';
+import ConfigMigrator from '../../src/config/migrator';
 
 describe('ConfigMigrator', function () {
   const migrate = (legacy: unknown) => {

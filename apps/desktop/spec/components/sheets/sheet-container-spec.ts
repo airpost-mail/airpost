@@ -1,4 +1,4 @@
-import SheetContainer from '../../../src/components/sheets/sheet-container';
+import SheetContainer from '../../../src/components/sheets/container';
 import { WorkspaceStore } from 'mailspring-exports';
 import { SHOW_NAV_RAIL_CONFIG_KEY } from '../../../src/components/nav-rail';
 

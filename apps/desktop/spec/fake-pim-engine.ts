@@ -7,9 +7,9 @@ The window's engine connection for the calendar, events and contacts specs: `eve
 does with them (the ICS and vCards, recurrence, ownership) is crates/ms-pim's tests and the
 desktop corpus they replay.
 */
-import EngineEvents from '../src/engine/engine-events';
-import { EngineConnectionError } from '../src/engine/engine-connection';
-import { ErrorCode, Feature } from '../src/shared/engine-protocol';
+import EngineEvents from '../src/engine/events';
+import { EngineConnectionError } from '../src/engine/connection';
+import { ErrorCode, Feature } from '../src/shared/engine/protocol';
 
 export interface PimCall {
   method: string;

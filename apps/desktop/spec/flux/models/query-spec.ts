@@ -1,9 +1,9 @@
 /* eslint quote-props: 0 */
-import ModelQuery from '../../../src/flux/models/query';
-import * as Attributes from '../../../src/flux/attributes';
-import { Message } from '../../../src/flux/models/message';
-import { Thread } from '../../../src/flux/models/thread';
-import { Account } from '../../../src/flux/models/account';
+import ModelQuery from '../../../src/data/query/query';
+import * as Attributes from '../../../src/data/attributes';
+import { Message } from '../../../src/data/models/message';
+import { Thread } from '../../../src/data/models/thread';
+import { Account } from '../../../src/data/models/account';
 
 describe('ModelQuery', function ModelQuerySpecs() {
   beforeEach(() => {

@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { apiVersion } from 'mailspring-exports';
-import PackageManager from '../../src/plugin-host/package-manager';
-import Package from '../../src/plugin-host/package';
-import { PLUGIN_API_VERSION } from '../../src/plugin-host/plugin-api-version';
+import PackageManager from '../../src/packages/manager';
+import Package from '../../src/packages/package';
+import { PLUGIN_API_VERSION } from '../../src/packages/api-version';
 
 // Spec mode reads packages from <resourcePath>/spec/fixtures/packages, so each test gets a
 // temporary resource path holding only the packages it writes.

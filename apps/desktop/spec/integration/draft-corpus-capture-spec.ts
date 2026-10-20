@@ -16,22 +16,22 @@
 // and run `cargo test -p ms-compose --test corpus`.
 import fs from 'fs';
 import path from 'path';
-import { Account } from '../../src/flux/models/account';
-import { Message } from '../../src/flux/models/message';
-import { Contact } from '../../src/flux/models/contact';
-import { Thread } from '../../src/flux/models/thread';
-import { File } from '../../src/flux/models/file';
-import { namePrefixes, nameSuffixes } from '../../src/flux/models/contact';
-import * as Utils from '../../src/flux/models/utils';
-import { AccountStore } from '../../src/flux/stores/account-store';
-import ContactStore from '../../src/flux/stores/contact-store';
-import DraftFactory from '../../src/flux/stores/draft-factory';
-import { DraftEditingSession } from '../../src/flux/stores/draft-editing-session';
-import InlineStyleTransformer from '../../src/services/inline-style-transformer';
-import { AllowedAttributes, AllowedTags } from '../../src/services/sanitize-transformer';
+import { Account } from '../../src/data/models/account';
+import { Message } from '../../src/data/models/message';
+import { Contact } from '../../src/data/models/contact';
+import { Thread } from '../../src/data/models/thread';
+import { File } from '../../src/data/models/file';
+import { namePrefixes, nameSuffixes } from '../../src/data/models/contact';
+import * as Utils from '../../src/data/models/utils';
+import { AccountStore } from '../../src/data/stores/account';
+import ContactStore from '../../src/data/stores/contact';
+import DraftFactory from '../../src/data/drafts/factory';
+import { DraftEditingSession } from '../../src/data/drafts/editing-session';
+import InlineStyleTransformer from '../../src/mail/body/inline-style-transformer';
+import { AllowedAttributes, AllowedTags } from '../../src/mail/body/sanitize-transformer';
 import { quoteTexts } from '../../src/shared/date-format';
 import { wrapPlaintext } from '../../src/components/composer-editor/plaintext';
-import userAgentStylesheet from '../../src/services/chrome-user-agent-stylesheet-string';
+import userAgentStylesheet from '../../src/mail/body/chrome-user-agent-stylesheet';
 import { applySignature } from '../../src/features/composer-signature/signature-utils';
 import {
   AdditionalRules,

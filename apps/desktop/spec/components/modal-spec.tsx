@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
-import ModalStore from '../../src/flux/stores/modal-store';
+import ModalStore from '../../src/data/stores/modal';
 import { getPortalContainer } from '../../src/components/kit/portal';
 import { wait, pressRealKey } from './kit/kit-spec-helpers';
 import { trackCommands } from './kit/layer-spec-helpers';

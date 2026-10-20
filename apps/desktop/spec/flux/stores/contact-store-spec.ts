@@ -1,6 +1,6 @@
 import _ from 'underscore';
-import { Contact } from '../../../src/flux/models/contact';
-import ContactStore from '../../../src/flux/stores/contact-store';
+import { Contact } from '../../../src/data/models/contact';
+import ContactStore from '../../../src/data/stores/contact';
 
 xdescribe('ContactStore', function () {
   beforeEach(function () {

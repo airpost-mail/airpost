@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 
 import { ContactProfilePhoto } from '../../src/components/contact-profile-photo';
-import { Contact } from '../../src/flux/models/contact';
+import { Contact } from '../../src/data/models/contact';
 
 const render = () =>
   ReactDOMServer.renderToStaticMarkup(

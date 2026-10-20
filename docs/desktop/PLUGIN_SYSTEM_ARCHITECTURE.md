@@ -23,8 +23,8 @@ Mailspring uses a robust plugin architecture where features are implemented as "
 
 | File | Purpose |
 |------|---------|
-| `src/plugin-host/package-manager.ts` | Discovers, validates, and activates packages |
-| `src/plugin-host/package.ts` | Represents individual plugin instances |
+| `src/packages/manager.ts` | Discovers, validates, and activates packages |
+| `src/packages/package.ts` | Represents individual plugin instances |
 
 The `PackageManager` is instantiated as part of the `AppEnv` singleton during application startup (see `src/window/app-env.ts`).
 
@@ -44,7 +44,7 @@ Plugins are discovered from these directories in order:
 Built-in features are not packages: they are app code in `src/features/<dir>/`, with no
 `package.json`, listed in `src/features/index.ts` with their package name, `windowTypes`,
 `syncInit` and a lazy `require` of `index.ts`. `PackageManager` wraps each in a
-`BuiltinFeature` (`src/plugin-host/builtin-feature.ts`) and merges them by directory name with
+`BuiltinFeature` (`src/packages/builtin-feature.ts`) and merges them by directory name with
 the bundled plugins and themes, so they share one activation order and stay in
 `AppEnv.packages` under their names. A user package with a feature's name still replaces it.
 The directory name is also the `mailspring://<dir>/` host for the feature's assets. Features
@@ -126,7 +126,7 @@ my-plugin/
 | `name` | Yes | Package identifier (kebab-case) |
 | `version` | Yes | Semantic version |
 | `main` | Yes* | Entry point path (required for non-theme plugins) |
-| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `src/plugin-host/plugin-api-version.ts`, 1.27.0). `*` matches any |
+| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `src/packages/api-version.ts`, 1.27.0). `*` matches any |
 | `displayName` | No | Human-readable name for UI |
 | `description` | No | Plugin description |
 | `windowTypes` | No | Which window types load this plugin |
@@ -379,7 +379,7 @@ class MyMessageExtension extends MessageViewExtension {
 }
 ```
 
-`MessageBody` (`src/message-frame/message-frame-bridge.ts`):
+`MessageBody` (`src/mail/frame/bridge.ts`):
 
 | Method | Does |
 |--------|------|
@@ -396,7 +396,7 @@ minor version.
 
 ### Engine
 
-`Engine` (in `mailspring-exports`, `src/engine/engine-api.ts`) is the plugin API's way to the sync
+`Engine` (in `mailspring-exports`, `src/engine/api.ts`) is the plugin API's way to the sync
 engine. Each window has its own connection to the engine; requests made while it is down reject.
 
 | Member | Does |
@@ -608,15 +608,15 @@ Optional plugins can be disabled via config:
 
 | File | Purpose |
 |------|---------|
-| `src/plugin-host/package-manager.ts` | Package discovery and activation |
-| `src/plugin-host/package.ts` | Package class implementation |
-| `src/plugin-host/builtin-feature.ts` | Built-in feature, held like a package |
+| `src/packages/manager.ts` | Package discovery and activation |
+| `src/packages/package.ts` | Package class implementation |
+| `src/packages/builtin-feature.ts` | Built-in feature, held like a package |
 | `src/features/index.ts` | The built-in feature list |
 | `src/window/app-env.ts` | AppEnv singleton, initializes PackageManager |
-| `src/registries/component-registry.ts` | UI component registration |
-| `src/registries/extension-registry.ts` | Extension registration |
-| `src/extensions/composer-extension.ts` | ComposerExtension base class |
-| `src/extensions/message-view-extension.ts` | MessageViewExtension base class |
-| `src/components/injected-component.tsx` | Renders registered components |
-| `src/plugin-api/mailspring-exports.ts` | Global API exports |
+| `src/packages/component-registry.ts` | UI component registration |
+| `src/packages/extension-registry.ts` | Extension registration |
+| `src/packages/composer-extension.ts` | ComposerExtension base class |
+| `src/packages/message-view-extension.ts` | MessageViewExtension base class |
+| `src/components/injected/component.tsx` | Renders registered components |
+| `src/packages/api/mailspring-exports.js` | Global API exports |
 | `src/features/theme-picker/` | Theme selection UI (reference for plugin UI) |

@@ -1,6 +1,6 @@
 import React from 'react';
 import { MessageViewExtension, Actions, Message } from 'mailspring-exports';
-import type { MessageBody } from '../../../src/message-frame/message-frame-bridge';
+import type { MessageBody } from '../../../src/mail/frame/bridge';
 import LinkTrackingMessagePopover from './link-tracking-message-popover';
 import { PLUGIN_ID } from './link-tracking-constants';
 import { LinkTrackingMetadata } from './types';

@@ -365,7 +365,7 @@ export interface IntegrationsTransport {
   send(method: IntegrationMethod, params: object): Promise<unknown>;
 }
 
-// The transport until a window wires its engine connection (engine-api.ts
+// The transport until a window wires its engine connection (api.ts
 // wireIntegrationsTransport), and in specs.
 export const UnavailableTransport: IntegrationsTransport = {
   available: false,
@@ -442,7 +442,7 @@ class IntegrationsClient {
 
   private _secrets(): SecretSource {
     if (this.secretSource) return this.secretSource;
-    const engine = require('./engine-accounts');
+    const engine = require('./accounts');
     return {
       available: engine.accountSetupAvailable,
       has: engine.hasSecrets,

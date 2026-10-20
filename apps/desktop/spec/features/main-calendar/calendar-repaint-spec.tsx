@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 import moment from 'moment';
 import Rx from 'rx-lite';
-import { Calendar } from '../../../src/flux/models/calendar';
+import { Calendar } from '../../../src/data/models/calendar';
 import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
 import { WeekView } from '../../../src/features/main-calendar/core/week-view';
 import { DayView } from '../../../src/features/main-calendar/core/day-view';

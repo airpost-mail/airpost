@@ -3,7 +3,7 @@
   "queries": [
     {
       "name": "inbox-page-1",
-      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "site": "src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -41,7 +41,7 @@
     },
     {
       "name": "inbox-page-2",
-      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "site": "src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -79,7 +79,7 @@
     },
     {
       "name": "inbox-ids",
-      "site": "src/flux/models/query-subscription.ts _getQueryForRange (idsOnly)",
+      "site": "src/data/query/subscription.ts _getQueryForRange (idsOnly)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -117,7 +117,7 @@
     },
     {
       "name": "unified-inbox",
-      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads",
+      "site": "src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -156,7 +156,7 @@
     },
     {
       "name": "sent",
-      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)",
+      "site": "src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (isSent)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -195,7 +195,7 @@
     },
     {
       "name": "trash",
-      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)",
+      "site": "src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (spam, trash)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -228,7 +228,7 @@
     },
     {
       "name": "two-categories-distinct",
-      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)",
+      "site": "src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (distinct)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -267,7 +267,7 @@
     },
     {
       "name": "label",
-      "site": "src/flux/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)",
+      "site": "src/data/mailbox-perspective.ts CategoryMailboxPerspective.threads (label)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -305,7 +305,7 @@
     },
     {
       "name": "starred-all-accounts",
-      "site": "src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads",
+      "site": "src/data/mailbox-perspective.ts StarredMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -341,7 +341,7 @@
     },
     {
       "name": "starred-one-account",
-      "site": "src/flux/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)",
+      "site": "src/data/mailbox-perspective.ts StarredMailboxPerspective.threads (accountId in)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -382,7 +382,7 @@
     },
     {
       "name": "empty-perspective",
-      "site": "src/flux/mailbox-perspective.ts EmptyMailboxPerspective.threads",
+      "site": "src/data/mailbox-perspective.ts EmptyMailboxPerspective.threads",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -413,7 +413,7 @@
     },
     {
       "name": "unread",
-      "site": "src/flux/models/unread-query-subscription.ts buildQuery",
+      "site": "src/data/query/unread-subscription.ts buildQuery",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -451,7 +451,7 @@
     },
     {
       "name": "unread-recently-read",
-      "site": "src/flux/models/unread-query-subscription.ts buildQuery (recentlyReadIds)",
+      "site": "src/data/query/unread-subscription.ts buildQuery (recentlyReadIds)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -652,7 +652,7 @@
     },
     {
       "name": "mail-rules-inbox",
-      "site": "src/flux/stores/mail-rules-store.ts _processAllMessages",
+      "site": "src/data/stores/mail-rules.ts _processAllMessages",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -688,7 +688,7 @@
     },
     {
       "name": "mail-rules-inbox-before",
-      "site": "src/flux/stores/mail-rules-store.ts _processAllMessages (lastTimestamp)",
+      "site": "src/data/stores/mail-rules.ts _processAllMessages (lastTimestamp)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -861,7 +861,7 @@
     },
     {
       "name": "missing-models",
-      "site": "src/flux/models/query-subscription.ts _fetchMissingModels",
+      "site": "src/data/query/subscription.ts _fetchMissingModels",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -965,7 +965,7 @@
     },
     {
       "name": "thread-messages",
-      "site": "src/flux/stores/message-store.ts _fetchFromCache",
+      "site": "src/data/stores/message.ts _fetchFromCache",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1064,7 +1064,7 @@
     },
     {
       "name": "latest-not-draft",
-      "site": "src/flux/stores/draft-factory.ts createDraftForResurfacing",
+      "site": "src/data/drafts/factory.ts createDraftForResurfacing",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1100,7 +1100,7 @@
     },
     {
       "name": "reply-candidates",
-      "site": "src/flux/stores/draft-store.ts _getMessageAndThread",
+      "site": "src/data/drafts/store.ts _getMessageAndThread",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1136,7 +1136,7 @@
     },
     {
       "name": "eml-latest",
-      "site": "src/services/eml-utils.ts latestMessages",
+      "site": "src/mail/eml.ts latestMessages",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1172,7 +1172,7 @@
     },
     {
       "name": "message-by-id-with-body",
-      "site": "src/flux/stores/draft-store.ts _getMessageAndThread",
+      "site": "src/data/drafts/store.ts _getMessageAndThread",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1205,7 +1205,7 @@
     },
     {
       "name": "message-pending-body",
-      "site": "src/flux/stores/draft-store.ts (body not fetched yet)",
+      "site": "src/data/drafts/store.ts (body not fetched yet)",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1269,7 +1269,7 @@
     },
     {
       "name": "draft-by-header",
-      "site": "src/flux/stores/draft-editing-session.ts prepare",
+      "site": "src/data/drafts/editing-session.ts prepare",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1552,7 +1552,7 @@
     },
     {
       "name": "folders",
-      "site": "src/plugin-api/mailspring-observables.ts categories",
+      "site": "src/packages/api/mailspring-observables.ts categories",
       "query": {
         "class": "Folder",
         "accounts": null,
@@ -1570,7 +1570,7 @@
     },
     {
       "name": "labels-for-account",
-      "site": "src/plugin-api/mailspring-observables.ts forAccount",
+      "site": "src/packages/api/mailspring-observables.ts forAccount",
       "query": {
         "class": "Label",
         "accounts": null,
@@ -1596,7 +1596,7 @@
     },
     {
       "name": "tasks",
-      "site": "src/flux/stores/task-queue.ts",
+      "site": "src/data/stores/task-queue.ts",
       "query": {
         "class": "Task",
         "accounts": null,
@@ -1614,7 +1614,7 @@
     },
     {
       "name": "contact-search",
-      "site": "src/flux/stores/contact-store.ts searchContacts",
+      "site": "src/data/stores/contact.ts searchContacts",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1653,7 +1653,7 @@
     },
     {
       "name": "contact-search-quoted",
-      "site": "src/flux/stores/contact-store.ts searchContacts (quotes)",
+      "site": "src/data/stores/contact.ts searchContacts (quotes)",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1692,7 +1692,7 @@
     },
     {
       "name": "top-contacts",
-      "site": "src/flux/stores/contact-store.ts topContacts",
+      "site": "src/data/stores/contact.ts topContacts",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1839,7 +1839,7 @@
     },
     {
       "name": "focused-contact",
-      "site": "src/flux/stores/focused-contacts-store.ts",
+      "site": "src/data/stores/focused-contacts.ts",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1875,7 +1875,7 @@
     },
     {
       "name": "contact-groups",
-      "site": "src/flux/stores/contact-store.ts searchContactGroups",
+      "site": "src/data/stores/contact.ts searchContactGroups",
       "query": {
         "class": "ContactGroup",
         "accounts": null,

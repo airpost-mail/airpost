@@ -5,7 +5,7 @@ import {
   queryParam,
   receive,
   stateMatches,
-} from '../../src/main/oauth-receiver';
+} from '../../src/main/ipc/oauth-receiver';
 
 // A fake http.Server: records listen() and lets the spec send requests to the handler.
 function fakeServer() {

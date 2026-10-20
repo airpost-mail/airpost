@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { canonicalZoneName } from '../../src/utils/date-utils';
+import { canonicalZoneName } from '../../src/utils/date';
 
 describe('canonicalZoneName', function () {
   it('maps a link name to the zone it stands for', function () {
@@ -41,11 +41,11 @@ describe('canonicalZoneName', function () {
 
   it('gives local time the canonical name of the zone the machine reports', function () {
     spyOn(moment.tz, 'guess').andReturn('Asia/Calcutta');
-    const path = require.resolve('../../src/utils/date-utils');
+    const path = require.resolve('../../src/utils/date');
     const cached = require.cache[path];
     delete require.cache[path];
     try {
-      expect(require('../../src/utils/date-utils').default.timeZone).toBe('Asia/Kolkata');
+      expect(require('../../src/utils/date').default.timeZone).toBe('Asia/Kolkata');
     } finally {
       require.cache[path] = cached;
     }

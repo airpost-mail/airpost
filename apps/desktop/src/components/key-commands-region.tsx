@@ -3,7 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import classNames from 'classnames';
 import { Disposable } from 'rx-core';
-import { CommandCallback } from '../registries/command-registry';
+import { CommandCallback } from '../window/command-registry';
 
 interface KeyCommandsRegionProps extends React.HTMLProps<HTMLDivElement> {
   localHandlers?: {

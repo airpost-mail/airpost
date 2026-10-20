@@ -1,10 +1,10 @@
-import DatabaseStore from '../../../src/flux/stores/database-store';
+import DatabaseStore from '../../../src/data/database/store';
 
-import { QueryRange } from '../../../src/flux/models/query-range';
-import { MutableQueryResultSet } from '../../../src/flux/models/mutable-query-result-set';
-import { QuerySubscription } from '../../../src/flux/models/query-subscription';
-import { Thread } from '../../../src/flux/models/thread';
-import * as Utils from '../../../src/flux/models/utils';
+import { QueryRange } from '../../../src/data/query/range';
+import { MutableQueryResultSet } from '../../../src/data/query/mutable-result-set';
+import { QuerySubscription } from '../../../src/data/query/subscription';
+import { Thread } from '../../../src/data/models/thread';
+import * as Utils from '../../../src/data/models/utils';
 import { forEachTransport } from '../../mock-engine';
 
 describe('QuerySubscription', function QuerySubscriptionSpecs() {

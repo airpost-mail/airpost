@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
 import { fireEvent } from '@testing-library/react';
-import PopoverStore from '../../../src/flux/stores/popover-store';
+import PopoverStore from '../../../src/data/stores/popover';
 import { getPortalContainer } from '../../../src/components/kit/portal';
 import { wait, pressRealKey } from '../../components/kit/kit-spec-helpers';
 import { trackCommands } from '../../components/kit/layer-spec-helpers';

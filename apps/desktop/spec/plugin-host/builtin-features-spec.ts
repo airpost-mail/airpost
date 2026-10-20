@@ -1,8 +1,8 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import PackageManager from '../../src/plugin-host/package-manager';
-import BuiltinFeature from '../../src/plugin-host/builtin-feature';
+import PackageManager from '../../src/packages/manager';
+import BuiltinFeature from '../../src/packages/builtin-feature';
 import { FEATURES } from '../../src/features';
 import { thirdPartyPlugins } from '../../src/features/preferences/tabs/plugins/preferences-plugins';
 

@@ -22,49 +22,49 @@ import proc from 'child_process';
 import { EventEmitter } from 'events';
 
 import { localized, initializeLocalization } from '../shared/intl';
-import WindowManager from './window-manager';
-import FileListCache from './file-list-cache';
-import ConfigMigrator from './config-migrator';
-import ApplicationMenu from './application-menu';
-import AutoUpdateManager from './autoupdate-manager';
-import SystemAccentWatcher from './system-accent-watcher';
-import SystemTrayManager from './system-tray-manager';
+import WindowManager from './windows/manager';
+import FileListCache from './windows/file-list-cache';
+import ConfigMigrator from '../config/migrator';
+import ApplicationMenu from './platform/application-menu';
+import AutoUpdateManager from './autoupdate/manager';
+import SystemAccentWatcher from './platform/accent-watcher';
+import SystemTrayManager from './platform/system-tray';
 import { DefaultClientHelper } from '../shared/default-client-helper';
 import { developerToolsAvailable } from '../shared/developer-tools';
-import MailspringProtocolHandler from './asset-protocol-handler';
-import { registerFilesProtocol } from './files-protocol-handler';
-import { registerMessageFrameProtocol } from './message-frame-protocol-handler';
-import { registerExternalFetchIPC } from './external-fetch-ipc';
-import { registerAttachmentSafetyIPC } from './attachment-safety-ipc';
-import ConfigPersistenceManager, { registerConfigIPC } from './config-persistence-manager';
-import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from './engine-settings';
-import moveToApplications from './move-to-applications';
-import { MailsyncProcess } from '../shared/engine-process';
-import Config from '../shared/config';
-import { registerQuickpreviewIPCHandlers } from './quickpreview-ipc';
-import { guardAuxiliaryWindowNavigation } from './auxiliary-window-guard';
-import { isAppWindowContents } from './app-window';
+import MailspringProtocolHandler from './protocols/asset';
+import { registerFilesProtocol } from './protocols/files';
+import { registerMessageFrameProtocol } from './frame/protocol-handler';
+import { registerExternalFetchIPC } from './ipc/external-fetch';
+import { registerAttachmentSafetyIPC } from './ipc/attachment-safety';
+import ConfigPersistenceManager, { registerConfigIPC } from '../config/persistence-manager';
+import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from './engine/settings';
+import moveToApplications from './platform/move-to-applications';
+import { MailsyncProcess } from '../shared/engine/process';
+import Config from '../config/config';
+import { registerQuickpreviewIPCHandlers } from './ipc/quick-preview';
+import { guardAuxiliaryWindowNavigation } from './windows/auxiliary-guard';
+import { isAppWindowContents } from './windows/app-window';
 import {
   handleWindowsToastXMLProtocolAction,
   registerNotificationIPCHandlers,
-} from './notification-ipc';
-import WindowsTaskbarManager from './windows-taskbar-manager';
-import { resetThemeForRecovery } from './theme-recovery';
+} from './ipc/notification';
+import WindowsTaskbarManager from './platform/win32-taskbar';
+import { resetThemeForRecovery } from './windows/theme-recovery';
 import {
   canResetProfileDirectory,
   profileResetDetail,
   resetProfileDirectory,
-} from './profile-reset';
-import { credentialsMovedToEngine, KeyManager, registerKeyManagerIPC } from './key-manager';
+} from './profile/reset';
+import { credentialsMovedToEngine, KeyManager, registerKeyManagerIPC } from './profile/key-manager';
 import {
   EngineSupervisor,
   QuitGate,
   registerEngineSupervisorIPC,
   waitForEarlierEngine,
   detachedEngineToReuse,
-} from './engine-supervisor';
-import { registerOAuthReceiverIPC } from './oauth-receiver';
-import { installedEngineUnit, runEngineUnit } from './engine-unit';
+} from './engine/supervisor';
+import { registerOAuthReceiverIPC } from './ipc/oauth-receiver';
+import { installedEngineUnit, runEngineUnit } from './engine/unit';
 
 // The application's singleton class.
 //
@@ -175,7 +175,7 @@ export default class Application extends EventEmitter {
       return;
     }
 
-    const Config = require('../shared/config').default;
+    const Config = require('../config/config').default;
     const config = new Config();
     this.config = config;
     this.configPersistenceManager = new ConfigPersistenceManager({ configDirPath, resourcePath });

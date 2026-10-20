@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import * as Actions from '../../../src/flux/actions';
-import DraftStore from '../../../src/flux/stores/draft-store';
-import { Message } from '../../../src/flux/models/message';
+import * as Actions from '../../../src/data/actions';
+import DraftStore from '../../../src/data/drafts/store';
+import { Message } from '../../../src/data/models/message';
 import InflatesDraftClientId from '../../../src/components/decorators/inflates-draft-client-id';
 
 class Dummy extends React.Component<Record<string, unknown>> {

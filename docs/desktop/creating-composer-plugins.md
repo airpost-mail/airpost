@@ -306,7 +306,7 @@ session.changes.commit();
 
 **Body synchronization**: When you write to `body` (an HTML string), the system automatically converts it to a Slate `Value` for the editor via `convertFromHTML()`. If the editor is mounted, the conversion preserves undo history by using Slate's `replaceNodeByKey` and `insertFragment` operations.
 
-Source: `src/flux/stores/draft-editing-session.ts`, `src/flux/stores/draft-change-set.ts`
+Source: `src/data/drafts/editing-session.ts`, `src/data/drafts/change-set.ts`
 
 ### Working with Plugin Metadata
 
@@ -331,7 +331,7 @@ This is useful for tracking plugin state (e.g., "link tracking is enabled for th
 
 `ComposerExtension` provides static hooks into the draft lifecycle. Subclass it and register via `ExtensionRegistry.Composer.register()`.
 
-Source: `src/extensions/composer-extension.ts`
+Source: `src/packages/composer-extension.ts`
 
 ### prepareNewDraft
 

@@ -3,12 +3,12 @@
  * DS102: Remove unnecessary code created because of implicit returns
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { Folder } from '../../../src/flux/models/folder';
-import { MailboxPerspective } from '../../../src/flux/mailbox-perspective';
+import { Folder } from '../../../src/data/models/folder';
+import { MailboxPerspective } from '../../../src/data/mailbox-perspective';
 
-import CategoryStore from '../../../src/flux/stores/category-store';
-import { AccountStore } from '../../../src/flux/stores/account-store';
-import FocusedPerspectiveStore from '../../../src/flux/stores/focused-perspective-store';
+import CategoryStore from '../../../src/data/stores/category';
+import { AccountStore } from '../../../src/data/stores/account';
+import FocusedPerspectiveStore from '../../../src/data/stores/focused-perspective';
 
 describe('FocusedPerspectiveStore', function () {
   beforeEach(function () {

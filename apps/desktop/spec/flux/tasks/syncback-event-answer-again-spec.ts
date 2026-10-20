@@ -1,5 +1,5 @@
 import { DatabaseStore, Event } from 'mailspring-exports';
-import { SyncbackEventTask } from '../../../src/flux/tasks/syncback-event-task';
+import { SyncbackEventTask } from '../../../src/data/tasks/syncback-event';
 import { fakePimEngine, refusal } from '../../fake-pim-engine';
 
 const ME = 'brian@example.com';

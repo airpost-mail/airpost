@@ -7,8 +7,8 @@ import { Emitter } from 'event-kit';
 import { mapSourcePosition } from 'source-map-support';
 import { localized, isRTL, initializeLocalization } from '../shared/intl';
 
-import { APIError } from '../flux/errors';
-import WindowEventHandler from './window-event-handler';
+import { APIError } from '../data/errors';
+import WindowEventHandler from './event-handler';
 import { isWaylandSession } from '../shared/is-wayland';
 
 function ensureInteger(f: number, fallback: number) {
@@ -29,17 +29,17 @@ export default class AppEnvConstructor {
 
   emitter = new Emitter();
   loadTime: number = null;
-  config: import('../shared/config').default;
+  config: import('../config/config').default;
   keymaps: import('./keymap-manager').default;
-  commands: import('../registries/command-registry').default;
-  packages: import('../plugin-host/package-manager').default;
-  styles: import('../plugin-host/style-manager').default;
-  themes: import('../plugin-host/theme-manager').default;
+  commands: import('./command-registry').default;
+  packages: import('../packages/manager').default;
+  styles: import('../packages/style-manager').default;
+  themes: import('../packages/theme-manager').default;
   spellchecker: typeof import('./spellchecker').default;
   menu: import('./menu-manager').default;
-  windowEventHandler: import('./window-event-handler').default;
-  actionBridge: import('../flux/action-bridge').default;
-  mailsyncBridge: import('../flux/engine-bridge').default;
+  windowEventHandler: import('./event-handler').default;
+  actionBridge: import('../data/action-bridge').default;
+  mailsyncBridge: import('../engine/bridge').default;
   errorLogger: any;
   savedState: any;
   isReloading: boolean;
@@ -65,16 +65,16 @@ export default class AppEnvConstructor {
 
     initializeLocalization({ configDirPath });
 
-    // Add 'src/plugin-api/' to module search path.
-    const pluginApiPath = path.join(resourcePath, 'src', 'plugin-api');
+    // Add 'src/packages/api/' to module search path.
+    const pluginApiPath = path.join(resourcePath, 'src', 'packages', 'api');
     require('app-module-path').addPath(pluginApiPath);
 
-    const Config = require('../shared/config').default;
+    const Config = require('../config/config').default;
     const KeymapManager = require('./keymap-manager').default;
-    const CommandRegistry = require('../registries/command-registry').default;
-    const PackageManager = require('../plugin-host/package-manager').default;
-    const ThemeManager = require('../plugin-host/theme-manager').default;
-    const StyleManager = require('../plugin-host/style-manager').default;
+    const CommandRegistry = require('./command-registry').default;
+    const PackageManager = require('../packages/manager').default;
+    const ThemeManager = require('../packages/theme-manager').default;
+    const StyleManager = require('../packages/style-manager').default;
     const MenuManager = require('./menu-manager').default;
 
     document.body.classList.add(`platform-${process.platform}`);
@@ -129,10 +129,10 @@ export default class AppEnvConstructor {
     // the window starts loading.
     require('mailspring-exports');
 
-    const ActionBridge = require('../flux/action-bridge').default;
+    const ActionBridge = require('../data/action-bridge').default;
     this.actionBridge = new ActionBridge(ipcRenderer);
 
-    const MailsyncBridge = require('../flux/engine-bridge').default;
+    const MailsyncBridge = require('../engine/bridge').default;
     this.mailsyncBridge = new MailsyncBridge();
 
     process.title = `Tern ${this.getWindowType()}`;
@@ -723,7 +723,7 @@ export default class AppEnvConstructor {
   // bar, stoplights, etc. This saves ~100ms when populating the hot
   // windows.
   initializeBasicSheet() {
-    const WorkspaceStore = require('../flux/stores/workspace-store').default;
+    const WorkspaceStore = require('../data/stores/workspace').default;
     if (!WorkspaceStore.Sheet.Main) {
       WorkspaceStore.defineSheet(
         'Main',
@@ -837,7 +837,7 @@ export default class AppEnvConstructor {
 
     const React = require('react');
     const ReactDOM = require('react-dom');
-    const SheetContainer = require('../components/sheets/sheet-container').default;
+    const SheetContainer = require('../components/sheets/container').default;
     const { UIProvider } = require('../components/kit/provider');
     ReactDOM.render(
       React.createElement(UIProvider, null, React.createElement(SheetContainer)),
@@ -854,7 +854,7 @@ export default class AppEnvConstructor {
   loadConfig() {
     this.config.setSchema(null, {
       type: 'object',
-      properties: _.clone(require('./config-schema').default),
+      properties: _.clone(require('../config/schema').default),
     });
     this.config.load();
   }

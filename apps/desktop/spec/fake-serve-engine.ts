@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
 import fs from 'fs';
 import net from 'net';
 import path from 'path';
-import { serveSocketPath } from '../src/shared/engine-protocol';
+import { serveSocketPath } from '../src/shared/engine/protocol';
 
 // Lets real I/O (the socket) and promise callbacks run; the spec helper fakes setTimeout.
 export const tick = () => new Promise((resolve) => setImmediate(resolve));

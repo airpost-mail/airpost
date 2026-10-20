@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import { Thread } from '../../../src/flux/models/thread';
-import { Message } from '../../../src/flux/models/message';
-import { Contact } from '../../../src/flux/models/contact';
-import DatabaseStore from '../../../src/flux/stores/database-store';
+import { Thread } from '../../../src/data/models/thread';
+import { Message } from '../../../src/data/models/message';
+import { Contact } from '../../../src/data/models/contact';
+import DatabaseStore from '../../../src/data/database/store';
 import EngineReads, {
   EngineUnavailableError,
   READ_WAIT_MS,
-} from '../../../src/flux/stores/engine-reads';
-import { Feature } from '../../../src/shared/engine-protocol';
+} from '../../../src/data/database/engine-reads';
+import { Feature } from '../../../src/shared/engine/protocol';
 import { MockEngine, settle } from '../../mock-engine';
 
 const thread = (id: string, ts: number, extra = {}) =>
@@ -106,7 +106,7 @@ describe('DatabaseStore on the engine', function () {
     expect(threadReads()).toBe(1);
 
     (EngineReads._flag as jasmine.Spy).andReturn('engine');
-    const { SearchQueryParser } = require('../../../src/services/search/search-query-parser');
+    const { SearchQueryParser } = require('../../../src/mail/search/parser');
     await DatabaseStore.findAll<Thread>(Thread).structuredSearch(SearchQueryParser.parse('ann'));
     expect(engine.queries('Thread')).toEqual([]);
     expect(threadReads()).toBe(2);
@@ -127,7 +127,7 @@ describe('DatabaseStore on the engine', function () {
       Thread.attributes.subject.ascending()
     );
     spyOn(engine, 'answer').andCallFake(() => {
-      throw new (require('../../../src/engine/engine-connection').EngineConnectionError)(
+      throw new (require('../../../src/engine/connection').EngineConnectionError)(
         'invalid params: subject is not queryable',
         { code: -32602 }
       );

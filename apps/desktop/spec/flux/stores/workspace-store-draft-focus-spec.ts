@@ -1,6 +1,6 @@
-import * as Actions from '../../../src/flux/actions';
-import WorkspaceStore from '../../../src/flux/stores/workspace-store';
-import { Message } from '../../../src/flux/models/message';
+import * as Actions from '../../../src/data/actions';
+import WorkspaceStore from '../../../src/data/stores/workspace';
+import { Message } from '../../../src/data/models/message';
 
 describe('WorkspaceStore draft focus', function () {
   const draft = new Message({ id: 'draft-1', headerMessageId: 'hmid-1', draft: true });

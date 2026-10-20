@@ -9,7 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { Contact, AccountStore, localized } from 'mailspring-exports';
-import { exportContacts, importContacts } from '../../engine/engine-pim';
+import { exportContacts, importContacts } from '../../engine/pim';
 
 function showInfo(title: string, message: string) {
   require('@electron/remote').dialog.showMessageBox({

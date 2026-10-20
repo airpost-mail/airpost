@@ -3,10 +3,10 @@
  * DS102: Remove unnecessary code created because of implicit returns
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-import { Message } from '../../../src/flux/models/message';
-import * as Actions from '../../../src/flux/actions';
-import DatabaseStore from '../../../src/flux/stores/database-store';
-import { DraftEditingSession } from '../../../src/flux/stores/draft-editing-session';
+import { Message } from '../../../src/data/models/message';
+import * as Actions from '../../../src/data/actions';
+import DatabaseStore from '../../../src/data/database/store';
+import { DraftEditingSession } from '../../../src/data/drafts/editing-session';
 const { DraftChangeSet } = DraftEditingSession;
 import _ from 'underscore';
 
