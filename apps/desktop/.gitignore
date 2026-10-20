@@ -1,17 +1,3 @@
-##### Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml
-
-##### Arcanist / Phab
-**/.arcconfig
-**/.arclint
-**/arclib
-
-##### Client Private Plugins (symlinked)
-**/internal_packages/composer-mail-merge
-**/internal_packages/composer-scheduler
-
 ##### Node modules
 node_modules
 !app/spec/fixtures/packages/package-with-incompatible-native-module/node_modules
@@ -33,35 +19,12 @@ certs
 **/Thumbs.db
 **/#emacs
 
-# Built cloud files
-n1_cloud_dist
-
 # Built client
 app/dist
-
-# Tests
-spec-saved-state.json
-
-# Symlinked Jasmine config files
-**/jasmine/config.json
-
-# Elastic Beanstalk Files
-.elasticbeanstalk/*
-!.elasticbeanstalk/*.cfg.yml
-!.elasticbeanstalk/*.global.yml
-
-# Sqlite amalgamation for scripts
-scripts/sqlite
-
-# Scripts for calculating statistics
-scripts/toolbox
-scripts/venv
 
 # Python
 *.pyc
 
-# OAuth client secret for talking to Google Sheets
-client_secret.json
 /app/mailsync
 /app/mailsync-rs
 /app/mailsync-rs.THIRD-PARTY-NOTICES.txt
@@ -70,8 +33,6 @@ client_secret.json
 /app/tern.exe
 /app/tern-mcp.exe
 /app/tern-mcp.THIRD-PARTY-NOTICES.txt
-/logfile.txt
-/app/dist-docs
 /app/mailsync.dSYM.zip
 /snap/snapcraft.yml
 /snap/.snapcraft/
@@ -83,7 +44,3 @@ client_secret.json
 /app/mailsync.exe
 /app/mailsync.dSYM
 .idea
-.claude/worktrees/
-/test-results
-/playwright-report
-/playwright/test-results/

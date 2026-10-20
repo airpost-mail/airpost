@@ -15,7 +15,6 @@ const ConnectSources = [
   'https://oauth2.googleapis.com', // Google token revocation
   'https://login.microsoftonline.com', // Microsoft token exchange
   'https://graph.microsoft.com', // Microsoft profile
-  'https://api.github.com', // github-contact-card
 ];
 
 export const AppContentSecurityPolicy =
