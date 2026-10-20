@@ -4,7 +4,7 @@ import { ErrorCode, Feature } from '../../../src/shared/engine/protocol';
 import {
   expandAccountWithCommonSettings,
   finalizeAndValidateAccount,
-} from '../../../src/features/onboarding/onboarding-helpers';
+} from '../../../src/features/onboarding/helpers';
 
 function accountFor(emailAddress: string, provider = 'imap', settings = {}) {
   return new Account({ name: 'Test', emailAddress, provider, settings } as any);

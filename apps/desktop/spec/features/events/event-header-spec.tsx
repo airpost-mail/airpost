@@ -20,7 +20,7 @@ import {
   Task,
   Utils,
 } from 'mailspring-exports';
-import { EventHeader, renderLocation } from '../../../src/features/events/event-header';
+import { EventHeader, renderLocation } from '../../../src/features/events/header';
 import type { EventConflictJSON, EventTimes } from '../../../src/shared/engine/protocol';
 import { fakePimEngine, refusal } from '../../fake-pim-engine';
 

@@ -1,7 +1,7 @@
 import { localized, Actions, ComponentRegistry, GrammarCheckPluginAPI } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
-import { GrammarCheckToggle } from './grammar-check-toggle';
-import { GrammarCheckStore } from './grammar-check-store';
+import { GrammarCheckToggle } from './toggle';
+import { GrammarCheckStore } from './store';
 
 const { setGrammarCheckStore, clearGrammarCheckStore, cleanupDraft, clearAllGrammarDecorations } =
   GrammarCheckPluginAPI;

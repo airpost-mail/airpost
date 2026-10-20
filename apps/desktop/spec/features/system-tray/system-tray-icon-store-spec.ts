@@ -1,6 +1,6 @@
 import { ipcRenderer } from 'electron';
 import { BadgeStore } from 'mailspring-exports';
-import SystemTrayIconStore from '../../../src/features/system-tray/system-tray-icon-store';
+import SystemTrayIconStore from '../../../src/features/system-tray/icon-store';
 
 describe('SystemTrayIconStore', function systemTrayIconStore() {
   beforeEach(() => {

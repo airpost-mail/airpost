@@ -4,8 +4,8 @@ import { render, fireEvent, cleanup } from '@testing-library/react';
 
 import TimePicker from '../../../src/components/time-picker';
 import { DatePicker } from '../../../src/components/date-picker';
-import { CalendarEventPopover } from '../../../src/features/main-calendar/core/calendar-event-popover';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+import { CalendarEventPopover } from '../../../src/features/main-calendar/event/popover';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 
 const EVENT_DAY = '2026-03-10';
 const TARGET_DAY = '2026-03-17';

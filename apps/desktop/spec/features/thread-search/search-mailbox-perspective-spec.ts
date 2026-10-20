@@ -7,7 +7,7 @@ import {
   Label,
   Thread,
 } from 'mailspring-exports';
-import SearchMailboxPerspective from '../../../src/features/thread-search/search-mailbox-perspective';
+import SearchMailboxPerspective from '../../../src/features/thread-search/mailbox-perspective';
 
 describe('SearchMailboxPerspective', function searchMailboxPerspective() {
   beforeEach(() => {

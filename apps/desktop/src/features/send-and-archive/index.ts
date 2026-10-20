@@ -1,5 +1,5 @@
 import { ExtensionRegistry } from 'mailspring-exports';
-import * as SendAndArchiveExtension from './send-and-archive-extension';
+import * as SendAndArchiveExtension from './extension';
 
 export function activate() {
   ExtensionRegistry.Composer.register(SendAndArchiveExtension);

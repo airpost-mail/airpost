@@ -1,5 +1,5 @@
 import { CapabilityStore, Integrations } from 'mailspring-exports';
-import { LanguageToolBackend } from '../lib/grammar-check-service';
+import { LanguageToolBackend } from '../lib/service';
 
 const match = {
   offset: 0,

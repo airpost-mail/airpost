@@ -10,7 +10,7 @@ import {
   textColorOnFill,
   formatShortTime,
   createCalendarEvent,
-} from '../../../src/features/main-calendar/core/calendar-helpers';
+} from '../../../src/features/main-calendar/helpers';
 import {
   shiftedDayStartUnix,
   dayStartUnix,

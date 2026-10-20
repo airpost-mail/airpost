@@ -1,9 +1,9 @@
 import { WorkspaceStore, ComponentRegistry, Actions } from 'mailspring-exports';
 import DraftList from './draft-list';
-import DraftListToolbar from './draft-list-toolbar';
-import DraftListSendStatus from './draft-list-send-status';
-import DraftPreview from './draft-preview';
-import { DraftDeleteButton } from './draft-toolbar-buttons';
+import DraftListToolbar from './toolbar';
+import DraftListSendStatus from './send-status';
+import DraftPreview from './preview';
+import { DraftDeleteButton } from './toolbar-buttons';
 
 export function activate() {
   WorkspaceStore.defineSheet(

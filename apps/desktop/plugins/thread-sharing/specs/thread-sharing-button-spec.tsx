@@ -1,6 +1,6 @@
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
-import ThreadSharingButton from '../lib/thread-sharing-button';
+import ThreadSharingButton from '../lib/button';
 
 describe('ThreadSharingButton', () => {
   it('is disabled with the capability store reason', () => {

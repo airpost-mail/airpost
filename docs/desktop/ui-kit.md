@@ -134,7 +134,7 @@ content; the empty container may stay.
 | Workspace (`SheetContainer`) | `src/window/app-env.ts` `initializeReactRoot` |
 | Modals | `src/data/stores/modal.tsx` (`renderModal` and the empty `<span />` renders) |
 | Popovers | `src/data/stores/popover.tsx` (same) |
-| Onboarding provider note | `src/features/onboarding/decorators/create-page-for-form.tsx` |
+| Onboarding provider note | `src/features/onboarding/pages/create-page-for-form.tsx` |
 
 Portals keep React context, so content portalled out of these roots still sees the direction. A
 new `ReactDOM.render` call has to wrap its tree in `UIProvider` too. Stage 2 adds a spec that
@@ -324,10 +324,10 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
   `<button>` is labelable.
 - Colours: box `--control` with an `--input` border, checked `--primary`/`--primary-foreground`.
 - Legacy classes: none (legacy checkboxes are native inputs).
-- Replaces: the five native `type="checkbox"` sites (`src/features/preferences/tabs/mcp/mcp-section.tsx`,
-  `src/features/onboarding/page-account-settings-imap.tsx` ×2,
-  `plugins/activity/lib/engagement/engagement-board.tsx`,
-  `plugins/activity/lib/feed/activity-feed-toolbar.tsx`).
+- Replaces: the five native `type="checkbox"` sites (`src/features/preferences/tabs/mcp/section.tsx`,
+  `src/features/onboarding/pages/account-settings-imap.tsx` ×2,
+  `plugins/activity/lib/engagement/board.tsx`,
+  `plugins/activity/lib/feed/toolbar.tsx`).
 
 ### 6.5 RadioGroup
 
@@ -342,7 +342,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
   data-state></span></button>`. The group is the tab stop (finding 4). Arrow keys mirror in RTL.
 - Legacy classes: none.
 - Replaces: the two hand-rolled radio groups in
-  `src/features/preferences/tabs/preferences-appearance.tsx` (theme tiles and label colours). Their
+  `src/features/preferences/tabs/appearance.tsx` (theme tiles and label colours). Their
   tile visuals become the items' children.
 
 ### 6.6 Select
@@ -510,7 +510,7 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
   `--muted-foreground`.
 - Legacy classes: none.
 - Replaces: hand-rolled tabs in `src/components/composer-editor/emoji-toolbar-popover.tsx` and
-  `plugins/activity/lib/root.tsx`. `src/features/preferences/preferences-sidebar.tsx` uses
+  `plugins/activity/lib/root.tsx`. `src/features/preferences/sidebar.tsx` uses
   `role="tablist"` for a vertical nav with search, and moves to vertical Tabs only if its batch
   finds the semantics fit.
 

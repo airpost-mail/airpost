@@ -1,4 +1,4 @@
-import { parseTemplate, stringifyTemplate } from '../lib/template-file';
+import { parseTemplate, stringifyTemplate } from '../lib/file';
 
 describe('template-file', function templateFile() {
   describe('parseTemplate', () => {

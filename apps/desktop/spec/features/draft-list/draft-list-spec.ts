@@ -1,6 +1,6 @@
 import { Actions, Message, WorkspaceStore, FocusedContentStore } from 'mailspring-exports';
 import DraftList from '../../../src/features/draft-list/draft-list';
-import DraftListStore from '../../../src/features/draft-list/draft-list-store';
+import DraftListStore from '../../../src/features/draft-list/store';
 
 describe('DraftList', function () {
   const cursor = new Message({ id: 'draft-1', headerMessageId: 'hmid-1', draft: true });

@@ -19,7 +19,7 @@ import EngineEvents from '../../src/engine/events';
 import { Feature, Method } from '../../src/shared/engine/protocol';
 import { isEngineBuilt } from '../../src/engine/drafts';
 import DraftFactory from '../../src/data/drafts/factory';
-import { sendMessageNow } from '../../src/features/undo-redo/undo-redo-toast';
+import { sendMessageNow } from '../../src/features/undo-redo/toast';
 
 const ME = { name: 'Me', email: 'me@example.com' };
 const ALICE = { name: 'Alice', email: 'alice@example.com' };

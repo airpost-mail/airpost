@@ -2,7 +2,7 @@ import _ from 'underscore';
 import React, { Component } from 'react';
 import { ListensToObservable } from 'mailspring-component-kit';
 import { localized } from 'mailspring-exports';
-import ThreadListStore from './thread-list-store';
+import ThreadListStore from './store';
 
 function getObservable() {
   return ThreadListStore.selectionObservable().map((items) => items.length);

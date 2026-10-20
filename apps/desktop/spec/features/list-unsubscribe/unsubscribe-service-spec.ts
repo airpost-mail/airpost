@@ -5,7 +5,7 @@ import {
   engineUnsubscribes,
   performEngineUnsubscribe,
   UnsubscribeOption,
-} from '../../../src/features/list-unsubscribe/unsubscribe-service';
+} from '../../../src/features/list-unsubscribe/service';
 
 // ---------------------------------------------------------------------------
 // parseListUnsubscribeHeader

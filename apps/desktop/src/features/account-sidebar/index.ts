@@ -1,5 +1,5 @@
 import { ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
-import AccountSidebar from './components/account-sidebar';
+import AccountSidebar from './account-sidebar';
 import { activateMboxExportRunner, deactivateMboxExportRunner } from './mbox-export-runner';
 
 export function activate(state) {

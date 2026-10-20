@@ -3,7 +3,7 @@ import {
   rankOfRole,
   wrapInQuotes,
   getCurrentTokenAndTerm,
-} from '../../../src/features/thread-search/search-bar-util';
+} from '../../../src/features/thread-search/bar-util';
 
 describe('search-bar-util', function () {
   describe('rankOfRole()', function () {

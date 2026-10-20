@@ -18,7 +18,7 @@ import {
   AiTriageProgressParams,
   AiTriageRunResult,
 } from 'mailspring-exports';
-import { AiError, providerParams, toAiError } from './ai-client';
+import { AiError, providerParams, toAiError } from './client';
 
 export const PLUGIN_ID = 'tern-ai-triage';
 // ms-ipc `feature::AI_TRIAGE`.

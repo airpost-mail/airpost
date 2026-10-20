@@ -1,8 +1,8 @@
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
-import { createDragState } from '../../../src/features/main-calendar/core/calendar-drag-utils';
-import { DEFAULT_DRAG_CONFIG } from '../../../src/features/main-calendar/core/calendar-drag-types';
-import * as CalendarRsvp from '../../../src/features/main-calendar/core/calendar-rsvp';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
+import { createDragState } from '../../../src/features/main-calendar/drag-utils';
+import { DEFAULT_DRAG_CONFIG } from '../../../src/features/main-calendar/drag-types';
+import * as CalendarRsvp from '../../../src/features/main-calendar/event/rsvp';
 
 const START = Date.UTC(2026, 5, 23, 14, 0, 0) / 1000;
 
@@ -36,7 +36,7 @@ describe('moving a meeting we do not organize', function () {
   let offer: jasmine.Spy;
 
   beforeEach(function () {
-    calendar = new MailspringCalendar({} as any);
+    calendar = new MainCalendar({} as any);
     calendar.setState = (update: object) => Object.assign(calendar.state, update);
     calendar.state.calendarsLoaded = true;
     calendar.state.readOnlyCalendarIds = new Set();

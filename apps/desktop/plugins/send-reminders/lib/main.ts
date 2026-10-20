@@ -1,15 +1,12 @@
 import { localized, ComponentRegistry, ExtensionRegistry } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
-import SendRemindersThreadTimestamp from './send-reminders-thread-timestamp';
-import SendRemindersComposerButton from './send-reminders-composer-button';
-import SendRemindersToolbarButton from './send-reminders-toolbar-button';
-import {
-  ScheduledReminderThreadHeader,
-  NotificationExplanationMessageHeader,
-} from './send-reminders-headers';
-import SendRemindersStore from './send-reminders-store';
-import * as ThreadListExtension from './send-reminders-thread-list-extension';
-import * as AccountSidebarExtension from './send-reminders-account-sidebar-extension';
+import SendRemindersThreadTimestamp from './thread-timestamp';
+import SendRemindersComposerButton from './composer-button';
+import SendRemindersToolbarButton from './toolbar-button';
+import { ScheduledReminderThreadHeader, NotificationExplanationMessageHeader } from './headers';
+import SendRemindersStore from './store';
+import * as ThreadListExtension from './thread-list-extension';
+import * as AccountSidebarExtension from './account-sidebar-extension';
 
 const ComposerButtonWithTip = HasTutorialTip(SendRemindersComposerButton, {
   title: localized('Get reminded!'),

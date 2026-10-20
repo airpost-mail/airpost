@@ -1,9 +1,9 @@
-import { CalendarEvent } from '../../../src/features/main-calendar/core/calendar-event';
+import { CalendarEvent } from '../../../src/features/main-calendar/event/event';
 import {
   AllDayOccurrence,
   EventOccurrence,
   TimedOccurrence,
-} from '../../../src/features/main-calendar/core/calendar-data-source';
+} from '../../../src/features/main-calendar/data-source';
 import moment from 'moment';
 import { CalendarDateUtils } from 'mailspring-exports';
 import { parseCalendarDate } from '../../../src/utils/calendar-date';

@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { CalendarEvent } from '../../../src/features/main-calendar/core/calendar-event';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { CalendarEvent } from '../../../src/features/main-calendar/event/event';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 
 const START = Date.UTC(2026, 5, 23, 14, 0, 0) / 1000;
 
@@ -26,7 +26,7 @@ const occurrence: TimedOccurrence = {
 
 describe('focusing a calendar event', function () {
   it('clears focusedEvent once the event has announced itself', function () {
-    const calendar: any = new MailspringCalendar({} as any);
+    const calendar: any = new MainCalendar({} as any);
     calendar.setState = (update: object) => Object.assign(calendar.state, update);
     calendar.state.focusedEvent = { id: occurrence.id, start: START };
 

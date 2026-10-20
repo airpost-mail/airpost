@@ -1,6 +1,6 @@
 import { AccountStore, Actions, Thread } from 'mailspring-exports';
 import { messageFrameBridgeFor, messageFrameContent } from '../../mail/frame/bridge';
-import PrintWindow from './print-window';
+import PrintWindow from './window';
 
 class Printer {
   public unsub = Actions.printThread.listen(this._printThread);

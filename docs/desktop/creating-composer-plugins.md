@@ -167,7 +167,7 @@ interface ComposerInjectedProps {
 }
 ```
 
-Source: `src/features/composer/composer-view.tsx`
+Source: `src/features/composer/view.tsx`
 
 ### Toolbar Buttons (Composer:ActionButton)
 

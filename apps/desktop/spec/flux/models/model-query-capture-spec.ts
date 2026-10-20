@@ -263,7 +263,7 @@ const SITES: Site[] = [
   },
   {
     name: 'permalink-date',
-    site: 'src/features/thread-list/thread-permalink-handler.ts (date)',
+    site: 'src/features/thread-list/permalink-handler.ts (date)',
     build: () =>
       DatabaseStore.findBy<Thread>(Thread).where([
         Thread.attributes.subject.equal('Subject 07'),
@@ -275,7 +275,7 @@ const SITES: Site[] = [
   },
   {
     name: 'permalink-last-date',
-    site: 'src/features/thread-list/thread-permalink-handler.ts (lastDate)',
+    site: 'src/features/thread-list/permalink-handler.ts (lastDate)',
     build: () =>
       DatabaseStore.findBy<Thread>(Thread).where([
         Thread.attributes.subject.equal('Subject 08'),
@@ -312,7 +312,7 @@ const SITES: Site[] = [
   },
   {
     name: 'search-result-ids',
-    site: 'src/features/thread-search/search-query-subscription.ts _onSearchResults',
+    site: 'src/features/thread-search/query-subscription.ts _onSearchResults',
     build: () =>
       DatabaseStore.findAll<Thread>(Thread)
         .where({ id: ['t01', 't05', 't30', 'missing'] })
@@ -325,7 +325,7 @@ const SITES: Site[] = [
   },
   {
     name: 'thread-findby-id-limit',
-    site: 'src/features/thread-list/thread-list-context-menu.ts copyPermalink',
+    site: 'src/features/thread-list/context-menu.ts copyPermalink',
     build: () => DatabaseStore.findBy<Thread>(Thread, { id: 't04' }).limit(1),
   },
   {
@@ -369,12 +369,12 @@ const SITES: Site[] = [
   },
   {
     name: 'thread-messages-no-body',
-    site: 'src/features/thread-list/thread-list-data-source.ts _observableForThreadMessages',
+    site: 'src/features/thread-list/data-source.ts _observableForThreadMessages',
     build: () => DatabaseStore.findAll<Message>(Message, { threadId: 't05' }),
   },
   {
     name: 'messages-of-threads',
-    site: 'src/features/thread-list/thread-list-data-source.ts (missingIds)',
+    site: 'src/features/thread-list/data-source.ts (missingIds)',
     build: () => DatabaseStore.findAll<Message>(Message, { threadId: ['t01', 't02', 't27'] }),
   },
   {
@@ -428,7 +428,7 @@ const SITES: Site[] = [
   },
   {
     name: 'draft-list',
-    site: 'src/features/draft-list/draft-list-store.ts _onPerspectiveChanged',
+    site: 'src/features/draft-list/store.ts _onPerspectiveChanged',
     build: () =>
       DatabaseStore.findAll<Message>(Message)
         .include(Message.attributes.body)
@@ -438,7 +438,7 @@ const SITES: Site[] = [
   },
   {
     name: 'draft-list-one-account',
-    site: 'src/features/draft-list/draft-list-store.ts (accountId)',
+    site: 'src/features/draft-list/store.ts (accountId)',
     build: () =>
       DatabaseStore.findAll<Message>(Message)
         .include(Message.attributes.body)
@@ -455,7 +455,7 @@ const SITES: Site[] = [
   },
   {
     name: 'activity',
-    site: 'plugins/activity/lib/activity-data-source.ts buildQuery',
+    site: 'plugins/activity/lib/data-source.ts buildQuery',
     build: () =>
       DatabaseStore.findAll<Message>(Message)
         .order(Message.attributes.date.descending())
@@ -466,7 +466,7 @@ const SITES: Site[] = [
   },
   {
     name: 'activity-accounts-dates',
-    site: 'plugins/activity/lib/activity-data-source.ts buildQuery (filters)',
+    site: 'plugins/activity/lib/data-source.ts buildQuery (filters)',
     build: () =>
       DatabaseStore.findAll<Message>(Message)
         .order(Message.attributes.date.descending())
@@ -542,7 +542,7 @@ const SITES: Site[] = [
   },
   {
     name: 'contacts-list',
-    site: 'src/features/contacts/Store.ts',
+    site: 'src/features/contacts/store.ts',
     build: () =>
       DatabaseStore.findAll<Contact>(Contact)
         .where(Contact.attributes.refs.greaterThan(0))
@@ -550,7 +550,7 @@ const SITES: Site[] = [
   },
   {
     name: 'contacts-not-mail',
-    site: 'src/features/contacts/Store.ts (source)',
+    site: 'src/features/contacts/store.ts (source)',
     build: () =>
       DatabaseStore.findAll<Contact>(Contact)
         .where(Contact.attributes.refs.greaterThan(0))
@@ -577,29 +577,29 @@ const SITES: Site[] = [
   },
   {
     name: 'contact-books',
-    site: 'src/features/contacts/Store.ts',
+    site: 'src/features/contacts/store.ts',
     build: () => DatabaseStore.findAll<ContactBook>(ContactBook),
   },
 
   // Calendar.
   {
     name: 'calendars',
-    site: 'src/features/main-calendar/core/calendar-sidebar.tsx',
+    site: 'src/features/main-calendar/sidebar.tsx',
     build: () => DatabaseStore.findAll<Calendar>(Calendar),
   },
   {
     name: 'calendars-for-account',
-    site: 'src/features/events/event-header.tsx',
+    site: 'src/features/events/header.tsx',
     build: () => DatabaseStore.findAll<Calendar>(Calendar).where({ accountId: A1 }),
   },
   {
     name: 'calendar-by-id',
-    site: 'src/features/main-calendar/core/calendar-rsvp.ts',
+    site: 'src/features/main-calendar/event/rsvp.ts',
     build: () => DatabaseStore.find<Calendar>(Calendar, 'cal2'),
   },
   {
     name: 'events-in-range',
-    site: 'src/features/main-calendar/core/calendar-data-source.ts buildObservable',
+    site: 'src/features/main-calendar/data-source.ts buildObservable',
     build: () => {
       const end = Event.attributes.recurrenceEnd;
       const start = Event.attributes.recurrenceStart;
@@ -617,12 +617,12 @@ const SITES: Site[] = [
   },
   {
     name: 'events-by-uid',
-    site: 'src/features/main-calendar/index.tsx, events/event-header.tsx',
+    site: 'src/features/main-calendar/index.tsx, events/header.tsx',
     build: () => DatabaseStore.findAll<Event>(Event).where({ icsuid: 'uid-03', accountId: A1 }),
   },
   {
     name: 'events-nearby',
-    site: 'src/features/events/event-header.tsx (conflicts)',
+    site: 'src/features/events/header.tsx (conflicts)',
     build: () =>
       DatabaseStore.findAll<Event>(Event).where([
         Event.attributes.accountId.equal(A1),
@@ -632,7 +632,7 @@ const SITES: Site[] = [
   },
   {
     name: 'event-master',
-    site: 'src/features/main-calendar/core/calendar-view.tsx _onDelete',
+    site: 'src/features/main-calendar/main-calendar.tsx _onDelete',
     build: () =>
       DatabaseStore.findBy<Event>(Event, {
         accountId: A1,
@@ -648,7 +648,7 @@ const SITES: Site[] = [
   },
   {
     name: 'event-search',
-    site: 'src/features/main-calendar/core/event-search-bar.tsx',
+    site: 'src/features/main-calendar/search-bar.tsx',
     build: () =>
       DatabaseStore.findAll<Event>(Event)
         .distinct()

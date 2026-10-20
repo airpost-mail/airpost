@@ -3,8 +3,8 @@
 import { Actions, DatabaseStore, DestroyEventTask, SyncbackEventTask } from 'mailspring-exports';
 import { dialog } from '@electron/remote';
 import { Event as MailspringEvent } from '../../../src/data/models/event';
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 import { fakePimEngine, refusal } from '../../fake-pim-engine';
 
 // A daily series whose 2 March occurrence has been moved to 08:00. Both rows the sync engine
@@ -107,7 +107,7 @@ describe('deleting a moved occurrence from the calendar', function () {
   beforeEach(function () {
     stubEngine();
     // _deleteEvent reads nothing from the rendered tree, so the component need not be mounted.
-    calendar = new MailspringCalendar({} as any);
+    calendar = new MainCalendar({} as any);
   });
 
   it('edits the master instead of destroying the resource the rows share', async function () {
@@ -169,7 +169,7 @@ describe('deleting one plain occurrence from the calendar', function () {
   });
 
   it('removes that slot alone when told to', async function () {
-    const calendar: any = new MailspringCalendar({} as any);
+    const calendar: any = new MainCalendar({} as any);
 
     await calendar._deleteEvent(plain);
 
@@ -182,7 +182,7 @@ describe('deleting one plain occurrence from the calendar', function () {
 
   it('destroys the series when told to delete every occurrence', async function () {
     choice.andReturn(1);
-    const calendar: any = new MailspringCalendar({} as any);
+    const calendar: any = new MainCalendar({} as any);
 
     await calendar._deleteEvent(plain);
 

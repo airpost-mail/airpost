@@ -4,11 +4,8 @@ import {
   eventsGroupedByDay,
   exclusiveDayEnds,
   overlapForEvents,
-} from '../../../src/features/main-calendar/core/week-view-helpers';
-import {
-  EventOccurrence,
-  coveredDates,
-} from '../../../src/features/main-calendar/core/calendar-data-source';
+} from '../../../src/features/main-calendar/views/week-helpers';
+import { EventOccurrence, coveredDates } from '../../../src/features/main-calendar/data-source';
 import moment, { Moment } from 'moment';
 
 // Runner is pinned to America/Chicago (scripts/test.js), so 2025-11-02 is a 25-hour day and

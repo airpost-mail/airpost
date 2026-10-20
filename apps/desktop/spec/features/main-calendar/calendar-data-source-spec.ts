@@ -11,7 +11,7 @@ import {
   isEventSelected,
   focusedEventInfoForEvents,
   EventOccurrence,
-} from '../../../src/features/main-calendar/core/calendar-data-source';
+} from '../../../src/features/main-calendar/data-source';
 import { parseCalendarDate } from '../../../src/utils/calendar-date';
 import { fakePimEngine, flush } from '../../fake-pim-engine';
 

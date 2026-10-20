@@ -4,7 +4,7 @@ import path from 'path';
 import PackageManager from '../../src/packages/manager';
 import BuiltinFeature from '../../src/packages/builtin-feature';
 import { FEATURES } from '../../src/features';
-import { thirdPartyPlugins } from '../../src/features/preferences/tabs/plugins/preferences-plugins';
+import { thirdPartyPlugins } from '../../src/features/preferences/tabs/plugins/plugins';
 
 // Features and bundled plugins activate as one list sorted by directory name, and the
 // registries render in registration order, so this order decides where toolbar buttons,

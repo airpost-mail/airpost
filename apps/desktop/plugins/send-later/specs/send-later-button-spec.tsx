@@ -4,8 +4,8 @@ import ReactDOM from 'react-dom';
 import { findRenderedDOMComponentWithClass } from 'react-dom/test-utils';
 
 import { DateUtils, Actions } from 'mailspring-exports';
-import SendLaterButton from '../lib/send-later-button';
-import { PLUGIN_ID } from '../lib/send-later-constants';
+import SendLaterButton from '../lib/button';
+import { PLUGIN_ID } from '../lib/constants';
 
 const node = document.createElement('div');
 

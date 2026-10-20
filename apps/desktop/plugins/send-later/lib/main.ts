@@ -12,9 +12,9 @@ import { HasTutorialTip } from 'mailspring-component-kit';
 
 import EngineEvents from '../../../src/engine/events';
 import { Feature } from '../../../src/shared/engine/protocol';
-import SendLaterButton from './send-later-button';
-import SendLaterStatus from './send-later-status';
-import { PLUGIN_ID } from './send-later-constants';
+import SendLaterButton from './button';
+import SendLaterStatus from './status';
+import { PLUGIN_ID } from './constants';
 
 let unlisten = null;
 

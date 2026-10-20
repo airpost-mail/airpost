@@ -1,7 +1,7 @@
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
 import { AccountStore, Account, Actions, MailRulesStore } from 'mailspring-exports';
-import DisabledMailRulesNotification from '../../../src/features/notifications/items/disabled-mail-rules-notif';
+import DisabledMailRulesNotification from '../../../src/features/notifications/items/disabled-mail-rules';
 
 describe('DisabledMailRulesNotification', function DisabledMailRulesNotifTests() {
   afterEach(cleanup);

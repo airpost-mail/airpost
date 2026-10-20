@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { act } from 'react-dom/test-utils';
 import { Message, CapabilityStore } from 'mailspring-exports';
-import OpenTrackingButton from '../lib/open-tracking-button';
-import LinkTrackingButton from '../../link-tracking/lib/link-tracking-button';
+import OpenTrackingButton from '../lib/button';
+import LinkTrackingButton from '../../link-tracking/lib/button';
 
 // The buttons are memo'd on the draft's metadata; the capability store has to re-render them.
 describe('Tracking composer buttons and capability changes', () => {

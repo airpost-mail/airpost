@@ -1,10 +1,10 @@
 import { localized, ComponentRegistry, ExtensionRegistry } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
 
-import { ToolbarSnooze, QuickActionSnooze } from './snooze-buttons';
-import * as AccountSidebarExtension from './snooze-account-sidebar-extension';
-import { SnoozeMailLabel } from './snooze-mail-label';
-import { SnoozeStore } from './snooze-store';
+import { ToolbarSnooze, QuickActionSnooze } from './buttons';
+import * as AccountSidebarExtension from './account-sidebar-extension';
+import { SnoozeMailLabel } from './mail-label';
+import { SnoozeStore } from './store';
 
 export function activate() {
   const ToolbarSnoozeWithTutorialTip = HasTutorialTip(ToolbarSnooze, {

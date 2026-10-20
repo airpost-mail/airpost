@@ -14,7 +14,7 @@ import {
   summarize,
   suggestReplies,
   testProvider,
-} from '../lib/ai-client';
+} from '../lib/client';
 import {
   ACCOUNT_ID,
   ENGINE_BEFORE_KEYS,

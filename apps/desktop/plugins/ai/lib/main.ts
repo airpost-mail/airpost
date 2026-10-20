@@ -18,7 +18,7 @@ import { ThreadSummary, watchSummaries } from './thread-summary';
 import { SuggestReplyButton } from './reply-suggestions';
 import { TriageChip } from './triage-chip';
 import { NeedsReplySidebarExtension } from './needs-reply';
-import { moveKeysToEngine } from './ai-client';
+import { moveKeysToEngine } from './client';
 
 let preferencesTab = null;
 let stopWatchingSummaries: (() => void) | null = null;

@@ -7,7 +7,7 @@ import {
   openProposeNewTimePopover,
   proposeNewTimeForCalendarEvent,
   respondToCalendarEvent,
-} from '../../../src/features/main-calendar/core/calendar-rsvp';
+} from '../../../src/features/main-calendar/event/rsvp';
 import { parseCalendarDate } from '../../../src/utils/calendar-date';
 import { fakePimEngine, refusal } from '../../fake-pim-engine';
 

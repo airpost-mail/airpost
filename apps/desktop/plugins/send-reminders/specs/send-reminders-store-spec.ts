@@ -1,7 +1,7 @@
 import { Actions, Thread, SyncbackMetadataTask } from 'mailspring-exports';
 
-import SendRemindersStore from '../lib/send-reminders-store';
-import { PLUGIN_ID } from '../lib/send-reminders-constants';
+import SendRemindersStore from '../lib/store';
+import { PLUGIN_ID } from '../lib/constants';
 import { EngineEvents } from '../../../src/engine/events';
 import { Feature } from '../../../src/shared/engine/protocol';
 

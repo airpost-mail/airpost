@@ -5,8 +5,8 @@ import {
   MessageBodyProcessor,
   MessageStore,
 } from 'mailspring-exports';
-import AutoloadImagesExtension from '../../../src/features/message-autoload-images/autoload-images-extension';
-import AutoloadImagesStore from '../../../src/features/message-autoload-images/autoload-images-store';
+import AutoloadImagesExtension from '../../../src/features/message-autoload-images/extension';
+import AutoloadImagesStore from '../../../src/features/message-autoload-images/store';
 
 const IMAGE_BODY = '<p>Hi</p><img src="https://tracker.example.com/open.gif">';
 const CSS_ONLY_BODY = '<div style="background:#fff url(https://tracker.example.com/p.png)"></div>';

@@ -1,8 +1,5 @@
 import { CapabilityStore } from 'mailspring-exports';
-import {
-  isTrackingServerAvailable,
-  trackingUnavailableReason,
-} from '../lib/open-tracking-constants';
+import { isTrackingServerAvailable, trackingUnavailableReason } from '../lib/constants';
 
 describe('Open tracking and the capability store', () => {
   it('stays off with the store reason', () => {

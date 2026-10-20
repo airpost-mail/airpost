@@ -3,7 +3,7 @@ import { localized, Contact, DOMUtils, RegExpUtils, Thread } from 'mailspring-ex
 import { RetinaImg, ContactProfilePhoto } from 'mailspring-component-kit';
 import { formatTime } from '../../../src/shared/date-format';
 
-import ParticipantProfileDataSource from './participant-profile-data-source';
+import ParticipantProfileDataSource from './data-source';
 
 class TimeInTimezone extends React.Component<{ timeZone: string }, { tick: number }> {
   constructor(props) {

@@ -6,11 +6,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { AccountStore, CategoryStore } from 'mailspring-exports';
 import { SettingsSwitch } from 'mailspring-component-kit';
 
-import { McpSection } from '../../../src/features/preferences/tabs/mcp/mcp-section';
+import { McpSection } from '../../../src/features/preferences/tabs/mcp/section';
 import {
   migrateCoreMcpConfig,
   readAuditLog,
-} from '../../../src/features/preferences/tabs/mcp/mcp-policy';
+} from '../../../src/features/preferences/tabs/mcp/policy';
 import {
   isStableInstall,
   runTernMcp,

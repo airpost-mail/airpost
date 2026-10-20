@@ -5,7 +5,7 @@ import { KeyManager, Integrations } from 'mailspring-exports';
 import {
   IntegrationSection,
   privacyNote,
-} from '../../../src/features/preferences/tabs/preferences-integrations';
+} from '../../../src/features/preferences/tabs/integrations';
 
 const SYNTHETIC_KEY = 'synthetic-test-key-0000:fx';
 

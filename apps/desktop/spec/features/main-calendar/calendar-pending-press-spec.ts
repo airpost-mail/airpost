@@ -1,9 +1,9 @@
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
-import { DEFAULT_DRAG_CONFIG } from '../../../src/features/main-calendar/core/calendar-drag-types';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
+import { DEFAULT_DRAG_CONFIG } from '../../../src/features/main-calendar/drag-types';
 import * as CalendarDateUtils from '../../../src/utils/calendar-date';
-import * as CalendarRsvp from '../../../src/features/main-calendar/core/calendar-rsvp';
-import { CalendarView } from '../../../src/features/main-calendar/core/calendar-constants';
+import * as CalendarRsvp from '../../../src/features/main-calendar/event/rsvp';
+import { CalendarView } from '../../../src/features/main-calendar/constants';
 
 const START = Date.UTC(2026, 8, 22, 13, 0, 0) / 1000;
 
@@ -43,7 +43,7 @@ describe('pressing an event', function () {
   let renders: number;
 
   beforeEach(function () {
-    cal = new MailspringCalendar({} as any);
+    cal = new MainCalendar({} as any);
     renders = 0;
     cal.setState = (next: any) => {
       renders++;
@@ -79,7 +79,7 @@ describe('pressing an event', function () {
         ...at(container.x, container.y),
         mouseEvent: { button: 0, clientX: 400, clientY },
       }) as any;
-    cal = new MailspringCalendar({} as any);
+    cal = new MainCalendar({} as any);
     cal.setState = (next: any) => Object.assign(cal.state, next);
     cal.state = { ...cal.state, calendarsLoaded: true, view: CalendarView.MONTH };
     cal._onEventDragStart(occurrence, {} as any, { mode: 'move' } as any);
@@ -114,7 +114,7 @@ describe("pressing a meeting we don't organize", function () {
   it('offers the counter once it travels, and a later move does not offer it again', function () {
     const offer = spyOn(CalendarRsvp, 'offerCounterInsteadOfMove');
     const guestMeeting = { ...occurrence, isMine: false, organizer: { email: 'ada@example.com' } };
-    const cal: any = new MailspringCalendar({} as any);
+    const cal: any = new MainCalendar({} as any);
     cal.setState = (next: any) => Object.assign(cal.state, next);
     cal.state = { ...cal.state, calendarsLoaded: true, readOnlyCalendarIds: new Set() };
     cal._onEventDragStart(guestMeeting, {} as any, { mode: 'move' } as any);

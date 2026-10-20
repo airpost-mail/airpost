@@ -7,7 +7,7 @@ import {
 } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
 
-import ThreadSearchBar from './thread-search-bar';
+import ThreadSearchBar from './bar';
 
 const ThreadSearchBarWithTip = HasTutorialTip(ThreadSearchBar, {
   title: localized('Search with ease'),

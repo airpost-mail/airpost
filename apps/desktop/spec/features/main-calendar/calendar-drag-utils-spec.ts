@@ -16,18 +16,18 @@ import {
   updateDragState,
   allDayColumnStartUnix,
   canAttemptMove,
-} from '../../../src/features/main-calendar/core/calendar-drag-utils';
+} from '../../../src/features/main-calendar/drag-utils';
 import {
   DEFAULT_DRAG_CONFIG,
   MONTH_VIEW_DRAG_CONFIG,
-} from '../../../src/features/main-calendar/core/calendar-drag-types';
-import { DEFAULT_TIMED_EVENT_DURATION_SECONDS } from '../../../src/features/main-calendar/core/calendar-constants';
+} from '../../../src/features/main-calendar/drag-types';
+import { DEFAULT_TIMED_EVENT_DURATION_SECONDS } from '../../../src/features/main-calendar/constants';
 import {
   EventOccurrence,
   TimedOccurrence,
   coveredDates,
   isTimed,
-} from '../../../src/features/main-calendar/core/calendar-data-source';
+} from '../../../src/features/main-calendar/data-source';
 
 const HOUR = 60 * 60;
 

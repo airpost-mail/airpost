@@ -31,7 +31,7 @@ import {
 
 import FindInThread from './find-in-thread';
 import MessageItemContainer from './message-item-container';
-import { MessageListScrollTooltip } from './message-list-scroll-tooltip';
+import { MessageListScrollTooltip } from './scroll-tooltip';
 import { SubjectLineIcons } from './subject-line-icons';
 
 type MinifiedBundle = { type: 'minifiedBundle'; messages: Message[] };

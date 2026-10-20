@@ -4,13 +4,13 @@ import ReactTestUtils from 'react-dom/test-utils';
 import moment from 'moment';
 import Rx from 'rx-lite';
 import { Calendar } from '../../../src/data/models/calendar';
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { WeekView } from '../../../src/features/main-calendar/core/week-view';
-import { DayView } from '../../../src/features/main-calendar/core/day-view';
-import { WeekViewEventColumn } from '../../../src/features/main-calendar/core/week-view-event-column';
-import { WeekViewAllDayEvents } from '../../../src/features/main-calendar/core/week-view-all-day-events';
-import { EventGridBackground } from '../../../src/features/main-calendar/core/event-grid-background';
-import { setCalendarColors } from '../../../src/features/main-calendar/core/calendar-helpers';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { WeekView } from '../../../src/features/main-calendar/views/week';
+import { DayView } from '../../../src/features/main-calendar/views/day';
+import { WeekViewEventColumn } from '../../../src/features/main-calendar/views/week-event-column';
+import { WeekViewAllDayEvents } from '../../../src/features/main-calendar/views/week-all-day-events';
+import { EventGridBackground } from '../../../src/features/main-calendar/views/event-grid-background';
+import { setCalendarColors } from '../../../src/features/main-calendar/helpers';
 
 const calendar = (color: string) =>
   new Calendar({ id: 'repaint-cal', accountId: 'a', name: 'Team', color } as any);
@@ -20,7 +20,7 @@ describe('repainting the calendar when colours change', function () {
     return cal._renderMainContent() as React.ReactElement<{ paintVersion: string }>;
   }
   function loadedCalendar() {
-    const cal: any = new MailspringCalendar({} as any);
+    const cal: any = new MainCalendar({} as any);
     cal.state = { ...cal.state, calendarsLoaded: true, calendars: [calendar('#112233')] };
     return cal;
   }

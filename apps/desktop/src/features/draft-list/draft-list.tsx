@@ -12,8 +12,8 @@ import {
   EmptyListState,
   MultiselectList,
 } from 'mailspring-component-kit';
-import DraftListStore from './draft-list-store';
-import * as DraftListColumns from './draft-list-columns';
+import DraftListStore from './store';
+import * as DraftListColumns from './columns';
 
 class DraftList extends React.Component {
   static displayName = 'DraftList';

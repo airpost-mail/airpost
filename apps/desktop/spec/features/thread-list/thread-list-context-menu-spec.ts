@@ -1,5 +1,5 @@
 import { Thread, Contact, Message, Account, AccountStore, DatabaseStore } from 'mailspring-exports';
-import ThreadListContextMenu from '../../../src/features/thread-list/thread-list-context-menu';
+import ThreadListContextMenu from '../../../src/features/thread-list/context-menu';
 
 // Answers queries from an in-memory set of models, honouring where, order and limit.
 function runAgainst(models: any[]) {

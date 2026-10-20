@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { DraftStore, Message } from 'mailspring-exports';
-import TemplateStore from '../lib/template-store';
+import TemplateStore from '../lib/store';
 
 const TEMPLATE = {
   id: 'Follow Up.html',

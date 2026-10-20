@@ -9,7 +9,7 @@ import {
   modifyAllOccurrences,
   modifyEventWithRecurringSupport,
   EventTimeChangeOptions,
-} from '../../../src/features/main-calendar/core/recurring-event-actions';
+} from '../../../src/features/main-calendar/event/recurring-actions';
 import { fakePimEngine } from '../../fake-pim-engine';
 
 const OLD_ICS =

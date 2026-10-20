@@ -7,9 +7,9 @@ import {
 } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
 
-import ActivityMailboxPerspective from './activity-mailbox-perspective';
-import ActivityEventStore from './activity-event-store';
-import ActivityListButton from './list/activity-list-button';
+import ActivityMailboxPerspective from './mailbox-perspective';
+import ActivityEventStore from './event-store';
+import ActivityListButton from './list/button';
 import Root from './root';
 
 const ActivityListButtonWithTutorialTip = HasTutorialTip(ActivityListButton, {

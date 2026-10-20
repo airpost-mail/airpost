@@ -19,7 +19,7 @@ import {
   errorMessage,
   isCancelled,
   suggestReplies,
-} from './ai-client';
+} from './client';
 import { insertReply, ReplySession } from './reply-insert';
 
 interface Draftish {

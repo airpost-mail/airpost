@@ -15,7 +15,7 @@ import {
   ToggleStarredButton,
   ToggleUnreadButton,
   MarkAsSpamButton,
-} from '../../../src/features/thread-list/thread-toolbar-buttons';
+} from '../../../src/features/thread-list/toolbar-buttons';
 
 const test_thread = new Thread({}).fromJSON({
   id: 'thread_12345',

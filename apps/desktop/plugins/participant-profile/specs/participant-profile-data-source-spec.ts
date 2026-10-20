@@ -1,5 +1,5 @@
 import { CapabilityStore, Integrations } from 'mailspring-exports';
-import ParticipantProfileDataSource from '../lib/participant-profile-data-source';
+import ParticipantProfileDataSource from '../lib/data-source';
 
 const contact = { email: 'person@company.example.test', name: 'Person' };
 

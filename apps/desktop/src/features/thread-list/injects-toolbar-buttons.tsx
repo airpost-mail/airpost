@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { Thread } from 'mailspring-exports';
 import { ListensToObservable, InjectedComponentSet } from 'mailspring-component-kit';
-import ThreadListStore from './thread-list-store';
+import ThreadListStore from './store';
 
 export const ToolbarRole = 'ThreadActionsToolbarButton';
 

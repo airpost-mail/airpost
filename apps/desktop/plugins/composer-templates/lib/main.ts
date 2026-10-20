@@ -5,9 +5,9 @@ import {
   ComponentRegistry,
   ExtensionRegistry,
 } from 'mailspring-exports';
-import TemplatePicker from './template-picker';
-import TemplateStatusBar from './template-status-bar';
-import TemplateComposerExtension from './template-composer-extension';
+import TemplatePicker from './picker';
+import TemplateStatusBar from './status-bar';
+import TemplateComposerExtension from './composer-extension';
 
 export function activate(state = {}) {
   this.state = state;

@@ -10,7 +10,7 @@ import {
   InflatesDraftClientId,
 } from 'mailspring-exports';
 import ComposeButton from './compose-button';
-import ComposerView from './composer-view';
+import ComposerView from './view';
 
 const ComposerViewForDraftClientId = InflatesDraftClientId(ComposerView);
 

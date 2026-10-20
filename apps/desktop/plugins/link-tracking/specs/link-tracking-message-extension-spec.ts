@@ -1,6 +1,6 @@
 import { Message } from 'mailspring-exports';
-import LinkTrackingMessageExtension from '../lib/link-tracking-message-extension';
-import { PLUGIN_ID } from '../lib/link-tracking-constants';
+import LinkTrackingMessageExtension from '../lib/message-extension';
+import { PLUGIN_ID } from '../lib/constants';
 
 // The extension works on the message frame through MessageBody calls.
 describe('LinkTrackingMessageExtension', function () {

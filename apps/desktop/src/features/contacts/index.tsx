@@ -5,14 +5,14 @@ import {
   AccountStore,
   localized,
 } from 'mailspring-exports';
-import { ContactPerspectivesList } from './ContactPerspectivesList';
-import { ContactDetailToolbar } from './ContactDetailToolbar';
-import { AddContactToolbar } from './AddContactToolbar';
-import { ContactList, ContactListSearch } from './ContactList';
-import { ContactDetail } from './ContactDetail';
-import { FoundInMailEnabledBar } from './FoundInMailEnabledBar';
-import { Store } from './Store';
-import { exportContactsToFile, importContactsFromFile } from './ContactFiles';
+import { ContactPerspectivesList } from './perspectives-list';
+import { ContactDetailToolbar } from './detail-toolbar';
+import { AddContactToolbar } from './add-contact-toolbar';
+import { ContactList, ContactListSearch } from './list';
+import { ContactDetail } from './detail';
+import { FoundInMailEnabledBar } from './found-in-mail-enabled-bar';
+import { Store } from './store';
+import { exportContactsToFile, importContactsFromFile } from './files';
 
 function adjustMenus() {
   const contactMenu: (typeof AppEnv.menu.template)[0] = {

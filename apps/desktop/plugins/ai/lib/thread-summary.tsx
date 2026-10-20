@@ -11,7 +11,7 @@ import {
   Message,
   Thread,
 } from 'mailspring-exports';
-import { AiCall, errorMessage, isCancelled, summarize, destinationNote } from './ai-client';
+import { AiCall, errorMessage, isCancelled, summarize, destinationNote } from './client';
 
 // A single message this long (HTML) is worth summarizing on its own.
 export const LONG_BODY_CHARS = 4000;

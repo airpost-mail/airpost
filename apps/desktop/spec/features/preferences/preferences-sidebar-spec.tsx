@@ -3,7 +3,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { render as renderDOM, fireEvent, cleanup } from '@testing-library/react';
 import { Actions, PreferencesUIStore } from 'mailspring-exports';
 import { ConfigSelectRow, ConfigSwitchRow } from 'mailspring-component-kit';
-import PreferencesSidebar from '../../../src/features/preferences/preferences-sidebar';
+import PreferencesSidebar from '../../../src/features/preferences/sidebar';
 import { getPortalContainer } from '../../../src/components/kit/portal';
 
 const Tab = PreferencesUIStore.TabItem;

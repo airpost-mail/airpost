@@ -1,5 +1,5 @@
 import { ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
-import UndoRedoToast from './undo-redo-toast';
+import UndoRedoToast from './toast';
 
 export function activate() {
   if (AppEnv.isMainWindow()) {

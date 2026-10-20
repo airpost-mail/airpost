@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { CalendarEvent } from '../../../src/features/main-calendar/core/calendar-event';
-import { MonthViewEvent } from '../../../src/features/main-calendar/core/month-view-event';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+import { CalendarEvent } from '../../../src/features/main-calendar/event/event';
+import { MonthViewEvent } from '../../../src/features/main-calendar/views/month-event';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 
 const START = Date.UTC(2026, 5, 23, 14, 0, 0) / 1000;
 

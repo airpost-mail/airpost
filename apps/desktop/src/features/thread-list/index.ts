@@ -1,14 +1,14 @@
 import { ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
 
 import ThreadList from './thread-list';
-import ThreadListToolbar from './thread-list-toolbar';
-import ThreadListVertical from './thread-list-vertical';
-import ThreadListEmptyFolderBar from './thread-list-empty-folder-bar';
+import ThreadListToolbar from './toolbar';
+import ThreadListVertical from './vertical';
+import ThreadListEmptyFolderBar from './empty-folder-bar';
 import MessageListToolbar from './message-list-toolbar';
 import SelectedItemsStack from './selected-items-stack';
-import * as ThreadPermalinkHandler from './thread-permalink-handler';
+import * as ThreadPermalinkHandler from './permalink-handler';
 
-import { UpButton, DownButton, MoveButtons, FlagButtons } from './thread-toolbar-buttons';
+import { UpButton, DownButton, MoveButtons, FlagButtons } from './toolbar-buttons';
 
 export function activate() {
   ThreadPermalinkHandler.activate();

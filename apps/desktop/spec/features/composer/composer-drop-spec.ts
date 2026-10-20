@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { nonNativeFilePathForDrop } from '../../../src/features/composer/composer-view';
+import { nonNativeFilePathForDrop } from '../../../src/features/composer/view';
 
 function transfer(data: { [type: string]: string }) {
   return { types: Object.keys(data), getData: (type: string) => data[type] } as any;

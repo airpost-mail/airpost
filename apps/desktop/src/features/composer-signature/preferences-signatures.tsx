@@ -17,9 +17,9 @@ import classNames from 'classnames';
 import { SettingsPage, SettingsCard, SettingsField } from 'mailspring-component-kit';
 
 import { ResolveSignatureData, RenderSignatureData, DataShape } from './constants';
-import SignatureAccountDefaultPicker from './signature-account-default-picker';
-import SignatureTemplatePicker from './signature-template-picker';
-import SignaturePhotoPicker from './signature-photo-picker';
+import SignatureAccountDefaultPicker from './account-default-picker';
+import SignatureTemplatePicker from './template-picker';
+import SignaturePhotoPicker from './photo-picker';
 import Templates from './templates';
 
 interface SignatureEditorProps {

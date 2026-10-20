@@ -4,7 +4,7 @@ import path from 'path';
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import { PluginsSection } from '../../../src/features/preferences/tabs/plugins/preferences-plugins';
+import { PluginsSection } from '../../../src/features/preferences/tabs/plugins/plugins';
 import { runTern, ternBinary } from '../../../src/features/preferences/tabs/plugins/tern-cli';
 
 // A temporary profile and resource directory: the bundled `tern` is a link to the built CLI,

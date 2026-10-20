@@ -32,13 +32,13 @@ import { AllowedAttributes, AllowedTags } from '../../src/mail/body/sanitize-tra
 import { quoteTexts } from '../../src/shared/date-format';
 import { wrapPlaintext } from '../../src/components/composer-editor/plaintext';
 import userAgentStylesheet from '../../src/mail/body/chrome-user-agent-stylesheet';
-import { applySignature } from '../../src/features/composer-signature/signature-utils';
+import { applySignature } from '../../src/features/composer-signature/utils';
 import {
   AdditionalRules,
   removeTrackingPixelsFromDraft,
 } from '../../src/features/remove-tracking-pixels/index';
 import { MailTrackerBlockerRules } from '../../src/features/remove-tracking-pixels/mail-tracker-blocker-rules';
-import TemplatesComposerExtension from '../../plugins/composer-templates/lib/template-composer-extension';
+import TemplatesComposerExtension from '../../plugins/composer-templates/lib/composer-extension';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
 const DATA = path.join(REPO, 'crates', 'ms-compose', 'src', 'desktop_data.json');

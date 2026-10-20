@@ -4,10 +4,10 @@
 // VEVENT) is crates/ms-pim's desktop corpus, recorded from this spec.
 import { Actions, DatabaseStore, SyncbackEventTask } from 'mailspring-exports';
 import { Event as MailspringEvent } from '../../../src/data/models/event';
-import { CalendarEventPopover } from '../../../src/features/main-calendar/core/calendar-event-popover';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
-import { AllDayToggle } from '../../../src/features/main-calendar/core/all-day-toggle';
-import { ShowAsSelector } from '../../../src/features/main-calendar/core/show-as-selector';
+import { CalendarEventPopover } from '../../../src/features/main-calendar/event/popover';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
+import { AllDayToggle } from '../../../src/features/main-calendar/event/all-day-toggle';
+import { ShowAsSelector } from '../../../src/features/main-calendar/event/show-as-selector';
 import { fakePimEngine, flush } from '../../fake-pim-engine';
 
 // A fortnightly Tue/Thu meeting that ends in June. Every part of this rule beyond FREQ is
@@ -392,7 +392,7 @@ describe('CalendarEventPopover save path and Show As', function () {
   });
 
   it('creates a new all-day event as Free when Show As was left alone', async function () {
-    const helpers = require('../../../src/features/main-calendar/core/calendar-helpers');
+    const helpers = require('../../../src/features/main-calendar/helpers');
     spyOn(helpers, 'createCalendarEvent').andReturn(Promise.resolve());
     spyOn(Actions, 'closePopover');
     await newEventPopover(true)._createNewEvent();
@@ -400,7 +400,7 @@ describe('CalendarEventPopover save path and Show As', function () {
   });
 
   it('creates the event with the Show As the user picked', async function () {
-    const helpers = require('../../../src/features/main-calendar/core/calendar-helpers');
+    const helpers = require('../../../src/features/main-calendar/helpers');
     spyOn(helpers, 'createCalendarEvent').andReturn(Promise.resolve());
     spyOn(Actions, 'closePopover');
     const popover: any = new CalendarEventPopover({

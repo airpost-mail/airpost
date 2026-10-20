@@ -8,7 +8,7 @@ import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 import { Actions } from 'mailspring-exports';
 
-import ThreadSearchBar from '../../../src/features/thread-search/thread-search-bar';
+import ThreadSearchBar from '../../../src/features/thread-search/bar';
 
 describe('ThreadSearchBar', function () {
   beforeEach(function () {

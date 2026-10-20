@@ -48,7 +48,7 @@ node --experimental-websocket "$CLAUDE_PROJECT_DIR/.claude/skills/app-screenshot
 
 Useful snippets inside the JS:
 
-- Navigate to a sheet: `$m.Actions.focusMailboxPerspective(new (require('../plugins/activity/lib/activity-mailbox-perspective').default)($m.FocusedPerspectiveStore.sidebarAccountIds()))`
+- Navigate to a sheet: `$m.Actions.focusMailboxPerspective(new (require('../plugins/activity/lib/mailbox-perspective').default)($m.FocusedPerspectiveStore.sidebarAccountIds()))`
 - Pick from a `DropdownMenu`: click `.dropdown-menu > div`, wait 300ms, then find the
   item by text under `.menu div` and dispatch `mousedown` **and** `click` on it.
 - Drive a controlled `<input>`: set the value through

@@ -37,7 +37,7 @@ import {
   listModels,
   saveKey,
   testProvider,
-} from './ai-client';
+} from './client';
 import { TRIAGE_ENGINE_FEATURE, TriageRun, triageInbox } from './triage';
 
 // Preferences > AI (docs/ai-plan.md section 7). Settings go to config under core.ai; API keys to

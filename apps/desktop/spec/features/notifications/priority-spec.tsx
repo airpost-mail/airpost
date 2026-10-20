@@ -2,7 +2,7 @@ import { render, cleanup, act } from '@testing-library/react';
 import { ComponentRegistry, React } from 'mailspring-exports';
 import { Notification } from 'mailspring-component-kit';
 
-import NotifWrapper from '../../../src/features/notifications/notif-wrapper';
+import NotifWrapper from '../../../src/features/notifications/wrapper';
 
 const stubNotif = (priority: number) => {
   return class extends React.Component {

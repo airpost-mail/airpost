@@ -1,6 +1,6 @@
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { CalendarEventContextMenu } from '../../../src/features/main-calendar/core/calendar-event-context-menu';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { CalendarEventContextMenu } from '../../../src/features/main-calendar/event/context-menu';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 
 const occurrence = {
   id: 'e1-e0',
@@ -17,7 +17,7 @@ const occurrence = {
 
 describe('double-clicking a calendar event', function () {
   it('opens its editor, not the card', function () {
-    const calendar: any = new MailspringCalendar({} as any);
+    const calendar: any = new MainCalendar({} as any);
     const open = spyOn(calendar, '_openEventPopover');
     calendar._onEventDoubleClick(occurrence);
     expect(open).toHaveBeenCalledWith(occurrence, true);
@@ -26,7 +26,7 @@ describe('double-clicking a calendar event', function () {
 
 describe("the context menu's open item", function () {
   function calendarWith(readOnlyCalendarIds: string[]) {
-    const calendar: any = new MailspringCalendar({} as any);
+    const calendar: any = new MainCalendar({} as any);
     calendar.state = {
       ...calendar.state,
       calendarsLoaded: true,

@@ -1,7 +1,7 @@
 // Import directly from the source files; the plugin isn't registered in mailspring-exports.
 import moment from 'moment';
-import { CalendarEventContainer } from '../../../src/features/main-calendar/core/calendar-event-container';
-import { dayBoundsUnix } from '../../../src/features/main-calendar/core/month-view-helpers';
+import { CalendarEventContainer } from '../../../src/features/main-calendar/event/container';
+import { dayBoundsUnix } from '../../../src/features/main-calendar/views/month-helpers';
 
 // A month-cell container as MonthViewWeek and MonthViewDayCell render it, 300px wide.
 function monthCell(firstISO: string, lastISO = firstISO) {

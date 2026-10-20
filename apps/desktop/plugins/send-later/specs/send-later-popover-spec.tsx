@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import SendLaterPopover from '../lib/send-later-popover';
+import SendLaterPopover from '../lib/popover';
 
 const makePopover = (props = {}) => {
   const { container } = render(

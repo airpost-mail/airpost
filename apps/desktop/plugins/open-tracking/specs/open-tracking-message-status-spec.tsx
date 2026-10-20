@@ -2,8 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 
 import { Message, MailspringTestUtils } from 'mailspring-exports';
-import OpenTrackingMessageStatus from '../lib/open-tracking-message-status';
-import { PLUGIN_ID } from '../lib/open-tracking-constants';
+import OpenTrackingMessageStatus from '../lib/message-status';
+import { PLUGIN_ID } from '../lib/constants';
 
 const { renderIntoDocument } = MailspringTestUtils;
 

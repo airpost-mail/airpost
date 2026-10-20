@@ -1,8 +1,8 @@
 import { localized, ComponentRegistry, ExtensionRegistry } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
 
-import LinkTrackingButton from './link-tracking-button';
-import LinkTrackingMessageExtension from './link-tracking-message-extension';
+import LinkTrackingButton from './button';
+import LinkTrackingMessageExtension from './message-extension';
 
 const LinkTrackingButtonWithTutorialTip = HasTutorialTip(LinkTrackingButton, {
   title: localized('Track links in this email'),

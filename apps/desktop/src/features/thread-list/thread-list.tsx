@@ -28,11 +28,11 @@ import {
   localized,
 } from 'mailspring-exports';
 
-import * as ThreadListColumns from './thread-list-columns';
-import ThreadListScrollTooltip from './thread-list-scroll-tooltip';
-import ThreadListStore from './thread-list-store';
-import ThreadListContextMenu from './thread-list-context-menu';
-import { threadAriaLabel } from './thread-list-aria-utils';
+import * as ThreadListColumns from './columns';
+import ThreadListScrollTooltip from './scroll-tooltip';
+import ThreadListStore from './store';
+import ThreadListContextMenu from './context-menu';
+import { threadAriaLabel } from './aria-utils';
 
 class ThreadList extends React.Component<
   Record<string, unknown>,
@@ -201,7 +201,7 @@ class ThreadList extends React.Component<
       };
       props.onSwipeLeft = (callback: (success: boolean) => void) => {
         // TODO this should be grabbed from elsewhere
-        const SnoozePopover = require('../../../plugins/thread-snooze/lib/snooze-popover').default;
+        const SnoozePopover = require('../../../plugins/thread-snooze/lib/popover').default;
 
         const element = document.querySelector(`[data-item-id="${item.id}"]`);
         const originRect = element.getBoundingClientRect();

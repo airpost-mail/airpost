@@ -1,11 +1,7 @@
 import React from 'react';
 import { Actions, Calendar, DatabaseStore, DateUtils, localized } from 'mailspring-exports';
 import { Moment } from 'moment';
-import {
-  getEditableCalendars,
-  showNoEditableCalendarsError,
-  createCalendarEvent,
-} from './core/calendar-helpers';
+import { getEditableCalendars, showNoEditableCalendarsError, createCalendarEvent } from './helpers';
 
 interface QuickEventPopoverState {
   start: Moment | null;

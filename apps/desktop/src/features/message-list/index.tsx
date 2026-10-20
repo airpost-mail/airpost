@@ -7,7 +7,7 @@ import {
   Thread,
 } from 'mailspring-exports';
 
-import { MessageListHiddenMessagesToggle } from './message-list-hidden-messages-toggle';
+import { MessageListHiddenMessagesToggle } from './hidden-messages-toggle';
 import MessageList from './message-list';
 import { SidebarPluginContainer } from './sidebar-plugin-container';
 import { SidebarParticipantPicker } from './sidebar-participant-picker';

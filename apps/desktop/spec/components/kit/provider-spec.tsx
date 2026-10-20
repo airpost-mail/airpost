@@ -17,7 +17,7 @@ const ROOTS = {
   'src/window/app-env.ts': 1,
   'src/data/stores/modal.tsx': 3,
   'src/data/stores/popover.tsx': 3,
-  'src/features/onboarding/decorators/create-page-for-form.tsx': 1,
+  'src/features/onboarding/pages/create-page-for-form.tsx': 1,
 };
 
 const DirProbe = (props: { id: string }) => <span id={props.id}>{useDirection()}</span>;

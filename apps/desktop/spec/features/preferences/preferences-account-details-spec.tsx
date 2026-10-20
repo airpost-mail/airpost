@@ -2,7 +2,7 @@ import React from 'react';
 import { renderIntoDocument } from 'react-dom/test-utils';
 import { Account } from 'mailspring-exports';
 
-import PreferencesAccountDetails from '../../../src/features/preferences/tabs/preferences-account-details';
+import PreferencesAccountDetails from '../../../src/features/preferences/tabs/accounts/details';
 
 const makeComponent = (props: any = {}) => {
   return renderIntoDocument(<PreferencesAccountDetails {...(props as any)} />) as any;

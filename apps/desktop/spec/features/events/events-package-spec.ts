@@ -7,6 +7,6 @@ describe('events package', function () {
   });
 
   it('loads the event header', function () {
-    expect(require('../../../src/features/events/event-header').EventHeader).toBeDefined();
+    expect(require('../../../src/features/events/header').EventHeader).toBeDefined();
   });
 });

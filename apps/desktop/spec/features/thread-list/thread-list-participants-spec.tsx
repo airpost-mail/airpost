@@ -2,9 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import _ from 'underscore';
 import { AccountStore, Thread, Contact, Message } from 'mailspring-exports';
-import ThreadListParticipants, {
-  getTokens,
-} from '../../../src/features/thread-list/thread-list-participants';
+import ThreadListParticipants, { getTokens } from '../../../src/features/thread-list/participants';
 
 describe('ThreadListParticipants', function () {
   beforeEach(function () {

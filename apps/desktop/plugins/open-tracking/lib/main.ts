@@ -1,8 +1,8 @@
 import { localized, ComponentRegistry } from 'mailspring-exports';
 import { HasTutorialTip } from 'mailspring-component-kit';
-import OpenTrackingButton from './open-tracking-button';
-import OpenTrackingIcon from './open-tracking-icon';
-import OpenTrackingMessageStatus from './open-tracking-message-status';
+import OpenTrackingButton from './button';
+import OpenTrackingIcon from './icon';
+import OpenTrackingMessageStatus from './message-status';
 
 const OpenTrackingButtonWithTutorialTip = HasTutorialTip(OpenTrackingButton, {
   title: localized('See when recipients open this email'),

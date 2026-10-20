@@ -3,7 +3,7 @@
 import React from 'react';
 import ReactTestUtils from 'react-dom/test-utils';
 import { SignatureStore } from 'mailspring-exports';
-import SignatureComposerDropdown from '../../../src/features/composer-signature/signature-composer-dropdown';
+import SignatureComposerDropdown from '../../../src/features/composer-signature/composer-dropdown';
 import MTestUtils from '../../test-utils';
 
 const SIGNATURES = {

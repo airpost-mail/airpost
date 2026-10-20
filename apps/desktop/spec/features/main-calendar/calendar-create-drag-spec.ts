@@ -3,18 +3,18 @@ import {
   createNewEventPreview,
   withNewEventPreview,
   CREATE_DRAG_SNAP_SECONDS,
-} from '../../../src/features/main-calendar/core/calendar-drag-utils';
+} from '../../../src/features/main-calendar/drag-utils';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import moment from 'moment';
 import Rx from 'rx-lite';
 import * as CalendarDateUtils from '../../../src/utils/calendar-date';
 import { Calendar } from '../../../src/data/models/calendar';
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { WeekView } from '../../../src/features/main-calendar/core/week-view';
-import { DayView } from '../../../src/features/main-calendar/core/day-view';
-import { DEFAULT_TIMED_EVENT_DURATION_SECONDS } from '../../../src/features/main-calendar/core/calendar-constants';
-import { MonthView } from '../../../src/features/main-calendar/core/month-view';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { WeekView } from '../../../src/features/main-calendar/views/week';
+import { DayView } from '../../../src/features/main-calendar/views/day';
+import { DEFAULT_TIMED_EVENT_DURATION_SECONDS } from '../../../src/features/main-calendar/constants';
+import { MonthView } from '../../../src/features/main-calendar/views/month';
 
 const BASE = 1787860800; // 2026-08-27 16:00:00 UTC, a quarter-hour boundary
 
@@ -110,7 +110,7 @@ describe('withNewEventPreview', function () {
   });
 });
 
-import { detectHitZone } from '../../../src/features/main-calendar/core/calendar-drag-utils';
+import { detectHitZone } from '../../../src/features/main-calendar/drag-utils';
 
 /** A vertical (week/day view) event box of the given height, at the origin. */
 const box = (height: number) =>
@@ -124,7 +124,7 @@ describe('drawing a new event on empty grid space', function () {
 
   // The calendar as the grid sees it: one writable calendar, setState landing in state.
   beforeEach(function () {
-    cal = new MailspringCalendar({} as any);
+    cal = new MainCalendar({} as any);
     cal.state = {
       ...cal.state,
       calendarsLoaded: true,
@@ -310,7 +310,7 @@ describe('opening the editor for a new event', function () {
   let cal: any;
 
   beforeEach(function () {
-    cal = new MailspringCalendar({} as any);
+    cal = new MainCalendar({} as any);
     cal.state = {
       ...cal.state,
       calendarsLoaded: true,
@@ -443,7 +443,7 @@ describe('opening the editor for a new event', function () {
   });
 
   it('opens nothing when no calendar can be written to', function () {
-    const helpers = require('../../../src/features/main-calendar/core/calendar-helpers');
+    const helpers = require('../../../src/features/main-calendar/helpers');
     spyOn(helpers, 'showNoEditableCalendarsError');
     cal.state.calendars = [new Calendar({ id: 'ro', accountId: 'acct-1', readOnly: true } as any)];
     cal._openNewEventPopover(range);

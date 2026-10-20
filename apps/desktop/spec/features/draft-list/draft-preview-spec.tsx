@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Rx, ComponentRegistry, DraftStore } from 'mailspring-exports';
-import DraftPreview from '../../../src/features/draft-list/draft-preview';
-import DraftListStore from '../../../src/features/draft-list/draft-list-store';
+import DraftPreview from '../../../src/features/draft-list/preview';
+import DraftListStore from '../../../src/features/draft-list/store';
 
 let lastComposerProps = null;
 let composerFocused = 0;

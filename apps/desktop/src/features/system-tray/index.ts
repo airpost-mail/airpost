@@ -1,4 +1,4 @@
-import SystemTrayIconStore from './system-tray-icon-store';
+import SystemTrayIconStore from './icon-store';
 
 export function activate() {
   this.store = new SystemTrayIconStore();

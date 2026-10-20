@@ -1,13 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { DatabaseStore, Event } from 'mailspring-exports';
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { CalendarEvent } from '../../../src/features/main-calendar/core/calendar-event';
-import { MonthViewEvent } from '../../../src/features/main-calendar/core/month-view-event';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
-import * as RecurringEventActions from '../../../src/features/main-calendar/core/recurring-event-actions';
-import { CalendarView } from '../../../src/features/main-calendar/core/calendar-constants';
-import FocusedMomentStore from '../../../src/features/main-calendar/core/focused-moment-store';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { CalendarEvent } from '../../../src/features/main-calendar/event/event';
+import { MonthViewEvent } from '../../../src/features/main-calendar/views/month-event';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
+import * as RecurringEventActions from '../../../src/features/main-calendar/event/recurring-actions';
+import { CalendarView } from '../../../src/features/main-calendar/constants';
+import FocusedMomentStore from '../../../src/features/main-calendar/focused-moment-store';
 import { fakePimEngine } from '../../fake-pim-engine';
 
 const START = Date.UTC(2026, 8, 22, 13, 0, 0) / 1000;
@@ -121,7 +121,7 @@ function expand(ics: string, start: number, end: number): TimedOccurrence[] {
 }
 
 function calendarWith(selected: TimedOccurrence[]) {
-  const calendar: any = new MailspringCalendar({} as any);
+  const calendar: any = new MainCalendar({} as any);
   calendar.setState = (update: object) => Object.assign(calendar.state, update);
   calendar.state.selectedEvents = selected;
   calendar.state.calendarsLoaded = true;

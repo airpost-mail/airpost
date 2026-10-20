@@ -2,7 +2,7 @@ import { render, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
 import { AccountStore, Account, Actions } from 'mailspring-exports';
 import { ipcRenderer } from 'electron';
-import AccountErrorNotification from '../../../src/features/notifications/items/account-error-notif';
+import AccountErrorNotification from '../../../src/features/notifications/items/account-error';
 
 describe('AccountErrorNotif', function AccountErrorNotifTests() {
   afterEach(cleanup);

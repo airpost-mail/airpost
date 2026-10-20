@@ -1,5 +1,5 @@
 import { Actions, Message, DatabaseStore, FocusedContentStore } from 'mailspring-exports';
-import DraftListStore from '../../../src/features/draft-list/draft-list-store';
+import DraftListStore from '../../../src/features/draft-list/store';
 
 describe('DraftListStore', function () {
   const draft = new Message({

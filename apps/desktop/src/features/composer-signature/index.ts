@@ -5,8 +5,8 @@ import {
   ComponentRegistry,
 } from 'mailspring-exports';
 
-import SignatureComposerExtension from './signature-composer-extension';
-import SignatureComposerDropdown from './signature-composer-dropdown';
+import SignatureComposerExtension from './composer-extension';
+import SignatureComposerDropdown from './composer-dropdown';
 
 export function activate() {
   this.preferencesTab = new PreferencesUIStore.TabItem({

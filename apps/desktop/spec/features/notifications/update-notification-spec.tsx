@@ -6,7 +6,7 @@ let stubUpdaterState = null;
 let stubUpdaterReleaseVersion = null;
 let ipcSendArgs = null;
 
-const patched = proxyquire('../../../src/features/notifications/items/update-notification', {
+const patched = proxyquire('../../../src/features/notifications/items/update', {
   electron: {
     ipcRenderer: {
       send: (...args) => {

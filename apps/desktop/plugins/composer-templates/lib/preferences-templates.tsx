@@ -12,8 +12,8 @@ import {
 import { Actions, localized, localizedReactFragment } from 'mailspring-exports';
 import { Value } from 'slate';
 
-import TemplateStore, { TemplateItem } from './template-store';
-import { parseTemplate, stringifyTemplate } from './template-file';
+import TemplateStore, { TemplateItem } from './store';
+import { parseTemplate, stringifyTemplate } from './file';
 
 const {
   Conversion: { convertFromHTML, convertToHTML },

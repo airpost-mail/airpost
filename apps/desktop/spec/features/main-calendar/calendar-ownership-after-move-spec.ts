@@ -1,7 +1,7 @@
 import { DatabaseStore, Event } from 'mailspring-exports';
 import { Calendar } from '../../../src/data/models/calendar';
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 import { fakePimEngine } from '../../fake-pim-engine';
 
 // Whether the meeting is ours is the engine's answer (crates/ms-pim's calendar_addresses: a
@@ -59,7 +59,7 @@ describe('a meeting our own secondary calendar organizes, after it is moved', fu
         },
       ],
     });
-    const calendar: any = new MailspringCalendar({} as any);
+    const calendar: any = new MainCalendar({} as any);
     calendar.setState = (update: object) => Object.assign(calendar.state, update);
     calendar.state.calendarsLoaded = true;
     calendar.state.calendars = [

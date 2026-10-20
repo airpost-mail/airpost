@@ -1,9 +1,9 @@
 import { AccountStore } from 'mailspring-exports';
-import { CalendarEventContextMenu } from '../../../src/features/main-calendar/core/calendar-event-context-menu';
+import { CalendarEventContextMenu } from '../../../src/features/main-calendar/event/context-menu';
 import {
   canRespondToEvent,
   myParticipationStatus,
-} from '../../../src/features/main-calendar/core/calendar-rsvp';
+} from '../../../src/features/main-calendar/event/rsvp';
 
 const ME = 'brian@example.com';
 
@@ -41,7 +41,7 @@ function menuFor(occ: any, readOnly = false) {
   return new CalendarEventContextMenu({
     occurrence: occ,
     readOnly,
-    // Mirrors how MailspringCalendar derives it: a writable calendar and a meeting of ours.
+    // Mirrors how MainCalendar derives it: a writable calendar and a meeting of ours.
     onOpen: () => {},
     onDelete: () => {},
     onProposeNewTime: () => {},

@@ -1,5 +1,5 @@
 import { SystemStartService, WorkspaceStore, ComponentRegistry } from 'mailspring-exports';
-import OnboardingRoot from './onboarding-root';
+import OnboardingRoot from './root';
 
 export function activate() {
   WorkspaceStore.defineSheet('Main', { root: true }, { list: ['Center'] });

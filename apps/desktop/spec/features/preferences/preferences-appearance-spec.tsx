@@ -2,7 +2,7 @@ import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 
 import configSchema from '../../../src/config/schema';
-import PreferencesAppearance from '../../../src/features/preferences/tabs/preferences-appearance';
+import PreferencesAppearance from '../../../src/features/preferences/tabs/appearance';
 import { getPortalContainer } from '../../../src/components/kit/portal';
 
 const KEY = 'core.appearance.emailRenderMode';

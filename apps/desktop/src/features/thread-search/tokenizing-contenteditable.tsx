@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { TokenAndTermRegexp } from './search-bar-util';
+import { TokenAndTermRegexp } from './bar-util';
 
 // The search value can contain untrusted text (message content reaches this
 // field through some search actions). It is written to the contentEditable as

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 
 import { Contact, Message } from 'mailspring-exports';
-import { ComposerHeader } from '../../../src/features/composer/composer-header';
+import { ComposerHeader } from '../../../src/features/composer/header';
 import Fields from '../../../src/features/composer/fields';
 
 const DRAFT_HEADER_MSG_ID = 'DRAFT_HEADER_MSG_ID';

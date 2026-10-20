@@ -1,7 +1,4 @@
-import {
-  currentSignatureId,
-  applySignature,
-} from '../../../src/features/composer-signature/signature-utils';
+import { currentSignatureId, applySignature } from '../../../src/features/composer-signature/utils';
 
 const QUOTE_START = '<div class="gmail_quote">On Mon, Jan 1 wrote:</div>';
 

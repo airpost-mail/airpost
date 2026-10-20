@@ -7,7 +7,7 @@ import {
   ComponentRegistry,
   DatabaseStore,
 } from 'mailspring-exports';
-import { EventHeader } from './event-header';
+import { EventHeader } from './header';
 import { bestICSAttachment } from './ics-attachment';
 import { InvitationCalendarRefresh } from './invitation-calendar-refresh';
 

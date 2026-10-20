@@ -544,7 +544,7 @@
     },
     {
       "name": "permalink-date",
-      "site": "src/features/thread-list/thread-permalink-handler.ts (date)",
+      "site": "src/features/thread-list/permalink-handler.ts (date)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -589,7 +589,7 @@
     },
     {
       "name": "permalink-last-date",
-      "site": "src/features/thread-list/thread-permalink-handler.ts (lastDate)",
+      "site": "src/features/thread-list/permalink-handler.ts (lastDate)",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -729,7 +729,7 @@
     },
     {
       "name": "search-result-ids",
-      "site": "src/features/thread-search/search-query-subscription.ts _onSearchResults",
+      "site": "src/features/thread-search/query-subscription.ts _onSearchResults",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -796,7 +796,7 @@
     },
     {
       "name": "thread-findby-id-limit",
-      "site": "src/features/thread-list/thread-list-context-menu.ts copyPermalink",
+      "site": "src/features/thread-list/context-menu.ts copyPermalink",
       "query": {
         "class": "Thread",
         "accounts": null,
@@ -998,7 +998,7 @@
     },
     {
       "name": "thread-messages-no-body",
-      "site": "src/features/thread-list/thread-list-data-source.ts _observableForThreadMessages",
+      "site": "src/features/thread-list/data-source.ts _observableForThreadMessages",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1029,7 +1029,7 @@
     },
     {
       "name": "messages-of-threads",
-      "site": "src/features/thread-list/thread-list-data-source.ts (missingIds)",
+      "site": "src/features/thread-list/data-source.ts (missingIds)",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1307,7 +1307,7 @@
     },
     {
       "name": "draft-list",
-      "site": "src/features/draft-list/draft-list-store.ts _onPerspectiveChanged",
+      "site": "src/features/draft-list/store.ts _onPerspectiveChanged",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1340,7 +1340,7 @@
     },
     {
       "name": "draft-list-one-account",
-      "site": "src/features/draft-list/draft-list-store.ts (accountId)",
+      "site": "src/features/draft-list/store.ts (accountId)",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1412,7 +1412,7 @@
     },
     {
       "name": "activity",
-      "site": "plugins/activity/lib/activity-data-source.ts buildQuery",
+      "site": "plugins/activity/lib/data-source.ts buildQuery",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1451,7 +1451,7 @@
     },
     {
       "name": "activity-accounts-dates",
-      "site": "plugins/activity/lib/activity-data-source.ts buildQuery (filters)",
+      "site": "plugins/activity/lib/data-source.ts buildQuery (filters)",
       "query": {
         "class": "Message",
         "accounts": null,
@@ -1728,7 +1728,7 @@
     },
     {
       "name": "contacts-list",
-      "site": "src/features/contacts/Store.ts",
+      "site": "src/features/contacts/store.ts",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1764,7 +1764,7 @@
     },
     {
       "name": "contacts-not-mail",
-      "site": "src/features/contacts/Store.ts (source)",
+      "site": "src/features/contacts/store.ts (source)",
       "query": {
         "class": "Contact",
         "accounts": null,
@@ -1898,7 +1898,7 @@
     },
     {
       "name": "contact-books",
-      "site": "src/features/contacts/Store.ts",
+      "site": "src/features/contacts/store.ts",
       "query": {
         "class": "ContactBook",
         "accounts": null,
@@ -1921,7 +1921,7 @@
     },
     {
       "name": "calendars",
-      "site": "src/features/main-calendar/core/calendar-sidebar.tsx",
+      "site": "src/features/main-calendar/sidebar.tsx",
       "query": {
         "class": "Calendar",
         "accounts": null,
@@ -1939,7 +1939,7 @@
     },
     {
       "name": "calendars-for-account",
-      "site": "src/features/events/event-header.tsx",
+      "site": "src/features/events/header.tsx",
       "query": {
         "class": "Calendar",
         "accounts": null,
@@ -1965,7 +1965,7 @@
     },
     {
       "name": "calendar-by-id",
-      "site": "src/features/main-calendar/core/calendar-rsvp.ts",
+      "site": "src/features/main-calendar/event/rsvp.ts",
       "query": {
         "class": "Calendar",
         "accounts": null,
@@ -1991,7 +1991,7 @@
     },
     {
       "name": "events-in-range",
-      "site": "src/features/main-calendar/core/calendar-data-source.ts buildObservable",
+      "site": "src/features/main-calendar/data-source.ts buildObservable",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2089,7 +2089,7 @@
     },
     {
       "name": "events-by-uid",
-      "site": "src/features/main-calendar/index.tsx, events/event-header.tsx",
+      "site": "src/features/main-calendar/index.tsx, events/header.tsx",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2125,7 +2125,7 @@
     },
     {
       "name": "events-nearby",
-      "site": "src/features/events/event-header.tsx (conflicts)",
+      "site": "src/features/events/header.tsx (conflicts)",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2166,7 +2166,7 @@
     },
     {
       "name": "event-master",
-      "site": "src/features/main-calendar/core/calendar-view.tsx _onDelete",
+      "site": "src/features/main-calendar/main-calendar.tsx _onDelete",
       "query": {
         "class": "Event",
         "accounts": null,
@@ -2243,7 +2243,7 @@
     },
     {
       "name": "event-search",
-      "site": "src/features/main-calendar/core/event-search-bar.tsx",
+      "site": "src/features/main-calendar/search-bar.tsx",
       "query": {
         "class": "Event",
         "accounts": null,

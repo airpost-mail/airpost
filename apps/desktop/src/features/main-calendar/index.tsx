@@ -10,10 +10,10 @@ import {
 } from 'mailspring-exports';
 import { NavRailItem } from 'mailspring-component-kit';
 import { QuickEventButton } from './quick-event-button';
-import { MailspringCalendar } from './core/calendar-view';
-import { CalendarSidebar } from './core/calendar-sidebar';
-import { EventSearchBar } from './core/event-search-bar';
-import { focusedEventInfoForEvents } from './core/calendar-data-source';
+import { MainCalendar } from './main-calendar';
+import { CalendarSidebar } from './sidebar';
+import { EventSearchBar } from './search-bar';
+import { focusedEventInfoForEvents } from './data-source';
 
 type MenuItem = (typeof AppEnv.menu.template)[0];
 
@@ -143,7 +143,7 @@ export function activate() {
   ComponentRegistry.register(CalendarSidebar, {
     location: WorkspaceStore.Location.CalendarSidebar,
   });
-  ComponentRegistry.register(MailspringCalendar, {
+  ComponentRegistry.register(MainCalendar, {
     location: WorkspaceStore.Location.CalendarContent,
   });
   ComponentRegistry.register(QuickEventButton, {
@@ -160,7 +160,7 @@ export function activate() {
 
 export function deactivate() {
   ComponentRegistry.unregister(CalendarSidebar);
-  ComponentRegistry.unregister(MailspringCalendar);
+  ComponentRegistry.unregister(MainCalendar);
   ComponentRegistry.unregister(QuickEventButton);
   ComponentRegistry.unregister(EventSearchBar);
   ComponentRegistry.unregister(CalendarNavRailItem);

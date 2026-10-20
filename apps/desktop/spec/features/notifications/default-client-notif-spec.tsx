@@ -4,7 +4,7 @@ import React from 'react';
 
 let stubIsRegistered = null;
 let stubRegister: (...args: any[]) => void = () => {};
-const patched = proxyquire('../../../src/features/notifications/items/default-client-notif', {
+const patched = proxyquire('../../../src/features/notifications/items/default-client', {
   'mailspring-exports': {
     DefaultClientHelper: class {
       constructor() {

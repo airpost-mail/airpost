@@ -1,6 +1,6 @@
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
-import DevModeNotification from '../../../src/features/notifications/items/dev-mode-notif';
+import DevModeNotification from '../../../src/features/notifications/items/dev-mode';
 
 describe('DevModeNotif', function DevModeNotifTests() {
   afterEach(cleanup);

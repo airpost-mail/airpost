@@ -2,14 +2,14 @@
 
 import { ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
 import ActivitySidebar from './sidebar/activity-sidebar';
-import NotifWrapper from './notif-wrapper';
+import NotifWrapper from './wrapper';
 
-import AccountErrorNotification from './items/account-error-notif';
-import DefaultClientNotification from './items/default-client-notif';
-import DevModeNotification from './items/dev-mode-notif';
-import DisabledMailRulesNotification from './items/disabled-mail-rules-notif';
-import OfflineNotification from './items/offline-notification';
-import UpdateNotification from './items/update-notification';
+import AccountErrorNotification from './items/account-error';
+import DefaultClientNotification from './items/default-client';
+import DevModeNotification from './items/dev-mode';
+import DisabledMailRulesNotification from './items/disabled-mail-rules';
+import OfflineNotification from './items/offline';
+import UpdateNotification from './items/update';
 import { EngineUnavailableNotification } from '../../components/engine-unavailable-state';
 
 const notifications = [

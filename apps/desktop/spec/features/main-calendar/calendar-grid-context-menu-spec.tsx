@@ -1,14 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
-import { MailspringCalendar } from '../../../src/features/main-calendar/core/calendar-view';
+import { MainCalendar } from '../../../src/features/main-calendar/main-calendar';
 import {
   CalendarEventArgs,
   CalendarEventContainer,
-} from '../../../src/features/main-calendar/core/calendar-event-container';
-import { CalendarEvent } from '../../../src/features/main-calendar/core/calendar-event';
-import { MonthViewEvent } from '../../../src/features/main-calendar/core/month-view-event';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+} from '../../../src/features/main-calendar/event/container';
+import { CalendarEvent } from '../../../src/features/main-calendar/event/event';
+import { MonthViewEvent } from '../../../src/features/main-calendar/views/month-event';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 
 const START = Date.UTC(2026, 5, 23, 14, 0, 0) / 1000;
 
@@ -112,7 +112,7 @@ describe('the grid menu', function () {
     ({ time, mouseEvent: { clientX: 10, clientY: 20 }, containerType: 'event-column' }) as any;
 
   function calendar() {
-    const cal: any = new MailspringCalendar({} as any);
+    const cal: any = new MainCalendar({} as any);
     spyOn(cal, '_showGridMenu');
     spyOn(cal, '_createEventAt');
     return cal;

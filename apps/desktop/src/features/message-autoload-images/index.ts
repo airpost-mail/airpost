@@ -1,7 +1,7 @@
 import { ComponentRegistry, ExtensionRegistry } from 'mailspring-exports';
 
-import AutoloadImagesExtension from './autoload-images-extension';
-import AutoloadImagesHeader from './autoload-images-header';
+import AutoloadImagesExtension from './extension';
+import AutoloadImagesHeader from './header';
 
 /*
 All packages must export a basic object that has at least the following 3

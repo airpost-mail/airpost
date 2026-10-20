@@ -3,12 +3,12 @@ import classnames from 'classnames';
 import { ScrollRegion, ListensToFluxStore } from 'mailspring-component-kit';
 import { localized, AccountStore, FocusedPerspectiveStore } from 'mailspring-exports';
 
-import ActivityFeed from './feed/activity-feed';
+import ActivityFeed from './feed/feed';
 import ActivityReports from './dashboard/root';
-import EngagementBoard from './engagement/engagement-board';
+import EngagementBoard from './engagement/board';
 import TimespanSelector from './timespan-selector';
 import { DEFAULT_TIMESPAN_ID, Timespan, timespanForId } from './timespan';
-import * as ActivityActions from './activity-actions';
+import * as ActivityActions from './actions';
 
 export type ActivityTabId = 'feed' | 'engagement' | 'reports';
 

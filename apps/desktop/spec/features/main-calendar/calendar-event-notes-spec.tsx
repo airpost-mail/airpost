@@ -2,8 +2,8 @@ import http from 'http';
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
 
-import { CalendarEventPopover } from '../../../src/features/main-calendar/core/calendar-event-popover';
-import { TimedOccurrence } from '../../../src/features/main-calendar/core/calendar-data-source';
+import { CalendarEventPopover } from '../../../src/features/main-calendar/event/popover';
+import { TimedOccurrence } from '../../../src/features/main-calendar/data-source';
 
 function renderCard(description: string) {
   const event = {
