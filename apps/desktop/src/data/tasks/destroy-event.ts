@@ -2,7 +2,7 @@ import { Task } from './task';
 import * as Attributes from '../attributes';
 import { Event } from '../models/event';
 import { AttributeValues } from '../models/model';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 
 export class DestroyEventTask extends Task {
   static attributes = {

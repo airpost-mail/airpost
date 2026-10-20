@@ -13,7 +13,7 @@ import {
   ConfigSelectRow,
 } from 'mailspring-component-kit';
 import { Actions, localized } from 'mailspring-exports';
-import { isWaylandSession } from '../../../shared/is-wayland';
+import { isWaylandSession } from '../../../platform/linux-desktop';
 import { LABEL_COLOR_SCHEMES, LABEL_COLOR_SCHEME_NAMES } from '../../../data/stores/label-color';
 import LessCompileCache from '../../../packages/compile-cache-less';
 import {

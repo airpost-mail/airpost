@@ -7,7 +7,7 @@ import ContactStore from '../stores/contact';
 import { MessageStore } from '../stores/message';
 import FocusedPerspectiveStore from '../stores/focused-perspective';
 import FocusedContentStore from '../stores/focused-content';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { Contact } from '../models/contact';
 import { Message } from '../models/message';
 import MessageUtils from '../models/message-utils';

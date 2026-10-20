@@ -1,6 +1,6 @@
 /* eslint react/jsx-no-bind: 0 */
 import moment, { Moment } from 'moment-timezone';
-import { formatTime, momentZone } from '../../../shared/date-format';
+import { formatTime, momentZone } from '../../../intl/date-format';
 import classnames from 'classnames';
 import React from 'react';
 import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';

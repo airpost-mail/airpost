@@ -1,8 +1,8 @@
 import { FilesScheme } from './files-scheme';
-import { MessageFrameOrigin, MessageFrameScriptURL } from './message-frame-protocol';
+import { MessageFrameOrigin, MessageFrameScriptURL } from './frame/protocol';
 
 // The app's policy. main.js sends it as a response header and every static/*.html page
-// carries the same string in its <meta> tag; tests/shared/content-security-policy.test.ts fails if
+// carries the same string in its <meta> tag; tests/mail/content-security-policy.test.ts fails if
 // they drift.
 //
 // connect-src lists the hosts the renderer fetches itself. Requests to hosts that depend on

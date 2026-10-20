@@ -1,6 +1,6 @@
 /* eslint global-require: "off" */
 
-import '../shared/safe-shell';
+import '../platform/safe-shell';
 import {
   BrowserWindow,
   ClipboardItem,
@@ -21,7 +21,7 @@ import path from 'path';
 import proc from 'child_process';
 import { EventEmitter } from 'events';
 
-import { localized, initializeLocalization } from '../shared/intl';
+import { localized, initializeLocalization } from '../intl/localize';
 import WindowManager from './windows/manager';
 import FileListCache from './windows/file-list-cache';
 import ConfigMigrator from '../config/migrator';
@@ -29,8 +29,8 @@ import ApplicationMenu from './platform/application-menu';
 import AutoUpdateManager from './autoupdate/manager';
 import SystemAccentWatcher from './platform/accent-watcher';
 import SystemTrayManager from './platform/system-tray';
-import { DefaultClientHelper } from '../shared/default-client-helper';
-import { developerToolsAvailable } from '../shared/developer-tools';
+import { DefaultClientHelper } from '../platform/default-client-helper';
+import { developerToolsAvailable } from '../platform/developer-tools';
 import AssetProtocolHandler from './protocols/asset';
 import { registerFilesProtocol } from './protocols/files';
 import { registerMessageFrameProtocol } from './frame/protocol-handler';

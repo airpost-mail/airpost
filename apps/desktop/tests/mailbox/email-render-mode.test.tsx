@@ -4,7 +4,7 @@ import { Message } from 'mailspring-exports';
 import EmailFrame from '../../src/features/message-list/email-frame';
 import { MessageFrameBridge } from '../../src/mail/frame/bridge';
 import { renderMessageDocument } from '../../src/mail/frame/document';
-import { RenderMessage } from '../../src/shared/message-frame-protocol';
+import { RenderMessage } from '../../src/mail/frame/protocol';
 import {
   DEFAULT_DARK_PALETTE,
   EMAIL_RENDER_MODE_KEY,

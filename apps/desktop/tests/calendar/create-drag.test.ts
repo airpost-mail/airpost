@@ -8,7 +8,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import moment from 'moment';
 import Rx from 'rx-lite';
-import * as CalendarDateUtils from '../../src/utils/calendar-date';
+import * as CalendarDateUtils from '../../src/data/calendar/calendar-date';
 import { Calendar } from '../../src/data/models/calendar';
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { WeekView } from '../../src/features/main-calendar/views/week';

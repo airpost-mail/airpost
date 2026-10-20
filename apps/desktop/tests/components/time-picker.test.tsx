@@ -115,7 +115,7 @@ describe('TimePicker', function timePicker() {
     expect(lastEmitted(onChange).format('YYYY-MM-DD HH:mm')).toBe(`${EVENT_DAY} 15:30`);
   });
 
-  // The 24-hour clock setting (src/shared/date-format.ts): the field renders and accepts 24-hour text.
+  // The 24-hour clock setting (src/intl/date-format.ts): the field renders and accepts 24-hour text.
   describe('on a 24-hour clock', () => {
     beforeEach(() => {
       const realGet = AppEnv.config.get.bind(AppEnv.config);

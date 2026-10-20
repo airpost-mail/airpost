@@ -1,6 +1,6 @@
 import React from 'react';
 import classNames from 'classnames';
-import { localized } from '../shared/intl';
+import { localized } from '../intl/localize';
 import { Switch } from './kit/switch';
 import { SegmentedControl } from './kit/segmented-control';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './kit/select';

@@ -1,7 +1,7 @@
 import _ from 'underscore';
 import { app, BrowserWindow } from 'electron';
 import WindowLauncher from './launcher';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import AppWindow from './app-window';
 
 const MAIN_WINDOW = 'default';

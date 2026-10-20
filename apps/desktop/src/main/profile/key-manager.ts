@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import {
   canMigrate as canMigrateFromMailspring,
   decryptWithMailspringKey,

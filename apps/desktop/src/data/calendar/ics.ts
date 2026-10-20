@@ -1,4 +1,7 @@
-import { AccountStore, Calendar, RegExpUtils, Utils } from 'mailspring-exports';
+import { AccountStore } from '../stores/account';
+import { Calendar } from '../models/calendar';
+import * as Utils from '../models/utils';
+import RegExpUtils from '../../utils/regexp';
 
 type ICAL = typeof import('ical.js').default;
 type ICALComponent = InstanceType<ICAL['Component']>;

@@ -1,8 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import { BrowserWindow, dialog, app } from 'electron';
-import { atomicWriteFileSync } from '../shared/fs-utils';
-import { localized } from '../shared/intl';
+import { atomicWriteFileSync } from '../utils/fs';
+import { localized } from '../intl/localize';
 import { ConfigChannel, ConfigReply } from './channels';
 import {
   ENGINE_SETTINGS_KEYS,
@@ -11,7 +11,7 @@ import {
   SettingsHost,
   touchesKey,
 } from '../engine/supervisor/settings';
-import { USE_24_HOUR_KEY } from '../shared/date-format';
+import { USE_24_HOUR_KEY } from '../intl/date-format';
 
 let _ = require('underscore');
 _ = Object.assign(_, require('./utils'));

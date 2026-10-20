@@ -1,6 +1,7 @@
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import pkg from '../../package.json';
 
 const HOME = os.homedir();
 
@@ -53,3 +54,22 @@ export const ICON_PATHS = XDG_DATA_PATHS.flatMap((dataPath) => [
   path.join(dataPath, 'icons'),
   path.join(dataPath, 'pixmaps'),
 ]).concat([path.join(HOME, '.icons'), os.tmpdir()]);
+
+// The .desktop file the app installs, used for xdg-mime registration, autostart and notifications.
+export const DESKTOP_FILE_NAME: string =
+  pkg.desktopName || (pkg.name ? `${pkg.name}.desktop` : 'com.ternmail.tern.desktop');
+
+/**
+ * Returns true if the current session is running on Wayland.
+ * Checks both XDG_SESSION_TYPE and WAYLAND_DISPLAY to handle
+ * cases where only one is set (e.g., some container environments).
+ *
+ * This should be used instead of `process.platform === 'linux'` when
+ * gating Wayland-specific workarounds, so X11 users are not affected.
+ */
+export function isWaylandSession(): boolean {
+  return (
+    process.platform === 'linux' &&
+    (process.env.XDG_SESSION_TYPE === 'wayland' || !!process.env.WAYLAND_DISPLAY)
+  );
+}

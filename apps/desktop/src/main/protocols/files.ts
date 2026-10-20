@@ -1,7 +1,7 @@
 import { net, protocol } from 'electron';
 import path from 'path';
 import { pathToFileURL } from 'url';
-import { FilesScheme, resolveFilesSchemeURL } from '../../shared/files-scheme';
+import { FilesScheme, resolveFilesSchemeURL } from '../../mail/files-scheme';
 
 // Serves tern-file: URLs from <configDir>/files and nowhere else.
 export function registerFilesProtocol(configDirPath: string) {

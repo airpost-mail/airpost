@@ -10,7 +10,7 @@ import { RetinaImg } from '../retina-img';
 import { RovingTabIndexToolbar } from '../roving-tab-index-toolbar';
 import * as Utils from '../../data/models/utils';
 import { Disposable } from 'rx-core';
-import { isWaylandSession } from '../../shared/is-wayland';
+import { isWaylandSession } from '../../platform/linux-desktop';
 import { SheetDepthContext } from './context';
 
 let Category = null;

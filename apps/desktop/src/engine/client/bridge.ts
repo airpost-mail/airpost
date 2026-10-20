@@ -1,6 +1,6 @@
 import path from 'path';
 import { ipcRenderer } from 'electron';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 
 import { Task } from '../../data/tasks/task';
 import TaskQueue from '../../data/stores/task-queue';

@@ -11,7 +11,7 @@ import {
   secondsIntoDayUnix,
   firstOccurrenceUnix,
   sameOffsetOccurrenceUnix,
-} from '../../src/utils/calendar-date';
+} from '../../src/data/calendar/calendar-date';
 
 /** Fixtures read as dates, not epoch-day integers — a failure says 2026-06-21, not 20627 */
 const d = (iso: string): CalendarDate => parseCalendarDate(iso);

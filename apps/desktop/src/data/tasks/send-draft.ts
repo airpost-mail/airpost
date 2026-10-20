@@ -7,7 +7,7 @@ import { Message } from '../models/message';
 import SoundRegistry from '../../packages/sound-registry';
 import { Composer as ComposerExtensionRegistry } from '../../packages/extension-registry';
 import { LocalizedErrorStrings } from '../../engine/process';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { AttributeValues } from '../models/model';
 import { Contact } from '../models/contact';
 import { ZERO_WIDTH_SPACE } from '../../components/composer-editor/plaintext';

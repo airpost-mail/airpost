@@ -1,5 +1,5 @@
-const { localized } = require('../src/shared/intl');
-const { developerToolsAvailable } = require('../src/shared/developer-tools');
+const { localized } = require('../src/intl/localize');
+const { developerToolsAvailable } = require('../src/platform/developer-tools');
 
 module.exports = {
   menu: [

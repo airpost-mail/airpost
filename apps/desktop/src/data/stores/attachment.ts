@@ -7,9 +7,9 @@ import DraftStore from '../drafts/store';
 import * as Actions from '../actions';
 import { File } from '../models/file';
 import * as Utils from '../models/utils';
-import { localized } from '../../shared/intl';
-import { filesSchemeURL } from '../../shared/files-scheme';
-import { confirmOpeningFile, markFileFromInternet } from '../../shared/attachment-safety';
+import { localized } from '../../intl/localize';
+import { filesSchemeURL } from '../../mail/files-scheme';
+import { confirmOpeningFile, markFileFromInternet } from '../../mail/attachment-safety';
 import {
   generatePreview,
   canPossiblyPreviewExtension,
@@ -76,7 +76,7 @@ class AttachmentStore extends BaseStore {
     return filePath;
   }
 
-  // The tern-file: URL message documents use to show the file (src/shared/files-scheme.ts).
+  // The tern-file: URL message documents use to show the file (src/mail/files-scheme.ts).
   fileSchemeURLForFile(file: File) {
     const filePath = this.pathForFile(file);
     return filePath ? filesSchemeURL(this._filesDirectory, filePath) : null;

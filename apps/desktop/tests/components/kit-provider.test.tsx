@@ -4,7 +4,7 @@ import path from 'path';
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
 import { useDirection } from '@radix-ui/react-direction';
-import * as intl from '../../src/shared/intl';
+import * as intl from '../../src/intl/localize';
 import ModalStore from '../../src/data/stores/modal';
 import PopoverStore from '../../src/data/stores/popover';
 import { UIProvider } from '../../src/components/kit/provider';

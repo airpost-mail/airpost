@@ -1,7 +1,7 @@
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';
 import { DEFAULT_DRAG_CONFIG } from '../../src/features/main-calendar/drag-types';
-import * as CalendarDateUtils from '../../src/utils/calendar-date';
+import * as CalendarDateUtils from '../../src/data/calendar/calendar-date';
 import * as CalendarRsvp from '../../src/features/main-calendar/event/rsvp';
 import { CalendarView } from '../../src/features/main-calendar/constants';
 

@@ -1,8 +1,8 @@
 import fs from 'fs';
 import { exec } from 'child_process';
 import { shell } from 'electron';
-import { localized } from './intl';
-import pkg from './package';
+import { localized } from '../intl/localize';
+import { DESKTOP_FILE_NAME } from './linux-desktop';
 
 interface DCH {
   available(): boolean;
@@ -108,7 +108,7 @@ export class DefaultClientHelperLinux implements DCH {
       throw new Error('isRegisteredForURLScheme is async, provide a callback');
     }
     exec(`xdg-mime query default x-scheme-handler/${scheme}`, (err, stdout) =>
-      err ? callback(err) : callback(stdout.trim() === pkg.desktopName)
+      err ? callback(err) : callback(stdout.trim() === DESKTOP_FILE_NAME)
     );
   }
 
@@ -118,7 +118,7 @@ export class DefaultClientHelperLinux implements DCH {
     );
   }
   registerForURLScheme(scheme: string, callback = (error?: Error) => {}) {
-    exec(`xdg-mime default ${pkg.desktopName} x-scheme-handler/${scheme}`, (err: Error | null) =>
+    exec(`xdg-mime default ${DESKTOP_FILE_NAME} x-scheme-handler/${scheme}`, (err: Error | null) =>
       err ? callback(err) : callback(null)
     );
   }

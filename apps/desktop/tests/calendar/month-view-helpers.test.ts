@@ -4,7 +4,7 @@ import {
   layoutWeekBars,
 } from '../../src/features/main-calendar/views/month-helpers';
 import { EventOccurrence, coveredDates } from '../../src/features/main-calendar/data-source';
-import { calendarDateFromUnix } from '../../src/utils/calendar-date';
+import { calendarDateFromUnix } from '../../src/data/calendar/calendar-date';
 import moment from 'moment';
 
 // Built the way MonthView builds a row: seven local midnights, read as dates.

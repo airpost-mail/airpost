@@ -1,5 +1,5 @@
 import moment, { Moment } from 'moment-timezone';
-import { hourCycle } from '../shared/date-format';
+import { appLocale, hourCycle } from '../intl/date-format';
 
 // Init locale for moment
 moment.locale(navigator.language);
@@ -460,10 +460,10 @@ const DateUtils = {
         opts.month = 'short';
         opts.day = 'numeric';
       }
-      return datetime.toLocaleDateString(navigator.language, opts);
+      return datetime.toLocaleDateString(appLocale(), opts);
     }
 
-    return datetime.toLocaleTimeString(navigator.language, opts);
+    return datetime.toLocaleTimeString(appLocale(), opts);
   },
 
   /**
@@ -473,7 +473,7 @@ const DateUtils = {
    * @return {String} Formated date/time
    */
   mediumTimeString(datetime: Date) {
-    return datetime.toLocaleTimeString(navigator.language, {
+    return datetime.toLocaleTimeString(appLocale(), {
       hourCycle: hourCycle(),
       year: 'numeric',
       month: 'long',
@@ -494,7 +494,7 @@ const DateUtils = {
     // which may work with the below regex, though localisation is required
     // `(?<!\d)${dateTime.getDay()}(?!\d)` replace `$1${localise(ordinal)}`
 
-    return datetime.toLocaleTimeString(navigator.language, {
+    return datetime.toLocaleTimeString(appLocale(), {
       hourCycle: hourCycle(),
       year: 'numeric',
       month: 'long',

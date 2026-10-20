@@ -1,9 +1,4 @@
-import {
-  AppToFrameMessage,
-  BodyOperation,
-  FrameRect,
-  FrameToAppMessage,
-} from '../../shared/message-frame-protocol';
+import { AppToFrameMessage, BodyOperation, FrameRect, FrameToAppMessage } from './protocol';
 import type { BodyElementInfo } from './document';
 
 const RequestTimeout = 10000;

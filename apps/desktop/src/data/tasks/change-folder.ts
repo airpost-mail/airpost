@@ -1,7 +1,7 @@
 import { ChangeMailTask } from './change-mail';
 import * as Attributes from '../attributes';
 import { Folder } from '../models/folder';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { Message } from '../models/message';
 import { Thread } from '../models/thread';
 import { AttributeValues } from '../models/model';

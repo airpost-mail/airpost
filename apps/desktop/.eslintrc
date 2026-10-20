@@ -148,7 +148,7 @@
         "src/window/platform/system-start-service.ts",
         "src/packages/manager.ts",
         "src/mail/quick-preview/index.ts",
-        "src/shared/default-client-helper.ts",
+        "src/platform/default-client-helper.ts",
         "src/engine/process.ts",
         "src/window/app-env.ts",
         "src/window/spellchecker.ts",
@@ -195,7 +195,7 @@
                   "./src/config/migrator.ts",
                   "./src/config/persistence-manager.ts"
                 ],
-                "message": "src/main/, src/engine/supervisor/ and the config migrator and persistence manager are main-process code; window code reaches them over IPC. Code both processes load goes in src/shared/, src/config/ or the src/engine/ root."
+                "message": "src/main/, src/engine/supervisor/ and the config migrator and persistence manager are main-process code; window code reaches them over IPC. Code both processes load is listed in the main-process override: src/intl/, src/platform/, src/config/, the src/engine/ root and single files in packages/, mail/, window/ and utils/."
               }
             ]
           }
@@ -203,7 +203,22 @@
       }
     },
     {
-      "files": ["src/main/**", "src/shared/**", "src/config/**", "src/engine/*.ts", "src/engine/supervisor/**"],
+      "files": [
+        "src/main/**",
+        "src/config/**",
+        "src/engine/*.ts",
+        "src/engine/supervisor/**",
+        "src/intl/**",
+        "src/platform/**",
+        "src/packages/bundled-packages.ts",
+        "src/mail/attachment-safety.ts",
+        "src/mail/content-security-policy.ts",
+        "src/mail/files-scheme.ts",
+        "src/mail/frame/protocol.ts",
+        "src/window/external-fetch.ts",
+        "src/utils/file-url.ts",
+        "src/utils/fs.ts"
+      ],
       "rules": {
         "import/no-restricted-paths": [
           "error",
@@ -214,17 +229,27 @@
                 "from": "./src",
                 "except": [
                   "./main",
-                  "./shared",
                   "./config",
                   "./engine/protocol.ts",
                   "./engine/process.ts",
                   "./engine/channels.ts",
+                  "./engine/resurfacing.ts",
                   "./engine/supervisor",
+                  "./intl",
+                  "./platform",
+                  "./packages/bundled-packages.ts",
+                  "./mail/attachment-safety.ts",
+                  "./mail/content-security-policy.ts",
+                  "./mail/files-scheme.ts",
+                  "./mail/frame/protocol.ts",
+                  "./window/external-fetch.ts",
+                  "./utils/file-url.ts",
+                  "./utils/fs.ts",
                   "./data/models/utils.ts",
                   "./data/database-object-registry.ts",
                   "./data/serializable-registry.ts"
                 ],
-                "message": "The main process loads src/main/, src/shared/, src/config/, src/engine/supervisor/ and the src/engine/ root files only (plus data/models/utils and the two registries it pulls in)."
+                "message": "The main process loads src/main/, src/config/, src/engine/supervisor/, src/intl/, src/platform/, the src/engine/ root and the single files listed here in packages/, mail/, window/ and utils/ (plus data/models/utils and the two registries it pulls in)."
               },
               {
                 "target": ".",

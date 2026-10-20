@@ -12,7 +12,7 @@ import {
   SendDraftTask,
   Thread,
 } from 'mailspring-exports';
-import { resurfacingBodies } from '../../../src/shared/resurfacing';
+import { resurfacingBodies } from '../../../src/engine/resurfacing';
 
 export function snoozedUntilMessage(snoozeDate: string | null, now: Moment = moment()) {
   let message = localized('Snoozed');

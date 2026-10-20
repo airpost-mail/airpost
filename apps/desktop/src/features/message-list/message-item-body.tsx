@@ -16,9 +16,9 @@ import EmailFrame from './email-frame';
 import {
   contentSecurityPolicyMetaTag,
   messageContentSecurityPolicy,
-} from '../../shared/content-security-policy';
+} from '../../mail/content-security-policy';
 import { BrowserWindow } from '@electron/remote';
-import { developerToolsAvailable } from '../../shared/developer-tools';
+import { developerToolsAvailable } from '../../platform/developer-tools';
 
 const TransparentPixel =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNikAQAACIAHF/uBd8AAAAASUVORK5CYII=';

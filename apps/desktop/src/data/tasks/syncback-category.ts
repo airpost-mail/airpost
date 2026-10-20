@@ -1,7 +1,7 @@
-import { imapUtf7 } from '../../utils/imap-utf7';
+import { imapUtf7 } from '../../mail/imap-utf7';
 import { Task } from './task';
 import * as Attributes from '../attributes';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { AttributeValues } from '../models/model';
 
 export class SyncbackCategoryTask extends Task {

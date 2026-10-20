@@ -4,7 +4,7 @@
 import path from 'path';
 import Package from './package';
 import { applyModuleConfig, loadKeymaps, loadMenus, loadStylesheets } from './resources';
-import { featuresRoot } from '../shared/bundled-packages';
+import { featuresRoot } from './bundled-packages';
 import type { FeatureManifest } from '../features';
 
 // A built-in feature from src/features/index.ts, held in PackageManager like a package so it

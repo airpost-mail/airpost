@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import { isRTL } from '../../shared/intl';
+import { isRTL } from '../../intl/localize';
 
 export const PORTAL_ROOT_ID = 'ui-portal-root';
 

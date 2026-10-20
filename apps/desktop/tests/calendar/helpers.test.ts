@@ -1,7 +1,7 @@
 import moment from 'moment';
 import { Actions, SyncbackEventTask, TaskQueue } from 'mailspring-exports';
 import { fakePimEngine, refusal } from '../support/fake-pim-engine';
-import { formatShortTime as shortTime } from '../../src/shared/date-format';
+import { formatShortTime as shortTime } from '../../src/intl/date-format';
 // Import directly from the source file; the plugin isn't registered in mailspring-exports.
 import {
   inclusiveAllDayEnd,
@@ -16,7 +16,7 @@ import {
   dayStartUnix,
   calendarDateFromUnix,
   calendarDaysBetween,
-} from '../../src/utils/calendar-date';
+} from '../../src/data/calendar/calendar-date';
 
 /** Local midnight, as unix seconds — all-day times are built from local date components */
 function localDay(year: number, month1Indexed: number, day: number): number {

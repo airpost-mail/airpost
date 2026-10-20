@@ -2,7 +2,7 @@ import React from 'react';
 import moment, { Moment } from 'moment';
 import { Actions, localized } from 'mailspring-exports';
 import { DatePicker, TimePicker } from 'mailspring-component-kit';
-import { formatTime } from '../shared/date-format';
+import { formatTime } from '../intl/date-format';
 
 // The pickers speak milliseconds; events are passed around in unix seconds.
 const toPicker = (unixSeconds: number) => unixSeconds * 1000;

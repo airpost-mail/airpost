@@ -1,6 +1,6 @@
 import path from 'path';
 import { Tray, Menu, nativeImage, nativeTheme } from 'electron';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { waitForStatusNotifierHost } from './sni-host';
 import Application from '../application';
 

@@ -1,10 +1,10 @@
 import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';
-import { localized } from '../shared/intl';
+import { localized } from '../intl/localize';
 import Package, { isValidPackageName } from './package';
 import BuiltinFeature from './builtin-feature';
-import { bundledPackagePaths, bundledPackageRoots, compareNames } from '../shared/bundled-packages';
+import { bundledPackagePaths, bundledPackageRoots, compareNames } from './bundled-packages';
 import { FEATURES, FeatureManifest } from '../features';
 import { PLUGIN_API_VERSION } from './api-version';
 import { recordPluginInstall } from './install-record';

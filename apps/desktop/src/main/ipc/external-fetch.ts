@@ -1,6 +1,6 @@
 import { net } from 'electron';
 import { isAppWindowContents } from '../windows/app-window';
-import type { ExternalFetchInit, ExternalFetchResult } from '../../shared/external-fetch';
+import type { ExternalFetchInit, ExternalFetchResult } from '../../window/external-fetch';
 
 const MaxResponseBytes = 50 * 1024 * 1024;
 

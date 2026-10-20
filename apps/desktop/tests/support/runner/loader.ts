@@ -3,7 +3,7 @@
 import _ from 'underscore';
 import fs from 'fs';
 import path from 'path';
-import { bundledPackagePaths } from '../../../src/shared/bundled-packages';
+import { bundledPackagePaths } from '../../../src/packages/bundled-packages';
 
 // Core and bundled package tests are `*.test.*` files under a `tests/` dir. Third-party
 // packages may also keep `*-spec.*` files under `specs/`.

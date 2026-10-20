@@ -2,7 +2,7 @@
 /* eslint no-use-before-define: 0 */
 import _ from 'underscore';
 
-import { localized } from '../shared/intl';
+import { localized } from '../intl/localize';
 import * as Utils from './models/utils';
 import { TaskFactory } from './tasks/factory';
 import { AccountStore } from './stores/account';

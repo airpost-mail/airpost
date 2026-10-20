@@ -1,4 +1,4 @@
-import { localized } from '../shared/intl';
+import { localized } from '../intl/localize';
 
 export default {
   core: {

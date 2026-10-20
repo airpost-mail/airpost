@@ -29,7 +29,7 @@ import DraftFactory from '../../src/data/drafts/factory';
 import { DraftEditingSession } from '../../src/data/drafts/editing-session';
 import InlineStyleTransformer from '../../src/mail/body/inline-style-transformer';
 import { AllowedAttributes, AllowedTags } from '../../src/mail/body/sanitize-transformer';
-import { quoteTexts } from '../../src/shared/date-format';
+import { quoteTexts } from '../../src/intl/date-format';
 import { wrapPlaintext } from '../../src/components/composer-editor/plaintext';
 import userAgentStylesheet from '../../src/mail/body/chrome-user-agent-stylesheet';
 import { applySignature } from '../../src/features/composer-signature/utils';
@@ -265,7 +265,7 @@ describe('Draft pipeline corpus (desktop half)', function corpusSpec() {
         ['de-DE', 'h23'],
         ['ja-JP', 'h12'],
       ] as const) {
-        const { formatQuoteDate } = require('../../src/shared/date-format');
+        const { formatQuoteDate } = require('../../src/intl/date-format');
         for (const at of [DATE, 978310800, 1704067140]) {
           corpus.dates.push({
             at,

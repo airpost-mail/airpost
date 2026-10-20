@@ -1,6 +1,6 @@
 import path from 'path';
 import { pathToFileURL } from 'url';
-import { isFileURLWithin, isHostedFileURL } from '../../src/shared/file-url-guard';
+import { isFileURLWithin, isHostedFileURL } from '../../src/utils/file-url';
 
 describe('file URL guard', function () {
   it('flags file: URLs that name a host or a UNC path', () => {

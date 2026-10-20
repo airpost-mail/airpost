@@ -6,7 +6,7 @@ import {
   messageContentSecurityPolicy,
   printContentSecurityPolicy,
   quickPreviewContentSecurityPolicy,
-} from '../../src/shared/content-security-policy';
+} from '../../src/mail/content-security-policy';
 
 const resourcePath = () => AppEnv.getLoadSettings().resourcePath;
 

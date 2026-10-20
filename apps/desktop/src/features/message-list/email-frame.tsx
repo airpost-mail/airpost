@@ -16,7 +16,7 @@ import {
   MessageFrameSandbox,
   SearchMatchRect,
   messageFrameURL,
-} from '../../shared/message-frame-protocol';
+} from '../../mail/frame/protocol';
 import EmailFrameStylesStore from './email-frame-styles-store';
 import {
   OriginalColors,

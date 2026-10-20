@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
 import { DirectionProvider } from '@radix-ui/react-direction';
-import { isRTL } from '../../shared/intl';
+import { isRTL } from '../../intl/localize';
 
 /**
  * Wraps every ReactDOM.render root so Radix primitives (and their portalled content, which keeps

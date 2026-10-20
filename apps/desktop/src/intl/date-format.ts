@@ -13,7 +13,7 @@ settings mirror gives it `composing.quoteTexts` (quoteTexts below): the localize
 the date pattern taken from Intl's own parts in the user's locale and hour cycle, which it fills in
 the same way formatQuoteDate does here.
 */
-import { localizerFor } from './intl';
+import { localizerFor } from './localize';
 
 export type HourCycle = 'h12' | 'h23';
 

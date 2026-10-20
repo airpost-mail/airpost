@@ -8,7 +8,7 @@ lists that keep their last rows. A short wait (a respawn, a reconnect) shows not
 */
 import React, { useEffect, useState } from 'react';
 import { ipcRenderer } from 'electron';
-import { localized } from '../shared/intl';
+import { localized } from '../intl/localize';
 import EngineReads, {
   ENGINE_READS_KEY,
   EngineReads as EngineReadsType,

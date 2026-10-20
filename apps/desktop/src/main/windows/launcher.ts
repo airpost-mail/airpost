@@ -1,4 +1,4 @@
-import { isWaylandSession } from '../../shared/is-wayland';
+import { isWaylandSession } from '../../platform/linux-desktop';
 import AppWindow from './app-window';
 import { AppWindowSettings } from './app-window';
 

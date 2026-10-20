@@ -59,7 +59,7 @@ function handleSetupError(error) {
   currentWindow.show();
   var stack = (error && error.stack) || String(error);
   console.error(stack);
-  if (require('../src/shared/developer-tools').developerToolsAvailable()) {
+  if (require('../src/platform/developer-tools').developerToolsAvailable()) {
     currentWindow.openDevTools();
   } else {
     showSetupErrorInWindow(stack);
@@ -83,10 +83,10 @@ function setupWindow(loadSettings) {
   }
 
   if (loadSettings.devMode) {
-    var CompileCache = require('../src/shared/compile-cache-ts');
+    var CompileCache = require('../src/platform/compile-cache-ts');
     CompileCache.setHomeDirectory(loadSettings.configDirPath);
   } else {
-    require('../src/shared/compile-cache-ts-unsupported');
+    require('../src/platform/compile-cache-ts-unsupported');
   }
 
   require(loadSettings.bootstrapScript);

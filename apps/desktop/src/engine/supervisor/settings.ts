@@ -32,9 +32,9 @@ applied before that set, and is skipped: the local write wins.
 */
 import _ from 'underscore';
 import { Feature, Method, SettingsValues } from '../protocol';
-import { localizerFor } from '../../shared/intl';
-import { REMINDER_BODY_KEY, SNOOZE_BODY_KEY, resurfacingBodies } from '../../shared/resurfacing';
-import { QUOTE_TEXTS_KEY, USE_24_HOUR_KEY, hourCycle, quoteTexts } from '../../shared/date-format';
+import { localizerFor } from '../../intl/localize';
+import { REMINDER_BODY_KEY, SNOOZE_BODY_KEY, resurfacingBodies } from '../resurfacing';
+import { QUOTE_TEXTS_KEY, USE_24_HOUR_KEY, hourCycle, quoteTexts } from '../../intl/date-format';
 
 // The keys the desktop mirrors. The engine also keeps `templates` (the desktop's are files in
 // <config>/templates) and `resurfacing.*` (written, not mirrored: _writeResurfacing).

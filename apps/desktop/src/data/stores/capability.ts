@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react';
 import BaseStore from 'mailspring-store';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
 import { CapabilityReason, EngineCapability, Feature } from '../../engine/protocol';
 import AI, { AiFeature, AiProvider } from '../../engine/client/ai';

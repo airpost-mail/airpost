@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Helpers for the kit layer specs (Dialog, Popover, DropdownMenu, Select, Tooltip).
 import { cleanup } from '@testing-library/react';
-import * as intl from '../../src/shared/intl';
+import * as intl from '../../src/intl/localize';
 import { PORTAL_ROOT_ID } from '../../src/components/kit/portal';
 
 const removePortalContainer = () => document.getElementById(PORTAL_ROOT_ID)?.remove();

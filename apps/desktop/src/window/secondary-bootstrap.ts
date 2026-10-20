@@ -14,7 +14,7 @@
 //
 // Extend the standard promise class a bit
 import './promise-extensions';
-import '../shared/safe-shell';
+import '../platform/safe-shell';
 
 import AppEnvClass from './app-env';
 window.AppEnv = new AppEnvClass();

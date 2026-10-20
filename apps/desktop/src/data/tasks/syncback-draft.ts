@@ -1,7 +1,7 @@
 import { Task } from './task';
 import * as Attributes from '../attributes';
 import { Message } from '../models/message';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { AttributeValues } from '../models/model';
 
 export class SyncbackDraftTask extends Task {

@@ -4,7 +4,7 @@ import { bundleScript } from './script-bundler';
 import {
   contentSecurityPolicyMetaTag,
   messageFrameContentSecurityPolicy,
-} from '../../shared/content-security-policy';
+} from '../../mail/content-security-policy';
 import {
   MessageFrameOrigin,
   MessageFrameScheme,
@@ -12,7 +12,7 @@ import {
   MessageFrameScriptURL,
   isMessageFrameURL,
   remoteImagesFromFrameURL,
-} from '../../shared/message-frame-protocol';
+} from '../../mail/frame/protocol';
 
 /** The frame page for `url`, with its policy both as a header and as the first element. */
 export function messageFramePage(url: string) {

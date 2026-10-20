@@ -1,7 +1,7 @@
 import BaseStore from 'mailspring-store';
 import * as Utils from '../models/utils';
 import * as Actions from '../actions';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import EngineEvents, { EngineNotification } from '../../engine/client/events';
 import {
   ErrorCode,

@@ -1,9 +1,13 @@
 import path from 'path';
 import fs from 'fs';
-import pkg from '../../shared/package';
-import { getFirstExistingPath, XDG_CONFIG_PATHS, XDG_DATA_PATHS } from '../../shared/xdg-paths';
+import {
+  DESKTOP_FILE_NAME,
+  getFirstExistingPath,
+  XDG_CONFIG_PATHS,
+  XDG_DATA_PATHS,
+} from '../../platform/linux-desktop';
 import * as portal from 'xdg-portal';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 
 class SystemStartServiceBase {
   checkAvailability(): Promise<boolean> {
@@ -132,12 +136,12 @@ class SystemStartServiceLinuxDesktopFile extends SystemStartServiceBase {
   }
 
   _launcherPath(): string | null {
-    return getFirstExistingPath(XDG_DATA_PATHS, path.join('applications', pkg.desktopName));
+    return getFirstExistingPath(XDG_DATA_PATHS, path.join('applications', DESKTOP_FILE_NAME));
   }
 
   _shortcutPath(): string {
     const configDir = XDG_CONFIG_PATHS[0];
-    return path.join(configDir, 'autostart', pkg.desktopName);
+    return path.join(configDir, 'autostart', DESKTOP_FILE_NAME);
   }
 }
 

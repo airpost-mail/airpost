@@ -1,5 +1,5 @@
 import moment from 'moment';
-import { formatTime } from '../../shared/date-format';
+import { formatTime } from '../../intl/date-format';
 import { CalendarContainerType, DragConfig, DragState, HitZone, ViewDirection } from './drag-types';
 import {
   EventOccurrence,

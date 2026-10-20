@@ -98,17 +98,17 @@ const lazyLoadAndRegisterTask = (klassName, path) => {
   DatabaseObjectRegistry.register(klassName, () => exports[klassName]);
 };
 
-lazyLoadWithGetter(`localized`, () => require('../../shared/intl').localized);
+lazyLoadWithGetter(`localized`, () => require('../../intl/localize').localized);
 lazyLoadWithGetter(
   `localizedReactFragment`,
-  () => require('../../shared/intl').localizedReactFragment
+  () => require('../../intl/localize').localizedReactFragment
 );
 lazyLoadWithGetter(
   `getAvailableLanguages`,
-  () => require('../../shared/intl').getAvailableLanguages
+  () => require('../../intl/localize').getAvailableLanguages
 );
-lazyLoadWithGetter(`getCurrentLocale`, () => require('../../shared/intl').getCurrentLocale);
-lazyLoadWithGetter(`isRTL`, () => require('../../shared/intl').isRTL);
+lazyLoadWithGetter(`getCurrentLocale`, () => require('../../intl/localize').getCurrentLocale);
+lazyLoadWithGetter(`isRTL`, () => require('../../intl/localize').isRTL);
 
 // The plugin API version plugins match `engines.mailspring` against
 lazyLoadWithGetter(`apiVersion`, () => require('../api-version').PLUGIN_API_VERSION);
@@ -251,14 +251,14 @@ lazyLoadWithGetter(
 lazyLoad(`Utils`, 'data/models/utils');
 lazyLoad(`DOMUtils`, 'utils/dom');
 lazyLoad(`DateUtils`, 'utils/date');
-lazyLoadWithGetter(`imapUtf7`, () => require('../../utils/imap-utf7').imapUtf7);
+lazyLoadWithGetter(`imapUtf7`, () => require('../../mail/imap-utf7').imapUtf7);
 const vtimezoneGone = (name) => () => {
   throw new Error(
     `CalendarUtils.${name} is gone: the engine writes the VTIMEZONEs of the events it builds (Engine.request("events.create") and "events.update")`
   );
 };
 lazyLoadWithGetter(`CalendarUtils`, () =>
-  withDeprecatedMembers('CalendarUtils', require('../../utils/calendar'), {
+  withDeprecatedMembers('CalendarUtils', require('../../data/calendar/ics'), {
     resolveIanaZone: {
       since: '1.32.0',
       removeIn: '2.0.0',
@@ -274,7 +274,7 @@ lazyLoadWithGetter(`CalendarUtils`, () =>
     },
   })
 );
-lazyLoad(`CalendarDateUtils`, 'utils/calendar-date');
+lazyLoad(`CalendarDateUtils`, 'data/calendar/calendar-date');
 deprecate(
   `ICSEventHelpers`,
   {
@@ -300,9 +300,9 @@ deprecate(
       }
     )
 );
-lazyLoad(`FsUtils`, 'shared/fs-utils');
-lazyLoad(`CanvasUtils`, 'utils/canvas');
-lazyLoad(`DragDropTypes`, 'utils/drag-drop-types');
+lazyLoad(`FsUtils`, 'utils/fs');
+lazyLoad(`CanvasUtils`, 'components/drag-canvas');
+lazyLoad(`DragDropTypes`, 'components/drag-drop-types');
 lazyLoadWithGetter(`RegExpUtils`, () => {
   const RegExpUtils = require('../../utils/regexp').default;
   return withDeprecatedMembers('RegExpUtils', RegExpUtils, {
@@ -321,7 +321,10 @@ lazyLoadWithGetter(`RegExpUtils`, () => {
   });
 });
 lazyLoad(`MenuHelpers`, 'window/menu-helpers');
-lazyLoad(`VirtualDOMUtils`, 'utils/virtual-dom');
+lazyLoadWithGetter(
+  `VirtualDOMUtils`,
+  () => require('../../components/searchable/virtual-dom-parser').VirtualDOMUtils
+);
 lazyLoad(`Spellchecker`, 'window/spellchecker');
 lazyLoad(`MessageUtils`, 'data/models/message-utils');
 
@@ -364,7 +367,7 @@ lazyLoadWithGetter(
 lazyLoadWithGetter(`APIError`, () => require('../../data/errors').APIError);
 
 // Process Internals
-lazyLoad(`DefaultClientHelper`, 'shared/default-client-helper');
+lazyLoad(`DefaultClientHelper`, 'platform/default-client-helper');
 lazyLoad(`SystemStartService`, 'window/platform/system-start-service');
 
 // Testing

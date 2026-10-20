@@ -1,5 +1,5 @@
 import moment, { Moment } from 'moment';
-import { formatShortTime, momentZone } from '../../../shared/date-format';
+import { formatShortTime, momentZone } from '../../../intl/date-format';
 import React from 'react';
 import {
   Actions,

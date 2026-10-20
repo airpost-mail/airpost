@@ -1,5 +1,5 @@
 import { Calendar } from '../../src/data/models/calendar';
-import { isOwnCalendar, isSomeoneElsesCalendar } from '../../src/utils/calendar';
+import { isOwnCalendar, isSomeoneElsesCalendar } from '../../src/data/calendar/ics';
 
 describe('calendar ownership', () => {
   const addresses = ['me@example.com', 'alias@example.com'];

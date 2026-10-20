@@ -1,4 +1,4 @@
-import { imapUtf7 } from '../../src/utils/imap-utf7';
+import { imapUtf7 } from '../../src/mail/imap-utf7';
 
 describe('imapUtf7', () => {
   describe('encode', () => {

@@ -4,7 +4,7 @@ import { EventEmitter } from 'events';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 
 let autoUpdater = null;
 

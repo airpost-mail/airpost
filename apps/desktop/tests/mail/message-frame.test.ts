@@ -8,14 +8,10 @@ import {
   messageFrameResponse,
   messageFrameScript,
 } from '../../src/main/frame/protocol-handler';
-import { messageFrameContentSecurityPolicy } from '../../src/shared/content-security-policy';
+import { messageFrameContentSecurityPolicy } from '../../src/mail/content-security-policy';
 import { startMessageFrame, normalizeHref } from '../../src/mail/frame/runtime';
 import { MessageBody, MessageFrameBridge, messageFrameContent } from '../../src/mail/frame/bridge';
-import {
-  FrameToAppMessage,
-  RenderMessage,
-  messageFrameURL,
-} from '../../src/shared/message-frame-protocol';
+import { FrameToAppMessage, RenderMessage, messageFrameURL } from '../../src/mail/frame/protocol';
 import { shouldBlockFrameNavigation } from '../../src/main/frame/navigation';
 
 const resourcePath = () => AppEnv.getLoadSettings().resourcePath;

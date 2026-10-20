@@ -3,7 +3,7 @@ import BaseStore from 'mailspring-store';
 import { Editor, Value, Block, Text } from 'slate';
 
 import RegExpUtils from '../../utils/regexp';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 
 import TaskQueue from '../stores/task-queue';
 import { Message } from '../models/message';

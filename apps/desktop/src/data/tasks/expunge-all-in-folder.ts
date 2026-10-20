@@ -1,7 +1,7 @@
 import { Task } from './task';
 import { Folder } from '../models/folder';
 import * as Attributes from '../attributes';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { AttributeValues } from '../models/model';
 
 export class ExpungeAllInFolderTask extends Task {

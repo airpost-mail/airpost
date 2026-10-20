@@ -11,7 +11,7 @@ into the emptied directory.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { SKIP_MAILSPRING_IMPORT_MARKER } from './mailspring-import';
 import { TERN_PROFILE_MARKER, hasTernProfileMarker } from './marker';
 

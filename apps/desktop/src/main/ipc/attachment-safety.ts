@@ -1,9 +1,9 @@
 import { BrowserWindow, dialog } from 'electron';
-import { localized } from '../../shared/intl';
-import { ConfirmOpenChannel } from '../../shared/attachment-safety';
+import { localized } from '../../intl/localize';
+import { ConfirmOpenChannel } from '../../mail/attachment-safety';
 import { isAppWindowContents } from '../windows/app-window';
 
-// The "open this executable?" prompt for src/shared/attachment-safety.ts. Cancel is the default.
+// The "open this executable?" prompt for src/mail/attachment-safety.ts. Cancel is the default.
 export function registerAttachmentSafetyIPC(ipcMain: Electron.IpcMain) {
   ipcMain.handle(ConfirmOpenChannel, async (event, message: string, detail: string) => {
     if (!isAppWindowContents(event.sender)) {

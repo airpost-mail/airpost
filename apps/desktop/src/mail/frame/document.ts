@@ -8,12 +8,7 @@ import RealDOMParser from '../../components/searchable/real-dom-parser';
 import { DOMUtils } from './exports';
 import { adjustImages } from './adjust-images';
 import { prepareEmailColors } from './email-color-detection';
-import {
-  BodyOperation,
-  FrameRect,
-  RenderMessage,
-  SearchMatchRect,
-} from '../../shared/message-frame-protocol';
+import { BodyOperation, FrameRect, RenderMessage, SearchMatchRect } from './protocol';
 
 export const ThemeStylesId = 'tern-theme-styles';
 export const HTMLWrapperId = 'inbox-html-wrapper';

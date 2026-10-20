@@ -3,10 +3,9 @@ import { ipcRenderer } from 'electron';
 import { convertToPNG, getIcon, Context } from './linux-theme';
 import { getDoNotDisturb as getLinuxDoNotDisturb } from './do-not-disturb-linux';
 import { getDoNotDisturb as getWindowsDoNotDisturb } from './do-not-disturb-windows';
-import pkg from '../../shared/package';
 import path from 'path';
 import fs from 'fs';
-import { XDG_DATA_PATHS } from '../../shared/xdg-paths';
+import { DESKTOP_FILE_NAME, XDG_DATA_PATHS } from '../../platform/linux-desktop';
 
 const platform = process.platform;
 const DEFAULT_ICON = path.resolve(
@@ -156,7 +155,9 @@ class NativeNotifications {
       return undefined;
     }
 
-    const filePaths = XDG_DATA_PATHS.map((dir) => path.join(dir, 'applications', pkg.desktopName));
+    const filePaths = XDG_DATA_PATHS.map((dir) =>
+      path.join(dir, 'applications', DESKTOP_FILE_NAME)
+    );
     for (const filePath of filePaths) {
       const desktopIcon = this.readIconFromDesktopFile(filePath);
       if (!desktopIcon) {

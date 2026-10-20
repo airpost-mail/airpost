@@ -6,7 +6,7 @@ import {
 } from '../../src/features/main-calendar/data-source';
 import moment from 'moment';
 import { CalendarDateUtils } from 'mailspring-exports';
-import { parseCalendarDate } from '../../src/utils/calendar-date';
+import { parseCalendarDate } from '../../src/data/calendar/calendar-date';
 
 // Fields _getDimensions never reads, but the occurrence type requires.
 const OCCURRENCE_META = {

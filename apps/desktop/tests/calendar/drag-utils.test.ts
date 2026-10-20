@@ -4,7 +4,7 @@ import {
   dayStartUnix,
   nextDayStartUnix,
   addCalendarDays,
-} from '../../src/utils/calendar-date';
+} from '../../src/data/calendar/calendar-date';
 // Import the functions under test directly from the source file.
 // We use a relative path because the plugin is not registered in mailspring-exports.
 import {

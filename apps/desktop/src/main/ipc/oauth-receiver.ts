@@ -15,7 +15,7 @@ One sign-in at a time: a new one (Try Again, another window) ends the one before
 import http from 'http';
 import crypto from 'crypto';
 import url from 'url';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { OAuthReceiverChannel, OAuthRedirect } from '../../engine/channels';
 
 export const OAUTH_RECEIVER_HOST = '127.0.0.1';

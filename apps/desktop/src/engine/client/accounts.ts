@@ -9,7 +9,7 @@ keeps every secret (none comes back) and starts the accounts it stores; config.j
 `accounts` follows with the account's public JSON.
 */
 import { ipcRenderer } from 'electron';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import EngineEvents from './events';
 import {
   AccountAddResult,

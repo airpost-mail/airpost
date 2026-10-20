@@ -10,8 +10,8 @@ import path from 'path';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import net from 'net';
-import { localized } from '../shared/intl';
-import { developerToolsAvailable } from '../shared/developer-tools';
+import { localized } from '../intl/localize';
+import { developerToolsAvailable } from '../platform/developer-tools';
 import {
   AccountAddResult,
   AccountChangedParams,

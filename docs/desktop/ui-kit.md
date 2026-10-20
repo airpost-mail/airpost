@@ -108,7 +108,7 @@ Findings the spec pins down:
 
 `getPortalContainer(doc = document)` in `src/components/kit/portal.ts` returns one
 `<div id="ui-portal-root" data-ui-portal-root>` per window, created on first use as the last
-child of `<body>`. It gets `dir="rtl"` when `isRTL` (`src/shared/intl`). `<html>` already carries
+child of `<body>`. It gets `dir="rtl"` when `isRTL` (`src/intl/localize`). `<html>` already carries
 `dir` in RTL (`src/window/app-env.ts` `initializeReactRoot`), so the container sits inside the
 dir-carrying root and carries `dir` itself, so content portalled into it gets the right CSS
 direction (finding 3). Every kit part that portals (Dialog, Popover, DropdownMenu, Select, Tooltip)

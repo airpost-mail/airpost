@@ -15,7 +15,7 @@ import {
   ForwardedKeyEvent,
   ForwardedMouseEvent,
   FrameToAppMessage,
-} from '../../shared/message-frame-protocol';
+} from './protocol';
 
 const KeyAttrs = [
   'key',

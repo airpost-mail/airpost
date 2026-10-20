@@ -1,6 +1,6 @@
 import AutoupdateImplBase from './impl-base';
 import WindowsUpdater from './win32-updater';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 
 export default class AutoupdateImplWin32 extends AutoupdateImplBase {
   supportsUpdates() {

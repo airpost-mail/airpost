@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "include": [
+    "**/*",
+    "../src/window/globals.d.ts",
+    "../src/window/react.d.ts",
+    "../src/main/global.d.ts"
+  ],
+  "exclude": ["support/runner/jasmine.js"]
+}

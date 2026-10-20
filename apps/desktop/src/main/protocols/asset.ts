@@ -1,7 +1,7 @@
 import { protocol } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { bundledAssetRoots } from '../../shared/bundled-packages';
+import { bundledAssetRoots } from '../../packages/bundled-packages';
 
 // Handles requests with 'mailspring' protocol.
 //

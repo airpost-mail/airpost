@@ -1,5 +1,5 @@
 import { app, ipcMain, nativeImage, NativeImage } from 'electron';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import Application from '../application';
 
 /**

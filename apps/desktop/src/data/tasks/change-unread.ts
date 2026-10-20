@@ -2,7 +2,7 @@
 import _ from 'underscore';
 import * as Attributes from '../attributes';
 import { ChangeMailTask } from './change-mail';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { AttributeValues } from '../models/model';
 import { Thread } from '../models/thread';
 import { Message } from '../models/message';

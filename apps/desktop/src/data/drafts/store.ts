@@ -17,7 +17,7 @@ import TaskQueue from '../stores/task-queue';
 import MessageBodyProcessor from '../../mail/body/processor';
 import SoundRegistry from '../../packages/sound-registry';
 import * as ExtensionRegistry from '../../packages/extension-registry';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import { DatabaseChangeRecord } from '../database/change-record';
 import {
   ENGINE_PREPARED_EXTENSIONS,

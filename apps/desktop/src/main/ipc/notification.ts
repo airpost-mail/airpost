@@ -1,7 +1,7 @@
 import { Notification, IpcMain, IpcMainInvokeEvent, nativeImage } from 'electron';
 import path from 'path';
 import { UrlWithParsedQuery } from 'url';
-import { ICON_PATHS } from '../../shared/xdg-paths';
+import { ICON_PATHS } from '../../platform/linux-desktop';
 
 interface NotificationOptions {
   id: string;

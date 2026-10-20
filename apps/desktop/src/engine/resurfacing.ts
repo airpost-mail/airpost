@@ -8,7 +8,7 @@ when no engine runs the expiration executor; otherwise the engine does, with the
 settings mirror writes to `resurfacing.snoozeBody` / `resurfacing.reminderBody`
 (docs/desktop-client-plan.md 3.3). With no translation these are the engine's English fallbacks.
 */
-import { localized } from './intl';
+import { localized } from '../intl/localize';
 
 export const SNOOZE_BODY_KEY = 'resurfacing.snoozeBody';
 export const REMINDER_BODY_KEY = 'resurfacing.reminderBody';

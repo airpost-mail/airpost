@@ -3,9 +3,12 @@ import path from 'path';
 import fs from 'fs';
 import url from 'url';
 import { EventEmitter } from 'events';
-import { isWaylandSession } from '../../shared/is-wayland';
-import { developerToolsAvailable } from '../../shared/developer-tools';
-import { XDG_DATA_PATHS, getFirstExistingPath } from '../../shared/xdg-paths';
+import { developerToolsAvailable } from '../../platform/developer-tools';
+import {
+  XDG_DATA_PATHS,
+  getFirstExistingPath,
+  isWaylandSession,
+} from '../../platform/linux-desktop';
 
 import {
   attemptEarlyRendererCrashRecovery,

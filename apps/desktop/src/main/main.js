@@ -35,7 +35,7 @@ console.inspect = function consoleInspect(val) {
 
 const { app, session, protocol } = require('electron');
 const path = require('path');
-const { developerToolsAvailable } = require('../shared/developer-tools');
+const { developerToolsAvailable } = require('../platform/developer-tools');
 
 if (typeof process.setFdLimit === 'function') {
   process.setFdLimit(1024);
@@ -104,14 +104,14 @@ const confirmStartAfterFailedImport = error => {
 
 const setupCompileCache = (configDirPath, devMode) => {
   if (devMode) {
-    require('../shared/compile-cache-ts').setHomeDirectory(configDirPath);
+    require('../platform/compile-cache-ts').setHomeDirectory(configDirPath);
   } else {
-    require('../shared/compile-cache-ts-unsupported');
+    require('../platform/compile-cache-ts-unsupported');
   }
 };
 
 const setupErrorLogger = (args = {}) => {
-  const ErrorLogger = require('../shared/error-logger');
+  const ErrorLogger = require('../platform/error-logger');
   const errorLogger = new ErrorLogger({
     inSpecMode: args.specMode,
     inDevMode: args.devMode,
@@ -347,7 +347,7 @@ const start = () => {
       }
     },
     {
-      // Downloaded attachments shown in message bodies (src/shared/files-scheme.ts).
+      // Downloaded attachments shown in message bodies (src/mail/files-scheme.ts).
       scheme: 'tern-file',
       privileges: {
         secure: true,
@@ -474,7 +474,7 @@ const start = () => {
     // No window may reach file://host/... (a UNC path on Windows), which the app CSP's `*`,
     // `file:` and 'self' all allow from a file: document. Message HTML also renders in the
     // main window (the quoted body in the composer), where no per-message CSP applies.
-    const { isHostedFileURL } = require('../shared/file-url-guard');
+    const { isHostedFileURL } = require('../utils/file-url');
     session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
       callback({ cancel: isHostedFileURL(details.url) });
     });
@@ -503,7 +503,7 @@ const start = () => {
 
     // The CSP also travels as a header in case the <meta> tag in static/index.html is missing
     // or removed. Both come from AppContentSecurityPolicy.
-    const { AppContentSecurityPolicy } = require('../shared/content-security-policy');
+    const { AppContentSecurityPolicy } = require('../mail/content-security-policy');
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       // The message frame sends its own, stricter policy.
       if (details.url.startsWith('devtools://') || details.url.startsWith('tern-message:')) {

@@ -5,9 +5,9 @@
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
 import { BrowserWindow, Menu, app } from 'electron';
-import { developerToolsAvailable } from '../../shared/developer-tools';
+import { developerToolsAvailable } from '../../platform/developer-tools';
 const Utils = require('../../data/models/utils');
-const { localized } = require('../../shared/intl');
+const { localized } = require('../../intl/localize');
 
 // Used to manage the global application menu.
 //

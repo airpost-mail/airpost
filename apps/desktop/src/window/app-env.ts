@@ -5,11 +5,11 @@ import path from 'path';
 import { ipcRenderer } from 'electron';
 import { Emitter } from 'event-kit';
 import { mapSourcePosition } from 'source-map-support';
-import { localized, isRTL, initializeLocalization } from '../shared/intl';
+import { localized, isRTL, initializeLocalization } from '../intl/localize';
 
 import { APIError } from '../data/errors';
 import WindowEventHandler from './event-handler';
-import { isWaylandSession } from '../shared/is-wayland';
+import { isWaylandSession } from '../platform/linux-desktop';
 
 function ensureInteger(f: number, fallback: number) {
   let int = f;
@@ -152,7 +152,7 @@ export default class AppEnvConstructor {
   // to the window and the Bluebird Promise library, converting things
   // back through the sourcemap as necessary.
   setupErrorLogger() {
-    const ErrorLogger = require('../shared/error-logger');
+    const ErrorLogger = require('../platform/error-logger');
     this.errorLogger = new ErrorLogger({
       inSpecMode: this.inSpecMode(),
       inDevMode: this.inDevMode(),

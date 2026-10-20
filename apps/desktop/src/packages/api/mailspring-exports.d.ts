@@ -1,12 +1,12 @@
-export type localized = typeof import('../../shared/intl').localized;
+export type localized = typeof import('../../intl/localize').localized;
 export const localized: localized;
-export type getCurrentLocale = typeof import('../../shared/intl').getCurrentLocale;
+export type getCurrentLocale = typeof import('../../intl/localize').getCurrentLocale;
 export const getCurrentLocale: getCurrentLocale;
-export type localizedReactFragment = typeof import('../../shared/intl').localizedReactFragment;
+export type localizedReactFragment = typeof import('../../intl/localize').localizedReactFragment;
 export const localizedReactFragment: localizedReactFragment;
-export type getAvailableLanguages = typeof import('../../shared/intl').getAvailableLanguages;
+export type getAvailableLanguages = typeof import('../../intl/localize').getAvailableLanguages;
 export const getAvailableLanguages: getAvailableLanguages;
-export type isRTL = typeof import('../../shared/intl').isRTL;
+export type isRTL = typeof import('../../intl/localize').isRTL;
 export const isRTL: isRTL;
 
 /** The plugin API version, matched as semver against a plugin's `engines.mailspring`. */
@@ -190,10 +190,10 @@ export type DOMUtils = typeof import('../../utils/dom').default;
 export const DOMUtils: DOMUtils;
 export type DateUtils = typeof import('../../utils/date').default;
 export const DateUtils: DateUtils;
-export type imapUtf7 = typeof import('../../utils/imap-utf7').imapUtf7;
+export type imapUtf7 = typeof import('../../mail/imap-utf7').imapUtf7;
 export const imapUtf7: imapUtf7;
 
-export type CalendarUtils = typeof import('../../utils/calendar') & {
+export type CalendarUtils = typeof import('../../data/calendar/ics') & {
   /**
    * @deprecated since plugin API 1.32.0, removed in 2.0.0: throws. The engine resolves time
    * zones for the events it builds and edits.
@@ -206,11 +206,11 @@ export type CalendarUtils = typeof import('../../utils/calendar') & {
   createVTIMEZONEString: (...args: unknown[]) => never;
 };
 export const CalendarUtils: CalendarUtils;
-export { ICSParticipantStatus, ICSParticipant } from '../../utils/calendar';
+export { ICSParticipantStatus, ICSParticipant } from '../../data/calendar/ics';
 
-export type CalendarDateUtils = typeof import('../../utils/calendar-date');
+export type CalendarDateUtils = typeof import('../../data/calendar/calendar-date');
 export const CalendarDateUtils: CalendarDateUtils;
-export { CalendarDate } from '../../utils/calendar-date';
+export { CalendarDate } from '../../data/calendar/calendar-date';
 
 /**
  * @deprecated since plugin API 1.32.0, removed in 2.0.0: the engine builds and edits events
@@ -220,11 +220,11 @@ export { CalendarDate } from '../../utils/calendar-date';
 export const ICSEventHelpers: { [name: string]: (...args: unknown[]) => never };
 export type { EventConflictJSON as CalendarConflict } from '../../engine/protocol';
 
-export type FsUtils = typeof import('../../shared/fs-utils');
+export type FsUtils = typeof import('../../utils/fs');
 export const FsUtils: FsUtils;
-export type CanvasUtils = typeof import('../../utils/canvas');
+export type CanvasUtils = typeof import('../../components/drag-canvas');
 export const CanvasUtils: CanvasUtils;
-export type DragDropTypes = typeof import('../../utils/drag-drop-types');
+export type DragDropTypes = typeof import('../../components/drag-drop-types');
 export const DragDropTypes: DragDropTypes;
 export type RegExpUtils = typeof import('../../utils/regexp').default & {
   /** @deprecated since plugin API 1.34.0, removed in 2.0.0: use `RegExpUtils.signatureRegex()`. */
@@ -239,7 +239,8 @@ export type EmlUtils = typeof import('../../mail/eml');
 export const EmlUtils: EmlUtils;
 export type MboxUtils = typeof import('../../mail/mbox');
 export const MboxUtils: MboxUtils;
-export type VirtualDOMUtils = typeof import('../../utils/virtual-dom').default;
+export type VirtualDOMUtils =
+  typeof import('../../components/searchable/virtual-dom-parser').VirtualDOMUtils;
 export const VirtualDOMUtils: VirtualDOMUtils;
 export type Spellchecker = typeof import('../../window/spellchecker').default;
 export const Spellchecker: Spellchecker;
@@ -339,7 +340,7 @@ export type GrammarCheckStoreAPI =
 export * from '../../data/errors';
 
 // Process Internals
-export * from '../../shared/default-client-helper';
+export * from '../../platform/default-client-helper';
 export type SystemStartService =
   typeof import('../../window/platform/system-start-service').default;
 export const SystemStartService: SystemStartService;

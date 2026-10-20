@@ -1,4 +1,4 @@
-import { ExternalFetch } from '../../shared/external-fetch';
+import { ExternalFetch } from '../../window/external-fetch';
 import EngineEvents from '../../engine/client/events';
 import {
   Feature,

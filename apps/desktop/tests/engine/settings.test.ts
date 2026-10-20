@@ -15,7 +15,7 @@ import {
 } from '../../src/engine/supervisor/settings';
 import { KeyManager } from '../../src/main/profile/key-manager';
 import { ConfigChannel } from '../../src/config/channels';
-import { resurfacingBodies } from '../../src/shared/resurfacing';
+import { resurfacingBodies } from '../../src/engine/resurfacing';
 import { EngineServeProcess } from '../../src/engine/process';
 import { FakeEngine, until } from '../support/fake-serve-engine';
 

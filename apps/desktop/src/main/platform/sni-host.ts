@@ -1,5 +1,5 @@
 import { execFile } from 'child_process';
-import { isWaylandSession } from '../../shared/is-wayland';
+import { isWaylandSession } from '../../platform/linux-desktop';
 
 const SNI_WATCHER_SERVICE = 'org.kde.StatusNotifierWatcher';
 const SNI_WATCHER_PATH = '/StatusNotifierWatcher';

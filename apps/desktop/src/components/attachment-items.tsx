@@ -8,8 +8,8 @@ import { pickHTMLProps } from 'pick-react-known-prop';
 import { RetinaImg } from './retina-img';
 import { Flexbox } from './flexbox';
 import { Spinner } from './spinner';
-import { localized } from '../shared/intl';
-import { markFileFromInternet } from '../shared/attachment-safety';
+import { localized } from '../intl/localize';
+import { markFileFromInternet } from '../mail/attachment-safety';
 
 const defaultProps = {
   draggable: true,

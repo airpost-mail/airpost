@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import moment from 'moment';
-import { formatTime, hourCycle } from '../shared/date-format';
+import { formatTime, hourCycle } from '../intl/date-format';
 import classnames from 'classnames';
 import { TabGroupContext } from 'mailspring-component-kit';
 

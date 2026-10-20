@@ -2,7 +2,7 @@
 import path from 'path';
 import { Model, AttributeValues } from './model';
 import * as Attributes from '../attributes';
-import { localized } from '../../shared/intl';
+import { localized } from '../../intl/localize';
 import RegExpUtils from '../../utils/regexp';
 
 /**

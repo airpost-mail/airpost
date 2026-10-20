@@ -1,4 +1,4 @@
-import { isMessageFrameURL } from '../../shared/message-frame-protocol';
+import { isMessageFrameURL } from '../../mail/frame/protocol';
 
 /**
  * Whether a navigation in a Tern window should be cancelled. The window itself never

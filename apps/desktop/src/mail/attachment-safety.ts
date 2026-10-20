@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { ipcRenderer } from 'electron';
-import { localized } from './intl';
+import { localized } from '../intl/localize';
 
 // Extensions the OS will run, install, mount or follow on double-click. Opening one asks first.
 const MAC_EXTENSIONS = (
