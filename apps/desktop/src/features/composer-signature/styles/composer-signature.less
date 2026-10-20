@@ -17,7 +17,7 @@
     border-right: 1px solid @sig-line;
     display: flex;
     flex-direction: column;
-    button {
+    .list-item {
       display: block;
       width: 100%;
       text-align: left;
@@ -42,10 +42,13 @@
         box-shadow: inset 0 0 0 2px @accent-primary;
       }
     }
+    // A kit link Button laid out as the list's last row.
     .settings-split-new {
-      color: @text-color-link;
-      font-weight: 500;
-      border-bottom: none;
+      justify-content: flex-start;
+      width: 100%;
+      height: auto;
+      padding: 9px 12px;
+      border-radius: 0;
     }
   }
 
@@ -81,7 +84,9 @@
     color: @text-color-subtle;
   }
 
+  // A kit RadioGroup; its tiles stay on one scrolling line.
   .signature-template-picker {
+    display: block;
     height: 62px;
     overflow-x: auto;
     overflow-y: hidden;
@@ -175,31 +180,6 @@
         gap: 8px;
         align-items: center;
         flex: 1;
-      }
-      select {
-        margin: 0;
-        width: auto;
-      }
-    }
-  }
-
-  .account-picker {
-    .button-dropdown {
-      .secondary-items {
-        .menu {
-          .item {
-            padding: 5px 10px 5px 25px;
-          }
-          .item.checked {
-            background-image: url(images/menu/osx-checkmark@2x.svg);
-            background-position: left;
-            background-position-x: 6%;
-            background-size: 10px;
-            margin: 0;
-            padding: 5px 10px 5px 25px;
-            background-repeat: no-repeat;
-          }
-        }
       }
     }
   }

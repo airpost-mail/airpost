@@ -32,6 +32,7 @@ export function currentSignatureIdSlate(value: Value) {
 }
 
 export function currentSignatureId(body: string) {
+  body = body || '';
   let replyEnd = body.search(RegExpUtils.nativeQuoteStartRegex());
   if (replyEnd === -1) {
     replyEnd = body.length;

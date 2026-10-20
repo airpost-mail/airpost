@@ -94,6 +94,8 @@
 
     .action {
       position: absolute;
+      width: auto;
+      height: auto;
       padding: 0;
       border: 0;
       margin: 0;
@@ -104,6 +106,10 @@
         background-color: @text-color-very-subtle;
       }
       font-size: 10px;
+      &:hover,
+      &:active {
+        background-color: transparent;
+      }
     }
     &:hover {
       background: linear-gradient(to bottom, @token-hover-top 0%, @token-hover-bottom 100%);

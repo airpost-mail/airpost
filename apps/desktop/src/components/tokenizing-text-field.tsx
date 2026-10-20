@@ -6,7 +6,7 @@ import ReactDOM from 'react-dom';
 import { localized, Utils, RegExpUtils } from 'mailspring-exports';
 import { Menu } from 'mailspring-component-kit';
 
-import { RetinaImg } from './retina-img';
+import { IconButton } from './kit/icon-button';
 import { KeyCommandsRegion } from './key-commands-region';
 
 type SizeToFitInputProps = {
@@ -143,9 +143,14 @@ class Token<T> extends React.Component<TokenProps<T>, TokenState> {
     let actionButton = null;
     if (this.props.onAction && !this.props.disabled) {
       actionButton = (
-        <button type="button" className="action" onClick={this._onAction} tabIndex={-1}>
-          <RetinaImg mode={RetinaImg.Mode.ContentIsMask} name="composer-caret.png" />
-        </button>
+        <IconButton
+          className="action"
+          icon="composer-caret.png"
+          label={localized('More options')}
+          tooltip={false}
+          tabIndex={-1}
+          onClick={this._onAction}
+        />
       );
     }
 

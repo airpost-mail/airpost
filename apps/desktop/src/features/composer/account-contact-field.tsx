@@ -8,8 +8,10 @@ import {
   Contact,
   DraftEditingSession,
   Message,
+  MessageWithEditorState,
 } from 'mailspring-exports';
 import { Menu, ButtonDropdown, InjectedComponentSet } from 'mailspring-component-kit';
+import SignatureComposerDropdown from '../composer-signature/composer-dropdown';
 
 interface AccountContactFieldProps {
   accounts: Account[];
@@ -127,20 +129,24 @@ export default class AccountContactField extends React.Component<AccountContactF
     );
   }
 
+  // The signature picker is built in. Plugins can still add to the From row through the
+  // `Composer:FromFieldComponents` role; their components render before it.
   _renderFromFieldComponents = () => {
     const { draft, session, accounts } = this.props;
+    const exposedProps = {
+      draft,
+      session,
+      accounts,
+      draftFromEmail: draft.from[0] ? draft.from[0].email : undefined,
+    };
     return (
       <InjectedComponentSet
-        deferred
         className="dropdown-component"
         matching={{ role: 'Composer:FromFieldComponents' }}
-        exposedProps={{
-          draft,
-          session,
-          accounts,
-          draftFromEmail: draft.from[0] ? draft.from[0].email : undefined,
-        }}
-      />
+        exposedProps={exposedProps}
+      >
+        <SignatureComposerDropdown {...exposedProps} draft={draft as MessageWithEditorState} />
+      </InjectedComponentSet>
     );
   };
 

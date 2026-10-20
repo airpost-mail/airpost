@@ -36,20 +36,6 @@
     flex-wrap: wrap;
     gap: 4px;
     margin-bottom: 6px;
-
-    button {
-      background: @background-color-info;
-      color: white;
-      border: none;
-      border-radius: 3px;
-      padding: 2px 8px;
-      font-size: 12px;
-      cursor: pointer;
-
-      &:hover {
-        opacity: 0.85;
-      }
-    }
   }
 
   .grammar-actions {
@@ -57,16 +43,7 @@
     padding-top: 6px;
 
     .btn-dismiss {
-      font-size: 11px;
-      color: @text-color-subtle;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      padding: 2px 4px;
-
-      &:hover {
-        color: @text-color;
-      }
+      color: var(--muted-foreground);
     }
   }
 }

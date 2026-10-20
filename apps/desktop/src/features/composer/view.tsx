@@ -32,6 +32,7 @@ import { AttachmentsArea } from './attachments-area';
 import { QuotedTextControl } from './quoted-text-control';
 import Fields from './fields';
 import { FilesScheme, resolveFilesSchemeURL } from '../../mail/files-scheme';
+import { IconButton } from '../../components/kit/icon-button';
 
 const { hasBlockquote, hasNonTrailingBlockquote, hideQuotedTextByDefault } =
   ComposerSupport.BaseBlockPlugins;
@@ -609,27 +610,27 @@ const DropToAttachCover = (props: { visible: boolean }) => (
 );
 
 const AttachFileButton = (props: { onClick: () => void }) => (
-  <button
+  <IconButton
+    variant="toolbar"
     tabIndex={-1}
-    className="btn btn-toolbar btn-attach"
+    className="btn-attach"
     style={{ order: 0 }}
-    title={localized('Attach File')}
+    icon="icon-composer-attachment.png"
+    label={localized('Attach File')}
     onClick={props.onClick}
-  >
-    <RetinaImg name="icon-composer-attachment.png" mode={RetinaImg.Mode.ContentIsMask} />
-  </button>
+  />
 );
 
 const DeleteButton = (props: { onClick: () => void }) => (
-  <button
+  <IconButton
+    variant="toolbar"
     tabIndex={-1}
-    className="btn btn-toolbar btn-trash"
+    className="btn-trash"
     style={{ order: 100 }}
-    title={localized('Delete Draft')}
+    icon="icon-composer-trash.png"
+    label={localized('Delete Draft')}
     onClick={props.onClick}
-  >
-    <RetinaImg name="icon-composer-trash.png" mode={RetinaImg.Mode.ContentIsMask} />
-  </button>
+  />
 );
 // Note: tabIndex={-1} on individual buttons is intentional - the RovingTabIndexToolbar
 // wrapper manages which button has tabIndex={0} at any given time.

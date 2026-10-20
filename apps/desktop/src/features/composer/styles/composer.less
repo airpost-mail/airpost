@@ -314,13 +314,19 @@ body.platform-win32 {
 
     .action-bar-cover-gen;
 
-    // Buttons in the composer footer
+    // Buttons in the composer footer: kit toolbar Buttons and IconButtons (which carry
+    // .btn.btn-toolbar) and plugin buttons that still use the classes.
     .btn.btn-toolbar:not(.btn-emphasis) {
       background: transparent;
       box-shadow: 0 0 0;
+      border-color: transparent;
       margin: 0;
       padding: 0 8px;
       white-space: nowrap;
+
+      &[data-slot='icon-button'] {
+        width: auto;
+      }
 
       img.content-mask {
         background-color: rgb(from color-mix(in srgb, @btn-default-text-color 88%, @component-active-color) r g b / 70%);
@@ -348,6 +354,7 @@ body.platform-win32 {
 
     .composer-action-bar-content {
       display: flex;
+      align-items: center;
       margin: 0 auto;
       flex-direction: row;
       padding: 9px 22.5px;
@@ -448,6 +455,26 @@ body.platform-win32 {
 
       &:last-child {
         padding-right: 0;
+      }
+
+      // Kit buttons are inline-flex, so their padding would count in the line box; the
+      // negative margin keeps the toolbar's height while the padding still widens the target.
+      &[data-slot] {
+        width: auto;
+        height: auto;
+        margin-block: -10px;
+        border: 0;
+        line-height: normal;
+        &,
+        &:hover,
+        &:active {
+          background: transparent;
+        }
+      }
+
+      &.show-popout img {
+        position: relative;
+        top: -2px;
       }
 
       &:hover {
@@ -583,6 +610,14 @@ body.platform-win32 {
 
         img {
           height: 24px;
+        }
+
+        &[data-slot] {
+          width: auto;
+          height: auto;
+          padding: 0;
+          border: 0;
+          background: transparent;
         }
       }
 

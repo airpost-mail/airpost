@@ -1,7 +1,13 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
 import { localized, Actions, Message } from 'mailspring-exports';
-import { Menu, RetinaImg } from 'mailspring-component-kit';
+import {
+  Menu,
+  RetinaImg,
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from 'mailspring-component-kit';
 import TemplateStore from './store';
 
 class TemplatePopover extends React.Component<{ headerMessageId: string }> {
@@ -112,8 +118,10 @@ class TemplatePicker extends React.Component<{
 }> {
   static displayName = 'TemplatePicker';
 
+  _button = React.createRef<HTMLButtonElement>();
+
   _onClickButton = () => {
-    const buttonRect = (ReactDOM.findDOMNode(this) as HTMLElement).getBoundingClientRect();
+    const buttonRect = this._button.current.getBoundingClientRect();
     Actions.openPopover(<TemplatePopover headerMessageId={this.props.headerMessageId} />, {
       originRect: buttonRect,
       direction: 'up',
@@ -124,26 +132,34 @@ class TemplatePicker extends React.Component<{
     if (this.props.draft.plaintext) {
       return <span />;
     }
+    const label = localized('Quick Reply');
     return (
-      <button
-        tabIndex={-1}
-        className="btn btn-toolbar btn-templates narrow pull-right"
-        onClick={this._onClickButton}
-        title={localized('Quick Reply')}
-        aria-label={localized('Quick Reply')}
-      >
-        <RetinaImg
-          url="mailspring://composer-templates/assets/icon-composer-templates@2x.png"
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-        &nbsp;
-        <RetinaImg
-          name="icon-composer-dropdown.png"
-          mode={RetinaImg.Mode.ContentIsMask}
-          aria-hidden="true"
-        />
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            // TooltipTrigger's data-slot would otherwise replace the button's own.
+            data-slot="button"
+            ref={this._button}
+            variant="toolbar"
+            tabIndex={-1}
+            className="btn-templates narrow pull-right"
+            onClick={this._onClickButton}
+            aria-label={label}
+          >
+            <RetinaImg
+              url="mailspring://composer-templates/assets/icon-composer-templates@2x.png"
+              mode={RetinaImg.Mode.ContentIsMask}
+              aria-hidden="true"
+            />
+            <RetinaImg
+              name="icon-composer-dropdown.png"
+              mode={RetinaImg.Mode.ContentIsMask}
+              aria-hidden="true"
+            />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
     );
   }
 }

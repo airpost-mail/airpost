@@ -2,6 +2,7 @@ import React from 'react';
 import { Editor, Decoration, Mark, Point, Text } from 'slate';
 import { localized } from 'mailspring-exports';
 import { ComposerEditorPlugin, ComposerEditorPluginTopLevelComponentProps } from './types';
+import { Button } from '../kit/button';
 
 export const GRAMMAR_ERROR_MARK = 'grammar-error';
 
@@ -483,29 +484,31 @@ function FloatingCorrectionPopover({ editor, value }: ComposerEditorPluginTopLev
       {replacements.length > 0 && (
         <div className="grammar-replacements">
           {replacements.slice(0, 5).map((replacement, i) => (
-            <button
+            <Button
               key={replacement}
-              className="btn btn-small"
+              size="sm"
               onMouseDown={(e) => {
                 e.preventDefault();
                 applyReplacement(editor, replacement);
               }}
             >
               {replacement}
-            </button>
+            </Button>
           ))}
         </div>
       )}
       <div className="grammar-actions">
-        <button
-          className="btn btn-small btn-dismiss"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="btn-dismiss"
           onMouseDown={(e) => {
             e.preventDefault();
             grammarCheckStore.dismissRule(ruleId);
           }}
         >
           {localized('Ignore rule')}
-        </button>
+        </Button>
       </div>
     </div>
   );

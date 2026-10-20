@@ -15,6 +15,7 @@ import {
 } from 'mailspring-exports';
 import classNames from 'classnames';
 import { SettingsPage, SettingsCard, SettingsField } from 'mailspring-component-kit';
+import { Button } from '../../components/kit/button';
 
 import { ResolveSignatureData, RenderSignatureData, DataShape } from './constants';
 import SignatureAccountDefaultPicker from './account-default-picker';
@@ -206,9 +207,9 @@ class SignatureEditor extends React.Component<SignatureEditorProps> {
 
         <div className="settings-actions">
           <span className="spacer" />
-          <button className="btn btn-danger" onClick={() => Actions.removeSignature(signature)}>
+          <Button variant="destructive" onClick={() => Actions.removeSignature(signature)}>
             {localized('Delete')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -291,6 +292,7 @@ export default class PreferencesSignatures extends React.Component<
         <SettingsCard className="settings-split">
           <div className="settings-split-list signature-list" role="listbox">
             {Object.values(signatures).map((sig) => (
+              // eslint-disable-next-line raw-controls -- a listbox option, not a kit Button
               <button
                 key={sig.id}
                 role="option"
@@ -301,9 +303,9 @@ export default class PreferencesSignatures extends React.Component<
                 {sig.title || localized('Untitled')}
               </button>
             ))}
-            <button className="settings-split-new" onClick={this._onAddSignature}>
+            <Button variant="link" className="settings-split-new" onClick={this._onAddSignature}>
               {localized('+ New signature')}
-            </button>
+            </Button>
           </div>
           {selectedSignature ? (
             <SignatureEditor

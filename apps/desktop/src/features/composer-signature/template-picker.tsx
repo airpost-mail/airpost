@@ -1,6 +1,10 @@
 import React from 'react';
 import { localized } from 'mailspring-exports';
+import { RadioGroup, RadioGroupItem } from '../../components/kit/radio-group';
 import Templates from './templates';
+
+// The Raw HTML choice has no template name; Radix needs a non-empty value for it.
+const RAW_HTML = '__raw__';
 
 export default class SignatureTemplatePicker extends React.Component<{
   resolvedData: any;
@@ -8,9 +12,10 @@ export default class SignatureTemplatePicker extends React.Component<{
 }> {
   _el: HTMLElement;
 
-  _onClickItem = (event: React.MouseEvent<HTMLDivElement>) => {
-    const value = event.currentTarget.dataset.value;
-    this.props.onChange({ target: { id: 'templateName', value } });
+  _onValueChange = (value: string) => {
+    this.props.onChange({
+      target: { id: 'templateName', value: value === RAW_HTML ? undefined : value },
+    });
   };
 
   componentDidMount() {
@@ -47,28 +52,34 @@ export default class SignatureTemplatePicker extends React.Component<{
         title: localized('Job Title'),
       };
     }
+    const selected = resolvedData.templateName || RAW_HTML;
     return (
-      <div ref={(el) => (this._el = el)} className="signature-template-picker">
+      <RadioGroup
+        ref={(el) => (this._el = el)}
+        className="signature-template-picker"
+        orientation="horizontal"
+        aria-label={localized('Style')}
+        value={selected}
+        onValueChange={this._onValueChange}
+      >
         {Templates.map((t, idx) => (
-          <div
+          <RadioGroupItem
             key={idx}
-            data-value={t.name}
-            className={`option ${t.name === resolvedData.templateName && 'active'}`}
-            onClick={this._onClickItem}
+            value={t.name}
+            className={`option ${t.name === selected ? 'active' : ''}`}
           >
             <div className="centered">
               <div className="preview">{t(resolvedData)}</div>
             </div>
-          </div>
+          </RadioGroupItem>
         ))}
-        <div
-          data-value={null}
-          className={`option ${!resolvedData.templateName && 'active'}`}
-          onClick={this._onClickItem}
+        <RadioGroupItem
+          value={RAW_HTML}
+          className={`option ${selected === RAW_HTML ? 'active' : ''}`}
         >
           <div className="centered">{localized('Raw HTML')}</div>
-        </div>
-      </div>
+        </RadioGroupItem>
+      </RadioGroup>
     );
   }
 }

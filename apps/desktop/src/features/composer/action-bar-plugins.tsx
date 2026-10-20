@@ -16,6 +16,7 @@ export class ActionBarPlugins extends React.Component<
   static displayName = 'ActionBarPlugins';
 
   _usub: () => void;
+  _mounted = false;
 
   constructor(props) {
     super(props);
@@ -23,10 +24,12 @@ export class ActionBarPlugins extends React.Component<
   }
 
   componentDidMount() {
+    this._mounted = true;
     this._usub = ComponentRegistry.listen(this._onComponentsChange);
   }
 
   componentWillUnmount() {
+    this._mounted = false;
     this._usub();
   }
 
@@ -40,7 +43,7 @@ export class ActionBarPlugins extends React.Component<
       // It also takes 2 frames to reliably get all of the icons painted.
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
-          this.setState(this._getStateFromStores());
+          if (this._mounted) this.setState(this._getStateFromStores());
         });
       });
     }

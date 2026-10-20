@@ -6,7 +6,14 @@ import {
   GrammarCheckPluginAPI,
   CapabilityStore,
 } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import classnames from 'classnames';
+import {
+  RetinaImg,
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from 'mailspring-component-kit';
 import { GrammarCheckStore } from './store';
 
 export class GrammarCheckToggle extends React.Component<{
@@ -34,41 +41,44 @@ export class GrammarCheckToggle extends React.Component<{
   };
 
   render() {
+    const icon = (
+      <span className="grammar-check-icon-wrap">
+        <RetinaImg
+          url="mailspring://composer-grammar-check/assets/icon-composer-grammar@2x.png"
+          mode={RetinaImg.Mode.ContentIsMask}
+          aria-hidden="true"
+        />
+        {this._checking() && <span className="grammar-check-spinner" />}
+      </span>
+    );
+
     if (!GrammarCheckStore.isAvailable()) {
       const reason = CapabilityStore.unavailableMessage('grammar-check');
+      // A disabled button takes no pointer events, so the tooltip hangs off a wrapper.
       return (
-        <button
-          tabIndex={-1}
-          className="btn btn-toolbar btn-grammar-check"
-          disabled
-          title={reason}
-          aria-label={reason}
-        >
-          <span className="grammar-check-icon-wrap">
-            <RetinaImg
-              url="mailspring://composer-grammar-check/assets/icon-composer-grammar@2x.png"
-              mode={RetinaImg.Mode.ContentIsMask}
-              aria-hidden="true"
-            />
-          </span>
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="grammar-check-unavailable">
+              <Button
+                variant="toolbar"
+                tabIndex={-1}
+                className="btn-grammar-check"
+                disabled
+                aria-label={reason}
+              >
+                {icon}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{reason}</TooltipContent>
+        </Tooltip>
       );
     }
 
     const enabled = GrammarCheckStore.isEnabled();
-    const checking = GrammarCheckStore.isChecking(this.props.draft.headerMessageId);
     const errorCount = GrammarCheckStore.errorCount(this.props.draft.headerMessageId);
 
     let title: string;
-    let className = 'btn btn-toolbar btn-grammar-check';
-
-    if (enabled) {
-      className += ' btn-enabled';
-    }
-    if (checking) {
-      className += ' checking';
-    }
-
     if (enabled) {
       title =
         errorCount > 0
@@ -79,22 +89,33 @@ export class GrammarCheckToggle extends React.Component<{
     }
 
     return (
-      <button
-        tabIndex={-1}
-        className={className}
-        onClick={this._onClick}
-        title={title}
-        aria-label={title}
-      >
-        <span className="grammar-check-icon-wrap">
-          <RetinaImg
-            url="mailspring://composer-grammar-check/assets/icon-composer-grammar@2x.png"
-            mode={RetinaImg.Mode.ContentIsMask}
-            aria-hidden="true"
-          />
-          {checking && <span className="grammar-check-spinner" />}
-        </span>
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            // TooltipTrigger's data-slot would otherwise replace the button's own.
+            data-slot="button"
+            variant="toolbar"
+            tabIndex={-1}
+            className={classnames('btn-grammar-check', {
+              'btn-enabled': enabled,
+              checking: this._checking(),
+            })}
+            aria-pressed={enabled}
+            onClick={this._onClick}
+            aria-label={title}
+          >
+            {icon}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{title}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  _checking() {
+    return (
+      GrammarCheckStore.isAvailable() &&
+      GrammarCheckStore.isChecking(this.props.draft.headerMessageId)
     );
   }
 }

@@ -8,6 +8,7 @@ import {
   SettingsPage,
   SettingsCard,
   SettingsField,
+  Button,
 } from 'mailspring-component-kit';
 import { Actions, localized, localizedReactFragment } from 'mailspring-exports';
 import { Value } from 'slate';
@@ -104,8 +105,8 @@ class TemplateEditor extends React.Component<
           )}
         </div>
         <div className="settings-actions">
-          <button
-            className="btn"
+          <Button
+            variant="outline"
             onClick={() =>
               require('@electron/remote').shell.showItemInFolder(TemplateStore.directory())
             }
@@ -113,11 +114,11 @@ class TemplateEditor extends React.Component<
             {process.platform === 'darwin'
               ? localized('Show in Finder')
               : localized('Show templates folder')}
-          </button>
+          </Button>
           <span className="spacer" />
-          <button className="btn btn-danger" onClick={onDelete}>
+          <Button variant="destructive" onClick={onDelete}>
             {localized('Delete')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -194,6 +195,7 @@ export default class PreferencesTemplates extends React.Component<
         <SettingsCard className="settings-split">
           <div className="settings-split-list template-list" role="listbox">
             {templates.map((t) => (
+              // eslint-disable-next-line raw-controls -- a listbox option, not a kit Button
               <button
                 key={t.name}
                 role="option"
@@ -204,9 +206,9 @@ export default class PreferencesTemplates extends React.Component<
                 {t.name}
               </button>
             ))}
-            <button className="settings-split-new" onClick={this._onAdd}>
+            <Button variant="link" className="settings-split-new" onClick={this._onAdd}>
               {localized('+ New template')}
-            </button>
+            </Button>
           </div>
           {selected ? (
             <TemplateEditor

@@ -1,12 +1,8 @@
-import {
-  localized,
-  PreferencesUIStore,
-  ExtensionRegistry,
-  ComponentRegistry,
-} from 'mailspring-exports';
+import { localized, PreferencesUIStore, ExtensionRegistry } from 'mailspring-exports';
 
 import SignatureComposerExtension from './composer-extension';
-import SignatureComposerDropdown from './composer-dropdown';
+
+// The composer's From row renders the signature picker (./composer-dropdown) itself.
 
 export function activate() {
   this.preferencesTab = new PreferencesUIStore.TabItem({
@@ -20,17 +16,11 @@ export function activate() {
 
   ExtensionRegistry.Composer.register(SignatureComposerExtension);
   PreferencesUIStore.registerPreferencesTab(this.preferencesTab);
-
-  ComponentRegistry.register(SignatureComposerDropdown, {
-    role: 'Composer:FromFieldComponents',
-  });
 }
 
 export function deactivate() {
   ExtensionRegistry.Composer.unregister(SignatureComposerExtension);
   PreferencesUIStore.unregisterPreferencesTab(this.preferencesTab.sectionId);
-
-  ComponentRegistry.unregister(SignatureComposerDropdown);
 }
 
 export function serialize() {
