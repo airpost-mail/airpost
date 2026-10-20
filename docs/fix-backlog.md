@@ -28,7 +28,7 @@ The user runs Mailspring 1.26.0, which already has the upstream Sent-copy rewrit
      stripped copy, `apps/engine/test/fakeimap/smtp.py:193-196`).
 2. **Quit mid-send leaves the draft row.** `_performRemoteRan` is saved before SMTP; the draft
    row is removed 4–12 s later (`crates/ms-tasks/src/send.rs:173-177`). Quitting kills the engine
-   (`src/flux/mailsync-bridge.ts:563-567`); on relaunch the task completes early and the draft stays.
+   (`src/flux/engine-bridge.ts:563-567`); on relaunch the task completes early and the draft stays.
    - Fix: engine removes the draft row in the early-return branch; client delays quit while a
      SendDraftTask is in flight.
    - Scenario: kill the engine during the Sent poll, restart.

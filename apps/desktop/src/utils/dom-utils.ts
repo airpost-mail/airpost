@@ -218,3 +218,24 @@ const DOMUtils = {
 };
 
 export default DOMUtils;
+
+/** Yields every node a TreeWalker over `rootNode` visits, in document order. */
+export function* walk(rootNode: Node, whatToShow?: number, filter?: NodeFilter | null) {
+  const walker = document.createTreeWalker(rootNode, whatToShow, filter);
+  let node = walker.nextNode();
+  while (node) {
+    yield node;
+    node = walker.nextNode();
+  }
+}
+
+/** Yields `node` and its descendants in reverse document order, the deepest last child first. */
+export function* walkBackwards(node: Node): Generator<Node> {
+  if (!node) {
+    return;
+  }
+  for (let i = node.childNodes.length - 1; i >= 0; i--) {
+    yield* walkBackwards(node.childNodes[i]);
+  }
+  yield node;
+}

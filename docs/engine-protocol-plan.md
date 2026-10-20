@@ -559,7 +559,7 @@ Delivered:
   exit 3 respawns every 1 s up to 30 times without counting a crash. Reset Cache removes
   the account, waits up to 10 s when `stillRunning` isn't empty, runs the one-shot
   `reset`, then adds it back. Secrets the client added are redacted from engine errors.
-  Spec: `spec/engine-client-spec.ts`.
+  Spec: `spec/engine-host-spec.ts`.
 
 Selecting a process model:
 - Engine: `--mode serve` runs every account in one process; `--mode sync` (stdio, or

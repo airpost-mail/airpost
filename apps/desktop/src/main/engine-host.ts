@@ -26,7 +26,7 @@ import type {
   EngineServeProcess,
   MailsyncProcessExit,
   ResetOptions,
-} from '../shared/mailsync-process';
+} from '../shared/engine-process';
 import {
   AccountAddResult,
   AccountState,

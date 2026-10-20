@@ -18,7 +18,7 @@ import {
 import { KeyManager } from '../src/main/key-manager';
 import { ConfigChannel } from '../src/shared/config-channels';
 import { resurfacingBodies } from '../src/shared/resurfacing';
-import { EngineServeProcess } from '../src/shared/mailsync-process';
+import { EngineServeProcess } from '../src/shared/engine-process';
 import { FakeEngine, until } from './fake-serve-engine';
 
 // The supervisor reads only `accounts`, the deleted ones and the log level from the main

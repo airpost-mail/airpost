@@ -664,7 +664,7 @@ their gates.
     renamed to `edgehill.legacy-imported.db*` (an older copy is replaced), so a new database
     created without a new legacy move (the user deleted `edgehill.db*` to resync) imports
     nothing. Output is the one-shot `{"error":…}`; a failure exits 1 and the client launches
-    anyway (`MailsyncProcess.migrate` in apps/desktop/src/shared/mailsync-process.ts runs it
+    anyway (`MailsyncProcess.migrate` in apps/desktop/src/shared/engine-process.ts runs it
     when the Rust engine is selected).
 - Future schema changes are Rust-owned migrations starting from this V12 baseline.
 

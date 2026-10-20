@@ -119,7 +119,7 @@ Deduplicated from the five readers. Recommended answer first.
 ## 1. Today (summary of the readers' maps)
 
 - **Supervision.** `MailsyncBridge` in the main window's renderer spawns and supervises
-  `serve` (`src/flux/mailsync-bridge.ts:66-95`, `src/shared/mailsync-process.ts:1011-1240`,
+  `serve` (`src/flux/engine-bridge.ts:66-95`, `src/shared/engine-process.ts:1011-1240`,
   `src/main/engine-host.ts`), so a window reload restarts the engine (V). It builds the
   account JSON with secrets in the renderer (`mailsync-bridge.ts:305-317`, from
   `KeyManager._getKeyHash` and `insertAccountSecrets`; `key-manager.ts:18` reaches

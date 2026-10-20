@@ -794,7 +794,7 @@ is exported to plugins (`src/plugin-api/mailspring-component-kit.js:70`). `webvi
 any http(s) URL a guest logs to the console, with no user gesture. Also dead:
 `onboarding/lib/page-top-bar.tsx:12-14`, `chromium-net-errors` (only used by `webview.tsx`), the
 `changePluginStateFromUrl` route with no listener (`src/main/application.ts:1061-1062`), and the
-protocol handler serving `dev/packages` outside dev mode (`src/main/mailspring-protocol-handler.ts:20-22`,
+protocol handler serving `dev/packages` outside dev mode (`src/main/asset-protocol-handler.ts:20-22`,
 unlike `package-manager.ts:36-39`).
 
 - Fix: deprecate the `Webview` export through `deprecate()` in stage 2 and remove at 2.0.0. Set
@@ -987,7 +987,7 @@ nine built-in sites call `AppEnv.mailsyncBridge` (`events/lib/main.tsx:43`,
 Verified. Actions use Reflux (TD24), stores their own emitter (`src/plugin-api/mailspring-store.ts`),
 queries rx-lite 4.0.8 (deprecated since 2016, 23 files, `src/plugin-api/mailspring-observables.ts`),
 Atom-era code event-kit (16 files). `DatabaseStore.trigger` fires once per incoming delta record
-(`src/flux/mailsync-bridge.ts:499`, `:524`).
+(`src/flux/engine-bridge.ts:499`, `:524`).
 
 - Cost: four subscribe and cleanup idioms; Rx monkey-patching caused the TaskQueue crash (TD36). A
   delta burst (initial sync, bulk label change) fans out synchronously per record, and stage 6

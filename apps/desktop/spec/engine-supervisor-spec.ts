@@ -13,7 +13,7 @@ import {
 } from '../src/main/engine-supervisor';
 import { KeyManager, secureStorage } from '../src/main/key-manager';
 import { EngineConnection } from '../src/engine/engine-connection';
-import { engineBuildId, EngineServeProcess } from '../src/shared/mailsync-process';
+import { engineBuildId, EngineServeProcess } from '../src/shared/engine-process';
 import { EngineStatus, SupervisorChannel } from '../src/shared/supervisor-channels';
 import { FakeEngine, tick, until } from './fake-serve-engine';
 

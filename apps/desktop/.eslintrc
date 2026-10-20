@@ -143,7 +143,7 @@
         "src/components/participants-text-field.tsx",
         "src/components/sheets/sheet-toolbar.tsx",
         "src/components/tokenizing-text-field.tsx",
-        "src/flux/mailsync-bridge.ts",
+        "src/flux/engine-bridge.ts",
         "src/flux/stores/attachment-store.ts",
         "src/flux/stores/database-store.ts",
         "src/flux/stores/message-store.ts",
@@ -153,7 +153,7 @@
         "src/plugin-host/package-manager.ts",
         "src/quickpreview/index.ts",
         "src/shared/default-client-helper.ts",
-        "src/shared/mailsync-process.ts",
+        "src/shared/engine-process.ts",
         "src/window/app-env.ts",
         "src/window/spellchecker.ts",
         "src/window/window-event-handler.ts"

@@ -73,7 +73,7 @@ Where it fails today:
 |---|---|---|
 | 1 | No DMG, no GitHub release for the desktop; builds go to an S3 bucket by commit (`desktop-build-macos.yml:141-156`) | DMG target; release workflow (section 8.3) |
 | 2 | Signing and notarisation skip without secrets; notarisation uses Apple ID + app password only (`build.js:361-368`) while the engine uses an API key | Add secrets (user); move the desktop to `notarytool` with the API key, like `engine-release.yml` |
-| 3 | `core.sync.engine` defaults to `cpp` (`src/shared/mailsync-process.ts:170`) and the CI builds bundle only `mailsync-rs` | No public release before stage 10 deletes the C++ engine, or flip the default first (question Q1) |
+| 3 | `core.sync.engine` defaults to `cpp` (`src/shared/engine-process.ts:170`) and the CI builds bundle only `mailsync-rs` | No public release before stage 10 deletes the C++ engine, or flip the default first (question Q1) |
 | 3 | Windows ships no engine at all (`desktop-build-windows.yml:3-6`); the engine needs a named pipe and a DPAPI store | Out of this plan: engine work. Windows builds stay internal until then |
 | 4 | `tern` is not bundled; `tern-mcp` is bundled by stage 2 (client-s2, unmerged); nothing on PATH on macOS or Windows; the deb/rpm `/usr/bin/ternmail` is the Electron app | Bundle `tern`; install command (2.3); deb/rpm symlinks |
 | 4 | CLI and tern-mcp look for the snap profile under `~/snap/mailspring` (`apps/cli/src/discovery.rs:29`, `apps/mcp/src/config.rs:15`) | One-line fix each, after stage 1 lands in `apps/cli` |

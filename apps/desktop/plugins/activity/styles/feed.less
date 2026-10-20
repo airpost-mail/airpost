@@ -73,9 +73,12 @@
     }
   }
 
-  // Sized and outlined like .btn so it sits flush with the other controls.
-  .segmented-control {
+  // The kit's SegmentedControl, sized and outlined like .btn so it sits flush with the other
+  // controls. Both classes so these win over the kit's Preferences look.
+  .segmented-control.settings-segmented {
     display: inline-flex;
+    gap: 0;
+    padding: 0;
     border-radius: @border-radius-base;
     background: @background-primary;
     font-size: @font-size-small;
@@ -86,12 +89,16 @@
       -0.5px 0 0 @btn-border-color,
       0 0.5px 1px @btn-border-color;
 
-    .segment {
+    button {
       cursor: default;
       height: 1.9em;
       line-height: 1.9em;
       padding: 0 0.8em;
+      border-radius: 0;
+      box-shadow: none;
       color: @btn-default-text-color;
+      font-size: inherit;
+      font-weight: inherit;
       white-space: nowrap;
       &:first-child {
         border-radius: @border-radius-base 0 0 @border-radius-base;
@@ -99,10 +106,10 @@
       &:last-child {
         border-radius: 0 @border-radius-base @border-radius-base 0;
       }
-      & + .segment {
+      & + button {
         box-shadow: -0.5px 0 0 @btn-border-color;
       }
-      &.active {
+      &.on {
         background: @accent-primary;
         color: @text-color-inverse;
       }

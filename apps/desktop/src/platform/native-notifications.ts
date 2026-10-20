@@ -1,8 +1,8 @@
 /* eslint global-require: 0 */
 import { ipcRenderer } from 'electron';
 import { convertToPNG, getIcon, Context } from './linux-theme-utils';
-import { getDoNotDisturb as getLinuxDoNotDisturb } from './dnd-utils-linux';
-import { getDoNotDisturb as getWindowsDoNotDisturb } from './dnd-utils-windows';
+import { getDoNotDisturb as getLinuxDoNotDisturb } from './do-not-disturb-linux';
+import { getDoNotDisturb as getWindowsDoNotDisturb } from './do-not-disturb-windows';
 import pkg from '../shared/package';
 import path from 'path';
 import fs from 'fs';

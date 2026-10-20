@@ -17,7 +17,7 @@ import {
 } from '../src/engine/engine-api';
 import { Integrations, IntegrationError } from '../src/engine/integrations';
 import { CapabilityStoreClass } from '../src/flux/stores/capability-store';
-import { feedEngineEvents } from '../src/flux/mailsync-bridge';
+import { feedEngineEvents } from '../src/flux/engine-bridge';
 import { EngineStatus } from '../src/shared/supervisor-channels';
 import { FakeEngine, until } from './fake-serve-engine';
 

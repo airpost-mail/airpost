@@ -17,7 +17,7 @@ export type Actions = typeof import('../flux/actions');
 export const Actions: Actions;
 
 // Sync engine
-export * from '../shared/mailsync-process';
+export * from '../shared/engine-process';
 
 // The Database
 export * from '../flux/attributes/matcher';

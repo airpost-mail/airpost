@@ -117,7 +117,7 @@ lazyLoadWithGetter(
 lazyLoad(`Actions`, 'flux/actions');
 
 // Sync engine
-lazyLoad(`MailsyncProcess`, 'shared/mailsync-process');
+lazyLoad(`MailsyncProcess`, 'shared/engine-process');
 // The Database
 lazyLoad(`Matcher`, 'flux/attributes/matcher');
 lazyLoadWithGetter(

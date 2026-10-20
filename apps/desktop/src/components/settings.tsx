@@ -112,27 +112,66 @@ export function NeedsServerPill() {
   return <StatusPill kind="server">{localized('Needs a Tern server')}</StatusPill>;
 }
 
+/** One choice of a few, as a radio group: the arrow keys move the choice and only the chosen
+ * segment is a tab stop. `className` restyles it outside Preferences. */
 export function SegmentedControl<T extends string | number | boolean>(props: {
   value: T;
   options: [T, string][];
   onChange: (value: T) => void;
   disabled?: boolean;
   label?: string;
+  className?: string;
 }) {
+  const { value, options, onChange, disabled } = props;
+  const root = React.useRef<HTMLDivElement>(null);
+  const movedByKey = React.useRef(false);
+
+  // Focus follows the choice once the parent has applied it.
+  React.useEffect(() => {
+    if (!movedByKey.current) return;
+    movedByKey.current = false;
+    root.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+  }, [value]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled || options.length === 0) return;
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const idx = options.findIndex(([v]) => v === value);
+    const from = idx < 0 ? (step > 0 ? -1 : 0) : idx;
+    const next = options[(from + step + options.length) % options.length][0];
+    if (next === value) return;
+    movedByKey.current = true;
+    onChange(next);
+  };
+
   return (
-    <div className="settings-segmented" role="radiogroup" aria-label={props.label}>
-      {props.options.map(([value, label]) => (
-        <button
-          key={String(value)}
-          role="radio"
-          aria-checked={value === props.value}
-          className={classNames({ on: value === props.value })}
-          disabled={props.disabled}
-          onClick={() => props.onChange(value)}
-        >
-          {label}
-        </button>
-      ))}
+    <div
+      ref={root}
+      className={classNames('settings-segmented', props.className)}
+      role="radiogroup"
+      aria-label={props.label}
+      onKeyDown={onKeyDown}
+    >
+      {options.map(([v, label], i) => {
+        const on = v === value;
+        // With nothing chosen the first segment takes the tab stop.
+        const tabStop = on || (i === 0 && !options.some(([o]) => o === value));
+        return (
+          <button
+            key={String(v)}
+            role="radio"
+            aria-checked={on}
+            tabIndex={tabStop ? 0 : -1}
+            className={classNames({ on })}
+            disabled={disabled}
+            onClick={() => onChange(v)}
+          >
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }

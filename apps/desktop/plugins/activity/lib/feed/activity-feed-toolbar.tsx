@@ -1,9 +1,8 @@
 import React from 'react';
 import classnames from 'classnames';
 import { localized } from 'mailspring-exports';
-import { DropdownMenu } from 'mailspring-component-kit';
+import { DropdownMenu, SegmentedControl } from 'mailspring-component-kit';
 import { eventCountLabel } from '../activity-events';
-import { SegmentedControl } from '../segmented-control';
 
 export type EventKind = 'all' | 'open' | 'click';
 export type GroupBy = 'none' | 'recipient' | 'message';
@@ -44,12 +43,13 @@ export function ActivityFeedToolbar({
         onChange={(e) => onChange({ search: e.target.value })}
       />
       <SegmentedControl<EventKind>
+        className="segmented-control"
         value={kind}
         onChange={(id) => onChange({ kind: id })}
         options={[
-          { id: 'all', label: localized('All') },
-          { id: 'open', label: localized('Opens') },
-          { id: 'click', label: localized('Clicks') },
+          ['all', localized('All')],
+          ['open', localized('Opens')],
+          ['click', localized('Clicks')],
         ]}
       />
       <div className="group-by">

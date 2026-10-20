@@ -9,7 +9,7 @@ import { ThreadCountsStore } from '../src/flux/stores/thread-counts-store';
 import DefaultEngineEvents, { EngineEvents } from '../src/engine/engine-events';
 import { EngineConnection } from '../src/engine/engine-connection';
 import { Feature } from '../src/shared/engine-protocol';
-import { applyDeltas, feedEngineEvents } from '../src/flux/mailsync-bridge';
+import { applyDeltas, feedEngineEvents } from '../src/flux/engine-bridge';
 import { Notifier } from '../features/unread-notifications/lib/main';
 import { EngineStatus } from '../src/shared/supervisor-channels';
 import { FakeEngine, until } from './fake-serve-engine';

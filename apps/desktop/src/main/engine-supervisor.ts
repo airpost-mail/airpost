@@ -42,7 +42,7 @@ import {
   EngineServeProcess,
   MailsyncProcessExit,
   ResetOptions,
-} from '../shared/mailsync-process';
+} from '../shared/engine-process';
 import { AccountSecretsJSON, isAccountSecretKey, KeyManager, KeySet } from './key-manager';
 import {
   CredentialsImportParams,

@@ -103,7 +103,7 @@ Each package in `features/`, `plugins/` and `themes/` has:
 
 One engine process (`mailsync-rs --mode serve`) runs every account, started by the main process at launch, with zero accounts too (docs/engine-protocol-plan.md section 4, docs/desktop-client-plan.md):
 
-1. **Main process → engine, stdin** (`main/engine-supervisor.ts`, `main/engine-host.ts`, `shared/mailsync-process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
+1. **Main process → engine, stdin** (`main/engine-supervisor.ts`, `main/engine-host.ts`, `shared/engine-process.ts` `EngineServeProcess`): JSON-RPC calls that carry credentials or manage the engine: `account.add`/`remove`/`test`/`reset`, `engine.resetDatabase`/`setLogLevel`/`shutdown`. stdout carries their responses and rotated secrets only.
 2. **Each window ↔ engine, Unix socket** (`engine-connection.ts`): JSON-RPC 2.0 over newline-delimited JSON at `<configDir>/run/engine.sock`: `hello`, `subscribe`, `task.queue`, reads, and the delta notifications.
 
 ```

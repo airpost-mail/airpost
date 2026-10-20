@@ -1,4 +1,4 @@
-import DOMWalkers from '../utils/dom-walkers';
+import { walkBackwards } from '../utils/dom-utils';
 import * as Utils from '../flux/models/utils';
 
 function textAndNodesAfterNode(node) {
@@ -27,7 +27,7 @@ function textAndNodesAfterNode(node) {
  */
 export default function unwrappedSignatureDetector(doc, quoteElements) {
   // Find the last quoteBlock
-  for (const node of DOMWalkers.walkBackwards(doc)) {
+  for (const node of walkBackwards(doc)) {
     let textAndNodes;
     let focusNode = node;
     if (node && quoteElements.includes(node)) {

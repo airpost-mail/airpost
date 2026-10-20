@@ -6,7 +6,7 @@ import {
   lastJSONResponse,
   MailsyncProcess,
   stripSecretKeys,
-} from '../src/shared/mailsync-process';
+} from '../src/shared/engine-process';
 import { FakeEngine, until } from './fake-serve-engine';
 
 describe('lastJSONResponse', function () {
@@ -258,7 +258,7 @@ describe("the serve engine's socket", function () {
     expect(proc.features).toEqual([]);
   });
 
-  // The secrets deltas on stdout are in engine-client-spec.
+  // The secrets deltas on stdout are in engine-host-spec.
   it('emits the socket deltas, however the envelope is spaced', async function () {
     await connected();
     const fromSocket = nextEvent(proc, 'deltas');

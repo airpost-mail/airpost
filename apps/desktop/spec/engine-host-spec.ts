@@ -4,7 +4,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { EngineServeProcess, ENGINE_SHUTDOWN_GRACE_MS } from '../src/shared/mailsync-process';
+import { EngineServeProcess, ENGINE_SHUTDOWN_GRACE_MS } from '../src/shared/engine-process';
 import {
   AccountJSON,
   EngineClient,

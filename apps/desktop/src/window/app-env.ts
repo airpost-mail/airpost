@@ -39,7 +39,7 @@ export default class AppEnvConstructor {
   menu: import('./menu-manager').default;
   windowEventHandler: import('./window-event-handler').default;
   actionBridge: import('../flux/action-bridge').default;
-  mailsyncBridge: import('../flux/mailsync-bridge').default;
+  mailsyncBridge: import('../flux/engine-bridge').default;
   errorLogger: any;
   savedState: any;
   isReloading: boolean;
@@ -132,7 +132,7 @@ export default class AppEnvConstructor {
     const ActionBridge = require('../flux/action-bridge').default;
     this.actionBridge = new ActionBridge(ipcRenderer);
 
-    const MailsyncBridge = require('../flux/mailsync-bridge').default;
+    const MailsyncBridge = require('../flux/engine-bridge').default;
     this.mailsyncBridge = new MailsyncBridge();
 
     process.title = `Tern ${this.getWindowType()}`;

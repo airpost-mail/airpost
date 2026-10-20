@@ -1,12 +1,11 @@
 import React from 'react';
 import classnames from 'classnames';
 import { localized, AccountStore } from 'mailspring-exports';
-import { ScrollRegion } from 'mailspring-component-kit';
+import { ScrollRegion, SegmentedControl } from 'mailspring-component-kit';
 
 import LoadingCover from '../dashboard/loading-cover';
 import { Timespan, timespanEndsNow } from '../timespan';
 import { exportCsv } from '../csv-export';
-import { SegmentedControl } from '../segmented-control';
 import {
   averageFirstOpenDelay,
   computeRecipientEngagement,
@@ -248,19 +247,21 @@ export default class EngagementBoard extends React.Component<
             onChange={(e) => this.setState({ search: e.target.value })}
           />
           <SegmentedControl<GroupBy>
+            className="segmented-control"
             value={groupBy}
             onChange={(id) => this.setState({ groupBy: id })}
             options={[
-              { id: 'recipient', label: localized('Recipients') },
-              { id: 'domain', label: localized('Domains') },
+              ['recipient', localized('Recipients')],
+              ['domain', localized('Domains')],
             ]}
           />
           <SegmentedControl<SortBy>
+            className="segmented-control"
             value={sortBy}
             onChange={(id) => this.setState({ sortBy: id })}
             options={[
-              { id: 'activity', label: localized('Recent') },
-              { id: 'score', label: localized('Score') },
+              ['activity', localized('Recent')],
+              ['score', localized('Score')],
             ]}
           />
           <label className="toolbar-checkbox">

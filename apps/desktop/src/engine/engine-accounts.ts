@@ -24,7 +24,7 @@ import {
   OAuthBeginResult,
   OAuthCompleteResult,
 } from '../shared/engine-protocol';
-import { errorFromEngineResult, stripSecretKeys } from '../shared/mailsync-process';
+import { errorFromEngineResult, stripSecretKeys } from '../shared/engine-process';
 import { OAuthReceiverChannel, OAuthRedirect } from '../shared/supervisor-channels';
 
 // How long a window waits for its connection's hello before giving up on a call.

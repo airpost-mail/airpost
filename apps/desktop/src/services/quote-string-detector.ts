@@ -1,4 +1,4 @@
-import DOMWalkers from '../utils/dom-walkers';
+import { walkBackwards } from '../utils/dom-utils';
 
 /*
  * There are semi-common cases where immediately before a blockquote, we
@@ -17,7 +17,7 @@ export default function quoteStringDetector(doc) {
   const quoteNodesToRemove = [];
   let seenInitialQuoteEnd = false;
 
-  for (const node of DOMWalkers.walkBackwards(doc)) {
+  for (const node of walkBackwards(doc)) {
     if (node.nodeType === Node.DOCUMENT_NODE) {
       continue;
     }
