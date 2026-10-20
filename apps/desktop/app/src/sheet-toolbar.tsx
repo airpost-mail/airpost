@@ -230,6 +230,96 @@ ComponentRegistry.register(ToolbarMenuControl, {
     : WorkspaceStore.Sheet.Global.Toolbar.Right,
 });
 
+/*
+Double-clicking a title bar zooms the window, as macOS does for native title bars. A frameless
+window doesn't get that from the drag region, so the toolbar and SheetTitleBar call this on click.
+*/
+let lastTitleBarClickTime = 0;
+
+export function onTitleBarClick(e: React.MouseEvent<HTMLElement>) {
+  if (process.platform !== 'darwin') return;
+  if (e.target instanceof HTMLElement) {
+    if (['INPUT', 'A', 'BUTTON'].includes(e.target.tagName)) return;
+    if (e.target.hasAttribute('contenteditable')) return;
+  }
+
+  if (Date.now() - lastTitleBarClickTime < 350) {
+    const win = AppEnv.getCurrentWindow();
+    if (win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win.maximize();
+    }
+  }
+  lastTitleBarClickTime = Date.now();
+}
+
+function itemContainer(
+  components: Array<typeof React.Component & { displayName?: string }>,
+  props: { data: SheetDeclaration; depth: number }
+) {
+  return (
+    <Flexbox className="item-container" direction="row">
+      {components.map((Component) => (
+        <Component key={Component.displayName} {...props} />
+      ))}
+      <ToolbarSpacer key="spacer-50" order={-50} />
+      <ToolbarSpacer key="spacer+50" order={50} />
+    </Flexbox>
+  );
+}
+
+interface SheetTitleBarProps {
+  /** `start` holds what the toolbar puts at its start: the window controls, the sheet's left items
+   * and the back button. `end` holds the sheet's right items and the menu button. */
+  side: 'start' | 'end';
+}
+
+/*
+The top strip of a sheet declared with `hideToolbar`, which runs to the top of the window in place
+of the shared toolbar. The sheet puts `side="start"` at the top of its first column and
+`side="end"` at the top of its last; both drag the window.
+*/
+export function SheetTitleBar({ side }: SheetTitleBarProps) {
+  const depth = React.useContext(SheetDepthContext);
+  const [, rerender] = React.useReducer((n: number) => n + 1, 0);
+  React.useEffect(() => {
+    const unlisten = ComponentRegistry.listen(() => rerender());
+    return () => {
+      unlisten();
+    };
+  }, []);
+
+  // Undefined while the sheet animates out after being popped.
+  const sheet = WorkspaceStore.sheetStack()[depth];
+  const mode = WorkspaceStore.layoutMode();
+  const find = (location: { id: string }) =>
+    ComponentRegistry.findComponentsMatching({ location, mode });
+
+  const components =
+    side === 'start'
+      ? [
+          ...find(WorkspaceStore.Sheet.Global.Toolbar.Left),
+          ...(sheet ? find(sheet.Toolbar.Left) : []),
+          ...(depth > 0 ? [ToolbarBack] : []),
+        ]
+      : [
+          ...(sheet ? find(sheet.Toolbar.Right) : []),
+          ...find(WorkspaceStore.Sheet.Global.Toolbar.Right),
+        ];
+
+  return (
+    <div
+      role="toolbar"
+      aria-label={localized('Toolbar')}
+      className={`sheet-title-bar sheet-title-bar-${side}`}
+      onClick={onTitleBarClick}
+    >
+      {itemContainer(components, { data: sheet, depth })}
+    </div>
+  );
+}
+
 interface ToolbarProps {
   data: SheetDeclaration;
   depth: number;
@@ -340,8 +430,9 @@ export default class Toolbar extends React.Component<ToolbarProps, ToolbarState>
       columnToolbarEl.style.width = `${width}px`;
     }
 
-    // Record our overall height for sheets
-    if (el.clientHeight !== lastReportedToolbarHeight) {
+    // Record our overall height for sheets. Skipped while a `hideToolbar` sheet hides the
+    // toolbar: its title bar has the toolbar's height, so the last offset still fits.
+    if (el.clientHeight > 0 && el.clientHeight !== lastReportedToolbarHeight) {
       lastReportedToolbarHeight = el.clientHeight;
       require('@electron/remote').getCurrentWindow().setSheetOffset(el.clientHeight);
     }
@@ -405,19 +496,6 @@ export default class Toolbar extends React.Component<ToolbarProps, ToolbarState>
     return state;
   }
 
-  _flexboxForComponents(components: Array<typeof React.Component & { displayName?: string }>) {
-    const elements = components.map((Component) => (
-      <Component key={Component.displayName} {...this.props} />
-    ));
-    return (
-      <Flexbox className="item-container" direction="row">
-        {elements}
-        <ToolbarSpacer key="spacer-50" order={-50} />
-        <ToolbarSpacer key="spacer+50" order={50} />
-      </Flexbox>
-    );
-  }
-
   render() {
     const toolbars = this.state.columns.map((components, idx) => (
       <div
@@ -428,7 +506,7 @@ export default class Toolbar extends React.Component<ToolbarProps, ToolbarState>
         data-column={idx}
         key={idx}
       >
-        {this._flexboxForComponents(components)}
+        {itemContainer(components, this.props)}
       </div>
     ));
 

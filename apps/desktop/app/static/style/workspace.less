@@ -154,7 +154,23 @@ body.is-blurred {
   // cover up the vertical resizing separators, so the toolbar appears
   // to be one continuous bar.
   z-index: 10;
+}
 
+// The strips a `hideToolbar` sheet (Preferences) draws at the top of its columns in place of
+// the toolbar. Same height, no surface of their own: they take the colour of the column.
+.sheet-title-bar {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  -webkit-app-region: drag;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+}
+
+// Toolbar items look the same in the toolbar and in a sheet's title bar.
+.sheet-toolbar,
+.sheet-title-bar {
   .item-container > * {
     -webkit-app-region: no-drag;
   }
@@ -469,7 +485,8 @@ body.is-blurred {
     padding-top: ((@toolbar-height-darwin - 36px) / 2);
   }
 
-  .sheet-toolbar {
+  .sheet-toolbar,
+  .sheet-title-bar {
     height: @toolbar-height-darwin;
     min-height: @toolbar-height-darwin;
     max-height: @toolbar-height-darwin;
@@ -565,7 +582,7 @@ body.is-blurred {
 
 // Kept at the specificity of the generic `body.is-blurred` rule above (which it
 // must outrank), so it deliberately does not use the zero-specificity :where().
-body:where(.platform-darwin).is-blurred .sheet-toolbar-container {
+body:where(.platform-darwin).is-blurred :is(.sheet-toolbar-container, .sheet-title-bar) {
   .btn.btn-toolbar {
     background: @toolbar-btn-fill-blurred-darwin;
     box-shadow: @toolbar-btn-edge-blurred-darwin;
@@ -623,7 +640,9 @@ body.platform-linux {
   }
   .sheet-toolbar {
     border-bottom: 1px solid var(--toolbar-border);
-
+  }
+  .sheet-toolbar,
+  .sheet-title-bar {
     .btn-toolbar {
       background: color-mix(in srgb, @text-color 8%, transparent);
       box-shadow: none;
@@ -681,6 +700,9 @@ body.platform-linux {
     .sheet-toolbar-container {
       background-image: none;
       background: var(--toolbar-background);
+    }
+    .sheet-toolbar-container,
+    .sheet-title-bar {
       .btn-toolbar {
         background: color-mix(in srgb, @text-color 5%, transparent);
         box-shadow: none;
@@ -718,6 +740,9 @@ body.platform-win32 {
   .sheet-toolbar-container {
     background-image: none;
     background: var(--toolbar-background);
+  }
+  .sheet-toolbar-container,
+  .sheet-title-bar {
     .btn-toolbar {
       transition: background 300ms;
       margin: 0 0 0 1px;

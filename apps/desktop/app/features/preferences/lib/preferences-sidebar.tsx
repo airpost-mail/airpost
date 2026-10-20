@@ -1,6 +1,6 @@
 import React from 'react';
 import classNames from 'classnames';
-import { RetinaImg } from 'mailspring-component-kit';
+import { RetinaImg, SheetTitleBar } from 'mailspring-component-kit';
 import {
   Account,
   AccountStore,
@@ -147,6 +147,7 @@ export default class PreferencesSidebar extends React.Component<
     const server = visible.filter((t) => t.group === 'server');
     return (
       <div className="preferences-sidebar">
+        <SheetTitleBar side="start" />
         <div className="preferences-sidebar-search">
           <input
             type="search"

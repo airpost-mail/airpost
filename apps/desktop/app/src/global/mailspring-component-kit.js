@@ -87,6 +87,7 @@ lazyLoad('Webview', 'webview');
 lazyLoad('Flexbox', 'flexbox');
 lazyLoad('RetinaImg', 'retina-img');
 lazyLoad('NavRailItem', 'nav-rail');
+lazyLoadFrom('SheetTitleBar', '../sheet-toolbar');
 lazyLoad('SwipeContainer', 'swipe-container');
 lazyLoad('FluxContainer', 'flux-container');
 lazyLoad('FocusContainer', 'focus-container');

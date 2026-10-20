@@ -49,6 +49,9 @@ export interface SheetDeclaration {
   name: string;
   root: boolean;
   sidebarComponent: any;
+  /** While this sheet is on top the shared toolbar is hidden and the sheet draws its own top
+   * strip with SheetTitleBar, which carries the window controls, back button and menu button. */
+  hideToolbar?: boolean;
 
   Toolbar: SheetToolbarDeclaration;
   Header: { id: string };
@@ -328,6 +331,7 @@ class WorkspaceStore extends MailspringStore {
       name: options.name,
       root: options.root,
       sidebarComponent: options.sidebarComponent,
+      hideToolbar: options.hideToolbar,
 
       Toolbar: {
         Left: { id: `Sheet:${id}:Toolbar:Left` },

@@ -63,7 +63,7 @@
   --rail-border: rgba(255, 255, 255, 0.08);
 
   /* ---- Toolbar: flat, no hairline. Each column's part matches the column below it; the rest
-     (Preferences, single-pane message view, popout windows) is tint(@sidebar, 90%). ---- */
+     (single-pane message view, popout windows) is tint(@sidebar, 90%). ---- */
   --toolbar-background: color-mix(in srgb, var(--sidebar-background) 10%, var(--background));
   --toolbar-border: transparent;
   --sidebar-toolbar-background: var(--sidebar-background);

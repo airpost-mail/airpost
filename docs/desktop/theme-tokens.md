@@ -260,7 +260,10 @@ token, so a theme can recolour the surface alone:
   read `--sidebar-background`, `--sidebar-foreground`, `--sidebar-muted-foreground` (labels,
   subtitles), `--sidebar-border`, `--sidebar-hover` and `--sidebar-selected-foreground` (active
   Preferences item). The Preferences separator reads `--sidebar-separator` and the search field
-  `--sidebar-control`, `--sidebar-control-foreground` and `--sidebar-control-placeholder`. In Light the Preferences items go from `@text-color` to the sidebar's 85%
+  `--sidebar-control`, `--sidebar-control-foreground` and `--sidebar-control-placeholder`.
+  Preferences has no toolbar: the sidebar runs to the top of the window, and its top strip (window
+  controls, back button) draws on `--sidebar-background` with `--sidebar-toolbar-foreground`; the
+  strip above the content is the content background. In Light the Preferences items go from `@text-color` to the sidebar's 85%
   text, the server card subtitle from 85% to 60%, and the active item from `--link` to `--selected`.
 - Image icons: under `body.theme-scheme-dark`, `img.content-dark`, `img.content-light`
   (`extra.less`) and thread icons other than the unread dot and star (`thread-list.less`) are

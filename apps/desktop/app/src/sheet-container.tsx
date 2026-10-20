@@ -3,7 +3,7 @@ import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { localized, WorkspaceStore } from 'mailspring-exports';
 
 import Sheet from './sheet';
-import Toolbar from './sheet-toolbar';
+import Toolbar, { onTitleBarClick } from './sheet-toolbar';
 import { Flexbox } from './components/flexbox';
 import { InjectedComponentSet } from './components/injected-component-set';
 import {
@@ -108,26 +108,6 @@ export default class SheetContainer extends React.Component<
     this.setState(this._getStateFromStores());
   };
 
-  _lastToolbarClickTime = 0;
-
-  _onToolbarDoubleClick = (e: React.MouseEvent<HTMLElement>) => {
-    if (process.platform !== 'darwin') return;
-    if (e.target instanceof HTMLElement) {
-      if (['INPUT', 'A', 'BUTTON'].includes(e.target.tagName)) return;
-      if (e.target.hasAttribute('contenteditable')) return;
-    }
-
-    if (Date.now() - this._lastToolbarClickTime < 350) {
-      const win = AppEnv.getCurrentWindow();
-      if (win.isMaximized()) {
-        win.unmaximize();
-      } else {
-        win.maximize();
-      }
-    }
-    this._lastToolbarClickTime = Date.now();
-  };
-
   _toolbarContainerElement() {
     const { toolbar } = AppEnv.getLoadSettings();
     if (!toolbar) {
@@ -145,13 +125,18 @@ export default class SheetContainer extends React.Component<
       />
     ));
 
+    // A sheet that hides the toolbar draws a SheetTitleBar instead. The toolbar stays mounted
+    // under it so the sheets below keep their toolbar items' state (e.g. a search in progress).
+    const topSheet = this.state.stack[this.state.stack.length - 1];
+    const hidden = !!topSheet?.hideToolbar;
+
     return (
       <header
         className="sheet-toolbar"
         role="banner"
         aria-label={localized('Application toolbar')}
-        style={{ order: 0, zIndex: 3 }}
-        onClick={this._onToolbarDoubleClick}
+        style={{ order: 0, zIndex: 3, ...(hidden ? { display: 'none' } : {}) }}
+        onClick={onTitleBarClick}
       >
         <div {...inertWhenStacked(this.state.stack.length > 1)}>{components[0]}</div>
         <TransitionGroup component={null}>

@@ -6,6 +6,7 @@ import {
   KeyCommandsRegion,
   ListensToFluxStore,
   ConfigPropContainer,
+  SheetTitleBar,
 } from 'mailspring-component-kit';
 import { PreferencesUIStore } from 'mailspring-exports';
 import PreferencesSidebar from './preferences-sidebar';
@@ -73,11 +74,14 @@ class PreferencesRoot extends React.Component<{ tab: any; tabs: any[]; selection
       >
         <Flexbox direction="row">
           <PreferencesSidebar tabs={tabs} selection={selection} />
-          <ScrollRegion className="preferences-content">
-            <ConfigPropContainer>
-              {tab ? <TabComponent accountId={selection.accountId} /> : null}
-            </ConfigPropContainer>
-          </ScrollRegion>
+          <div className="preferences-main">
+            <SheetTitleBar side="end" />
+            <ScrollRegion className="preferences-content">
+              <ConfigPropContainer>
+                {tab ? <TabComponent accountId={selection.accountId} /> : null}
+              </ConfigPropContainer>
+            </ScrollRegion>
+          </div>
         </Flexbox>
       </KeyCommandsRegion>
     );

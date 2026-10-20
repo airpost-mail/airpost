@@ -162,9 +162,10 @@ export function activate() {
     })
   );
 
+  // Preferences runs to the top of the window, its sidebar under the window controls.
   WorkspaceStore.defineSheet(
     'Preferences',
-    {},
+    { hideToolbar: true },
     {
       list: ['Preferences'],
       split: ['Preferences'],
