@@ -114,6 +114,22 @@ describe('MessageStore on the engine', function () {
     expect(engine.queries()).toEqual([]);
   });
 
+  it('keeps one item per draft when a draft arrives under another id', async function () {
+    const draft = (id: string) =>
+      message(11, { id, draft: true, headerMessageId: 'draft-hmid@tern.test', body: '<p>d</p>' });
+    change('persist', [draft('local-draft')]);
+    await settle();
+    change('persist', [draft('engine-draft')]);
+    await settle();
+    const drafts = MessageStore.items().filter((m) => m.draft);
+    expect(drafts.map((m) => m.id)).toEqual(['engine-draft']);
+    // A sent copy with the same Message-ID is not a draft and stays.
+    change('persist', [message(12, { headerMessageId: 'draft-hmid@tern.test' })]);
+    await settle();
+    expect(MessageStore.items().map((m) => m.id)).toContain('m12');
+    expect(MessageStore.items().map((m) => m.id)).toContain('engine-draft');
+  });
+
   it('loads a body when a collapsed message is expanded, showing it expanded once loaded', async function () {
     engine.requests = [];
     Actions.toggleMessageIdExpanded('m2');

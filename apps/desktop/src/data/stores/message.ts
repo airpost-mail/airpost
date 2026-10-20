@@ -195,6 +195,19 @@ class _MessageStore extends BaseStore {
       }
       const old = byId.get(message.id);
       if (old && message.body === undefined) message.body = old.body;
+      // One item per draft: two would mount two composers on the same editing session, which
+      // feed each other's changes back without end.
+      if (message.draft) {
+        for (const [id, other] of byId) {
+          if (
+            id !== message.id &&
+            other.draft &&
+            other.headerMessageId === message.headerMessageId
+          ) {
+            byId.delete(id);
+          }
+        }
+      }
       byId.set(message.id, message);
     }
     const next = [...byId.values()].filter((m) => !m.isHidden()).sort(byDate);

@@ -174,6 +174,40 @@ describe('the draft pipeline in the windows', function draftPipeline() {
     expect(builtIn.callCount).toBe(2);
   });
 
+  // Harnesses set PLAYWRIGHT so page.evaluate works; the engine still runs and saves drafts.
+  describe('under a Playwright harness', () => {
+    let was: string | undefined;
+    beforeEach(() => {
+      was = process.env.PLAYWRIGHT;
+      process.env.PLAYWRIGHT = '1';
+    });
+    afterEach(() => {
+      if (was === undefined) delete process.env.PLAYWRIGHT;
+      else process.env.PLAYWRIGHT = was;
+    });
+
+    it('waits for the engine to save a task locally', async function () {
+      const task = new SyncbackMetadataTask({ accountId: 'acct', modelId: 'm', value: {} } as any);
+      let resolved = false;
+      TaskQueue.waitForPerformLocal(task).then(() => (resolved = true));
+      await flush();
+      expect(resolved).toBe(false);
+      (TaskQueue as any)._waitingForLocal = (TaskQueue as any)._waitingForLocal.filter(
+        (w) => w.task !== task
+      );
+    });
+
+    it('leaves a new draft to the engine instead of announcing it itself', async function () {
+      spyOn(Actions, 'queueTask');
+      spyOn(TaskQueue, 'waitForPerformLocal').andReturn(Promise.resolve());
+      spyOn(DatabaseStore, 'trigger');
+      const draft = new Message({ ...message, id: undefined, draft: true } as any);
+      await DraftStore._finalizeAndPersistNewMessage(draft);
+      expect(draft.id).toBeUndefined();
+      expect(DatabaseStore.trigger).not.toHaveBeenCalled();
+    });
+  });
+
   describe('sending', () => {
     beforeEach(function () {
       this.draft = new Message({
