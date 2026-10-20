@@ -35,6 +35,7 @@ const KIT_STYLESHEETS = [
   'popover',
   'tooltip',
   'dropdown-menu',
+  'menu',
   'select',
   'tabs',
 ];

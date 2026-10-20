@@ -1,0 +1,128 @@
+/* Menu (src/components/menu.tsx): the searchable list the pickers, completions and legacy
+   dropdowns show, styled like the kit's DropdownMenu content. Its keyboard handling is its own
+   (focus stays in the search field), so it isn't on Radix. Legacy classes: menu, header-container,
+   content-container (plus empty), footer-container, item (plus selected and checked), item divider.
+   The core .menu rules are guarded with :where(:not([data-slot])). */
+
+[data-slot='menu'] {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--menu-foreground);
+  text-align: start;
+}
+[data-slot='menu']:focus,
+[data-slot='menu']:focus-visible {
+  outline: none;
+}
+
+[data-slot='menu-header'] {
+  flex-shrink: 0;
+  position: relative;
+  padding: 3px;
+  background-color: var(--menu-background);
+  border-bottom: 1px solid var(--menu-border);
+}
+body.platform-win32 [data-slot='menu-header'] input.search {
+  box-shadow: none;
+}
+
+[data-slot='menu-footer'] {
+  position: relative;
+}
+
+[data-slot='menu-content'] {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: -1px;
+  padding: 4px;
+  overflow: auto;
+  background-color: var(--menu-background);
+}
+[data-slot='menu-content'].empty {
+  padding: 0;
+}
+[data-slot='menu-content']::-webkit-scrollbar {
+  width: 8px;
+}
+[data-slot='menu-content']::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-slot='menu-content']::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--menu-foreground) 20%, transparent);
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background-clip: padding-box;
+}
+[data-slot='menu-content']::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--menu-foreground) 35%, transparent);
+  background-clip: padding-box;
+}
+
+[data-slot='menu-item'] {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
+  padding: calc(4px * var(--density)) calc(8px * var(--density));
+  border-radius: calc(var(--radius) * 4 / 3);
+  color: inherit;
+  cursor: default;
+  user-select: none;
+}
+[data-slot='menu-item']:hover:not([data-highlighted]) {
+  background-color: var(--hover);
+}
+[data-slot='menu-item'][data-highlighted] {
+  color: var(--selected-foreground);
+  background-color: var(--selected);
+}
+[data-slot='menu-item'] .primary,
+[data-slot='menu-item'] .secondary {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-slot='menu-item'] .secondary {
+  padding-inline-start: 5px;
+  color: var(--menu-muted-foreground);
+}
+[data-slot='menu-item'][data-highlighted] .secondary {
+  color: inherit;
+  opacity: 0.8;
+}
+
+[data-slot='menu-item'][data-state='checked'] {
+  padding-inline-end: calc(28px * var(--density));
+}
+[data-slot='menu-item-indicator'] {
+  position: absolute;
+  inset-inline-end: calc(8px * var(--density));
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+[data-slot='menu-label'] {
+  margin-top: 6px;
+  padding: calc(4px * var(--density)) calc(8px * var(--density));
+  color: var(--menu-muted-foreground);
+  font-size: calc(var(--font-size) - 2px);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+[data-slot='menu-separator'] {
+  height: 1px;
+  margin: 4px -4px;
+  padding: 0;
+  background-color: var(--menu-border);
+  pointer-events: none;
+}

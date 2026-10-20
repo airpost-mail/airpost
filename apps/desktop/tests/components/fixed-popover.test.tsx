@@ -1,303 +1,160 @@
+// SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
-import { findDOMNode } from 'react-dom';
-import ReactTestUtils from 'react-dom/test-utils';
+import { render, fireEvent, cleanup } from '@testing-library/react';
 import FixedPopover from '../../src/components/fixed-popover';
-import MTestUtils from '../support/test-utils';
+import * as Actions from '../../src/data/actions';
+import { getPortalContainer } from '../../src/components/kit/portal';
+import { wait, pressRealKey } from '../support/kit-helpers';
+import { trackCommands } from '../support/kit-layer-helpers';
 
 const {
   Directions: { Up, Down, Left, Right },
 } = FixedPopover;
 
-const makePopover = (props: any = {}) => {
-  const originRect = props.originRect ? props.originRect : {};
-  const popover = MTestUtils.renderIntoDocument(
-    <FixedPopover {...props} originRect={originRect} />
-  ) as any;
-  if (props.initialState) {
-    popover.setState(props.initialState);
-  }
-  return popover;
-};
+const content = () =>
+  getPortalContainer().querySelector('[data-slot="popover-content"]') as HTMLElement;
 
-describe('FixedPopover', function fixedPopover() {
-  describe('computeAdjustedOffsetAndDirection', () => {
-    beforeEach(() => {
-      this.popover = makePopover();
-      this.PADDING = 10;
-      this.windowDimensions = {
-        height: 500,
-        width: 500,
-      };
-    });
+const windowSize = () => ({
+  width: document.documentElement.clientWidth,
+  height: document.documentElement.clientHeight,
+});
 
-    const compute = (direction, { fallback = undefined, top, left, bottom, right }) => {
-      return this.popover.computeAdjustedOffsetAndDirection({
-        direction,
-        windowDimensions: this.windowDimensions,
-        currentRect: {
-          top,
-          left,
-          bottom,
-          right,
-        },
-        fallback,
-        offsetPadding: this.PADDING,
-      });
-    };
+// Placement resolves asynchronously in floating-ui.
+const placed = () => wait(50);
 
-    it('returns null when no overflows present', () => {
-      const res = compute(Up, { top: 10, left: 10, right: 20, bottom: 20 });
-      expect(res).toBe(null);
-    });
+describe('FixedPopover on the UI kit', function fixedPopover() {
+  beforeEach(() => {
+    jasmine.unspy(window, 'setTimeout');
+    spyOn(Actions, 'closePopover');
+  });
 
-    describe('when overflowing on 1 side of the window', () => {
-      it('returns fallback direction when it is specified', () => {
-        const { offset, direction } = compute(Up, {
-          fallback: Left,
-          top: -10,
-          left: 10,
-          right: 20,
-          bottom: 10,
-        });
-        expect(offset).toEqual({});
-        expect(direction).toEqual(Left);
-      });
+  afterEach(() => cleanup());
 
-      it('inverts direction if is Up and overflows on the top', () => {
-        const { offset, direction } = compute(Up, { top: -10, left: 10, right: 20, bottom: 10 });
-        expect(offset).toEqual({});
-        expect(direction).toEqual(Down);
-      });
+  const open = (
+    props: any = {},
+    body = <div className="body" style={{ width: 120, height: 60 }} />
+  ) =>
+    render(
+      <FixedPopover originRect={{ top: 200, left: 200, width: 40, height: 20 }} {...props}>
+        {body}
+      </FixedPopover>
+    );
 
-      it('inverts direction if is Down and overflows on the bottom', () => {
-        const { offset, direction } = compute(Down, { top: 490, left: 10, right: 20, bottom: 510 });
-        expect(offset).toEqual({});
-        expect(direction).toEqual(Up);
-      });
+  it('renders the content with the legacy classes and a blur trap over the rect', () => {
+    open();
+    const el = content();
+    expect(el.className).toBe('fixed-popover');
+    expect(el.getAttribute('data-variant')).toBe('bare');
+    expect(el.hasAttribute('data-ui-layer')).toBe(true);
+    expect(el.querySelector('.body')).not.toBe(null);
+    expect(el.querySelector('.fixed-popover-pointer')).not.toBe(null);
+    const trap = document.querySelector<HTMLElement>('.fixed-popover-blur-trap');
+    expect([trap.style.top, trap.style.left, trap.style.width, trap.style.height]).toEqual([
+      '200px',
+      '200px',
+      '40px',
+      '20px',
+    ]);
+  });
 
-      it('inverts direction if is Right and overflows on the right', () => {
-        const { offset, direction } = compute(Right, {
-          top: 10,
-          left: 490,
-          right: 510,
-          bottom: 20,
-        });
-        expect(offset).toEqual({});
-        expect(direction).toEqual(Left);
-      });
+  it('takes the rect from bottom and right when width and height are missing', () => {
+    open({ originRect: { top: 10, left: 20, bottom: 40, right: 70 } });
+    const trap = document.querySelector<HTMLElement>('.fixed-popover-blur-trap');
+    expect([trap.style.width, trap.style.height]).toEqual(['50px', '30px']);
+  });
 
-      it('inverts direction if is Left and overflows on the left', () => {
-        const { offset, direction } = compute(Left, { top: 10, left: -10, right: 10, bottom: 20 });
-        expect(offset).toEqual({});
-        expect(direction).toEqual(Right);
-      });
-
-      [Up, Down, Left, Right].forEach((dir) => {
-        if (dir === Up || dir === Down) {
-          it('moves left if its overflowing on the right', () => {
-            const { offset, direction } = compute(dir, {
-              top: 10,
-              left: 490,
-              right: 510,
-              bottom: 20,
-            });
-            expect(offset).toEqual({ x: -20 });
-            expect(direction).toEqual(dir);
-          });
-
-          it('moves right if overflows on the left', () => {
-            const { offset, direction } = compute(dir, {
-              top: 10,
-              left: -10,
-              right: 10,
-              bottom: 20,
-            });
-            expect(offset).toEqual({ x: 20 });
-            expect(direction).toEqual(dir);
-          });
-        }
-
-        if (dir === Left || dir === Right) {
-          it('moves up if its overflowing on the bottom', () => {
-            const { offset, direction } = compute(dir, {
-              top: 490,
-              left: 10,
-              right: 20,
-              bottom: 510,
-            });
-            expect(offset).toEqual({ y: -20 });
-            expect(direction).toEqual(dir);
-          });
-
-          it('moves down if overflows on the top', () => {
-            const { offset, direction } = compute(dir, {
-              top: -10,
-              left: 10,
-              right: 20,
-              bottom: 10,
-            });
-            expect(offset).toEqual({ y: 20 });
-            expect(direction).toEqual(dir);
-          });
-        }
-      });
-    });
-
-    describe('when overflowing on 2 sides of the window', () => {
-      describe('when direction is up', () => {
-        it('computes correctly when it overflows up and right', () => {
-          const { offset, direction } = compute(Up, { top: -10, left: 10, right: 510, bottom: 10 });
-          expect(offset).toEqual({ x: -20 });
-          expect(direction).toEqual(Down);
-        });
-
-        it('computes correctly when it overflows up and left', () => {
-          const { offset, direction } = compute(Up, { top: -10, left: -10, right: 10, bottom: 10 });
-          expect(offset).toEqual({ x: 20 });
-          expect(direction).toEqual(Down);
-        });
-      });
-
-      describe('when direction is right', () => {
-        it('computes correctly when it overflows right and up', () => {
-          const { offset, direction } = compute(Right, {
-            top: -10,
-            left: 490,
-            right: 510,
-            bottom: 10,
-          });
-          expect(offset).toEqual({ y: 20 });
-          expect(direction).toEqual(Left);
-        });
-
-        it('computes correctly when it overflows right and down', () => {
-          const { offset, direction } = compute(Right, {
-            top: 490,
-            left: 490,
-            right: 510,
-            bottom: 510,
-          });
-          expect(offset).toEqual({ y: -20 });
-          expect(direction).toEqual(Left);
-        });
-      });
-
-      describe('when direction is left', () => {
-        it('computes correctly when it overflows left and up', () => {
-          const { offset, direction } = compute(Left, {
-            top: -10,
-            left: -10,
-            right: 10,
-            bottom: 10,
-          });
-          expect(offset).toEqual({ y: 20 });
-          expect(direction).toEqual(Right);
-        });
-
-        it('computes correctly when it overflows left and down', () => {
-          const { offset, direction } = compute(Left, {
-            top: 490,
-            left: -10,
-            right: 10,
-            bottom: 510,
-          });
-          expect(offset).toEqual({ y: -20 });
-          expect(direction).toEqual(Right);
-        });
-      });
-
-      describe('when direction is down', () => {
-        it('computes correctly when it overflows down and left', () => {
-          const { offset, direction } = compute(Down, {
-            top: 490,
-            left: -10,
-            right: 10,
-            bottom: 510,
-          });
-          expect(offset).toEqual({ x: 20 });
-          expect(direction).toEqual(Up);
-        });
-
-        it('computes correctly when it overflows down and right', () => {
-          const { offset, direction } = compute(Down, {
-            top: 490,
-            left: 490,
-            right: 510,
-            bottom: 510,
-          });
-          expect(offset).toEqual({ x: -20 });
-          expect(direction).toEqual(Up);
-        });
-      });
+  [
+    [Up, 'top'],
+    [Down, 'bottom'],
+    [Left, 'left'],
+    [Right, 'right'],
+  ].forEach(([direction, side]) => {
+    it(`opens on the ${side} side when the direction is ${direction}, centred on the rect`, async () => {
+      open({ direction });
+      await placed();
+      const el = content();
+      expect(el.getAttribute('data-side')).toBe(side);
+      expect(el.getAttribute('data-align')).toBe('center');
+      const box = el.getBoundingClientRect();
+      if (side === 'top' || side === 'bottom') {
+        expect(Math.round(box.left + box.width / 2)).toBe(220);
+      } else {
+        expect(Math.round(box.top + box.height / 2)).toBe(210);
+      }
     });
   });
 
-  describe('computeClampedOffset', () => {
-    beforeEach(() => {
-      this.popover = makePopover();
-      this.PADDING = 10;
-      this.windowDimensions = { height: 500, width: 500 };
-    });
+  it('opens down when no direction is given', async () => {
+    open();
+    await placed();
+    expect(content().getAttribute('data-side')).toBe('bottom');
+  });
 
-    const clamp = ({ top, left, bottom, right }, offset = {}) => {
-      return this.popover.computeClampedOffset({
-        currentRect: { top, left, bottom, right },
-        windowDimensions: this.windowDimensions,
-        offset,
-        offsetPadding: this.PADDING,
-      });
+  // The rect sits against the window edge on the side asked for (body 120x60).
+  const edgeRects = () => {
+    const { width, height } = windowSize();
+    return {
+      [Up]: { top: 5, left: 200, width: 40, height: 20 },
+      [Down]: { top: height - 25, left: 200, width: 40, height: 20 },
+      [Left]: { top: 200, left: 5, width: 40, height: 20 },
+      [Right]: { top: 200, left: width - 45, width: 40, height: 20 },
     };
+  };
 
-    it('does not move a popover that is already on screen', () => {
-      expect(clamp({ top: 10, left: 10, bottom: 200, right: 200 })).toEqual({ x: 0, y: 0 });
-    });
-
-    it('slides left when the right edge is past the window', () => {
-      expect(clamp({ top: 10, left: 300, bottom: 200, right: 520 })).toEqual({ x: -30, y: 0 });
-    });
-
-    it('slides right when the left edge is past the window', () => {
-      expect(clamp({ top: 10, left: -20, bottom: 200, right: 100 })).toEqual({ x: 30, y: 0 });
-    });
-
-    it('slides up when the bottom edge is past the window', () => {
-      expect(clamp({ top: 300, left: 10, bottom: 530, right: 200 })).toEqual({ x: 0, y: -40 });
-    });
-
-    it('slides down when the top edge is past the window', () => {
-      expect(clamp({ top: -15, left: 10, bottom: 200, right: 200 })).toEqual({ x: 0, y: 25 });
-    });
-
-    it('favours the top left edge when the popover is larger than the window', () => {
-      // Pulling the far edge in would push the near edge out. The near edge wins, so the
-      // popover starts inside the window and its own max-height scrolls the remainder.
-      expect(clamp({ top: -20, left: -20, bottom: 520, right: 520 })).toEqual({ x: 30, y: 30 });
-    });
-
-    it('adds to the offset currentRect already reflects', () => {
-      expect(clamp({ top: 10, left: 300, bottom: 200, right: 520 }, { x: 5, y: 7 })).toEqual({
-        x: -25,
-        y: 7,
-      });
+  [
+    [Up, 'bottom'],
+    [Down, 'top'],
+    [Left, 'right'],
+    [Right, 'left'],
+  ].forEach(([direction, flipped]) => {
+    it(`flips to the ${flipped} side when ${direction} has no room`, async () => {
+      open({ direction, originRect: edgeRects()[direction] });
+      await placed();
+      expect(content().getAttribute('data-side')).toBe(flipped);
     });
   });
 
-  describe('computePopoverStyles', () => {
-    const originRect = { top: 100, left: 100, width: 50, height: 20 };
+  // A rect against one window edge, so the body centred on it overflows that edge.
+  const rectAgainst = (edge: string) => {
+    const { width, height } = windowSize();
+    return {
+      right: { top: 100, left: width - 30, width: 20, height: 20 },
+      left: { top: 200, left: 5, width: 20, height: 20 },
+      bottom: { top: height - 30, left: 100, width: 20, height: 20 },
+      top: { top: 5, left: 300, width: 20, height: 20 },
+    }[edge];
+  };
 
-    // Every direction has to honour both axes: the clamp that rescues an off-screen popover
-    // can need to move it on either one, whichever way the popover happens to point.
-    [Up, Down, Left, Right].forEach((direction) => {
-      it(`applies both offset axes when pointing ${direction}`, () => {
-        const popover = makePopover();
-        const { popoverStyle } = popover.computePopoverStyles({
-          originRect,
-          direction,
-          offset: { x: 12, y: 34 },
-        });
-        expect(popoverStyle.transform).toContain('translate(12px, 34px)');
-      });
+  [
+    [Down, 'right'],
+    [Up, 'left'],
+    [Right, 'bottom'],
+    [Left, 'top'],
+  ].forEach(([direction, edge]) => {
+    it(`keeps the ${direction} side and slides in from the ${edge} edge`, async () => {
+      const { width, height } = windowSize();
+      open({ direction, originRect: rectAgainst(edge) });
+      await placed();
+      const el = content();
+      expect(el.getAttribute('data-side')).toBe(
+        { up: 'top', down: 'bottom', left: 'left', right: 'right' }[direction]
+      );
+      const box = el.getBoundingClientRect();
+      expect(box.left).toBeGreaterThan(-1);
+      expect(box.top).toBeGreaterThan(-1);
+      expect(box.right).toBeLessThan(width + 1);
+      expect(box.bottom).toBeLessThan(height + 1);
     });
+  });
+
+  it('keeps its start edge inside the window when it is taller than the room beside the rect', async () => {
+    const { height } = windowSize();
+    open(
+      { direction: Right, originRect: { top: height - 40, left: 20, width: 40, height: 20 } },
+      <div style={{ width: 100, height: height + 200 }} />
+    );
+    await placed();
+    expect(content().getBoundingClientRect().top).toBeGreaterThan(-1);
   });
 
   describe('when the content changes size after placement', () => {
@@ -337,54 +194,84 @@ describe('FixedPopover', function fixedPopover() {
       window.ResizeObserver = RealResizeObserver;
     });
 
-    // The default export is the AutoFocuses decorator, which renders the FixedPopover inside it;
-    // placement state, refs and the ResizeObserver live on that inner instance.
-    const mountWithChild = (height: number, width = 200, originLeft = 10) => {
-      const outer = makePopover({
-        direction: Right,
-        originRect: { top: 400, left: originLeft, width: 50, height: 20 },
-        children: <div className="grows" style={{ width, height }} />,
-      });
-      const inner = ReactTestUtils.findAllInRenderedTree(
-        outer,
-        (c: any) => c !== outer && c.state && 'visible' in c.state
-      )[0] as any;
-      spyOn(inner, 'getWindowDimensions').andReturn({ width: 500, height: 500 });
-      return inner;
-    };
+    it('places it again so it comes back inside the window', async () => {
+      const { height } = windowSize();
+      open(
+        { direction: Right, originRect: { top: height - 60, left: 20, width: 40, height: 20 } },
+        <div className="grows" style={{ width: 100, height: 40 }} />
+      );
+      await placed();
+      const before = content().getBoundingClientRect();
+      expect(before.bottom).toBeLessThan(height + 1);
 
-    // Placement runs in deferred passes on the mocked clock.
-    const settle = () => {
-      for (let i = 0; i < 5; i++) advanceClock(10);
-    };
-
-    it('places the popover again so it comes back inside the window', () => {
-      const popover = mountWithChild(100);
-      settle();
-      expect(popover.state.visible).toBe(true);
-      expect(popover.getCurrentRect().top).toBeGreaterThan(0);
-
-      (findDOMNode(popover) as HTMLElement).querySelector<HTMLElement>('.grows').style.height =
-        '2000px';
+      content().querySelector<HTMLElement>('.grows').style.height = `${height - 100}px`;
       reportResizes();
-      expect(popover.placing).toBe(true);
-      settle();
-      expect(popover.placing).toBe(false);
-      expect(popover.state.visible).toBe(true);
-      expect(popover.getCurrentRect().top).toBeGreaterThan(0);
+      await placed();
+      const after = content().getBoundingClientRect();
+      expect(after.top).toBeLessThan(before.top);
+      expect(after.top).toBeGreaterThan(-1);
+      expect(after.bottom).toBeLessThan(height + 1);
+    });
+  });
+
+  it('focuses the first field, or an [autofocus] one', async () => {
+    open(
+      {},
+      <div>
+        <button>Plain</button>
+        <input className="field" />
+      </div>
+    );
+    await wait(20);
+    expect(document.activeElement).toBe(content().querySelector('.field'));
+    cleanup();
+
+    open(
+      {},
+      <div>
+        <input className="first" />
+        <input className="chosen" autoFocus />
+      </div>
+    );
+    await wait(20);
+    expect(document.activeElement).toBe(content().querySelector('.chosen'));
+  });
+
+  describe('closing', function () {
+    const commands = trackCommands();
+
+    it('closes on Escape without popping the sheet', async () => {
+      open({}, <input className="field" />);
+      await wait(20);
+      await pressRealKey('Escape');
+      expect(Actions.closePopover).toHaveBeenCalled();
+      expect(commands.count('core:pop-sheet')).toBe(0);
     });
 
-    it('starts again from the requested direction once the content fits it', () => {
-      const popover = mountWithChild(100, 200, 250);
-      settle();
-      expect(popover.state.direction).toBe(Left);
+    it('closes on a window resize', () => {
+      open();
+      window.dispatchEvent(new Event('resize'));
+      expect(Actions.closePopover).toHaveBeenCalled();
+    });
 
-      (findDOMNode(popover) as HTMLElement).querySelector<HTMLElement>('.grows').style.width =
-        '50px';
-      reportResizes();
-      settle();
-      expect(popover.state.direction).toBe(Right);
-      expect(popover.state.visible).toBe(true);
+    it('closes when the app loses focus, unless closeOnAppBlur is false', () => {
+      open({ closeOnAppBlur: false });
+      window.dispatchEvent(new Event('blur'));
+      expect(Actions.closePopover).not.toHaveBeenCalled();
+      cleanup();
+      open();
+      window.dispatchEvent(new Event('blur'));
+      expect(Actions.closePopover).toHaveBeenCalled();
+    });
+
+    it('closes on a click outside, and not on a click inside', async () => {
+      open();
+      await wait(10);
+      fireEvent.pointerDown(content().querySelector('.body'));
+      expect(Actions.closePopover).not.toHaveBeenCalled();
+      fireEvent.pointerDown(document.body);
+      fireEvent.click(document.body);
+      expect(Actions.closePopover).toHaveBeenCalled();
     });
   });
 });

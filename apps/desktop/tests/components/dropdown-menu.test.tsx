@@ -2,7 +2,8 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import DropdownMenu from '../../src/components/dropdown-menu';
-import { wait } from '../support/kit-helpers';
+import { wait, pressRealKey } from '../support/kit-helpers';
+import { trackCommands } from '../support/kit-layer-helpers';
 
 const ITEMS = [
   { id: 'week', name: 'Last week' },
@@ -68,5 +69,19 @@ describe('legacy DropdownMenu on the UI kit', function () {
     fireEvent.pointerDown(document.body);
     fireEvent.click(document.body);
     expect(container.querySelector('.menu')).toBe(null);
+  });
+
+  describe('Escape', function () {
+    const commands = trackCommands();
+
+    it('closes the menu without popping the sheet', async () => {
+      const container = renderMenu({ headerComponents: [<input key="s" className="search" />] });
+      fireEvent.click(container.querySelector('.dropdown-menu').firstElementChild);
+      await wait(10);
+      expect(document.activeElement).toBe(container.querySelector('input.search'));
+      await pressRealKey('Escape');
+      expect(container.querySelector('.menu')).toBe(null);
+      expect(commands.count('core:pop-sheet')).toBe(0);
+    });
   });
 });

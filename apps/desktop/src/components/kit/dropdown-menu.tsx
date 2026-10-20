@@ -4,6 +4,7 @@ import classNames from 'classnames';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { getPortalContainer } from './portal';
 import { consumeEscape, layerProps } from './layer';
+import { CheckGlyph, DotGlyph } from './glyphs';
 
 /* Public: A menu opened from a button, on Radix DropdownMenu with shadcn's parts
    (docs/desktop/ui-kit.md 6.11). Context menus stay native Electron menus. Plugins get the root
@@ -50,25 +51,6 @@ function useLegacySelected<E extends HTMLElement>(
     },
   };
 }
-
-const CheckGlyph = () => (
-  <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
-    <path
-      d="M3.5 8.5l3 3 6-7"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      fill="none"
-    />
-  </svg>
-);
-
-const DotGlyph = () => (
-  <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
-    <circle cx="8" cy="8" r="3" fill="currentColor" />
-  </svg>
-);
 
 const ChevronGlyph = () => (
   <svg

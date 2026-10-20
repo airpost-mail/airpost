@@ -1,10 +1,10 @@
 # Desktop UI kit
 
 Design for the desktop's component kit: Radix primitives, shadcn-like props and markup, plain CSS
-reading the theme tokens (`docs/desktop/theme-tokens.md`). This is the spec stage 2 builds from;
-nothing here is implemented yet except the dependencies and the compatibility spec
-`tests/components/radix-react17.test.tsx`. Paths are relative to `apps/desktop/` unless they
-start with `docs/`.
+reading the theme tokens (`docs/desktop/theme-tokens.md`). This is the spec stage 2 built from:
+the components, their styles, `settings.tsx` and the legacy shared exports (`Switch`, `Menu`,
+`ButtonDropdown`, `DropdownMenu`, `MultiselectDropdown`, `Modal`, `FixedPopover`) are on the kit.
+Paths are relative to `apps/desktop/` unless they start with `docs/`.
 
 Settled before this doc (stage 0, `/tmp/tern-shots/ui-kit-stage0.md`): Radix per-primitive
 packages, no Tailwind, no lucide, shadcn token names, native Electron context menus and
@@ -450,8 +450,12 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
   keeps its API (24 callers). PopoverStore renders a `Popover open` with a `PopoverAnchor
   virtualRef` whose `getBoundingClientRect()` returns `originRect`. `direction` up/down/left/right
   maps to `side` top/bottom/left/right. `fallbackDirection` is covered by Radix's collision flip,
-  which only flips to the opposite side. Stage 2 checks every caller's pair and lists any that asks
-  for a perpendicular fallback. `closeOnAppBlur` maps to a `window` `blur` listener that closes.
+  which only flips to the opposite side. One caller asks for a perpendicular fallback:
+  `src/features/thread-list/thread-list.tsx` (right, fallback down), which flips to the left
+  instead. `closeOnAppBlur` maps to a `window` `blur` listener that closes. The `FixedPopover`
+  export (`src/components/fixed-popover.tsx`) is that component, with its props and `Directions`;
+  PopoverStore renders it. Radix's `shift` keeps it inside the window along the other axis, also
+  after its content changes size, which replaces the legacy placement code.
 
 ### 6.11 DropdownMenu
 
@@ -474,11 +478,15 @@ accept but drop it. "Legacy classes" are the classes rendered for theme compatib
 - Colours: as Select's content; destructive items `--destructive`.
 - Legacy classes: content `menu`; items `item`, plus `selected` while highlighted (tracked from the
   item's `onFocus`/`onBlur`, since Radix highlights the focused item); separator `item divider`.
-- Replaces: the legacy `DropdownMenu` component (2 sites), `ButtonDropdown`'s menu (7),
-  `MultiselectDropdown` (1, as checkbox items). The legacy `DropdownMenu` export keeps its name and
-  API. Not replaced: the searchable `Menu` (`src/components/menu.tsx`, used inside the category,
-  label and snooze pickers), which stays legacy with its `.menu .item.selected` classes, and
-  native context menus.
+- Replaces: `MultiselectDropdown` (1, as checkbox items that leave the menu open). The legacy
+  `DropdownMenu` (2 sites) and `ButtonDropdown` (7) take arbitrary menu content (a `Menu`), so they
+  open it in a kit Popover rather than as DropdownMenu items; both keep their names and API. Not
+  replaced: native context menus, and the searchable `Menu` (`src/components/menu.tsx`, used inside
+  the category, label and snooze pickers and the completions), whose focus stays in its search
+  field. `Menu` keeps its own keyboard handling and its `.menu .item.selected` classes, and renders
+  the kit's look: `data-slot` `menu`, `menu-header`, `menu-content`, `menu-footer`, `menu-item`
+  (`data-highlighted` when selected, `data-state="checked"` and a check indicator when checked),
+  `menu-label` and `menu-separator`, styled by `static/styles/kit/menu.css`.
 
 ### 6.12 Tooltip
 

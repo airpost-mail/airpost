@@ -3,6 +3,7 @@ import _ from 'underscore';
 import React, { HTMLProps } from 'react';
 import ReactDOM from 'react-dom';
 import { DOMUtils } from 'mailspring-exports';
+import { CheckGlyph } from './kit/glyphs';
 
 export interface MenuItemProps {
   id?: string;
@@ -67,7 +68,12 @@ class MenuItem extends React.Component<MenuItemProps> {
   render() {
     if (this.props.divider) {
       const dividerLabel = _.isString(this.props.divider) ? this.props.divider : '';
-      return <div className="item divider">{dividerLabel}</div>;
+      // A divider with text heads a section; without, it is a line.
+      return (
+        <div data-slot={dividerLabel ? 'menu-label' : 'menu-separator'} className="item divider">
+          {dividerLabel}
+        </div>
+      );
     } else {
       const className = classNames({
         item: true,
@@ -83,10 +89,18 @@ class MenuItem extends React.Component<MenuItemProps> {
               ? this.props.selected
               : undefined
           }
+          data-slot="menu-item"
+          data-highlighted={this.props.selected ? '' : undefined}
+          data-state={this.props.checked ? 'checked' : undefined}
           className={className}
           onMouseDown={this.props.onMouseDown}
         >
           {this.props.content}
+          {this.props.checked && (
+            <span data-slot="menu-item-indicator">
+              <CheckGlyph />
+            </span>
+          )}
         </div>
       );
     }
@@ -146,6 +160,13 @@ component's Menu instance:
   height: 100px;
 }
 ```
+
+It renders the UI kit's menu markup, styled by static/styles/kit/menu.css like the kit's
+DropdownMenu: `data-slot` `menu`, `menu-header`, `menu-content`, `menu-footer`, `menu-item`
+(with `data-highlighted` on the selected item and `data-state="checked"` plus a check indicator
+on checked ones), `menu-label` for a divider with text and `menu-separator` for one without. The
+legacy classes above stay. Its keyboard handling is its own rather than Radix's, because focus
+stays in the field in its header.
 
 Section: Component Kit
 */
@@ -339,10 +360,19 @@ export class Menu extends React.Component<MenuProps, MenuState> {
     const fc = this.props.footerComponents || <span />;
     const className = this.props.className ? this.props.className : '';
     return (
-      <div onKeyDown={this.onKeyDown} className={`menu ${className}`} tabIndex={-1}>
-        <div className="header-container">{hc}</div>
+      <div
+        data-slot="menu"
+        onKeyDown={this.onKeyDown}
+        className={`menu ${className}`}
+        tabIndex={-1}
+      >
+        <div data-slot="menu-header" className="header-container">
+          {hc}
+        </div>
         {this._contentContainer()}
-        <div className="footer-container">{fc}</div>
+        <div data-slot="menu-footer" className="footer-container">
+          {fc}
+        </div>
       </div>
     );
   }
@@ -432,6 +462,7 @@ export class Menu extends React.Component<MenuProps, MenuState> {
       <div
         id={this.props.listboxId}
         role={this.props.listboxId ? 'listbox' : undefined}
+        data-slot="menu-content"
         className={contentClass}
       >
         {items}

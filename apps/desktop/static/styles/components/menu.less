@@ -127,3 +127,21 @@ body.platform-win32 {
     }
   }
 }
+
+// The legacy DropdownMenu's Menu draws the box: the kit popover around it is the plain variant.
+// :where() keeps the selector's weight, so plugins sizing `.dropdown-menu .menu` still win.
+.dropdown-menu .menu:where([data-slot='menu']) {
+  width: 250px;
+  max-height: 400px;
+  overflow: hidden;
+  background: var(--menu-background);
+  border: 1px solid var(--menu-border);
+  border-radius: calc(var(--radius) * 8 / 3);
+  box-shadow:
+    0 4px 12px var(--shadow-color),
+    0 1px 2px var(--shadow-color);
+
+  .header-container {
+    border-bottom: 0;
+  }
+}

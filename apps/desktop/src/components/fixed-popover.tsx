@@ -1,10 +1,8 @@
 import _ from 'underscore';
-import React, { Component, CSSProperties } from 'react';
-import { findDOMNode } from 'react-dom';
+import React from 'react';
 
 import * as Actions from '../data/actions';
-import compose from './decorators/compose';
-import AutoFocuses from './decorators/auto-focuses';
+import { Popover, PopoverAnchor, PopoverArrow, PopoverContent } from './kit/popover';
 
 enum Direction {
   Up = 'up',
@@ -13,18 +11,9 @@ enum Direction {
   Right = 'right',
 }
 
-const InverseDirections = {
-  [Direction.Up]: Direction.Down,
-  [Direction.Down]: Direction.Up,
-  [Direction.Left]: Direction.Right,
-  [Direction.Right]: Direction.Left,
-};
-
-const OFFSET_PADDING = 11.5;
-
 type FixedPopoverProps = {
-  direction?: Direction;
-  fallbackDirection?: Direction;
+  direction?: Direction | `${Direction}`;
+  fallbackDirection?: Direction | `${Direction}`;
   closeOnAppBlur?: boolean;
   originRect?: {
     bottom?: number;
@@ -34,393 +23,95 @@ type FixedPopoverProps = {
     height?: number;
     width?: number;
   };
+  /** Accepted for compatibility and not called: the popover focuses its first field itself. */
   focusElementWithTabIndex?: (...args: any[]) => any;
+  children?: React.ReactNode;
 };
 
-type FixedPopoverState = {
-  offset: { x?: number; y?: number };
-  direction: any;
-  visible: boolean;
-};
+const SIDES = { up: 'top', down: 'bottom', left: 'left', right: 'right' } as const;
 
-/*
- * Renders a popover absultely positioned in the window next to the provided
- * rect.
- * If `Actions.openPopover` is called when the popover is already open, it will
- * close the previous one and open the new one.
- * @class FixedPopover
- **/
-class FixedPopover extends Component<FixedPopoverProps, FixedPopoverState> {
-  static Directions = Direction;
+const FOCUSABLE_SELECTOR = 'input, textarea, [contenteditable], [tabIndex]';
 
-  static defaultProps = {
-    closeOnAppBlur: true,
-  };
-
-  mounted = false;
-  updateCount = 0;
-  fallback: Direction;
-  placing = true;
-  resizeObserver: ResizeObserver;
-
-  constructor(props: FixedPopoverProps) {
-    super(props);
-    this.fallback = this.props.fallbackDirection;
-    this.state = {
-      offset: {},
-      direction: props.direction,
-      visible: false,
-    };
-  }
-
-  componentDidMount() {
-    this.mounted = true;
-    findDOMNode(this.refs.popoverContainer).addEventListener('animationend', this.onAnimationEnd);
-    window.addEventListener('resize', this.onWindowResize);
-    this.resizeObserver = new ResizeObserver(this.onPopoverResized);
-    this.resizeObserver.observe(findDOMNode(this.refs.popover) as Element);
-    _.defer(this.onPopoverRendered);
-  }
-
-  componentDidUpdate(prevProps: FixedPopoverProps, prevState: FixedPopoverState) {
-    if (prevProps.fallbackDirection !== this.props.fallbackDirection) {
-      this.fallback = this.props.fallbackDirection;
-    }
-    if (prevProps.direction !== this.props.direction) {
-      this.setState({ direction: this.props.direction });
-    }
-    _.defer(this.onPopoverRendered);
-  }
-
-  shouldComponentUpdate(nextProps: FixedPopoverProps, nextState: FixedPopoverState) {
-    return !_.isEqual(this.state, nextState) || !_.isEqual(this.props, nextProps);
-  }
-
-  componentWillUnmount() {
-    this.mounted = false;
-    findDOMNode(this.refs.popoverContainer).removeEventListener(
-      'animationend',
-      this.onAnimationEnd
-    );
-    window.removeEventListener('resize', this.onWindowResize);
-    this.resizeObserver.disconnect();
-  }
-
-  onAnimationEnd = () => {
-    _.defer(this.props.focusElementWithTabIndex);
-  };
-
-  onWindowResize() {
-    Actions.closePopover();
-  }
-
-  // The content can change size once the popover is placed: the event card becomes the editor
-  // in place, and the taller box, still centred on its anchor, runs past the window. Placement
-  // starts over from the requested direction, as opening at the new size would.
-  onPopoverResized = () => {
-    if (!this.mounted || this.placing) {
-      return;
-    }
-    this.placing = true;
-    this.updateCount = 0;
-    this.fallback = this.props.fallbackDirection;
-    this.setState({ direction: this.props.direction, offset: {} }, this.onPopoverRendered);
-  };
-
-  onPopoverRendered = () => {
-    if (!this.mounted) {
-      return;
-    }
-
-    const { direction } = this.state;
-    const currentRect = this.getCurrentRect();
-    const windowDimensions = this.getWindowDimensions();
-    const newState = this.computeAdjustedOffsetAndDirection({
-      direction,
-      windowDimensions,
-      currentRect,
-    });
-    if (newState) {
-      if (this.updateCount > 1) {
-        // No direction fits, so bring the popover inside the window rather than leave it
-        // where it overflows. The direction that produced currentRect is kept, because the
-        // correction is measured against it - so a popover given a fallbackDirection settles
-        // in the direction that was tried last rather than the one originally asked for.
-        this.placing = false;
-        this.setState({
-          offset: this.computeClampedOffset({
-            currentRect,
-            windowDimensions,
-            offset: this.state.offset,
-          }),
-          visible: true,
-        });
-        return;
-      }
-
-      // Reset fallback after using it once
-      this.fallback = null;
-      this.updateCount++;
-      this.setState(newState);
-    } else {
-      this.placing = false;
-      this.setState({ visible: true });
-    }
-  };
-
-  onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    const target = event.nativeEvent.relatedTarget;
-    if (!this.props.closeOnAppBlur && target === null) {
-      return;
-    }
-    if (!target || !findDOMNode(this).contains(target as Node)) {
-      Actions.closePopover();
-    }
-  };
-
-  onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      Actions.closePopover();
-    }
-  };
-
-  getCurrentRect = () => {
-    return (findDOMNode(this.refs.popover) as HTMLElement).getBoundingClientRect();
-  };
-
-  getWindowDimensions = () => {
-    return {
-      width: document.body.clientWidth,
-      height: document.body.clientHeight,
-    };
-  };
-
-  computeOverflows = ({ currentRect, windowDimensions }) => {
-    const overflows = {
-      top: currentRect.top < 0,
-      left: currentRect.left < 0,
-      bottom: currentRect.bottom > windowDimensions.height,
-      right: currentRect.right > windowDimensions.width,
-    };
-    const overflowValues = {
-      top: Math.abs(currentRect.top),
-      left: Math.abs(currentRect.left),
-      bottom: Math.abs(currentRect.bottom - windowDimensions.height),
-      right: Math.abs(currentRect.right - windowDimensions.width),
-    };
-    return { overflows, overflowValues };
-  };
-
-  /*
-  The extra translate that brings an off-screen popover back inside the window.
-
-  Reached when flipping the direction and nudging across it have both failed, which happens
-  when the popover is simply taller or wider than the room beside its anchor - a full event
-  editor next to an event low in a short window, say. The popover is moved off its anchor to
-  stay reachable, so the pointer no longer touches it; an unreachable footer is the worse of
-  the two.
-
-  `offset` must be the one currentRect already reflects, since the correction is added to it
-  rather than replacing it. Pulling an edge in can push the opposite edge out when the
-  popover is larger than the window itself; there the top/left edge wins, so the popover
-  starts inside the window and its own max-height scrolls the rest.
-  */
-  computeClampedOffset = ({
-    currentRect,
-    windowDimensions,
-    offset = {} as FixedPopoverState['offset'],
-    offsetPadding = OFFSET_PADDING,
-  }) => {
-    let dx = 0;
-    let dy = 0;
-
-    if (currentRect.right > windowDimensions.width) {
-      dx = windowDimensions.width - currentRect.right - offsetPadding;
-    }
-    if (currentRect.left + dx < 0) {
-      dx = offsetPadding - currentRect.left;
-    }
-    if (currentRect.bottom > windowDimensions.height) {
-      dy = windowDimensions.height - currentRect.bottom - offsetPadding;
-    }
-    if (currentRect.top + dy < 0) {
-      dy = offsetPadding - currentRect.top;
-    }
-
-    return { x: (offset.x || 0) + dx, y: (offset.y || 0) + dy };
-  };
-
-  computeAdjustedOffsetAndDirection = ({
-    direction,
-    currentRect,
-    windowDimensions,
-    fallback = this.fallback,
-    offsetPadding = OFFSET_PADDING,
-  }) => {
-    const { overflows, overflowValues } = this.computeOverflows({ currentRect, windowDimensions });
-    const overflowCount = Object.keys(_.pick(overflows, (val) => val === true)).length;
-
-    if (overflowCount > 0) {
-      if (fallback) {
-        return { direction: fallback, offset: {} };
-      }
-
-      const isHorizontalDirection = [Direction.Left, Direction.Right].includes(direction);
-      const isVerticalDirection = [Direction.Up, Direction.Down].includes(direction);
-      const shouldInvertDirection =
-        (isHorizontalDirection && (overflows.left || overflows.right)) ||
-        (isVerticalDirection && (overflows.top || overflows.bottom));
-      const offset: { x?: number; y?: number } = {};
-      let newDirection = direction;
-
-      if (shouldInvertDirection) {
-        newDirection = InverseDirections[direction];
-      }
-
-      if (isHorizontalDirection && (overflows.top || overflows.bottom)) {
-        const overflowVal = overflows.top ? overflowValues.top : overflowValues.bottom;
-        let offsetY = overflowVal + offsetPadding;
-
-        offsetY = overflows.bottom ? -offsetY : offsetY;
-        offset.y = offsetY;
-      }
-      if (isVerticalDirection && (overflows.left || overflows.right)) {
-        const overflowVal = overflows.left ? overflowValues.left : overflowValues.right;
-        let offsetX = overflowVal + offsetPadding;
-
-        offsetX = overflows.right ? -offsetX : offsetX;
-        offset.x = offsetX;
-      }
-      return { offset, direction: newDirection };
-    }
-    return null;
-  };
-
-  computePopoverStyles = ({ originRect, direction, offset }) => {
-    const { Up, Down, Left, Right } = Direction;
-    let containerStyle: CSSProperties = {};
-    let popoverStyle: CSSProperties = {};
-    let pointerStyle: CSSProperties = {};
-
-    switch (direction) {
-      case Up:
-        containerStyle = {
-          // Place container on the top left corner of the rect
-          top: originRect.top,
-          left: originRect.left,
-          width: originRect.width,
-        };
-        popoverStyle = {
-          // Center, place on top of container, and adjust 10px for the pointer
-          transform: `translate(${offset.x || 0}px, ${offset.y || 0}px) translate(-50%, calc(-100% - 10px))`,
-          left: originRect.width / 2,
-        };
-        pointerStyle = {
-          // Center, and place on top of our container
-          transform: 'translate(-50%, -100%)',
-          left: originRect.width, // Don't divide by 2 because of zoom
-        };
-        break;
-      case Down:
-        containerStyle = {
-          // Place container on the bottom left corner of the rect
-          top: originRect.top + originRect.height,
-          left: originRect.left,
-          width: originRect.width,
-        };
-        popoverStyle = {
-          // Center and adjust 10px for the pointer (already positioned at the bottom of container)
-          transform: `translate(${offset.x || 0}px, ${offset.y || 0}px) translate(-50%, 10px)`,
-          left: originRect.width / 2,
-        };
-        pointerStyle = {
-          // Center, already positioned at the bottom of container
-          transform: 'translate(-50%, 0) rotateX(180deg)',
-          left: originRect.width, // Don't divide by 2 because of zoom
-        };
-        break;
-      case Left:
-        containerStyle = {
-          // Place container on the top left corner of the rect
-          top: originRect.top,
-          left: originRect.left,
-          height: originRect.height,
-        };
-        popoverStyle = {
-          // Center, place on left of container, and adjust 10px for the pointer
-          transform: `translate(${offset.x || 0}px, ${offset.y || 0}px) translate(calc(-100% - 10px), -50%)`,
-          top: originRect.height / 2,
-        };
-        pointerStyle = {
-          // Center, and place on left of our container (adjust for rotation)
-          transform: 'translate(calc(-100% + 13px), -50%) rotate(270deg)',
-          top: originRect.height, // Don't divide by 2 because of zoom
-        };
-        break;
-      case Right:
-        containerStyle = {
-          // Place container on the top right corner of the rect
-          top: originRect.top,
-          left: originRect.left + originRect.width,
-          height: originRect.height,
-        };
-        popoverStyle = {
-          // Center and adjust 10px for the pointer
-          transform: `translate(${offset.x || 0}px, ${offset.y || 0}px) translate(10px, -50%)`,
-          top: originRect.height / 2,
-        };
-        pointerStyle = {
-          // Center, already positioned at the right of container (adjust for rotation)
-          transform: 'translate(-12px, -50%) rotate(90deg)',
-          top: originRect.height, // Don't divide by 2 because of zoom
-        };
-        break;
-      default:
-        break;
-    }
-
-    // Set the zoom directly on the style element. Otherwise it won't work with
-    // mask image of our shadow pointer element. This is probably a Chrome bug
-    pointerStyle.zoom = 0.5;
-
-    return { containerStyle, popoverStyle, pointerStyle };
-  };
-
-  render() {
-    const { offset, direction, visible } = this.state;
-    const { children, originRect } = this.props;
-    const blurTrapStyle = {
-      top: originRect.top,
-      left: originRect.left,
-      height: originRect.height,
-      width: originRect.width,
-    };
-    const { containerStyle, popoverStyle, pointerStyle } = this.computePopoverStyles({
-      originRect,
-      direction,
-      offset,
-    });
-    const animateClass = visible ? ' popout' : '';
-
-    return (
-      <div>
-        <div ref="blurTrap" className="fixed-popover-blur-trap" style={blurTrapStyle} />
-        <div
-          ref="popoverContainer"
-          style={containerStyle}
-          className={`fixed-popover-container${animateClass}`}
-          onKeyDown={this.onKeyDown}
-          onBlur={this.onBlur}
-        >
-          <div ref="popover" className={`fixed-popover`} style={popoverStyle}>
-            {children}
-          </div>
-          <div className={`fixed-popover-pointer`} style={pointerStyle} />
-          <div className={`fixed-popover-pointer shadow`} style={pointerStyle} />
-        </div>
-      </div>
-    );
-  }
+/* The element that takes focus when the popover opens: an [autofocus] element, then the lowest
+   positive tabIndex, then the first input, then any other focusable. */
+function initialFocusTarget(root: HTMLElement): HTMLElement | null {
+  const autoFocus = root.querySelector<HTMLElement>('[autofocus]');
+  if (autoFocus) return autoFocus;
+  const focusable = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  const sorted = _.sortBy(focusable, (node) => {
+    if (node.tabIndex > 0) return node.tabIndex;
+    if (node.nodeName === 'INPUT') return 1000000;
+    return 1000001;
+  });
+  return sorted[0] || null;
 }
 
-export default compose(FixedPopover, AutoFocuses);
+/* Public: A popover next to a rect in the window, as `Actions.openPopover(element, { originRect,
+   direction, fallbackDirection, closeOnAppBlur })` shows it. The UI kit's Popover anchored to
+   `originRect`, with the legacy `fixed-popover` (content), `fixed-popover-pointer` (arrow) and
+   `fixed-popover-blur-trap` classes.
+
+   `direction` is the side it opens on, centred on the rect. Radix flips to the opposite side when
+   that one doesn't fit and slides it along the other axis to keep it inside the window, also
+   after its content changes size, so a `fallbackDirection` other than the opposite side isn't
+   honoured. It closes (`Actions.closePopover()`) on a click outside, Escape, a window resize, and
+   when the app loses focus unless `closeOnAppBlur` is false. The Escape that closes it doesn't
+   reach the keymap, so it doesn't also pop the sheet. */
+function FixedPopover(props: FixedPopoverProps) {
+  const { originRect = {}, direction = Direction.Down, closeOnAppBlur = true, children } = props;
+  const close = () => Actions.closePopover();
+
+  React.useEffect(() => {
+    const onBlur = () => closeOnAppBlur && close();
+    window.addEventListener('resize', close);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('resize', close);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [closeOnAppBlur]);
+
+  const top = originRect.top || 0;
+  const left = originRect.left || 0;
+  const width = originRect.width ?? (originRect.right ?? left) - left;
+  const height = originRect.height ?? (originRect.bottom ?? top) - top;
+  const anchor = React.useMemo(
+    () => ({ current: { getBoundingClientRect: () => new DOMRect(left, top, width, height) } }),
+    [left, top, width, height]
+  );
+
+  return (
+    <>
+      {/* Covers the element that opened the popover, so the click that closes the popover
+          doesn't reach it and open the popover again. */}
+      <div className="fixed-popover-blur-trap" style={{ top, left, width, height }} />
+      <Popover open onOpenChange={(open) => !open && close()}>
+        <PopoverAnchor virtualRef={anchor} />
+        <PopoverContent
+          data-variant="bare"
+          side={SIDES[direction] || 'bottom'}
+          sticky="always"
+          onOpenAutoFocus={(event) => {
+            const root = event.currentTarget as HTMLElement;
+            if (root.contains(document.activeElement)) return;
+            const target = initialFocusTarget(root);
+            if (target) {
+              event.preventDefault();
+              target.focus();
+            }
+          }}
+          // Focus isn't put back where it was: an action in the popover may have moved it on
+          // purpose.
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
+          {children}
+          <PopoverArrow />
+        </PopoverContent>
+      </Popover>
+    </>
+  );
+}
+FixedPopover.displayName = 'FixedPopover';
+FixedPopover.Directions = Direction;
+
+export default FixedPopover;
