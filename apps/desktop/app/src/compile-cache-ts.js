@@ -17,9 +17,14 @@ const optionsDigest = crypto
   .update(JSON.stringify(compilerOptions), 'utf8')
   .digest('hex');
 
-function getCachePath(sourceCode) {
+// The path is part of the key because the cached output embeds it (the sourceURL and the
+// source map). With a content-only key, a renamed or copied file would reuse another path's
+// output, and its stack frames would name the old path, which callerPackageFromStack reads.
+function getCachePath(sourceCode, filePath) {
   const sourceDigest = crypto
     .createHash('sha256')
+    .update(filePath, 'utf8')
+    .update('\0', 'utf8')
     .update(sourceCode, 'utf8')
     .digest('hex');
   return path.join('ts', optionsDigest, `${sourceDigest}.js`);
@@ -52,7 +57,7 @@ function addSourceURL(jsCode, filePath) {
 
 function compileFileAtPath(filePath) {
   const sourceCode = fs.readFileSync(filePath, 'utf8');
-  const cachePath = getCachePath(sourceCode);
+  const cachePath = getCachePath(sourceCode, filePath);
   let compiledCode = readCachedJavascript(cachePath);
   if (compiledCode == null) {
     const { outputText } = TypeScript.transpileModule(sourceCode, {
@@ -89,7 +94,7 @@ require('source-map-support').install({
       return null;
     }
 
-    const javascriptCode = readCachedJavascript(getCachePath(sourceCode));
+    const javascriptCode = readCachedJavascript(getCachePath(sourceCode, filePath));
     if (javascriptCode == null) {
       return null;
     }

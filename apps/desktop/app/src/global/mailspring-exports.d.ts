@@ -333,7 +333,7 @@ export type GrammarCheckPluginAPI =
   typeof import('../components/composer-editor/grammar-check-plugins').GrammarCheckPluginAPI;
 export const GrammarCheckPluginAPI: GrammarCheckPluginAPI;
 export type GrammarCheckStoreAPI =
-  typeof import('../components/composer-editor/grammar-check-plugins').GrammarCheckStoreAPI;
+  import('../components/composer-editor/grammar-check-plugins').GrammarCheckStoreAPI;
 
 // Errors
 export * from '../flux/errors';

@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const rimraf = require('rimraf');
 const { safeExec } = require('./utils/child-process-wrapper.js');
+const { checkNativeAbi } = require('./check-native-abi.js');
 
 const appDependencies = require('../app/package.json').dependencies;
 const rootDependencies = require('../package.json').dependencies;
@@ -101,6 +102,14 @@ async function run() {
   if (['linux', 'darwin'].includes(process.platform) && (await sqliteMissingNanosleep())) {
     console.error(`better-sqlite compiled without -HAVE_NANOSLEEP, do not ship this build!`);
     process.exit(1001);
+  }
+
+  // The host's Electron can't load a module cross-built for another arch (OVERRIDE_TO_INTEL).
+  const abiFailure =
+    npmEnvs.electron.npm_config_arch === process.arch && checkNativeAbi(appModulesPath);
+  if (abiFailure) {
+    console.error(abiFailure);
+    process.exit(1);
   }
 
   // write the marker with the electron version

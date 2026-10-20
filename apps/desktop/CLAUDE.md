@@ -15,8 +15,11 @@ npm start
 npm run lint
 npm run lint:check
 
-# TypeScript type checking
+# TypeScript type checking, then the plugin API .d.ts check (scripts/check-plugin-api-dts.js)
 npm run typecheck
+
+# Check that better-sqlite3 is built for Electron (postinstall runs it too)
+npm run check:native
 
 # Run all tests, or only spec files whose path matches a regex
 npm test
@@ -225,7 +228,7 @@ smaller functions over commentary; a comment that restates the code should be de
 
 ## Development Notes
 
-- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file contents); main-process code in `app/src/browser` needs a full restart. `Cmd/Ctrl+R` is Reply
+- Reload the window with Developer > Reload: `Cmd+Option+L` (macOS), `Ctrl+Alt+L` (Linux), `Ctrl+Shift+R` (Windows). It reruns renderer code and recompiles edited files (the compile cache is keyed on file path and contents); main-process code in `app/src/browser` needs a full restart. `Cmd/Ctrl+R` is Reply
 - Dev tools accessible via Menu > Developer > Toggle Developer Tools
 - In dev tools console, `$m` provides access to `mailspring-exports` for debugging
 - Profiles live under the OS app-data dir: `Tern`, `Tern-dev` (`--dev`), `Tern-spec` (specs), e.g. `~/Library/Application Support/Tern-dev/`; `--config-dir-path` overrides, and the snap uses `$SNAP_USER_COMMON`. `make desktop` from the repo root runs on `.dev/profile`. On first launch an empty default `Tern`/`Tern-dev` profile is copied from `Mailspring`/`Mailspring-dev` (`src/browser/mailspring-profile-import.ts`), which is only read; spec mode, the snap and `--config-dir-path` don't import

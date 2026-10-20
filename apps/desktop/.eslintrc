@@ -83,6 +83,11 @@
     ]
   },
   "settings": {
+    "import/resolver": {
+      "node": { "extensions": [".js", ".jsx", ".ts", ".tsx", ".json"] }
+    },
+    "import/extensions": [".js", ".jsx", ".ts", ".tsx"],
+    "import/parsers": { "@typescript-eslint/parser": [".ts", ".tsx"] },
     "import/core-modules": [
       "mailspring-exports",
       "mailspring-component-kit",
