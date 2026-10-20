@@ -18,6 +18,26 @@ export const TOKEN_DEFAULTS_SOURCE_PATH = 'tokens:defaults';
 export const THEME_TOKENS_SOURCE_PATH = 'tokens:theme';
 const THEME_TOKENS_FILE = 'tokens.css';
 const THEME_VARIABLES_FILE = 'ui-variables.less';
+// The UI kit's plain-CSS sheets in static/style/kit, in dependency order. Loaded raw after
+// static/style/index.less at the same priority, so on a specificity tie the kit beats core LESS
+// and package and theme styles beat the kit (docs/desktop/ui-kit.md section 5).
+const KIT_STYLESHEETS = [
+  'base',
+  'button',
+  'icon-button',
+  'switch',
+  'checkbox',
+  'radio-group',
+  'segmented-control',
+  'text-field',
+  'textarea',
+  'dialog',
+  'popover',
+  'tooltip',
+  'dropdown-menu',
+  'select',
+  'tabs',
+];
 
 export type ThemeScheme = 'light' | 'dark';
 export const AUTOMATIC_THEME_NAME = 'ui-automatic';
@@ -391,6 +411,9 @@ export default class ThemeManager {
       });
     this.requireStylesheet(path.join(this.resourcePath, 'static', 'style', 'index'));
     this.requireStylesheet(path.join(this.resourcePath, 'static', 'style', 'email-frame'));
+    for (const name of KIT_STYLESHEETS) {
+      this.requireStylesheet(path.join(this.resourcePath, 'static', 'style', 'kit', `${name}.css`));
+    }
   }
 
   resolveStylesheetPath(stylesheetPath) {

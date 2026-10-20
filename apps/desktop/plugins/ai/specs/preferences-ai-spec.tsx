@@ -4,7 +4,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { AccountStore, KeyManager } from 'mailspring-exports';
-import { ProviderCard } from 'mailspring-component-kit';
+import { ProviderCard, SettingsSwitch } from 'mailspring-component-kit';
 import PreferencesAI, { ProviderSection } from '../lib/preferences-ai';
 import {
   ACCOUNT_ID,
@@ -33,10 +33,11 @@ function button(renderer: TestRenderer.ReactTestRenderer, label: string) {
   return renderer.root.find((n) => n.type === 'button' && n.props.children === label);
 }
 
+// The switch is the UI kit's (a Radix <button role="switch">, whose click handler reads the
+// event), so the toggle goes through SettingsSwitch's onChange, as a click would.
 function toggle(renderer: TestRenderer.ReactTestRenderer, label: string) {
-  return renderer.root
-    .find((n) => n.type === 'div' && n.props.role === 'switch' && n.props['aria-label'] === label)
-    .props.onClick();
+  const sw = renderer.root.find((n) => n.type === SettingsSwitch && n.props.label === label);
+  return sw.props.onChange(!sw.props.checked);
 }
 
 function accountName(accountId: string) {

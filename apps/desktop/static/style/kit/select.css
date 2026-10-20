@@ -1,0 +1,139 @@
+/* Select (src/components/kit/select.tsx). No legacy classes: themes that restyle the native
+   select element don't reach it. */
+
+button[data-slot='select-trigger'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 26px;
+  margin: 0;
+  padding: 0 calc(8px * var(--density));
+  color: var(--control-foreground);
+  background-color: var(--control);
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 2);
+  font: inherit;
+  font-size: calc(var(--font-size) - 1px);
+  text-align: start;
+  white-space: nowrap;
+}
+button[data-slot='select-trigger'][data-size='sm'] {
+  height: 22px;
+  padding: 0 calc(6px * var(--density));
+}
+button[data-slot='select-trigger'][data-placeholder] {
+  color: var(--muted-foreground);
+}
+button[data-slot='select-trigger']:disabled {
+  opacity: 0.5;
+}
+button[data-slot='select-trigger'][aria-invalid='true'] {
+  border-color: var(--destructive);
+}
+
+[data-slot='select-value'] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-slot='select-icon'] {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+[data-slot='select-content'] {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 128px;
+  max-height: var(--radix-select-content-available-height);
+  overflow: hidden;
+  color: var(--menu-foreground);
+  background-color: var(--menu-background);
+  border: 1px solid var(--menu-border);
+  border-radius: calc(var(--radius) * 8 / 3);
+  box-shadow:
+    0 4px 12px var(--shadow-color),
+    0 1px 2px var(--shadow-color);
+  font-size: calc(var(--font-size) - 1px);
+  text-align: start;
+  transform-origin: var(--radix-select-content-transform-origin);
+}
+[data-slot='select-content'][data-side] {
+  min-width: var(--radix-select-trigger-width);
+}
+[data-slot='select-content'][data-state='open'] {
+  animation: ui-fade-in 100ms ease-out;
+}
+[data-slot='select-content'][data-state='closed'] {
+  animation: ui-fade-out 100ms ease-in;
+}
+
+[data-slot='select-viewport'] {
+  padding: 4px;
+}
+
+[data-slot='select-item'] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(4px * var(--density)) calc(8px * var(--density));
+  padding-inline-start: calc(28px * var(--density));
+  border-radius: calc(var(--radius) * 4 / 3);
+  cursor: default;
+  user-select: none;
+  outline: none;
+  white-space: nowrap;
+}
+/* The highlight marks the focused item; base.css's focus ring would double it. */
+[data-slot='select-item']:focus-visible,
+[data-slot='select-content']:focus-visible {
+  outline: none;
+}
+[data-slot='select-item'][data-highlighted] {
+  color: var(--selected-foreground);
+  background-color: var(--selected);
+}
+[data-slot='select-item'][data-disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+[data-slot='select-item-indicator'] {
+  position: absolute;
+  inset-inline-start: calc(8px * var(--density));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+[data-slot='select-label'] {
+  padding: calc(4px * var(--density)) calc(8px * var(--density));
+  color: var(--menu-muted-foreground);
+  font-size: calc(var(--font-size) - 2px);
+  font-weight: 600;
+}
+
+[data-slot='select-separator'] {
+  height: 1px;
+  margin: 4px -4px;
+  background-color: var(--menu-border);
+}
+
+[data-slot='select-scroll-up-button'],
+[data-slot='select-scroll-down-button'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  cursor: default;
+}
+[data-slot='select-scroll-up-button'] .flip {
+  transform: rotate(180deg);
+}

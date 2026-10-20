@@ -1,0 +1,43 @@
+/* SegmentedControl (src/components/kit/segmented-control.tsx, docs/desktop/ui-kit.md 6.7).
+   Ported from .settings-segmented in components/settings.less; tokens only. */
+
+[data-slot='segmented-control'] {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+[data-slot='segmented-control-item'] {
+  margin: 0;
+  padding-block: 3px;
+  padding-inline: calc(10px * var(--density));
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--subtle-foreground);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: inherit;
+  cursor: pointer;
+}
+[data-slot='segmented-control'][data-size='sm'] [data-slot='segmented-control-item'] {
+  padding-block: 1px;
+  padding-inline: calc(8px * var(--density));
+  font-size: calc(var(--font-size) - 2px);
+}
+[data-slot='segmented-control-item'][data-state='on'] {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 1px 2px var(--shadow-color);
+}
+[data-slot='segmented-control-item']:disabled {
+  cursor: not-allowed;
+}
+[data-slot='segmented-control-item']:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 0;
+}

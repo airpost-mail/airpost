@@ -1,0 +1,35 @@
+/* Checkbox (src/components/kit/checkbox.tsx, docs/desktop/ui-kit.md 6.4). Tokens only. */
+
+[data-slot='checkbox'] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 4 / 3);
+  vertical-align: middle;
+  cursor: default;
+  background: var(--control);
+  color: var(--primary-foreground);
+}
+[data-slot='checkbox'][data-state='checked'],
+[data-slot='checkbox'][data-state='indeterminate'] {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+[data-slot='checkbox-indicator'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+[data-slot='checkbox']:disabled {
+  opacity: 0.5;
+}

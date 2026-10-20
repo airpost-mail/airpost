@@ -65,7 +65,11 @@ mousetrap.prototype.stopCallback = (e: KeyboardEvent, element: HTMLElement, comb
     element.tagName === 'TEXTAREA' ||
     element.isContentEditable ||
     !!element.closest('.composer-outer-wrap');
-  if (withinTextInput) {
+  // Open UI kit layers (menus, selects, popovers, dialogs) own their plain keys: arrows, Enter,
+  // Space and Backspace move or pick inside the layer instead of acting on the thread list.
+  // mod+ shortcuts still fire. See docs/desktop/ui-kit.md 4.4.
+  const withinUILayer = !!element.closest('[data-ui-layer]');
+  if (withinTextInput || withinUILayer) {
     const isPlainKey = !/(mod|command|ctrl)/.test(combo);
     const isReservedTextEditingShortcut = /(mod|command|ctrl)\+(a|x|c|v|left|right)/.test(combo);
     if (isPlainKey || isReservedTextEditingShortcut) {

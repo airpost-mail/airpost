@@ -1,0 +1,46 @@
+/* Shared rules for the UI kit (docs/desktop/ui-kit.md 5). Plain CSS, loaded raw after
+   static/style/index.less by ThemeManager (KIT_STYLESHEETS); never @import it from LESS. */
+
+/* The container every kit layer portals into (src/components/kit/portal.ts). Above the legacy
+   modal container (z-index 1000) and FixedPopover (40). */
+[data-ui-portal-root] {
+  position: relative;
+  z-index: 1100;
+  isolation: isolate;
+}
+
+[data-slot]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* Open and close motion for layers. Radix Presence keeps closing content mounted until
+   animationend, and unmounts at once when animation-name is none. */
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ui-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ui-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes ui-zoom-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot][data-state] {
+    animation: none !important;
+  }
+}

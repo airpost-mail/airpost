@@ -1,7 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { act } from 'react-dom/test-utils';
-import { SegmentedControl } from '../../src/components/settings';
+import { render as renderDOM, fireEvent, cleanup } from '@testing-library/react';
+import {
+  SegmentedControl,
+  ConfigSelectRow,
+  ProviderCard,
+  SettingsSwitch,
+} from '../../src/components/settings';
+import { getPortalContainer } from '../../src/components/kit/portal';
 
 type Kind = 'all' | 'open' | 'click';
 
@@ -118,5 +125,77 @@ describe('SegmentedControl', function segmentedControlSpec() {
       segments()[2].click();
     });
     expect(onChange).toHaveBeenCalledWith('click');
+  });
+});
+
+describe('ConfigSelectRow on the UI kit', function configSelectRowSpec() {
+  beforeEach(() => {
+    jasmine.unspy(window, 'setTimeout');
+    spyOn(AppEnv.config, 'set');
+  });
+
+  afterEach(() => cleanup());
+
+  const renderRow = (value: string) => {
+    spyOn(AppEnv.config, 'get').andReturn(value);
+    return renderDOM(
+      <ConfigSelectRow
+        keyPath="core.some.key"
+        label="Choice"
+        options={[
+          ['', 'None'],
+          ['a', 'A'],
+        ]}
+      />
+    ).container.querySelector('[data-slot="select-trigger"]');
+  };
+  const pick = (trigger: Element, label: string) => {
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    const item = Array.from(
+      getPortalContainer().querySelectorAll<HTMLElement>('[data-slot="select-item"]')
+    ).find((i) => i.textContent === label);
+    fireEvent.click(item);
+  };
+
+  it('shows and sets an empty option value, which Radix keeps for "cleared"', () => {
+    const trigger = renderRow('');
+    expect(trigger.textContent).toBe('None');
+    pick(trigger, 'A');
+    expect(AppEnv.config.set).toHaveBeenCalledWith('core.some.key', 'a');
+  });
+
+  it('sets the empty value back', () => {
+    const trigger = renderRow('a');
+    expect(trigger.textContent).toBe('A');
+    pick(trigger, 'None');
+    expect(AppEnv.config.set).toHaveBeenCalledWith('core.some.key', '');
+  });
+});
+
+describe('ProviderCard', function providerCardSpec() {
+  afterEach(() => cleanup());
+
+  it('leaves Enter and Space on a control in its head to the control', () => {
+    const onToggle = jasmine.createSpy('onToggle');
+    const { container } = renderDOM(
+      <ProviderCard
+        title="Provider"
+        onToggle={onToggle}
+        actions={<SettingsSwitch checked={false} onChange={() => {}} label="On" />}
+      >
+        <div>Fields</div>
+      </ProviderCard>
+    );
+    const sw = container.querySelector('[role="switch"]');
+    const onSwitch = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    sw.dispatchEvent(onSwitch);
+    expect(onSwitch.defaultPrevented).toBe(false);
+    expect(onToggle).not.toHaveBeenCalled();
+
+    const head = container.querySelector('.settings-provider-head');
+    const onHead = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    head.dispatchEvent(onHead);
+    expect(onHead.defaultPrevented).toBe(true);
+    expect(onToggle).toHaveBeenCalledWith(true);
   });
 });

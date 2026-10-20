@@ -1,6 +1,6 @@
 @import 'ui-variables';
 
-.menu {
+.menu:where(:not([data-slot])) {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -105,7 +105,7 @@
   }
 }
 body.platform-win32 {
-  .menu {
+  .menu:where(:not([data-slot])) {
     .header-container {
       input.search {
         box-shadow: none;
@@ -115,7 +115,7 @@ body.platform-win32 {
 }
 
 .dropdown-menu {
-  .menu {
+  .menu:where(:not([data-slot])) {
     background: var(--menu-background);
     width: 250px;
     max-height: 400px;

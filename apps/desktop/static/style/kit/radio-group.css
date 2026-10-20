@@ -1,0 +1,54 @@
+/* RadioGroup (src/components/kit/radio-group.tsx, docs/desktop/ui-kit.md 6.5). Tokens only.
+   An item without children draws a round radio; with children (tiles, swatches) the children
+   are the visual and the group's CSS in that screen styles [data-state='checked']. */
+
+[data-slot='radio-group'] {
+  display: grid;
+  gap: 8px;
+}
+[data-slot='radio-group'][aria-orientation='horizontal'] {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+[data-slot='radio-group-item'] {
+  position: relative;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+[data-slot='radio-group-item']:empty,
+[data-slot='radio-group-item']:has(> [data-slot='radio-group-indicator']:only-child) {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--input);
+  border-radius: 9999px;
+  background: var(--control);
+}
+[data-slot='radio-group-item']:has(> [data-slot='radio-group-indicator']:only-child)[data-state='checked'] {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+[data-slot='radio-group-item'] > [data-slot='radio-group-indicator']:only-child {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--primary-foreground);
+}
+/* With children the indicator is only state for CSS; it draws nothing. */
+[data-slot='radio-group-item'] > [data-slot='radio-group-indicator']:not(:only-child) {
+  display: none;
+}
+
+[data-slot='radio-group-item']:disabled {
+  opacity: 0.5;
+}

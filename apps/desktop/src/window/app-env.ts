@@ -838,7 +838,11 @@ export default class AppEnvConstructor {
     const React = require('react');
     const ReactDOM = require('react-dom');
     const SheetContainer = require('../components/sheets/sheet-container').default;
-    ReactDOM.render(React.createElement(SheetContainer), item);
+    const { UIProvider } = require('../components/kit/provider');
+    ReactDOM.render(
+      React.createElement(UIProvider, null, React.createElement(SheetContainer)),
+      item
+    );
 
     if (this.inSpecMode()) {
       document.querySelector('#jasmine-content').appendChild(item);

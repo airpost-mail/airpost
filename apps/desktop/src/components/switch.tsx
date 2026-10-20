@@ -1,4 +1,5 @@
 import React from 'react';
+import { Switch as KitSwitch } from './kit/switch';
 
 /* Public: A small React component which renders as a horizontal on/off switch.
    Provide it with `onChange` and `checked` props just like a checkbox:
@@ -6,6 +7,9 @@ import React from 'react';
   ```
   <Switch onChange={this._onToggleChecked} checked={this.state.form.isChecked} />
   ```
+
+  The UI kit's Switch (src/components/kit/switch.tsx) behind this export's props. It keeps the
+  `slide-switch`, `active` and `handle` classes; the root is a <button role="switch">.
 */
 type SwitchProps = {
   checked?: boolean;
@@ -15,31 +19,16 @@ type SwitchProps = {
   labelledBy?: string;
 };
 
-const Switch: React.SFC<SwitchProps> = (props) => {
-  let classnames = `${props.className || ''} slide-switch`;
-  if (props.checked) {
-    classnames += ' active';
-  }
-
-  return (
-    <div
-      className={classnames}
-      role="switch"
-      aria-checked={props.checked}
-      tabIndex={0}
-      aria-label={props.label}
-      aria-labelledby={props.labelledBy}
-      onClick={props.onChange}
-      onKeyDown={(e) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault();
-          props.onChange(e);
-        }
-      }}
-    >
-      <div className="handle" />
-    </div>
-  );
-};
+const Switch: React.FunctionComponent<SwitchProps> = (props) => (
+  // Always controlled: without `checked` it shows off and stays off, as before.
+  <KitSwitch
+    className={props.className}
+    checked={!!props.checked}
+    label={props.label}
+    labelledBy={props.labelledBy}
+    onChange={props.onChange}
+  />
+);
+Switch.displayName = 'Switch';
 
 export default Switch;

@@ -1,0 +1,56 @@
+/* Popover (src/components/kit/popover.tsx). Legacy classes: fixed-popover on the content,
+   fixed-popover-pointer on the arrow. */
+
+[data-slot='popover-content'] {
+  box-sizing: border-box;
+  padding: calc(12px * var(--density));
+  color: var(--menu-foreground);
+  background-color: var(--menu-background);
+  border: 1px solid var(--menu-border);
+  border-radius: calc(var(--radius) * 8 / 3);
+  box-shadow:
+    0 4px 12px var(--shadow-color),
+    0 1px 2px var(--shadow-color);
+  font-size: calc(var(--font-size) - 1px);
+  text-align: start;
+  transform-origin: var(--radix-popover-content-transform-origin);
+  max-height: var(--radix-popover-content-available-height);
+  overflow: auto;
+}
+[data-slot='popover-content']:focus,
+[data-slot='popover-content']:focus-visible {
+  outline: none;
+}
+[data-slot='popover-content'][data-state='open'] {
+  animation: ui-zoom-in 150ms ease-out;
+}
+[data-slot='popover-content'][data-state='closed'] {
+  animation: ui-zoom-out 120ms ease-in;
+}
+
+[data-slot='popover-arrow'] {
+  fill: var(--menu-background);
+}
+
+/* data-variant='bare': the content brings its own padding and scrolling, as the bodies
+   Actions.openPopover shows do. Overflow stays visible so the arrow isn't clipped. */
+[data-slot='popover-content'][data-variant='bare'] {
+  padding: 0;
+  overflow: visible;
+  max-height: none;
+}
+
+/* data-variant='plain': no box of its own, only placement. For legacy menus whose own classes
+   (.secondary-items, .menu) draw the box. :where() keeps it at the base rule's specificity, so
+   those classes still win. Positioned so a z-index set on it counts: Radix copies the content's
+   z-index to its wrapper, which matters when the content is portalled in place. */
+[data-slot='popover-content']:where([data-variant='plain']) {
+  position: relative;
+  padding: 0;
+  overflow: visible;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}

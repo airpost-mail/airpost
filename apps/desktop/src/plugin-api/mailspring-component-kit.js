@@ -135,6 +135,65 @@ lazyLoadFrom('ImageAttachmentItem', 'attachment-items');
 lazyLoad('CodeSnippet', 'code-snippet');
 lazyLoad('CopyButton', 'copy-button');
 
+// UI kit (src/components/kit, docs/desktop/ui-kit.md). The kit Switch and SegmentedControl are
+// the `Switch` and `SegmentedControl` exports above, behind their existing props.
+lazyLoadFrom('Button', 'kit/button');
+lazyLoadFrom('IconButton', 'kit/icon-button');
+lazyLoadFrom('Checkbox', 'kit/checkbox');
+lazyLoadFrom('RadioGroup', 'kit/radio-group');
+lazyLoadFrom('RadioGroupItem', 'kit/radio-group');
+lazyLoadFrom('TextField', 'kit/text-field');
+lazyLoadFrom('Textarea', 'kit/textarea');
+lazyLoadFrom('Dialog', 'kit/dialog');
+lazyLoadFrom('DialogTrigger', 'kit/dialog');
+lazyLoadFrom('DialogContent', 'kit/dialog');
+lazyLoadFrom('DialogHeader', 'kit/dialog');
+lazyLoadFrom('DialogFooter', 'kit/dialog');
+lazyLoadFrom('DialogTitle', 'kit/dialog');
+lazyLoadFrom('DialogDescription', 'kit/dialog');
+lazyLoadFrom('DialogClose', 'kit/dialog');
+lazyLoadFrom('DialogOverlay', 'kit/dialog');
+lazyLoadFrom('Popover', 'kit/popover');
+lazyLoadFrom('PopoverTrigger', 'kit/popover');
+lazyLoadFrom('PopoverAnchor', 'kit/popover');
+lazyLoadFrom('PopoverContent', 'kit/popover');
+lazyLoadFrom('PopoverArrow', 'kit/popover');
+lazyLoadFrom('Tooltip', 'kit/tooltip');
+lazyLoadFrom('TooltipTrigger', 'kit/tooltip');
+lazyLoadFrom('TooltipContent', 'kit/tooltip');
+// `DropdownMenu` is the legacy menu; the kit's menu root is exported as DropdownMenuRoot.
+lazyLoadWithGetter(
+  'DropdownMenuRoot',
+  () => require('../components/kit/dropdown-menu').DropdownMenu
+);
+lazyLoadFrom('DropdownMenuTrigger', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuContent', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuGroup', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuItem', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuCheckboxItem', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuRadioGroup', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuRadioItem', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuLabel', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuSeparator', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuShortcut', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuSub', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuSubTrigger', 'kit/dropdown-menu');
+lazyLoadFrom('DropdownMenuSubContent', 'kit/dropdown-menu');
+lazyLoadFrom('Select', 'kit/select');
+lazyLoadFrom('SelectTrigger', 'kit/select');
+lazyLoadFrom('SelectValue', 'kit/select');
+lazyLoadFrom('SelectContent', 'kit/select');
+lazyLoadFrom('SelectGroup', 'kit/select');
+lazyLoadFrom('SelectItem', 'kit/select');
+lazyLoadFrom('SelectLabel', 'kit/select');
+lazyLoadFrom('SelectSeparator', 'kit/select');
+lazyLoadFrom('SelectScrollUpButton', 'kit/select');
+lazyLoadFrom('SelectScrollDownButton', 'kit/select');
+lazyLoadFrom('Tabs', 'kit/tabs');
+lazyLoadFrom('TabsList', 'kit/tabs');
+lazyLoadFrom('TabsTrigger', 'kit/tabs');
+lazyLoadFrom('TabsContent', 'kit/tabs');
+
 lazyLoad('ComposerEditor', 'composer-editor/composer-editor');
 lazyLoad('ComposerEditorPlaintext', 'composer-editor/composer-editor-plaintext');
 lazyLoad('ComposerSupport', 'composer-editor/composer-support');

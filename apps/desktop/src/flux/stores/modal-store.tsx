@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Modal } from 'mailspring-component-kit';
 import MailspringStore from 'mailspring-store';
+import { UIProvider } from '../../components/kit/provider';
 
 import * as Actions from '../actions';
 
@@ -20,7 +21,12 @@ class ModalStore extends MailspringStore {
   constructor(containerId = CONTAINER_ID) {
     super();
     this.container = createContainer(containerId);
-    ReactDOM.render(<span />, this.container);
+    ReactDOM.render(
+      <UIProvider>
+        <span />
+      </UIProvider>,
+      this.container
+    );
 
     this.listenTo(Actions.openModal, this.openModal);
     this.listenTo(Actions.closeModal, this.closeModal);
@@ -31,7 +37,11 @@ class ModalStore extends MailspringStore {
   };
 
   renderModal = (child, props, callback) => {
-    const modal = <Modal {...props}>{child}</Modal>;
+    const modal = (
+      <UIProvider>
+        <Modal {...props}>{child}</Modal>
+      </UIProvider>
+    );
 
     ReactDOM.render(modal, this.container, () => {
       this.isOpen = true;
@@ -56,7 +66,12 @@ class ModalStore extends MailspringStore {
   };
 
   closeModal = (callback = () => {}) => {
-    ReactDOM.render(<span />, this.container, () => {
+    const empty = (
+      <UIProvider>
+        <span />
+      </UIProvider>
+    );
+    ReactDOM.render(empty, this.container, () => {
       this.isOpen = false;
       this.trigger();
       callback();

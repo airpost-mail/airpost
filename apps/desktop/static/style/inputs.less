@@ -1,18 +1,18 @@
 @import 'ui-variables';
 @import 'ui-mixins';
 
-input[type='text'],
-input[type='email'],
-input[type='date'],
-input[type='datetime'],
-input[type='datetime-local'],
-input[type='month'],
-input[type='number'],
-input[type='password'],
-input[type='search'],
-input[type='tel'],
-input[type='time'],
-input[type='url'] {
+input[type='text']:where(:not([data-slot])),
+input[type='email']:where(:not([data-slot])),
+input[type='date']:where(:not([data-slot])),
+input[type='datetime']:where(:not([data-slot])),
+input[type='datetime-local']:where(:not([data-slot])),
+input[type='month']:where(:not([data-slot])),
+input[type='number']:where(:not([data-slot])),
+input[type='password']:where(:not([data-slot])),
+input[type='search']:where(:not([data-slot])),
+input[type='tel']:where(:not([data-slot])),
+input[type='time']:where(:not([data-slot])),
+input[type='url']:where(:not([data-slot])) {
   width: 100%;
   padding-left: @padding-xs-horizontal;
   padding-right: @padding-xs-horizontal;
@@ -31,19 +31,19 @@ input[type='url'] {
 }
 
 .search-bar .menu .header-container input,
-textarea,
-input[type='text'],
-input[type='email'],
-input[type='date'],
-input[type='datetime'],
-input[type='datetime-local'],
-input[type='month'],
-input[type='number'],
-input[type='password'],
-input[type='search'],
-input[type='tel'],
-input[type='time'],
-input[type='url'] {
+textarea:where(:not([data-slot])),
+input[type='text']:where(:not([data-slot])),
+input[type='email']:where(:not([data-slot])),
+input[type='date']:where(:not([data-slot])),
+input[type='datetime']:where(:not([data-slot])),
+input[type='datetime-local']:where(:not([data-slot])),
+input[type='month']:where(:not([data-slot])),
+input[type='number']:where(:not([data-slot])),
+input[type='password']:where(:not([data-slot])),
+input[type='search']:where(:not([data-slot])),
+input[type='tel']:where(:not([data-slot])),
+input[type='time']:where(:not([data-slot])),
+input[type='url']:where(:not([data-slot])) {
   &:focus {
     border: 1px solid @accent-primary;
     box-shadow: 0 0 1.5px @accent-primary;
@@ -51,18 +51,18 @@ input[type='url'] {
 }
 
 body.platform-win32 {
-  input[type='text'],
-  input[type='email'],
-  input[type='date'],
-  input[type='datetime'],
-  input[type='datetime-local'],
-  input[type='month'],
-  input[type='number'],
-  input[type='password'],
-  input[type='search'],
-  input[type='tel'],
-  input[type='time'],
-  input[type='url'] {
+  input[type='text']:where(:not([data-slot])),
+  input[type='email']:where(:not([data-slot])),
+  input[type='date']:where(:not([data-slot])),
+  input[type='datetime']:where(:not([data-slot])),
+  input[type='datetime-local']:where(:not([data-slot])),
+  input[type='month']:where(:not([data-slot])),
+  input[type='number']:where(:not([data-slot])),
+  input[type='password']:where(:not([data-slot])),
+  input[type='search']:where(:not([data-slot])),
+  input[type='tel']:where(:not([data-slot])),
+  input[type='time']:where(:not([data-slot])),
+  input[type='url']:where(:not([data-slot])) {
     border: 0;
     border-radius: 0;
     box-shadow: 0 0 0 2px @input-border-color;

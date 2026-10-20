@@ -11,7 +11,7 @@ html input[type='button'] {
 }
 
 body.platform-win32 {
-  .btn {
+  .btn:where(:not([data-slot])) {
     .windows-btn-bg;
     .windows-btn-border;
 
@@ -49,7 +49,9 @@ body.platform-win32 {
   }
 }
 
-.btn {
+// A mixin as well (button-dropdown.less calls .btn() and .btn.btn-emphasis()), so the guard
+// against kit elements goes on the rule that applies it.
+.btn() {
   padding: 0 0.8em;
   border-radius: @border-radius-base;
   border: 0;
@@ -173,7 +175,11 @@ body.platform-win32 {
   }
 }
 
-.btn-toolbar {
+.btn:where(:not([data-slot])) {
+  .btn();
+}
+
+.btn-toolbar:where(:not([data-slot])) {
   .btn-gradient;
 
   padding: 0 13px;
@@ -204,7 +210,7 @@ body.platform-win32 {
   );
 }
 
-.btn-icon {
+.btn-icon:where(:not([data-slot])) {
   background: transparent;
   border: 0;
   box-shadow: none;

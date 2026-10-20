@@ -59,6 +59,77 @@ export * from '../components/attachment-items';
 export const CodeSnippet: typeof import('../components/code-snippet').default;
 export const CopyButton: typeof import('../components/copy-button').default;
 
+// UI kit
+export { Button } from '../components/kit/button';
+export type { ButtonProps, ButtonVariant, ButtonSize } from '../components/kit/button';
+export { IconButton } from '../components/kit/icon-button';
+export type { IconButtonProps } from '../components/kit/icon-button';
+export { Checkbox } from '../components/kit/checkbox';
+export type { CheckboxProps } from '../components/kit/checkbox';
+export { RadioGroup, RadioGroupItem } from '../components/kit/radio-group';
+export type { RadioGroupProps, RadioGroupItemProps } from '../components/kit/radio-group';
+export { TextField } from '../components/kit/text-field';
+export type { TextFieldProps } from '../components/kit/text-field';
+export { Textarea } from '../components/kit/textarea';
+export type { TextareaProps } from '../components/kit/textarea';
+export {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+  DialogOverlay,
+} from '../components/kit/dialog';
+export type { DialogContentProps } from '../components/kit/dialog';
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverArrow,
+} from '../components/kit/popover';
+export type { PopoverContentProps } from '../components/kit/popover';
+export { Tooltip, TooltipTrigger, TooltipContent } from '../components/kit/tooltip';
+export type { TooltipProps, TooltipContentProps } from '../components/kit/tooltip';
+export {
+  DropdownMenu as DropdownMenuRoot,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+} from '../components/kit/dropdown-menu';
+export type {
+  DropdownMenuContentProps,
+  DropdownMenuItemProps,
+  DropdownMenuSubContentProps,
+} from '../components/kit/dropdown-menu';
+export {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+} from '../components/kit/select';
+export type { SelectTriggerProps, SelectContentProps } from '../components/kit/select';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/kit/tabs';
+
 export * from '../components/composer-editor/composer-editor';
 export * from '../components/composer-editor/composer-editor-plaintext';
 

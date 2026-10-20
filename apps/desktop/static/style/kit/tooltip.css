@@ -1,0 +1,22 @@
+/* Tooltip (src/components/kit/tooltip.tsx): shadcn's inverted look. */
+
+[data-slot='tooltip-content'] {
+  box-sizing: border-box;
+  max-width: 280px;
+  padding: calc(4px * var(--density)) calc(8px * var(--density));
+  color: var(--background);
+  background-color: var(--foreground);
+  border-radius: calc(var(--radius) * 2);
+  font-size: calc(var(--font-size) - 2px);
+  line-height: 1.35;
+  text-align: start;
+  overflow-wrap: break-word;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+}
+[data-slot='tooltip-content'][data-state='delayed-open'],
+[data-slot='tooltip-content'][data-state='instant-open'] {
+  animation: ui-fade-in 120ms ease-out;
+}
+[data-slot='tooltip-content'][data-state='closed'] {
+  animation: ui-fade-out 100ms ease-in;
+}

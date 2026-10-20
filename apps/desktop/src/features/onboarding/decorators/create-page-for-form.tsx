@@ -8,6 +8,7 @@ import * as OnboardingActions from '../onboarding-actions';
 import { finalizeAndValidateAccount } from '../onboarding-helpers';
 import FormErrorMessage from '../form-error-message';
 import AccountProviders from '../account-providers';
+import { UIProvider } from '../../../components/kit/provider';
 
 let didWarnAboutGmailIMAP = false;
 
@@ -200,7 +201,7 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
 
           if (providerConfig.note) {
             const node = document.createElement('div');
-            ReactDOM.render(providerConfig.note, node);
+            ReactDOM.render(<UIProvider>{providerConfig.note}</UIProvider>, node);
             let note = node.innerText;
             const link = node.querySelector('a');
             if (link) {

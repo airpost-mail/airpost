@@ -1,105 +1,68 @@
 import _ from 'underscore';
-import React, { CSSProperties } from 'react';
-import ReactDOM from 'react-dom';
+import React from 'react';
 import * as Actions from '../flux/actions';
-import { RetinaImg } from './retina-img';
+import { localized } from '../shared/intl';
+import { Dialog, DialogContent } from './kit/dialog';
 
 type ModalProps = {
   className?: string;
   height?: number;
   width?: number;
+  /** Read by screen readers; the modal shows no title of its own. */
+  title?: string;
+  children?: React.ReactNode;
 };
 
-type ModalState = {
-  animateClass: boolean;
-  offset: number;
-};
+/* The element that took focus when a modal opened before the kit: the lowest positive
+   tabIndex, then the first input, then any other element with a tabIndex. */
+function legacyFocusTarget(root: HTMLElement): HTMLElement | null {
+  const focusable = root.querySelectorAll<HTMLElement>('[tabIndex], input');
+  const matches = _.sortBy(Array.from(focusable), (node) => {
+    if (node.tabIndex > 0) return node.tabIndex;
+    if (node.nodeName === 'INPUT') return 1000000;
+    return 1000001;
+  });
+  return matches[0] || null;
+}
 
-class Modal extends React.Component<ModalProps, ModalState> {
-  _mounted = false;
+/* Public: The window's modal, opened with `Actions.openModal({ component, width, height })` and
+   closed with `Actions.closeModal()`, by clicking outside it, with Escape or with its close
+   button. The UI kit's Dialog behind this export's props, with the legacy `modal-container`,
+   `modal` and `modal-close` classes. */
+class Modal extends React.Component<ModalProps> {
+  static displayName = 'Modal';
 
-  state = {
-    offset: 0,
-    animateClass: false,
-  };
-
-  componentDidMount() {
-    this._mounted = true;
-    this._focusImportantElement();
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        if (!this._mounted) return;
-        this.setState({ animateClass: true });
-      });
-    });
-  }
-
-  componentWillUnmount() {
-    this._mounted = false;
-  }
-
-  _focusImportantElement = () => {
-    const modalNode = ReactDOM.findDOMNode(this) as HTMLElement;
-
-    const focusable = modalNode.querySelectorAll('[tabIndex], input');
-    const matches = _.sortBy(focusable, (node) => {
-      if ((node as HTMLElement).tabIndex > 0) {
-        return (node as HTMLElement).tabIndex;
-      } else if (node.nodeName === 'INPUT') {
-        return 1000000;
-      }
-      return 1000001;
-    });
-    if (matches[0]) {
-      (matches[0] as HTMLElement).focus();
-    }
-  };
-
-  _computeModalStyles = (height, width) => {
-    const modalStyle: CSSProperties = {
-      height: height,
-      maxHeight: '95%',
-      width: width,
-      maxWidth: '95%',
-      overflow: 'auto',
-      position: 'absolute',
-      backgroundColor: 'white',
-      boxShadow: '0 10px 20px rgba(0,0,0,0.19), inset 0 0 1px rgba(0,0,0,0.5)',
-      borderRadius: '5px',
-    };
-    return { modalStyle };
-  };
-
-  _onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      Actions.closeModal();
+  _onOpenAutoFocus = (event: Event) => {
+    const target = legacyFocusTarget(event.currentTarget as HTMLElement);
+    if (target) {
+      event.preventDefault();
+      target.focus();
     }
   };
 
   render() {
-    const { children, height, width } = this.props;
-    const { modalStyle } = this._computeModalStyles(height, width);
-
+    const { children, height, width, className, title } = this.props;
     return (
-      <div
-        className={`modal-container ${this.state.animateClass && 'animate'}`}
-        onKeyDown={this._onKeyDown}
-        onClick={() => Actions.closeModal()}
-      >
-        <div className="modal" style={modalStyle} onClick={(event) => event.stopPropagation()}>
-          <RetinaImg
-            className="modal-close"
-            style={{ width: '14', WebkitFilter: 'none', zIndex: 1, position: 'relative' }}
-            name="modal-close.png"
-            mode={RetinaImg.Mode.ContentDark}
-            onClick={(event) => {
-              event.stopPropagation();
-              Actions.closeModal();
-            }}
-          />
+      <Dialog open onOpenChange={(open) => !open && Actions.closeModal()}>
+        <DialogContent
+          className={className}
+          hiddenTitle={title || localized('Dialog')}
+          aria-describedby={undefined}
+          onOpenAutoFocus={this._onOpenAutoFocus}
+          // The legacy modal's box: the size asked for, no padding of its own.
+          style={{
+            width,
+            height,
+            maxWidth: '95%',
+            maxHeight: '95%',
+            padding: 0,
+            gap: 0,
+            display: 'block',
+          }}
+        >
           {children}
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 }

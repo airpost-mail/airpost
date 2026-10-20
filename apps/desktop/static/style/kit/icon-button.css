@@ -1,0 +1,78 @@
+/* IconButton (src/components/kit/icon-button.tsx, docs/desktop/ui-kit.md 6.2). Tokens only. */
+
+[data-slot='icon-button'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) * 2);
+  box-shadow: none;
+  cursor: default;
+  user-select: none;
+  background: transparent;
+  color: var(--subtle-foreground);
+}
+[data-slot='icon-button'][data-size='sm'] {
+  width: 22px;
+  height: 22px;
+}
+[data-slot='icon-button'][data-size='lg'] {
+  width: 32px;
+  height: 32px;
+}
+
+/* The icon is a mask, so it takes the button's text colour in every state. */
+[data-slot='icon-button'] img.content-mask {
+  background-color: currentColor;
+}
+
+[data-slot='icon-button'][data-variant='ghost']:hover {
+  background: var(--hover);
+  color: var(--foreground);
+}
+
+[data-slot='icon-button'][data-variant='outline'] {
+  background: var(--control);
+  color: var(--control-foreground);
+  border-color: var(--control-border);
+}
+[data-slot='icon-button'][data-variant='outline']:hover {
+  background: color-mix(in srgb, var(--control), var(--foreground) 4%);
+}
+
+[data-slot='icon-button'][data-variant='secondary'] {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+[data-slot='icon-button'][data-variant='secondary']:hover {
+  background: color-mix(in srgb, var(--secondary), var(--foreground) 5%);
+}
+
+[data-slot='icon-button'][data-variant='toolbar'] {
+  background: var(--control);
+  color: var(--toolbar-foreground);
+  border-color: var(--control-border);
+}
+[data-slot='icon-button'][data-variant='toolbar']:hover {
+  background: color-mix(in srgb, var(--control), var(--foreground) 4%);
+}
+
+[data-slot='icon-button']:active {
+  background: color-mix(in srgb, var(--hover), var(--foreground) 5%);
+}
+
+[data-slot='icon-button'][data-state='on'] {
+  background: var(--accent);
+  color: var(--primary);
+}
+
+[data-slot='icon-button']:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

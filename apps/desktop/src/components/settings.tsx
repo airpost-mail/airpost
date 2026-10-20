@@ -1,7 +1,9 @@
 import React from 'react';
 import classNames from 'classnames';
 import { localized } from '../shared/intl';
-import Switch from './switch';
+import { Switch } from './kit/switch';
+import { SegmentedControl } from './kit/segmented-control';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './kit/select';
 
 /* Public: The building blocks of a Preferences page: a page header, titled sections of
    cards, rows with a label and description on the left and a control on the right, and
@@ -113,68 +115,9 @@ export function NeedsServerPill() {
 }
 
 /** One choice of a few, as a radio group: the arrow keys move the choice and only the chosen
- * segment is a tab stop. `className` restyles it outside Preferences. */
-export function SegmentedControl<T extends string | number | boolean>(props: {
-  value: T;
-  options: [T, string][];
-  onChange: (value: T) => void;
-  disabled?: boolean;
-  label?: string;
-  className?: string;
-}) {
-  const { value, options, onChange, disabled } = props;
-  const root = React.useRef<HTMLDivElement>(null);
-  const movedByKey = React.useRef(false);
-
-  // Focus follows the choice once the parent has applied it.
-  React.useEffect(() => {
-    if (!movedByKey.current) return;
-    movedByKey.current = false;
-    root.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
-  }, [value]);
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled || options.length === 0) return;
-    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
-    if (!step) return;
-    e.preventDefault();
-    const idx = options.findIndex(([v]) => v === value);
-    const from = idx < 0 ? (step > 0 ? -1 : 0) : idx;
-    const next = options[(from + step + options.length) % options.length][0];
-    if (next === value) return;
-    movedByKey.current = true;
-    onChange(next);
-  };
-
-  return (
-    <div
-      ref={root}
-      className={classNames('settings-segmented', props.className)}
-      role="radiogroup"
-      aria-label={props.label}
-      onKeyDown={onKeyDown}
-    >
-      {options.map(([v, label], i) => {
-        const on = v === value;
-        // With nothing chosen the first segment takes the tab stop.
-        const tabStop = on || (i === 0 && !options.some(([o]) => o === value));
-        return (
-          <button
-            key={String(v)}
-            role="radio"
-            aria-checked={on}
-            tabIndex={tabStop ? 0 : -1}
-            className={classNames({ on })}
-            disabled={disabled}
-            onClick={() => onChange(v)}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+ * segment is a tab stop. `className` restyles it outside Preferences. The kit's control,
+ * re-exported here under its existing name. */
+export { SegmentedControl };
 
 export function SettingsSwitch(props: {
   checked: boolean;
@@ -183,9 +126,12 @@ export function SettingsSwitch(props: {
   label?: string;
 }) {
   return (
+    // Disabled stays focusable and only ignores the toggle, as before the kit; aria-disabled
+    // tells assistive tech and the kit CSS.
     <Switch
       className={classNames('settings-switch', { disabled: props.disabled })}
-      checked={props.checked}
+      checked={!!props.checked}
+      aria-disabled={props.disabled || undefined}
       label={props.label}
       onChange={() => !props.disabled && props.onChange(!props.checked)}
     />
@@ -231,6 +177,11 @@ export function ConfigSwitchRow(props: {
   );
 }
 
+// Radix Select reserves the empty string for "cleared", so an option whose value is '' goes
+// through this sentinel.
+const EMPTY_OPTION = '__empty__';
+const optionKey = (v: Option[0]) => (String(v) === '' ? EMPTY_OPTION : String(v));
+
 /** A select bound to a config key; options default to the schema's enum and labels. */
 export function ConfigSelectRow(props: {
   keyPath: string;
@@ -243,22 +194,25 @@ export function ConfigSelectRow(props: {
   const value = AppEnv.config.get(props.keyPath) ?? options[0]?.[0];
   return (
     <SettingsRow label={props.label} description={props.description} disabled={props.disabled}>
-      <select
-        className="settings-select"
-        value={String(value)}
+      <Select
+        value={optionKey(value)}
         disabled={props.disabled}
-        aria-label={typeof props.label === 'string' ? props.label : undefined}
-        onChange={(e) => {
-          const picked = options.find(([v]) => String(v) === e.target.value);
-          AppEnv.config.set(props.keyPath, picked ? picked[0] : e.target.value);
+        onValueChange={(key) => {
+          const picked = options.find(([v]) => optionKey(v) === key);
+          AppEnv.config.set(props.keyPath, picked ? picked[0] : key);
         }}
       >
-        {options.map(([v, label]) => (
-          <option key={String(v)} value={String(v)}>
-            {label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger aria-label={typeof props.label === 'string' ? props.label : undefined}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map(([v, label]) => (
+            <SelectItem key={optionKey(v)} value={optionKey(v)}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </SettingsRow>
   );
 }
@@ -332,8 +286,12 @@ export class ProviderCard extends React.Component<
     return this.props.open !== undefined ? this.props.open : this.state.open;
   }
 
+  // Clicks and keys on a control inside the head (a switch or button in `actions`) belong to it.
+  _fromControl = (e: React.SyntheticEvent) =>
+    !!(e.target as HTMLElement).closest('button, input, select, a, [role="switch"]');
+
   _toggle = (e: React.MouseEvent | React.KeyboardEvent) => {
-    if ((e.target as HTMLElement).closest('button, input, select, a, [role="switch"]')) return;
+    if (this._fromControl(e)) return;
     const next = !this._isOpen();
     if (this.props.open === undefined) this.setState({ open: next });
     this.props.onToggle?.(next);
@@ -350,7 +308,9 @@ export class ProviderCard extends React.Component<
           onKeyDown={
             expandable
               ? (e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  // Kit controls are <button>s that activate natively on these keys, so
+                  // preventDefault() here would cancel their click.
+                  if ((e.key === 'Enter' || e.key === ' ') && !this._fromControl(e)) {
                     e.preventDefault();
                     this._toggle(e);
                   }

@@ -1,6 +1,6 @@
 @import 'ui-variables';
 
-.modal-container {
+.modal-container:where(:not([data-slot])) {
   perspective: 1000px;
   display: flex;
   align-items: center;
@@ -35,13 +35,13 @@
 }
 
 @media (-webkit-min-device-pixel-ratio: 2) {
-  .modal-close {
+  .modal-close:where(:not([data-slot])) {
     margin: 12px;
   }
 }
 
 body.platform-win32 {
-  .modal {
+  .modal:where(:not([data-slot])) {
     border-radius: 0;
   }
 }

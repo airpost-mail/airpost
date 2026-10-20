@@ -1,0 +1,40 @@
+/* Textarea (src/components/kit/textarea.tsx, docs/desktop/ui-kit.md 6.8). Tokens only. */
+
+textarea[data-slot='textarea'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 60px;
+  margin: 0;
+  padding-block: calc(6px * var(--density));
+  padding-inline: calc(8px * var(--density));
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 2);
+  box-shadow: none;
+  outline: none;
+  font-family: inherit;
+  font-size: calc(var(--font-size) - 1px);
+  line-height: 1.4;
+  background: var(--control);
+  color: var(--control-foreground);
+  resize: vertical;
+}
+textarea[data-slot='textarea']::placeholder {
+  color: var(--muted-foreground);
+}
+textarea[data-slot='textarea']:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+textarea[data-slot='textarea']:focus-visible {
+  outline: none;
+}
+textarea[data-slot='textarea'][aria-invalid='true'] {
+  border-color: var(--destructive);
+}
+textarea[data-slot='textarea'][aria-invalid='true']:focus {
+  box-shadow: 0 0 0 1px var(--destructive);
+}
+textarea[data-slot='textarea']:disabled {
+  opacity: 0.6;
+}

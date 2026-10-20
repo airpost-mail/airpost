@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { RetinaImg } from './retina-img';
 import { localized } from 'mailspring-exports';
 import classnames from 'classnames';
+import { Popover, PopoverAnchor, PopoverContent } from './kit/popover';
 
 type ButtonDropdownState = {
   open: 'up' | 'down' | false;
@@ -20,8 +21,15 @@ type ButtonDropdownProps = {
   className?: string;
 };
 
+/* Public: A button with a menu: a primary item that acts and a disclosure that opens `menu`, or,
+   without `primaryClick`, one item that opens it. The menu is the UI kit's Popover: it closes
+   on a click outside, on Escape and when focus leaves, and flips up when there's no room
+   below. It is rendered inside the component, as `.secondary-items`, so styles that reach it
+   through `.button-dropdown` keep applying. */
 export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonDropdownState> {
   static displayName = 'ButtonDropdown';
+
+  _root: HTMLDivElement | null = null;
 
   static defaultProps = {
     style: {},
@@ -41,12 +49,10 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
       bordered: this.props.bordered !== false,
     });
 
-    const menu = this.state.open ? this.props.menu : false;
-
     if (this.props.primaryClick) {
-      return (
+      return this._renderAnchored(
         <div
-          ref="button"
+          ref={this._setRoot}
           onBlur={this._onBlur}
           tabIndex={-1}
           className={`${classes} ${this.props.className || ''}`}
@@ -85,15 +91,13 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
           >
             <RetinaImg name={'icon-thread-disclosure.png'} mode={RetinaImg.Mode.ContentIsMask} />
           </div>
-          <div role="menu" className="secondary-items" onMouseDown={this._onMenuClick}>
-            {menu}
-          </div>
-        </div>
+        </div>,
+        this._renderMenu('secondary-items', 'end', 'menu')
       );
     } else {
-      return (
+      return this._renderAnchored(
         <div
-          ref="button"
+          ref={this._setRoot}
           onBlur={this._onBlur}
           tabIndex={-1}
           className={`${classes} ${this.props.className || ''}`}
@@ -111,16 +115,58 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
               mode={RetinaImg.Mode.ContentIsMask}
             />
           </div>
-          <div
-            className={`secondary-items ${this.props.attachment}`}
-            onMouseDown={this._onMenuClick}
-          >
-            {menu}
-          </div>
-        </div>
+        </div>,
+        this._renderMenu(
+          `secondary-items ${this.props.attachment}`,
+          this.props.attachment === 'left' ? 'start' : 'end'
+        )
       );
     }
   }
+
+  _setRoot = (el: HTMLDivElement | null) => {
+    this._root = el;
+  };
+
+  _renderAnchored(button: React.ReactElement, menu: React.ReactElement) {
+    return (
+      <Popover open={this.state.open !== false} onOpenChange={this._onOpenChange}>
+        <PopoverAnchor asChild>{button}</PopoverAnchor>
+        {menu}
+      </Popover>
+    );
+  }
+
+  _renderMenu(className: string, align: 'start' | 'end', role?: string) {
+    if (this.state.open === false || !this._root) return null;
+    return (
+      <PopoverContent
+        data-variant="plain"
+        role={role}
+        className={className}
+        // Portalled into the component itself rather than the window's portal root.
+        container={this._root}
+        side={this.state.open === 'up' ? 'top' : 'bottom'}
+        align={align}
+        sideOffset={1}
+        collisionPadding={4}
+        onMouseDown={this._onMenuClick}
+        // Focus stays where it was, as before the kit: the menu takes it only when clicked.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          // The buttons toggle the menu themselves.
+          if (this._root && this._root.contains(e.target as Node)) e.preventDefault();
+        }}
+      >
+        {this.props.menu}
+      </PopoverContent>
+    );
+  }
+
+  _onOpenChange = (open: boolean) => {
+    if (!open) this.setState({ open: false });
+  };
 
   toggleDropdown = () => {
     if (this.state.open !== false) {
@@ -144,7 +190,7 @@ export class ButtonDropdown extends React.Component<ButtonDropdownProps, ButtonD
 
   _onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
     const target = event.nativeEvent.relatedTarget as Node | null;
-    if (target != null && ReactDOM.findDOMNode(this.refs.button).contains(target)) {
+    if (target != null && this._root && this._root.contains(target)) {
       return;
     }
     this.setState({ open: false });

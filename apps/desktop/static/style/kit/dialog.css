@@ -1,0 +1,99 @@
+/* Dialog (src/components/kit/dialog.tsx). Legacy classes on the parts: modal-container,
+   modal, modal-close; the core rules for them are guarded with :where(:not([data-slot])). */
+
+[data-slot='dialog-overlay'] {
+  position: fixed;
+  inset: 0;
+  background-color: var(--modal-overlay);
+}
+[data-slot='dialog-overlay'][data-state='open'] {
+  animation: ui-fade-in 150ms ease-out;
+}
+[data-slot='dialog-overlay'][data-state='closed'] {
+  animation: ui-fade-out 120ms ease-in;
+}
+
+/* Centred with inset/margin rather than a translate, so the zoom transform and RTL need no
+   special cases. */
+[data-slot='dialog-content'] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: calc(12px * var(--density));
+  padding: calc(20px * var(--density));
+  color: var(--modal-foreground);
+  background-color: var(--modal-background);
+  border: 1px solid var(--modal-border);
+  border-radius: calc(var(--radius) * 8 / 3);
+  box-shadow:
+    0 10px 30px var(--shadow-color),
+    0 1px 3px var(--shadow-color);
+  font-size: calc(var(--font-size) - 1px);
+  text-align: start;
+}
+[data-slot='dialog-content']:focus,
+[data-slot='dialog-content']:focus-visible {
+  outline: none;
+}
+[data-slot='dialog-content'][data-state='open'] {
+  animation: ui-zoom-in 150ms ease-out;
+}
+[data-slot='dialog-content'][data-state='closed'] {
+  animation: ui-zoom-out 120ms ease-in;
+}
+
+[data-slot='dialog-header'] {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: start;
+}
+
+[data-slot='dialog-footer'] {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+[data-slot='dialog-title'] {
+  margin: 0;
+  font-size: calc(var(--font-size) + 1px);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--modal-foreground);
+}
+
+[data-slot='dialog-description'] {
+  margin: 0;
+  color: var(--modal-muted-foreground);
+}
+
+button[data-slot='dialog-close'].modal-close {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius) * 2);
+  color: var(--modal-muted-foreground);
+  background-color: transparent;
+}
+button[data-slot='dialog-close'].modal-close:hover {
+  color: var(--modal-foreground);
+  background-color: var(--hover);
+}

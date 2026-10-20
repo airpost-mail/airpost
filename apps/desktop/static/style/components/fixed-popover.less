@@ -60,7 +60,7 @@
 }
 
 body.platform-win32 {
-  .fixed-popover {
+  .fixed-popover:where(:not([data-slot])) {
     border-radius: 0;
 
     .menu {

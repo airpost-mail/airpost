@@ -1,0 +1,122 @@
+/* Button (src/components/kit/button.tsx, docs/desktop/ui-kit.md 6.1). Tokens only. */
+
+[data-slot='button'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 26px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: calc(10px * var(--density));
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) * 2);
+  box-shadow: none;
+  font-family: inherit;
+  font-size: calc(var(--font-size) - 1px);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: default;
+  user-select: none;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+[data-slot='button'][data-size='sm'] {
+  height: 22px;
+  padding-inline: calc(8px * var(--density));
+  font-size: calc(var(--font-size) - 2px);
+}
+[data-slot='button'][data-size='lg'] {
+  height: 32px;
+  padding-inline: calc(14px * var(--density));
+  font-size: var(--font-size);
+}
+
+[data-slot='button'] img.content-mask {
+  background-color: currentColor;
+}
+
+[data-slot='button'][data-variant='default']:hover {
+  background: hsl(from var(--primary) h s calc(l - 5));
+}
+[data-slot='button'][data-variant='default']:active {
+  background: hsl(from var(--primary) h s calc(l - 9));
+}
+
+[data-slot='button'][data-variant='secondary'] {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+[data-slot='button'][data-variant='secondary']:hover {
+  background: color-mix(in srgb, var(--secondary), var(--foreground) 5%);
+}
+[data-slot='button'][data-variant='secondary']:active {
+  background: color-mix(in srgb, var(--secondary), var(--foreground) 9%);
+}
+
+[data-slot='button'][data-variant='outline'] {
+  background: var(--control);
+  color: var(--control-foreground);
+  border-color: var(--control-border);
+}
+[data-slot='button'][data-variant='outline']:hover {
+  background: color-mix(in srgb, var(--control), var(--foreground) 4%);
+}
+[data-slot='button'][data-variant='outline']:active {
+  background: color-mix(in srgb, var(--control), var(--foreground) 8%);
+}
+
+[data-slot='button'][data-variant='ghost'] {
+  background: transparent;
+  color: inherit;
+}
+[data-slot='button'][data-variant='ghost']:hover {
+  background: var(--hover);
+}
+[data-slot='button'][data-variant='ghost']:active {
+  background: color-mix(in srgb, var(--hover), var(--foreground) 5%);
+}
+
+[data-slot='button'][data-variant='destructive'] {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+[data-slot='button'][data-variant='destructive']:hover {
+  background: hsl(from var(--destructive) h s calc(l - 5));
+}
+[data-slot='button'][data-variant='destructive']:active {
+  background: hsl(from var(--destructive) h s calc(l - 9));
+}
+
+[data-slot='button'][data-variant='link'] {
+  height: auto;
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+  color: var(--link);
+}
+[data-slot='button'][data-variant='link']:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+[data-slot='button'][data-variant='toolbar'] {
+  background: var(--control);
+  color: var(--toolbar-foreground);
+  border-color: var(--control-border);
+}
+[data-slot='button'][data-variant='toolbar']:hover {
+  background: color-mix(in srgb, var(--control), var(--foreground) 4%);
+}
+[data-slot='button'][data-variant='toolbar']:active {
+  background: color-mix(in srgb, var(--control), var(--foreground) 8%);
+}
+
+[data-slot='button']:disabled,
+[data-slot='button'][aria-disabled='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+}

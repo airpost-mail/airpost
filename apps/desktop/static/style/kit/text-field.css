@@ -1,0 +1,47 @@
+/* TextField (src/components/kit/text-field.tsx, docs/desktop/ui-kit.md 6.8). Tokens only.
+   input[...] matches the legacy element rules in inputs.less on specificity; those are guarded
+   against [data-slot], and theme rules on input[type='text'] still apply. */
+
+input[data-slot='input'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: calc(8px * var(--density));
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 2);
+  box-shadow: none;
+  outline: none;
+  font-family: inherit;
+  font-size: calc(var(--font-size) - 1px);
+  font-weight: 400;
+  line-height: normal;
+  background: var(--control);
+  color: var(--control-foreground);
+}
+input[data-slot='input'][data-size='sm'] {
+  height: 22px;
+  padding-inline: calc(6px * var(--density));
+  font-size: calc(var(--font-size) - 2px);
+}
+input[data-slot='input']::placeholder {
+  color: var(--muted-foreground);
+}
+input[data-slot='input']:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+input[data-slot='input']:focus-visible {
+  outline: none;
+}
+input[data-slot='input'][aria-invalid='true'] {
+  border-color: var(--destructive);
+}
+input[data-slot='input'][aria-invalid='true']:focus {
+  box-shadow: 0 0 0 1px var(--destructive);
+}
+input[data-slot='input']:disabled {
+  opacity: 0.6;
+}

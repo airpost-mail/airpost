@@ -10,12 +10,16 @@
     }
   }
 
+  // The menu is the kit's popover content (data-slot) since the kit; Radix places it, so the
+  // placement rules here only apply to a .secondary-items without data-slot.
   &.open.open-up {
     .secondary-items {
       border-radius: @border-radius-base @border-radius-base 0 @border-radius-base;
       box-shadow: 0 0.5px 0 @standard-shadow-color, 0 -0.5px 0 @standard-shadow-color,
         0.5px 0 0 @standard-shadow-color, -0.5px 0 0 @standard-shadow-color,
         0 -3px 12px @standard-shadow-color;
+    }
+    .secondary-items:where(:not([data-slot])) {
       top: -100%;
       transform: translate(0, -6px);
     }
@@ -29,6 +33,8 @@
       box-shadow: 0 0.5px 0 @standard-shadow-color, 0 -0.5px 0 @standard-shadow-color,
         0.5px 0 0 @standard-shadow-color, -0.5px 0 0 @standard-shadow-color,
         0 5px 12px @standard-shadow-color;
+    }
+    .secondary-items:where(:not([data-slot])) {
       transform: translate(0, 1.5px);
     }
     .secondary-picker {
@@ -65,22 +71,23 @@
     border-left: 0;
     padding: 0 6px;
   }
-  .secondary-items {
-    &:hover {
-      cursor: default;
-    }
+  .secondary-items:where(:not([data-slot])) {
     &.left {
       width: auto;
       left: -1px;
       right: auto;
-      white-space: nowrap;
     }
-    z-index: 3;
-    background-color: @background-secondary;
     position: absolute;
     right: 0;
-    white-space: nowrap;
     visibility: hidden;
+  }
+  .secondary-items {
+    z-index: 3;
+    &:hover {
+      cursor: default;
+    }
+    background-color: @background-secondary;
+    white-space: nowrap;
 
     .menu {
       .footer-container,

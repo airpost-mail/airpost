@@ -1,8 +1,10 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
+import { render as renderDOM, fireEvent, cleanup } from '@testing-library/react';
 import { Actions, PreferencesUIStore } from 'mailspring-exports';
 import { ConfigSelectRow, ConfigSwitchRow } from 'mailspring-component-kit';
 import PreferencesSidebar from '../../../src/features/preferences/preferences-sidebar';
+import { getPortalContainer } from '../../../src/components/kit/portal';
 
 const Tab = PreferencesUIStore.TabItem;
 const tab = (tabId: string, group?: any, keywords?: string[]) =>
@@ -65,25 +67,32 @@ describe('PreferencesSidebar', function () {
   });
 });
 
+// Rendered with ReactDOM and driven with real events: the rows hold the UI kit's Switch and
+// Select, which react-test-renderer can't click (Radix reads the event) or host (Radix keeps the
+// closed list in a ReactDOM portal).
 describe('Config-bound settings rows', function () {
   beforeEach(() => {
     spyOn(AppEnv.config, 'set');
+    // Radix Select uses delay-less timeouts, which the spec clock never fires.
+    jasmine.unspy(window, 'setTimeout');
   });
+
+  afterEach(() => cleanup());
 
   it('writes the inverse of an inverted switch', () => {
     spyOn(AppEnv.config, 'get').andReturn(true);
-    const r = TestRenderer.create(
+    const { container } = renderDOM(
       <ConfigSwitchRow keyPath="core.reading.swipeDisabled" invert label="Swipe" />
     );
-    const sw = r.root.find((n) => n.props.role === 'switch');
-    expect(sw.props['aria-checked']).toBe(false);
-    act(() => sw.props.onClick({}));
+    const sw = container.querySelector('[role="switch"]');
+    expect(sw.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(sw);
     expect(AppEnv.config.set).toHaveBeenCalledWith('core.reading.swipeDisabled', false);
   });
 
   it("sets a select's option with its own type and shows the first option when unset", () => {
     spyOn(AppEnv.config, 'get').andReturn(undefined);
-    const r = TestRenderer.create(
+    const { container } = renderDOM(
       <ConfigSelectRow
         keyPath="core.sending.undoSend"
         label="Undo Send"
@@ -93,9 +102,14 @@ describe('Config-bound settings rows', function () {
         ]}
       />
     );
-    const select = r.root.findByType('select');
-    expect(select.props.value).toBe('5000');
-    act(() => select.props.onChange({ target: { value: '0' } }));
+    const trigger = container.querySelector('[data-slot="select-trigger"]');
+    expect(trigger.getAttribute('aria-label')).toBe('Undo Send');
+    expect(trigger.textContent).toBe('5 seconds');
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    const off = Array.from(
+      getPortalContainer().querySelectorAll<HTMLElement>('[data-slot="select-item"]')
+    ).find((i) => i.textContent === 'Off');
+    fireEvent.click(off);
     expect(AppEnv.config.set).toHaveBeenCalledWith('core.sending.undoSend', 0);
   });
 });
