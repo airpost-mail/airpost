@@ -56,6 +56,9 @@ import {
   resetProfileDirectory,
 } from './profile/reset';
 import { credentialsMovedToEngine, KeyManager, registerKeyManagerIPC } from './profile/key-manager';
+import { hasMailspringProfile, requestMailspringImport } from './profile/mailspring-import';
+import { addMailspringAccounts, confirmProfileImport } from './profile/mailspring-import-flow';
+import { MailspringImportChannel, MailspringImportOutcome } from '../engine/channels';
 import {
   EngineSupervisor,
   QuitGate,
@@ -77,6 +80,8 @@ export default class Application extends EventEmitter {
   specMode: boolean;
   safeMode: boolean;
   quitting: boolean;
+  // The profile Import from Mailspring reads (main.js); null when there is none to offer.
+  mailspringProfilePath: string | null = null;
 
   configMigrator: ConfigMigrator;
   configPersistenceManager: ConfigPersistenceManager;
@@ -101,6 +106,7 @@ export default class Application extends EventEmitter {
 
   async start(options) {
     const { resourcePath, configDirPath, version, devMode, specMode, safeMode } = options;
+    this.mailspringProfilePath = options.mailspringProfilePath || null;
 
     initializeLocalization({ configDirPath });
 
@@ -281,6 +287,10 @@ export default class Application extends EventEmitter {
     }
     registerEngineSupervisorIPC(ipcMain, this.engineSupervisor);
     registerOAuthReceiverIPC(ipcMain);
+    ipcMain.handle(MailspringImportChannel.Available, () =>
+      hasMailspringProfile(this.mailspringProfilePath)
+    );
+    ipcMain.handle(MailspringImportChannel.Start, () => this._importFromMailspring());
     if (this.engineSupervisor) this.engineSupervisor.start();
   }
 
@@ -467,15 +477,7 @@ export default class Application extends EventEmitter {
     if (this._resettingAndRelaunching) return;
     const protectedPaths = [app.getPath('appData')];
     if (!canResetProfileDirectory(this.configDirPath, protectedPaths)) {
-      dialog.showMessageBoxSync({
-        type: 'error',
-        buttons: [localized('Okay')],
-        message: localized('Could not reset accounts and settings'),
-        detail: localized(
-          `%@ wasn't created by Tern or holds more than Tern's files, so Tern won't empty it.`,
-          this.configDirPath
-        ),
-      });
+      this._cannotEmptyProfile(localized('Could not reset accounts and settings'));
       return;
     }
     const options = {
@@ -490,7 +492,25 @@ export default class Application extends EventEmitter {
     const choice = parent
       ? dialog.showMessageBoxSync(parent, options)
       : dialog.showMessageBoxSync(options);
-    if (choice !== 1 || this._resettingAndRelaunching) return;
+    if (choice !== 1) return;
+    await this._emptyProfileAndRelaunch(protectedPaths);
+  };
+
+  _cannotEmptyProfile(message: string) {
+    dialog.showMessageBoxSync({
+      type: 'error',
+      buttons: [localized('Okay')],
+      message,
+      detail: localized(
+        `%@ wasn't created by Tern or holds more than Tern's files, so Tern won't empty it.`,
+        this.configDirPath
+      ),
+    });
+  }
+
+  // Empties the profile with nothing still writing to it, runs `afterEmptying`, and restarts.
+  async _emptyProfileAndRelaunch(protectedPaths: string[], afterEmptying?: () => void) {
+    if (this._resettingAndRelaunching) return;
     this._resettingAndRelaunching = true;
     this.quitGate.relaunching = true;
 
@@ -509,6 +529,13 @@ export default class Application extends EventEmitter {
     } catch (err) {
       failed = [`${this.configDirPath}: ${err.message}`];
     }
+    if (afterEmptying) {
+      try {
+        afterEmptying();
+      } catch (err) {
+        failed.push(`${this.configDirPath}: ${err.message}`);
+      }
+    }
     if (failed.length) {
       dialog.showMessageBoxSync({
         type: 'warning',
@@ -521,6 +548,40 @@ export default class Application extends EventEmitter {
       });
     }
     this._relaunch();
+  }
+
+  /*
+  Import from Mailspring (main/profile/mailspring-import.ts). With accounts in Tern it adds the
+  Mailspring accounts Tern doesn't have and leaves the rest alone; with none it empties the
+  profile, as Reset Accounts and Settings does, and restarts to copy the Mailspring profile in.
+  */
+  _importFromMailspring = async (): Promise<MailspringImportOutcome> => {
+    const from = this.mailspringProfilePath;
+    if (this._resettingAndRelaunching || !hasMailspringProfile(from)) return 'unavailable';
+    const accounts = this.config.get('accounts') || [];
+    if (accounts.length) {
+      const outcome = await addMailspringAccounts({
+        from,
+        config: this.config,
+        keyManager: this.keyManager,
+      });
+      if (outcome === 'added') {
+        const onboarding = this.windowManager.get(WindowManager.ONBOARDING_WINDOW);
+        if (onboarding) onboarding.close();
+      }
+      return outcome;
+    }
+    const protectedPaths = [app.getPath('appData')];
+    if (!canResetProfileDirectory(this.configDirPath, protectedPaths)) {
+      this._cannotEmptyProfile(localized('Could not import from Mailspring'));
+      return 'failed';
+    }
+    if (!confirmProfileImport(from)) return 'cancelled';
+    // Not awaited: the window that asked is destroyed on the way.
+    this._emptyProfileAndRelaunch(protectedPaths, () =>
+      requestMailspringImport(this.configDirPath, from)
+    );
+    return 'restarting';
   };
 
   // A Dock click, second instance or mailto: link that arrived during a reset opens after it.

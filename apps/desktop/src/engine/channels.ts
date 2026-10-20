@@ -3,8 +3,9 @@
 
 /*
 IPC between the main process, which owns the `serve` engine and the keyset
-(engine/supervisor/supervisor.ts, main/profile/key-manager.ts), and the windows. Imported from both
-sides, so it holds only names and shapes.
+(engine/supervisor/supervisor.ts, main/profile/key-manager.ts) and imports Mailspring profiles
+(main/profile/mailspring-import-flow.ts), and the windows. Imported from both sides, so it holds
+only names and shapes.
 */
 
 // ipcRenderer.invoke(KEY_MANAGER_CHANNEL, method, ...args) -> KeyManagerReply
@@ -48,6 +49,23 @@ export const SupervisorChannel = {
   // invoke: starts the engine again now, after it gave up or while a respawn waits.
   RetryEngine: 'engine-supervisor:retry-engine',
 } as const;
+
+// Import from Mailspring (Preferences > Accounts, onboarding).
+export const MailspringImportChannel = {
+  // invoke -> boolean: whether there is a Mailspring profile to import from.
+  Available: 'mailspring-import:available',
+  // invoke -> MailspringImportOutcome. Main shows the confirmation and the result itself; a
+  // whole-profile import ('restarting') goes on after a restart.
+  Start: 'mailspring-import:start',
+} as const;
+
+export type MailspringImportOutcome =
+  | 'added'
+  | 'none'
+  | 'cancelled'
+  | 'failed'
+  | 'restarting'
+  | 'unavailable';
 
 // The OAuth redirect receiver in the main process (main/ipc/oauth-receiver.ts).
 export const OAuthReceiverChannel = {

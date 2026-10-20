@@ -261,11 +261,12 @@ with a detail text that names the directory and lists what goes, stops `config.j
 destroys the windows, stops the engine through `EngineSupervisor.shutdown()` (serve's
 `engine.shutdown`, killed after the grace period), clears the default session's storage, then
 deletes everything in the config dir except the running instance's `Singleton*` lock
-(`src/main/profile-reset.ts`) and writes `skip-mailspring-import` last.
-`shouldImportMailspringProfile` returns false while that marker exists. The dir is whatever
+(`src/main/profile-reset.ts`). Nothing imports a Mailspring profile on its own any more (Import
+from Mailspring is an action in onboarding and Preferences > Accounts,
+`src/main/profile/mailspring-import.ts`), so no marker is needed. The dir is whatever
 `main.js` resolved (`Tern`, `Tern-dev`, `--config-dir-path`, snap); the filesystem root, the home
 folder and `appData` are refused. Entries that can't be deleted are listed and the app relaunches
-anyway. Not done: an "Import from Mailspring again?" choice. The supervisor and `engine.shutdown`
+anyway. The supervisor and `engine.shutdown`
 named under Size already exist, so nothing waits on stages 6 or 10.
 
 Review fixes (roadmap/security, a5d05e112). Reset only empties a dir carrying `.tern-profile`

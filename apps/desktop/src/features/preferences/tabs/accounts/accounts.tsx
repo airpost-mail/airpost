@@ -8,9 +8,32 @@ import {
   OnlineStatusStore,
   localized,
 } from 'mailspring-exports';
-import { SettingsPage, SettingsSection } from 'mailspring-component-kit';
+import { SettingsPage, SettingsRow, SettingsSection } from 'mailspring-component-kit';
 import PreferencesAccountList from './list';
 import PreferencesAccountDetails from './details';
+import {
+  ImportFromMailspringButton,
+  useMailspringProfile,
+} from '../../../../components/mailspring-import';
+
+// Shown only when there is a Mailspring profile on this computer.
+function MailspringImportSection() {
+  if (!useMailspringProfile()) return null;
+  return (
+    <SettingsSection title={localized('Mailspring')}>
+      <SettingsRow
+        label={localized('Import from Mailspring')}
+        description={localized(
+          "Adds the accounts in Mailspring that Tern doesn't have yet, with the passwords Mailspring saved. Mailspring is only read, never changed."
+        )}
+      >
+        <ImportFromMailspringButton variant="secondary" size="sm">
+          {localized('Import…')}
+        </ImportFromMailspringButton>
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
 
 interface PreferencesAccountsState {
   accounts: Account[];
@@ -128,6 +151,7 @@ class PreferencesAccounts extends React.Component<
             onRemoveAccount={this._onRemoveAccount}
           />
         )}
+        <MailspringImportSection />
       </SettingsPage>
     );
   }

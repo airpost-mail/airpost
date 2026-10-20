@@ -3,8 +3,8 @@
 
 /*
 The windows' KeyManager: the same methods as before, answered by the main process's
-KeyManager (main/profile/key-manager.ts), which owns safeStorage, the keyset in config.json and the
-Mailspring keychain migration. Exported to plugins as `KeyManager`.
+KeyManager (main/profile/key-manager.ts), which owns safeStorage and the keyset in config.json.
+Exported to plugins as `KeyManager`.
 */
 import { Account } from '../data/models/account';
 import { KEY_MANAGER_CHANNEL, KeyManagerMethod, KeyManagerReply } from '../engine/channels';

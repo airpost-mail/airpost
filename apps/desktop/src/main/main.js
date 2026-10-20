@@ -41,30 +41,27 @@ if (typeof process.setFdLimit === 'function') {
   process.setFdLimit(1024);
 }
 
-// Tern keeps its own profile so it can run next to Mailspring.app, and imports the Mailspring
-// profile of the same mode on first launch. The app name (package.json productName) is "Tern",
-// so safeStorage's keychain item is "Tern Safe Storage"; key-manager.ts carries saved
-// credentials over from Mailspring's.
-const profileDirNames = args => {
-  if (args.specMode) return { tern: 'Tern-spec', mailspring: null };
-  if (args.devMode) return { tern: 'Tern-dev', mailspring: 'Mailspring-dev' };
-  return { tern: 'Tern', mailspring: 'Mailspring' };
+// Tern keeps its own profile so it can run next to Mailspring.app. The app name (package.json
+// productName) is "Tern", so safeStorage's keychain item is "Tern Safe Storage".
+const profileDirName = args => {
+  if (args.specMode) return 'Tern-spec';
+  if (args.devMode) return 'Tern-dev';
+  return 'Tern';
 };
 
-// Returns the config dir, the Mailspring profile to import from when the default dir is used, and
-// whether the dir is Tern's own (profile/marker.ts): the default one, or a --config-dir-path
-// that didn't exist yet or was empty.
+// Returns the config dir, the Mailspring profile Import from Mailspring offers (null when there
+// is none to offer), and whether the dir is Tern's own (profile/marker.ts): the default one, or
+// a --config-dir-path that didn't exist yet or was empty.
 const setupConfigDir = args => {
-  const names = profileDirNames(args);
   const appData = app.getPath('appData');
-  let configDirPath = args.configDirPath || path.join(appData, names.tern);
-  let importFromPath =
-    !args.configDirPath && names.mailspring ? path.join(appData, names.mailspring) : null;
+  const snap = process.platform === 'linux' && !!process.env.SNAP;
+  let configDirPath = args.configDirPath || path.join(appData, profileDirName(args));
+  // A snap can't see Mailspring's profile outside its sandbox, and specs never offer the real one.
+  const mailspringProfilePath = args.specMode || snap ? null : path.join(appData, 'Mailspring');
 
-  if (process.platform === 'linux' && process.env.SNAP) {
+  if (snap) {
     // for linux snap, use the sandbox directory that is persisted between snap revisions
     configDirPath = args.configDirPath || process.env.SNAP_USER_COMMON;
-    importFromPath = null;
   }
 
   const ownsConfigDir =
@@ -77,29 +74,29 @@ const setupConfigDir = args => {
   // too (the default userData would be the app name's folder, "Tern").
   app.setPath('userData', configDirPath);
 
-  return { configDirPath, importFromPath, ownsConfigDir };
+  return { configDirPath, mailspringProfilePath, ownsConfigDir };
 };
 
-// Starts the first-launch import. The promise resolves once the profile is ready to use: to
-// null, or to the error if the import failed (with nothing copied left behind).
-const startProfileImport = (configDirPath, importFromPath) => {
-  if (!importFromPath) return Promise.resolve(null);
-  const { importMailspringProfile } = require('./profile/mailspring-import');
-  return importMailspringProfile(importFromPath, configDirPath).then(() => null, error => error);
+// Starts the Import from Mailspring the last session asked for, or that
+// --import-from-mailspring names for a new profile (profile/mailspring-import.ts). Resolves once
+// the profile is ready to use: to null when there was nothing to import, else to the result or
+// the error (with nothing copied left behind).
+const startProfileImport = (configDirPath, importFromMailspring) => {
+  const imports = require('./profile/mailspring-import');
+  const from = imports.pendingMailspringImport(configDirPath, importFromMailspring);
+  if (!from) return Promise.resolve(null);
+  const credentials = stored =>
+    app.whenReady().then(() => importFlow(configDirPath).mailspringCredentialsForTern(stored, from));
+  return imports
+    .importMailspringProfile(from, configDirPath, { credentials })
+    .then(result => ({ result }), error => ({ error }));
 };
 
-// Returns whether to start anyway, with an empty profile.
-const confirmStartAfterFailedImport = error => {
-  const { dialog } = require('electron');
-  const choice = dialog.showMessageBoxSync({
-    type: 'error',
-    buttons: ['Quit', 'Start Without Importing'],
-    defaultId: 0,
-    cancelId: 0,
-    message: 'Your Mailspring profile could not be copied.',
-    detail: `${error.message}\n\nNothing in the Mailspring profile was changed. Quit to try again on the next launch, or start with no accounts.`,
-  });
-  return choice === 1;
+// The import's dialogs, once `ready`, in the profile's language (Application.start loads it
+// again once config.json is in place).
+const importFlow = configDirPath => {
+  require('../intl/localize').initializeLocalization({ configDirPath });
+  return require('./profile/mailspring-import-flow');
 };
 
 const setupCompileCache = (configDirPath, devMode) => {
@@ -182,6 +179,12 @@ const declareOptions = argv => {
     .alias('b', 'background')
     .boolean('b')
     .describe('b', 'Start Tern in the background');
+  options
+    .string('import-from-mailspring')
+    .describe(
+      'import-from-mailspring',
+      'Import this Mailspring profile into a Tern profile that has no config.json yet'
+    );
   return options;
 };
 
@@ -210,6 +213,7 @@ const parseCommandLine = argv => {
   const safeMode = args['safe'];
   const background = args['background'];
   const configDirPath = args['config-dir-path'];
+  const importFromMailspring = args['import-from-mailspring'] || null;
   const specDirectory = args['spec-directory'] && path.resolve(args['spec-directory']);
   if (specDirectory && !fs.existsSync(specDirectory)) {
     process.stderr.write(`--spec-directory does not exist: ${specDirectory}\n`);
@@ -259,6 +263,7 @@ const parseCommandLine = argv => {
     jUnitXmlPath,
     safeMode,
     configDirPath,
+    importFromMailspring,
     specDirectory,
     specFilePattern,
     showSpecsInWindow,
@@ -396,9 +401,10 @@ const start = () => {
 
   const options = parseCommandLine(process.argv);
   // Before the error logger: it starts the crash reporter, which writes under userData.
-  const { configDirPath, importFromPath, ownsConfigDir } = setupConfigDir(options);
+  const { configDirPath, mailspringProfilePath, ownsConfigDir } = setupConfigDir(options);
   global.errorLogger = setupErrorLogger(options);
   options.configDirPath = configDirPath;
+  options.mailspringProfilePath = mailspringProfilePath;
 
   // On macOS, setLoginItemSettings doesn't support passing custom args, so we
   // detect login-item launches via wasOpenedAtLogin and start in background.
@@ -438,7 +444,7 @@ const start = () => {
   };
   app.on('session-created', installPermissionHandlers);
 
-  const profileImport = startProfileImport(configDirPath, importFromPath);
+  const profileImport = startProfileImport(configDirPath, options.importFromMailspring);
 
   // Must precede `ready`: disableHardwareAcceleration() has no effect afterward.
   require('./windows/hardware-acceleration-recovery').applyPersistentSoftwareRendering(
@@ -459,11 +465,8 @@ const start = () => {
   app.on('open-url', onOpenUrlBeforeReady);
   app.on('open-file', onOpenFileBeforeReady);
   app.on('ready', async () => {
-    const importError = await profileImport;
-    if (importError && !confirmStartAfterFailedImport(importError)) {
-      app.exit(1);
-      return;
-    }
+    const imported = await profileImport;
+    if (imported) importFlow(configDirPath).reportProfileImport(imported);
 
     app.removeListener('open-file', onOpenFileBeforeReady);
     app.removeListener('open-url', onOpenUrlBeforeReady);

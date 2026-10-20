@@ -3,6 +3,21 @@ import { localized } from 'mailspring-exports';
 import { RetinaImg } from 'mailspring-component-kit';
 import * as OnboardingActions from '../actions';
 import AccountProviders from '../account-providers';
+import {
+  ImportFromMailspringButton,
+  useMailspringProfile,
+} from '../../../components/mailspring-import';
+
+// Shown only when there is a Mailspring profile on this computer.
+function MailspringImportPrompt() {
+  if (!useMailspringProfile()) return null;
+  return (
+    <div className="mailspring-import">
+      <span>{localized('Used Mailspring on this computer?')}</span>
+      <ImportFromMailspringButton variant="link" />
+    </div>
+  );
+}
 
 export default class AccountChoosePage extends React.Component<{ account?: object }> {
   static displayName = 'AccountChoosePage';
@@ -27,6 +42,7 @@ export default class AccountChoosePage extends React.Component<{ account?: objec
       <div className="page account-choose">
         <h2>{localized('Connect an email account')}</h2>
         <div className="provider-list">{this._renderProviders()}</div>
+        <MailspringImportPrompt />
       </div>
     );
   }

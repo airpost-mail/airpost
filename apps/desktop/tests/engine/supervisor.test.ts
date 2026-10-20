@@ -102,7 +102,6 @@ describe('the engine supervisor', function () {
         'a3@example.com-imap': 'pw-a3',
       })
     );
-    config.values.credentialsKeyOwner = 'tern';
     config.values.accounts = [configAccount('a1'), configAccount('a2')];
     keyManager = new KeyManager({ config });
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Run the desktop client from source on the Rust engine, against a copy of an existing
-# Mailspring profile, so the real profile and the running Mailspring.app are never touched.
+# Run the desktop client from source on the Rust engine, with a trial profile imported from a
+# copy of an existing Mailspring profile, so the real profile and the running Mailspring.app are
+# never touched.
 #
 #   apps/engine/tools/trial-desktop.sh [--accounts EMAIL,...] [--fresh] [--from DIR] [--to DIR]
 #
@@ -9,10 +10,14 @@
 # --to       trial profile (default: ~/tern-trial); reused on later runs unless --fresh
 # --fresh    delete the trial profile and copy it again
 #
-# The Rust engine's migrate moves the copied edgehill.db aside and resyncs every account from
-# scratch; import-legacy then carries over local drafts, snooze/send-later/reminder metadata and
-# sync cursors. Secrets stay in the macOS keychain ("Mailspring Safe Storage"), which the trial
-# shares with the real app; macOS may ask once to let the dev Electron binary read it.
+# A new trial profile starts empty. The Mailspring profile is copied (filtered by --accounts) to
+# <to>.mailspring, and the desktop's first launch imports that copy with
+# --import-from-mailspring, as Import from Mailspring does: edgehill.db becomes tern.db, which
+# the Rust engine's migrate moves aside before it resyncs every account from scratch;
+# import-legacy then carries over local drafts, snooze/send-later/reminder metadata and sync
+# cursors. The import reads the saved passwords from the macOS keychain ("Mailspring Safe
+# Storage"), so macOS asks to let the dev Electron binary read it, and stores them under "Tern
+# Safe Storage".
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -38,27 +43,45 @@ case "$(cd "$to" 2>/dev/null && pwd -P)" in
   "$(cd "$from" && pwd -P)") echo "--to must not be the source profile" >&2; exit 1 ;;
 esac
 
-if [ "$fresh" = 1 ] && [ -d "$to" ]; then
-  log "removing $to"
-  rm -rf "$to"
+to="${to%/}"
+staging="$to.mailspring"
+case "$(cd "$staging" 2>/dev/null && pwd -P)" in
+  "$(cd "$from" && pwd -P)") echo "$staging must not be the source profile" >&2; exit 1 ;;
+esac
+
+if [ "$fresh" = 1 ]; then
+  for dir in "$to" "$staging"; do
+    if [ -d "$dir" ]; then
+      log "removing $dir"
+      rm -rf "$dir"
+    fi
+  done
 fi
 
+import_args=()
 if [ ! -f "$to/config.json" ]; then
-  log "copying profile $from -> $to"
-  mkdir -p "$to"
+  # A profile left by an import that did not finish is Tern's (marked) or empty; anything else
+  # is not this script's to replace.
+  if [ -d "$to" ] && [ -n "$(ls -A "$to")" ] && [ ! -f "$to/.tern-profile" ]; then
+    echo "$to holds files but is not a Tern profile; pick another --to" >&2
+    exit 1
+  fi
+  log "copying profile $from -> $staging"
+  rm -rf "$staging"
+  mkdir -p "$staging"
   # Caches, crash dumps, locks and logs are not needed; the database is copied separately.
   rsync -a \
     --exclude 'Cache' --exclude 'Code Cache' --exclude 'GPUCache' --exclude 'GPUPersistentCache' \
     --exclude '*DawnCache' --exclude 'DawnWebGPUCache' --exclude 'Crashpad' --exclude 'compile-cache' \
     --exclude 'Singleton*' --exclude 'mailsync-*.log*' --exclude 'edgehill.db*' \
-    "$from/" "$to/"
+    "$from/" "$staging/"
   # The live database is in WAL mode and in use by Mailspring.app; the backup API gives a
   # consistent copy without stopping it.
   log "copying edgehill.db (online backup)"
-  sqlite3 "$from/edgehill.db" ".backup '$to/edgehill.db'"
+  sqlite3 "$from/edgehill.db" ".backup '$staging/edgehill.db'"
   if [ -n "$accounts" ]; then
     log "keeping only: $accounts"
-    python3 -I - "$to" "$accounts" <<'PY'
+    python3 -I - "$staging" "$accounts" <<'PY'
 import json, sqlite3, sys
 to, wanted = sys.argv[1], [e.strip().lower() for e in sys.argv[2].split(",") if e.strip()]
 cfg_path = f"{to}/config.json"
@@ -85,7 +108,13 @@ db.execute("VACUUM")
 print(f"kept {len(keep)} of {len(accts)} accounts", file=sys.stderr)
 PY
   fi
-  printf '%s\n' "${accounts:-all}" > "$to/.tern-trial-accounts"
+  # Copied into the trial profile by the import.
+  printf '%s\n' "${accounts:-all}" > "$staging/.tern-trial-accounts"
+  # The import runs only into a profile with no config.json; an empty one is also marked as
+  # Tern's, so Reset Accounts and Settings works on it.
+  rm -rf "$to"
+  mkdir -p "$to"
+  import_args=(--import-from-mailspring="$staging")
 else
   if [ -n "$accounts" ] && [ "$(cat "$to/.tern-trial-accounts" 2>/dev/null)" != "$accounts" ]; then
     echo "$to was made with different accounts; pass --fresh to recopy" >&2
@@ -107,6 +136,6 @@ if [ ! -d "$repo/apps/desktop/node_modules/react" ] ||
 fi
 
 log "launching the desktop on the Rust engine with profile $to"
-log "engine logs: $to/mailsync-<accountId>.log"
+log "engine log: $to/engine.log"
 cd "$repo/apps/desktop"
-exec npm start -- --config-dir-path="$to"
+exec npm start -- --config-dir-path="$to" ${import_args[@]+"${import_args[@]}"}

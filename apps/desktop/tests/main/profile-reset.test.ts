@@ -2,10 +2,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
-  SKIP_MAILSPRING_IMPORT_MARKER,
-  shouldImportMailspringProfile,
-} from '../../src/main/profile/mailspring-import';
-import {
   canResetProfileDirectory,
   profileResetDetail,
   resetProfileDirectory,
@@ -45,39 +41,30 @@ describe('resetProfileDirectory', function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('empties the profile except the running instance lock, and leaves the markers', function () {
+  it('empties the profile except the running instance lock, and leaves the marker', function () {
     expect(resetProfileDirectory(tern)).toEqual([]);
     expect(fs.readdirSync(tern).sort()).toEqual(
-      [TERN_PROFILE_MARKER, 'SingletonLock', 'lockfile', SKIP_MAILSPRING_IMPORT_MARKER].sort()
+      [TERN_PROFILE_MARKER, 'SingletonLock', 'lockfile'].sort()
     );
     // Still marked, so it can be reset again.
     expect(canResetProfileDirectory(tern)).toBe(true);
   });
 
-  it('keeps the next launch from importing the Mailspring profile again', function () {
-    expect(shouldImportMailspringProfile(mailspring, tern)).toBe(false);
+  it('leaves a Mailspring profile next to it alone', function () {
     resetProfileDirectory(tern);
-    expect(fs.existsSync(path.join(tern, 'config.json'))).toBe(false);
-    expect(shouldImportMailspringProfile(mailspring, tern)).toBe(false);
-    // Without the marker the empty profile would import again.
-    fs.rmSync(path.join(tern, SKIP_MAILSPRING_IMPORT_MARKER));
-    expect(shouldImportMailspringProfile(mailspring, tern)).toBe(true);
+    expect(fs.readFileSync(path.join(mailspring, 'config.json'), 'utf8')).toBe(
+      '{"*":{"accounts":[{"id":"a"}]}}'
+    );
   });
 
-  it('writes the marker after deleting, so an existing one survives the reset', function () {
-    write(path.join(tern, SKIP_MAILSPRING_IMPORT_MARKER), 'old');
-    resetProfileDirectory(tern);
-    expect(fs.existsSync(path.join(tern, SKIP_MAILSPRING_IMPORT_MARKER))).toBe(true);
-  });
-
-  it('reports what it could not delete and still writes the marker', function () {
+  it('reports what it could not delete', function () {
     const realRmSync = fs.rmSync;
     spyOn(fs, 'rmSync').andCallFake((entry: string, options: fs.RmOptions) => {
       if (path.basename(entry) === 'tern.db') throw new Error('EBUSY');
       realRmSync(entry, options);
     });
     expect(resetProfileDirectory(tern)).toEqual([path.join(tern, 'tern.db')]);
-    expect(fs.existsSync(path.join(tern, SKIP_MAILSPRING_IMPORT_MARKER))).toBe(true);
+    expect(fs.existsSync(path.join(tern, 'files'))).toBe(false);
   });
 
   it("doesn't report Chromium storage that clearStorageData already emptied", function () {

@@ -1,30 +1,17 @@
-import crypto from 'crypto';
 import {
   KeyManager as MainKeyManager,
   registerKeyManagerIPC,
   secureStorage,
 } from '../../src/main/profile/key-manager';
 import { KEY_MANAGER_CHANNEL } from '../../src/engine/channels';
-import { mailspringKeychain, MigrationError } from '../../src/main/profile/mailspring-keychain';
+import { mailspringKeychain } from '../../src/main/profile/mailspring-keychain';
 
 const CREDENTIALS_KEY = 'credentials';
-const KEY_OWNER_KEY = 'credentialsKeyOwner';
-const UNMIGRATED_KEY = 'credentialsFromMailspring';
-
-// A synthetic stand-in for the "Mailspring Safe Storage" password; never a real keychain item.
-const OLD_SECRET = 'c3ludGhldGljLW1haWxzcHJpbmc=';
-
-// Encrypts the way Chromium's macOS KeychainKeyProvider does.
-const mailspringBlob = (plaintext: string, secret = OLD_SECRET) => {
-  const key = crypto.pbkdf2Sync(secret, 'saltysalt', 1003, 16, 'sha1');
-  const cipher = crypto.createCipheriv('aes-128-cbc', key, Buffer.alloc(16, ' '));
-  return Buffer.concat([Buffer.from('v10'), cipher.update(plaintext, 'utf8'), cipher.final()]);
-};
 
 // A stored blob is a JSON-serialized Buffer, which is what config.get() hands back.
 const storedBlob = () => Buffer.from('v10encrypted').toJSON();
 
-// The main process's KeyManager, on a plain-object config; nothing here reaches safeStorage, the
+// The main process's KeyManager, on a plain-object config; nothing here reaches safeStorage, a
 // keychain or a real dialog.
 let KeyManager: MainKeyManager = null;
 
@@ -47,23 +34,10 @@ describe('KeyManager in the main process', function () {
     spyOn(secureStorage, 'decryptLegacy').andCallFake(() => {
       throw new Error('sync backend unavailable');
     });
-    // Specs must never reach the real keychain; ones that migrate replace this.
-    this.platform = mailspringKeychain.platform;
-    mailspringKeychain.platform = 'darwin';
+    // Reading saved passwords never reaches for Mailspring's keychain item.
     spyOn(mailspringKeychain, 'run').andCallFake(() =>
       Promise.reject(new Error('no keychain in specs'))
     );
-    // The migration's dialogs are real Electron dialogs, and any spec whose blob fails to
-    // decrypt reaches the migration.
-    spyOn(KeyManager, '_showMigrationFailedNotice');
-    spyOn(KeyManager, '_askToSignInAgainAfterMigrationFailed').andReturn(false);
-    spyOn(KeyManager, '_quitAfterDialog').andCallFake((err: Error) => {
-      throw err;
-    });
-  });
-
-  afterEach(function () {
-    mailspringKeychain.platform = this.platform;
   });
 
   describe('_getKeyHash', function () {
@@ -93,7 +67,6 @@ describe('KeyManager in the main process', function () {
 
     it('is fatal when a stored blob cannot be decrypted', async function () {
       this.config[CREDENTIALS_KEY] = storedBlob();
-      this.config[KEY_OWNER_KEY] = 'tern';
       spyOn(secureStorage, 'decrypt').andCallFake(() =>
         Promise.reject(new Error('keyring locked'))
       );
@@ -109,6 +82,30 @@ describe('KeyManager in the main process', function () {
       }
       expect(raised).not.toBe(null);
       expect(KeyManager._reportFatalError).toHaveBeenCalled();
+      expect(mailspringKeychain.run).not.toHaveBeenCalled();
+    });
+
+    // Passwords copied from Mailspring are re-encrypted by Import from Mailspring; a blob in
+    // config.json that Tern can't open is never tried with Mailspring's key.
+    it('is fatal, and leaves the blob alone, when Tern cannot read one Mailspring wrote', async function () {
+      const untouched = Buffer.from('v10mailspring').toJSON();
+      this.config[CREDENTIALS_KEY] = untouched;
+      spyOn(secureStorage, 'decrypt').andCallFake(() =>
+        Promise.reject(new Error('Error while decrypting the ciphertext'))
+      );
+      spyOn(KeyManager, '_reportFatalError').andCallFake((err: Error) => {
+        throw err;
+      });
+      let raised: Error = null;
+      try {
+        await KeyManager._getKeyHash();
+      } catch (err) {
+        raised = err;
+      }
+      expect(raised).not.toBe(null);
+      expect(mailspringKeychain.run).not.toHaveBeenCalled();
+      expect(this.config[CREDENTIALS_KEY]).toBe(untouched);
+      expect(Object.keys(this.config)).toEqual([CREDENTIALS_KEY]);
     });
 
     // The regression this guards: an unreadable blob resolving to {} let the next
@@ -116,7 +113,6 @@ describe('KeyManager in the main process', function () {
     it('does not overwrite stored credentials when decryption fails', async function () {
       const untouched = storedBlob();
       this.config[CREDENTIALS_KEY] = untouched;
-      this.config[KEY_OWNER_KEY] = 'tern';
       spyOn(secureStorage, 'decrypt').andCallFake(() =>
         Promise.reject(new Error('keyring locked'))
       );
@@ -154,173 +150,9 @@ describe('KeyManager in the main process', function () {
       spyOn(secureStorage, 'decrypt').andCallFake(() =>
         Promise.resolve({ result: 'not json', shouldReEncrypt: false })
       );
-      (mailspringKeychain.run as jasmine.Spy).andCallFake(() =>
-        Promise.reject(new MigrationError('/usr/bin/security failed (44)', false))
-      );
       spyOn(KeyManager, '_reportFatalError');
       expect(await KeyManager._getKeyHash()).toEqual({});
       expect(KeyManager._reportFatalError).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('migrating from Mailspring', function () {
-    beforeEach(function () {
-      spyOn(secureStorage, 'decrypt').andCallFake(() =>
-        Promise.reject(new Error('Error while decrypting the ciphertext'))
-      );
-      spyOn(KeyManager, '_reportFatalError').andCallFake((err: Error) => {
-        throw err;
-      });
-      this.config[CREDENTIALS_KEY] = mailspringBlob('{"a-imap":"secret"}').toJSON();
-    });
-
-    const givesSecret = (secret: string) =>
-      (mailspringKeychain.run as jasmine.Spy).andCallFake(() =>
-        Promise.resolve(Buffer.from(`${secret}\n`))
-      );
-
-    const readFails = async () => {
-      let raised: Error = null;
-      try {
-        await KeyManager._getKeyHash();
-      } catch (err) {
-        raised = err;
-      }
-      return raised;
-    };
-
-    it('decrypts with the Mailspring key read-only and re-encrypts with the Tern key', async function () {
-      givesSecret(OLD_SECRET);
-      expect(await KeyManager._getKeyHash()).toEqual({ 'a-imap': 'secret' });
-
-      const [file, args] = (mailspringKeychain.run as jasmine.Spy).calls[0].args;
-      expect(file).toBe('/usr/bin/security');
-      expect(args).toEqual(['find-generic-password', '-w', '-s', 'Mailspring Safe Storage']);
-      expect(secureStorage.encrypt).toHaveBeenCalledWith('{"a-imap":"secret"}');
-      expect(this.config[CREDENTIALS_KEY].toString()).toBe('{"a-imap":"secret"}');
-      expect(this.config[KEY_OWNER_KEY]).toBe('tern');
-      expect(KeyManager._showMigrationFailedNotice).not.toHaveBeenCalled();
-    });
-
-    it('prompts once for concurrent reads', async function () {
-      givesSecret(OLD_SECRET);
-      const results = await Promise.all([KeyManager._getKeyHash(), KeyManager._getKeyHash()]);
-      expect(results).toEqual([{ 'a-imap': 'secret' }, { 'a-imap': 'secret' }]);
-      expect((mailspringKeychain.run as jasmine.Spy).calls.length).toBe(1);
-    });
-
-    it('does not migrate credentials Tern wrote itself', async function () {
-      givesSecret(OLD_SECRET);
-      this.config[KEY_OWNER_KEY] = 'tern';
-      expect(await readFails()).not.toBe(null);
-      expect(mailspringKeychain.run).not.toHaveBeenCalled();
-    });
-
-    it('records the key owner after a normal read, so a later failure is not migrated', async function () {
-      (secureStorage.decrypt as jasmine.Spy).andCallFake(() =>
-        Promise.resolve({ result: '{"a-imap":"secret"}', shouldReEncrypt: false })
-      );
-      await KeyManager._getKeyHash();
-      expect(this.config[KEY_OWNER_KEY]).toBe('tern');
-      expect(mailspringKeychain.run).not.toHaveBeenCalled();
-    });
-
-    const lookupFails = (code: number | string) =>
-      (mailspringKeychain.run as jasmine.Spy).andCallFake(() =>
-        Promise.reject(new MigrationError(`/usr/bin/security failed (${code})`, code !== 44))
-      );
-
-    // Missing item, or a key that does not open the blob: the accounts ask for their passwords
-    // again, the copied blob is kept aside, and the user is not asked again.
-    const abandons = (name: string, setup: () => void) => {
-      it(`sets the credentials aside once when ${name}`, async function () {
-        setup();
-        const original = this.config[CREDENTIALS_KEY];
-        expect(await KeyManager._getKeyHash()).toEqual({});
-        expect(KeyManager._reportFatalError).not.toHaveBeenCalled();
-        expect((KeyManager._showMigrationFailedNotice as jasmine.Spy).calls.length).toBe(1);
-        expect(this.config[CREDENTIALS_KEY]).toBe(null);
-        expect(this.config[UNMIGRATED_KEY]).toBe(original);
-        expect(this.config[KEY_OWNER_KEY]).toBe('tern');
-
-        (KeyManager as any)._migration = null;
-        expect(await KeyManager._getKeyHash()).toEqual({});
-        expect((mailspringKeychain.run as jasmine.Spy).calls.length).toBeLessThan(2);
-        expect((KeyManager._showMigrationFailedNotice as jasmine.Spy).calls.length).toBe(1);
-      });
-    };
-    abandons('the keychain item does not exist', () => lookupFails(44));
-    abandons('the secret is a different one', () => givesSecret('another-secret'));
-    abandons('the lookup prints nothing', () => givesSecret(''));
-
-    // Declined or missed prompt, timeout, locked or not-yet-started keyring, missing lookup tool:
-    // the secret may be readable next launch, so nothing is set aside unless the user says so.
-    describe('when the Mailspring secret is out of reach', function () {
-      beforeEach(function () {
-        this.signInAgain = false;
-        (KeyManager._askToSignInAgainAfterMigrationFailed as jasmine.Spy).andCallFake(
-          () => this.signInAgain
-        );
-      });
-
-      const retries = (name: string, setup: (this: any) => void) => {
-        it(`quits with nothing changed when ${name}, and asks again next launch`, async function () {
-          setup.call(this);
-          const original = this.config[CREDENTIALS_KEY];
-          expect(await readFails()).not.toBe(null);
-          expect(KeyManager._quitAfterDialog).toHaveBeenCalled();
-          expect(KeyManager._showMigrationFailedNotice).not.toHaveBeenCalled();
-          expect(this.config[CREDENTIALS_KEY]).toBe(original);
-          expect(this.config[UNMIGRATED_KEY]).toBeUndefined();
-          expect(this.config[KEY_OWNER_KEY]).toBeUndefined();
-
-          const lookups = (mailspringKeychain.run as jasmine.Spy).calls.length;
-          (KeyManager as any)._migration = null;
-          expect(await readFails()).not.toBe(null);
-          expect((mailspringKeychain.run as jasmine.Spy).calls.length).toBe(2 * lookups);
-        });
-      };
-      retries('the keychain prompt is declined', () => lookupFails(51));
-      retries('the lookup times out', () => lookupFails('null'));
-      retries('the lookup fails unexpectedly', () => {});
-      retries('the Linux keyring is not running yet', function () {
-        mailspringKeychain.platform = 'linux';
-        this.config[CREDENTIALS_KEY] = Buffer.from('v11encrypted').toJSON();
-        (mailspringKeychain.run as jasmine.Spy).andCallFake((file: string) =>
-          Promise.reject(new MigrationError(`${file} failed (1)`, true))
-        );
-      });
-
-      it('sets the credentials aside when the user chooses to sign in again', async function () {
-        lookupFails(51);
-        this.signInAgain = true;
-        const original = this.config[CREDENTIALS_KEY];
-        expect(await KeyManager._getKeyHash()).toEqual({});
-        expect(KeyManager._quitAfterDialog).not.toHaveBeenCalled();
-        expect(KeyManager._showMigrationFailedNotice).not.toHaveBeenCalled();
-        expect(this.config[CREDENTIALS_KEY]).toBe(null);
-        expect(this.config[UNMIGRATED_KEY]).toBe(original);
-        expect(this.config[KEY_OWNER_KEY]).toBe('tern');
-      });
-    });
-
-    it('keeps the Mailspring blob and stays fatal when the Tern keyring is unavailable', async function () {
-      givesSecret(OLD_SECRET);
-      (secureStorage.isAvailable as jasmine.Spy).andCallFake(() => Promise.resolve(false));
-      const original = this.config[CREDENTIALS_KEY];
-      expect(await readFails()).not.toBe(null);
-      expect(KeyManager._reportFatalError).toHaveBeenCalled();
-      expect(this.config[CREDENTIALS_KEY]).toBe(original);
-      expect(this.config[KEY_OWNER_KEY]).toBeUndefined();
-      expect(KeyManager._showMigrationFailedNotice).not.toHaveBeenCalled();
-    });
-
-    // DPAPI is per user and its wrapped key is in the copied "Local State": nothing to migrate.
-    it('does not migrate on Windows', async function () {
-      mailspringKeychain.platform = 'win32';
-      expect(await readFails()).not.toBe(null);
-      expect(mailspringKeychain.run).not.toHaveBeenCalled();
-      expect(this.config[KEY_OWNER_KEY]).toBeUndefined();
     });
   });
 
@@ -433,7 +265,6 @@ describe('KeyManager in the main process', function () {
           'integration-deepl-key': 'k',
         })
       ).toJSON();
-      this.config[KEY_OWNER_KEY] = 'tern';
       spyOn(secureStorage, 'decrypt').andCallFake((blob: Buffer) =>
         Promise.resolve({ result: blob.toString(), shouldReEncrypt: false })
       );
@@ -482,7 +313,6 @@ describe('KeyManager in the main process', function () {
   describe('for the windows', function () {
     beforeEach(function () {
       this.config[CREDENTIALS_KEY] = Buffer.from('{"a-imap":"secret"}').toJSON();
-      this.config[KEY_OWNER_KEY] = 'tern';
       spyOn(secureStorage, 'decrypt').andCallFake((blob: Buffer) =>
         Promise.resolve({ result: blob.toString(), shouldReEncrypt: false })
       );

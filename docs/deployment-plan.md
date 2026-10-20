@@ -140,9 +140,9 @@ there is no update server to run:
 ### 2.5 First run and onboarding
 
 Owned by stages 10 and 12 (engine started at launch with zero accounts, onboarding through
-the engine). Deployment adds only the one-time prompt for command line tools, and, when a
-Mailspring profile exists, the existing profile import (engine-port-status "Before
-shipping").
+the engine). Deployment adds only the one-time prompt for command line tools. When a
+Mailspring profile exists, onboarding and Preferences > Accounts offer Import from Mailspring
+(`apps/desktop/src/main/profile/mailspring-import.ts`).
 
 ### 2.6 Logs, health, uninstall
 

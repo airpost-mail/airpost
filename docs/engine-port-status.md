@@ -46,18 +46,19 @@ Desktop checks (not run here: no `node_modules`, npm was installed with `--ignor
   `app/src/config-schema.ts` and `app/spec/mailsync-process-spec.ts` were only syntax-checked.
 - [ ] `apps/engine/packaging/build-release.sh macos --install-desktop`, then launch the app on
   a profile that has used C++. Check: the engine is `app.asar.unpacked/mailsync-rs`; the log shows
-  `import-legacy` after `migrate`; `edgehill.legacy-imported.db` exists and
+  `import-legacy` after `migrate`; `tern.legacy-imported.db` exists and
   `_State.legacy-import` is set; local drafts open with their attachments; a reply draft sits
   in its thread; an existing snooze and a send-later fire at their time; mail, contacts and
   calendars resync.
 - [ ] Relaunch and confirm `import-legacy` logs nothing to import (it ran once).
-- [ ] Profile move: the desktop now keeps its data in `Tern` / `Tern-dev` under the app-data
-  dir and, on first launch, copies the `Mailspring` / `Mailspring-dev` profile there (no
-  caches, crash dumps, locks or logs; the database via SQLite online backup; the Mailspring
-  profile is only read). Check on a machine with Mailspring.app running: the first launch
-  imports without a dialog, accounts sign in from the shared `Mailspring Safe Storage`
-  keychain item, `migrate` and `import-legacy` run on the copy, Mailspring.app keeps
-  working, and a second launch does not import again.
+- [ ] Import from Mailspring: the desktop keeps its data in `Tern` / `Tern-dev` under the
+  app-data dir and imports the `Mailspring` profile only when asked (onboarding, Preferences >
+  Accounts). With no accounts it restarts and copies the profile in (no caches, crash dumps,
+  locks, logs or Local State; `edgehill.db` to `tern.db` via SQLite online backup; the
+  Mailspring profile is only read). Check on a machine with Mailspring.app running: the
+  keychain asks once for `Mailspring Safe Storage`, the accounts sign in with the passwords it
+  held, `migrate` and `import-legacy` run on the copy, Mailspring.app keeps working, and a
+  second launch does not import again. With accounts, it adds only the missing ones.
 
 Real accounts (each: `--mode test` on both binaries, then a dogfood week with the Rust engine;
 none has run against a real server)

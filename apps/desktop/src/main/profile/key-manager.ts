@@ -1,11 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { localized } from '../../intl/localize';
-import {
-  canMigrate as canMigrateFromMailspring,
-  decryptWithMailspringKey,
-  MigrationError,
-} from './mailspring-keychain';
 import { KEY_MANAGER_CHANNEL, KeyManagerMethod, KeyManagerReply } from '../../engine/channels';
 
 export interface KeySet {
@@ -39,16 +34,7 @@ export interface KeyManagerConfig {
 
 const SECRET_SETTINGS = ['imap_password', 'smtp_password', 'refresh_token'];
 
-const configCredentialsKey = 'credentials';
-
-// "tern" once the stored credentials are known to be encrypted with Tern's own safeStorage key:
-// Tern wrote them, read them, or migrated them. Until then an unreadable blob is taken to be one
-// copied from Mailspring, and decrypted with Mailspring's key once.
-const configCredentialsKeyOwnerKey = 'credentialsKeyOwner';
-const TERN_OWNS_KEY = 'tern';
-
-// The Mailspring blob, kept when it could not be migrated, so nothing copied over is destroyed.
-const configUnmigratedCredentialsKey = 'credentialsFromMailspring';
+export const configCredentialsKey = 'credentials';
 
 // Set once the accounts' secrets moved into the engine (credentials.import, stage 11). The blob
 // as it was then is kept under credentialsBeforeEngine for one release, so a downgrade and
@@ -98,8 +84,7 @@ const usesPlaintextFallbackKey = (encrypted: Buffer) =>
 
 /**
  * A basic wrap around electron's secure key management. Consolidates all of
- * our keys under a single namespaced keymap and provides migration
- * support.
+ * our keys under a single namespaced keymap.
  *
  * Consolidating this prevents a ton of key authorization popups for each
  * and every key we want to access.
@@ -110,8 +95,6 @@ const usesPlaintextFallbackKey = (encrypted: Buffer) =>
 export class KeyManager {
   private _fatalErrorReported = false;
   private _reEncryptAttempted = false;
-  // Concurrent reads share one migration, so the user sees one keychain prompt.
-  private _migration: Promise<KeySet | null> = null;
   // Read-modify-write changes run one at a time: every window and the engine's token
   // rotations write the one keyset.
   private _writes: Promise<unknown> = Promise.resolve();
@@ -267,9 +250,6 @@ export class KeyManager {
         // A blob from 1.23 or earlier. Flag it so it is rewritten with the async key below.
         decrypted = { result: secureStorage.decryptLegacy(encrypted), shouldReEncrypt: true };
       } catch (syncErr) {
-        const migrated = await this._migrateFromMailspring(encrypted);
-        if (migrated) return migrated;
-
         // Stored-but-unreadable is not the same as nothing stored. Resolving to an empty keyset
         // would let the next read-modify-write mutator persist it, erasing every account's
         // password over a locked keyring or a secret service that has not started yet.
@@ -287,15 +267,8 @@ export class KeyManager {
     try {
       keys = JSON.parse(decrypted.result) as KeySet;
     } catch (err) {
-      // A wrong key passes the padding check about once in 256 tries and yields garbage.
-      const migrated = await this._migrateFromMailspring(encrypted);
-      if (migrated) return migrated;
       // Decrypted to something that is not a keyset: no passwords left to preserve.
       return {} as KeySet;
-    }
-
-    if (this.config.get(configCredentialsKeyOwnerKey) !== TERN_OWNS_KEY) {
-      this.config.set(configCredentialsKeyOwnerKey, TERN_OWNS_KEY);
     }
 
     // Set by Chromium when the provider that encrypts new data is not the one this blob was
@@ -312,104 +285,6 @@ export class KeyManager {
     }
 
     return keys;
-  }
-
-  // Resolves to the migrated keyset; to an empty one when the blob had to be set aside (the
-  // accounts then ask for their passwords again); or to null when the failure is Tern's own
-  // keyring, which is left to the fatal path above with nothing changed. Rejects, with nothing
-  // changed, when the Mailspring secret was out of reach and the user chose to quit and retry.
-  _migrateFromMailspring(encrypted: Buffer): Promise<KeySet | null> {
-    if (this.config.get(configCredentialsKeyOwnerKey) === TERN_OWNS_KEY) {
-      return Promise.resolve(null);
-    }
-    if (!canMigrateFromMailspring()) {
-      return Promise.resolve(null);
-    }
-    if (!this._migration) {
-      this._migration = this._runMigrationFromMailspring(encrypted);
-    }
-    return this._migration;
-  }
-
-  async _runMigrationFromMailspring(encrypted: Buffer): Promise<KeySet | null> {
-    let keys: KeySet;
-    try {
-      const plaintext = await decryptWithMailspringKey(encrypted);
-      keys = JSON.parse(plaintext) as KeySet;
-      if (!keys || typeof keys !== 'object') throw new Error('not a keyset');
-    } catch (err) {
-      console.warn(`Tern could not bring over the passwords saved by Mailspring: ${err.message}`);
-      if (err instanceof MigrationError && err.retryable) {
-        // The secret may be readable next launch (keyring locked or not started yet, prompt
-        // dismissed, lookup tool missing), so the copied blob is only set aside if the user says so.
-        if (!this._askToSignInAgainAfterMigrationFailed()) {
-          this._quitAfterDialog(err);
-        }
-        this._setAsideMailspringCredentials();
-        return {} as KeySet;
-      }
-      // Missing, or not Mailspring's: give up for good rather than prompt every launch.
-      this._setAsideMailspringCredentials();
-      this._showMigrationFailedNotice();
-      return {} as KeySet;
-    }
-
-    try {
-      await this._writeKeyHash(keys);
-    } catch (err) {
-      // Tern's keyring is unavailable: keep the Mailspring blob and try again next launch.
-      console.warn('Tern could not re-encrypt the passwords saved by Mailspring.', err);
-      return null;
-    }
-    console.log('Moved the passwords saved by Mailspring to the Tern keychain item.');
-    return keys;
-  }
-
-  // Mailspring's own profile still has its copy, and this one is kept aside.
-  _setAsideMailspringCredentials() {
-    this.config.set(configUnmigratedCredentialsKey, this.config.get(configCredentialsKey));
-    this.config.set(configCredentialsKey, null);
-    this.config.set(configCredentialsKeyOwnerKey, TERN_OWNS_KEY);
-  }
-
-  // True when the user would rather sign in to each account again than retry next launch.
-  _askToSignInAgainAfterMigrationFailed(): boolean {
-    const response = this._showMessageBoxSync({
-      type: 'warning',
-      buttons: [localized('Quit'), localized('Sign In Again')],
-      defaultId: 0,
-      cancelId: 0,
-      message: localized('Tern could not read the passwords saved by Mailspring'),
-      detail:
-        localized(
-          'Your accounts were copied from Mailspring, but the passwords Mailspring saved could not be read just now. Quit and open Tern again to retry, allowing access if your keychain asks, or sign in to each account again. Mailspring itself is not affected.'
-        ) +
-        (process.platform === 'linux'
-          ? localized(
-              ' On Linux, reading them needs your desktop keyring to be running and unlocked, and the secret-tool command (package libsecret-tools) or kwallet-query.'
-            )
-          : ''),
-    });
-    return response === 1;
-  }
-
-  // Ends the session like _reportFatalError, for a failure the user has already seen a dialog for.
-  _quitAfterDialog(err: Error): never {
-    this._fatalErrorReported = true;
-    (err as any).noSentry = true;
-    this._quit();
-    throw err;
-  }
-
-  _showMigrationFailedNotice() {
-    this._showMessageBox({
-      type: 'warning',
-      buttons: [localized('OK')],
-      message: localized('Tern could not bring over your saved passwords'),
-      detail: localized(
-        'Your accounts were copied from Mailspring, but the passwords Mailspring saved could not be read. Tern will ask you to sign in to each account again. Mailspring itself is not affected.'
-      ),
-    });
   }
 
   _encryptionUnavailableHint() {
@@ -435,16 +310,11 @@ export class KeyManager {
       throw unavailable();
     }
     this.config.set(configCredentialsKey, encryptedCredentials);
-    this.config.set(configCredentialsKeyOwnerKey, TERN_OWNS_KEY);
   }
 
-  // Electron's main-process dialogs and quit, which specs replace.
+  // Electron's main-process dialog and quit, which specs replace.
   _showMessageBoxSync(options: Electron.MessageBoxSyncOptions): number {
     return require('electron').dialog.showMessageBoxSync(options);
-  }
-
-  _showMessageBox(options: Electron.MessageBoxOptions) {
-    return require('electron').dialog.showMessageBox(options);
   }
 
   _quit() {
