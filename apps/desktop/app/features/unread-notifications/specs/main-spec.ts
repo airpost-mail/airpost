@@ -13,12 +13,18 @@ import {
 import { Notifier } from '../lib/main';
 
 function getObjectsRawJson(ids: string[]) {
-  return ids.map(id => {
-    return { headersSyncComplete: true, id }
-  })
+  return ids.map((id) => {
+    return { headersSyncComplete: true, id };
+  });
 }
 
+// NativeNotifications types this as a readonly platform constant; the specs flip it.
+const notifications = NativeNotifications as { playsSoundWithNotification: boolean };
+
 describe('UnreadNotifications', function UnreadNotifications() {
+  let displayNotification: jasmine.Spy;
+  let displaySummaryNotification: jasmine.Spy;
+
   beforeEach(() => {
     this.notifier = new Notifier();
 
@@ -176,10 +182,14 @@ describe('UnreadNotifications', function UnreadNotifications() {
     });
 
     this.notification = jasmine.createSpyObj('notification', ['close']);
-    spyOn(NativeNotifications, 'displayNotification').andReturn(this.notification);
-    spyOn(NativeNotifications, 'displaySummaryNotification').andReturn(Promise.resolve(null));
+    displayNotification = spyOn(NativeNotifications, 'displayNotification').andReturn(
+      this.notification
+    );
+    displaySummaryNotification = spyOn(NativeNotifications, 'displaySummaryNotification').andReturn(
+      Promise.resolve(null)
+    );
 
-    spyOn(Promise, 'props').andCallFake(dict => {
+    spyOn(Promise, 'props').andCallFake((dict) => {
       const dictOut = {};
       for (const key of Object.keys(dict)) {
         const val = dict[key];
@@ -199,14 +209,13 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should create a Notification if there is one unread message', () => {
     waitsForPromise(async () => {
-
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgRead, this.msg1],
-        objectsRawJSON: getObjectsRawJson([this.msgRead.id, '1'])
+        objectsRawJSON: getObjectsRawJson([this.msgRead.id, '1']),
       });
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
-      const options = NativeNotifications.displayNotification.mostRecentCall.args[0];
+      const options = displayNotification.mostRecentCall.args[0];
       delete options.onActivate;
       delete options.playSound;
       expect(options).toEqual({
@@ -231,7 +240,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg1, this.msg2, this.msg3],
-        objectsRawJSON: getObjectsRawJson(['1', '2', '3'])
+        objectsRawJSON: getObjectsRawJson(['1', '2', '3']),
       });
       // msg1 is already notified; drain microtasks so _notifyMessages registers
       // the setTimeout for msg2, then advance the clock to fire it.
@@ -241,7 +250,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await Promise.resolve();
       await Promise.resolve();
       advanceClock(2000); // fires → msg3 notified
-      expect(NativeNotifications.displayNotification.callCount).toEqual(3);
+      expect(displayNotification.callCount).toEqual(3);
     });
   });
 
@@ -250,7 +259,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg1, this.msg2],
-        objectsRawJSON: getObjectsRawJson(['1', '2'])
+        objectsRawJSON: getObjectsRawJson(['1', '2']),
       });
       // Drain microtasks so _notifyMessages registers the setTimeout for msg2
       await Promise.resolve();
@@ -258,7 +267,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg3, this.msg4],
-        objectsRawJSON: getObjectsRawJson(['3', '4'])
+        objectsRawJSON: getObjectsRawJson(['3', '4']),
       });
       // msg3 and msg4 are now queued; fire the pending setTimeout for msg2
       advanceClock(2000); // fires → msg2 notified
@@ -268,11 +277,11 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await Promise.resolve();
       await Promise.resolve();
       advanceClock(2000); // fires → msg4 notified
-      expect(NativeNotifications.displayNotification.callCount).toEqual(4);
-      const subjects = NativeNotifications.displayNotification.calls.map(call => {
+      expect(displayNotification.callCount).toEqual(4);
+      const subjects = displayNotification.calls.map((call) => {
         return call.args[0].subtitle;
       });
-      const expected = [this.msg1, this.msg2, this.msg3, this.msg4].map(msg => msg.subject);
+      const expected = [this.msg1, this.msg2, this.msg3, this.msg4].map((msg) => msg.subject);
       expect(subjects).toEqual(expected);
     });
   });
@@ -282,12 +291,12 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg1, this.msg2, this.msg3, this.msg4, this.msg5],
-        objectsRawJSON: getObjectsRawJson(['1', '2', '3', '4', '5'])
+        objectsRawJSON: getObjectsRawJson(['1', '2', '3', '4', '5']),
       });
       advanceClock(2000);
       expect(NativeNotifications.displaySummaryNotification).toHaveBeenCalled();
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
-      const options = NativeNotifications.displaySummaryNotification.mostRecentCall.args[0];
+      const options = displaySummaryNotification.mostRecentCall.args[0];
       expect(options.count).toEqual(5);
       expect(options.senders).toContain('Ben');
       expect(options.senders).toContain('Mark');
@@ -296,38 +305,36 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
   it('should keep notifying after a notification fails to display', () => {
     spyOn(AppEnv, 'reportError');
-    NativeNotifications.displayNotification.andCallFake(() => Promise.reject(new Error('boom')));
+    displayNotification.andCallFake(() => Promise.reject(new Error('boom')));
     waitsForPromise(async () => {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg1],
-        objectsRawJSON: getObjectsRawJson(['1'])
+        objectsRawJSON: getObjectsRawJson(['1']),
       });
       await Promise.resolve();
       await Promise.resolve();
       expect(AppEnv.reportError).toHaveBeenCalled();
       expect(this.notifier.hasScheduledNotify).toBe(false);
 
-      NativeNotifications.displayNotification.andReturn(this.notification);
+      displayNotification.andReturn(this.notification);
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg2],
-        objectsRawJSON: getObjectsRawJson(['2'])
+        objectsRawJSON: getObjectsRawJson(['2']),
       });
-      expect(NativeNotifications.displayNotification.callCount).toEqual(2);
+      expect(displayNotification.callCount).toEqual(2);
     });
   });
 
   it('should not retry a summary Notification that fails to display', () => {
     spyOn(AppEnv, 'reportError');
-    NativeNotifications.displaySummaryNotification.andCallFake(() =>
-      Promise.reject(new Error('boom'))
-    );
+    displaySummaryNotification.andCallFake(() => Promise.reject(new Error('boom')));
     waitsForPromise(async () => {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg1, this.msg2, this.msg3, this.msg4, this.msg5],
-        objectsRawJSON: getObjectsRawJson(['1', '2', '3', '4', '5'])
+        objectsRawJSON: getObjectsRawJson(['1', '2', '3', '4', '5']),
       });
       await Promise.resolve();
       await Promise.resolve();
@@ -343,11 +350,11 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgNoSender],
-        objectsRawJSON: getObjectsRawJson([this.msgNoSender.id])
+        objectsRawJSON: getObjectsRawJson([this.msgNoSender.id]),
       });
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
 
-      const options = NativeNotifications.displayNotification.mostRecentCall.args[0];
+      const options = displayNotification.mostRecentCall.args[0];
       delete options.onActivate;
       delete options.playSound;
       expect(options).toEqual({
@@ -372,7 +379,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [],
-        objectsRawJSON: []
+        objectsRawJSON: [],
       });
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
       await this.notifier._onDatabaseChanged({});
@@ -385,10 +392,10 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgUnreadButArchived, this.msg1],
-        objectsRawJSON: getObjectsRawJson([this.msgUnreadButArchived.id, '1'])
+        objectsRawJSON: getObjectsRawJson([this.msgUnreadButArchived.id, '1']),
       });
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
-      const options = NativeNotifications.displayNotification.mostRecentCall.args[0];
+      const options = displayNotification.mostRecentCall.args[0];
       delete options.onActivate;
       delete options.playSound;
       expect(options).toEqual({
@@ -413,7 +420,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgRead],
-        objectsRawJSON: getObjectsRawJson([this.msgRead.id])
+        objectsRawJSON: getObjectsRawJson([this.msgRead.id]),
       });
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
@@ -425,7 +432,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgHigherVersion],
-        objectsRawJSON: getObjectsRawJson([this.msgHigherVersion.id])
+        objectsRawJSON: getObjectsRawJson([this.msgHigherVersion.id]),
       });
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
@@ -436,7 +443,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgOld],
-        objectsRawJSON: getObjectsRawJson([this.msgOld.id])
+        objectsRawJSON: getObjectsRawJson([this.msgOld.id]),
       });
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
@@ -447,7 +454,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgFromMeSameAccount],
-        objectsRawJSON: getObjectsRawJson([this.msgFromMeSameAccount.id])
+        objectsRawJSON: getObjectsRawJson([this.msgFromMeSameAccount.id]),
       });
       expect(NativeNotifications.displayNotification).not.toHaveBeenCalled();
     });
@@ -458,7 +465,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msgFromMeDiffAccount],
-        objectsRawJSON: getObjectsRawJson([this.msgFromMeDiffAccount.id])
+        objectsRawJSON: getObjectsRawJson([this.msgFromMeDiffAccount.id]),
       });
       expect(NativeNotifications.displayNotification).toHaveBeenCalled();
     });
@@ -469,7 +476,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
       await this.notifier._onDatabaseChanged({
         objectClass: Message.name,
         objects: [this.msg1],
-        objectsRawJSON: getObjectsRawJson([this.msg1.id])
+        objectsRawJSON: getObjectsRawJson([this.msg1.id]),
       });
       // Drain the microtask queue so that the async _onMessagesChanged chain
       // (which stores the notification in activeNotifications) fully completes
@@ -489,12 +496,13 @@ describe('UnreadNotifications', function UnreadNotifications() {
   });
 
   describe('new mail sound', () => {
-    let playsSoundWithNotification;
+    let playsSoundWithNotification: boolean;
+    let playSound: jasmine.Spy;
 
     beforeEach(() => {
-      playsSoundWithNotification = NativeNotifications.playsSoundWithNotification;
-      spyOn(SoundRegistry, 'playSound');
-      spyOn(AppEnv.config, 'get').andCallFake(config => {
+      playsSoundWithNotification = notifications.playsSoundWithNotification;
+      playSound = spyOn(SoundRegistry, 'playSound');
+      spyOn(AppEnv.config, 'get').andCallFake((config) => {
         if (config === 'core.notifications.enabled') return true;
         if (config === 'core.notifications.sounds') return this.soundsEnabled;
         return undefined;
@@ -503,28 +511,26 @@ describe('UnreadNotifications', function UnreadNotifications() {
     });
 
     afterEach(() => {
-      NativeNotifications.playsSoundWithNotification = playsSoundWithNotification;
+      notifications.playsSoundWithNotification = playsSoundWithNotification;
     });
 
-    const receive = ids =>
+    const receive = (ids) =>
       this.notifier._onDatabaseChanged({
         objectClass: Message.name,
-        objects: ids.map(id => this[`msg${id}`]),
+        objects: ids.map((id) => this[`msg${id}`]),
         objectsRawJSON: getObjectsRawJson(ids),
       });
 
     describe('when the app plays the sound', () => {
       beforeEach(() => {
-        NativeNotifications.playsSoundWithNotification = false;
+        notifications.playsSoundWithNotification = false;
       });
 
       it('should play a sound when it gets new mail', () => {
         waitsForPromise(async () => {
           await receive(['1']);
           expect(SoundRegistry.playSound).toHaveBeenCalledWith('new-mail');
-          expect(NativeNotifications.displayNotification.mostRecentCall.args[0].playSound).toBe(
-            false
-          );
+          expect(displayNotification.mostRecentCall.args[0].playSound).toBe(false);
         });
       });
 
@@ -540,7 +546,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
         waitsForPromise(async () => {
           await receive(['1', '2']);
           expect(SoundRegistry.playSound).toHaveBeenCalled();
-          SoundRegistry.playSound.reset();
+          playSound.reset();
           await receive(['3']);
           expect(SoundRegistry.playSound).not.toHaveBeenCalled();
         });
@@ -549,16 +555,14 @@ describe('UnreadNotifications', function UnreadNotifications() {
 
     describe('when the notification carries the sound (macOS)', () => {
       beforeEach(() => {
-        NativeNotifications.playsSoundWithNotification = true;
+        notifications.playsSoundWithNotification = true;
       });
 
       it('should attach the sound to the first notification instead of playing it', () => {
         waitsForPromise(async () => {
           await receive(['1']);
           expect(SoundRegistry.playSound).not.toHaveBeenCalled();
-          expect(NativeNotifications.displayNotification.mostRecentCall.args[0].playSound).toBe(
-            true
-          );
+          expect(displayNotification.mostRecentCall.args[0].playSound).toBe(true);
         });
       });
 
@@ -566,9 +570,7 @@ describe('UnreadNotifications', function UnreadNotifications() {
         this.soundsEnabled = false;
         waitsForPromise(async () => {
           await receive(['1']);
-          expect(NativeNotifications.displayNotification.mostRecentCall.args[0].playSound).toBe(
-            false
-          );
+          expect(displayNotification.mostRecentCall.args[0].playSound).toBe(false);
         });
       });
 
@@ -579,8 +581,8 @@ describe('UnreadNotifications', function UnreadNotifications() {
           await Promise.resolve();
           await Promise.resolve();
           await receive(['2']);
-          const calls = NativeNotifications.displayNotification.calls;
-          expect(calls.map(c => c.args[0].playSound)).toEqual([true, false]);
+          const calls = displayNotification.calls;
+          expect(calls.map((c) => c.args[0].playSound)).toEqual([true, false]);
         });
       });
 
@@ -591,8 +593,8 @@ describe('UnreadNotifications', function UnreadNotifications() {
           await Promise.resolve();
           this.notifier.lastNewMailSoundRequest = Date.now() - 6000;
           await receive(['2']);
-          const calls = NativeNotifications.displayNotification.calls;
-          expect(calls.map(c => c.args[0].playSound)).toEqual([true, true]);
+          const calls = displayNotification.calls;
+          expect(calls.map((c) => c.args[0].playSound)).toEqual([true, true]);
         });
       });
     });

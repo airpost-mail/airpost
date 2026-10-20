@@ -82,7 +82,7 @@ export default class ModelQuery<T extends Model | Model[]> {
   //
   constructor(klass, database: DB) {
     this._klass = klass.SubclassesUseModelTable || klass;
-    this._database = database || require('./database-store').default;
+    this._database = database || require('../stores/database-store').default;
   }
 
   clone(): ModelQuery<T> {

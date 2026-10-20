@@ -293,7 +293,7 @@ function writeLicenses({ buildPath, platform, commit }) {
   }
 
   const sourceURL = sourceURLFor(commit);
-  const preamble = read(path.join(appDir, 'static', 'all_licenses_preamble.html'))
+  const preamble = read(path.join(licensesDir, 'all_licenses_preamble.html'))
     .replace(/\{\{SOURCE_URL\}\}/g, escapeHTML(sourceURL))
     .replace(/\{\{COMMIT\}\}/g, escapeHTML(commit));
 

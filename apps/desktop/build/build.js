@@ -229,8 +229,6 @@ function buildPackagerOptions() {
           // file on disk rather than a copy extracted from the asar on every change.
           '*.ico',
           '**/vendor/**',
-          'examples/**',
-          '**/src/tasks/**',
           '**/src/quickpreview/**',
           '**/static/all_licenses.html',
           '**/static/extensions/**',

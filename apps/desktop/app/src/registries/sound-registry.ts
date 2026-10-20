@@ -20,11 +20,10 @@ class SoundRegistry {
     const { resourcePath } = AppEnv.getLoadSettings();
 
     if (typeof src === 'string') {
-      if (src.indexOf('mailspring://') === 0) {
-        a.src = src;
-      } else {
-        a.src = path.join(resourcePath, 'static', 'sounds', src);
-      }
+      // Only package-asset URLs play; there is no bundled sounds directory to resolve a
+      // bare filename against.
+      if (src.indexOf('mailspring://') !== 0) return;
+      a.src = src;
     } else if (src instanceof Array) {
       const args = [resourcePath].concat(src);
       a.src = path.join.apply(this, args);

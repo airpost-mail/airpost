@@ -27,8 +27,6 @@ class N1SpecLoader {
 
     this._setSpecType('core');
 
-    const fixturesPackagesPath = path.join(__dirname, 'fixtures', 'packages');
-
     let packagePathsList: string[] = [];
     const iterable = bundledPackagePaths(resourcePath);
     for (let i = 0; i < iterable.length; i++) {
@@ -41,9 +39,7 @@ class N1SpecLoader {
     packagePathsList = _.uniq(packagePathsList);
 
     const packagePaths: { [key: string]: string[] } = _.groupBy(packagePathsList, (packagePath) => {
-      if (packagePath.indexOf(`${fixturesPackagesPath}${path.sep}`) === 0) {
-        return 'fixtures';
-      } else if (packagePath.indexOf(`${resourcePath}${path.sep}`) === 0) {
+      if (packagePath.indexOf(`${resourcePath}${path.sep}`) === 0) {
         return 'bundled';
       }
       return 'user';

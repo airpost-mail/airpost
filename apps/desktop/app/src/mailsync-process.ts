@@ -637,7 +637,6 @@ export class MailsyncProcess extends EventEmitter {
         onData: (data) => {
           const str = data.toString().toLowerCase();
           if (str.includes('running migration')) this._showStatusWindow('migration');
-          if (str.includes('running vacuum')) this._showStatusWindow('vacuum');
         },
       });
       console.log(this._stripSecrets(buffer.toString()));
