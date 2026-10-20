@@ -45,6 +45,7 @@ export default class SheetContainer extends React.Component<
   static displayName = 'SheetContainer';
 
   _toolbarComponents = {};
+  _lastChromeKey?: string;
   unsubscribe?: () => void;
   windowPropsDisposable?: Disposable;
   navRailConfigDisposable?: Disposable;
@@ -56,6 +57,7 @@ export default class SheetContainer extends React.Component<
   }
 
   componentDidMount() {
+    this._lastChromeKey = this._chromeKey();
     this.unsubscribe = WorkspaceStore.listen(this._onStoreChange);
     // A hot window mounts with the empty window's load settings and receives the real
     // ones (including `toolbar`) only when it is assigned a window type.
@@ -68,6 +70,21 @@ export default class SheetContainer extends React.Component<
         this._onStoreChange();
       });
     }
+  }
+
+  componentDidUpdate() {
+    // The toolbars place their items over the sheet's columns, measured on resize. A resize while
+    // Preferences hides the toolbar and the nav rail measures the columns without the rail, so
+    // remeasure when either comes back (or goes) rather than wait for the next resize. Compared
+    // with the last key rather than prevState: WorkspaceStore mutates the stack array in place.
+    const key = this._chromeKey();
+    if (key === this._lastChromeKey) return;
+    this._lastChromeKey = key;
+    window.requestAnimationFrame(() => {
+      for (const toolbar of Object.values(this._toolbarComponents) as Toolbar[]) {
+        toolbar?.recomputeLayout();
+      }
+    });
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
@@ -94,6 +111,20 @@ export default class SheetContainer extends React.Component<
       mode: WorkspaceStore.layoutMode(),
       showNavRail: isNavRailShown(),
     };
+  }
+
+  _navRail() {
+    const { stack, showNavRail } = this.state;
+    const topSheet = stack[stack.length - 1];
+    // Preferences takes over the window, so it shows neither the rail nor its restore button.
+    const allowed = AppEnv.isMainWindow() && topSheet !== WorkspaceStore.Sheet.Preferences;
+    return { allowed, shown: allowed && showNavRail };
+  }
+
+  /** What around the sheets moves their columns: the rail and whether the toolbar shows. */
+  _chromeKey() {
+    const { stack } = this.state;
+    return `${this._navRail().shown}:${!!stack[stack.length - 1]?.hideToolbar}`;
   }
 
   _onColumnSizeChanged = (sheet: Sheet) => {
@@ -153,9 +184,7 @@ export default class SheetContainer extends React.Component<
   render() {
     const totalSheets = this.state.stack.length;
     const topSheet = this.state.stack[totalSheets - 1];
-    // Preferences takes over the window, so it shows neither the rail nor its restore button.
-    const navRailAllowed = AppEnv.isMainWindow() && topSheet !== WorkspaceStore.Sheet.Preferences;
-    const hasNavRail = navRailAllowed && this.state.showNavRail;
+    const { allowed: navRailAllowed, shown: hasNavRail } = this._navRail();
 
     if (!topSheet) {
       return <div />;
