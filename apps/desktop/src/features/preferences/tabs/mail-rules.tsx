@@ -20,6 +20,9 @@ import {
   SettingsField,
   StatusPill,
 } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
+import { TextField } from '../../../components/kit/text-field';
+import { SettingsSelect } from '../../../components/settings-select';
 
 const { ActionTemplatesForAccount, ConditionTemplatesForAccount } = MailRulesTemplates;
 
@@ -111,8 +114,7 @@ class PreferencesMailRules extends React.Component<
     };
   }
 
-  _onSelectAccount = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const accountId = event.target.value;
+  _onSelectAccount = (accountId: string) => {
     const currentAccount = this.state.accounts.find((acct) => acct.id === accountId);
     this.setState({ currentAccount: currentAccount, editingRuleId: undefined }, () => {
       this.setState(this._getStateFromStores());
@@ -217,18 +219,15 @@ class PreferencesMailRules extends React.Component<
           label={localized('Account')}
           description={localized('Each account has its own rules.')}
         >
-          <select
-            className="settings-select"
+          <SettingsSelect
             aria-label={localized('Account')}
             value={this.state.currentAccount.id}
             onChange={this._onSelectAccount}
-          >
-            {this.state.accounts.map((account) => (
-              <option value={account.id} key={account.id}>
-                {account.label}
-              </option>
-            ))}
-          </select>
+            options={this.state.accounts.map((account): [string, string] => [
+              account.id,
+              account.label,
+            ])}
+          />
         </SettingsRow>
       </SettingsSection>
     );
@@ -243,9 +242,9 @@ class PreferencesMailRules extends React.Component<
           {rule.disabled && rule.disabledReason && (
             <StatusPill kind="bad">{localized('Stopped')}</StatusPill>
           )}
-          <button className="btn" onClick={() => this._onToggleEditing(rule)}>
+          <Button variant="outline" onClick={() => this._onToggleEditing(rule)}>
             {editing ? localized('Done') : localized('Edit')}
-          </button>
+          </Button>
           <SettingsSwitch
             checked={!rule.disabled}
             label={localized('Turn on %@', rule.name)}
@@ -268,15 +267,14 @@ class PreferencesMailRules extends React.Component<
               )}
               <div className="disabled-reason-detail">{rule.disabledReason}</div>
             </div>
-            <button className="btn" onClick={() => this._onSetRuleEnabled(rule, true)}>
+            <Button variant="outline" onClick={() => this._onSetRuleEnabled(rule, true)}>
               {localized('Turn on')}
-            </button>
+            </Button>
           </div>
         )}
         <div className="inner">
           <SettingsField label={localized('Name')} htmlFor={`mail-rule-name-${rule.id}`}>
-            <input
-              type="text"
+            <TextField
               id={`mail-rule-name-${rule.id}`}
               key={rule.id}
               defaultValue={rule.name}
@@ -289,17 +287,19 @@ class PreferencesMailRules extends React.Component<
           <div className="mail-rule-label">
             {localizedReactFragment(
               'If %@ of the following conditions are met:',
-              <select
+              <SettingsSelect
+                key="condition-mode"
+                size="sm"
+                aria-label={localized('Any or all')}
                 value={rule.conditionMode}
-                onChange={(e) =>
-                  Actions.updateMailRule(rule.id, {
-                    conditionMode: e.target.value as MailRule['conditionMode'],
-                  })
+                onChange={(conditionMode: MailRule['conditionMode']) =>
+                  Actions.updateMailRule(rule.id, { conditionMode })
                 }
-              >
-                <option value="any">{localized('Any')}</option>
-                <option value="all">{localized('All')}</option>
-              </select>
+                options={[
+                  ['any', localized('Any')],
+                  ['all', localized('All')],
+                ]}
+              />
             )}
           </div>
           <ScenarioEditor
@@ -316,20 +316,24 @@ class PreferencesMailRules extends React.Component<
             className="well well-actions"
           />
           <div className="settings-actions">
-            <button className="btn" disabled={idx === 0} onClick={() => this._onMoveRule(rule, -1)}>
+            <Button
+              variant="outline"
+              disabled={idx === 0}
+              onClick={() => this._onMoveRule(rule, -1)}
+            >
               {localized('Move up')}
-            </button>
-            <button
-              className="btn"
+            </Button>
+            <Button
+              variant="outline"
               disabled={idx === this.state.rules.length - 1}
               onClick={() => this._onMoveRule(rule, 1)}
             >
               {localized('Move down')}
-            </button>
+            </Button>
             <span className="spacer" />
-            <button className="btn btn-danger" onClick={() => this._onDeleteRule(rule)}>
+            <Button variant="destructive" onClick={() => this._onDeleteRule(rule)}>
               {localized('Delete rule')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -349,9 +353,9 @@ class PreferencesMailRules extends React.Component<
           <div className="mail-rules-empty">{localized('No rules for this account yet.')}</div>
         )}
         {this.state.rules.map(this._renderRule)}
-        <button className="mail-rules-new" onClick={this._onAddRule}>
+        <Button variant="ghost" className="mail-rules-new" onClick={this._onAddRule}>
           {localized('+ New rule')}
-        </button>
+        </Button>
       </SettingsSection>
     );
   }
@@ -366,13 +370,13 @@ class PreferencesMailRules extends React.Component<
             'Rules only apply to new mail as it arrives. Running them on your whole inbox can take a long time and slow Tern down.'
           )}
         >
-          <button
-            className="btn"
+          <Button
+            variant="outline"
             disabled={!!reprocessing[currentAccount.id]}
             onClick={this._onReprocessRules}
           >
             {localized('Run now')}
-          </button>
+          </Button>
         </SettingsRow>
         {Object.keys(reprocessing).map((accountId) => {
           const { count, total } = reprocessing[accountId];
@@ -391,9 +395,12 @@ class PreferencesMailRules extends React.Component<
                   : localized('Starting…')
               }
             >
-              <button className="btn" onClick={() => Actions.stopReprocessingMailRules(accountId)}>
+              <Button
+                variant="outline"
+                onClick={() => Actions.stopReprocessingMailRules(accountId)}
+              >
                 {localized('Stop')}
-              </button>
+              </Button>
             </SettingsRow>
           );
         })}

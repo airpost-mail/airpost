@@ -28,7 +28,14 @@ import {
   ProviderCard,
   ProviderLogo,
   PrivacyNote,
+  Button,
+  TextField,
+  DropdownMenuRoot,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
 } from 'mailspring-component-kit';
+import { SettingsSelect } from '../../../src/components/settings-select';
 import {
   errorMessage,
   forgetKey,
@@ -252,10 +259,10 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     this.props.onChange(next);
   };
 
-  _onPickModel = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!event.target.value) return;
+  _onPickModel = (model: string) => {
+    if (!model) return;
     this._formGeneration++;
-    const draft = { ...this.state.draft, model: event.target.value };
+    const draft = { ...this.state.draft, model };
     this.setState({ draft, testResult: null }, this._onCommit);
   };
 
@@ -358,7 +365,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
   _renderText(field: 'name' | 'url', label: string, placeholder: string) {
     return (
       <SettingsField label={label} htmlFor={this._id(field)}>
-        <input
+        <TextField
           id={this._id(field)}
           type={field === 'url' ? 'url' : 'text'}
           spellCheck={false}
@@ -379,7 +386,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
     return (
       <SettingsField label={localized('API key')} htmlFor={this._id('key')}>
         <div className="ai-inline">
-          <input
+          <TextField
             id={this._id('key')}
             type="password"
             autoComplete="off"
@@ -390,14 +397,14 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
             onKeyDown={(e) => e.key === 'Enter' && this._onSaveKey()}
           />
           {!!keyInput.trim() && (
-            <button className="btn btn-emphasis" onClick={this._onSaveKey}>
+            <Button variant="default" onClick={this._onSaveKey}>
               {localized('Save key')}
-            </button>
+            </Button>
           )}
           {hasKey && !keyInput && (
-            <button className="btn" onClick={this._onForgetKey}>
+            <Button variant="outline" onClick={this._onForgetKey}>
               {localized('Forget key')}
-            </button>
+            </Button>
           )}
         </div>
         {keyNotice && <div className="ai-field-note">{keyNotice}</div>}
@@ -412,7 +419,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
       <>
         <SettingsField label={localized('Model')} htmlFor={this._id('model')}>
           <div className="ai-inline">
-            <input
+            <TextField
               id={this._id('model')}
               type="text"
               spellCheck={false}
@@ -423,9 +430,9 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
               onBlur={this._onCommit}
               onKeyDown={(e) => e.key === 'Enter' && this._onCommit()}
             />
-            <button className="btn" onClick={this._onLoadModels} disabled={loadingModels}>
+            <Button variant="outline" onClick={this._onLoadModels} disabled={loadingModels}>
               {loadingModels ? localized('Loading…') : localized('Load models')}
-            </button>
+            </Button>
           </div>
           <datalist id={modelsList}>
             {models.map((m) => (
@@ -437,14 +444,18 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
         </SettingsField>
         {models.length > 0 && (
           <SettingsField label={localized('Available models')} htmlFor={this._id('model-picker')}>
-            <select id={this._id('model-picker')} value={draft.model} onChange={this._onPickModel}>
-              <option value="">{localized('Choose…')}</option>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name && m.name !== m.id ? `${m.name} (${m.id})` : m.id}
-                </option>
-              ))}
-            </select>
+            <SettingsSelect
+              id={this._id('model-picker')}
+              value={draft.model || ''}
+              onChange={this._onPickModel}
+              options={[
+                ['', localized('Choose…')],
+                ...models.map((m): [string, string] => [
+                  m.id,
+                  m.name && m.name !== m.id ? `${m.name} (${m.id})` : m.id,
+                ]),
+              ]}
+            />
           </SettingsField>
         )}
       </>
@@ -475,7 +486,7 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
         {this._renderModel()}
         <SettingsField label={localized('Context window')} htmlFor={this._id('contextTokens')}>
           <div className="ai-inline">
-            <input
+            <TextField
               id={this._id('contextTokens')}
               className="ai-tokens"
               type="number"
@@ -490,9 +501,9 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
           </div>
         </SettingsField>
         <div className="settings-actions">
-          <button className="btn" onClick={this._onTest} disabled={testing}>
+          <Button variant="outline" onClick={this._onTest} disabled={testing}>
             {testing ? localized('Testing…') : localized('Test')}
-          </button>
+          </Button>
           {modelsError && <span className="ai-result failed">{modelsError}</span>}
           {testResult && (
             <span className={`ai-result ${testResult.ok ? 'ok' : 'failed'}`}>
@@ -500,9 +511,9 @@ export class ProviderSection extends React.Component<ProviderProps, ProviderStat
             </span>
           )}
           <span className="spacer" />
-          <button className="btn btn-danger" onClick={this.props.onRemove}>
+          <Button variant="destructive" onClick={this.props.onRemove}>
             {localized('Remove')}
-          </button>
+          </Button>
         </div>
         <PrivacyFor provider={draft} />
       </ProviderCard>
@@ -635,8 +646,7 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
     this.setState({ settings: AI.readSettings() });
   }
 
-  _onAddProvider = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const kind = event.target.value as AiProviderKind;
+  _onAddProvider = (kind: AiProviderKind) => {
     if (!kind) return;
     const { settings } = this.state;
     const provider: AiProvider = {
@@ -719,20 +729,21 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
         title={localized('Models')}
         note={
           <div className="ai-add-model">
-            <select
-              id="ai-add-provider"
-              className="settings-select"
-              aria-label={localized('Add a model')}
-              value=""
-              onChange={this._onAddProvider}
-            >
-              <option value="">{localized('+ Add a model')}</option>
-              {KIND_ORDER.map((kind) => (
-                <option key={kind} value={kind}>
-                  {AI.KINDS[kind].name}
-                </option>
-              ))}
-            </select>
+            <DropdownMenuRoot>
+              <DropdownMenuTrigger asChild>
+                {/* The trigger's own data-slot would replace the button's. */}
+                <Button id="ai-add-provider" data-slot="button" variant="link">
+                  {localized('+ Add a model')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {KIND_ORDER.map((kind) => (
+                  <DropdownMenuItem key={kind} onSelect={() => this._onAddProvider(kind)}>
+                    {AI.KINDS[kind].name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenuRoot>
             <span>
               {localized(
                 'Anthropic, OpenAI, any OpenAI-compatible server like LM Studio, or Ollama'
@@ -780,20 +791,19 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
                 </>
               }
             >
-              <select
+              <SettingsSelect
                 id={`ai-feature-${feature}-provider`}
-                className="settings-select"
                 aria-label={localized('Model for %@', label())}
                 value={f.provider || ''}
-                onChange={(e) => this._onFeatureProvider(feature, e.target.value)}
-              >
-                <option value="">{localized('No model')}</option>
-                {settings.providers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.model ? `${AI.providerName(p)}: ${p.model}` : AI.providerName(p)}
-                  </option>
-                ))}
-              </select>
+                onChange={(provider) => this._onFeatureProvider(feature, provider)}
+                options={[
+                  ['', localized('No model')],
+                  ...settings.providers.map((p): [string, string] => [
+                    p.id,
+                    p.model ? `${AI.providerName(p)}: ${p.model}` : AI.providerName(p),
+                  ]),
+                ]}
+              />
               <SettingsSwitch
                 checked={f.enabled}
                 label={label()}
@@ -836,13 +846,13 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
         >
           {progressText && <span className="ai-triage-progress">{progressText}</span>}
           {progress && progress.running ? (
-            <button className="btn" onClick={() => this._onStopTriage(account.id)}>
+            <Button variant="outline" onClick={() => this._onStopTriage(account.id)}>
               {localized('Stop')}
-            </button>
+            </Button>
           ) : (
-            <button className="btn" onClick={() => this._onTriageInbox(account.id)}>
+            <Button variant="outline" onClick={() => this._onTriageInbox(account.id)}>
               {localized('Sort now')}
-            </button>
+            </Button>
           )}
         </SettingsRow>
       );
@@ -967,14 +977,15 @@ export default class PreferencesAI extends React.Component<Record<string, unknow
         bare
         className="ai-sent"
         title={
-          <button
+          <Button
+            variant="ghost"
             className="ai-disclosure"
             aria-expanded={showSent}
             onClick={() => this.setState({ showSent: !showSent })}
           >
             <span className="settings-chevron" aria-hidden />
             {localized('What is sent to the model')}
-          </button>
+          </Button>
         }
       >
         {showSent && (

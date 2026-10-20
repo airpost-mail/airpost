@@ -12,6 +12,9 @@ import {
   ConfigSwitchRow,
   ConfigSelectRow,
 } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
+import { RadioGroup, RadioGroupItem } from '../../../components/kit/radio-group';
+import { SettingsSelect } from '../../../components/settings-select';
 import { Actions, localized } from 'mailspring-exports';
 import { isWaylandSession } from '../../../platform/linux-desktop';
 import { LABEL_COLOR_SCHEMES, LABEL_COLOR_SCHEME_NAMES } from '../../../data/stores/label-color';
@@ -160,54 +163,28 @@ class ThemeChooser extends React.Component<
     } else {
       preview = <ThemeMiniature colors={colors[theme.name]} />;
     }
-    const on = active === theme.name;
     return (
-      <div
+      <RadioGroupItem
         key={theme.name}
-        role="radio"
-        aria-checked={on}
-        tabIndex={on ? 0 : -1}
-        className={classnames('theme-tile', { on })}
-        onClick={() => AppEnv.themes.setActiveTheme(theme.name)}
-        onKeyDown={(e) => this._onTileKeyDown(e, theme)}
+        value={theme.name}
+        className={classnames('theme-tile', { on: active === theme.name })}
       >
         {preview}
         <span className="theme-tile-name">{themeLabel(theme)}</span>
-      </div>
+      </RadioGroupItem>
     );
   }
-
-  _onTileKeyDown = (e: React.KeyboardEvent<HTMLElement>, theme: ThemePackage) => {
-    const { themes } = this.state;
-    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      AppEnv.themes.setActiveTheme(theme.name);
-    } else if (step) {
-      e.preventDefault();
-      const next = themes[(themes.indexOf(theme) + step + themes.length) % themes.length];
-      AppEnv.themes.setActiveTheme(next.name);
-      const tiles = e.currentTarget.parentElement.children;
-      (tiles[themes.indexOf(next)] as HTMLElement)?.focus();
-    }
-  };
 
   _renderSystemThemeSelect(label: string, value: string, onChange: (name: string) => void) {
     const choices = this.state.themes.filter((t) => t.name !== AUTOMATIC_THEME_NAME);
     return (
       <SettingsRow label={label}>
-        <select
-          className="settings-select"
+        <SettingsSelect
           aria-label={label}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {choices.map((t) => (
-            <option key={t.name} value={t.name}>
-              {themeLabel(t)}
-            </option>
-          ))}
-        </select>
+          onChange={onChange}
+          options={choices.map((t): [string, string] => [t.name, themeLabel(t)])}
+        />
       </SettingsRow>
     );
   }
@@ -216,9 +193,14 @@ class ThemeChooser extends React.Component<
     const active = AppEnv.themes.getActiveThemeSetting().name;
     return (
       <>
-        <div className="theme-tiles" role="radiogroup" aria-label={localized('Theme')}>
+        <RadioGroup
+          className="theme-tiles"
+          aria-label={localized('Theme')}
+          value={active}
+          onValueChange={(name) => AppEnv.themes.setActiveTheme(name)}
+        >
           {this.state.themes.map((theme) => this._renderTile(theme, active))}
-        </div>
+        </RadioGroup>
         {active === AUTOMATIC_THEME_NAME && (
           <>
             {this._renderSystemThemeSelect(
@@ -269,9 +251,9 @@ class ReadingPaneRow extends React.Component<Record<string, unknown>, { value: L
           onChange={(value) => this.setState({ value })}
         />
         {changed && (
-          <button className="btn btn-emphasis" onClick={this._onApply}>
+          <Button variant="default" onClick={this._onApply}>
             {localized('Apply')}
-          </button>
+          </Button>
         )}
       </SettingsRow>
     );
@@ -292,21 +274,17 @@ function LabelColorSchemeRows() {
   const names = LABEL_SCHEME_NAMES();
   const hues = Array.from({ length: 12 }, (_, i) => `hsl(${i * 30}, 62%, 47%)`);
   return (
-    <div role="radiogroup" aria-label={localized('Label colours')}>
+    <RadioGroup
+      className="label-scheme-rows"
+      aria-label={localized('Label colours')}
+      value={value}
+      onValueChange={(name) => AppEnv.config.set(keyPath, name)}
+    >
       {LABEL_COLOR_SCHEME_NAMES.map((name) => (
-        <div
+        <RadioGroupItem
           key={name}
-          role="radio"
-          tabIndex={0}
-          aria-checked={value === name}
+          value={name}
           className={classnames('settings-row label-scheme-row', { on: value === name })}
-          onClick={() => AppEnv.config.set(keyPath, name)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              AppEnv.config.set(keyPath, name);
-            }
-          }}
         >
           <div className="settings-row-label">
             <span className="label-scheme-check" aria-hidden />
@@ -317,9 +295,9 @@ function LabelColorSchemeRows() {
               <i key={color} style={{ backgroundColor: LabelColorizer.dotColorFor(color) }} />
             ))}
           </div>
-        </div>
+        </RadioGroupItem>
       ))}
-    </div>
+    </RadioGroup>
   );
 }
 
@@ -392,15 +370,15 @@ function WindowControlsRows() {
         options={options}
       />
       <SettingsRow label={localized('Relaunch Tern')}>
-        <button
-          className="btn"
+        <Button
+          variant="outline"
           onClick={() => {
             require('@electron/remote').app.relaunch();
             require('@electron/remote').app.quit();
           }}
         >
           {localized('Relaunch')}
-        </button>
+        </Button>
       </SettingsRow>
     </SettingsSection>
   );

@@ -11,6 +11,10 @@ import {
   ProviderCard,
   ProviderLogo,
 } from 'mailspring-component-kit';
+import { Button } from '../../../../components/kit/button';
+import { Checkbox } from '../../../../components/kit/checkbox';
+import { TextField } from '../../../../components/kit/text-field';
+import { SettingsSelect } from '../../../../components/settings-select';
 
 import {
   ACCESS_LEVELS,
@@ -299,8 +303,7 @@ export class McpSection extends React.Component<Props, State> {
     }
   };
 
-  _onAccessLevel = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const accessLevel = event.target.value;
+  _onAccessLevel = (accessLevel: string) => {
     this._save((p) => ({ ...p, accessLevel }));
   };
 
@@ -462,31 +465,31 @@ export class McpSection extends React.Component<Props, State> {
         actions={
           <>
             {result?.canForce && (
-              <button
-                className="btn"
+              <Button
+                variant="outline"
                 disabled={!!busyClient}
                 onClick={() => this._onRunClient(id, 'install', true)}
               >
                 {localized('Replace It')}
-              </button>
+              </Button>
             )}
             {connected !== true && (
-              <button
-                className="btn"
+              <Button
+                variant="outline"
                 disabled={disabled}
                 onClick={() => this._onRunClient(id, 'install')}
               >
                 {localized('Connect')}
-              </button>
+              </Button>
             )}
             {connected !== false && (
-              <button
-                className="btn"
+              <Button
+                variant="outline"
                 disabled={disabled}
                 onClick={() => this._onRunClient(id, 'uninstall')}
               >
                 {localized('Disconnect')}
-              </button>
+              </Button>
             )}
           </>
         }
@@ -527,20 +530,16 @@ export class McpSection extends React.Component<Props, State> {
             localized('Every connected app gets the same access.')
           }
         >
-          <select
+          <SettingsSelect
             id="mcp-access-level"
-            className="settings-select"
             aria-label={localized('Access')}
             value={policy.accessLevel}
             onChange={this._onAccessLevel}
-          >
-            {!known && <option value={policy.accessLevel}>{localized('Read mail')}</option>}
-            {ACCESS_LEVELS.map((l) => (
-              <option key={l} value={l}>
-                {localized(ACCESS_LEVEL_LABELS[l])}
-              </option>
-            ))}
-          </select>
+            options={[
+              ...(known ? [] : [[policy.accessLevel, localized('Read mail')] as [string, string]]),
+              ...ACCESS_LEVELS.map((l): [string, string] => [l, localized(ACCESS_LEVEL_LABELS[l])]),
+            ]}
+          />
         </SettingsRow>
       </SettingsSection>
     );
@@ -561,14 +560,14 @@ export class McpSection extends React.Component<Props, State> {
       <React.Fragment key={account.id}>
         <SettingsRow label={name} description={description}>
           {enabled && (
-            <button
-              className="btn"
+            <Button
+              variant="outline"
               onClick={() =>
                 this.setState({ expanded: { ...this.state.expanded, [account.id]: !expanded } })
               }
             >
               {expanded ? localized('Done') : localized('Choose folders')}
-            </button>
+            </Button>
           )}
           <SettingsSwitch
             checked={enabled}
@@ -580,10 +579,9 @@ export class McpSection extends React.Component<Props, State> {
           <div className="agents-folders">
             {CategoryStore.categories(account.id).map((cat) => (
               <label key={cat.id} className="agents-folder">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={!excluded.includes(cat.id)}
-                  onChange={() => this._onToggleFolder(account.id, cat.id)}
+                  onCheckedChange={() => this._onToggleFolder(account.id, cat.id)}
                 />
                 {cat.displayName || cat.name}
               </label>
@@ -736,9 +734,9 @@ export class McpSection extends React.Component<Props, State> {
     }
     return (
       <SettingsRow label={localized('Connection to your mail')} description={text}>
-        <button className="btn" onClick={this._refreshStatus}>
+        <Button variant="outline" onClick={this._refreshStatus}>
           {localized('Check again')}
-        </button>
+        </Button>
       </SettingsRow>
     );
   }
@@ -771,7 +769,7 @@ export class McpSection extends React.Component<Props, State> {
                   path.join(configDir(), TOKEN_FILE)
                 )}
               >
-                <input
+                <TextField
                   id="mcp-http-port"
                   className="agents-port"
                   type="text"

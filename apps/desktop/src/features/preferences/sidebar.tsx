@@ -9,6 +9,7 @@ import {
   localized,
 } from 'mailspring-exports';
 import { PreferencesIcon } from './icon';
+import { TextField } from '../../components/kit/text-field';
 
 type Group = PreferencesUIStoreTab['group'];
 
@@ -149,7 +150,7 @@ export default class PreferencesSidebar extends React.Component<
       <div className="preferences-sidebar">
         <SheetTitleBar side="start" />
         <div className="preferences-sidebar-search">
-          <input
+          <TextField
             type="search"
             placeholder={localized('Search settings')}
             aria-label={localized('Search settings')}

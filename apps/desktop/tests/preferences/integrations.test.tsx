@@ -1,8 +1,10 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import TestRenderer, { act } from 'react-test-renderer';
 import { KeyManager, Integrations } from 'mailspring-exports';
 
 import { IntegrationSection, privacyNote } from '../../src/features/preferences/tabs/integrations';
+import { SettingsSelect } from '../../src/components/settings-select';
 
 const SYNTHETIC_KEY = 'synthetic-test-key-0000:fx';
 
@@ -28,8 +30,22 @@ async function render(kind: 'translation' | 'grammar' | 'enrichment') {
   return renderer;
 }
 
+// The DOM element with the id: kit components pass `id` down to the element they render.
 function byId(renderer: TestRenderer.ReactTestRenderer, id: string) {
-  return renderer.root.find((node) => node.props.id === id);
+  return renderer.root.find((node) => typeof node.type === 'string' && node.props.id === id);
+}
+
+// Radix Select renders its closed list into a DocumentFragment through ReactDOM.createPortal,
+// which react-test-renderer can't host. The specs never open a list.
+function withoutPortals() {
+  spyOn(ReactDOM, 'createPortal').andReturn(null);
+}
+
+// Picks an option through SettingsSelect's onChange, as choosing it in the open list would.
+function pick(renderer: TestRenderer.ReactTestRenderer, id: string, value: string) {
+  return renderer.root
+    .find((node) => node.type === SettingsSelect && node.props.id === id)
+    .props.onChange(value);
 }
 
 async function type(renderer: TestRenderer.ReactTestRenderer, id: string, value: string) {
@@ -73,6 +89,7 @@ describe('Preferences > Integrations', () => {
 
   beforeEach(() => {
     keys = fakeKeyset();
+    withoutPortals();
   });
 
   afterEach(() => {
@@ -83,9 +100,7 @@ describe('Preferences > Integrations', () => {
     const renderer = await render('translation');
     await setUp(renderer);
     await act(async () => {
-      byId(renderer, 'integrations-translation-provider').props.onChange({
-        target: { value: 'deepl' },
-      });
+      pick(renderer, 'integrations-translation-provider', 'deepl');
     });
     await act(async () => {
       button(renderer, 'Turn on').props.onClick();
@@ -269,7 +284,7 @@ describe('Preferences > Integrations', () => {
     const renderer = await render('translation');
     await setUp(renderer);
     await act(async () => {
-      byId(renderer, 'integrations-translation-provider').props.onChange({ target: { value: '' } });
+      pick(renderer, 'integrations-translation-provider', '');
     });
     await act(async () => {
       await button(renderer, 'Remove saved keys').props.onClick();

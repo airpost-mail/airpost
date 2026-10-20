@@ -16,18 +16,19 @@ import {
   useMailspringProfile,
 } from '../../../../components/mailspring-import';
 
-// Shown only when there is a Mailspring profile on this computer.
+// Under the account list, with Add account: it adds accounts, so it belongs to the page and not
+// to the account selected below. Shown only when there is a Mailspring profile on this computer.
 function MailspringImportSection() {
   if (!useMailspringProfile()) return null;
   return (
-    <SettingsSection title={localized('Mailspring')}>
+    <SettingsSection>
       <SettingsRow
         label={localized('Import from Mailspring')}
         description={localized(
           "Adds the accounts in Mailspring that Tern doesn't have yet, with the passwords Mailspring saved. Mailspring is only read, never changed."
         )}
       >
-        <ImportFromMailspringButton variant="secondary" size="sm">
+        <ImportFromMailspringButton variant="outline">
           {localized('Import…')}
         </ImportFromMailspringButton>
       </SettingsRow>
@@ -142,6 +143,7 @@ class PreferencesAccounts extends React.Component<
             onSelectAccount={this._onSelectAccount}
           />
         </SettingsSection>
+        <MailspringImportSection />
         {selected && (
           <PreferencesAccountDetails
             key={selected.id}
@@ -151,7 +153,6 @@ class PreferencesAccounts extends React.Component<
             onRemoveAccount={this._onRemoveAccount}
           />
         )}
-        <MailspringImportSection />
       </SettingsPage>
     );
   }

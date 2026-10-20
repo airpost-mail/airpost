@@ -2,6 +2,8 @@ import React from 'react';
 import { shell } from 'electron';
 import { localized } from 'mailspring-exports';
 import { RetinaImg, SettingsPage, SettingsSection, SettingsNote } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
+import { TextField } from '../../../components/kit/text-field';
 
 const SELF_HOSTING_GUIDE = 'https://github.com/ternmail/ternmail/blob/main/docs/self-hosting.md';
 
@@ -45,15 +47,15 @@ export default function PreferencesServer() {
             )}
           </p>
           <div className="server-connect">
-            <input
+            <TextField
               type="url"
               placeholder="tern.example.com"
               aria-label={localized('Server address')}
               disabled
             />
-            <button className="btn btn-emphasis" disabled>
+            <Button variant="default" disabled>
               {localized('Sign in')}
-            </button>
+            </Button>
           </div>
           <SettingsNote>
             {localized('Signing in from the desktop comes in a later version.')}{' '}

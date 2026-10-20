@@ -1,6 +1,10 @@
 import React from 'react';
 import Rx, { Disposable } from 'rx-lite';
 import { Flexbox } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import { Button } from '../kit/button';
+import { TextField } from '../kit/text-field';
+import { SettingsSelect } from '../settings-select';
 
 import { Template } from './models';
 
@@ -62,8 +66,8 @@ class SourceSelect extends React.Component<SourceSelectProps, SourceSelectState>
     }
   }
 
-  _onChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value === SOURCE_SELECT_NULL ? null : event.target.value;
+  _onChange = (key: string) => {
+    const value = key === SOURCE_SELECT_NULL ? null : key;
     const option = this.state.options.find((o) => o.value === value);
     this.props.onChange({
       target: {
@@ -74,19 +78,17 @@ class SourceSelect extends React.Component<SourceSelectProps, SourceSelectState>
   };
 
   render() {
-    // The React <select> component won't select the correct option if the value
-    // is null or undefined - it just leaves the selection whatever it was in the
-    // previous render. To work around this, we coerce null/undefined to SOURCE_SELECT_NULL.
-
+    // No value is the blank SOURCE_SELECT_NULL option, which also clears the value.
     return (
-      <select value={this.props.value || SOURCE_SELECT_NULL} onChange={this._onChange}>
-        <option key={SOURCE_SELECT_NULL} value={SOURCE_SELECT_NULL} />
-        {this.state.options.map(({ value, name }) => (
-          <option key={value} value={value}>
-            {name}
-          </option>
-        ))}
-      </select>
+      <SettingsSelect
+        size="sm"
+        value={this.props.value || SOURCE_SELECT_NULL}
+        onChange={this._onChange}
+        options={[
+          [SOURCE_SELECT_NULL, ''],
+          ...this.state.options.map(({ value, name }): [string, string] => [value, name]),
+        ]}
+      />
     );
   }
 }
@@ -123,44 +125,41 @@ export default class ScenarioEditorRow extends React.Component<ScenarioEditorRow
     this.props.onChange(instance);
   };
 
-  _onChangeComparator = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  _onChangeComparator = (comparatorKey: string) => {
     const instance = JSON.parse(JSON.stringify(this.props.instance));
-    instance.comparatorKey = event.target.value;
+    instance.comparatorKey = comparatorKey;
     this.props.onChange(instance);
   };
 
-  _onChangeTemplate = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  _onChangeTemplate = (templateKey: string) => {
     const instance = JSON.parse(JSON.stringify(this.props.instance));
-    const newTemplate = this.props.templates.find((t) => t.key === event.target.value);
+    const newTemplate = this.props.templates.find((t) => t.key === templateKey);
     this.props.onChange(newTemplate.coerceInstance(instance));
   };
 
   _renderTemplateSelect() {
-    const options = this.props.templates.map(({ key, name }) => (
-      <option value={key} key={key}>
-        {name}
-      </option>
-    ));
     return (
-      <select value={this.props.instance.templateKey} onChange={this._onChangeTemplate}>
-        {options}
-      </select>
+      <SettingsSelect
+        size="sm"
+        value={this.props.instance.templateKey}
+        onChange={this._onChangeTemplate}
+        options={this.props.templates.map(({ key, name }): [string, string] => [key, name])}
+      />
     );
   }
 
   _renderComparator(template: Template) {
-    const options = Object.keys(template.comparators).map((key) => (
-      <option key={key} value={key}>
-        {template.comparators[key].name}
-      </option>
-    ));
-    if (options.length === 0) {
+    const keys = Object.keys(template.comparators);
+    if (keys.length === 0) {
       return false;
     }
     return (
-      <select value={this.props.instance.comparatorKey} onChange={this._onChangeComparator}>
-        {options}
-      </select>
+      <SettingsSelect
+        size="sm"
+        value={this.props.instance.comparatorKey}
+        onChange={this._onChangeComparator}
+        options={keys.map((key): [string, string] => [key, template.comparators[key].name])}
+      />
     );
   }
 
@@ -176,7 +175,9 @@ export default class ScenarioEditorRow extends React.Component<ScenarioEditorRow
     }
 
     if (template.type === Template.Type.String || template.type === Template.Type.InputString) {
-      return <input type="text" value={this.props.instance.value} onChange={this._onChangeValue} />;
+      return (
+        <TextField size="sm" value={this.props.instance.value} onChange={this._onChangeValue} />
+      );
     }
     return false;
   }
@@ -185,17 +186,17 @@ export default class ScenarioEditorRow extends React.Component<ScenarioEditorRow
     return (
       <div className="actions">
         {this.props.removable && (
-          <div className="btn" onClick={this.props.onRemove}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <Button variant="outline" aria-label={localized('Remove')} onClick={this.props.onRemove}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
               <path d="M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
-          </div>
+          </Button>
         )}
-        <div className="btn" onClick={this.props.onInsert}>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <Button variant="outline" aria-label={localized('Add')} onClick={this.props.onInsert}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
             <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-        </div>
+        </Button>
       </div>
     );
   }

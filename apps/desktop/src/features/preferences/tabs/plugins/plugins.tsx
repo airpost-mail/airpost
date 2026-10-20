@@ -10,6 +10,7 @@ import {
   ProviderLogo,
   PrivacyNote,
 } from 'mailspring-component-kit';
+import { Button } from '../../../../components/kit/button';
 
 import { pluginInstallRecord } from '../../../../packages/install-record';
 import {
@@ -203,17 +204,17 @@ export class PluginsSection extends React.Component<Props, State> {
         <p>{localized('The service itself is set up in %@:', plan.unit.path)}</p>
         <pre className="plugin-unit">{plan.unit.text}</pre>
         <div className="settings-actions">
-          <button
-            className="btn btn-emphasis"
+          <Button
+            variant="default"
             id={`plugin-install-${plan.package}`}
             disabled={busy}
             onClick={this._onInstall}
           >
             {localized('Install service')}
-          </button>
-          <button className="btn" disabled={busy} onClick={() => this.setState({ plan: null })}>
+          </Button>
+          <Button variant="outline" disabled={busy} onClick={() => this.setState({ plan: null })}>
             {localized('Cancel')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -230,26 +231,26 @@ export class PluginsSection extends React.Component<Props, State> {
     const { busy, plan } = this.state;
     if (record) {
       return (
-        <button
-          className="btn"
+        <Button
+          variant="outline"
           id={`plugin-uninstall-${name}`}
           disabled={busy === name}
           onClick={() => this._onUninstall(name)}
         >
           {localized('Remove service')}
-        </button>
+        </Button>
       );
     }
     if (plan?.package === name) return null;
     return (
-      <button
-        className="btn"
+      <Button
+        variant="outline"
         id={`plugin-review-${name}`}
         disabled={busy === name || !ternBinary()}
         onClick={() => this._onReview(name)}
       >
         {localized('Set up service…')}
-      </button>
+      </Button>
     );
   }
 
@@ -389,9 +390,9 @@ export class PluginsSection extends React.Component<Props, State> {
               label={localized('Tern couldn’t list the services')}
               description={<span className="plugin-result failed">{this.state.listError}</span>}
             >
-              <button className="btn" onClick={this._refresh}>
+              <Button variant="outline" onClick={this._refresh}>
                 {localized('Try again')}
-              </button>
+              </Button>
             </SettingsRow>
           )}
           {orphans.map((s) => this._renderOrphan(s))}

@@ -9,6 +9,7 @@ import {
   ConfigSelectRow,
   ConfigSegmentedRow,
 } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
 
 function onTurnWarningsBackOn() {
   localStorage.removeItem('recipientWarningBlacklist');
@@ -108,9 +109,9 @@ export default function PreferencesComposing() {
             'Warnings about recipients that you asked Tern not to show again.'
           )}
         >
-          <button className="btn" onClick={onTurnWarningsBackOn}>
+          <Button variant="outline" onClick={onTurnWarningsBackOn}>
             {localized('Turn back on')}
-          </button>
+          </Button>
         </SettingsRow>
       </SettingsSection>
 

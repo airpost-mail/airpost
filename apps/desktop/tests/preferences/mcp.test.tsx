@@ -2,11 +2,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import React from 'react';
+import ReactDOM from 'react-dom';
 import TestRenderer, { act } from 'react-test-renderer';
 import { AccountStore, CategoryStore } from 'mailspring-exports';
 import { SettingsSwitch } from 'mailspring-component-kit';
 
 import { McpSection } from '../../src/features/preferences/tabs/mcp/section';
+import { SettingsSelect } from '../../src/components/settings-select';
 import { migrateCoreMcpConfig, readAuditLog } from '../../src/features/preferences/tabs/mcp/policy';
 import {
   isStableInstall,
@@ -29,16 +31,29 @@ function mcpJSON() {
   return readJSON(path.join(dir, 'mcp.json'));
 }
 
+// Unmounted after each spec: a pane left mounted re-renders on the next spec's store changes,
+// after that spec's createPortal spy is gone.
+let mounted: TestRenderer.ReactTestRenderer[] = [];
+
 async function render(props = {}) {
   let renderer: TestRenderer.ReactTestRenderer;
   await act(async () => {
     renderer = TestRenderer.create(<McpSection {...props} />);
   });
+  mounted.push(renderer);
   return renderer;
 }
 
+// The DOM element with the id: kit components pass `id` down to the element they render.
 function byId(renderer: TestRenderer.ReactTestRenderer, id: string) {
-  return renderer.root.find((node) => node.props.id === id);
+  return renderer.root.find((node) => typeof node.type === 'string' && node.props.id === id);
+}
+
+// Picks an option through SettingsSelect's onChange, as choosing it in the open list would.
+function pick(renderer: TestRenderer.ReactTestRenderer, id: string, value: string) {
+  return renderer.root
+    .find((node) => node.type === SettingsSelect && node.props.id === id)
+    .props.onChange(value);
 }
 
 function switchLabelled(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -89,6 +104,9 @@ describe('Preferences > Agents', function () {
       { id: 'a1', label: 'Work', emailAddress: 'work@example.test' },
       { id: 'a2', label: 'Home', emailAddress: 'home@example.test' },
     ] as any);
+    // Radix Select renders its closed list into a DocumentFragment through
+    // ReactDOM.createPortal, which react-test-renderer can't host. The specs never open it.
+    spyOn(ReactDOM, 'createPortal').andReturn(null);
     spyOn(CategoryStore, 'categories').andReturn([
       { id: 'f-inbox', displayName: 'Inbox' },
       { id: 'f-private', displayName: 'Private' },
@@ -96,6 +114,8 @@ describe('Preferences > Agents', function () {
   });
 
   afterEach(() => {
+    act(() => mounted.forEach((r) => r.unmount()));
+    mounted = [];
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
@@ -147,7 +167,7 @@ describe('Preferences > Agents', function () {
     const renderer = await render();
 
     await act(async () => {
-      byId(renderer, 'mcp-access-level').props.onChange({ target: { value: 'read-write' } });
+      pick(renderer, 'mcp-access-level', 'read-write');
     });
     expect(mcpJSON().accessLevel).toBe('read-write');
 

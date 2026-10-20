@@ -36,8 +36,9 @@ function textOf(renderer: TestRenderer.ReactTestRenderer) {
   return JSON.stringify(renderer.toJSON());
 }
 
+// The DOM element with the id: kit components pass `id` down to the element they render.
 function byId(renderer: TestRenderer.ReactTestRenderer, id: string) {
-  return renderer.root.find((node) => node.props.id === id);
+  return renderer.root.find((node) => typeof node.type === 'string' && node.props.id === id);
 }
 
 async function waitFor(check: () => boolean, what: string) {

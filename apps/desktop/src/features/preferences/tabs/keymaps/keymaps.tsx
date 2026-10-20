@@ -3,6 +3,8 @@ import path from 'path';
 import fs from 'fs';
 
 import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
+import { Button } from '../../../../components/kit/button';
+import { SettingsSelect } from '../../../../components/settings-select';
 import { localized } from 'mailspring-exports';
 
 import displayedKeybindings from './displayed-keybindings';
@@ -99,18 +101,12 @@ export default class PreferencesKeymaps extends React.Component<
             label={localized('Shortcut set')}
             description={localized('Uses the keys of a mail app you already know.')}
           >
-            <select
-              className="settings-select"
+            <SettingsSelect
               aria-label={localized('Shortcut set')}
               value={template}
-              onChange={(event) => this.props.config.set('core.keymapTemplate', event.target.value)}
-            >
-              {this.state.templates.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+              onChange={(name) => this.props.config.set('core.keymapTemplate', name)}
+              options={this.state.templates.map((name): [string, string] => [name, name])}
+            />
           </SettingsRow>
           <SettingsRow
             label={localized('Your changes')}
@@ -118,12 +114,12 @@ export default class PreferencesKeymaps extends React.Component<
               'Shortcuts you change are saved in a file on top of the set. You can also edit that file yourself.'
             )}
           >
-            <button className="btn" onClick={this._onShowUserKeymaps}>
+            <Button variant="outline" onClick={this._onShowUserKeymaps}>
               {localized('Edit in a file')}
-            </button>
-            <button className="btn" onClick={this._onDeleteUserKeymap}>
+            </Button>
+            <Button variant="outline" onClick={this._onDeleteUserKeymap}>
               {localized('Restore the set')}
-            </button>
+            </Button>
           </SettingsRow>
         </SettingsSection>
 

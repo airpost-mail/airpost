@@ -2,6 +2,7 @@ import React from 'react';
 import { ipcRenderer } from 'electron';
 import { Actions, localized } from 'mailspring-exports';
 import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
 
 export default function PreferencesAdvanced() {
   return (
@@ -18,9 +19,9 @@ export default function PreferencesAdvanced() {
             'Which folder each account uses for Sent, Drafts, Archive, Spam and Trash.'
           )}
         >
-          <button className="btn" onClick={() => Actions.switchPreferencesTab('Folders')}>
+          <Button variant="outline" onClick={() => Actions.switchPreferencesTab('Folders')}>
             {localized('Choose')}
-          </button>
+          </Button>
         </SettingsRow>
       </SettingsSection>
 
@@ -31,12 +32,12 @@ export default function PreferencesAdvanced() {
             'Downloads your mail again from every account. Your accounts and settings stay.'
           )}
         >
-          <button
-            className="btn"
+          <Button
+            variant="outline"
             onClick={() => ipcRenderer.send('command', 'application:reset-database', {})}
           >
             {localized('Rebuild')}
-          </button>
+          </Button>
         </SettingsRow>
       </SettingsSection>
 
@@ -47,12 +48,12 @@ export default function PreferencesAdvanced() {
             "Tern starts over as if newly installed. Mail on your providers isn't touched."
           )}
         >
-          <button
-            className="btn btn-danger"
+          <Button
+            variant="destructive"
             onClick={() => ipcRenderer.send('command', 'application:reset-profile')}
           >
             {localized('Reset Tern…')}
-          </button>
+          </Button>
         </SettingsRow>
       </SettingsSection>
     </SettingsPage>

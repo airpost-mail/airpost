@@ -66,12 +66,12 @@ describe('PreferencesAccountDetails', function preferencesAccountDetails() {
 
   describe('_onDefaultAliasSelected', () => {
     it('sets the default alias correctly when set to None', () => {
-      this.component._onDefaultAliasSelected({ target: { value: 'None' } });
+      this.component._onDefaultAliasSelected('None');
       assertAccountState(this.component.setState.calls[0].args[0], { defaultAlias: null });
     });
 
     it('sets the default alias correctly when set to any value', () => {
-      this.component._onDefaultAliasSelected({ target: { value: 'my alias' } });
+      this.component._onDefaultAliasSelected('my alias');
       assertAccountState(this.component.setState.calls[0].args[0], { defaultAlias: 'my alias' });
     });
   });

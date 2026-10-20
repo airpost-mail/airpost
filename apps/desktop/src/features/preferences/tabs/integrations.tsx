@@ -23,6 +23,9 @@ import {
   ProviderLogo,
   PrivacyNote,
 } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
+import { TextField } from '../../../components/kit/text-field';
+import { SettingsSelect } from '../../../components/settings-select';
 
 // Preferences > Integrations (docs/integrations-plan.md, section 2). Settings go to config under
 // core.integrations.<kind>; API keys to the engine's secret store (the keyset for an engine
@@ -186,8 +189,8 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     this.setState({ settings: Integrations.readSettings(this.props.kind), testResult: null });
   }
 
-  _onChangeProvider = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const provider = (event.target.value || null) as IntegrationProvider | null;
+  _onChangeProvider = (value: string) => {
+    const provider = (value || null) as IntegrationProvider | null;
     // URLs don't carry over between providers; keys are per provider in the keyset.
     this._formGeneration++;
     this._update({ provider, url: undefined, enabled: !!provider && this.state.settings.enabled });
@@ -309,7 +312,7 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     return (
       <SettingsField label={label} htmlFor={id}>
         <div className="integrations-inline">
-          <input
+          <TextField
             id={id}
             type="password"
             autoComplete="off"
@@ -320,14 +323,14 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
             onKeyDown={(e) => e.key === 'Enter' && this._onSaveKey()}
           />
           {!!keyInput.trim() && (
-            <button className="btn btn-emphasis" onClick={this._onSaveKey}>
+            <Button variant="default" onClick={this._onSaveKey}>
               {localized('Save key')}
-            </button>
+            </Button>
           )}
           {hasKey && !keyInput && (
-            <button className="btn" onClick={this._onForgetKey}>
+            <Button variant="outline" onClick={this._onForgetKey}>
               {localized('Forget key')}
-            </button>
+            </Button>
           )}
         </div>
       </SettingsField>
@@ -338,7 +341,7 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     const id = `integrations-${this.props.kind}-${field}`;
     return (
       <SettingsField label={label} htmlFor={id}>
-        <input
+        <TextField
           id={id}
           type={field === 'url' ? 'url' : 'text'}
           spellCheck={false}
@@ -394,18 +397,15 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
     const id = `integrations-${kind}-provider`;
     return (
       <SettingsField label={localized('Service')} htmlFor={id}>
-        <select
+        <SettingsSelect
           id={id}
           value={this.state.settings.provider || ''}
           onChange={this._onChangeProvider}
-        >
-          <option value="">{localized('None')}</option>
-          {choices.map((p) => (
-            <option key={p} value={p}>
-              {Integrations.PROVIDERS[p].name}
-            </option>
-          ))}
-        </select>
+          options={[
+            ['', localized('None')],
+            ...choices.map((p): [string, string] => [p, Integrations.PROVIDERS[p].name]),
+          ]}
+        />
       </SettingsField>
     );
   }
@@ -420,9 +420,9 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
           {this._renderServiceField()}
           {hasLeftoverKey && (
             <div className="settings-actions">
-              <button className="btn" onClick={this._onRemove}>
+              <Button variant="outline" onClick={this._onRemove}>
                 {localized('Remove saved keys')}
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -434,17 +434,17 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
         {this._renderFields()}
         <div className="settings-actions">
           {settings.enabled ? (
-            <button className="btn" onClick={this._onToggleEnabled}>
+            <Button variant="outline" onClick={this._onToggleEnabled}>
               {localized('Turn off')}
-            </button>
+            </Button>
           ) : (
-            <button className="btn btn-emphasis" onClick={this._onToggleEnabled}>
+            <Button variant="default" onClick={this._onToggleEnabled}>
               {localized('Turn on')}
-            </button>
+            </Button>
           )}
-          <button className="btn" onClick={this._onTest} disabled={testing}>
+          <Button variant="outline" onClick={this._onTest} disabled={testing}>
             {testing ? localized('Testing…') : localized('Test')}
-          </button>
+          </Button>
           {testResult && (
             <span className={`integrations-test-result ${testResult.ok ? 'ok' : 'failed'}`}>
               {testResult.message}
@@ -452,9 +452,9 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
           )}
           <span className="spacer" />
           {(hasKey || settings.url || settings.username || settings.enabled) && (
-            <button className="btn btn-danger" onClick={this._onRemove}>
+            <Button variant="destructive" onClick={this._onRemove}>
               {localized('Remove')}
-            </button>
+            </Button>
           )}
         </div>
         {settings.enabled && !capability.available && capability.reason && (
@@ -483,9 +483,9 @@ export class IntegrationSection extends React.Component<SectionProps, SectionSta
         actions={
           !open &&
           !settings.enabled && (
-            <button className="btn" onClick={() => this.setState({ open: true })}>
+            <Button variant="outline" onClick={() => this.setState({ open: true })}>
               {localized('Set up')}
-            </button>
+            </Button>
           )
         }
         open={open}

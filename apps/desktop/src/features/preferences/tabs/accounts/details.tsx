@@ -4,6 +4,9 @@ import React, { Component } from 'react';
 import classnames from 'classnames';
 import { ipcRenderer } from 'electron';
 import { SettingsSection, SettingsRow, SettingsCard } from 'mailspring-component-kit';
+import { Button } from '../../../../components/kit/button';
+import { TextField } from '../../../../components/kit/text-field';
+import { SettingsSelect } from '../../../../components/settings-select';
 import { localized, RegExpUtils, Account, AccountAutoaddress } from 'mailspring-exports';
 import { developerToolsAvailable } from '../../../../platform/developer-tools';
 
@@ -25,8 +28,7 @@ class AliasRow extends Component<
     if (this.state.editing) {
       return (
         <div className="settings-row alias-input-row">
-          <input
-            type="text"
+          <TextField
             autoFocus
             aria-label={localized('Address')}
             value={this.state.value}
@@ -42,16 +44,16 @@ class AliasRow extends Component<
     }
     return (
       <SettingsRow label={<span dir="auto">{alias}</span>}>
-        <button
-          className="btn"
+        <Button
+          variant="outline"
           onClick={() => this.setState({ editing: true, value: alias })}
           aria-label={localized('Edit %@', alias)}
         >
           {localized('Edit')}
-        </button>
-        <button className="btn" onClick={onRemove} aria-label={localized('Remove %@', alias)}>
+        </Button>
+        <Button variant="outline" onClick={onRemove} aria-label={localized('Remove %@', alias)}>
           {localized('Remove')}
-        </button>
+        </Button>
       </SettingsRow>
     );
   }
@@ -168,8 +170,8 @@ class PreferencesAccountDetails extends Component<
     this._onAccountAliasCreated(value);
   };
 
-  _onDefaultAliasSelected = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const defaultAlias = event.target.value === 'None' ? null : event.target.value;
+  _onDefaultAliasSelected = (value: string) => {
+    const defaultAlias = value === 'None' ? null : value;
     this._setStateAndSave({ defaultAlias });
   };
 
@@ -287,12 +289,12 @@ class PreferencesAccountDetails extends Component<
           <div className="account-banner-detail">{detail}</div>
         </div>
         <div className="account-banner-actions">
-          <button className="btn" onClick={this._onShowErrorDetails}>
+          <Button variant="outline" onClick={this._onShowErrorDetails}>
             {localized('Error details')}
-          </button>
-          <button className="btn btn-emphasis" onClick={primary.action}>
+          </Button>
+          <Button variant="default" onClick={primary.action}>
             {primary.text}
-          </button>
+          </Button>
         </div>
       </SettingsCard>
     );
@@ -343,9 +345,9 @@ class PreferencesAccountDetails extends Component<
           label={localized('Signed in with %@', account.displayProvider())}
           description={localized('Sign in again if Tern stops getting your mail.')}
         >
-          <button className="btn" onClick={this._onReconnect}>
+          <Button variant="outline" onClick={this._onReconnect}>
             {localized('Sign in again…')}
-          </button>
+          </Button>
         </SettingsRow>
       );
     }
@@ -359,9 +361,9 @@ class PreferencesAccountDetails extends Component<
         }
         description={localized('Change the password, servers or ports Tern uses.')}
       >
-        <button className="btn" onClick={this._onReconnect}>
+        <Button variant="outline" onClick={this._onReconnect}>
           {localized('Update connection settings…')}
-        </button>
+        </Button>
       </SettingsRow>
     );
   }
@@ -379,9 +381,8 @@ class PreferencesAccountDetails extends Component<
 
         <SettingsSection title={<span dir="auto">{account.label}</span>}>
           <SettingsRow label={localized('Name in the sidebar')}>
-            <input
+            <TextField
               id="account-label"
-              type="text"
               aria-label={localized('Name in the sidebar')}
               value={account.label}
               onBlur={this._saveChanges}
@@ -389,9 +390,8 @@ class PreferencesAccountDetails extends Component<
             />
           </SettingsRow>
           <SettingsRow label={localized('Your name on sent mail')}>
-            <input
+            <TextField
               id="account-sender-name"
-              type="text"
               aria-label={localized('Your name on sent mail')}
               value={account.name}
               onBlur={this._saveChanges}
@@ -412,9 +412,9 @@ class PreferencesAccountDetails extends Component<
               onChange={(e) => this._onSetColor({ color: e.target.value })}
             />
             {account.color ? (
-              <button className="btn" onClick={this._onResetColor}>
+              <Button variant="outline" onClick={this._onResetColor}>
                 {localized('No colour')}
-              </button>
+              </Button>
             ) : (
               <span className="account-color-none">{localized('None')}</span>
             )}
@@ -424,21 +424,18 @@ class PreferencesAccountDetails extends Component<
             description={localized('Adds these addresses to every message you write.')}
             className="autoaddress-row"
           >
-            <select
-              className="settings-select"
+            <SettingsSelect
               aria-label={localized('Cc or Bcc')}
               value={autoaddress.type}
-              onChange={(e) =>
-                this._setStateAndSave({
-                  autoaddress: { ...autoaddress, type: e.target.value as 'cc' | 'bcc' },
-                })
+              onChange={(type: 'cc' | 'bcc') =>
+                this._setStateAndSave({ autoaddress: { ...autoaddress, type } })
               }
-            >
-              <option value="cc">{localized('Cc')}</option>
-              <option value="bcc">{localized('Bcc')}</option>
-            </select>
-            <input
-              type="text"
+              options={[
+                ['cc', localized('Cc')],
+                ['bcc', localized('Bcc')],
+              ]}
+            />
+            <TextField
               aria-label={localized('Addresses to copy, separated by commas')}
               value={autoaddress.value}
               onChange={(e) =>
@@ -465,33 +462,28 @@ class PreferencesAccountDetails extends Component<
             />
           ))}
           <div className="settings-row alias-input-row">
-            <input
-              type="text"
+            <TextField
               aria-label={localized('New address')}
               placeholder={aliasPlaceholder}
               value={newAlias}
               onChange={(e) => this.setState({ newAlias: e.target.value })}
               onKeyDown={(e) => e.key === 'Enter' && this._onAddAlias()}
             />
-            <button className="btn" disabled={!newAlias.trim()} onClick={this._onAddAlias}>
+            <Button variant="outline" disabled={!newAlias.trim()} onClick={this._onAddAlias}>
               {localized('Add')}
-            </button>
+            </Button>
           </div>
           {aliases.length > 0 && (
             <SettingsRow label={localized('New messages from')}>
-              <select
-                className="settings-select"
+              <SettingsSelect
                 aria-label={localized('New messages from')}
                 value={defaultAlias}
                 onChange={this._onDefaultAliasSelected}
-              >
-                <option value="None">{`${account.name} <${account.emailAddress}>`}</option>
-                {aliases.map((alias, idx) => (
-                  <option key={`alias-${idx}`} value={alias}>
-                    {alias}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  ['None', `${account.name} <${account.emailAddress}>`],
+                  ...aliases.map((alias): [string, string] => [alias, alias]),
+                ]}
+              />
             </SettingsRow>
           )}
         </SettingsSection>
@@ -503,15 +495,15 @@ class PreferencesAccountDetails extends Component<
               label={localized('Shared mailbox')}
               description={localized('Add a mailbox other people in your organisation share.')}
             >
-              <button className="btn" onClick={this._onAddSharedMailbox}>
+              <Button variant="outline" onClick={this._onAddSharedMailbox}>
                 {localized('Add shared mailbox…')}
-              </button>
+              </Button>
             </SettingsRow>
           )}
           <SettingsRow label={localized('Contacts')}>
-            <button className="btn" onClick={this._onManageContacts}>
+            <Button variant="outline" onClick={this._onManageContacts}>
               {localized('Manage contacts')}
-            </button>
+            </Button>
           </SettingsRow>
         </SettingsSection>
 
@@ -522,9 +514,9 @@ class PreferencesAccountDetails extends Component<
               'Downloads its mail again. Use it when mail is missing or looks wrong. It can take a while for a large mailbox.'
             )}
           >
-            <button className="btn" onClick={this._onResetCache}>
+            <Button variant="outline" onClick={this._onResetCache}>
               {localized('Rebuild…')}
-            </button>
+            </Button>
           </SettingsRow>
           <SettingsRow
             label={localized('Remove this account')}
@@ -532,9 +524,9 @@ class PreferencesAccountDetails extends Component<
               "Deletes its mail from this computer. Your mail stays on your provider's server."
             )}
           >
-            <button className="btn btn-danger" onClick={this._onRemoveAccount}>
+            <Button variant="destructive" onClick={this._onRemoveAccount}>
               {localized('Remove…')}
-            </button>
+            </Button>
           </SettingsRow>
         </SettingsSection>
       </div>

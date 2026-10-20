@@ -3,6 +3,7 @@ import { localized, DefaultClientHelper, SystemStartService } from 'mailspring-e
 import { shell } from 'electron';
 
 import { SettingsRow, SettingsSwitch } from 'mailspring-component-kit';
+import { Button } from '../../../components/kit/button';
 
 interface DefaultMailClientItemState {
   defaultClient: boolean | 'unknown';
@@ -61,9 +62,9 @@ export class DefaultMailClientRow extends React.Component<
           label={localized('Tern is your default mail app')}
           description={localized('Mail links in other apps open in Tern.')}
         >
-          <button className="btn" onClick={this._onReset}>
+          <Button variant="outline" onClick={this._onReset}>
             {localized('Stop using Tern')}
-          </button>
+          </Button>
         </SettingsRow>
       );
     }
@@ -72,9 +73,9 @@ export class DefaultMailClientRow extends React.Component<
         label={localized("Tern isn't your default mail app")}
         description={localized('Mail links in other apps open in another mail app.')}
       >
-        <button className="btn" onClick={this._onMakeDefault}>
+        <Button variant="outline" onClick={this._onMakeDefault}>
           {localized('Make Tern the default')}
-        </button>
+        </Button>
       </SettingsRow>
     );
   }

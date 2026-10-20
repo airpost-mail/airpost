@@ -115,15 +115,8 @@
   justify-content: flex-end;
 }
 
-.settings-select,
 .settings-row-control [data-slot='select-trigger'] {
   max-width: 260px;
-}
-.settings-select {
-  height: 26px;
-  border-radius: 6px;
-  padding: 0 24px 0 9px;
-  margin: 0;
 }
 
 .settings-pill {
@@ -242,7 +235,8 @@
   input[type='text'],
   input[type='password'],
   input[type='url'],
-  select {
+  select,
+  [data-slot='select-trigger'] {
     width: 100%;
     margin: 0;
   }

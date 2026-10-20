@@ -22,19 +22,17 @@
     color: @text-color-subtle;
   }
 
+  // A kit ghost Button spanning the card, as the last row of the list.
   .mail-rules-new {
-    display: block;
+    display: flex;
+    justify-content: flex-start;
     width: 100%;
-    text-align: left;
-    border: none;
-    background: transparent;
+    height: auto;
     padding: 10px 14px;
-    color: @text-color-link;
-    font-weight: 500;
+    border-radius: 0;
+    color: var(--link);
+    font-size: inherit;
     cursor: pointer;
-    &:hover {
-      background: color-mix(in srgb, @text-color 5%, transparent);
-    }
   }
 
   .rule-detail {
@@ -66,7 +64,7 @@
 
     .mail-rule-label {
       margin: 14px 0 6px;
-      select {
+      [data-slot='select-trigger'] {
         margin: 0 4px;
       }
     }
@@ -80,31 +78,30 @@
         align-items: center;
         padding: 6px 10px;
         border-bottom: 1px solid @rules-line;
-        select,
-        input {
-          margin: 2px 4px;
+        [data-slot='select-trigger'],
+        [data-slot='input'] {
+          margin-block: 2px;
+          margin-inline: 4px;
           &:first-child {
-            margin-left: 0;
+            margin-inline-start: 0;
           }
         }
-        select {
+        [data-slot='select-trigger'] {
           max-width: 170px;
         }
-        input {
+        [data-slot='input'] {
           flex: 1;
+          width: auto;
           max-width: 200px;
           min-width: 100px;
         }
         .actions {
           white-space: nowrap;
-          margin-left: auto;
-          .btn {
+          margin-inline-start: auto;
+          [data-slot='button'] {
             padding: 0;
             border-radius: 100%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-left: 8px;
+            margin-inline-start: 8px;
             width: 24px;
             height: 24px;
           }

@@ -2,10 +2,12 @@
 // Copyright (C) 2026 Tern contributors
 
 import React from 'react';
+import ReactDOM from 'react-dom';
 import TestRenderer, { act } from 'react-test-renderer';
 import { AccountStore, KeyManager } from 'mailspring-exports';
 import { ProviderCard, SettingsSwitch } from 'mailspring-component-kit';
 import PreferencesAI, { ProviderSection } from '../lib/preferences-ai';
+import { SettingsSelect } from '../../../src/components/settings-select';
 import {
   ACCOUNT_ID,
   ENGINE_KEYS,
@@ -25,8 +27,27 @@ async function render() {
   return renderer;
 }
 
+// The DOM element with the id: kit components pass `id` down to the element they render.
 function byId(renderer: TestRenderer.ReactTestRenderer, id: string) {
-  return renderer.root.find((node) => node.props.id === id);
+  return renderer.root.find((node) => typeof node.type === 'string' && node.props.id === id);
+}
+
+// Radix Select renders its closed list into a DocumentFragment through ReactDOM.createPortal,
+// which react-test-renderer can't host. The specs never open a list.
+function withoutPortals() {
+  spyOn(ReactDOM, 'createPortal').andReturn(null);
+}
+
+// Picks an option through SettingsSelect's onChange, as choosing it in the open list would.
+function pick(renderer: TestRenderer.ReactTestRenderer, id: string, value: string) {
+  return renderer.root
+    .find((node) => node.type === SettingsSelect && node.props.id === id)
+    .props.onChange(value);
+}
+
+// The "+ Add a model" menu's items, which a closed menu doesn't render.
+function addProvider(renderer: TestRenderer.ReactTestRenderer, kind: 'anthropic' | 'openai') {
+  return (renderer.root.findByType(PreferencesAI).instance as PreferencesAI)._onAddProvider(kind);
 }
 
 function button(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -75,11 +96,12 @@ describe('Preferences > AI', () => {
 
   beforeEach(() => {
     keys = fakeKeyset();
+    withoutPortals();
   });
 
   async function addAnthropic(renderer: TestRenderer.ReactTestRenderer) {
     await act(async () => {
-      byId(renderer, 'ai-add-provider').props.onChange({ target: { value: 'anthropic' } });
+      addProvider(renderer, 'anthropic');
       await settle();
     });
   }
@@ -166,9 +188,7 @@ describe('Preferences > AI', () => {
       },
     });
     await act(async () => {
-      byId(renderer, 'ai-provider-anthropic-model-picker').props.onChange({
-        target: { value: 'claude-b' },
-      });
+      pick(renderer, 'ai-provider-anthropic-model-picker', 'claude-b');
       await settle();
     });
     expect(AppEnv.config.get('core.ai').providers[0].model).toBe('claude-b');
@@ -189,7 +209,7 @@ describe('Preferences > AI', () => {
     });
     const renderer = await render();
     await act(async () => {
-      byId(renderer, 'ai-add-provider').props.onChange({ target: { value: 'openai' } });
+      addProvider(renderer, 'openai');
       await settle();
     });
     // Same server, written out: the key stays.
@@ -247,6 +267,7 @@ describe('Preferences > AI with an engine that keeps the keys', () => {
   beforeEach(() => {
     keys = fakeKeyset();
     secrets = {};
+    withoutPortals();
   });
 
   const engine = (answers = {}) =>
