@@ -1,0 +1,56 @@
+name: Feature request
+description: Something Tern should do that it doesn't.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search [existing issues](https://github.com/ternmail/ternmail/issues?q=is%3Aissue), closed ones included, first.
+        Some features fit better as a plugin or theme ([plugin system](https://github.com/ternmail/ternmail/blob/main/docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md)); say if you'd consider that.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Desktop app
+        - Sync engine (mail, calendar, contacts)
+        - tern CLI
+        - MCP server (tern-mcp)
+        - Web client
+        - Tern server (backend, gateway, Docker images)
+        - Plugin API
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you're trying to do and what gets in the way today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you'd like Tern to do. Mockups or examples from other clients help.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds you use now, or other ways this could work.
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you work on it?
+      options:
+        - "No"
+        - Yes, with some guidance
+        - Yes

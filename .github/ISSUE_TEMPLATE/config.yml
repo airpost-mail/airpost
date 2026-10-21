@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/ternmail/ternmail/security/advisories/new
+    about: Report vulnerabilities privately, as described in SECURITY.md. Please don't open a public issue.
+  - name: Security policy
+    url: https://github.com/ternmail/ternmail/blob/main/SECURITY.md
+    about: What is in scope and how Tern handles your data.

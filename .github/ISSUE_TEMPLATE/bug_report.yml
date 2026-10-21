@@ -1,0 +1,109 @@
+name: Bug report
+description: Something in Tern doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search [existing issues](https://github.com/ternmail/ternmail/issues?q=is%3Aissue), closed ones included, first.
+        Security problems go through [private vulnerability reporting](https://github.com/ternmail/ternmail/security/advisories/new) (see SECURITY.md), not here.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Desktop app
+        - Sync engine (mail, calendar, contacts)
+        - tern CLI
+        - MCP server (tern-mcp)
+        - Web client
+        - Tern server (backend, gateway, Docker images)
+        - Plugin or theme
+        - Install or packaging
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+
+  - type: input
+    id: version
+    attributes:
+      label: Tern version
+      description: The version line in the app's menu (the Tern menu on macOS, Help on Linux), `tern --version`, or the commit if you built from source.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options:
+        - Release download from GitHub
+        - Homebrew
+        - .deb or .rpm
+        - Snap
+        - AUR
+        - Nix
+        - Docker image
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.5 (arm64), Ubuntu 24.04, Windows 11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Account provider
+      description: The kind of account the problem happens with, if any. Pick all that apply.
+      multiple: true
+      options:
+        - Gmail or Google Workspace
+        - Microsoft 365 / Office 365
+        - Outlook.com / Hotmail
+        - iCloud
+        - Yahoo
+        - Fastmail
+        - GMX
+        - Yandex
+        - Other IMAP / SMTP server
+        - Not account-specific
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Engine logs
+      description: |
+        For sync, send and connection problems. In the desktop app, Developer > Open Engine Logs opens the folder; each account logs to `engine-<accountId>.log` in the profile (`~/Library/Application Support/Tern` on macOS, `~/.config/Tern` on Linux, `%APPDATA%\Tern` on Windows). From a terminal, `tern logs <email>` prints an account's log and `tern logs engine|gateway|mcp-http` a service's.
+        Paste the lines around the problem. Logins are not logged, but logs can contain server and folder names, email addresses and subjects; remove what you don't want public.
+      render: text
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, the developer console (Developer > Toggle Developer Tools), installed plugins, or whether it worked in an earlier version.
