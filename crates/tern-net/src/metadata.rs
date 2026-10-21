@@ -15,7 +15,7 @@
 //! |---|---|
 //! | `MetadataWorker` `/metadata/<aid>`, `/deltas/<aid>/head`, `/deltas/<aid>/streaming` | [`MetadataBackend::pull`]; the thread is not started for [`LocalOnly`]. The HTTP backend streams from cursor `0` instead of head + pages |
 //! | `performRemoteSyncbackMetadata` `POST /metadata/<aid>/<id>/<plugin>` | [`MetadataBackend::push`]; a no-op for [`LocalOnly`] |
-//! | `performRemoteSendFeatureUsageEvent` `POST /api/feature_usage_event` | [`MetadataBackend::record_feature_usage`]; a no-op |
+//! | `performRemoteSendFeatureUsageEvent` `POST /api/feature_usage_event` | none; the desktop queues no `SendFeatureUsageEventTask` |
 //! | `DAVWorker` `POST /api/resolve-dav-hosts` (DNS SRV through the server) | tern-dav resolves SRV records locally |
 //! | `install-check` `GET <IDENTITY_SERVER>/ping` | the bin probes a TLS host with `HttpClient::probe` |
 
@@ -136,12 +136,6 @@ pub trait MetadataBackend: Send + Sync {
         Ok(())
     }
 
-    /// A client feature was used (`SendFeatureUsageEventTask`). Usage counts fed
-    /// Mailspring's plan limits, which Tern does not have.
-    fn record_feature_usage(&self, _feature: &str) -> Result<()> {
-        Ok(())
-    }
-
     /// Where tracking URLs point, when a server that offers tracking is connected; `None`
     /// sends tracked drafts untracked. It may make a request, so callers ask outside a store
     /// transaction.
@@ -204,7 +198,6 @@ mod tests {
             header_message_id: None,
         };
         assert!(backend.push(&push).is_ok());
-        assert!(backend.record_feature_usage("snooze").is_ok());
 
         let mut delivered = 0;
         let cursor = backend

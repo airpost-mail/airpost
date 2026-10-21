@@ -232,7 +232,6 @@ impl<'a> TaskProcessor<'a> {
             "SyncbackCategoryTask"
             | "DestroyCategoryTask"
             | "SendDraftTask"
-            | "SendFeatureUsageEventTask"
             | "ExpungeAllInFolderTask"
             | "GetManyRFC2822Task"
             | "EventRSVPTask" => Ok(()),
@@ -335,10 +334,6 @@ impl<'a> TaskProcessor<'a> {
             }
             "DestroyCategoryTask" => self.perform_remote_destroy_category(&task.data, session),
             "SyncbackMetadataTask" => self.perform_remote_syncback_metadata(&task.data),
-            "SendFeatureUsageEventTask" => {
-                let feature = json_str(&task.data, "feature").to_owned();
-                self.metadata.record_feature_usage(&feature)
-            }
             "ExpungeAllInFolderTask" => {
                 self.perform_remote_expunge_all_in_folder(&task.data, session)
             }
