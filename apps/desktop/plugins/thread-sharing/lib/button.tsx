@@ -1,5 +1,5 @@
 import React from 'react';
-import { Thread, CapabilityStore } from 'mailspring-exports';
+import { Thread, CapabilityStore, localized } from 'mailspring-exports';
 import {
   BindGlobalCommands,
   IconButton,
@@ -8,8 +8,9 @@ import {
   TooltipTrigger,
 } from 'mailspring-component-kit';
 
-// Sharing uploads the thread to a Tern server that hosts the public page. Until the capability
-// store reports one, the button stays visible but disabled.
+// Sharing uploads the thread to a Tern server that hosts the public page. The upload and the
+// share popover aren't written yet, so the button stays disabled: with the capability store's
+// reason until a server offers sharing, then with "not in this version yet".
 // `thread` is the first selected item, so it is missing when nothing is selected.
 export default class ThreadSharingButton extends React.Component<{
   items: any[];
@@ -31,7 +32,9 @@ export default class ThreadSharingButton extends React.Component<{
     if (this.props.items && this.props.items.length > 1) {
       return <span />;
     }
-    const unavailable = CapabilityStore.unavailableMessage('thread-sharing');
+    const unavailable =
+      CapabilityStore.unavailableMessage('thread-sharing') ??
+      localized('Sharing threads comes in a later version.');
     return (
       <BindGlobalCommands
         commands={{
@@ -47,7 +50,7 @@ export default class ThreadSharingButton extends React.Component<{
               <IconButton
                 variant="toolbar"
                 icon="ic-toolbar-native-share.png"
-                label={unavailable ?? ''}
+                label={localized('Share this thread')}
                 tooltip={false}
                 disabled
                 style={{ marginRight: 0 }}
