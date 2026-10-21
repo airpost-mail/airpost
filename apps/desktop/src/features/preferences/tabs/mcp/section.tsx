@@ -1,4 +1,4 @@
-import path from 'path';
+import fs from 'fs';
 import React from 'react';
 import classNames from 'classnames';
 import { localized } from '../../../../intl/localize';
@@ -19,12 +19,14 @@ import { Button } from '../../../../components/kit/button';
 import { Checkbox } from '../../../../components/kit/checkbox';
 import { TextField } from '../../../../components/kit/text-field';
 import { SettingsSelect } from '../../../../components/settings-select';
+import { Clipboard } from '../../../../platform/app-api';
+import { McpHttpStatus, ServicesChannel } from '../../../../platform/services';
+import { invokeServices, onServiceChange, servicePill } from '../services-client';
 
 import {
   ACCESS_LEVELS,
   AuditEntry,
   McpPolicy,
-  TOKEN_FILE,
   defaultPolicy,
   isValidPort,
   migrateCoreMcpConfig,
@@ -44,8 +46,9 @@ import {
   uninstallClient,
 } from './tern-mcp';
 
-// Preferences > Agents: the policy tern-mcp reads (mcp.json), client registration through
-// the bundled tern-mcp, and its audit log and status. The `tern` command is in General.
+// Preferences > MCP: the policy tern-mcp reads (mcp.json), client registration through the
+// bundled tern-mcp, the `tern-mcp http` server main runs (main/services/mcp-http.ts), and the
+// audit log and status. The `tern` command is in General.
 
 type AccessLevel = (typeof ACCESS_LEVELS)[number];
 
@@ -142,6 +145,7 @@ interface State {
   audit: AuditEntry[];
   showAllActivity: boolean;
   trayTurnedOn: boolean;
+  http: McpHttpStatus | null;
 }
 
 export function configDir() {
@@ -193,7 +197,7 @@ function paramsText(params: string | undefined) {
 }
 
 /** Turns inertness on and off on the wrapped element: React 17 doesn't pass `inert`. */
-function Dimmed(props: { off: boolean; children: React.ReactNode }) {
+function Dimmed(props: { off: boolean; className?: string; children: React.ReactNode }) {
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!ref.current) return;
@@ -201,7 +205,7 @@ function Dimmed(props: { off: boolean; children: React.ReactNode }) {
     else ref.current.removeAttribute('inert');
   }, [props.off]);
   return (
-    <div ref={ref} className={classNames('agents-body', { off: props.off })}>
+    <div ref={ref} className={classNames(props.className || 'agents-body', { off: props.off })}>
       {props.children}
     </div>
   );
@@ -211,6 +215,7 @@ export class McpSection extends React.Component<Props, State> {
   static displayName = 'McpSection';
 
   _mounted = false;
+  _unsubscribe: (() => void) | null = null;
 
   constructor(props: Props) {
     super(props);
@@ -227,6 +232,7 @@ export class McpSection extends React.Component<Props, State> {
       audit: [],
       showAllActivity: false,
       trayTurnedOn: false,
+      http: null,
     };
   }
 
@@ -240,10 +246,24 @@ export class McpSection extends React.Component<Props, State> {
     this._reloadPolicy();
     this._reloadAudit();
     this._refreshStatus();
+    this._unsubscribe = onServiceChange<McpHttpStatus>('mcp-http', (http) =>
+      this.setState({ http })
+    );
+    invokeServices<McpHttpStatus>(ServicesChannel.McpHttpStatus).then((http) => {
+      if (this._mounted && http) this.setState({ http });
+    });
   }
 
   componentWillUnmount() {
     this._mounted = false;
+    if (this._unsubscribe) this._unsubscribe();
+  }
+
+  /** Main polls mcp.json too; asking now starts or stops the server without that wait. */
+  _reloadHttp() {
+    invokeServices<McpHttpStatus>(ServicesChannel.McpHttpReload).then((http) => {
+      if (this._mounted && http) this.setState({ http });
+    });
   }
 
   _reloadPolicy() {
@@ -299,14 +319,18 @@ export class McpSection extends React.Component<Props, State> {
 
   /** Apps only reach mail while the engine runs, and off macOS the tray icon is what keeps
    * Tern running once the window closes (product-model.md section 3). */
-  _onToggleAccess = (on: boolean) => {
-    if (!this._save((p) => ({ ...p, enabled: on }))) return;
+  _keepRunning(on: boolean) {
     if (on && !AppEnv.config.get('core.workspace.systemTray')) {
       AppEnv.config.set('core.workspace.systemTray', true);
       this.setState({ trayTurnedOn: true });
-    } else if (!on) {
+    } else if (!on && !this._isOn() && !this.state.policy.http.enabled) {
       this.setState({ trayTurnedOn: false });
     }
+  }
+
+  _onToggleAccess = (on: boolean) => {
+    if (!this._save((p) => ({ ...p, enabled: on }))) return;
+    this._keepRunning(on);
   };
 
   _onAccessLevel = (accessLevel: string) => {
@@ -357,7 +381,20 @@ export class McpSection extends React.Component<Props, State> {
   };
 
   _onToggleHttp = () => {
-    this._save((p) => ({ ...p, http: { ...p.http, enabled: !p.http.enabled } }));
+    const on = !this.state.policy.http.enabled;
+    if (!this._save((p) => ({ ...p, http: { ...p.http, enabled: on } }))) return;
+    this._keepRunning(on);
+    this._reloadHttp();
+  };
+
+  _onCopyKey = () => {
+    const file = this.state.http?.tokenFile;
+    if (!file) return;
+    try {
+      Clipboard.writeText(fs.readFileSync(file, 'utf8').trim());
+    } catch (err) {
+      // tern-mcp writes the key the first time the server starts.
+    }
   };
 
   _onCommitPort = () => {
@@ -366,7 +403,7 @@ export class McpSection extends React.Component<Props, State> {
       this.setState({ portInput: String(this.state.policy.http.port) });
       return;
     }
-    this._save((p) => ({ ...p, http: { ...p.http, port } }));
+    if (this._save((p) => ({ ...p, http: { ...p.http, port } }))) this._reloadHttp();
   };
 
   _onRunClient = async (client: McpClientId, action: 'install' | 'uninstall', force = false) => {
@@ -395,41 +432,19 @@ export class McpSection extends React.Component<Props, State> {
     this.setState({ busyClient: null, results: { ...this.state.results, [client]: result } });
   };
 
-  _renderHero() {
-    const { policyError, trayTurnedOn } = this.state;
-    const on = this._isOn();
-    const label = localized('Let apps on this computer use Tern');
+  _renderTrayNote() {
+    if (!this.state.trayTurnedOn) return null;
     return (
-      <>
-        <div className={classNames('agents-hero', { on })}>
-          <div>
-            <b>{label}</b>
-            <p>
-              {localized(
-                'Claude, Codex and other AI apps can read your mail and act on it, with the access you choose below.'
-              )}
-            </p>
-          </div>
-          <SettingsSwitch
-            checked={on && !policyError}
-            disabled={!!policyError}
-            label={label}
-            onChange={this._onToggleAccess}
-          />
-        </div>
-        {trayTurnedOn && (
-          <SettingsNote>
-            {process.platform === 'darwin'
-              ? localized('Tern now shows in the menu bar, so you can see that it is running.')
-              : localized(
-                  'Tern now keeps running in the system tray after you close the window, so apps keep working.'
-                )}{' '}
-            <a onClick={() => Actions.switchPreferencesTab('General')}>
-              {localized('Change in General')}
-            </a>
-          </SettingsNote>
-        )}
-      </>
+      <SettingsNote>
+        {process.platform === 'darwin'
+          ? localized('Tern now shows in the menu bar, so you can see that it is running.')
+          : localized(
+              'Tern now keeps running in the system tray after you close the window, so apps keep working.'
+            )}{' '}
+        <a onClick={() => Actions.switchPreferencesTab('General')}>
+          {localized('Change in General')}
+        </a>
+      </SettingsNote>
     );
   }
 
@@ -504,21 +519,113 @@ export class McpSection extends React.Component<Props, State> {
     );
   }
 
-  _renderApps() {
+  _renderLocalApps() {
+    const { policyError } = this.state;
+    const on = this._isOn();
+    const label = localized('Allow apps over stdio');
     return (
       <SettingsSection
-        title={localized('Apps')}
+        title={localized('Local apps (stdio)')}
         note={
           ternMcpBinary()
             ? localized(
                 'Connecting adds Tern to the app’s own settings. Tern can’t tell whether an app is still connected after this window closes.'
               )
             : localized(
-                'This copy of Tern can’t connect apps because it doesn’t include the part that does it. Install Tern from the official download to use this.'
+                'This copy of Tern can’t connect apps because it doesn’t include tern-mcp. Install Tern from the official download to use this.'
               )
         }
       >
-        {MCP_CLIENTS.map((c) => this._renderClient(c))}
+        <SettingsRow
+          label={label}
+          description={localized(
+            'Claude Desktop, Claude Code, Codex and other MCP apps on this computer start Tern’s MCP server (tern-mcp) themselves and talk to it over stdio.'
+          )}
+        >
+          <SettingsSwitch
+            checked={on && !policyError}
+            disabled={!!policyError}
+            label={label}
+            onChange={this._onToggleAccess}
+          />
+        </SettingsRow>
+        <Dimmed off={!on} className="agents-clients">
+          {MCP_CLIENTS.map((c) => this._renderClient(c))}
+        </Dimmed>
+      </SettingsSection>
+    );
+  }
+
+  _httpServerText(http: McpHttpStatus | null) {
+    if (!http) return localized('Restart Tern to start the server.');
+    if (!http.available) return localized('tern-mcp is not in this build of Tern.');
+    if (http.policyError) return http.policyError;
+    if (http.state === 'running') return localized('Serving %@.', http.url);
+    if (http.state === 'error') {
+      return localized('Couldn’t start: %@. Tern tries again shortly.', http.error);
+    }
+    if (http.state === 'starting') return localized('Starting the server…');
+    return localized('Tern starts the server while it is open.');
+  }
+
+  _renderHttp() {
+    const { policy, policyError, portInput, http } = this.state;
+    const label = localized('Allow apps over HTTP');
+    const pill = http && http.available ? servicePill(http) : null;
+    const keyExists = !!http && fs.existsSync(http.tokenFile);
+    return (
+      <SettingsSection title={localized('HTTP')}>
+        <SettingsRow
+          label={label}
+          description={localized(
+            'For apps that can’t start Tern themselves. Tern runs the server (tern-mcp http) while it is open, and only programs on this computer can connect.'
+          )}
+        >
+          <SettingsSwitch
+            checked={policy.http.enabled && !policyError}
+            disabled={!!policyError}
+            label={label}
+            onChange={this._onToggleHttp}
+          />
+        </SettingsRow>
+        {policy.http.enabled && !policyError && (
+          <>
+            <SettingsRow
+              label={localized('Port')}
+              description={localized('Apps connect to http://127.0.0.1:%@/mcp.', policy.http.port)}
+            >
+              <TextField
+                id="mcp-http-port"
+                className="agents-port"
+                type="text"
+                inputMode="numeric"
+                aria-label={localized('Port')}
+                value={portInput}
+                onChange={(e) => this.setState({ portInput: e.target.value })}
+                onBlur={this._onCommitPort}
+                onKeyDown={(e) => e.key === 'Enter' && this._onCommitPort()}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={localized('Access key')}
+              description={
+                http
+                  ? localized(
+                      'Apps send it as “Authorization: Bearer <key>”. It is kept in %@.',
+                      http.tokenFile
+                    )
+                  : localized('Apps send it as “Authorization: Bearer <key>”.')
+              }
+            >
+              <Button variant="outline" disabled={!keyExists} onClick={this._onCopyKey}>
+                {localized('Copy Key')}
+              </Button>
+            </SettingsRow>
+            <SettingsRow label={localized('Server')} description={this._httpServerText(http)}>
+              {pill && <StatusPill kind={pill.kind}>{pill.text}</StatusPill>}
+            </SettingsRow>
+          </>
+        )}
       </SettingsSection>
     );
   }
@@ -723,59 +830,11 @@ export class McpSection extends React.Component<Props, State> {
     );
   }
 
-  _renderAdvanced() {
-    const { policy, policyError, portInput } = this.state;
-    const httpLabel = localized('Allow apps that connect over HTTP');
-    return (
-      <SettingsSection title={localized('Advanced')}>
-        {this._renderStatusRow()}
-        {!policyError && (
-          <>
-            <SettingsRow
-              label={httpLabel}
-              description={localized(
-                'For apps that can’t start Tern themselves. Only programs on this computer can connect.'
-              )}
-            >
-              <SettingsSwitch
-                checked={policy.http.enabled}
-                label={httpLabel}
-                onChange={this._onToggleHttp}
-              />
-            </SettingsRow>
-            {policy.http.enabled && (
-              <SettingsRow
-                label={localized('Port')}
-                description={localized(
-                  'Start the server with `tern-mcp http`. Apps send the access key in %@.',
-                  path.join(configDir(), TOKEN_FILE)
-                )}
-              >
-                <TextField
-                  id="mcp-http-port"
-                  className="agents-port"
-                  type="text"
-                  inputMode="numeric"
-                  aria-label={localized('Port')}
-                  value={portInput}
-                  onChange={(e) => this.setState({ portInput: e.target.value })}
-                  onBlur={this._onCommitPort}
-                  onKeyDown={(e) => e.key === 'Enter' && this._onCommitPort()}
-                />
-              </SettingsRow>
-            )}
-          </>
-        )}
-      </SettingsSection>
-    );
-  }
-
   render() {
-    const { policyError, policyErrorFile } = this.state;
-    const off = !this._isOn();
+    const { policyError, policyErrorFile, policy } = this.state;
+    const off = !this._isOn() && !policy.http.enabled;
     return (
       <div className="agents-section">
-        {this._renderHero()}
         {policyError && (
           <SettingsSection danger>
             <SettingsRow
@@ -788,13 +847,15 @@ export class McpSection extends React.Component<Props, State> {
             />
           </SettingsSection>
         )}
+        {this._renderLocalApps()}
+        {this._renderTrayNote()}
+        {this._renderHttp()}
         <Dimmed off={off}>
-          {this._renderApps()}
           {!policyError && this._renderAccessLevel()}
           {!policyError && this._renderAccounts()}
           {this._renderActivity()}
         </Dimmed>
-        <Dimmed off={off}>{this._renderAdvanced()}</Dimmed>
+        <SettingsSection title={localized('Status')}>{this._renderStatusRow()}</SettingsSection>
       </div>
     );
   }

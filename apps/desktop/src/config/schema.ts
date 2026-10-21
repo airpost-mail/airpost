@@ -36,6 +36,17 @@ export default {
           },
         },
       },
+      services: {
+        type: 'object',
+        properties: {
+          // Preferences > General > Web access: main runs tern-gateway while the app runs
+          // (main/services/gateway.ts).
+          webAccess: {
+            type: 'boolean',
+            default: false,
+          },
+        },
+      },
       appearance: {
         type: 'object',
         properties: {

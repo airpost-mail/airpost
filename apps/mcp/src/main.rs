@@ -171,7 +171,7 @@ fn print_status(s: &Value) {
             p["source"].as_str().unwrap_or("")
         );
         if p["enabled"] == false {
-            println!("Access:    off (every tool is refused)");
+            println!("Access:    off for stdio clients (every tool is refused)");
         }
         let accounts = p["enabledAccounts"].as_object().filter(|o| !o.is_empty());
         match accounts {
@@ -221,7 +221,7 @@ fn run(cli: Cli) -> Result<(), String> {
                 ));
             }
             let port = port.unwrap_or(policy.http.port);
-            let app = Arc::new(server::App::new(dir));
+            let app = Arc::new(server::App::over_http(dir));
             runtime()?.block_on(http::serve(app, port))
         }
         Some(Command::Install {

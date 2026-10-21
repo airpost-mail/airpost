@@ -80,8 +80,10 @@ open Tern.
 - `enabledAccounts`: empty means every account. Otherwise an account that is absent or has
   `enabled: false` is invisible: not listed, and its ids answer "not found". Threads and
   messages in an excluded folder are hidden the same way, and the folder isn't listed.
-- `enabled`: `false` refuses every tool call and hides every account; absent or `true` is
-  on. The desktop's Agents switch ("Let apps on this computer use Tern") writes it.
+- `enabled`: `false` refuses every stdio tool call and hides every account from stdio
+  clients; absent or `true` is on. The desktop's "Allow apps over stdio" switch (Preferences >
+  MCP) writes it. Over HTTP, `http.enabled` plays this part instead, so each transport is
+  turned on and off by its own switch.
 - The file is re-read on every call. A file that doesn't parse is an error for every tool, so
   a typo can't widen access.
 - Without `mcp.json`, `accessLevel` and `enabledAccounts` come from the desktop's
@@ -99,7 +101,10 @@ open Tern.
 when `http.enabled` is true. Every request needs `Authorization: Bearer <token>`; the token
 is in `<config-dir>/mcp-token`, created owner-only (0600) on first use. Requests whose `Host`
 isn't a loopback name get 403, which stops DNS rebinding. `install` only writes stdio entries.
-Nothing starts `tern-mcp http` for you; the desktop no longer serves MCP over HTTP itself.
+While the desktop runs and `http.enabled` is true, its main process runs `tern-mcp http` on
+`http.port` (`apps/desktop/src/main/services/mcp-http.ts`): it polls `mcp.json`, restarts the
+server when the port changes or it exits (with a growing delay), and stops it when HTTP is
+turned off or the app quits. Without the desktop, run it yourself.
 
 ## Audit log: `<config-dir>/mcp-audit.log`
 

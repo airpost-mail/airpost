@@ -141,14 +141,37 @@ export function engineBinaryPath(resourcePath: string) {
   return path.join(resourcePath, 'tern-engine').replace('app.asar', 'app.asar.unpacked');
 }
 
-// The `tern` CLI shipped next to tern-engine: TERN_BIN (a source checkout), else the bundled
+// A binary shipped next to tern-engine: the env override (a source checkout), else the bundled
 // one; null when neither exists.
-export function ternBinaryPath(resourcePath: string): string | null {
-  const fromEnv = process.env.TERN_BIN;
+function bundledBinaryPath(resourcePath: string, name: string, envVar: string): string | null {
+  const fromEnv = process.env[envVar];
   if (fromEnv) return fs.existsSync(fromEnv) ? fromEnv : null;
-  const name = process.platform === 'win32' ? 'tern.exe' : 'tern';
-  const bundled = path.join(resourcePath, name).replace('app.asar', 'app.asar.unpacked');
+  const file = process.platform === 'win32' ? `${name}.exe` : name;
+  const bundled = path.join(resourcePath, file).replace('app.asar', 'app.asar.unpacked');
   return fs.existsSync(bundled) ? bundled : null;
+}
+
+// The `tern` CLI: TERN_BIN, else the bundled one.
+export function ternBinaryPath(resourcePath: string): string | null {
+  return bundledBinaryPath(resourcePath, 'tern', 'TERN_BIN');
+}
+
+// tern-mcp (apps/mcp): TERN_MCP_BIN, else the bundled one.
+export function ternMcpBinaryPath(resourcePath: string): string | null {
+  return bundledBinaryPath(resourcePath, 'tern-mcp', 'TERN_MCP_BIN');
+}
+
+// tern-gateway (apps/gateway): TERN_GATEWAY_BIN, else the bundled one.
+export function ternGatewayBinaryPath(resourcePath: string): string | null {
+  return bundledBinaryPath(resourcePath, 'tern-gateway', 'TERN_GATEWAY_BIN');
+}
+
+// The built web client (apps/web, `npm run build:desktop`) tern-gateway serves:
+// TERN_GATEWAY_WEB_ROOT, else the `web` folder build.js ships unpacked.
+export function ternWebRootPath(resourcePath: string): string | null {
+  const fromEnv = process.env.TERN_GATEWAY_WEB_ROOT;
+  const dir = fromEnv || path.join(resourcePath, 'web').replace('app.asar', 'app.asar.unpacked');
+  return fs.existsSync(path.join(dir, 'index.html')) ? dir : null;
 }
 
 // Unpackaged runs (`make desktop`, `npm start`, specs) keep the engine's secrets in a file
