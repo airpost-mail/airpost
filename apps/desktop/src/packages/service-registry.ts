@@ -1,17 +1,21 @@
-class ServiceRegistry {
-  private _waitingForServices = {};
-  private _services = {};
+type ServiceCallback = (service: unknown) => void;
 
-  withService(name: string, callback) {
+// Services are whatever their plugin registers; `T` is the caller's word for what `name` is.
+class ServiceRegistry {
+  private _waitingForServices: { [name: string]: ServiceCallback[] } = {};
+  private _services: { [name: string]: unknown } = {};
+
+  withService<T = unknown>(name: string, callback: (service: T) => void) {
+    const call = callback as ServiceCallback;
     if (this._services[name]) {
-      setTimeout(() => callback(this._services[name]), 0);
+      setTimeout(() => call(this._services[name]), 0);
     } else {
       this._waitingForServices[name] = this._waitingForServices[name] || [];
-      this._waitingForServices[name].push(callback);
+      this._waitingForServices[name].push(call);
     }
   }
 
-  registerService(name: string, obj) {
+  registerService(name: string, obj: unknown) {
     this._services[name] = obj;
     if (this._waitingForServices[name]) {
       for (const callback of this._waitingForServices[name]) {

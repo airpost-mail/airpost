@@ -13,20 +13,23 @@ import {
 } from '../engine/supervisor/settings';
 import { USE_24_HOUR_KEY } from '../intl/date-format';
 
-let _ = require('underscore');
-_ = Object.assign(_, require('./utils'));
+import _ from 'underscore';
+import { setValueForKeyPath, valueForKeyPath } from './utils';
 
 const RETRY_SAVES = 3;
 
 // Tells the main process's Config and every window but the one that made the change.
-type ChangeListener = (settings: object, sourceWebcontentsId?: number) => void;
+type ChangeListener = (
+  settings: { [key: string]: unknown },
+  sourceWebcontentsId?: number | null
+) => void;
 
 export default class ConfigPersistenceManager implements SettingsHost {
   userWantsToPreserveErrors = false;
   // Set once the profile is being reset: a later write would put the old settings back.
   discarded = false;
   saveRetries = 0;
-  settings = {};
+  settings: { [key: string]: unknown } = {};
   configDirPath: string;
   configFilePath: string;
   resourcePath: string;
@@ -82,7 +85,7 @@ export default class ConfigPersistenceManager implements SettingsHost {
     fs.writeFileSync(this.configFilePath, templateConfig);
   }
 
-  _showLoadErrorDialog(error) {
+  _showLoadErrorDialog(error: Error) {
     const message = localized(`Failed to load "%@"`, path.basename(this.configFilePath));
     let detail = error.message;
 
@@ -117,7 +120,8 @@ export default class ConfigPersistenceManager implements SettingsHost {
       }
       this.settings = json['*'];
       this.emitChangeEvent();
-    } catch (error) {
+    } catch (thrown) {
+      const error = thrown instanceof Error ? thrown : new Error(String(thrown));
       error.message = localized(`Failed to load config.json: %@`, error.message);
 
       const action = this._showLoadErrorDialog(error);
@@ -167,7 +171,9 @@ export default class ConfigPersistenceManager implements SettingsHost {
       this.saveRetries = 0;
     } catch (error) {
       if (this.saveRetries >= RETRY_SAVES) {
-        error.message = localized(`Failed to save config.json: %@`, error.message);
+        if (error instanceof Error) {
+          error.message = localized(`Failed to save config.json: %@`, error.message);
+        }
         const action = this._showSaveErrorDialog();
         this.saveRetries = 0;
 
@@ -189,7 +195,7 @@ export default class ConfigPersistenceManager implements SettingsHost {
     return JSON.stringify(this.settings);
   };
 
-  setSettings = (value, sourceWebcontentsId) => {
+  setSettings = (value: { [key: string]: unknown }, sourceWebcontentsId: number | null) => {
     this._forwardEngineKeys(null, () => {
       this.settings = value;
     });
@@ -197,23 +203,23 @@ export default class ConfigPersistenceManager implements SettingsHost {
     this.save();
   };
 
-  setRawValue = (keyPath, value, sourceWebcontentsId) => {
+  setRawValue = (keyPath: string, value: unknown, sourceWebcontentsId: number | null) => {
     if (!keyPath) {
       throw new Error('keyPath must not be false-y!');
     }
     this._forwardEngineKeys(keyPath, () => {
-      _.setValueForKeyPath(this.settings, keyPath, value);
+      setValueForKeyPath(this.settings, keyPath, value);
     });
     this.emitChangeEvent({ sourceWebcontentsId });
     this.save();
   };
 
-  get = (keyPath: string) => _.valueForKeyPath(this.settings, keyPath);
+  get = (keyPath: string) => valueForKeyPath(this.settings, keyPath);
 
   // Values from the engine's settings store: every window gets them, the engine doesn't.
   applyEngineValues = (changes: { [keyPath: string]: unknown }) => {
     for (const keyPath of Object.keys(changes)) {
-      _.setValueForKeyPath(this.settings, keyPath, changes[keyPath]);
+      setValueForKeyPath(this.settings, keyPath, changes[keyPath]);
     }
     this.emitChangeEvent();
     this.save();
@@ -221,28 +227,33 @@ export default class ConfigPersistenceManager implements SettingsHost {
 
   // Runs `write`, then hands the engine-owned keys whose value it changed to the mirror.
   _forwardEngineKeys(keyPath: string | null, write: () => void) {
-    const keys = this.engineSettings
-      ? ENGINE_SETTINGS_KEYS.filter((key) => touchesKey(keyPath, key))
-      : [];
-    const language = this.engineSettings && touchesKey(keyPath, LANGUAGE_KEY);
+    const mirror = this.engineSettings;
+    if (!mirror) {
+      write();
+      return;
+    }
+    const keys = ENGINE_SETTINGS_KEYS.filter((key) => touchesKey(keyPath, key));
+    const language = touchesKey(keyPath, LANGUAGE_KEY);
     const languageBefore = language ? this.get(LANGUAGE_KEY) : undefined;
-    const clock = this.engineSettings && touchesKey(keyPath, USE_24_HOUR_KEY);
+    const clock = touchesKey(keyPath, USE_24_HOUR_KEY);
     const clockBefore = clock ? this.get(USE_24_HOUR_KEY) : undefined;
     const before = keys.map((key) => JSON.stringify(this.get(key)));
     write();
     const changed = keys.filter((key, i) => JSON.stringify(this.get(key)) !== before[i]);
-    if (changed.length) this.engineSettings.localChanged(changed);
-    if (language && this.get(LANGUAGE_KEY) !== languageBefore)
-      this.engineSettings.languageChanged();
-    else if (clock && this.get(USE_24_HOUR_KEY) !== clockBefore) this.engineSettings.clockChanged();
+    if (changed.length) mirror.localChanged(changed);
+    if (language && this.get(LANGUAGE_KEY) !== languageBefore) mirror.languageChanged();
+    else if (clock && this.get(USE_24_HOUR_KEY) !== clockBefore) mirror.clockChanged();
   }
 
-  emitChangeEvent = ({ sourceWebcontentsId }: { sourceWebcontentsId?: number } = {}) => {
+  emitChangeEvent = ({ sourceWebcontentsId }: { sourceWebcontentsId?: number | null } = {}) => {
     this.onChange(this.settings, sourceWebcontentsId);
   };
 }
 
-function notifyConfigAndWindows(settings: object, sourceWebcontentsId?: number) {
+function notifyConfigAndWindows(
+  settings: { [key: string]: unknown },
+  sourceWebcontentsId?: number | null
+) {
   global.application.config.updateSettings(settings);
 
   BrowserWindow.getAllWindows().forEach((win) => {
@@ -258,7 +269,8 @@ function replyTo(event: Electron.IpcMainEvent, work: () => string | void) {
     const value = work();
     event.returnValue = (value === undefined ? {} : { value }) as ConfigReply;
   } catch (err) {
-    event.returnValue = { error: (err && err.message) || `${err}` } as ConfigReply;
+    const message = err instanceof Error ? err.message : undefined;
+    event.returnValue = { error: message || `${err}` } as ConfigReply;
   }
 }
 
@@ -271,7 +283,7 @@ export function registerConfigIPC(
   ipcMain.on(ConfigChannel.SetRaw, (event, keyPath: string, value: unknown) =>
     replyTo(event, () => manager.setRawValue(keyPath, value, event.sender.id))
   );
-  ipcMain.on(ConfigChannel.SetAll, (event, settings: object) =>
+  ipcMain.on(ConfigChannel.SetAll, (event, settings: { [key: string]: unknown }) =>
     replyTo(event, () => manager.setSettings(settings, event.sender.id))
   );
 }

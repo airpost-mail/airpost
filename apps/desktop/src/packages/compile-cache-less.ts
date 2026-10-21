@@ -10,7 +10,15 @@ export default class LessCompileCache {
   lessSearchPaths: string[];
   cache: LessCache;
 
-  constructor({ configDirPath, resourcePath, importPaths = [] }) {
+  constructor({
+    configDirPath,
+    resourcePath,
+    importPaths = [],
+  }: {
+    configDirPath: string;
+    resourcePath: string;
+    importPaths?: string[];
+  }) {
     this.lessSearchPaths = [
       path.join(resourcePath, 'static', 'styles'),
       path.join(resourcePath, 'static', 'styles', 'base'),
@@ -27,7 +35,7 @@ export default class LessCompileCache {
     // on the final CSS, and THEN save the cached result / return the CSS
     if (isRTL) {
       const original = this.cache.parseLess;
-      this.cache.parseLess = (filePath, contents) => {
+      this.cache.parseLess = (filePath: string, contents: string) => {
         const { imports, css } = original.call(this.cache, filePath, contents);
         return { imports, css: rtlcss.process(css) };
       };

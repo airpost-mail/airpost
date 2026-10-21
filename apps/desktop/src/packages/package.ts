@@ -2,7 +2,13 @@ import path from 'path';
 import fs from 'fs';
 import semver from 'semver';
 import { PLUGIN_API_VERSION } from './api-version';
-import { applyModuleConfig, loadKeymaps, loadMenus, loadStylesheets } from './resources';
+import {
+  applyModuleConfig,
+  Disposable,
+  loadKeymaps,
+  loadMenus,
+  loadStylesheets,
+} from './resources';
 
 class NoPackageJSONError extends Error {}
 class InvalidPackageNameError extends Error {}
@@ -23,7 +29,7 @@ export default class Package {
   static NoPackageJSONError = NoPackageJSONError;
   static InvalidPackageNameError = InvalidPackageNameError;
 
-  public disposables = [];
+  public disposables: Disposable[] = [];
   public directory: string;
   public name: string;
   public displayName: string;

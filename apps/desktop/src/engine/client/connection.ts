@@ -55,7 +55,10 @@ export class EngineConnectionError extends Error {
   code: number | null;
   data: unknown;
 
-  constructor(message: string, { code = null, data }: Partial<RpcError> = {}) {
+  constructor(
+    message: string,
+    { code = null, data }: { code?: number | null; data?: unknown } = {}
+  ) {
     super(message);
     this.code = code;
     this.data = data;
@@ -93,12 +96,12 @@ and 'disconnected'.
 export class EngineConnection extends EventEmitter {
   clientName: string;
   mainWindow: boolean;
-  status: EngineStatus = null;
-  hello: HelloResult = null;
+  status: EngineStatus | null = null;
+  hello: HelloResult | null = null;
 
-  _socket: net.Socket = null;
+  _socket: net.Socket | null = null;
   // The engine generation `_socket` belongs to.
-  _generation: number = null;
+  _generation: number | null = null;
   _requests = new Map<RequestId, PendingRequest>();
   _nextId = 1;
   // Commands for accounts whose account.add hasn't answered, in order.
@@ -106,8 +109,8 @@ export class EngineConnection extends EventEmitter {
   // Commands for running accounts sent while the socket was down, in order.
   _offline: Array<{ accountId: string; json: Command }> = [];
   // A non-main window's last subscribed account list, joined; null when it needs one.
-  _subscribedAccounts: string = null;
-  _reconnectTimer = null;
+  _subscribedAccounts: string | null = null;
+  _reconnectTimer: ReturnType<typeof setTimeout> | undefined = undefined;
   _reconnectDelay = RECONNECT_FIRST_DELAY_MS;
   _closed = false;
 
@@ -153,7 +156,9 @@ export class EngineConnection extends EventEmitter {
       this._offline.push({ accountId, json });
       if (this._offline.length > MAX_OFFLINE_COMMANDS) {
         const dropped = this._offline.shift();
-        console.warn(`Dropped ${dropped.json.type}: too many commands while disconnected`);
+        if (dropped) {
+          console.warn(`Dropped ${dropped.json.type}: too many commands while disconnected`);
+        }
       }
       return true;
     }
@@ -163,8 +168,9 @@ export class EngineConnection extends EventEmitter {
 
   // The accounts the engine was asked to run.
   accountIds() {
-    if (!this.status) return [];
-    return Object.keys(this.status.accounts).filter((id) => this.status.accounts[id].state);
+    const status = this.status;
+    if (!status) return [];
+    return Object.keys(status.accounts).filter((id) => status.accounts[id].state);
   }
 
   request<R = unknown>(
@@ -172,7 +178,8 @@ export class EngineConnection extends EventEmitter {
     params: unknown,
     inline?: PendingRequest['inline']
   ): Promise<R> {
-    if (!this._socket) {
+    const socket = this._socket;
+    if (!socket) {
       return Promise.reject(
         new EngineConnectionError(`Not connected to the sync engine (${method})`)
       );
@@ -180,7 +187,7 @@ export class EngineConnection extends EventEmitter {
     const id = this._nextId++;
     return new Promise<R>((resolve, reject) => {
       this._requests.set(id, { method, resolve, reject, inline });
-      this._socket.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`, 'utf-8');
+      socket.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`, 'utf-8');
     });
   }
 
@@ -218,9 +225,10 @@ export class EngineConnection extends EventEmitter {
 
   // The accounts the engine holds: one it doesn't hold makes it refuse the whole subscribe.
   _runningAccounts() {
-    if (!this.status) return [];
-    return Object.keys(this.status.accounts)
-      .filter((id) => this.status.accounts[id].state === 'added')
+    const status = this.status;
+    if (!status) return [];
+    return Object.keys(status.accounts)
+      .filter((id) => status.accounts[id].state === 'added')
       .sort();
   }
 
@@ -250,9 +258,9 @@ export class EngineConnection extends EventEmitter {
     if (this._runningAccounts().join(',') !== this._subscribedAccounts) this._subscribe();
   }
 
-  _connect(socketPath: string, generation: number) {
+  _connect(socketPath: string, generation: number | null) {
     clearTimeout(this._reconnectTimer);
-    this._reconnectTimer = null;
+    this._reconnectTimer = undefined;
     const socket = net.createConnection(socketPath);
     socket.setEncoding('utf8');
     this._socket = socket;
@@ -304,7 +312,7 @@ export class EngineConnection extends EventEmitter {
         return;
       }
       const lines = inBuffer.split('\n');
-      inBuffer = lines.pop();
+      inBuffer = lines.pop() ?? '';
       const deltas: string[] = [];
       const mailNew: MailNewParams[] = [];
       const notes: Array<{ method: string; params: unknown }> = [];
@@ -370,10 +378,11 @@ export class EngineConnection extends EventEmitter {
       return false;
     }
     if (msg.method === undefined && msg.id !== undefined && msg.id !== null) {
+      const id: RequestId = msg.id;
       const response = msg as RpcResponse;
-      const pending = this._requests.get(response.id);
+      const pending = this._requests.get(id);
       if (!pending) return false;
-      this._requests.delete(response.id);
+      this._requests.delete(id);
       if (response.error) {
         const { message, code, data } = response.error;
         pending.reject(new EngineConnectionError(message, { code, data }));
@@ -396,7 +405,7 @@ export class EngineConnection extends EventEmitter {
     const delay = this._reconnectDelay;
     this._reconnectDelay = Math.min(this._reconnectDelay * 2, RECONNECT_MAX_DELAY_MS);
     this._reconnectTimer = setTimeout(() => {
-      this._reconnectTimer = null;
+      this._reconnectTimer = undefined;
       const current = this.status;
       if (!this._closed && !this._socket && current && current.socketPath) {
         this._connect(current.socketPath, current.generation);
@@ -406,7 +415,7 @@ export class EngineConnection extends EventEmitter {
 
   _disconnect() {
     clearTimeout(this._reconnectTimer);
-    this._reconnectTimer = null;
+    this._reconnectTimer = undefined;
     const socket = this._socket;
     if (!socket) return;
     this._socket = null;

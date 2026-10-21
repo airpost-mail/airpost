@@ -99,11 +99,11 @@ export class EngineSupervisor {
   stopped = false;
 
   // The engine whose socket windows should use, and its number.
-  _readyEngine: EngineServeProcess = null;
+  _readyEngine: EngineServeProcess | null = null;
   _generation = 0;
-  _readyGeneration: number = null;
+  _readyGeneration: number | null = null;
 
-  _mainWindow: SupervisorTarget = null;
+  _mainWindow: SupervisorTarget | null = null;
   _pending: PendingEvent[] = [];
   _nextSeq = 1;
 
@@ -219,10 +219,11 @@ export class EngineSupervisor {
     for (const id of this.client.held.keys()) {
       if (!accounts[id]) accounts[id] = { state: null, held: true };
     }
-    const ready = this._readyEngine !== null && this._readyEngine === this.client.engine;
+    const engine = this._readyEngine;
+    const ready = engine !== null && engine === this.client.engine;
     return {
       generation: ready ? this._readyGeneration : null,
-      socketPath: ready ? this._readyEngine._socketPath : null,
+      socketPath: ready ? engine._socketPath : null,
       ...(this.client.engineGaveUp ? { gaveUp: true } : {}),
       accounts,
     };
@@ -368,7 +369,9 @@ export class EngineSupervisor {
     if (!json || !keyManager.credentialsMovedToEngine()) return;
     keyManager
       .hasAccountSecrets(json.emailAddress)
-      .then((has) => has && keyManager.deleteAccountSecrets(json))
+      .then((has) => {
+        if (has) return keyManager.deleteAccountSecrets(json);
+      })
       .catch((err) => console.warn(`Could not drop the secrets the engine stored: ${err}`));
   }
 
@@ -384,7 +387,7 @@ export class EngineSupervisor {
     const keys = await keyManager._getKeyHash();
     const moved = keyManager.credentialsMovedToEngine();
     const registered = new Set((hello.accounts || []).map((a) => a.accountId));
-    let earlier: KeySet = null;
+    let earlier: KeySet | null = null;
     const accounts: CredentialsImportParams['accounts'] = [];
     for (const json of this.accounts()) {
       const own = await keyManager.hasAccountSecrets(json.emailAddress, keys);
@@ -478,7 +481,8 @@ async function reply(work: () => Promise<unknown>) {
     await work();
     return {};
   } catch (err) {
-    return { error: (err && err.message) || `${err}` };
+    const message = err instanceof Error ? err.message : undefined;
+    return { error: message || `${err}` };
   }
 }
 
@@ -531,7 +535,7 @@ export function pidAlive(pid: number) {
     return true;
   } catch (err) {
     // EPERM: it exists but belongs to someone else.
-    return err.code === 'EPERM';
+    return err instanceof Error && 'code' in err && err.code === 'EPERM';
   }
 }
 
@@ -621,7 +625,7 @@ export function engineSocketExchange(
     socket.on('data', (chunk: string) => {
       buffer += chunk;
       const lines = buffer.split('\n');
-      buffer = lines.pop();
+      buffer = lines.pop() ?? '';
       for (const line of lines) {
         let msg = null;
         try {
@@ -722,11 +726,11 @@ const UNREACHABLE = 'unreachable';
 // Null when the launch can join `found`; UNREACHABLE when its socket didn't answer.
 async function reasonNotToJoin(
   found: EngineDiscovery,
-  bundled: string,
+  bundled: string | null,
   canReuse: boolean,
   timeoutMs: number
 ): Promise<string | null> {
-  let hello: HelloResult = null;
+  let hello: HelloResult | null = null;
   try {
     const [answer] = await engineSocketExchange(found.socket, [], timeoutMs);
     hello = answer.result || null;
@@ -736,7 +740,9 @@ async function reasonNotToJoin(
       );
     }
   } catch (err) {
-    console.warn(`Could not reach the detached sync engine (pid ${found.pid}): ${err.message}`);
+    console.warn(
+      `Could not reach the detached sync engine (pid ${found.pid}): ${err instanceof Error ? err.message : err}`
+    );
     return UNREACHABLE;
   }
   if (!hello) return 'it refused hello';
@@ -774,7 +780,7 @@ export class QuitGate {
   done = false;
   // A reset that relaunches the app (application.ts) defers launches too, for its own relaunch.
   relaunching = false;
-  _launchArgs: string[] = null;
+  _launchArgs: string[] | null = null;
 
   // Takes a will-quit: `stop` runs, then `quit` with the launches that arrived meanwhile.
   // False once done, so the quit that follows goes through.

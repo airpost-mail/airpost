@@ -78,7 +78,7 @@ export function setupError(err: any): Error {
   if (err && err.code === ErrorCode.OAuthFailed) {
     const data = (err.data || {}) as { key?: string; offline?: boolean };
     error.isNetworkError = data.offline === true;
-    error.isUserError = ['no-mailbox', 'wrong-account'].includes(data.key);
+    error.isUserError = data.key === 'no-mailbox' || data.key === 'wrong-account';
     if (data.key === 'no-mailbox') {
       error.message = localized('There is no email mailbox associated with this account.');
     }

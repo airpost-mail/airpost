@@ -415,8 +415,8 @@ class IntegrationsClient {
   private _transport: IntegrationsTransport = UnavailableTransport;
   private _emitter = new EventEmitter();
   /** Swappable for specs. */
-  keySource: KeySource = null;
-  secretSource: SecretSource = null;
+  keySource: KeySource | null = null;
+  secretSource: SecretSource | null = null;
 
   transport() {
     return this._transport;
@@ -461,11 +461,11 @@ class IntegrationsClient {
     const secrets = this._secrets();
     const keys = this._keys();
     if (!secrets.available()) {
-      await keys.replacePassword(keyName(provider), value);
+      await keys.replacePassword?.(keyName(provider), value);
       return;
     }
     await secrets.set(secretName(provider), value);
-    if (await keys.getPassword(keyName(provider))) await keys.deletePassword(keyName(provider));
+    if (await keys.getPassword(keyName(provider))) await keys.deletePassword?.(keyName(provider));
     this._keysChanged();
   }
 
@@ -477,7 +477,7 @@ class IntegrationsClient {
       await secrets.delete(secretName(provider));
       this._keysChanged();
     }
-    if (await keys.getPassword(keyName(provider))) await keys.deletePassword(keyName(provider));
+    if (await keys.getPassword(keyName(provider))) await keys.deletePassword?.(keyName(provider));
   }
 
   /** Whether the engine keeps a key for `provider`. */
@@ -515,7 +515,7 @@ class IntegrationsClient {
   async request<M extends IntegrationMethod>(
     method: M,
     params: object = {},
-    options: { kind?: IntegrationKind; config?: ProviderConfig } = {}
+    options: { kind?: IntegrationKind; config?: ProviderConfig | null } = {}
   ): Promise<IntegrationResults[M]> {
     const transport = this._transport;
     if (!transport.available) {

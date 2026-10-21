@@ -22,7 +22,7 @@ import fs from 'fs';
 import path from 'path';
 import { localized } from '../../intl/localize';
 import EngineEvents, { EngineEvents as EngineEventsType, EngineNotification } from './events';
-import { EngineCapabilities, ErrorCode, Feature } from '../protocol';
+import { EngineCapabilities, ErrorCode, Feature, rejectionFields } from '../protocol';
 import {
   Integrations,
   IntegrationError,
@@ -69,9 +69,10 @@ export interface CallerPackage {
 
 export class EngineRequestRefused extends Error {
   method: string;
-  packageName: string;
+  // Null when no package made the call.
+  packageName: string | null;
 
-  constructor(message: string, method: string, packageName: string) {
+  constructor(message: string, method: string, packageName: string | null) {
     super(message);
     this.name = 'EngineRequestRefused';
     this.method = method;
@@ -211,7 +212,7 @@ export class EngineAPI {
       );
     }
     try {
-      this._checkCaller(method, new Error().stack);
+      this._checkCaller(method, new Error().stack ?? '');
     } catch (err) {
       return Promise.reject(err);
     }
@@ -290,16 +291,14 @@ export function engineIntegrationsTransport(
       try {
         return await events.request(method, params);
       } catch (err) {
-        if (err && err.code === ErrorCode.IntegrationFailed && err.data) throw err.data;
-        if (err && err.code === ErrorCode.EngineBusy) {
-          throw new IntegrationError({
-            key: 'rate-limited',
-            message: err.message,
-            retryable: true,
-          });
+        const { code, data, message } = rejectionFields(err);
+        const text = typeof message === 'string' ? message : undefined;
+        if (err && code === ErrorCode.IntegrationFailed && data) throw data;
+        if (err && code === ErrorCode.EngineBusy) {
+          throw new IntegrationError({ key: 'rate-limited', message: text, retryable: true });
         }
-        if (err && (err.code === null || err.code === undefined)) {
-          throw new IntegrationError({ key: 'engine-unavailable', message: err.message });
+        if (err && (code === null || code === undefined)) {
+          throw new IntegrationError({ key: 'engine-unavailable', message: text });
         }
         throw err;
       }

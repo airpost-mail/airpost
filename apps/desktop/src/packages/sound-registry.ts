@@ -2,7 +2,8 @@ import path from 'path';
 import NativeNotifications from '../window/platform/native-notifications';
 
 class SoundRegistry {
-  private _sounds = {};
+  // A package-asset URL, or path segments under the resource path.
+  private _sounds: { [name: string]: string | string[] | undefined } = {};
 
   async playSound(name: string) {
     if (AppEnv.inSpecMode()) {
@@ -25,8 +26,7 @@ class SoundRegistry {
       if (!/^(tern-asset|mailspring):\/\//.test(src)) return;
       a.src = src;
     } else if (src instanceof Array) {
-      const args = [resourcePath].concat(src);
-      a.src = path.join.apply(this, args);
+      a.src = path.join(resourcePath, ...src);
     }
     a.autoplay = true;
     // play() rejects on every call when the platform can't decode the file. A missed sound

@@ -7,8 +7,8 @@ import { DESKTOP_FILE_NAME } from './linux-desktop';
 interface DCH {
   available(): boolean;
   isRegisteredForURLScheme(scheme: string, callback: (registered: boolean | Error) => void): void;
-  resetURLScheme(scheme, callback: (error?: Error) => void): void;
-  registerForURLScheme(scheme: string, callback: (error?: Error) => void): void;
+  resetURLScheme(scheme: string, callback: (error?: Error | null) => void): void;
+  registerForURLScheme(scheme: string, callback: (error?: Error | null) => void): void;
 }
 
 export class DefaultClientHelperWindows implements DCH {
@@ -29,8 +29,9 @@ export class DefaultClientHelperWindows implements DCH {
           `reg.exe query HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\${scheme}\\UserChoice`,
           (err2, stdout2) => {
             output += stdout2.toString();
-            if (err1 || err2) {
-              callback(err1 || err2);
+            const err = err1 || err2;
+            if (err) {
+              callback(err);
               return;
             }
             callback(output.includes('Tern.Url.'));
@@ -52,7 +53,7 @@ export class DefaultClientHelperWindows implements DCH {
     });
   }
 
-  registerForURLScheme(scheme: string, callback = (error?: Error) => {}) {
+  registerForURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     // Ensure that our registry entires are present
     const WindowsUpdater = require('@electron/remote').require('./autoupdate/win32-updater');
     WindowsUpdater.createRegistryEntries(
@@ -60,7 +61,7 @@ export class DefaultClientHelperWindows implements DCH {
         allowEscalation: true,
         registerDefaultIfPossible: true,
       },
-      async (err, didMakeDefault) => {
+      async (err: Error | null, didMakeDefault: boolean) => {
         if (err) {
           await require('@electron/remote').dialog.showMessageBox({
             type: 'error',
@@ -112,12 +113,12 @@ export class DefaultClientHelperLinux implements DCH {
     );
   }
 
-  resetURLScheme(scheme: string, callback = (error?: Error) => {}) {
+  resetURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     exec(`xdg-mime default thunderbird.desktop x-scheme-handler/${scheme}`, (err: Error | null) =>
       err ? callback(err) : callback(null)
     );
   }
-  registerForURLScheme(scheme: string, callback = (error?: Error) => {}) {
+  registerForURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     exec(`xdg-mime default ${DESKTOP_FILE_NAME} x-scheme-handler/${scheme}`, (err: Error | null) =>
       err ? callback(err) : callback(null)
     );
@@ -138,14 +139,14 @@ export class DefaultClientHelperMac implements DCH {
     return callback(require('@electron/remote').app.isDefaultProtocolClient(scheme));
   }
 
-  resetURLScheme(scheme: string, callback = (error?: Error) => {}) {
+  resetURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     const success = require('@electron/remote').app.removeAsDefaultProtocolClient(scheme);
     return callback(
       success ? null : new Error(`Failed to remove Tern as default handler for ${scheme}`)
     );
   }
 
-  registerForURLScheme(scheme: string, callback = (error?: Error) => {}) {
+  registerForURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     const success = require('@electron/remote').app.setAsDefaultProtocolClient(scheme);
     return callback(
       success ? null : new Error(`Failed to set Tern as default handler for ${scheme}`)
@@ -156,7 +157,7 @@ export class DefaultClientHelperMac implements DCH {
 let Default:
   | typeof DefaultClientHelperMac
   | typeof DefaultClientHelperLinux
-  | typeof DefaultClientHelperWindows = null;
+  | typeof DefaultClientHelperWindows;
 
 if (process.platform === 'darwin') {
   Default = DefaultClientHelperMac;

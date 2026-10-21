@@ -67,8 +67,8 @@ and won't relaunch it until:
 
 */
 export class CrashTracker {
-  _timestamps = {};
-  _tooManyFailures = {};
+  _timestamps: { [key: string]: number[] } = {};
+  _tooManyFailures: { [key: string]: boolean } = {};
 
   forgetCrashes(fullAccountJSON: CrashKeyJSON) {
     const key = this._keyFor(fullAccountJSON);
@@ -84,7 +84,7 @@ export class CrashTracker {
     // We now let crashpad do this, because Sentry was losing it's mind.
   }
 
-  _keyFor({ id, settings }) {
+  _keyFor({ id, settings }: CrashKeyJSON) {
     return JSON.stringify({ id, settings });
   }
 
@@ -187,7 +187,7 @@ const ENGINE_CRASH_KEY: CrashKeyJSON = { id: 'engine', settings: {} };
 
 export class EngineClient {
   host: EngineClientHost;
-  engine: EngineServeProcess = null;
+  engine: EngineServeProcess | null = null;
   // The accounts the engine was asked to run, by id.
   entries = new Map<string, Entry>();
   // Accounts being reset or relaunched, which ensure() leaves alone.
@@ -204,7 +204,7 @@ export class EngineClient {
   shuttingDown = false;
   // From engine.resetDatabase until the relaunch that follows it.
   resettingDatabase = false;
-  respawnTimer = null;
+  respawnTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(host: EngineClientHost) {
     this.host = host;
@@ -216,7 +216,8 @@ export class EngineClient {
     if (this.shuttingDown || this.engineGaveUp || this.respawnTimer || this.resettingDatabase) {
       return Promise.resolve();
     }
-    if (!this._ensureEngine()) return Promise.resolve();
+    const engine = this._ensureEngine();
+    if (!engine) return Promise.resolve();
     const wanted = this.host.accounts();
     const wantedIds = new Set(wanted.map((a) => a.id));
     for (const id of [...this.entries.keys()]) {
@@ -224,7 +225,7 @@ export class EngineClient {
         this._remove(id);
       }
     }
-    this._removeDeleted(this.engine);
+    this._removeDeleted(engine);
     const missing = wanted.filter((a) => !this.entries.has(a.id) && !this.held.has(a.id));
     return missing.length ? this._add(missing, { force: false }) : Promise.resolve();
   }
@@ -313,7 +314,8 @@ export class EngineClient {
     if (entry.pending) {
       entry.pending.push(json);
     } else {
-      this.engine.sendToAccount(accountId, json);
+      // Entries exist only while an engine runs: its close and shutdown() clear them.
+      this.engine!.sendToAccount(accountId, json);
     }
     return true;
   }
@@ -352,7 +354,7 @@ export class EngineClient {
 
   shutdown() {
     this.shuttingDown = true;
-    clearTimeout(this.respawnTimer);
+    if (this.respawnTimer) clearTimeout(this.respawnTimer);
     this.respawnTimer = null;
     const engine = this.engine;
     this.engine = null;
@@ -461,7 +463,11 @@ export class EngineClient {
     try {
       engine.serve();
     } catch (error) {
-      this._onEngineClose(engine, { code: -1, error, signal: null });
+      this._onEngineClose(engine, {
+        code: -1,
+        error: error instanceof Error ? error : new Error(String(error)),
+        signal: null,
+      });
       return null;
     }
     return engine;
@@ -526,10 +532,11 @@ export class EngineClient {
       return;
     }
     entry.state = 'added';
-    const pending = entry.pending;
+    // An 'adding' entry always has its pending list, and an engine runs while it exists.
+    const pending = entry.pending!;
     entry.pending = null;
     for (const json of pending) {
-      this.engine.sendToAccount(accountId, json);
+      this.engine!.sendToAccount(accountId, json);
     }
     this._changed();
   }
@@ -641,17 +648,17 @@ export class EngineClient {
           }
         )
       : Promise.resolve([] as string[]);
-    const removal: Removal = { done: null, finishedAt: null };
-    entry.removal = removed.then((stillRunning) => {
+    const done = removed.then((stillRunning) => {
       removal.finishedAt = Date.now();
       if (this.entries.get(accountId) === entry) this.entries.delete(accountId);
       this._changed();
       this.host.onAccountExited(accountId);
       return stillRunning;
     });
-    removal.done = entry.removal;
+    const removal: Removal = { done, finishedAt: null };
+    entry.removal = done;
     this.removals.set(accountId, removal);
-    return entry.removal;
+    return done;
   }
 
   _onEngineClose(engine: EngineServeProcess, exit: EngineProcessExit) {

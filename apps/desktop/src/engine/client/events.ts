@@ -58,7 +58,11 @@ export class EngineEvents extends EventEmitter {
 
   // Bridge side.
 
-  connected(features: string[], request: Requester, capabilities: EngineCapabilities = null) {
+  connected(
+    features: string[],
+    request: Requester,
+    capabilities: EngineCapabilities | null = null
+  ) {
     this.features = new Set(features);
     this._request = request;
     this.capabilities = capabilities || null;

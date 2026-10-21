@@ -1,6 +1,6 @@
 import _ from 'underscore';
 
-let EmojiData = null;
+let EmojiData: { chars(options: { include_variants: boolean }): string[] } | null = null;
 
 export function escapeRegExp(str: string) {
   return str.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
@@ -289,10 +289,9 @@ const RegExpUtils = {
   },
 
   emojiRegex() {
-    if (!EmojiData) {
-      EmojiData = require('emoji-data');
-    }
-    return new RegExp(`(?:${EmojiData.chars({ include_variants: true }).join('|')})`, 'g');
+    const emojiData: NonNullable<typeof EmojiData> = EmojiData || require('emoji-data');
+    EmojiData = emojiData;
+    return new RegExp(`(?:${emojiData.chars({ include_variants: true }).join('|')})`, 'g');
   },
 
   looseStyleTag() {

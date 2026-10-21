@@ -45,10 +45,11 @@ export interface ResetOptions {
   keepMetadata?: boolean;
 }
 
+// `code` is null when a signal ended the engine.
 export interface EngineProcessExit {
-  code: number;
-  error?: Error;
-  signal: string;
+  code: number | null;
+  error?: Error | null;
+  signal: string | null;
 }
 
 export const LocalizedErrorStrings = {
@@ -181,7 +182,9 @@ export function errorFromEngineResult(response: any, stripSecrets: (text: string
     LocalizedErrorStrings,
     response.error
   );
-  let msg = isRecognizedEngineError ? LocalizedErrorStrings[response.error] : response.error;
+  let msg = isRecognizedEngineError
+    ? LocalizedErrorStrings[response.error as keyof typeof LocalizedErrorStrings]
+    : response.error;
   if (response.error_service) {
     msg = `${msg} (${response.error_service.toUpperCase()})`;
   }
@@ -246,14 +249,14 @@ The engine binary: the one-shot `migrate` and `import-legacy` the main process r
 anything else, and (EngineServeProcess) the `serve` engine every account runs in.
 */
 export class EngineProcess extends EventEmitter {
-  _proc: ChildProcess = null;
-  _win = null;
+  _proc: ChildProcess | null = null;
+  _win: Electron.BrowserWindow | null = null;
 
   // The socket connection (EngineServeProcess). `_socketQueue` holds requests sent before the
   // engine bound its socket; it is null once connected and after the connection ends.
-  _socketPath: string = null;
-  _socket: net.Socket = null;
-  _socketQueue: string[] = null;
+  _socketPath: string | null = null;
+  _socket: net.Socket | null = null;
+  _socketQueue: string[] | null = null;
   _socketRequests = new Map<RequestId, string>();
   // Socket requests whose answer someone awaits (request()), by id.
   _socketCalls = new Map<
@@ -261,14 +264,14 @@ export class EngineProcess extends EventEmitter {
     { resolve: (result: any) => void; reject: (error: Error) => void }
   >();
   // `hello.features` of the engine on the socket; null until hello answers.
-  features: string[] = null;
+  features: string[] | null = null;
   _nextRequestId = 1;
   _killed = false;
   // What the socket connection subscribes to. The main process's supervisor takes no model
   // class, which still brings it every account.state (src/engine/supervisor/supervisor.ts).
   subscription: SubscribeParams = { accounts: null, classes: null };
 
-  verbose: boolean;
+  verbose?: boolean;
   resourcePath: string;
   configDirPath: string;
   binaryPath: string;
@@ -289,17 +292,17 @@ export class EngineProcess extends EventEmitter {
     this.binaryPath = engineBinaryPath(resourcePath);
   }
 
-  _showStatusWindow(mode) {
+  _showStatusWindow(mode: string) {
     if (this._win) return;
 
-    let BrowserWindow;
+    let BrowserWindow: typeof Electron.BrowserWindow;
     if (process.type === 'renderer') {
       BrowserWindow = require('@electron/remote').BrowserWindow;
     } else {
       BrowserWindow = require('electron').BrowserWindow;
     }
 
-    this._win = new BrowserWindow({
+    const win = new BrowserWindow({
       width: 350,
       height: 108,
       show: false,
@@ -317,27 +320,29 @@ export class EngineProcess extends EventEmitter {
         devTools: developerToolsAvailable(),
       },
     });
-    this._win.setContentSize(350, 90);
-    this._win.once('ready-to-show', () => {
-      this._win.show();
+    this._win = win;
+    win.setContentSize(350, 90);
+    win.once('ready-to-show', () => {
+      win.show();
     });
-    this._win.loadURL(`file://${this.resourcePath}/static/db-${mode}.html`);
+    win.loadURL(`file://${this.resourcePath}/static/db-${mode}.html`);
   }
 
   _closeStatusWindow() {
-    if (!this._win) return;
-    this._win.removeAllListeners('ready-to-show');
-    this._win.setClosable(true);
-    this._win.hide();
+    const win = this._win;
+    if (!win) return;
+    win.removeAllListeners('ready-to-show');
+    win.setClosable(true);
+    win.hide();
     setTimeout(() => {
       // don't know why this timeout is necessary but the app becomes unable to
       // load Electron modules in the main process if we close immediately.
-      if (!this._win.isDestroyed()) this._win.close();
+      if (!win.isDestroyed()) win.close();
       this._win = null;
     });
   }
 
-  _spawnProcess(mode, extraArgs: string[] = []) {
+  _spawnProcess(mode: string, extraArgs: string[] = []) {
     // Build on a null-prototype object so the spawned engine inherits only
     // genuine environment variables, not properties a prototype-pollution bug
     // elsewhere in the process could have added to Object.prototype. See
@@ -353,16 +358,24 @@ export class EngineProcess extends EventEmitter {
       args.push('--verbose');
     }
     args.push(...extraArgs);
-    this._proc = spawn(this.binaryPath, args, { env });
+    const proc = spawn(this.binaryPath, args, { env });
+    this._proc = proc;
 
     /* Allow us to buffer up to 1MB on stdin instead of 16k. This is necessary
     because some tasks (creating replies to drafts, etc.) can be gigantic amounts
     of HTML, many tasks can be created at once, etc, and we don't want to kill
     the channel. */
-    if (this._proc.stdin) {
-      this._proc.stdin.setDefaultEncoding('utf-8');
-      (this._proc.stdin as any).highWaterMark = 1024 * 1024;
+    if (proc.stdin) {
+      proc.stdin.setDefaultEncoding('utf-8');
+      (proc.stdin as any).highWaterMark = 1024 * 1024;
     }
+  }
+
+  // The process _spawnProcess just started (specs replace _spawnProcess, so it is read back
+  // from `_proc`).
+  _spawned(): ChildProcess {
+    if (!this._proc) throw new Error('tern-engine was not spawned');
+    return this._proc;
   }
 
   // Redacts known secrets from a log or error text before it's surfaced to the UI, error
@@ -372,9 +385,10 @@ export class EngineProcess extends EventEmitter {
     return stripSecretKeys(text);
   }
 
-  _spawnAndWait(mode, { onData }: { onData?: (data: any) => void } = {}) {
+  _spawnAndWait(mode: string, { onData }: { onData?: (data: any) => void } = {}) {
     return new Promise<{ response: any; buffer: Buffer }>((resolve, reject) => {
       this._spawnProcess(mode);
+      const proc = this._spawned();
       // `bothChunks` is both streams together and is what we show the user when something
       // goes wrong; `outChunks` is stdout alone, which is the only place the JSON result
       // appears. Chunks are concatenated as bytes and decoded once at the end: `a += b` on
@@ -383,25 +397,25 @@ export class EngineProcess extends EventEmitter {
       const bothChunks: Buffer[] = [];
       const outChunks: Buffer[] = [];
 
-      if (this._proc.stdout) {
-        this._proc.stdout.on('data', (data: Buffer) => {
+      if (proc.stdout) {
+        proc.stdout.on('data', (data: Buffer) => {
           bothChunks.push(data);
           outChunks.push(data);
           if (onData) onData(data);
         });
       }
-      if (this._proc.stderr) {
-        this._proc.stderr.on('data', (data: Buffer) => {
+      if (proc.stderr) {
+        proc.stderr.on('data', (data: Buffer) => {
           bothChunks.push(data);
           if (onData) onData(data);
         });
       }
 
-      this._proc.on('error', (err: Error) => {
+      proc.on('error', (err: Error) => {
         reject(err);
       });
 
-      this._proc.on('close', (code, signal) => {
+      proc.on('close', (code, signal) => {
         const buffer = Buffer.concat(bothChunks);
         try {
           const response = lastJSONResponse(Buffer.concat(outChunks).toString('utf-8'));
@@ -541,9 +555,9 @@ export class EngineProcess extends EventEmitter {
         return;
       }
       const lines = inBuffer.split('\n');
-      inBuffer = lines.pop();
+      inBuffer = lines.pop() ?? '';
       const deltas: string[] = [];
-      let failure: Error = null;
+      let failure: Error | null = null;
       for (const line of lines) {
         failure = this._onSocketLine(line, deltas) || failure;
       }
@@ -600,10 +614,13 @@ export class EngineProcess extends EventEmitter {
     }
     if (msg.method === undefined && msg.id !== undefined) {
       const response = msg as RpcResponse;
-      const method = this._socketRequests.get(response.id);
-      this._socketRequests.delete(response.id);
-      const call = this._socketCalls.get(response.id);
-      this._socketCalls.delete(response.id);
+      const id = response.id;
+      const method = id === null ? undefined : this._socketRequests.get(id);
+      const call = id === null ? undefined : this._socketCalls.get(id);
+      if (id !== null) {
+        this._socketRequests.delete(id);
+        this._socketCalls.delete(id);
+      }
       if (response.error) {
         const { code, message, data } = response.error;
         if (call) {
@@ -678,7 +695,11 @@ export class EngineRequestError extends Error {
 
   constructor(
     message: string,
-    { code = null, data, engineExited = false }: Partial<RpcError> & { engineExited?: boolean } = {}
+    {
+      code = null,
+      data,
+      engineExited = false,
+    }: { code?: number | null; data?: unknown; engineExited?: boolean } = {}
   ) {
     super(message);
     this.code = code;
@@ -707,8 +728,8 @@ export class EngineServeProcess extends EngineProcess {
   >();
   _nextParentId = 1;
   _closed = false;
-  _shutdownTimer = null;
-  _startupError: string = null;
+  _shutdownTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+  _startupError: string | null = null;
   // Joined a detached engine (attach()) rather than spawned one.
   _attached = false;
   // When set, serve() joins the detached engine on this socket instead of spawning one.
@@ -733,11 +754,12 @@ export class EngineServeProcess extends EngineProcess {
     this._socketPath = socketPath;
     this._socketQueue = [];
     this._spawnProcess('serve', ['--socket', socketPath]);
+    const proc = this._spawned();
 
     const decoder = new StringDecoder('utf8');
     let outBuffer = '';
     let errBuffer = '';
-    let socketCloseTimer = null;
+    let socketCloseTimer: ReturnType<typeof setTimeout> | undefined;
 
     const finish = (exit: EngineProcessExit) => {
       if (this._closed) return;
@@ -760,7 +782,7 @@ export class EngineServeProcess extends EngineProcess {
       const kill = () => {
         if (this._closed || this._killed) return;
         console.warn(`Sync engine socket failed: ${error}`);
-        this._proc.kill();
+        proc.kill();
         finish({ code: -2, error, signal: null });
       };
       if (now) {
@@ -770,12 +792,12 @@ export class EngineServeProcess extends EngineProcess {
       }
     };
 
-    if (this._proc.stdout) {
-      this._proc.stdout.on('data', (data: Buffer) => {
+    if (proc.stdout) {
+      proc.stdout.on('data', (data: Buffer) => {
         outBuffer += decoder.write(data);
         if (outBuffer.indexOf('\n') === -1) return;
         const lines = outBuffer.split('\n');
-        outBuffer = lines.pop();
+        outBuffer = lines.pop() ?? '';
         const deltas: string[] = [];
         for (const line of lines) {
           this._onParentLine(line, deltas);
@@ -785,8 +807,8 @@ export class EngineServeProcess extends EngineProcess {
         }
       });
     }
-    if (this._proc.stderr) {
-      this._proc.stderr.on('data', (data: Buffer) => {
+    if (proc.stderr) {
+      proc.stderr.on('data', (data: Buffer) => {
         errBuffer += data.toString();
         if (errBuffer.length > 100 * 1024) {
           errBuffer = errBuffer.slice(-100 * 1024);
@@ -794,23 +816,23 @@ export class EngineServeProcess extends EngineProcess {
       });
     }
     // Never re-emitted as 'error' on `this`: an EventEmitter with no 'error' listener throws.
-    this._proc.on('error', (error: Error) => {
+    proc.on('error', (error: Error) => {
       console.log(`Sync engine exited with ${error}`);
       finish({ code: -1, error, signal: null });
     });
-    if (this._proc.stdin) {
-      this._proc.stdin.on('error', (error: Error) => {
+    if (proc.stdin) {
+      proc.stdin.on('error', (error: Error) => {
         if (this._closed) return;
-        this._proc.kill();
+        proc.kill();
         finish({ code: -2, error, signal: null });
       });
     }
-    const onExit = (code: number, signal: string) => {
+    const onExit = (code: number | null, signal: string | null) => {
       const text = errBuffer || this._startupError;
       finish({ code, error: text ? new Error(this._stripSecrets(text)) : null, signal });
     };
-    this._proc.on('close', onExit);
-    this._proc.on('exit', onExit);
+    proc.on('close', onExit);
+    proc.on('exit', onExit);
 
     // stdin is read only once the socket is bound, so this answer means it can be connected.
     this._parentCall(Method.AccountList, {}).then(
@@ -904,7 +926,8 @@ export class EngineServeProcess extends EngineProcess {
       }
       return this.request<R>(method, params);
     }
-    if (this._closed || !this._proc || !this._proc.stdin) {
+    const stdin = this._proc && this._proc.stdin;
+    if (this._closed || !stdin) {
       return Promise.reject(
         new EngineRequestError('The sync engine is not running', { engineExited: true })
       );
@@ -914,7 +937,7 @@ export class EngineServeProcess extends EngineProcess {
     return new Promise<R>((resolve, reject) => {
       this._parentRequests.set(id, { method, resolve, reject });
       try {
-        this._proc.stdin.write(line, 'utf-8');
+        stdin.write(line, 'utf-8');
       } catch (err) {
         this._parentRequests.delete(id);
         reject(err);
@@ -1008,13 +1031,14 @@ export class EngineServeProcess extends EngineProcess {
       this.emit('close', { code: 0, signal: null });
       return closed;
     }
-    if (this._closed || !this._proc) return Promise.resolve();
+    const proc = this._proc;
+    if (this._closed || !proc) return Promise.resolve();
     this._killed = true;
     const closed = new Promise<void>((resolve) => this.once('close', () => resolve()));
     this._parentCall(Method.EngineShutdown, {}).catch(() => {});
     this._shutdownTimer = setTimeout(() => {
       console.warn('The sync engine did not shut down in time; killing it');
-      this._proc.kill();
+      proc.kill();
     }, graceMs);
     return closed;
   }

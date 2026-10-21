@@ -5,6 +5,7 @@ import fs from 'fs';
 import { localized } from '../intl/localize';
 import LessCompileCache from './compile-cache-less';
 import PackageManager from './manager';
+import type Package from './package';
 import { bundledAssetRoots } from './bundled-packages';
 
 const CONFIG_THEME_KEY = 'core.theme';
@@ -94,10 +95,10 @@ function parseScheme(value: unknown): ThemeScheme | null {
  *  - ThemeManager directly updates <style> tags when recompiling LESS.
  */
 export default class ThemeManager {
-  private activeThemePackage = null;
+  private activeThemePackage: Package | null = null;
   private baseThemeOnly = false;
   private emitter = new Emitter();
-  private styleSheetDisposablesBySourcePath = {};
+  private styleSheetDisposablesBySourcePath: { [sourcePath: string]: Disposable } = {};
   private themeTokensDisposable: Disposable | null = null;
   private lessCache: LessCompileCache;
   private packageManager: PackageManager;
@@ -111,7 +112,17 @@ export default class ThemeManager {
   private _systemAccentDisposable: Disposable | null = null;
   private _systemDarkMode = false;
 
-  constructor({ packageManager, resourcePath, configDirPath, safeMode }) {
+  constructor({
+    packageManager,
+    resourcePath,
+    configDirPath,
+    safeMode,
+  }: {
+    packageManager: PackageManager;
+    resourcePath: string;
+    configDirPath: string;
+    safeMode: boolean;
+  }) {
     this.packageManager = packageManager;
     this.resourcePath = resourcePath;
     this.configDirPath = configDirPath;
@@ -217,7 +228,7 @@ export default class ThemeManager {
   //
   // * `callback` {Function}
   //
-  onDidChangeActiveThemes(callback) {
+  onDidChangeActiveThemes(callback: () => void) {
     return this.emitter.on('did-change-active-themes', callback);
   }
 
@@ -272,7 +283,7 @@ export default class ThemeManager {
   // Set the active theme.
   //  * `packageName` {string} - the theme package to activate
   //
-  setActiveTheme(packageName) {
+  setActiveTheme(packageName: string) {
     AppEnv.config.set(CONFIG_THEME_KEY, packageName);
     // because we're observing the config, changes will be applied
   }
@@ -319,7 +330,7 @@ export default class ThemeManager {
   }
 
   /** A theme that sets LESS variables and no tokens, so its tokens come from static/styles/compat/tokens.less. */
-  usesCompatTokens(theme) {
+  usesCompatTokens(theme: Pick<Package, 'getStylesheetsPath'>) {
     const styles = theme.getStylesheetsPath();
     return (
       !fs.existsSync(path.join(styles, THEME_TOKENS_FILE)) &&
@@ -332,7 +343,7 @@ export default class ThemeManager {
   }
 
   /** The theme's tokens as CSS: its styles/tokens.css, or the compat tokens. Empty for neither. */
-  themeTokensCSS(theme): string {
+  themeTokensCSS(theme: Package): string {
     const tokensPath = path.join(theme.getStylesheetsPath(), THEME_TOKENS_FILE);
     if (fs.existsSync(tokensPath)) return fs.readFileSync(tokensPath, 'utf8');
     if (!this.usesCompatTokens(theme)) return '';
@@ -346,7 +357,10 @@ export default class ThemeManager {
   }
 
   /** package.json `scheme` / `sidebarScheme`; else what compat tokens derived; else light. */
-  themeSchemes(theme, tokensCSS: string): { scheme: ThemeScheme; sidebarScheme: ThemeScheme } {
+  themeSchemes(
+    theme: Package,
+    tokensCSS: string
+  ): { scheme: ThemeScheme; sidebarScheme: ThemeScheme } {
     const derived = (prop: string) =>
       parseScheme(new RegExp(`${prop}:\\s*(light|dark)`).exec(tokensCSS)?.[1]);
     const scheme = theme.scheme() || derived('--compat-scheme') || 'light';
@@ -354,7 +368,7 @@ export default class ThemeManager {
     return { scheme, sidebarScheme };
   }
 
-  private loadThemeTokens(theme) {
+  private loadThemeTokens(theme: Package) {
     if (this.themeTokensDisposable) {
       this.themeTokensDisposable.dispose();
       this.themeTokensDisposable = null;
@@ -391,7 +405,7 @@ export default class ThemeManager {
   // Section: Private
   // ------
 
-  requireStylesheet(stylesheetPath) {
+  requireStylesheet(stylesheetPath: string) {
     const sourcePath = this.resolveStylesheetPath(stylesheetPath);
     if (!sourcePath) {
       throw new Error(localized(`Could not find a file at path '%@'`, stylesheetPath));
@@ -419,7 +433,7 @@ export default class ThemeManager {
     }
   }
 
-  resolveStylesheetPath(stylesheetPath) {
+  resolveStylesheetPath(stylesheetPath: string) {
     if (path.extname(stylesheetPath).length > 0) {
       const p = path.resolve(__dirname, stylesheetPath);
       return fs.existsSync(p) ? p : null;
@@ -431,7 +445,7 @@ export default class ThemeManager {
     return null;
   }
 
-  cssContentsOfStylesheet(stylesheetPath) {
+  cssContentsOfStylesheet(stylesheetPath: string) {
     const ext = path.extname(stylesheetPath);
 
     if (ext === '.less') {
@@ -443,17 +457,21 @@ export default class ThemeManager {
     }
   }
 
-  cssContentsOfLessStylesheet(lessStylesheetPath) {
+  cssContentsOfLessStylesheet(lessStylesheetPath: string) {
     try {
       const less = fs.readFileSync(lessStylesheetPath, 'utf8').toString();
       return this.lessCache.cssForFile(lessStylesheetPath, less);
     } catch (error) {
+      // less throws objects with `line` for syntax errors.
+      const failure = typeof error === 'object' && error !== null ? error : {};
+      const errorMessage = 'message' in failure ? failure.message : undefined;
+      const line = 'line' in failure ? failure.line : undefined;
       let message = `Error loading Less stylesheet: ${lessStylesheetPath}`;
-      let detail = error.message;
+      let detail: unknown = errorMessage;
 
-      if (error.line !== undefined) {
+      if (line !== undefined) {
         message = `Error compiling Less stylesheet: ${lessStylesheetPath}`;
-        detail = `Line number: ${error.line}\n${error.message}`;
+        detail = `Line number: ${line}\n${errorMessage}`;
       }
       console.error(message, { detail, dismissable: true });
       console.error(detail);

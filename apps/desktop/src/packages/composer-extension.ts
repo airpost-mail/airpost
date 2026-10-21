@@ -51,7 +51,7 @@ export class ComposerExtension {
   Returns a list of warning strings, or an empty array if no warnings need
   to be displayed.
   */
-  static warningsForSending(args: { draft: Message }) {
+  static warningsForSending(args: { draft: Message }): string[] {
     return [];
   }
 
@@ -120,6 +120,6 @@ export class ComposerExtension {
   static applyTransformsForSending(args: {
     draft: Message;
     draftBodyRootNode?: HTMLElement; // Note: Only present for HTML messages
-    recipient?: Contact;
+    recipient?: Contact | null;
   }) {}
 }

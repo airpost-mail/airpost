@@ -156,10 +156,11 @@ The windows' side of the sync engine. The main process supervises the `serve` en
 main window also sends its accounts' commands on it and applies the supervisor's account events.
 */
 export default class EngineBridge {
-  _connection: EngineConnection = null;
+  // Null in spec mode, where no engine runs.
+  _connection: EngineConnection | null = null;
   _mainWindow = false;
   _appliedEvents = new Set<number>();
-  _lastWait: number;
+  _lastWait = 0;
 
   constructor() {
     if (AppEnv.inSpecMode()) return;
@@ -222,7 +223,7 @@ export default class EngineBridge {
   // The end of the account's log, from its first whole line; empty when the engine can't say.
   async tailClientLog(accountId: string) {
     try {
-      const { text, truncated } = await this._connection.request<LogsTailResult>(
+      const { text, truncated } = await this._conn().request<LogsTailResult>(
         Method.EngineLogsTail,
         { accountId, bytes: CLIENT_LOG_TAIL_BYTES } as LogsTailParams
       );
@@ -235,7 +236,7 @@ export default class EngineBridge {
 
   sendSyncMailNow() {
     console.warn('Sending `wake` to all engine workers...');
-    this._connection
+    this._conn()
       .request(Method.SyncWake, {})
       .catch((err) => console.warn(`sync.wake failed: ${err.message}`));
   }
@@ -247,16 +248,17 @@ export default class EngineBridge {
       ipcRenderer.send('command', 'application:sync-calendar', accountId);
       return;
     }
-    const ids = accountId ? [accountId] : this._connection.accountIds();
+    const connection = this._conn();
+    const ids = accountId ? [accountId] : connection.accountIds();
     for (const id of ids) {
-      if (this._connection.accountIds().includes(id)) {
-        this._connection.send(id, { type: 'sync-calendar' });
+      if (connection.accountIds().includes(id)) {
+        connection.send(id, { type: 'sync-calendar' });
       }
     }
   }
 
   sendMessageToAccount(accountId: string, json: Record<string, unknown>) {
-    if (!this._connection.send(accountId, json)) {
+    if (!this._conn().send(accountId, json)) {
       const { emailAddress } = AccountStore.accountForId(accountId) || { emailAddress: undefined };
       return AppEnv.showErrorDialog({
         title: localized(`Tern is unable to sync %@`, emailAddress),
@@ -313,6 +315,11 @@ export default class EngineBridge {
   }
 
   // Private
+
+  _conn() {
+    if (!this._connection) throw new Error('No sync engine connection in spec mode');
+    return this._connection;
+  }
 
   _createConnection() {
     const connection = new EngineConnection({
@@ -379,7 +386,7 @@ export default class EngineBridge {
         return;
       case 'too-many-failures': {
         const { code, signal, error } = accountEvent.exit;
-        let syncError: Error = null;
+        let syncError: Error | null = null;
         if (error) {
           syncError = new Error(error.message);
           if (error.syncError) (syncError as any).syncError = error.syncError;
@@ -417,7 +424,7 @@ export default class EngineBridge {
     task.willBeQueued();
 
     task.status = 'local';
-    (task as any).origin = new Error().stack.split('\n').slice(2).join('\n');
+    (task as any).origin = (new Error().stack ?? '').split('\n').slice(2).join('\n');
 
     this.sendMessageToAccount(task.accountId, { type: 'queue-task', task: task });
   }
@@ -432,7 +439,7 @@ export default class EngineBridge {
   }
 
   _onCancelTask(taskOrId: Task | string) {
-    let task: Task;
+    let task: Task | undefined;
     if (typeof taskOrId === 'string') {
       task = TaskQueue.queue().find((t) => t.id === taskOrId);
     } else {
@@ -477,6 +484,6 @@ export default class EngineBridge {
 
   // The `serve` engine outlives the window; the supervisor stops it when the app quits.
   _onReadyToUnload = () => {
-    this._connection.close();
+    this._conn().close();
   };
 }

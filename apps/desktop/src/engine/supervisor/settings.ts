@@ -137,13 +137,14 @@ const local = (v: unknown) => (v === null ? undefined : v);
 
 export class EngineSettingsMirror {
   host: SettingsHost;
-  engine: SettingsEngine = null;
+  engine: SettingsEngine | null = null;
   // Written locally and not yet stored by an engine.
   _unsent = new Set<string>();
   // Keys with a settings.set awaiting its answer, and how many.
   _inFlight = new Map<string, number>();
   _ready: Promise<void>;
-  _markReady: () => void;
+  // Set by the Promise executor, which runs inside the constructor.
+  _markReady!: () => void;
 
   constructor(host: SettingsHost) {
     this.host = host;
@@ -238,7 +239,9 @@ export class EngineSettingsMirror {
         [KEPT_KEY]: kept.length ? _.uniq(kept) : undefined,
       });
     } catch (err) {
-      console.warn(`Could not read the engine's settings: ${err.message}`);
+      console.warn(
+        `Could not read the engine's settings: ${err instanceof Error ? err.message : err}`
+      );
     }
   }
 
@@ -246,7 +249,7 @@ export class EngineSettingsMirror {
   _writeResurfacing(engine: SettingsEngine, current: { [key: string]: unknown }) {
     if (!(engine.features || []).includes(Feature.ExpirationExecutor)) return;
     const bodies = resurfacingBodies(localizerFor(this.host.get(LANGUAGE_KEY) as string));
-    const values = {
+    const values: { [key: string]: string } = {
       [SNOOZE_BODY_KEY]: bodies.snoozeBody,
       [REMINDER_BODY_KEY]: bodies.reminderBody,
     };

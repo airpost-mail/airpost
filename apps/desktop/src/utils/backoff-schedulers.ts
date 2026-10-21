@@ -1,7 +1,7 @@
 const BASE_TIMEOUT = 2 * 1000;
 const MAX_TIMEOUT = 5 * 60 * 1000;
 
-function exponentialBackoff(base, numTries) {
+function exponentialBackoff(base: number, numTries: number) {
   return base * 2 ** numTries;
 }
 
@@ -61,7 +61,7 @@ export class BackoffScheduler {
 }
 
 export class ExponentialBackoffScheduler extends BackoffScheduler {
-  constructor(opts = {}) {
+  constructor(opts: Omit<BackoffSchedulerOptions, 'getNextBackoffDelay'> = {}) {
     super({ ...opts, getNextBackoffDelay: exponentialBackoff });
   }
 }

@@ -62,9 +62,9 @@ export async function buildDraft(
     ...params,
     save: false,
   });
-  const draft = new Message({}).fromJSON(json);
-  // The engine's id is the one a save gives it; SyncbackDraftTask assigns it again.
-  draft.id = undefined;
+  // The engine's id is the one a save gives it, so the draft starts without one;
+  // SyncbackDraftTask assigns it again.
+  const draft = new Message({}).fromJSON({ ...json, id: undefined });
   engineBuilt.add(draft);
   return draft;
 }

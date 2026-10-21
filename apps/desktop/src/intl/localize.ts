@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type { ReactNode } from 'react';
 const React = process.type === 'renderer' ? require('react') : null;
 
 const RTL_LANGS = [
@@ -49,7 +50,7 @@ const VERIFIED_LANGS = [
   'he',
 ];
 
-const LANG_NAMES = {
+const LANG_NAMES: { [code: string]: string } = {
   af: 'Afrikaans',
   am: 'Amharic',
   an: 'Aragonese',
@@ -176,13 +177,14 @@ const langsFiles = fs
   .filter((f) => f.endsWith('.json'))
   .map((f) => f.replace('.json', ''));
 
-let localizations = {};
-let locale = null;
+let localizations: { [en: string]: string } = {};
+// Set by initializeLocalization, which every process runs first.
+let locale: string | null = null;
 
 export let isRTL = false;
 
-export function initializeLocalization({ configDirPath }) {
-  locale = automaticLocale;
+export function initializeLocalization({ configDirPath }: { configDirPath: string }) {
+  let chosen = automaticLocale;
 
   // Load the user's language choice if they've explicitly set one in settings
   // Note we can't use our nice Config class becuase the config schema itself
@@ -192,13 +194,14 @@ export function initializeLocalization({ configDirPath }) {
     const choice = config['*'].core.intl.language;
     if (choice && choice !== '') {
       // '' represents "use automatic"
-      locale = choice;
+      chosen = choice;
     }
   } catch (err) {
     // may be first run
   }
+  locale = chosen;
 
-  const lang = locale.split('-')[0] || 'en';
+  const lang = chosen.split('-')[0] || 'en';
 
   localizations = {};
   isRTL = false;
@@ -211,8 +214,8 @@ export function initializeLocalization({ configDirPath }) {
 
   // Load localizations for the full locale if present (eg: `zh-CN`)
   // and override base localizations with the more specific regional ones.
-  if (langsFiles.includes(locale)) {
-    localizations = Object.assign(localizations, require(path.join(langsDir, `${locale}.json`)));
+  if (langsFiles.includes(chosen)) {
+    localizations = Object.assign(localizations, require(path.join(langsDir, `${chosen}.json`)));
   }
 }
 
@@ -223,7 +226,7 @@ export function initializeLocalization({ configDirPath }) {
 export function localizerFor(choice: string | null | undefined): (en: string) => string {
   const want = choice || automaticLocale;
   const lang = want.split('-')[0] || 'en';
-  let table = {};
+  let table: { [en: string]: string } = {};
   if (langsFiles.includes(lang)) table = { ...require(path.join(langsDir, `${lang}.json`)) };
   if (langsFiles.includes(want)) {
     table = Object.assign(table, require(path.join(langsDir, `${want}.json`)));
@@ -231,7 +234,7 @@ export function localizerFor(choice: string | null | undefined): (en: string) =>
   return (en: string) => table[en] || en;
 }
 
-export function localized(en, ...subs) {
+export function localized(en: string, ...subs: unknown[]): string {
   let i = 0;
   let translated = localizations[en] || en;
   if (subs.length) {
@@ -239,16 +242,16 @@ export function localized(en, ...subs) {
     // The translation may contain this format even if the original string does not.
     if (translated.includes('%1$@')) {
       subs.forEach((sub, idx) => {
-        translated = translated.replace(`%${idx + 1}$@`, sub);
+        translated = translated.replace(`%${idx + 1}$@`, String(sub));
       });
     } else {
-      translated = translated.replace(/%@/g, () => subs[i++]);
+      translated = translated.replace(/%@/g, () => String(subs[i++]));
     }
   }
   return translated;
 }
 
-export function localizedReactFragment(en, ...subs) {
+export function localizedReactFragment(en: string, ...subs: ReactNode[]) {
   let translated = localizations[en] || en;
   if (!subs.length) {
     return translated;
@@ -257,7 +260,7 @@ export function localizedReactFragment(en, ...subs) {
   // Support "%@ and %@" OR "%1$@ and %2$@" which allows for param reordering.
   // The translation may contain this format even if the original string does not.
 
-  const parts = [];
+  const parts: ReactNode[] = [];
   let match = null;
   let used = 0;
   while ((match = /%(?:(\d+)\$)?@/g.exec(translated))) {
@@ -285,15 +288,17 @@ export function getCurrentLocale() {
 }
 
 export function getAvailableLanguages() {
-  const localeToItem = (f) => ({ key: f, name: LANG_NAMES[f] || f });
+  const localeToItem = (f: string) => ({ key: f, name: LANG_NAMES[f] || f });
+  const current = locale;
+  if (current === null) throw new Error('initializeLocalization() has not run');
 
   // The list we expose is mostly just languages, but also a few lang-locale combos like zh-CN.
   // If our current/system locale in a known combo expose that, otherwis cut it so it's always
   // a member of the available list.
-  const currentLang = LANG_NAMES[locale] ? locale : locale.split('-').shift();
+  const currentLang = LANG_NAMES[current] ? current : current.split('-')[0];
   const automaticLang = LANG_NAMES[automaticLocale]
     ? automaticLocale
-    : automaticLocale.split('-').shift();
+    : automaticLocale.split('-')[0];
 
   return {
     current: localeToItem(currentLang),

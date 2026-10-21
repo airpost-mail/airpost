@@ -5,6 +5,13 @@ import { SheetToolbarDeclaration } from '../data/stores/workspace';
 
 type LocationDescriptor = { id: string } | SheetToolbarDeclaration;
 
+// What register() takes and the find methods return: something with a `displayName`, usually
+// a React component. Injection sites pass it whatever props and read whatever statics they
+// define, and some roles (ContactSearchResults) register plain objects, so entries stay
+// untyped: this is the plugin API's contract.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type RegisteredComponent = any;
+
 export interface ComponentRegistryDescriptor {
   mode?: string;
   modes?: string[];
@@ -27,10 +34,10 @@ class ComponentRegistry extends BaseStore {
       modes?: string[];
       locations?: LocationDescriptor[];
       roles?: string[];
-      component: React.ComponentType;
+      component: RegisteredComponent;
     };
   } = {};
-  _cache = {};
+  _cache: { [descriptorJSON: string]: RegisteredComponent[] } = {};
   _showComponentRegions = false;
 
   // Public: Like `listen`, for components that mount many times (InjectedComponent and
@@ -61,7 +68,7 @@ class ComponentRegistry extends BaseStore {
   //
   // This method is chainable.
   //
-  register(component, options: ComponentRegistryDescriptor) {
+  register(component: RegisteredComponent, options: ComponentRegistryDescriptor) {
     if (component.view) {
       return console.warn(
         'Ignoring component trying to register with old CommandRegistry.register syntax'
@@ -108,7 +115,7 @@ class ComponentRegistry extends BaseStore {
     return this;
   }
 
-  unregister(component) {
+  unregister(component: RegisteredComponent) {
     if (typeof component === 'string') {
       throw new Error('ComponentRegistry.unregister() must be called with a component.');
     }
@@ -175,7 +182,8 @@ class ComponentRegistry extends BaseStore {
 
     // Made into a convenience function because default
     // values (`[]`) are necessary and it was getting messy.
-    const overlaps = (entry = [], search = []) => _.intersection(entry, search).length > 0;
+    const overlaps = (entry: unknown[] = [], search: unknown[] = []) =>
+      _.intersection(entry, search).length > 0;
 
     const entries = Object.values(this._registry).filter((entry) => {
       if (modes && entry.modes && !overlaps(modes, entry.modes)) {

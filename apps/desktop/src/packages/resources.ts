@@ -8,13 +8,13 @@
 import path from 'path';
 import fs from 'fs';
 
-interface Disposable {
+export interface Disposable {
   dispose(): void;
 }
 
 // Every keymaps/*.json, in the `package` keymap layer.
 export function loadKeymaps(directory: string, disposables: Disposable[]) {
-  let keymapPaths = [];
+  let keymapPaths: string[] = [];
   const keymapsRoot = path.join(directory, 'keymaps');
   try {
     keymapPaths = fs
@@ -37,7 +37,7 @@ export function loadStylesheets(
   { isTheme }: { isTheme: boolean },
   disposables: Disposable[]
 ) {
-  let stylesheets = [];
+  let stylesheets: string[] = [];
   try {
     const filenames = fs.readdirSync(stylesRoot);
     const index = filenames.find((fn) => fn.startsWith('index.'));
@@ -66,7 +66,7 @@ export function loadStylesheets(
 // Every menus/*.json that has a `menu` key.
 export function loadMenus(directory: string, disposables: Disposable[]) {
   const menusRoot = path.join(directory, 'menus');
-  let menuPaths = [];
+  let menuPaths: string[] = [];
 
   try {
     menuPaths = fs

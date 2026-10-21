@@ -1,16 +1,20 @@
 import _ from 'underscore';
 
+function isTextNode(node: Node): node is Text {
+  return node.nodeType === Node.TEXT_NODE;
+}
+
 const DOMUtils = {
-  findLastTextNode(node: Node) {
+  findLastTextNode(node: Node): Text | null {
     if (!node) {
       return null;
     }
-    if (node.nodeType === Node.TEXT_NODE) {
+    if (isTextNode(node)) {
       return node;
     }
     for (let i = node.childNodes.length - 1; i >= 0; i--) {
       const childNode = node.childNodes[i];
-      if (childNode.nodeType === Node.TEXT_NODE) {
+      if (isTextNode(childNode)) {
         return childNode;
       } else if (childNode.nodeType === Node.ELEMENT_NODE) {
         return DOMUtils.findLastTextNode(childNode);
@@ -21,15 +25,15 @@ const DOMUtils = {
     return null;
   },
 
-  findFirstTextNode(node: Node) {
+  findFirstTextNode(node: Node): Text | null {
     if (!node) {
       return null;
     }
-    if (node.nodeType === Node.TEXT_NODE) {
+    if (isTextNode(node)) {
       return node;
     }
     for (const childNode of node.childNodes) {
-      if (childNode.nodeType === Node.TEXT_NODE) {
+      if (isTextNode(childNode)) {
         return childNode;
       } else if (childNode.nodeType === Node.ELEMENT_NODE) {
         return DOMUtils.findFirstTextNode(childNode);
@@ -41,7 +45,7 @@ const DOMUtils = {
   },
 
   escapeHTMLCharacters(text: string) {
-    const map = {
+    const map: { [char: string]: string } = {
       '&': '&amp;',
       '<': '&lt;',
       '>': '&gt;',
@@ -57,9 +61,10 @@ const DOMUtils = {
   // WARNING. This is a fairly expensive operation and should be used
   // sparingly.
   nodeIsVisible(node: Node) {
-    while (node && node.nodeType === Node.ELEMENT_NODE) {
-      const style = window.getComputedStyle(node as Element);
-      node = node.parentNode;
+    let current: Node | null = node;
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+      const style = window.getComputedStyle(current as Element);
+      current = current.parentNode;
       if (style == null) {
         continue;
       }
@@ -101,9 +106,10 @@ const DOMUtils = {
     // nodes. Since we're looking for a common ancestor we can really speed
     // this up by keeping track of the min depth reached. We know that we
     // won't need to check past that.
-    const getParents = function (node) {
-      const parentNodes = [node];
+    const getParents = function (start: Node) {
+      const parentNodes = [start];
       let depth = 0;
+      let node: Node | null = start;
       while ((node = node.parentNode)) {
         if (parentFilter) {
           if (parentFilter(node)) {

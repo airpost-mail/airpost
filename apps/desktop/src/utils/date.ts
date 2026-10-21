@@ -81,8 +81,8 @@ function midnight(momentDate: Moment, midnightHour = Hours.Midnight) {
 }
 
 function isPastDate(
-  inputDateObj: { month: number; [key: string]: unknown },
-  currentDate: Date | Moment | string
+  inputDateObj: { [component: string]: number },
+  currentDate: Date | Moment | string | undefined
 ) {
   const inputMoment = moment({ ...inputDateObj, month: inputDateObj.month - 1 });
   const currentMoment = moment(currentDate);
@@ -90,18 +90,44 @@ function isPastDate(
   return inputMoment.isBefore(currentMoment);
 }
 
-let _chronoPast = null;
-let _chronoFuture = null;
-let _chrono = null;
-
-function getChrono() {
-  if (!_chrono) {
-    _chrono = require('chrono-node'); //eslint-disable-line
-  }
-  return _chrono;
+// The parts of chrono-node this file uses. Its typings make `knownValues` and `impliedValues`
+// private, and the refiners below read and adjust them.
+interface ChronoComponents {
+  knownValues: { [component: string]: number };
+  impliedValues: { [component: string]: number };
+  isCertain(component: string): boolean;
+  imply(component: string, value: number): unknown;
 }
 
-function getChronoFuture() {
+interface ChronoResult {
+  text: string;
+  ref?: Date;
+  start: ChronoComponents;
+  end?: ChronoComponents;
+}
+
+interface ChronoParser {
+  parse(text: string): ChronoResult[];
+  parseDate(text: string): Date | null;
+  refiners: Array<{ refine: (text: unknown, results: ChronoResult[]) => ChronoResult[] }>;
+}
+
+interface ChronoModule {
+  casual: ChronoParser & { clone(): ChronoParser };
+  parse(text: string): ChronoResult[];
+}
+
+let _chronoPast: ChronoParser | null = null;
+let _chronoFuture: ChronoParser | null = null;
+let _chrono: ChronoModule | null = null;
+
+function getChrono(): ChronoModule {
+  const chrono: ChronoModule = _chrono || require('chrono-node'); //eslint-disable-line
+  _chrono = chrono;
+  return chrono;
+}
+
+function getChronoFuture(): ChronoParser {
   if (_chronoFuture) {
     return _chronoFuture;
   }
@@ -137,7 +163,7 @@ function getChronoFuture() {
   return _chronoFuture;
 }
 
-function getChronoPast() {
+function getChronoPast(): ChronoParser {
   if (_chronoPast) {
     return _chronoPast;
   }
@@ -181,27 +207,27 @@ function expandDateLikeString(dateLikeString: string) {
   }
 
   // Short format: 2h
-  if (/^\d+h$/.test(dateLikeString)) {
-    const numHours = dateLikeString.match(/^\d+/)[0]; // Extract number
-    return `${numHours} hours`;
+  const hours = /^(\d+)h$/.exec(dateLikeString);
+  if (hours) {
+    return `${hours[1]} hours`;
   }
 
   // Short format: 2d
-  if (/^\d+d$/.test(dateLikeString)) {
-    const numDays = dateLikeString.match(/^\d+/)[0]; // Extract number
-    return `${numDays} days`;
+  const days = /^(\d+)d$/.exec(dateLikeString);
+  if (days) {
+    return `${days[1]} days`;
   }
 
   // Short format: 2w
-  if (/^\d+w$/.test(dateLikeString)) {
-    const numWeeks = dateLikeString.match(/^\d+/)[0]; // Extract number
-    return `${numWeeks} weeks`;
+  const weeks = /^(\d+)w$/.exec(dateLikeString);
+  if (weeks) {
+    return `${weeks[1]} weeks`;
   }
 
   // Short format: 2m, 2mo
-  if (/^\d+mo?$/.test(dateLikeString)) {
-    const numMonths = dateLikeString.match(/^\d+/)[0]; // Extract number
-    return `${numMonths} months`;
+  const months = /^(\d+)mo?$/.exec(dateLikeString);
+  if (months) {
+    return `${months[1]} months`;
   }
 
   // Short format: t, to, tom => tomorrow
@@ -219,6 +245,20 @@ function expandDateLikeString(dateLikeString: string) {
   }
 
   return dateLikeString; // Return original string if no match
+}
+
+function format(momentDate: Moment, formatString?: string): string;
+function format(momentDate: Moment | null | undefined, formatString?: string): string | null;
+function format(momentDate: Moment | null | undefined, formatString?: string) {
+  if (!momentDate) return null;
+  return momentDate.format(formatString);
+}
+
+function utc(momentDate: Moment): Moment;
+function utc(momentDate: Moment | null | undefined): Moment | null;
+function utc(momentDate: Moment | null | undefined) {
+  if (!momentDate) return null;
+  return momentDate.utc();
 }
 
 const DateUtils = {
@@ -244,21 +284,15 @@ const DateUtils = {
 
   timeZone: tz,
 
-  format(momentDate, formatString?) {
-    if (!momentDate) return null;
-    return momentDate.format(formatString);
-  },
+  format,
 
-  utc(momentDate) {
-    if (!momentDate) return null;
-    return momentDate.utc();
-  },
+  utc,
 
-  minutesFromNow(minutes, now = moment()) {
+  minutesFromNow(minutes: number, now = moment()) {
     return now.add(minutes, 'minutes');
   },
 
-  hoursFromNow(hours, now = moment()) {
+  hoursFromNow(hours: number, now = moment()) {
     return now.add(hours, 'hours');
   },
 
@@ -293,7 +327,7 @@ const DateUtils = {
     return morning(now.day(Days.ThisWeekend(now.day())));
   },
 
-  weeksFromNow(weeks, now = moment()) {
+  weeksFromNow(weeks: number, now = moment()) {
     return now.add(weeks, 'weeks');
   },
 
@@ -301,7 +335,7 @@ const DateUtils = {
     return morning(now.day(Days.NextMonday(now.day())));
   },
 
-  monthsFromNow(months, now = moment()) {
+  monthsFromNow(months: number, now = moment()) {
     return now.add(months, 'months');
   },
 
@@ -322,14 +356,15 @@ const DateUtils = {
     const now = moment();
     const results = { start: moment(now), end: moment(now), leftoverText: dateLikeString };
     for (const item of parsed) {
-      for (const val of ['start', 'end']) {
-        if (!item[val]) {
+      for (const val of ['start', 'end'] as const) {
+        const components = item[val];
+        if (!components) {
           continue;
         }
-        const { day: knownDay, weekday: knownWeekday, hour: knownHour } = item[val].knownValues;
+        const { day: knownDay, weekday: knownWeekday, hour: knownHour } = components.knownValues;
         const { year, month, day, hour, minute } = Object.assign(
-          item[val].knownValues,
-          item[val].impliedValues
+          components.knownValues,
+          components.impliedValues
         );
         if (!gotTime[val] && knownHour) {
           gotTime[val] = true;
@@ -376,7 +411,7 @@ const DateUtils = {
    * @param {string} dateLikeString - a string representing a date.
    * @return {moment} - moment object representing date
    */
-  futureDateFromString(dateLikeString) {
+  futureDateFromString(dateLikeString: string) {
     const expanded = expandDateLikeString(dateLikeString);
     const date = getChronoFuture().parseDate(expanded);
     if (!date) {
@@ -398,7 +433,7 @@ const DateUtils = {
    * seconds, upperCase and timeZone are the supported extra options to the format string.
    * Checks whether or not to use 24 hour time format.
    */
-  getTimeFormat(opts) {
+  getTimeFormat(opts?: { seconds?: boolean; upperCase?: boolean; timeZone?: boolean } | null) {
     const use24HourClock = hourCycle() === 'h23';
     let timeFormat = use24HourClock ? 'HH:mm' : 'h:mm';
 

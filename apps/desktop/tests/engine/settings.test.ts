@@ -231,7 +231,11 @@ describe('the engine-owned settings in the main process', function () {
     expect(manager.get('core.ai.limits')).toEqual({ triagePerHour: 50 });
 
     // Saving Preferences > AI writes the whole core.ai object; each key goes to the engine.
-    manager.setRawValue('core.ai', { ...manager.get('core.ai'), accounts: ['a1', 'a2'] }, null);
+    manager.setRawValue(
+      'core.ai',
+      { ...(manager.get('core.ai') as object), accounts: ['a1', 'a2'] },
+      null
+    );
     await until('the set', () => (fake.settings['core.ai.accounts'] || []).length === 2);
     expect(fake.settings['core.ai.limits']).toEqual({ triagePerHour: 50 });
   });

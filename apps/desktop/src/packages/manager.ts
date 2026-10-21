@@ -105,7 +105,7 @@ export default class PackageManager {
           localized(
             `Unable to read package.json for %@: %@`,
             path.basename(packagePath),
-            err.toString()
+            String(err)
           )
         );
         AppEnv.reportError(wrapped);
@@ -178,7 +178,7 @@ export default class PackageManager {
       const message = localized(
         `Failed to activate plugin %@: %@`,
         pkg.name,
-        err.message || err.toString()
+        (err instanceof Error && err.message) || String(err)
       );
       // Only report activation failures for built-in packages. User-installed
       // third-party plugins can fail for many reasons outside our control
@@ -254,7 +254,10 @@ export default class PackageManager {
     );
   }
 
-  installPackageFromPath(packagePath: string, callback) {
+  installPackageFromPath(
+    packagePath: string,
+    callback: (err: Error | null, packageName?: string) => void
+  ) {
     // check that the path contains a package.json file
     let json = null;
     try {
@@ -264,7 +267,7 @@ export default class PackageManager {
         new Error(
           localized(
             `The plugin or theme folder you selected doesn't contain a package.json file, or it was invalid JSON. %@`,
-            err.toString()
+            String(err)
           )
         )
       );
@@ -323,7 +326,7 @@ export default class PackageManager {
         new Error(
           localized(
             `Failed to install the plugin or theme: %@`,
-            err && err.message ? err.message : err.toString()
+            err instanceof Error && err.message ? err.message : String(err)
           )
         )
       );

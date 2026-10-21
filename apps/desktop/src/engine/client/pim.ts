@@ -73,21 +73,22 @@ async function taskForWrite(
   write: EventWriteJSON,
   { accountId, event, description }: { accountId: string; event?: Event; description?: string }
 ): Promise<Task | null> {
+  // tern-ipc EventWrite: a create names the calendar, an update or destroy the row.
   if (write.kind === 'create') {
-    const created = new Event({ calendarId: write.calendarId, accountId, ics: write.ics });
-    return SyncbackEventTask.forCreating({
-      event: created,
-      calendarId: write.calendarId,
-      accountId,
-    });
+    const { calendarId } = write;
+    if (calendarId === undefined) return null;
+    const created = new Event({ calendarId, accountId, ics: write.ics });
+    return SyncbackEventTask.forCreating({ event: created, calendarId, accountId });
   }
+  if (write.eventId === undefined) return null;
   const stored = await storedEvent(write.eventId, event);
   if (!stored) return null;
   if (write.kind === 'destroy') {
     return DestroyEventTask.forRemoving({ events: [stored] });
   }
   const updated = stored.clone();
-  updated.ics = write.ics;
+  // An update always carries the event's new ICS.
+  if (write.ics !== undefined) updated.ics = write.ics;
   return SyncbackEventTask.forUpdating({
     event: updated,
     undoData: snapshot(stored),
@@ -138,7 +139,7 @@ export async function editEvent(
 export async function createEvent(
   params: Omit<EventsCreateParams, 'queue' | 'tz'>,
   engine: EngineEventsType = EngineEvents
-): Promise<{ task: SyncbackEventTask; icsuid: string }> {
+): Promise<{ task: SyncbackEventTask; icsuid: string | undefined }> {
   const result = await engine.request<EventsWriteResult>(Method.EventsCreate, {
     ...params,
     tz: localTimeZone(),

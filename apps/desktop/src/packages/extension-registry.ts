@@ -3,7 +3,7 @@ import BaseStore from '../data/stores/base';
 
 export class Registry extends BaseStore {
   name: string;
-  _registry: { name: string; extension: any; priority: number }[];
+  _registry: { name: string; extension: any; priority: number }[] = [];
 
   constructor(name: string) {
     super();

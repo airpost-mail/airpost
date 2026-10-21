@@ -9,10 +9,10 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-let errorLogger;
+let errorLogger: { reportError(error: Error): void };
 import _ from 'underscore';
 import { valueForKeyPath, setValueForKeyPath, remove } from './utils';
-import { Emitter } from 'event-kit';
+import { Disposable, Emitter } from 'event-kit';
 import { ConfigChannel, ConfigReply } from './channels';
 
 if (process.type === 'renderer') {
@@ -26,7 +26,7 @@ if (process.type === 'renderer') {
 interface Persistence {
   getRawValuesString(): string;
   setRawValue(keyPath: string, value: unknown): void;
-  setSettings(settings: object): void;
+  setSettings(settings: ConfigObject): void;
 }
 
 function sendSync(channel: string, ...args: unknown[]): string | undefined {
@@ -41,7 +41,13 @@ function sendSync(channel: string, ...args: unknown[]): string | undefined {
 function persistence(): Persistence {
   if (process.type === 'renderer') {
     return {
-      getRawValuesString: () => sendSync(ConfigChannel.GetRaw),
+      getRawValuesString: () => {
+        const value = sendSync(ConfigChannel.GetRaw);
+        if (value === undefined) {
+          throw new Error(`no settings on ${ConfigChannel.GetRaw}`);
+        }
+        return value;
+      },
       setRawValue: (keyPath, value) => {
         sendSync(ConfigChannel.SetRaw, keyPath, value);
       },
@@ -57,6 +63,34 @@ function persistence(): Persistence {
     setSettings: (settings) => manager.setSettings(settings, null),
   };
 }
+
+// A JSON-schema subset describing one config key (or a tree of them under `properties`).
+export interface ConfigSchema {
+  type?: string | string[];
+  default?: unknown;
+  properties?: { [key: string]: ConfigSchema };
+  items?: ConfigSchema;
+  minimum?: unknown;
+  maximum?: unknown;
+  enum?: unknown;
+  title?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+type ConfigObject = { [key: string]: unknown };
+
+// Config values are untyped JSON, so listeners get them as `any` (the public plugin contract).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ConfigChangeCallback = (event: { oldValue: any; newValue: any }) => void;
+
+// Coerces `value` to the schema or throws; called with `this` = the Config class.
+export type SchemaEnforcer = (
+  this: typeof Config,
+  keyPath: string | null,
+  value: unknown,
+  schema: ConfigSchema
+) => unknown;
 
 // Essential: Used to access all of N1's configuration details.
 //
@@ -317,16 +351,16 @@ function persistence(): Persistence {
 // * Don't depend on (or write to) configuration keys outside of your keypath.
 //
 export default class Config {
-  static schemaEnforcers = {};
+  static schemaEnforcers: { [typeName: string]: SchemaEnforcer[] } = {};
 
-  static addSchemaEnforcer(typeName, enforcerFunction) {
+  static addSchemaEnforcer(typeName: string, enforcerFunction: SchemaEnforcer) {
     if (this.schemaEnforcers[typeName] == null) {
       this.schemaEnforcers[typeName] = [];
     }
     this.schemaEnforcers[typeName].push(enforcerFunction);
   }
 
-  static addSchemaEnforcers(filters) {
+  static addSchemaEnforcers(filters: { [typeName: string]: { [name: string]: SchemaEnforcer } }) {
     for (const typeName in filters) {
       const functions = filters[typeName];
       for (const name in functions) {
@@ -336,15 +370,15 @@ export default class Config {
     }
   }
 
-  static executeSchemaEnforcers(keyPath, value, schema) {
-    let error = null;
-    let types = schema.type;
-    if (!Array.isArray(types)) {
-      types = [types];
-    }
+  static executeSchemaEnforcers(keyPath: string | null, value: unknown, schema: ConfigSchema) {
+    let error: unknown = null;
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
     for (const type of types) {
       try {
-        const enforcerFunctions = this.schemaEnforcers[type].concat(this.schemaEnforcers['*']);
+        // An unknown (or missing) type has no enforcers: the TypeError here counts as a failure.
+        const enforcerFunctions = this.schemaEnforcers[String(type)].concat(
+          this.schemaEnforcers['*']
+        );
         for (const enforcer of enforcerFunctions) {
           // At some point in one's life, one must call upon an enforcer.
           value = enforcer.call(this, keyPath, value, schema);
@@ -362,11 +396,11 @@ export default class Config {
     return value;
   }
 
-  settings = {};
-  defaultSettings = {};
+  settings: ConfigObject = {};
+  defaultSettings: ConfigObject = {};
   transactDepth = 0;
   emitter = new Emitter();
-  schema = {
+  schema: ConfigSchema = {
     type: 'object',
     properties: {},
   };
@@ -378,13 +412,14 @@ export default class Config {
       // If new Config() has already been called, unmount it's listener when
       // we attach ourselves. This is only done during specs, Config is a singleton.
       ipcRenderer.removeAllListeners(ConfigChannel.Reloaded);
-      ipcRenderer.on(ConfigChannel.Reloaded, (event, settings) => {
+      ipcRenderer.on(ConfigChannel.Reloaded, (event: unknown, settings: ConfigObject) => {
         this.updateSettings(settings);
       });
     }
   }
 
-  _logError(prefix: string, error: Error) {
+  _logError(prefix: string, thrown: unknown) {
+    const error = thrown instanceof Error ? thrown : new Error(String(thrown));
     error.message = `${prefix}: ${error.message}`;
     console.error(error.message);
     errorLogger.reportError(error);
@@ -435,13 +470,10 @@ export default class Config {
   //
   // Returns a {Disposable} with the following keys on which you can call
   // `.dispose()` to unsubscribe.
-  onDidChange(...args) {
-    let callback, keyPath;
-    if (args.length === 1) {
-      [callback] = args;
-    } else if (args.length === 2) {
-      [keyPath, callback] = args;
-    }
+  onDidChange(callback: ConfigChangeCallback): Disposable;
+  onDidChange(keyPath: string | null | undefined, callback: ConfigChangeCallback): Disposable;
+  onDidChange(...args: [ConfigChangeCallback] | [string | null | undefined, ConfigChangeCallback]) {
+    const [keyPath, callback] = args.length === 1 ? [undefined, args[0]] : args;
     return this.onDidChangeKeyPath(keyPath, callback);
   }
 
@@ -463,7 +495,9 @@ export default class Config {
   //
   // Returns the value from N1's default settings, the user's configuration
   // file in the type specified by the configuration schema.
-  get(keyPath?: string) {
+  // Settings are untyped JSON; `any` is the public contract for core and plugins.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get(keyPath?: string | null): any {
     return this.getRawValue(keyPath);
   }
 
@@ -486,7 +520,7 @@ export default class Config {
   // Returns a {Boolean}
   // * `true` if the value was set.
   // * `false` if the value was not able to be coerced to the type specified in the setting's schema.
-  set(keyPath, value) {
+  set(keyPath: string, value: unknown) {
     if (value === undefined) {
       value = valueForKeyPath(this.defaultSettings, keyPath);
     } else {
@@ -512,7 +546,7 @@ export default class Config {
   //
   // * `keyPath` The {String} name of the key.
   // * `options` (optional) {Object}
-  unset(keyPath) {
+  unset(keyPath: string) {
     this.set(keyPath, valueForKeyPath(this.defaultSettings, keyPath));
   }
 
@@ -524,9 +558,9 @@ export default class Config {
   //
   // Returns an {Object} eg. `{type: 'integer', default: 23, minimum: 1}`.
   // Returns `null` when the keyPath has no schema specified.
-  getSchema(keyPath) {
+  getSchema(keyPath: string | null) {
     const keys = splitKeyPath(keyPath);
-    let { schema } = this;
+    let schema: ConfigSchema | undefined = this.schema;
     for (const key of keys) {
       if (schema == null) {
         break;
@@ -541,7 +575,7 @@ export default class Config {
   // handlers will be called once if the value for their key-path has changed.
   //
   // * `callback` {Function} to execute while suppressing calls to handlers.
-  transact(callback) {
+  transact<T>(callback: () => T): T {
     this.transactDepth++;
     try {
       return callback();
@@ -555,7 +589,7 @@ export default class Config {
     Section: Internal methods used by core
     */
 
-  pushAtKeyPath(keyPath, value) {
+  pushAtKeyPath(keyPath: string, value: unknown) {
     const arrayValue = this.get(keyPath) || [];
     if (!(arrayValue instanceof Array)) {
       throw new Error(
@@ -569,7 +603,7 @@ export default class Config {
     return result;
   }
 
-  unshiftAtKeyPath(keyPath, value) {
+  unshiftAtKeyPath(keyPath: string, value: unknown) {
     const arrayValue = this.get(keyPath) || [];
     if (!(arrayValue instanceof Array)) {
       throw new Error(
@@ -583,7 +617,7 @@ export default class Config {
     return result;
   }
 
-  removeAtKeyPath(keyPath, value) {
+  removeAtKeyPath(keyPath: string, value: unknown) {
     const arrayValue = this.get(keyPath) || [];
     if (!(arrayValue instanceof Array)) {
       throw new Error(
@@ -597,7 +631,8 @@ export default class Config {
     return result;
   }
 
-  setSchema(keyPath, schema) {
+  // A null keyPath sets the root schema.
+  setSchema(keyPath: string | null, schema: ConfigSchema) {
     if (!isPlainObject(schema)) {
       throw new Error(`Error loading schema for ${keyPath}: schemas can only be objects!`);
     }
@@ -632,7 +667,7 @@ export default class Config {
     Section: Private methods managing global settings
     */
 
-  updateSettings = (newSettings) => {
+  updateSettings = (newSettings: ConfigObject) => {
     if (!newSettings || _.isEmpty(newSettings)) {
       throw new Error(`Tried to update settings with false-y value: ${newSettings}`);
     }
@@ -640,7 +675,8 @@ export default class Config {
     this.emitChangeEvent();
   };
 
-  getRawValue(keyPath?: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getRawValue(keyPath?: string | null): any {
     let value = valueForKeyPath(this.settings, keyPath);
     const defaultValue = valueForKeyPath(this.defaultSettings, keyPath);
 
@@ -657,7 +693,7 @@ export default class Config {
   }
 
   onDidChangeKeyPath(
-    keyPath: string,
+    keyPath: string | null | undefined,
     callback: (event: { oldValue: unknown; newValue: unknown }) => void
   ) {
     let oldValue = this.get(keyPath);
@@ -680,12 +716,12 @@ export default class Config {
     return _.isEqual(pathTokens, pathSubTokens);
   }
 
-  setRawDefault(keyPath, value) {
+  setRawDefault(keyPath: string | null, value: unknown) {
     setValueForKeyPath(this.defaultSettings, keyPath, value);
     this.emitChangeEvent();
   }
 
-  setDefaults(keyPath: string, defaults) {
+  setDefaults(keyPath: string | null, defaults: unknown) {
     if (defaults != null && isPlainObject(defaults)) {
       const keys = splitKeyPath(keyPath);
       for (const key in defaults) {
@@ -708,17 +744,17 @@ export default class Config {
     }
   }
 
-  deepClone(object) {
-    if (_.isArray(object)) {
-      return object.map((value) => this.deepClone(value));
+  deepClone(object: unknown): unknown {
+    if (Array.isArray(object)) {
+      return object.map((value): unknown => this.deepClone(value));
     } else if (isPlainObject(object)) {
-      return _.mapObject(object, (value) => this.deepClone(value));
+      return _.mapObject(object, (value): unknown => this.deepClone(value));
     } else {
       return object;
     }
   }
 
-  extractDefaultsFromSchema(schema) {
+  extractDefaultsFromSchema(schema: ConfigSchema): unknown {
     if (schema.default != null) {
       return schema.default;
     } else if (
@@ -726,7 +762,7 @@ export default class Config {
       schema.properties != null &&
       isPlainObject(schema.properties)
     ) {
-      const defaults = {};
+      const defaults: ConfigObject = {};
       const properties = schema.properties || {};
       for (const key in properties) {
         const value = properties[key];
@@ -736,7 +772,7 @@ export default class Config {
     }
   }
 
-  makeValueConformToSchema(keyPath, value) {
+  makeValueConformToSchema(keyPath: string | null, value: unknown) {
     const schema = this.getSchema(keyPath);
     if (schema) {
       value = Config.executeSchemaEnforcers(keyPath, value, schema);
@@ -776,7 +812,7 @@ export default class Config {
     }
   }
 
-  setRawValue(keyPath, value) {
+  setRawValue(keyPath: string, value: unknown) {
     persistence().setRawValue(keyPath, value);
     this.load();
   }
@@ -793,27 +829,25 @@ export default class Config {
 Config.addSchemaEnforcers({
   integer: {
     coerce(keyPath, value, schema) {
-      value = parseInt(value, 10);
-      if (isNaN(value) || !isFinite(value)) {
+      const int = parseInt(String(value), 10);
+      if (isNaN(int) || !isFinite(int)) {
         throw new Error(
-          `Validation failed at ${keyPath}, ${JSON.stringify(value)} cannot be coerced into an int`
+          `Validation failed at ${keyPath}, ${JSON.stringify(int)} cannot be coerced into an int`
         );
       }
-      return value;
+      return int;
     },
   },
 
   number: {
     coerce(keyPath, value, schema) {
-      value = parseFloat(value);
-      if (isNaN(value) || !isFinite(value)) {
+      const num = parseFloat(String(value));
+      if (isNaN(num) || !isFinite(num)) {
         throw new Error(
-          `Validation failed at ${keyPath}, ${JSON.stringify(
-            value
-          )} cannot be coerced into a number`
+          `Validation failed at ${keyPath}, ${JSON.stringify(num)} cannot be coerced into a number`
         );
       }
-      return value;
+      return num;
     },
   },
 
@@ -858,7 +892,7 @@ Config.addSchemaEnforcers({
   null: {
     // null sort of isnt supported. It will just unset in this case
     coerce(keyPath, value, schema) {
-      if (![undefined, null].includes(value)) {
+      if (value !== undefined && value !== null) {
         throw new Error(`Validation failed at ${keyPath}, ${JSON.stringify(value)} must be null`);
       }
       return value;
@@ -876,7 +910,7 @@ Config.addSchemaEnforcers({
         return value;
       }
 
-      const newValue = {};
+      const newValue: ConfigObject = {};
       for (const prop in value) {
         const propValue = value[prop];
         const childSchema = schema.properties[prop];
@@ -888,7 +922,7 @@ Config.addSchemaEnforcers({
               childSchema
             );
           } catch (error) {
-            console.warn(`Error setting item in object: ${error.message}`);
+            console.warn(`Error setting item in object: ${errorMessage(error)}`);
           }
         } else {
           // Just pass through un-schema'd values
@@ -909,12 +943,12 @@ Config.addSchemaEnforcers({
       }
       const itemSchema = schema.items;
       if (itemSchema != null) {
-        const newValue = [];
+        const newValue: unknown[] = [];
         for (const item of value) {
           try {
             newValue.push(this.executeSchemaEnforcers(keyPath, item, itemSchema));
           } catch (error) {
-            console.warn(`Error setting item in array: ${error.message}`);
+            console.warn(`Error setting item in array: ${errorMessage(error)}`);
           }
         }
         return newValue;
@@ -929,13 +963,14 @@ Config.addSchemaEnforcers({
       if (typeof value !== 'number') {
         return value;
       }
+      let num = value;
       if (schema.minimum != null && typeof schema.minimum === 'number') {
-        value = Math.max(value, schema.minimum);
+        num = Math.max(num, schema.minimum);
       }
       if (schema.maximum != null && typeof schema.maximum === 'number') {
-        value = Math.min(value, schema.maximum);
+        num = Math.min(num, schema.maximum);
       }
-      return value;
+      return num;
     },
 
     validateEnum(keyPath, value, schema) {
@@ -960,16 +995,20 @@ Config.addSchemaEnforcers({
   },
 });
 
-function isPlainObject(value) {
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isPlainObject(value: unknown): value is ConfigObject {
   return _.isObject(value) && !_.isArray(value) && !_.isFunction(value) && !_.isString(value);
 }
 
-function splitKeyPath(keyPath) {
+function splitKeyPath(keyPath: string | null | undefined): string[] {
   if (keyPath == null) {
     return [];
   }
   let startIndex = 0;
-  const keyPathArray = [];
+  const keyPathArray: string[] = [];
   for (let i = 0; i < keyPath.length; i++) {
     const char = keyPath[i];
     if (char === '.' && (i === 0 || keyPath[i - 1] !== '\\')) {
@@ -979,23 +1018,4 @@ function splitKeyPath(keyPath) {
   }
   keyPathArray.push(keyPath.substr(startIndex, keyPath.length));
   return keyPathArray;
-}
-
-function withoutEmptyObjects(object) {
-  let resultObject = undefined;
-  if (isPlainObject(object)) {
-    for (const key in object) {
-      const value = object[key];
-      const newValue = withoutEmptyObjects(value);
-      if (newValue != null) {
-        if (resultObject == null) {
-          resultObject = {};
-        }
-        resultObject[key] = newValue;
-      }
-    }
-  } else {
-    resultObject = object;
-  }
-  return resultObject;
 }

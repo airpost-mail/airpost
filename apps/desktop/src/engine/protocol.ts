@@ -680,6 +680,21 @@ export function requestForCommand(
   }
 }
 
+// The `code`, `message` and `data` of a rejected request, whatever it was rejected with: an
+// EngineConnectionError or EngineRequestError, a plain Error, or anything else.
+export function rejectionFields(err: unknown): {
+  code?: unknown;
+  message?: unknown;
+  data?: unknown;
+} {
+  if (typeof err !== 'object' || err === null) return {};
+  return {
+    code: 'code' in err ? err.code : undefined,
+    message: 'message' in err ? err.message : undefined,
+    data: 'data' in err ? err.data : undefined,
+  };
+}
+
 const DELTA_PREFIX = '{"jsonrpc":"2.0","method":"delta","params":';
 
 /*
