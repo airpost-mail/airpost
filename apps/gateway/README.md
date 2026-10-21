@@ -10,6 +10,11 @@ desktop quits, the engine stops and browsers show "The engine isn't running".
 
 ## Run it locally
 
+The desktop ships tern-gateway and the built web client (`apps/desktop/tern-web`, from
+`npm run build:desktop` in `apps/web`) and runs `serve` on `127.0.0.1:5180` while "Web
+access from this computer" is on in Preferences > General, with a "Pair a browser" button
+for `pair`. By hand:
+
     cargo build --release -p tern-gateway
     (cd apps/web && VITE_TERN_ENGINE=gateway npm run build)
     target/release/tern-gateway serve --web-root apps/web/dist

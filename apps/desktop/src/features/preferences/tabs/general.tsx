@@ -4,6 +4,7 @@ import { SettingsPage, SettingsSection, ConfigSwitchRow } from '../../../compone
 import { DefaultMailClientRow, LaunchOnStartRow } from './startup-rows';
 import LanguageRow from './language-row';
 import { CommandLineRow } from './command-line-row';
+import { EngineUnitRow, McpHttpRow, WebAccessRows } from './services-rows';
 import { ConfigLike, ConfigSchemaLike } from '../types';
 
 /** On macOS Tern always outlives its window, so the setting only shows or hides the menu bar
@@ -16,7 +17,7 @@ export function BackgroundRow() {
         keyPath="core.workspace.systemTray"
         label={localized('Show Tern in the menu bar')}
         description={localized(
-          'Tern keeps running after you close the window, so scheduled sends go out and agents keep working.'
+          'Tern keeps running after you close the window, so scheduled sends go out and agents keep working. To keep them going after you quit Tern, use Keep Tern running in the background below.'
         )}
       />
     );
@@ -28,7 +29,7 @@ export function BackgroundRow() {
       description={
         process.platform === 'linux'
           ? localized(
-              'Closing the window leaves Tern running, so scheduled sends go out and agents keep working. The tray icon may need libappindicator; turning it off takes effect after a restart.'
+              'Closing the window leaves Tern running, so scheduled sends go out and agents keep working. The tray icon may need libappindicator; turning it off takes effect after a restart. Keep Tern running in the background, below, does this without the tray icon.'
             )
           : localized(
               'Closing the window leaves Tern running, so scheduled sends go out and agents keep working. Quit from the tray icon.'
@@ -61,7 +62,10 @@ export default function PreferencesGeneral(props: {
         />
       </SettingsSection>
 
-      <SettingsSection title={localized('Command line')}>
+      <SettingsSection title={localized('Services on this computer')}>
+        <EngineUnitRow />
+        <WebAccessRows />
+        <McpHttpRow />
         <CommandLineRow />
       </SettingsSection>
     </SettingsPage>

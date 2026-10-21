@@ -167,10 +167,11 @@ export function ternGatewayBinaryPath(resourcePath: string): string | null {
 }
 
 // The built web client (apps/web, `npm run build:desktop`) tern-gateway serves:
-// TERN_GATEWAY_WEB_ROOT, else the `web` folder build.js ships unpacked.
+// TERN_GATEWAY_WEB_ROOT, else the `tern-web` folder build.js ships unpacked.
 export function ternWebRootPath(resourcePath: string): string | null {
   const fromEnv = process.env.TERN_GATEWAY_WEB_ROOT;
-  const dir = fromEnv || path.join(resourcePath, 'web').replace('app.asar', 'app.asar.unpacked');
+  const bundled = path.join(resourcePath, 'tern-web').replace('app.asar', 'app.asar.unpacked');
+  const dir = fromEnv || bundled;
   return fs.existsSync(path.join(dir, 'index.html')) ? dir : null;
 }
 
