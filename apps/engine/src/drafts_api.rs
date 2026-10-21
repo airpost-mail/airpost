@@ -906,6 +906,254 @@ mod tests {
         assert!(PendingSends::new(dir.path(), ACCOUNT).ids().is_empty());
     }
 
+    /// The delta lines a store wrote, shared with the test.
+    #[derive(Clone, Default)]
+    struct Lines(Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Lines {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A received message in INBOX, ingested as a folder scan does, so it has a thread with
+    /// categories and counts. Returns the message's id and thread id.
+    fn received_reply_target(store: &Store) -> (String, String) {
+        let mut inbox = Folder::new(&tern_core::ids::folder_id(ACCOUNT, "INBOX"), ACCOUNT, 0);
+        inbox.set_path("INBOX");
+        inbox.set_role("inbox");
+        store.save(&mut inbox).unwrap();
+        let remote = tern_imap::ImapMessage {
+            uid: 7,
+            flags: tern_core::MessageFlags::SEEN,
+            internal_date: Some(1_699_000_000),
+            header: Some(tern_core::MessageHeader {
+                date_raw: Some("Fri, 3 Nov 2023 08:26:40 +0000".into()),
+                date: Some(1_699_000_000),
+                subject_raw: Some(b"Plans".to_vec()),
+                subject: Some("Plans".into()),
+                message_id: Some("orig@example.net".into()),
+                from: vec![tern_core::Address::new(Some("Bob"), "bob@example.net")],
+                to: vec![tern_core::Address::new(None, "me@example.com")],
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let account = account();
+        let m = tern_sync::mail_processor::MailProcessor::new(&account, store)
+            .insert_fallback_to_update_message(&remote, &inbox, 1_700_000_000)
+            .unwrap();
+        store
+            .conn()
+            .execute(
+                "REPLACE INTO MessageBody (id, value) VALUES (?, '<p>Lunch?</p>')",
+                [m.id()],
+            )
+            .unwrap();
+        (m.id().to_owned(), m.thread_id().to_owned())
+    }
+
+    /// What one way of making a reply draft leaves behind: the draft row, its thread and the
+    /// deltas, with what differs by construction (ids, Message-ID, times, body text) blanked.
+    #[derive(Debug, PartialEq)]
+    struct ReplyState {
+        columns: Value,
+        json: Value,
+        thread: Value,
+        categories: Vec<(String, i64, i64)>,
+        deltas: Vec<(String, String, Value)>,
+    }
+
+    fn reply_state(path: impl FnOnce(&Path, &Store, &str, &str) -> String) -> ReplyState {
+        let dir = tempfile::tempdir().unwrap();
+        let clock = tern_core::ManualClock::new(1_700_000_000);
+        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let lines = Lines::default();
+        let stream = DeltaStream::new(Box::new(lines.clone()));
+        let store = Store::open(dir.path(), stream.clone()).unwrap();
+        store.set_clock(Arc::new(clock));
+        let mut drafts = Folder::new(&tern_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
+        drafts.set_path("Drafts");
+        drafts.set_role("drafts");
+        store.save(&mut drafts).unwrap();
+        let (message_id, thread_id) = received_reply_target(&store);
+        stream.flush();
+        lines.0.lock().unwrap().clear();
+
+        let hmid = path(dir.path(), &store, &message_id, &thread_id);
+        stream.flush();
+
+        let d = &drafts_with(&store, &hmid)[0];
+        let columns: Value = store
+            .conn()
+            .query_row(
+                "SELECT threadId, draft, accountId, unread, starred FROM Message WHERE id = ?",
+                [d.id()],
+                |r| {
+                    Ok(json!([
+                        r.get::<_, String>(0)?,
+                        r.get::<_, i64>(1)?,
+                        r.get::<_, String>(2)?,
+                        r.get::<_, i64>(3)?,
+                        r.get::<_, i64>(4)?
+                    ]))
+                },
+            )
+            .unwrap();
+        let blank = |mut j: Value| {
+            for k in ["id", "hMsgId", "date", "body", "pristine", "v"] {
+                if j.get(k).is_some() {
+                    j[k] = json!("…");
+                }
+            }
+            j
+        };
+        let thread = store
+            .find::<Thread>(&Query::new().equal("id", &thread_id))
+            .unwrap()
+            .unwrap();
+        let mut thread_json = thread.data.clone();
+        for k in ["v", "lmt", "lmst", "lmrt", "fmt"] {
+            if thread_json.get(k).is_some() {
+                thread_json[k] = json!("…");
+            }
+        }
+        let categories = store
+            .conn()
+            .prepare(
+                "SELECT value, unread, inAllMail FROM ThreadCategory WHERE id = ? ORDER BY value",
+            )
+            .unwrap()
+            .query_map([&thread_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap();
+        let text = String::from_utf8(lines.0.lock().unwrap().clone()).unwrap();
+        let mut deltas = Vec::new();
+        for line in text.lines().filter(|l| !l.trim().is_empty()) {
+            let item: Value = serde_json::from_str(line).unwrap();
+            let class = item["modelClass"].as_str().unwrap_or("").to_owned();
+            if class == "Task" {
+                continue;
+            }
+            for m in item["modelJSONs"].as_array().into_iter().flatten() {
+                let summary = match class.as_str() {
+                    "Message" => json!({
+                        "threadId": m["threadId"], "draft": m["draft"],
+                        "rthMsgId": m["rthMsgId"], "folders": m["folders"],
+                    }),
+                    "Thread" => json!({"id": m["id"], "folders": m["folders"]}),
+                    _ => json!(null),
+                };
+                deltas.push((
+                    item["type"].as_str().unwrap().to_owned(),
+                    class.clone(),
+                    summary,
+                ));
+            }
+        }
+        ReplyState {
+            columns,
+            json: blank(d.data.clone()),
+            thread: thread_json,
+            categories,
+            deltas,
+        }
+    }
+
+    fn create_reply(h: &Here, message_id: &str, save: bool) -> Value {
+        h.create(CreateCall {
+            params: params(json!({
+                "accountId": ACCOUNT, "kind": "reply", "messageId": message_id,
+                "save": save, "html": true,
+            })),
+            settings: ComposeSettings::default(),
+            accounts: Identities::from_accounts_json([account().as_json()]),
+            resurface_body: None,
+        })
+        .unwrap()
+    }
+
+    /// `draft.create` with `save` (the `tern` CLI) and with the client saving what it built
+    /// (tern-mcp, and the desktop's DraftFactory on an engine with the draft pipeline) leave
+    /// the same row, thread and deltas as a reply the desktop builds itself
+    /// (`DraftFactory.createDraftForReply` without the pipeline, `Message.toJSON()` in a
+    /// SyncbackDraftTask): the replied-to thread, `rthMsgId`, the Drafts copy on the thread.
+    #[test]
+    fn engine_built_reply_drafts_match_the_desktop_reply_draft() {
+        let desktop = reply_state(|dir, store, _, thread_id| {
+            let hmid = "desktop-reply@example.com";
+            let mut d = draft(hmid);
+            d["subject"] = json!("Re: Plans");
+            d["to"] = json!([{"name": "Bob", "email": "bob@example.net", "__cls": "Contact"}]);
+            d["from"] = json!([{"name": "", "email": "me@example.com", "__cls": "Contact"}]);
+            d["threadId"] = json!(thread_id);
+            d["rthMsgId"] = json!("orig@example.net");
+            d["unread"] = json!(false);
+            d["starred"] = json!(false);
+            d["draft"] = json!(true);
+            d["pristine"] = json!(true);
+            d["date"] = json!(1_700_000_000);
+            d["metadata"] = json!([]);
+            d["events"] = json!([]);
+            save_draft(dir, store, d);
+            hmid.to_owned()
+        });
+        // What the thread list's pencil and the Drafts view read: a draft row in the thread,
+        // the thread listed in Drafts, and a Message delta carrying both.
+        let drafts_id = tern_core::ids::folder_id(ACCOUNT, "Drafts");
+        assert_eq!(desktop.columns[1], 1, "{desktop:#?}");
+        assert_eq!(desktop.json["threadId"], desktop.columns[0], "{desktop:#?}");
+        assert!(
+            desktop.thread["folders"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|f| f["id"] == drafts_id.as_str()),
+            "{desktop:#?}"
+        );
+        assert!(desktop.categories.iter().any(|c| c.0 == drafts_id));
+        assert!(desktop
+            .deltas
+            .iter()
+            .any(|(kind, class, m)| kind == "persist"
+                && class == "Message"
+                && m["draft"] == true
+                && m["threadId"] == desktop.columns[0]));
+
+        let saved_by_engine = reply_state(|dir, store, message_id, _| {
+            let built = with_here(dir, store, |h| create_reply(h, message_id, true));
+            built["hMsgId"].as_str().unwrap().to_owned()
+        });
+        let saved_by_client = reply_state(|dir, store, message_id, thread_id| {
+            let mut built = with_here(dir, store, |h| create_reply(h, message_id, false));
+            built.as_object_mut().unwrap().remove("id");
+            built["threadId"] = json!(thread_id);
+            let hmid = built["hMsgId"].as_str().unwrap().to_owned();
+            save_draft(dir, store, built);
+            hmid
+        });
+        for (name, state) in [
+            ("draft.create save", &saved_by_engine),
+            ("draft.create + SyncbackDraftTask", &saved_by_client),
+        ] {
+            assert_eq!(state.columns, desktop.columns, "{name}: Message columns");
+            assert_eq!(state.thread, desktop.thread, "{name}: thread");
+            assert_eq!(
+                state.categories, desktop.categories,
+                "{name}: ThreadCategory"
+            );
+            assert_eq!(state.deltas, desktop.deltas, "{name}: deltas");
+            for key in ["threadId", "rthMsgId", "draft", "folders", "labels", "aid"] {
+                assert_eq!(state.json[key], desktop.json[key], "{name}: {key}");
+            }
+        }
+    }
+
     struct NoSettings;
 
     impl EngineSettings for NoSettings {
