@@ -20,6 +20,8 @@ stdout carries MCP; stderr is the log, which MCP clients keep.
 ```
 tern-mcp [--config-dir DIR]                       # MCP on stdio (also: tern-mcp stdio)
 tern-mcp http [--port N]                           # streamable HTTP on 127.0.0.1, see below
+tern-mcp token                                    # print the HTTP bearer token
+tern-mcp healthcheck [--port N]                    # exit 0 when `http` answers on 127.0.0.1
 tern-mcp install   --client claude-desktop|claude-code|codex [--config-file PATH] [--force | --if-stale]
 tern-mcp uninstall --client claude-desktop|claude-code|codex [--config-file PATH]
 tern-mcp status [--json]
@@ -97,9 +99,15 @@ open Tern.
 
 `tern-mcp http` serves MCP's streamable HTTP transport at `http://127.0.0.1:<port>/mcp`, only
 when `http.enabled` is true. Every request needs `Authorization: Bearer <token>`; the token
-is in `<config-dir>/mcp-token`, created owner-only (0600) on first use. Requests whose `Host`
-isn't a loopback name get 403, which stops DNS rebinding. `install` only writes stdio entries.
-Nothing starts `tern-mcp http` for you; the desktop no longer serves MCP over HTTP itself.
+is in `<config-dir>/mcp-token`, created owner-only (0600) on first use, and `tern-mcp token`
+prints it. Requests whose `Host` isn't a loopback name or an `--allowed-host` get 403, which
+stops DNS rebinding. `install` only writes stdio entries. Nothing starts `tern-mcp http` for
+you; the desktop no longer serves MCP over HTTP itself.
+
+On a server (docs/self-hosting.md, "Tern server"), `--bind 0.0.0.0` (`TERN_MCP_BIND`) listens
+on every interface and `--allowed-host tern.example.com` (`TERN_MCP_ALLOWED_HOSTS`,
+comma-separated) accepts the name a TLS proxy forwards. `TERN_MCP_POLICY` names the policy file
+in place of `<config-dir>/mcp.json`, so it can be mounted read-only from outside the profile.
 
 ## Audit log: `<config-dir>/mcp-audit.log`
 

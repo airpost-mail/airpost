@@ -18,7 +18,9 @@
 //! Without `mcp.json`, the desktop's `core.mcp.accessLevel` and `core.mcp.enabledAccounts`
 //! in `config.json` are read instead, so settings made in the old preferences pane keep
 //! applying; HTTP stays off in that case.
-//! The policy is read again for every tool call.
+//! The policy is read again for every tool call. `TERN_MCP_POLICY` names another file in place
+//! of `<config-dir>/mcp.json`, for a server whose operator keeps the policy read-only outside
+//! the profile (deploy/server).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -29,6 +31,7 @@ use serde_json::Value;
 use crate::config::DesktopConfig;
 
 pub const POLICY_FILE: &str = "mcp.json";
+pub const ENV_POLICY: &str = "TERN_MCP_POLICY";
 pub const DEFAULT_HTTP_PORT: u16 = 2587;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,11 +130,23 @@ impl Default for Policy {
     }
 }
 
+/// The policy file: [`ENV_POLICY`] when set, else `<config-dir>/mcp.json`.
+pub fn policy_path(config_dir: &Path) -> PathBuf {
+    policy_path_with(config_dir, std::env::var_os(ENV_POLICY))
+}
+
+fn policy_path_with(config_dir: &Path, env: Option<std::ffi::OsString>) -> PathBuf {
+    match env.filter(|v| !v.is_empty()) {
+        Some(path) => PathBuf::from(path),
+        None => config_dir.join(POLICY_FILE),
+    }
+}
+
 impl Policy {
     /// Reads `mcp.json`, else the desktop's keys. A `mcp.json` that doesn't parse is an
     /// error rather than a fallback, so a typo can't widen access.
     pub fn load(config_dir: &Path, desktop: &DesktopConfig) -> Result<Policy, String> {
-        let path = config_dir.join(POLICY_FILE);
+        let path = policy_path(config_dir);
         match std::fs::read(&path) {
             Ok(bytes) => {
                 let f: PolicyFile = serde_json::from_slice(&bytes)
@@ -300,6 +315,20 @@ fn desktop_accounts(v: &Value) -> Result<BTreeMap<String, AccountPolicy>, String
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_env_names_another_policy_file() {
+        let dir = Path::new("/profile");
+        assert_eq!(policy_path_with(dir, None), dir.join(POLICY_FILE));
+        assert_eq!(
+            policy_path_with(dir, Some("".into())),
+            dir.join(POLICY_FILE)
+        );
+        assert_eq!(
+            policy_path_with(dir, Some("/etc/tern/mcp.json".into())),
+            PathBuf::from("/etc/tern/mcp.json")
+        );
+    }
 
     fn policy(v: Value) -> Policy {
         let tmp = tempfile::tempdir().unwrap();
