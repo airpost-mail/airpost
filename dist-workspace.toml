@@ -3,7 +3,9 @@
 # .github/workflows/cli-release.yml from this file and cli-release-build-setup.yml. The
 # workflow is then hand-edited for least-privilege permissions and a PR path filter
 # (`allow-dirty = ["ci"]` keeps dist from rejecting that): after regenerating, put back
-# the top-level `contents: read`, `host`'s `contents: write` and the `pull_request` paths.
+# the top-level `contents: read`, `host`'s `contents: write`, the `pull_request` paths and
+# `--latest=false` on `gh release create` (GitHub's latest release is the vX.Y.Z one from
+# release.yml, which install.sh and the docs download from).
 #
 # Only packages with `[package.metadata.dist] dist = true` ship: every crate in the workspace
 # is `publish = false`, which dist reads as "don't release". The engine (tern-engine) stays out

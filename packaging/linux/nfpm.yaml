@@ -1,0 +1,71 @@
+# nfpm config for the tern-cli .deb and .rpm, packed from one unpacked release archive by
+# packaging/linux/build-packages.sh, which sets VERSION and ARCH (amd64, arm64) and runs nfpm
+# in the unpacked archive (the src paths are relative to it).
+#
+# The package is tern-cli, not tern: the desktop's packages (apps/desktop/build/mkdeb, mkrpm)
+# are named tern and own /usr/share/tern. Both install side by side. No systemd units: `tern
+# engine install` writes the user's unit (~/.config/systemd/user/tern-engine.service), and a
+# packaged unit of the same name would be a second owner.
+name: tern-cli
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+release: 1
+section: mail
+priority: optional
+maintainer: Tern contributors <https://github.com/ternmail/ternmail/issues>
+vendor: Tern
+homepage: https://github.com/ternmail/ternmail
+license: GPL-3.0-only
+description: |-
+  Tern mail engine, command-line client, MCP server and web gateway
+  The programs behind the Tern email client, without the desktop app: tern-engine syncs mail,
+  calendars and contacts; tern is the command-line client; tern-mcp gives AI agents access
+  through the Model Context Protocol; tern-gateway serves the web client.
+
+contents:
+  - src: ./bin/tern
+    dst: /usr/bin/tern
+    file_info: { mode: 0755 }
+  - src: ./bin/tern-engine
+    dst: /usr/bin/tern-engine
+    file_info: { mode: 0755 }
+  - src: ./bin/tern-mcp
+    dst: /usr/bin/tern-mcp
+    file_info: { mode: 0755 }
+  - src: ./bin/tern-gateway
+    dst: /usr/bin/tern-gateway
+    file_info: { mode: 0755 }
+  - src: ./share/tern-gateway/web
+    dst: /usr/share/tern-gateway/web
+    type: tree
+  - src: ./share/doc/tern
+    dst: /usr/share/doc/tern-cli
+    type: tree
+  # Debian's place for the licence; build-packages.sh writes it from NOTICE.md and LICENSE.md.
+  - src: ./copyright
+    dst: /usr/share/doc/tern-cli/copyright
+    packager: deb
+    file_info: { mode: 0644 }
+
+overrides:
+  deb:
+    # build-release.sh builds on Debian bullseye (glibc 2.31); Rust's unwinder needs libgcc_s.
+    # TLS reads the system's CA store.
+    depends:
+      - libc6 (>= 2.31)
+      - libgcc-s1 | libgcc1
+      - ca-certificates
+    # A Secret Service keyring for the engine's secrets; servers use `--key-file` instead.
+    suggests:
+      - gnome-keyring
+  rpm:
+    depends:
+      - glibc >= 2.31
+      # The soname, not a package: libgcc on Fedora and RHEL, libgcc_s1 on openSUSE.
+      - libgcc_s.so.1()(64bit)
+      - ca-certificates
+
+rpm:
+  group: Applications/Internet
+  summary: Tern mail engine, command-line client, MCP server and web gateway
