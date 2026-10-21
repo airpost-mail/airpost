@@ -1,6 +1,6 @@
 # Installing Tern
 
-Tern comes in two parts, installed separately:
+Tern runs on macOS and Linux and comes in two parts, installed separately:
 
 - **The desktop app** (Electron, `apps/desktop`): mail, calendar and contacts in a window. It
   bundles its own engine and the `tern` command (Preferences > General links it onto your
@@ -98,7 +98,9 @@ TLS are in `apps/gateway/README.md`.
 - macOS: `brew install --cask ternmail/tap/tern`, or `Tern-AppleSilicon.zip` / `Tern.zip`
   (Intel) from the release. (`--cask` is needed: the formula has the same name.)
 - Linux: the `tern` .deb or .rpm, or the snap.
-- Windows: the installer.
+
+Windows isn't supported yet: there is no Windows build of the engine, and its socket is a
+Unix socket only.
 
 ## Building the archives yourself
 

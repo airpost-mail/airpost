@@ -6,7 +6,8 @@ Two things can run on your server:
   headless, so your mail syncs and scheduled sends go out while every device is off, with
   Tern on the web, the backend and MCP for agents next to it, each switched on or off.
 - **The backend alone** (`deploy/backend/`, the `tern-backend` image): metadata sync between
-  your desktops and open and link tracking, without mail on the server.
+  your desktops, without mail on the server. Open and link tracking and sharing aren't
+  implemented yet, and the desktop can't sign in to it yet ([Backend only](#backend-only)).
 
 ## Tern server
 
@@ -17,7 +18,7 @@ Two things can run on your server:
 | `engine` | always | on | `tern-engine --mode serve --detached`: syncs the accounts, keeps their credentials |
 | `gateway` | `web` | on | `tern-gateway` with the web client, paired browsers only |
 | `caddy` | `proxy` | on | TLS for `TERN_DOMAIN`; leave it out behind your own proxy |
-| `backend` | `backend` | off | `tern-backend` (below): metadata sync between desktops, tracking. The web client doesn't need it. |
+| `backend` | `backend` | off | `tern-backend` (below): metadata sync between desktops. The web client doesn't need it. |
 | `mcp` | `mcp` | off | `tern-mcp http` at `https://<domain>/mcp`: agents reach your mail with a bearer token, so it is opt-in |
 
 They stay separate processes in separate containers. Docker restarts one that stops; there is
@@ -160,19 +161,22 @@ log to `docker compose logs <service>`.
 
 ## Backend only
 
-The backend (`apps/backend`, one binary, `tern-backend`) adds the features that need a
-server on the internet: metadata sync between your devices (snoozes, reminders, tracking
-state), open and link tracking, and, once they land, sharing and signature images. The backend
-process never holds mail credentials or mail content; those stay in the engine, on your
-devices or in the Tern server's engine container (`docs/architecture.md`). Tern works without
-it. In the Tern server it is the `backend` service, configured by the same variables as
-below.
+The backend (`apps/backend`, one binary, `tern-backend`) is for the features that need a
+server on the internet. Today that is metadata sync between your devices (snoozes, reminders
+and other per-message metadata); open and link tracking, sharing and signature images come
+later, and `GET /tern/v1/server` reports tracking and sharing as off whatever the config
+says. The backend process never holds mail credentials or mail content; those stay in the
+engine, on your devices or in the Tern server's engine container (`docs/architecture.md`).
+Tern works without it. In the Tern server it is the `backend` service, configured by the same
+variables as below.
 
 It serves plain HTTP and expects a TLS reverse proxy in front. The compose file below
 includes one (Caddy), which gets a certificate for your domain.
 
-Not yet released: the published image (`ghcr.io/ternmail/tern-backend`) and the desktop's
-server settings. Until the image exists, build it from a checkout (step 3 below shows how).
+Not yet released: the published image (`ghcr.io/ternmail/tern-backend`) and signing in from
+the desktop. Preferences > Tern server shows the address field but says signing in comes in a
+later version, so for now no Tern client connects to the backend on its own. Until the image
+exists, build it from a checkout (step 3 below shows how).
 
 ### With Docker Compose
 
@@ -196,7 +200,8 @@ You need a Linux machine with Docker, a DNS name pointing at it, and ports 80 an
 
 5. Check it from outside: `curl https://tern.example.com/tern/v1/server` returns the server
    id, version and features.
-6. In Tern on each device, enter `https://tern.example.com` as the server and sign in. Each
+6. Signing in from the desktop (Preferences > Tern server) comes in a later version. Once it
+   does, you enter `https://tern.example.com` there on each device and sign in, and each
    device gets its own token.
 
 `docker compose ps` shows the backend as `healthy` once it answers `/ping`. Logs:
@@ -239,7 +244,7 @@ file.
 | `bind` | `TERN_BIND` | `127.0.0.1:5101` | The image sets `0.0.0.0:5101`. |
 | `public_url` | `TERN_PUBLIC_URL` | `http://<bind>` | Where clients and mail recipients reach the server. Required when binding `0.0.0.0`. Must be `https` unless it is a loopback address (tokens travel in `Authorization: Basic`); `serve --insecure-public-url` overrides that. |
 | `signup` | `TERN_SIGNUP` | `closed` | `open` lets anyone create an account on `/tern/v1/login`. |
-| `[features] tracking`, `sharing` | | `true` | Server-side switches; advertised only once implemented. |
+| `[features] tracking`, `sharing` | | `true` | Server-side switches. Neither is implemented yet, so neither is advertised. |
 | `trusted_proxies` | `TERN_TRUSTED_PROXIES` | `["127.0.0.0/8", "::1"]` | Peers whose `X-Forwarded-For` is used to find the client address for login rate limits. Comma-separated in the env var; empty trusts none. The compose file sets it to its own network. |
 | `[backup] dir` | `TERN_BACKUP_DIR` | unset | Turns on scheduled backups into this directory. |
 | `[backup] interval` | `TERN_BACKUP_INTERVAL` | `24h` | `<n>m`, `<n>h` or `<n>d`; at least `1m`. |
@@ -258,13 +263,13 @@ file.
 With Docker, prefix them with `docker compose exec backend`. While there are no users and
 signup is closed, the server logs a reminder at startup.
 
-Signing in from the desktop mints one token per device; revoke it to sign that device out.
-Don't share one token between two running clients: a new metadata stream from a token
+Once the desktop signs in, it will mint one token per device; revoking it signs that device
+out. Don't share one token between two running clients: a new metadata stream from a token
 replaces that token's previous stream for the same account.
 
 ### Backups and restores
 
-The database holds everything: users, password and token hashes, metadata, tracking events.
+The database holds everything: users, password and token hashes, metadata.
 Every backup is a consistent copy taken while the server runs (`VACUUM INTO`), owner-only,
 with a new server id (see restores below).
 
@@ -362,16 +367,16 @@ could pick their own rate-limit key.
 
 ### Uninstall
 
-Sign out on each device first, which revokes its token; the desktop then keeps working
-without a server. Then:
+The desktop doesn't sign in to the backend yet, so there is nothing to sign out first:
 
     docker compose down          # add -v to delete the database, backups and certificates
 
 Without Docker: `systemctl disable --now tern-backend`, remove the binary, the unit,
 `/etc/tern-backend` and `/var/lib/tern-backend`.
 
-What stops working for other people: tracking pixels and tracked links in mail you already
-sent point at this server, and so will shared pages and hosted signature images.
+Once tracking, sharing and signature images land, uninstalling also breaks them for other
+people: tracking pixels, tracked links, shared pages and hosted signature images in mail you
+already sent point at this server.
 
 ### Licence
 

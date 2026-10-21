@@ -6,7 +6,7 @@
   "isOptional": true,
 
   "title": "Translation",
-  "description": "Translate your drafts in the composer into other languages using the Yandex Translation API.",
+  "description": "Translate drafts in the composer and incoming messages, with your own LibreTranslate server or DeepL key.",
   "icon": "./icon.png",
 
   "license": "GPL-3.0-only",
