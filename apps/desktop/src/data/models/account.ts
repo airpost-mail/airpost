@@ -118,6 +118,8 @@ export class Account extends ModelWithMetadata {
     smtp_allow_cleartext?: string | false;
     refresh_token: string;
     container_folder: string;
+    // Engine setting, on when absent: drafts are saved to the account's Drafts folder.
+    save_drafts_to_server?: boolean;
   };
   declare label: string;
   declare autoaddress: AccountAutoaddress;

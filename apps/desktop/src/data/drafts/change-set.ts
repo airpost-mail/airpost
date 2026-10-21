@@ -33,6 +33,8 @@ export class DraftChangeSet extends EventEmitter {
     pluginMetadata?: number;
   } = {};
   _lastCommitTime = 0;
+  // The previous commit's start while a commit is in flight.
+  _savingSince: number | null = null;
   _commitPromise: Promise<any> | null = null;
 
   constructor(callbacks: DraftChangeSetCallbacks) {
@@ -73,8 +75,21 @@ export class DraftChangeSet extends EventEmitter {
   }
 
   dirtyFields() {
+    return this._fieldsModifiedSince(this._lastCommitTime);
+  }
+
+  /**
+   * The fields a copy of the draft coming in from the engine must not replace: those edited
+   * since the last save (since the session opened if it hasn't saved), and while a save is in
+   * flight, the ones it carries.
+   */
+  lockedFields() {
+    return this._fieldsModifiedSince(this._savingSince ?? this._lastCommitTime);
+  }
+
+  _fieldsModifiedSince(time: number) {
     return Object.keys(this._lastModifiedTimes).filter(
-      (key) => (this._lastModifiedTimes[key] ?? 0) > this._lastCommitTime
+      (key) => (this._lastModifiedTimes[key] ?? 0) > time
     );
   }
 
@@ -107,10 +122,15 @@ export class DraftChangeSet extends EventEmitter {
 
     if (this.dirtyFields().length > 0) {
       this.clearDelayedCommit();
+      this._savingSince = this._lastCommitTime;
       this._lastCommitTime = performance.now();
       this._commitPromise = this.callbacks.onCommit();
-      await this._commitPromise;
-      this._commitPromise = null;
+      try {
+        await this._commitPromise;
+      } finally {
+        this._commitPromise = null;
+        this._savingSince = null;
+      }
     }
   }
 }

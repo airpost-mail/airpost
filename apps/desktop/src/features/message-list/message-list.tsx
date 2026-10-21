@@ -351,7 +351,8 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
 
       elements.push(
         <div
-          key={message.id}
+          // A draft keeps its composer mounted when the engine moves it to a new id.
+          key={message.draft ? `draft-${message.headerMessageId}` : message.id}
           role="listitem"
           tabIndex={isFocused ? 0 : -1}
           aria-label={ariaLabel}

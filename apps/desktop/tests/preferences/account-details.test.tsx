@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { renderIntoDocument } from 'react-dom/test-utils';
 import { Account } from '../../src/data/models/account';
 
@@ -73,6 +74,44 @@ describe('PreferencesAccountDetails', function preferencesAccountDetails() {
     it('sets the default alias correctly when set to any value', () => {
       this.component._onDefaultAliasSelected('my alias');
       assertAccountState(this.component.setState.calls[0].args[0], { defaultAlias: 'my alias' });
+    });
+  });
+
+  describe('Save drafts to server', () => {
+    const withSettings = (settings: Record<string, any>) =>
+      new Account({
+        id: 'acct-drafts',
+        name: 'someone',
+        emailAddress: 'someone@example.com',
+        settings: { imap_host: 'imap.example.com', ...settings },
+      } as any);
+
+    const renderedSwitch = (component: any) =>
+      Array.from(
+        (ReactDOM.findDOMNode(component) as HTMLElement).querySelectorAll('[role="switch"]')
+      ).find((el) => el.getAttribute('aria-label') === 'Save drafts to server') as HTMLElement;
+
+    it('is on when the account has no setting', () => {
+      const component = makeComponent({ account: withSettings({}), onAccountUpdated() {} });
+      expect(renderedSwitch(component).getAttribute('aria-checked')).toBe('true');
+    });
+
+    it('is off when the setting is false', () => {
+      const component = makeComponent({
+        account: withSettings({ save_drafts_to_server: false }),
+        onAccountUpdated() {},
+      });
+      expect(renderedSwitch(component).getAttribute('aria-checked')).toBe('false');
+    });
+
+    it('saves the setting with the account, keeping its other settings', () => {
+      const onAccountUpdated = jasmine.createSpy('onAccountUpdated');
+      const component = makeComponent({ account: withSettings({}), onAccountUpdated });
+      component._onSaveDraftsToServerChanged(false);
+      expect(onAccountUpdated).toHaveBeenCalled();
+      const updated = onAccountUpdated.calls[0].args[1] as Account;
+      expect(updated.settings.save_drafts_to_server).toBe(false);
+      expect(updated.settings.imap_host).toBe('imap.example.com');
     });
   });
 

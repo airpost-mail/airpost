@@ -2,7 +2,12 @@
 import React, { Component } from 'react';
 import classnames from 'classnames';
 import { ipcRenderer } from 'electron';
-import { SettingsSection, SettingsRow, SettingsCard } from '../../../../components/settings';
+import {
+  SettingsSection,
+  SettingsRow,
+  SettingsCard,
+  SettingsSwitch,
+} from '../../../../components/settings';
 import { Button } from '../../../../components/kit/button';
 import { TextField } from '../../../../components/kit/text-field';
 import { SettingsSelect } from '../../../../components/settings-select';
@@ -195,6 +200,13 @@ class PreferencesAccountDetails extends Component<
     ipcRenderer.send('command', 'application:add-account', {
       existingAccountJSON: this.state.account.toJSON(),
       o365SharedMailbox: true,
+    });
+  };
+
+  // The engine restarts the account when its settings change, so this applies right away.
+  _onSaveDraftsToServerChanged = (saveDraftsToServer: boolean) => {
+    this._setStateAndSave({
+      settings: { ...this.state.account.settings, save_drafts_to_server: saveDraftsToServer },
     });
   };
 
@@ -510,6 +522,18 @@ class PreferencesAccountDetails extends Component<
               </Button>
             </SettingsRow>
           )}
+          <SettingsRow
+            label={localized('Save drafts to server')}
+            description={localized(
+              "Drafts are saved to the account's Drafts folder, so they show up in webmail and on your other devices."
+            )}
+          >
+            <SettingsSwitch
+              label={localized('Save drafts to server')}
+              checked={account.settings.save_drafts_to_server !== false}
+              onChange={this._onSaveDraftsToServerChanged}
+            />
+          </SettingsRow>
           <SettingsRow label={localized('Contacts')}>
             <Button variant="outline" onClick={this._onManageContacts}>
               {localized('Manage contacts')}

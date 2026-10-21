@@ -11,6 +11,7 @@ No plugin API change:
 - `src/` is grouped by domain (`data/`, `engine/`, `mail/`, `packages/`, `window/`, `config/`, `main/`, `components/`, `utils/`) and file names drop the prefix or suffix their dir already states (`src/flux/stores/draft-store.ts` is `src/data/drafts/store.ts`). `mailspring-exports`, `mailspring-component-kit`, `mailspring-store` and `mailspring-observables` resolve as before; a plugin that requires files under `src/` by path has to use the new paths.
 - `BaseStore` is defined in `src/data/stores/base.ts` and the Rx helpers in `src/data/query/observables.ts`; `mailspring-store` and `mailspring-observables` re-export them and resolve as before.
 - A package's tests can be `tests/*.test.*` files as well as `specs/*-spec.*`, and `--test-file-pattern` is an alias of `--spec-file-pattern`. The pattern matches the test file's path relative to the core or package root.
+- With Save drafts to server on (the account setting `save_drafts_to_server`, on when absent), another device's revision of a draft reaches an open `DraftEditingSession` as a persist of the draft, sometimes under a new id with the same `headerMessageId`. The session takes it in the fields not edited since the last save and not carried by a save in flight, and ignores a non-draft message with the draft's `headerMessageId`; `session.draft().id` follows the new id.
 
 Plugin API 1.36.0:
 

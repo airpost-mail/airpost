@@ -82,6 +82,7 @@ function hotwireDraftBodyState(draft: any, session: DraftEditingSession): Messag
       // the null-reference crash at the point of use.
       const mountedEditor = session._mountedEditor;
       if (mountedEditor) {
+        const wasFocused = mountedEditor.value.selection.isFocused;
         const inHTMLEditorValue = convertFromHTML(inHTML);
         try {
           // try to apply the new value to the existing document to preserve undo history.
@@ -113,8 +114,10 @@ function hotwireDraftBodyState(draft: any, session: DraftEditingSession): Messag
             edits = edits.removeNodeByKey(firstBlock.key);
           }
 
-          // Note: We must re-focus the body or the composer is blurred after this operation
-          edits = edits.moveToStart().focus();
+          // Note: We must re-focus the body or the composer is blurred after this operation.
+          // A copy coming in from the engine leaves the focus where it was.
+          edits = edits.moveToStart();
+          if (wasFocused || !session._applyingIncoming) edits = edits.focus();
 
           _bodyEditorValue = edits.value;
         } catch (err) {
@@ -210,6 +213,7 @@ export class DraftEditingSession extends BaseStore {
   _draftPromise: Promise<Message | undefined>;
   _destroyed = false;
   _mountedEditor: Editor | null = null;
+  _applyingIncoming = false;
 
   headerMessageId: string;
   changes = new DraftChangeSet({
@@ -511,36 +515,39 @@ export class DraftEditingSession extends BaseStore {
 
     const draft = this._draft;
     const nextDraft = change.objects
-      .filter((obj) => obj.headerMessageId === draft.headerMessageId)
+      .filter((obj) => obj.draft && obj.headerMessageId === draft.headerMessageId)
       .pop();
 
     if (!nextDraft) {
       return;
     }
 
-    // If the session has unsaved changes for a given field (eg: 'to' or 'body'),
-    // we don't accept changes from the database. All changes to the draft should
-    // be made through the editing session and we don't want to overwrite the user's
-    // work under any scenario.
-    const lockedFields = this.changes.dirtyFields();
-    let changed = false;
-    for (const [key] of Object.entries(Message.attributes)) {
-      if (key === 'headerMessageId') continue;
+    // A persist of this draft is a save of ours coming back, or another device's revision
+    // the engine adopted (docs/drafts-sync-design.md section 6), which can also move the row
+    // to a new id under the same headerMessageId. The session takes its values except in the
+    // fields the user edited since the last save, so it never replaces what they're writing.
+    const lockedFields = this.changes.lockedFields();
+    const incoming: [string, unknown][] = [];
+    for (const key of Object.keys(Message.attributes)) {
+      if (key === 'headerMessageId' || lockedFields.includes(key)) continue;
       const value = attributeValue(nextDraft, key);
       if (value === undefined || value === null) continue;
-      if (lockedFields.includes(key)) continue;
-      if (attributeValue(this._draft, key) === value) continue;
-
-      if (changed === false) {
-        this._draft = fastCloneDraft(this._draft);
-        changed = true;
-      }
-      setAttributeValue(this._draft, key, value);
+      if (Utils.isEqual(attributeValue(draft, key), value)) continue;
+      incoming.push([key, value]);
+    }
+    if (incoming.length === 0) {
+      return;
     }
 
-    if (changed) {
-      this.trigger();
+    const next = fastCloneDraft(draft);
+    this._draft = next;
+    this._applyingIncoming = true;
+    try {
+      for (const [key, value] of incoming) setAttributeValue(next, key, value);
+    } finally {
+      this._applyingIncoming = false;
     }
+    this.trigger();
   };
 
   async changeSetCommit() {
