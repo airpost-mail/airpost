@@ -45,12 +45,15 @@ pub struct DraftCreateParams {
     pub mailto: Option<String>,
     /// Message JSON keys set over what the kind builds: `to`, `cc`, `bcc`, `from` (contact
     /// lists), `subject`, `body`, `files`, `threadId`, `hMsgId`, `rthMsgId`, `fwdMsgId`,
-    /// `plaintext`, `pristine`; `aid` for `new`.
+    /// `plaintext`, `pristine`; `aid` for `new`. A draft the engine saves (`save` not false)
+    /// is not pristine when these set any recipients, subject, body or files, unless they
+    /// set `pristine` themselves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fields: Option<Map<String, Value>>,
     /// `reply`, `reply-all`: `prefer-existing` answers with the newest draft already replying
-    /// to the message (its recipients switched to the kind), `prefer-existing-if-pristine`
-    /// only when that draft is untouched. Without it a new draft is made.
+    /// to the message (its recipients switched to the kind, then `fields` over it, `hMsgId`
+    /// aside), `prefer-existing-if-pristine` only when that draft is untouched. Without it a
+    /// new draft is made.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub behavior: Option<String>,
     /// HTML or plaintext; `core.composing.html` by default.

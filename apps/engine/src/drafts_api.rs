@@ -317,6 +317,13 @@ impl Here<'_> {
             now: self.store.now(),
         };
         let fields = p.fields.clone().unwrap_or_default();
+        // A draft the engine saves with the caller's content in it has been written: a
+        // pristine one is never pushed to the server, and the desktop discards it when its
+        // composer closes untouched. A caller that saves the draft itself (the desktop's
+        // compose-to-contact draft, pristine until edited) decides that on its own.
+        let touched = p.save != Some(false)
+            && !fields.contains_key("pristine")
+            && draft::sets_content(&fields);
         let identity = accounts
             .get(self.account.id())
             .cloned()
@@ -349,6 +356,7 @@ impl Here<'_> {
                 if let Some(existing) = self.existing_reply(&message, p.behavior.as_deref())? {
                     let mut d = existing;
                     draft::update_reply_draft(&ctx, &mut d, &message, reply_all);
+                    draft::set_fields(&mut d, &fields);
                     d
                 } else {
                     draft::reply_draft(&ctx, &message, reply_all, &fields).map_err(invalid)?
@@ -366,6 +374,9 @@ impl Here<'_> {
             }
             _ => return Err(invalid("unknown kind")),
         };
+        if touched {
+            built["pristine"] = json!(false);
+        }
         let hmid = built
             .get("hMsgId")
             .and_then(Value::as_str)
@@ -882,6 +893,103 @@ mod tests {
         let drafts = drafts_with(&store, "reply-1@example.com");
         assert_eq!(drafts.len(), 1, "saved in place, not as a second draft");
         assert_eq!(drafts[0].id(), "synced-draft-id");
+    }
+
+    fn create(h: &Here, p: Value) -> Value {
+        h.create(CreateCall {
+            params: params(p),
+            settings: ComposeSettings::default(),
+            accounts: Identities::from_accounts_json([account().as_json()]),
+            resurface_body: None,
+        })
+        .unwrap()
+    }
+
+    fn stored_pristine(store: &Store, built: &Value) -> Option<bool> {
+        let hmid = built["hMsgId"].as_str().unwrap();
+        let drafts = drafts_with(store, hmid);
+        assert_eq!(drafts.len(), 1, "{hmid}");
+        drafts[0].data["pristine"].as_bool()
+    }
+
+    #[test]
+    fn a_draft_saved_with_the_callers_content_is_not_pristine() {
+        let (dir, store) = setup();
+        let (message_id, _) = received_reply_target(&store);
+        with_here(dir.path(), &store, |h| {
+            let body = json!({"body": "<p>Sure</p>"});
+            let reply = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "reply", "messageId": message_id,
+                       "behavior": "prefer-existing", "fields": body}),
+            );
+            assert_eq!(reply["pristine"], false);
+            assert_eq!(stored_pristine(&store, &reply), Some(false));
+
+            let to = json!({"to": [{"email": "ann@example.net"}]});
+            let new = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "new", "fields": to}),
+            );
+            assert_eq!(stored_pristine(&store, &new), Some(false));
+
+            // Built from the message alone, or told otherwise: untouched.
+            let forward = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "forward", "messageId": message_id}),
+            );
+            assert_eq!(stored_pristine(&store, &forward), Some(true));
+            let told = json!({"body": "<p>Template</p>", "pristine": true});
+            let told = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "new", "fields": told}),
+            );
+            assert_eq!(stored_pristine(&store, &told), Some(true));
+
+            // The desktop saves what it built itself: its compose-to-contact draft stays
+            // pristine until the user edits it.
+            let unsaved = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "new", "save": false, "fields": to}),
+            );
+            assert_eq!(unsaved["pristine"], true);
+            let desktop_reply = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "reply", "messageId": message_id,
+                       "save": false, "fields": {"threadId": "t1"}}),
+            );
+            assert_eq!(desktop_reply["pristine"], true);
+        });
+    }
+
+    #[test]
+    fn prefer_existing_edits_the_reply_draft_with_the_callers_fields() {
+        let (dir, store) = setup();
+        let (message_id, _) = received_reply_target(&store);
+        with_here(dir.path(), &store, |h| {
+            let first = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "reply", "messageId": message_id,
+                       "behavior": "prefer-existing"}),
+            );
+            assert_eq!(first["pristine"], true);
+            let second = create(
+                h,
+                json!({"accountId": ACCOUNT, "kind": "reply", "messageId": message_id,
+                       "behavior": "prefer-existing",
+                       "fields": {"body": "<p>Second</p>", "subject": "Re: Plans, again",
+                                  "hMsgId": "other@example.com"}}),
+            );
+            assert_eq!(second["id"], first["id"]);
+            assert_eq!(second["hMsgId"], first["hMsgId"]);
+            assert_eq!(second["subject"], "Re: Plans, again");
+            assert_eq!(stored_pristine(&store, &second), Some(false));
+            let id = second["id"].as_str().unwrap();
+            assert_eq!(
+                stored_body(&store, id).unwrap().as_deref(),
+                Some("<p>Second</p>")
+            );
+        });
     }
 
     #[test]
