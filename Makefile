@@ -111,10 +111,11 @@ test-desktop: ## Desktop Jasmine specs: make test-desktop SPEC=calendar runs the
 	cd apps/desktop && npm test $(if $(SPEC),-- --spec-file-pattern='$(SPEC)')
 
 .PHONY: lint
-lint: ## fmt, clippy, cargo deny, and the JS linters
+lint: ## fmt, clippy, cargo deny, npm licences, and the JS linters
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets --locked -- -D warnings
 	cargo deny check
+	node .github/scripts/check-npm-licenses.mjs apps/desktop apps/web
 	cd apps/desktop && npm run lint:check
 	cd apps/web && npm run lint && npm run typecheck
 

@@ -22,9 +22,9 @@ jobs:
   engine:
     runs-on: ubuntu-22.04-arm
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.92
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Install cargo-about
         run: cargo install --locked cargo-about --version 0.9.2 --features cli
       - name: Build the Rust engine
@@ -32,7 +32,7 @@ jobs:
         env:
           OUT_DIR: ${{ runner.temp }}/engine-dist
           TERN_REQUIRE_NOTICES: 1
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: engine-aarch64
           path: |
@@ -62,7 +62,7 @@ jobs:
           echo "This workflow can only be run on main to ensure code-signed builds come from merged PRs"
           exit 1
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system deps
         env:
@@ -80,7 +80,7 @@ jobs:
           # Note: execstack is not available on ARM64 and not needed for aarch64 binaries.
 
       - name: Download the Rust engine
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: engine-aarch64
           path: ${{ runner.temp }}/engine
@@ -94,7 +94,7 @@ jobs:
           install -m 644 "$RUNNER_TEMP/engine/tern-mcp.THIRD-PARTY-NOTICES.txt" tern-mcp.THIRD-PARTY-NOTICES.txt
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
           cache: 'npm'
@@ -121,7 +121,7 @@ jobs:
 
       - name: Setup AWS CLI
         if: env.HAVE_AWS == 'true'
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -137,7 +137,7 @@ jobs:
           BUCKET: ${{ vars.BUILDS_S3_BUCKET }}
 
       - name: Upload DEB artifact for testing
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tern-arm64-deb
           path: |
@@ -146,7 +146,7 @@ jobs:
           retention-days: 1
 
       - name: Upload RPM artifact for testing
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tern-arm64-rpm
           path: |
@@ -160,20 +160,20 @@ jobs:
     env:
       HAVE_SNAP: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS != '' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download DEB artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: tern-arm64-deb
           path: apps/desktop/dist/
 
-      - uses: snapcore/action-build@v1
+      - uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1.3.0
         id: build-snap
         with:
           path: apps/desktop
 
-      - uses: snapcore/action-publish@v1
+      - uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1.2.0
         if: env.HAVE_SNAP == 'true'
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
@@ -189,7 +189,7 @@ jobs:
         ubuntu_version: ['22.04', '24.04', '25.04']
     steps:
       - name: Download DEB artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: tern-arm64-deb
 
@@ -263,7 +263,7 @@ jobs:
         fedora_version: ['40', '41', '43']
     steps:
       - name: Download RPM artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: tern-arm64-rpm
 

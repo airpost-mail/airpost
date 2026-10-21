@@ -35,11 +35,11 @@ jobs:
       HAVE_CERT: ${{ secrets.APPLE_CODESIGN_P12 != '' }}
       HAVE_NOTARY: ${{ secrets.APPLE_API_KEY_P8 != '' || secrets.APPLE_ID != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Install cargo-about
         run: cargo install --locked cargo-about --version "$CARGO_ABOUT_VERSION" --features cli
 
@@ -102,7 +102,7 @@ jobs:
         env:
           DIST: ${{ runner.temp }}/engine-dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: engine-macos
           path: ${{ runner.temp }}/archives/*.tar.gz
@@ -119,11 +119,11 @@ jobs:
             target: aarch64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
         with:
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Install cargo-about
         run: cargo install --locked cargo-about --version "$CARGO_ABOUT_VERSION" --features cli
 
@@ -153,7 +153,7 @@ jobs:
         env:
           DIST: ${{ runner.temp }}/engine-dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: engine-${{ matrix.target }}
           path: ${{ runner.temp }}/archives/*.tar.gz
@@ -164,8 +164,8 @@ jobs:
   source:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@0be0c8e6607124ba7557736a4b6b5a8fe2b0c284 # 1.92
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@3da603d4464771f1a8c3dd4acb41f03bc8107551 # 1.92
       - name: Archive the source with vendored crates
         run: |
           name="tern-engine-src-${GITHUB_REF_NAME//\//-}"
@@ -179,7 +179,7 @@ jobs:
           cargo vendor --locked --versioned-dirs vendor > .cargo/config.toml
           cd ..
           tar -czf "$RUNNER_TEMP/archives/$name.tar.gz" "$name"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: engine-source
           path: ${{ runner.temp }}/archives/*.tar.gz
@@ -191,8 +191,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: archives
           merge-multiple: true
