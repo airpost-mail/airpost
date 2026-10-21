@@ -15,6 +15,7 @@ import {
   isPrimaryWindow,
 } from './hardware-acceleration-recovery';
 import { shouldBlockFrameNavigation } from '../frame/navigation';
+import { openWebviewPopupExternally } from './webview-guest';
 import { attachAppWindowContents } from '../ipc/app-api';
 
 let WindowIconPath: string | null = null;
@@ -182,6 +183,9 @@ export default class AppWindow extends EventEmitter {
       webPreferences.contextIsolation = true;
       webPreferences.sandbox = true;
       webPreferences.devTools = developerToolsAvailable();
+    });
+    this.browserWindow.webContents.on('did-attach-webview', (_event, guest) => {
+      guest.setWindowOpenHandler((details) => openWebviewPopupExternally(details));
     });
 
     // Tern's code reaches main over ipc/app-api.ts; remote stays enabled for v1 plugins that

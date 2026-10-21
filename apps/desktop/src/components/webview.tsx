@@ -6,7 +6,6 @@ import networkErrors from 'chromium-net-errors';
 import { localized } from '../intl/localize';
 
 import { RetinaImg } from './retina-img';
-import { Disposable } from 'event-kit';
 
 type InitialLoadingCoverProps = {
   src?: string;
@@ -92,7 +91,6 @@ export default class Webview extends React.Component<WebviewProps, WebviewState>
   static displayName = 'Webview';
 
   _mounted = false;
-  _disposable?: Disposable | null;
 
   state: WebviewState = {
     webviewLoading: false,
@@ -114,46 +112,44 @@ export default class Webview extends React.Component<WebviewProps, WebviewState>
 
   componentWillUnmount() {
     this._mounted = false;
-    if (this._disposable) {
-      this._disposable.dispose();
-      this._disposable = null;
-    }
+    const webview = ReactDOM.findDOMNode(this.refs.webview) as Electron.WebviewTag | null;
+    if (webview) this._removeListeners(webview);
+  }
+
+  _removeListeners(webview: Electron.WebviewTag) {
+    webview.removeEventListener('did-fail-load', this._webviewDidFailLoad);
+    webview.removeEventListener('did-finish-load', this._webviewDidFinishLoad);
+    webview.removeEventListener('did-frame-navigate', this._webviewDidFrameNavigate);
+    webview.removeEventListener('console-message', this._onConsoleMessage);
+    webview.removeEventListener('did-navigate', this._onDidNavigate);
   }
 
   _setupWebview(props: WebviewProps) {
     if (!props.src) return;
     const webview = ReactDOM.findDOMNode(this.refs.webview) as Electron.WebviewTag;
-    // Workaround: When a webview changes pages, it's focus state seems to get out of
-    // sync and the text insertion cursor disappears until you blur it and focus it again.
-    const onDidNavigate = () => webview.blur();
-
-    webview.removeEventListener('did-fail-load', this._webviewDidFailLoad);
-    webview.removeEventListener('did-finish-load', this._webviewDidFinishLoad);
-    webview.removeEventListener('did-frame-navigate', this._webviewDidFrameNavigate);
-    webview.removeEventListener('console-message', this._onConsoleMessage);
-    webview.removeEventListener('new-window', this._onNewWindow);
-    webview.removeEventListener('did-navigate', onDidNavigate);
+    this._removeListeners(webview);
     webview.partition = 'in-memory-only';
+    // Lets window.open and target=_blank reach the main process, whose window open handler
+    // (main/windows/webview-guest.ts) opens http(s) links in the browser and denies the window.
+    // Read when the guest is created, on the first src.
+    webview.setAttribute('allowpopups', '');
     webview.src = props.src;
     webview.addEventListener('did-fail-load', this._webviewDidFailLoad);
     webview.addEventListener('did-finish-load', this._webviewDidFinishLoad);
     webview.addEventListener('did-frame-navigate', this._webviewDidFrameNavigate);
     webview.addEventListener('console-message', this._onConsoleMessage);
-    webview.addEventListener('new-window', this._onNewWindow);
-    webview.addEventListener('did-navigate', onDidNavigate);
+    webview.addEventListener('did-navigate', this._onDidNavigate);
   }
+
+  // Workaround: When a webview changes pages, it's focus state seems to get out of
+  // sync and the text insertion cursor disappears until you blur it and focus it again.
+  _onDidNavigate = () => {
+    (ReactDOM.findDOMNode(this.refs.webview) as Electron.WebviewTag | null)?.blur();
+  };
 
   _onTryAgain = () => {
     const webview = ReactDOM.findDOMNode(this.refs.webview) as Electron.WebviewTag;
     webview.reload();
-  };
-
-  // Electron no longer types (or fires) new-window on webviews; read its url defensively.
-  _onNewWindow = (e: Event) => {
-    const url = 'url' in e && typeof e.url === 'string' ? e.url : '';
-    if (/^https?:\/\/.+/i.test(url)) {
-      shell.openExternal(url);
-    }
   };
 
   _onConsoleMessage = (e: Electron.ConsoleMessageEvent) => {
