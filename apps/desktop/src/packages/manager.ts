@@ -114,6 +114,15 @@ export default class PackageManager {
     }
   }
 
+  // Discovers again, keeping the active packages as they are. A hot window discovers when it
+  // is created, which can be long before it becomes a composer or popout; it calls this when
+  // populated, so plugins installed or removed since then are seen.
+  rediscoverPackages() {
+    this.available = {};
+    this.discoverPackages();
+    Object.assign(this.available, this.active);
+  }
+
   activatePackages(windowType: string) {
     for (const name of Object.keys(this.available)) {
       const pkg = this.available[name];

@@ -69,6 +69,25 @@ describe('PackageManager engines check', function () {
     expect(messages.some((m) => m.includes('future') && m.includes('>=2.0.0'))).toBe(true);
   });
 
+  it('activates a composer plugin installed after a hot window discovered its packages', () => {
+    writePackage('early', { syncInit: true, engines: { tern: '*' }, windowTypes: { all: true } });
+    const pm = manager();
+    pm.activatePackages('emptyWindow');
+    const early = pm.getPackageNamed('early');
+    writePackage('late', {
+      syncInit: true,
+      engines: { tern: '*' },
+      windowTypes: { default: true, composer: true },
+    });
+
+    // AppEnv.populateHotWindow
+    pm.rediscoverPackages();
+    pm.activatePackages('composer');
+
+    expect(pm.isPackageActive('late')).toBe(true);
+    expect(pm.getPackageNamed('early')).toBe(early);
+  });
+
   it('reads the engines range without throwing when engines is missing', () => {
     writePackage('bare', {});
     const pkg = new Package(

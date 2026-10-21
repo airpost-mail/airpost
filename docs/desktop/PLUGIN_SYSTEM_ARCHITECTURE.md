@@ -209,7 +209,7 @@ export function activateConfig() {
 
 ### Loading Sequence
 
-1. **Discovery**: `PackageManager.discoverPackages()` scans configured directories
+1. **Discovery**: `PackageManager.discoverPackages()` scans configured directories. A preloaded (hot) window discovers again when it becomes a composer or popout (`rediscoverPackages()`), so plugins installed after it was created load there too
 2. **Filtering**: Packages filtered by `windowTypes` for current window
 3. **Validation**: Checks that `engines.tern` is a range `PLUGIN_API_VERSION` satisfies
 4. **Sync Loading**: Plugins with `syncInit: true` activate immediately

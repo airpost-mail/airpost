@@ -784,6 +784,7 @@ export default class AppEnvConstructor {
     document.body.classList.remove(`window-type-${previousWindowType}`);
     document.body.classList.add(`window-type-${loadSettings.windowType}`);
 
+    this.packages.rediscoverPackages();
     this.packages.activatePackages(loadSettings.windowType);
 
     this.emitter.emit(
