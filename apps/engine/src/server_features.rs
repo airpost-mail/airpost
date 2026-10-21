@@ -7,7 +7,7 @@
 
 use std::sync::Mutex;
 
-use ms_net::Me;
+use tern_net::Me;
 
 /// `None`: no server answered, or its token was refused. `Some(tracking)` otherwise.
 static TRACKING: Mutex<Option<bool>> = Mutex::new(None);

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 // The contacts package's files and saves on the engine (contacts.*). The vCards it reads and
-// writes are crates/ms-pim's tests and the desktop contact corpus.
+// writes are crates/tern-pim's tests and the desktop contact corpus.
 import fs from 'fs';
 import os from 'os';
 import path from 'path';

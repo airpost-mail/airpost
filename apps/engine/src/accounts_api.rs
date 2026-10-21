@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! Account setup on `serve`'s socket: discovery
-//! over [`ms_providers::discovery`], the OAuth sign-in whose PKCE verifier, `state` and client
+//! over [`tern_providers::discovery`], the OAuth sign-in whose PKCE verifier, `state` and client
 //! secret never leave the engine, Google grant revocation, and the account JSON a new account
 //! gets (its id, trimmed hosts, numeric ports).
 //!
@@ -23,14 +23,14 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use base64::Engine as _;
-use ms_ipc::{
+use serde_json::{json, Map, Value};
+use tern_ipc::{
     code, AccountDiscoverParams, AccountDiscoverResult, ErrorObject, OAuthBeginParams,
     OAuthBeginResult, OAuthCompleteParams,
 };
-use ms_net::{Endpoints, HttpClient};
-use ms_providers::discovery::{self, Lookups};
-use ms_providers::OAuthProvider;
-use serde_json::{json, Map, Value};
+use tern_net::{Endpoints, HttpClient};
+use tern_providers::discovery::{self, Lookups};
+use tern_providers::OAuthProvider;
 use tracing::{info, warn};
 
 use crate::dispatch::Reply;
@@ -93,7 +93,7 @@ fn check_email(email: &str) -> Result<(), ErrorObject> {
 
 /// What `finalizeAndValidateAccount` did before testing: hosts trimmed, numeric ports, a
 /// label that is an address replaced by the account's own, and an id when it has none
-/// ([`ms_core::ids::account_id`]).
+/// ([`tern_core::ids::account_id`]).
 pub fn prepare_new_account(json: &mut Value) {
     let email = json
         .get("emailAddress")
@@ -138,7 +138,7 @@ pub fn prepare_new_account(json: &mut Value) {
             .unwrap_or_default();
         fields.insert(
             "id".into(),
-            json!(ms_core::ids::account_id(&email, &settings)),
+            json!(tern_core::ids::account_id(&email, &settings)),
         );
     }
 }
@@ -152,7 +152,7 @@ struct Network {
 
 impl Lookups for Network {
     fn mx(&mut self, domain: &str) -> Vec<String> {
-        ms_dav::discovery::DnsResolver.mx(domain)
+        tern_dav::discovery::DnsResolver.mx(domain)
     }
 
     fn fetch(&mut self, url: &str) -> Option<String> {
@@ -279,7 +279,7 @@ impl OAuthSessions {
         }
         let port = p
             .redirect_port
-            .unwrap_or(ms_providers::oauth::DEFAULT_REDIRECT_PORT);
+            .unwrap_or(tern_providers::oauth::DEFAULT_REDIRECT_PORT);
         if port == 0 {
             return Err(invalid("invalid params: redirectPort must not be 0"));
         }
@@ -358,7 +358,7 @@ fn oauth_failed(key: &str, message: impl Into<String>) -> ErrorObject {
 
 /// An HTTP failure of the sign-in as [`code::OAUTH_FAILED`]. The provider's error body is
 /// kept (it names the problem, never a token: the response carries none on failure).
-fn http_failed(key: &str, what: &str, e: ms_core::Error) -> ErrorObject {
+fn http_failed(key: &str, what: &str, e: tern_core::Error) -> ErrorObject {
     let (message, data) = match e.as_sync() {
         Some(se) => (
             format!("{what} failed: {}: {}", se.key, se.debuginfo),
@@ -433,7 +433,7 @@ pub fn sign_in(session: &OAuthSession, code: &str) -> Result<Value, ErrorObject>
         OAuthProvider::Google => {
             let url = env_url(
                 ENV_GOOGLE_USERINFO_URL,
-                ms_providers::oauth::GOOGLE_USERINFO_URL,
+                tern_providers::oauth::GOOGLE_USERINFO_URL,
             );
             let me = http
                 .json("GET", &url, Some(access_token), None)
@@ -446,7 +446,7 @@ pub fn sign_in(session: &OAuthSession, code: &str) -> Result<Value, ErrorObject>
         OAuthProvider::Microsoft => {
             let url = env_url(
                 ENV_MICROSOFT_GRAPH_ME_URL,
-                ms_providers::oauth::MICROSOFT_GRAPH_ME_URL,
+                tern_providers::oauth::MICROSOFT_GRAPH_ME_URL,
             );
             let me = http
                 .json("GET", &url, Some(access_token), None)
@@ -538,7 +538,7 @@ pub fn revoke(provider: &str, refresh_token: &str) {
     }
     let url = env_url(
         ENV_GOOGLE_REVOKE_URL,
-        ms_providers::oauth::GOOGLE_REVOKE_URL,
+        tern_providers::oauth::GOOGLE_REVOKE_URL,
     );
     let outcome = HttpClient::with_timeouts(REVOKE_TIMEOUT, REVOKE_TIMEOUT)
         .and_then(|http| http.post_form(&url, &[("token", refresh_token)]));

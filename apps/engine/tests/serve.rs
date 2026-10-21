@@ -14,8 +14,8 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
-use ms_ipc::{code, method, Client, ClientError, SubscribeParams};
 use serde_json::{json, Value};
+use tern_ipc::{code, method, Client, ClientError, SubscribeParams};
 
 // Ids starting with c-f have no start delay.
 const A: &str = "c0ffee-serve-a";
@@ -84,7 +84,7 @@ impl Parent {
         id
     }
 
-    fn call(&mut self, method: &str, params: Value) -> Result<Value, ms_ipc::ErrorObject> {
+    fn call(&mut self, method: &str, params: Value) -> Result<Value, tern_ipc::ErrorObject> {
         let id = self.send(method, params);
         loop {
             let msg = self
@@ -818,7 +818,7 @@ fn a_second_engine_on_the_socket_exits_in_use() {
         .unwrap();
     assert_eq!(
         out.status.code(),
-        Some(ms_core::constants::EXIT_SOCKET_IN_USE)
+        Some(tern_core::constants::EXIT_SOCKET_IN_USE)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
@@ -1097,39 +1097,39 @@ fn storing_rules_sets_their_auto_since_once() {
     assert!(status["features"]
         .as_array()
         .unwrap()
-        .contains(&json!(ms_ipc::feature::RULES)));
+        .contains(&json!(tern_ipc::feature::RULES)));
     watcher
         .call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
         .unwrap();
-    let before = ms_core::Clock::now(&ms_core::SystemClock) * 1000;
+    let before = tern_core::Clock::now(&tern_core::SystemClock) * 1000;
     let rules = json!([{ "id": "r1", "accountId": "a1", "conditions": [], "actions": [] }]);
     writer
         .call(
             method::SETTINGS_SET,
-            json!({ "values": { ms_ipc::MAIL_RULES_KEY: rules } }),
+            json!({ "values": { tern_ipc::MAIL_RULES_KEY: rules } }),
         )
         .unwrap();
     let n = next_matching(&mut watcher, |v| v["method"] == method::SETTINGS_CHANGED);
-    let since = n["params"]["values"][ms_ipc::MAIL_RULES_AUTO_SINCE_KEY]
+    let since = n["params"]["values"][tern_ipc::MAIL_RULES_AUTO_SINCE_KEY]
         .as_i64()
         .unwrap();
     assert!(since >= before, "{since} < {before}");
-    assert_eq!(n["params"]["values"][ms_ipc::MAIL_RULES_KEY], rules);
+    assert_eq!(n["params"]["values"][tern_ipc::MAIL_RULES_KEY], rules);
     // Kept when the rules change again, and a client's own value wins.
     writer
         .call(
             method::SETTINGS_SET,
-            json!({ "values": { ms_ipc::MAIL_RULES_KEY: [], ms_ipc::MAIL_RULES_AUTO_SINCE_KEY: 5 } }),
+            json!({ "values": { tern_ipc::MAIL_RULES_KEY: [], tern_ipc::MAIL_RULES_AUTO_SINCE_KEY: 5 } }),
         )
         .unwrap();
     writer
         .call(
             method::SETTINGS_SET,
-            json!({ "values": { ms_ipc::MAIL_RULES_KEY: rules } }),
+            json!({ "values": { tern_ipc::MAIL_RULES_KEY: rules } }),
         )
         .unwrap();
     let got = writer.call(method::SETTINGS_GET, json!({})).unwrap();
-    assert_eq!(got["values"][ms_ipc::MAIL_RULES_AUTO_SINCE_KEY], json!(5));
+    assert_eq!(got["values"][tern_ipc::MAIL_RULES_AUTO_SINCE_KEY], json!(5));
 
     let unknown = writer
         .call(method::RULES_REPROCESS, json!({ "accountId": "nope" }))
@@ -1150,7 +1150,7 @@ fn settings_round_trip_and_notify_the_other_connections() {
     let status = writer.call(method::ENGINE_STATUS, json!({})).unwrap();
     let features = status["features"].as_array().unwrap();
     assert!(features.contains(&json!("settings")));
-    assert!(features.contains(&json!(ms_ipc::feature::EXPIRATION_EXECUTOR)));
+    assert!(features.contains(&json!(tern_ipc::feature::EXPIRATION_EXECUTOR)));
     for c in [&mut writer, &mut watcher] {
         // A class filter doesn't hold settings.changed back.
         c.call(method::SUBSCRIBE, json!({ "classes": ["Task"] }))
@@ -1236,7 +1236,7 @@ fn settings_round_trip_and_notify_the_other_connections() {
 }
 
 /// A relayed device without the admin scope may change the plain settings but not the ones
-/// the desktop renders as HTML (signatures) or that act on mail (ms-ipc's policy).
+/// the desktop renders as HTML (signatures) or that act on mail (tern-ipc's policy).
 #[test]
 fn relayed_settings_writes_are_limited() {
     let e = Serve::start();

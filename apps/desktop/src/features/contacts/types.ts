@@ -4,7 +4,7 @@
 /*
 The contact editor's shape, which `contacts.get` answers and `contacts.create` and
 `contacts.update` take. The engine maps it onto a CardDAV
-vCard or a Google person (crates/ms-pim/src/contact.rs).
+vCard or a Google person (crates/tern-pim/src/contact.rs).
 */
 export interface ContactBase {
   name: {

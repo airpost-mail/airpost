@@ -1,6 +1,6 @@
 // The engine's AI settings (`core.ai.*`), read-only here:
 // providers, feature switches and account opt-in are set on the desktop, and a relayed
-// connection may read them but never write them. The provider rules mirror ms-ai's
+// connection may read them but never write them. The provider rules mirror tern-ai's
 // ProviderConfig (and the desktop's src/engine/client/ai.ts).
 
 export type AiProviderKind = 'openai' | 'anthropic' | 'ollama';
@@ -64,7 +64,7 @@ export function readAiSettings(values: Record<string, unknown>): AiSettings {
   const features = {} as AiSettings['features'];
   for (const f of AI_FEATURES) {
     const raw = rawFeatures[f];
-    // As ms-ipc AiSettings::feature_enabled: `true`, or an object with `enabled: true`.
+    // As tern-ipc AiSettings::feature_enabled: `true`, or an object with `enabled: true`.
     const enabled = raw === true || (isObject(raw) && raw.enabled === true);
     const provider = isObject(raw) && typeof raw.provider === 'string' ? raw.provider : undefined;
     features[f] = provider ? { enabled, provider } : { enabled };
@@ -91,7 +91,7 @@ export function providerFor(s: AiSettings, feature: AiFeature): AiProvider | nul
   return s.providers.find((p) => p.id === id) ?? null;
 }
 
-/** The base URL as ms-ai's ProviderConfig::base_url builds it. */
+/** The base URL as tern-ai's ProviderConfig::base_url builds it. */
 export function baseUrl(p: AiProvider): string {
   let url = (p.url ?? '').trim() || KINDS[p.kind].defaultUrl;
   url = url.replace(/\/+$/, '');
@@ -128,7 +128,7 @@ function isPrivateV4([a, b]: number[]) {
   );
 }
 
-/** Loopback or a private address, as ms-ai's ProviderConfig::is_local. */
+/** Loopback or a private address, as tern-ai's ProviderConfig::is_local. */
 export function isLocal(p: AiProvider): boolean {
   const host = hostOf(p).toLowerCase().replace(/\.$/, '');
   if (!host) return false;

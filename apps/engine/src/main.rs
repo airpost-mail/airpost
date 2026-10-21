@@ -46,7 +46,7 @@ mod workers;
 
 use std::process::ExitCode;
 
-use ms_core::constants::{EXIT_FAILURE, EXIT_OK, EXIT_PATH_CHECK};
+use tern_core::constants::{EXIT_FAILURE, EXIT_OK, EXIT_PATH_CHECK};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args_os()

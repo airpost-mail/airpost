@@ -1,15 +1,15 @@
 // The desktop half of the search grammar parity suite.
 //
-// Writes crates/ms-store/tests/fixtures/search_queries.json: for each query text below, the
+// Writes crates/tern-store/tests/fixtures/search_queries.json: for each query text below, the
 // AST `SearchQueryParser.parse` builds (or that it fails), and for queries without dates the
 // WHERE clause `LocalSearchQueryBackend` compiles for Thread. The engine's parser must build
-// the same AST, and `crates/ms-store/tests/search_grammar_parity.rs` runs both WHERE clauses
+// the same AST, and `crates/tern-store/tests/search_grammar_parity.rs` runs both WHERE clauses
 // on one fixture database and compares the threads. The texts avoid the places where the
-// engine's grammar differs on purpose (see crates/ms-store/src/search_grammar.rs).
+// engine's grammar differs on purpose (see crates/tern-store/src/search_grammar.rs).
 //
 // After changing the parser or the list, regenerate the file with
 //   TERN_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=search-query-capture
-// and run `cargo test -p ms-store --test search_grammar_parity`.
+// and run `cargo test -p tern-store --test search_grammar_parity`.
 import fs from 'fs';
 import path from 'path';
 import { SearchQueryParser } from '../../src/mail/search/parser';
@@ -31,7 +31,7 @@ import {
 } from '../../src/mail/search/ast';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const FIXTURE = path.join(REPO, 'crates', 'ms-store', 'tests', 'fixtures', 'search_queries.json');
+const FIXTURE = path.join(REPO, 'crates', 'tern-store', 'tests', 'fixtures', 'search_queries.json');
 const WRITE = !!process.env.TERN_WRITE_QUERY_FIXTURES;
 
 const QUERIES = [

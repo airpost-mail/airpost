@@ -3,7 +3,7 @@
 
 //! `messages.unsubscribe` on the socket: the message's
 //! `List-Unsubscribe` header, acted on as the desktop's `list-unsubscribe` plugin does
-//! ([`ms_net::unsubscribe`]). The engine makes the one-click POST itself; a mailto becomes a
+//! ([`tern_net::unsubscribe`]). The engine makes the one-click POST itself; a mailto becomes a
 //! `SendDraftTask` on the account's `main` thread; a web link goes back to the client to
 //! open. Unsubscribe links found only in the body are left to the client.
 //!
@@ -16,13 +16,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-use ms_ipc::{
+use serde_json::Value;
+use tern_ipc::{
     code, unsubscribe_method, ErrorObject, MessagesUnsubscribeParams, MessagesUnsubscribeResult,
     Request as RpcRequest,
 };
-use ms_net::unsubscribe::{self, Method};
-use ms_store::read::ReadStore;
-use serde_json::Value;
+use tern_net::unsubscribe::{self, Method};
+use tern_store::read::ReadStore;
 use tracing::{info, warn};
 
 use crate::dispatch::{Deferred, Reply, Request};

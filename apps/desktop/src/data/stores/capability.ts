@@ -77,7 +77,7 @@ const SERVER: CapabilityFeature[] = [
   'activity-sharing',
   'metadata-sync',
 ];
-// The engine's names for them (ms-ipc `server_feature`).
+// The engine's names for them (tern-ipc `server_feature`).
 const ENGINE_SERVER_FEATURE: { [feature: string]: string } = {
   'read-receipts': 'readReceipts',
   'link-tracking': 'linkTracking',

@@ -13,8 +13,8 @@
 mod common;
 
 use common::{Event, Setup, WAIT};
-use ms_ipc::policy;
 use serde_json::json;
+use tern_ipc::policy;
 
 /// Far past the gateway's limit on browser frames (50 a second, burst 200).
 const BURST: usize = 5000;
@@ -129,7 +129,7 @@ const AI_METHODS: &[&str] = &[
     "ai.usage",
 ];
 
-/// The gateway applies ms-ipc's relay policy to `ai.*` requests, params included, so the
+/// The gateway applies tern-ipc's relay policy to `ai.*` requests, params included, so the
 /// `config` refusal AI2 adds there holds on both sides (G6) for every `ai.*` method. Until
 /// then `ai.*` are local-only.
 #[tokio::test(flavor = "multi_thread")]

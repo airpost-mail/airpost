@@ -1,18 +1,18 @@
 // The desktop half of the `query` parity suite.
 //
-// Two checked-in files under crates/ms-store are generated here and compared with what the
+// Two checked-in files under crates/tern-store are generated here and compared with what the
 // models produce now, so a change on either side fails one of the two suites:
 // - src/model_query_allowlist.json: every `queryable` attribute (and every joined-data
 //   attribute) of the classes the engine's `query` serves, with the natural sort orders. The
 //   engine compiles only what this table names.
 // - tests/fixtures/model_queries.json: the queries the desktop's call sites build, each as
-//   `Query.toJSON()` and `Query.sql()`. `crates/ms-store/tests/model_query_parity.rs` runs both
+//   `Query.toJSON()` and `Query.sql()`. `crates/tern-store/tests/model_query_parity.rs` runs both
 //   forms against one fixture database and compares the rows; the ids below are that
 //   database's.
 //
 // After changing a model or a call site, regenerate both files with
 //   TERN_WRITE_QUERY_FIXTURES=1 npm test -- --spec-file-pattern=model-query-capture
-// and run `cargo test -p ms-store --test model_query_parity`.
+// and run `cargo test -p tern-store --test model_query_parity`.
 import fs from 'fs';
 import path from 'path';
 import DatabaseStore from '../../src/data/database/store';
@@ -42,8 +42,8 @@ import { File } from '../../src/data/models/file';
 import { Task } from '../../src/data/tasks/task';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const ALLOWLIST = path.join(REPO, 'crates', 'ms-store', 'src', 'model_query_allowlist.json');
-const QUERIES = path.join(REPO, 'crates', 'ms-store', 'tests', 'fixtures', 'model_queries.json');
+const ALLOWLIST = path.join(REPO, 'crates', 'tern-store', 'src', 'model_query_allowlist.json');
+const QUERIES = path.join(REPO, 'crates', 'tern-store', 'tests', 'fixtures', 'model_queries.json');
 const WRITE = !!process.env.TERN_WRITE_QUERY_FIXTURES;
 
 /** The classes `query` serves. */
@@ -106,7 +106,7 @@ function allowlist() {
   };
 }
 
-// Ids of the fixture database in crates/ms-store/tests/model_query_parity.rs.
+// Ids of the fixture database in crates/tern-store/tests/model_query_parity.rs.
 const BASE = 1_700_000_000;
 const at = (offset: number) => new Date((BASE + offset) * 1000);
 const A1 = 'a1';

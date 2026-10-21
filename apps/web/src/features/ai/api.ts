@@ -14,7 +14,7 @@ import {
   type RpcResult,
 } from '@/engine';
 
-/** ms-ai error keys, plus `engine-busy`, `engine-disconnected` and `unknown`. */
+/** tern-ai error keys, plus `engine-busy`, `engine-disconnected` and `unknown`. */
 export type AiErrorKey =
   | 'not-configured'
   | 'not-enabled'

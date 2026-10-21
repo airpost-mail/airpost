@@ -38,7 +38,7 @@ pub struct Fake {
 
 fn not_found(what: &str) -> EngineError {
     EngineError::Rpc {
-        code: ms_ipc::code::NOT_FOUND,
+        code: tern_ipc::code::NOT_FOUND,
         message: format!("no {what}"),
         data: None,
     }
@@ -91,7 +91,11 @@ impl Backend for Fake {
     }
 
     fn settings(&mut self, keys: &[&str]) -> Option<serde_json::Map<String, Value>> {
-        if !self.features.iter().any(|f| f == ms_ipc::feature::SETTINGS) {
+        if !self
+            .features
+            .iter()
+            .any(|f| f == tern_ipc::feature::SETTINGS)
+        {
             return None;
         }
         Some(
@@ -170,7 +174,7 @@ impl Backend for Fake {
                 self.searches.push(params.clone());
                 if str_of(&params, "query") == "(x" {
                     return Err(EngineError::Rpc {
-                        code: ms_ipc::code::INVALID_PARAMS,
+                        code: tern_ipc::code::INVALID_PARAMS,
                         message: "invalid params: search: a '(' is never closed".into(),
                         data: None,
                     });
@@ -221,7 +225,7 @@ impl Backend for Fake {
                 self.queued.push(task.clone());
                 Ok(task)
             }
-            "tasks.list" if self.has_feature(account, ms_ipc::feature::TASKS_LIST) => {
+            "tasks.list" if self.has_feature(account, tern_ipc::feature::TASKS_LIST) => {
                 let statuses = array_of(&params, "status").to_vec();
                 let hmid = params.get("headerMessageId").and_then(Value::as_str);
                 let mut tasks: Vec<Value> = self
@@ -245,7 +249,7 @@ impl Backend for Fake {
                 tasks.sort_by(|a, b| str_of(a, "id").cmp(str_of(b, "id")));
                 Ok(json!({"tasks": tasks}))
             }
-            "metadata.list" if self.has_feature(account, ms_ipc::feature::METADATA_LIST) => {
+            "metadata.list" if self.has_feature(account, tern_ipc::feature::METADATA_LIST) => {
                 let plugin = str_of(&params, "pluginId");
                 let num = |k: &str| params.get(k).and_then(Value::as_i64);
                 let mut models: Vec<Value> = Self::of_account(&self.messages, account)
@@ -282,7 +286,7 @@ impl Backend for Fake {
                 Ok(json!({"models": models}))
             }
             // An engine with draft-pipeline: the builders it runs, over the seeded messages.
-            "draft.create" if self.has_feature(account, ms_ipc::feature::DRAFT_PIPELINE) => {
+            "draft.create" if self.has_feature(account, tern_ipc::feature::DRAFT_PIPELINE) => {
                 self.actions.push((method.to_owned(), params.clone()));
                 let mut message = Self::of_account(&self.messages, account)
                     .find(|m| str_of(m, "id") == str_of(&params, "messageId"))
@@ -299,12 +303,12 @@ impl Backend for Fake {
                     .iter()
                     .map(|a| json!({"id": a.account_id, "name": "Me", "emailAddress": a.email}))
                     .collect();
-                let identities = ms_compose::Identities::from_accounts_json(&accounts);
-                let settings = ms_compose::ComposeSettings::from_values(
+                let identities = tern_compose::Identities::from_accounts_json(&accounts);
+                let settings = tern_compose::ComposeSettings::from_values(
                     |k| self.settings.get(k).cloned(),
-                    ms_compose::ComposeSettings::default().tz,
+                    tern_compose::ComposeSettings::default().tz,
                 );
-                let ctx = ms_compose::draft::Ctx {
+                let ctx = tern_compose::draft::Ctx {
                     settings: &settings,
                     accounts: &identities,
                     html: params["html"].as_bool().unwrap_or(settings.html),
@@ -312,25 +316,27 @@ impl Backend for Fake {
                 };
                 let fields = params["fields"].as_object().cloned().unwrap_or_default();
                 let built = match (str_of(&params, "kind"), message) {
-                    ("reply", Some(m)) => ms_compose::draft::reply_draft(&ctx, &m, false, &fields),
+                    ("reply", Some(m)) => {
+                        tern_compose::draft::reply_draft(&ctx, &m, false, &fields)
+                    }
                     ("reply-all", Some(m)) => {
-                        ms_compose::draft::reply_draft(&ctx, &m, true, &fields)
+                        tern_compose::draft::reply_draft(&ctx, &m, true, &fields)
                     }
                     _ => {
                         let mut fields = fields;
                         fields.insert("aid".into(), json!(account));
-                        ms_compose::draft::new_draft(&ctx, &fields)
+                        tern_compose::draft::new_draft(&ctx, &fields)
                     }
                 };
                 let mut d = built.map_err(|e| EngineError::Rpc {
-                    code: ms_ipc::code::INVALID_PARAMS,
+                    code: tern_ipc::code::INVALID_PARAMS,
                     message: e,
                     data: None,
                 })?;
                 d["body"] = json!(format!("<!-- engine -->{}", str_of(&d, "body")));
                 Ok(d)
             }
-            "draft.send" if self.has_feature(account, ms_ipc::feature::DRAFT_PIPELINE) => {
+            "draft.send" if self.has_feature(account, tern_ipc::feature::DRAFT_PIPELINE) => {
                 self.actions.push((method.to_owned(), params));
                 Ok(json!({"taskId": "engine-send-1"}))
             }
@@ -386,7 +392,7 @@ impl Backend for Fake {
                 )
             }
             other => Err(EngineError::Rpc {
-                code: ms_ipc::code::METHOD_NOT_FOUND,
+                code: tern_ipc::code::METHOD_NOT_FOUND,
                 message: format!("unknown method {other}"),
                 data: None,
             }),

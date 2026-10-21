@@ -21,32 +21,32 @@ publish = false
 
 [workspace.dependencies]
 # Engine crates
-ms-core = { path = "crates/ms-core" }
-ms-store = { path = "crates/ms-store" }
-ms-providers = { path = "crates/ms-providers" }
-ms-imap = { path = "crates/ms-imap" }
-ms-mime = { path = "crates/ms-mime" }
-ms-smtp = { path = "crates/ms-smtp" }
-ms-net = { path = "crates/ms-net" }
-ms-dav = { path = "crates/ms-dav" }
-ms-pim = { path = "crates/ms-pim" }
-ms-sync = { path = "crates/ms-sync" }
-ms-tasks = { path = "crates/ms-tasks" }
+tern-core = { path = "crates/tern-core" }
+tern-store = { path = "crates/tern-store" }
+tern-providers = { path = "crates/tern-providers" }
+tern-imap = { path = "crates/tern-imap" }
+tern-mime = { path = "crates/tern-mime" }
+tern-smtp = { path = "crates/tern-smtp" }
+tern-net = { path = "crates/tern-net" }
+tern-dav = { path = "crates/tern-dav" }
+tern-pim = { path = "crates/tern-pim" }
+tern-sync = { path = "crates/tern-sync" }
+tern-tasks = { path = "crates/tern-tasks" }
 # Drafts as the desktop builds them: quoting, signatures, send warnings.
-ms-compose = { path = "crates/ms-compose" }
+tern-compose = { path = "crates/tern-compose" }
 # Shared with tern-backend, which must not depend on the engine crates above.
-ms-wire = { path = "crates/ms-wire" }
+tern-wire = { path = "crates/tern-wire" }
 # The engine socket protocol: serde and serde_json only.
-ms-ipc = { path = "crates/ms-ipc" }
+tern-ipc = { path = "crates/tern-ipc" }
 # The client half of that protocol, for tern, tern-mcp and the gateway.
 tern-client = { path = "crates/tern-client" }
 # Third-party providers and model providers.
-ms-integrations = { path = "crates/ms-integrations" }
-ms-ai = { path = "crates/ms-ai" }
+tern-integrations = { path = "crates/tern-integrations" }
+tern-ai = { path = "crates/tern-ai" }
 # The engine's secret store.
-ms-secrets = { path = "crates/ms-secrets" }
+tern-secrets = { path = "crates/tern-secrets" }
 
-# IMAP. ms-imap has its own parser and command layer; async-imap and
+# IMAP. tern-imap has its own parser and command layer; async-imap and
 # imap-proto are dev-dependencies of its spike example only.
 async-imap = { version = "0.12", default-features = false, features = ["runtime-tokio"] }
 imap-proto = "0.17"
@@ -65,10 +65,10 @@ calcard = "0.3"
 encoding_rs = "0.8"
 chardetng = "1.0"
 html5ever = "0.40"
-# Draft quoting (ms-compose): the desktop's DOMPurify and juice passes.
+# Draft quoting (tern-compose): the desktop's DOMPurify and juice passes.
 ammonia = "4.2"
 css-inline = { version = "0.23", default-features = false }
-# Tracking transforms (ms-compose): a streaming rewriter keeps the untouched markup as it was.
+# Tracking transforms (tern-compose): a streaming rewriter keeps the untouched markup as it was.
 lol_html = "3"
 idna = "1.1"
 roxmltree = "0.21"
@@ -96,7 +96,7 @@ hostname = "0.4"
 
 # Secrets: AES-256-GCM for the file store, the macOS Keychain, the Linux Secret Service.
 ring = "0.17"
-# AES-256-CTR, only to read the obfuscated default Google client secret (ms-providers).
+# AES-256-CTR, only to read the obfuscated default Google client secret (tern-providers).
 aes = "0.8"
 security-framework = "3"
 # libdbus rather than zbus (no async runtime; secret-service 5 is on zbus 5, whose zvariant

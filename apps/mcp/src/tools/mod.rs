@@ -365,14 +365,18 @@ impl Ctx<'_> {
         if let Some(p) = self.sender(account).meta.provider {
             return Ok(p == "gmail");
         }
-        let labels = self.call(&account.account_id, ms_ipc::method::LABELS_LIST, json!({}))?;
+        let labels = self.call(
+            &account.account_id,
+            tern_ipc::method::LABELS_LIST,
+            json!({}),
+        )?;
         Ok(!array_of(&labels, "labels").is_empty())
     }
 
     /// The account's folders and labels, folders first, each with its `__cls`.
     pub(crate) fn categories(&mut self, account: &str) -> Result<Vec<Value>, ToolError> {
-        let folders = self.call(account, ms_ipc::method::FOLDERS_LIST, json!({}))?;
-        let labels = self.call(account, ms_ipc::method::LABELS_LIST, json!({}))?;
+        let folders = self.call(account, tern_ipc::method::FOLDERS_LIST, json!({}))?;
+        let labels = self.call(account, tern_ipc::method::LABELS_LIST, json!({}))?;
         let tagged = |list: &[Value], cls: &str| -> Vec<Value> {
             list.iter()
                 .map(|c| {
@@ -409,7 +413,7 @@ impl Ctx<'_> {
         for account in self.allowed_accounts()? {
             match self.call(
                 &account.account_id,
-                ms_ipc::method::THREADS_GET,
+                tern_ipc::method::THREADS_GET,
                 json!({"id": thread_id}),
             ) {
                 Ok(r) => {
@@ -436,7 +440,7 @@ impl Ctx<'_> {
         for account in self.accounts_for(account_id)? {
             match self.call(
                 &account.account_id,
-                ms_ipc::method::MESSAGES_GET,
+                tern_ipc::method::MESSAGES_GET,
                 json!({"id": message_id}),
             ) {
                 Ok(r) => {
@@ -475,7 +479,7 @@ impl Ctx<'_> {
         }
         self.call(
             account,
-            ms_ipc::method::BODIES_FETCH,
+            tern_ipc::method::BODIES_FETCH,
             json!({"ids": missing}),
         )?;
         let deadline = Instant::now() + wait;
@@ -498,7 +502,7 @@ impl Ctx<'_> {
     fn body_now(&mut self, account: &str, id: &str) -> Result<Option<String>, ToolError> {
         let r = self.call(
             account,
-            ms_ipc::method::MESSAGES_GET,
+            tern_ipc::method::MESSAGES_GET,
             json!({"id": id, "body": true}),
         )?;
         Ok(r.get("body").and_then(Value::as_str).map(str::to_owned))
@@ -513,7 +517,7 @@ impl Ctx<'_> {
 
     /// Queues a task and returns it after its local phase.
     pub(crate) fn queue(&mut self, account: &str, task: Value) -> Result<Value, ToolError> {
-        self.call(account, ms_ipc::method::TASK_QUEUE, json!({"task": task}))
+        self.call(account, tern_ipc::method::TASK_QUEUE, json!({"task": task}))
             .map_err(|e| failed(format!("The engine refused the task: {e}")))
     }
 }

@@ -35,7 +35,7 @@ BINARY_NAME = "tern-backend"
 CPP_IDENTITY_CREATED_AT = "2018-02-16T00:00:00.000Z"
 DEFAULT_USER = "harness@example.test"
 DEFAULT_PASSWORD = "harness-password"
-PAGE_SIZE = 500  # ms_wire::PAGE_SIZE, the server's cap on `limit`
+PAGE_SIZE = 500  # tern_wire::PAGE_SIZE, the server's cap on `limit`
 
 
 class BackendError(RuntimeError):

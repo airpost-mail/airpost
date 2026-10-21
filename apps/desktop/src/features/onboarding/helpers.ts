@@ -2,7 +2,7 @@ import { Account, AccountStore } from 'mailspring-exports';
 import * as EngineAccounts from '../../engine/client/accounts';
 
 // The servers for a new account come from the engine (`account.discover`: the provider
-// tables, MX records and Thunderbird autoconfig, crates/ms-providers). What the user typed
+// tables, MX records and Thunderbird autoconfig, crates/tern-providers). What the user typed
 // stays ahead of them.
 export async function expandAccountWithCommonSettings(account: Account) {
   const { account: found } = await EngineAccounts.discover(account.emailAddress, account.provider);

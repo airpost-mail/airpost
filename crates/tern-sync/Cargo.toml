@@ -1,0 +1,29 @@
+[package]
+name = "tern-sync"
+description = "The mail sync workers: background scans, foreground IDLE, mail processing, metadata and calendar/contact threads"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+tern-core.workspace = true
+tern-store.workspace = true
+tern-providers.workspace = true
+tern-imap.workspace = true
+tern-mime.workspace = true
+tern-net.workspace = true
+tern-dav.workspace = true
+tern-compose.workspace = true
+serde_json.workspace = true
+rusqlite.workspace = true
+uuid.workspace = true
+hostname.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+# The tern-net tests' MockServer, which the People API tests share.
+reqwest.workspace = true

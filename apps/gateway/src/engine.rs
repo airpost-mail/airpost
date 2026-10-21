@@ -8,10 +8,10 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use ms_ipc::{feature, method, HelloResult, Request, Response, PROTOCOL_VERSION};
 use serde::Serialize;
 use serde_json::json;
 use tern_client::discovery::{self, ENGINE_FILE};
+use tern_ipc::{feature, method, HelloResult, Request, Response, PROTOCOL_VERSION};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 use tokio::sync::Mutex;
@@ -59,7 +59,7 @@ pub async fn probe(config_dir: &Path) -> EngineInfo {
             method::HELLO,
             json!({ "protocol": PROTOCOL_VERSION, "client": concat!("tern-gateway/", env!("CARGO_PKG_VERSION"), " (probe)") }),
         );
-        w.write_all(&ms_ipc::encode(&req)).await.ok()?;
+        w.write_all(&tern_ipc::encode(&req)).await.ok()?;
         let mut line = Vec::new();
         BufReader::new(r)
             .take(MAX_HELLO_LINE)
@@ -89,7 +89,7 @@ pub enum CallError {
     /// The engine lacks the feature the call needs.
     TooOld,
     /// The engine answered with an error.
-    Rpc(ms_ipc::ErrorObject),
+    Rpc(tern_ipc::ErrorObject),
 }
 
 /// Calls `method` on a connection of its own, as a local client: the gateway's file routes,
@@ -110,7 +110,7 @@ pub async fn call(
         let (r, mut w) = stream.into_split();
         let mut lines = BufReader::new(r);
         let send = |id: i64, method: &str, params: serde_json::Value| {
-            ms_ipc::encode(&Request::new(id, method, params))
+            tern_ipc::encode(&Request::new(id, method, params))
         };
         let hello = send(
             1,
@@ -144,7 +144,7 @@ async fn read_result(
     loop {
         line.clear();
         let n = (&mut *lines)
-            .take(ms_ipc::MAX_LINE_BYTES as u64 + 1)
+            .take(tern_ipc::MAX_LINE_BYTES as u64 + 1)
             .read_until(b'\n', &mut line)
             .await
             .map_err(|_| CallError::Down)?;
@@ -154,7 +154,7 @@ async fn read_result(
         let Ok(res) = serde_json::from_slice::<Response>(&line) else {
             continue;
         };
-        if res.id != Some(ms_ipc::Id::Num(id)) {
+        if res.id != Some(tern_ipc::Id::Num(id)) {
             continue;
         }
         return match (res.result, res.error) {

@@ -18,16 +18,16 @@ The user runs Mailspring 1.26.0, which already has the upstream Sent-copy rewrit
 #144, #150). The Rust engine ports that behaviour. Remaining causes, all present in both engines:
 
 1. **Bcc changes the id.** The message id hashes To+Cc+Bcc (`MailUtils.cpp:639-652`,
-   `crates/ms-core/src/ids.rs:84-95`). Our APPENDed Sent copy keeps Bcc; providers file the
+   `crates/tern-core/src/ids.rs:84-95`). Our APPENDed Sent copy keeps Bcc; providers file the
    Bcc-stripped wire copy. A late provider copy then gets a different id, and
-   `removeLateSentCopies` groups by id (`crates/ms-tasks/src/lib.rs:440-512`), so it never matches.
+   `removeLateSentCopies` groups by id (`crates/tern-tasks/src/lib.rs:440-512`), so it never matches.
    Same for Bcc-to-self (Inbox copy vs Sent copy).
    - Fix: drop Bcc from the id source (D4 allows it; update the golden file). Also match late
      copies by `headerMessageId` in the cleanup.
    - Scenario: a `sent-copy-*` variant with a Bcc recipient (the fake SMTP already files the
      stripped copy, `apps/engine/test/fakeimap/smtp.py:193-196`).
 2. **Quit mid-send leaves the draft row.** `_performRemoteRan` is saved before SMTP; the draft
-   row is removed 4–12 s later (`crates/ms-tasks/src/send.rs:173-177`). Quitting kills the engine
+   row is removed 4–12 s later (`crates/tern-tasks/src/send.rs:173-177`). Quitting kills the engine
    (`src/engine/client/bridge.ts:563-567`); on relaunch the task completes early and the draft stays.
    - Fix: engine removes the draft row in the early-return branch; client delays quit while a
      SendDraftTask is in flight.
@@ -56,8 +56,8 @@ lines for one affected send.
 ## F2. Gmail Important markers
 
 Works when `[Gmail]/Important` is listed with `\Important`. Breaks in three setups; the Rust port
-copies all three (`crates/ms-providers/src/roles.rs`, `crates/ms-store/src/models/thread.rs:565-582`,
-`crates/ms-tasks/src/messages.rs:169-177`, `crates/ms-sync/src/background.rs:833-916`):
+copies all three (`crates/tern-providers/src/roles.rs`, `crates/tern-store/src/models/thread.rs:565-582`,
+`crates/tern-tasks/src/messages.rs:169-177`, `crates/tern-sync/src/background.rs:833-916`):
 
 1. Important hidden from IMAP in Gmail settings: no `important` role, icon hidden, every
    `\Important` X-GM-LABEL dropped (Mailspring #443). Re-enabling needs Rebuild Cache because

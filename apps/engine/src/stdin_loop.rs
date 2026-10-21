@@ -14,8 +14,8 @@ use std::io::BufRead;
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
-use ms_core::constants::{thread, EXIT_STDIN_CLOSED, STDIN_ORPHAN_TIMEOUT};
 use serde_json::Value;
+use tern_core::constants::{thread, EXIT_STDIN_CLOSED, STDIN_ORPHAN_TIMEOUT};
 
 use crate::dispatch::{Command, Request};
 use crate::platform;
@@ -26,8 +26,8 @@ pub fn spawn_reader(commands: Sender<Command>) {
         .name(thread::STDIN.into())
         .spawn(move || read_commands(&commands));
     if let Err(e) = spawned {
-        ms_core::critical!("Could not start the {} thread: {e}", thread::STDIN);
-        ms_core::log::flush();
+        tern_core::critical!("Could not start the {} thread: {e}", thread::STDIN);
+        tern_core::log::flush();
         std::process::abort();
     }
 }

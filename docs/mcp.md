@@ -9,7 +9,7 @@ engine can't tell the two apart. With an engine that has the draft pipeline (`dr
 `create_draft` and `reply_to_thread` build the draft with `draft.create` and `send_draft` sends
 with `draft.send`, so drafts get the same quoting, attribution line and signature as the
 desktop's; against an older engine tern-mcp builds them itself with the same code
-(`crates/ms-compose`). The desktop doesn't have to be open, but an engine does
+(`crates/tern-compose`). The desktop doesn't have to be open, but an engine does
 (scheduled sends on an engine without the expiration executor are the exception, see
 `schedule_send` below).
 

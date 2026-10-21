@@ -10,7 +10,7 @@
 //! - [`tasks`]: the task JSON the desktop queues, and the checks for a finished task;
 //! - [`search`]: the zone and clock a client sends with grammar searches.
 //!
-//! The wire types and the blocking client are `ms-ipc`'s.
+//! The wire types and the blocking client are `tern-ipc`'s.
 
 pub mod discovery;
 mod engines;

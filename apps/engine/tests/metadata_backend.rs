@@ -9,16 +9,16 @@
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
-use ms_core::{Account, MailError, ManualClock, MessageFlags, Metadata, UidSet};
-use ms_imap::{
+use serde_json::json;
+use tern_core::{Account, MailError, ManualClock, MessageFlags, Metadata, UidSet};
+use tern_imap::{
     Capabilities, FetchKind, FetchResult, FolderStatus, IdleInterrupt, ImapAuth, ImapSession,
     ListedFolder, Namespace, SelectInfo, StoreOp, SyncResult, UidMapping,
 };
-use ms_net::{LocalOnly, MetadataBackend, MetadataDelta, MetadataPush, TokenManager};
-use ms_providers::ServerProfile;
-use ms_store::{DeltaStream, Model, Query, Store, Task, Thread};
-use ms_sync::WorkerContext;
-use serde_json::json;
+use tern_net::{LocalOnly, MetadataBackend, MetadataDelta, MetadataPush, TokenManager};
+use tern_providers::ServerProfile;
+use tern_store::{DeltaStream, Model, Query, Store, Task, Thread};
+use tern_sync::WorkerContext;
 
 const ACCOUNT: &str = "acc1";
 const T0: i64 = 1_700_000_000;
@@ -32,7 +32,7 @@ struct FakeBackend {
 }
 
 impl MetadataBackend for FakeBackend {
-    fn push(&self, push: &MetadataPush) -> ms_core::Result<()> {
+    fn push(&self, push: &MetadataPush) -> tern_core::Result<()> {
         self.pushes.lock().unwrap().push(push.clone());
         Ok(())
     }
@@ -42,7 +42,7 @@ impl MetadataBackend for FakeBackend {
         cursor: Option<&str>,
         _stop: &dyn Fn() -> bool,
         sink: &mut dyn FnMut(MetadataDelta),
-    ) -> ms_core::Result<String> {
+    ) -> tern_core::Result<String> {
         if let Some(deltas) = self.first_pull.lock().unwrap().take() {
             for d in deltas {
                 sink(d);
@@ -74,8 +74,8 @@ fn context(dir: &std::path::Path, backend: Arc<dyn MetadataBackend>) -> WorkerCo
         DeltaStream::new(Box::new(std::io::sink())),
         Arc::new(TokenManager::new(None)),
         backend,
-        Arc::new(ms_tasks::Tasks),
-        Arc::new(|f: &ms_sync::AccountFailure| panic!("account failed: {}", f.message)),
+        Arc::new(tern_tasks::Tasks),
+        Arc::new(|f: &tern_sync::AccountFailure| panic!("account failed: {}", f.message)),
     );
     ctx.clock = Arc::new(ManualClock::new(T0));
     ctx
@@ -83,7 +83,7 @@ fn context(dir: &std::path::Path, backend: Arc<dyn MetadataBackend>) -> WorkerCo
 
 fn migrated() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    ms_store::migrate::migrate(dir.path(), &ManualClock::new(T0), &mut Vec::new()).unwrap();
+    tern_store::migrate::migrate(dir.path(), &ManualClock::new(T0), &mut Vec::new()).unwrap();
     dir
 }
 
@@ -99,7 +99,7 @@ fn syncback_metadata(store: &Store, ctx: &WorkerContext, thread: &Thread) -> Tas
             "value": {"expiration": T0 + 60},
         }),
     );
-    ms_tasks::TaskProcessor::for_context(ctx, store)
+    tern_tasks::TaskProcessor::for_context(ctx, store)
         .perform_local(&mut task)
         .unwrap();
     assert_eq!(task.status(), "remote");
@@ -153,7 +153,7 @@ fn local_only_backend_neither_pushes_nor_pulls() {
         "complete"
     );
     // Returns at once: the bin does not start the thread for LocalOnly either.
-    ms_sync::metadata_worker::run_metadata_worker(ctx);
+    tern_sync::metadata_worker::run_metadata_worker(ctx);
 }
 
 #[test]
@@ -185,8 +185,8 @@ fn metadata_thread_pulls_into_the_store_and_keeps_the_cursor() {
     });
     let ctx = context(dir.path(), backend);
     std::thread::Builder::new()
-        .name(ms_core::constants::thread::METADATA.into())
-        .spawn(move || ms_sync::metadata_worker::run_metadata_worker(ctx))
+        .name(tern_core::constants::thread::METADATA.into())
+        .spawn(move || tern_sync::metadata_worker::run_metadata_worker(ctx))
         .unwrap();
 
     let resumed_from = rx.recv_timeout(Duration::from_secs(10)).unwrap();
@@ -222,18 +222,18 @@ struct NoImap {
     profile: ServerProfile,
 }
 
-fn unused<T>() -> ms_imap::Result<T> {
+fn unused<T>() -> tern_imap::Result<T> {
     Err(MailError::new(
-        ms_core::ErrorCode::Connection,
+        tern_core::ErrorCode::Connection,
         "this task does not use IMAP",
     ))
 }
 
 impl ImapSession for NoImap {
-    fn connect_if_needed(&mut self) -> ms_imap::Result<()> {
+    fn connect_if_needed(&mut self) -> tern_imap::Result<()> {
         unused()
     }
-    fn login_if_needed(&mut self) -> ms_imap::Result<()> {
+    fn login_if_needed(&mut self) -> tern_imap::Result<()> {
         unused()
     }
     fn is_disconnected(&self) -> bool {
@@ -262,31 +262,36 @@ impl ImapSession for NoImap {
     fn last_tls_error(&self) -> Option<&str> {
         None
     }
-    fn list_folders(&mut self) -> ms_imap::Result<Vec<ListedFolder>> {
+    fn list_folders(&mut self) -> tern_imap::Result<Vec<ListedFolder>> {
         unused()
     }
-    fn select(&mut self, _: &str) -> ms_imap::Result<SelectInfo> {
+    fn select(&mut self, _: &str) -> tern_imap::Result<SelectInfo> {
         unused()
     }
-    fn select_if_needed(&mut self, _: &str) -> ms_imap::Result<()> {
+    fn select_if_needed(&mut self, _: &str) -> tern_imap::Result<()> {
         unused()
     }
-    fn noop(&mut self) -> ms_imap::Result<()> {
+    fn noop(&mut self) -> tern_imap::Result<()> {
         unused()
     }
-    fn status(&mut self, _: &str) -> ms_imap::Result<FolderStatus> {
+    fn status(&mut self, _: &str) -> tern_imap::Result<FolderStatus> {
         unused()
     }
-    fn create_folder(&mut self, _: &str) -> ms_imap::Result<()> {
+    fn create_folder(&mut self, _: &str) -> tern_imap::Result<()> {
         unused()
     }
-    fn rename_folder(&mut self, _: &str, _: &str) -> ms_imap::Result<()> {
+    fn rename_folder(&mut self, _: &str, _: &str) -> tern_imap::Result<()> {
         unused()
     }
-    fn delete_folder(&mut self, _: &str) -> ms_imap::Result<()> {
+    fn delete_folder(&mut self, _: &str) -> tern_imap::Result<()> {
         unused()
     }
-    fn fetch_by_uid(&mut self, _: &str, _: FetchKind, _: &UidSet) -> ms_imap::Result<FetchResult> {
+    fn fetch_by_uid(
+        &mut self,
+        _: &str,
+        _: FetchKind,
+        _: &UidSet,
+    ) -> tern_imap::Result<FetchResult> {
         unused()
     }
     fn sync_by_uid(
@@ -295,13 +300,13 @@ impl ImapSession for NoImap {
         _: FetchKind,
         _: &UidSet,
         _: u64,
-    ) -> ms_imap::Result<SyncResult> {
+    ) -> tern_imap::Result<SyncResult> {
         unused()
     }
     fn take_vanished(&mut self, _: &str) -> UidSet {
         UidSet::default()
     }
-    fn fetch_message_bytes(&mut self, _: &str, _: u32) -> ms_imap::Result<Option<Vec<u8>>> {
+    fn fetch_message_bytes(&mut self, _: &str, _: u32) -> tern_imap::Result<Option<Vec<u8>>> {
         unused()
     }
     fn store_flags(
@@ -310,7 +315,7 @@ impl ImapSession for NoImap {
         _: &UidSet,
         _: StoreOp,
         _: MessageFlags,
-    ) -> ms_imap::Result<()> {
+    ) -> tern_imap::Result<()> {
         unused()
     }
     fn store_keywords(
@@ -319,7 +324,7 @@ impl ImapSession for NoImap {
         _: &UidSet,
         _: StoreOp,
         _: &[String],
-    ) -> ms_imap::Result<()> {
+    ) -> tern_imap::Result<()> {
         unused()
     }
     fn store_labels(
@@ -328,35 +333,35 @@ impl ImapSession for NoImap {
         _: &UidSet,
         _: StoreOp,
         _: &[String],
-    ) -> ms_imap::Result<()> {
+    ) -> tern_imap::Result<()> {
         unused()
     }
-    fn move_uids(&mut self, _: &str, _: &UidSet, _: &str) -> ms_imap::Result<UidMapping> {
+    fn move_uids(&mut self, _: &str, _: &UidSet, _: &str) -> tern_imap::Result<UidMapping> {
         unused()
     }
-    fn copy_uids(&mut self, _: &str, _: &UidSet, _: &str) -> ms_imap::Result<UidMapping> {
+    fn copy_uids(&mut self, _: &str, _: &UidSet, _: &str) -> tern_imap::Result<UidMapping> {
         unused()
     }
-    fn expunge(&mut self, _: &str) -> ms_imap::Result<()> {
+    fn expunge(&mut self, _: &str) -> tern_imap::Result<()> {
         unused()
     }
-    fn expunge_uids(&mut self, _: &str, _: &UidSet) -> ms_imap::Result<()> {
+    fn expunge_uids(&mut self, _: &str, _: &UidSet) -> tern_imap::Result<()> {
         unused()
     }
-    fn append(&mut self, _: &str, _: &[u8], _: MessageFlags) -> ms_imap::Result<Option<u32>> {
+    fn append(&mut self, _: &str, _: &[u8], _: MessageFlags) -> tern_imap::Result<Option<u32>> {
         unused()
     }
     fn find_uids_of_recent_header_message_id(
         &mut self,
         _: &str,
         _: &str,
-    ) -> ms_imap::Result<Vec<u32>> {
+    ) -> tern_imap::Result<Vec<u32>> {
         unused()
     }
     fn supports_idle(&self) -> bool {
         false
     }
-    fn idle(&mut self, _: &str, _: &IdleInterrupt) -> ms_imap::Result<()> {
+    fn idle(&mut self, _: &str, _: &IdleInterrupt) -> tern_imap::Result<()> {
         unused()
     }
 }

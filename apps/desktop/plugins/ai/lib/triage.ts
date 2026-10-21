@@ -5,7 +5,7 @@
 Triage: the engine's triage worker files a `tern-ai-triage` value on
 each new inbox thread of an opted-in account. This module reads that value, writes the user's
 corrections (`source: 'user'`, which triage never replaces), and makes the `ai.triage.run` and
-`ai.triage.list` calls. The value stays on this computer: ms-net never syncs the plugin id.
+`ai.triage.list` calls. The value stays on this computer: tern-net never syncs the plugin id.
 */
 import {
   AI,
@@ -21,11 +21,11 @@ import {
 import { AiError, providerParams, toAiError } from './client';
 
 export const PLUGIN_ID = 'tern-ai-triage';
-// ms-ipc `feature::AI_TRIAGE`.
+// tern-ipc `feature::AI_TRIAGE`.
 export const TRIAGE_ENGINE_FEATURE = 'ai-triage';
 // How far back "Triage inbox" goes, as `tern ai triage` does by default.
 export const TRIAGE_SINCE_DAYS = 7;
-// The "Needs reply" list shows at most this many threads (ms-ipc READ_MAX_LIMIT).
+// The "Needs reply" list shows at most this many threads (tern-ipc READ_MAX_LIMIT).
 export const LIST_LIMIT = 500;
 
 export type TriageCategory =
@@ -36,7 +36,7 @@ export type TriageCategory =
   | 'promotion'
   | 'other';
 
-// ms-ai `Category::ALL`, in its order.
+// tern-ai `Category::ALL`, in its order.
 export const CATEGORIES: TriageCategory[] = [
   'needs-reply',
   'important',
@@ -70,7 +70,7 @@ function seconds(date: Date | null | undefined) {
 
 /**
  * Whether the user replied since the value said "needs reply": mail sent after the last mail
- * came in, or, for a value the user filed, after filing it. As ms-store `triaged_threads`.
+ * came in, or, for a value the user filed, after filing it. As tern-store `triaged_threads`.
  */
 export function answered(value: TriageValue, thread: Thread | null | undefined) {
   const sent = seconds(thread && thread.lastMessageSentTimestamp);

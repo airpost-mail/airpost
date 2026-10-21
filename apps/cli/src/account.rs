@@ -11,8 +11,8 @@ use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
-use ms_ipc::{code, feature, method, ClientError};
 use serde_json::{json, Value};
+use tern_ipc::{code, feature, method, ClientError};
 
 use crate::app::Ctx;
 use crate::cli::AccountAddArgs;

@@ -86,7 +86,7 @@ def _log_epoch(ts: str) -> float:
 _task_seq = itertools.count(1)
 
 TRANSPORTS = ("stdio", "socket", "serve")
-# The protocol version the socket transport speaks (ms-ipc PROTOCOL_VERSION).
+# The protocol version the socket transport speaks (tern-ipc PROTOCOL_VERSION).
 SOCKET_PROTOCOL = 1
 # The engine's TASK_REJECTED: the task's local phase failed. The Task delta carries the same
 # error, as on stdio, so it is an outcome rather than a transport problem.

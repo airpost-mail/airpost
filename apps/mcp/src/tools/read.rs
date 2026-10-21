@@ -15,7 +15,7 @@ use crate::policy::Category;
 /// Threads `search_mail` and `list_threads` look at per account before giving up on
 /// filling a page.
 const SCAN_LIMIT: usize = 2000;
-const PAGE: usize = ms_ipc::READ_MAX_LIMIT;
+const PAGE: usize = tern_ipc::READ_MAX_LIMIT;
 
 pub(super) fn definitions() -> Vec<ToolDef> {
     vec![
@@ -216,7 +216,7 @@ fn collect_threads(
         if let Some(b) = &before {
             params["before"] = Value::from(b.as_str());
         }
-        let page = ctx.call(account, ms_ipc::method::THREADS_LIST, params)?;
+        let page = ctx.call(account, tern_ipc::method::THREADS_LIST, params)?;
         let threads = array_of(&page, "threads");
         scanned += threads.len();
         out.extend(threads.iter().filter(|t| keep(t)).cloned());
@@ -245,7 +245,10 @@ pub(super) fn search_mail(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let mut plain: Option<crate::search::Query> = None;
     for account in &accounts {
         let id = account.account_id.as_str();
-        if ctx.backend.has_feature(id, ms_ipc::feature::SEARCH_GRAMMAR) {
+        if ctx
+            .backend
+            .has_feature(id, tern_ipc::feature::SEARCH_GRAMMAR)
+        {
             found.extend(grammar_search(ctx, id, &text)?);
         } else {
             if plain.is_none() {
@@ -275,9 +278,9 @@ fn grammar_search(ctx: &mut Ctx<'_>, account: &str, text: &str) -> Result<Vec<Va
     let params = tern_client::search::grammar_search(text, Some(PAGE));
     let params = serde_json::to_value(params).expect("params");
     let r = ctx
-        .call(account, ms_ipc::method::SEARCH, params)
+        .call(account, tern_ipc::method::SEARCH, params)
         .map_err(|e| {
-            if e.code() == Some(ms_ipc::code::INVALID_PARAMS) {
+            if e.code() == Some(tern_ipc::code::INVALID_PARAMS) {
                 failed(format!("The search query can't be used: {e}"))
             } else {
                 e.into()
@@ -330,7 +333,7 @@ fn plain_search(
     }
     let r = ctx.call(
         id,
-        ms_ipc::method::SEARCH,
+        tern_ipc::method::SEARCH,
         json!({"query": query.terms.join(" "), "limit": PAGE}),
     )?;
     Ok(array_of(&r, "threads")
@@ -493,7 +496,7 @@ fn metadata_messages(
         params["pluginId"] = Value::from(plugin_id);
         params["limit"] = Value::from(PAGE);
         params["offset"] = Value::from(out.len());
-        let page = match ctx.call(account, ms_ipc::method::METADATA_LIST, params) {
+        let page = match ctx.call(account, tern_ipc::method::METADATA_LIST, params) {
             Ok(p) => p,
             Err(e) if e.is_unknown_method() => {
                 return Err(failed(format!(

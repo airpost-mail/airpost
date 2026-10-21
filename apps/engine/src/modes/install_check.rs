@@ -24,14 +24,14 @@
 
 use std::sync::Arc;
 
-use ms_core::constants::{EXIT_FAILURE, EXIT_OK};
-use ms_core::protolog::AccumulatingLogger;
-use ms_core::{ErrorCode, Security};
-use ms_imap::{ImapAuth, ImapConfig, ImapSession, Session};
-use ms_net::{Endpoints, HttpClient};
-use ms_providers::OAuthProvider;
-use ms_smtp::{SmtpAuth, SmtpClient, SmtpConfig};
 use serde_json::{json, Value};
+use tern_core::constants::{EXIT_FAILURE, EXIT_OK};
+use tern_core::protolog::AccumulatingLogger;
+use tern_core::{ErrorCode, Security};
+use tern_imap::{ImapAuth, ImapConfig, ImapSession, Session};
+use tern_net::{Endpoints, HttpClient};
+use tern_providers::OAuthProvider;
+use tern_smtp::{SmtpAuth, SmtpClient, SmtpConfig};
 
 use crate::output::write_stdout;
 
@@ -131,7 +131,7 @@ fn smtp_check(transcript: &Arc<AccumulatingLogger>) -> Result<(), String> {
         auth: SmtpAuth::None,
         allow_obsolete_tls: false,
         outlook: false,
-        timeout: ms_smtp::DEFAULT_TIMEOUT,
+        timeout: tern_smtp::DEFAULT_TIMEOUT,
         logger: Some(transcript.clone()),
         tls_config: None,
     };

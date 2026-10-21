@@ -447,7 +447,7 @@ interface PluginEngine {
   `has()` in `onload` for what it can't run without.
 - `refresh-on-focus` reaches `AppEnv.mailsyncBridge.sendSyncMailNow()`. Its v2 path is
   `this.engine.request('sync.wake', { accountId? })`: the engine already has the method
-  (`method::SYNC_WAKE` in `crates/ms-ipc`, handled in `apps/engine/src/socket.rs`), it wakes one
+  (`method::SYNC_WAKE` in `crates/tern-ipc`, handled in `apps/engine/src/socket.rs`), it wakes one
   account or, without `accountId`, every running one, and it is an open method, so it needs no
   `engineMethods` entry or prompt. `sendSyncMailNow()` sends the same request. Nothing has to be
   added to the engine.
@@ -632,7 +632,7 @@ Settled with the user on 2026-10-20.
 ### Open question: "sync now" from a plugin
 
 Answered: no engine addition is needed. The socket method `sync.wake` (`accountId?`, none = all
-accounts; `method::SYNC_WAKE` in `crates/ms-ipc/src/lib.rs`, handled in
-`apps/engine/src/socket.rs`, open class in `crates/ms-ipc/src/policy.rs`) triggers a sync now,
+accounts; `method::SYNC_WAKE` in `crates/tern-ipc/src/lib.rs`, handled in
+`apps/engine/src/socket.rs`, open class in `crates/tern-ipc/src/policy.rs`) triggers a sync now,
 and `sendSyncMailNow()` already uses it. `refresh-on-focus` moves to
 `this.engine.request('sync.wake', {})` (section 6).

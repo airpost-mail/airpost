@@ -25,7 +25,7 @@ export interface ThreadQuery {
   /** Unread threads only (`query` only). */
   unread?: boolean;
 }
-/** Spam and trash list threads outside all mail (ms-store `threads()`, the desktop's perspectives). */
+/** Spam and trash list threads outside all mail (tern-store `threads()`, the desktop's perspectives). */
 export function listsOutsideAllMail(q: ThreadQuery): boolean {
   const role = q.categoryRole ?? q.role;
   return role === 'spam' || role === 'trash';

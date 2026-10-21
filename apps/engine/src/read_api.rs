@@ -10,7 +10,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use ms_ipc::{
+use serde::Serialize;
+use serde_json::Value;
+use tern_ipc::{
     code, method, CategoriesListParams, CategoryCounts, ContactsSearchParams, ContactsSearchResult,
     CountsGetParams, CountsGetResult, ErrorObject, FoldersListResult, LabelsListResult,
     MessagesGetParams, MessagesGetResult, MetadataListParams, MetadataListResult, QueryResult,
@@ -18,14 +20,12 @@ use ms_ipc::{
     TasksListParams, TasksListResult, ThreadsGetParams, ThreadsGetResult, ThreadsListParams,
     ThreadsListResult, READ_DEFAULT_LIMIT,
 };
-use ms_store::model_query::{ModelQuery, QueryError, QueryOutput};
-use ms_store::read::{
+use tern_store::model_query::{ModelQuery, QueryError, QueryOutput};
+use tern_store::read::{
     Category, CategoryTable, Cursor, InCategory, MetadataFilter, MetadataObject, ReadStore,
     TaskFilter, ThreadSearch,
 };
-use ms_store::search_dates::DateContext;
-use serde::Serialize;
-use serde_json::Value;
+use tern_store::search_dates::DateContext;
 
 use crate::dispatch::Reply;
 use crate::socket::{Accounts, DatabaseGeneration};

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-The Rust port of Mailspring-Sync: the `mailsync` bin here, the `ms-*` libraries in
+The Rust port of Mailspring-Sync: the `mailsync` bin here, the `tern-*` libraries in
 `../../crates/`. The C++ engine in `../../legacy/mailsync-cpp/` is the reference for behaviour, and its
 `CLAUDE.md` documents the invariants (message identity, placements, the orphan sweep,
 undo pairing) that the port keeps.
@@ -9,23 +9,23 @@ undo pairing) that the port keeps.
 
 | Crate | Owns |
 |---|---|
-| `ms-core` | errors (`SyncError`, `MailError`, `Error`, `Result`), ids, base58, constants, `Clock`, the log sink, `logmsg`, `Account`/`Identity`, header and flag types, `UidSet`, modified UTF-7, RFC 2047, dates, wake signals, protocol loggers |
-| `ms-store` | schema, `migrate`/`reset`, `Store`, `Model`, `Query`, models, placements, `DeltaStream` |
-| `ms-providers` | `ServerProfile`, `resolve`, folder roles, OAuth endpoints |
-| `ms-imap` | the `ImapSession` trait and its async-imap `Session` |
-| `ms-mime` | parse and render bodies, snippets, the outgoing builder |
-| `ms-smtp` | `SmtpClient` on lettre |
-| `ms-net` | HTTP, OAuth tokens, `MetadataBackend` / `LocalOnly`, People API |
-| `ms-dav` | DAV XML, vCard, ICS fields, discovery |
-| `ms-sync` | worker threads, `MailProcessor`, `MailboxModel`, `WorkerContext`, the task runner seam |
-| `ms-tasks` | `TaskProcessor` |
-| `ms-ipc` | the socket protocol: JSON-RPC envelope, method types, NDJSON framing, blocking client |
+| `tern-core` | errors (`SyncError`, `MailError`, `Error`, `Result`), ids, base58, constants, `Clock`, the log sink, `logmsg`, `Account`/`Identity`, header and flag types, `UidSet`, modified UTF-7, RFC 2047, dates, wake signals, protocol loggers |
+| `tern-store` | schema, `migrate`/`reset`, `Store`, `Model`, `Query`, models, placements, `DeltaStream` |
+| `tern-providers` | `ServerProfile`, `resolve`, folder roles, OAuth endpoints |
+| `tern-imap` | the `ImapSession` trait and its async-imap `Session` |
+| `tern-mime` | parse and render bodies, snippets, the outgoing builder |
+| `tern-smtp` | `SmtpClient` on lettre |
+| `tern-net` | HTTP, OAuth tokens, `MetadataBackend` / `LocalOnly`, People API |
+| `tern-dav` | DAV XML, vCard, ICS fields, discovery |
+| `tern-sync` | worker threads, `MailProcessor`, `MailboxModel`, `WorkerContext`, the task runner seam |
+| `tern-tasks` | `TaskProcessor` |
+| `tern-ipc` | the socket protocol: JSON-RPC envelope, method types, NDJSON framing, blocking client |
 | `mailsync` (here) | CLI, modes, stdin reader, main-thread dispatch, `--socket` server, `serve` mode (`serve.rs`: account registry, parent channel), thread startup |
 
-Dependency order: `ms-core` ← everything; `ms-store`, `ms-providers`, `ms-mime`, `ms-net`
-on `ms-core`; `ms-imap`, `ms-smtp` also on `ms-providers`; `ms-dav` on `ms-net`; `ms-sync`
-on all of those; `ms-tasks` on `ms-sync`. Workers reach `TaskProcessor` through
-`ms_sync::TaskRunnerFactory`, which the bin fills with `ms_tasks::Tasks`.
+Dependency order: `tern-core` ← everything; `tern-store`, `tern-providers`, `tern-mime`, `tern-net`
+on `tern-core`; `tern-imap`, `tern-smtp` also on `tern-providers`; `tern-dav` on `tern-net`; `tern-sync`
+on all of those; `tern-tasks` on `tern-sync`. Workers reach `TaskProcessor` through
+`tern_sync::TaskRunnerFactory`, which the bin fills with `tern_tasks::Tasks`.
 
 ## Commands
 
@@ -61,7 +61,7 @@ Several agents may work in this tree at once.
   `MetadataBackend`, `RemoteTaskRunner`/`TaskRunnerFactory`, `WorkerContext`) are used across
   crates. Adding a method or field is fine; changing or removing one breaks other crates, so
   make the smallest change and say so in your hand-off.
-- `ms-core` is shared by everyone. Add to it (a `logmsg` function, a constant); don't
+- `tern-core` is shared by everyone. Add to it (a `logmsg` function, a constant); don't
   change what is there without checking every user.
 - Add dependencies to `[workspace.dependencies]` in the root `Cargo.toml` and reference them
   with `.workspace = true`. Licences must pass `cargo deny check` (MIT, Apache-2.0, ISC,
@@ -89,28 +89,28 @@ smaller functions over commentary; a comment that restates the code should be de
 - Every Rust file starts with `// SPDX-License-Identifier: GPL-3.0-only` and
   `// Copyright (C) 2026 Tern contributors`. A file that ports C++ code then opens with a
   module doc naming the C++ files it derives from and the upstream copyright (Foundry 376,
-  GPL-3.0), as `ms-core/src/lib.rs` does. Code ported from mailcore2, libetpan or
+  GPL-3.0), as `tern-core/src/lib.rs` does. Code ported from mailcore2, libetpan or
   iCalendarLib also names that holder and licence and its NOTICE.md section, as
-  `ms-imap/src/lib.rs` does.
+  `tern-imap/src/lib.rs` does.
 
 ## Logging
 
-- Use `tracing` (`info!`, `warn!`, `error!`) and `ms_core::critical!` for what ends the
+- Use `tracing` (`info!`, `warn!`, `error!`) and `tern_core::critical!` for what ends the
   process. Levels print as `info`, `warning`, `error`, `critical`; nothing below INFO is
-  recorded, and only events from `ms_*` / `mailsync` targets reach the log.
+  recorded, and only events from `tern_*` / `mailsync` targets reach the log.
 - Top-level steps are unprefixed (`Sync loop complete.`); sub-steps use `"- "` then
   `"-- "`; failures use `"-X "`. Present tense, one line, no trailing newline.
-- Any line the harness or the client matches on is a function in `ms_core::logmsg`, with
+- Any line the harness or the client matches on is a function in `tern_core::logmsg`, with
   the scenario that depends on it in its doc. Never inline such a string, and change its
-  wording only together with the scenario. `ms-core/tests/logmsg.rs` checks every function
+  wording only together with the scenario. `tern-core/tests/logmsg.rs` checks every function
   against the scenario regexes; add a case when you add a function.
 - Threads that log must be spawned with `std::thread::Builder::name`, using the names in
-  `ms_core::constants::thread` (`background`, `foreground`, `calContacts`, `metadata`,
+  `tern_core::constants::thread` (`background`, `foreground`, `calContacts`, `metadata`,
   `metadataExpiration`, `calendar`). The log line carries the thread name and the harness
   reads it. An account's threads, short-lived ones included, are spawned with
   `WorkerContext::spawn`, which also carries the account id that routes their lines to
-  `mailsync-<accountId>.log` when one process holds several accounts (`ms_core::log`).
-- Protocol traffic goes through `ms_core::protolog::ProtocolLogger` (`sent …` / `recv …`, one
+  `mailsync-<accountId>.log` when one process holds several accounts (`tern_core::log`).
+- Protocol traffic goes through `tern_core::protolog::ProtocolLogger` (`sent …` / `recv …`, one
   line per protocol line), and AUTH payloads are `Direction::SentPrivate` so they are never
   logged.
 - stderr stays empty: the client treats any stderr output as a crash. Never use `eprintln!`
@@ -122,20 +122,20 @@ smaller functions over commentary; a comment that restates the code should be de
 - **Naming.** snake_case ports of the C++ names: `perform_local_x` / `perform_remote_x`,
   `sync_*` / `fetch_*`, `find` / `find_all`. JSON keys and SQL identifiers stay exactly as the
   C++ wrote them (`_sa`, `hMsgId`, `aid`, `v`, camelCase columns). Tunables live in
-  `ms_core::constants` with the C++ name in their doc.
-- **Errors.** Library functions return `ms_core::Result<T>`. Protocol crates return
+  `tern_core::constants` with the C++ name in their doc.
+- **Errors.** Library functions return `tern_core::Result<T>`. Protocol crates return
   `Result<T, MailError>`; convert with `MailError::into_sync("<call>")` so the debuginfo
   names the failing call. Logical failures are `SyncError::new(key, debuginfo, retryable,
   offline)` (or `fatal` / `offline`). Constraint races on insert check
   `Error::is_constraint_violation()`. Workers sleep on retryable errors; the rest, task
   local-phase database errors and panics on an account's threads stop that account through
-  `WorkerContext::fail` (`ms_sync::runtime`), whose `sync`-mode handler logs critical and
+  `WorkerContext::fail` (`tern_sync::runtime`), whose `sync`-mode handler logs critical and
   aborts; in `serve` mode it logs at error (nothing on stderr), stops only that account and
   sends `account.state` `stopped`. A panic on an engine-wide thread (stdin, socket, signals)
   is logged as critical and aborts in both modes.
 - **Database.** One `Store` per thread (it is `!Send`). SQL is inline uppercase literals;
   repeated statements use `prepare_cached`. Writes that batch deltas run in
-  `store.transaction("<function_name>", |s| …)`. The schema is `ms_store::schema::V12_SCHEMA`;
+  `store.transaction("<function_name>", |s| …)`. The schema is `tern_store::schema::V12_SCHEMA`;
   any change to it is a new Rust migration starting from V12 and must update
   `tests/fixtures/v12_schema.json`.
 - **Models** wrap their JSON (`data: Value`) and expose typed accessors over it, so keys
@@ -143,7 +143,7 @@ smaller functions over commentary; a comment that restates the code should be de
   `bind` binds them as `:<column>`.
 - **Threads and async.** Store access is synchronous. A thread that speaks a network
   protocol owns a current-thread tokio runtime and blocks on it; never call a blocking HTTP
-  client (`ms-net`) from inside that runtime. Fetch OAuth tokens before entering it.
+  client (`tern-net`) from inside that runtime. Fetch OAuth tokens before entering it.
 - **Portability.** No Unix-only APIs outside `src/platform.rs`. Build paths with `Path`,
   never by joining strings with `/`.
 - **Branding.** Don't add Mailspring branding or calls to `*.getmailspring.com`. Existing

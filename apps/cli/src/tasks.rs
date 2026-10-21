@@ -7,9 +7,9 @@
 
 use std::io::Read;
 
-use ms_ipc::{code, feature, method, ClientError, DeltaParams, TasksGetResult, TasksListResult};
 use serde_json::{json, Value};
 use tern_client::tasks::{finished, is_final, TASK_CLASS};
+use tern_ipc::{code, feature, method, ClientError, DeltaParams, TasksGetResult, TasksListResult};
 
 use crate::app::{call, is_not_found, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -128,7 +128,7 @@ pub fn list(ctx: &Ctx, engines: &mut [Engine], filter: &ListFilter) -> Result<()
                 t.email
             )));
         }
-        let params = ms_ipc::TasksListParams {
+        let params = tern_ipc::TasksListParams {
             account_id: Some(t.account_id.clone()),
             status: (!filter.status.is_empty()).then(|| filter.status.clone()),
             class: filter.class.clone(),
@@ -192,7 +192,7 @@ pub fn queue(
     if wait {
         // On the same connection, before queueing: the deltas that follow are buffered while
         // task.queue waits for its reply, so none is missed.
-        let params = ms_ipc::SubscribeParams {
+        let params = tern_ipc::SubscribeParams {
             accounts: Some(vec![t.account_id.clone()]),
             classes: Some(vec![TASK_CLASS.to_owned()]),
         };
@@ -280,7 +280,7 @@ pub fn wait(ctx: &Ctx, mut engines: Vec<Engine>, id: &str, timeout: Option<u64>)
         return report(ctx, &task);
     }
     let mut engine = engines.swap_remove(t.engine);
-    let params = ms_ipc::SubscribeParams {
+    let params = tern_ipc::SubscribeParams {
         accounts: Some(vec![t.account_id.clone()]),
         classes: Some(vec![TASK_CLASS.to_owned()]),
     };

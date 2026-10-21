@@ -18,7 +18,7 @@ The desktop has no plans, quotas or upgrade prompts, and no Mailspring ID: there
 | Signature photo upload | No | `/api/save-public-asset` | Same storage as thread sharing (B2-S) |
 | Feature usage events | n/a | `/api/feature_usage_event` | Nothing; the desktop no longer queues `SendFeatureUsageEventTask` |
 
-- Snooze and reminders fire from `metadata-expiration` deltas, which the engine emits from its local database. The `LocalOnly` metadata backend (`crates/ms-net/src/metadata.rs`) is enough for a single device.
+- Snooze and reminders fire from `metadata-expiration` deltas, which the engine emits from its local database. The `LocalOnly` metadata backend (`crates/tern-net/src/metadata.rs`) is enough for a single device.
 - Send later fires from the draft's own metadata on the same device.
 - Open and link tracking: the engine adds the pixel and rewrites the links when it sends a draft with tracking on, in the Tern format (backend plan 3.6), from the connected server's `publicURL` and `trackingNS`; the desktop's composer extensions are gone. The capability store reports `read-receipts` and `link-tracking` from the engine's `capabilities.server`, so the toolbar toggles stay disabled with the store's tooltip until a server that offers tracking is connected. The server's `/t/o` and `/t/l` endpoints don't exist yet (apps/backend).
 - Activity: the dashboard reads local tracking metadata. Only the share button needs a server; it is disabled with the capability store's tooltip (`plugins/activity/lib/dashboard/share-button.tsx`).

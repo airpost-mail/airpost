@@ -1,5 +1,5 @@
 // Deleting from the grid asks the engine for the write (events.update, `deleted`); the ICS it
-// writes (the override dropped, the slot excluded, SEQUENCE bumped) is crates/ms-pim's tests.
+// writes (the override dropped, the slot excluded, SEQUENCE bumped) is crates/tern-pim's tests.
 import { Actions, DatabaseStore, DestroyEventTask, SyncbackEventTask } from 'mailspring-exports';
 import { dialog } from '@electron/remote';
 import { Event as EventModel } from '../../src/data/models/event';

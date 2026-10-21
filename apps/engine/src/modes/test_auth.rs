@@ -17,15 +17,15 @@
 
 use std::sync::Arc;
 
-use ms_core::constants::{EXIT_FAILURE, EXIT_OK};
-use ms_core::protolog::AccumulatingLogger;
-use ms_core::{tls_failure_advice, Account, ErrorCode};
-use ms_imap::{ImapAuth, ImapConfig, ImapSession, Session};
-use ms_net::{AccessToken, HttpClient, TokenManager};
-use ms_providers::roles::role_for_folder;
-use ms_providers::MailboxModelKind;
-use ms_smtp::{OAuthParts, SmtpClient, SmtpConfig};
 use serde_json::{json, Value};
+use tern_core::constants::{EXIT_FAILURE, EXIT_OK};
+use tern_core::protolog::AccumulatingLogger;
+use tern_core::{tls_failure_advice, Account, ErrorCode};
+use tern_imap::{ImapAuth, ImapConfig, ImapSession, Session};
+use tern_net::{AccessToken, HttpClient, TokenManager};
+use tern_providers::roles::role_for_folder;
+use tern_providers::MailboxModelKind;
+use tern_smtp::{OAuthParts, SmtpClient, SmtpConfig};
 
 use crate::output::write_stdout;
 
@@ -41,7 +41,7 @@ struct Failure {
 }
 
 pub fn run(account: &Account) -> i32 {
-    let deltas = ms_store::DeltaStream::stdout();
+    let deltas = tern_store::DeltaStream::stdout();
     let deltas_for_tokens = deltas.clone();
     // A rotated refresh token must reach the client even though the process exits right
     // after, so the delta is written before the refresh returns.
@@ -103,7 +103,7 @@ fn response(error: Value, service: &str, transcript: &AccumulatingLogger, accoun
 /// `runTestAuthReportingExceptions`: a failure outside the sessions, the OAuth refresh
 /// above all (a revoked refresh token is a 400, an offline machine fails the request). A
 /// `SyncError` is reported by retryability, the two codes the client has strings for.
-fn raised(e: &ms_core::Error, service: &str, transcript: &AccumulatingLogger) -> Value {
+fn raised(e: &tern_core::Error, service: &str, transcript: &AccumulatingLogger) -> Value {
     let (error, offline) = match e.as_sync() {
         Some(se) => {
             transcript.push(&format!("\n\n{}: {}\n", se.key, se.debuginfo));
@@ -136,7 +136,7 @@ fn test_auth(
     tokens: &TokenManager,
     transcript: &Arc<AccumulatingLogger>,
     service: &mut &'static str,
-) -> ms_core::Result<Option<Failure>> {
+) -> tern_core::Result<Option<Failure>> {
     *service = SERVICE_IMAP;
     transcript.push("----------IMAP----------\n");
     let token = access_token(account, tokens)?;
@@ -151,7 +151,10 @@ fn test_auth(
 
 /// The OAuth access token, fetched before any session exists: the refresh is blocking
 /// HTTP and must not run on a session's runtime.
-fn access_token(account: &Account, tokens: &TokenManager) -> ms_core::Result<Option<AccessToken>> {
+fn access_token(
+    account: &Account,
+    tokens: &TokenManager,
+) -> tern_core::Result<Option<AccessToken>> {
     if account.refresh_token().is_empty() {
         return Ok(None);
     }

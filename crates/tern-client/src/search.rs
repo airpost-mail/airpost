@@ -7,7 +7,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ms_ipc::SearchParams;
+use tern_ipc::SearchParams;
 
 /// The local IANA zone: `TZ` when it names one (a zoneinfo path is read from its
 /// `zoneinfo/` part), else the system's. A POSIX `TZ` rule such as `UTC0` or

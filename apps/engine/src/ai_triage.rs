@@ -6,7 +6,7 @@
 //! into a bounded queue, asks the triage provider about each thread's latest inbound message
 //! and stores the answer as `tern-ai-triage` thread metadata through `SyncbackMetadataTask`'s
 //! local phase, as the expiration executor writes its metadata. The plugin id is local-only
-//! (`ms_net::LOCAL_ONLY_PLUGINS`), so no Tern server receives it.
+//! (`tern_net::LOCAL_ONLY_PLUGINS`), so no Tern server receives it.
 //!
 //! - Only for accounts opted in (`core.ai.accounts`) with triage on (`core.ai.features`),
 //!   with the stored provider and its key from the secret store (`integration:ai-<id>`);
@@ -27,18 +27,20 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
-use ms_ai::{AiError, CancelToken, Category, Person, ProviderConfig, TriageAnswer, PROMPT_VERSION};
-use ms_core::constants::{thread, AI_TRIAGE_PLUGIN};
-use ms_ipc::{
+use serde_json::{json, Value};
+use tern_ai::{
+    AiError, CancelToken, Category, Person, ProviderConfig, TriageAnswer, PROMPT_VERSION,
+};
+use tern_core::constants::{thread, AI_TRIAGE_PLUGIN};
+use tern_ipc::{
     ai_feature, code, AiProviderParams, AiTriageListParams, AiTriageListResult,
     AiTriageProgressParams, AiTriageRunParams, AiTriageRunResult, ErrorObject,
     Request as RpcRequest, AI_TRIAGE_RUN_MAX, READ_MAX_LIMIT,
 };
-use ms_store::model::metadata_value;
-use ms_store::read::ReadStore;
-use ms_store::{DeltaSink, Model, Query, Store, Task, Thread, MAIL_NEW};
-use ms_sync::{EngineSettings, WorkerContext};
-use serde_json::{json, Value};
+use tern_store::model::metadata_value;
+use tern_store::read::ReadStore;
+use tern_store::{DeltaSink, Model, Query, Store, Task, Thread, MAIL_NEW};
+use tern_sync::{EngineSettings, WorkerContext};
 use tracing::{error, info, warn};
 
 use crate::ai_api::{
@@ -604,7 +606,7 @@ impl Worker {
         &mut self,
         thread_id: &str,
         stored: &StoredAi,
-    ) -> Option<(ms_ai::MailContext, String)> {
+    ) -> Option<(tern_ai::MailContext, String)> {
         let account = self.ctx.account.clone();
         let owners: Vec<String> = account.own_addresses().map(str::to_owned).collect();
         let reads = self.reads()?;
@@ -657,7 +659,7 @@ impl Worker {
                 if pause.is_some_and(|(until, _)| until <= Instant::now()) {
                     *pause = None;
                     drop(pause);
-                    info!("{}", ms_core::logmsg::ai_triage_resumed());
+                    info!("{}", tern_core::logmsg::ai_triage_resumed());
                     capabilities_changed();
                 }
             }
@@ -673,7 +675,7 @@ impl Worker {
                     let wait = e.retry_after().unwrap_or_default();
                     warn!(
                         "{}",
-                        ms_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
+                        tern_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
                     );
                     capabilities_changed();
                 }
@@ -681,7 +683,7 @@ impl Worker {
             }
             Ok(()) if held => {
                 self.capped = None;
-                info!("{}", ms_core::logmsg::ai_triage_resumed());
+                info!("{}", tern_core::logmsg::ai_triage_resumed());
                 capabilities_changed();
             }
             Ok(()) => {}
@@ -742,7 +744,7 @@ impl Worker {
             "messageId": message_id,
             "model": answer.model,
             "v": PROMPT_VERSION,
-            "at": ms_core::Clock::now(&*self.ctx.clock),
+            "at": tern_core::Clock::now(&*self.ctx.clock),
         });
         let mut task = Task::create(
             "SyncbackMetadataTask",
@@ -759,7 +761,7 @@ impl Worker {
             return Flow::Stop;
         }
         self.ctx.foreground.interrupt();
-        info!("{}", ms_core::logmsg::ai_triage_stored(thread_id));
+        info!("{}", tern_core::logmsg::ai_triage_stored(thread_id));
         Flow::Next
     }
 }
@@ -777,7 +779,7 @@ fn pause(provider_id: &str, e: &AiError) {
         .unwrap_or_else(|e| e.into_inner()) = Some((Instant::now() + wait, e.key()));
     warn!(
         "{}",
-        ms_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
+        tern_core::logmsg::ai_triage_paused(wait.as_secs(), e.key())
     );
     capabilities_changed();
 }
@@ -829,7 +831,7 @@ pub fn run(
             let inbox = store
                 .category_for_role(&p.account_id, "inbox")
                 .map_err(internal)?;
-            let since = ms_core::Clock::now(&ms_core::SystemClock) - i64::from(days) * 86_400;
+            let since = tern_core::Clock::now(&tern_core::SystemClock) - i64::from(days) * 86_400;
             store
                 .category_threads_since(
                     &inbox.into_iter().collect::<Vec<_>>(),

@@ -1,0 +1,570 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Tern contributors
+
+//! The metadata threads against a migrated database: the expiration scan
+//! (`MetadataExpirationWorker.cpp`) and the backend pull with its detached-metadata
+//! hand-off (`MetadataWorker.cpp`, `MailModel::beforeSave`), the pull through an in-test
+//! backend.
+
+use std::collections::VecDeque;
+use std::io::Write;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use serde_json::{json, Value};
+use tern_core::{ManualClock, Metadata, Result};
+use tern_net::{MetadataBackend, MetadataDelta, MetadataPush};
+use tern_store::{DeltaStream, Message, Model, Query, Store, Thread};
+use tern_sync::metadata_expiration::MetadataExpirationWorker;
+use tern_sync::metadata_worker::{apply_metadata, MetadataWorker};
+
+const ACCOUNT: &str = "acc1";
+const T0: i64 = 1_700_000_000;
+
+#[derive(Clone, Default)]
+struct Captured(Arc<Mutex<Vec<u8>>>);
+
+impl Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Captured {
+    /// Every delta line written so far.
+    fn deltas(&self) -> Vec<Value> {
+        let bytes = std::mem::take(&mut *self.0.lock().unwrap());
+        String::from_utf8(bytes)
+            .unwrap()
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect()
+    }
+}
+
+struct Fixture {
+    _dir: tempfile::TempDir,
+    store: Store,
+    deltas: Arc<DeltaStream>,
+    out: Captured,
+    clock: Arc<ManualClock>,
+}
+
+fn fixture() -> Fixture {
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(T0));
+    tern_store::migrate::migrate(dir.path(), &*clock, &mut Vec::new()).unwrap();
+    let out = Captured::default();
+    let deltas = DeltaStream::new(Box::new(out.clone()));
+    let store = Store::open(dir.path(), deltas.clone()).unwrap();
+    Fixture {
+        _dir: dir,
+        store,
+        deltas,
+        out,
+        clock,
+    }
+}
+
+impl Fixture {
+    fn thread(&self, first_message_id: &str) -> Thread {
+        let mut t = Thread::create(first_message_id, ACCOUNT, "subject", 0);
+        self.store.save(&mut t).unwrap();
+        t
+    }
+
+    fn message(&self, id: &str) -> Message {
+        let mut m = Message::new(json!({
+            "id": id, "aid": ACCOUNT, "v": 0, "hMsgId": format!("{id}@x"), "threadId": "",
+            "subject": "s", "date": T0, "folders": [], "labels": [],
+        }));
+        self.store.save(&mut m).unwrap();
+        m
+    }
+
+    fn set_metadata<M: Model>(&self, model: &mut M, plugin: &str, value: Value) {
+        model.upsert_metadata(plugin, &value, None);
+        self.store.save(model).unwrap();
+    }
+
+    fn scanner(&self) -> MetadataExpirationWorker<'_> {
+        MetadataExpirationWorker::new(
+            ACCOUNT,
+            &self.store,
+            self.deltas.clone(),
+            self.clock.clone(),
+        )
+        .with_chunk_pause(Duration::ZERO)
+    }
+
+    /// The `metadata-expiration` deltas written since the last call, as (class, id).
+    fn expirations(&self) -> Vec<(String, String)> {
+        self.deltas.flush();
+        self.out
+            .deltas()
+            .into_iter()
+            .filter(|d| d["type"] == "metadata-expiration")
+            .flat_map(|d| {
+                let class = d["modelClass"].as_str().unwrap().to_owned();
+                d["modelJSONs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|j| (class.clone(), j["id"].as_str().unwrap().to_owned()))
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    fn count(&self, sql: &str) -> i64 {
+        self.store.conn().query_row(sql, [], |r| r.get(0)).unwrap()
+    }
+}
+
+#[test]
+fn scan_emits_due_models_until_the_metadata_is_cleared() {
+    let f = fixture();
+    let mut snoozed = f.thread("m1");
+    let mut later = f.thread("m2");
+    let mut tracked = f.message("m3");
+    let mut scheduled = f.message("m4");
+    f.set_metadata(
+        &mut snoozed,
+        "thread-snooze",
+        json!({"expiration": T0 + 10}),
+    );
+    f.set_metadata(&mut later, "thread-snooze", json!({"expiration": T0 + 500}));
+    f.set_metadata(&mut tracked, "open-tracking", json!({"uid": "u"}));
+    f.set_metadata(
+        &mut scheduled,
+        "send-later",
+        json!({"expiration": (T0 + 10) as f64}),
+    );
+    f.expirations();
+
+    // Nothing due: the next expiration is 10 s away, above the 5 s floor.
+    assert_eq!(f.scanner().scan().unwrap(), T0 + 10);
+    assert!(f.expirations().is_empty());
+
+    f.clock.set(T0 + 10);
+    // Due: both kinds go out; the next wake is the remaining expiration.
+    assert_eq!(f.scanner().scan().unwrap(), T0 + 500);
+    let mut sent = f.expirations();
+    sent.sort();
+    assert_eq!(
+        sent,
+        [
+            ("Message".to_owned(), scheduled.id().to_owned()),
+            ("Thread".to_owned(), snoozed.id().to_owned()),
+        ]
+    );
+
+    // Not cleared yet: sent again. 15 s after emitting is the soonest the next scan runs.
+    f.clock.set(T0 + 488);
+    assert_eq!(f.scanner().scan().unwrap(), T0 + 503);
+    assert_eq!(f.expirations().len(), 2);
+
+    // The client clears both, one with `{}` and one with a null expiration.
+    let mut snoozed = f
+        .store
+        .find::<Thread>(&Query::new().equal("id", snoozed.id()))
+        .unwrap()
+        .unwrap();
+    f.set_metadata(&mut snoozed, "thread-snooze", json!({}));
+    let mut scheduled = f
+        .store
+        .find::<Message>(&Query::new().equal("id", scheduled.id()))
+        .unwrap()
+        .unwrap();
+    f.set_metadata(&mut scheduled, "send-later", json!({"expiration": null}));
+    f.expirations();
+    f.clock.set(T0 + 489);
+    assert_eq!(f.scanner().scan().unwrap(), T0 + 500);
+    assert!(f.expirations().is_empty());
+    // Nothing emitted, so the floor is 5 s.
+    f.clock.set(T0 + 498);
+    assert_eq!(f.scanner().scan().unwrap(), T0 + 503);
+
+    // With nothing left after emitting, the worker sleeps two hours.
+    f.clock.set(T0 + 600);
+    assert_eq!(f.scanner().scan().unwrap(), T0 + 600 + 2 * 60 * 60);
+    assert_eq!(
+        f.expirations(),
+        [("Thread".to_owned(), later.id().to_owned())]
+    );
+    let mut later = f
+        .store
+        .find::<Thread>(&Query::new().equal("id", later.id()))
+        .unwrap()
+        .unwrap();
+    f.set_metadata(&mut later, "thread-snooze", json!({}));
+    assert_eq!(f.scanner().scan().unwrap(), T0 + 600 + 2 * 60 * 60);
+    assert_eq!(
+        f.count("SELECT count(*) FROM ModelPluginMetadata WHERE expiration IS NOT NULL"),
+        0
+    );
+}
+
+#[test]
+fn scan_reads_only_its_account_and_survives_a_damaged_row() {
+    let f = fixture();
+    let mut t = f.thread("m1");
+    f.set_metadata(&mut t, "thread-snooze", json!({"expiration": T0 - 1}));
+    f.store
+        .conn()
+        .execute_batch(&format!(
+            "INSERT INTO ModelPluginMetadata (id, accountId, objectType, value, expiration) VALUES
+               ('x', 'other', 'Thread', 'thread-snooze', {T0}),
+               ('y', '{ACCOUNT}', 'Folder', 'p', {T0})"
+        ))
+        .unwrap();
+    f.expirations();
+    f.scanner().scan().unwrap();
+    assert_eq!(f.expirations(), [("Thread".to_owned(), t.id().to_owned())]);
+}
+
+#[test]
+fn metadata_for_a_missing_model_waits_and_attaches_on_first_save() {
+    let f = fixture();
+    let pending = Metadata {
+        object_type: "Message".into(),
+        object_id: "later".into(),
+        account_id: ACCOUNT.into(),
+        plugin_id: "send-reminders".into(),
+        version: 4,
+        value: json!({"expiration": T0 + 100}),
+    };
+    apply_metadata(&f.store, &pending).unwrap();
+    assert_eq!(f.count("SELECT count(*) FROM DetatchedPluginMetadata"), 1);
+
+    let m = f.message("later");
+    assert_eq!(m.json()["metadata"][0]["pluginId"], "send-reminders");
+    assert_eq!(m.json()["metadata"][0]["v"], 4);
+    assert_eq!(f.count("SELECT count(*) FROM DetatchedPluginMetadata"), 0);
+    let expiration: i64 = f
+        .store
+        .conn()
+        .query_row(
+            "SELECT expiration FROM ModelPluginMetadata WHERE id = 'later'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(expiration, T0 + 100);
+
+    // An older or equal version is ignored; a newer one replaces the value.
+    apply_metadata(
+        &f.store,
+        &Metadata {
+            version: 4,
+            value: json!({}),
+            ..pending.clone()
+        },
+    )
+    .unwrap();
+    let stored = |f: &Fixture| {
+        f.store
+            .find::<Message>(&Query::new().equal("id", "later"))
+            .unwrap()
+            .unwrap()
+            .json()["metadata"][0]
+            .clone()
+    };
+    assert_eq!(stored(&f)["value"]["expiration"], T0 + 100);
+    apply_metadata(
+        &f.store,
+        &Metadata {
+            version: 5,
+            value: json!({}),
+            ..pending.clone()
+        },
+    )
+    .unwrap();
+    assert_eq!(stored(&f)["v"], 5);
+    assert_eq!(f.count("SELECT count(*) FROM ModelPluginMetadata"), 0);
+
+    // A class findGeneric does not know is dropped, not fatal.
+    apply_metadata(
+        &f.store,
+        &Metadata {
+            object_type: "Folder".into(),
+            ..pending
+        },
+    )
+    .unwrap();
+}
+
+/// A backend that serves scripted pulls and records pushes.
+#[derive(Default)]
+struct FakeBackend {
+    pulls: Mutex<VecDeque<(Vec<MetadataDelta>, Result<String>)>>,
+    cursors_seen: Mutex<Vec<Option<String>>>,
+    pushes: Mutex<Vec<MetadataPush>>,
+}
+
+impl MetadataBackend for FakeBackend {
+    fn push(&self, push: &MetadataPush) -> Result<()> {
+        self.pushes.lock().unwrap().push(push.clone());
+        Ok(())
+    }
+
+    fn pull(
+        &self,
+        cursor: Option<&str>,
+        _stop: &dyn Fn() -> bool,
+        sink: &mut dyn FnMut(MetadataDelta),
+    ) -> Result<String> {
+        self.cursors_seen
+            .lock()
+            .unwrap()
+            .push(cursor.map(str::to_owned));
+        let (deltas, result) = self
+            .pulls
+            .lock()
+            .unwrap()
+            .pop_front()
+            .expect("a scripted pull");
+        for d in deltas {
+            sink(d);
+        }
+        result
+    }
+}
+
+#[test]
+fn pull_applies_deltas_and_resumes_from_the_saved_cursor() {
+    let f = fixture();
+    let t = f.thread("m1");
+    let metadata = |id: &str, class: &str, v: i64| {
+        MetadataDelta::Metadata(Metadata {
+            object_type: class.into(),
+            object_id: id.into(),
+            account_id: ACCOUNT.into(),
+            plugin_id: "thread-snooze".into(),
+            version: v,
+            value: json!({"expiration": T0 + 30}),
+        })
+    };
+    let backend = Arc::new(FakeBackend::default());
+    backend.pulls.lock().unwrap().extend([
+        (
+            vec![
+                MetadataDelta::Cursor("head".into()),
+                metadata(t.id(), "Thread", 3),
+                metadata("not-yet", "Message", 1),
+                MetadataDelta::IdentityRefreshNeeded,
+            ],
+            Ok("c1".into()),
+        ),
+        (
+            vec![MetadataDelta::Cursor("c2".into())],
+            Err(tern_core::SyncError::offline("pull", "stream dropped").into()),
+        ),
+    ]);
+    let worker = MetadataWorker::new(ACCOUNT, &f.store, backend.clone());
+    assert_eq!(worker.cursor().unwrap(), None);
+    worker.pull_once().unwrap();
+    assert_eq!(worker.cursor().unwrap().as_deref(), Some("c1"));
+
+    let t = f
+        .store
+        .find::<Thread>(&Query::new().equal("id", t.id()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(t.json()["metadata"][0]["v"], 3);
+    assert_eq!(
+        f.count("SELECT count(*) FROM ModelPluginMetadata WHERE expiration IS NOT NULL"),
+        1
+    );
+    assert_eq!(
+        f.count("SELECT count(*) FROM DetatchedPluginMetadata WHERE objectId = 'not-yet'"),
+        1
+    );
+    f.deltas.flush();
+    assert!(f
+        .out
+        .deltas()
+        .iter()
+        .any(|d| d["modelClass"] == "ProcessIdentityRefreshNeeded"));
+
+    // A dropped stream keeps the cursor reached before it dropped.
+    let err = worker.pull_once().unwrap_err();
+    assert!(err.is_retryable());
+    assert_eq!(worker.cursor().unwrap().as_deref(), Some("c2"));
+    assert_eq!(
+        *backend.cursors_seen.lock().unwrap(),
+        [None, Some("c1".to_owned())]
+    );
+}
+
+/// A backend bound to a server: `binding` answers what the test sets, `rebind` and the
+/// cursors it is pulled from are recorded, and every pull ends at once at `"c-next"`.
+#[derive(Default)]
+struct BoundBackend {
+    binding: Mutex<Option<String>>,
+    rebinds: Mutex<Vec<Vec<MetadataPush>>>,
+    drains: Mutex<usize>,
+    cursors_seen: Mutex<Vec<Option<String>>>,
+}
+
+impl MetadataBackend for BoundBackend {
+    fn push(&self, _push: &MetadataPush) -> Result<()> {
+        Ok(())
+    }
+
+    fn pull(
+        &self,
+        cursor: Option<&str>,
+        _stop: &dyn Fn() -> bool,
+        _sink: &mut dyn FnMut(MetadataDelta),
+    ) -> Result<String> {
+        self.cursors_seen
+            .lock()
+            .unwrap()
+            .push(cursor.map(str::to_owned));
+        Ok("c-next".into())
+    }
+
+    fn binding(&self) -> Result<Option<String>> {
+        Ok(self.binding.lock().unwrap().clone())
+    }
+
+    fn rebind(&self, local: &[MetadataPush]) -> Result<()> {
+        self.rebinds.lock().unwrap().push(local.to_vec());
+        Ok(())
+    }
+
+    fn drain_outbox(&self) -> Result<()> {
+        *self.drains.lock().unwrap() += 1;
+        Ok(())
+    }
+}
+
+#[test]
+fn a_new_binding_discards_the_cursor_and_backfills_local_metadata() {
+    let f = fixture();
+    let mut m = Message::new(json!({
+        "id": "m1", "aid": ACCOUNT, "v": 0, "hMsgId": "first@x", "threadId": "t:m1",
+        "subject": "s", "date": T0, "folders": [], "labels": [],
+    }));
+    f.store.save(&mut m).unwrap();
+    let mut t = f.thread("m1");
+    f.set_metadata(&mut t, "thread-snooze", json!({"expiration": T0 + 30}));
+    f.set_metadata(&mut m, "open-tracking", json!({"open_count": 1}));
+    // A cursor from somewhere else, e.g. carried over by import-legacy.
+    f.store
+        .save_key_value(&format!("cursor-{ACCOUNT}"), "c-mailspring")
+        .unwrap();
+
+    let backend = Arc::new(BoundBackend::default());
+    *backend.binding.lock().unwrap() = Some("s1:u1".into());
+    let worker = MetadataWorker::new(ACCOUNT, &f.store, backend.clone());
+    worker.pull_once().unwrap();
+
+    let rebinds = backend.rebinds.lock().unwrap().clone();
+    assert_eq!(rebinds.len(), 1);
+    let mut local = rebinds[0].clone();
+    local.sort_by(|a, b| a.model_class.cmp(&b.model_class));
+    assert_eq!(local.len(), 2, "{local:?}");
+    assert_eq!(
+        (
+            local[0].model_class.as_str(),
+            local[0].plugin_id.as_str(),
+            local[0].version
+        ),
+        ("Message", "open-tracking", 1)
+    );
+    assert_eq!(local[0].header_message_id.as_deref(), Some("first@x"));
+    assert_eq!(
+        (local[1].model_id.as_str(), local[1].plugin_id.as_str()),
+        ("t:m1", "thread-snooze")
+    );
+    assert_eq!(
+        local[1].header_message_id.as_deref(),
+        Some("first@x"),
+        "thread anchor"
+    );
+    assert_eq!(
+        f.store
+            .get_key_value(&format!("metadata-binding-{ACCOUNT}"))
+            .unwrap()
+            .as_deref(),
+        Some("s1:u1")
+    );
+
+    // Same binding: no backfill, resume from the saved cursor. Another server: start over.
+    worker.pull_once().unwrap();
+    *backend.binding.lock().unwrap() = Some("s2:u1".into());
+    worker.pull_once().unwrap();
+    assert_eq!(backend.rebinds.lock().unwrap().len(), 2);
+    assert_eq!(
+        *backend.cursors_seen.lock().unwrap(),
+        [None, Some("c-next".to_owned()), None]
+    );
+    assert_eq!(*backend.drains.lock().unwrap(), 3);
+}
+
+#[test]
+fn anchored_thread_metadata_reaches_the_local_thread() {
+    let f = fixture();
+    let mut m = Message::new(json!({
+        "id": "local1", "aid": ACCOUNT, "v": 0, "hMsgId": "anchor@x", "threadId": "t:local1",
+        "subject": "s", "date": T0, "folders": [], "labels": [],
+    }));
+    f.store.save(&mut m).unwrap();
+    let local = f.thread("local1");
+    let remote = |id: &str| Metadata {
+        object_type: "thread".into(),
+        object_id: id.into(),
+        account_id: ACCOUNT.into(),
+        plugin_id: "thread-snooze".into(),
+        version: 4,
+        value: json!({"expiration": T0 + 30}),
+    };
+    let backend = Arc::new(FakeBackend::default());
+    backend.pulls.lock().unwrap().push_back((
+        vec![
+            MetadataDelta::AnchoredThreadMetadata(remote("t:elsewhere"), "anchor@x".into()),
+            MetadataDelta::AnchoredThreadMetadata(remote("t:elsewhere2"), "later@x".into()),
+        ],
+        Ok("c1".into()),
+    ));
+    MetadataWorker::new(ACCOUNT, &f.store, backend)
+        .pull_once()
+        .unwrap();
+    let t = f
+        .store
+        .find::<Thread>(&Query::new().equal("id", local.id()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(t.json()["metadata"][0]["v"], 4);
+    assert_eq!(
+        f.count("SELECT count(*) FROM DetatchedPluginMetadata WHERE objectId = 't:elsewhere'"),
+        0
+    );
+
+    // The anchor message arrives later: its first save attaches the waiting value.
+    assert_eq!(
+        f.count("SELECT count(*) FROM DetatchedPluginMetadata WHERE objectId LIKE 't:<later@x>%'"),
+        1
+    );
+    let later = f.thread("local2");
+    let mut m2 = Message::new(json!({
+        "id": "local2", "aid": ACCOUNT, "v": 0, "hMsgId": "later@x", "threadId": later.id(),
+        "subject": "s", "date": T0, "folders": [], "labels": [],
+    }));
+    f.store.save(&mut m2).unwrap();
+    let t = f
+        .store
+        .find::<Thread>(&Query::new().equal("id", later.id()))
+        .unwrap()
+        .unwrap();
+    assert_eq!(t.json()["metadata"][0]["v"], 4);
+    assert_eq!(f.count("SELECT count(*) FROM DetatchedPluginMetadata"), 0);
+}

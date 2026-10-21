@@ -10,15 +10,15 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use ms_ipc::{
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+use tern_ipc::{
     code, feature, method, Client, ClientError, CountsGetParams, CountsGetResult, FilesGetParams,
     FilesGetResult, FilesPutParams, FilesPutResult, FilesReadParams, FilesReadResult, HelloResult,
     MessagesUnsubscribeParams, MessagesUnsubscribeResult, MetadataListParams, MetadataListResult,
     QueryParams, QueryResult, SettingsGetParams, SettingsValues, TasksListParams, TasksListResult,
     ThreadsSnoozeParams, ThreadsSnoozeResult, ThreadsUnsnoozeParams, PROTOCOL_VERSION,
 };
-use serde::de::DeserializeOwned;
-use serde_json::Value;
 
 use crate::discovery::{scan, Entry};
 
@@ -139,7 +139,7 @@ impl Engine {
         })
     }
 
-    /// Whether `hello.features` lists `name` ([`ms_ipc::feature`]).
+    /// Whether `hello.features` lists `name` ([`tern_ipc::feature`]).
     pub fn has_feature(&self, name: &str) -> bool {
         self.hello.features.iter().any(|f| f == name)
     }
@@ -201,13 +201,13 @@ impl Engine {
         .map(drop)
     }
 
-    /// `query` ([`feature::QUERY`](ms_ipc::feature::QUERY)). `accounts: None` reads every
+    /// `query` ([`feature::QUERY`](tern_ipc::feature::QUERY)). `accounts: None` reads every
     /// account in the engine's database, with no check against the accounts it holds.
     pub fn query(&mut self, params: &QueryParams) -> Result<QueryResult, EngineError> {
         self.call_as(method::QUERY, to_params(params))
     }
 
-    /// `files.get` ([`feature::FILES`](ms_ipc::feature::FILES)): the file, downloaded first
+    /// `files.get` ([`feature::FILES`](tern_ipc::feature::FILES)): the file, downloaded first
     /// when it isn't on disk. Takes as long as the download, up to the engine's wait.
     pub fn files_get(
         &mut self,
@@ -234,7 +234,7 @@ impl Engine {
         self.call_as(method::FILES_PUT, to_params(params))
     }
 
-    /// `threads.snooze` ([`feature::SNOOZE`](ms_ipc::feature::SNOOZE)): the threads move to
+    /// `threads.snooze` ([`feature::SNOOZE`](tern_ipc::feature::SNOOZE)): the threads move to
     /// Snoozed until `until` (Unix seconds).
     pub fn threads_snooze(
         &mut self,
@@ -267,8 +267,8 @@ impl Engine {
         )
     }
 
-    /// `messages.unsubscribe` ([`feature::UNSUBSCRIBE`](ms_ipc::feature::UNSUBSCRIBE)).
-    /// `method` is one of [`ms_ipc::unsubscribe_method`], or the engine's choice. A `web`
+    /// `messages.unsubscribe` ([`feature::UNSUBSCRIBE`](tern_ipc::feature::UNSUBSCRIBE)).
+    /// `method` is one of [`tern_ipc::unsubscribe_method`], or the engine's choice. A `web`
     /// result is a link for the caller to open.
     pub fn messages_unsubscribe(
         &mut self,
@@ -391,7 +391,7 @@ impl Engines {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ms_ipc::AccountInfo;
+    use tern_ipc::AccountInfo;
 
     fn engine(accounts: &[(&str, &str)], features: &[&str], input: &str) -> Engine {
         Engine {
@@ -442,7 +442,7 @@ mod tests {
     fn routes_by_account_and_dedups() {
         let reply = r#"{"jsonrpc":"2.0","id":1,"result":{"counts":{"f1":{"unread":1,"total":2}}}}"#;
         let mut e = engines(vec![
-            engine(&[("a1", "ann@x.test")], &[ms_ipc::feature::COUNTS], "\n"),
+            engine(&[("a1", "ann@x.test")], &[tern_ipc::feature::COUNTS], "\n"),
             engine(
                 &[("a1", "ann@x.test"), ("b1", "bob@x.test")],
                 &[],
@@ -481,7 +481,7 @@ mod tests {
         let page = r#"{"jsonrpc":"2.0","id":1,"result":{"rows":[{"id":"t1"}],"nextCursor":null}}"#;
         let mut e = engine(
             &[("a1", "a@x.test")],
-            &[ms_ipc::feature::QUERY],
+            &[tern_ipc::feature::QUERY],
             &format!("{page}\n"),
         );
         let r = e
@@ -504,7 +504,7 @@ mod tests {
         ];
         let mut e = engine(
             &[("a1", "a@x.test")],
-            &[ms_ipc::feature::SNOOZE, ms_ipc::feature::UNSUBSCRIBE],
+            &[tern_ipc::feature::SNOOZE, tern_ipc::feature::UNSUBSCRIBE],
             &format!("{}\n", replies.join("\n")),
         );
         let ids = vec!["th1".to_owned()];

@@ -133,7 +133,7 @@ binaries come from `TERN_BIN`, `TERN_MCP_BIN` and `TERN_GATEWAY_BIN`, else the n
 `REQUIRE_TERN` (`REQUIRE_TERN_MCP` for tern-mcp) is set.
 
 `test_query_latency.py` replays the desktop thread list's paging reads (the captured
-`Query.toJSON()` forms in `crates/ms-store/tests/fixtures/model_queries.json`) over the socket
+`Query.toJSON()` forms in `crates/tern-store/tests/fixtures/model_queries.json`) over the socket
 on a `serve` engine with 1,500 inbox threads, and writes the per-page times to `latency.json`
 in the run's work dir. About 1.3 ms per page (three reads) on a release build.
 

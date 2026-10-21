@@ -7,6 +7,6 @@
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
     if let Ok(vcf) = std::str::from_utf8(data) {
-        let _ = ms_dav::vcard::ContactFields::from_vcard(vcf);
+        let _ = tern_dav::vcard::ContactFields::from_vcard(vcf);
     }
 });

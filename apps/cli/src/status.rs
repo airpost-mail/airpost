@@ -3,8 +3,8 @@
 
 //! Engine-level commands: status, accounts, sync, calendar sync, raw rpc.
 
-use ms_ipc::{account_state, method, CalendarSyncResult, EngineStatusResult};
 use serde_json::{json, Value};
+use tern_ipc::{account_state, method, CalendarSyncResult, EngineStatusResult};
 
 use crate::app::{call, Ctx};
 use crate::discovery::{self, Engine};

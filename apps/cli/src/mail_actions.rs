@@ -7,11 +7,11 @@
 //! the search.
 
 use chrono::{DateTime, Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use ms_ipc::{
+use serde_json::{json, Value};
+use tern_ipc::{
     feature, method, unsubscribe_method, MessagesUnsubscribeParams, MessagesUnsubscribeResult,
     ThreadsSnoozeResult,
 };
-use serde_json::{json, Value};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
 use crate::discovery::{self, Engine, Target};

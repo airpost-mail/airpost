@@ -1,5 +1,5 @@
 // The mock's copy of the engine grammar against the cases of the engine's own tests
-// (crates/ms-store/src/search_grammar.rs, search_dates.rs), so the two don't drift.
+// (crates/tern-store/src/search_grammar.rs, search_dates.rs), so the two don't drift.
 import { describe, expect, it } from 'vitest';
 import { RpcErrorCode } from '../rpc';
 import {

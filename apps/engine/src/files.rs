@@ -13,12 +13,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use base64::Engine as _;
-use ms_core::constants::FILES_DIR;
-use ms_ipc::{
+use tern_core::constants::FILES_DIR;
+use tern_ipc::{
     code, method, ErrorObject, FilesGetParams, FilesGetResult, FilesPutParams, FilesPutResult,
     FilesReadParams, FilesReadResult, Request as RpcRequest, FILES_READ_MAX_BYTES,
 };
-use ms_store::{File, Model};
+use tern_store::{File, Model};
 
 use crate::dispatch::{Deferred, Reply, Request};
 use crate::socket::Session;
@@ -195,7 +195,7 @@ impl Session {
             Some(t) if valid_content_type(t) => t.to_ascii_lowercase(),
             Some(_) => return Err(invalid("contentType is not a MIME type")),
         };
-        let file_id = ms_core::ids::local_file_id();
+        let file_id = tern_core::ids::local_file_id();
         let root = files_root(&self.server.config_dir);
         let draft = File::create_local(&file_id, &p.account_id, "", name, &content_type, 0);
         let written = match (&p.data, &p.path) {

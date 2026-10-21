@@ -4,7 +4,7 @@
 /*
 An engine for specs that answers `query` from fixture models, standing in for the window's
 connection to `serve`. It reads Query.toJSON() the way
-crates/ms-store/src/model_query.rs does for what specs use: matchers run as the desktop's own
+crates/tern-store/src/model_query.rs does for what specs use: matchers run as the desktop's own
 Matcher on the fixtures, then the order, offset and limit, `count`, `idsOnly` and `include`.
 `search` keeps the models whose JSON contains the text. Answers go through JSON, as on the wire.
 

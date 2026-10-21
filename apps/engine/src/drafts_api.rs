@@ -9,24 +9,24 @@
 //! addresses, which decide who "me" is in a reply) and hands the call to the account's `main`
 //! thread, whose half reads and writes the store: drafts are saved with `SyncbackDraftTask`,
 //! sends queued as `SendDraftTask` and undo windows written as send-later metadata, through
-//! the same local phases a client's tasks take. The builders are `ms_compose`'s.
+//! the same local phases a client's tasks take. The builders are `tern_compose`'s.
 
-use ms_compose::draft::{self, Ctx};
-use ms_compose::settings::local_tz;
-use ms_compose::{ComposeSettings, Identities};
-use ms_core::Account;
-use ms_ipc::{
+use serde_json::{json, Map, Value};
+use tern_compose::draft::{self, Ctx};
+use tern_compose::settings::local_tz;
+use tern_compose::{ComposeSettings, Identities};
+use tern_core::Account;
+use tern_ipc::{
     code, draft_kind, method, DraftCancelSendParams, DraftCancelSendResult, DraftCreateParams,
     DraftSendParams, DraftSendResult, DraftValidateParams, ErrorObject, Request as RpcRequest,
 };
-use ms_net::{MetadataBackend, TrackingTarget};
-use ms_store::{Message, Model, Query, Store, Task, Thread};
-use ms_sync::expiration_executor::{
+use tern_net::{MetadataBackend, TrackingTarget};
+use tern_store::{Message, Model, Query, Store, Task, Thread};
+use tern_sync::expiration_executor::{
     apply_tracking, archive_task, finalise_draft, send_later_expiration, send_task_json,
     stored_body, SEND_ACTIONS, SEND_LATER, SNOOZE_BODY_EN, SNOOZE_BODY_KEY,
 };
-use ms_sync::pending_sends::{recipient_mismatch, PendingBodies, PendingSends};
-use serde_json::{json, Map, Value};
+use tern_sync::pending_sends::{recipient_mismatch, PendingBodies, PendingSends};
 use tracing::info;
 
 use crate::dispatch::{Reply, Request};
@@ -208,7 +208,7 @@ impl Here<'_> {
         let result = self.store.transaction(name, |_| {
             f().map_err(|e| {
                 refused = Some(e);
-                ms_core::Error::other("rolled back")
+                tern_core::Error::other("rolled back")
             })
         });
         match (result, refused) {
@@ -320,7 +320,7 @@ impl Here<'_> {
         let identity = accounts
             .get(self.account.id())
             .cloned()
-            .unwrap_or_else(|| ms_compose::Identity::from_account_json(self.account.as_json()));
+            .unwrap_or_else(|| tern_compose::Identity::from_account_json(self.account.as_json()));
         let need = |v: &Option<String>, what: &str| {
             v.clone()
                 .filter(|s| !s.is_empty())
@@ -378,7 +378,7 @@ impl Here<'_> {
             .and_then(Value::as_str)
             .is_none_or(str::is_empty)
         {
-            built["id"] = json!(ms_core::ids::draft_id(self.account.id(), &hmid));
+            built["id"] = json!(tern_core::ids::draft_id(self.account.id(), &hmid));
         }
         if p.save != Some(false) {
             self.save_draft(&built)?;
@@ -434,7 +434,7 @@ impl Here<'_> {
     fn resurface(
         &self,
         ctx: &Ctx,
-        identity: &ms_compose::Identity,
+        identity: &tern_compose::Identity,
         thread_id: &str,
         message_id: Option<&str>,
         body: Option<String>,
@@ -497,7 +497,7 @@ impl Here<'_> {
     /// tracking.
     fn tracking_target(&self, header_message_id: &str) -> Option<TrackingTarget> {
         let draft = self.draft(header_message_id).ok()?;
-        ms_compose::tracking::kinds_of(&draft.data)?;
+        tern_compose::tracking::kinds_of(&draft.data)?;
         self.metadata.tracking()
     }
 
@@ -638,7 +638,7 @@ impl Here<'_> {
         json["body"] = json!(stored_body(self.store, draft.id())
             .map_err(internal)?
             .unwrap_or_default());
-        Ok(ms_compose::validate::validate(&json, &accounts, &p.skip_salutation_for).to_json())
+        Ok(tern_compose::validate::validate(&json, &accounts, &p.skip_salutation_for).to_json())
     }
 }
 
@@ -649,11 +649,11 @@ fn to_value<T: serde::Serialize>(v: T) -> Reply {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ms_store::{DeltaStream, Folder};
-    use ms_sync::expiration_executor::{EngineSettings, Executor};
-    use ms_tasks::TaskProcessor;
     use std::path::Path;
     use std::sync::{Arc, Barrier};
+    use tern_store::{DeltaStream, Folder};
+    use tern_sync::expiration_executor::{EngineSettings, Executor};
+    use tern_tasks::TaskProcessor;
 
     const ACCOUNT: &str = "acct1";
 
@@ -673,10 +673,10 @@ mod tests {
 
     fn setup() -> (tempfile::TempDir, Store) {
         let dir = tempfile::tempdir().unwrap();
-        let clock = ms_core::ManualClock::new(1_700_000_000);
-        ms_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
+        let clock = tern_core::ManualClock::new(1_700_000_000);
+        tern_store::migrate::migrate(dir.path(), &clock, &mut Vec::new()).unwrap();
         let store = open(dir.path());
-        let mut drafts = Folder::new(&ms_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
+        let mut drafts = Folder::new(&tern_core::ids::folder_id(ACCOUNT, "Drafts"), ACCOUNT, 0);
         drafts.set_path("Drafts");
         drafts.set_role("drafts");
         store.save(&mut drafts).unwrap();
@@ -701,7 +701,7 @@ mod tests {
     }
 
     fn with_here<T>(dir: &Path, store: &Store, f: impl FnOnce(&Here) -> T) -> T {
-        with_backend(dir, store, &ms_net::LocalOnly, f)
+        with_backend(dir, store, &tern_net::LocalOnly, f)
     }
 
     fn with_backend<T>(
@@ -726,15 +726,15 @@ mod tests {
     struct Tracking(std::sync::atomic::AtomicUsize);
 
     impl MetadataBackend for Tracking {
-        fn push(&self, _: &ms_net::MetadataPush) -> ms_core::Result<()> {
+        fn push(&self, _: &tern_net::MetadataPush) -> tern_core::Result<()> {
             Ok(())
         }
         fn pull(
             &self,
             cursor: Option<&str>,
             _: &dyn Fn() -> bool,
-            _: &mut dyn FnMut(ms_net::MetadataDelta),
-        ) -> ms_core::Result<String> {
+            _: &mut dyn FnMut(tern_net::MetadataDelta),
+        ) -> tern_core::Result<String> {
             Ok(cursor.unwrap_or("0").to_owned())
         }
         fn tracking(&self) -> Option<TrackingTarget> {
@@ -791,7 +791,7 @@ mod tests {
                 .unwrap()
                 .contains(r#"<img alt="" src="https://t.example/t/o/nsnsnsnsnsnsnsnsnsnsns/"#));
         }
-        let open = ms_store::model::metadata_value(&task.data["draft"], "open-tracking").unwrap();
+        let open = tern_store::model::metadata_value(&task.data["draft"], "open-tracking").unwrap();
         assert_eq!(open["recipients"].as_object().unwrap().len(), 2);
         assert!(send_task(&store, "plain-1@example.com").data["perRecipientBodies"].is_null());
         assert_eq!(send_tasks(&store, "tr-2@example.com"), 0);

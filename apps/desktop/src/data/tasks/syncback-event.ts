@@ -57,7 +57,7 @@ export class SyncbackEventTask extends Task {
     /**
      * Set on an undo or redo: the engine re-sends `event.ics`, a snapshot that can be several
      * revisions behind the stored copy, over that copy, with the overrides added since put back
-     * and SEQUENCE no lower than the stored one (ms-pim plan::restore).
+     * and SEQUENCE no lower than the stored one (tern-pim plan::restore).
      */
     restore: Attributes.Boolean({
       modelKey: 'restore',

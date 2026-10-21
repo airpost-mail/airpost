@@ -1,7 +1,7 @@
 // Message templates. The desktop keeps them as HTML files in its config directory; the web
 // client keeps them in localStorage until the engine has somewhere to put them.
 // TODO(engine): the engine keeps `templates` (DCP stage 3), but a device without the admin
-// scope can't set them (ms-ipc `RELAYED_SETTINGS_KEYS`: HTML the desktop renders) and the
+// scope can't set them (tern-ipc `RELAYED_SETTINGS_KEYS`: HTML the desktop renders) and the
 // desktop doesn't mirror its template files there; both need deciding before the web moves.
 import { generateId } from '@/engine';
 import { localStore } from './local-store';

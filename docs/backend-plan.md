@@ -71,7 +71,7 @@ covers send-later. Sharing and asset hosting follow in B2.
 | O3 | Auth and identity | **Decided (2026-10-16).** Multi-user data model; single-admin by default. Users are created with `tern-backend user add`; open signup is a config switch, off by default. The user enters a server URL in Tern; the desktop opens the server's login page in its own window, and the result page returns one revocable token per device in its body (3.4). The token lives in the keyset; the engine gets it in the Tern server object on stdin (4.1). | Reuses B0's form, rate limits and token minting. The token never appears in a URL, a redirect or a log. A device-code flow needs a new table, polling and a code page; it is the later path for a CLI and fits the same tokens. |
 | O4 | Storage | SQLite (rusqlite `bundled`, WAL) in v1, behind a `Repo` trait. Postgres only if someone runs a large shared instance. | One file to back up, same crate the engine uses. sqlx's SQLite driver would pull a second `libsqlite3-sys` and collide with rusqlite on `links = "sqlite3"`; a later Postgres backend should use `tokio-postgres`. |
 | O5 | Deployment | One binary, `tern-backend serve`, plain HTTP on `127.0.0.1:5101` behind a TLS reverse proxy (Caddy or similar), plus a Docker image with `/data` as the only volume and `TERN_BIND=0.0.0.0:5101`. | No TLS stack to configure in-process, and no chance of pulling aws-lc-rs. |
-| O6 | Licence | **Decided (2026-10-16): GPL-3.0-only** for `apps/backend` and `crates/ms-wire`, like the rest of the repo; this replaces the MIT decision of 2026-10-15. Dependencies must be GPL-3.0-compatible. The backend still depends on no engine crate (3.1). No `/tern/v1/source` endpoint: GPLv3 has no network-use clause. | The user chose one licence for the whole repo until a part is deliberately moved. Both crates are written from scratch and depend on no engine crate, so a later move to MIT stays possible while all their code is ours. |
+| O6 | Licence | **Decided (2026-10-16): GPL-3.0-only** for `apps/backend` and `crates/tern-wire`, like the rest of the repo; this replaces the MIT decision of 2026-10-15. Dependencies must be GPL-3.0-compatible. The backend still depends on no engine crate (3.1). No `/tern/v1/source` endpoint: GPLv3 has no network-use clause. | The user chose one licence for the whole repo until a part is deliberately moved. Both crates are written from scratch and depend on no engine crate, so a later move to MIT stays possible while all their code is ours. |
 | O7 | Engine switch for the HTTP backend | **Decided (2026-10-16).** Rust: the HTTP backend when the identity line is a valid Tern server object (4.1); `null` or anything else stays `LocalOnly`. `IDENTITY_SERVER` is not read. Desktop: the server object only when the engine is `rust`; C++ always gets `null`. C++ stays a test oracle, driven by the harness with a Mailspring-shaped identity. | C++ `abort()`s on a revoked token, and the crash handler then marks the mail account `SYNC_STATE_AUTH_FAILED`; it also keeps the head-before-pages bug (7) and has none of the Tern additions. The harness keeps `--identity null` by default, so existing scenarios stay local. This changes plan section 3 ("accepted and ignored"); update it when B1-E lands. |
 | O8 | Public URL for tracking and shares | One `public_url` in server config, returned as `publicURL` by `GET /tern/v1/server` and `/tern/v1/me` (3.4). The client uses it for pixels, redirects and share links, falling back to the server URL. | Tracking and shares only work if recipients can reach the host; the API host may sit on a private network. |
 
@@ -81,13 +81,13 @@ covers send-later. Sharing and asset hosting follow in B2.
 
 | Crate | Role | Depends on |
 |---|---|---|
-| `apps/backend` (`tern-backend`, GPL-3.0-only per O6) | Bin + lib: HTTP server, repo, auth, tracking, sharing, CLI. A member of the root workspace since B1-E. `tern_backend::wire` re-exports `ms_wire`. | `ms-wire`; no engine crate, not even as a dev-dependency |
-| `crates/ms-wire` (GPL-3.0-only per O6) | Serde types for the wire protocol: metadata record, push body, stream line (`metadata` / `backend-event`), head response, backfill and claim bodies, the login result, `/tern/v1/server` and `/tern/v1/me` bodies and the engine's Tern server object with its URL check (3.4, 4.1), the constants (heartbeat 5 s × 16 bytes, page size 500, low-speed 30 s, `v` max `u32::MAX`). | serde, serde_json |
-| `ms-net` | `HttpMetadataBackend` and its `Outbox` (4.1) on `ms-wire`. | |
+| `apps/backend` (`tern-backend`, GPL-3.0-only per O6) | Bin + lib: HTTP server, repo, auth, tracking, sharing, CLI. A member of the root workspace since B1-E. `tern_backend::wire` re-exports `tern_wire`. | `tern-wire`; no engine crate, not even as a dev-dependency |
+| `crates/tern-wire` (GPL-3.0-only per O6) | Serde types for the wire protocol: metadata record, push body, stream line (`metadata` / `backend-event`), head response, backfill and claim bodies, the login result, `/tern/v1/server` and `/tern/v1/me` bodies and the engine's Tern server object with its URL check (3.4, 4.1), the constants (heartbeat 5 s × 16 bytes, page size 500, low-speed 30 s, `v` max `u32::MAX`). | serde, serde_json |
+| `tern-net` | `HttpMetadataBackend` and its `Outbox` (4.1) on `tern-wire`. | |
 
 The backend does not compute message ids and has its own schema, so it depends on neither
-`ms-store` nor `ms-core`; converting a wire record to `ms_core::Metadata` is one function in
-ms-net. The point of `ms-wire` is that the engine and server cannot drift on the wire format,
+`tern-store` nor `tern-core`; converting a wire record to `tern_core::Metadata` is one function in
+tern-net. The point of `tern-wire` is that the engine and server cannot drift on the wire format,
 as `packages/` does for client protocol types.
 
 The backend started in its own workspace so it could not break the engine workflow's cargo
@@ -227,7 +227,7 @@ transaction, so commit order equals seq order and a reader never sees seq `n+1` 
 - Arrival order at the server is the conflict rule: the last push wins, and `v` only grows.
   Clients apply only greater versions, so devices converge on the server's row as long as every
   push reaches the server. Neither engine retries a failed `SyncbackMetadataTask` (C++
-  `TaskProcessor.cpp:996-1000`, Rust `fail()` in `crates/ms-tasks/src/lib.rs`), so the Rust
+  `TaskProcessor.cpp:996-1000`, Rust `fail()` in `crates/tern-tasks/src/lib.rs`), so the Rust
   engine keeps an outbox (4.1); without it, a lost push leaves the device's `v` above the
   server's and it ignores every later echo.
 - The response is `200 {"v": new_v}`; both engines ignore the body.
@@ -307,7 +307,7 @@ the client's version check.
 
 The engine generates, per tracked message, a random 128-bit `trackingId` (base64url, 22
 chars), and per recipient a random 64-bit `rid` (11 chars), when it sends a draft (`draft.send`
-or the expiration executor; `ms_compose::tracking`). Both live in the
+or the expiration executor; `tern_compose::tracking`). Both live in the
 plugin value, which the send moves to the sent message and pushes as any metadata:
 - `open-tracking`: `{trackingId, recipients: {<rid>: <email>}, open_count, open_data, uid}`.
 - `link-tracking`: `{trackingId, recipients, links: [{url, click_count, click_data}], uid}`, one
@@ -333,7 +333,7 @@ otherwise a tracked draft is sent untracked. Plaintext drafts are never tracked.
 The server looks the row up by `(user of <ns>, plugin_id, tracking_id)`. Scoping by `ns` is what
 stops hijacking: a recipient on the same server sees the `trackingId` in their copy and could
 push a row with it before the sender's push lands (minutes on Exchange, see
-`remove_late_sent_copies` in `crates/ms-tasks/src/lib.rs`), but only under their own user, which
+`remove_late_sent_copies` in `crates/tern-tasks/src/lib.rs`), but only under their own user, which
 the sender's URLs never reach. The recipient's address is not in the URL, so a forwarded message
 reveals only an opaque `rid`. There are no Mailspring `/o/` or `/link/` routes and no
 `header_message_id` lookup.
@@ -424,12 +424,12 @@ engine restarts, and the row is left for the winning device's change to sync in.
 
 ## 4. Engine and client changes
 
-### 4.1 Engine (`crates/ms-net`, `crates/ms-sync`, `crates/ms-store`, `apps/engine/src/modes.rs`)
+### 4.1 Engine (`crates/tern-net`, `crates/tern-sync`, `crates/tern-store`, `apps/engine/src/modes.rs`)
 
 - **Tern server object.** The identity line the engine reads after the account line (stdin;
   `--identity` takes the same JSON, for tests only, since argv is visible to other users):
   `{"type":"tern-server","version":1,"url":"https://tern.example.com","token":"tern_…","userId":"…","serverId":"…"}`,
-  as `ms_wire::TernServer`, whose `Debug` redacts `token`. `url` is the base URL the user
+  as `tern_wire::TernServer`, whose `Debug` redacts `token`. `url` is the base URL the user
   configured: scheme, host, optional port and path prefix; no trailing slash, query, fragment or
   userinfo; `https`, or `http` only for a loopback host; never `*.getmailspring.com`.
   - `null`: `LocalOnly`, unchanged.
@@ -438,7 +438,7 @@ engine restarts, and the row is left for the winning device's change to sync in.
   - Any other object (a Mailspring-shaped identity): validated as today
     (`ErrorIdentityMissingFields`, `Invalid Identity JSON`), then ignored: `LocalOnly`.
 - **`HttpMetadataBackend { server: TernServer, push_client, stream_client, outbox }`**
-  in ms-net on `ms-wire`; credentials and the account id go into the constructor. The trait
+  in tern-net on `tern-wire`; credentials and the account id go into the constructor. The trait
   gained three defaulted methods the `metadata` thread calls before each pull: `binding()`
   (the `/tern/v1/me` pair), `rebind(local)` (clear the outbox, queue backfill) and
   `drain_outbox()`; `MetadataDelta` gained `AnchoredThreadMetadata(Metadata, hmid)`.
@@ -455,7 +455,7 @@ engine restarts, and the row is left for the winning device's change to sync in.
     as they are.
   - **Outbox:** a `MetadataOutbox` table in `tern.db` (account, object type and id,
     plugin, version, value, header Message-ID, backfill flag; latest per key wins), created by
-    `ms_net::Outbox` on first use so a migrated database keeps the C++ V12 schema. Ids are
+    `tern_net::Outbox` on first use so a migrated database keeps the C++ V12 schema. Ids are
     AUTOINCREMENT so removing a sent entry never drops a newer push for the same key. A push
     that reaches the server deletes what is queued for its key, and pushes and drained entries
     are sent one at a time under a lock, so an older queued value never lands after a newer one
@@ -494,16 +494,16 @@ engine restarts, and the row is left for the winning device's change to sync in.
   - `record_feature_usage` stays the no-op default.
 - **Thread anchor** (wire-compatible; C++ ignores extra fields):
   - Thread pushes carry `headerMessageId`, taken from the message whose id forms the thread id
-    (`t:<message id>`, `crates/ms-core/src/ids.rs:121`).
-  - `apply_metadata` (`crates/ms-sync/src/metadata_worker.rs:115`), given a `t:` id that does
+    (`t:<message id>`, `crates/tern-core/src/ids.rs:121`).
+  - `apply_metadata` (`crates/tern-sync/src/metadata_worker.rs:115`), given a `t:` id that does
     not exist locally and an `attributes.headerMessageId`, resolves it through the local message
     with that Message-ID to its `threadId`. With no such message yet, it parks the record under
     the `t:<hmid>…` pending key `import-legacy` already uses (`legacy_import.rs:80-95`), so the
     message's first save attaches it.
 - **`modes.rs`:** parse the identity line as above and build the backend from it per O7,
-  replacing the hard-coded `Arc::new(ms_net::LocalOnly)`; `IDENTITY_SERVER` is not read.
+  replacing the hard-coded `Arc::new(tern_net::LocalOnly)`; `IDENTITY_SERVER` is not read.
   `WorkerContext.identity` is unused today and can go. Log the choice (server host, never the
-  token) through `ms_core::logmsg`.
+  token) through `tern_core::logmsg`.
 - **Doc fixes** found in the sweep: `MetadataPush::model_class` is lowercase; the
   `MetadataWorker::cursor` doc says a reset clears the cursor, but it writes `"0"`.
 - Unchanged: workers, tasks and the expiration worker.
@@ -610,7 +610,7 @@ reporter and Sentry are being handled outside this plan.
 - **Engine against the real server** (B1-E, `apps/backend/tests`): `tern-backend` exposes
   `test_server() -> (url, token)` from its lib, running its own tokio runtime on a thread,
   because the blocking reqwest client must not run inside a runtime. The backend dev-depends on
-  ms-net and drives `HttpMetadataBackend` directly: push, pull from `0`, outbox drain after a
+  tern-net and drives `HttpMetadataBackend` directly: push, pull from `0`, outbox drain after a
   server restart, backfill, cursor discarded on a different `serverId`, the thread anchor
   round-trip. `apps/engine/tests/metadata_backend.rs` gains a case with the HTTP backend.
 - **Harness** (`apps/engine/test`):
@@ -669,7 +669,7 @@ CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspri
   close, the claim endpoint (3.8).
 - **B1-E engine backend and Tern auth** (done): in `apps/backend`, the 3.4 endpoints
   (`/tern/v1/server`, `/tern/v1/login`, `/tern/v1/me`, `DELETE /tern/v1/tokens/current`) and
-  removal of the dead ones; then move the wire module to `crates/ms-wire` (with `TernServer`)
+  removal of the dead ones; then move the wire module to `crates/tern-wire` (with `TernServer`)
   and add `apps/backend` to the root workspace in one change; `HttpMetadataBackend` with its
   stream client, the outbox, backfill, the `(serverId, userId)` cursor binding, the thread
   anchor, the identity-line parsing and O7 switch in `modes.rs`, 401/403 dormancy and 429
@@ -710,8 +710,8 @@ CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspri
 ## 7. Risks and unknowns
 
 - **Thread ids differ across devices.** A thread's id is `t:<id of the first message seen
-  locally>` (`crates/ms-core/src/ids.rs:121`, `Thread.cpp:23`), and imported threads use a
-  `t:<hmid>…` pending form (`crates/ms-store/src/legacy_import.rs:89`), so devices disagree for
+  locally>` (`crates/tern-core/src/ids.rs:121`, `Thread.cpp:23`), and imported threads use a
+  `t:<hmid>…` pending form (`crates/tern-store/src/legacy_import.rs:89`), so devices disagree for
   most threads and thread metadata parks in `DetatchedPluginMetadata`. The anchor in 4.1 fixes
   it for the Rust engine. A thread whose anchor message the other device never syncs (deleted,
   outside the sync window) still never attaches.
@@ -779,17 +779,17 @@ CORS, `/ping`, account removal, Dockerfile, `docs/self-hosting.md`. Its Mailspri
   invalid records and returns them in `rejected`. Login limits use the forwarded client IP from
   trusted proxies, check the IP first, key IPv6 per /64, cap emails at 254 bytes and bound
   concurrent argon2. The data dir is 0700 and the database and backups 0600.
-- **B1-E (2026-10-16, uncommitted).** `crates/ms-wire` holds the wire types, with
+- **B1-E (2026-10-16, uncommitted).** `crates/tern-wire` holds the wire types, with
   `TernServer`, `LoginResult`, `ServerInfo` and `Me`; `apps/backend` is in the root workspace.
   Backend: `/tern/v1/server`, `/tern/v1/login`, `/tern/v1/me`, `DELETE /tern/v1/tokens/current`;
   `/onboarding`, `/api/me`, `/api/feature_usage_event`, the stubs, `wire::Identity` and
   `STRIPE_PLAN` removed. Engine: `HttpMetadataBackend` with the outbox, backfill, binding,
   thread anchor (push and apply), 401/403 dormancy and retryable 429/5xx; the identity-line
-  switch in `modes.rs`; `WorkerContext.identity` removed. Tests: `crates/ms-net/tests/backend_server.rs`
+  switch in `modes.rs`; `WorkerContext.identity` removed. Tests: `crates/tern-net/tests/backend_server.rs`
   (push and stream from 0 with the anchor, outbox across a restart, backfill, binding after a
-  rotation, revoked token, path prefix), ms-sync binding and anchor tests, a CLI test per
+  rotation, revoked token, path prefix), tern-sync binding and anchor tests, a CLI test per
   identity-line case. Not done: an HTTP-backend case in `apps/engine/tests/metadata_backend.rs`
-  (covered by `crates/ms-net/tests/backend_server.rs` instead), and a test of the 30 s per-read stream
+  (covered by `crates/tern-net/tests/backend_server.rs` instead), and a test of the 30 s per-read stream
   timeout (still unconfirmed, 7).
 - **Next.** B1-H's Rust half (the fixture's Tern server object), B2-T server side. B1-C waits for
   `apps/desktop` to be free.

@@ -1,19 +1,19 @@
 // The desktop half of the draft pipeline's corpus.
 //
-// The engine builds drafts itself (`draft.create`, `draft.validate`, crates/ms-compose). Two
-// checked-in files under crates/ms-compose are generated here and compared with what the desktop
+// The engine builds drafts itself (`draft.create`, `draft.validate`, crates/tern-compose). Two
+// checked-in files under crates/tern-compose are generated here and compared with what the desktop
 // produces now, so a change on either side fails one of the two suites:
 // - src/desktop_data.json: the lists the engine copies from the desktop (the sanitizer's tags and
 //   attributes, the draft tracker rules, the user-agent stylesheet juice inlines with, the
 //   salutations, name prefixes and suffixes, and the not-a-person address patterns).
 // - tests/fixtures/draft_corpus.json: inputs and what the desktop makes of them: the quoting of
 //   replies and forwards (sanitize and inline styles), signatures, tracking pixels in quotes,
-//   mailto links, plaintext wrapping and the send warnings. `crates/ms-compose/tests/corpus.rs`
+//   mailto links, plaintext wrapping and the send warnings. `crates/tern-compose/tests/corpus.rs`
 //   runs the same inputs through the engine and compares.
 //
 // After changing the desktop's drafting, regenerate both files with
 //   TERN_WRITE_DRAFT_CORPUS=1 npm test -- --spec-file-pattern=draft-corpus-capture
-// and run `cargo test -p ms-compose --test corpus`.
+// and run `cargo test -p tern-compose --test corpus`.
 import fs from 'fs';
 import path from 'path';
 import { Account } from '../../src/data/models/account';
@@ -41,8 +41,8 @@ import { MailTrackerBlockerRules } from '../../src/features/remove-tracking-pixe
 import TemplatesComposerExtension from '../../plugins/composer-templates/lib/composer-extension';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const DATA = path.join(REPO, 'crates', 'ms-compose', 'src', 'desktop_data.json');
-const CORPUS = path.join(REPO, 'crates', 'ms-compose', 'tests', 'fixtures', 'draft_corpus.json');
+const DATA = path.join(REPO, 'crates', 'tern-compose', 'src', 'desktop_data.json');
+const CORPUS = path.join(REPO, 'crates', 'tern-compose', 'tests', 'fixtures', 'draft_corpus.json');
 const WRITE = !!process.env.TERN_WRITE_DRAFT_CORPUS;
 const TZ = 'America/Chicago';
 

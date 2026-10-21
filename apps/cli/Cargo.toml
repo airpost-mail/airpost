@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 # No tokio, TLS or SQLite: the CLI talks to running engines over their sockets only.
 [dependencies]
-ms-ipc.workspace = true
+tern-ipc.workspace = true
 tern-client.workspace = true
 clap.workspace = true
 serde.workspace = true

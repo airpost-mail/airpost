@@ -14,7 +14,7 @@ text is in LICENSE.md.
 - `apps/engine/` and `crates/` are a Rust translation of Mailspring-Sync and are a derivative
   work of it. Parts of them are also translated from mailcore2, libetpan and iCalendarLib, whose
   notices follow.
-- `apps/backend/` and `crates/ms-wire/` are written by the Tern contributors.
+- `apps/backend/` and `crates/tern-wire/` are written by the Tern contributors.
 
 Each file keeps its upstream copyright notices. Changes since the import are recorded in the git
 history of this repository.
@@ -39,7 +39,7 @@ version; Tern uses it under the GPL. Its source is in the `libdbus-sys` crate (`
 
 ## mailcore2
 
-`crates/ms-imap`, `crates/ms-smtp`, `crates/ms-mime`, `crates/ms-core` and `crates/ms-providers`
+`crates/tern-imap`, `crates/tern-smtp`, `crates/tern-mime`, `crates/tern-core` and `crates/tern-providers`
 translate parts of mailcore2 (https://github.com/MailCore/mailcore2) as modified in
 Mailspring-Sync's `Vendor/mailcore2`.
 
@@ -74,12 +74,12 @@ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 SUCH DAMAGE.
 ```
 
-The test corpus in `crates/ms-mime/tests/corpus/mailcore/` is taken from mailcore2's tests and
+The test corpus in `crates/tern-mime/tests/corpus/mailcore/` is taken from mailcore2's tests and
 keeps its own LICENSE file. It is used by tests only and is not shipped.
 
 ## libEtPan!
 
-`crates/ms-imap`, `crates/ms-smtp`, `crates/ms-mime` and `crates/ms-providers` translate parts
+`crates/tern-imap`, `crates/tern-smtp`, `crates/tern-mime` and `crates/tern-providers` translate parts
 of libEtPan! (https://github.com/dinhvh/libetpan) as modified in Mailspring-Sync's
 `Vendor/libetpan`: the IMAP, SMTP and IMF code (`mailimap*.c`, `mailsmtp*.c`, `mailimf.c`,
 `mailstream_helper.c` and the CONDSTORE, QRESYNC, UIDPLUS, X-GM-LABELS and OAuth2 extensions).
@@ -120,7 +120,7 @@ Message-Digest Algorithm and Cyrus IMAP. None of those parts is translated into 
 
 ## iCalendarLib
 
-`crates/ms-dav` (`src/ical.rs`) translates parts of iCalendarLib by Juliusz Gonera
+`crates/tern-dav` (`src/ical.rs`) translates parts of iCalendarLib by Juliusz Gonera
 (https://github.com/jgonera/icalendarlib, 2010), as vendored in Mailspring-Sync's
 `Vendor/icalendarlib`. Its README states that it is provided under the MIT licence. Upstream
 carries no copyright line; the one below names the author from the repository history.
@@ -241,7 +241,7 @@ The tracker rules in
 `apps/desktop/src/features/remove-tracking-pixels/mail-tracker-blocker-rules.ts` are
 ported from MailTrackerBlocker (https://github.com/apparition47/MailTrackerBlocker,
 `Source/MTBBlockedMessage.m`, commit `7463682a3`). The engine's draft pipeline keeps a copy of
-the vendor rules in `crates/ms-compose/src/desktop_data.json` (`trackerRules`).
+the vendor rules in `crates/tern-compose/src/desktop_data.json` (`trackerRules`).
 
 ```
 BSD 3-Clause License
@@ -278,7 +278,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## Blink default stylesheet
 
 `apps/desktop/src/mail/body/chrome-user-agent-stylesheet.ts`, and its copy in
-`crates/ms-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
+`crates/tern-compose/src/desktop_data.json` (`userAgentStylesheet`), are the default HTML
 stylesheet of Chromium's Blink engine (`Source/core/css/html.css`), which comes from KHTML and
 WebKit: Copyright (C) 2000 Lars Knoll, Copyright (C) 2003-2011 Apple Inc. The upstream file is
 under the GNU Library General Public License, version 2 or (at your option) any later version.

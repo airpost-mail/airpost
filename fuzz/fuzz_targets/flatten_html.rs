@@ -7,7 +7,7 @@
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
     if let Ok(html) = std::str::from_utf8(data) {
-        let _ = ms_mime::flatten_html_with(html, true, true);
-        let _ = ms_mime::flatten_html_with(html, false, false);
+        let _ = tern_mime::flatten_html_with(html, true, true);
+        let _ = tern_mime::flatten_html_with(html, false, false);
     }
 });

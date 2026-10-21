@@ -41,7 +41,7 @@ ENGINE_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = ENGINE_DIR.parents[1]
 SCHEMA_CHECK = ENGINE_DIR / "tools" / "schema_check.py"
 CONSTANTS_H = REPO_ROOT / "legacy" / "mailsync-cpp" / "MailSync" / "constants.h"
-V12_FIXTURE = REPO_ROOT / "crates" / "ms-store" / "tests" / "fixtures" / "v12_schema.json"
+V12_FIXTURE = REPO_ROOT / "crates" / "tern-store" / "tests" / "fixtures" / "v12_schema.json"
 
 DATABASE = "tern.db"
 LEGACY_DATABASE = "tern.legacy.db"

@@ -66,7 +66,7 @@ async function openEditor() {
 
 // The toggle leaves state.start and state.end at their wall-clock values; shiftEndWithStart's
 // all-day branch keeps the span, and the engine writes the DATEs, rolling the last second over
-// to the next day (crates/ms-pim's desktop corpus has these rows with the DATEs written). The
+// to the next day (crates/tern-pim's desktop corpus has these rows with the DATEs written). The
 // days the patch covers are checked here: from the start's day to the day of its last second.
 describe('CalendarEventPopover all-day toggle', function () {
   let engine: ReturnType<typeof fakePimEngine>;

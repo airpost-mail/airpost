@@ -14,15 +14,15 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ms_core::constants::{thread, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
-use ms_core::SyncError;
-use ms_ipc::{code, ErrorObject};
-use ms_net::unsubscribe::Mailto;
-use ms_store::{File, Model, Task};
-use ms_sync::{AccountFailure, WorkerContext};
-use ms_tasks::mail_actions::{self, ActionError};
-use ms_tasks::TaskProcessor;
 use serde_json::{json, Value};
+use tern_core::constants::{thread, QUEUE_TASK_IDLE_DEBOUNCE_MS, STREAM_DELAY_MAIN_MS};
+use tern_core::SyncError;
+use tern_ipc::{code, ErrorObject};
+use tern_net::unsubscribe::Mailto;
+use tern_store::{File, Model, Task};
+use tern_sync::{AccountFailure, WorkerContext};
+use tern_tasks::mail_actions::{self, ActionError};
+use tern_tasks::TaskProcessor;
 
 use crate::platform;
 
@@ -38,12 +38,12 @@ pub enum Request {
     SyncCalendar,
     /// `files.put`: saves the File JSON (its bytes are already on disk) and answers with it.
     SaveFile(Value),
-    /// `threads.snooze`: answers with [`ms_ipc::ThreadsSnoozeResult`].
+    /// `threads.snooze`: answers with [`tern_ipc::ThreadsSnoozeResult`].
     Snooze {
         thread_ids: Vec<String>,
         until: i64,
     },
-    /// `threads.unsnooze`: answers with [`ms_ipc::ThreadsSnoozeResult`].
+    /// `threads.unsnooze`: answers with [`tern_ipc::ThreadsSnoozeResult`].
     Unsnooze {
         thread_ids: Vec<String>,
     },
@@ -55,11 +55,11 @@ pub enum Request {
     /// `draft.create` (`crate::drafts_api`).
     DraftCreate(Box<crate::drafts_api::CreateCall>),
     /// `draft.send`.
-    DraftSend(ms_ipc::DraftSendParams),
+    DraftSend(tern_ipc::DraftSendParams),
     /// `draft.cancelSend`.
-    DraftCancelSend(ms_ipc::DraftCancelSendParams),
+    DraftCancelSend(tern_ipc::DraftCancelSendParams),
     /// `draft.validate`, with every account's addresses.
-    DraftValidate(ms_ipc::DraftValidateParams, ms_compose::Identities),
+    DraftValidate(tern_ipc::DraftValidateParams, tern_compose::Identities),
     /// The `events.*` and `contacts.*` writes (`crate::pim_api`).
     Pim(Box<crate::pim_api::Call>),
     /// stdin only.
@@ -91,7 +91,7 @@ pub struct Command {
 /// starts the transports), then handles commands until the account stops or every sender
 /// is gone. A database error on the way stops the account.
 pub fn run(ctx: WorkerContext, commands: mpsc::Receiver<Command>, start: impl FnOnce()) {
-    let store = match ms_store::Store::open(&ctx.config_dir, ctx.deltas.clone()) {
+    let store = match tern_store::Store::open(&ctx.config_dir, ctx.deltas.clone()) {
         Ok(s) => s,
         Err(e) => {
             let message = format!("Could not open the database: {e}");
@@ -112,7 +112,7 @@ pub fn run(ctx: WorkerContext, commands: mpsc::Receiver<Command>, start: impl Fn
         fg_wake_queued: Arc::new(AtomicBool::new(false)),
         calendar_running: Arc::new(AtomicBool::new(false)),
     };
-    while let Some(command) = ms_sync::runtime::next_command(&ctx, &commands) {
+    while let Some(command) = tern_sync::runtime::next_command(&ctx, &commands) {
         let result = dispatcher.handle(command.request);
         if let Some(reply) = command.reply {
             let _ = reply.send(result);
@@ -123,7 +123,7 @@ pub fn run(ctx: WorkerContext, commands: mpsc::Receiver<Command>, start: impl Fn
 /// A database error from a task's local phase or a cancel leaves the task as it was and
 /// stops the account (the C++ main loop let it escape and aborted). Returns the reply for
 /// the command that hit it.
-fn fail_on_task_error(ctx: &WorkerContext, e: &ms_core::Error) -> ErrorObject {
+fn fail_on_task_error(ctx: &WorkerContext, e: &tern_core::Error) -> ErrorObject {
     let message = format!("An unexpected error occurred during program execution: {e}");
     ctx.fail(AccountFailure::new(message, e.to_json()));
     ErrorObject::new(
@@ -142,7 +142,7 @@ fn action_error(e: ActionError) -> ErrorObject {
     }
 }
 
-fn internal(e: ms_core::Error) -> ErrorObject {
+fn internal(e: tern_core::Error) -> ErrorObject {
     ErrorObject::new(code::INTERNAL_ERROR, e.to_string())
 }
 
@@ -172,7 +172,7 @@ impl Dispatcher<'_> {
                 Ok(json!({}))
             }
             Request::WakeWorkers => {
-                tracing::info!("{}", ms_core::logmsg::waking_all_workers());
+                tracing::info!("{}", tern_core::logmsg::waking_all_workers());
                 self.ctx.background_mark_all.store(true, Ordering::SeqCst);
                 self.ctx.wake_workers();
                 // The network may have changed while asleep; don't leave IDLE hanging on a
@@ -328,7 +328,7 @@ impl Dispatcher<'_> {
         let flag = self.calendar_running.clone();
         let c = self.ctx.clone();
         let spawned = self.ctx.spawn(thread::CALENDAR, move || {
-            ms_sync::cal_contacts::run_calendar_pass(c);
+            tern_sync::cal_contacts::run_calendar_pass(c);
             flag.store(false, Ordering::SeqCst);
         });
         if spawned.is_err() {

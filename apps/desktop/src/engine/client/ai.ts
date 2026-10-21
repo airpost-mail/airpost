@@ -139,7 +139,7 @@ export function providerFor(settings: AiSettings, feature: AiFeature): AiProvide
   return settings.providers.find((p) => p.id === id) || null;
 }
 
-/** The base URL as ms-ai's ProviderConfig::base_url builds it. */
+/** The base URL as tern-ai's ProviderConfig::base_url builds it. */
 export function baseUrl(provider: AiProvider) {
   let url = (provider.url || '').trim() || KINDS[provider.kind].defaultUrl;
   url = url.replace(/\/+$/, '');
@@ -177,7 +177,7 @@ function isLocalV4(parts: number[]) {
   );
 }
 
-/** Loopback or a private address, as ms-ai's ProviderConfig::is_local decides it. */
+/** Loopback or a private address, as tern-ai's ProviderConfig::is_local decides it. */
 export function isLocal(provider: AiProvider) {
   const host = hostOf(provider).toLowerCase().replace(/\.$/, '');
   if (!host) return false;
@@ -225,7 +225,7 @@ export function missingSetting(
   return null;
 }
 
-/** ms-ai's ProviderConfig JSON, key included when there is one. */
+/** tern-ai's ProviderConfig JSON, key included when there is one. */
 export interface AiProviderConfig {
   id: string;
   kind: AiProviderKind;
@@ -246,7 +246,7 @@ export function providerConfig(provider: AiProvider, key: string | null | undefi
   return config;
 }
 
-/** The `settings` the thread methods take until the engine keeps them (ms_ipc::AiSettings). */
+/** The `settings` the thread methods take until the engine keeps them (tern_ipc::AiSettings). */
 export function requestSettings(settings: AiSettings) {
   const features: { [feature: string]: boolean } = {};
   for (const feature of AI_FEATURES) features[feature] = settings.features[feature].enabled;

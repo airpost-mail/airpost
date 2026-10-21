@@ -14,9 +14,9 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use base64::Engine as _;
-use ms_ipc::{code, feature, method, Client, FilesGetResult, FilesPutResult, FilesReadResult};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
+use tern_ipc::{code, feature, method, Client, FilesGetResult, FilesPutResult, FilesReadResult};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
@@ -230,11 +230,11 @@ fn get_waits_out_of_order() {
     assert!(started.elapsed() < Duration::from_millis(1200));
     let slow = loop {
         match c.read_message().unwrap() {
-            ms_ipc::Message::Response(r) => break r,
+            tern_ipc::Message::Response(r) => break r,
             _ => continue,
         }
     };
-    assert_eq!(slow.id, Some(ms_ipc::Id::Str("slow".into())));
+    assert_eq!(slow.id, Some(tern_ipc::Id::Str("slow".into())));
     let got: FilesGetResult = serde_json::from_value(slow.result.unwrap()).unwrap();
     assert!(!got.downloaded);
     assert!(got.path.is_none());

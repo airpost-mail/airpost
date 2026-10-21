@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use ms_ipc::AccountInfo;
+use tern_ipc::AccountInfo;
 
 pub use tern_client::discovery::default_config_dir;
 pub use tern_client::Engine;
@@ -103,10 +103,10 @@ pub fn one_target(engines: &[Engine], account: Option<&str>) -> Result<Target> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ms_ipc::{Client, HelloResult};
     use serde_json::json;
     use std::path::PathBuf;
     use tern_client::discovery::Entry;
+    use tern_ipc::{Client, HelloResult};
 
     fn write(dir: &Path, name: &str, body: &str) {
         std::fs::write(dir.join(name), body).unwrap();

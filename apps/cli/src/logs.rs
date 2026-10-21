@@ -3,7 +3,7 @@
 
 //! `tern logs`: the engine's per-account log, `<config-dir>/mailsync-<accountId>.log`. The
 //! engine rotates it at 5 MB by renaming it to `.log.1` (and `.1` to `.2`, up to `.3`) and
-//! starting a new file (`ms_core::log`), so following it means noticing the rename.
+//! starting a new file (`tern_core::log`), so following it means noticing the rename.
 
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};

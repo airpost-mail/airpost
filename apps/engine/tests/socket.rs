@@ -12,8 +12,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use ms_ipc::{code, method, Client, ClientError, Message, SubscribeParams};
 use serde_json::{json, Value};
+use tern_ipc::{code, method, Client, ClientError, Message, SubscribeParams};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
@@ -173,7 +173,8 @@ fn hello_first_and_version_refusal() {
     assert_eq!(hello.accounts[0].email, "me@example.com");
     assert_eq!(hello.accounts[0].state, "running");
 
-    let status: ms_ipc::EngineStatusResult = c.call_as(method::ENGINE_STATUS, Value::Null).unwrap();
+    let status: tern_ipc::EngineStatusResult =
+        c.call_as(method::ENGINE_STATUS, Value::Null).unwrap();
     assert_eq!(status.protocol, 1);
     assert_eq!(status.engine, hello.engine);
     assert_eq!(status.accounts[0].account_id, ACCOUNT_ID);
@@ -316,7 +317,7 @@ fn methods_and_subscribe_filter() {
     while !saw_cancel && Instant::now() < deadline {
         let n = sub.next_notification().unwrap();
         assert_eq!(n.method, "delta");
-        let p: ms_ipc::DeltaParams = serde_json::from_value(n.params).unwrap();
+        let p: tern_ipc::DeltaParams = serde_json::from_value(n.params).unwrap();
         assert_eq!(p.account_id, ACCOUNT_ID);
         assert_eq!(p.model_class, "Task");
         saw_cancel = p
@@ -394,12 +395,12 @@ fn relayed_connection_policy() {
     assert!(hello["features"]
         .as_array()
         .unwrap()
-        .contains(&json!(ms_ipc::feature::RELAYED)));
+        .contains(&json!(tern_ipc::feature::RELAYED)));
     // `sync` mode emits due metadata for the client instead of acting on it.
     assert!(!hello["features"]
         .as_array()
         .unwrap()
-        .contains(&json!(ms_ipc::feature::EXPIRATION_EXECUTOR)));
+        .contains(&json!(tern_ipc::feature::EXPIRATION_EXECUTOR)));
 
     let list = c.call(method::ACCOUNT_LIST, Value::Null).unwrap();
     let account = &list["accounts"][0]["account"];
@@ -521,7 +522,7 @@ fn relayed_subscriber_leaves_the_backlog() {
 #[test]
 fn connection_cap() {
     let e = Engine::start();
-    let max = ms_core::constants::SOCKET_MAX_CONNECTIONS;
+    let max = tern_core::constants::SOCKET_MAX_CONNECTIONS;
     let mut open: Vec<Client> = (0..max).map(|_| e.client()).collect();
     // Answered in order per connection, so the last one is accepted once this returns.
     open.last_mut()

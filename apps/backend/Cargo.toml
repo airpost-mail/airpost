@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 # Written from scratch, GPL-3.0-only like the rest of the repo (docs/backend-plan.md O6). It
-# shares only ms-wire with the engine and never depends on an engine crate; `deny.toml` here
+# shares only tern-wire with the engine and never depends on an engine crate; `deny.toml` here
 # checks that and the licences of its dependencies.
 license.workspace = true
 repository.workspace = true
@@ -16,7 +16,7 @@ name = "tern-backend"
 path = "src/main.rs"
 
 [dependencies]
-ms-wire.workspace = true
+tern-wire.workspace = true
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "form", "tokio", "tower-log", "original-uri", "matched-path"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "signal", "macros", "net", "sync", "time"] }
 tower = { version = "0.5", default-features = false }

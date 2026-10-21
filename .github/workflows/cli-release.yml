@@ -45,7 +45,7 @@ on:
   pull_request:
     paths:
       - "apps/cli/**"
-      - "crates/ms-ipc/**"
+      - "crates/tern-ipc/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "about.toml"

@@ -4,7 +4,7 @@
 /*
 The window's engine connection for the calendar, events and contacts specs: `events.*` and
 `contacts.*` answered from `answers` by method, every request recorded in `calls`. What the engine
-does with them (the ICS and vCards, recurrence, ownership) is crates/ms-pim's tests and the
+does with them (the ICS and vCards, recurrence, ownership) is crates/tern-pim's tests and the
 desktop corpus they replay.
 */
 import EngineEvents from '../../src/engine/client/events';

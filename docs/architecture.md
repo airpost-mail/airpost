@@ -43,7 +43,7 @@ if Tern ever offers one, is a separate per-user engine deployment with its own i
 never part of the backend process.
 
 **Packaging for self-hosters** who run both: one compose file, or later an option for a
-headless engine to embed the backend crate. The code shares only `crates/ms-wire`, so that
+headless engine to embed the backend crate. The code shares only `crates/tern-wire`, so that
 stays possible.
 
 Consequences:

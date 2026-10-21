@@ -4,8 +4,8 @@
 //! `tern settings get|set`: the settings the engine keeps,
 //! on the one engine that announces them.
 
-use ms_ipc::{feature, method, SettingsGetParams, SettingsValues, SETTINGS_KEYS};
 use serde_json::{json, Map, Value};
+use tern_ipc::{feature, method, SettingsGetParams, SettingsValues, SETTINGS_KEYS};
 
 use crate::app::Ctx;
 use crate::discovery::Engine;
@@ -34,7 +34,7 @@ fn call(engine: &mut Engine, method: &str, params: Value) -> Result<Value> {
 
 pub fn get(ctx: &Ctx, engines: &mut [Engine], keys: Vec<String>) -> Result<()> {
     for k in &keys {
-        if ms_ipc::setting_kind(k).is_none() {
+        if tern_ipc::setting_kind(k).is_none() {
             return Err(unknown_key(k));
         }
     }
@@ -59,11 +59,11 @@ pub fn get(ctx: &Ctx, engines: &mut [Engine], keys: Vec<String>) -> Result<()> {
 }
 
 pub fn set(ctx: &Ctx, engines: &mut [Engine], key: &str, value: &str) -> Result<()> {
-    if ms_ipc::setting_kind(key).is_none() {
+    if tern_ipc::setting_kind(key).is_none() {
         return Err(unknown_key(key));
     }
     let value = parse_value(value);
-    if let Some(e) = ms_ipc::setting_error(key, &value) {
+    if let Some(e) = tern_ipc::setting_error(key, &value) {
         return Err(CliError::usage(e));
     }
     let engine = settings_engine(engines)?;

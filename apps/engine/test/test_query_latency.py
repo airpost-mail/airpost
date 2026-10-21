@@ -4,7 +4,7 @@ the reads the desktop sends while scrolling the inbox, replayed over the
 socket against an engine that synced about 1,500 threads.
 
 The reads are the captured `Query.toJSON()` forms in
-crates/ms-store/tests/fixtures/model_queries.json (apps/desktop/tests/integration/model-query-capture.test.ts),
+crates/tern-store/tests/fixtures/model_queries.json (apps/desktop/tests/integration/model-query-capture.test.ts),
 with the fixture's ids replaced by the synced ones. Each page is what one 25-row scroll step
 sends (thread-list-engine-spec): the ids of the new rows (`inbox-ids`), their threads
 (`missing-models`) and their messages (`messages-of-threads`), one after the other.
@@ -29,7 +29,7 @@ from harness.scenario import ScenarioRun, ServerSpec
 THREADS = 1500
 ROWS = 50
 STEP = 25
-QUERIES = REPO_ROOT / "crates" / "ms-store" / "tests" / "fixtures" / "model_queries.json"
+QUERIES = REPO_ROOT / "crates" / "tern-store" / "tests" / "fixtures" / "model_queries.json"
 
 SCENARIO = {
     "name": "query-latency-thread-list",

@@ -17,7 +17,7 @@ const REVOKE_TIMEOUT_MS = 5000;
  * Revocation is grant-scoped, not token-scoped: Google withdraws the application's
  * authorization for that user and every token issued under it, which is why the
  * endpoint takes a token and no client id. All Tern installs present the same
- * client (the engine's Gmail client, crates/ms-providers), so Google holds one grant per
+ * client (the engine's Gmail client, crates/tern-providers), so Google holds one grant per
  * user rather than one per install — disconnecting an account on one machine also
  * signs that account out of Tern on the user's other machines, where refreshes
  * then fail with invalid_grant. That cost is accepted on purpose: Google offers no

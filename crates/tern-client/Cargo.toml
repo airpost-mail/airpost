@@ -12,7 +12,7 @@ publish.workspace = true
 # TLS or SQLite: it talks to running engines over their sockets only.
 [dependencies]
 iana-time-zone.workspace = true
-ms-ipc.workspace = true
+tern-ipc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true

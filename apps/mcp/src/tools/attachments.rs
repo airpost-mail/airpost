@@ -236,21 +236,21 @@ pub(super) fn get_attachment(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
             "Attachment '{file_id}' has an unsafe filename and cannot be resolved on disk"
         )));
     }
-    let mut path = if ctx.backend.has_feature(&aid, ms_ipc::feature::FILES) {
+    let mut path = if ctx.backend.has_feature(&aid, tern_ipc::feature::FILES) {
         engine_path(ctx, &aid, &file_id)?
     } else {
         path_on_disk(ctx.config_dir, &file)
     };
-    if path.is_none() && !ctx.backend.has_feature(&aid, ms_ipc::feature::FILES) {
+    if path.is_none() && !ctx.backend.has_feature(&aid, tern_ipc::feature::FILES) {
         let r = ctx.call(
             &aid,
-            ms_ipc::method::MESSAGES_GET,
+            tern_ipc::method::MESSAGES_GET,
             json!({"id": message_id, "body": true}),
         )?;
         let has_body = r.get("body").is_some_and(|b| !b.is_null());
         ctx.call(
             &aid,
-            ms_ipc::method::BODIES_FETCH,
+            tern_ipc::method::BODIES_FETCH,
             json!({"ids": [message_id]}),
         )?;
         let deadline = Instant::now()
@@ -324,9 +324,9 @@ fn engine_path(
     account: &str,
     file_id: &str,
 ) -> Result<Option<PathBuf>, ToolError> {
-    let got: ms_ipc::FilesGetResult = serde_json::from_value(ctx.call(
+    let got: tern_ipc::FilesGetResult = serde_json::from_value(ctx.call(
         account,
-        ms_ipc::method::FILES_GET,
+        tern_ipc::method::FILES_GET,
         json!({ "fileId": file_id }),
     )?)
     .map_err(|e| failed(format!("Unexpected files.get answer: {e}")))?;
@@ -356,7 +356,7 @@ pub fn read_attachment_resource(
         ))
     })?;
     let aid = account.account_id.clone();
-    let path = if ctx.backend.has_feature(&aid, ms_ipc::feature::FILES) {
+    let path = if ctx.backend.has_feature(&aid, tern_ipc::feature::FILES) {
         engine_path(ctx, &aid, &file_id)?
     } else {
         path_on_disk(ctx.config_dir, &file)

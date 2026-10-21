@@ -26,11 +26,12 @@ use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use ms_core::constants::{
+use serde_json::{json, Value};
+use tern_core::constants::{
     thread, SOCKET_BACKLOG_BYTES, SOCKET_MAX_CONNECTIONS, SOCKET_QUEUE_BYTES,
 };
-use ms_core::Account;
-use ms_ipc::{
+use tern_core::Account;
+use tern_ipc::{
     account_state, code, feature, method, policy, AccountChangedParams, AccountInfo,
     AccountListResult, AccountStateParams, AccountStatus, AiDeltaParams, AiTriageProgressParams,
     BodiesFetchParams, CalendarSyncParams, Capabilities, CredentialsStatus, DisconnectParams,
@@ -41,8 +42,7 @@ use ms_ipc::{
     TaskQueueParams, ThreadsSnoozeParams, ThreadsUnsnoozeParams, LOGS_TAIL_DEFAULT_BYTES,
     LOGS_TAIL_MAX_BYTES, MAIL_RULES_KEY, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
-use ms_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
-use serde_json::{json, Value};
+use tern_store::{DeltaSink, DeltaStream, MAIL_NEW, SECRETS_UPDATED};
 use tracing::{info, warn};
 
 use crate::ai_api::{self, is_ai_method, StoredAi, Streams};
@@ -176,7 +176,7 @@ fn disconnect_line(reason: &str) -> Arc<[u8]> {
         })
         .unwrap_or(Value::Null),
     );
-    ms_ipc::encode(&n).into()
+    tern_ipc::encode(&n).into()
 }
 
 // -- Per-connection queue -------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn drop_slow(conn: u64, outbox: &Outbox) {
     let reason = format!("its queue passed {} bytes", outbox.limit);
     warn!(
         "{}",
-        ms_core::logmsg::socket_connection_dropped(conn, &reason)
+        tern_core::logmsg::socket_connection_dropped(conn, &reason)
     );
     outbox.drop_with(disconnect_line(&format!(
         "the connection fell behind: {reason}"
@@ -368,7 +368,8 @@ impl DeltaSink for HubSink {
         } else if model_class == MAIL_NEW {
             self.hub.mail_new(&self.account_id, line);
         } else {
-            let note = framed(ms_ipc::delta_notification_line(&self.account_id, line).into_bytes());
+            let note =
+                framed(tern_ipc::delta_notification_line(&self.account_id, line).into_bytes());
             self.hub.publish(&self.account_id, Some(model_class), note);
         }
     }
@@ -405,7 +406,7 @@ impl Hub {
             method::ACCOUNT_STATE,
             serde_json::to_value(params).unwrap_or(Value::Null),
         );
-        self.publish(&params.account_id, None, ms_ipc::encode(&n).into());
+        self.publish(&params.account_id, None, tern_ipc::encode(&n).into());
     }
 
     /// Sends `mail.new` for each message in a [`MAIL_NEW`] item to the subscribers of
@@ -426,7 +427,7 @@ impl Hub {
                 method::MAIL_NEW,
                 serde_json::to_value(params).unwrap_or(Value::Null),
             );
-            self.publish_to(account_id, None, ms_ipc::encode(&n).into(), false);
+            self.publish_to(account_id, None, tern_ipc::encode(&n).into(), false);
         }
     }
 
@@ -437,7 +438,7 @@ impl Hub {
             method::RULES_DISABLED,
             serde_json::to_value(params).unwrap_or(Value::Null),
         );
-        let note: Arc<[u8]> = ms_ipc::encode(&n).into();
+        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
         self.lock()
             .subscribers
             .retain(|s| match s.outbox.push(note.clone()) {
@@ -462,7 +463,7 @@ impl Hub {
             })
             .unwrap_or(Value::Null),
         );
-        let note: Arc<[u8]> = ms_ipc::encode(&n).into();
+        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
         self.lock().subscribers.retain(|s| {
             if Some(s.conn) == origin {
                 return !s.outbox.is_closed();
@@ -491,7 +492,7 @@ impl Hub {
                 })
                 .unwrap_or(Value::Null),
             );
-            ms_ipc::encode(&n).into()
+            tern_ipc::encode(&n).into()
         };
         let local = line(params.account.clone());
         let public = line(policy::public_account_json(&params.account));
@@ -518,7 +519,7 @@ impl Hub {
             method::CAPABILITIES_CHANGED,
             serde_json::to_value(capabilities).unwrap_or(Value::Null),
         );
-        let note: Arc<[u8]> = ms_ipc::encode(&n).into();
+        let note: Arc<[u8]> = tern_ipc::encode(&n).into();
         self.lock()
             .subscribers
             .retain(|s| match s.outbox.push(note.clone()) {
@@ -802,7 +803,7 @@ fn refuse_busy(id: u64, mut stream: UnixStream) {
         format!("the engine already has {SOCKET_MAX_CONNECTIONS} connections open"),
     );
     let _ = stream.set_write_timeout(Some(WRITE_POLL));
-    let _ = stream.write_all(&ms_ipc::encode(&Response::err(None, e)));
+    let _ = stream.write_all(&tern_ipc::encode(&Response::err(None, e)));
     let _ = stream.shutdown(Shutdown::Both);
 }
 
@@ -928,7 +929,7 @@ impl Session {
                 .and_then(|p| self.dispatch(&p.account_id, Request::NeedBodies(p.ids))),
             method::THREADS_SNOOZE => req.params_as::<ThreadsSnoozeParams>().and_then(|p| {
                 accounts.check(&p.account_id)?;
-                if p.until <= ms_core::Clock::now(&ms_core::SystemClock) {
+                if p.until <= tern_core::Clock::now(&tern_core::SystemClock) {
                     return Err(ErrorObject::new(
                         code::INVALID_PARAMS,
                         "invalid params: until must be in the future",
@@ -1206,7 +1207,7 @@ fn settings_call(
                     .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e))?;
             }
             let mut changed = guard.set(p.values)?;
-            let now_ms = ms_core::Clock::now(&ms_core::SystemClock).saturating_mul(1000);
+            let now_ms = tern_core::Clock::now(&tern_core::SystemClock).saturating_mul(1000);
             let since = crate::rules::set_auto_since(&mut guard, &changed, now_ms);
             changed.extend(since);
             if !changed.is_empty() {
@@ -1261,9 +1262,9 @@ fn logs_tail(config_dir: &Path, p: &LogsTailParams) -> Reply {
                     format!("invalid accountId {id:?}"),
                 ));
             }
-            ms_core::log::log_path(config_dir, id)
+            tern_core::log::log_path(config_dir, id)
         }
-        None => config_dir.join(ms_core::constants::ENGINE_LOG_FILE),
+        None => config_dir.join(tern_core::constants::ENGINE_LOG_FILE),
     };
     let want = p
         .bytes
@@ -1374,7 +1375,7 @@ impl Connection {
         let mut reader = BufReader::new(stream);
         let mut line = Vec::new();
         loop {
-            match ms_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
+            match tern_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
                 Ok(true) => {}
                 Ok(false) | Err(FrameError::Io(_)) => break,
                 Err(FrameError::TooLong) => {
@@ -1390,7 +1391,7 @@ impl Connection {
             if text.iter().all(u8::is_ascii_whitespace) {
                 continue;
             }
-            let response = match ms_ipc::parse_request(&text) {
+            let response = match tern_ipc::parse_request(&text) {
                 Ok(req) => self.handle(req),
                 Err((id, e)) => Some(Response::err(id, e)),
             };
@@ -1408,7 +1409,7 @@ impl Connection {
 
     /// Queues a response. False once the connection is closed or dropped.
     fn respond(&self, response: Response) -> bool {
-        match self.outbox.push(ms_ipc::encode(&response).into()) {
+        match self.outbox.push(tern_ipc::encode(&response).into()) {
             Ok(()) => true,
             Err(PushError::Closed) => false,
             Err(PushError::Full) => {
@@ -1588,7 +1589,7 @@ impl Connection {
     fn answer_later(
         &self,
         lane: &'static Lane,
-        id: Option<ms_ipc::Id>,
+        id: Option<tern_ipc::Id>,
         work: Box<dyn FnOnce() -> Reply + Send>,
     ) {
         self.answer_later_for(lane, None, id, work);
@@ -1599,7 +1600,7 @@ impl Connection {
         &self,
         lane: &'static Lane,
         account: Option<Arc<str>>,
-        id: Option<ms_ipc::Id>,
+        id: Option<tern_ipc::Id>,
         work: Box<dyn FnOnce() -> Reply + Send>,
     ) {
         let conn = self.id;
@@ -1613,7 +1614,7 @@ impl Connection {
                 Ok(v) => Response::ok(Some(id), v),
                 Err(e) => Response::err(Some(id), e),
             };
-            if let Err(PushError::Full) = outbox.push(ms_ipc::encode(&response).into()) {
+            if let Err(PushError::Full) = outbox.push(tern_ipc::encode(&response).into()) {
                 drop_slow(conn, &outbox);
                 hub.unsubscribe(conn);
             }
@@ -1665,7 +1666,7 @@ impl Connection {
                 method::AI_TRIAGE_PROGRESS,
                 serde_json::to_value(p).unwrap_or(Value::Null),
             );
-            if let Err(PushError::Full) = outbox.push(ms_ipc::encode(&n).into()) {
+            if let Err(PushError::Full) = outbox.push(tern_ipc::encode(&n).into()) {
                 drop_slow(conn, &outbox);
                 hub.unsubscribe(conn);
             }
@@ -1676,7 +1677,7 @@ impl Connection {
             let Some(id) = id else {
                 return;
             };
-            let line = ms_ipc::encode(&Response::ok(Some(id), result));
+            let line = tern_ipc::encode(&Response::ok(Some(id), result));
             if let Err(PushError::Full) = answer_outbox.push(line.into()) {
                 drop_slow(conn, &answer_outbox);
                 answer_hub.unsubscribe(conn);
@@ -1708,7 +1709,7 @@ impl Connection {
                 method::RULES_PROGRESS,
                 serde_json::to_value(p).unwrap_or(Value::Null),
             );
-            if let Err(PushError::Full) = outbox.push(ms_ipc::encode(&n).into()) {
+            if let Err(PushError::Full) = outbox.push(tern_ipc::encode(&n).into()) {
                 drop_slow(conn, &outbox);
                 hub.unsubscribe(conn);
             }
@@ -1719,7 +1720,7 @@ impl Connection {
             let Some(id) = id else {
                 return;
             };
-            let line = ms_ipc::encode(&Response::ok(Some(id), result));
+            let line = tern_ipc::encode(&Response::ok(Some(id), result));
             if let Err(PushError::Full) = answer_outbox.push(line.into()) {
                 drop_slow(conn, &answer_outbox);
                 answer_hub.unsubscribe(conn);
@@ -1750,7 +1751,7 @@ impl Connection {
         self.relay = Some(Relay { scopes: p.scopes });
     }
 
-    /// Whether this is a relayed connection that may not make `req` (ms-ipc's `policy`).
+    /// Whether this is a relayed connection that may not make `req` (tern-ipc's `policy`).
     fn relay_refuses(&self, req: &RpcRequest) -> bool {
         let Some(relay) = &self.relay else {
             return false;
@@ -1768,7 +1769,7 @@ impl Connection {
         let response = req
             .id
             .clone()
-            .map(|id| ms_ipc::encode(&Response::ok(Some(id), json!({}))).into());
+            .map(|id| tern_ipc::encode(&Response::ok(Some(id), json!({}))).into());
         self.session.server.hub.subscribe(
             Subscriber {
                 conn: self.id,
@@ -1790,10 +1791,10 @@ struct AiSink {
     outbox: Arc<Outbox>,
     hub: Arc<Hub>,
     stream_id: Option<String>,
-    token: ms_ai::CancelToken,
+    token: tern_ai::CancelToken,
 }
 
-impl ms_ai::Sink for AiSink {
+impl tern_ai::Sink for AiSink {
     fn delta(&mut self, text: &str) -> ControlFlow<()> {
         let Some(stream_id) = &self.stream_id else {
             return ControlFlow::Continue(());
@@ -1806,7 +1807,7 @@ impl ms_ai::Sink for AiSink {
             })
             .unwrap_or(Value::Null),
         );
-        match self.outbox.push(ms_ipc::encode(&n).into()) {
+        match self.outbox.push(tern_ipc::encode(&n).into()) {
             Ok(()) => ControlFlow::Continue(()),
             Err(PushError::Closed) => ControlFlow::Break(()),
             Err(PushError::Full) => {
@@ -1817,7 +1818,7 @@ impl ms_ai::Sink for AiSink {
         }
     }
 
-    fn cancel_token(&self) -> Option<&ms_ai::CancelToken> {
+    fn cancel_token(&self) -> Option<&tern_ai::CancelToken> {
         Some(&self.token)
     }
 }
@@ -1980,7 +1981,7 @@ mod tests {
 
     #[test]
     fn mail_new_never_reaches_stdout() {
-        let mut sink = ms_store::WriteSink(Vec::new());
+        let mut sink = tern_store::WriteSink(Vec::new());
         sink.write_item(MAIL_NEW, r#"{"modelClass":"MailNew"}"#);
         sink.write_item("Task", r#"{"modelClass":"Task"}"#);
         assert_eq!(

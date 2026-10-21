@@ -1,5 +1,5 @@
 // The engine expands the occurrences (events.expand); its rules, the desktop corpus they were
-// checked against and the fixture calendar are crates/ms-pim's tests. Here: what the calendar
+// checked against and the fixture calendar are crates/tern-pim's tests. Here: what the calendar
 // asks for, and the helpers that read the answer.
 import { Event as EventModel } from '../../src/data/models/event';
 import { Calendar } from '../../src/data/models/calendar';

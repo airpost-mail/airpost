@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use ms_core::constants::{EXIT_FAILURE, EXIT_OK};
+use tern_core::constants::{EXIT_FAILURE, EXIT_OK};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {

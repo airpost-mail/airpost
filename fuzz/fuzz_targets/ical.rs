@@ -7,6 +7,6 @@
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
     if let Ok(ics) = std::str::from_utf8(data) {
-        let _ = ms_dav::ical::parse_events(ics);
+        let _ = tern_dav::ical::parse_events(ics);
     }
 });

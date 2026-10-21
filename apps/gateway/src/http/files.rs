@@ -22,9 +22,9 @@ use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use futures::StreamExt;
-use ms_ipc::{code, feature, method, FilesGetResult, FilesPutResult};
 use serde::Deserialize;
 use serde_json::json;
+use tern_ipc::{code, feature, method, FilesGetResult, FilesPutResult};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
@@ -42,7 +42,7 @@ const DRAIN_WAIT: Duration = Duration::from_secs(5);
 /// Uploads left behind (a crash between the write and the delete) are removed after this.
 const INCOMING_MAX_AGE: Duration = Duration::from_secs(24 * 3600);
 const INCOMING_DIR: &str = "incoming";
-/// Where the engine keeps attachments under the profile (`ms_core::constants::FILES_DIR`).
+/// Where the engine keeps attachments under the profile (`tern_core::constants::FILES_DIR`).
 const FILES_DIR: &str = "files";
 
 fn incoming_dir(state: &AppState) -> PathBuf {

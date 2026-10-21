@@ -1,5 +1,5 @@
 // Wire types for the engine's model JSON. Field names are the JSON keys the engine writes
-// (crates/ms-store/src/models/*.rs) and the desktop parses (apps/desktop/src/data/models),
+// (crates/tern-store/src/models/*.rs) and the desktop parses (apps/desktop/src/data/models),
 // so the mock and the real engine share one set of types. Timestamps are unix seconds.
 
 export type ModelClass =
@@ -141,7 +141,7 @@ export interface EventJSON extends ModelJSON {
   re: number;
 }
 
-/** ms-store `Calendar` (CalDAV collection). */
+/** tern-store `Calendar` (CalDAV collection). */
 export interface CalendarJSON extends ModelJSON {
   __cls: 'Calendar';
   name: string;

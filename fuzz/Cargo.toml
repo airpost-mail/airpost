@@ -13,10 +13,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-ms-core = { path = "../crates/ms-core" }
-ms-imap = { path = "../crates/ms-imap" }
-ms-mime = { path = "../crates/ms-mime" }
-ms-dav = { path = "../crates/ms-dav" }
+tern-core = { path = "../crates/tern-core" }
+tern-imap = { path = "../crates/tern-imap" }
+tern-mime = { path = "../crates/tern-mime" }
+tern-dav = { path = "../crates/tern-dav" }
 
 [workspace]
 members = ["."]

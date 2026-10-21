@@ -5,9 +5,9 @@
 
 use std::path::PathBuf;
 
-use ms_ipc::{code, ClientError};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use tern_ipc::{code, ClientError};
 
 use crate::cli::{
     AccountCommand, AiCommand, CalendarCommand, Cli, Command, ContactCommand, EngineCommand,

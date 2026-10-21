@@ -6,5 +6,5 @@
 #![no_main]
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
-    ms_imap::fuzz_parse_response(data);
+    tern_imap::fuzz_parse_response(data);
 });

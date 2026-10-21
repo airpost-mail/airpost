@@ -4,7 +4,7 @@
 //! `events.*` and `contacts.*` on the socket on the debug
 //! binary, against a seeded database and an account whose servers refuse connections: the
 //! answers, and the rows the queued tasks' local phases write. The ICS and vCard edits
-//! themselves are `ms-pim`'s tests.
+//! themselves are `tern-pim`'s tests.
 
 #![cfg(unix)]
 
@@ -13,9 +13,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
-use ms_ipc::{code, feature, method, Client, ClientError};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Value};
+use tern_ipc::{code, feature, method, Client, ClientError};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","name":"Me","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
@@ -474,14 +474,14 @@ fn events_expand_and_edit() {
     assert_eq!(out["truncated"], true);
     assert_eq!(
         out["occurrences"].as_array().unwrap().len(),
-        ms_ipc::EVENTS_EXPAND_MAX_OCCURRENCES
+        tern_ipc::EVENTS_EXPAND_MAX_OCCURRENCES
     );
     let one = minutely
         .trim_start_matches("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n")
         .trim_end_matches("END:VCALENDAR\r\n");
     let many = format!(
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n{}END:VCALENDAR\r\n",
-        (0..=ms_ipc::EVENTS_EXPAND_MAX_MASTERS)
+        (0..=tern_ipc::EVENTS_EXPAND_MAX_MASTERS)
             .map(|i| one.replace("UID:m@test", &format!("UID:m{i}@test")))
             .collect::<String>()
     );

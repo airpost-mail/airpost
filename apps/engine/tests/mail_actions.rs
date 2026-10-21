@@ -16,9 +16,9 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use ms_ipc::{code, feature, method, Client, MessagesUnsubscribeResult, TasksListResult};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
+use tern_ipc::{code, feature, method, Client, MessagesUnsubscribeResult, TasksListResult};
 
 const ACCOUNT_ID: &str = "c0ffee-harness";
 const ACCOUNT: &str = r#"{"id":"c0ffee-harness","emailAddress":"me@example.com","name":"Me","provider":"imap","settings":{"imap_host":"127.0.0.1","imap_port":1,"imap_username":"me","imap_password":"x","imap_security":"none","smtp_host":"127.0.0.1","smtp_port":1,"smtp_username":"me","smtp_password":"x","smtp_security":"none","imap_allow_insecure_ssl":false,"smtp_allow_insecure_ssl":false}}"#;
@@ -361,11 +361,11 @@ fn one_click_failure_and_ordering() {
     assert!(started.elapsed() < Duration::from_millis(1200));
     let slow = loop {
         match c.read_message().unwrap() {
-            ms_ipc::Message::Response(r) => break r,
+            tern_ipc::Message::Response(r) => break r,
             _ => continue,
         }
     };
-    assert_eq!(slow.id, Some(ms_ipc::Id::Str("slow".into())));
+    assert_eq!(slow.id, Some(tern_ipc::Id::Str("slow".into())));
     let r: MessagesUnsubscribeResult = serde_json::from_value(slow.result.unwrap()).unwrap();
     assert_eq!((r.method.as_str(), r.ok), ("one-click", false));
     assert!(r.error.unwrap().contains("503"));

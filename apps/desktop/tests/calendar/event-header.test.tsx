@@ -159,7 +159,7 @@ describe('EventHeader location', function () {
 });
 
 // The engine reads the invitation's times (events.expand: `first`, `upcoming`), finds the
-// conflicts and answers (events.rsvp); this stands in for it. The ICS it builds is crates/ms-pim's
+// conflicts and answers (events.rsvp); this stands in for it. The ICS it builds is crates/tern-pim's
 // tests (plan.rs rsvp_*, counter_*).
 const unfold = (ics: string) => ics.replace(/\r?\n[ \t]/g, '');
 

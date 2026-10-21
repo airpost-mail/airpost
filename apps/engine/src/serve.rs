@@ -16,7 +16,7 @@
 //! The account methods (`account.add`, `.test`, `.oauth.*`, `.setSecrets`, `.update`, `.remove`,
 //! ..., `secrets.*`, `server.*`) are taken on stdin and on the socket alike: secrets go client to
 //! engine and are never read back (T13). A relayed connection makes them only with the admin scope
-//! (ms-ipc's `policy`).
+//! (tern-ipc's `policy`).
 //!
 //! `--detached` has no parent channel: local, non-relayed socket connections also take the
 //! engine methods but `credentials.import`, the slow ones on the same worker lanes, and
@@ -36,12 +36,13 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
 
-use ms_core::constants::{
+use serde_json::{json, Value};
+use tern_core::constants::{
     thread, ACCOUNT_RESET_STRAGGLER_WAIT_MS, ACCOUNT_START_WAIT_MS, ACCOUNT_STOP_TIMEOUT_MS,
     DATABASE_FILE, ENGINE_LOG_FILE, EXIT_FAILURE, EXIT_OK, EXIT_SOCKET_IN_USE,
 };
-use ms_core::Account;
-use ms_ipc::{
+use tern_core::Account;
+use tern_ipc::{
     account_state, code, method, AccountAddParams, AccountAddResult, AccountChangedParams,
     AccountDiscoverParams, AccountIdParams, AccountRemoveParams, AccountRemoveResult,
     AccountReorderParams, AccountResetParams, AccountSetSecretsParams, AccountStateParams,
@@ -51,10 +52,9 @@ use ms_ipc::{
     SecretsDeleteParams, SecretsHasParams, SecretsSetParams, ServerSetParams, SetLogLevelParams,
     SetLogLevelResult, ACCOUNT_DISPLAY_FIELDS, MAX_LINE_BYTES,
 };
-use ms_net::TernServer;
-use ms_store::{DeltaSink, DeltaStream};
-use ms_sync::{AccountFailure, AccountRuntime, WorkerContext};
-use serde_json::{json, Value};
+use tern_net::TernServer;
+use tern_store::{DeltaSink, DeltaStream};
+use tern_sync::{AccountFailure, AccountRuntime, WorkerContext};
 use tracing::{info, warn};
 
 use crate::accounts_api;
@@ -77,7 +77,7 @@ pub fn run(opts: &Options) -> i32 {
         one_shot_error(&format!("Setup Failed: {e}"));
         return EXIT_FAILURE;
     }
-    if let Err(e) = ms_core::log::init_file(&opts.config_dir.join(ENGINE_LOG_FILE)) {
+    if let Err(e) = tern_core::log::init_file(&opts.config_dir.join(ENGINE_LOG_FILE)) {
         one_shot_error(&format!("Setup Failed: {e}"));
         return EXIT_FAILURE;
     }
@@ -106,7 +106,7 @@ pub fn run(opts: &Options) -> i32 {
     crate::platform::remove_on_exit(socket_path.clone());
     let mut progress = Vec::new();
     let migrated =
-        ms_store::migrate::migrate(&opts.config_dir, &ms_core::SystemClock, &mut progress);
+        tern_store::migrate::migrate(&opts.config_dir, &tern_core::SystemClock, &mut progress);
     let progress = String::from_utf8_lossy(&progress);
     if !progress.trim().is_empty() {
         info!(
@@ -181,7 +181,7 @@ pub fn run(opts: &Options) -> i32 {
     socket::serve(listener, server.clone());
     info!(
         "{}",
-        ms_core::logmsg::socket_listening(&socket_path.to_string_lossy())
+        tern_core::logmsg::socket_listening(&socket_path.to_string_lossy())
     );
 
     let starting = engine.clone();
@@ -465,15 +465,15 @@ struct AccountScope(Option<Arc<str>>);
 
 impl AccountScope {
     fn enter(id: &str) -> Self {
-        let previous = ms_core::log::thread_account();
-        ms_core::log::set_thread_account(Some(id.into()));
+        let previous = tern_core::log::thread_account();
+        tern_core::log::set_thread_account(Some(id.into()));
         AccountScope(previous)
     }
 }
 
 impl Drop for AccountScope {
     fn drop(&mut self) {
-        ms_core::log::set_thread_account(self.0.take());
+        tern_core::log::set_thread_account(self.0.take());
     }
 }
 
@@ -493,7 +493,7 @@ impl DeltaSink for ParentSink {
             );
             return;
         }
-        let note = ms_ipc::delta_notification_line(&self.account_id, line);
+        let note = tern_ipc::delta_notification_line(&self.account_id, line);
         write_stdout(&format!("{note}\n"));
     }
 }
@@ -608,7 +608,7 @@ impl Engine {
             if let Err(message) = outcome {
                 warn!("-X Could not start registered account {id}: {message}");
                 let error = json!({
-                    "what": ms_core::error::SYNC_ERROR_WHAT,
+                    "what": tern_core::error::SYNC_ERROR_WHAT,
                     "key": "ErrorAccountNotStarted",
                     "debuginfo": message,
                     "retryable": false,
@@ -796,13 +796,13 @@ impl Engine {
         let generation = reg.next_generation;
         reg.next_generation += 1;
 
-        if let Err(e) = ms_core::log::open_account_log(&self.config_dir, &id) {
+        if let Err(e) = tern_core::log::open_account_log(&self.config_dir, &id) {
             warn!("-X Could not open the log of account {id}; its lines go to engine.log: {e}");
         }
         let scope = AccountScope::enter(&id);
         info!(
             "{}",
-            ms_core::logmsg::starting_sync(account.email_address())
+            tern_core::logmsg::starting_sync(account.email_address())
         );
         let (ctx, deltas, triage, rules) = self.context(account.clone(), parsed, generation);
         let slot = Slot {
@@ -829,7 +829,7 @@ impl Engine {
 
         let weak = self.weak();
         let started_id = id.clone();
-        let dispatcher: ms_sync::runtime::Dispatcher<Command> = Box::new(move |ctx, rx, _| {
+        let dispatcher: tern_sync::runtime::Dispatcher<Command> = Box::new(move |ctx, rx, _| {
             dispatch::run(ctx, rx, move || {
                 if let Some(engine) = weak.upgrade() {
                     engine.started(&started_id, generation);
@@ -896,7 +896,7 @@ impl Engine {
         // A registered account's rotated token goes to the store; any other account's to
         // the parent, as before the engine kept secrets. A detached engine has no parent, so
         // the token stays in the token manager, which the account's restarts use.
-        let tokens = ms_net::TokenManager::new(Some(Box::new(move |a: &Account| {
+        let tokens = tern_net::TokenManager::new(Some(Box::new(move |a: &Account| {
             let stored = weak.upgrade().map(|engine| {
                 engine
                     .registered
@@ -936,7 +936,7 @@ impl Engine {
             deltas.clone(),
             Arc::new(tokens),
             metadata,
-            Arc::new(ms_tasks::Tasks),
+            Arc::new(tern_tasks::Tasks),
             Arc::new(on_failure),
         );
         ctx.verbose = now_ms() < self.verbose_until.load(Ordering::SeqCst);
@@ -978,18 +978,21 @@ impl Engine {
 
         let weak = self.weak();
         let stop_id = id.to_owned();
-        let spawned =
-            ms_core::log::spawn_account_thread(Some(id.into()), thread::ACCOUNT_STOP, move || {
+        let spawned = tern_core::log::spawn_account_thread(
+            Some(id.into()),
+            thread::ACCOUNT_STOP,
+            move || {
                 if let Some(rt) = &runtime {
                     rt.stop(Duration::from_millis(ACCOUNT_STOP_TIMEOUT_MS));
                 }
                 if let Some(engine) = weak.upgrade() {
                     engine.stopped(&stop_id, generation);
                 }
-            });
+            },
+        );
         if let Err(e) = spawned {
-            ms_core::critical!("Could not start the {} thread: {e}", thread::ACCOUNT_STOP);
-            ms_core::log::flush();
+            tern_core::critical!("Could not start the {} thread: {e}", thread::ACCOUNT_STOP);
+            tern_core::log::flush();
             std::process::abort();
         }
     }
@@ -1016,7 +1019,7 @@ impl Engine {
         if slot.removing {
             self.changed.notify_all();
             drop(reg);
-            ms_core::log::flush();
+            tern_core::log::flush();
             return;
         }
         let decision = self
@@ -1055,7 +1058,7 @@ impl Engine {
             auth_failed: slot.auth_failed,
         });
         drop(reg);
-        ms_core::log::flush();
+        tern_core::log::flush();
         if let Some(delay) = delay {
             let weak = self.weak();
             let id = id.to_owned();
@@ -1207,7 +1210,7 @@ impl Engine {
         self.write_discovery(&reg);
         self.notify_state(&id, account_state::REMOVED, None);
         drop(reg);
-        ms_core::log::close_account_log(&id);
+        tern_core::log::close_account_log(&id);
         Ok(still_running)
     }
 
@@ -1252,8 +1255,8 @@ impl Engine {
                     std::thread::sleep(Duration::from_millis(ACCOUNT_RESET_STRAGGLER_WAIT_MS));
                 }
             }
-            let sink = ms_store::DeltaStream::new(Box::new(std::io::sink()));
-            ms_store::Store::open(&self.config_dir, sink)
+            let sink = tern_store::DeltaStream::new(Box::new(std::io::sink()));
+            tern_store::Store::open(&self.config_dir, sink)
                 .and_then(|store| store.reset_for_account(id, keep_metadata))
                 .map_err(|e| {
                     ErrorObject::new(code::INTERNAL_ERROR, format!("reset failed: {e}"))
@@ -1261,7 +1264,7 @@ impl Engine {
             crate::ai_api::clear_cache();
             if !keep_metadata {
                 // Their send-later metadata went with the drafts.
-                ms_sync::pending_sends::PendingSends::new(&self.config_dir, id).remove_all();
+                tern_sync::pending_sends::PendingSends::new(&self.config_dir, id).remove_all();
             }
             info!("Account {id} reset");
             Ok(held)
@@ -1295,7 +1298,7 @@ impl Engine {
 
     /// `engine.resetDatabase`: stops and forgets every account, deletes the database and
     /// creates an empty one, carrying the plugin metadata over by Message-ID
-    /// ([`ms_store::metadata_stash`]) when `keep_metadata`. Socket sessions reopen it on their
+    /// ([`tern_store::metadata_stash`]) when `keep_metadata`. Socket sessions reopen it on their
     /// next read. Runs on its own thread.
     fn reset_database(&self, keep_metadata: bool) -> Reply {
         if self.resetting_database.swap(true, Ordering::SeqCst) {
@@ -1316,12 +1319,12 @@ impl Engine {
             // A database that can't be read (often why it is being rebuilt) loses its
             // metadata; the rebuild goes ahead.
             let kept = if keep_metadata {
-                ms_store::metadata_stash::collect_database(&self.config_dir).unwrap_or_else(|e| {
+                tern_store::metadata_stash::collect_database(&self.config_dir).unwrap_or_else(|e| {
                     warn!("-X Could not keep the plugin metadata of the old database: {e}");
                     Vec::new()
                 })
             } else {
-                ms_sync::pending_sends::PendingSends::remove_every_account(&self.config_dir);
+                tern_sync::pending_sends::PendingSends::remove_every_account(&self.config_dir);
                 Vec::new()
             };
             for suffix in ["", "-wal", "-shm"] {
@@ -1337,13 +1340,13 @@ impl Engine {
                 }
             }
             self.database.bump();
-            ms_store::migrate::migrate(
+            tern_store::migrate::migrate(
                 &self.config_dir,
-                &ms_core::SystemClock,
+                &tern_core::SystemClock,
                 &mut std::io::sink(),
             )
             .map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, format!("migrate failed: {e}")))?;
-            if let Err(e) = ms_store::metadata_stash::save_database(&self.config_dir, &kept) {
+            if let Err(e) = tern_store::metadata_stash::save_database(&self.config_dir, &kept) {
                 warn!("-X Could not keep the plugin metadata of the old database: {e}");
             }
             crate::ai_api::clear_cache();
@@ -1603,7 +1606,7 @@ fn internal(e: impl std::fmt::Display) -> ErrorObject {
 /// Not started until the client sends its credentials again.
 fn needs_credentials_error(message: &str) -> Value {
     json!({
-        "what": ms_core::error::SYNC_ERROR_WHAT,
+        "what": tern_core::error::SYNC_ERROR_WHAT,
         "key": "ErrorAccountNotStarted",
         "debuginfo": message,
         "retryable": false,
@@ -1616,7 +1619,7 @@ const MAX_SECRET_NAMES: usize = 256;
 
 /// An AI provider's key decides `capabilities.ai`.
 fn secret_changed(name: &str) {
-    if name.starts_with(ms_secrets::names::AI_PROVIDER_PREFIX) {
+    if name.starts_with(tern_secrets::names::AI_PROVIDER_PREFIX) {
         crate::ai_triage::capabilities_changed();
     }
 }
@@ -1636,7 +1639,10 @@ impl Engine {
         let Some(server) = self.registered.server() else {
             return Value::Null;
         };
-        let token = match self.registered.secret(ms_secrets::names::TERN_SERVER_TOKEN) {
+        let token = match self
+            .registered
+            .secret(tern_secrets::names::TERN_SERVER_TOKEN)
+        {
             Ok(Some(t)) => t,
             Ok(None) => {
                 warn!(
@@ -1926,7 +1932,7 @@ impl Engine {
             self.registered.set_server(&next).map_err(internal)?;
             if moved {
                 self.registered
-                    .delete_secret(ms_secrets::names::TERN_SERVER_TOKEN)
+                    .delete_secret(tern_secrets::names::TERN_SERVER_TOKEN)
                     .map_err(internal)?;
             }
             info!("Tern server set to {}", probe.host());
@@ -1977,15 +1983,15 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
     let mut line = Vec::new();
     loop {
         line.clear();
-        match ms_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
+        match tern_ipc::read_frame(&mut reader, &mut line, MAX_LINE_BYTES) {
             Ok(true) => {}
-            Ok(false) | Err(ms_ipc::FrameError::Io(_)) => {
+            Ok(false) | Err(tern_ipc::FrameError::Io(_)) => {
                 if orphan {
                     return;
                 }
                 crate::stdin_loop::wait_for_parent_then_exit();
             }
-            Err(ms_ipc::FrameError::TooLong) => {
+            Err(tern_ipc::FrameError::TooLong) => {
                 let e = ErrorObject::new(
                     code::PARSE_ERROR,
                     format!("parse error: the line exceeds {MAX_LINE_BYTES} bytes"),
@@ -1999,7 +2005,7 @@ fn parent_loop(engine: Arc<Engine>, mut session: Session, orphan: bool) {
         if line.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
-        let req = match ms_ipc::parse_request(&line) {
+        let req = match tern_ipc::parse_request(&line) {
             Ok(req) => req,
             Err((id, e)) => {
                 respond(&Response::err(id, e));
@@ -2089,7 +2095,7 @@ fn slow_parent_job(engine: Arc<Engine>, req: &RpcRequest) -> Result<SocketJob, E
 }
 
 fn respond(response: &Response) {
-    write_stdout(&String::from_utf8_lossy(&ms_ipc::encode(response)));
+    write_stdout(&String::from_utf8_lossy(&tern_ipc::encode(response)));
 }
 
 fn handle_parent(engine: &Engine, session: &mut Session, req: &RpcRequest) -> Reply {

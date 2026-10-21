@@ -7,7 +7,7 @@ _migrateToV10 with freshDatabase = true; V11 and V12 only rewrite rows). The Rus
 creates the same final schema in one step. This
 script is the reference for that DDL:
 
-    schema_check.py dump  [--constants PATH] > crates/ms-store/tests/fixtures/v12_schema.json
+    schema_check.py dump  [--constants PATH] > crates/tern-store/tests/fixtures/v12_schema.json
     schema_check.py check DB [--constants PATH]   # compare a database made by --mode migrate
 
 Comparison is on sqlite_master (type, name, tbl_name, sql), which is what SQLite itself

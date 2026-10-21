@@ -96,7 +96,7 @@ export function syncbackMetadata(args: {
 }
 
 // expungeAllInFolder, syncbackCategory and destroyCategory have no local
-// phase in ms-tasks: nothing changes until the remote phase and the next folder sync. UI
+// phase in tern-tasks: nothing changes until the remote phase and the next folder sync. UI
 // built on them must wait for the Folder/Label (and Message) deltas, not the `task.queue`
 // result; `created` is only filled on the completed task.
 export function expungeAllInFolder(folder: FolderJSON): ExpungeAllInFolderTaskJSON {

@@ -13,7 +13,7 @@ name = "tern-gateway"
 path = "src/main.rs"
 
 [dependencies]
-ms-ipc.workspace = true
+tern-ipc.workspace = true
 tern-client.workspace = true
 futures.workspace = true
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio", "tower-log", "ws"] }

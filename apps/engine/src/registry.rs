@@ -13,9 +13,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use ms_ipc::{CredentialsImportParams, CredentialsImportResult, CredentialsStatus, ImportFailure};
-use ms_secrets::{names, SecretStore, Selection};
 use serde_json::{json, Map, Value};
+use tern_ipc::{
+    CredentialsImportParams, CredentialsImportResult, CredentialsStatus, ImportFailure,
+};
+use tern_secrets::{names, SecretStore, Selection};
 use tracing::{info, warn};
 
 pub const ACCOUNTS_FILE: &str = "accounts.json";
@@ -52,7 +54,7 @@ pub struct Registry {
 impl Registry {
     pub fn open(config_dir: &Path) -> Self {
         let dev_key = cfg!(debug_assertions).then(|| config_dir.join(DEV_KEY_FILE));
-        let selection = ms_secrets::select(config_dir, &|k| std::env::var(k).ok(), dev_key)
+        let selection = tern_secrets::select(config_dir, &|k| std::env::var(k).ok(), dev_key)
             .map_err(|e| e.to_string());
         Self::with_selection(config_dir, selection)
     }
@@ -363,8 +365,8 @@ impl Registry {
                     }
                 }
             }
-            let checked =
-                ms_core::Account::from_json(account.clone()).and_then(|a| a.validate().map(|()| a));
+            let checked = tern_core::Account::from_json(account.clone())
+                .and_then(|a| a.validate().map(|()| a));
             match checked {
                 Err(e) => out.failed.push(fail(e)),
                 Ok(_) => match self.register(&account) {
@@ -611,13 +613,13 @@ fn save_accounts(path: &Path, accounts: &[Value]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ms_secrets::KeySource;
+    use tern_secrets::KeySource;
 
     fn registry(dir: &Path) -> Registry {
         Registry::with_selection(
             dir,
             Ok(Selection::File {
-                data: dir.join(ms_secrets::FILE_NAME),
+                data: dir.join(tern_secrets::FILE_NAME),
                 key: KeySource::Bytes(vec![3; 32]),
             }),
         )
@@ -757,7 +759,7 @@ mod tests {
 
         // A store whose file no longer reads.
         let broken = tempfile::tempdir().unwrap();
-        std::fs::write(broken.path().join(ms_secrets::FILE_NAME), b"not a keyset").unwrap();
+        std::fs::write(broken.path().join(tern_secrets::FILE_NAME), b"not a keyset").unwrap();
         let broken = registry(broken.path());
         assert!(broken.secret("integration:ai-claude").is_err());
         assert!(broken.forget_secret("integration:ai-claude").is_ok());

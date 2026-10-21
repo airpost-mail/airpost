@@ -45,7 +45,7 @@ export type MockAiHandlers = {
   [M in AiMethod]: (p: RpcMethods[M]['params']) => RpcResult<M> | Promise<RpcResult<M>>;
 };
 
-/** ms-ai PROMPT_VERSION as of AI4. */
+/** tern-ai PROMPT_VERSION as of AI4. */
 const PROMPT_VERSION = 2;
 const TRIAGE_RUN_MAX = 200;
 const READ_MAX_LIMIT = 500;

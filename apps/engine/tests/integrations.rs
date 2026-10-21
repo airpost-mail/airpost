@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-//! `integrations.*` and `capabilities` on `serve`'s socket, against ms-integrations' mock
+//! `integrations.*` and `capabilities` on `serve`'s socket, against tern-integrations' mock
 //! provider server.
 
 #![cfg(unix)]
 
-#[path = "../../../crates/ms-integrations/tests/common/mod.rs"]
+#[path = "../../../crates/tern-integrations/tests/common/mod.rs"]
 mod common;
 
 use std::io::{BufRead, BufReader};
@@ -15,8 +15,8 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use common::{MockServer, Reply};
-use ms_ipc::{code, feature, method, Client, Message, Request};
 use serde_json::{json, Value};
+use tern_ipc::{code, feature, method, Client, Message, Request};
 
 const WAIT: Duration = Duration::from_secs(30);
 
@@ -226,7 +226,7 @@ fn integrations_call_the_provider_and_map_its_errors() {
     let err = c
         .call(method::INTEGRATIONS_TEST, json!({"config": bad}))
         .unwrap_err();
-    let ms_ipc::ClientError::Rpc(err) = err else {
+    let tern_ipc::ClientError::Rpc(err) = err else {
         panic!("{err:?}")
     };
     assert_eq!(err.code, code::INTEGRATION_FAILED);
@@ -253,14 +253,14 @@ fn a_slow_integration_is_answered_after_later_requests() {
         method::INTEGRATIONS_TRANSLATE,
         json!({"config": config, "text": "slow", "target": "es"}),
     );
-    c.send_raw(&ms_ipc::encode(&slow)).unwrap();
+    c.send_raw(&tern_ipc::encode(&slow)).unwrap();
     let status = Request::new(101, method::ENGINE_STATUS, json!({}));
-    c.send_raw(&ms_ipc::encode(&status)).unwrap();
+    c.send_raw(&tern_ipc::encode(&status)).unwrap();
     let mut order = Vec::new();
     while order.len() < 2 {
         if let Message::Response(r) = c.read_message().unwrap() {
             order.push(serde_json::to_value(&r.id).unwrap());
-            if r.id == Some(ms_ipc::Id::Num(100)) {
+            if r.id == Some(tern_ipc::Id::Num(100)) {
                 assert_eq!(r.result.unwrap()["translatedText"], "lento");
             }
         }

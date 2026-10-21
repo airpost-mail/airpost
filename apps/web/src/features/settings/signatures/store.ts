@@ -3,7 +3,7 @@
 // TODO(engine): signatures live in this browser only. The engine keeps `signatures` and
 // `defaultSignatures` (DCP stage 3), but a device without the admin scope may set only
 // `defaultSignatures`: the signature HTML is rendered by the desktop, so `signatures` joins
-// ms-ipc `RELAYED_SETTINGS_KEYS` only once the desktop treats web-written HTML as untrusted.
+// tern-ipc `RELAYED_SETTINGS_KEYS` only once the desktop treats web-written HTML as untrusted.
 import { useSyncExternalStore } from 'react';
 import { generateId } from '@/engine';
 

@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use ms_ipc::{code, ClientError};
+use tern_ipc::{code, ClientError};
 
 /// What ends a command, and its exit code.
 #[derive(Debug)]

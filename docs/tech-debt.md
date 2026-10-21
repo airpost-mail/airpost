@@ -239,12 +239,12 @@ for any IMAP port other than 993 and any SMTP port other than 465/587 (`onboardi
 `:194`). 135 of the 1064 entries in `mailspring-provider-settings.json` ship `none` (105
 plala/wind `.jp`, plus nifty.com, goo.jp, terra.es, telefonica.net, versatel.de, tiscali.cz,
 peoplepc.com and others). In the engine, `Security::from_setting`
-(`crates/ms-core/src/account.rs:25-31`) maps any unknown, empty or missing value to `Clear`, so it
-fails open, and `Account::valid()` doesn't check it. `crates/ms-smtp/src/session.rs:142` then
+(`crates/tern-core/src/account.rs:25-31`) maps any unknown, empty or missing value to `Clear`, so it
+fails open, and `Account::valid()` doesn't check it. `crates/tern-smtp/src/session.rs:142` then
 greets with no TLS. The UI shows no warning.
 
 - Cost: passwords and mail in clear for users who type 143, for those domains, and for any
-  account JSON with a bad value. Stage 12 ports discovery into `ms-providers` and would copy the
+  account JSON with a bad value. Stage 12 ports discovery into `tern-providers` and would copy the
   table and defaults as-is.
 - Fix: engine accepts only an explicit `"none"` as `Clear` and rejects unknown values with an
   error (existing `none` values weren't always the user's choice; see the review fixes above). UI: port 143 defaults to STARTTLS,
@@ -296,10 +296,10 @@ profile, accounts and database are copied in again (`main.js:404`).
 
 ### TD6. No schema migration path for Rust-written databases
 
-Verified. `crates/ms-store/src/migrate.rs:57-77` either creates V12 on an empty database or
+Verified. `crates/tern-store/src/migrate.rs:57-77` either creates V12 on an empty database or
 errors on a Rust database below version 12, and silently accepts a version above
 `SCHEMA_VERSION` (`:78-79`), so an older build would run against a schema it doesn't know.
-`crates/ms-store/tests/schema.rs:4-6` requires the schema to match the C++ V12 byte for byte.
+`crates/tern-store/tests/schema.rs:4-6` requires the schema to match the C++ V12 byte for byte.
 The port's rule is that future changes are Rust-owned migrations from V12, but no
 code does it and no stage schedules it.
 
@@ -316,9 +316,9 @@ code does it and no stage schedules it.
 
 Verified (EXPLAIN on the V12 schema). Non-Gmail accounts find a new message's thread with
 `WHERE ThreadReference.accountId = ? AND headerMessageId IN (…)`
-(`crates/ms-store/src/search.rs:131-157`, called inside the insert transaction at
-`crates/ms-sync/src/mail_processor.rs:212`). The only index is the primary key
-`(threadId, accountId, headerMessageId)` (`crates/ms-store/src/schema.rs:43`), and the plan is
+(`crates/tern-store/src/search.rs:131-157`, called inside the insert transaction at
+`crates/tern-sync/src/mail_processor.rs:212`). The only index is the primary key
+`(threadId, accountId, headerMessageId)` (`crates/tern-store/src/schema.rs:43`), and the plan is
 `SCAN ThreadReference`. Thread removal never deletes its references (`Thread::after_remove`,
 `thread.rs` ~625-634; only account reset does, `schema.rs:92`), so the table only grows. The join
 on `Thread` drops orphans, so they cost time, not wrong matches. Inherited from `constants.h:138`.
@@ -333,9 +333,9 @@ Gmail is unaffected (it uses `ThreadGmailLookup`).
 
 ### TD8. Query planner has no statistics
 
-Verified (EXPLAIN on the V12 schema). Nothing in `crates/ms-store/src` or `apps/engine/src` runs
+Verified (EXPLAIN on the V12 schema). Nothing in `crates/tern-store/src` or `apps/engine/src` runs
 `ANALYZE` or `PRAGMA optimize`. Without `sqlite_stat1`, the `threads.get` message query
-(`crates/ms-store/src/read.rs:259`, `WHERE threadId = ? AND accountId = ? ORDER BY date`) uses
+(`crates/tern-store/src/read.rs:259`, `WHERE threadId = ? AND accountId = ? ORDER BY date`) uses
 `MessageListDateIndex (accountId=?)` plus a temp B-tree instead of `MessageListThreadIndex`.
 
 - Cost: opening one thread from the CLI, tern-mcp or web walks every message in the account. The
@@ -422,8 +422,8 @@ defaults (0644 under the usual umask) at predictable names and never removed:
 (`preferences-account-details.tsx:205-207`, `onboarding/lib/form-error-message.tsx:23`).
 
 The engine creates `tern.db`, logs and attachments at the default umask
-(`crates/ms-sync/src/mail_processor.rs:712-721`, `crates/ms-core/src/log.rs:146`,
-`crates/ms-store/src/schema.rs:114`); only `run/` is private (`apps/engine/src/platform.rs:153-166`).
+(`crates/tern-sync/src/mail_processor.rs:712-721`, `crates/tern-core/src/log.rs:146`,
+`crates/tern-store/src/schema.rs:114`); only `run/` is private (`apps/engine/src/platform.rs:153-166`).
 Today the desktop chmods the config dir to 0700 (`src/main/config-persistence-manager.ts:37-45`),
 which covers those files, so the engine half matters when the engine creates its own directory
 (stage 11 `--detached`, `--config-dir-path`, hosted).
@@ -563,7 +563,7 @@ in 129 places. No `prefers-reduced-motion` rule outside vendored pdf.js.
 ### TD20. Body-fetch placeholder rows are never retried
 
 Verified. `sync_message_bodies` reserves up to 30 messages with `MessageBody(id, NULL)` and no
-`fetchedAt` (`crates/ms-sync/src/worker.rs:661-667`) and fetches them one at a time. A connection
+`fetchedAt` (`crates/tern-sync/src/worker.rs:661-667`) and fetches them one at a time. A connection
 error returns early (`:719-720`), leaving the rest as NULL rows. Candidate selection skips ids
 with a row and the purge needs `fetchedAt < now-14d` (`:559`), so they're never background-fetched
 again. Inherited (`SyncWorker.cpp:1588-1608`).
@@ -577,8 +577,8 @@ again. Inherited (`SyncWorker.cpp:1588-1608`).
 ### TD21. Threading ignores In-Reply-To and never merges
 
 Verified. Non-Gmail lookup uses only the message's Message-ID and References
-(`crates/ms-store/src/search.rs:131-157`, `crates/ms-sync/src/mail_processor.rs:205-217`), though
-In-Reply-To is parsed (`crates/ms-store/src/models/message.rs:139`). When references hit two
+(`crates/tern-store/src/search.rs:131-157`, `crates/tern-sync/src/mail_processor.rs:205-217`), though
+In-Reply-To is parsed (`crates/tern-store/src/models/message.rs:139`). When references hit two
 threads, `LIMIT 1` with no `ORDER BY` picks one and they're never merged. Inherited
 (`MailProcessor.cpp:162-227`).
 
@@ -665,7 +665,7 @@ Ordered by the stage they belong to.
 
 ### TD26. Engine protocol types hand-copied in desktop and web (before stage 1)
 
-Verified. `src/shared/engine-protocol.ts:4-8` says its types are hand-written from `crates/ms-ipc` and
+Verified. `src/shared/engine-protocol.ts:4-8` says its types are hand-written from `crates/tern-ipc` and
 generation waits until "the surface grows". `apps/web/src/engine/rpc.ts` (279 lines) has its own
 envelope, `PROTOCOL_VERSION` and method map, and `apps/web/src/engine/types.ts` (421 lines) copies
 the model JSON. The protocol design deferred generation to the desktop client refactor, which scheduled no generation step while adding ~30 methods and
@@ -675,7 +675,7 @@ README.
 - Cost: every new method is three hand edits; drift shows up as runtime `undefined`s, and stage 8
   routes every read through these types. tern-client (T20) shares types on the Rust side only.
 - Fix: derive TS (ts-rs or specta) or JSON Schema (schemars plus json-schema-to-typescript) from the
-  ms-ipc request, response and notification types and the ms-store model structs into
+  tern-ipc request, response and notification types and the tern-store model structs into
   `packages/engine-protocol`; desktop and web import it; CI fails when regeneration gives a diff.
   Keep only runtime helpers (socket path, framing) in `engine-protocol.ts`. The desktop's
   `flux/models` classes stay, since they carry attribute metadata.
@@ -804,13 +804,13 @@ unlike `package-manager.ts:36-39`).
 ### TD32. Reset / Rebuild Cache deletes local-only plugin metadata (before stage 4)
 
 Verified, except that thread ids change after resync, which is inferred. `reset_account`
-(`crates/ms-store/src/migrate.rs:101-108`) runs `DELETE FROM ModelPluginMetadata` and
-`DetatchedPluginMetadata` (`crates/ms-store/src/schema.rs:106-107`) and sets the metadata cursor to
+(`crates/tern-store/src/migrate.rs:101-108`) runs `DELETE FROM ModelPluginMetadata` and
+`DetatchedPluginMetadata` (`crates/tern-store/src/schema.rs:106-107`) and sets the metadata cursor to
 0 "so metadata is fetched again on resync". Under D3 LocalOnly is the default and nothing is
 fetched. The whole-database delete after a database error (`src/main/application.ts:349-374`)
 and per-account Reset in Preferences (`preferences-account-details.tsx:168` →
 `mailsync-bridge.ts:231` → `--mode reset`) both hit this today. Thread ids are `t:<first message
-inserted>` (`crates/ms-core/src/ids.rs:126-128`), so reattaching by thread id wouldn't work anyway.
+inserted>` (`crates/tern-core/src/ids.rs:126-128`), so reattaching by thread id wouldn't work anyway.
 With `HttpMetadataBackend` configured, the cursor reset does replay from the backend.
 
 - Cost: reset drops scheduled sends, reminders and snoozes without saying so; snoozed threads stay
@@ -824,7 +824,7 @@ With `HttpMetadataBackend` configured, the cursor reset does replay from the bac
 - Size: ~300–400 Rust plus scenario. Before stage 4 makes the engine the only owner of
   snooze and send-later state.
 - Status (2026-10-18, `roadmap/client-next`): fixed for `--mode reset`, `account.reset` and
-  `engine.resetDatabase` (`crates/ms-store/src/metadata_stash.rs`; scenarios
+  `engine.resetDatabase` (`crates/tern-store/src/metadata_stash.rs`; scenarios
   `reset-keeps-plugin-metadata`, `expiration-reset-keeps-snooze`). Removing an account does not
   keep it: `account.reset {keepMetadata: false}` and `engine.resetDatabase {keepMetadata: false}`
   (from the desktop's account removal) delete it, since a re-added account has the same id
@@ -834,7 +834,7 @@ With `HttpMetadataBackend` configured, the cursor reset does replay from the bac
 
 ### TD33. No outbox; failed silent sends pop a composer (silent fix now; queue in stages 4 and 13)
 
-Verified. A send runs once (`crates/ms-tasks/src/send.rs:9-12`); a connection error ends the task
+Verified. A send runs once (`crates/tern-tasks/src/send.rs:9-12`); a connection error ends the task
 with an error dialog or popout composer (`src/flux/stores/draft-store.ts:667-690`). Nothing in the
 send path reads `OnlineStatusStore`. `SendDraftTask` checks `silent` at `:115` and `:142` but not
 in `onError` (~`:150-201`), so a snooze or reminder resurfacing message that fails offline opens a
@@ -998,11 +998,11 @@ Atom-era code event-kit (16 files). `DatabaseStore.trigger` fires once per incom
 ### TD39. Folder identity is a path hash (stage 3, before stage 14)
 
 Verified; downstream effects inferred. Folder sync matches LIST output only by
-`hash(accountId:path)` (`crates/ms-core/src/ids.rs:121`, `crates/ms-sync/src/background.rs:814-830`).
+`hash(accountId:path)` (`crates/tern-core/src/ids.rs:121`, `crates/tern-sync/src/background.rs:814-830`).
 After a rename, in Tern or on the server, the old row is unused, its messages are detached and the
 folder removed (`:883-930`), a new id refetches headers from scratch, and orphans relink only if
 the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with the new path
-(`crates/ms-tasks/src/folders.rs:113-131`), which the next listing discards.
+(`crates/tern-tasks/src/folders.rs:113-131`), which the next listing discards.
 
 - Cost: renaming a large folder or Gmail label triggers a full header resync and thread churn.
   Anything storing folder ids (rule targets, per-category settings, soon engine settings and rules)
@@ -1026,8 +1026,8 @@ the walk reaches them within 24 hours. `RenameFolderTask` keeps the old id with 
   thread snapshots (and their `ThreadSearch.categories`, which `in:` reads) are rewritten in
   chunks, queued in `_State` `folderRenameRefresh-<accountId>`
   in the same transaction so a quit resumes it. A new folder at a path whose hash a renamed row
-  holds gets `hash(accountId:path#n)` (`ms_core::ids::free_folder_id`). Code in
-  `ms_sync::folder_identity`, `Background::pair_renamed`, `ms_tasks` folders.rs. Desktop:
+  holds gets `hash(accountId:path#n)` (`tern_core::ids::free_folder_id`). Code in
+  `tern_sync::folder_identity`, `Background::pair_renamed`, `tern_tasks` folders.rs. Desktop:
   `FocusedPerspectiveStore` swaps in the renamed category in place, and `ThreadListStore` keeps
   its data source (scroll position, open thread) for a perspective with the same type,
   accounts, category ids and roles. Scenarios `folder-renamed-in-tern`,
@@ -1085,8 +1085,8 @@ Inferred: the warning's source isn't confirmed in devtools. `BaseStore` caps lis
 ### TD42. ThreadSearch is one append-only FTS row per thread (before stage 9)
 
 Verified. Each body fetch appends up to 5,000 chars to the thread's row with no already-indexed
-check and no cap (`crates/ms-store/src/search.rs:56-101`, called from
-`crates/ms-sync/src/mail_processor.rs:683-687`). Bodies purged after 14 days (`worker.rs:559-571`)
+check and no cap (`crates/tern-store/src/search.rs:56-101`, called from
+`crates/tern-sync/src/mail_processor.rs:683-687`). Bodies purged after 14 days (`worker.rs:559-571`)
 and fetched again on open (`foreground.rs:160`, `background.rs:560`) are appended twice.
 `Message::after_remove` (`message.rs:650-658`) never touches ThreadSearch, so text of removed
 messages stays searchable. Category changes UPDATE the whole row (`thread.rs:541-547`) and FTS5
@@ -1105,7 +1105,7 @@ indexes an unspaced CJK run as one token, so only its prefix matches.
 
 ### TD43. Transient task errors revert the user's action (before stages 11 and 14)
 
-Done (roadmap/client-next, stage 11, 9899c06d1, 825d791ed). `ms-tasks` retries the remote
+Done (roadmap/client-next, stage 11, 9899c06d1, 825d791ed). `tern-tasks` retries the remote
 phase of ChangeUnread/Starred/Folder/Labels, SyncbackCategory, DestroyCategory and
 ExpungeAllInFolder after a retryable error: the task stays `remote` with `_remoteAttempts` and
 `_nextAttemptAt` in its data, 5 s doubling to 5 min, up to 8 attempts, then fails as before. A
@@ -1114,9 +1114,9 @@ rescan until the last attempt. The foreground worker skips a task until its next
 Scenario `flag-change-retried-after-connection-drop`.
 
 Verified; the flag-revert via rescan is inferred. Only `Error::Database` leaves a task queued
-(`crates/ms-tasks/src/lib.rs:287-290`, `:353-379`); any other error, retryable or not, marks it
+(`crates/tern-tasks/src/lib.rs:287-290`, `:353-379`); any other error, retryable or not, marks it
 complete with the error. Moves abandon the optimistic placement and flag changes rescan folders
-(`crates/ms-tasks/src/messages.rs:614-625`, `:637-645`, `:685-689`). This is the C++ "no automatic
+(`crates/tern-tasks/src/messages.rs:614-625`, `:637-645`, `:685-689`). This is the C++ "no automatic
 retries" rule, kept on purpose.
 
 - Cost: a connection that drops mid-task (Wi-Fi flap, server cutting a long MOVE, STORE or EXPUNGE,
@@ -1138,9 +1138,9 @@ backoff; only other errors stop the account, and `serve`'s restart policy (5 s d
 5 stops in 5 minutes gives up, auth failures wait for the client) restarts it.
 
 Verified. `is_retryable` is true only for a `SyncError` with `retryable` set
-(`crates/ms-core/src/error.rs:353-355`). A Database error (`SQLITE_BUSY` after the 60 s busy
+(`crates/tern-core/src/error.rs:353-355`). A Database error (`SQLITE_BUSY` after the 60 s busy
 timeout, disk full, I/O error) or a serde or io error calls `ctx.fail`
-(`crates/ms-sync/src/lib.rs:96-110`), and `serve` never restarts the account
+(`crates/tern-sync/src/lib.rs:96-110`), and `serve` never restarts the account
 (`apps/engine/src/serve.rs:15-19`). In C++ these crashed the process and the client's CrashTracker
 restarted it.
 
@@ -1163,12 +1163,12 @@ skipped, so the account keeps syncing; this works in `serve`, where account thre
 account keeps running.
 
 Inferred: no concrete panic found. The IMAP parser and envelope code
-(`crates/ms-imap/src/parser.rs`, `envelope.rs`), MIME (`crates/ms-mime/src/mime.rs`, `header.rs`,
-`flatten.rs`), `crates/ms-core/src/rfc2047.rs` and DAV (`crates/ms-dav/src/ical.rs`, `vcard.rs`)
+(`crates/tern-imap/src/parser.rs`, `envelope.rs`), MIME (`crates/tern-mime/src/mime.rs`, `header.rs`,
+`flatten.rs`), `crates/tern-core/src/rfc2047.rs` and DAV (`crates/tern-dav/src/ical.rs`, `vcard.rs`)
 slice buffers by computed offsets on server- and sender-controlled input. For example
 `parser.rs:571` computes `p + n` for a literal length unchecked and relies on the transport cap
 (`transport.rs:28`). No cargo-fuzz targets or proptest exist. A panic on an account thread stops
-the account (`crates/ms-sync/src/runtime.rs:201`, `apps/engine/src/modes.rs:225-235`).
+the account (`crates/tern-sync/src/runtime.rs:201`, `apps/engine/src/modes.rs:225-235`).
 
 - Cost: one malformed message or response stops an account, the header fetch hits it again on
   every restart, and stage 11's restart policy loops until it gives up. Remote-triggerable denial
@@ -1187,7 +1187,7 @@ after an hourly cleanup that deleted rows the engine runs `incremental_vacuum(20
 are not converted (that needs one full VACUUM); they still get the WAL truncation.
 
 Verified; WAL growth inferred. Every 30 days `migrate` runs a full VACUUM before the app starts
-(`crates/ms-store/src/migrate.rs:82-95`), needing twice the database size free, and
+(`crates/tern-store/src/migrate.rs:82-95`), needing twice the database size free, and
 `reset_account` runs one synchronously (`:106`). No connection sets `journal_size_limit` or
 `auto_vacuum` and nothing checkpoints with TRUNCATE (`schema.rs:114-128`).
 
@@ -1206,7 +1206,7 @@ snapshot; tiles say "Gmail or G Suite", "Office 365", "FastMail" (`account-provi
 `:88`); `apps/web/src/features/settings/accounts/presets.ts` is a third copy. `dns.resolveMx` has no
 timeout, and the code's own comment says ~30 s (`onboarding-helpers.ts:65-76`).
 
-- Fix: when stage 12 moves discovery into the engine, keep one `ms-providers` data file regenerated
+- Fix: when stage 12 moves discovery into the engine, keep one `tern-providers` data file regenerated
   from current Thunderbird ISPDB with dead entries removed (after TD4's cleartext pass); desktop
   and web render tiles from `account.discover`; 5 s MX timeout.
 - Size: 1–2 days.
@@ -1245,10 +1245,10 @@ hard-coded `h:mm A` in eight places (`calendar-event-popover.tsx:971-976`,
 
 ### TD49. Very large sync and send functions (stage 13; with TD39 and TD55)
 
-Verified. `sync_now` (~404 lines, `crates/ms-sync/src/background.rs:265`),
+Verified. `sync_now` (~404 lines, `crates/tern-sync/src/background.rs:265`),
 `sync_folders_and_labels` (~216, `:739`), `perform_remote_send_draft` (~288,
-`crates/ms-tasks/src/send.rs:176`) and `sync_folder_uid_range` (~189, `worker.rs:238`) are
-line-for-line C++ ports mixing many invariants. ms-sync has ~36 unit tests; most coverage is the
+`crates/tern-tasks/src/send.rs:176`) and `sync_folder_uid_range` (~189, `worker.rs:238`) are
+line-for-line C++ ports mixing many invariants. tern-sync has ~36 unit tests; most coverage is the
 Python harness.
 
 - Cost: TD39, TD55 and stage 13 all land in these bodies; once the C++ A/B oracle goes (stage 10),
@@ -1257,21 +1257,21 @@ Python harness.
   path in stage 13; `sync_now` with TD39 or TD55), not as a standalone pass.
 - Status (2026-10-18, stage 13): not done. Stage 13 didn't edit `perform_remote_send_draft`
   (`draft.send` queues the existing `SendDraftTask`; the shared finalisation is
-  `ms_sync::expiration_executor::finalise_draft`), so the split stays with the next stage that
+  `tern_sync::expiration_executor::finalise_draft`), so the split stays with the next stage that
   changes the send body.
 - Status (2026-10-18, TD39): `sync_folders_and_labels` lost the LIST and helper-folder step
   (`list_remote_folders`) and role assignment (`assign_roles`); rename pairing is
-  `Background::pair_renamed` over unit-tested functions in `ms_sync::folder_identity`.
+  `Background::pair_renamed` over unit-tested functions in `tern_sync::folder_identity`.
   `sync_now` is unchanged.
 
 ### TD50. EventSearch and ContactSearch updated by an UNINDEXED column (before stage 18)
 
 Done (roadmap/client-next, stage 18). Event and Contact keep their FTS rowid as `searchRowId`
-(`crates/ms-store/src/models/search_row.rs`) and update and delete by it. A row written before
+(`crates/tern-store/src/models/search_row.rs`) and update and delete by it. A row written before
 that is found by `content_id` once, on its next save, so no migration was needed; a
 `searchRowId` that names another model's row is not trusted.
 
-Verified (EXPLAIN). `content_id` is declared UNINDEXED (`crates/ms-store/src/schema.rs:31`, `:66`)
+Verified (EXPLAIN). `content_id` is declared UNINDEXED (`crates/tern-store/src/schema.rs:31`, `:66`)
 and every event update and delete and non-mail contact update uses `WHERE content_id = ?`
 (`models/calendar.rs:346-364`, `models/contact.rs:203-221`), giving a full virtual-table scan per
 row. Inherited.
@@ -1350,8 +1350,8 @@ unmaintained), and the feed is empty (`autoupdate-manager.ts:23`).
 ### TD55. STATUS on every folder every 2 minutes, IDLE only on Inbox
 
 Verified; throttling risk inferred. Each background pass sends one STATUS per selectable folder in
-sequence, then sleeps 120 s (`crates/ms-sync/src/background.rs:305-311`,
-`crates/ms-core/src/constants.rs:60-61`, `:111`); IDLE covers Inbox or All Mail only
+sequence, then sleeps 120 s (`crates/tern-sync/src/background.rs:305-311`,
+`crates/tern-core/src/constants.rs:60-61`, `:111`); IDLE covers Inbox or All Mail only
 (`foreground.rs:218-303`); errors sleep a fixed 120 s with no backoff or jitter. No LIST-STATUS
 (RFC 5819) or NOTIFY (RFC 5465).
 

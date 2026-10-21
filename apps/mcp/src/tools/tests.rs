@@ -411,7 +411,7 @@ fn new_drafts_use_the_engine_default_sending_account() {
     let mut f = fake();
     f.accounts.push(Fake::account("a2", "two@x.test"));
     assert_eq!(draft_account(&mut f), "a1");
-    f.features.push(ms_ipc::feature::SETTINGS.into());
+    f.features.push(tern_ipc::feature::SETTINGS.into());
     f.settings
         .insert("core.sending.defaultAccountIdForSend".into(), json!("a2"));
     assert_eq!(draft_account(&mut f), "a2");
@@ -636,7 +636,8 @@ fn schedule_send_says_who_does_the_send() {
         json!({"headerMessageId": "draft-0@x.test", "sendAt": at}),
     ));
     assert!(out["note"].as_str().unwrap().contains("desktop app"));
-    f.features.push(ms_ipc::feature::EXPIRATION_EXECUTOR.into());
+    f.features
+        .push(tern_ipc::feature::EXPIRATION_EXECUTOR.into());
     let out = json_of(&run(
         &mut f,
         &send,
@@ -721,7 +722,7 @@ fn search_and_listing() {
 #[test]
 fn search_hands_the_grammar_to_the_engine() {
     let mut f = fake();
-    f.features = vec![ms_ipc::feature::SEARCH_GRAMMAR.into()];
+    f.features = vec![tern_ipc::feature::SEARCH_GRAMMAR.into()];
     f.threads.push(
         json!({"id": "t2", "aid": "a1", "subject": "Other", "unread": 0,
         "starred": 0, "lmt": 3000, "lmrt": 3000, "labels": [], "participants": [],
@@ -755,7 +756,7 @@ fn search_hands_the_grammar_to_the_engine() {
 /// Two sent messages with tracking, a scheduled draft and one whose schedule has passed.
 fn tracked() -> Fake {
     let mut f = fake();
-    f.features = vec![ms_ipc::feature::METADATA_LIST.into()];
+    f.features = vec![tern_ipc::feature::METADATA_LIST.into()];
     let ev = |r: &str, ts: i64| json!({"recipient": r, "timestamp": ts});
     let sent = |id: &str, date: i64, metadata: Value| {
         json!({"id": id, "aid": "a1", "threadId": "t1", "hMsgId": format!("{id}@x.test"),
@@ -921,7 +922,7 @@ fn scheduled_sends_include_due_and_failed_ones() {
 #[test]
 fn a_send_queued_elsewhere_blocks_edits_when_the_engine_lists_tasks() {
     let mut f = fake();
-    f.features = vec![ms_ipc::feature::TASKS_LIST.into()];
+    f.features = vec![tern_ipc::feature::TASKS_LIST.into()];
     f.tasks.insert(
         "desktop-send".into(),
         json!({"id": "desktop-send", "aid": "a1", "__cls": "SendDraftTask",
@@ -961,7 +962,7 @@ fn snooze_and_unsnooze_go_through_the_engine() {
         "{}",
         o.first_text()
     );
-    f.features.push(ms_ipc::feature::SNOOZE.into());
+    f.features.push(tern_ipc::feature::SNOOZE.into());
     let out = json_of(&run(&mut f, &rw(), "snooze_threads", args));
     assert_eq!(out["snoozed"], 1);
     let (m, params) = f.actions.last().unwrap();
@@ -1010,7 +1011,7 @@ fn snooze_and_unsnooze_go_through_the_engine() {
 #[test]
 fn unsubscribe_needs_send_access_and_says_what_to_do() {
     let mut f = fake();
-    f.features.push(ms_ipc::feature::UNSUBSCRIBE.into());
+    f.features.push(tern_ipc::feature::UNSUBSCRIBE.into());
     f.messages[0]["hListUnsub"] = json!("<https://lists.y.test/u/1>");
     let send = policy("read-write-send", json!({}));
     let o = run(&mut f, &rw(), "unsubscribe", json!({"messageId": "m1"}));
@@ -1036,7 +1037,7 @@ fn unsubscribe_needs_send_access_and_says_what_to_do() {
 #[test]
 fn an_engine_with_the_draft_pipeline_builds_and_sends_the_drafts() {
     let mut f = fake();
-    f.features.push(ms_ipc::feature::DRAFT_PIPELINE.into());
+    f.features.push(tern_ipc::feature::DRAFT_PIPELINE.into());
     json_of(&run(
         &mut f,
         &rw(),
@@ -1097,11 +1098,11 @@ fn an_engine_with_the_draft_pipeline_builds_and_sends_the_drafts() {
 fn drafts_are_html_when_the_composer_default_is_plaintext() {
     for pipeline in [false, true] {
         let mut f = fake();
-        f.features.push(ms_ipc::feature::SETTINGS.into());
+        f.features.push(tern_ipc::feature::SETTINGS.into());
         f.settings
             .insert("core.composing.html".into(), json!(false));
         if pipeline {
-            f.features.push(ms_ipc::feature::DRAFT_PIPELINE.into());
+            f.features.push(tern_ipc::feature::DRAFT_PIPELINE.into());
         }
         json_of(&run(
             &mut f,
@@ -1134,8 +1135,8 @@ fn drafts_are_html_when_the_composer_default_is_plaintext() {
 fn calendar_and_contact_tools() {
     let mut f = fake();
     f.features = vec![
-        ms_ipc::feature::CALENDAR_EDITING.into(),
-        ms_ipc::feature::CONTACT_EDITING.into(),
+        tern_ipc::feature::CALENDAR_EDITING.into(),
+        tern_ipc::feature::CONTACT_EDITING.into(),
     ];
     let ro = policy("read-only", json!({}));
     let send = policy("read-write-send", json!({}));

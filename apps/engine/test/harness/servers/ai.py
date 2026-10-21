@@ -1,5 +1,5 @@
 """
-An in-process fake of the Ollama endpoints ms-ai calls (crates/ms-ai/src/wire/ollama.rs), for
+An in-process fake of the Ollama endpoints tern-ai calls (crates/tern-ai/src/wire/ollama.rs), for
 the AI triage tests (test_ai.py):
 
   GET  /api/tags    the model list

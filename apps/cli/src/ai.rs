@@ -9,12 +9,12 @@
 use std::io::IsTerminal;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ms_ipc::{
+use serde_json::{json, Value};
+use tern_client::CALL_TIMEOUT;
+use tern_ipc::{
     encode, feature, method, AiDeltaParams, AiTriageProgressParams, AiTriageRunResult, AiUsageRow,
     ClientError, Id, Message, Request, SettingsGetParams, SettingsValues,
 };
-use serde_json::{json, Value};
-use tern_client::CALL_TIMEOUT;
 
 use crate::app::{call, Ctx};
 use crate::discovery::{self, Engine, Target};
@@ -286,7 +286,7 @@ fn streaming_call(
     method: &str,
     params: Value,
     timeout: Option<Duration>,
-    mut on_note: impl FnMut(&ms_ipc::Notification),
+    mut on_note: impl FnMut(&tern_ipc::Notification),
 ) -> std::result::Result<Value, ClientError> {
     // String ids never meet the client's own numbered ones.
     let id = Id::Str(stream_id());

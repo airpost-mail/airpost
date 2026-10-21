@@ -11,5 +11,5 @@ pub mod http;
 pub mod ids;
 pub mod repo;
 
-/// The wire types live in `crates/ms-wire`, shared with the engine.
-pub use ms_wire as wire;
+/// The wire types live in `crates/tern-wire`, shared with the engine.
+pub use tern_wire as wire;

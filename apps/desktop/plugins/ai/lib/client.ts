@@ -23,17 +23,17 @@ import {
   AiTestReport,
 } from 'mailspring-exports';
 
-// ms-ipc `code::AI_FAILED` and `code::ENGINE_BUSY`.
+// tern-ipc `code::AI_FAILED` and `code::ENGINE_BUSY`.
 const AI_FAILED = -32011;
 const ENGINE_BUSY = -32012;
 const ENGINE_FEATURE = 'ai';
-// ms-ipc `feature::AI_KEYS` (stored providers read `integration:ai-<id>`) and
+// tern-ipc `feature::AI_KEYS` (stored providers read `integration:ai-<id>`) and
 // `feature::ACCOUNT_SETUP` (`secrets.*` on the socket).
 const KEYS_FEATURE = 'ai-keys';
 const SECRETS_FEATURE = 'account-setup';
 
 /**
- * crates/ms-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
+ * crates/tern-ai error keys, plus the desktop's own: `engine-unavailable` (the engine doesn't serve
  * ai.*), `engine-disconnected` (the connection dropped), `engine-busy` (the engine's AI lane is
  * full, -32012), `keyset` (the saved key could not be read) and `stopped` (a triage job ended
  * early: the account stopped or triage was turned off).
@@ -220,7 +220,7 @@ function requireConnected() {
   }
 }
 
-/** The engine's secret for the provider's key (ms-secrets `names::ai_provider`). */
+/** The engine's secret for the provider's key (tern-secrets `names::ai_provider`). */
 export function secretName(providerId: string) {
   return `integration:ai-${providerId}`;
 }

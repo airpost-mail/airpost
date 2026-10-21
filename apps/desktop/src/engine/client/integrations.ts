@@ -1,5 +1,5 @@
 // The desktop's client for third-party integrations (translation, grammar, contact
-// enrichment). Provider logic lives in the engine (crates/ms-integrations); this module only
+// enrichment). Provider logic lives in the engine (crates/tern-integrations); this module only
 // reads the user's provider settings and key, builds the `integrations.*` request params and maps
 // the engine's errors to short messages.
 //
@@ -83,7 +83,7 @@ export function keyName(provider: IntegrationProvider) {
   return `integration-${provider}-key`;
 }
 
-/** The engine's name for a provider's key (crates/ms-secrets `names::integration`). */
+/** The engine's name for a provider's key (crates/tern-secrets `names::integration`). */
 export function secretName(provider: IntegrationProvider) {
   return `integration:${provider}`;
 }
@@ -168,7 +168,7 @@ export function buildProviderConfig(
   }
 }
 
-// Results, as crates/ms-integrations serializes them.
+// Results, as crates/tern-integrations serializes them.
 
 export interface DetectedLanguage {
   language: string;
@@ -253,7 +253,7 @@ export interface IntegrationResults {
 
 // Errors
 
-/** crates/ms-integrations error keys, plus the desktop's own `engine-unavailable`. */
+/** crates/tern-integrations error keys, plus the desktop's own `engine-unavailable`. */
 export type IntegrationErrorKey =
   | 'not-configured'
   | 'auth'

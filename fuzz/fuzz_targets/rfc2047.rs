@@ -6,5 +6,5 @@
 #![no_main]
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
-    let _ = ms_core::rfc2047::decode(data);
+    let _ = tern_core::rfc2047::decode(data);
 });

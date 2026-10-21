@@ -11,8 +11,8 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ms_ipc::DeltaParams;
 use serde_json::{json, Map, Value};
+use tern_ipc::DeltaParams;
 
 /// `source` on every task tern-mcp queues, as the desktop MCP plugin's.
 pub const SOURCE: &str = "MCP";

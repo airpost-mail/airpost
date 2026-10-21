@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Tern contributors
 
 //! The `integrations.*` methods on `serve`'s socket,
-//! over [`ms_integrations`], and the engine's `capabilities`.
+//! over [`tern_integrations`], and the engine's `capabilities`.
 //! Each call carries its provider `config`; a key it lacks comes from the secret
 //! store (`integration:<provider>`, [`with_stored_key`]). Nothing here keeps or logs it. The
 //! socket runs the calls on the integrations workers ([`crate::workers::INTEGRATIONS`]), since
@@ -10,17 +10,17 @@
 
 use std::sync::{Arc, Mutex};
 
-use ms_integrations::{
-    GrammarRequest, IntegrationError, Integrations, ProviderConfig, TranslateRequest,
-    TranslationProvider,
-};
-use ms_ipc::{
-    capability_reason, code, integration_kind, method, server_feature, Capabilities, Capability,
-    ErrorObject, Request as RpcRequest, CREDENTIALS_PER_REQUEST,
-};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};
+use tern_integrations::{
+    GrammarRequest, IntegrationError, Integrations, ProviderConfig, TranslateRequest,
+    TranslationProvider,
+};
+use tern_ipc::{
+    capability_reason, code, integration_kind, method, server_feature, Capabilities, Capability,
+    ErrorObject, Request as RpcRequest, CREDENTIALS_PER_REQUEST,
+};
 
 use crate::dispatch::Reply;
 
@@ -71,7 +71,7 @@ fn failed(e: IntegrationError) -> ErrorObject {
     ErrorObject::new(code::INTEGRATION_FAILED, format!("Integration failed: {e}")).with_data(data)
 }
 
-fn answer<T: serde::Serialize>(r: ms_integrations::Result<T>) -> Reply {
+fn answer<T: serde::Serialize>(r: tern_integrations::Result<T>) -> Reply {
     let value = r.map_err(failed)?;
     serde_json::to_value(value).map_err(|e| ErrorObject::new(code::INTERNAL_ERROR, e.to_string()))
 }
@@ -117,7 +117,7 @@ pub fn with_stored_key(
     if !blank(config.get("url")) && !is_stored_url(settings, provider, config.get("url")) {
         return req;
     }
-    if let Some(key) = secret(&ms_secrets::names::integration(provider)) {
+    if let Some(key) = secret(&tern_secrets::names::integration(provider)) {
         config.insert("apiKey".into(), Value::String(key));
     }
     req

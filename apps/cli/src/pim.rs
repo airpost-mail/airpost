@@ -6,8 +6,8 @@
 //! builds the ICS and vCards and queues the tasks that write them to the server.
 
 use chrono::{Local, Utc};
-use ms_ipc::{feature, method};
 use serde_json::{json, Map, Value};
+use tern_ipc::{feature, method};
 
 use crate::app::{call, Ctx};
 use crate::discovery::{self, Engine, Target};

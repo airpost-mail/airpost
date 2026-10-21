@@ -6,7 +6,7 @@
 //! browser only sees 1006 for an upgrade answered with an HTTP error.
 //!
 //! The browser's first frame must be `hello`, which the gateway forwards as a relayed
-//! `hello` for the device. After that each browser frame is parsed, checked against ms-ipc's
+//! `hello` for the device. After that each browser frame is parsed, checked against tern-ipc's
 //! `policy` and re-encoded before it is written to the engine: the engine frames by newline,
 //! and valid JSON may hold raw newlines between tokens, so the browser's bytes are never
 //! forwarded as they are. Engine lines go to the browser unchanged and in order, with no
@@ -45,8 +45,8 @@ use futures::stream::{SplitSink, SplitStream};
 use futures::task::{self, ArcWake, AtomicWaker};
 use futures::{SinkExt, StreamExt};
 use governor::{Quota, RateLimiter};
-use ms_ipc::{code, feature, method, policy, ErrorObject, Request, Response as RpcResponse};
 use serde_json::{json, Map, Value};
+use tern_ipc::{code, feature, method, policy, ErrorObject, Request, Response as RpcResponse};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::UnixStream;
@@ -158,7 +158,7 @@ async fn send_rpc(tx: &mut Tx, res: &RpcResponse) -> Result<(), Close> {
 }
 
 fn rpc_message(res: &RpcResponse) -> Message {
-    let line = ms_ipc::encode(res);
+    let line = tern_ipc::encode(res);
     Message::Text(
         String::from_utf8_lossy(trim_newline(&line))
             .into_owned()
@@ -246,7 +246,7 @@ async fn relay_inner(
                     }
                     Ok(_) => {}
                 }
-                if line.len() > ms_ipc::MAX_LINE_BYTES {
+                if line.len() > tern_ipc::MAX_LINE_BYTES {
                     return Err((close::ENGINE_UNAVAILABLE, "the engine sent an oversized line"));
                 }
                 let text = trim_newline(&line);
@@ -432,13 +432,13 @@ async fn hello(
     let Some(Ok(Message::Text(text))) = first else {
         return Err((close::PROTOCOL, "hello must come first"));
     };
-    let req = ms_ipc::parse_request(text.as_bytes())
+    let req = tern_ipc::parse_request(text.as_bytes())
         .ok()
         .filter(|r| r.method == method::HELLO && r.id.is_some())
         .ok_or((close::PROTOCOL, "hello must come first"))?;
     let id = req.id.clone().expect("checked");
     let relayed = Request::new(id, method::HELLO, relayed_hello_params(req.params, device));
-    w.write_all(&ms_ipc::encode(&relayed))
+    w.write_all(&tern_ipc::encode(&relayed))
         .await
         .map_err(|_| (close::ENGINE_UNAVAILABLE, engine::NOT_RUNNING))?;
 
@@ -493,7 +493,7 @@ fn relayed_hello_params(params: Value, device: &Device) -> Value {
 /// The engine line for a browser frame, or None when the gateway answered or dropped it
 /// itself.
 fn checked(text: &str, scopes: &[String], out: &mut Outbox) -> Result<Option<Vec<u8>>, Close> {
-    let req = match ms_ipc::parse_request(text.as_bytes()) {
+    let req = match tern_ipc::parse_request(text.as_bytes()) {
         Ok(r) => r,
         Err((id, e)) => {
             out.push(rpc_message(&RpcResponse::err(id, e)));
@@ -517,7 +517,7 @@ fn checked(text: &str, scopes: &[String], out: &mut Outbox) -> Result<Option<Vec
         }
         return Ok(None);
     }
-    Ok(Some(ms_ipc::encode(&req)))
+    Ok(Some(tern_ipc::encode(&req)))
 }
 
 /// Method names come from the browser: log the known ones only.

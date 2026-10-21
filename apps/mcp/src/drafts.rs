@@ -5,8 +5,8 @@
 //! back in a `SyncbackDraftTask` or `SendDraftTask`, the way the desktop's draft session
 //! saves it. New and reply drafts are built by `crate::compose`.
 
-use ms_compose::contacts::{contact_from_string, emails_equivalent};
 use serde_json::{json, Map, Value};
+use tern_compose::contacts::{contact_from_string, emails_equivalent};
 
 use crate::config::AccountMeta;
 use crate::model::{array_of, bool_of, str_of};

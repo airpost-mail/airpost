@@ -104,13 +104,13 @@ export interface HelloResult {
   engine: string;
   pid: number;
   accounts: EngineAccountSummary[];
-  /** What this engine has beyond protocol 1 (ms-ipc `feature`); absent on older engines. */
+  /** What this engine has beyond protocol 1 (tern-ipc `feature`); absent on older engines. */
   features?: string[];
   /** With `EngineFeature.Capabilities`; `capabilities.changed` carries later values. */
   capabilities?: EngineCapabilities;
 }
 
-/** One entry of `capabilities` (ms-ipc `Capability`, DCP 3.1). */
+/** One entry of `capabilities` (tern-ipc `Capability`, DCP 3.1). */
 export interface EngineCapability {
   available: boolean;
   provider?: string;
@@ -123,7 +123,7 @@ export interface EngineCapability {
 }
 
 /**
- * `hello.capabilities` and `capabilities.changed` (ms-ipc `Capabilities`): the integrations
+ * `hello.capabilities` and `capabilities.changed` (tern-ipc `Capabilities`): the integrations
  * by kind (`translation`, `grammar`, `enrichment`) and the Tern server's features
  * (`readReceipts`, `linkTracking`, `threadSharing`, `activitySharing`, `metadataSync`).
  * Groups a newer engine adds are kept as they came.
@@ -162,7 +162,7 @@ export const EngineFeature = {
   Unsubscribe: 'unsubscribe',
   /**
    * `settings.get`, `settings.set` and `settings.changed` (DCP stage 3). A device without
-   * the admin scope may set only the keys in ms-ipc `RELAYED_SETTINGS_KEYS`.
+   * the admin scope may set only the keys in tern-ipc `RELAYED_SETTINGS_KEYS`.
    */
   Settings: 'settings',
   /** The engine sends due send-later drafts and returns snoozed threads (DCP stage 4). */
@@ -177,7 +177,7 @@ export const EngineFeature = {
   AiTriage: 'ai-triage',
 } as const;
 
-/** ms-ipc `EngineStatusResult`. */
+/** tern-ipc `EngineStatusResult`. */
 export interface EngineStatus {
   protocol: number;
   engine: string;
@@ -207,7 +207,7 @@ export interface AccountListResult {
   accounts: AccountListEntry[];
 }
 
-// Read API params and results, as in crates/ms-ipc/src/read.rs. A `limit` defaults to 50
+// Read API params and results, as in crates/tern-ipc/src/read.rs. A `limit` defaults to 50
 // and is clamped to 1..=500 by the engine.
 
 export interface CategoriesListParams {
@@ -346,7 +346,7 @@ export type QueryClass =
   | 'File';
 
 /**
- * `query` (DCP 3.2, crates/ms-ipc `QueryParams`): the JSON form of the desktop's ModelQuery.
+ * `query` (DCP 3.2, crates/tern-ipc `QueryParams`): the JSON form of the desktop's ModelQuery.
  * `accounts` null or absent reads every account. `where` as a list means all must match. An
  * empty `order` is the class's natural order. `cursor` pages by keyset: `''` for the first
  * page, then the previous page's `nextCursor`. No limit applies when `limit` is absent.
@@ -380,7 +380,7 @@ export interface QueryResult<T = unknown> {
   nextCursor?: string | null;
 }
 
-// Mail actions, as in crates/ms-ipc/src/mail.rs.
+// Mail actions, as in crates/tern-ipc/src/mail.rs.
 
 /**
  * `threads.snooze`: the threads move to Snoozed and get the `thread-snooze` metadata that
@@ -435,7 +435,7 @@ export interface AccountTestResult {
 }
 
 /**
- * An integration provider with its settings, key included (ms-integrations `ProviderConfig`).
+ * An integration provider with its settings, key included (tern-integrations `ProviderConfig`).
  */
 export interface IntegrationConfig {
   provider: 'libretranslate' | 'deepl' | 'languagetool' | 'peopledatalabs';
@@ -456,7 +456,7 @@ export interface IntegrationTestReport {
   usage?: { used: number; limit?: number };
 }
 
-// `ai.*` (crates/ms-ipc/src/ai.rs). A relayed connection may
+// `ai.*` (crates/tern-ipc/src/ai.rs). A relayed connection may
 // name a stored provider (`provider`) but never send `config` or `settings`, so the web
 // leaves both out and the engine uses its `core.ai.*` settings.
 
@@ -549,7 +549,7 @@ export interface AiUsageRow {
   requests: number;
 }
 
-/** The `data` of an `AiFailed` error (ms-ai `AiError`). */
+/** The `data` of an `AiFailed` error (tern-ai `AiError`). */
 export interface AiErrorJSON {
   key: string;
   message: string;

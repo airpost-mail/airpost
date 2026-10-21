@@ -15,7 +15,7 @@ export interface ISendAction {
 
 const ACTION_CONFIG_KEY = 'core.sending.defaultSendType';
 const DefaultSendActionKey = 'send';
-// The send actions an engine performs when it sends a scheduled draft itself (ms-sync
+// The send actions an engine performs when it sends a scheduled draft itself (tern-sync
 // expiration_executor SEND_ACTIONS).
 const ENGINE_SEND_ACTION_KEYS = [DefaultSendActionKey, 'send-and-archive'];
 const DefaultSendAction: ISendAction = {

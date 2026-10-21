@@ -3,7 +3,7 @@
 
 //! Mail rules in `serve` (`feature::RULES`): each
 //! account's `mailRules` thread applies the enabled rules of the `mailRules` setting
-//! ([`ms_tasks::mail_rules`]) to the account's arriving mail and runs its `rules.reprocess`
+//! ([`tern_tasks::mail_rules`]) to the account's arriving mail and runs its `rules.reprocess`
 //! jobs.
 //!
 //! - Arriving mail is the messages whose delta carries `rulesReady` (`Message::
@@ -32,20 +32,20 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::Duration;
 
-use ms_compose::settings::local_tz;
-use ms_compose::{ComposeSettings, Identities};
-use ms_core::constants::thread;
-use ms_ipc::{
+use serde_json::{json, Map, Value};
+use tern_compose::settings::local_tz;
+use tern_compose::{ComposeSettings, Identities};
+use tern_core::constants::thread;
+use tern_ipc::{
     code, draft_kind, DraftCreateParams, DraftSendParams, ErrorObject, RulesCancelParams,
     RulesCancelResult, RulesProgressParams, RulesReprocessParams, RulesReprocessResult,
     MAIL_RULES_AUTO_SINCE_KEY, MAIL_RULES_KEY,
 };
-use ms_store::read::ReadStore;
-use ms_store::{DeltaSink, Message, Model, Query, Store, Task, Thread};
-use ms_sync::expiration_executor::stored_body;
-use ms_sync::{EngineSettings, WorkerContext};
-use ms_tasks::mail_rules::{self, Categories, Matcher, Planned, Rule};
-use serde_json::{json, Map, Value};
+use tern_store::read::ReadStore;
+use tern_store::{DeltaSink, Message, Model, Query, Store, Task, Thread};
+use tern_sync::expiration_executor::stored_body;
+use tern_sync::{EngineSettings, WorkerContext};
+use tern_tasks::mail_rules::{self, Categories, Matcher, Planned, Rule};
 use tracing::{error, info, warn};
 
 use crate::dispatch::Reply;
@@ -548,7 +548,7 @@ impl Worker {
         }
     }
 
-    fn store(&mut self) -> ms_core::Result<&Store> {
+    fn store(&mut self) -> tern_core::Result<&Store> {
         if self.store.is_none() {
             self.store = Some(Store::open(&self.ctx.config_dir, self.ctx.deltas.clone())?);
         }
@@ -574,7 +574,7 @@ impl Worker {
     /// Arriving mail: the messages still there, not drafts, dated no earlier than
     /// `mailRulesAutoSince` (whose second the Date header can share) and not sent by the
     /// account to others.
-    fn arrived(&mut self, ids: &[String]) -> ms_core::Result<()> {
+    fn arrived(&mut self, ids: &[String]) -> tern_core::Result<()> {
         if self.rules().is_empty() {
             return Ok(());
         }
@@ -587,7 +587,7 @@ impl Worker {
         self.apply(&mail)
     }
 
-    fn load(&mut self, ids: &[String], since_ms: Option<i64>) -> ms_core::Result<Vec<Mail>> {
+    fn load(&mut self, ids: &[String], since_ms: Option<i64>) -> tern_core::Result<Vec<Mail>> {
         let account_id = self.account_id().to_owned();
         let is_mine = self.is_mine();
         let store = self.store()?;
@@ -618,7 +618,7 @@ impl Worker {
     }
 
     /// `processMessages`: one rule at a time over every message, once per thread.
-    fn apply(&mut self, mail: &[Mail]) -> ms_core::Result<()> {
+    fn apply(&mut self, mail: &[Mail]) -> tern_core::Result<()> {
         if mail.is_empty() {
             return Ok(());
         }
@@ -654,7 +654,7 @@ impl Worker {
 
     /// `_applyRuleToMessage`: every action planned against the thread as it is now, then
     /// their tasks run; nothing runs when one action can't. `Ok(Err)` is the rule's error.
-    fn act(&mut self, rule: &Rule, m: &Mail) -> ms_core::Result<Result<bool, String>> {
+    fn act(&mut self, rule: &Rule, m: &Mail) -> tern_core::Result<Result<bool, String>> {
         let account_id = self.account_id().to_owned();
         let store = self.store()?;
         let Some(thread) =
@@ -699,7 +699,7 @@ impl Worker {
         Ok(Ok(queued))
     }
 
-    fn perform_local(&mut self, task: &mut Task) -> ms_core::Result<()> {
+    fn perform_local(&mut self, task: &mut Task) -> tern_core::Result<()> {
         let ctx = self.ctx.clone();
         let store = self.store()?;
         ctx.tasks.perform_local(store, &ctx, task)?;
@@ -716,7 +716,7 @@ impl Worker {
     /// `composeAndSendForward`: the engine's forward of `message` to `to`, sent at once.
     /// Mail from this account isn't forwarded, so a rule that forwards to the account itself
     /// can't forward its own forwards forever.
-    fn forward(&mut self, message: &Message, to: &str) -> ms_core::Result<Result<(), String>> {
+    fn forward(&mut self, message: &Message, to: &str) -> tern_core::Result<Result<(), String>> {
         let from_me = {
             let is_mine = self.is_mine();
             message
@@ -797,7 +797,7 @@ impl Worker {
     }
 
     /// A `rules.reprocess` job, between whose batches arriving mail goes.
-    fn job(&mut self, job: &Arc<Job>) -> ms_core::Result<()> {
+    fn job(&mut self, job: &Arc<Job>) -> tern_core::Result<()> {
         let mut done = 0;
         for chunk in job.thread_ids.chunks(BATCH) {
             if job.is_cancelled() || self.ctx.is_stopping() || self.feed.is_closed() {
@@ -844,8 +844,8 @@ impl Worker {
 fn run_job(
     feed: &Feed,
     job: &Arc<Job>,
-    f: impl FnOnce(&Arc<Job>) -> ms_core::Result<()>,
-) -> ms_core::Result<()> {
+    f: impl FnOnce(&Arc<Job>) -> tern_core::Result<()>,
+) -> tern_core::Result<()> {
     let r = f(job);
     job.stop();
     feed.job_done(job);
@@ -857,7 +857,7 @@ fn run_job(
 struct LocalQueue<'a> {
     ctx: &'a WorkerContext,
     store: &'a Store,
-    database_error: std::cell::RefCell<Option<ms_core::Error>>,
+    database_error: std::cell::RefCell<Option<tern_core::Error>>,
 }
 
 impl QueueTask for LocalQueue<'_> {
@@ -949,7 +949,7 @@ mod tests {
         };
         let r = run_job(&feed, &taken, |j| {
             j.report(50);
-            Err(ms_core::Error::other("disk I/O error"))
+            Err(tern_core::Error::other("disk I/O error"))
         });
         assert!(r.is_err());
         let sent = sent.lock().unwrap();

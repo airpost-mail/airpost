@@ -1,0 +1,21 @@
+[package]
+name = "tern-ai"
+description = "Model providers for thread summaries, reply suggestions and inbox triage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+tern-integrations.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+tracing.workspace = true
+
+[dev-dependencies]
+tracing-subscriber.workspace = true

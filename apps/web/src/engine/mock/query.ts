@@ -1,6 +1,6 @@
-// The mock's `query` (DCP 3.2): the engine's compiler (crates/ms-store/src/model_query.rs)
+// The mock's `query` (DCP 3.2): the engine's compiler (crates/tern-store/src/model_query.rs)
 // over the in-memory store. Attribute names are the desktop's model keys from the engine's
-// allowlist (crates/ms-store/src/model_query_allowlist.json), for the classes the mock holds.
+// allowlist (crates/tern-store/src/model_query_allowlist.json), for the classes the mock holds.
 import {
   RpcError,
   RpcErrorCode,

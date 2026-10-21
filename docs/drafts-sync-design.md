@@ -7,13 +7,13 @@ desktop paths relative to `apps/desktop/`.
 ## 1. Today (C++ and Rust behave the same)
 
 **Saving (`SyncbackDraftTask`).**
-- Local phase `TaskProcessor.cpp:1320-1357` / `crates/ms-tasks/src/drafts.rs:130-168`.
+- Local phase `TaskProcessor.cpp:1320-1357` / `crates/tern-tasks/src/drafts.rs:130-168`.
   `inflateClientDraftJSON` (`TaskProcessor.cpp:1043-1084`) merges client JSON over the row's
   `_data`, so engine bookkeeping in `_data` survives saves.
 - New draft id: `draft_id` = base58(sha256(`aid:hMsgId`)) (`MailUtils.cpp:572-578`).
 - `ensureDraftPlacement` (`:1359-1369`) adds a UID-0 placement in Drafts; on Gmail, Drafts is a
   Label, so it falls back to All Mail at UID 0. UID-0 draft rows are exempt from cleanup
-  (`MailStore.cpp:1224-1229`, `crates/ms-store/src/placement.rs:606-611`).
+  (`MailStore.cpp:1224-1229`, `crates/tern-store/src/placement.rs:606-611`).
 - Remote phase: `// right now we don't syncback drafts` (`TaskProcessor.cpp:922-923`), since 2017.
 
 **Why it was never built.** Mailspring #1726 (2019): draft sync existed in the Nylas cloud era,
@@ -21,7 +21,7 @@ desktop paths relative to `apps/desktop/`.
 topics 2874 and 9254.
 
 **Server drafts from other clients** are ingested as normal messages with the header-hash id
-(`MailUtils.cpp:620`, `crates/ms-sync/src/mail_processor.rs:51`); `draft` comes from `\Draft` or
+(`MailUtils.cpp:620`, `crates/tern-sync/src/mail_processor.rs:51`); `draft` comes from `\Draft` or
 the drafts-role folder (`MailStore.cpp:58-77`, `placement.rs:101-125`). On Gmail they arrive via
 All Mail with `\Draft` in X-GM-LABELS. The Drafts view is every Message with `draft = true`
 (`draft-list-store.ts:53`).

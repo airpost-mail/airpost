@@ -55,7 +55,7 @@ describe('engine settings', () => {
     await setEngineSettings(engine, { [SettingKey.UndoSend]: 60000 });
     expect(engine.settings.get(SettingKey.UndoSend)).toBe(60000);
 
-    // A device without the admin scope can't set signatures (ms-ipc RELAYED_SETTINGS_KEYS).
+    // A device without the admin scope can't set signatures (tern-ipc RELAYED_SETTINGS_KEYS).
     const refused = setEngineSettings(engine, { signatures: {} });
     expect(getEngineSetting('signatures')).toEqual({});
     await expect(refused).rejects.toMatchObject({ code: RpcErrorCode.NotAllowedRelayed });

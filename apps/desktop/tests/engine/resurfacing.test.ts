@@ -6,7 +6,7 @@ import { localizerFor } from '../../src/intl/localize';
 import { resurfacingBodies } from '../../src/engine/resurfacing';
 
 describe('the resurfacing messages', function () {
-  it('are, untranslated, the engine fallbacks (ms-sync expiration_executor)', function () {
+  it('are, untranslated, the engine fallbacks (tern-sync expiration_executor)', function () {
     const bodies = resurfacingBodies((en) => en);
     expect(bodies.snoozeBody).toBe(
       '<p><strong>Tern Reminder:</strong> This thread has been moved to the top of your inbox by Tern.</p><p>--The Tern Team</p>'

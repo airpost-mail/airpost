@@ -8,11 +8,11 @@ use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use ms_ipc::{
+use serde_json::{json, Value};
+use tern_ipc::{
     method, ClientError, DeltaParams, DisconnectParams, MailNewParams, Notification,
     SubscribeParams,
 };
-use serde_json::{json, Value};
 
 use crate::app::Ctx;
 use crate::discovery::{self, Engine};
@@ -328,8 +328,8 @@ pub fn deadline(timeout: Option<u64>) -> Option<Instant> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ms_ipc::{AccountInfo, Client, HelloResult};
     use tern_client::discovery::Entry;
+    use tern_ipc::{AccountInfo, Client, HelloResult};
 
     /// An engine whose connection yields `input` (NDJSON) and then ends.
     fn engine(pid: u32, account: &str, input: String) -> Engine {

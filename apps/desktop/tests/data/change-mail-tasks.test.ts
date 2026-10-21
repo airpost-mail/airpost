@@ -868,7 +868,7 @@ END:VCALENDAR`;
   });
 
   // What `restore` does with the snapshot (SEQUENCE no lower than the stored copy's, overrides
-  // added since put back) is crates/ms-pim plan::restore's tests.
+  // added since put back) is crates/tern-pim plan::restore's tests.
   describe('undo and redo against the copy stored when they run', function () {
     it('asks the engine to restore the snapshot over that copy', function () {
       const event = makeEvent({ id: 'undo-redo-event', ics: SAMPLE_ICS_NEW } as any);

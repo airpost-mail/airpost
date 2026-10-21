@@ -13,22 +13,22 @@ name = "mailsync"
 path = "src/main.rs"
 
 [dependencies]
-ms-core.workspace = true
-ms-store.workspace = true
-ms-providers.workspace = true
-ms-imap.workspace = true
-ms-mime.workspace = true
-ms-smtp.workspace = true
-ms-net.workspace = true
-ms-dav.workspace = true
-ms-sync.workspace = true
-ms-tasks.workspace = true
-ms-ipc.workspace = true
-ms-integrations.workspace = true
-ms-ai.workspace = true
-ms-secrets.workspace = true
-ms-compose.workspace = true
-ms-pim.workspace = true
+tern-core.workspace = true
+tern-store.workspace = true
+tern-providers.workspace = true
+tern-imap.workspace = true
+tern-mime.workspace = true
+tern-smtp.workspace = true
+tern-net.workspace = true
+tern-dav.workspace = true
+tern-sync.workspace = true
+tern-tasks.workspace = true
+tern-ipc.workspace = true
+tern-integrations.workspace = true
+tern-ai.workspace = true
+tern-secrets.workspace = true
+tern-compose.workspace = true
+tern-pim.workspace = true
 ring.workspace = true
 base64.workspace = true
 chrono.workspace = true
@@ -43,7 +43,7 @@ uuid.workspace = true
 libc.workspace = true
 
 [dev-dependencies]
-ms-ipc.workspace = true
+tern-ipc.workspace = true
 reqwest.workspace = true
 regex.workspace = true
 tempfile.workspace = true

@@ -48,7 +48,7 @@ export const MOCK_FEATURES: readonly string[] = [
 ];
 
 /**
- * ms-ipc `SETTINGS_KEYS` with the JSON type each takes, and the ones a device without the
+ * tern-ipc `SETTINGS_KEYS` with the JSON type each takes, and the ones a device without the
  * admin scope may set (`RELAYED_SETTINGS_KEYS`); the mock always plays such a device.
  */
 const SETTING_KINDS: Record<string, 'count' | 'string' | 'bool' | 'object' | 'array'> = {
@@ -151,7 +151,7 @@ type Handlers = {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Params the read methods accept (crates/ms-ipc/src/read.rs). The real engine's serde
+ * Params the read methods accept (crates/tern-ipc/src/read.rs). The real engine's serde
  * ignores unknown keys, so a filter it doesn't know silently widens the result; the mock
  * rejects them instead so the gap shows up here.
  */
@@ -445,7 +445,7 @@ export class MockEngine implements EngineClient {
 
   /**
    * Fires a `metadata-expiration` delta when the model's earliest metadata `expiration`
-   * passes, like ms-sync's metadata_expiration worker.
+   * passes, like tern-sync's metadata_expiration worker.
    */
   private watchExpiration(task: TaskJSON) {
     const model = this.metadataTarget(task);
@@ -483,7 +483,7 @@ export class MockEngine implements EngineClient {
 
   /**
    * With `expiration-executor` announced, a due `send-later` row is the engine's: cleared,
-   * then the draft sent (crates/ms-sync/src/expiration_executor.rs). Returns whether it was
+   * then the draft sent (crates/tern-sync/src/expiration_executor.rs). Returns whether it was
    * one.
    */
   private executeSendLater(m: MessageJSON): boolean {
@@ -801,7 +801,7 @@ const DEFAULT_HOSTS: Record<string, string> = {
 };
 
 /**
- * Checks the settings look complete, failing as ms-integrations does (`-32010` "Integration
+ * Checks the settings look complete, failing as tern-integrations does (`-32010` "Integration
  * failed: …"); the real test calls the provider.
  */
 function mockIntegrationTest(p: IntegrationParams): IntegrationTestReport {

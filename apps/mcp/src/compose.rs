@@ -3,25 +3,25 @@
 
 //! New and reply drafts as the desktop builds them. An engine with `draft-pipeline` builds
 //! them (`draft.create`, unsaved, so the tool can put its text on top before saving); an older
-//! one gets the same builders run here (`ms_compose`), with the signatures and quote texts of
+//! one gets the same builders run here (`tern_compose`), with the signatures and quote texts of
 //! the settings the engines keep, if any.
 
-use ms_compose::draft::{self, Ctx as ComposeCtx};
-use ms_compose::{ComposeSettings, Identities};
-use ms_ipc::{draft_kind, feature, method};
 use serde_json::{json, Map, Value};
+use tern_compose::draft::{self, Ctx as ComposeCtx};
+use tern_compose::{ComposeSettings, Identities};
+use tern_ipc::{draft_kind, feature, method};
 
 use crate::discovery::AccountRef;
 use crate::drafts::Sender;
 use crate::tools::{failed, Ctx, ToolError};
 
-/// The settings keys a draft is built with (`ms_compose::settings`).
+/// The settings keys a draft is built with (`tern_compose::settings`).
 const COMPOSE_KEYS: [&str; 5] = [
-    ms_compose::settings::HTML_KEY,
-    ms_compose::settings::SIGNATURES_KEY,
-    ms_compose::settings::DEFAULT_SIGNATURES_KEY,
-    ms_compose::settings::DEFAULT_ACCOUNT_KEY,
-    ms_compose::settings::QUOTE_TEXTS_KEY,
+    tern_compose::settings::HTML_KEY,
+    tern_compose::settings::SIGNATURES_KEY,
+    tern_compose::settings::DEFAULT_SIGNATURES_KEY,
+    tern_compose::settings::DEFAULT_ACCOUNT_KEY,
+    tern_compose::settings::QUOTE_TEXTS_KEY,
 ];
 
 fn account_json(s: &Sender) -> Value {
@@ -69,8 +69,10 @@ pub fn build(
         .collect();
     let identities = Identities::from_accounts_json(&accounts);
     let stored = ctx.backend.settings(&COMPOSE_KEYS).unwrap_or_default();
-    let settings =
-        ComposeSettings::from_values(|k| stored.get(k).cloned(), ms_compose::settings::local_tz());
+    let settings = ComposeSettings::from_values(
+        |k| stored.get(k).cloned(),
+        tern_compose::settings::local_tz(),
+    );
     let c = ComposeCtx {
         settings: &settings,
         accounts: &identities,

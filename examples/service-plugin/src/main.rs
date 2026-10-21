@@ -24,9 +24,9 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use ms_ipc::{method, DeltaParams, SubscribeParams};
 use serde_json::{json, Value};
 use tern_client::{tasks, Engine, Engines};
+use tern_ipc::{method, DeltaParams, SubscribeParams};
 
 const CLIENT_NAME: &str = concat!("tern-sample-service/", env!("CARGO_PKG_VERSION"));
 const DEFAULT_PLUGIN_ID: &str = "tern-sample-service";
@@ -133,7 +133,7 @@ fn serve(
     loop {
         let n = match engine.client.next_notification() {
             Ok(n) => n,
-            Err(ms_ipc::ClientError::Closed) => return Ok(()),
+            Err(tern_ipc::ClientError::Closed) => return Ok(()),
             Err(e) => return Err(e.to_string()),
         };
         if n.method == method::DISCONNECT {

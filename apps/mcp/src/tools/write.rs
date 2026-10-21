@@ -20,7 +20,7 @@ use crate::tasks;
 const SEND_LATER_ID: &str = "send-later";
 const DEFAULT_SEND_ACTION_KEY: &str = "send";
 /// The after-send actions the engine's expiration executor performs itself
-/// (ms-sync `expiration_executor::SEND_ACTIONS`).
+/// (tern-sync `expiration_executor::SEND_ACTIONS`).
 const ENGINE_SEND_ACTIONS: [&str; 2] = ["send", "send-and-archive"];
 /// Draft threads `find_draft` looks through when a Message-ID isn't the id the engine
 /// gives drafts created on this device.
@@ -225,7 +225,7 @@ pub(super) fn definitions() -> Vec<ToolDef> {
     ]
 }
 
-/// The id the engine gives a draft created on this device (`ms_core::ids::draft_id`):
+/// The id the engine gives a draft created on this device (`tern_core::ids::draft_id`):
 /// base58 of the first 30 bytes of sha256(`accountId:headerMessageId`).
 pub(crate) fn draft_id(account_id: &str, header_message_id: &str) -> String {
     let digest = Sha256::digest(format!("{account_id}:{header_message_id}").as_bytes());
@@ -311,7 +311,7 @@ pub(super) fn create_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     fields.insert("cc".into(), drafts::recipients_json(&cc));
     fields.insert("bcc".into(), drafts::recipients_json(&bcc));
     fields.insert("subject".into(), json!(subject));
-    let built = compose::build(ctx, &account, ms_ipc::draft_kind::NEW, None, fields)?;
+    let built = compose::build(ctx, &account, tern_ipc::draft_kind::NEW, None, fields)?;
     let draft = compose::with_text(built, &body);
     let task = ctx.queue(&account.account_id, tasks::syncback_draft(draft))?;
     Ok(Output::text(&draft_result(&task, json!({}))).with_account(&account.account_id))
@@ -432,7 +432,11 @@ fn find_draft(
             (None, Some(h)) => draft_id(aid, h),
             _ => unreachable!("checked above"),
         };
-        match ctx.call(aid, ms_ipc::method::MESSAGES_GET, json!({"id": candidate})) {
+        match ctx.call(
+            aid,
+            tern_ipc::method::MESSAGES_GET,
+            json!({"id": candidate}),
+        ) {
             Ok(r) => {
                 let m = r.get("message").cloned().unwrap_or(Value::Null);
                 if is_match(&m) && ctx.policy.message_allowed(&m) {
@@ -450,7 +454,7 @@ fn find_draft(
         let aid = account.account_id.as_str();
         let page = match ctx.call(
             aid,
-            ms_ipc::method::THREADS_LIST,
+            tern_ipc::method::THREADS_LIST,
             json!({"role": "drafts", "limit": DRAFT_SCAN}),
         ) {
             Ok(p) => p,
@@ -460,7 +464,7 @@ fn find_draft(
         for t in array_of(&page, "threads").to_vec() {
             let r = ctx.call(
                 aid,
-                ms_ipc::method::THREADS_GET,
+                tern_ipc::method::THREADS_GET,
                 json!({"id": str_of(&t, "id")}),
             )?;
             if let Some(m) = array_of(&r, "messages").iter().find(|m| is_match(m)) {
@@ -496,11 +500,11 @@ fn ensure_not_sending(ctx: &mut Ctx<'_>, account: &str, draft: &Value) -> Result
     }
     if ctx
         .backend
-        .has_feature(account, ms_ipc::feature::TASKS_LIST)
+        .has_feature(account, tern_ipc::feature::TASKS_LIST)
     {
         let r = ctx.call(
             account,
-            ms_ipc::method::TASKS_LIST,
+            tern_ipc::method::TASKS_LIST,
             json!({"class": tasks::SEND_DRAFT_TASK, "headerMessageId": hmid,
                    "status": ["local", "remote"], "limit": 1}),
         )?;
@@ -520,7 +524,7 @@ fn ensure_not_sending(ctx: &mut Ctx<'_>, account: &str, draft: &Value) -> Result
     if let Some((task_account, task_id)) = pending.filter(|(a, _)| a == account) {
         match ctx.call(
             &task_account,
-            ms_ipc::method::TASKS_GET,
+            tern_ipc::method::TASKS_GET,
             json!({"id": task_id}),
         ) {
             Ok(r) if matches!(str_of(&r["task"], "status"), "local" | "remote") => {
@@ -551,7 +555,7 @@ fn loaded_draft(
     ctx.body(account, &id)?.ok_or_else(not_local)?;
     let r = match ctx.call(
         account,
-        ms_ipc::method::MESSAGES_GET,
+        tern_ipc::method::MESSAGES_GET,
         json!({"id": id, "body": true}),
     ) {
         Ok(r) => r,
@@ -641,13 +645,13 @@ pub(super) fn send_draft(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let (draft, body) = loaded_draft(ctx, &account.account_id, &draft)?;
     let task_id = if ctx
         .backend
-        .has_feature(&account.account_id, ms_ipc::feature::DRAFT_PIPELINE)
+        .has_feature(&account.account_id, tern_ipc::feature::DRAFT_PIPELINE)
     {
         // The engine finalises the draft and queues the send itself.
         let r = ctx
             .call(
                 &account.account_id,
-                ms_ipc::method::DRAFT_SEND,
+                tern_ipc::method::DRAFT_SEND,
                 json!({"accountId": account.account_id, "headerMessageId": hmid}),
             )
             .map_err(|e| failed(format!("The engine refused to send the draft: {e}")))?;
@@ -696,7 +700,7 @@ pub(super) fn schedule_send(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let note = if engine_action
         && ctx
             .backend
-            .has_feature(&account.account_id, ms_ipc::feature::EXPIRATION_EXECUTOR)
+            .has_feature(&account.account_id, tern_ipc::feature::EXPIRATION_EXECUTOR)
     {
         SCHEDULE_NOTE
     } else {
@@ -788,7 +792,7 @@ fn threads_by_account(
         for account in ctx.allowed_accounts()? {
             match ctx.call(
                 &account.account_id,
-                ms_ipc::method::THREADS_GET,
+                tern_ipc::method::THREADS_GET,
                 json!({"id": id}),
             ) {
                 Ok(r) => {
@@ -1013,12 +1017,12 @@ pub(super) fn snooze_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     }
     let groups = threads_by_account(ctx, &ids)?;
     for (account, _) in &groups {
-        require_feature(ctx, &account.account_id, ms_ipc::feature::SNOOZE)?;
+        require_feature(ctx, &account.account_id, tern_ipc::feature::SNOOZE)?;
     }
     for (account, threads) in &groups {
         ctx.call(
             &account.account_id,
-            ms_ipc::method::THREADS_SNOOZE,
+            tern_ipc::method::THREADS_SNOOZE,
             json!({"threadIds": ids_of(threads), "until": when.timestamp()}),
         )
         .map_err(ToolError::from)?;
@@ -1036,12 +1040,12 @@ pub(super) fn unsnooze_threads(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let ids = req_str_list(args, "threadIds")?;
     let groups = threads_by_account(ctx, &ids)?;
     for (account, _) in &groups {
-        require_feature(ctx, &account.account_id, ms_ipc::feature::SNOOZE)?;
+        require_feature(ctx, &account.account_id, tern_ipc::feature::SNOOZE)?;
     }
     for (account, threads) in &groups {
         ctx.call(
             &account.account_id,
-            ms_ipc::method::THREADS_UNSNOOZE,
+            tern_ipc::method::THREADS_UNSNOOZE,
             json!({"threadIds": ids_of(threads)}),
         )
         .map_err(ToolError::from)?;
@@ -1057,13 +1061,13 @@ pub(super) fn unsubscribe(ctx: &mut Ctx<'_>, args: &Value) -> ToolResult {
     let wanted = opt_str(args, "method")?;
     let (account, _) = ctx.find_message(&message_id, None)?;
     let aid = account.account_id.clone();
-    require_feature(ctx, &aid, ms_ipc::feature::UNSUBSCRIBE)?;
+    require_feature(ctx, &aid, tern_ipc::feature::UNSUBSCRIBE)?;
     let mut params = json!({"messageId": message_id});
     if let Some(m) = wanted {
         params["method"] = json!(m);
     }
     let r = ctx
-        .call(&aid, ms_ipc::method::MESSAGES_UNSUBSCRIBE, params)
+        .call(&aid, tern_ipc::method::MESSAGES_UNSUBSCRIBE, params)
         .map_err(|e| {
             if e.is_not_found() {
                 failed(format!(

@@ -9,10 +9,10 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use ms_ipc::{
+use serde_json::{json, Map, Value};
+use tern_ipc::{
     code, feature, method, ClientError, SearchResult, READ_DEFAULT_LIMIT, READ_MAX_LIMIT,
 };
-use serde_json::{json, Map, Value};
 
 use crate::app::{call, call_raw, is_not_found, Ctx};
 use crate::cli::ThreadsArgs;

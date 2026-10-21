@@ -3,7 +3,7 @@
 # (cargo-deny picks this file, the nearest to the manifest.)
 # tern-backend is GPL-3.0-only like the rest of the workspace, so the licence list is the root
 # one: GPLv3-compatible only. What this file adds is architectural: the server shares only
-# ms-wire with the engine and never depends on an engine crate (backend-plan 3.1).
+# tern-wire with the engine and never depends on an engine crate (backend-plan 3.1).
 
 [graph]
 all-features = false
@@ -48,16 +48,16 @@ deny = [
     { crate = "reqwest" },
     # The engine and its crates.
     { crate = "mailsync" },
-    { crate = "ms-core" },
-    { crate = "ms-store" },
-    { crate = "ms-providers" },
-    { crate = "ms-imap" },
-    { crate = "ms-mime" },
-    { crate = "ms-smtp" },
-    { crate = "ms-net" },
-    { crate = "ms-dav" },
-    { crate = "ms-sync" },
-    { crate = "ms-tasks" },
+    { crate = "tern-core" },
+    { crate = "tern-store" },
+    { crate = "tern-providers" },
+    { crate = "tern-imap" },
+    { crate = "tern-mime" },
+    { crate = "tern-smtp" },
+    { crate = "tern-net" },
+    { crate = "tern-dav" },
+    { crate = "tern-sync" },
+    { crate = "tern-tasks" },
 ]
 
 [advisories]

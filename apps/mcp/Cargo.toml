@@ -15,9 +15,9 @@ path = "src/main.rs"
 
 # Talks to running engines over their sockets only (docs/mcp.md); no TLS or SQLite.
 [dependencies]
-ms-ipc.workspace = true
+tern-ipc.workspace = true
 tern-client.workspace = true
-ms-compose.workspace = true
+tern-compose.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true

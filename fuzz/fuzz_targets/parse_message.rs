@@ -6,5 +6,5 @@
 #![no_main]
 
 libfuzzer_sys::fuzz_target!(|data: &[u8]| {
-    let _ = ms_mime::parse_message(data);
+    let _ = tern_mime::parse_message(data);
 });

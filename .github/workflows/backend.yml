@@ -10,9 +10,9 @@ name: backend
 on:
   push:
     branches: [main]
-    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/tern-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["apps/backend/**", "crates/ms-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
+    paths: ["apps/backend/**", "crates/tern-wire/**", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "about.toml", "about.hbs", "apps/engine/packaging/third-party-notices.sh", "deploy/backend/**", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read
@@ -30,8 +30,8 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      - run: cargo clippy -p tern-backend -p ms-wire --all-targets --locked -- -D warnings
-      - run: cargo test -p tern-backend -p ms-wire --locked
+      - run: cargo clippy -p tern-backend -p tern-wire --all-targets --locked -- -D warnings
+      - run: cargo test -p tern-backend -p tern-wire --locked
 
   deny:
     runs-on: ubuntu-latest

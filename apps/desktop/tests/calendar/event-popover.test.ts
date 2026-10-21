@@ -1,7 +1,7 @@
 // The popover's save path: what it asks the engine to change (events.update with queue: false)
 // and the undoable task it queues. The ICS the engine writes for these edits (a detailed RRULE
 // or RDATEs kept, EXDATEs rezoned, one SEQUENCE bump, ORGANIZER on the first guest, TRANSP per
-// VEVENT) is crates/ms-pim's desktop corpus, recorded from this spec.
+// VEVENT) is crates/tern-pim's desktop corpus, recorded from this spec.
 import { Actions, DatabaseStore, SyncbackEventTask } from 'mailspring-exports';
 import { Event as EventModel } from '../../src/data/models/event';
 import { CalendarEventPopover } from '../../src/features/main-calendar/event/popover';

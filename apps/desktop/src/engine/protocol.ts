@@ -3,7 +3,7 @@
 
 /*
 The Rust engine's socket protocol, v1: JSON-RPC 2.0
-over newline-delimited JSON on a Unix socket. Hand-written from crates/ms-ipc; generating these
+over newline-delimited JSON on a Unix socket. Hand-written from crates/tern-ipc; generating these
 from it waits until the surface grows.
 */
 import crypto from 'crypto';
@@ -12,7 +12,7 @@ import path from 'path';
 
 export const PROTOCOL_VERSION = 1;
 
-// The longest line the engine sends or accepts, without its newline (ms-ipc MAX_LINE_BYTES).
+// The longest line the engine sends or accepts, without its newline (tern-ipc MAX_LINE_BYTES).
 export const MAX_LINE_BYTES = 64 * 1024 * 1024;
 
 // macOS allows 104 bytes in sun_path including the NUL; Linux 108. The smaller one wins.
@@ -158,7 +158,7 @@ export const Method = {
   RulesDisabled: 'rules.disabled',
 } as const;
 
-// What `hello.features` may list (ms-ipc `feature`). Clients gate on these, never on versions;
+// What `hello.features` may list (tern-ipc `feature`). Clients gate on these, never on versions;
 // an older engine without `features` has none.
 export const Feature = {
   // The engine keeps the account registry and the secrets (accounts.json, its secret store),
@@ -210,7 +210,7 @@ export const Feature = {
   ContactEditing: 'contact-editing',
 } as const;
 
-// `draft.create` params (ms-ipc DraftCreateParams).
+// `draft.create` params (tern-ipc DraftCreateParams).
 export interface DraftCreateParams {
   accountId?: string;
   kind: 'new' | 'reply' | 'reply-all' | 'forward' | 'mailto' | 'resurface';
@@ -283,7 +283,7 @@ export const ErrorCode = {
 } as const;
 
 // `serve`'s exit code when another engine is listening on its socket, typically the previous
-// one still shutting down (ms_core EXIT_SOCKET_IN_USE).
+// one still shutting down (tern_core EXIT_SOCKET_IN_USE).
 export const EXIT_SOCKET_IN_USE = 3;
 
 export const AccountState = {
@@ -339,7 +339,7 @@ export interface HelloResult {
   credentials?: CredentialsStatus;
 }
 
-// One entry of `capabilities` (ms-ipc `Capability`). `reason` is one of CapabilityReason, or one
+// One entry of `capabilities` (tern-ipc `Capability`). `reason` is one of CapabilityReason, or one
 // a newer engine adds.
 export interface EngineCapability {
   available: boolean;
@@ -383,7 +383,7 @@ export interface CountsGetParams {
   accounts?: string[] | null;
 }
 
-// `query`'s answer (ms-ipc QueryResult): `rows` always (model JSON, with each `include` key),
+// `query`'s answer (tern-ipc QueryResult): `rows` always (model JSON, with each `include` key),
 // `ids` for idsOnly, `count` for count.
 export interface QueryResult {
   rows: Record<string, any>[];
@@ -593,7 +593,7 @@ export interface SetLogLevelResult {
   restarted: string[];
 }
 
-// The most `engine.logs.tail` returns (ms-ipc LOGS_TAIL_MAX_BYTES).
+// The most `engine.logs.tail` returns (tern-ipc LOGS_TAIL_MAX_BYTES).
 export const LOGS_TAIL_MAX_BYTES = 1024 * 1024;
 
 // Without `accountId`, the engine's own log.
@@ -694,7 +694,7 @@ export function deltaParamsText(line: string): string | null {
   return null;
 }
 
-// `messages.unsubscribe` (ms-ipc `MessagesUnsubscribeParams`/`Result`). Without `method` the
+// `messages.unsubscribe` (tern-ipc `MessagesUnsubscribeParams`/`Result`). Without `method` the
 // engine picks one-click, else mailto, else web; a web link comes back for the client to open.
 export type UnsubscribeMethod = 'one-click' | 'mailto' | 'web';
 
@@ -712,7 +712,7 @@ export interface MessagesUnsubscribeResult {
   taskId?: string;
 }
 
-// `ai.*` results (crates/ms-ai).
+// `ai.*` results (crates/tern-ai).
 
 export interface AiModelInfo {
   id: string;
@@ -794,7 +794,7 @@ export interface AiUsageRow {
   requests: number;
 }
 
-// Calendar and contact editing (ms-ipc pim.rs). Times are epoch seconds; `tz` is the zone floating
+// Calendar and contact editing (tern-ipc pim.rs). Times are epoch seconds; `tz` is the zone floating
 // times, DATE values and all-day events are read in.
 
 export interface EventsExpandParams {

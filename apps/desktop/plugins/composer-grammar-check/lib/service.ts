@@ -60,7 +60,7 @@ export class LanguageToolBackend implements GrammarCheckBackend {
     return CapabilityStore.isAvailable('grammar-check');
   }
 
-  // The engine calls LanguageTool (crates/ms-integrations) and returns matches already in
+  // The engine calls LanguageTool (crates/tern-integrations) and returns matches already in
   // GrammarError's shape, misspellings dropped: the composer's spellchecker marks those.
   async check(text: string, messageId: string, language?: string): Promise<GrammarError[]> {
     this._readConfig();

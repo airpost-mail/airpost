@@ -11,7 +11,7 @@ description: >
   everything from the server, and nothing from the old database - its local draft and its
   snooze metadata - reaches the new one without `--mode import-legacy`. A second launch sees
   its own database and runs no migration.
-source: "crates/ms-store/src/migrate.rs"
+source: "crates/tern-store/src/migrate.rs"
 servers:
   - {fake: dovecot}
 mailboxes:

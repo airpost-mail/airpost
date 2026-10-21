@@ -1,0 +1,31 @@
+[package]
+name = "tern-tasks"
+description = "Client tasks: local and remote phases of every task the client queues"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+tern-core.workspace = true
+tern-store.workspace = true
+tern-providers.workspace = true
+tern-imap.workspace = true
+tern-mime.workspace = true
+tern-smtp.workspace = true
+tern-net.workspace = true
+tern-dav.workspace = true
+tern-pim.workspace = true
+tern-sync.workspace = true
+serde_json.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+# The tern-net tests' MockServer, which the People API task tests share.
+reqwest.workspace = true

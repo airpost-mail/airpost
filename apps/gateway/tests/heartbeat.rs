@@ -17,10 +17,10 @@ use std::time::Duration;
 
 use common::{delta_text, Event, Setup, WAIT};
 use futures::{SinkExt, StreamExt};
-use ms_ipc::policy;
 use serde_json::{json, Value};
 use tern_gateway::config::Heartbeat;
 use tern_gateway::http::close;
+use tern_ipc::policy;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;

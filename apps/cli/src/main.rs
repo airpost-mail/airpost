@@ -3,7 +3,7 @@
 
 //! `tern`, the command-line client of the Tern mail engine.
 //! It finds the running engines through their discovery files, talks to them
-//! over the socket protocol with `ms-ipc`'s blocking client, and reads nothing else of the
+//! over the socket protocol with `tern-ipc`'s blocking client, and reads nothing else of the
 //! profile but the engine logs.
 
 mod account;

@@ -15,6 +15,6 @@ path = "src/main.rs"
 # A service plugin is a separate program on the engine socket;
 # tern-client is the supported way to find and talk to the engine.
 [dependencies]
-ms-ipc.workspace = true
+tern-ipc.workspace = true
 tern-client.workspace = true
 serde_json.workspace = true
