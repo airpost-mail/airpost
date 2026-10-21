@@ -206,6 +206,10 @@ def account_json(
         "smtp_allow_insecure_ssl": smtp_security != "none",
         "container_folder": container_folder,
         "create_helper_folders": False,
+        # Off unless a scenario turns it on (`account: {extra_settings: ...}`): the C++
+        # engine has no server-synced drafts, so A/B runs and the parity gates compare
+        # like with like (docs/drafts-sync-design.md 3.7).
+        "save_drafts_to_server": False,
     }
     if oauth:
         settings.pop("imap_password")

@@ -11,6 +11,7 @@
 use serde_json::{json, Value};
 use tern_core::{Error, Result, SyncError};
 use tern_imap::ImapSession;
+use tern_store::model::json_str;
 use tern_store::{Folder, Message, MessageAttributes, Model, Query, Store};
 use tracing::info;
 
@@ -89,6 +90,47 @@ impl TaskProcessor<'_> {
         Ok(msg)
     }
 
+    /// The stored draft the client's draft JSON names: by `id`, else, when the account
+    /// syncs drafts, the one draft row with its `hMsgId`. A synced draft can be re-keyed while
+    /// a composer holds it (tern_store `rekey_message`), and the client's next save or send
+    /// still names the old id; the JSON is pointed at the row it means.
+    pub(crate) fn find_client_draft(
+        &self,
+        store: &Store,
+        draft_json: &mut Value,
+    ) -> Result<Option<Message>> {
+        if has(draft_json, "id") {
+            let id = get_str(at(draft_json, "id"))?;
+            if let Some(m) = store.find::<Message>(&Query::new().equal("id", &id))? {
+                return Ok(Some(m));
+            }
+            if !self.account.save_drafts_to_server() {
+                return Ok(None);
+            }
+            let hmid = json_str(draft_json, "hMsgId").to_owned();
+            if hmid.is_empty() {
+                return Ok(None);
+            }
+            let ids = store.draft_ids_with_header_message_id(self.account.id(), &hmid, &id)?;
+            let [found] = &ids[..] else {
+                return Ok(None);
+            };
+            let found = store.find::<Message>(&Query::new().equal("id", found))?;
+            if let Some(m) = &found {
+                draft_json["id"] = json!(m.id());
+            }
+            return Ok(found);
+        }
+        // Without an id the draft is new to the client, but a synced draft of that
+        // Message-ID may be here already, under the id a new one would get.
+        let hmid = json_str(draft_json, "hMsgId");
+        if !self.account.save_drafts_to_server() || hmid.is_empty() {
+            return Ok(None);
+        }
+        let id = tern_core::ids::draft_id(self.account.id(), hmid);
+        store.find::<Message>(&Query::new().equal("id", &id))
+    }
+
     fn drafts_folder(&self, store: &Store) -> Result<Folder> {
         let by_role = |role: &str| {
             store.find::<Folder>(
@@ -134,12 +176,7 @@ impl TaskProcessor<'_> {
         let draft_json = &mut data["draft"];
         self.store.transaction("performLocalSaveDraft", |s| {
             // An existing draft is updated in place so its save hooks see the change.
-            let existing = if has(draft_json, "id") {
-                let id = get_str(at(draft_json, "id"))?;
-                s.find::<Message>(&Query::new().equal("id", &id))?
-            } else {
-                None
-            };
+            let existing = self.find_client_draft(s, draft_json)?;
             let draft = self.inflate_client_draft_json(draft_json, existing.as_ref(), s.now())?;
             let draft_id = draft.id().to_owned();
 

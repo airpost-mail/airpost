@@ -7,12 +7,13 @@
 //! `_expungeMovedCopies`, `_moveMessagesResilient`, `_removeMessagesResilient`,
 //! `_removeMessageCopiesResilient`), Copyright © 2017 Foundry 376, GPL-3.0. See NOTICE.md.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use tern_core::{logmsg, ErrorCode, MessageFlags, Result, UidSet};
 use tern_imap::{FetchKind, ImapSession, StoreOp, UidMapping};
 use tern_store::{Folder, Message, Model, Query, Store};
-use tern_sync::mail_processor::id_for_message;
+use tern_sync::drafts::is_draft_copy;
+use tern_sync::mail_processor::{attributes_of, id_for_message, CopyLabels};
 use tracing::{error, info, warn};
 
 use crate::messages::TaskPlacement;
@@ -77,25 +78,41 @@ fn resolve_new_uids(
         return result;
     };
     // Several copies of one message (Exchange duplicates) arrive as several UIDs that hash
-    // to the same id; each moved copy takes one so no two commit to the same UID.
+    // to the same id; each moved copy takes one so no two commit to the same UID. A draft
+    // copy is also listed under its Message-ID's draft id, which a draft row has when the
+    // account syncs drafts (tern_sync::drafts); `claimed` keeps it from being taken twice.
     let mut uids_by_id: HashMap<String, VecDeque<u32>> = HashMap::new();
+    let labels = CopyLabels::for_profile(session.profile());
     for m in &fetched.messages {
         uids_by_id
             .entry(id_for_message(dest.account_id(), dest.path(), m))
             .or_default()
             .push_back(m.uid);
+        let mid = m.header.as_ref().and_then(|h| h.message_id.as_deref());
+        if let Some(mid) = mid.filter(|_| is_draft_copy(dest, &attributes_of(m, labels))) {
+            uids_by_id
+                .entry(tern_core::ids::draft_id(dest.account_id(), mid))
+                .or_default()
+                .push_back(m.uid);
+        }
     }
     for uids in uids_by_id.values_mut() {
         uids.make_contiguous().sort_unstable();
     }
 
+    let mut claimed: HashSet<u32> = HashSet::new();
     let mut unmatched = Vec::new();
     let mut unpaired = 0;
     for (i, item) in items.iter().enumerate() {
-        let Some(uid) = uids_by_id
-            .get_mut(&item.message_id)
-            .and_then(VecDeque::pop_front)
-        else {
+        let next = uids_by_id.get_mut(&item.message_id).and_then(|uids| {
+            while let Some(uid) = uids.pop_front() {
+                if claimed.insert(uid) {
+                    return Some(uid);
+                }
+            }
+            None
+        });
+        let Some(uid) = next else {
             unmatched.push(i);
             continue;
         };

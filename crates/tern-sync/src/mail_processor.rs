@@ -70,6 +70,18 @@ pub fn id_for_message(account_id: &str, folder_path: &str, m: &ImapMessage) -> S
     })
 }
 
+/// The id a fetched copy is stored under: [`crate::drafts::synced_draft_id`] for a draft
+/// copy of an account that syncs drafts, else [`id_for_message`].
+pub fn id_for_copy(
+    account: &Account,
+    folder: &Folder,
+    m: &ImapMessage,
+    labels: CopyLabels,
+) -> String {
+    crate::drafts::synced_draft_id(account, folder, m, labels)
+        .unwrap_or_else(|| id_for_message(account.id(), folder.path(), m))
+}
+
 /// Where a fetched copy's labels come from.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CopyLabels {
@@ -188,14 +200,33 @@ impl<'a> MailProcessor<'a> {
     /// unchanged copy, most of every scan, opens no transaction; `update_message` decides
     /// again inside one. The insert can still hit a constraint error when the other worker
     /// ingested the same message a moment ago, or the two race on one (folder, UID).
+    ///
+    /// A draft copy of an account that syncs drafts is keyed by its Message-ID
+    /// ([`id_for_copy`]); a draft row of that Message-ID still under another id (a server
+    /// draft from before, a draft saved without a Message-ID header) is re-keyed onto it
+    /// first, so its local edits carry over instead of being swept as an orphan.
     pub fn insert_fallback_to_update_message(
         &self,
         remote: &ImapMessage,
         folder: &Folder,
         sync_data_timestamp: i64,
     ) -> Result<Message> {
-        let id = id_for_message(folder.account_id(), folder.path(), remote);
-        let local = self.store.find::<Message>(&Query::new().equal("id", &id))?;
+        let draft_mid = crate::drafts::synced_draft_message_id(
+            self.account,
+            folder,
+            remote,
+            self.copy_labels(),
+        );
+        let id = match draft_mid {
+            Some(mid) => tern_core::ids::draft_id(self.account.id(), mid),
+            None => id_for_message(folder.account_id(), folder.path(), remote),
+        };
+        let mut local = self.store.find::<Message>(&Query::new().equal("id", &id))?;
+        if local.is_none() {
+            if let Some(mid) = draft_mid {
+                local = self.rekey_draft(mid, &id)?;
+            }
+        }
         if let Some(local) = local {
             let existing = placement_at(self.store, &id, folder.id(), remote.uid)?;
             if placement_is_current(&existing, &attributes_of(remote, self.copy_labels())) {
@@ -215,6 +246,21 @@ impl<'a> MailProcessor<'a> {
             }
             Err(e) => Err(e),
         }
+    }
+
+    /// Re-keys the one draft row with Message-ID `mid` onto `id`, if there is exactly one.
+    fn rekey_draft(&self, mid: &str, id: &str) -> Result<Option<Message>> {
+        self.store.transaction("rekeyDraft", |s| {
+            let others = s.draft_ids_with_header_message_id(self.account.id(), mid, id)?;
+            let [old] = &others[..] else {
+                return Ok(None);
+            };
+            let rekeyed = s.rekey_message(old, id)?;
+            if rekeyed.is_some() {
+                info!("{}", logmsg::draft_rekeyed(old, id));
+            }
+            Ok(rekeyed)
+        })
     }
 
     fn insert_message(

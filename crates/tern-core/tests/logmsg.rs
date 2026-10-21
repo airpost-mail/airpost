@@ -264,3 +264,36 @@ fn ai_triage_lines() {
     );
     assert_matches(r"^AI triage resumed$", ai_triage_resumed());
 }
+
+#[test]
+fn synced_drafts() {
+    assert_matches(r"Draft \S+ is now \S+", &draft_rekeyed("abc", "def"));
+    assert_matches(
+        r"Saved draft \S+ to .+ UID \d+",
+        &draft_pushed("d1@example.test", "[Gmail]/All Mail", 12),
+    );
+    assert_matches(
+        r"Could not save draft",
+        &draft_push_failed("d1@example.test", "Connection", 5),
+    );
+    assert_matches(
+        r"over the server's APPENDLIMIT",
+        &draft_over_append_limit("d1@example.test", 40_000_000, 35_651_584),
+    );
+    assert_matches(
+        r"draft-conflict: \S+",
+        &draft_conflict("d1@example.test", 1),
+    );
+    assert_matches(
+        r"Draft \S+ changed on the server",
+        &draft_adopted("d1@example.test", "Drafts", 4),
+    );
+    assert_matches(
+        r"of sent or deleted draft",
+        &deleting_tombstoned_draft_copy("d1@example.test", "Drafts", 4),
+    );
+    assert_matches(
+        r"Saving \d+ local drafts to the server",
+        &draft_sync_enabled(3),
+    );
+}

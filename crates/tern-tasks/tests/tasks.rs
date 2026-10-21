@@ -505,7 +505,7 @@ fn account() -> Arc<Account> {
             "id": ACCOUNT,
             "provider": "imap",
             "emailAddress": "me@example.com",
-            "settings": {},
+            "settings": {"save_drafts_to_server": false},
         }))
         .unwrap(),
     )

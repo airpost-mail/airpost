@@ -331,6 +331,64 @@ pub fn ai_triage_resumed() -> &'static str {
     "AI triage resumed"
 }
 
+// -- Server-synced drafts (docs/drafts-sync-design.md) ------------------------------------
+
+/// A draft row moved to the id its Message-ID gives it. draft-remote-edit-adopt and
+/// import-legacy-drafts-pushed match `Draft \S+ is now \S+`.
+pub fn draft_rekeyed(old_id: &str, new_id: &str) -> String {
+    format!("- Draft {old_id} is now {new_id}")
+}
+
+/// A draft revision was APPENDed and its UID recorded. The draft-push-* scenarios count
+/// `Saved draft \S+ to .+ UID \d+`.
+pub fn draft_pushed(header_message_id: &str, path: &str, uid: u32) -> String {
+    format!("- Saved draft {header_message_id} to {path} UID {uid}")
+}
+
+/// A push failed and backs off. The draft-push-* scenarios assert `Could not save draft`
+/// absent.
+pub fn draft_push_failed(header_message_id: &str, error: &str, retry_in: i64) -> String {
+    format!(
+        "-X Could not save draft {header_message_id} to the server ({error}); trying again in {retry_in}s"
+    )
+}
+
+/// A revision over the server's APPENDLIMIT is kept local until the next save.
+/// draft-attachments waits for `over the server's APPENDLIMIT`.
+pub fn draft_over_append_limit(header_message_id: &str, size: usize, limit: u64) -> String {
+    format!(
+        "-X Draft {header_message_id} is {size} bytes, over the server's APPENDLIMIT of {limit}; it stays local"
+    )
+}
+
+/// Another device saved a revision while this one had unsaved edits: ours wins and theirs
+/// goes to Trash. draft-conflict-local-wins waits for `draft-conflict: \S+`.
+pub fn draft_conflict(header_message_id: &str, copies: usize) -> String {
+    format!(
+        "-X draft-conflict: {header_message_id} changed here and elsewhere; moving {copies} other copies to Trash"
+    )
+}
+
+/// A newer revision from another device or webmail replaced the local one.
+/// draft-remote-edit-adopt waits for `Draft \S+ changed on the server`.
+pub fn draft_adopted(header_message_id: &str, path: &str, uid: u32) -> String {
+    format!(
+        "- Draft {header_message_id} changed on the server ({path} UID {uid}); taking that revision"
+    )
+}
+
+/// A server copy of a draft that was sent or deleted here is deleted instead of synced.
+/// draft-send-before-scan and draft-destroy-after-push match `of sent or deleted draft`.
+pub fn deleting_tombstoned_draft_copy(header_message_id: &str, path: &str, uid: u32) -> String {
+    format!("- Deleting {path} UID {uid}, a copy of sent or deleted draft {header_message_id}")
+}
+
+/// Save drafts to server is on for the first time: the local drafts are queued to push.
+/// import-legacy-drafts-pushed waits for `Saving \d+ local drafts to the server`.
+pub fn draft_sync_enabled(drafts: usize) -> String {
+    format!("Saving {drafts} local drafts to the server.")
+}
+
 // Patterns the scenarios assert are absent and that no engine line produces on purpose:
 // `UNIQUE constraint` and `no such (table|column)` (SQLite error text that would reach the
 // log through a failure), `Unsafe Login` (Coremail's refusal), `count is not falling` (no

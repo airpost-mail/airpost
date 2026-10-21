@@ -13,6 +13,7 @@
 pub mod background;
 pub mod cal_contacts;
 pub mod dav;
+pub mod drafts;
 pub mod expiration_executor;
 pub mod folder_identity;
 pub mod foreground;

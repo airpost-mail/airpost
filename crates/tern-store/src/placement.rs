@@ -118,7 +118,9 @@ impl MessageAttributes {
                 trash_or_spam = true;
                 continue;
             }
-            if l == "\\Draft" {
+            // Google's IMAP extension docs name the drafts label `\Drafts`, Mailspring matched
+            // `\Draft`; no transcript settles it (docs/drafts-sync-design.md risk 1).
+            if l == "\\Draft" || l == "\\Drafts" {
                 draft_label = true;
             }
             labels.push(l.clone());

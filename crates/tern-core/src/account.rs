@@ -299,7 +299,19 @@ impl Account {
     pub fn container_folder(&self) -> &str {
         self.setting_str("container_folder")
     }
+
+    /// `save_drafts_to_server` (Preferences "Save drafts to server"), on unless set to
+    /// `false`: drafts are APPENDed to the Drafts folder and a server draft is one row across
+    /// devices (docs/drafts-sync-design.md). Off, drafts stay local and server drafts are
+    /// ordinary messages, as in the C++ engine; the harness runs with it off unless a
+    /// scenario turns it on, so A/B runs compare like with like.
+    pub fn save_drafts_to_server(&self) -> bool {
+        self.setting_bool(SAVE_DRAFTS_TO_SERVER, true)
+    }
 }
+
+/// The account setting behind [`Account::save_drafts_to_server`].
+pub const SAVE_DRAFTS_TO_SERVER: &str = "save_drafts_to_server";
 
 /// The signed-in Mailspring identity. `--identity null` is a normal mode (D2): every
 /// feature works without one, and nothing reaches an identity server (D3).

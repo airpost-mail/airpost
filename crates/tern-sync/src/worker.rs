@@ -25,7 +25,7 @@ use tern_net::HttpClient;
 use tern_store::{Folder, Message, Model, Query, Store};
 use tracing::{error, info, warn};
 
-use crate::mail_processor::{attributes_of, id_for_message, CopyLabels, MailProcessor};
+use crate::mail_processor::{attributes_of, id_for_copy, CopyLabels, MailProcessor};
 use crate::WorkerContext;
 
 /// A mailcore `Range`: `location` through `location + length` inclusive, `length`
@@ -390,7 +390,8 @@ impl SyncWorker {
             // its flags match (a mis-paired COPYUID). Ingesting the UID gives it to the
             // message it holds; the ingest of the displaced message's own UID relinks it.
             if same && heavy_initial_request {
-                let remote_id = id_for_message(folder.account_id(), &remote_path, remote_msg);
+                let remote_id =
+                    id_for_copy(&self.ctx.account, folder, remote_msg, self.copy_labels());
                 let recorded = existing
                     .as_ref()
                     .map(|l| l.message_id.as_str())

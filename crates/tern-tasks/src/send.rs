@@ -182,12 +182,7 @@ impl TaskProcessor<'_> {
         let plaintext = get_bool(at(draft_json, "plaintext"))?;
         let multisend = per_recipient.as_object();
 
-        let existing = if has(draft_json, "id") {
-            let id = get_str(at(draft_json, "id"))?;
-            self.store.find::<Message>(&Query::new().equal("id", &id))?
-        } else {
-            None
-        };
+        let existing = self.find_client_draft(self.store, draft_json)?;
         let now = self.store.now();
         let draft = self.inflate_client_draft_json(draft_json, existing.as_ref(), now)?;
 
