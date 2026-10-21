@@ -143,9 +143,31 @@ impl Kind {
     }
 }
 
-/// This `tern`, canonical.
+/// This `tern` as it was found: the path it was run by (argv[0], or its entry on PATH), not
+/// resolved through links. A package manager's stable link (`/opt/homebrew/bin/tern`, a Nix
+/// profile) then names it and the binaries beside it, rather than the versioned file it points
+/// to, which an upgrade removes. Units keep that path; copies are compared canonically.
 pub fn this_tern() -> Option<PathBuf> {
-    std::env::current_exe().ok()?.canonicalize().ok()
+    let exe = std::env::current_exe().ok()?;
+    let found = std::env::args_os()
+        .next()
+        .and_then(|a| found_on_path(Path::new(&a)))
+        .filter(|f| same_file(f, &exe));
+    Some(found.unwrap_or(exe))
+}
+
+fn found_on_path(argv0: &Path) -> Option<PathBuf> {
+    if argv0.components().count() > 1 {
+        return std::path::absolute(argv0).ok().filter(|p| p.is_file());
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .filter_map(|d| std::path::absolute(d.join(argv0)).ok())
+        .find(|p| p.is_file())
+}
+
+/// Whether two paths name the same file.
+fn same_file(a: &Path, b: &Path) -> bool {
+    canonical(a) == canonical(b)
 }
 
 /// The binary this copy of `tern` runs for `kind`: `$TERN_*_BIN`, else the one beside `tern`.
@@ -231,13 +253,14 @@ impl Plan {
                 ))
             })?,
         };
-        let bin = bin.canonicalize().map_err(|e| {
-            CliError::failed(format!(
-                "the {} binary {}: {e}",
+        // Kept as found, links included: see [`this_tern`].
+        if !bin.is_file() {
+            return Err(CliError::failed(format!(
+                "the {} binary {} is not there",
                 kind.as_str(),
                 bin.display()
-            ))
-        })?;
+            )));
+        }
         let sha256 = service::sha256_file(&bin)
             .map_err(|e| CliError::failed(format!("{}: {e}", bin.display())))?;
         let mut env = vec![(
@@ -414,24 +437,23 @@ fn web_root_dir(d: &Path) -> Result<PathBuf> {
             d.display()
         )));
     }
-    Ok(canonical(&d))
+    Ok(d)
 }
 
-/// The built web client beside the gateway: `$TERN_GATEWAY_WEB_ROOT`, the desktop's
-/// `tern-web` folder, `web`, or a package's `../share/tern/web`.
+/// The built web client beside the gateway binary: `$TERN_GATEWAY_WEB_ROOT`, a package's
+/// `../share/tern-gateway/web` (packaging/archive.sh), or the desktop bundle's `tern-web`.
 fn default_web_root(bin: &Path) -> Option<PathBuf> {
     let dir = bin.parent()?;
     let env = std::env::var_os("TERN_GATEWAY_WEB_ROOT")
         .filter(|v| !v.is_empty())
         .map(PathBuf::from);
+    let package = dir
+        .parent()
+        .map(|prefix| prefix.join("share").join("tern-gateway").join("web"));
     env.into_iter()
-        .chain([
-            dir.join("tern-web"),
-            dir.join("web"),
-            dir.join("..").join("share").join("tern").join("web"),
-        ])
+        .chain(package)
+        .chain([dir.join("tern-web")])
         .find(|d| d.join("index.html").is_file())
-        .map(|d| canonical(&d))
 }
 
 /// `http` in tern-mcp's policy file: what `tern-mcp http` checks before it serves.
@@ -488,7 +510,7 @@ pub fn install(
     out["manager"] = json!(place.manager.as_str());
     out["load"] = json!(place.load);
     out["started"] = json!(place.load && !place.no_start);
-    if let Some(theirs) = installed_bin(kind, &place).filter(|b| canonical(b) != plan.bin) {
+    if let Some(theirs) = installed_bin(kind, &place).filter(|b| !same_file(b, &plan.bin)) {
         out["replaces"] = json!(theirs);
         if !opts.replace {
             return Err(CliError::failed(format!(
@@ -789,9 +811,9 @@ fn status_row(
         ),
         _ => (None, None),
     };
-    let ours = default_bin(kind).map(|b| canonical(&b));
+    let ours = default_bin(kind);
     let owner = unit_bin.as_ref().map(|b| {
-        if Some(canonical(b)) == ours {
+        if ours.as_deref().is_some_and(|o| same_file(b, o)) {
             "this"
         } else {
             "other"
@@ -1311,6 +1333,40 @@ mod tests {
         o.bind = Some("127.0.0.1:0".parse().unwrap());
         let e = install(Kind::Gateway, &env.config, &p, &o, &mut Fake::default()).unwrap_err();
         assert!(e.to_string().contains("port 0"), "{e}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_package_managers_links_stay_in_the_unit() {
+        // Homebrew's layout: bin/ links into a versioned Cellar, share/ beside bin/.
+        let env = env();
+        let prefix = env.root.join("prefix");
+        fs::create_dir_all(prefix.join("bin")).unwrap();
+        let link = prefix.join("bin").join("tern-gateway");
+        std::os::unix::fs::symlink(env.root.join("a/tern-gateway"), &link).unwrap();
+        let web = prefix.join("share").join("tern-gateway").join("web");
+        fs::create_dir_all(&web).unwrap();
+        fs::write(web.join("index.html"), "<html>").unwrap();
+        let p = place(&env, Manager::Systemd);
+        let o = Options {
+            bin: Some(link.clone()),
+            ..Options::default()
+        };
+        install(Kind::Gateway, &env.config, &p, &o, &mut Fake::default()).unwrap();
+        let unit = fs::read_to_string(env.units.join("tern-gateway.service")).unwrap();
+        assert!(
+            unit.contains(&format!(
+                "ExecStart=\"{}\" \"serve\" \"--bind\" \"127.0.0.1:5180\" \"--web-root\" \"{}\"",
+                link.display(),
+                web.display()
+            )),
+            "{unit}"
+        );
+        // The file the link points to is the same binary, not another copy's.
+        let mut same = opts(&env, "a", Kind::Gateway);
+        install(Kind::Gateway, &env.config, &p, &same, &mut Fake::default()).unwrap();
+        same.bin = Some(link);
+        install(Kind::Gateway, &env.config, &p, &same, &mut Fake::default()).unwrap();
     }
 
     #[test]
