@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 import { localized } from '../../intl/localize';
 import { escapeHTML } from 'underscore.string';
@@ -19,6 +19,54 @@ interface PrintWindowOptions {
   // The messages' HTML as a JSON array.
   printMessages: string;
   remoteImages: boolean;
+}
+
+const MimeTypes: { [ext: string]: string } = {
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+};
+
+/**
+ * The style tags' relative URLs are written against the window's page (static/index.html),
+ * so from print.html in the temp directory they find nothing, and the print CSP allows images
+ * and fonts from data: and tern-asset: but not file:. Each relative URL naming a file in the
+ * page's directory becomes a data: URL; the rest are left as they are.
+ */
+export function inlineRelativeStyleURLs(css: string, baseURI: string) {
+  const pageDir = path.dirname(fileURLToPath(baseURI));
+  const inlined = new Map<string, string | null>();
+  return css.replace(/url\(\s*(['"]?)([^'")]*)\1\s*\)/g, (match, _quote, ref: string) => {
+    if (!ref || ref.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(ref)) return match;
+    let filePath: string;
+    try {
+      const resolved = new URL(ref, baseURI);
+      if (resolved.protocol !== 'file:') return match;
+      filePath = fileURLToPath(resolved);
+    } catch {
+      return match;
+    }
+    const mime = MimeTypes[path.extname(filePath).toLowerCase()];
+    if (!mime || !filePath.startsWith(pageDir + path.sep)) return match;
+    if (!inlined.has(filePath)) {
+      try {
+        inlined.set(
+          filePath,
+          `data:${mime};base64,${fs.readFileSync(filePath).toString('base64')}`
+        );
+      } catch {
+        inlined.set(filePath, null);
+      }
+    }
+    const data = inlined.get(filePath);
+    return data ? `url("${data}")` : match;
+  });
 }
 
 /**
@@ -55,7 +103,7 @@ export default async function openPrintWindow({
       <head>
         ${contentSecurityPolicyMetaTag(printContentSecurityPolicy({ remoteImages }))}
         <meta charset="utf-8">
-        ${styleTags}
+        ${inlineRelativeStyleURLs(styleTags, document.baseURI)}
         <link rel="stylesheet" type="text/css" href="${pathToFileURL(stylesPath).href}">
       </head>
       <body>
