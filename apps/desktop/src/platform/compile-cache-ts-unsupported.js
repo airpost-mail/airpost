@@ -8,16 +8,18 @@ let dialogShown = false;
 function showDialog(filePath) {
   if (dialogShown) return;
   dialogShown = true;
-  const dialog =
-    process.type === 'renderer'
-      ? require('@electron/remote').dialog
-      : require('electron').dialog;
-  dialog.showErrorBox(
-    'Plugin must be compiled',
+  const title = 'Plugin must be compiled';
+  const content =
     `Tern does not ship with a TypeScript compiler to recompile plugins on the fly. ` +
-      `Ask the plugin developer to compile the plugin to vanilla JavaScript as a pre-publish step.` +
-      `\n\nFile: ${filePath}`
-  );
+    `Ask the plugin developer to compile the plugin to vanilla JavaScript as a pre-publish step.` +
+    `\n\nFile: ${filePath}`;
+  if (process.type === 'renderer') {
+    // A window asks main (platform/app-api-channels.ts) and doesn't wait for the dialog; the
+    // hook throws right after.
+    require('electron').ipcRenderer.invoke('app-api:dialog:show-error-box', title, content);
+  } else {
+    require('electron').dialog.showErrorBox(title, content);
+  }
 }
 
 ['.ts', '.tsx', '.jsx', '.es6'].forEach(extension => {

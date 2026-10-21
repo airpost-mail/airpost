@@ -12,6 +12,7 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { DirectionProvider } from '@radix-ui/react-direction';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { specWebContents } from '../support/kit-helpers';
 
 // The Radix primitives the UI kit builds on (docs/desktop/ui-kit.md), run on the app's React 17
 // in the renderer, and the Escape contract with the keymap's core:pop-sheet.
@@ -282,7 +283,7 @@ describe('Radix primitives on React 17', function () {
     afterEach(() => handlers.dispose());
 
     const pressEscape = async () => {
-      const webContents = AppEnv.getCurrentWindow().webContents;
+      const webContents = specWebContents();
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
       webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
       await wait(100);
@@ -338,7 +339,7 @@ describe('Radix primitives on React 17', function () {
       );
       await wait(50);
       expect(portal.contains(document.activeElement)).toBe(true);
-      const webContents = AppEnv.getCurrentWindow().webContents;
+      const webContents = specWebContents();
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Down' });
       webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Down' });
       await wait(100);

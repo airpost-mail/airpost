@@ -1,6 +1,7 @@
 import path from 'path';
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, shell } from 'electron';
 import { localized } from '../../intl/localize';
+import { App } from '../../platform/app-api';
 
 import { Task } from '../../data/tasks/task';
 import TaskQueue from '../../data/stores/task-queue';
@@ -190,7 +191,7 @@ export default class EngineBridge {
   openLogs() {
     const { configDirPath } = AppEnv.getLoadSettings();
     const configDirItem = path.join(configDirPath, 'config.json');
-    require('@electron/remote').shell.showItemInFolder(configDirItem); // eslint-disable-line
+    shell.showItemInFolder(configDirItem);
   }
 
   // The supervisor follows the setting and passes it to the engine (engine.setLogLevel).
@@ -469,9 +470,7 @@ export default class EngineBridge {
     // If other windows are open, delay the closing of the main window
     // by 400ms the first time beforeUnload is called so other windows
     // ave a chance to save drafts before we kill the workers.
-    if (
-      require('@electron/remote').getGlobal('application').windowManager.getOpenWindowCount() <= 1
-    ) {
+    if (App.openWindowCount() <= 1) {
       return true;
     }
     if (this._lastWait && Date.now() - this._lastWait < 2000) {

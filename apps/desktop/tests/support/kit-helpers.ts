@@ -6,10 +6,16 @@
 export const wait = (ms: number) =>
   new Promise<void>((resolve) => window.originalSetTimeout(resolve, ms));
 
+// The spec window's webContents, for sendInputEvent. Specs may use @electron/remote; app code
+// can't (it goes through src/platform/app-api.ts).
+export function specWebContents(): Electron.WebContents {
+  return require('@electron/remote').getCurrentWebContents();
+}
+
 // A real key press through Chromium, so native behaviour (a focused <button> clicking on Space
 // and Enter) runs as in the app. Electron key codes: 'Space', 'Enter', 'Left', 'Right', ...
 export async function pressRealKey(keyCode: string) {
-  const webContents = AppEnv.getCurrentWindow().webContents;
+  const webContents = specWebContents();
   webContents.sendInputEvent({ type: 'keyDown', keyCode });
   if (keyCode === 'Enter' || keyCode === 'Space') {
     webContents.sendInputEvent({ type: 'char', keyCode: keyCode === 'Enter' ? '\r' : ' ' });

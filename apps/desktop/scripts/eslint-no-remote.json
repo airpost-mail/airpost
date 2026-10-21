@@ -1,0 +1,35 @@
+{
+  "root": true,
+  "plugins": [
+    "import"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2022": true
+  },
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@electron/remote",
+            "message": "Tern code reaches main-process APIs through src/platform/app-api.ts; @electron/remote stays installed only for v1 plugins."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='require'][arguments.0.value='@electron/remote']",
+        "message": "Tern code reaches main-process APIs through src/platform/app-api.ts; @electron/remote stays installed only for v1 plugins."
+      }
+    ]
+  }
+}

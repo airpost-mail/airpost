@@ -36,6 +36,8 @@ import { registerFilesProtocol } from './protocols/files';
 import { registerMessageFrameProtocol } from './frame/protocol-handler';
 import { registerExternalFetchIPC } from './ipc/external-fetch';
 import { registerAttachmentSafetyIPC } from './ipc/attachment-safety';
+import { createAppApiHost, registerAppApiIPC } from './ipc/app-api';
+import { registerQuickPreviewWindowsIPC } from './windows/quick-preview';
 import ConfigPersistenceManager, { registerConfigIPC } from '../config/persistence-manager';
 import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from '../engine/supervisor/settings';
 import moveToApplications from './platform/move-to-applications';
@@ -1047,36 +1049,12 @@ export default class Application extends EventEmitter {
       win.emit(command, ...args);
     });
 
-    const ALLOWED_WINDOW_METHODS = new Set<
-      | 'setPosition'
-      | 'center'
-      | 'focus'
-      | 'show'
-      | 'hide'
-      | 'maximize'
-      | 'minimize'
-      | 'setFullScreen'
-    >(['setPosition', 'center', 'focus', 'show', 'hide', 'maximize', 'minimize', 'setFullScreen']);
     const ALLOWED_WEBCONTENTS_METHODS = new Set<'reload' | 'openDevTools' | 'toggleDevTools'>(
       developerToolsAvailable() ? ['reload', 'openDevTools', 'toggleDevTools'] : ['reload']
     );
     const ALLOWED_DEVTOOLS_WEBCONTENTS_METHODS = new Set<'executeJavaScript'>([
       'executeJavaScript',
     ]);
-
-    ipcMain.on('call-window-method', (event, method: unknown, ...args: unknown[]) => {
-      if (!isAllowedMethod(ALLOWED_WINDOW_METHODS, method)) {
-        console.error(`Method ${method} is not permitted on BrowserWindow!`);
-        return;
-      }
-      const win = BrowserWindow.fromWebContents(event.sender);
-      if (!win) return;
-      if (!win[method]) {
-        console.error(`Method ${method} does not exist on BrowserWindow!`);
-        return;
-      }
-      Reflect.apply(win[method], win, args);
-    });
 
     ipcMain.on('call-devtools-webcontents-method', (event, method: unknown, ...args: unknown[]) => {
       if (!isAllowedMethod(ALLOWED_DEVTOOLS_WEBCONTENTS_METHODS, method)) {
@@ -1238,6 +1216,18 @@ export default class Application extends EventEmitter {
     registerNotificationIPCHandlers(ipcMain);
     registerExternalFetchIPC(ipcMain);
     registerAttachmentSafetyIPC(ipcMain);
+    registerAppApiIPC(
+      ipcMain,
+      createAppApiHost(this, isAppWindowContents, developerToolsAvailable)
+    );
+    registerQuickPreviewWindowsIPC(
+      ipcMain,
+      {
+        configDirPath: this.configDirPath,
+        autoloadImages: () => !!this.config.get('core.reading.autoloadImages'),
+      },
+      isAppWindowContents
+    );
   }
 
   sendCalendarSync(accountId?: string) {

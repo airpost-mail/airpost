@@ -1,15 +1,12 @@
 import fs from 'fs';
 import path from 'path';
+import { App, Spellchecker as SessionSpellchecker } from '../platform/app-api';
 
-const { app } = require('@electron/remote');
 const customDictFilePath = path.join(AppEnv.getConfigDirPath(), 'custom-dict.json');
 
+// The window session's spellchecker lives in main; this sets its language and dictionary.
 class Spellchecker {
-  private _session = require('@electron/remote').getCurrentWebContents().session;
-
   constructor() {
-    //this._session = ;
-
     // Nobody will notice if spellcheck isn't available for a few seconds and it
     // takes a considerable amount of time to startup (212ms in dev mode on my 2017 MBP)
     const initHandler = () => {
@@ -32,13 +29,13 @@ class Spellchecker {
     }
   }
 
-  _switchToLanguage = (requested: string | undefined | null) => {
-    const lang: string = requested ? requested : app.getLocale() || 'en-US';
-    const supported: string[] = this._session.availableSpellCheckerLanguages || [];
+  _switchToLanguage = async (requested: string | undefined | null) => {
+    const lang: string = requested ? requested : App.facts().locale || 'en-US';
+    const supported = await SessionSpellchecker.availableLanguages();
     if (supported.includes(lang)) {
-      this._session.setSpellCheckerLanguages([lang]);
+      await SessionSpellchecker.setLanguages([lang]);
     } else if (lang.includes('-') && supported.includes(lang.split('-')[0])) {
-      this._session.setSpellCheckerLanguages([lang.split('-')[0]]);
+      await SessionSpellchecker.setLanguages([lang.split('-')[0]]);
     }
   };
 
@@ -55,20 +52,18 @@ class Spellchecker {
         }
       }
       const loadedDict = JSON.parse(fileData);
-      Object.keys(loadedDict).forEach((word) =>
-        this._session.addWordToSpellCheckerDictionary(word)
-      );
+      Object.keys(loadedDict).forEach((word) => SessionSpellchecker.addWord(word));
       fs.unlink(customDictFilePath, () => {});
     });
   };
 
   learnWord = (word: string) => {
     // TODO: Ensure that this work. Somehow on my Ubuntu 20.12., this does not add words to the custom dict.
-    this._session.addWordToSpellCheckerDictionary(word);
+    SessionSpellchecker.addWord(word);
   };
 
   unlearnWord = (word: string) => {
-    this._session.removeWordFromSpellCheckerDictionary(word);
+    SessionSpellchecker.removeWord(word);
   };
 }
 

@@ -11,6 +11,7 @@ import electron from 'electron';
 import { MessageViewExtension } from '../../packages/message-view-extension';
 import { DatabaseChangeRecord } from '../database/change-record';
 import EngineReads from '../database/engine-reads';
+import { CurrentWindow } from '../../platform/app-api';
 
 const FolderNamesHiddenByDefault = ['spam', 'trash'];
 
@@ -265,7 +266,7 @@ class _MessageStore extends BaseStore {
 
   _setWindowTitle() {
     const title = 'Tern' + (this._thread ? ' · ' + this._thread.subject : '');
-    require('@electron/remote').getCurrentWindow().setTitle(title);
+    CurrentWindow.setTitle(title);
   }
 
   _markAsRead() {

@@ -1,14 +1,9 @@
-var ErrorLogger, _, app;
+var ErrorLogger, _;
 
 let ipcRenderer = null;
 if (process.type === 'renderer') {
   ipcRenderer = require('electron').ipcRenderer;
-  app = require('@electron/remote').app;
-} else {
-  app = require('electron').app;
 }
-
-var appVersion = app.getVersion();
 
 // A globally available ErrorLogger that can report errors to various
 // sources and enhance error functionality.
@@ -146,7 +141,7 @@ module.exports = ErrorLogger = (function () {
       companyName: 'Tern',
       uploadToServer: false,
       extra: {
-        ver: appVersion,
+        ver: require('electron').app.getVersion(),
         platform: process.platform,
       },
     });

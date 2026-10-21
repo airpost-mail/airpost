@@ -31,9 +31,9 @@ function openExternally(url: string) {
  * with its preload. Links the user clicks open in the default browser instead; a meta
  * refresh or script-initiated navigation is just dropped.
  *
- * These windows are created from renderers over @electron/remote, where a
- * `will-navigate` listener runs asynchronously and can no longer call preventDefault(),
- * so the guard has to be installed here. AppWindow installs its own.
+ * The guard goes on every new webContents, so it also covers windows a plugin opens over
+ * @electron/remote, whose own `will-navigate` listeners run asynchronously and can no longer
+ * call preventDefault(). AppWindow installs its own.
  */
 export function guardAuxiliaryWindowNavigation() {
   app.on('web-contents-created', (_event, contents) => {

@@ -69,7 +69,7 @@
         "paths": [
           {
             "name": "@electron/remote",
-            "message": "@electron/remote is a sync IPC round trip into any main-process object (docs/tech-debt.md TD35); add a typed ipcRenderer channel instead."
+            "message": "Tern code reaches main-process APIs through src/platform/app-api.ts (channels in app-api-channels.ts); @electron/remote stays installed only for v1 plugins."
           }
         ]
       }
@@ -78,7 +78,7 @@
       "error",
       {
         "selector": "CallExpression[callee.name='require'][arguments.0.value='@electron/remote']",
-        "message": "@electron/remote is a sync IPC round trip into any main-process object (docs/tech-debt.md TD35); add a typed ipcRenderer channel instead."
+        "message": "Tern code reaches main-process APIs through src/platform/app-api.ts (channels in app-api-channels.ts); @electron/remote stays installed only for v1 plugins."
       }
     ]
   },
@@ -138,21 +138,7 @@
         "src/features/preferences/tabs/keymaps/keymaps.tsx",
         "src/features/print/window.ts",
         "src/features/system-tray/icon-store.ts",
-        "src/features/thread-list/context-menu.ts",
-        "src/engine/client/bridge.ts",
-        "src/data/stores/attachment.ts",
-        "src/data/database/store.ts",
-        "src/data/stores/message.ts",
-        "src/main/windows/app-window.ts",
-        "src/main/windows/auxiliary-guard.ts",
-        "src/window/platform/system-start-service.ts",
-        "src/packages/manager.ts",
-        "src/mail/quick-preview/index.ts",
-        "src/platform/default-client-helper.ts",
-        "src/engine/process.ts",
-        "src/window/app-env.ts",
-        "src/window/spellchecker.ts",
-        "src/window/event-handler.ts"
+        "src/features/thread-list/context-menu.ts"
       ],
       "rules": {
         "no-restricted-imports": "off",

@@ -10,6 +10,14 @@ import { localized, isRTL, initializeLocalization } from '../intl/localize';
 import { APIError } from '../data/errors';
 import WindowEventHandler, { UnloadCallback } from './event-handler';
 import { isWaylandSession } from '../platform/linux-desktop';
+import {
+  App,
+  CurrentWindow,
+  CurrentWindowHandle,
+  Dialogs,
+  FileListCache,
+  Screen,
+} from '../platform/app-api';
 
 function ensureInteger(f: number, fallback: number) {
   let int = f;
@@ -27,6 +35,11 @@ function errorField(error: unknown, key: string): unknown {
     return undefined;
   }
   return Reflect.get(error, key);
+}
+
+// Electron's dialogs show a missing message or detail as empty.
+function dialogText(value: unknown) {
+  return value == null ? '' : String(value);
 }
 
 // What the main process's AutoUpdateManager sends with update-available.
@@ -125,7 +138,7 @@ export default class AppEnvConstructor {
     this.spellchecker = require('./spellchecker').default;
     this.menu = new MenuManager({ resourcePath });
     if (process.platform === 'win32') {
-      this.getCurrentWindow().setMenuBarVisibility(false);
+      CurrentWindow.setMenuBarVisibility(false);
     }
 
     this.windowEventHandler = new WindowEventHandler();
@@ -420,18 +433,18 @@ export default class AppEnvConstructor {
 
   // Essential: Close the current window.
   close() {
-    return this.getCurrentWindow().close();
+    return CurrentWindow.close();
   }
 
   quit() {
-    return require('@electron/remote').app.quit();
+    return App.quit();
   }
 
   // Essential: Get the size of current window.
   //
   // Returns an {Object} in the format `{width: 1000, height: 700}`
   getSize() {
-    const [width, height] = Array.from(this.getCurrentWindow().getSize());
+    const [width, height] = CurrentWindow.getSize();
     return { width, height };
   }
 
@@ -440,17 +453,15 @@ export default class AppEnvConstructor {
   // * `width` The {Number} of pixels.
   // * `height` The {Number} of pixels.
   setSize(width: number, height: number) {
-    return this.getCurrentWindow().setSize(ensureInteger(width, 100), ensureInteger(height, 100));
+    return CurrentWindow.setSize(ensureInteger(width, 100), ensureInteger(height, 100));
   }
 
   setMinimumWidth(minWidth: number) {
-    const win = this.getCurrentWindow();
-    const minHeight = win.getMinimumSize()[1];
-    win.setMinimumSize(ensureInteger(minWidth, 0), minHeight);
+    const { minimumSize, bounds } = CurrentWindow.state();
+    CurrentWindow.setMinimumSize(ensureInteger(minWidth, 0), minimumSize[1]);
 
-    const [currWidth, currHeight] = win.getSize();
-    if (minWidth > currWidth) {
-      win.setSize(minWidth, currHeight);
+    if (minWidth > bounds.width) {
+      CurrentWindow.setSize(minWidth, bounds.height);
     }
   }
 
@@ -458,7 +469,7 @@ export default class AppEnvConstructor {
   //
   // Returns an {Object} in the format `{x: 10, y: 20}`
   getPosition() {
-    const [x, y] = Array.from(this.getCurrentWindow().getPosition());
+    const [x, y] = CurrentWindow.getPosition();
     return { x, y };
   }
 
@@ -467,54 +478,51 @@ export default class AppEnvConstructor {
   // * `x` The {Number} of pixels.
   // * `y` The {Number} of pixels.
   setPosition(x: number, y: number) {
-    return ipcRenderer.send(
-      'call-window-method',
-      'setPosition',
-      ensureInteger(x, 0),
-      ensureInteger(y, 0)
-    );
+    return CurrentWindow.setPosition(ensureInteger(x, 0), ensureInteger(y, 0));
   }
 
-  // Extended: Get the current window
-  getCurrentWindow(): Electron.BrowserWindow {
-    return require('@electron/remote').getCurrentWindow();
+  // Extended: Get the current window. A handle to the BrowserWindow methods windows may call on
+  // themselves (platform/app-api.ts), not the BrowserWindow.
+  getCurrentWindow(): CurrentWindowHandle {
+    return CurrentWindow;
   }
 
   // Extended: Move current window to the center of the screen.
   center() {
     if (process.platform === 'linux') {
       const dimensions = this.getWindowDimensions();
+      const { x, y, width, height } = dimensions;
       const display =
-        require('@electron/remote').screen.getDisplayMatching(dimensions) ||
-        require('@electron/remote').screen.getPrimaryDisplay();
-      const x = display.bounds.x + (display.bounds.width - dimensions.width) / 2;
-      const y = display.bounds.y + (display.bounds.height - dimensions.height) / 2;
+        Screen.getDisplayMatching({ x, y, width, height }) || Screen.getPrimaryDisplay();
 
-      return this.setPosition(x, y);
+      return this.setPosition(
+        display.bounds.x + (display.bounds.width - width) / 2,
+        display.bounds.y + (display.bounds.height - height) / 2
+      );
     } else {
-      return ipcRenderer.send('call-window-method', 'center');
+      return CurrentWindow.center();
     }
   }
 
   // Extended: Focus the current window. Note: this will not open the window
   // if it is hidden.
   focus() {
-    ipcRenderer.send('call-window-method', 'focus');
+    CurrentWindow.focus();
     return window.focus();
   }
 
   // Extended: Show the current window.
   show() {
-    return ipcRenderer.send('call-window-method', 'show');
+    return CurrentWindow.show();
   }
 
   isVisible() {
-    return this.getCurrentWindow().isVisible();
+    return CurrentWindow.isVisible();
   }
 
   // Extended: Hide the current window.
   hide() {
-    return ipcRenderer.send('call-window-method', 'hide');
+    return CurrentWindow.hide();
   }
 
   // Extended: Reload the current window.
@@ -542,25 +550,25 @@ export default class AppEnvConstructor {
 
   // Extended: Is the current window maximized?
   isMaximixed() {
-    return this.getCurrentWindow().isMaximized();
+    return CurrentWindow.isMaximized();
   }
 
   maximize() {
-    return ipcRenderer.send('call-window-method', 'maximize');
+    return CurrentWindow.maximize();
   }
 
   minimize() {
-    return ipcRenderer.send('call-window-method', 'minimize');
+    return CurrentWindow.minimize();
   }
 
   // Extended: Is the current window in full screen mode?
   isFullScreen() {
-    return this.getCurrentWindow().isFullScreen();
+    return CurrentWindow.isFullScreen();
   }
 
   // Extended: Set the full screen state of the current window.
   setFullScreen(fullScreen = false) {
-    ipcRenderer.send('call-window-method', 'setFullScreen', fullScreen);
+    CurrentWindow.setFullScreen(fullScreen);
     if (fullScreen) {
       return document.body.classList.add('fullscreen');
     }
@@ -580,11 +588,9 @@ export default class AppEnvConstructor {
   //   * `width`  The window's width {Number}.
   //   * `height` The window's height {Number}.
   getWindowDimensions() {
-    const browserWindow = this.getCurrentWindow();
-    const { x, y, width, height } = browserWindow.getBounds();
-    const maximized = browserWindow.isMaximized();
-    const fullScreen = browserWindow.isFullScreen();
-    return { x, y, width, height, maximized, fullScreen };
+    const { bounds, isMaximized, isFullScreen } = CurrentWindow.state();
+    const { x, y, width, height } = bounds;
+    return { x, y, width, height, maximized: isMaximized, fullScreen: isFullScreen };
   }
 
   // Set the dimensions of the window.
@@ -610,7 +616,7 @@ export default class AppEnvConstructor {
     height?: number;
   }) {
     if (x != null && y != null && width != null && height != null) {
-      return this.getCurrentWindow().setBounds({ x, y, width, height });
+      return CurrentWindow.setBounds({ x, y, width, height });
     } else if (width != null && height != null) {
       return this.setSize(width, height);
     } else if (x != null && y != null) {
@@ -634,7 +640,7 @@ export default class AppEnvConstructor {
   }
 
   getDefaultWindowDimensions() {
-    let { width, height } = require('@electron/remote').screen.getPrimaryDisplay().workAreaSize;
+    let { width, height } = Screen.getPrimaryDisplay().workAreaSize;
     let x = 0;
     let y = 0;
 
@@ -730,7 +736,7 @@ export default class AppEnvConstructor {
   // Call this method when establishing a real application window.
   async startRootWindow() {
     this.restoreWindowDimensions();
-    this.getCurrentWindow().setMinimumSize(875, 250);
+    CurrentWindow.setMinimumSize(875, 250);
     await this.startWindow();
   }
 
@@ -785,9 +791,8 @@ export default class AppEnvConstructor {
       loadSettings.windowProps != null ? loadSettings.windowProps : {}
     );
 
-    const browserWindow = this.getCurrentWindow();
-    if (browserWindow.resizable !== loadSettings.resizable) {
-      browserWindow.resizable = loadSettings.resizable;
+    if (CurrentWindow.isResizable() !== loadSettings.resizable) {
+      CurrentWindow.setResizable(loadSettings.resizable);
     }
 
     if (!loadSettings.hidden) {
@@ -836,7 +841,7 @@ export default class AppEnvConstructor {
   }
 
   isDevToolsOpened() {
-    return this.getCurrentWindow().webContents.isDevToolsOpened();
+    return CurrentWindow.isDevToolsOpened();
   }
 
   // Extended: Toggle the visibility of the dev tools for the current window.
@@ -891,15 +896,11 @@ export default class AppEnvConstructor {
   }
 
   exit(status: number) {
-    require('@electron/remote').app.emit('will-exit');
-    require('@electron/remote').process.exit(status);
+    App.exit(status);
   }
 
   async showOpenDialog(options: Electron.OpenDialogOptions, callback: (paths: string[]) => void) {
-    const result = await require('@electron/remote').dialog.showOpenDialog(
-      this.getCurrentWindow(),
-      options
-    );
+    const result = await Dialogs.showOpenDialog(options, 'window');
     callback(result.filePaths);
   }
 
@@ -907,10 +908,7 @@ export default class AppEnvConstructor {
     if (options.title == null) {
       options.title = 'Save File';
     }
-    const result = await require('@electron/remote').dialog.showSaveDialog(
-      this.getCurrentWindow(),
-      options
-    );
+    const result = await Dialogs.showSaveDialog(options, 'window');
     callback(result.filePath);
   }
 
@@ -930,26 +928,29 @@ export default class AppEnvConstructor {
       throw new Error(`Must pass a valid message to show dialog: ${message}`);
     }
 
-    let winToShow = null;
-    if (showInMainWindow) {
-      winToShow = require('@electron/remote').getGlobal('application').getMainWindow();
-    }
+    const parent = showInMainWindow ? 'main' : 'none';
 
     if (!detail) {
-      return require('@electron/remote').dialog.showMessageBoxSync(winToShow, {
-        type: 'warning',
-        buttons: [localized('Okay')],
-        message: title,
-        detail: message,
-      });
+      return Dialogs.ask(
+        {
+          type: 'warning',
+          buttons: [localized('Okay')],
+          message: dialogText(title),
+          detail: dialogText(message),
+        },
+        parent
+      );
     }
 
-    const result = require('@electron/remote').dialog.showMessageBoxSync(winToShow, {
-      type: 'warning',
-      buttons: [localized('Okay'), localized('Show Detail')],
-      message: title,
-      detail: message,
-    });
+    const result = await Dialogs.ask(
+      {
+        type: 'warning',
+        buttons: [localized('Okay'), localized('Show Detail')],
+        message: dialogText(title),
+        detail: dialogText(message),
+      },
+      parent
+    );
     if (result === 1) {
       const Actions = require('../data/actions');
       const CodeSnippet = require('../components/code-snippet').default;
@@ -961,9 +962,9 @@ export default class AppEnvConstructor {
     }
   }
 
-  // Delegate to the browser's process fileListCache
+  // The main process's fileListCache, shared by every window.
   fileListCache() {
-    return require('@electron/remote').getGlobal('application').fileListCache;
+    return FileListCache;
   }
 
   getWindowStateKey() {
@@ -990,7 +991,7 @@ export default class AppEnvConstructor {
   }
 
   crashMainProcess() {
-    require('@electron/remote').process.crash();
+    App.crashMainProcess();
   }
 
   crashRenderProcess() {

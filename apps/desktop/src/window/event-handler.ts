@@ -3,6 +3,8 @@ import { shell, ipcRenderer } from 'electron';
 import url from 'url';
 import { localized } from '../intl/localize';
 import { developerToolsAvailable } from '../platform/developer-tools';
+import { App, CurrentWindow } from '../platform/app-api';
+import { AppApiEvent } from '../platform/app-api-channels';
 
 let ComponentRegistry: typeof import('../packages/component-registry').default | null = null;
 
@@ -126,8 +128,6 @@ export default class WindowEventHandler {
       AppEnv.packages.installPackageManually();
     });
 
-    const webContents = AppEnv.getCurrentWindow().webContents;
-
     let _UndoStore: typeof import('../data/stores/undo-redo').default | null = null;
     const getUndoStore = () => {
       if (!_UndoStore) {
@@ -138,30 +138,27 @@ export default class WindowEventHandler {
       return _UndoStore;
     };
 
+    const edit = CurrentWindow.edit;
     AppEnv.commands.add(document.body, {
       'core:copy': (e: CustomEvent) =>
-        isIFrame(e.target) ? webContents.copy() : document.execCommand('copy'),
+        isIFrame(e.target) ? edit('copy') : document.execCommand('copy'),
       'core:cut': (e: CustomEvent) =>
-        isIFrame(e.target) ? webContents.cut() : document.execCommand('cut'),
-      'core:paste': () => webContents.paste(),
-      'core:paste-and-match-style': () => webContents.pasteAndMatchStyle(),
+        isIFrame(e.target) ? edit('cut') : document.execCommand('cut'),
+      'core:paste': () => edit('paste'),
+      'core:paste-and-match-style': () => edit('pasteAndMatchStyle'),
       'core:undo': (e: CustomEvent) =>
-        isTextInput(e.target) ? webContents.undo() : getUndoStore().undo(),
+        isTextInput(e.target) ? edit('undo') : getUndoStore().undo(),
       'core:redo': (e: CustomEvent) =>
-        isTextInput(e.target) ? webContents.redo() : getUndoStore().redo(),
+        isTextInput(e.target) ? edit('redo') : getUndoStore().redo(),
       'core:select-all': (e: CustomEvent) =>
         isIFrame(e.target) || isTextInput(e.target)
-          ? webContents.selectAll()
+          ? edit('selectAll')
           : AppEnv.commands.dispatch('multiselect-list:select-all'),
     });
 
-    webContents.on('input-event', (e: Electron.Event, input: Electron.InputEvent) => {
-      if (input.type === 'gestureScrollBegin') {
-        window.dispatchEvent(new Event('gesture-scroll-begin'));
-      }
-      if (input.type === 'gestureScrollEnd') {
-        window.dispatchEvent(new Event('gesture-scroll-end'));
-      }
+    // Main forwards the webContents' trackpad scroll gestures (main/ipc/app-api.ts).
+    ipcRenderer.on(AppApiEvent.GestureScroll, (_event, phase: 'begin' | 'end') => {
+      window.dispatchEvent(new Event(`gesture-scroll-${phase}`));
     });
 
     // "Pinch to zoom" on the Mac gets translated by the system into a
@@ -182,75 +179,8 @@ export default class WindowEventHandler {
       }
     });
 
-    // Handle context menu for all editable areas with native spellcheck
-    webContents.on('context-menu', (event: Electron.Event, params: Electron.ContextMenuParams) => {
-      // Only handle if we're in an editable area
-      if (!params.isEditable) {
-        return;
-      }
-
-      const { Menu, MenuItem } = require('@electron/remote');
-      const menu = new Menu();
-
-      // Add spelling suggestions if there's a misspelled word
-      if (params.misspelledWord) {
-        if (params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
-          for (const suggestion of params.dictionarySuggestions) {
-            menu.append(
-              new MenuItem({
-                label: suggestion,
-                click: () => webContents.replaceMisspelling(suggestion),
-              })
-            );
-          }
-        } else {
-          menu.append(new MenuItem({ label: localized('No Guesses Found'), enabled: false }));
-        }
-        menu.append(new MenuItem({ type: 'separator' }));
-
-        menu.append(
-          new MenuItem({
-            label: localized('Learn Spelling'),
-            click: () => {
-              webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord);
-            },
-          })
-        );
-        menu.append(new MenuItem({ type: 'separator' }));
-      }
-
-      // Add standard edit menu items using editFlags from Electron
-      menu.append(
-        new MenuItem({
-          label: localized('Cut'),
-          enabled: params.editFlags.canCut,
-          click: () => webContents.cut(),
-        })
-      );
-      menu.append(
-        new MenuItem({
-          label: localized('Copy'),
-          enabled: params.editFlags.canCopy,
-          click: () => webContents.copy(),
-        })
-      );
-      menu.append(
-        new MenuItem({
-          label: localized('Paste'),
-          enabled: params.editFlags.canPaste,
-          click: () => webContents.paste(),
-        })
-      );
-      menu.append(
-        new MenuItem({
-          label: localized('Paste and Match Style'),
-          enabled: params.editFlags.canPaste,
-          click: () => webContents.pasteAndMatchStyle(),
-        })
-      );
-
-      menu.popup({});
-    });
+    // The spelling and edit menu of editable areas is main's (attachAppWindowContents in
+    // main/ipc/app-api.ts).
 
     // Prevent form submits from changing the current window's URL
     document.addEventListener('submit', (event) => {
@@ -314,9 +244,9 @@ export default class WindowEventHandler {
     for (const callback of this.unloadCompleteCallbacks) {
       callback();
     }
-    setTimeout(() => {
-      if (require('@electron/remote').getGlobal('application').isQuitting()) {
-        require('@electron/remote').app.quit();
+    setTimeout(async () => {
+      if (await App.isQuitting()) {
+        App.quit();
       } else if (AppEnv.isReloading) {
         AppEnv.isReloading = false;
         AppEnv.reload();
@@ -372,7 +302,7 @@ export default class WindowEventHandler {
       // Be sure to escape them once, and completely, before we try to open them. This logic
       // *might* apply to http/https as well but it's unclear.
       const sanitized = encodeURI(decodeURI(resolved));
-      require('@electron/remote').getGlobal('application').openUrl(sanitized);
+      App.openUrl(sanitized);
     } else if (['http:', 'https:', 'tel:'].includes(protocol)) {
       shell.openExternal(resolved, { activate: !metaKey }).catch((err: Error) => {
         if (!this._openExternalErrorShown) {

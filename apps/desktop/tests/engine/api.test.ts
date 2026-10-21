@@ -268,6 +268,25 @@ describe('Engine.request and local-only methods (TD29)', function () {
     });
   });
 
+  it('shows one question for concurrent calls, and sends them once allowed', async () => {
+    caller.engineMethods = ['engine.logs.tail'];
+    let answer: (allowed: boolean) => void = null;
+    engine.askUser = jasmine
+      .createSpy('askUser')
+      .andCallFake(() => new Promise<boolean>((resolve) => (answer = resolve)));
+    const first = outcome('engine.logs.tail');
+    const second = outcome('engine.logs.tail');
+    expect((engine.askUser as jasmine.Spy).callCount).toBe(1);
+    expect(sent).toEqual([]);
+    answer(true);
+    expect(await first).toBe('sent');
+    expect(await second).toBe('sent');
+    expect(sent).toEqual(['engine.logs.tail', 'engine.logs.tail']);
+    expect(AppEnv.config.get(ENGINE_METHOD_APPROVALS_KEY)).toEqual({
+      'third-party': ['engine.logs.tail'],
+    });
+  });
+
   it('refuses hello and subscribe, which belong to the window connection', async () => {
     caller = null;
     expect(await outcome('subscribe')).toBe('refused');

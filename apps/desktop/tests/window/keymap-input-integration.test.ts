@@ -1,4 +1,5 @@
 import path from 'path';
+import { specWebContents } from '../support/kit-helpers';
 
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => window.originalSetTimeout(resolve, milliseconds));
@@ -18,7 +19,7 @@ describe('Keymap input integration', function () {
 
     try {
       await wait(250);
-      const webContents = AppEnv.getCurrentWindow().webContents;
+      const webContents = specWebContents();
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Q', modifiers: ['control'] });
       webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Q', modifiers: ['control'] });
       webContents.sendInputEvent({ type: 'keyDown', keyCode: 'U', modifiers: ['control'] });

@@ -1,4 +1,16 @@
-const { app } = require('electron');
+const { app, ipcRenderer } = require('electron');
+
+let rendererIsPackaged = null;
+
+// A window asks main (platform/app-api-channels.ts); this file loads before the TypeScript
+// compile cache, so it can't use the client.
+function isPackaged() {
+  if (process.type !== 'renderer') return app.isPackaged;
+  if (rendererIsPackaged === null) {
+    rendererIsPackaged = ipcRenderer.sendSync('app-api:sync:facts').isPackaged;
+  }
+  return rendererIsPackaged;
+}
 
 /**
  * Whether development mode and the developer console may be used at all.
@@ -14,8 +26,7 @@ const { app } = require('electron');
  * (`npm start`) or an unpackaged build, where this returns true.
  */
 function developerToolsAvailable() {
-  const electronApp = process.type === 'renderer' ? require('@electron/remote').app : app;
-  return !electronApp.isPackaged;
+  return !isPackaged();
 }
 
 module.exports = { developerToolsAvailable };

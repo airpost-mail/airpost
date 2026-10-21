@@ -41,10 +41,6 @@ function handleUnrecoverableDatabaseError(
   err: unknown = new Error(`Manually called handleUnrecoverableDatabaseError`)
 ) {
   AppEnv.errorLogger.reportError(err);
-  const app = require('@electron/remote').getGlobal('application');
-  if (!app) {
-    throw new Error('handleUnrecoverableDatabaseError: `app` is not ready!');
-  }
   const ipc = require('electron').ipcRenderer;
   ipc.send('command', 'application:reset-database', {
     errorMessage: String(err),

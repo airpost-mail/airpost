@@ -295,12 +295,8 @@ export class EngineProcess extends EventEmitter {
   _showStatusWindow(mode: string) {
     if (this._win) return;
 
-    let BrowserWindow: typeof Electron.BrowserWindow;
-    if (process.type === 'renderer') {
-      BrowserWindow = require('@electron/remote').BrowserWindow;
-    } else {
-      BrowserWindow = require('electron').BrowserWindow;
-    }
+    // Only main runs migrate(); this file loads in windows too, where BrowserWindow is undefined.
+    const { BrowserWindow }: typeof Electron = require('electron');
 
     const win = new BrowserWindow({
       width: 350,

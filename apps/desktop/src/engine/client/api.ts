@@ -21,6 +21,7 @@ everyone: a second `subscribe` would replace the app's own subscription.
 import fs from 'fs';
 import path from 'path';
 import { localized } from '../../intl/localize';
+import { Dialogs } from '../../platform/app-api';
 import EngineEvents, { EngineEvents as EngineEventsType, EngineNotification } from './events';
 import { EngineCapabilities, ErrorCode, Feature, rejectionFields } from '../protocol';
 import {
@@ -150,19 +151,20 @@ export function callerPackageFromStack(stack: string): CallerPackage | null {
   return null;
 }
 
-function askUser(pkg: CallerPackage, method: string) {
-  // eslint-disable-next-line no-restricted-syntax
-  const { dialog } = require('@electron/remote');
-  const response = dialog.showMessageBoxSync(AppEnv.getCurrentWindow(), {
-    type: 'warning',
-    buttons: [localized('Allow'), localized('Deny')],
-    defaultId: 1,
-    cancelId: 1,
-    message: localized('Allow the plugin %1$@ to call %2$@?', pkg.name, method),
-    detail: localized(
-      'This lets the plugin change your accounts, their passwords or the sync engine itself. Plugins run with full access to Tern; only allow this for plugins you trust.'
-    ),
-  });
+async function askUser(pkg: CallerPackage, method: string) {
+  const response = await Dialogs.ask(
+    {
+      type: 'warning',
+      buttons: [localized('Allow'), localized('Deny')],
+      defaultId: 1,
+      cancelId: 1,
+      message: localized('Allow the plugin %1$@ to call %2$@?', pkg.name, method),
+      detail: localized(
+        'This lets the plugin change your accounts, their passwords or the sync engine itself. Plugins run with full access to Tern; only allow this for plugins you trust.'
+      ),
+    },
+    'window'
+  );
   return response === 0;
 }
 
@@ -170,9 +172,11 @@ export class EngineAPI {
   events: EngineEventsType;
   // Swappable for specs.
   findCaller: (stack: string) => CallerPackage | null = callerPackageFromStack;
-  askUser: (pkg: CallerPackage, method: string) => boolean = askUser;
+  askUser: (pkg: CallerPackage, method: string) => boolean | Promise<boolean> = askUser;
   // Refused this session, so a plugin that retries doesn't ask again until a restart.
   private _denied = new Set<string>();
+  // The question on screen per package and method, so concurrent calls share one dialog.
+  private _asking = new Map<string, Promise<boolean>>();
 
   constructor(events: EngineEventsType = EngineEvents) {
     this.events = events;
@@ -211,12 +215,14 @@ export class EngineAPI {
         )
       );
     }
+    let check: Promise<void> | null;
     try {
-      this._checkCaller(method, new Error().stack ?? '');
+      check = this._checkCaller(method, new Error().stack ?? '');
     } catch (err) {
       return Promise.reject(err);
     }
-    return this.events.request<R>(method, params);
+    if (!check) return this.events.request<R>(method, params);
+    return check.then(() => this.events.request<R>(method, params));
   }
 
   /** Calls `callback` for each notification that passes `filter`. Deltas come as DatabaseStore changes instead. */
@@ -244,10 +250,14 @@ export class EngineAPI {
     return { dispose: () => events.forEach((e) => this.events.removeListener(e, callback)) };
   }
 
-  _checkCaller(method: string, stack: string) {
-    if (!isLocalOnlyMethod(method)) return;
+  /**
+   * Throws EngineRequestRefused when the caller may not call `method`. Returns null when it
+   * may, or a promise of the user's answer when it has to ask.
+   */
+  _checkCaller(method: string, stack: string): Promise<void> | null {
+    if (!isLocalOnlyMethod(method)) return null;
     const caller = this.findCaller(stack);
-    if (!caller || caller.bundled) return;
+    if (!caller || caller.bundled) return null;
     const refuse = (why: string) => {
       throw new EngineRequestRefused(
         `${caller.name} may not call ${method}: ${why}`,
@@ -258,17 +268,32 @@ export class EngineAPI {
     if (!caller.engineMethods.includes(method)) {
       refuse(`it is a local-only method and package.json's tern.engineMethods doesn't list it`);
     }
-    const approvals = AppEnv.config.get(ENGINE_METHOD_APPROVALS_KEY) || {};
-    const approved: string[] = Array.isArray(approvals[caller.name]) ? approvals[caller.name] : [];
-    if (approved.includes(method)) return;
+    const approvedFor = (name: string): string[] => {
+      const approvals = AppEnv.config.get(ENGINE_METHOD_APPROVALS_KEY) || {};
+      return Array.isArray(approvals[name]) ? approvals[name] : [];
+    };
+    if (approvedFor(caller.name).includes(method)) return null;
     const key = `${caller.name}\u0000${method}`;
-    if (this._denied.has(key) || !this.askUser(caller, method)) {
-      this._denied.add(key);
-      refuse('the user did not allow it');
+    if (this._denied.has(key)) refuse('the user did not allow it');
+
+    let answer = this._asking.get(key);
+    if (!answer) {
+      answer = Promise.resolve(this.askUser(caller, method));
+      this._asking.set(key, answer);
+      const done = () => this._asking.delete(key);
+      answer.then(done, done);
     }
-    AppEnv.config.set(ENGINE_METHOD_APPROVALS_KEY, {
-      ...approvals,
-      [caller.name]: [...approved, method],
+    return answer.then((allowed) => {
+      if (!allowed) {
+        this._denied.add(key);
+        refuse('the user did not allow it');
+      }
+      const approved = approvedFor(caller.name);
+      if (approved.includes(method)) return;
+      AppEnv.config.set(ENGINE_METHOD_APPROVALS_KEY, {
+        ...(AppEnv.config.get(ENGINE_METHOD_APPROVALS_KEY) || {}),
+        [caller.name]: [...approved, method],
+      });
     });
   }
 }

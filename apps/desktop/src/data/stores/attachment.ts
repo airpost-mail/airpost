@@ -8,6 +8,7 @@ import * as Actions from '../actions';
 import { File } from '../models/file';
 import * as Utils from '../models/utils';
 import { localized } from '../../intl/localize';
+import { Dialogs } from '../../platform/app-api';
 import { filesSchemeURL } from '../../mail/files-scheme';
 import { confirmOpeningFile, markFileFromInternet } from '../../mail/attachment-safety';
 import {
@@ -240,7 +241,7 @@ class AttachmentStore extends BaseStore {
               AppEnv.config.get('core.attachments.openFolderAfterDownload')
             ) {
               this._lastDownloadDirectory = newDownloadDirectory;
-              require('@electron/remote').shell.showItemInFolder(actualSavePath);
+              shell.showItemInFolder(actualSavePath);
             }
           }
         })
@@ -293,7 +294,7 @@ class AttachmentStore extends BaseStore {
                 lastSavePaths.length > 0 &&
                 AppEnv.config.get('core.attachments.openFolderAfterDownload')
               ) {
-                require('@electron/remote').shell.showItemInFolder(lastSavePaths[0]);
+                shell.showItemInFolder(lastSavePaths[0]);
               }
               return resolve(lastSavePaths);
             })
@@ -354,19 +355,24 @@ class AttachmentStore extends BaseStore {
     const name = file ? file.displayName() : localized('one or more files');
     const errorString = error ? error.toString() : '';
 
-    require('@electron/remote').dialog.showMessageBoxSync({
-      type: 'warning',
-      message: localized('Download Failed'),
-      detail: localized(
-        `Unable to download %@. Check your network connection and try again. %@`,
-        name,
-        errorString
-      ),
-      buttons: ['OK'],
-    });
+    Dialogs.showMessageBox(
+      {
+        type: 'warning',
+        message: localized('Download Failed'),
+        detail: localized(
+          `Unable to download %@. Check your network connection and try again. %@`,
+          name,
+          errorString
+        ),
+        buttons: ['OK'],
+      },
+      'none'
+    );
   }
 
-  _catchFSErrors(error: NodeJS.ErrnoException) {
+  // Resolves once the user has seen a dialog for a file system error it explains; rejects with
+  // any other error.
+  async _catchFSErrors(error: NodeJS.ErrnoException) {
     let message: string | null = null;
     const code = error.code || '';
     if (['EPERM', 'EROFS', 'EPIPE', 'EBUSY', 'EMFILE', 'EACCES', 'UNKNOWN'].includes(code)) {
@@ -381,15 +387,18 @@ class AttachmentStore extends BaseStore {
     }
 
     if (message) {
-      require('@electron/remote').dialog.showMessageBoxSync({
-        type: 'warning',
-        message: localized('Download Failed'),
-        detail: `${message}\n\n${error.message}`,
-        buttons: [localized('OK')],
-      });
-      return Promise.resolve();
+      await Dialogs.showMessageBox(
+        {
+          type: 'warning',
+          message: localized('Download Failed'),
+          detail: `${message}\n\n${error.message}`,
+          buttons: [localized('OK')],
+        },
+        'none'
+      );
+      return;
     }
-    return Promise.reject(error);
+    throw error;
   }
 
   // Section: Adding Files

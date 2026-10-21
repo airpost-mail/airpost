@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { shell } from 'electron';
 import { localized } from '../intl/localize';
 import { DESKTOP_FILE_NAME } from './linux-desktop';
+import { App, Dialogs } from './app-api';
 
 interface DCH {
   available(): boolean;
@@ -55,25 +56,23 @@ export class DefaultClientHelperWindows implements DCH {
 
   registerForURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
     // Ensure that our registry entires are present
-    const WindowsUpdater = require('@electron/remote').require('./autoupdate/win32-updater');
-    WindowsUpdater.createRegistryEntries(
-      {
-        allowEscalation: true,
-        registerDefaultIfPossible: true,
-      },
-      async (err: Error | null, didMakeDefault: boolean) => {
-        if (err) {
-          await require('@electron/remote').dialog.showMessageBox({
+    App.registerDefaultMailClient().then(async ({ error, didMakeDefault }) => {
+      if (error) {
+        await Dialogs.showMessageBox(
+          {
             type: 'error',
             buttons: [localized('OK')],
             message: localized('An error has occurred'),
-            detail: err.message,
-          });
-          return;
-        }
+            detail: error,
+          },
+          'none'
+        );
+        return;
+      }
 
-        if (!didMakeDefault) {
-          const { response } = await require('@electron/remote').dialog.showMessageBox({
+      if (!didMakeDefault) {
+        const { response } = await Dialogs.showMessageBox(
+          {
             type: 'info',
             buttons: [localized('Open Settings'), localized('Cancel')],
             defaultId: 0,
@@ -81,21 +80,22 @@ export class DefaultClientHelperWindows implements DCH {
             detail: localized(
               "Click 'Open Settings' to open Windows Settings where you can set Tern as your default email app."
             ),
-          });
-          if (response === 0) {
-            // On Windows 11 21H2+ (with April 2023 update), this deep links directly to
-            // Tern's default app settings. On older versions, falls back to Default Apps.
-            shell.openExternal('ms-settings:defaultapps?registeredAppUser=Tern').catch((err) => {
-              AppEnv.showErrorDialog({
-                title: localized('Failed to Open Settings'),
-                message: localized('Tern was unable to open Windows Settings.\n\n%@', err.message),
-              });
+          },
+          'none'
+        );
+        if (response === 0) {
+          // On Windows 11 21H2+ (with April 2023 update), this deep links directly to
+          // Tern's default app settings. On older versions, falls back to Default Apps.
+          shell.openExternal('ms-settings:defaultapps?registeredAppUser=Tern').catch((err) => {
+            AppEnv.showErrorDialog({
+              title: localized('Failed to Open Settings'),
+              message: localized('Tern was unable to open Windows Settings.\n\n%@', err.message),
             });
-          }
+          });
         }
-        callback(null);
       }
-    );
+      callback(null);
+    });
   }
 }
 
@@ -136,20 +136,18 @@ export class DefaultClientHelperMac implements DCH {
     if (!callback) {
       throw new Error('isRegisteredForURLScheme is async, provide a callback');
     }
-    return callback(require('@electron/remote').app.isDefaultProtocolClient(scheme));
+    App.isDefaultProtocolClient(scheme).then(callback);
   }
 
   resetURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
-    const success = require('@electron/remote').app.removeAsDefaultProtocolClient(scheme);
-    return callback(
-      success ? null : new Error(`Failed to remove Tern as default handler for ${scheme}`)
+    App.removeAsDefaultProtocolClient(scheme).then((success) =>
+      callback(success ? null : new Error(`Failed to remove Tern as default handler for ${scheme}`))
     );
   }
 
   registerForURLScheme(scheme: string, callback = (error?: Error | null) => {}) {
-    const success = require('@electron/remote').app.setAsDefaultProtocolClient(scheme);
-    return callback(
-      success ? null : new Error(`Failed to set Tern as default handler for ${scheme}`)
+    App.setAsDefaultProtocolClient(scheme).then((success) =>
+      callback(success ? null : new Error(`Failed to set Tern as default handler for ${scheme}`))
     );
   }
 }

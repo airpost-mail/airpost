@@ -391,6 +391,8 @@ const start = () => {
     }
   }
 
+  // Tern's code doesn't use @electron/remote (src/main/ipc/app-api.ts); it stays for v1
+  // plugins that load it, until plugin API 2.0.
   require('@electron/remote/main').initialize();
 
   // Configure Chromium command line switches before app ready event.

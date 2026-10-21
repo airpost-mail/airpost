@@ -8,6 +8,7 @@ import {
 } from '../../platform/linux-desktop';
 import * as portal from 'xdg-portal';
 import { localized } from '../../intl/localize';
+import { App } from '../../platform/app-api';
 
 class SystemStartServiceBase {
   checkAvailability(): Promise<boolean> {
@@ -32,20 +33,17 @@ class SystemStartServiceDarwin extends SystemStartServiceBase {
     return Promise.resolve(true);
   }
 
-  doesLaunchOnSystemStart() {
-    const app = require('@electron/remote').app;
-    const settings = app.getLoginItemSettings();
-    return Promise.resolve(settings.openAtLogin as boolean);
+  async doesLaunchOnSystemStart() {
+    const settings = await App.getLoginItemSettings();
+    return settings.openAtLogin;
   }
 
   configureToLaunchOnSystemStart() {
-    const app = require('@electron/remote').app;
-    app.setLoginItemSettings({ openAtLogin: true });
+    App.setLoginItemSettings({ openAtLogin: true });
   }
 
   dontLaunchOnSystemStart() {
-    const app = require('@electron/remote').app;
-    app.setLoginItemSettings({ openAtLogin: false });
+    App.setLoginItemSettings({ openAtLogin: false });
   }
 }
 
@@ -58,18 +56,16 @@ class SystemStartServiceWin32 extends SystemStartServiceBase {
     });
   }
 
-  doesLaunchOnSystemStart() {
-    const app = require('@electron/remote').app;
-    const settings = app.getLoginItemSettings({
+  async doesLaunchOnSystemStart() {
+    const settings = await App.getLoginItemSettings({
       path: this._updateExePath(),
       args: this._loginArgs(),
     });
-    return Promise.resolve(settings.openAtLogin as boolean);
+    return settings.openAtLogin;
   }
 
   configureToLaunchOnSystemStart() {
-    const app = require('@electron/remote').app;
-    app.setLoginItemSettings({
+    App.setLoginItemSettings({
       openAtLogin: true,
       path: this._updateExePath(),
       args: this._loginArgs(),
@@ -77,8 +73,7 @@ class SystemStartServiceWin32 extends SystemStartServiceBase {
   }
 
   dontLaunchOnSystemStart() {
-    const app = require('@electron/remote').app;
-    app.setLoginItemSettings({
+    App.setLoginItemSettings({
       openAtLogin: false,
       path: this._updateExePath(),
       args: this._loginArgs(),

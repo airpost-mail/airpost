@@ -35,7 +35,7 @@ function showSetupErrorInWindow(stack) {
   button.textContent = 'Copy to Clipboard';
   button.style.cssText = 'margin:0 0 16px;padding:4px 12px;font:13px system-ui,sans-serif;';
   button.onclick = function () {
-    require('@electron/remote').clipboard.writeText(stack);
+    require('electron').clipboard.writeText(stack);
     button.textContent = 'Copied';
   };
 
@@ -52,15 +52,20 @@ function showSetupErrorInWindow(stack) {
   document.body.appendChild(pre);
 }
 
+// The window commands are main's (src/platform/app-api-channels.ts); this file runs before the
+// TypeScript compile cache, so it sends them by name.
+function windowCommand(command) {
+  require('electron').ipcRenderer.send('app-api:window:command', command);
+}
+
 function handleSetupError(error) {
-  var currentWindow = require('@electron/remote').getCurrentWindow();
-  currentWindow.setSize(800, 600);
-  currentWindow.center();
-  currentWindow.show();
+  windowCommand({ op: 'setSize', width: 800, height: 600 });
+  windowCommand({ op: 'center' });
+  windowCommand({ op: 'show' });
   var stack = (error && error.stack) || String(error);
   console.error(stack);
   if (require('../src/platform/developer-tools').developerToolsAvailable()) {
-    currentWindow.openDevTools();
+    require('electron').ipcRenderer.send('call-webcontents-method', 'openDevTools');
   } else {
     showSetupErrorInWindow(stack);
   }
@@ -70,7 +75,7 @@ function copyEnvFromMainProcess() {
   const newEnv = Object.assign(
     {},
     process.env,
-    JSON.parse(JSON.stringify(require('@electron/remote').process.env))
+    require('electron').ipcRenderer.sendSync('app-api:sync:main-env')
   );
   process.env = newEnv;
 }

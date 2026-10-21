@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { shell } from 'electron';
 import { localized } from '../intl/localize';
+import { Dialogs } from '../platform/app-api';
 import Package, { isValidPackageName } from './package';
 import BuiltinFeature from './builtin-feature';
 import { bundledPackagePaths, bundledPackageRoots, compareNames } from './bundled-packages';
@@ -212,17 +213,20 @@ export default class PackageManager {
 
   // Installing and Creating Packages
 
-  installPackageManually() {
-    const response = require('@electron/remote').dialog.showMessageBoxSync({
-      type: 'warning',
-      buttons: [localized('Cancel'), localized('Continue')],
-      defaultId: 0,
-      cancelId: 0,
-      message: localized('Only install plugins from sources you trust'),
-      detail: localized(
-        'Tern plugins run in the application and have access to your email data. Only install plugins from developers you trust.'
-      ),
-    });
+  async installPackageManually() {
+    const response = await Dialogs.ask(
+      {
+        type: 'warning',
+        buttons: [localized('Cancel'), localized('Continue')],
+        defaultId: 0,
+        cancelId: 0,
+        message: localized('Only install plugins from sources you trust'),
+        detail: localized(
+          'Tern plugins run in the application and have access to your email data. Only install plugins from developers you trust.'
+        ),
+      },
+      'none'
+    );
     if (response !== 1) {
       return;
     }

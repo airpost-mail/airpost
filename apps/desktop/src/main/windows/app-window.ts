@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog } from 'electron';
+import { BrowserWindow, Menu, app, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import url from 'url';
@@ -15,6 +15,7 @@ import {
   isPrimaryWindow,
 } from './hardware-acceleration-recovery';
 import { shouldBlockFrameNavigation } from '../frame/navigation';
+import { attachAppWindowContents } from '../ipc/app-api';
 
 let WindowIconPath: string | null = null;
 let idNum = 0;
@@ -120,11 +121,10 @@ export default class AppWindow extends EventEmitter {
       contextIsolation: false,
       webviewTag: true,
       // Withholding the capability, rather than only the ways to ask for it, is what makes
-      // the console unreachable in a packaged build: these windows hand the renderer a
-      // @electron/remote handle to their own webContents, so any code running in them could
-      // otherwise call openDevTools() directly. Electron turns such calls into silent no-ops.
+      // the console unreachable in a packaged build: @electron/remote stays enabled for these
+      // windows (below), so any code running in them could otherwise call openDevTools() on
+      // its own webContents. Electron turns such calls into silent no-ops.
       devTools: developerToolsAvailable(),
-      // Note: @electron/remote is enabled via remote.initialize() in main process
     };
     const browserWindowOptions: Electron.BrowserWindowConstructorOptions = {
       show: false,
@@ -184,7 +184,12 @@ export default class AppWindow extends EventEmitter {
       webPreferences.devTools = developerToolsAvailable();
     });
 
+    // Tern's code reaches main over ipc/app-api.ts; remote stays enabled for v1 plugins that
+    // load @electron/remote themselves, until plugin API 2.0.
     require('@electron/remote/main').enable(this.browserWindow.webContents);
+    attachAppWindowContents(this.browserWindow.webContents, (template) =>
+      Menu.buildFromTemplate(template)
+    );
 
     this.handleEvents();
 
