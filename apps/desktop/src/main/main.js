@@ -36,6 +36,7 @@ console.inspect = function consoleInspect(val) {
 const { app, session, protocol } = require('electron');
 const path = require('path');
 const { developerToolsAvailable } = require('../platform/developer-tools');
+const { isSamePath } = require('./same-path');
 
 if (typeof process.setFdLimit === 'function') {
   process.setFdLimit(1024);
@@ -238,8 +239,9 @@ const parseCommandLine = argv => {
       ignoreNext = true;
       continue;
     }
-    // Skip the argument if it's part of the main electron invocation.
-    if (path.resolve(arg) === resourcePath) {
+    // Skip the argument if it's part of the main electron invocation. __dirname has its
+    // symlinks resolved and the argument may not (/tmp on macOS), so compare real paths.
+    if (isSamePath(arg, resourcePath)) {
       continue;
     }
     if (arg.startsWith('mailto:') || arg.startsWith('tern:')) {
