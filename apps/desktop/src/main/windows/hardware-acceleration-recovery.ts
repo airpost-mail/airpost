@@ -58,8 +58,8 @@ export function isPrimaryWindow({
   mainWindow,
   windowType,
 }: {
-  mainWindow: boolean;
-  windowType: string;
+  mainWindow?: boolean;
+  windowType?: string;
 }) {
   return !!mainWindow || windowType === 'onboarding';
 }
@@ -129,7 +129,8 @@ export function applyPersistentSoftwareRendering(
         fileSystem.rmSync(path.join(configDirPath, cacheName), { recursive: true, force: true });
       } catch (error) {
         // Best effort: software rendering is the recovery step that matters.
-        console.warn(`Unable to clear ${cacheName} during GPU recovery: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`Unable to clear ${cacheName} during GPU recovery: ${message}`);
       }
     }
     fileSystem.writeFileSync(cacheClearedPath, `${new Date().toISOString()}\n`);

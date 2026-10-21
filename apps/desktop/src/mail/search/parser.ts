@@ -34,7 +34,7 @@ const nextStringToken = (text: string): [SearchQueryToken, string] => {
   throw new Error('Expected string but ran out of input');
 };
 
-const isWhitespace = (c) => {
+const isWhitespace = (c: string) => {
   switch (c) {
     case ' ':
     case '\t':
@@ -108,7 +108,7 @@ const isValidNonStringText = (text: string) => {
   return true;
 };
 
-const nextToken = (text: string): [SearchQueryToken, string] => {
+const nextToken = (text: string): [SearchQueryToken | null, string] => {
   const newText = consumeWhitespace(text);
   if (newText.length === 0) {
     return [null, newText];
@@ -182,6 +182,9 @@ const nextToken = (text: string): [SearchQueryToken, string] => {
  */
 const consumeExpectedToken = (text: string, token: string) => {
   const [tok, afterTok] = nextToken(text);
+  if (tok === null) {
+    throw new Error(`Expected '${token}' but ran out of input`);
+  }
   if (tok.s !== token) {
     throw new Error(`Expected '${token}', got '${tok.s}'`);
   }
@@ -196,7 +199,7 @@ const parseText = (text: string): [TextQueryExpression, string] => {
   return [new TextQueryExpression(tok), afterTok];
 };
 
-const parseIsQuery = (text: string): [QueryExpression, string] => {
+const parseIsQuery = (text: string): [QueryExpression, string] | null => {
   const afterColon = consumeExpectedToken(text, ':');
   const [tok, afterTok] = nextToken(afterColon);
   if (tok === null) {
@@ -218,7 +221,7 @@ const parseIsQuery = (text: string): [QueryExpression, string] => {
   return null;
 };
 
-const parseHasQuery = (text: string): [QueryExpression, string] => {
+const parseHasQuery = (text: string): [QueryExpression, string] | null => {
   const afterColon = consumeExpectedToken(text, ':');
   const [tok, afterTok] = nextToken(afterColon);
   if (tok === null) {
@@ -236,7 +239,7 @@ const parseHasQuery = (text: string): [QueryExpression, string] => {
   return null;
 };
 
-const parseSimpleQuery = (text: string): [QueryExpression, string] => {
+const parseSimpleQuery = (text: string): [QueryExpression | null, string] => {
   const [tok, afterTok] = nextToken(text);
   if (tok === null) {
     return [null, afterTok];
@@ -301,7 +304,15 @@ const parseSimpleQuery = (text: string): [QueryExpression, string] => {
   return [new GenericQueryExpression(txt), afterTxt];
 };
 
-const parseOrQuery = (text: string): [QueryExpression, string] => {
+// A query that ends after an operator ("a OR") leaves the operand null.
+const operand = (exp: QueryExpression | null): QueryExpression => {
+  if (exp === null) {
+    throw new Error('Expected an expression but ran out of input');
+  }
+  return exp;
+};
+
+const parseOrQuery = (text: string): [QueryExpression | null, string] => {
   const [lhs, afterLhs] = parseSimpleQuery(text);
   const [tok, afterOr] = nextToken(afterLhs);
   if (tok === null) {
@@ -311,10 +322,10 @@ const parseOrQuery = (text: string): [QueryExpression, string] => {
     return [lhs, afterLhs];
   }
   const [rhs, afterRhs] = parseOrQuery(afterOr);
-  return [new OrQueryExpression(lhs, rhs), afterRhs];
+  return [new OrQueryExpression(operand(lhs), operand(rhs)), afterRhs];
 };
 
-const parseAndQuery = (text: string): [QueryExpression, string] => {
+const parseAndQuery = (text: string): [QueryExpression | null, string] => {
   const [lhs, afterLhs] = parseOrQuery(text);
   let [tok, afterTok] = nextToken(afterLhs);
   if (tok === null) {
@@ -331,13 +342,13 @@ const parseAndQuery = (text: string): [QueryExpression, string] => {
       rhsStart = afterTok;
       [tok, afterTok] = nextToken(afterTok);
     }
-    if (tok.s.toUpperCase() === 'NOT') {
+    if (tok?.s.toUpperCase() === 'NOT') {
       rhsStart = afterTok;
       const [rhs, afterRhs] = parseAndQuery(rhsStart);
-      return [new NotQueryExpression(lhs, rhs), afterRhs];
+      return [new NotQueryExpression(operand(lhs), operand(rhs)), afterRhs];
     } else {
       const [rhs, afterRhs] = parseAndQuery(rhsStart);
-      return [new AndQueryExpression(lhs, rhs), afterRhs];
+      return [new AndQueryExpression(operand(lhs), operand(rhs)), afterRhs];
     }
   }
 
@@ -353,13 +364,13 @@ const parseAndQuery = (text: string): [QueryExpression, string] => {
   // but typically the NOT should only apply to the very next clause... tbd how to fix.
 };
 
-const parseQuery = (text: string) => {
+const parseQuery = (text: string): [QueryExpression | null, string] => {
   return parseAndQuery(text);
 };
 
 const parseQueryWrapper = (text: string) => {
   let currText = text;
-  const exps = [];
+  const exps: QueryExpression[] = [];
   while (currText.length > 0) {
     const [result, leftover] = parseQuery(currText);
     if (result === null) {
@@ -373,13 +384,9 @@ const parseQueryWrapper = (text: string) => {
     throw new Error('Unable to parse query');
   }
 
-  let result: QueryExpression = null;
-  for (let i = exps.length - 1; i >= 0; --i) {
-    if (result === null) {
-      result = exps[i];
-    } else {
-      result = new AndQueryExpression(exps[i], result);
-    }
+  let result = exps[exps.length - 1];
+  for (let i = exps.length - 2; i >= 0; --i) {
+    result = new AndQueryExpression(exps[i], result);
   }
   return result;
 };

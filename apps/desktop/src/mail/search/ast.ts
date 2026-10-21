@@ -1,72 +1,85 @@
-export class SearchQueryExpressionVisitor {
-  _result = null;
+/*
+ * R is the type a visit method stores in _result. A visit method that sets nothing leaves it
+ * null, so visitAndGetResult returns R | null.
+ */
+export class SearchQueryExpressionVisitor<R = unknown> {
+  _result: R | null = null;
 
-  visitAndGetResult(node: QueryExpression) {
+  visitAndGetResult(node: QueryExpression): R | null {
     node.accept(this);
     const result = this._result;
     this._result = null;
     return result;
   }
 
-  visitAnd(node: QueryExpression) {
+  /* For visitors whose every visit method sets a result or throws. */
+  visitAndGetRequiredResult(node: QueryExpression): R {
+    const result = this.visitAndGetResult(node);
+    if (result === null) {
+      throw new Error(`Visitor produced no result for ${node}`);
+    }
+    return result;
+  }
+
+  visitAnd(node: AndQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitNot(node: QueryExpression) {
+  visitNot(node: NotQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitOr(node: QueryExpression) {
+  visitOr(node: OrQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitFrom(node: QueryExpression) {
+  visitFrom(node: FromQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitDate(node: QueryExpression) {
+  visitDate(node: DateQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitTo(node: QueryExpression) {
+  visitTo(node: ToQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitSubject(node: QueryExpression) {
+  visitSubject(node: SubjectQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitGeneric(node: QueryExpression) {
+  visitGeneric(node: GenericQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitText(node: QueryExpression) {
+  visitText(node: TextQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitUnread(node: QueryExpression) {
+  visitUnread(node: UnreadStatusQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitStarred(node: QueryExpression) {
+  visitStarred(node: StarredStatusQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitMatch(node: QueryExpression) {
+  visitMatch(node: MatchQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitIn(node: QueryExpression) {
+  visitIn(node: InQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
-  visitHasAttachment(node: QueryExpression) {
+  visitHasAttachment(node: HasAttachmentQueryExpression) {
     throw new Error(`Abstract function not implemented!: ${node}`);
   }
 }
 
 export class QueryExpression {
-  _isMatchCompatible = null;
+  _isMatchCompatible: boolean | null = null;
 
-  accept(visitor: SearchQueryExpressionVisitor) {
+  accept(visitor: SearchQueryExpressionVisitor): void {
     throw new Error(`Abstract function not implemented!: ${visitor}`);
   }
 
-  isMatchCompatible() {
+  isMatchCompatible(): boolean {
     if (this._isMatchCompatible === null) {
       this._isMatchCompatible = this._computeIsMatchCompatible();
     }
     return this._isMatchCompatible;
   }
 
-  _computeIsMatchCompatible() {
+  _computeIsMatchCompatible(): boolean {
     throw new Error('Abstract function not implemented!');
   }
 
@@ -410,7 +423,7 @@ export class MatchQueryExpression extends QueryExpression {
     visitor.visitMatch(this);
   }
 
-  _computeIsMatchCompatible() {
+  _computeIsMatchCompatible(): boolean {
     /*
      * We should never call this for match nodes b/c we generate match nodes
      * after checking if other nodes are match-compatible.

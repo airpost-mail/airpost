@@ -2,9 +2,14 @@ import quoteStringDetector from './quote-string-detector';
 import unwrappedSignatureDetector from './unwrapped-signature-detector';
 const { FIRST_ORDERED_NODE_TYPE } = XPathResult;
 
-const isEmptyishTextContent = (el) => {
+// ChildNode.remove(), for nodes the DOM types only know as Node.
+const removeNode = (node: Node) => {
+  node.parentNode?.removeChild(node);
+};
+
+const isEmptyishTextContent = (el: Node) => {
   // either '' or '---' (often left over from sig / confidentiality notice removal)
-  const trimmed = el.textContent.trim();
+  const trimmed = (el.textContent ?? '').trim();
   return trimmed === '' || /^-+$/.test(trimmed);
 };
 
@@ -15,7 +20,7 @@ const isEmptyishTextContent = (el) => {
 // mode or the sheet is silently dropped between sanitization and display.
 const isWholeDocument = (html: string) => /<\s?head\s?>/i.test(html) || /<\s?body[\s>]/i.test(html);
 
-const looksLikeTrackingPixel = (img) => {
+const looksLikeTrackingPixel = (img: HTMLElement) => {
   // we want to avoid hiding quoted text if the user has added an image beneath it, but only
   // if that image is more than 1px in size...
   const w = Number(img.getAttribute('width') || (img.style.width || '').replace('px', '') || 10000);
@@ -55,13 +60,13 @@ class QuotedHTMLTransformer {
     this._removeTrailingFootersAndWhitespace(doc);
     for (const el of this._findQuoteElements(doc)) {
       if (el) {
-        el.remove();
+        removeNode(el);
       }
     }
 
     // It's possible that the entire body was quoted text anyway and we've removed everything.
     if (options.keepIfWholeBodyIsQuote) {
-      if (!doc.body || !doc.children[0] || doc.body.textContent.trim().length === 0) {
+      if (!doc.body || !doc.children[0] || (doc.body.textContent ?? '').trim().length === 0) {
         return this._outputHTMLFor(this._parseHTML(html), { initialHTML: html });
       }
     }
@@ -72,7 +77,7 @@ class QuotedHTMLTransformer {
 
     for (const el of quoteStringDetector(doc)) {
       if (el && el !== doc.body) {
-        el.remove();
+        removeNode(el);
       }
     }
 
@@ -95,7 +100,7 @@ class QuotedHTMLTransformer {
       XPathResult.ANY_TYPE,
       null
     );
-    const nodes = [];
+    const nodes: Node[] = [];
 
     // collect all the results and then remove them all
     // to avoid modifying the dom while using the xpath selector
@@ -104,7 +109,7 @@ class QuotedHTMLTransformer {
       nodes.push(node);
       node = result.iterateNext();
     }
-    nodes.forEach((n) => n.remove());
+    nodes.forEach(removeNode);
   }
 
   _removeUnnecessaryWhitespace(doc: Document) {
@@ -115,7 +120,7 @@ class QuotedHTMLTransformer {
     // Find back-to-back <br><br> at the top level and de-duplicate them. Note that
     // some emails contain TEXT<br>TEXT<br>TEXT, so the only ELEMENT children may be the <brs>
     const nodes = doc.body.childNodes;
-    const extraTailBrTags = [];
+    const extraTailBrTags: ChildNode[] = [];
     for (let i = nodes.length - 1; i >= 0; i--) {
       const curr = nodes[i];
       const next = nodes[i - 1];
@@ -143,7 +148,7 @@ class QuotedHTMLTransformer {
     //
     // Containers with empty space at the end occur pretty often when we
     // remove the quoted text and it had preceding spaces.
-    const removeTrailingWhitespaceChildren = (el) => {
+    const removeTrailingWhitespaceChildren = (el: Node) => {
       while (el.lastChild) {
         const child = el.lastChild;
         if (child.nodeType === Node.TEXT_NODE) {
@@ -154,7 +159,8 @@ class QuotedHTMLTransformer {
         }
         if (['BR', 'P', 'DIV', 'SPAN', 'HR'].includes(child.nodeName)) {
           removeTrailingWhitespaceChildren(child);
-          if (child.childElementCount === 0 && isEmptyishTextContent(child)) {
+          // An element, by its nodeName
+          if ((child as Element).childElementCount === 0 && isEmptyishTextContent(child)) {
             child.remove();
             continue;
           }
@@ -182,11 +188,11 @@ class QuotedHTMLTransformer {
 
   _parseHTML(text: string) {
     const domParser = new DOMParser();
-    let doc;
+    let doc: Document;
     try {
       doc = domParser.parseFromString(isWholeDocument(text) ? text : `<body>${text}`, 'text/html');
     } catch (error) {
-      const errText = `HTML Parser Error: ${error.toString()}`;
+      const errText = `HTML Parser Error: ${String(error)}`;
       doc = domParser.parseFromString(errText, 'text/html');
       AppEnv.reportError(error);
     }
@@ -196,17 +202,17 @@ class QuotedHTMLTransformer {
     return doc;
   }
 
-  _outputHTMLFor(doc, { initialHTML }: { initialHTML?: string } = {}) {
+  _outputHTMLFor(doc: Document, { initialHTML }: { initialHTML?: string } = {}) {
     if (!doc.body) {
       doc = this._parseHTML('');
     }
-    if (isWholeDocument(initialHTML)) {
+    if (initialHTML !== undefined && isWholeDocument(initialHTML)) {
       return doc.children[0].innerHTML;
     }
     return doc.body.innerHTML;
   }
 
-  _findQuoteElements(doc: Document) {
+  _findQuoteElements(doc: Document): Node[] {
     const parsers = [
       this._findGmailQuotes,
       this._findYahooQuotes,
@@ -215,7 +221,7 @@ class QuotedHTMLTransformer {
       this._findQuotesAfter__OriginalMessage__,
     ];
 
-    let quoteElements = [];
+    let quoteElements: Node[] = [];
     for (const parser of parsers) {
       quoteElements = quoteElements.concat(parser.call(this, doc) || []);
     }
@@ -235,26 +241,26 @@ class QuotedHTMLTransformer {
     return quoteElements;
   }
 
-  _isElementFollowedByUnquotedElement(el: Element, quoteElementSet: Set<any>) {
-    const seen = new Set();
-    let head = el;
+  _isElementFollowedByUnquotedElement(el: Node, quoteElementSet: Set<Node>) {
+    const seen = new Set<Node>();
+    let head: Node | null = el;
 
     while (head) {
       // advance to the next sibling, or the parent's next sibling
       while (head && !head.nextSibling) {
-        head = head.parentNode as Element;
+        head = head.parentNode;
       }
-      if (!head) {
+      if (!head || !head.nextSibling) {
         break;
       }
-      head = head.nextSibling as Element;
+      head = head.nextSibling;
 
       // search this branch of the tree for any text nodes / images that
       // are not contained within a matched quoted text block. We mark
       // the subtree as "seen" because we traverse upwards, and would
       // re-evaluate the subtree on each iteration otherwise.
-      const pile = [head];
-      let node = null;
+      const pile: Node[] = [head];
+      let node: Node | undefined;
 
       while ((node = pile.pop())) {
         if (seen.has(node)) {
@@ -266,7 +272,8 @@ class QuotedHTMLTransformer {
         if (node.childNodes) {
           pile.push(...node.childNodes);
         }
-        if (node.nodeName === 'IMG' && !looksLikeTrackingPixel(node)) {
+        // An <img>, by its nodeName
+        if (node.nodeName === 'IMG' && !looksLikeTrackingPixel(node as HTMLElement)) {
           return true;
         }
         if (node.nodeType === Node.TEXT_NODE && !isEmptyishTextContent(node)) {
@@ -297,11 +304,11 @@ class QuotedHTMLTransformer {
   }
 
   _removeTrailingFootersAndWhitespace(doc: Document) {
-    let els = [];
+    let els: Node[] | null = [];
     let iters = 0;
     while ((els = this._findTrailingFooter(doc))) {
       iters++;
-      els.forEach((el) => el.remove());
+      els.forEach(removeNode);
       this._removeUnnecessaryWhitespace(doc);
       if (iters > 20) {
         return;
@@ -309,7 +316,7 @@ class QuotedHTMLTransformer {
     }
   }
 
-  _findTrailingFooter(doc: Document) {
+  _findTrailingFooter(doc: Document): Node[] | null {
     // Traverse from the body down the tree of "last" nodes looking for a
     // Confidentiality Notice, "To unsubscribe from this group", etc.
     // We strip these nodes because otherwise the quoted text logic
@@ -323,9 +330,9 @@ class QuotedHTMLTransformer {
 
     const hasQuote = !!doc.querySelector('.gmail_quote, blockquote');
 
-    let head = doc.body;
+    let head: Node | null = doc.body;
     while (head) {
-      const tc = head.textContent.trim();
+      const tc = (head.textContent ?? '').trim();
       if (head.nodeType === Node.TEXT_NODE) {
         if (footerRegexps.find((r) => r.test(tc))) {
           return [head];
@@ -338,7 +345,7 @@ class QuotedHTMLTransformer {
         tc === '.' &&
         head.previousSibling &&
         head.previousSibling.previousSibling &&
-        head.previousSibling.previousSibling.textContent.trim().startsWith('To unsubscribe')
+        (head.previousSibling.previousSibling.textContent ?? '').trim().startsWith('To unsubscribe')
       ) {
         return [head, head.previousSibling, head.previousSibling.previousSibling];
       }
@@ -346,14 +353,18 @@ class QuotedHTMLTransformer {
       // chop off gmail_signature if the user has it configured to go at the absolute
       // bottom of the email, beneath the quote. Without a quote it must stay: Gmail can
       // put text typed below the greeting inside the signature div.
-      if (hasQuote && head.nodeName === 'DIV' && head.classList.contains('gmail_signature')) {
+      if (
+        hasQuote &&
+        head.nodeName === 'DIV' &&
+        (head as Element).classList.contains('gmail_signature')
+      ) {
         return [head];
       }
 
       if (head.childNodes.length === 0 && tc === '') {
-        head = head.previousSibling as HTMLElement;
+        head = head.previousSibling;
       } else {
-        head = head.lastChild as HTMLElement;
+        head = head.lastChild;
       }
     }
     return null;
@@ -373,7 +384,8 @@ class QuotedHTMLTransformer {
       null,
       FIRST_ORDERED_NODE_TYPE,
       null
-    ).singleNodeValue;
+      // The XPath selects elements
+    ).singleNodeValue as Element | null;
 
     if (!originalMessageMarker) {
       return [];
@@ -411,9 +423,12 @@ class QuotedHTMLTransformer {
 
     // check to see if the parent container also contains the other two
     const headerContainer = dateMarker.parentElement;
+    if (!headerContainer) {
+      return [];
+    }
     let matches = 0;
     for (const node of Array.from(headerContainer.children)) {
-      const tc = (node as any).textContent.trim();
+      const tc = (node.textContent ?? '').trim();
       if (tc === 'To:' || tc === 'Subject:') {
         matches++;
       }
@@ -428,7 +443,7 @@ class QuotedHTMLTransformer {
     // Special case to add "From:" because it's often detatched from the rest of the
     // header fields. We just add it where ever it's located.
     const fromXPath = "//b[. = 'From:'] | //span[. = 'From:']| //span[. = 'From: ']";
-    let from = doc.evaluate(
+    let from: Node | null = doc.evaluate(
       fromXPath,
       doc.body,
       null,
@@ -440,18 +455,19 @@ class QuotedHTMLTransformer {
       if (from.nodeName === 'SPAN') {
         from = from.parentElement;
       }
-      quotedTextNodes.push(from);
+      // A <span> under doc.body always has a parent element
+      if (from) quotedTextNodes.push(from);
     }
 
     return quotedTextNodes;
   }
 
-  _collectAllNodesBelow = (headerContainer) => {
+  _collectAllNodesBelow = (headerContainer: Element): Node[] => {
     // The headers container and everything past it in the document is quoted text.
     // This traverses the DOM, walking up the tree and adding all siblings below
     // our current path to the array.
-    let head = headerContainer;
-    const results = [];
+    let head: Element | null = headerContainer;
+    const results: Node[] = [];
     while (head) {
       results.push(head);
       while (head && !head.nextElementSibling) {

@@ -14,9 +14,15 @@ function safeHttpUrl(value: unknown): string | null {
   }
 }
 
+// The update server's answer to a check; url is checked to be http(s) before it is passed on.
+export interface UpdateJSON {
+  url: string;
+  version?: string;
+}
+
 export default class AutoupdateImplBase extends EventEmitter {
-  feedURL: string;
-  lastRetrievedUpdateURL?: string;
+  feedURL = '';
+  lastRetrievedUpdateURL: string | null = null;
 
   supportsUpdates() {
     // If we're packaged into a Snapcraft distribution, we don't need
@@ -28,21 +34,28 @@ export default class AutoupdateImplBase extends EventEmitter {
   }
 
   /* Public: Set the feed URL where we retrieve update information. */
-  setFeedURL(feedURL) {
+  setFeedURL(feedURL: string) {
     this.feedURL = feedURL;
     this.lastRetrievedUpdateURL = null;
   }
 
-  emitError = (error) => {
+  emitError = (error: unknown) => {
     if (this.listenerCount('error') > 0) {
       this.emit('error', error);
     } else {
-      console.error('Autoupdater error (unhandled):', error.message);
+      console.error(
+        'Autoupdater error (unhandled):',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   };
 
-  manuallyQueryUpdateServer(successCallback) {
+  manuallyQueryUpdateServer(successCallback: (json: UpdateJSON | false) => void) {
     const feedHost = url.parse(this.feedURL).hostname;
+    if (!feedHost) {
+      this.emitError(new Error(`Autoupdater feed URL has no host: ${this.feedURL}`));
+      return;
+    }
     const feedPath = this.feedURL.split(feedHost).pop();
 
     // Hit the feed URL ourselves and see if an update is available.

@@ -32,7 +32,11 @@ function message(type: 'info' | 'warning' | 'error', text: string, detail?: stri
   importDialogs.showMessageBoxSync({ type, buttons: [localized('OK')], message: text, detail });
 }
 
-function keychainHint(err: Error) {
+function errorText(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function keychainHint(err: unknown) {
   const retryable = err instanceof MailspringKeychainError && err.retryable;
   let hint = retryable
     ? localized(
@@ -48,14 +52,14 @@ function keychainHint(err: Error) {
 }
 
 // True when the user goes on without the passwords Mailspring saved.
-export function continueWithoutPasswords(err: Error) {
+export function continueWithoutPasswords(err: unknown) {
   const choice = importDialogs.showMessageBoxSync({
     type: 'warning',
     buttons: [localized('Cancel'), localized('Import Without Passwords')],
     defaultId: 0,
     cancelId: 0,
     message: localized('Tern could not bring over the passwords Mailspring saved'),
-    detail: `${err.message}\n\n${keychainHint(err)}`,
+    detail: `${errorText(err)}\n\n${keychainHint(err)}`,
   });
   return choice === 1;
 }
@@ -84,7 +88,7 @@ export async function mailspringCredentialsForTern(stored: unknown, from: string
     await detachedKeyManager(holder)._writeKeyHash(keys as KeySet);
     return holder[configCredentialsKey];
   } catch (err) {
-    console.warn(`Tern could not bring over the passwords saved by Mailspring: ${err.message}`);
+    console.warn(`Tern could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
     if (continueWithoutPasswords(err)) return null;
     throw new ImportCancelledError();
   }
@@ -107,20 +111,22 @@ export function confirmProfileImport(from: string) {
 }
 
 // After a launch that imported a whole profile.
-export function reportProfileImport(outcome: { result?: ImportResult; error?: Error }) {
-  const { result, error } = outcome;
-  if (error instanceof ImportCancelledError) return;
-  if (error) {
+// `outcome` is main.js's settled startProfileImport promise.
+export function reportProfileImport(outcome: { result: ImportResult } | { error: unknown }) {
+  if ('error' in outcome) {
+    const { error } = outcome;
+    if (error instanceof ImportCancelledError) return;
     message(
       'error',
       localized('Tern could not import from Mailspring'),
       localized(
         '%@\n\nNothing in the Mailspring profile was changed. Tern starts with no accounts; you can import again from the welcome screen.',
-        error.message
+        errorText(error)
       )
     );
     return;
   }
+  const { result } = outcome;
   let detail = localized(
     'Your mail downloads again in the background. Local drafts, snoozes, reminders and scheduled sends come back as each account syncs. Mailspring was not changed.'
   );
@@ -156,7 +162,7 @@ export async function addMailspringAccounts({
   try {
     settings = readMailspringSettings(from);
   } catch (err) {
-    message('error', localized('Tern could not read the Mailspring profile'), err.message);
+    message('error', localized('Tern could not read the Mailspring profile'), errorText(err));
     return 'failed';
   }
   const existing = config.get('accounts') || [];
@@ -188,7 +194,7 @@ export async function addMailspringAccounts({
   try {
     keys = (await readMailspringKeySet(settings.credentials, from)) as KeySet;
   } catch (err) {
-    console.warn(`Tern could not bring over the passwords saved by Mailspring: ${err.message}`);
+    console.warn(`Tern could not bring over the passwords saved by Mailspring: ${errorText(err)}`);
     if (!continueWithoutPasswords(err)) return 'cancelled';
     passwordsLeftBehind = true;
   }

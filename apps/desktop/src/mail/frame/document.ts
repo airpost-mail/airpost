@@ -125,7 +125,10 @@ export function searchMessageDocument(
   }
   return Array.from(root.querySelectorAll<HTMLElement>('search-match'))
     .filter((node) => DOMUtils.nodeIsLikelyVisible(node))
-    .map((node) => ({ ...frameRect(node), renderIndex: +node.getAttribute('data-render-index') }))
+    .map((node) => ({
+      ...frameRect(node),
+      renderIndex: Number(node.getAttribute('data-render-index')),
+    }))
     .sort((a, b) => a.renderIndex - b.renderIndex);
 }
 
@@ -197,7 +200,7 @@ export class BodyElements {
   }
 
   info(el: Element): BodyElementInfo {
-    const attributes = {};
+    const attributes: { [name: string]: string } = {};
     for (const attr of Array.from(el.attributes)) attributes[attr.name] = attr.value;
     return {
       ref: this.refFor(el),

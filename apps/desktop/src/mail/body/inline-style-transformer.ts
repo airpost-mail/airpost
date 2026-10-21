@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 import RegExpUtils from '../../utils/regexp';
 
-let userAgentDefault = null;
+let userAgentDefault: string | null = null;
 
 class InlineStyleTransformer {
   _inlineStylePromises: { [key: string]: Promise<string> } = {};
@@ -63,7 +63,7 @@ class InlineStyleTransformer {
 
   // This will prepend the user agent stylesheet so we can apply it to the
   // styles properly.
-  _injectUserAgentStyles(body) {
+  _injectUserAgentStyles(body: string) {
     // No DOM parsing! Just find the first <style> tag and prepend there.
     const i = body.search(RegExpUtils.looseStyleTag());
     if (i === -1) {
@@ -76,7 +76,10 @@ class InlineStyleTransformer {
     return `${body.slice(0, i)}<style>${userAgentDefault}</style>${body.slice(i)}`;
   }
 
-  _onInlineStylesResult = (event, { html, key }) => {
+  _onInlineStylesResult = (
+    event: Electron.IpcRendererEvent,
+    { html, key }: { html: string; key: string }
+  ) => {
     delete this._inlineStylePromises[key];
     this._inlineStyleResolvers[key](html);
     delete this._inlineStyleResolvers[key];

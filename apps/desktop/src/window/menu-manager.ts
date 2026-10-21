@@ -11,9 +11,9 @@ import { IMenuItem } from './menu-helpers';
 export default class MenuManager {
   resourcePath: string;
   template: IMenuItem[] = [];
-  pendingUpdateOperation: boolean;
+  pendingUpdateOperation = false;
 
-  constructor({ resourcePath }) {
+  constructor({ resourcePath }: { resourcePath: string }) {
     this.resourcePath = resourcePath;
     this.loadBaseItems();
 
@@ -109,7 +109,7 @@ export default class MenuManager {
     if (!keystrokesByCommand) {
       return {};
     }
-    const filtered = {};
+    const filtered: Record<string, string[]> = {};
 
     for (const key of Object.keys(keystrokesByCommand)) {
       const bindings = keystrokesByCommand[key];

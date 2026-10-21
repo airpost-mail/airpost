@@ -9,16 +9,32 @@ import { developerToolsAvailable } from '../../platform/developer-tools';
 const Utils = require('../../data/models/utils');
 const { localized } = require('../../intl/localize');
 
+// A menu item as the windows send it (window/menu-manager.ts) or getDefaultTemplate builds it:
+// Electron's options plus the command it sends and our metadata.
+export interface MenuTemplateItem extends Electron.MenuItemConstructorOptions {
+  command?: string;
+  args?: unknown;
+  metadata?: { [key: string]: unknown };
+  submenu?: MenuTemplateItem[];
+}
+
+// Electron's MenuItem keeps the template's other properties, so the built items carry these too.
+interface NativeMenuItem extends Electron.MenuItem {
+  command?: string;
+  metadata?: { [key: string]: unknown };
+}
+
 // Used to manage the global application menu.
 //
 // It's created by {Application} upon instantiation and used to add, remove
 // and maintain the state of all menu items.
 export default class ApplicationMenu {
-  windowTemplates = new WeakMap();
+  windowTemplates = new WeakMap<BrowserWindow, MenuTemplateItem[]>();
   version: string;
-  lastFocusedWindow: BrowserWindow;
-  activeTemplate: any;
-  menu: Electron.Menu;
+  lastFocusedWindow: BrowserWindow | null = null;
+  activeTemplate?: MenuTemplateItem[];
+  // Built by the constructor's setActiveTemplate.
+  menu!: Electron.Menu;
 
   constructor(version: string) {
     this.version = version;
@@ -34,7 +50,11 @@ export default class ApplicationMenu {
   // template - The Object which describes the menu to display.
   // keystrokesByCommand - An Object where the keys are commands and the values
   //                       are Arrays containing the keystroke.
-  update(window: BrowserWindow, template: any[], keystrokesByCommand: Record<string, string[]>) {
+  update(
+    window: BrowserWindow,
+    template: MenuTemplateItem[],
+    keystrokesByCommand: Record<string, string[]>
+  ) {
     this.translateTemplate(template, keystrokesByCommand);
     this.windowTemplates.set(window, template);
     if (window === this.lastFocusedWindow) {
@@ -42,7 +62,7 @@ export default class ApplicationMenu {
     }
   }
 
-  setActiveTemplate(template) {
+  setActiveTemplate(template: MenuTemplateItem[]) {
     if (!Utils.isEqual(template, this.activeTemplate)) {
       this.activeTemplate = template;
       this.rebuildMenuWithActiveTemplate();
@@ -101,8 +121,8 @@ export default class ApplicationMenu {
   // menu - A complete menu configuration object for electron's menu API.
   //
   // Returns an Array of native menu items.
-  flattenMenuItems(menu: Electron.Menu) {
-    let items = [];
+  flattenMenuItems(menu: Electron.Menu): NativeMenuItem[] {
+    let items: NativeMenuItem[] = [];
     for (const item of menu.items || []) {
       items.push(item);
       if (item.submenu) {
@@ -117,8 +137,8 @@ export default class ApplicationMenu {
   // template - An object describing the menu item.
   //
   // Returns an Array of native menu items.
-  flattenMenuTemplate(template: any[]) {
-    let items = [];
+  flattenMenuTemplate(template: MenuTemplateItem[]): MenuTemplateItem[] {
+    let items: MenuTemplateItem[] = [];
     for (const item of template) {
       items.push(item);
       if (item.submenu) {
@@ -141,16 +161,16 @@ export default class ApplicationMenu {
   }
 
   // Replaces VERSION with the current version.
-  extendTemplateWithVersion(template: any[]) {
+  extendTemplateWithVersion(template: MenuTemplateItem[]) {
     const item = this.flattenMenuTemplate(template).find(({ label }) => label === 'VERSION');
     if (item) {
       item.label = `Version ${this.version}`;
     }
   }
 
-  extendTemplateWithWindowMenu(template: any[]) {
+  extendTemplateWithWindowMenu(template: MenuTemplateItem[]) {
     const windowMenu = template.find(({ label }) => label === localized('Window'));
-    if (!windowMenu) {
+    if (!windowMenu || !windowMenu.submenu) {
       return;
     }
     const idx = windowMenu.submenu.findIndex(({ id }) => id === 'window-list-separator');
@@ -166,7 +186,7 @@ export default class ApplicationMenu {
         },
       }));
 
-    return windowMenu.submenu.splice(idx, 0, { type: 'separator' }, ...windowsItems);
+    return windowMenu.submenu.splice(idx, 0, { type: 'separator' as const }, ...windowsItems);
   }
 
   // Sets the proper visible state the update menu items
@@ -232,7 +252,7 @@ export default class ApplicationMenu {
   // Default list of menu items.
   //
   // Returns an Array of menu item Objects.
-  getDefaultTemplate() {
+  getDefaultTemplate(): MenuTemplateItem[] {
     return [
       {
         label: 'Tern',
@@ -241,23 +261,19 @@ export default class ApplicationMenu {
           {
             label: localized('Reload'),
             accelerator: 'CmdOrCtrl+R',
-            click: () =>
-              BrowserWindow.getFocusedWindow() && BrowserWindow.getFocusedWindow().reload(),
+            click: () => BrowserWindow.getFocusedWindow()?.reload(),
           },
           {
             label: localized('Close Window'),
             accelerator: 'CmdOrCtrl+Shift+W',
-            click: () =>
-              BrowserWindow.getFocusedWindow() && BrowserWindow.getFocusedWindow().close(),
+            click: () => BrowserWindow.getFocusedWindow()?.close(),
           },
           ...(developerToolsAvailable()
             ? [
                 {
                   label: localized('Toggle Dev Tools'),
                   accelerator: 'CmdOrCtrl+Alt+I',
-                  click: () =>
-                    BrowserWindow.getFocusedWindow() &&
-                    BrowserWindow.getFocusedWindow().webContents.toggleDevTools(),
+                  click: () => BrowserWindow.getFocusedWindow()?.webContents.toggleDevTools(),
                 },
               ]
             : []),
@@ -282,18 +298,18 @@ export default class ApplicationMenu {
   //
   // Returns a complete menu configuration object for electron's menu API.
   //
-  translateTemplate(template: any[], keystrokesByCommand: Record<string, string[]>) {
+  translateTemplate(template: MenuTemplateItem[], keystrokesByCommand: Record<string, string[]>) {
     template.forEach((item) => {
-      if (item.metadata == null) {
-        item.metadata = {};
-      }
-      if (item.command) {
-        item.accelerator = this.acceleratorForCommand(item.command, keystrokesByCommand);
+      const metadata = item.metadata || {};
+      item.metadata = metadata;
+      const command = item.command;
+      if (command) {
+        item.accelerator = this.acceleratorForCommand(command, keystrokesByCommand);
         item.click = () => {
-          global.application.sendCommand(item.command, item.args);
+          global.application.sendCommand(command, item.args);
         };
-        if (!/^application:/.test(item.command)) {
-          item.metadata['windowSpecific'] = true;
+        if (!/^application:/.test(command)) {
+          metadata['windowSpecific'] = true;
         }
       }
       if (item.submenu) {
@@ -323,17 +339,17 @@ export default class ApplicationMenu {
         : keystrokes.filter((keystroke) => !/\b(command|meta)\b/.test(keystroke));
     let firstKeystroke = native[0] || keystrokes[0];
     if (!firstKeystroke) {
-      return null;
+      return undefined;
     }
 
     if (/f\d+/.test(firstKeystroke)) {
       firstKeystroke = firstKeystroke.toUpperCase();
     }
 
-    let modifiers = firstKeystroke.split('+');
-    const key = modifiers.pop();
+    const parts = firstKeystroke.split('+');
+    const key = parts[parts.length - 1];
 
-    modifiers = modifiers.map((modifier) =>
+    const modifiers = parts.slice(0, -1).map((modifier) =>
       modifier
         .replace(/shift/gi, 'Shift')
         .replace(/command/gi, 'Command')

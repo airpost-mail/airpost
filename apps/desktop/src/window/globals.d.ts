@@ -3,11 +3,11 @@ export {};
 declare global {
   const AppEnv: import('./app-env').default;
 
-  // Extensions to globalThis for main process
-  // eslint-disable-next-line no-var
-  var errorLogger: any;
-  // eslint-disable-next-line no-var
-  var application: any;
+  // AppEnv.enhanceEventObject adds these to every Event in a window.
+  interface Event {
+    propagationStopped?: boolean;
+    isPropagationStopped(): boolean | undefined;
+  }
 
   interface Window {
     $m: any;

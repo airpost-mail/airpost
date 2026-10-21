@@ -32,10 +32,8 @@ class Spellchecker {
     }
   }
 
-  _switchToLanguage = (lang: string | undefined | null) => {
-    if (lang === null || lang === undefined || lang === '') {
-      lang = app.getLocale() || 'en-US';
-    }
+  _switchToLanguage = (requested: string | undefined | null) => {
+    const lang: string = requested ? requested : app.getLocale() || 'en-US';
     const supported: string[] = this._session.availableSpellCheckerLanguages || [];
     if (supported.includes(lang)) {
       this._session.setSpellCheckerLanguages([lang]);

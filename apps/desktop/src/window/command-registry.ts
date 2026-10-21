@@ -4,8 +4,8 @@ export type CommandCallback = (event: CustomEvent) => void;
 
 export default class CommandRegistry {
   emitter = new Emitter();
-  listenerCounts = {};
-  listenerCountChanges = {};
+  listenerCounts: { [command: string]: number } = {};
+  listenerCountChanges: { [command: string]: number } = {};
   pendingEmit = false;
 
   add(
@@ -33,12 +33,14 @@ export default class CommandRegistry {
       );
     }
 
-    target.addEventListener(commandName, callback);
+    // Commands arrive as the CustomEvents dispatch() creates.
+    const listener = callback as EventListener;
+    target.addEventListener(commandName, listener);
     this.listenerCountChanges[commandName] = (this.listenerCountChanges[commandName] || 0) + 1;
     this.flushChangesSoon();
 
     return new Disposable(() => {
-      target.removeEventListener(commandName, callback);
+      target.removeEventListener(commandName, listener);
       this.listenerCountChanges[commandName] = (this.listenerCountChanges[commandName] || 0) - 1;
       this.flushChangesSoon();
     });
@@ -57,9 +59,10 @@ export default class CommandRegistry {
   //
   // * `target` The DOM node at which to start bubbling the command event.
   // * `commandName` {String} indicating the name of the command to dispatch.
-  dispatch(commandName: string, detail?) {
+  dispatch(commandName: string, detail?: unknown) {
     const event = new CustomEvent(commandName, { bubbles: true, detail });
-    return document.activeElement.dispatchEvent(event);
+    // The body when nothing else has focus.
+    return document.activeElement!.dispatchEvent(event);
   }
 
   flushChangesSoon = () => {
@@ -86,7 +89,7 @@ export default class CommandRegistry {
     }, 100);
   };
 
-  onRegistedCommandsChanged(callback) {
+  onRegistedCommandsChanged(callback: () => void) {
     return this.emitter.on('commands-changed', callback);
   }
 }

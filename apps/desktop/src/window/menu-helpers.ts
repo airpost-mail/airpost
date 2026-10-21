@@ -4,22 +4,26 @@
  * DS207: Consider shorter variations of null checks
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
-const ItemSpecificities = new WeakMap();
+const ItemSpecificities = new WeakMap<IMenuItem, number>();
 
 export type IMenuItem = {
   label?: string;
   submenu?: IMenuItem[];
-  type?: 'separator';
+  type?: 'separator' | 'checkbox';
 
   id?: string; //unlocalized label
   command?: string;
   enabled?: boolean;
   hideWhenDisabled?: boolean;
   visible?: boolean;
+  isOptional?: boolean;
 };
 
-export function merge(menu: IMenuItem[], item: IMenuItem, itemSpecificity?: number) {
-  let matchingItem;
+type MergeResult = IMenuItem | number | MergeResult[] | undefined;
+
+// findMatchingItemIndex only matches an item with a submenu to one with a submenu.
+export function merge(menu: IMenuItem[], item: IMenuItem, itemSpecificity?: number): MergeResult {
+  let matchingItem: IMenuItem | undefined;
   if (itemSpecificity == null) {
     itemSpecificity = Infinity;
   }
@@ -34,11 +38,13 @@ export function merge(menu: IMenuItem[], item: IMenuItem, itemSpecificity?: numb
 
   if (matchingItem != null) {
     if (item.submenu != null) {
+      const matchingSubmenu = matchingItem.submenu!;
       return item.submenu.map((submenuItem) =>
-        merge(matchingItem.submenu, submenuItem, itemSpecificity)
+        merge(matchingSubmenu, submenuItem, itemSpecificity)
       );
     } else if (itemSpecificity) {
-      if (!(itemSpecificity < ItemSpecificities.get(matchingItem))) {
+      const matchingSpecificity = ItemSpecificities.get(matchingItem);
+      if (matchingSpecificity === undefined || !(itemSpecificity < matchingSpecificity)) {
         return (menu[matchingItemIndex] = item);
       }
     }
@@ -48,7 +54,7 @@ export function merge(menu: IMenuItem[], item: IMenuItem, itemSpecificity?: numb
 }
 
 export function unmerge(menu: IMenuItem[], item: IMenuItem) {
-  let matchingItem;
+  let matchingItem: IMenuItem | undefined;
   const matchingItemIndex = findMatchingItemIndex(menu, item);
   if (matchingItemIndex !== -1) {
     matchingItem = menu[matchingItemIndex];
@@ -56,8 +62,9 @@ export function unmerge(menu: IMenuItem[], item: IMenuItem) {
 
   if (matchingItem != null) {
     if (item.submenu != null) {
+      const matchingSubmenu = matchingItem.submenu!;
       for (const submenuItem of Array.from(item.submenu)) {
-        unmerge(matchingItem.submenu, submenuItem);
+        unmerge(matchingSubmenu, submenuItem);
       }
     }
 
@@ -86,7 +93,7 @@ export function findMatchingItemIndex(menu: IMenuItem[], { type, label, submenu 
   return -1;
 }
 
-export function normalizeLabel(label: string | null) {
+export function normalizeLabel(label: string | null | undefined) {
   if (label == null) {
     return undefined;
   }

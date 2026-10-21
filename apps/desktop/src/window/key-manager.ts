@@ -15,7 +15,7 @@ interface KeySet {
 
 type Invoke = (channel: string, ...args: any[]) => Promise<KeyManagerReply>;
 
-const SECRET_SETTINGS = ['imap_password', 'smtp_password', 'refresh_token'];
+const SECRET_SETTINGS = ['imap_password', 'smtp_password', 'refresh_token'] as const;
 
 export class KeyManagerFacade {
   // ipcRenderer.invoke; specs replace it.
@@ -51,7 +51,7 @@ export class KeyManagerFacade {
     return next;
   }
 
-  async insertAccountSecrets(account: Account, keys: KeySet = null) {
+  async insertAccountSecrets(account: Account, keys: KeySet | null = null) {
     const next = account.clone();
     const secrets = keys
       ? {

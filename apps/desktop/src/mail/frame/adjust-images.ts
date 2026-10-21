@@ -1,10 +1,10 @@
-function _getDimension(node: HTMLElement, dim: string) {
+function _getDimension(node: HTMLImageElement, dim: 'width' | 'height'): [number | null, string] {
   const raw = node.style[dim] || node[dim];
   if (!raw) {
     return [null, ''];
   }
   const valueRegexp = /([\d.]*)(.*)/;
-  const match = valueRegexp.exec(raw);
+  const match = valueRegexp.exec(String(raw));
   if (!match) {
     return [null, ''];
   }
@@ -24,7 +24,7 @@ function _correctMalformedSrc(node: HTMLElement) {
   }
 }
 
-function _applyMaxWidthAndHeight(node: HTMLElement) {
+function _applyMaxWidthAndHeight(node: HTMLImageElement) {
   const [width, widthUnits] = _getDimension(node, 'width');
   const [height, heightUnits] = _getDimension(node, 'height');
 
@@ -57,7 +57,8 @@ export function adjustImages(doc: Document) {
   });
 
   while (imgTagWalker.nextNode()) {
-    const el = imgTagWalker.currentNode as HTMLElement;
+    // The walker accepts only <img>s
+    const el = imgTagWalker.currentNode as HTMLImageElement;
     _applyMaxWidthAndHeight(el);
     _correctMalformedSrc(el);
   }

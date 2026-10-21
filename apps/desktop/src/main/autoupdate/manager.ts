@@ -5,8 +5,18 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import { localized } from '../../intl/localize';
+import type AutoupdateImplBase from './impl-base';
+import type AutoupdateImplWin32 from './impl-win32';
 
-let autoUpdater = null;
+// AutoupdateImplBase, or Electron's autoUpdater on macOS (which also takes a feed URL string).
+interface Updater extends NodeJS.EventEmitter {
+  setFeedURL(feedURL: string): void;
+  checkForUpdates(): void;
+  quitAndInstall(): void;
+  supportsUpdates?(): boolean;
+}
+
+let autoUpdater: Updater | null = null;
 
 const IdleState = 'idle';
 const CheckingState = 'checking';
@@ -30,8 +40,8 @@ export default class AutoUpdateManager extends EventEmitter {
   preferredChannel: string;
   feedBaseURL: string;
   feedURL: string | null = null;
-  releaseNotes: string;
-  releaseVersion: string;
+  releaseNotes?: string;
+  releaseVersion?: string;
 
   constructor(
     version: string,
@@ -82,37 +92,40 @@ export default class AutoUpdateManager extends EventEmitter {
   };
 
   setupAutoUpdater() {
+    let updater: Updater;
     if (process.platform === 'win32') {
-      const Impl = require('./impl-win32').default;
-      autoUpdater = new Impl();
+      const Impl: typeof AutoupdateImplWin32 = require('./impl-win32').default;
+      updater = new Impl();
     } else if (process.platform === 'linux') {
-      const Impl = require('./impl-base').default;
-      autoUpdater = new Impl();
+      const Impl: typeof AutoupdateImplBase = require('./impl-base').default;
+      updater = new Impl();
     } else {
-      autoUpdater = require('electron').autoUpdater;
+      updater = require('electron').autoUpdater;
     }
+    autoUpdater = updater;
 
-    autoUpdater.on('error', (error) => {
+    updater.on('error', (error: Error) => {
       if (this.specMode) return;
       console.error(`Error Downloading Update: ${error.message}`);
       this.setState(ErrorState);
     });
 
-    autoUpdater.setFeedURL(this.feedURL);
+    // Set by updateFeedURL in the constructor, which schedules this.
+    if (this.feedURL) updater.setFeedURL(this.feedURL);
 
-    autoUpdater.on('checking-for-update', () => {
+    updater.on('checking-for-update', () => {
       this.setState(CheckingState);
     });
 
-    autoUpdater.on('update-not-available', () => {
+    updater.on('update-not-available', () => {
       this.setState(NoUpdateAvailableState);
     });
 
-    autoUpdater.on('update-available', () => {
+    updater.on('update-available', () => {
       this.setState(DownloadingState);
     });
 
-    autoUpdater.on(
+    updater.on(
       'update-downloaded',
       (_event: Electron.Event, releaseNotes: string, releaseVersion: string) => {
         this.releaseNotes = releaseNotes;
@@ -122,7 +135,7 @@ export default class AutoUpdateManager extends EventEmitter {
       }
     );
 
-    if (autoUpdater.supportsUpdates && !autoUpdater.supportsUpdates()) {
+    if (updater.supportsUpdates && !updater.supportsUpdates()) {
       this.setState(UnsupportedState);
       return;
     }
@@ -195,7 +208,7 @@ export default class AutoUpdateManager extends EventEmitter {
   }
 
   onUpdateNotAvailable = () => {
-    autoUpdater.removeListener('error', this.onUpdateError);
+    autoUpdater?.removeListener('error', this.onUpdateError);
     dialog.showMessageBox({
       type: 'info',
       buttons: [localized('OK')],
@@ -207,7 +220,7 @@ export default class AutoUpdateManager extends EventEmitter {
   };
 
   onUpdateError = (event: Electron.Event, message: string) => {
-    autoUpdater.removeListener('update-not-available', this.onUpdateNotAvailable);
+    autoUpdater?.removeListener('update-not-available', this.onUpdateNotAvailable);
     dialog.showMessageBox({
       type: 'warning',
       buttons: [localized('OK')],

@@ -53,7 +53,7 @@ mousetrap.prototype.stopCallback = (e: KeyboardEvent, element: HTMLElement, comb
     return true;
   }
 
-  if ((e as any).isPropagationStopped()) {
+  if (e.isPropagationStopped()) {
     return true;
   }
   // Also treat anything inside an open composer as text input so that focus
@@ -93,7 +93,7 @@ mousetrap.prototype.stopCallback = (e: KeyboardEvent, element: HTMLElement, comb
 };
 
 class KeymapFile {
-  _bindings = {};
+  _bindings: { [command: string]: string[] } = {};
   _disposable = null;
   _path: string;
   _manager: KeymapManager;
@@ -114,7 +114,7 @@ class KeymapFile {
     try {
       keymaps = JSON.parse(fs.readFileSync(this._path).toString());
     } catch (e) {
-      if (e.code === 'ENOENT') {
+      if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
         return;
       }
       console.error(e);
@@ -141,7 +141,7 @@ class KeymapFile {
       fs.watch(this._path, this.load);
     } catch (err) {
       // usually an ENOSPC error
-      console.warn(`Unable to watch your keymap file for changes: ${err.toString()}`);
+      console.warn(`Unable to watch your keymap file for changes: ${String(err)}`);
     }
   }
 
@@ -156,8 +156,8 @@ class KeymapFile {
 
 export default class KeymapManager {
   _emitter = new Emitter();
-  _registered = {};
-  _files = [];
+  _registered: { [keystrokes: string]: boolean } = {};
+  _files: KeymapFile[] = [];
   configDirPath: string;
   resourcePath: string;
   userKeymap?: KeymapFile;
@@ -166,16 +166,16 @@ export default class KeymapManager {
   _bindingsCache: any;
   _commandsCache: any;
   _altKeyDown = false;
-  _altKeyTimer: NodeJS.Timeout = null;
+  _altKeyTimer?: NodeJS.Timeout;
 
   EVENT_ALT_KEY_STATE_CHANGE = 'alt-key-state-change';
 
-  constructor({ configDirPath, resourcePath }) {
+  constructor({ configDirPath, resourcePath }: { configDirPath: string; resourcePath: string }) {
     this.configDirPath = configDirPath;
     this.resourcePath = resourcePath;
 
-    for (const event of ['keydown', 'keyup', 'click']) {
-      window.addEventListener(event, (e: KeyboardEvent) => this.onUpsertModifierState(e.altKey), {
+    for (const event of ['keydown', 'keyup', 'click'] as const) {
+      window.addEventListener(event, (e) => this.onUpsertModifierState(e.altKey), {
         capture: true,
         passive: true,
       });

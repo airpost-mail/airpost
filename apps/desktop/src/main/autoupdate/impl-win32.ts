@@ -27,7 +27,7 @@ export default class AutoupdateImplWin32 extends AutoupdateImplBase {
       this.emit('update-available');
       this.lastRetrievedUpdateURL = json.url;
 
-      WindowsUpdater.spawn(['--update', json.url], (error, stdout) => {
+      WindowsUpdater.spawn(['--update', json.url], (error: unknown) => {
         if (error) {
           this.emitError(error);
           return;

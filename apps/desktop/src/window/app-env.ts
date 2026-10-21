@@ -8,7 +8,7 @@ import { mapSourcePosition } from 'source-map-support';
 import { localized, isRTL, initializeLocalization } from '../intl/localize';
 
 import { APIError } from '../data/errors';
-import WindowEventHandler from './event-handler';
+import WindowEventHandler, { UnloadCallback } from './event-handler';
 import { isWaylandSession } from '../platform/linux-desktop';
 
 function ensureInteger(f: number, fallback: number) {
@@ -21,6 +21,20 @@ function ensureInteger(f: number, fallback: number) {
 
 let loadSettings = JSON.parse(decodeURIComponent(window.location.search.substr(14)));
 
+// A property of a thrown value or other untyped input, which can be anything.
+function errorField(error: unknown, key: string): unknown {
+  if ((typeof error !== 'object' && typeof error !== 'function') || error === null) {
+    return undefined;
+  }
+  return Reflect.get(error, key);
+}
+
+// What the main process's AutoUpdateManager sends with update-available.
+export interface UpdateDetails {
+  releaseVersion?: string;
+  releaseNotes?: string;
+}
+
 // Essential: AppEnv global for dealing with packages, themes, menus, and the window.
 //
 // The singleton of this class is always available as the `AppEnv` global.
@@ -28,7 +42,7 @@ export default class AppEnvConstructor {
   // Returns the load settings hash associated with the current window.
 
   emitter = new Emitter();
-  loadTime: number = null;
+  loadTime: number | null = null;
   config: import('../config/config').default;
   keymaps: import('./keymap-manager').default;
   commands: import('./command-registry').default;
@@ -42,7 +56,7 @@ export default class AppEnvConstructor {
   engineBridge: import('../engine/client/bridge').default;
   errorLogger: any;
   savedState: any;
-  isReloading: boolean;
+  isReloading = false;
 
   // True once the constructor finishes. Guards against config IPC arriving
   // re-entrantly mid-boot, before our other singletons are assigned.
@@ -158,7 +172,7 @@ export default class AppEnvConstructor {
       if (!originalError && !message) return;
       if (!originalError) originalError = new Error(`${message}`);
 
-      if (!this.inDevMode()) {
+      if (!this.inDevMode() || url === undefined || line === undefined || column === undefined) {
         return this.reportError(originalError, { url, line, column });
       }
       const { line: newLine, column: newColumn } = mapSourcePosition({ source: url, line, column });
@@ -199,10 +213,10 @@ export default class AppEnvConstructor {
   // The difference between this and `ErrorLogger.reportError` is that
   // `AppEnv.reportError` hooks into test failures and dev tool popups.
   //
-  reportError(error, extra: any = {}) {
+  reportError(error: unknown, extra: any = {}) {
     // Check if this error should be ignored and not reported to Sentry
     // Errors marked noSentry have already been displayed to the user via a dialog.
-    if (error && error.noSentry) {
+    if (errorField(error, 'noSentry')) {
       return;
     }
 
@@ -270,10 +284,12 @@ export default class AppEnvConstructor {
       }
     }
 
+    const message = errorField(error, 'message');
     if (
-      error.message &&
+      typeof message === 'string' &&
+      message &&
       ['EROFS', 'EPIPE', 'ENOSPC', 'EBUSY', 'EACCES', 'UNKNOWN: unknown error, open'].find(
-        (prefix) => error.message.startsWith(prefix)
+        (prefix) => message.startsWith(prefix)
       )
     ) {
       // Don't fill Sentry with "couldn't open an attachment" type errors.
@@ -283,12 +299,13 @@ export default class AppEnvConstructor {
     this.errorLogger.reportError(error, extra);
   }
 
-  _findPluginsFromError(error) {
-    if (!error.stack) {
+  _findPluginsFromError(error: unknown) {
+    const stack = errorField(error, 'stack');
+    if (!stack || typeof stack !== 'string') {
       return [];
     }
-    const stackPaths = error.stack.match(/((?:\/[\w-_]+)+)/g) || [];
-    const stackPathComponents = [...new Set(stackPaths.flatMap((p) => p.split('/')))];
+    const stackPaths = stack.match(/((?:\/[\w-_]+)+)/g) || [];
+    const stackPathComponents = [...new Set(stackPaths.flatMap((p: string) => p.split('/')))];
 
     return this.packages
       .getActivePackages()
@@ -299,13 +316,14 @@ export default class AppEnvConstructor {
   // stack (the culprit — where the error was actually thrown), not every
   // frame in the call chain. V8 stacks are newest-first, so that's the
   // first "at ..." line after the message.
-  _culpritPackagesFromError(error) {
-    if (!error.stack || typeof error.stack !== 'string') {
+  _culpritPackagesFromError(error: unknown) {
+    const stack = errorField(error, 'stack');
+    if (!stack || typeof stack !== 'string') {
       return [];
     }
-    const topFrame = error.stack.split('\n')[1] || '';
+    const topFrame = stack.split('\n')[1] || '';
     const stackPaths = topFrame.match(/((?:\/[\w-_]+)+)/g) || [];
-    const stackPathComponents = [...new Set(stackPaths.flatMap((p) => p.split('/')))];
+    const stackPathComponents = [...new Set(stackPaths.flatMap((p: string) => p.split('/')))];
 
     return this.packages
       .getActivePackages()
@@ -359,7 +377,7 @@ export default class AppEnvConstructor {
   // Public: Get the version of Tern.
   //
   // Returns the version text {String}.
-  private appVersion;
+  private appVersion?: string;
 
   getVersion() {
     return this.appVersion != null
@@ -458,7 +476,7 @@ export default class AppEnvConstructor {
   }
 
   // Extended: Get the current window
-  getCurrentWindow() {
+  getCurrentWindow(): Electron.BrowserWindow {
     return require('@electron/remote').getCurrentWindow();
   }
 
@@ -580,7 +598,17 @@ export default class AppEnvConstructor {
   //   * `y` The new y coordinate.
   //   * `width` The new width.
   //   * `height` The new height.
-  setWindowDimensions({ x, y, width, height }) {
+  setWindowDimensions({
+    x,
+    y,
+    width,
+    height,
+  }: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  }) {
     if (x != null && y != null && width != null && height != null) {
       return this.getCurrentWindow().setBounds({ x, y, width, height });
     } else if (width != null && height != null) {
@@ -599,6 +627,9 @@ export default class AppEnvConstructor {
     width,
     height,
   }: { x?: number; y?: number; width?: number; height?: number } = {}) {
+    if (x === undefined || y === undefined || width === undefined || height === undefined) {
+      return false;
+    }
     return width > 0 && height > 0 && x + width > 0 && y + height > 0;
   }
 
@@ -740,7 +771,7 @@ export default class AppEnvConstructor {
   //
   // This also means that the windowType has changed and a different set of
   // plugins needs to be loaded.
-  populateHotWindow(newLoadSettings) {
+  populateHotWindow(newLoadSettings: { [key: string]: unknown }) {
     const previousWindowType = loadSettings.windowType;
     loadSettings = newLoadSettings;
 
@@ -814,7 +845,7 @@ export default class AppEnvConstructor {
   }
 
   // Extended: Execute code in dev tools.
-  executeJavaScriptInDevTools(code) {
+  executeJavaScriptInDevTools(code: string) {
     return ipcRenderer.send('call-devtools-webcontents-method', 'executeJavaScript', code);
   }
 
@@ -844,7 +875,8 @@ export default class AppEnvConstructor {
     );
 
     if (this.inSpecMode()) {
-      document.querySelector('#jasmine-content').appendChild(item);
+      // The spec runner's page has it.
+      document.querySelector('#jasmine-content')!.appendChild(item);
     } else {
       document.body.appendChild(item);
     }
@@ -858,7 +890,7 @@ export default class AppEnvConstructor {
     this.config.load();
   }
 
-  exit(status) {
+  exit(status: number) {
     require('@electron/remote').app.emit('will-exit');
     require('@electron/remote').process.exit(status);
   }
@@ -883,17 +915,17 @@ export default class AppEnvConstructor {
   }
 
   async showErrorDialog(
-    messageData,
+    messageData: unknown,
     { showInMainWindow, detail }: { showInMainWindow?: boolean; detail?: string } = {}
   ) {
-    let message;
-    let title;
+    let message: unknown;
+    let title: unknown;
     if (_.isString(messageData) || _.isNumber(messageData)) {
       message = messageData;
       title = 'Error';
     } else if (_.isObject(messageData)) {
-      ({ message } = messageData);
-      ({ title } = messageData);
+      message = errorField(messageData, 'message');
+      title = errorField(messageData, 'title');
     } else {
       throw new Error(`Must pass a valid message to show dialog: ${message}`);
     }
@@ -950,7 +982,7 @@ export default class AppEnvConstructor {
         this.savedState = JSON.parse(stateString);
       }
     } catch (error) {
-      console.warn(`Error parsing window state: ${error.stack}`, error);
+      console.warn(`Error parsing window state: ${errorField(error, 'stack')}`, error);
     }
     if (!this.savedState) {
       this.savedState = {};
@@ -965,11 +997,11 @@ export default class AppEnvConstructor {
     process.crash();
   }
 
-  onUpdateAvailable(callback) {
+  onUpdateAvailable(callback: (details: UpdateDetails) => void) {
     return this.emitter.on('update-available', callback);
   }
 
-  updateAvailable(details) {
+  updateAvailable(details: UpdateDetails) {
     this.emitter.emit('update-available', details);
   }
 
@@ -981,25 +1013,25 @@ export default class AppEnvConstructor {
   //
   // Also see logic in main/AppWindow::handleEvents where we listen
   // to the browserWindow.on 'close' event to catch "unclosable" windows.
-  onBeforeUnload(callback) {
+  onBeforeUnload(callback: UnloadCallback) {
     return this.windowEventHandler.addUnloadCallback(callback);
   }
 
-  onReadyToUnload(callback) {
+  onReadyToUnload(callback: () => void) {
     return this.windowEventHandler.addReadyToUnloadCallback(callback);
   }
 
-  removeUnloadCallback(callback) {
+  removeUnloadCallback(callback: UnloadCallback) {
     this.windowEventHandler.removeUnloadCallback(callback);
   }
 
   enhanceEventObject() {
     const overriddenStop = Event.prototype.stopPropagation;
-    Event.prototype.stopPropagation = function stopPropagation(...args) {
+    Event.prototype.stopPropagation = function stopPropagation(this: Event, ...args: []) {
       this.propagationStopped = true;
       return overriddenStop.apply(this, args);
     };
-    (Event.prototype as any).isPropagationStopped = function isPropagationStopped() {
+    Event.prototype.isPropagationStopped = function isPropagationStopped(this: Event) {
       return this.propagationStopped;
     };
   }

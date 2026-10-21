@@ -17,21 +17,6 @@ import {
   FrameToAppMessage,
 } from './protocol';
 
-const KeyAttrs = [
-  'key',
-  'code',
-  'location',
-  'ctrlKey',
-  'shiftKey',
-  'altKey',
-  'metaKey',
-  'repeat',
-  'isComposing',
-  'charCode',
-  'keyCode',
-  'which',
-];
-
 function closestWith(target: EventTarget | null, attribute: string): HTMLElement | null {
   let node = target as HTMLElement | null;
   while (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
@@ -63,7 +48,8 @@ export function startMessageFrame(
   const elements = new BodyElements(doc);
   let generation = 0;
   let lastHeight = -1;
-  let lastSearch: { regionId: string; term: string | null; currentIndex: number | null } = null;
+  let lastSearch: { regionId: string; term: string | null; currentIndex: number | null } | null =
+    null;
 
   const send = post;
 
@@ -115,7 +101,9 @@ export function startMessageFrame(
         );
         send({ type: 'response', id: msg.id, result });
       } catch (e) {
-        send({ type: 'response', id: msg.id, error: String((e && e.message) || e) });
+        const message =
+          typeof e === 'object' && e !== null && 'message' in e ? e.message : undefined;
+        send({ type: 'response', id: msg.id, error: String(message || e) });
       }
     }
   });
@@ -126,8 +114,8 @@ export function startMessageFrame(
     if (!target) return;
     e.preventDefault();
     const raw = target.getAttribute('href');
-    // file: links never open; the app checks the rest again.
-    if (/^file:/i.test(raw)) return;
+    // file: links never open; the app checks the rest again. closestWith found the href.
+    if (raw === null || /^file:/i.test(raw)) return;
     const href = normalizeHref(raw);
     if (href !== raw) target.setAttribute('href', href);
     send({ type: 'link', href, metaKey: e.metaKey });
@@ -148,8 +136,22 @@ export function startMessageFrame(
   const onKey = (e: KeyboardEvent) => {
     // Shortcuts with modifiers reach the app's menu natively.
     if (e.metaKey || e.altKey || e.ctrlKey) return;
-    const event = { type: e.type } as ForwardedKeyEvent;
-    for (const attr of KeyAttrs) event[attr] = e[attr];
+    const event: ForwardedKeyEvent = {
+      // onKey listens to these three only
+      type: e.type as ForwardedKeyEvent['type'],
+      key: e.key,
+      code: e.code,
+      location: e.location,
+      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
+      altKey: e.altKey,
+      metaKey: e.metaKey,
+      repeat: e.repeat,
+      isComposing: e.isComposing,
+      charCode: e.charCode,
+      keyCode: e.keyCode,
+      which: e.which,
+    };
     send({ type: 'key', event });
   };
   doc.addEventListener('keydown', onKey);

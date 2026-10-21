@@ -36,7 +36,7 @@ export function resetThemeForRecovery(
     config.set(keyPath, value);
   }
 
-  const cacheClearErrors: Error[] = [];
+  const cacheClearErrors: unknown[] = [];
   for (const cachePath of themeCompileCachePaths(configDirPath)) {
     try {
       fileSystem.rmSync(cachePath, { recursive: true, force: true });

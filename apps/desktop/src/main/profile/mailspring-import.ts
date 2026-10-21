@@ -74,7 +74,7 @@ function isCopiedEntry(name: string) {
   );
 }
 
-export function hasMailspringProfile(dir: string | null) {
+export function hasMailspringProfile(dir: string | null): dir is string {
   if (!dir) return false;
   try {
     return fs.statSync(path.join(dir, CONFIG_FILE)).isFile();
@@ -273,7 +273,7 @@ export function importMailspringProfile(
 ): Promise<ImportResult> {
   console.log(`Importing the Mailspring profile from ${from} into ${to}`);
   const created: string[] = [];
-  const fail = (err: Error) => {
+  const fail = (err: unknown) => {
     console.error(`Importing the Mailspring profile failed: ${err}`);
     removeEntries(to, created);
     clearMailspringImportRequest(to);

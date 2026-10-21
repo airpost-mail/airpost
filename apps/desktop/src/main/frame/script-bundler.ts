@@ -54,17 +54,19 @@ export function bundleScript(entryPath: string, aliases: { [spec: string]: strin
 
   const stub = (specifier: string) => {
     const key = `stub:${specifier}`;
-    if (!ids.has(key)) {
-      ids.set(key, modules.length);
-      modules.push(
-        `[function () { throw new Error(${JSON.stringify(`${specifier} is not bundled`)}); }, {}]`
-      );
-    }
-    return ids.get(key);
+    const existing = ids.get(key);
+    if (existing !== undefined) return existing;
+    const id = modules.length;
+    ids.set(key, id);
+    modules.push(
+      `[function () { throw new Error(${JSON.stringify(`${specifier} is not bundled`)}); }, {}]`
+    );
+    return id;
   };
 
   const visit = (filePath: string): number => {
-    if (ids.has(filePath)) return ids.get(filePath);
+    const existing = ids.get(filePath);
+    if (existing !== undefined) return existing;
     const id = modules.length;
     ids.set(filePath, id);
     modules.push('');

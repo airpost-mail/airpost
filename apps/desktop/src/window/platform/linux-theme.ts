@@ -30,7 +30,7 @@ const ICON_EXTENSION = ['.png', '.svg'];
  * @returns {string} command
  * @private
  */
-function __getGsettingsIconThemeCMD(): string {
+function __getGsettingsIconThemeCMD(): string | null {
   const path = __getDesktopSettingsPath();
   const key = 'icon-theme';
   return path != null ? `gsettings get ${path} ${key}` : null;
@@ -42,7 +42,7 @@ function __getGsettingsIconThemeCMD(): string {
  * @returns {string} command
  * @private
  */
-function __getGsettingsGtkThemeCMD(): string {
+function __getGsettingsGtkThemeCMD(): string | null {
   const path = __getDesktopSettingsPath();
   const key = 'gtk-theme';
   return path != null ? `gsettings ${path} ${key}` : null;
@@ -54,7 +54,7 @@ function __getGsettingsGtkThemeCMD(): string {
  * @returns {*}
  * @private
  */
-function __getDesktopSettingsPath(): string {
+function __getDesktopSettingsPath(): string | null {
   switch (DESKTOP) {
     case 'MATE':
       return 'org.mate.interface';
@@ -73,7 +73,7 @@ function __getDesktopSettingsPath(): string {
  * @returns {string} result of the command
  * @private
  */
-function __exec(cmd: string): string {
+function __exec(cmd: string | null): string | null {
   try {
     return cmd == null ? null : execSync(cmd).toString().trim().replace(/'/g, '');
   } catch (error) {
@@ -87,7 +87,7 @@ function __exec(cmd: string): string {
  *
  * @returns {string} name of the icon
  */
-function getIconThemeName(): string {
+function getIconThemeName(): string | null {
   return __exec(__getGsettingsIconThemeCMD());
 }
 
@@ -96,7 +96,7 @@ function getIconThemeName(): string {
  *
  * @returns {string} name of the theme
  */
-function getThemeName(): string {
+function getThemeName(): string | null {
   return __exec(__getGsettingsGtkThemeCMD());
 }
 
@@ -110,7 +110,8 @@ function getThemeName(): string {
 function __parseIconTheme(themePath: string): IconThemeData | null {
   const themeIndex = path.join(themePath, 'index.theme');
   if (fs.existsSync(themeIndex)) {
-    return ini.parse(fs.readFileSync(themeIndex, 'utf-8'));
+    // An index.theme has the sections IconThemeData describes.
+    return ini.parse(fs.readFileSync(themeIndex, 'utf-8')) as IconThemeData;
   }
   return null;
 }
@@ -121,7 +122,7 @@ function __parseIconTheme(themePath: string): IconThemeData | null {
  * @param {string} themeName to parse
  * @returns {IconTheme} containing the parsed index.theme file and path to the theme
  */
-function getIconTheme(themeName: string): IconTheme {
+function getIconTheme(themeName: string | null): IconTheme | null {
   if (!themeName) return null;
 
   for (const themesPath of ICON_PATHS) {
@@ -144,6 +145,7 @@ type IconThemeData = {
     MinSize?: string;
     MaxSize?: string;
     Scale?: any;
+    Inherits?: string;
   };
 };
 
@@ -170,7 +172,7 @@ function __getAllIconPaths(
   contexts: string | string[],
   scale: 1 | 2 = 1
 ): string[] {
-  const icons = [];
+  const icons: string[] = [];
 
   if (!(contexts instanceof Array)) {
     contexts = [contexts];
@@ -179,9 +181,10 @@ function __getAllIconPaths(
   for (const [sectionName, section] of Object.entries(theme.data)) {
     if (sectionName !== 'Icon Theme') {
       const _context = (section.Context || '').toLowerCase();
-      const _size = parseInt(section.Size, 10);
-      const _minSize = parseInt(section.MinSize || section.Size, 10);
-      const _maxSize = parseInt(section.MaxSize || section.Size, 10);
+      // parseInt of a missing size is NaN, as parseInt(undefined) is
+      const _size = parseInt(section.Size ?? '', 10);
+      const _minSize = parseInt(section.MinSize || section.Size || '', 10);
+      const _maxSize = parseInt(section.MaxSize || section.Size || '', 10);
       const _scale = parseInt(section.Scale || 1, 10);
 
       if (
@@ -254,8 +257,8 @@ function getIconPath(iconName: string, size: number, context: string | string[],
   }
 
   // in case the icon was not found in the theme, we search the inherited themes
-  for (const key of inherits) {
-    const inheritsTheme = getIconTheme(inherits[key]);
+  for (const inheritedThemeName of inherits) {
+    const inheritsTheme = getIconTheme(inheritedThemeName);
     if (!inheritsTheme) continue;
     icon = getIconFromTheme(inheritsTheme, iconName, size, context);
     if (icon !== null) {
@@ -275,7 +278,7 @@ function getIconPath(iconName: string, size: number, context: string | string[],
  * @returns {string} path to the icon
  */
 function getIcon(
-  iconName,
+  iconName: string,
   size = 22,
   context: string | string[] = [Context.APPLICATIONS],
   scale: 1 | 2 = 2

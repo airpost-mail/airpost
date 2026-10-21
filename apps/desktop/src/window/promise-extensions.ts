@@ -9,17 +9,22 @@ const IGNORED_PROPS = /^(?:length|name|arguments|caller|callee|prototype|__isPro
  * @param {object} o
  * @return {bool} True if this resembles a promise
  */
-function thatLooksLikeAPromiseToMe(o) {
-  return o && typeof o.then === 'function' && typeof o.catch === 'function';
+function thatLooksLikeAPromiseToMe(o: unknown) {
+  if ((typeof o !== 'object' && typeof o !== 'function') || o === null) return false;
+  return (
+    typeof Reflect.get(o, 'then') === 'function' && typeof Reflect.get(o, 'catch') === 'function'
+  );
 }
 
-function isPromisified(fn) {
+function isPromisified(fn: unknown) {
   try {
-    return fn[MAGIC_KEY] === true;
+    return Reflect.get(Object(fn), MAGIC_KEY) === true;
   } catch (e) {
     return false;
   }
 }
+
+type CallbackStyleFunction = (...args: unknown[]) => unknown;
 
 /**
  * promisify()
@@ -34,10 +39,13 @@ function isPromisified(fn) {
  * @param {bool} settings.multiArgs - Should multiple arguments be returned as an array?
  * @return {function} A promisified version of `original`
  */
-function promisify(original, settings) {
-  return function promiseWrapper(...args) {
+function promisify(
+  original: CallbackStyleFunction,
+  settings?: { thisArg?: unknown; multiArgs?: boolean }
+) {
+  return function promiseWrapper(...args: unknown[]) {
     const returnMultipleArguments = settings && settings.multiArgs;
-    let target;
+    let target: unknown;
     if (settings && settings.thisArg) {
       target = settings.thisArg;
     } else if (settings) {
@@ -47,7 +55,7 @@ function promisify(original, settings) {
     // Return the promisified function
     return new Promise(function promisified(resolve, reject) {
       // Append the callback bound to the context
-      args.push(function callback(err, ...values) {
+      args.push(function callback(err: unknown, ...values: unknown[]) {
         if (err) {
           reject(err);
           return;
@@ -73,23 +81,25 @@ function promisify(original, settings) {
   };
 }
 
-function promisifyAll(target) {
+function promisifyAll(target: { [key: string]: unknown }) {
   Object.getOwnPropertyNames(target).forEach((key) => {
     const descriptor = Object.getOwnPropertyDescriptor(target, key);
 
-    if (typeof descriptor.value !== 'function') {
+    // A data property, so its value is target[key]
+    const fn: unknown = descriptor && descriptor.value;
+    if (typeof fn !== 'function') {
       return;
     }
     if (IGNORED_PROPS.test(key)) {
       return;
     }
-    if (isPromisified(target[key])) {
+    if (isPromisified(fn)) {
       return;
     }
 
     const promisifiedKey = `${key}Async`;
 
-    target[promisifiedKey] = promisify(target[key], {});
+    target[promisifiedKey] = promisify(fn as CallbackStyleFunction, {});
 
     [key, promisifiedKey].forEach((rkey) => {
       Object.defineProperty(target[rkey], MAGIC_KEY, {
@@ -104,26 +114,26 @@ function promisifyAll(target) {
   return target;
 }
 
-async function each(items, fn) {
-  const results = [];
+async function each<T, R>(items: Iterable<T>, fn: (item: T) => R | Promise<R>) {
+  const results: R[] = [];
   for (const item of items) {
     results.push(await fn(item));
   }
   return results;
 }
 
-function delay(ms) {
+function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function props(obj) {
-  const awaitables = [];
+function props(obj: { [key: string]: unknown }) {
+  const awaitables: unknown[] = [];
   const keys = Object.keys(obj);
   for (const key of keys) {
     awaitables.push(obj[key]);
   }
   return Promise.all(awaitables).then(function r(results) {
-    const byName = {};
+    const byName: { [key: string]: unknown } = {};
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
       byName[key] = results[i];
@@ -132,7 +142,7 @@ function props(obj) {
   });
 }
 
-async function getState() {
+async function getState(this: Promise<unknown>) {
   const t = {};
   return await Promise.race([this, t]).then(
     (v) => (v === t ? 'pending' : 'fulfilled'),
@@ -140,11 +150,11 @@ async function getState() {
   );
 }
 
-async function isResolved() {
+async function isResolved(this: Promise<unknown>) {
   return (await this.getState()) === 'fulfilled';
 }
 
-async function isRejected() {
+async function isRejected(this: Promise<unknown>) {
   return (await this.getState()) === 'rejected';
 }
 

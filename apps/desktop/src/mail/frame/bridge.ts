@@ -20,7 +20,7 @@ export class MessageFrameBridge {
   _pending = new Map<number, Pending>();
   _nextId = 1;
   _onMessage: (msg: FrameToAppMessage) => void;
-  _listeners = new Map<number, (e: { rect: FrameRect }) => void>();
+  _listeners = new Map<number, (e: { rect: MessageBodyRect }) => void>();
   _disposed = false;
 
   constructor(iframe: HTMLIFrameElement, onMessage: (msg: FrameToAppMessage) => void) {
@@ -71,12 +71,18 @@ export class MessageFrameBridge {
         this._pending.delete(id);
         reject(new Error(`the message frame did not answer ${operation.op}`));
       }, RequestTimeout);
-      this._pending.set(id, { resolve, reject, timer });
+      // The frame answers `operation` with its T.
+      this._pending.set(id, { resolve: (value) => resolve(value as T), reject, timer });
       this.post({ type: 'request', id, generation, ...operation } as AppToFrameMessage);
     });
   }
 
-  listen(generation: number, ref: number, event: 'click' | 'mousedown', cb) {
+  listen(
+    generation: number,
+    ref: number,
+    event: 'click' | 'mousedown',
+    cb: (e: { rect: MessageBodyRect }) => void
+  ) {
     const listenerId = this._nextId++;
     this._listeners.set(listenerId, cb);
     return this.request<null>({ op: 'listen', ref, event, listenerId }, generation);

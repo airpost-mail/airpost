@@ -194,7 +194,7 @@ function usePortal(): boolean {
 }
 
 /* eslint import/no-mutable-exports: 0*/
-let SystemStartService;
+let SystemStartService: typeof SystemStartServiceBase;
 if (process.platform === 'darwin') {
   SystemStartService = SystemStartServiceDarwin;
 } else if (process.platform === 'linux') {

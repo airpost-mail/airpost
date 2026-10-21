@@ -48,11 +48,19 @@ function applyQuickPreviewCSP(session: Electron.Session) {
   });
 }
 
-let quickPreviewWindow = null;
+interface CaptureJob {
+  file: File;
+  filePath: string;
+  previewPath: string;
+  strategy: string;
+  resolve: (success: boolean) => void;
+}
+
+let quickPreviewWindow: Electron.BrowserWindow | null = null;
 let quickPreviewWebContentsId: number | null = null;
-let captureWindow = null;
+let captureWindow: Electron.BrowserWindow | null = null;
 let captureWindowInUse = false;
-const captureQueue = [];
+const captureQueue: CaptureJob[] = [];
 
 const filesRoot = __dirname.replace('app.asar', 'app.asar.unpacked');
 // pdf.js, Prism, SheetJS and DOMPurify, which renderer.html loads by relative path.
@@ -80,7 +88,7 @@ const QuicklookBlacklist = [
   'ics',
 ];
 
-const CrossplatformStrategies = {
+const CrossplatformStrategies: { [strategy: string]: string[] } = {
   pdfjs: ['pdf'],
   mammoth: ['docx'],
   snarkdown: ['md'],
@@ -220,7 +228,7 @@ const PreviewWindowMenuTemplate: Electron.MenuItemConstructorOptions[] = [
                 if (process.platform === 'darwin') return 'Alt+Command+I';
                 else return 'Ctrl+Shift+I';
               })(),
-              click: function (item, focusedWindow) {
+              click: function (item: Electron.MenuItem, focusedWindow?: Electron.BaseWindow) {
                 if (focusedWindow)
                   (focusedWindow as Electron.BrowserWindow).webContents.toggleDevTools();
               },
@@ -248,9 +256,10 @@ export function displayQuickPreviewWindow(filePath: string) {
     return;
   }
 
-  if (quickPreviewWindow === null) {
-    const { BrowserWindow } = require('@electron/remote');
-    quickPreviewWindow = new BrowserWindow({
+  let previewWindow = quickPreviewWindow;
+  if (previewWindow === null) {
+    const { BrowserWindow }: typeof Electron = require('@electron/remote');
+    previewWindow = new BrowserWindow({
       width: 800,
       height: 600,
       center: true,
@@ -265,20 +274,21 @@ export function displayQuickPreviewWindow(filePath: string) {
       },
     });
 
-    quickPreviewWebContentsId = quickPreviewWindow.webContents.id;
-    applyQuickPreviewCSP(quickPreviewWindow.webContents.session);
+    quickPreviewWindow = previewWindow;
+    quickPreviewWebContentsId = previewWindow.webContents.id;
+    applyQuickPreviewCSP(previewWindow.webContents.session);
 
-    quickPreviewWindow.once('closed', () => {
+    previewWindow.once('closed', () => {
       quickPreviewWindow = null;
       quickPreviewWebContentsId = null;
     });
-    quickPreviewWindow.setMenu(
+    previewWindow.setMenu(
       require('@electron/remote').Menu.buildFromTemplate(PreviewWindowMenuTemplate)
     );
   } else {
-    quickPreviewWindow.show();
+    previewWindow.show();
   }
-  quickPreviewWindow.setTitle(path.basename(filePath));
+  previewWindow.setTitle(path.basename(filePath));
 
   const onLoadError = (err: Error) => {
     if (!err?.message?.includes('ERR_ABORTED')) {
@@ -287,13 +297,13 @@ export function displayQuickPreviewWindow(filePath: string) {
   };
 
   if (isPDF) {
-    quickPreviewWindow
+    previewWindow
       .loadFile(path.join(PDFJSRoot, 'web/viewer.html'), {
         search: `file=${encodeURIComponent(`file://${filePath}`)}`,
       })
       .catch(onLoadError);
   } else {
-    quickPreviewWindow
+    previewWindow
       .loadFile(path.join(filesRoot, 'renderer.html'), {
         search: JSON.stringify({ mode: 'display', filePath, strategy }),
       })
@@ -334,7 +344,7 @@ async function _generateCrossplatformPreview({
   previewPath: string;
   strategy: string;
 }) {
-  return new Promise((resolve) => {
+  return new Promise<boolean>((resolve) => {
     captureQueue.push({ file, filePath, previewPath, strategy, resolve });
 
     if (!captureWindow || captureWindow.isDestroyed()) {
@@ -345,7 +355,7 @@ async function _generateCrossplatformPreview({
 }
 
 function _createCaptureWindow() {
-  const { BrowserWindow } = require('@electron/remote');
+  const { BrowserWindow }: typeof Electron = require('@electron/remote');
   const win = new BrowserWindow({
     width: ThumbnailWidth,
     height: ThumbnailWidth,
@@ -373,7 +383,8 @@ function _createCaptureWindow() {
 }
 
 async function _generateNextCrossplatformPreview() {
-  if (captureQueue.length === 0) {
+  const job = captureQueue.pop();
+  if (!job) {
     // Don't tear down the window if a generation is already in progress — that
     // invocation will schedule the next call to _generateNextCrossplatformPreview
     // once it finishes, which will then reach this branch and clean up properly.
@@ -388,7 +399,7 @@ async function _generateNextCrossplatformPreview() {
     return;
   }
 
-  const { strategy, filePath, previewPath, resolve } = captureQueue.pop();
+  const { strategy, filePath, previewPath, resolve } = job;
 
   // Mark the window as in-use before the async token generation so that a
   // concurrent invocation reaching the queue-empty branch above does not
@@ -410,12 +421,14 @@ async function _generateNextCrossplatformPreview() {
 
   // The renderer process may have crashed while we were awaiting the token above.
   // Recreate the window so generation can continue.
-  if (!captureWindow || captureWindow.isDestroyed()) {
-    captureWindow = _createCaptureWindow();
+  let win = captureWindow;
+  if (!win || win.isDestroyed()) {
+    win = _createCaptureWindow();
+    captureWindow = win;
   }
 
   // Start the thumbnail generation
-  captureWindow
+  win
     .loadFile(path.join(filesRoot, 'renderer.html'), {
       search: JSON.stringify({ strategy, mode: 'capture', filePath, previewToken }),
     })
@@ -429,8 +442,6 @@ async function _generateNextCrossplatformPreview() {
 
   // Race against a timer to complete the preview. We don't want this to hang
   // forever if for some reason the window encounters an exception
-  let onFinalize = null;
-
   const timer = setTimeout(() => {
     console.warn(`Thumbnail generation timed out for ${filePath}`);
     onFinalize(false);
@@ -440,7 +451,7 @@ async function _generateNextCrossplatformPreview() {
     onFinalize(true);
   };
 
-  onFinalize = (success) => {
+  function onFinalize(success: boolean) {
     captureWindowInUse = false;
     clearTimeout(timer);
     if (captureWindow) {
@@ -452,16 +463,16 @@ async function _generateNextCrossplatformPreview() {
     }
     process.nextTick(_generateNextCrossplatformPreview);
     resolve(success);
-  };
+  }
 
-  captureWindow.once('page-title-updated', onRendererSuccess);
+  win.once('page-title-updated', onRendererSuccess);
 }
 
 async function _generateQuicklookPreview({ filePath }: { filePath: string }) {
   const dirQuoted = path.dirname(filePath).replace(/"/g, '\\"');
   const pathQuoted = filePath.replace(/"/g, '\\"');
 
-  return new Promise((resolve) => {
+  return new Promise<boolean>((resolve) => {
     const cmd = '/usr/bin/qlmanage';
     const args = [
       '-t',

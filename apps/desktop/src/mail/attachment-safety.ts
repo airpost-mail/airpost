@@ -119,7 +119,8 @@ export async function markFileFromInternet(
     }
     return true;
   } catch (err) {
-    console.warn(`Could not mark ${filePath} as downloaded: ${err && err.message}`);
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`Could not mark ${filePath} as downloaded: ${message}`);
     return false;
   }
 }
@@ -129,7 +130,7 @@ export async function markFileFromInternet(
 const PROGRAM_SIGNATURES = [Buffer.from('MZ'), Buffer.from('\x7fELF', 'latin1'), Buffer.from('#!')];
 
 export async function looksLikeProgram(filePath: string): Promise<boolean> {
-  let handle: fs.promises.FileHandle;
+  let handle: fs.promises.FileHandle | undefined;
   try {
     handle = await fs.promises.open(filePath, 'r');
     const head = Buffer.alloc(4);

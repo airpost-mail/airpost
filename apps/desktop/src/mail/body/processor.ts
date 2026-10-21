@@ -3,6 +3,8 @@ import { Message } from '../../data/models/message';
 import { MessageStore } from '../../data/stores/message';
 import DatabaseStore from '../../data/database/store';
 import SanitizeTransformer from './sanitize-transformer';
+import { DatabaseChangeRecord } from '../../data/database/change-record';
+import { Model } from '../../data/models/model';
 
 interface ProcessorResult {
   key: string;
@@ -12,21 +14,26 @@ interface ProcessorResult {
   remoteImages: boolean;
 }
 
+type ProcessedBody = Omit<ProcessorResult, 'key'>;
+type BodyCallback = (output: ProcessedBody) => void;
+
 class MessageBodyProcessor {
   MAX_DISPLAY_LENGTH = 300000;
 
-  _subscriptions = [];
-  _timeouts = {};
-  _recentlyProcessedD: { [key: string]: ProcessorResult };
-  _recentlyProcessedA: ProcessorResult[];
+  _subscriptions: { message: Message; callback: BodyCallback }[] = [];
+  _timeouts: { [key: string]: NodeJS.Timeout } = {};
+  // Set by the constructor's resetCache.
+  _recentlyProcessedD!: { [key: string]: ProcessorResult };
+  _recentlyProcessedA!: ProcessorResult[];
   _version = 0;
 
   constructor() {
     this.resetCache();
 
-    DatabaseStore.listen((change) => {
+    DatabaseStore.listen((change: DatabaseChangeRecord<Model>) => {
       if (change.objectClass === Message.name) {
-        change.objects.forEach((m) => {
+        // objectClass says these are Messages
+        (change.objects as Message[]).forEach((m) => {
           const key = this._key(m);
           if (!this._recentlyProcessedD[key]) {
             return;
@@ -102,7 +109,7 @@ class MessageBodyProcessor {
     return this._version;
   }
 
-  subscribe(message: Message, sendInitial: boolean, callback) {
+  subscribe(message: Message, sendInitial: boolean, callback: BodyCallback) {
     const sub = { message, callback };
 
     if (sendInitial) {
@@ -236,7 +243,7 @@ class MessageBodyProcessor {
   ) {
     if (this._recentlyProcessedA.length > 50) {
       const removed = this._recentlyProcessedA.pop();
-      delete this._recentlyProcessedD[removed.key];
+      if (removed) delete this._recentlyProcessedD[removed.key];
     }
     const item = { key, body, clipped, remoteImages };
     this._recentlyProcessedA.unshift(item);

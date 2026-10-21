@@ -46,7 +46,7 @@ function isNearBlack([r, g, b]: RGBA): boolean {
 
 function hasOwnText(el: Element): boolean {
   for (const node of Array.from(el.childNodes)) {
-    if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) return true;
+    if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim()) return true;
   }
   return false;
 }

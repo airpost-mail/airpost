@@ -46,11 +46,11 @@ interface NotificationHandle {
  */
 interface IIPCNotificationOptions {
   id: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   body?: string;
   tag?: string;
-  icon?: string;
+  icon?: string | null;
   threadId?: string;
   messageId?: string;
   hasReply?: boolean;
@@ -70,7 +70,7 @@ class NativeNotifications {
    */
   readonly playsSoundWithNotification = platform === 'darwin';
 
-  private resolvedIcon: string = null;
+  private resolvedIcon: string | null | undefined = null;
   private callbacks: Map<string, INotificationCallback> = new Map();
 
   constructor() {
@@ -130,7 +130,7 @@ class NativeNotifications {
    * @returns {string} icon from the desktop file
    * @private
    */
-  private readIconFromDesktopFile(filePath) {
+  private readIconFromDesktopFile(filePath: string) {
     if (fs.existsSync(filePath)) {
       const ini = require('ini');
       const content = ini.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -194,7 +194,7 @@ class NativeNotifications {
    * This handles the full UTF-8 range including Chinese characters and other
    * international text, as well as any special characters in untrusted email input.
    */
-  private escapeXml(str: string): string {
+  private escapeXml(str: string | undefined): string {
     if (!str) return '';
     // Use the DOM's XMLSerializer to properly escape text for XML.
     // Creating a text node and serializing it handles all XML special characters.
@@ -233,7 +233,7 @@ class NativeNotifications {
    */
   private buildWindowsToastXml(options: {
     id: string;
-    title: string;
+    title?: string;
     subtitle?: string;
     body?: string;
     actions?: Array<{ type: 'button'; text: string }>;
@@ -370,7 +370,7 @@ ${actionsXml}
     }
 
     // Windows toast XML for rich notifications with actions and/or reply
-    if (platform === 'win32' && (actions?.length > 0 || canReply)) {
+    if (platform === 'win32' && ((actions?.length ?? 0) > 0 || canReply)) {
       options.toastXml = this.buildWindowsToastXml({
         id,
         title,

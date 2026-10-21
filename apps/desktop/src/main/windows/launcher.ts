@@ -1,6 +1,6 @@
 import { isWaylandSession } from '../../platform/linux-desktop';
 import AppWindow from './app-window';
-import { AppWindowSettings } from './app-window';
+import { AppWindowOptions, AppWindowSettings } from './app-window';
 
 const DEBUG_SHOW_HOT_WINDOW = process.env.SHOW_HOT_WINDOW === 'true';
 let winNum = 0;
@@ -18,9 +18,9 @@ let winNum = 0;
 export default class WindowLauncher {
   static EMPTY_WINDOW = 'emptyWindow';
 
-  public hotWindow?: AppWindow;
+  public hotWindow: AppWindow | null = null;
 
-  private _defaultWindowOpts: AppWindowSettings;
+  private _defaultWindowOpts: AppWindowOptions;
   private config: import('../../config/config').default;
   private onCreatedHotWindow: (win: AppWindow) => void;
 
@@ -87,10 +87,10 @@ export default class WindowLauncher {
     return opts;
   }
 
-  newWindow(options) {
+  newWindow(options: AppWindowSettings) {
     const opts = Object.assign(this.createDefaultWindowOpts(), options);
 
-    let win;
+    let win: AppWindow;
 
     // On Wayland, always use cold windows - see createHotWindow comment above
     if (this._mustUseColdWindow(opts) || isWaylandSession()) {
@@ -98,10 +98,7 @@ export default class WindowLauncher {
     } else {
       // Check if the hot window has been deleted. This may happen when we are
       // relaunching the app
-      if (!this.hotWindow) {
-        this.createHotWindow();
-      }
-      win = this.hotWindow;
+      win = this.hotWindow || this._createHotWindowNow();
 
       const newLoadSettings = Object.assign({}, win.loadSettings(), opts);
       if (newLoadSettings.windowType === WindowLauncher.EMPTY_WINDOW) {
@@ -159,12 +156,17 @@ export default class WindowLauncher {
     // for hidden windows when the Wayland activation context is missing, so we use cold
     // windows instead and show them immediately when loaded.
     if (isWaylandSession()) return;
+    this._createHotWindowNow();
+  }
 
-    this.hotWindow = new AppWindow(this._hotWindowOpts());
-    this.onCreatedHotWindow(this.hotWindow);
+  _createHotWindowNow() {
+    const hotWindow = new AppWindow(this._hotWindowOpts());
+    this.hotWindow = hotWindow;
+    this.onCreatedHotWindow(hotWindow);
     if (DEBUG_SHOW_HOT_WINDOW) {
-      this.hotWindow.showWhenLoaded();
+      hotWindow.showWhenLoaded();
     }
+    return hotWindow;
   }
 
   // Note: This method calls `browserWindow.destroy()` which closes
@@ -180,7 +182,7 @@ export default class WindowLauncher {
   // Some properties, like the `frame` or `toolbar` can't be updated once
   // a window has been setup. If we detect this case we have to bootup a
   // plain AppWindow instead of using a hot window.
-  _mustUseColdWindow(opts) {
+  _mustUseColdWindow(opts: AppWindowSettings) {
     const { bootstrapScript, frame } = this.createDefaultWindowOpts();
 
     const usesOtherBootstrap = opts.bootstrapScript !== bootstrapScript;

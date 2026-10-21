@@ -1,10 +1,10 @@
 import { walkBackwards } from '../../utils/dom';
 import * as Utils from '../../data/models/utils';
 
-function textAndNodesAfterNode(node) {
+function textAndNodesAfterNode(node: Node) {
   let text = '';
-  let curNode = node;
-  const nodes = [];
+  let curNode: Node | null = node;
+  const nodes: Node[] = [];
   while (curNode) {
     let sibling = curNode.nextSibling;
     while (sibling) {
@@ -25,7 +25,7 @@ function textAndNodesAfterNode(node) {
  *
  * See email_18, email_20, email_21, and email_23 test cases for this.
  */
-export default function unwrappedSignatureDetector(doc, quoteElements) {
+export default function unwrappedSignatureDetector(doc: Node, quoteElements: Node[]) {
   // Find the last quoteBlock
   for (const node of walkBackwards(doc)) {
     let textAndNodes;

@@ -16,7 +16,7 @@ import {
 } from './hardware-acceleration-recovery';
 import { shouldBlockFrameNavigation } from '../frame/navigation';
 
-let WindowIconPath = null;
+let WindowIconPath: string | null = null;
 let idNum = 0;
 
 const appWebContents = new WeakSet<Electron.WebContents>();
@@ -51,6 +51,10 @@ export interface AppWindowSettings {
   exitWhenDone?: boolean;
   configDirPath?: string;
   autoHideMenuBar?: boolean;
+  bounds?: Electron.Rectangle;
+  coldStartOnly?: boolean;
+  initializeInBackground?: boolean;
+  titleBarStyle?: Electron.BrowserWindowConstructorOptions['titleBarStyle'];
   bootstrapScript?: string;
   appVersion?: string;
   shellLoadTime?: number;
@@ -58,67 +62,71 @@ export interface AppWindowSettings {
   [key: string]: unknown;
 }
 
+// What WindowLauncher passes: its defaults always carry both paths.
+export type AppWindowOptions = AppWindowSettings & { resourcePath: string; configDirPath: string };
+
+type AppBrowserWindow = BrowserWindow & {
+  loadSettings: AppWindowSettings;
+  loadSettingsChangedSinceGetURL: boolean;
+  updateLoadSettings: (newSettings?: AppWindowSettings) => void;
+};
+
 export default class AppWindow extends EventEmitter {
   static includeShellLoadTime = true;
 
-  public windowType: string;
-  public browserWindow: BrowserWindow & {
-    loadSettings?: AppWindowSettings;
-    loadSettingsChangedSinceGetURL?: boolean;
-  } = null;
-  public devMode: boolean;
-  public safeMode: boolean;
+  public windowType: string | undefined;
+  public browserWindow: AppBrowserWindow;
+  public devMode: boolean | undefined;
+  public safeMode: boolean | undefined;
 
-  private loaded: boolean;
-  private isSpec: boolean;
+  private loaded = false;
+  private isSpec: boolean | undefined;
   public windowKey: string;
-  private neverClose: boolean;
-  private mainWindow: boolean;
+  private neverClose: boolean | undefined;
+  private mainWindow: boolean | undefined;
   private resourcePath: string;
-  private exitWhenDone: boolean;
+  private exitWhenDone: boolean | undefined;
   private configDirPath: string;
 
-  private isWindowClosing: boolean;
+  private isWindowClosing = false;
 
-  constructor(settings: AppWindowSettings = {}) {
+  constructor(settings: AppWindowOptions) {
     super();
 
-    let frame, height, pathToOpen, resizable, title, width, autoHideMenuBar, titleBarStyle;
+    // toolbar is present too, but passed through to client-side
+    const { frame, title, width, height, resizable, pathToOpen, autoHideMenuBar, titleBarStyle } =
+      settings;
+    this.isSpec = settings.isSpec;
+    this.devMode = settings.devMode;
+    this.safeMode = settings.safeMode;
+    this.neverClose = settings.neverClose;
+    this.mainWindow = settings.mainWindow;
+    this.windowType = settings.windowType;
+    this.exitWhenDone = settings.exitWhenDone;
+    this.configDirPath = settings.configDirPath;
 
-    ({
-      frame,
-      title,
-      width,
-      height,
-      // toolbar, present but passed through to client-side
-      resizable,
-      pathToOpen,
-      titleBarStyle,
-      isSpec: this.isSpec,
-      devMode: this.devMode,
-      windowKey: this.windowKey,
-      safeMode: this.safeMode,
-      neverClose: this.neverClose,
-      mainWindow: this.mainWindow,
-      windowType: this.windowType,
-      resourcePath: this.resourcePath,
-      exitWhenDone: this.exitWhenDone,
-      configDirPath: this.configDirPath,
-      autoHideMenuBar,
-    } = settings);
-
-    if (!this.windowKey) {
+    if (settings.windowKey) {
+      this.windowKey = settings.windowKey;
+    } else {
       this.windowKey = `${this.windowType}-${idNum}`;
       idNum += 1;
     }
 
     // Normalize to make sure drive letter case is consistent on Windows
-    if (this.resourcePath) {
-      this.resourcePath = path.normalize(this.resourcePath);
-    }
+    this.resourcePath = settings.resourcePath && path.normalize(settings.resourcePath);
 
-    type GetConstructorArgs<T> = T extends new (options: infer U) => any ? U : never;
-    const browserWindowOptions: GetConstructorArgs<typeof BrowserWindow> = {
+    const webPreferences: Electron.WebPreferences = {
+      nodeIntegration: true,
+      contextIsolation: false,
+      webviewTag: true,
+      // Withholding the capability, rather than only the ways to ask for it, is what makes
+      // the console unreachable in a packaged build: these windows hand the renderer a
+      // @electron/remote handle to their own webContents, so any code running in them could
+      // otherwise call openDevTools() directly. Electron turns such calls into silent no-ops.
+      devTools: developerToolsAvailable(),
+      // Note: @electron/remote is enabled via remote.initialize() in main process
+    };
+    const browserWindowOptions: Electron.BrowserWindowConstructorOptions = {
       show: false,
       title: title || 'Tern',
       frame,
@@ -126,17 +134,7 @@ export default class AppWindow extends EventEmitter {
       height,
       resizable,
       titleBarStyle,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-        webviewTag: true,
-        // Withholding the capability, rather than only the ways to ask for it, is what makes
-        // the console unreachable in a packaged build: these windows hand the renderer a
-        // @electron/remote handle to their own webContents, so any code running in them could
-        // otherwise call openDevTools() directly. Electron turns such calls into silent no-ops.
-        devTools: developerToolsAvailable(),
-        // Note: @electron/remote is enabled via remote.initialize() in main process
-      },
+      webPreferences,
       autoHideMenuBar,
     };
 
@@ -146,7 +144,7 @@ export default class AppWindow extends EventEmitter {
       // For spec windows, this is critical: the hidden spec window would otherwise
       // throttle setTimeout calls to ~1Hz, making each test take ~1s and causing
       // the full test suite to exceed CI time limits.
-      browserWindowOptions.webPreferences.backgroundThrottling = false;
+      webPreferences.backgroundThrottling = false;
     }
 
     // Don't set icon on Windows so the exe's ico will be used as window and
@@ -161,7 +159,11 @@ export default class AppWindow extends EventEmitter {
       browserWindowOptions.icon = WindowIconPath;
     }
 
-    this.browserWindow = new BrowserWindow(browserWindowOptions);
+    this.browserWindow = Object.assign(new BrowserWindow(browserWindowOptions), {
+      loadSettings: settings,
+      loadSettingsChangedSinceGetURL: false,
+      updateLoadSettings: this.updateLoadSettings,
+    });
     appWebContents.add(this.browserWindow.webContents);
 
     // Constrain every <webview> guest to low-privilege preferences regardless of
@@ -183,7 +185,6 @@ export default class AppWindow extends EventEmitter {
     });
 
     require('@electron/remote/main').enable(this.browserWindow.webContents);
-    (this.browserWindow as any).updateLoadSettings = this.updateLoadSettings;
 
     this.handleEvents();
 
@@ -214,12 +215,14 @@ export default class AppWindow extends EventEmitter {
     loadSettings.initialPath = pathToOpen;
 
     let stats: fs.Stats | false = false;
-    try {
-      stats = fs.statSync(pathToOpen);
-    } catch (e) {
-      // path doesn't exist
+    if (pathToOpen) {
+      try {
+        stats = fs.statSync(pathToOpen);
+      } catch (e) {
+        // path doesn't exist
+      }
     }
-    if (stats && stats.isFile && stats.isFile()) {
+    if (pathToOpen && stats && stats.isFile && stats.isFile()) {
       loadSettings.initialPath = path.dirname(pathToOpen);
     }
 
@@ -271,7 +274,7 @@ export default class AppWindow extends EventEmitter {
     }
   }
 
-  updateLoadSettings = (newSettings = {}) => {
+  updateLoadSettings = (newSettings: AppWindowSettings = {}) => {
     this.loaded = true;
     this.setLoadSettings({ ...this.browserWindow.loadSettings, ...newSettings });
   };
@@ -285,13 +288,13 @@ export default class AppWindow extends EventEmitter {
   //
   // The windowType will change which will cause a new set of plugins to
   // load.
-  setLoadSettings(loadSettings) {
+  setLoadSettings(loadSettings: AppWindowSettings) {
     this.browserWindow.loadSettings = loadSettings;
     this.browserWindow.loadSettingsChangedSinceGetURL = true;
     this.browserWindow.webContents.send('load-settings-changed', loadSettings);
   }
 
-  getURL(loadSettings) {
+  getURL(loadSettings: AppWindowSettings) {
     this.browserWindow.loadSettingsChangedSinceGetURL = false;
 
     return url.format({
@@ -468,11 +471,11 @@ export default class AppWindow extends EventEmitter {
     }
   }
 
-  sendMessage(message, detail?) {
+  sendMessage(message: string, detail?: unknown) {
     this.waitForLoad(() => this.browserWindow.webContents.send(message, detail));
   }
 
-  sendCommand(command, ...args) {
+  sendCommand(command: string, ...args: unknown[]) {
     if (this.isSpecWindow()) {
       if (!global.application.sendCommandToFirstResponder(command)) {
         switch (command) {
@@ -494,7 +497,7 @@ export default class AppWindow extends EventEmitter {
     }
   }
 
-  sendCommandToBrowserWindow(command, ...args) {
+  sendCommandToBrowserWindow(command: string, ...args: unknown[]) {
     this.browserWindow.webContents.send('command', command, ...args);
   }
 
@@ -523,7 +526,7 @@ export default class AppWindow extends EventEmitter {
     });
   }
 
-  waitForLoad(fn) {
+  waitForLoad(fn: () => void) {
     if (this.loaded) {
       fn();
     } else {

@@ -126,7 +126,7 @@ export class KeyManager {
     return next as AccountSecretsJSON;
   }
 
-  async accountSecrets(emailAddress: string, keys: KeySet = null): Promise<AccountSecrets> {
+  async accountSecrets(emailAddress: string, keys: KeySet | null = null): Promise<AccountSecrets> {
     if (!keys) keys = await this._getKeyHash();
     return {
       imap_password: keys[`${emailAddress}-imap`],
@@ -136,7 +136,7 @@ export class KeyManager {
   }
 
   // A copy of the account's JSON with its secrets, as the engine takes it.
-  async insertAccountSecrets(account: AccountSecretsJSON, keys: KeySet = null) {
+  async insertAccountSecrets(account: AccountSecretsJSON, keys: KeySet | null = null) {
     const next = JSON.parse(JSON.stringify(account));
     next.settings = {
       ...(next.settings || {}),
@@ -146,7 +146,7 @@ export class KeyManager {
   }
 
   // Whether the keyset of this account has any secret.
-  async hasAccountSecrets(emailAddress: string, keys: KeySet = null) {
+  async hasAccountSecrets(emailAddress: string, keys: KeySet | null = null) {
     const secrets = await this.accountSecrets(emailAddress, keys);
     return Object.values(secrets).some((v) => typeof v === 'string' && v.length > 0);
   }
@@ -321,11 +321,12 @@ export class KeyManager {
     require('electron').app.quit();
   }
 
-  _reportFatalError(err: Error): never {
+  _reportFatalError(thrown: unknown): never {
+    const err = thrown instanceof Error ? thrown : new Error(String(thrown));
     // ensureClients is throttled rather than serialized, and _getKeyHash's callers report its
     // throw a second time, so only the first failure gets a dialog. The rest still propagate.
     if (this._fatalErrorReported) {
-      (err as any).noSentry = true;
+      Object.assign(err, { noSentry: true });
       throw err;
     }
     this._fatalErrorReported = true;
@@ -340,7 +341,7 @@ export class KeyManager {
     // on the passwords being saved never runs (saving identity for example).
     // Mark as user-visible so the global error handler does not also report
     // it to Sentry — the user has already been informed via the dialog above.
-    (err as any).noSentry = true;
+    Object.assign(err, { noSentry: true });
     this._quit();
     throw err;
   }
@@ -371,7 +372,13 @@ export function registerKeyManagerIPC(ipcMain: Electron.IpcMain, keyManager: Key
       try {
         return { value: await fn(...args) };
       } catch (err) {
-        return { error: (err && err.message) || `${err}`, noSentry: !!(err && err.noSentry) };
+        const fields = typeof err === 'object' && err !== null ? err : {};
+        const message = 'message' in fields ? fields.message : undefined;
+        const noSentry = 'noSentry' in fields ? fields.noSentry : undefined;
+        return {
+          error: (typeof message === 'string' && message) || `${err}`,
+          noSentry: !!noSentry,
+        };
       }
     }
   );

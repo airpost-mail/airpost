@@ -145,7 +145,7 @@ async function readOldSecret(platform: string): Promise<Buffer> {
   // Retryable if any one lookup might succeed later.
   let retryable = false;
   for (const [file, args] of lookups(platform)) {
-    let output: Buffer = null;
+    let output: Buffer;
     try {
       output = await mailspringKeychain.run(file, args);
     } catch (err) {

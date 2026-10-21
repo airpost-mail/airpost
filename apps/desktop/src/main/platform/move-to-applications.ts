@@ -30,7 +30,7 @@ export default function moveToApplications() {
         message: localized(
           `We encountered a problem moving to the Applications folder. Try quitting the application and moving it manually.`
         ),
-        detail: err.toString(),
+        detail: String(err),
       });
     }
   }

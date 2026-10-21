@@ -2,7 +2,16 @@ import _ from 'underscore';
 import { app, BrowserWindow } from 'electron';
 import WindowLauncher from './launcher';
 import { localized } from '../../intl/localize';
-import AppWindow from './app-window';
+import AppWindow, { AppWindowSettings } from './app-window';
+
+export interface WindowDimensions {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized: boolean;
+  fullScreen: boolean;
+}
 
 const MAIN_WINDOW = 'default';
 const SPEC_WINDOW = 'spec';
@@ -55,12 +64,12 @@ export default class WindowManager {
     });
   }
 
-  get(windowKey: string) {
+  get(windowKey: string): AppWindow | undefined {
     return this._windows[windowKey];
   }
 
   getOpenWindows() {
-    const values = [];
+    const values: AppWindow[] = [];
     Object.keys(this._windows).forEach((key) => {
       const win = this._windows[key];
       if (win.windowType !== WindowLauncher.EMPTY_WINDOW) {
@@ -94,7 +103,7 @@ export default class WindowManager {
   }
 
   getAllWindowDimensions() {
-    const dims = {};
+    const dims: { [windowKey: string]: WindowDimensions } = {};
     Object.keys(this._windows).forEach((key) => {
       const win = this._windows[key];
       if (win.windowType !== WindowLauncher.EMPTY_WINDOW) {
@@ -107,7 +116,7 @@ export default class WindowManager {
     return dims;
   }
 
-  newWindow(options = {}) {
+  newWindow(options: AppWindowSettings = {}) {
     if (this._closedForRelaunch) return null;
     const win = this.windowLauncher.newWindow(options);
     const existingKey = this._registeredKeyForWindow(win);
@@ -165,7 +174,7 @@ export default class WindowManager {
 
   ensureWindow(
     windowKey: string,
-    windowExtraOpts = {},
+    windowExtraOpts: AppWindowSettings = {},
     behavior?: { preserveHiddenOrMinimized: boolean }
   ) {
     const win = this._windows[windowKey];
@@ -199,7 +208,7 @@ export default class WindowManager {
     }
   }
 
-  sendToAllWindows(msg, { except }: { except?: BrowserWindow }, ...args) {
+  sendToAllWindows(msg: string, { except }: { except?: BrowserWindow | null }, ...args: unknown[]) {
     for (const windowKey of Object.keys(this._windows)) {
       const win = this._windows[windowKey];
       if (win.browserWindow === except) {
@@ -259,8 +268,8 @@ export default class WindowManager {
     return _.find(this._windows, (win) => win.isFocused());
   }
 
-  _coreWindowOpts(windowKey, extraOpts = {}) {
-    const coreWinOpts = {};
+  _coreWindowOpts(windowKey: string, extraOpts: AppWindowSettings = {}): AppWindowSettings {
+    const coreWinOpts: { [windowKey: string]: AppWindowSettings } = {};
     coreWinOpts[WindowManager.MAIN_WINDOW] = {
       windowKey: WindowManager.MAIN_WINDOW,
       windowType: WindowManager.MAIN_WINDOW,

@@ -25,7 +25,7 @@ const RECEIVE_TIMEOUT_MS = 15 * 60 * 1000;
 // Reads a query parameter, ignoring the path so one listener serves Google (root) and
 // Microsoft (`/desktop`). decodeURIComponent keeps `+` literal (RFC 3986), as providers send
 // it in codes.
-export function queryParam(requestUrl: string, param: string): string | null {
+export function queryParam(requestUrl: string | undefined, param: string): string | null {
   const rawQuery = url.parse(requestUrl || '').query || '';
   const match = rawQuery.match(new RegExp(`(?:^|&)${param}=([^&]*)`));
   if (!match) return null;
@@ -81,7 +81,7 @@ export function receive(
   cancelReceive('superseded');
   return new Promise<OAuthRedirect>((resolve) => {
     let done = false;
-    let timer: NodeJS.Timeout = null;
+    let timer: NodeJS.Timeout | null = null;
     const server = http.createServer((request, response) => {
       const code = queryParam(request.url, 'code');
       const error = queryParam(request.url, 'error');
@@ -91,7 +91,7 @@ export function receive(
         response.end('Unknown Request');
         return;
       }
-      if (!stateMatches(received, state)) {
+      if (!received || !stateMatches(received, state)) {
         // A tab left open from an earlier sign-in: this one keeps waiting.
         response.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
         response.end(
@@ -107,7 +107,8 @@ export function receive(
         finish({ error: `denied: ${error}` });
       } else {
         response.end(page(localized('You can close this window and return to the app.')));
-        finish({ code, state: received });
+        // code is set: the request had a code or an error, and has no error
+        finish({ code: code ?? undefined, state: received });
       }
     });
     const finish = (r: OAuthRedirect) => {

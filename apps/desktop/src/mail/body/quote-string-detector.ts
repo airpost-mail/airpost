@@ -13,20 +13,22 @@ import { walkBackwards } from '../../utils/dom';
  *
  * See email_19 as a test case for this.
  */
-export default function quoteStringDetector(doc) {
-  const quoteNodesToRemove = [];
+export default function quoteStringDetector(doc: Node) {
+  const quoteNodesToRemove: Node[] = [];
   let seenInitialQuoteEnd = false;
 
   for (const node of walkBackwards(doc)) {
     if (node.nodeType === Node.DOCUMENT_NODE) {
       continue;
     }
-    if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim().length > 0) {
+    // A text node's nodeValue is its text, never null
+    const text = node.nodeValue ?? '';
+    if (node.nodeType === Node.TEXT_NODE && text.trim().length > 0) {
       if (!seenInitialQuoteEnd) {
-        if (/wrote:\s*$/gim.test(node.nodeValue)) {
+        if (/wrote:\s*$/gim.test(text)) {
           seenInitialQuoteEnd = true;
           quoteNodesToRemove.push(node);
-          if (/On \S/gim.test(node.nodeValue)) {
+          if (/On \S/gim.test(text)) {
             // The beginning of the quoted string may be in the same node
             return quoteNodesToRemove;
           }
@@ -38,7 +40,7 @@ export default function quoteStringDetector(doc) {
         }
       } else {
         quoteNodesToRemove.push(node);
-        if (/On \S/gim.test(node.nodeValue)) {
+        if (/On \S/gim.test(text)) {
           // This means we've reached the beginning of the quoted string.
           return quoteNodesToRemove;
         }

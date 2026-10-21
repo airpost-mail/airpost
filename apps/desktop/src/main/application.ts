@@ -43,7 +43,7 @@ import { EngineProcess } from '../engine/process';
 import Config from '../config/config';
 import { registerQuickpreviewIPCHandlers } from './ipc/quick-preview';
 import { guardAuxiliaryWindowNavigation } from './windows/auxiliary-guard';
-import { isAppWindowContents } from './windows/app-window';
+import AppWindow, { AppWindowSettings, isAppWindowContents } from './windows/app-window';
 import {
   handleWindowsToastXMLProtocolAction,
   registerNotificationIPCHandlers,
@@ -69,42 +69,93 @@ import {
 import { registerOAuthReceiverIPC } from './ipc/oauth-receiver';
 import { installedEngineUnit, runEngineUnit } from '../engine/supervisor/unit';
 
-// The application's singleton class.
-//
-export default class Application extends EventEmitter {
-  resourcePath: string;
-  configDirPath: string;
-  config: Config;
+// What main.js parses from the command line (parseCommandLine), for this launch or a second
+// instance's.
+export interface LaunchOptions {
   version: string;
   devMode: boolean;
   specMode: boolean;
   safeMode: boolean;
-  quitting: boolean;
+  background?: boolean;
+  logFile?: string;
+  jUnitXmlPath?: string;
+  configDirPath: string;
+  resourcePath: string;
+  importFromMailspring?: string | null;
+  mailspringProfilePath?: string | null;
+  specDirectory?: string;
+  specFilePattern?: string;
+  showSpecsInWindow?: boolean;
+  urlsToOpen?: string[];
+  pathsToOpen?: string[];
+}
+
+export interface SpecWindowOptions extends AppWindowSettings {
+  exitWhenDone: boolean;
+  showSpecsInWindow?: boolean;
+  resourcePath: string;
+  specDirectory?: string;
+  specFilePattern?: string;
+  logFile?: string;
+  jUnitXmlPath?: string;
+  safeMode?: boolean;
+}
+
+const COMMANDS_TO_ACTIONS: { [command: string]: string } = {
+  'core:undo': 'undo:',
+  'core:redo': 'redo:',
+  'core:copy': 'copy:',
+  'core:cut': 'cut:',
+  'core:paste': 'paste:',
+  'core:select-all': 'selectAll:',
+};
+
+function isAllowedMethod<T extends string>(allowed: ReadonlySet<T>, method: unknown): method is T {
+  return typeof method === 'string' && (allowed as ReadonlySet<unknown>).has(method);
+}
+
+function errorMessage(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
+
+// The application's singleton class.
+//
+// start() is its real constructor: the fields declared with `!` are set there, before
+// handleEvents() registers anything that reads them.
+export default class Application extends EventEmitter {
+  resourcePath!: string;
+  configDirPath!: string;
+  config!: Config;
+  version!: string;
+  devMode!: boolean;
+  specMode!: boolean;
+  safeMode!: boolean;
+  quitting = false;
   // The profile Import from Mailspring reads (main.js); null when there is none to offer.
   mailspringProfilePath: string | null = null;
 
-  configMigrator: ConfigMigrator;
-  configPersistenceManager: ConfigPersistenceManager;
-  fileListCache: FileListCache;
-  applicationMenu: ApplicationMenu;
-  assetProtocolHandler: AssetProtocolHandler;
-  windowManager: WindowManager;
-  autoUpdateManager: AutoUpdateManager;
-  systemAccentWatcher: SystemAccentWatcher;
-  systemTrayManager: SystemTrayManager;
+  configMigrator!: ConfigMigrator;
+  configPersistenceManager!: ConfigPersistenceManager;
+  fileListCache!: FileListCache;
+  applicationMenu!: ApplicationMenu;
+  assetProtocolHandler!: AssetProtocolHandler;
+  windowManager!: WindowManager;
+  autoUpdateManager!: AutoUpdateManager;
+  systemAccentWatcher!: SystemAccentWatcher;
+  systemTrayManager!: SystemTrayManager;
   windowsTaskbarManager?: WindowsTaskbarManager;
-  keyManager: KeyManager;
+  keyManager!: KeyManager;
   engineSupervisor: EngineSupervisor | null = null;
   _attachTo: string | null = null;
   quitGate = new QuitGate();
 
-  _sourceWindows: { [taskId: string]: BrowserWindow } = {};
-  _resettingAndRelaunching: boolean;
+  _sourceWindows: { [taskId: string]: BrowserWindow | null } = {};
+  _resettingAndRelaunching = false;
   _initialized = false;
-  _pendingLaunchOptions: any[] = [];
+  _pendingLaunchOptions: LaunchOptions[] = [];
   _pendingUrls: string[] = [];
 
-  async start(options) {
+  async start(options: LaunchOptions) {
     const { resourcePath, configDirPath, version, devMode, specMode, safeMode } = options;
     this.mailspringProfilePath = options.mailspringProfilePath || null;
 
@@ -158,18 +209,18 @@ export default class Application extends EventEmitter {
         await engine.migrate();
       }
     } catch (err) {
-      let message = null;
+      let message: string;
       let buttons = [localized('Quit')];
-      if (err.toString().includes('ENOENT')) {
+      if (String(err).includes('ENOENT')) {
         message = localized(
           `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p tern-engine\` and copy target/release/tern-engine to apps/desktop/tern-engine.`
         );
-      } else if (err.toString().includes('spawn')) {
-        message = localized(`Tern could not spawn the engine process. %@`, err.toString());
+      } else if (String(err).includes('spawn')) {
+        message = localized(`Tern could not spawn the engine process. %@`, String(err));
       } else {
         message = localized(
           `We encountered a problem with your local email database. %@\n\nCheck that no other copies of Tern are running and click Rebuild to reset your local cache.`,
-          err.toString()
+          String(err)
         );
         buttons = [localized('Quit'), localized('Rebuild')];
       }
@@ -314,7 +365,7 @@ export default class Application extends EventEmitter {
   }
 
   // Opens a new window based on the options provided.
-  handleLaunchOptions(options) {
+  handleLaunchOptions(options: LaunchOptions) {
     // If start() hasn't finished initializing yet (e.g. a second-instance event
     // arrives while the async engine migration or oneTimeMoveToApplications is
     // still running), windowManager won't exist yet.  Queue the options and
@@ -401,7 +452,7 @@ export default class Application extends EventEmitter {
   // we close windows and log out, we need to wait for these processes to completely
   // exit and then delete the file. It's hard to tell when this happens, so we just
   // retry the deletion a few times.
-  deleteFileWithRetry(filePath, callback = () => {}, retries = 5) {
+  deleteFileWithRetry(filePath: string, callback: () => void = () => {}, retries = 5) {
     const callbackWithRetry = (err: NodeJS.ErrnoException | null) => {
       if (err && err.message.indexOf('no such file') === -1) {
         console.log(`File Error: ${err.message} - retrying in 150msec`);
@@ -533,13 +584,13 @@ export default class Application extends EventEmitter {
     try {
       failed = resetProfileDirectory(this.configDirPath, protectedPaths);
     } catch (err) {
-      failed = [`${this.configDirPath}: ${err.message}`];
+      failed = [`${this.configDirPath}: ${errorMessage(err)}`];
     }
     if (afterEmptying) {
       try {
         afterEmptying();
       } catch (err) {
-        failed.push(`${this.configDirPath}: ${err.message}`);
+        failed.push(`${this.configDirPath}: ${errorMessage(err)}`);
       }
     }
     if (failed.length) {
@@ -598,7 +649,7 @@ export default class Application extends EventEmitter {
     app.quit();
   }
 
-  _deleteDatabase = (callback) => {
+  _deleteDatabase = (callback: () => void) => {
     this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db'), callback);
     this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db-wal'));
     this.deleteFileWithRetry(path.join(this.configDirPath, 'tern.db-shm'));
@@ -828,8 +879,8 @@ export default class Application extends EventEmitter {
       this.systemTrayManager.destroyTray();
     });
 
-    let pathsToOpen = [];
-    let pathsTimeout = null;
+    let pathsToOpen: string[] = [];
+    let pathsTimeout: NodeJS.Timeout | undefined;
     app.on('open-file', (event, pathToOpen) => {
       event.preventDefault();
       if (this.quitGate.deferLaunch([pathToOpen])) return;
@@ -872,7 +923,7 @@ export default class Application extends EventEmitter {
 
     app.whenReady().then(() => {
       if (process.platform === 'darwin') {
-        app.dock.setMenu(dockMenu);
+        app.dock?.setMenu(dockMenu);
       }
     });
 
@@ -996,23 +1047,25 @@ export default class Application extends EventEmitter {
       win.emit(command, ...args);
     });
 
-    const ALLOWED_WINDOW_METHODS = new Set([
-      'setPosition',
-      'center',
-      'focus',
-      'show',
-      'hide',
-      'maximize',
-      'minimize',
-      'setFullScreen',
-    ]);
-    const ALLOWED_WEBCONTENTS_METHODS = new Set(
+    const ALLOWED_WINDOW_METHODS = new Set<
+      | 'setPosition'
+      | 'center'
+      | 'focus'
+      | 'show'
+      | 'hide'
+      | 'maximize'
+      | 'minimize'
+      | 'setFullScreen'
+    >(['setPosition', 'center', 'focus', 'show', 'hide', 'maximize', 'minimize', 'setFullScreen']);
+    const ALLOWED_WEBCONTENTS_METHODS = new Set<'reload' | 'openDevTools' | 'toggleDevTools'>(
       developerToolsAvailable() ? ['reload', 'openDevTools', 'toggleDevTools'] : ['reload']
     );
-    const ALLOWED_DEVTOOLS_WEBCONTENTS_METHODS = new Set(['executeJavaScript']);
+    const ALLOWED_DEVTOOLS_WEBCONTENTS_METHODS = new Set<'executeJavaScript'>([
+      'executeJavaScript',
+    ]);
 
-    ipcMain.on('call-window-method', (event, method, ...args) => {
-      if (!ALLOWED_WINDOW_METHODS.has(method)) {
+    ipcMain.on('call-window-method', (event, method: unknown, ...args: unknown[]) => {
+      if (!isAllowedMethod(ALLOWED_WINDOW_METHODS, method)) {
         console.error(`Method ${method} is not permitted on BrowserWindow!`);
         return;
       }
@@ -1022,11 +1075,11 @@ export default class Application extends EventEmitter {
         console.error(`Method ${method} does not exist on BrowserWindow!`);
         return;
       }
-      win[method](...args);
+      Reflect.apply(win[method], win, args);
     });
 
-    ipcMain.on('call-devtools-webcontents-method', (event, method, ...args) => {
-      if (!ALLOWED_DEVTOOLS_WEBCONTENTS_METHODS.has(method)) {
+    ipcMain.on('call-devtools-webcontents-method', (event, method: unknown, ...args: unknown[]) => {
+      if (!isAllowedMethod(ALLOWED_DEVTOOLS_WEBCONTENTS_METHODS, method)) {
         console.error(`Method ${method} is not permitted on devToolsWebContents!`);
         return;
       }
@@ -1038,11 +1091,12 @@ export default class Application extends EventEmitter {
         console.error(`Method ${method} does not exist on devToolsWebContents!`);
         return;
       }
-      event.sender.devToolsWebContents[method](...args);
+      const devTools = event.sender.devToolsWebContents;
+      Reflect.apply(devTools[method], devTools, args);
     });
 
-    ipcMain.on('call-webcontents-method', (event, method, ...args) => {
-      if (!ALLOWED_WEBCONTENTS_METHODS.has(method)) {
+    ipcMain.on('call-webcontents-method', (event, method: unknown, ...args: unknown[]) => {
+      if (!isAllowedMethod(ALLOWED_WEBCONTENTS_METHODS, method)) {
         console.error(`Method ${method} is not permitted on WebContents!`);
         return;
       }
@@ -1050,7 +1104,7 @@ export default class Application extends EventEmitter {
         console.error(`Method ${method} does not exist on WebContents!`);
         return;
       }
-      event.sender[method](...args);
+      Reflect.apply(event.sender[method], event.sender, args);
     });
 
     ipcMain.on('action-bridge-rebroadcast-to-all', (event, ...args) => {
@@ -1102,9 +1156,10 @@ export default class Application extends EventEmitter {
       const sourceWindow = BrowserWindow.fromWebContents(event.sender);
       this._sourceWindows[params.taskId] = sourceWindow;
 
-      const targetWindowKey = {
+      const targetWindowKeys: { [window: string]: string | undefined } = {
         main: WindowManager.MAIN_WINDOW,
-      }[params.window];
+      };
+      const targetWindowKey = targetWindowKeys[params.window];
       if (!targetWindowKey) {
         throw new Error("We don't support running in that window");
       }
@@ -1118,7 +1173,7 @@ export default class Application extends EventEmitter {
 
     ipcMain.on('remote-run-results', (event, params) => {
       const sourceWindow = this._sourceWindows[params.taskId];
-      sourceWindow.webContents.send('remote-run-results', params);
+      if (sourceWindow) sourceWindow.webContents.send('remote-run-results', params);
       delete this._sourceWindows[params.taskId];
     });
 
@@ -1201,7 +1256,7 @@ export default class Application extends EventEmitter {
   //
   // command - The string representing the command.
   // args - The optional arguments to pass along.
-  sendCommand(command, ...args) {
+  sendCommand(command: string, ...args: unknown[]) {
     if (this.emit(command, ...args)) {
       return;
     }
@@ -1242,7 +1297,7 @@ export default class Application extends EventEmitter {
   // command - The string representing the command.
   // appWindow - The {AppWindow} to send the command to.
   // args - The optional arguments to pass along.
-  sendCommandToWindow = (command, appWindow, ...args) => {
+  sendCommandToWindow = (command: string, appWindow: AppWindow | null, ...args: unknown[]) => {
     console.log('sendCommandToWindow');
     console.log(command);
     if (this.emit(command, ...args)) {
@@ -1257,22 +1312,14 @@ export default class Application extends EventEmitter {
 
   // Translates the command into OS X action and sends it to application's first
   // responder.
-  sendCommandToFirstResponder = (command) => {
+  sendCommandToFirstResponder = (command: string) => {
     if (process.platform !== 'darwin') {
       return false;
     }
 
-    const commandsToActions = {
-      'core:undo': 'undo:',
-      'core:redo': 'redo:',
-      'core:copy': 'copy:',
-      'core:cut': 'cut:',
-      'core:paste': 'paste:',
-      'core:select-all': 'selectAll:',
-    };
-
-    if (commandsToActions[command]) {
-      Menu.sendActionToFirstResponder(commandsToActions[command]);
+    const action = COMMANDS_TO_ACTIONS[command];
+    if (action) {
+      Menu.sendActionToFirstResponder(action);
       return true;
     }
     return false;
@@ -1280,7 +1327,7 @@ export default class Application extends EventEmitter {
 
   // Open a mailto:// url.
   //
-  openUrl(urlToOpen) {
+  openUrl(urlToOpen: string) {
     if (!this._initialized) {
       this._pendingUrls.push(urlToOpen);
       return;
@@ -1292,7 +1339,7 @@ export default class Application extends EventEmitter {
     try {
       parts = url.parse(urlToOpen, true);
     } catch (err) {
-      console.warn(`Ignoring URL - could not parse ${urlToOpen}: ${err.message}`);
+      console.warn(`Ignoring URL - could not parse ${urlToOpen}: ${errorMessage(err)}`);
       return;
     }
     const main = this.windowManager.get(WindowManager.MAIN_WINDOW);
@@ -1308,7 +1355,7 @@ export default class Application extends EventEmitter {
       // Handle notification action URLs from Windows toast notifications
       // These URLs are triggered when users click buttons on Windows toast notifications
       // since Windows toast XML with activationType="background" doesn't work reliably with Electron
-      if (parts.host.startsWith('notification-')) {
+      if (parts.host?.startsWith('notification-')) {
         handleWindowsToastXMLProtocolAction(parts);
       } else if (parts.host === 'open-inbox') {
         main.show();
@@ -1327,7 +1374,7 @@ export default class Application extends EventEmitter {
     }
   }
 
-  openComposerWithFiles(pathsToOpen) {
+  openComposerWithFiles(pathsToOpen: string[]) {
     const main = this.windowManager.get(WindowManager.MAIN_WINDOW);
     if (main) {
       main.sendMessage('mailfiles', pathsToOpen);
@@ -1347,7 +1394,7 @@ export default class Application extends EventEmitter {
   //   :safeMode - A Boolean that, if true, won't run specs from <config-dir>/packages
   //               and <config-dir>/dev/packages, defaults to false.
   //   :jUnitXmlPath - The path to output jUnit XML reports to, if desired.
-  runSpecs(specWindowOptionsArg) {
+  runSpecs(specWindowOptionsArg: SpecWindowOptions) {
     const specWindowOptions = specWindowOptionsArg;
     let { resourcePath } = specWindowOptions;
     if (resourcePath !== this.resourcePath && !fs.existsSync(resourcePath)) {

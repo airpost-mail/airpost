@@ -5,7 +5,7 @@ import { waitForStatusNotifierHost } from './sni-host';
 import Application from '../application';
 
 function _getMenuTemplate(platform: string, application: Application) {
-  const template = [
+  const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: localized('New Message'),
       click: () => application.emit('application:new-message'),
@@ -33,11 +33,11 @@ function _getMenuTemplate(platform: string, application: Application) {
   return template;
 }
 
-function _getTooltip(unreadString: string) {
+function _getTooltip(unreadString: string | null) {
   return unreadString ? `${unreadString} unread messages` : '';
 }
 
-function _getIcon(iconPath: string) {
+function _getIcon(iconPath: string | null) {
   if (!iconPath) {
     return nativeImage.createEmpty();
   }
@@ -45,11 +45,11 @@ function _getIcon(iconPath: string) {
 }
 
 class SystemTrayManager {
-  _iconPath = null;
-  _unreadString = null;
-  _tray = null;
+  _iconPath: string | null = null;
+  _unreadString: string | null = null;
+  _tray: Tray | null = null;
   _awaitingTrayHost = false;
-  _platform: string = null;
+  _platform: string;
   _application: Application;
 
   constructor(platform: string, application: Application) {
@@ -121,7 +121,7 @@ class SystemTrayManager {
     this._tray.setToolTip(_getTooltip(this._unreadString));
     this._tray.addListener('click', this._onClick);
     this._tray.setContextMenu(
-      Menu.buildFromTemplate(_getMenuTemplate(this._platform, this._application) as any)
+      Menu.buildFromTemplate(_getMenuTemplate(this._platform, this._application))
     );
   }
 

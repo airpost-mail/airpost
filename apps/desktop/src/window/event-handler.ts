@@ -4,13 +4,16 @@ import url from 'url';
 import { localized } from '../intl/localize';
 import { developerToolsAvailable } from '../platform/developer-tools';
 
-let ComponentRegistry = null;
+let ComponentRegistry: typeof import('../packages/component-registry').default | null = null;
 
-const isIFrame = (node: EventTarget) => {
+// Returns true to let the window close, or false to hold it until it calls unloadComplete.
+export type UnloadCallback = (unloadComplete: () => void) => unknown;
+
+const isIFrame = (node: EventTarget | null) => {
   return node instanceof HTMLElement && node.tagName === 'IFRAME';
 };
 
-const isTextInput = (node: EventTarget) => {
+const isTextInput = (node: EventTarget | null) => {
   if (!node) {
     return false;
   }
@@ -32,8 +35,8 @@ const isTextInput = (node: EventTarget) => {
 
 // Handles low-level events related to the window.
 export default class WindowEventHandler {
-  unloadCallbacks = [];
-  unloadCompleteCallbacks = [];
+  unloadCallbacks: UnloadCallback[] = [];
+  unloadCompleteCallbacks: (() => void)[] = [];
   _openExternalErrorShown = false;
 
   constructor() {
@@ -108,7 +111,11 @@ export default class WindowEventHandler {
     });
 
     AppEnv.commands.add(document.body, 'window:toggle-component-regions', () => {
-      ComponentRegistry = ComponentRegistry || require('../packages/component-registry').default;
+      if (!ComponentRegistry) {
+        const registry: typeof import('../packages/component-registry').default =
+          require('../packages/component-registry').default;
+        ComponentRegistry = registry;
+      }
       ComponentRegistry.toggleComponentRegions();
     });
 
@@ -121,9 +128,13 @@ export default class WindowEventHandler {
 
     const webContents = AppEnv.getCurrentWindow().webContents;
 
-    let _UndoStore = null;
+    let _UndoStore: typeof import('../data/stores/undo-redo').default | null = null;
     const getUndoStore = () => {
-      if (!_UndoStore) _UndoStore = require('../data/stores/undo-redo').default;
+      if (!_UndoStore) {
+        const store: typeof import('../data/stores/undo-redo').default =
+          require('../data/stores/undo-redo').default;
+        _UndoStore = store;
+      }
       return _UndoStore;
     };
 
@@ -144,7 +155,7 @@ export default class WindowEventHandler {
           : AppEnv.commands.dispatch('multiselect-list:select-all'),
     });
 
-    webContents.on('input-event', (e, input) => {
+    webContents.on('input-event', (e: Electron.Event, input: Electron.InputEvent) => {
       if (input.type === 'gestureScrollBegin') {
         window.dispatchEvent(new Event('gesture-scroll-begin'));
       }
@@ -156,8 +167,8 @@ export default class WindowEventHandler {
     // "Pinch to zoom" on the Mac gets translated by the system into a
     // "scroll with ctrl key down". To prevent the page from zooming in,
     // prevent default when the ctrlKey is detected.
-    document.addEventListener('mousewheel', (event: WheelEvent) => {
-      if (event.ctrlKey) {
+    document.addEventListener('mousewheel', (event: Event) => {
+      if (event instanceof MouseEvent && event.ctrlKey) {
         event.preventDefault();
       }
     });
@@ -172,7 +183,7 @@ export default class WindowEventHandler {
     });
 
     // Handle context menu for all editable areas with native spellcheck
-    webContents.on('context-menu', (event, params) => {
+    webContents.on('context-menu', (event: Electron.Event, params: Electron.ContextMenuParams) => {
       // Only handle if we're in an editable area
       if (!params.isEditable) {
         return;
@@ -251,17 +262,17 @@ export default class WindowEventHandler {
 
   // Called on beforeUnload, callback return value
   // can stop / postpone the window from closing
-  addUnloadCallback(callback) {
+  addUnloadCallback(callback: UnloadCallback) {
     this.unloadCallbacks.push(callback);
   }
 
   // Called when all beforeUnload callbacks have
   // been called and have returned
-  addReadyToUnloadCallback(callback) {
+  addReadyToUnloadCallback(callback: () => void) {
     this.unloadCompleteCallbacks.push(callback);
   }
 
-  removeUnloadCallback(callback) {
+  removeUnloadCallback(callback: UnloadCallback) {
     this.unloadCallbacks = this.unloadCallbacks.filter((cb) => cb !== callback);
   }
 
@@ -323,7 +334,7 @@ export default class WindowEventHandler {
     event.stopPropagation();
   };
 
-  resolveHref(el: EventTarget) {
+  resolveHref(el: EventTarget | null | undefined) {
     if (!el || !(el instanceof HTMLElement)) {
       return null;
     }
@@ -337,9 +348,9 @@ export default class WindowEventHandler {
     currentTarget,
     metaKey,
   }: {
-    href?: string;
-    target?: EventTarget;
-    currentTarget?: EventTarget;
+    href?: string | null;
+    target?: EventTarget | null;
+    currentTarget?: EventTarget | null;
     metaKey?: boolean;
   }) {
     let resolved = href || this.resolveHref(target || currentTarget);

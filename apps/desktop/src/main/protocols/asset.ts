@@ -21,7 +21,15 @@ export const AssetSchemes = ['tern-asset', 'mailspring'];
 export default class AssetProtocolHandler {
   loadPaths: string[] = [];
 
-  constructor({ configDirPath, resourcePath, safeMode }) {
+  constructor({
+    configDirPath,
+    resourcePath,
+    safeMode,
+  }: {
+    configDirPath: string;
+    resourcePath: string;
+    safeMode: boolean;
+  }) {
     if (!safeMode) {
       this.loadPaths.push(path.resolve(path.join(configDirPath, 'dev', 'packages')));
     }
