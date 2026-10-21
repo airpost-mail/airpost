@@ -515,8 +515,8 @@ export default function PreferencesIntegrations() {
           <a key="ai" onClick={() => Actions.switchPreferencesTab('AI')}>
             {localized('AI')}
           </a>,
-          <a key="agents" onClick={() => Actions.switchPreferencesTab('Agents')}>
-            {localized('Agents')}
+          <a key="mcp" onClick={() => Actions.switchPreferencesTab('Agents')}>
+            {localized('MCP')}
           </a>
         )}
       </SettingsNote>

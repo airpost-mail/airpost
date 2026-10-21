@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// The `tern` command on the PATH (Preferences > Agents): a symlink to the bundled binary that
-// main makes (main/cli-link.ts), as VS Code and Zed install `code` and `zed`.
+// The `tern` command on the PATH (Preferences > General): a symlink to the bundled binary that
+// main makes (main/cli-link.ts), as VS Code and Zed install `code` and `zed`, or on a profile
+// other than the default one a wrapper that sets TERN_CONFIG_DIR.
 export const CliLinkChannel = {
   // invoke -> CliLinkStatus
   Status: 'cli-link:status',
@@ -13,11 +14,12 @@ export const CliLinkChannel = {
 } as const;
 
 export type CliLinkState =
-  // `path` is a link to this copy's tern.
+  // `path` is a link to this copy's tern, or its wrapper for this profile.
   | 'installed'
   // Nothing at `path`; installing links it there.
   | 'missing'
-  // Something else is at `path`: a link to `otherTarget` (replaceable), or a real file.
+  // Something else is at `path`: a link or Tern wrapper running `otherTarget` (replaceable),
+  // or another program.
   | 'other'
   // Windows, or this copy has no tern.
   | 'unsupported';
@@ -26,7 +28,13 @@ export interface CliLinkStatus {
   state: CliLinkState;
   binary: string | null;
   path: string | null;
+  /** The profile the command pins, when it isn't the one `tern` finds on its own. */
+  profile?: string;
   otherTarget?: string;
+  /** The profile another Tern wrapper pins; null for a link. */
+  otherProfile?: string | null;
+  /** The thing at `path` runs this copy's tern, with another profile. */
+  sameBinary?: boolean;
   replaceable?: boolean;
   /** A packaged macOS copy outside /Applications, whose link would break once it's moved. */
   needsMove?: boolean;

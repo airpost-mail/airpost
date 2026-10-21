@@ -11,9 +11,10 @@
 //!   account is enabled. An account that isn't enabled is invisible: tools treat its ids as
 //!   unknown. A thread or message with a copy in an excluded folder or label is blocked, even
 //!   when it is also somewhere allowed.
-//! - `http`: `{enabled, port}` for `tern-mcp http`; off by default.
-//! - `enabled`: `false` turns every tool off (the desktop's "Let apps on this computer use
-//!   Tern" switch). Absent means on, so files written before the switch keep working.
+//! - `http`: `{enabled, port}` for `tern-mcp http`; off by default. Over HTTP, `http.enabled`
+//!   is what turns every tool on or off ([`Policy::for_http`]).
+//! - `enabled`: `false` turns every tool off for stdio clients (the desktop's "Local apps"
+//!   switch). Absent means on, so files written before the switch keep working.
 //!
 //! Without `mcp.json`, the desktop's `core.mcp.accessLevel` and `core.mcp.enabledAccounts`
 //! in `config.json` are read instead, so settings made in the old preferences pane keep
@@ -184,12 +185,20 @@ impl Policy {
         })
     }
 
+    /// The policy for a call that came over HTTP: the HTTP switch stands in for `enabled`, so
+    /// the two transports are turned on and off separately, and a server still running after
+    /// HTTP was turned off refuses every call.
+    pub fn for_http(mut self) -> Policy {
+        self.enabled = self.http.enabled;
+        self
+    }
+
     /// `checkAccessLevel`: `Err` with the message the plugin returned.
     pub fn check_access(&self, category: Category) -> Result<(), String> {
         if !self.enabled {
             return Err(
                 "Access denied: apps on this computer are not allowed to use Tern. \
-                        Turn it on in Tern's Preferences > Agents."
+                        Turn it on in Tern's Preferences > MCP."
                     .into(),
             );
         }
@@ -392,11 +401,21 @@ mod tests {
         assert!(policy(json!({})).enabled);
         let p = policy(json!({"enabled": false, "accessLevel": "read-write-send"}));
         let e = p.check_access(Category::Read).unwrap_err();
-        assert!(e.contains("Preferences > Agents"), "{e}");
+        assert!(e.contains("Preferences > MCP"), "{e}");
         assert!(p.check_access(Category::Send).is_err());
         assert!(!p.account_allowed("a"));
         assert!(!p.thread_allowed(&json!({"aid": "a", "folders": [], "labels": []})));
         assert_eq!(p.summary()["enabled"], false);
+    }
+
+    #[test]
+    fn http_calls_follow_the_http_switch() {
+        let p = policy(json!({"enabled": false, "http": {"enabled": true}})).for_http();
+        assert!(p.check_access(Category::Read).is_ok());
+        assert!(p.account_allowed("a"));
+        let p = policy(json!({"http": {"enabled": false}})).for_http();
+        assert!(p.check_access(Category::Read).is_err());
+        assert!(!p.account_allowed("a"));
     }
 
     #[test]

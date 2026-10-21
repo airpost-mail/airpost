@@ -229,11 +229,12 @@ function sourceURLFor(commit) {
 
 /**
  * Writes the licence page into `buildPath/static/all_licenses.html` and puts LICENSE.md,
- * NOTICE.md and the engine's and tern-mcp's THIRD-PARTY-NOTICES in the resources directory,
+ * NOTICE.md and the engine's, tern-mcp's and tern-gateway's THIRD-PARTY-NOTICES in the resources directory,
  * outside the asar. On macOS it also copies Electron's LICENSE and LICENSES.chromium.html
  * into Contents/Resources, since the zip holds only the .app.
  *
- * Throws in CI (`CI` set) when the engine or tern-mcp is packaged without its crate notices,
+ * Throws in CI (`CI` set) when the engine, tern-mcp or tern-gateway is packaged without its crate
+ * notices, or the web client without the licences Vite collected (tern-web/.vite/license.md),
  * Electron's licence files cannot be found, or an npm package has no licence text, so a
  * release cannot ship without them.
  */
@@ -274,6 +275,34 @@ function writeLicenses({ buildPath, platform, commit }) {
     console.warn(`---> ${msg}`);
   }
 
+  const hasGateway = ['tern-gateway', 'tern-gateway.exe'].some((f) =>
+    fs.existsSync(path.join(buildPath, f))
+  );
+  const gatewayNoticesPath =
+    process.env.TERN_GATEWAY_NOTICES || path.join(appDir, 'tern-gateway.THIRD-PARTY-NOTICES.txt');
+  let gatewayNotices = null;
+  if (fs.existsSync(gatewayNoticesPath)) {
+    gatewayNotices = read(gatewayNoticesPath);
+    fs.copyFileSync(
+      gatewayNoticesPath,
+      path.join(resourcesDir, 'THIRD-PARTY-NOTICES-tern-gateway.txt')
+    );
+  } else if (hasGateway) {
+    const msg = `tern-gateway is packaged but ${gatewayNoticesPath} is missing (run apps/engine/packaging/build-release.sh --install-desktop with cargo-about installed)`;
+    if (inCI) throw new Error(msg);
+    console.warn(`---> ${msg}`);
+  }
+
+  const webLicensesPath = path.join(buildPath, 'tern-web', '.vite', 'license.md');
+  let webLicenses = null;
+  if (fs.existsSync(webLicensesPath)) {
+    webLicenses = read(webLicensesPath);
+  } else if (fs.existsSync(path.join(buildPath, 'tern-web'))) {
+    const msg = `The web client is packaged but ${webLicensesPath} is missing (build it with npm run build:desktop in apps/web)`;
+    if (inCI) throw new Error(msg);
+    console.warn(`---> ${msg}`);
+  }
+
   const electronDir = findElectronLicenseDir(buildPath);
   let electronLicense = null;
   if (electronDir) {
@@ -307,6 +336,14 @@ function writeLicenses({ buildPath, platform, commit }) {
   if (mcpNotices) {
     parts.push(section('tern-mcp', 'MCP server (tern-mcp): Rust crates', pre(mcpNotices)));
   }
+  if (gatewayNotices) {
+    parts.push(
+      section('tern-gateway', 'Web gateway (tern-gateway): Rust crates', pre(gatewayNotices))
+    );
+  }
+  if (webLicenses) {
+    parts.push(section('tern-web', 'Web client: bundled npm packages', pre(webLicenses)));
+  }
 
   if (electronLicense) {
     const where =
@@ -331,7 +368,8 @@ function writeLicenses({ buildPath, platform, commit }) {
   parts.push(section('vendored', 'Vendored code and assets', vendored));
 
   const treeFiles = collectTreeLicenseFiles(buildPath).filter(
-    (f) => !['LICENSE.md', 'NOTICE.md'].includes(path.relative(buildPath, f))
+    (f) =>
+      !['LICENSE.md', 'NOTICE.md'].includes(path.relative(buildPath, f)) && f !== webLicensesPath
   );
   parts.push(
     section(

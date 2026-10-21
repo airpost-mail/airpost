@@ -8,18 +8,24 @@ import {
   linkLocations,
   linkStatus,
   osascriptAdminRunner,
+  profileToPin,
   uninstallLink,
 } from '../cli-link';
 import { isAppWindowContents } from '../windows/app-window';
 
-// Preferences > Agents > Command line. Main finds the binary itself, so a window can't point
-// the link (or the administrator prompt) anywhere else.
-export function registerCliLinkIPC(ipcMain: Electron.IpcMain, resourcePath: string) {
+// Preferences > General > tern command. Main finds the binary and the profile itself, so a
+// window can't point the command (or the administrator prompt) anywhere else.
+export function registerCliLinkIPC(
+  ipcMain: Electron.IpcMain,
+  resourcePath: string,
+  configDirPath: string
+) {
   const binary = () => ternBinaryPath(resourcePath);
+  const profile = profileToPin(configDirPath);
   const needsMove = () =>
     process.platform === 'darwin' && app.isPackaged && !app.isInApplicationsFolder();
   const status = (): CliLinkStatus => {
-    const s = linkStatus(binary(), linkLocations());
+    const s = linkStatus(binary(), linkLocations(), { profile });
     return needsMove() ? { ...s, needsMove: true } : s;
   };
   const admin = (prompt: string) =>
@@ -36,6 +42,7 @@ export function registerCliLinkIPC(ipcMain: Electron.IpcMain, resourcePath: stri
       if (needsMove()) return { ok: false, error: 'needs-move', status: status() };
       const result = await installLink(binary(), linkLocations(), {
         replace: !!replace,
+        profile,
         runAdmin: admin(localized('Tern wants to install the tern command.')),
       });
       return { ...result, status: status() };
@@ -44,6 +51,7 @@ export function registerCliLinkIPC(ipcMain: Electron.IpcMain, resourcePath: stri
   ipcMain.handle(CliLinkChannel.Uninstall, async (event): Promise<CliLinkResult | null> => {
     if (!isAppWindowContents(event.sender)) return null;
     const result = await uninstallLink(binary(), linkLocations(), {
+      profile,
       runAdmin: admin(localized('Tern wants to remove the tern command.')),
     });
     return { ...result, status: status() };

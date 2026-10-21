@@ -66,7 +66,7 @@ export function ternBinary(): string | null {
 }
 
 export function runTern(args: string[], timeout = 60000): Promise<RunResult> {
-  const writesUnits = args.includes('install') || args.includes('uninstall');
+  const writesUnits = ['install', 'uninstall', 'start', 'stop'].some((a) => args.includes(a));
   if (AppEnv.inSpecMode() && writesUnits && !args.includes('--unit-dir')) {
     return Promise.reject(new Error('specs must give tern service install --unit-dir'));
   }

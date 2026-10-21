@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2329  # build_* are called as build_$platform
-# Builds the release engine (`tern-engine`), the MCP server (`tern-mcp`, apps/mcp) and the CLI
-# (`tern`, apps/cli) for macOS and Linux and optionally places them where the desktop build
-# picks them up (apps/desktop/tern-engine, apps/desktop/tern-mcp and
-# apps/desktop/tern, unpacked from the asar by apps/desktop/build/build.js).
+# Builds the release engine (`tern-engine`), the MCP server (`tern-mcp`, apps/mcp), the CLI
+# (`tern`, apps/cli) and the web gateway (`tern-gateway`, apps/gateway) for macOS and Linux and
+# optionally places them where the desktop build picks them up (apps/desktop/tern-engine,
+# apps/desktop/tern-mcp, apps/desktop/tern and apps/desktop/tern-gateway, unpacked from the
+# asar by apps/desktop/build/build.js).
 #
 #   build-release.sh [macos] [linux] [--install-desktop[=ARCH]]
 #
@@ -13,11 +14,11 @@
 #   aarch64-apple-darwin/tern-engine     x86_64-apple-darwin/tern-engine   universal-apple-darwin/tern-engine
 #   x86_64-unknown-linux-gnu/tern-engine aarch64-unknown-linux-gnu/tern-engine
 #
-# and tern-mcp and tern next to each tern-engine.
+# and tern-mcp, tern and tern-gateway next to each tern-engine.
 # Each target directory also gets LICENSE.md, NOTICE.md and THIRD-PARTY-NOTICES.txt (the
-# engine crates' licences, from third-party-notices.sh) and tern-mcp.THIRD-PARTY-NOTICES.txt
-# (tern-mcp's, which also cover tern: its crates are a subset of tern-mcp's), which ship next
-# to the binaries. Without
+# engine crates' licences, from third-party-notices.sh), tern-mcp.THIRD-PARTY-NOTICES.txt
+# (tern-mcp's, which also cover tern: its crates are a subset of tern-mcp's) and
+# tern-gateway.THIRD-PARTY-NOTICES.txt, which ship next to the binaries. Without
 # cargo-about the notices are skipped with a warning; TERN_REQUIRE_NOTICES=1 (set in CI) makes
 # that an error.
 #
@@ -27,9 +28,10 @@
 # bullseye container (glibc 2.31, older than any distro the desktop's Linux packages
 # support). Linux debug info is split into tern-engine.debug next to each binary.
 #
-# --install-desktop copies one tern-engine to apps/desktop/tern-engine and its tern-mcp and
-# tern to apps/desktop/tern-mcp and apps/desktop/tern, and the notices to
-# apps/desktop/tern-engine.THIRD-PARTY-NOTICES.txt for build.js. ARCH is arm64, x64 or
+# --install-desktop copies one tern-engine to apps/desktop/tern-engine and its tern-mcp, tern
+# and tern-gateway next to it, and the notices to apps/desktop/<binary>.THIRD-PARTY-NOTICES.txt
+# for build.js. It also builds the web client tern-gateway serves into apps/desktop/tern-web
+# (`npm run build:desktop` in apps/web, which needs its node_modules). ARCH is arm64, x64 or
 # universal (macOS only); the default is the arch build.js packages for: x64 when
 # OVERRIDE_TO_INTEL is set, else the host's.
 #
@@ -45,7 +47,7 @@ export CARGO_TARGET_DIR="$TARGET_DIR"
 OUT_DIR="${OUT_DIR:-$TARGET_DIR/engine-dist}"
 case "$OUT_DIR" in /*) ;; *) OUT_DIR="$PWD/$OUT_DIR" ;; esac
 DESKTOP_DIR="$REPO_ROOT/apps/desktop"
-BINARIES=(tern-engine tern-mcp tern)
+BINARIES=(tern-engine tern-mcp tern tern-gateway)
 LINUX_IMAGE="${LINUX_IMAGE:-rust:$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$REPO_ROOT/rust-toolchain.toml")-bullseye}"
 # Electron 44's floor; also above arm64's 11.0 minimum.
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-12.0}"
@@ -79,9 +81,10 @@ cargo_build() {
     local bin
     bin="$(dirname "$("$RUSTUP" which --toolchain "$TOOLCHAIN" cargo)")"
     PATH="$bin:$PATH" RUSTC="$bin/rustc" "$bin/cargo" build --release --locked -p tern-engine \
-      -p tern-mcp -p tern --target "$target" "$@"
+      -p tern-mcp -p tern -p tern-gateway --target "$target" "$@"
   else
-    cargo build --release --locked -p tern-engine -p tern-mcp -p tern --target "$target" "$@" ||
+    cargo build --release --locked -p tern-engine -p tern-mcp -p tern -p tern-gateway \
+      --target "$target" "$@" ||
       die "cargo build for $target failed; without rustup the $target standard library must already be installed"
   fi
 }
@@ -100,6 +103,9 @@ generate_notices() {
   log "Writing $OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
   "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
     "$OUT_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/mcp/Cargo.toml"
+  log "Writing $OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt"
+  "$REPO_ROOT/apps/engine/packaging/third-party-notices.sh" \
+    "$OUT_DIR/tern-gateway.THIRD-PARTY-NOTICES.txt" "$REPO_ROOT/apps/gateway/Cargo.toml"
 }
 
 collect() {
@@ -110,7 +116,7 @@ collect() {
     cp "$TARGET_DIR/$target/release/$b" "$OUT_DIR/$target/$b"
   done
   cp "$REPO_ROOT/LICENSE.md" "$REPO_ROOT/NOTICE.md" "$OUT_DIR/$target/"
-  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt; do
+  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt tern-gateway.THIRD-PARTY-NOTICES.txt; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/$target/"; fi
   done
   log "$OUT_DIR/$target/tern-engine"
@@ -131,7 +137,7 @@ build_macos() {
       "$OUT_DIR/aarch64-apple-darwin/$b" "$OUT_DIR/x86_64-apple-darwin/$b"
   done
   cp "$OUT_DIR/aarch64-apple-darwin/"{LICENSE.md,NOTICE.md} "$OUT_DIR/universal-apple-darwin/"
-  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt; do
+  for b in THIRD-PARTY-NOTICES.txt tern-mcp.THIRD-PARTY-NOTICES.txt tern-gateway.THIRD-PARTY-NOTICES.txt; do
     if [ -f "$OUT_DIR/$b" ]; then cp "$OUT_DIR/$b" "$OUT_DIR/universal-apple-darwin/"; fi
   done
   lipo "$OUT_DIR/universal-apple-darwin/tern-engine" -verify_arch arm64 x86_64
@@ -240,15 +246,27 @@ install_desktop() {
   install -m 755 "$OUT_DIR/$target/tern-mcp" "$DESKTOP_DIR/tern-mcp"
   # Preferences > Plugins runs it for `tern service install`.
   install -m 755 "$OUT_DIR/$target/tern" "$DESKTOP_DIR/tern"
-  log "Installed $target into $DESKTOP_DIR/tern-engine, $DESKTOP_DIR/tern-mcp and $DESKTOP_DIR/tern"
+  # Preferences > General > Web access runs it.
+  install -m 755 "$OUT_DIR/$target/tern-gateway" "$DESKTOP_DIR/tern-gateway"
+  log "Installed $target into $DESKTOP_DIR/{tern-engine,tern-mcp,tern,tern-gateway}"
   if [ -f "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" ]; then
     install -m 644 "$OUT_DIR/$target/THIRD-PARTY-NOTICES.txt" \
       "$DESKTOP_DIR/tern-engine.THIRD-PARTY-NOTICES.txt"
   fi
-  if [ -f "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" ]; then
-    install -m 644 "$OUT_DIR/$target/tern-mcp.THIRD-PARTY-NOTICES.txt" \
-      "$DESKTOP_DIR/tern-mcp.THIRD-PARTY-NOTICES.txt"
-  fi
+  for b in tern-mcp tern-gateway; do
+    if [ -f "$OUT_DIR/$target/$b.THIRD-PARTY-NOTICES.txt" ]; then
+      install -m 644 "$OUT_DIR/$target/$b.THIRD-PARTY-NOTICES.txt" \
+        "$DESKTOP_DIR/$b.THIRD-PARTY-NOTICES.txt"
+    fi
+  done
+  install_web
+}
+
+# The web client for tern-gateway, built once for every arch: it is static files.
+install_web() {
+  [ -d "$REPO_ROOT/apps/web/node_modules" ] || (cd "$REPO_ROOT/apps/web" && npm ci)
+  log "Building the web client into $DESKTOP_DIR/tern-web"
+  (cd "$REPO_ROOT/apps/web" && npm run build:desktop)
 }
 
 platforms=()

@@ -7,9 +7,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { AccountStore } from '../../src/data/stores/account';
 import CategoryStore from '../../src/data/stores/category';
 import { SettingsSwitch } from '../../src/components/settings';
+import { Button } from '../../src/components/kit/button';
 
 import { McpSection } from '../../src/features/preferences/tabs/mcp/section';
 import { SettingsSelect } from '../../src/components/settings-select';
+import { Runner } from '../../src/features/preferences/tabs/local-services';
 import { migrateCoreMcpConfig, readAuditLog } from '../../src/features/preferences/tabs/mcp/policy';
 import {
   isStableInstall,
@@ -83,7 +85,35 @@ function textOf(renderer: TestRenderer.ReactTestRenderer) {
   return JSON.stringify(renderer.toJSON());
 }
 
-describe('Preferences > Agents', function () {
+function dimmed(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root
+    .findAll((n) => typeof n.type === 'string' && / off$/.test(n.props.className || ''))
+    .map((n) => n.props.className);
+}
+
+/** A fake tern that keeps the mcp-http unit's state, as `tern mcp-http` and `tern status` would. */
+function fakeTern(calls: string[][]) {
+  const unit = { installed: false, running: false, port: null as number | null, fail: '' };
+  const run: Runner = async (args) => {
+    const rest = args.slice(3);
+    calls.push(rest);
+    if (rest[0] === 'status') {
+      const url = unit.running ? `http://127.0.0.1:${unit.port}/mcp` : null;
+      const service = { name: 'mcp-http', pid: null, unit: null, bin: null, url, ...unit };
+      return { ok: false, stdout: JSON.stringify({ services: [service] }), stderr: '' };
+    }
+    if (unit.fail) return { ok: false, stdout: '', stderr: unit.fail };
+    if (rest[1] === 'install') {
+      Object.assign(unit, { installed: true, running: true, port: Number(rest[3]) });
+    }
+    if (rest[1] === 'uninstall') Object.assign(unit, { installed: false, running: false });
+    if (rest[1] === 'start') unit.running = true;
+    return { ok: true, stdout: '{}', stderr: '' };
+  };
+  return { run, unit };
+}
+
+describe('Preferences > MCP', function () {
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tern-mcp-pane-'));
     coreMcp = undefined;
@@ -187,7 +217,7 @@ describe('Preferences > Agents', function () {
       excludedFolderIds: ['f-private'],
     });
 
-    await flip(renderer, 'Allow apps that connect over HTTP');
+    await flip(renderer, 'Allow apps over HTTP');
     await act(async () => {
       byId(renderer, 'mcp-http-port').props.onChange({ target: { value: '3000' } });
     });
@@ -220,22 +250,71 @@ describe('Preferences > Agents', function () {
     );
     systemTray = false;
     const renderer = await render();
-    const master = 'Let apps on this computer use Tern';
+    const master = 'Allow apps over stdio';
     expect(switchLabelled(renderer, master).props.checked).toBe(true);
-    expect(renderer.root.findAll((n) => n.props.className === 'agents-body off').length).toBe(0);
+    expect(dimmed(renderer)).toEqual([]);
 
     await flip(renderer, master);
     expect(mcpJSON().enabled).toBe(false);
     expect(mcpJSON().accessLevel).toBe('read-write');
     expect(mcpJSON().enabledAccounts.a1.enabled).toBe(true);
     expect(switchLabelled(renderer, master).props.checked).toBe(false);
-    expect(renderer.root.findAll((n) => n.props.className === 'agents-body off').length).toBe(2);
+    expect(dimmed(renderer)).toEqual(['agents-clients off', 'agents-body off']);
     expect(systemTray).toBe(false);
 
     await flip(renderer, master);
     expect(mcpJSON().enabled).toBe(true);
     expect(systemTray).toBe(true);
     expect(textOf(renderer)).toContain('Change in General');
+  });
+
+  it('turns HTTP on and off apart from stdio, through tern mcp-http', async () => {
+    fs.writeFileSync(path.join(dir, 'mcp.json'), JSON.stringify({ enabled: false }));
+    const calls: string[][] = [];
+    const { run, unit } = fakeTern(calls);
+    const renderer = await render({ run });
+    expect(calls).toEqual([['status']]);
+    expect(dimmed(renderer)).toEqual(['agents-clients off', 'agents-body off']);
+    expect(renderer.root.findAll((n) => n.props.id === 'mcp-http-port').length).toBe(0);
+
+    await flip(renderer, 'Allow apps over HTTP');
+    expect(mcpJSON().enabled).toBe(false);
+    expect(mcpJSON().http).toEqual({ enabled: true, port: 2587 });
+    expect(calls).toContain(['mcp-http', 'install', '--port', '2587']);
+    // Stdio stays off; what apps can do still applies to HTTP, so it isn't dimmed.
+    expect(dimmed(renderer)).toEqual(['agents-clients off']);
+    expect(textOf(renderer)).toContain('Serving http://127.0.0.1:2587/mcp.');
+    expect(textOf(renderer)).toContain(path.join(dir, 'mcp-token'));
+
+    await act(async () => {
+      byId(renderer, 'mcp-http-port').props.onChange({ target: { value: '3100' } });
+    });
+    await act(async () => {
+      byId(renderer, 'mcp-http-port').props.onBlur();
+    });
+    expect(calls).toContain(['mcp-http', 'install', '--port', '3100']);
+    expect(textOf(renderer)).toContain('Serving http://127.0.0.1:3100/mcp.');
+
+    // Stopped from elsewhere: the pane offers Start, and shows tern's error.
+    unit.running = false;
+    unit.fail = 'launchctl kickstart failed';
+    await act(async () => {
+      await section(renderer)._refreshHttp();
+    });
+    expect(textOf(renderer)).toContain('Installed, but not running.');
+    await act(async () => {
+      await renderer.root
+        .find((n) => n.type === Button && n.props.children === 'Start')
+        .props.onClick();
+    });
+    expect(calls).toContain(['mcp-http', 'start']);
+    expect(textOf(renderer)).toContain('launchctl kickstart failed');
+
+    unit.fail = '';
+    await flip(renderer, 'Allow apps over HTTP');
+    expect(mcpJSON().http.enabled).toBe(false);
+    expect(calls).toContain(['mcp-http', 'uninstall']);
+    expect(dimmed(renderer)).toEqual(['agents-clients off', 'agents-body off']);
   });
 
   it('keeps nested keys it does not know and edits made while the pane is open', async () => {
@@ -253,7 +332,7 @@ describe('Preferences > Agents', function () {
     changed.enabledAccounts.a2 = { enabled: true };
     fs.writeFileSync(path.join(dir, 'mcp.json'), JSON.stringify(changed));
 
-    await flip(renderer, 'Allow apps that connect over HTTP');
+    await flip(renderer, 'Allow apps over HTTP');
     const saved = mcpJSON();
     expect(saved.http).toEqual({ enabled: true, port: 2600, host: '127.0.0.1' });
     expect(saved.accessLevel).toBe('read-write');

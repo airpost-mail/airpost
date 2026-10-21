@@ -207,6 +207,11 @@ const shippedTopLevel = [
   'tern-mcp.THIRD-PARTY-NOTICES.txt',
   'tern',
   'tern.exe',
+  'tern-gateway',
+  'tern-gateway.exe',
+  'tern-gateway.THIRD-PARTY-NOTICES.txt',
+  // The web client tern-gateway serves (`npm run build:desktop` in apps/web).
+  'tern-web',
 ];
 const topLevelAllowlist = new RegExp(
   `^/(?!(?:${shippedTopLevel.map((n) => n.replace(/[.]/g, '\\.')).join('|')})(?:/|$))`
@@ -241,16 +246,19 @@ function buildPackagerOptions() {
       unpack:
         '{' +
         [
-          // The Rust engine, the MCP server and the CLI, placed by
-          // apps/engine/packaging/build-release.sh --install-desktop. Preferences runs
-          // tern-mcp and tern, and MCP clients and service units run binaries from here, so
-          // they must be real files.
+          // The Rust engine, the MCP server, the CLI and the gateway, placed by
+          // apps/engine/packaging/build-release.sh --install-desktop. Main and Preferences
+          // run them, and MCP clients and service units run binaries from here, so they must
+          // be real files. tern-gateway serves `tern-web` from disk, so it is unpacked too.
           'tern-engine',
           'tern-engine.exe',
           'tern-mcp',
           'tern-mcp.exe',
           'tern',
           'tern.exe',
+          'tern-gateway',
+          'tern-gateway.exe',
+          '**/tern-web/**',
           '*.so',
           '*.so.*',
           '*.dll',
