@@ -3,6 +3,7 @@ import { localized } from '../../../intl/localize';
 import { SettingsPage, SettingsSection, ConfigSwitchRow } from '../../../components/settings';
 import { DefaultMailClientRow, LaunchOnStartRow } from './startup-rows';
 import LanguageRow from './language-row';
+import { CommandLineRow } from './command-line-row';
 import { ConfigLike, ConfigSchemaLike } from '../types';
 
 /** On macOS Tern always outlives its window, so the setting only shows or hides the menu bar
@@ -58,6 +59,10 @@ export default function PreferencesGeneral(props: {
           keyPath="core.workspace.use24HourClock"
           label={localized('Use 24-hour time')}
         />
+      </SettingsSection>
+
+      <SettingsSection title={localized('Command line')}>
+        <CommandLineRow />
       </SettingsSection>
     </SettingsPage>
   );

@@ -36,6 +36,7 @@ import { registerFilesProtocol } from './protocols/files';
 import { registerMessageFrameProtocol } from './frame/protocol-handler';
 import { registerExternalFetchIPC } from './ipc/external-fetch';
 import { registerAttachmentSafetyIPC } from './ipc/attachment-safety';
+import { registerCliLinkIPC } from './ipc/cli-link';
 import { createAppApiHost, registerAppApiIPC } from './ipc/app-api';
 import { registerQuickPreviewWindowsIPC } from './windows/quick-preview';
 import { createPrintWindowHost, registerPrintWindowIPC } from './windows/print-window';
@@ -1217,6 +1218,7 @@ export default class Application extends EventEmitter {
     registerNotificationIPCHandlers(ipcMain);
     registerExternalFetchIPC(ipcMain);
     registerAttachmentSafetyIPC(ipcMain);
+    registerCliLinkIPC(ipcMain, this.resourcePath);
     registerAppApiIPC(
       ipcMain,
       createAppApiHost(this, isAppWindowContents, developerToolsAvailable)

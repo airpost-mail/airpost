@@ -43,10 +43,9 @@ import {
   ternMcpStatus,
   uninstallClient,
 } from './tern-mcp';
-import { ternBinary } from '../plugins/tern-cli';
 
 // Preferences > Agents: the policy tern-mcp reads (mcp.json), client registration through
-// the bundled tern-mcp, its audit log and status, and the bundled `tern` command.
+// the bundled tern-mcp, and its audit log and status. The `tern` command is in General.
 
 type AccessLevel = (typeof ACCESS_LEVELS)[number];
 
@@ -684,31 +683,6 @@ export class McpSection extends React.Component<Props, State> {
     );
   }
 
-  _renderCommandLine() {
-    const tern = ternBinary();
-    return (
-      <SettingsSection title={localized('Command line')}>
-        <SettingsRow
-          label={localized('tern command')}
-          description={
-            tern
-              ? localized(
-                  'Search, read and send mail from the terminal and your own scripts. It comes with Tern, at %@, and the switch above doesn’t apply to it.',
-                  tern
-                )
-              : localized(
-                  'Search, read and send mail from the terminal and your own scripts. This copy of Tern doesn’t include it; the official download does.'
-                )
-          }
-        >
-          <StatusPill kind={tern ? 'ok' : 'off'}>
-            {tern ? localized('Included') : localized('Not included')}
-          </StatusPill>
-        </SettingsRow>
-      </SettingsSection>
-    );
-  }
-
   _renderStatusRow() {
     const { status, statusError } = this.state;
     if (!ternMcpBinary()) {
@@ -820,7 +794,6 @@ export class McpSection extends React.Component<Props, State> {
           {!policyError && this._renderAccounts()}
           {this._renderActivity()}
         </Dimmed>
-        {this._renderCommandLine()}
         <Dimmed off={off}>{this._renderAdvanced()}</Dimmed>
       </div>
     );
