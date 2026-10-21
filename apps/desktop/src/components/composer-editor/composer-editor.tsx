@@ -503,10 +503,10 @@ export function handleFilePasted(
     const reader = new FileReader();
     reader.addEventListener('loadend', () => {
       const buffer = Buffer.from(new Uint8Array(reader.result as any));
-      const tmpFolder = path.join(os.tmpdir(), `-tern-attachment-${crypto.randomUUID()}`);
-      const tmpPath = path.join(tmpFolder, `Pasted File${ext}`);
-      fs.mkdir(tmpFolder, () => {
-        fs.writeFile(tmpPath, buffer, () => {
+      fs.mkdtemp(path.join(os.tmpdir(), 'tern-attachment-'), (err, tmpFolder) => {
+        if (err) return;
+        const tmpPath = path.join(tmpFolder, `Pasted File${ext}`);
+        fs.writeFile(tmpPath, buffer, { mode: 0o600 }, () => {
           onFileReceived(tmpPath);
         });
       });

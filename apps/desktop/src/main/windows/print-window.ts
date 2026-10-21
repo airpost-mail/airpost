@@ -7,13 +7,15 @@ import { pathToFileURL } from 'url';
 import { localized } from '../../intl/localize';
 import { developerToolsAvailable } from '../../platform/developer-tools';
 import { handleInvoke } from '../ipc/app-api';
-import type { PrintWindowOptions } from '../../platform/app-api-channels';
+import { PrintMessagesScriptName, PrintWindowOptions } from '../../platform/app-api-channels';
 
 /*
-The print preview window. The window that prints (features/print/window.ts) writes print.html
-and print.messages.js to the temp directory, then asks for this window over
-app-api:print:open. features/print/static/print.js runs in it and asks for a PDF through the
-preload's `printToPDF`, which posts 'print-to-pdf' to this window's own ipc.
+The print preview window. The window that prints (features/print/window.ts) builds the page
+and sends it over app-api:print:open; main writes it as print.html, with print.messages.js
+next to it, into its own mkdtemp directory (0700, files 0600) and removes that when the window
+closes, so on a shared /tmp nobody else can read the mail or plant the script the page loads.
+features/print/static/print.js runs in it and asks for a PDF through the preload's
+`printToPDF`, which posts 'print-to-pdf' to this window's own ipc.
 */
 
 const PreloadPath = path.join(__dirname, '..', '..', 'features', 'print', 'static', 'preload.js');
@@ -26,28 +28,42 @@ export interface PrintWindowLike {
   };
   removeMenu(): void;
   loadURL(url: string): Promise<void>;
+  once(event: 'closed', listener: () => void): void;
 }
 
 export interface PrintWindowHost {
-  tempPath(): string;
+  /** A new private directory for one print page. */
+  makePrivateDir(): string;
+  removeDir(dir: string): void;
   createWindow(options: Electron.BrowserWindowConstructorOptions): PrintWindowLike;
   showSaveDialog(options: Electron.SaveDialogOptions): Promise<Electron.SaveDialogReturnValue>;
   showMessageBox(options: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue>;
   writeFile(filePath: string, data: Buffer): void;
+  writePrivateFile(filePath: string, data: string): void;
 }
 
 export function createPrintWindowHost(): PrintWindowHost {
   const { app, BrowserWindow, dialog } = require('electron') as typeof Electron;
   return {
-    tempPath: () => app.getPath('temp'),
+    makePrivateDir: () => fs.mkdtempSync(path.join(app.getPath('temp'), 'tern-print-')),
+    removeDir: (dir) => fs.rmSync(dir, { recursive: true, force: true }),
     createWindow: (options) => new BrowserWindow(options),
     showSaveDialog: (options) => dialog.showSaveDialog(options),
     showMessageBox: (options) => dialog.showMessageBox(options),
     writeFile: (filePath, data) => fs.writeFileSync(filePath, data),
+    writePrivateFile: (filePath, data) => fs.writeFileSync(filePath, data, { mode: 0o600 }),
   };
 }
 
-export function openPrintWindow(host: PrintWindowHost, { subject }: PrintWindowOptions) {
+export function openPrintWindow(
+  host: PrintWindowHost,
+  { subject, html, messagesScript }: PrintWindowOptions
+) {
+  const dir = host.makePrivateDir();
+  const pagePath = path.join(dir, 'print.html');
+  host.writePrivateFile(path.join(dir, PrintMessagesScriptName), messagesScript);
+  host.writePrivateFile(pagePath, html);
+
   const win = host.createWindow({
     width: 800,
     height: 600,
@@ -92,10 +108,10 @@ export function openPrintWindow(host: PrintWindowHost, { subject }: PrintWindowO
     }
   });
 
+  win.once('closed', () => host.removeDir(dir));
   win.removeMenu();
-  // Always the temp file the window writes, never a path the window passes.
   win
-    .loadURL(pathToFileURL(path.join(host.tempPath(), 'print.html')).href)
+    .loadURL(pathToFileURL(pagePath).href)
     .catch((err: Error) => console.error('Print window failed to load:', err));
   return win;
 }
@@ -106,6 +122,10 @@ export function registerPrintWindowIPC(
   isTrustedSender: (contents: Electron.WebContents) => boolean
 ) {
   handleInvoke(ipcMain, { isTrustedSender }, 'app-api:print:open', (_event, options) => {
-    openPrintWindow(host, { subject: String(options.subject) });
+    openPrintWindow(host, {
+      subject: String(options.subject),
+      html: String(options.html),
+      messagesScript: String(options.messagesScript),
+    });
   });
 }

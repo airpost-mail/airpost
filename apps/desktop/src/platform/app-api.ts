@@ -290,7 +290,7 @@ export const QuickPreviewWindows = {
 };
 
 export const PrintWindows = {
-  /** Opens the print preview of print.html in the temp directory; write that file first. */
+  /** Opens the print preview of the given print page. */
   open(options: PrintWindowOptions) {
     return AppApiTransport.invoke('app-api:print:open', options);
   },

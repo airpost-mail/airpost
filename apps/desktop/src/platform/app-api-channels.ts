@@ -98,9 +98,16 @@ export interface StaticPageOptions {
   height?: number;
 }
 
+/** print.html loads the messages from this file next to it. */
+export const PrintMessagesScriptName = 'print.messages.js';
+
 export interface PrintWindowOptions {
   /** The window title and the PDF's default file name. */
   subject: string;
+  /** print.html, which main writes with `messagesScript` into a private temp directory. */
+  html: string;
+  /** The contents of print.messages.js. */
+  messagesScript: string;
 }
 
 export interface QuickPreviewDisplay {
@@ -169,7 +176,7 @@ export interface AppApiInvoke {
     string | null
   >;
   'app-api:menu:popup-application-menu': Channel<[], void>;
-  /** The print preview of the temp dir's print.html, which the window wrote first. */
+  /** The print preview of the given page. */
   'app-api:print:open': Channel<[options: PrintWindowOptions], void>;
   'app-api:spellchecker:get-available-languages': Channel<[], string[]>;
   'app-api:spellchecker:set-languages': Channel<[languages: string[]], void>;

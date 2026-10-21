@@ -1,5 +1,4 @@
 /* eslint global-require: 0 */
-import fs from 'fs';
 import React, { Component } from 'react';
 import classnames from 'classnames';
 import { ipcRenderer } from 'electron';
@@ -10,7 +9,9 @@ import { SettingsSelect } from '../../../../components/settings-select';
 import { localized } from '../../../../intl/localize';
 import RegExpUtils from '../../../../utils/regexp';
 import { Account, AccountAutoaddress } from '../../../../data/models/account';
-import { Dialogs, App, openStaticPage } from '../../../../platform/app-api';
+import { Dialogs, openStaticPage } from '../../../../platform/app-api';
+import { writePrivateTempFile } from '../../../../utils/private-temp';
+import { escapeHTML } from 'underscore.string';
 
 /** One address the account sends from, shown as text until the user edits it. */
 class AliasRow extends Component<
@@ -246,11 +247,7 @@ class PreferencesAccountDetails extends Component<
 
   _onShowErrorDetails = async () => {
     const { id, syncState, settings, provider } = this.props.account;
-    const filepath = require('path').join(
-      await App.getPath('temp'),
-      `error-details-${id}-${Date.now()}.html`
-    );
-
+    let filepath: string;
     try {
       const logs = await AppEnv.engineBridge.tailClientLog(id);
       const result = [
@@ -264,9 +261,11 @@ class PreferencesAccountDetails extends Component<
         logs,
       ].join('\n');
 
-      fs.writeFileSync(
-        filepath,
-        `<div style="white-space: pre-wrap; font-family: monospace;">${result}</div>`
+      filepath = writePrivateTempFile(
+        `error-details-${id}.html`,
+        `<meta charset="UTF-8"><div style="white-space: pre-wrap; font-family: monospace;">${escapeHTML(
+          result
+        )}</div>`
       );
     } catch (err) {
       AppEnv.showErrorDialog({ title: 'Error', message: `Could not retrieve sync logs. ${err}` });

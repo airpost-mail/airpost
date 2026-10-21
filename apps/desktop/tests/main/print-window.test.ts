@@ -13,6 +13,8 @@ describe('the print window', function () {
   let win: PrintWindowLike;
   let windowOptions: Electron.BrowserWindowConstructorOptions;
   let printToPDFRequest: () => Promise<void>;
+  let closeWindow: () => void;
+  const page = { subject: 'Hello', html: '<p>Hi</p>', messagesScript: 'window.printMessages = []' };
   const trusted: any = {};
 
   beforeEach(() => {
@@ -29,9 +31,13 @@ describe('the print window', function () {
       },
       removeMenu: jasmine.createSpy('removeMenu'),
       loadURL: jasmine.createSpy('loadURL').andReturn(Promise.resolve()),
+      once: ((event: string, fn: () => void) => {
+        if (event === 'closed') closeWindow = fn;
+      }) as any,
     };
     host = {
-      tempPath: () => '/tmp/tern-temp',
+      makePrivateDir: () => '/tmp/tern-print-abc',
+      removeDir: jasmine.createSpy('removeDir'),
       createWindow: (options) => {
         windowOptions = options;
         return win;
@@ -43,6 +49,7 @@ describe('the print window', function () {
         .createSpy('showMessageBox')
         .andReturn(Promise.resolve({ response: 0, checkboxChecked: false })),
       writeFile: jasmine.createSpy('writeFile'),
+      writePrivateFile: jasmine.createSpy('writePrivateFile'),
     };
     registerPrintWindowIPC(ipcMain as Electron.IpcMain, host, (contents) => contents === trusted);
   });
@@ -50,16 +57,22 @@ describe('the print window', function () {
   it("answers Tern's windows only", async () => {
     let error: Error = null;
     try {
-      await handlers['app-api:print:open']({ sender: {} }, { subject: 'Hello' });
+      await handlers['app-api:print:open']({ sender: {} }, page);
     } catch (err) {
       error = err;
     }
     expect(error && error.message).toContain('only available to Tern windows');
     expect(windowOptions).toBeUndefined();
+    expect(host.writePrivateFile).not.toHaveBeenCalled();
   });
 
-  it('loads print.html from the temp directory with the print preload', async () => {
-    await handlers['app-api:print:open']({ sender: trusted }, { subject: 'Hello' });
+  it('writes the page into its own temp directory, loads it with the print preload, and removes it on close', async () => {
+    await handlers['app-api:print:open']({ sender: trusted }, page);
+    expect(host.writePrivateFile).toHaveBeenCalledWith('/tmp/tern-print-abc/print.html', page.html);
+    expect(host.writePrivateFile).toHaveBeenCalledWith(
+      '/tmp/tern-print-abc/print.messages.js',
+      page.messagesScript
+    );
     expect(windowOptions.title).toBe('Print - Hello');
     expect(windowOptions.webPreferences.preload).toMatch(
       /features[/\\]print[/\\]static[/\\]preload\.js$/
@@ -68,12 +81,15 @@ describe('the print window', function () {
     expect(windowOptions.webPreferences.nodeIntegration).toBe(false);
     expect(win.removeMenu).toHaveBeenCalled();
     expect((win.loadURL as jasmine.Spy).mostRecentCall.args[0]).toBe(
-      'file:///tmp/tern-temp/print.html'
+      'file:///tmp/tern-print-abc/print.html'
     );
+    expect(host.removeDir).not.toHaveBeenCalled();
+    closeWindow();
+    expect(host.removeDir).toHaveBeenCalledWith('/tmp/tern-print-abc');
   });
 
   it('saves a PDF where the user picks, and nothing when they cancel', async () => {
-    await handlers['app-api:print:open']({ sender: trusted }, { subject: 'Hello' });
+    await handlers['app-api:print:open']({ sender: trusted }, page);
     await printToPDFRequest();
     expect((host.showSaveDialog as jasmine.Spy).mostRecentCall.args[0]).toEqual({
       defaultPath: 'Hello.pdf',
@@ -87,7 +103,7 @@ describe('the print window', function () {
 
   it('shows the error dialog when the PDF fails', async () => {
     (win.webContents.printToPDF as jasmine.Spy).andReturn(Promise.reject(new Error('boom')));
-    await handlers['app-api:print:open']({ sender: trusted }, { subject: 'Hello' });
+    await handlers['app-api:print:open']({ sender: trusted }, page);
     await printToPDFRequest();
     expect(host.writeFile).not.toHaveBeenCalled();
     const options = (host.showMessageBox as jasmine.Spy).mostRecentCall.args[0];

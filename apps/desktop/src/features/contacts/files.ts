@@ -6,13 +6,12 @@
 (`contacts.import`, `contacts.export`); this keeps the dialogs and the files.
 */
 import fs from 'fs';
-import os from 'os';
-import path from 'path';
 import { Contact } from '../../data/models/contact';
 import { AccountStore } from '../../data/stores/account';
 import { localized } from '../../intl/localize';
 import { exportContacts, importContacts } from '../../engine/client/pim';
 import { Dialogs } from '../../platform/app-api';
+import { writePrivateTempFile } from '../../utils/private-temp';
 
 function showInfo(title: string, message: string) {
   Dialogs.showMessageBox({ type: 'info', title, message, buttons: [localized('OK')] }, 'none');
@@ -50,12 +49,11 @@ export function writeContactsToTempVCF(contacts: Contact[]): string {
     contacts.length === 1
       ? (contacts[0].name || 'contact').replace(/[^a-z0-9 ]/gi, '_').trim() || 'contact'
       : 'contacts';
-  const filePath = path.join(os.tmpdir(), `${safeName}.vcf`);
   const stored = contacts
     .map((c) => (c.info && 'vcf' in c.info ? c.info.vcf : ''))
     .filter(Boolean)
     .join('');
-  fs.writeFileSync(filePath, stored, 'utf-8');
+  const filePath = writePrivateTempFile(`${safeName}.vcf`, stored);
   exportContacts(contacts)
     .then((vcf) => fs.promises.writeFile(filePath, vcf, 'utf-8'))
     .catch((err) => console.warn('Could not export the dragged contacts:', err));
