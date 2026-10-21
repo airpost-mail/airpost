@@ -123,9 +123,12 @@ else
   log "reusing $to (pass --fresh to copy again)"
 fi
 
-log "building the Rust engine"
-(cd "$repo" && cargo build --release -p tern-engine)
-cp "$repo/target/release/tern-engine" "$repo/apps/desktop/tern-engine"
+# tern-mcp and tern too: Preferences > Agents finds them next to tern-engine, as in a packaged build.
+log "building the Rust engine, tern-mcp and tern"
+(cd "$repo" && cargo build --release -p tern-engine -p tern-mcp -p tern)
+for bin in tern-engine tern-mcp tern; do
+  cp "$repo/target/release/$bin" "$repo/apps/desktop/$bin"
+done
 
 # A checkout from before the flatten still has the tooling-only node_modules (no react, and a
 # Node-built better-sqlite3), so test for the app's runtime deps rather than the dir.
