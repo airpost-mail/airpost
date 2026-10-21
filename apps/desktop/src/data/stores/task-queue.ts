@@ -1,19 +1,15 @@
 import _ from 'underscore';
-import BaseStore from 'mailspring-store';
-import { Rx } from 'mailspring-exports';
+import BaseStore from './base';
+import Rx from 'rx-lite';
 import { Task } from '../tasks/task';
 import DatabaseStore from '../database/store';
 
 // TaskQueue is constructed as a module-level side effect below (`export default
 // new TaskQueue()`), and its constructor calls `Rx.Observable.fromQuery`, which
-// only exists once `mailspring-observables` has run and patched it onto Rx.
-// That normally happens because app-env.ts requires 'mailspring-observables'
-// before 'mailspring-exports', but nothing enforces that ordering when this
-// module is required directly or transitively before that point (this exact
-// scenario has caused "Rx.Observable.fromQuery is not a function" crashes in
-// production). Importing it here guarantees the patch is applied before we
-// construct the singleton below, regardless of require order elsewhere.
-import 'mailspring-observables';
+// only exists once data/query/observables has patched it onto Rx. app-env.ts
+// requires that module early, but this module can be required before that, so it
+// imports it too.
+import '../query/observables';
 
 /*
 Public: The TaskQueue is a Flux-compatible Store that manages a queue of {Task}

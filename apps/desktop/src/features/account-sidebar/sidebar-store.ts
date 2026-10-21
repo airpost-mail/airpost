@@ -1,17 +1,15 @@
 import _ from 'underscore';
-import BaseStore from 'mailspring-store';
-import {
-  Actions,
-  Account,
-  AccountStore,
-  ThreadCountsStore,
-  WorkspaceStore,
-  OutboxStore,
-  FocusedPerspectiveStore,
-  CategoryStore,
-  LabelColorStore,
-  ExtensionRegistry,
-} from 'mailspring-exports';
+import BaseStore from '../../data/stores/base';
+import * as Actions from '../../data/actions';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
+import ThreadCountsStore from '../../data/stores/thread-counts';
+import WorkspaceStore from '../../data/stores/workspace';
+import OutboxStore from '../../data/stores/outbox';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import CategoryStore from '../../data/stores/category';
+import LabelColorStore from '../../data/stores/label-color';
+import * as ExtensionRegistry from '../../packages/extension-registry';
 
 import SidebarSection from './sidebar-section';
 import * as SidebarActions from './sidebar-actions';

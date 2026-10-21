@@ -1,4 +1,4 @@
-import { Table } from 'mailspring-component-kit';
+import Table from '../../../src/components/table/table';
 
 export const testData = {
   columns: ['col1', 'col2', 'col3'],

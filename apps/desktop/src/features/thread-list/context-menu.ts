@@ -1,19 +1,17 @@
 /* eslint global-require: 0*/
-import {
-  localized,
-  Thread,
-  Actions,
-  Message,
-  TaskFactory,
-  DatabaseStore,
-  FocusedPerspectiveStore,
-  GetMessageRFC2822Task,
-  SyncbackDraftTask,
-  DraftFactory,
-  AccountStore,
-  TaskQueue,
-  EmlUtils,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { Thread } from '../../data/models/thread';
+import * as Actions from '../../data/actions';
+import { Message } from '../../data/models/message';
+import { TaskFactory } from '../../data/tasks/factory';
+import DatabaseStore from '../../data/database/store';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import { GetMessageRFC2822Task } from '../../data/tasks/get-message-rfc2822';
+import { SyncbackDraftTask } from '../../data/tasks/syncback-draft';
+import DraftFactory from '../../data/drafts/factory';
+import { AccountStore } from '../../data/stores/account';
+import TaskQueue from '../../data/stores/task-queue';
+import * as EmlUtils from '../../mail/eml';
 
 type TemplateItem =
   | {

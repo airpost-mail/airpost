@@ -3,8 +3,10 @@ import { ListTabular, ListTabularProps, ListTabularColumn } from '../list/tabula
 import { Spinner } from '../spinner';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Utils, WorkspaceStore, localized } from 'mailspring-exports';
-import { KeyCommandsRegion } from 'mailspring-component-kit';
+import * as Utils from '../../data/models/utils';
+import WorkspaceStore from '../../data/stores/workspace';
+import { localized } from '../../intl/localize';
+import { KeyCommandsRegion } from '../key-commands-region';
 
 import MultiselectListInteractionHandler from './list-interaction-handler';
 import MultiselectSplitInteractionHandler from './split-interaction-handler';

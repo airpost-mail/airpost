@@ -1,4 +1,5 @@
-import { Calendar, Event } from 'mailspring-exports';
+import { Calendar } from '../../src/data/models/calendar';
+import { Event } from '../../src/data/models/event';
 import {
   resolveRSVPTarget,
   resolveAddTo,

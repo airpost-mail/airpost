@@ -1,14 +1,16 @@
 import React from 'react';
-import {
-  ListTabular,
-  RetinaImg,
-  MailLabelSet,
-  MailImportantIcon,
-  InjectedComponent,
-  InjectedComponentSet,
-} from 'mailspring-component-kit';
+import { ListTabular } from '../../components/list/tabular';
+import { RetinaImg } from '../../components/retina-img';
+import MailLabelSet from '../../components/mail-label-set';
+import MailImportantIcon from '../../components/mail-important-icon';
+import InjectedComponent from '../../components/injected/component';
+import { InjectedComponentSet } from '../../components/injected/component-set';
 
-import { localized, FocusedPerspectiveStore, Utils, DateUtils, Thread } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import * as Utils from '../../data/models/utils';
+import DateUtils from '../../utils/date';
+import { Thread } from '../../data/models/thread';
 
 import { ThreadArchiveQuickAction, ThreadTrashQuickAction } from './quick-actions';
 import ThreadListParticipants from './participants';

@@ -3,15 +3,13 @@
 // message header controls and the sidebar's contact picker.
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import {
-  Actions,
-  Contact,
-  File,
-  FocusedContactsStore,
-  Message,
-  SearchableComponentStore,
-  Thread,
-} from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Contact } from '../../src/data/models/contact';
+import { File } from '../../src/data/models/file';
+import FocusedContactsStore from '../../src/data/stores/focused-contacts';
+import { Message } from '../../src/data/models/message';
+import SearchableComponentStore from '../../src/data/stores/searchable-component';
+import { Thread } from '../../src/data/models/thread';
 import { SubjectLineIcons } from '../../src/features/message-list/subject-line-icons';
 import FindInThread from '../../src/features/message-list/find-in-thread';
 import MessageControls from '../../src/features/message-list/message-controls';

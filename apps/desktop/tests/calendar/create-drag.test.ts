@@ -9,6 +9,7 @@ import ReactDOM from 'react-dom';
 import moment from 'moment';
 import Rx from 'rx-lite';
 import * as CalendarDateUtils from '../../src/data/calendar/calendar-date';
+import * as Actions from '../../src/data/actions';
 import { Calendar } from '../../src/data/models/calendar';
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { WeekView } from '../../src/features/main-calendar/views/week';
@@ -172,7 +173,7 @@ describe('drawing a new event on empty grid space', function () {
       clientX: 100,
       clientY: 200,
     });
-    const closePopover = spyOn(require('mailspring-exports').Actions, 'closePopover');
+    const closePopover = spyOn(Actions, 'closePopover');
     cal._onCalendarClick(at(BASE));
     expect(closePopover).not.toHaveBeenCalled();
     cal._onCalendarClick(at(BASE));
@@ -193,7 +194,7 @@ describe('drawing a new event on empty grid space', function () {
     cal._onCalendarMouseMove(at(BASE + 60));
     cal._onCalendarMouseUp(at(BASE + 60));
     expect(cal._openNewEventPopover).not.toHaveBeenCalled();
-    const closePopover = spyOn(require('mailspring-exports').Actions, 'closePopover');
+    const closePopover = spyOn(Actions, 'closePopover');
     cal._onCalendarClick(at(BASE));
     expect(closePopover).toHaveBeenCalled();
   });
@@ -306,7 +307,6 @@ describe('drawing a new event on empty grid space', function () {
 });
 
 describe('opening the editor for a new event', function () {
-  const { Actions } = require('mailspring-exports');
   let cal: any;
 
   beforeEach(function () {
@@ -323,7 +323,7 @@ describe('opening the editor for a new event', function () {
   });
 
   const shown = () => cal._renderMainContent().props.newEventPreview;
-  const editor = () => Actions.openPopover.mostRecentCall.args[0];
+  const editor = () => (Actions.openPopover as any).mostRecentCall.args[0];
   const mountEditor = (): any => ReactDOM.render(editor(), document.createElement('div'));
   const dateOf = (unix: number) => CalendarDateUtils.calendarDateFromUnix(unix);
 
@@ -350,7 +350,7 @@ describe('opening the editor for a new event', function () {
 
   it('anchors the editor at the pointer', function () {
     cal._openNewEventPopover(range);
-    const { originRect } = Actions.openPopover.mostRecentCall.args[1];
+    const { originRect } = (Actions.openPopover as any).mostRecentCall.args[1];
     expect(originRect.left).toBe(99);
     expect(originRect.top).toBe(199);
   });

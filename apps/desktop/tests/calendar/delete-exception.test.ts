@@ -1,6 +1,9 @@
 // Deleting from the grid asks the engine for the write (events.update, `deleted`); the ICS it
 // writes (the override dropped, the slot excluded, SEQUENCE bumped) is crates/tern-pim's tests.
-import { Actions, DatabaseStore, DestroyEventTask, SyncbackEventTask } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import DatabaseStore from '../../src/data/database/store';
+import { DestroyEventTask } from '../../src/data/tasks/destroy-event';
+import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
 import { dialog } from '@electron/remote';
 import { Event as EventModel } from '../../src/data/models/event';
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';

@@ -6,7 +6,9 @@
  */
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Utils, localized, SearchableComponentStore } from 'mailspring-exports';
+import * as Utils from '../data/models/utils';
+import { localized } from '../intl/localize';
+import SearchableComponentStore from '../data/stores/searchable-component';
 import IFrameSearcher from './searchable/iframe-searcher';
 import url from 'url';
 import _ from 'underscore';

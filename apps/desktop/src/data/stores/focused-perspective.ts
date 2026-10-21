@@ -1,6 +1,6 @@
 import _ from 'underscore';
 import { ipcRenderer } from 'electron';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import { AccountStore } from './account';
 import WorkspaceStore from './workspace';
 import { MailboxPerspective } from '../mailbox-perspective';

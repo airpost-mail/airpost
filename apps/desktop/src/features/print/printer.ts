@@ -1,4 +1,6 @@
-import { AccountStore, Actions, Thread } from 'mailspring-exports';
+import { AccountStore } from '../../data/stores/account';
+import * as Actions from '../../data/actions';
+import { Thread } from '../../data/models/thread';
 import { messageFrameBridgeFor, messageFrameContent } from '../../mail/frame/bridge';
 import PrintWindow from './window';
 

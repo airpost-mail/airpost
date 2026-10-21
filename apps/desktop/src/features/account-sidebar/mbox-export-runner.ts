@@ -1,5 +1,9 @@
 import fs from 'fs';
-import { localized, Task, TaskQueue, GetManyRFC2822Task, MboxUtils } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { Task } from '../../data/tasks/task';
+import TaskQueue from '../../data/stores/task-queue';
+import { GetManyRFC2822Task } from '../../data/tasks/get-many-rfc2822';
+import * as MboxUtils from '../../mail/mbox';
 
 /*
  * Finishes mbox folder exports. The sync engine's half of an export (fetching

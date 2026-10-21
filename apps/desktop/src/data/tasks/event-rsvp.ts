@@ -1,15 +1,13 @@
 import { Task } from './task';
 import { AttributeValues } from '../models/model';
 import * as Attributes from '../attributes';
-import {
-  localized,
-  ICSParticipantStatus,
-  SyncbackMetadataTask,
-  CalendarUtils,
-  DatabaseStore,
-  Message,
-  Actions,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { ICSParticipantStatus } from '../calendar/ics';
+import * as CalendarUtils from '../calendar/ics';
+import { SyncbackMetadataTask } from './syncback-metadata';
+import DatabaseStore from '../database/store';
+import { Message } from '../models/message';
+import * as Actions from '../actions';
 
 /**
  * Emails an iTIP message to a meeting organizer (RFC 5546): a REPLY with our status, or a
@@ -165,6 +163,6 @@ export class EventRSVPTask extends Task {
 
     // Pull the provider's latest calendar state after any RSVP response. Calendar
     // views observe the local Event table and update as soon as this sync lands.
-    AppEnv.mailsyncBridge.sendSyncCalendarNow(this.accountId);
+    AppEnv.engineBridge.sendSyncCalendarNow(this.accountId);
   }
 }

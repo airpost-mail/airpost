@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import DOMUtils from '../../utils/dom';
 import * as Actions from '../actions';
 import { MAX_MATCHES, CHAR_THRESHOLD } from '../../components/searchable/constants';

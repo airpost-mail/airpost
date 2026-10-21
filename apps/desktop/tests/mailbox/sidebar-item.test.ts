@@ -1,4 +1,7 @@
-import { Folder, Actions, DatabaseStore, ChangeUnreadTask } from 'mailspring-exports';
+import { Folder } from '../../src/data/models/folder';
+import * as Actions from '../../src/data/actions';
+import DatabaseStore from '../../src/data/database/store';
+import { ChangeUnreadTask } from '../../src/data/tasks/change-unread';
 import SidebarItem from '../../src/features/account-sidebar/sidebar-item';
 
 describe('sidebar-item', function sidebarItemSpec() {

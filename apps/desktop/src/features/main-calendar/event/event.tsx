@@ -1,7 +1,7 @@
 import React, { CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
-import { InjectedComponentSet } from 'mailspring-component-kit';
-import { CalendarDateUtils } from 'mailspring-exports';
+import { InjectedComponentSet } from '../../../components/injected/component-set';
+import * as CalendarDateUtils from '../../../data/calendar/calendar-date';
 import { EventOccurrence, isTimed, occurrenceStartUnix, occurrenceEndUnix } from '../data-source';
 import { calcEventColors, extractMeetingDomain, formatEventTimeRange } from '../helpers';
 import { HitZone, ViewDirection } from '../drag-types';

@@ -1,4 +1,5 @@
-import { Utils, localized } from 'mailspring-exports';
+import * as Utils from '../../data/models/utils';
+import { localized } from '../../intl/localize';
 import React from 'react';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 

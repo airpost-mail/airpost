@@ -22,7 +22,7 @@ account the engine has that the host doesn't list is left alone: another client 
 add`, the web) may have added it. Only the ids the host says it deleted (`removedAccounts`, kept
 across launches for a delete made while the engine was down) are removed once it says hello.
 */
-import type { EngineServeProcess, MailsyncProcessExit, ResetOptions } from '../process';
+import type { EngineServeProcess, EngineProcessExit, ResetOptions } from '../process';
 import {
   AccountAddResult,
   AccountState,
@@ -76,7 +76,7 @@ export class CrashTracker {
     delete this._tooManyFailures[key];
   }
 
-  recordClientCrash(fullAccountJSON: CrashKeyJSON, crash: MailsyncProcessExit) {
+  recordClientCrash(fullAccountJSON: CrashKeyJSON, crash: EngineProcessExit) {
     console.log(`Sync worker exited.`, crash);
 
     this._appendCrashToHistory(fullAccountJSON);
@@ -126,8 +126,8 @@ export class CrashTracker {
 export function isAuthFailure(error: unknown) {
   const text = `${error}`;
   return (
-    text.includes('Response Code: 401') || // mailspring services
-    text.includes('Response Code: 403') || // mailspring services
+    text.includes('Response Code: 401') || // HTTP services
+    text.includes('Response Code: 403') || // HTTP services
     text.includes('invalid_grant') || // Google
     text.includes('ErrorAuthentication') // mailcore
   );
@@ -154,7 +154,7 @@ export interface EngineClientHost {
   // account.add was sent for this account.
   onAccountLaunched(json: AccountJSON): void;
   // The account (or, after an engine cutoff, every account) is not relaunched any more.
-  onTooManyFailures(accountId: string, exit: MailsyncProcessExit, authFailure: boolean): void;
+  onTooManyFailures(accountId: string, exit: EngineProcessExit, authFailure: boolean): void;
   // `entries` or `held` changed: an account is being added, was added, is being removed or
   // is gone, or a reset holds it.
   onAccountsChanged?(): void;
@@ -457,7 +457,7 @@ export class EngineClient {
       })
     );
     engine.on('hello', () => this._removeDeleted(engine));
-    engine.on('close', (exit: MailsyncProcessExit) => this._onEngineClose(engine, exit));
+    engine.on('close', (exit: EngineProcessExit) => this._onEngineClose(engine, exit));
     try {
       engine.serve();
     } catch (error) {
@@ -581,7 +581,7 @@ export class EngineClient {
     this._changed();
     if (!entry.retrying) this.host.onAccountExited(accountId);
     if (!entry.json) return;
-    const exit: MailsyncProcessExit = {
+    const exit: EngineProcessExit = {
       code: null,
       error: this._stoppedError(error),
       signal: null,
@@ -590,7 +590,7 @@ export class EngineClient {
     this.host.onTooManyFailures(accountId, exit, !!authFailed);
   }
 
-  // The `error` of the MailsyncProcessExit a stopped account is recorded with: its text is the
+  // The `error` of the EngineProcessExit a stopped account is recorded with: its text is the
   // SyncError's key and debuginfo, as the per-account path's stderr carried them, and it keeps
   // the SyncError JSON for the account's syncError.
   _stoppedError(error?: SyncErrorJSON) {
@@ -608,7 +608,7 @@ export class EngineClient {
     this._changed();
     this.host.onAccountExited(accountId);
     if (!entry.json) return;
-    const exit: MailsyncProcessExit = { code: null, error, signal: null };
+    const exit: EngineProcessExit = { code: null, error, signal: null };
     this.crashes.recordClientCrash(entry.json, exit);
     if (this.crashes.tooManyFailures(entry.json)) {
       this.host.onTooManyFailures(accountId, exit, isAuthFailure(error));
@@ -654,7 +654,7 @@ export class EngineClient {
     return entry.removal;
   }
 
-  _onEngineClose(engine: EngineServeProcess, exit: MailsyncProcessExit) {
+  _onEngineClose(engine: EngineServeProcess, exit: EngineProcessExit) {
     if (this.engine !== engine) return;
     this.engine = null;
     const ids = [...this.entries.keys()];

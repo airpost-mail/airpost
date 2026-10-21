@@ -7,7 +7,7 @@ import {
   occurrenceStartUnix,
   occurrenceEndUnix,
 } from './data-source';
-import { CalendarDateUtils } from 'mailspring-exports';
+import * as CalendarDateUtils from '../../data/calendar/calendar-date';
 import { inclusiveAllDayEnd } from './helpers';
 import { DEFAULT_TIMED_EVENT_DURATION_SECONDS, MIN_EVENT_DURATION_SECONDS } from './constants';
 

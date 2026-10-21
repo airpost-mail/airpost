@@ -1,6 +1,6 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
-import { SettingsPage } from 'mailspring-component-kit';
+import { localized } from '../../../intl/localize';
+import { SettingsPage } from '../../../components/settings';
 import { McpSection } from './mcp/section';
 
 export default function PreferencesAgents() {

@@ -1,4 +1,5 @@
-import { ICSParticipantStatus, localized } from 'mailspring-exports';
+import { ICSParticipantStatus } from '../../../data/calendar/ics';
+import { localized } from '../../../intl/localize';
 import { EventOccurrence } from '../data-source';
 import { canRespondToEvent, myParticipationStatus, respondToCalendarEvent } from './rsvp';
 

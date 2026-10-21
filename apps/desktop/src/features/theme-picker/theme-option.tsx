@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import fs from 'fs';
 import path from 'path';
 
-import { EventedIFrame } from 'mailspring-component-kit';
+import { EventedIFrame } from '../../components/evented-iframe';
 import Package from '../../packages/package';
 import LessCompileCache from '../../packages/compile-cache-less';
 import { RadioGroupItem } from '../../components/kit/radio-group';

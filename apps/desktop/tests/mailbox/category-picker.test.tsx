@@ -3,20 +3,18 @@ import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 import MovePickerPopover from '../../src/features/category-picker/move-picker-popover';
 
-import {
-  Folder,
-  Label,
-  Thread,
-  Actions,
-  AccountStore,
-  CategoryStore,
-  FocusedPerspectiveStore,
-  MailboxPerspective,
-  TestUtils,
-  TaskQueue,
-} from 'mailspring-exports';
+import { Folder } from '../../src/data/models/folder';
+import { Label } from '../../src/data/models/label';
+import { Thread } from '../../src/data/models/thread';
+import * as Actions from '../../src/data/actions';
+import { AccountStore } from '../../src/data/stores/account';
+import CategoryStore from '../../src/data/stores/category';
+import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
+import { MailboxPerspective } from '../../src/data/mailbox-perspective';
+import TestUtils from '../support/test-utils';
+import TaskQueue from '../../src/data/stores/task-queue';
 
-import { Categories } from 'mailspring-observables';
+import { Categories } from '../../src/data/query/observables';
 
 describe('MovePickerPopover', function () {
   beforeEach(() => (CategoryStore._categoryCache = {}));

@@ -1,6 +1,6 @@
 import React from 'react';
 import { isEqual } from 'underscore';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
 import { Button } from '../../components/kit/button';
 
 interface ListEditorProps<T> {

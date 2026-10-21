@@ -457,7 +457,7 @@ export class Message extends ModelWithMetadata {
       this.to.length === 1 &&
       this.from.length === 1 &&
       this.to[0].email === this.from[0].email &&
-      // "via Mailspring": reminders created before the rename.
+      // "via Mailspring": the reminders Mailspring sent, in mailboxes it was used with.
       ((this.from[0].name || '').endsWith('via Tern') ||
         (this.from[0].name || '').endsWith('via Mailspring'));
     const isDraftBeingDeleted = this.id.startsWith('deleted-');

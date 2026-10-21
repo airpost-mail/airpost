@@ -250,7 +250,6 @@ Hello World\
     });
 
     // Test 11: The <body> tag itself is just a quoted text block.
-    // I believe this is https://sentry.mailspring.com/sentry/edgehill/group/8323/
     tests.push({
       before: `\
 <body class="gmail_quote">

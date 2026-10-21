@@ -1,5 +1,7 @@
 import React from 'react';
-import { Calendar, Account, localized } from 'mailspring-exports';
+import { Calendar } from '../../../data/models/calendar';
+import { Account } from '../../../data/models/account';
+import { localized } from '../../../intl/localize';
 import {
   Select,
   SelectContent,

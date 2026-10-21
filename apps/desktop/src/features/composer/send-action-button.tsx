@@ -1,13 +1,12 @@
 import React from 'react';
-import {
-  localized,
-  ISendAction,
-  Actions,
-  SendActionsStore,
-  SoundRegistry,
-  Message,
-} from 'mailspring-exports';
-import { Menu, RetinaImg, ButtonDropdown } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import { ISendAction, SendActionsStore } from '../../data/stores/send-actions';
+import * as Actions from '../../data/actions';
+import SoundRegistry from '../../packages/sound-registry';
+import { Message } from '../../data/models/message';
+import { Menu } from '../../components/menu';
+import { RetinaImg } from '../../components/retina-img';
+import { ButtonDropdown } from '../../components/button-dropdown';
 
 interface SendActionButtonProps {
   tabIndex: number;

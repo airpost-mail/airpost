@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import { Actions } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
 import ComposeButton from '../../src/features/composer/compose-button';
 import ComposerHeaderActions from '../../src/features/composer/header-actions';
 import { QuotedTextControl } from '../../src/features/composer/quoted-text-control';

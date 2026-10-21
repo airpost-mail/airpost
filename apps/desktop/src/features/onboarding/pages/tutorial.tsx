@@ -1,4 +1,5 @@
-import { localized, React } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import React from 'react';
 import * as OnboardingActions from '../actions';
 import { Button } from '../../../components/kit/button';
 

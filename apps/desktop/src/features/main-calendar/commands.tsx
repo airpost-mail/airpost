@@ -1,6 +1,6 @@
 import React from 'react';
 import moment from 'moment';
-import { BindGlobalCommands } from 'mailspring-component-kit';
+import BindGlobalCommands from '../../components/bind-global-commands';
 import { CalendarView } from './constants';
 
 interface CalendarMenuCommandsProps {

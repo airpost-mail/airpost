@@ -1,14 +1,12 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
-import {
-  AccountStore,
-  Actions,
-  Account,
-  FolderSyncProgressStore,
-  OnlineStatusStore,
-  localized,
-} from 'mailspring-exports';
-import { SettingsPage, SettingsRow, SettingsSection } from 'mailspring-component-kit';
+import { AccountStore } from '../../../../data/stores/account';
+import * as Actions from '../../../../data/actions';
+import { Account } from '../../../../data/models/account';
+import FolderSyncProgressStore from '../../../../data/stores/folder-sync-progress';
+import OnlineStatusStore from '../../../../data/stores/online-status';
+import { localized } from '../../../../intl/localize';
+import { SettingsPage, SettingsRow, SettingsSection } from '../../../../components/settings';
 import PreferencesAccountList from './list';
 import PreferencesAccountDetails from './details';
 import {

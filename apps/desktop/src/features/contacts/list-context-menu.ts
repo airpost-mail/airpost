@@ -1,4 +1,5 @@
-import { localized, Contact } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { Contact } from '../../data/models/contact';
 import { Store } from './store';
 import { exportContactsToFile } from './files';
 import { showGPeopleReadonlyNotice } from './google-support';

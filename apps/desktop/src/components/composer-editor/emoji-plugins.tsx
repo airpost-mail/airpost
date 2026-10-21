@@ -1,6 +1,6 @@
 import React from 'react';
 import * as NodeEmoji from 'node-emoji';
-import { Actions } from 'mailspring-exports';
+import * as Actions from '../../data/actions';
 import { Editor, Mark } from 'slate';
 import {
   Rule,

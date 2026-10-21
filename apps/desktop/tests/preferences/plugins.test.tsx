@@ -74,7 +74,7 @@ describe('Preferences > Plugins', function () {
       path.join(pkg, 'package.json'),
       JSON.stringify({
         name: SERVICE,
-        engines: { mailspring: '^1.27.0' },
+        engines: { tern: '^1.27.0' },
         tern: { service: { bin: 'bin/svc', args: ['--quiet'] } },
       })
     );

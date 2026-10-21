@@ -1,13 +1,11 @@
-import {
-  ChangeFolderTask,
-  ChangeLabelsTask,
-  SyncbackEventTask,
-  CategoryStore,
-  Thread,
-  Folder,
-  Label,
-  Event as EventModel,
-} from 'mailspring-exports';
+import { ChangeFolderTask } from '../../src/data/tasks/change-folder';
+import { ChangeLabelsTask } from '../../src/data/tasks/change-labels';
+import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
+import CategoryStore from '../../src/data/stores/category';
+import { Thread } from '../../src/data/models/thread';
+import { Folder } from '../../src/data/models/folder';
+import { Label } from '../../src/data/models/label';
+import { Event as EventModel } from '../../src/data/models/event';
 import { parseICSString } from '../../src/data/calendar/ics';
 
 // ---------------------------------------------------------------------------

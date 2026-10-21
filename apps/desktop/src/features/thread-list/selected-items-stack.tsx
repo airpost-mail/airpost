@@ -1,7 +1,7 @@
 import _ from 'underscore';
 import React, { Component } from 'react';
-import { ListensToObservable } from 'mailspring-component-kit';
-import { localized } from 'mailspring-exports';
+import ListensToObservable from '../../components/decorators/listens-to-observable';
+import { localized } from '../../intl/localize';
 import { Button } from '../../components/kit/button';
 import ThreadListStore from './store';
 

@@ -1,12 +1,10 @@
-import {
-  AccountStore,
-  CategoryStore,
-  ChangeFolderTask,
-  ChangeLabelsTask,
-  Folder,
-  Label,
-  Thread,
-} from 'mailspring-exports';
+import { AccountStore } from '../../src/data/stores/account';
+import CategoryStore from '../../src/data/stores/category';
+import { ChangeFolderTask } from '../../src/data/tasks/change-folder';
+import { ChangeLabelsTask } from '../../src/data/tasks/change-labels';
+import { Folder } from '../../src/data/models/folder';
+import { Label } from '../../src/data/models/label';
+import { Thread } from '../../src/data/models/thread';
 import SearchMailboxPerspective from '../../src/features/thread-search/mailbox-perspective';
 
 describe('SearchMailboxPerspective', function searchMailboxPerspective() {
@@ -32,9 +30,8 @@ describe('SearchMailboxPerspective', function searchMailboxPerspective() {
       expect(task.labelsToAdd).toEqual([]);
       expect(task.labelsToRemove).toEqual([inboxCategory]);
 
-      // Regression test for MAILSPRING-CLIENT-AC: willBeQueued() previously threw
-      // "Assertion Failure: ChangeLabelsTask requires labelsToAdd" because labelsToAdd
-      // was never passed to the task and so was `undefined`, not `[]`.
+      // willBeQueued() throws "Assertion Failure: ChangeLabelsTask requires labelsToAdd"
+      // when labelsToAdd is `undefined` rather than `[]`.
       expect(() => task.willBeQueued()).not.toThrow();
     });
 

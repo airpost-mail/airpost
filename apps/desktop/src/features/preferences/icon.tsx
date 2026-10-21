@@ -1,5 +1,5 @@
 import React from 'react';
-import { RetinaImg } from 'mailspring-component-kit';
+import { RetinaImg } from '../../components/retina-img';
 
 // Built-in tabs draw a white line glyph on a coloured tile. Plugin tabs keep their
 // `icon-preferences-<tabId>.png`, the convention plugins already ship.

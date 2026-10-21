@@ -1,4 +1,4 @@
-import { Utils } from 'mailspring-exports';
+import * as Utils from '../data/models/utils';
 import React from 'react';
 
 type FlexboxProps = {

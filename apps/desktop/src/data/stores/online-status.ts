@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import { ipcRenderer } from 'electron';
 import _ from 'underscore';
 
@@ -77,7 +77,7 @@ class OnlineStatusStore extends BaseStore {
   };
 
   onMayBeOnline = _.throttle(() => {
-    AppEnv.mailsyncBridge.sendSyncMailNow();
+    AppEnv.engineBridge.sendSyncMailNow();
   }, 3000);
 }
 

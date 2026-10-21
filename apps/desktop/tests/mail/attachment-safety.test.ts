@@ -3,7 +3,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import * as AttachmentSafety from '../../src/mail/attachment-safety';
-import { AttachmentStore, File } from 'mailspring-exports';
+import AttachmentStore from '../../src/data/stores/attachment';
+import { File } from '../../src/data/models/file';
 
 const {
   executableExtension,

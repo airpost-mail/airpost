@@ -22,15 +22,15 @@ class SoundRegistry {
     if (typeof src === 'string') {
       // Only package-asset URLs play; there is no bundled sounds directory to resolve a
       // bare filename against.
-      if (src.indexOf('mailspring://') !== 0) return;
+      if (!/^(tern-asset|mailspring):\/\//.test(src)) return;
       a.src = src;
     } else if (src instanceof Array) {
       const args = [resourcePath].concat(src);
       a.src = path.join.apply(this, args);
     }
     a.autoplay = true;
-    // play() rejects on every call when the platform can't decode the file
-    // (MAILSPRING-CLIENT-HF). A missed sound effect isn't worth reporting.
+    // play() rejects on every call when the platform can't decode the file. A missed sound
+    // effect isn't worth reporting.
     a.play().catch((err) => {
       console.warn(`SoundRegistry: Could not play ${name}: ${err.message}`);
     });

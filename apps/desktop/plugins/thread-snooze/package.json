@@ -12,7 +12,7 @@
     "default": true
   },
   "engines": {
-    "mailspring": "*"
+    "tern": "*"
   },
   "license": "GPL-3.0-only"
 }

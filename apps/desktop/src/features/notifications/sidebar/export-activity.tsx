@@ -1,5 +1,8 @@
 import React from 'react';
-import { localized, Utils, Actions, GetManyRFC2822Task } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import * as Utils from '../../../data/models/utils';
+import * as Actions from '../../../data/actions';
+import { GetManyRFC2822Task } from '../../../data/tasks/get-many-rfc2822';
 
 export class ExportActivity extends React.Component<{ tasks: any[] }> {
   shouldComponentUpdate(nextProps: { tasks: any[] }, nextState: Record<string, never>) {

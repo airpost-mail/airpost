@@ -1,6 +1,8 @@
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import React from 'react';
-import { AccountStore, Account, Actions } from 'mailspring-exports';
+import { AccountStore } from '../../src/data/stores/account';
+import { Account } from '../../src/data/models/account';
+import * as Actions from '../../src/data/actions';
 import { ipcRenderer } from 'electron';
 import AccountErrorNotification from '../../src/features/notifications/items/account-error';
 
@@ -25,10 +27,10 @@ describe('AccountErrorNotif', function AccountErrorNotifTests() {
     });
 
     it('allows the user to refresh the account', () => {
-      spyOn(AppEnv.mailsyncBridge, 'forceRelaunchClient').andReturn(Promise.resolve());
+      spyOn(AppEnv.engineBridge, 'forceRelaunchClient').andReturn(Promise.resolve());
       const { container } = render(<AccountErrorNotification />);
       fireEvent.click(container.querySelector('#action-0'));
-      expect(AppEnv.mailsyncBridge.forceRelaunchClient).toHaveBeenCalled();
+      expect(AppEnv.engineBridge.forceRelaunchClient).toHaveBeenCalled();
     });
 
     it('allows the user to reconnect the account', () => {
@@ -69,10 +71,10 @@ describe('AccountErrorNotif', function AccountErrorNotifTests() {
     });
 
     it('allows the user to refresh the accounts', () => {
-      spyOn(AppEnv.mailsyncBridge, 'forceRelaunchClient').andReturn(Promise.resolve());
+      spyOn(AppEnv.engineBridge, 'forceRelaunchClient').andReturn(Promise.resolve());
       const { container } = render(<AccountErrorNotification />);
       fireEvent.click(container.querySelector('#action-0'));
-      expect(AppEnv.mailsyncBridge.forceRelaunchClient).toHaveBeenCalled();
+      expect(AppEnv.engineBridge.forceRelaunchClient).toHaveBeenCalled();
     });
 
     it('allows the user to open preferences', () => {

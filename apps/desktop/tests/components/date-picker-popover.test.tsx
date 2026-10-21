@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import { DateUtils } from 'mailspring-exports';
-import { DatePickerPopover } from 'mailspring-component-kit';
+import DateUtils from '../../src/utils/date';
+import DatePickerPopover from '../../src/components/date-picker-popover';
 
 const makePopover = (props = {}) => {
   return render(

@@ -4,8 +4,9 @@ import path from 'path';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import TestRenderer, { act } from 'react-test-renderer';
-import { AccountStore, CategoryStore } from 'mailspring-exports';
-import { SettingsSwitch } from 'mailspring-component-kit';
+import { AccountStore } from '../../src/data/stores/account';
+import CategoryStore from '../../src/data/stores/category';
+import { SettingsSwitch } from '../../src/components/settings';
 
 import { McpSection } from '../../src/features/preferences/tabs/mcp/section';
 import { SettingsSelect } from '../../src/components/settings-select';
@@ -354,7 +355,7 @@ describe('Preferences > Agents', function () {
       if (noBinary()) return;
       fs.writeFileSync(
         claudeDesktop,
-        JSON.stringify({ mcpServers: { mailspring: { command: '/Applications/Mailspring.app' } } })
+        JSON.stringify({ mcpServers: { other: { command: '/usr/local/bin/other-mcp' } } })
       );
       const renderer = await renderWithFiles();
       await act(async () => {
@@ -363,7 +364,7 @@ describe('Preferences > Agents', function () {
       const servers = readJSON(claudeDesktop).mcpServers;
       expect(servers.tern.args).toEqual(['--config-dir', dir]);
       expect(path.basename(servers.tern.command)).toBe('tern-mcp');
-      expect(servers.mailspring).toEqual({ command: '/Applications/Mailspring.app' });
+      expect(servers.other).toEqual({ command: '/usr/local/bin/other-mcp' });
       expect(section(renderer).state.results['claude-desktop'].ok).toBe(true);
 
       await act(async () => {

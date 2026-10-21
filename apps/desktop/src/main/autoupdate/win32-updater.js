@@ -27,8 +27,8 @@ const path = require('path');
 const os = require('os');
 const { shell } = require('electron');
 
-// Windows identity, shared with main.js. The toast activator CLSID is Tern's own: reusing
-// Mailspring's would point its COM registration at whichever app registered last.
+// Windows identity, shared with main.js. The toast activator CLSID is Tern's own, so its COM
+// registration doesn't collide with Mailspring.app's when both are installed.
 const APP_USER_MODEL_ID = 'com.ternmail.tern';
 const TOAST_ACTIVATOR_CLSID = '{F4C2EDE9-B070-46C4-98C2-6B1A53639196}';
 

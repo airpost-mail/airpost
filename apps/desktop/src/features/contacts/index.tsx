@@ -1,10 +1,8 @@
-import {
-  WorkspaceStore,
-  ComponentRegistry,
-  Actions,
-  AccountStore,
-  localized,
-} from 'mailspring-exports';
+import WorkspaceStore from '../../data/stores/workspace';
+import ComponentRegistry from '../../packages/component-registry';
+import * as Actions from '../../data/actions';
+import { AccountStore } from '../../data/stores/account';
+import { localized } from '../../intl/localize';
 import { ContactPerspectivesList } from './perspectives-list';
 import { ContactDetailToolbar } from './detail-toolbar';
 import { AddContactToolbar } from './add-contact-toolbar';

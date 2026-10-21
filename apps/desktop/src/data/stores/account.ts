@@ -2,7 +2,7 @@
 
 import _ from 'underscore';
 
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import KeyManager from '../../window/key-manager';
 import { revokeOAuthGrant } from '../../engine/client/oauth-revocation';
 import * as EngineAccounts from '../../engine/client/accounts';
@@ -328,7 +328,7 @@ export class _AccountStore extends BaseStore {
       KeyManager.deleteAccountSecrets(account);
     } else {
       // Clear the cached data for the account and reset secrets once that has completed
-      AppEnv.mailsyncBridge
+      AppEnv.engineBridge
         .resetCacheForAccount(account, { silent: true, keepMetadata: false })
         .then(() => {
           console.log('Account removal complete.');

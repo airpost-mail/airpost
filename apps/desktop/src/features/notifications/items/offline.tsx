@@ -1,6 +1,9 @@
 import React from 'react';
-import { localized, Actions, AccountStore, OnlineStatusStore } from 'mailspring-exports';
-import { ListensToFluxStore } from 'mailspring-component-kit';
+import { localized } from '../../../intl/localize';
+import * as Actions from '../../../data/actions';
+import { AccountStore } from '../../../data/stores/account';
+import OnlineStatusStore from '../../../data/stores/online-status';
+import ListensToFluxStore from '../../../components/decorators/listens-to-flux-store';
 
 // Losing the network (usually a sleeping laptop) is expected and resolves on its own,
 // so this is a quiet status line rather than a prominent Notification. Problems the user
@@ -39,7 +42,7 @@ function OfflineNotification({
       </span>
       <span
         className="offline-indicator-retry"
-        onClick={() => AppEnv.mailsyncBridge.sendSyncMailNow()}
+        onClick={() => AppEnv.engineBridge.sendSyncMailNow()}
       >
         {localized('Try now')}
       </span>

@@ -4,7 +4,7 @@ import moment from 'moment';
 import { formatTime, hourCycle } from '../intl/date-format';
 import { localized } from '../intl/localize';
 import classnames from 'classnames';
-import { TabGroupContext } from 'mailspring-component-kit';
+import { TabGroupContext } from './tab-group-region';
 import { TextField } from './kit/text-field';
 
 const INTERVAL_MINUTES = 30;

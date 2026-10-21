@@ -1,5 +1,5 @@
 import * as Immutable from 'immutable';
-import BaseStore from 'mailspring-store';
+import BaseStore from '../stores/base';
 import { Editor, Value, Block, Text } from 'slate';
 
 import RegExpUtils from '../../utils/regexp';

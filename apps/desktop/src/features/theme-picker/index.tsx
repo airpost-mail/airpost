@@ -1,5 +1,6 @@
 import React from 'react';
-import { Actions, WorkspaceStore } from 'mailspring-exports';
+import * as Actions from '../../data/actions';
+import WorkspaceStore from '../../data/stores/workspace';
 
 import ThemePicker from './theme-picker';
 

@@ -2,15 +2,14 @@ import fs from 'fs';
 import { escapeHTML } from 'underscore.string';
 
 import React from 'react';
-import {
-  Utils,
-  MessageUtils,
-  MessageBodyProcessor,
-  QuotedHTMLTransformer,
-  AttachmentStore,
-  Message,
-} from 'mailspring-exports';
-import { InjectedComponentSet, RetinaImg } from 'mailspring-component-kit';
+import * as Utils from '../../data/models/utils';
+import MessageUtils from '../../data/models/message-utils';
+import MessageBodyProcessor from '../../mail/body/processor';
+import QuotedHTMLTransformer from '../../mail/body/quoted-html-transformer';
+import AttachmentStore from '../../data/stores/attachment';
+import { Message } from '../../data/models/message';
+import { InjectedComponentSet } from '../../components/injected/component-set';
+import { RetinaImg } from '../../components/retina-img';
 
 import EmailFrame from './email-frame';
 import {
@@ -24,7 +23,7 @@ const TransparentPixel =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNikAQAACIAHF/uBd8AAAAASUVORK5CYII=';
 
 const SpinnerImg =
-  '<img alt="spinner.gif" src="mailspring://message-list/assets/spinner.gif" style="-webkit-user-drag: none;">';
+  '<img alt="spinner.gif" src="tern-asset://message-list/assets/spinner.gif" style="-webkit-user-drag: none;">';
 
 class ConditionalQuotedTextControl extends React.Component<{ body: string; onClick?: () => void }> {
   static displayName = 'ConditionalQuotedTextControl';

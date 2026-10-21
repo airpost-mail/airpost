@@ -82,8 +82,11 @@ export class Category extends Model {
         return decoded.substr(prefix.length + 1); // + delimiter
       }
     }
-    if (decoded.startsWith('Mailspring/') || decoded.startsWith('Mailspring.')) {
-      return decoded.substr(11);
+    // Tern's default container folder and the one Mailspring created.
+    for (const prefix of ['Tern/', 'Tern.', 'Mailspring/', 'Mailspring.']) {
+      if (decoded.startsWith(prefix)) {
+        return decoded.substr(prefix.length);
+      }
     }
     if (decoded === 'INBOX') {
       return 'Inbox';

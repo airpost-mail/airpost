@@ -11,13 +11,7 @@ Section: Database
 */
 export class AttributeString extends Attribute {
   // `null` is omitted rather than serialized, so that null and absent mean the same
-  // thing to mailsync. The engine guards optional string fields with nlohmann
-  // `count()`, which reports a key as present when its value is `null`, and then
-  // reads it with `get<string>()` - so `"key": null` slips past the guard and throws
-  // `json::type_error`. Draft JSON is even more sensitive: `inflateClientDraftJSON`
-  // fills in defaults with nlohmann's object `insert`, which does not overwrite keys
-  // that are already present, so a null would survive into an unguarded read.
-  // Foundry376/Mailspring-Sync#143 keeps such a task from killing the engine.
+  // thing to the engine.
   toJSON(val: string | null): string | undefined {
     return val === null ? undefined : val;
   }

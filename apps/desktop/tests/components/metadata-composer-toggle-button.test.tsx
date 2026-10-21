@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { findRenderedDOMComponentWithTag, Simulate } from 'react-dom/test-utils';
-import { Message } from 'mailspring-exports';
+import { Message } from '../../src/data/models/message';
 
 import MetadataComposerToggleButton from '../../src/components/metadata-composer-toggle-button';
 import MTestUtils from '../support/test-utils';

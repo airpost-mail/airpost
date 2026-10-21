@@ -8,8 +8,10 @@ import { MessageFrameOrigin, MessageFrameScriptURL } from './frame/protocol';
 // connect-src lists the hosts the renderer fetches itself. Requests to hosts that depend on
 // user data (autoconfig, one-click unsubscribe, saving a remote image) go through
 // ExternalFetch in the main process instead.
+// Package assets are tern-asset: URLs; mailspring: is the v1 plugin API name of that scheme.
 const ConnectSources = [
   "'self'",
+  'tern-asset:',
   'mailspring:',
   'https://www.googleapis.com', // Gmail token exchange and userinfo
   'https://oauth2.googleapis.com', // Google token revocation
@@ -19,17 +21,17 @@ const ConnectSources = [
 
 export const AppContentSecurityPolicy =
   [
-    "default-src 'self' mailspring:",
+    "default-src 'self' tern-asset: mailspring:",
     "script-src 'self'",
-    "style-src * 'unsafe-inline' mailspring:",
-    `img-src * data: mailspring: file: ${FilesScheme}:`,
-    'font-src * data: mailspring:',
+    "style-src * 'unsafe-inline' tern-asset: mailspring:",
+    `img-src * data: tern-asset: mailspring: file: ${FilesScheme}:`,
+    'font-src * data: tern-asset: mailspring:',
     `connect-src ${ConnectSources.join(' ')}`,
     // Message bodies render in the sandboxed message frame (src/mail/frame). Other
     // frames are src-less about:blank ones, which frame-src doesn't govern.
     `frame-src ${MessageFrameOrigin}`,
     "object-src 'none'",
-    'media-src mailspring:',
+    'media-src tern-asset: mailspring:',
     "manifest-src 'none'",
   ].join('; ') + ';';
 
@@ -49,8 +51,8 @@ export function messageContentSecurityPolicy({ remoteImages }: { remoteImages: b
   return [
     "default-src 'none'",
     "style-src 'unsafe-inline'",
-    `img-src data: mailspring: ${FilesScheme}:${remote}`,
-    `font-src data: mailspring:${remote}`,
+    `img-src data: tern-asset: mailspring: ${FilesScheme}:${remote}`,
+    `font-src data: tern-asset: mailspring:${remote}`,
     "form-action 'none'",
   ].join('; ');
 }
@@ -73,9 +75,9 @@ export function printContentSecurityPolicy({ remoteImages }: { remoteImages: boo
   return [
     "default-src 'none'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline' mailspring:",
-    `img-src data: mailspring: ${FilesScheme}:${remote}`,
-    `font-src data: mailspring:${remote}`,
+    "style-src 'self' 'unsafe-inline' tern-asset: mailspring:",
+    `img-src data: tern-asset: mailspring: ${FilesScheme}:${remote}`,
+    `font-src data: tern-asset: mailspring:${remote}`,
     "form-action 'none'",
   ].join('; ');
 }

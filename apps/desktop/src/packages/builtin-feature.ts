@@ -20,7 +20,7 @@ export default class BuiltinFeature extends Package {
       name,
       syncInit: !!manifest.syncInit,
       windowTypes: manifest.windowTypes,
-      engines: { mailspring: '*' },
+      engines: { tern: '*' },
     });
     this.manifest = manifest;
   }

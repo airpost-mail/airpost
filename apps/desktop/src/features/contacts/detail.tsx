@@ -1,7 +1,12 @@
 import React from 'react';
-import { Contact, localized, AccountStore, ContactGroup } from 'mailspring-exports';
+import { Contact } from '../../data/models/contact';
+import { localized } from '../../intl/localize';
+import { AccountStore } from '../../data/stores/account';
+import { ContactGroup } from '../../data/models/contact-group';
 import { isEqual } from 'underscore';
-import { FocusContainer, ListensToFluxStore, ScrollRegion } from 'mailspring-component-kit';
+import FocusContainer from '../../components/focus-container';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import { ScrollRegion } from '../../components/scroll-region';
 import { ContactBase, ContactInteractorMetadata } from './types';
 import { ContactDetailRead } from './detail-read';
 import { ContactDetailEdit } from './detail-edit';

@@ -3,7 +3,9 @@ import * as Attributes from '../attributes';
 import { Event } from '../models/event';
 import { AttributeValues } from '../models/model';
 import { localized } from '../../intl/localize';
-import { DatabaseChangeRecord, DatabaseStore, ICSParticipantStatus } from 'mailspring-exports';
+import { DatabaseChangeRecord } from '../database/change-record';
+import DatabaseStore from '../database/store';
+import { ICSParticipantStatus } from '../calendar/ics';
 import { answerEvent } from '../../engine/client/pim';
 import { localTimeZone } from '../../engine/client/drafts';
 
@@ -212,7 +214,7 @@ export class SyncbackEventTask extends Task {
   // The engine's read-back after the PUT (DAVWorker::writeAndResyncEvent) updates only this row.
   // A series' exception rows, and any exception this write added, arrive with the next full sync.
   async onSuccess() {
-    AppEnv.mailsyncBridge.sendSyncCalendarNow(this.accountId);
+    AppEnv.engineBridge.sendSyncCalendarNow(this.accountId);
   }
 
   // Keys from TaskProcessor::perform{Local,Remote}SyncbackEvent and DAVWorker::writeAndResyncEvent.
@@ -280,7 +282,7 @@ export class SyncbackEventTask extends Task {
         const stored = record.objects.find((e) => e.id === this.event.id);
         if (stored) finish(stored);
       });
-      AppEnv.mailsyncBridge.sendSyncCalendarNow(this.accountId);
+      AppEnv.engineBridge.sendSyncCalendarNow(this.accountId);
     });
   }
 }

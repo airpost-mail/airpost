@@ -1,17 +1,15 @@
 import React from 'react';
+import * as Actions from '../../../data/actions';
+import { localized, localizedReactFragment } from '../../../intl/localize';
+import KeyManager from '../../../window/key-manager';
+import { CapabilityStore, CapabilityFeature } from '../../../data/stores/capability';
 import {
-  Actions,
-  localized,
-  localizedReactFragment,
-  KeyManager,
-  CapabilityStore,
-  CapabilityFeature,
   Integrations,
   IntegrationKind,
   IntegrationProvider,
   IntegrationSettings,
   ProviderConfig,
-} from 'mailspring-exports';
+} from '../../../engine/client/integrations';
 import {
   SettingsPage,
   SettingsSection,
@@ -22,7 +20,7 @@ import {
   ProviderCard,
   ProviderLogo,
   PrivacyNote,
-} from 'mailspring-component-kit';
+} from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 import { TextField } from '../../../components/kit/text-field';
 import { SettingsSelect } from '../../../components/settings-select';

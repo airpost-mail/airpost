@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { DatabaseStore, Event } from 'mailspring-exports';
+import DatabaseStore from '../../src/data/database/store';
+import { Event } from '../../src/data/models/event';
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { CalendarEvent } from '../../src/features/main-calendar/event/event';
 import { MonthViewEvent } from '../../src/features/main-calendar/views/month-event';

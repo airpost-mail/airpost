@@ -1,6 +1,6 @@
 import _ from 'underscore';
 import Rx from 'rx-lite';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 
 import * as Utils from '../models/utils';
 import { Thread } from '../models/thread';

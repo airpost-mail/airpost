@@ -1,12 +1,12 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
 import {
   SettingsPage,
   SettingsSection,
   ConfigSwitchRow,
   ConfigSelectRow,
   ConfigSegmentedRow,
-} from 'mailspring-component-kit';
+} from '../../../components/settings';
 
 export default function PreferencesReading() {
   return (

@@ -8,7 +8,7 @@
 // so toolbar buttons, message headers and composer extensions register in the same order as
 // when the features were packages.
 //
-// `dir` is also the `mailspring://<dir>/…` asset host, so it must not change. `name` is the
+// `dir` is also the `tern-asset://<dir>/…` asset host, so it must not change. `name` is the
 // name the feature has in AppEnv.packages (defaults to `dir`). `load` stays a lazy require:
 // many feature modules have import-time side effects that only belong in the windows that
 // activate them.

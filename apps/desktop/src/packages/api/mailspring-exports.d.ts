@@ -9,7 +9,7 @@ export const getAvailableLanguages: getAvailableLanguages;
 export type isRTL = typeof import('../../intl/localize').isRTL;
 export const isRTL: isRTL;
 
-/** The plugin API version, matched as semver against a plugin's `engines.mailspring`. */
+/** The plugin API version, matched as semver against a plugin's `engines.tern`. */
 export const apiVersion: string;
 
 // Actions
@@ -18,6 +18,10 @@ export const Actions: Actions;
 
 // Sync engine
 export * from '../../engine/process';
+export {
+  EngineProcess as MailsyncProcess,
+  type EngineProcessExit as MailsyncProcessExit,
+} from '../../engine/process';
 
 // The Database
 export * from '../../data/attributes/matcher';
@@ -82,7 +86,6 @@ export * from '../../data/tasks/get-message-rfc2822';
 export * from '../../data/tasks/get-many-rfc2822';
 export * from '../../data/tasks/expunge-all-in-folder';
 export * from '../../data/tasks/change-role-mapping';
-export * from '../../data/tasks/send-feature-usage-event';
 export * from '../../data/tasks/syncback-contact';
 export * from '../../data/tasks/destroy-contact';
 export * from '../../data/tasks/destroy-contactgroup';

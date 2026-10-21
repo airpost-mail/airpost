@@ -2,7 +2,7 @@ import React from 'react';
 import { ipcRenderer } from 'electron';
 import ReactDOM from 'react-dom';
 import { renderIntoDocument, Simulate } from 'react-dom/test-utils';
-import { Account } from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
 import { AccountIMAPSettingsForm } from '../../src/features/onboarding/pages/account-settings-imap';
 import { getPortalContainer } from '../../src/components/kit/portal';
 

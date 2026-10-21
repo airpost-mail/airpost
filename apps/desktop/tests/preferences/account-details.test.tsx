@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderIntoDocument } from 'react-dom/test-utils';
-import { Account } from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
 
 import PreferencesAccountDetails from '../../src/features/preferences/tabs/accounts/details';
 
@@ -11,7 +11,7 @@ const makeComponent = (props: any = {}) => {
 const account = new Account({
   id: 1,
   name: 'someone',
-  emailAddress: 'someone@nylas.com',
+  emailAddress: 'someone@example.com',
   aliases: [],
   defaultAlias: null,
 });
@@ -33,27 +33,27 @@ describe('PreferencesAccountDetails', function preferencesAccountDetails() {
   describe('_makeAlias', () => {
     it('returns correct alias when empty string provided', () => {
       const alias = this.component._makeAlias('', this.account);
-      expect(alias).toEqual('someone <someone@nylas.com>');
+      expect(alias).toEqual('someone <someone@example.com>');
     });
 
     it('returns correct alias when only the name provided', () => {
       const alias = this.component._makeAlias('Chad', this.account);
-      expect(alias).toEqual('Chad <someone@nylas.com>');
+      expect(alias).toEqual('Chad <someone@example.com>');
     });
 
     it('returns correct alias when email provided', () => {
-      const alias = this.component._makeAlias('keith@nylas.com', this.account);
-      expect(alias).toEqual('someone <keith@nylas.com>');
+      const alias = this.component._makeAlias('keith@example.com', this.account);
+      expect(alias).toEqual('someone <keith@example.com>');
     });
 
     it('returns correct alias if name and email provided', () => {
-      const alias = this.component._makeAlias('Donald donald@nylas.com', this.account);
-      expect(alias).toEqual('Donald <donald@nylas.com>');
+      const alias = this.component._makeAlias('Donald donald@example.com', this.account);
+      expect(alias).toEqual('Donald <donald@example.com>');
     });
 
     it('returns correct alias if alias provided', () => {
-      const alias = this.component._makeAlias('Donald <donald@nylas.com>', this.account);
-      expect(alias).toEqual('Donald <donald@nylas.com>');
+      const alias = this.component._makeAlias('Donald <donald@example.com>', this.account);
+      expect(alias).toEqual('Donald <donald@example.com>');
     });
   });
 
@@ -78,8 +78,8 @@ describe('PreferencesAccountDetails', function preferencesAccountDetails() {
 
   describe('alias handlers', () => {
     beforeEach(() => {
-      this.currentAlias = 'juan <blah@nylas>';
-      this.newAlias = 'some <alias@nylas.com>';
+      this.currentAlias = 'juan <blah@example>';
+      this.newAlias = 'some <alias@example.com>';
       this.account.aliases = [this.currentAlias];
       this.component = makeComponent({
         account: this.account,

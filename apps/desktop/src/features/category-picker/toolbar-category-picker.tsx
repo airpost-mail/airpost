@@ -1,13 +1,12 @@
 import React, { useContext, useMemo, useRef, useCallback } from 'react';
-import {
-  localized,
-  Actions,
-  AccountStore,
-  WorkspaceStore,
-  SheetDepthContext,
-  Thread,
-} from 'mailspring-exports';
-import { KeyCommandsRegion, RovingTabIndexToolbar } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { AccountStore } from '../../data/stores/account';
+import WorkspaceStore from '../../data/stores/workspace';
+import { SheetDepthContext } from '../../components/sheets/context';
+import { Thread } from '../../data/models/thread';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
+import { RovingTabIndexToolbar } from '../../components/roving-tab-index-toolbar';
 import { IconButton } from '../../components/kit/icon-button';
 
 import MovePickerPopover from './move-picker-popover';

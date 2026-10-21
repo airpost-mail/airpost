@@ -1,5 +1,5 @@
-import { Categories } from 'mailspring-observables';
-import BaseStore from 'mailspring-store';
+import { Categories } from '../query/observables';
+import BaseStore from './base';
 import { AccountStore } from './account';
 import { Account } from '../models/account';
 import { Category } from '../models/category';

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Actions, localized } from 'mailspring-exports';
+import * as Actions from '../../../data/actions';
+import { localized } from '../../../intl/localize';
 import { Button } from '../../../components/kit/button';
 
 export function CalendarEmptyState() {

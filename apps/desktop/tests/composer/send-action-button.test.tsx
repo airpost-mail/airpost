@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import { Actions, Message, SendActionsStore } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Message } from '../../src/data/models/message';
+import { SendActionsStore } from '../../src/data/stores/send-actions';
 import { SendActionButton } from '../../src/features/composer/send-action-button';
 
 const GoodSendAction = {

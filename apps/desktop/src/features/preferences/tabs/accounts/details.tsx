@@ -3,11 +3,13 @@ import fs from 'fs';
 import React, { Component } from 'react';
 import classnames from 'classnames';
 import { ipcRenderer } from 'electron';
-import { SettingsSection, SettingsRow, SettingsCard } from 'mailspring-component-kit';
+import { SettingsSection, SettingsRow, SettingsCard } from '../../../../components/settings';
 import { Button } from '../../../../components/kit/button';
 import { TextField } from '../../../../components/kit/text-field';
 import { SettingsSelect } from '../../../../components/settings-select';
-import { localized, RegExpUtils, Account, AccountAutoaddress } from 'mailspring-exports';
+import { localized } from '../../../../intl/localize';
+import RegExpUtils from '../../../../utils/regexp';
+import { Account, AccountAutoaddress } from '../../../../data/models/account';
 import { developerToolsAvailable } from '../../../../platform/developer-tools';
 
 /** One address the account sends from, shown as text until the user edits it. */
@@ -183,7 +185,7 @@ class PreferencesAccountDetails extends Component<
   };
 
   _onResetCache = () => {
-    AppEnv.mailsyncBridge.resetCacheForAccount(this.state.account);
+    AppEnv.engineBridge.resetCacheForAccount(this.state.account);
   };
 
   _onAddSharedMailbox = () => {
@@ -237,7 +239,7 @@ class PreferencesAccountDetails extends Component<
     );
 
     try {
-      const logs = await AppEnv.mailsyncBridge.tailClientLog(id);
+      const logs = await AppEnv.engineBridge.tailClientLog(id);
       const result = [
         `Tern Version: ${AppEnv.getVersion()}`,
         `Platform: ${process.platform}`,
@@ -332,7 +334,7 @@ class PreferencesAccountDetails extends Component<
           localized(
             'It will keep trying. Your computer may be offline, or your mail provider may be having trouble.'
           ),
-          { text: localized('Try now'), action: () => AppEnv.mailsyncBridge.sendSyncMailNow() }
+          { text: localized('Try now'), action: () => AppEnv.engineBridge.sendSyncMailNow() }
         );
     }
   }

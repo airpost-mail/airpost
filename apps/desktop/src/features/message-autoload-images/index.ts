@@ -1,4 +1,5 @@
-import { ComponentRegistry, ExtensionRegistry } from 'mailspring-exports';
+import ComponentRegistry from '../../packages/component-registry';
+import * as ExtensionRegistry from '../../packages/extension-registry';
 
 import AutoloadImagesExtension from './extension';
 import AutoloadImagesHeader from './header';

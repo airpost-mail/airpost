@@ -6,7 +6,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
-import { Actions } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
 
 import ThreadSearchBar from '../../src/features/thread-search/bar';
 

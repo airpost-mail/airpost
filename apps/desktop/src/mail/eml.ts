@@ -4,13 +4,11 @@ import path from 'path';
 import crypto from 'crypto';
 import _ from 'underscore';
 
-import {
-  Actions,
-  DatabaseStore,
-  Message,
-  TaskQueue,
-  GetMessageRFC2822Task,
-} from 'mailspring-exports';
+import * as Actions from '../data/actions';
+import DatabaseStore from '../data/database/store';
+import { Message } from '../data/models/message';
+import TaskQueue from '../data/stores/task-queue';
+import { GetMessageRFC2822Task } from '../data/tasks/get-message-rfc2822';
 
 /**
  * Generate a safe default .eml filename from a message subject.
@@ -69,8 +67,6 @@ export async function newestExportableMessagesForThreadIds(
 }
 
 const STAGING_DIR_PREFIX = 'tern-eml-';
-// Directories an older build staged under its own prefix are still ours to remove.
-const STAGING_DIR_PREFIXES = [STAGING_DIR_PREFIX, 'mailspring-eml-'];
 
 /**
  * Ask the sync engine for the raw RFC2822 source of each message and write it
@@ -167,7 +163,7 @@ function removeStagingDirectory(dir: string) {
   // Guard against deleting anything we didn't create ourselves — callers hand
   // us paths, and a wrong one shouldn't take a real directory with it.
   const name = path.basename(dir);
-  if (!STAGING_DIR_PREFIXES.some((prefix) => name.startsWith(prefix))) {
+  if (!name.startsWith(STAGING_DIR_PREFIX)) {
     return;
   }
   try {

@@ -108,13 +108,26 @@ describe('Content-Security-Policy', function () {
       const blocked = directives(messageContentSecurityPolicy({ remoteImages: false }));
       expect(blocked['default-src']).toEqual(["'none'"]);
       expect(blocked['style-src']).toEqual(["'unsafe-inline'"]);
-      expect(blocked['img-src']).toEqual(['data:', 'mailspring:', 'tern-file:']);
-      expect(blocked['font-src']).toEqual(['data:', 'mailspring:']);
+      expect(blocked['img-src']).toEqual(['data:', 'tern-asset:', 'mailspring:', 'tern-file:']);
+      expect(blocked['font-src']).toEqual(['data:', 'tern-asset:', 'mailspring:']);
       expect(blocked['form-action']).toEqual(["'none'"]);
 
       const allowed = directives(messageContentSecurityPolicy({ remoteImages: true }));
-      expect(allowed['img-src']).toEqual(['data:', 'mailspring:', 'tern-file:', 'https:', 'http:']);
-      expect(allowed['font-src']).toEqual(['data:', 'mailspring:', 'https:', 'http:']);
+      expect(allowed['img-src']).toEqual([
+        'data:',
+        'tern-asset:',
+        'mailspring:',
+        'tern-file:',
+        'https:',
+        'http:',
+      ]);
+      expect(allowed['font-src']).toEqual([
+        'data:',
+        'tern-asset:',
+        'mailspring:',
+        'https:',
+        'http:',
+      ]);
       expect(allowed['default-src']).toEqual(["'none'"]);
     });
 

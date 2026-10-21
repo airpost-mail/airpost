@@ -1,6 +1,10 @@
 import React from 'react';
-import { Account, Contact, AccountStore, ContactGroup } from 'mailspring-exports';
-import { ContactProfilePhoto, RetinaImg } from 'mailspring-component-kit';
+import { Account } from '../../data/models/account';
+import { Contact } from '../../data/models/contact';
+import { AccountStore } from '../../data/stores/account';
+import { ContactGroup } from '../../data/models/contact-group';
+import { ContactProfilePhoto } from '../../components/contact-profile-photo';
+import { RetinaImg } from '../../components/retina-img';
 import * as Icons from './svg-icons';
 import { Button } from '../../components/kit/button';
 import { Store } from './store';

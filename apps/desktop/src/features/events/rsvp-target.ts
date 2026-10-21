@@ -1,4 +1,7 @@
-import { Calendar, CalendarUtils, Event, Utils } from 'mailspring-exports';
+import { Calendar } from '../../data/models/calendar';
+import * as CalendarUtils from '../../data/calendar/ics';
+import { Event } from '../../data/models/event';
+import * as Utils from '../../data/models/utils';
 import ICAL from 'ical.js';
 
 /** Where an RSVP will be recorded, once we're certain which copy of the event is ours. */

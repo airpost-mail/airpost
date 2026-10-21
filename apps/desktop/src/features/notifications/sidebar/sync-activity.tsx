@@ -1,5 +1,7 @@
 import React from 'react';
-import { localized, AccountStore, imapUtf7 } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import { AccountStore } from '../../../data/stores/account';
+import { imapUtf7 } from '../../../mail/imap-utf7';
 
 interface SyncActivityProps {
   syncState: {

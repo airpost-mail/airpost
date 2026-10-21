@@ -1,5 +1,7 @@
 import React from 'react';
-import { Account, localized, Actions } from 'mailspring-exports';
+import { Account } from '../../data/models/account';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
 import { ipcRenderer } from 'electron';
 import { IconButton } from '../../components/kit/icon-button';
 import * as AccountCommands from './account-commands';

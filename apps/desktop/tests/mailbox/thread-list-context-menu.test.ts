@@ -1,4 +1,9 @@
-import { Thread, Contact, Message, Account, AccountStore, DatabaseStore } from 'mailspring-exports';
+import { Thread } from '../../src/data/models/thread';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { Account } from '../../src/data/models/account';
+import { AccountStore } from '../../src/data/stores/account';
+import DatabaseStore from '../../src/data/database/store';
 import ThreadListContextMenu from '../../src/features/thread-list/context-menu';
 
 // Answers queries from an in-memory set of models, honouring where, order and limit.

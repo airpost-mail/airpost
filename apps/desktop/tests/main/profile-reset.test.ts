@@ -31,7 +31,7 @@ describe('resetProfileDirectory', function () {
     write(path.join(tern, 'packages', 'theme', 'package.json'), '{}');
     write(path.join(tern, 'run', 'engine.json'), '{"pid":1}');
     write(path.join(tern, 'Local Storage', 'leveldb', 'CURRENT'), 'ls');
-    write(path.join(tern, 'mailsync-abc.log'), 'log');
+    write(path.join(tern, 'engine-abc.log'), 'log');
     write(path.join(tern, 'SingletonLock'), 'lock');
     write(path.join(tern, 'lockfile'), 'lock');
     markTernProfile(tern);

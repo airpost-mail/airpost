@@ -1,4 +1,4 @@
-import { Utils } from 'mailspring-exports';
+import { escapeRegExp } from '../../utils/regexp';
 import { MAX_MATCHES, CHAR_THRESHOLD } from './constants';
 
 export default class UnifiedDOMParser {
@@ -99,7 +99,7 @@ export default class UnifiedDOMParser {
         const reText = matches[1];
         re = new RegExp(reText, 'ig');
       } else {
-        re = new RegExp(Utils.escapeRegExp(searchTerm), 'ig');
+        re = new RegExp(escapeRegExp(searchTerm), 'ig');
       }
     } catch (e) {
       return null;

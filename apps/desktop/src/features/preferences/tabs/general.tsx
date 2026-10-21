@@ -1,6 +1,6 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
-import { SettingsPage, SettingsSection, ConfigSwitchRow } from 'mailspring-component-kit';
+import { localized } from '../../../intl/localize';
+import { SettingsPage, SettingsSection, ConfigSwitchRow } from '../../../components/settings';
 import { DefaultMailClientRow, LaunchOnStartRow } from './startup-rows';
 import LanguageRow from './language-row';
 import { ConfigLike, ConfigSchemaLike } from '../types';

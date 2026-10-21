@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Message } from 'mailspring-exports';
+import { Message } from '../../src/data/models/message';
 import EmailFrame from '../../src/features/message-list/email-frame';
 import { messageFrameContentSecurityPolicy } from '../../src/mail/content-security-policy';
 import { messageFrameContent } from '../../src/mail/frame/bridge';

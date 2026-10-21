@@ -1,11 +1,9 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
-import {
-  localized,
-  ComponentRegistry,
-  WorkspaceStore,
-  FocusedPerspectiveStore,
-} from 'mailspring-exports';
+import { localized } from '../intl/localize';
+import ComponentRegistry from '../packages/component-registry';
+import WorkspaceStore from '../data/stores/workspace';
+import FocusedPerspectiveStore from '../data/stores/focused-perspective';
 import { RetinaImg } from './retina-img';
 import { InjectedComponentSet } from './injected/component-set';
 

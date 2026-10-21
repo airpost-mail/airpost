@@ -1,7 +1,8 @@
 import React from 'react';
 
-import { Flexbox, ScrollRegion } from 'mailspring-component-kit';
-import { localized } from 'mailspring-exports';
+import { Flexbox } from '../../components/flexbox';
+import { ScrollRegion } from '../../components/scroll-region';
+import { localized } from '../../intl/localize';
 import {
   AUTOMATIC_THEME_NAME,
   LIGHT_THEME_NAME,

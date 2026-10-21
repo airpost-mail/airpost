@@ -1,6 +1,9 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import { SelectableTableCell, SelectableTableRow, SelectableTable } from 'mailspring-component-kit';
+import SelectableTable, {
+  SelectableTableCell,
+  SelectableTableRow,
+} from '../../src/components/selectable-table';
 import {
   selection,
   cellProps,

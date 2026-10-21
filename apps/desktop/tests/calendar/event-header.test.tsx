@@ -5,21 +5,19 @@ import fs from 'fs';
 import moment from 'moment';
 import os from 'os';
 import path from 'path';
-import {
-  Account,
-  AccountStore,
-  Actions,
-  AttachmentStore,
-  Calendar,
-  Contact,
-  Event,
-  File,
-  Message,
-  Rx,
-  SyncbackEventTask,
-  Task,
-  Utils,
-} from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
+import { AccountStore } from '../../src/data/stores/account';
+import * as Actions from '../../src/data/actions';
+import AttachmentStore from '../../src/data/stores/attachment';
+import { Calendar } from '../../src/data/models/calendar';
+import { Contact } from '../../src/data/models/contact';
+import { Event } from '../../src/data/models/event';
+import { File } from '../../src/data/models/file';
+import { Message } from '../../src/data/models/message';
+import Rx from 'rx-lite';
+import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
+import { Task } from '../../src/data/tasks/task';
+import * as Utils from '../../src/data/models/utils';
 import { EventHeader, renderLocation } from '../../src/features/events/header';
 import type { EventConflictJSON, EventTimes } from '../../src/engine/protocol';
 import { fakePimEngine, refusal } from '../support/fake-pim-engine';

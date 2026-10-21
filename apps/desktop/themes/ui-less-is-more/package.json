@@ -7,7 +7,7 @@
   "description": "A minimal approach to email in Tern",
   "license": "MIT",
   "engines": {
-    "mailspring": "*"
+    "tern": "*"
   },
   "private": true
 }

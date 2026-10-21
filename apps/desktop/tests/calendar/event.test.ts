@@ -5,7 +5,7 @@ import {
   TimedOccurrence,
 } from '../../src/features/main-calendar/data-source';
 import moment from 'moment';
-import { CalendarDateUtils } from 'mailspring-exports';
+import * as CalendarDateUtils from '../../src/data/calendar/calendar-date';
 import { parseCalendarDate } from '../../src/data/calendar/calendar-date';
 
 // Fields _getDimensions never reads, but the occurrence type requires.

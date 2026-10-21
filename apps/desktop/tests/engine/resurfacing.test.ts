@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import { Actions, Message, SendDraftTask } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Message } from '../../src/data/models/message';
+import { SendDraftTask } from '../../src/data/tasks/send-draft';
 import { localizerFor } from '../../src/intl/localize';
 import { resurfacingBodies } from '../../src/engine/resurfacing';
 

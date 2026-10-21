@@ -1,6 +1,7 @@
 import React from 'react';
-import { FocusedContentStore, Actions } from 'mailspring-exports';
-import { FluxContainer } from 'mailspring-component-kit';
+import FocusedContentStore from '../data/stores/focused-content';
+import * as Actions from '../data/actions';
+import FluxContainer from './flux-container';
 
 type FocusContainerProps = {
   collection?: string;

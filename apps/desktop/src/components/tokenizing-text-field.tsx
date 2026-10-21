@@ -3,8 +3,10 @@ import _ from 'underscore';
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { localized, Utils, RegExpUtils } from 'mailspring-exports';
-import { Menu } from 'mailspring-component-kit';
+import { localized } from '../intl/localize';
+import * as Utils from '../data/models/utils';
+import RegExpUtils from '../utils/regexp';
+import { Menu } from './menu';
 
 import { IconButton } from './kit/icon-button';
 import { KeyCommandsRegion } from './key-commands-region';

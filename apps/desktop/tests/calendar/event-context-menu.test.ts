@@ -1,4 +1,4 @@
-import { AccountStore } from 'mailspring-exports';
+import { AccountStore } from '../../src/data/stores/account';
 import { CalendarEventContextMenu } from '../../src/features/main-calendar/event/context-menu';
 import {
   canRespondToEvent,

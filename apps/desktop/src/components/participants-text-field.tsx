@@ -1,17 +1,17 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
-import {
-  localized,
-  Utils,
-  Contact,
-  ContactStore,
-  RegExpUtils,
-  Message,
-  DraftEditingSession,
-  ContactGroup,
-  DatabaseStore,
-} from 'mailspring-exports';
-import { TokenizingTextField, Menu, InjectedComponentSet } from 'mailspring-component-kit';
+import { localized } from '../intl/localize';
+import * as Utils from '../data/models/utils';
+import { Contact } from '../data/models/contact';
+import ContactStore from '../data/stores/contact';
+import RegExpUtils from '../utils/regexp';
+import { Message } from '../data/models/message';
+import { DraftEditingSession } from '../data/drafts/editing-session';
+import { ContactGroup } from '../data/models/contact-group';
+import DatabaseStore from '../data/database/store';
+import { TokenizingTextField } from './tokenizing-text-field';
+import { Menu } from './menu';
+import { InjectedComponentSet } from './injected/component-set';
 
 const TokenRenderer = (props: { token: object }) => {
   const contact = props.token as Contact;

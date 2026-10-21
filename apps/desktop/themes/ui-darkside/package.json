@@ -8,7 +8,7 @@
   "description": "A customizable, dark sidebar theme for Tern.",
   "license": "MIT",
   "engines": {
-    "mailspring": "*"
+    "tern": "*"
   },
   "private": true
 }

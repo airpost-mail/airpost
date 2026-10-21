@@ -2,7 +2,8 @@ import React from 'react';
 import DraftStore from '../../data/drafts/store';
 import * as Actions from '../../data/actions';
 import * as Utils from '../../data/models/utils';
-import { Message, DraftEditingSession } from 'mailspring-exports';
+import { Message } from '../../data/models/message';
+import { DraftEditingSession } from '../../data/drafts/editing-session';
 
 interface InflatesDraftClientIdProps {
   headerMessageId: string;

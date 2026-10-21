@@ -1,6 +1,9 @@
 import React from 'react';
-import { localized, Actions, IAliasSet, ISignature, IDefaultSignatures } from 'mailspring-exports';
-import { MultiselectDropdown } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { IAliasSet } from '../../data/stores/account';
+import { ISignature, IDefaultSignatures } from '../../data/stores/signature';
+import MultiselectDropdown from '../../components/multiselect-dropdown';
 
 interface SignatureAccountDefaultPickerProps {
   defaults: IDefaultSignatures;

@@ -15,9 +15,7 @@ describe('SignaturePhotoPicker', function () {
   afterEach(() => cleanup());
 
   const renderPicker = (photoURL: string, onChange = jasmine.createSpy('onChange')) => {
-    const { container } = render(
-      <SignaturePhotoPicker data={{ photoURL }} resolvedURL={photoURL} onChange={onChange} />
-    );
+    const { container } = render(<SignaturePhotoPicker data={{ photoURL }} onChange={onChange} />);
     return { container, onChange, trigger: container.querySelector('#photoURL') as HTMLElement };
   };
 

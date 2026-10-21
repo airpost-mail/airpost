@@ -1,19 +1,17 @@
-import BaseStore from 'mailspring-store';
-import {
-  Rx,
-  Actions,
-  Message,
-  OutboxStore,
-  AccountStore,
-  MutableQueryResultSet,
-  MutableQuerySubscription,
-  ObservableListDataSource,
-  FocusedPerspectiveStore,
-  DatabaseStore,
-  QueryResultSet,
-  FocusedContentStore,
-} from 'mailspring-exports';
-import { ListTabular, ListDataSource } from 'mailspring-component-kit';
+import BaseStore from '../../data/stores/base';
+import Rx from 'rx-lite';
+import * as Actions from '../../data/actions';
+import { Message } from '../../data/models/message';
+import OutboxStore from '../../data/stores/outbox';
+import { AccountStore } from '../../data/stores/account';
+import { MutableQueryResultSet } from '../../data/query/mutable-result-set';
+import { MutableQuerySubscription } from '../../data/query/mutable-subscription';
+import { ObservableListDataSource } from '../../components/list/observable-data-source';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import DatabaseStore from '../../data/database/store';
+import { QueryResultSet } from '../../data/query/result-set';
+import FocusedContentStore from '../../data/stores/focused-content';
+import { ListTabular, ListDataSource } from '../../components/list/tabular';
 
 /*
 The preview follows the focused draft by headerMessageId, not by id: changing the From
@@ -101,7 +99,7 @@ class DraftListStore extends BaseStore {
   };
 
   // Editing the same draft in the preview and a popout makes the two sessions overwrite
-  // each other (Mailspring #2158), so the preview lets go of a draft that pops out.
+  // each other (Foundry376/Mailspring#2158), so the preview lets go of a draft that pops out.
   _onPopoutDraft = (headerMessageId: string) => {
     if (headerMessageId && headerMessageId === this._focusedHeaderMessageId) {
       Actions.setFocus({ collection: 'draft', item: null });

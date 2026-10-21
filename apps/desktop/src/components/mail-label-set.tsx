@@ -7,7 +7,7 @@ import { MailLabel } from './mail-label';
 import * as Actions from '../data/actions';
 import { ChangeLabelsTask } from '../data/tasks/change-labels';
 import { InjectedComponentSet } from './injected/component-set';
-import { Thread } from 'mailspring-exports';
+import { Thread } from '../data/models/thread';
 
 const LabelComponentCache = {};
 

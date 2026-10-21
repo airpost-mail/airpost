@@ -36,6 +36,6 @@ export class DestroyEventTask extends Task {
 
   // deleteEvent removes only this row; a deleted series' exception rows go with the next full sync.
   async onSuccess() {
-    AppEnv.mailsyncBridge.sendSyncCalendarNow(this.accountId);
+    AppEnv.engineBridge.sendSyncCalendarNow(this.accountId);
   }
 }

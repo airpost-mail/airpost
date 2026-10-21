@@ -1,4 +1,4 @@
-import { Account } from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
 import KeyManager from '../../src/window/key-manager';
 import { revokeOAuthGrant } from '../../src/engine/client/oauth-revocation';
 

@@ -1,6 +1,8 @@
-import { localized, AccountStore, Account } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { AccountStore } from '../../data/stores/account';
+import { Account } from '../../data/models/account';
 import { ipcRenderer } from 'electron';
-import BaseStore from 'mailspring-store';
+import BaseStore from '../../data/stores/base';
 
 import * as OnboardingActions from './actions';
 import { repairStoredSecurity } from './connection-security';

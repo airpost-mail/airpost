@@ -1,7 +1,10 @@
 import { shell, ipcRenderer } from 'electron';
 import React from 'react';
-import { localized, Account, AccountStore, Actions } from 'mailspring-exports';
-import { Notification } from 'mailspring-component-kit';
+import { localized } from '../../../intl/localize';
+import { Account } from '../../../data/models/account';
+import { AccountStore } from '../../../data/stores/account';
+import * as Actions from '../../../data/actions';
+import Notification from '../../../components/notification';
 
 export default class AccountErrorNotification extends React.Component<
   Record<string, unknown>,
@@ -63,7 +66,7 @@ export default class AccountErrorNotification extends React.Component<
     this.setState({ checking: true });
     this._checkingTimeout = setTimeout(() => this.setState({ checking: false }), 10000);
 
-    accounts.forEach((acct) => AppEnv.mailsyncBridge.forceRelaunchClient(acct));
+    accounts.forEach((acct) => AppEnv.engineBridge.forceRelaunchClient(acct));
   }
 
   render() {

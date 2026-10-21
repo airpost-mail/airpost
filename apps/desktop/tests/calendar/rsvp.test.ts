@@ -1,6 +1,9 @@
 // The calendar's answers and counter-proposals go to the engine (events.rsvp), which builds the
 // PARTSTAT edit, the REPLY and the COUNTER (crates/tern-pim plan.rs and its tests).
-import { AccountStore, Actions, DatabaseStore, Event } from 'mailspring-exports';
+import { AccountStore } from '../../src/data/stores/account';
+import * as Actions from '../../src/data/actions';
+import DatabaseStore from '../../src/data/database/store';
+import { Event } from '../../src/data/models/event';
 import {
   occurrenceSlot,
   offerCounterInsteadOfMove,

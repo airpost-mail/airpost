@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { ipcRenderer, shell } from 'electron';
-import { AccountStore } from 'mailspring-exports';
+import { AccountStore } from '../../src/data/stores/account';
 import EngineEvents from '../../src/engine/client/events';
 import { Feature } from '../../src/engine/protocol';
 import AccountProviders from '../../src/features/onboarding/account-providers';
@@ -51,8 +51,13 @@ describe('OAuthSignInPage', function oauthSignInPageSpecs() {
   });
 
   it("leaves the engine's default to the engine", async () => {
-    spyOn(AccountStore, 'containerFolderDefaultGetter').andReturn('Mailspring');
+    spyOn(AccountStore, 'containerFolderDefaultGetter').andReturn('Tern');
     expect((await beginParams()).containerFolder).toBeUndefined();
+  });
+
+  it('passes a Mailspring container folder on, since the engine defaults to Tern', async () => {
+    spyOn(AccountStore, 'containerFolderDefaultGetter').andReturn('Mailspring');
+    expect((await beginParams()).containerFolder).toEqual('Mailspring');
   });
 
   it("keeps a reconnected account's folder", async () => {

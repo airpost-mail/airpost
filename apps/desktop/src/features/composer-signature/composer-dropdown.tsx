@@ -1,15 +1,12 @@
 import React from 'react';
-import {
-  localized,
-  Actions,
-  SignatureStore,
-  DraftEditingSession,
-  Account,
-  ISignature,
-  ISignatureSet,
-  MessageWithEditorState,
-} from 'mailspring-exports';
-import { Menu, RetinaImg, ButtonDropdown } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { SignatureStore, ISignature, ISignatureSet } from '../../data/stores/signature';
+import { DraftEditingSession, MessageWithEditorState } from '../../data/drafts/editing-session';
+import { Account } from '../../data/models/account';
+import { Menu } from '../../components/menu';
+import { RetinaImg } from '../../components/retina-img';
+import { ButtonDropdown } from '../../components/button-dropdown';
 
 import { applySignature, currentSignatureIdSlate, currentSignatureId } from './utils';
 

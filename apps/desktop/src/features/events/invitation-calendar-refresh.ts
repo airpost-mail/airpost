@@ -1,5 +1,6 @@
 import _ from 'underscore';
-import { DatabaseChangeRecord, Message } from 'mailspring-exports';
+import { DatabaseChangeRecord } from '../../data/database/change-record';
+import { Message } from '../../data/models/message';
 import { bestICSAttachment } from './ics-attachment';
 
 const REFRESH_INTERVAL_MS = 60 * 1000;

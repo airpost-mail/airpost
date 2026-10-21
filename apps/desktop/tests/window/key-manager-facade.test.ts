@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import { Account } from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
 import { KeyManagerFacade } from '../../src/window/key-manager';
 import { KEY_MANAGER_CHANNEL } from '../../src/engine/channels';
 

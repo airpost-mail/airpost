@@ -1,16 +1,14 @@
 import React from 'react';
-import {
-  localized,
-  Account,
-  AccountStore,
-  CategoryStore,
-  Category,
-  Actions,
-  ChangeRoleMappingTask,
-  Folder,
-  imapUtf7,
-} from 'mailspring-exports';
-import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
+import CategoryStore from '../../data/stores/category';
+import { Category } from '../../data/models/category';
+import * as Actions from '../../data/actions';
+import { ChangeRoleMappingTask } from '../../data/tasks/change-role-mapping';
+import { Folder } from '../../data/models/folder';
+import { imapUtf7 } from '../../mail/imap-utf7';
+import { SettingsPage, SettingsSection, SettingsRow } from '../../components/settings';
 import {
   Select,
   SelectContent,

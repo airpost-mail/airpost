@@ -1,6 +1,9 @@
 import React, { Component } from 'react';
-import { Actions, Utils, AttachmentStore, File } from 'mailspring-exports';
-import { AttachmentItem, ImageAttachmentItem } from 'mailspring-component-kit';
+import * as Actions from '../../data/actions';
+import * as Utils from '../../data/models/utils';
+import AttachmentStore from '../../data/stores/attachment';
+import { File } from '../../data/models/file';
+import { AttachmentItem, ImageAttachmentItem } from '../../components/attachment-items';
 
 interface MessageAttachmentsProps {
   files: File[];

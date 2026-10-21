@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from '../../data/stores/base';
 import { EMAIL_RENDER_MODE_KEY } from './email-render-mode';
 
 class EmailFrameStylesStore extends BaseStore {

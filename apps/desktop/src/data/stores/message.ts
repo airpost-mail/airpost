@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import * as Actions from '../actions';
 import { Message } from '../models/message';
 import { Thread } from '../models/thread';
@@ -8,7 +8,7 @@ import FocusedPerspectiveStore from './focused-perspective';
 import FocusedContentStore from './focused-content';
 import * as ExtensionRegistry from '../../packages/extension-registry';
 import electron from 'electron';
-import { MessageViewExtension } from 'mailspring-exports';
+import { MessageViewExtension } from '../../packages/message-view-extension';
 import { DatabaseChangeRecord } from '../database/change-record';
 import EngineReads from '../database/engine-reads';
 

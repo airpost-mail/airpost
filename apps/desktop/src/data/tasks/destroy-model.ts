@@ -1,5 +1,5 @@
-/* eslint global-require:0 */
 import { Task } from './task';
+import DatabaseObjectRegistry from '../database-object-registry';
 
 export class DestroyModelTask extends Task {
   modelId: string;
@@ -31,6 +31,6 @@ export class DestroyModelTask extends Task {
   }
 
   getModelConstructor() {
-    return require('mailspring-exports')[this.modelName];
+    return DatabaseObjectRegistry.get(this.modelName);
   }
 }

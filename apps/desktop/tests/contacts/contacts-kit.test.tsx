@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import {
-  Actions,
-  ComponentRegistry,
-  Contact,
-  DestroyContactTask,
-  WorkspaceStore,
-} from 'mailspring-exports';
-import { ListTabular, InjectedComponentSet } from 'mailspring-component-kit';
+import * as Actions from '../../src/data/actions';
+import ComponentRegistry from '../../src/packages/component-registry';
+import { Contact } from '../../src/data/models/contact';
+import { DestroyContactTask } from '../../src/data/tasks/destroy-contact';
+import WorkspaceStore from '../../src/data/stores/workspace';
+import { ListTabular } from '../../src/components/list/tabular';
+import { InjectedComponentSet } from '../../src/components/injected/component-set';
 import Sheet from '../../src/components/sheets/sheet';
 import { Store } from '../../src/features/contacts/store';
 import { ContactDetailToolbar } from '../../src/features/contacts/detail-toolbar';

@@ -2,7 +2,8 @@ import _ from 'underscore';
 import React from 'react';
 
 import { calcColor } from './helpers';
-import { Calendar, Account } from 'mailspring-exports';
+import { Calendar } from '../../data/models/calendar';
+import { Account } from '../../data/models/account';
 import { Checkbox } from '../../components/kit/checkbox';
 
 const DISABLED_CALENDARS = 'core.calendar.disabledCalendars';

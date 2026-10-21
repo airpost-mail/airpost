@@ -1,6 +1,6 @@
 import React from 'react';
 import Switch from '../../../components/switch';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
 import { EventPropertyRow } from './property-row';
 
 interface AllDayToggleProps {

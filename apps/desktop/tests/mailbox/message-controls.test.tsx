@@ -1,6 +1,7 @@
 import React from 'react';
-import { Thread, Message } from 'mailspring-exports';
-import { ButtonDropdown } from 'mailspring-component-kit';
+import { Thread } from '../../src/data/models/thread';
+import { Message } from '../../src/data/models/message';
+import { ButtonDropdown } from '../../src/components/button-dropdown';
 import MessageControls from '../../src/features/message-list/message-controls';
 
 const rendered = (message: Message) => {

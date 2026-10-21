@@ -1,5 +1,7 @@
 import React from 'react';
-import { AccountStore, Actions, localized } from 'mailspring-exports';
+import { AccountStore } from '../../../data/stores/account';
+import * as Actions from '../../../data/actions';
+import { localized } from '../../../intl/localize';
 import {
   SettingsPage,
   SettingsSection,
@@ -8,7 +10,7 @@ import {
   ConfigSwitchRow,
   ConfigSelectRow,
   ConfigSegmentedRow,
-} from 'mailspring-component-kit';
+} from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 
 function onTurnWarningsBackOn() {

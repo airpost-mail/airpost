@@ -1,10 +1,10 @@
-import { SoundRegistry } from 'mailspring-exports';
+import SoundRegistry from '../../packages/sound-registry';
 
 // The sounds are synthesized by scripts/generate-sounds.sh in apps/desktop.
 const SOUNDS = {
-  send: 'mailspring://custom-sounds/sounds/send.ogg',
-  'hit-send': 'mailspring://custom-sounds/sounds/hit-send.ogg',
-  'new-mail': 'mailspring://custom-sounds/sounds/new-mail.ogg',
+  send: 'tern-asset://custom-sounds/sounds/send.ogg',
+  'hit-send': 'tern-asset://custom-sounds/sounds/hit-send.ogg',
+  'new-mail': 'tern-asset://custom-sounds/sounds/new-mail.ogg',
 };
 
 export function activate() {

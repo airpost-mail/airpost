@@ -1,7 +1,8 @@
 import * as React from 'react';
 import * as cheerio from 'cheerio';
 import { LRUCache } from 'lru-cache';
-import { Message, ComponentRegistry } from 'mailspring-exports';
+import { Message } from '../../data/models/message';
+import ComponentRegistry from '../../packages/component-registry';
 import { UnsubscribeHeader } from './header';
 import {
   UnsubscribeOption,

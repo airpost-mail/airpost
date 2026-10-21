@@ -1,12 +1,10 @@
-import {
-  Account,
-  TaskQueue,
-  AccountStore,
-  DatabaseStore,
-  ComponentRegistry,
-  MailboxPerspective,
-  FocusedPerspectiveStore,
-} from 'mailspring-exports';
+import { Account } from '../../../src/data/models/account';
+import TaskQueue from '../../../src/data/stores/task-queue';
+import { AccountStore } from '../../../src/data/stores/account';
+import DatabaseStore from '../../../src/data/database/store';
+import ComponentRegistry from '../../../src/packages/component-registry';
+import { MailboxPerspective } from '../../../src/data/mailbox-perspective';
+import FocusedPerspectiveStore from '../../../src/data/stores/focused-perspective';
 import Config from '../../../src/config/config';
 import * as configUtils from '../../../src/config/utils';
 import TimeOverride from './time-override';

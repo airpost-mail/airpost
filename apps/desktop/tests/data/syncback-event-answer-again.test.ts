@@ -1,4 +1,5 @@
-import { DatabaseStore, Event } from 'mailspring-exports';
+import DatabaseStore from '../../src/data/database/store';
+import { Event } from '../../src/data/models/event';
 import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
 import { fakePimEngine, refusal } from '../support/fake-pim-engine';
 
@@ -51,7 +52,7 @@ describe('an answer refused because our copy changed on the server', function ()
       listener = fn;
       return unlisten;
     });
-    spyOn(AppEnv.mailsyncBridge, 'sendSyncCalendarNow');
+    spyOn(AppEnv.engineBridge, 'sendSyncCalendarNow');
     engine = fakePimEngine();
     engine.answers['events.rsvp'] = (params) => ({
       email: ME,
@@ -62,7 +63,7 @@ describe('an answer refused because our copy changed on the server', function ()
 
   it('re-reads the calendar and makes the answer again on the copy the server has now', async function () {
     const done = answerTask().onError({ key: 'etag-conflict', debuginfo: '' });
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith('acct-1');
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith('acct-1');
     listener(stored([moved()]));
     await done;
 
@@ -133,7 +134,7 @@ describe('an answer refused because our copy changed on the server', function ()
       key: 'etag-conflict',
       debuginfo: '',
     });
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).not.toHaveBeenCalled();
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).not.toHaveBeenCalled();
     expect(dialog).toHaveBeenCalled();
   });
 
@@ -142,13 +143,13 @@ describe('an answer refused because our copy changed on the server', function ()
       key: 'etag-conflict',
       debuginfo: '',
     });
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).not.toHaveBeenCalled();
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).not.toHaveBeenCalled();
     expect(dialog).toHaveBeenCalled();
   });
 
   it('does not retry an answer refused for another reason', async function () {
     await answerTask().onError({ key: 'not-found', debuginfo: '' });
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).not.toHaveBeenCalled();
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).not.toHaveBeenCalled();
     expect(dialog.mostRecentCall.args[0].message).toContain('no longer exists');
   });
 });

@@ -1,4 +1,6 @@
-import { DatabaseStore, File, Message } from 'mailspring-exports';
+import DatabaseStore from '../../src/data/database/store';
+import { File } from '../../src/data/models/file';
+import { Message } from '../../src/data/models/message';
 import { InvitationCalendarRefresh } from '../../src/features/events/invitation-calendar-refresh';
 
 const SINCE = Date.UTC(2026, 9, 9, 14, 0, 0);
@@ -86,7 +88,7 @@ describe('events package: refreshing on invitations', function () {
       listener = fn;
       return unlisten;
     });
-    spyOn(AppEnv.mailsyncBridge, 'sendSyncCalendarNow');
+    spyOn(AppEnv.engineBridge, 'sendSyncCalendarNow');
   });
 
   afterEach(function () {
@@ -97,7 +99,7 @@ describe('events package: refreshing on invitations', function () {
     spyOn(AppEnv, 'isMainWindow').andReturn(true);
     main.activate();
     listener(delta([message({ accountId: 'a3', date: new Date(Date.now() + MINUTE) })]));
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith('a3');
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith('a3');
   });
 
   it('stops listening when deactivated', function () {

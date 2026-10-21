@@ -1,6 +1,7 @@
 import React from 'react';
-import { AccountStore, localized } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { AccountStore } from '../../../data/stores/account';
+import { localized } from '../../../intl/localize';
+import { RetinaImg } from '../../../components/retina-img';
 import { IconButton } from '../../../components/kit/icon-button';
 import * as OnboardingActions from '../actions';
 

@@ -1,4 +1,5 @@
-import { DatabaseStore, Event } from 'mailspring-exports';
+import DatabaseStore from '../../src/data/database/store';
+import { Event } from '../../src/data/models/event';
 import { Calendar } from '../../src/data/models/calendar';
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';

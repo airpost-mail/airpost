@@ -1,6 +1,6 @@
 import React from 'react';
 import moment, { Moment } from 'moment-timezone';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
 import { EventOccurrence, isEventSelected } from '../data-source';
 import { EventRendererProps } from '../main-calendar';
 import { DragState, HitZone } from '../drag-types';

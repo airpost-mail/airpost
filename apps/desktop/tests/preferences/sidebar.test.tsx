@@ -1,8 +1,9 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { render as renderDOM, fireEvent, cleanup } from '@testing-library/react';
-import { Actions, PreferencesUIStore } from 'mailspring-exports';
-import { ConfigSelectRow, ConfigSwitchRow } from 'mailspring-component-kit';
+import * as Actions from '../../src/data/actions';
+import { PreferencesUIStore } from '../../src/data/stores/preferences-ui';
+import { ConfigSelectRow, ConfigSwitchRow } from '../../src/components/settings';
 import PreferencesSidebar from '../../src/features/preferences/sidebar';
 import { getPortalContainer } from '../../src/components/kit/portal';
 

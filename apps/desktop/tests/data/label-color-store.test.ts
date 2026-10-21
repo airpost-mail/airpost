@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Label } from 'mailspring-exports';
+import { Label } from '../../src/data/models/label';
 import { LabelColorStoreClass, LABEL_COLOR_SCHEMES } from '../../src/data/stores/label-color';
 import { LabelColorizer } from '../../src/components/mail-label';
 

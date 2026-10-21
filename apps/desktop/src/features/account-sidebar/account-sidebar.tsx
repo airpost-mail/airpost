@@ -1,6 +1,12 @@
 import React from 'react';
-import { localized, Utils, DOMUtils, Account, AccountStore } from 'mailspring-exports';
-import { OutlineView, ScrollRegion, Flexbox } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Utils from '../../data/models/utils';
+import DOMUtils from '../../utils/dom';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
+import { OutlineView } from '../../components/outline-view';
+import { ScrollRegion } from '../../components/scroll-region';
+import { Flexbox } from '../../components/flexbox';
 import AccountSwitcher from './account-switcher';
 import SidebarStore from './sidebar-store';
 import { ISidebarSection } from './types';

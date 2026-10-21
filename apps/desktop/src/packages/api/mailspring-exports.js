@@ -110,14 +110,15 @@ lazyLoadWithGetter(
 lazyLoadWithGetter(`getCurrentLocale`, () => require('../../intl/localize').getCurrentLocale);
 lazyLoadWithGetter(`isRTL`, () => require('../../intl/localize').isRTL);
 
-// The plugin API version plugins match `engines.mailspring` against
+// The plugin API version plugins match `engines.tern` against
 lazyLoadWithGetter(`apiVersion`, () => require('../api-version').PLUGIN_API_VERSION);
 
 // Actions
 lazyLoad(`Actions`, 'data/actions');
 
 // Sync engine
-lazyLoad(`MailsyncProcess`, 'engine/process');
+lazyLoad(`EngineProcess`, 'engine/process');
+lazyLoadWithGetter(`MailsyncProcess`, () => require('../../engine/process').EngineProcess);
 // The Database
 lazyLoad(`Matcher`, 'data/attributes/matcher');
 lazyLoadWithGetter(
@@ -181,7 +182,6 @@ lazyLoadAndRegisterTask(`GetMessageRFC2822Task`, 'get-message-rfc2822');
 lazyLoadAndRegisterTask(`GetManyRFC2822Task`, 'get-many-rfc2822');
 lazyLoadAndRegisterTask(`ExpungeAllInFolderTask`, 'expunge-all-in-folder');
 lazyLoadAndRegisterTask(`ChangeRoleMappingTask`, 'change-role-mapping');
-lazyLoadAndRegisterTask(`SendFeatureUsageEventTask`, 'send-feature-usage-event');
 lazyLoadAndRegisterTask(`DestroyContactTask`, 'destroy-contact');
 lazyLoadAndRegisterTask(`SyncbackContactTask`, 'syncback-contact');
 lazyLoadAndRegisterTask(`DestroyContactGroupTask`, 'destroy-contactgroup');

@@ -1,11 +1,9 @@
-import {
-  AccountStore,
-  MailboxPerspective,
-  TaskFactory,
-  Label,
-  Folder,
-  CategoryStore,
-} from 'mailspring-exports';
+import { AccountStore } from '../../src/data/stores/account';
+import { MailboxPerspective } from '../../src/data/mailbox-perspective';
+import { TaskFactory } from '../../src/data/tasks/factory';
+import { Label } from '../../src/data/models/label';
+import { Folder } from '../../src/data/models/folder';
+import CategoryStore from '../../src/data/stores/category';
 
 describe('MailboxPerspective', function mailboxPerspective() {
   beforeEach(() => {

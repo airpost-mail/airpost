@@ -4,7 +4,9 @@
 // renders the slot's consumer with the feature's component and a fake one registered side by side.
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
-import { ComponentRegistry, Message, WorkspaceStore } from 'mailspring-exports';
+import ComponentRegistry from '../../src/packages/component-registry';
+import { Message } from '../../src/data/models/message';
+import WorkspaceStore from '../../src/data/stores/workspace';
 import MessageItemBody from '../../src/features/message-list/message-item-body';
 import Toolbar from '../../src/components/sheets/toolbar';
 import Sheet from '../../src/components/sheets/sheet';

@@ -9,7 +9,18 @@ No plugin API change:
 
 - The built-in features moved from `<resourcePath>/features/<dir>/lib/` to `<resourcePath>/src/features/<dir>/` and have no `package.json` any more. `AppEnv.packages` lists them under the same names, they activate in the same order, and `mailspring://<dir>/…` asset URLs are unchanged. A plugin that requires a feature's files by path has to use the new path.
 - `src/` is grouped by domain (`data/`, `engine/`, `mail/`, `packages/`, `window/`, `config/`, `main/`, `components/`, `utils/`) and file names drop the prefix or suffix their dir already states (`src/flux/stores/draft-store.ts` is `src/data/drafts/store.ts`). `mailspring-exports`, `mailspring-component-kit`, `mailspring-store` and `mailspring-observables` resolve as before; a plugin that requires files under `src/` by path has to use the new paths.
+- `BaseStore` is defined in `src/data/stores/base.ts` and the Rx helpers in `src/data/query/observables.ts`; `mailspring-store` and `mailspring-observables` re-export them and resolve as before.
 - A package's tests can be `tests/*.test.*` files as well as `specs/*-spec.*`, and `--test-file-pattern` is an alias of `--spec-file-pattern`. The pattern matches the test file's path relative to the core or package root.
+
+Plugin API 1.35.0:
+
+- Package assets are served under `tern-asset://<package>/<path>`. `mailspring://` is the same handler and keeps working; the content security policies allow both.
+- `engines.tern` in `package.json` is read before `engines.mailspring`; either one is enough.
+- `AppEnv.engineBridge` is the sync engine bridge; `AppEnv.mailsyncBridge` returns the same object.
+- `EngineProcess` and `EngineProcessExit` are the names of `MailsyncProcess` and `MailsyncProcessExit`, which stay as aliases.
+- The Developer menu's command is `window:open-engine-logs` (it was `window:open-mailsync-logs`).
+- `MAILSPRING_FORCE_BACKGROUND_PORTAL` is no longer read; use `TERN_FORCE_BACKGROUND_PORTAL`.
+- `RegExpUtils.commandRegex()` matches `tern:` links only.
 
 Plugin API 1.34.0:
 

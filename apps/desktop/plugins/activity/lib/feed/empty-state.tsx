@@ -2,7 +2,7 @@ import React from 'react';
 import { localized, Actions } from 'mailspring-exports';
 import { RetinaImg, Button } from 'mailspring-component-kit';
 
-const OPEN_ICON = 'mailspring://open-tracking/assets/icon-composer-eye@2x.png';
+const OPEN_ICON = 'tern-asset://open-tracking/assets/icon-composer-eye@2x.png';
 
 export function ActivityFeedEmptyState({ hasTrackedMessages }: { hasTrackedMessages: boolean }) {
   return (

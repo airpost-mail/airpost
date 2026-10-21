@@ -10,6 +10,7 @@ import path from 'path';
 
 let ResourcePath = null;
 import DatabaseObjectRegistry from '../database-object-registry';
+import { escapeRegExp } from '../../utils/regexp';
 
 export function waitFor(latch, options: { timeout?: number } = {}) {
   const timeout = options.timeout || 400;
@@ -90,9 +91,7 @@ export function isHash(object: any) {
   return _.isObject(object) && !_.isFunction(object) && !_.isArray(object);
 }
 
-export function escapeRegExp(str: string) {
-  return str.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
-}
+export { escapeRegExp };
 
 export function range(left, right, inclusive = true) {
   const range = [];

@@ -1,11 +1,11 @@
 import React from 'react';
-import { Contact } from 'mailspring-exports';
+import { Contact } from '../../data/models/contact';
 import { ContactBase } from './types';
 import { YYMMDDInput } from './yymmdd-input';
 import { ListEditor } from './list-editor';
 import { TypeaheadFreeInput } from './typeahead-free-input';
 import * as Icons from './svg-icons';
-import { ContactProfilePhoto } from 'mailspring-component-kit';
+import { ContactProfilePhoto } from '../../components/contact-profile-photo';
 import { TextField, TextFieldProps } from '../../components/kit/text-field';
 import { Textarea } from '../../components/kit/textarea';
 

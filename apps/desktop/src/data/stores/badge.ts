@@ -1,5 +1,5 @@
 /* eslint global-require:0 */
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import FocusedPerspectiveStore from './focused-perspective';
 import { AccountStore } from './account';
 import ThreadCountsStore from './thread-counts';

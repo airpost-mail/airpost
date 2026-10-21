@@ -1,15 +1,15 @@
 import React, { CSSProperties, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { webUtils } from 'electron';
-import { Contact, localized, CanvasUtils, AccountStore } from 'mailspring-exports';
-import {
-  FocusContainer,
-  MultiselectList,
-  ListTabular,
-  RetinaImg,
-  ListensToFluxStore,
-  ListDataSource,
-} from 'mailspring-component-kit';
+import { Contact } from '../../data/models/contact';
+import { localized } from '../../intl/localize';
+import * as CanvasUtils from '../../components/drag-canvas';
+import { AccountStore } from '../../data/stores/account';
+import FocusContainer from '../../components/focus-container';
+import { MultiselectList } from '../../components/multiselect/list';
+import { ListTabular, ListDataSource } from '../../components/list/tabular';
+import { RetinaImg } from '../../components/retina-img';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
 import { ContactsPerspective, Store } from './store';
 import { writeContactsToTempVCF, importContactsFromPaths } from './files';
 import { ContactListContextMenu } from './list-context-menu';

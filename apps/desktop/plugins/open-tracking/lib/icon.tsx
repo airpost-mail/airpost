@@ -70,7 +70,7 @@ export default class OpenTrackingIcon extends React.Component<{
     const image = (
       <RetinaImg
         className={opened ? 'opened' : 'unopened'}
-        url="mailspring://open-tracking/assets/icon-tracking-opened@2x.png"
+        url="tern-asset://open-tracking/assets/icon-tracking-opened@2x.png"
         mode={RetinaImg.Mode.ContentIsMask}
         aria-hidden="true"
       />

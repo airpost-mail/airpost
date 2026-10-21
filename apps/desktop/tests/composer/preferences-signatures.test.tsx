@@ -2,7 +2,8 @@
 import ReactTestUtils from 'react-dom/test-utils';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { SignatureStore, Actions } from 'mailspring-exports';
+import { SignatureStore } from '../../src/data/stores/signature';
+import * as Actions from '../../src/data/actions';
 import PreferencesSignatures from '../../src/features/composer-signature/preferences-signatures';
 
 const SIGNATURES = {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { InjectedComponentSet } from 'mailspring-component-kit';
-import { WorkspaceStore } from 'mailspring-exports';
+import { InjectedComponentSet } from '../../components/injected/component-set';
+import WorkspaceStore from '../../data/stores/workspace';
 import { ResizableRegion, ResizableHandle } from '../../components/resizable-region';
 import { Flexbox } from '../../components/flexbox';
 import ThreadList from './thread-list';

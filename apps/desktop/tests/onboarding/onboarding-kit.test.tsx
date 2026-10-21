@@ -2,7 +2,8 @@
 // The onboarding pages' controls on the UI kit.
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import { Account, AccountStore } from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
+import { AccountStore } from '../../src/data/stores/account';
 import * as OnboardingActions from '../../src/features/onboarding/actions';
 import PageTopBar from '../../src/features/onboarding/pages/top-bar';
 import TutorialPage from '../../src/features/onboarding/pages/tutorial';

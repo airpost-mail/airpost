@@ -4,7 +4,7 @@ import {
   EngineServeProcess,
   errorFromEngineResult,
   lastJSONResponse,
-  MailsyncProcess,
+  EngineProcess,
   stripSecretKeys,
 } from '../../src/engine/process';
 import { FakeEngine, until } from '../support/fake-serve-engine';
@@ -72,11 +72,11 @@ describe('accumulating engine stdout', function () {
 });
 
 describe('interpreting an engine exit', function () {
-  let proc: MailsyncProcess = null;
+  let proc: EngineProcess = null;
   let child: any = null;
 
   beforeEach(function () {
-    proc = new MailsyncProcess({ configDirPath: '/tmp', resourcePath: '/tmp', verbose: false });
+    proc = new EngineProcess({ configDirPath: '/tmp', resourcePath: '/tmp', verbose: false });
     child = new EventEmitter();
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
@@ -149,7 +149,7 @@ describe('the error of a failed account test', function () {
 
 describe('migrating', function () {
   it('runs import-legacy after migrate and launches anyway when it fails', async function () {
-    const proc = new MailsyncProcess({ configDirPath: '/tmp', resourcePath: '/tmp' });
+    const proc = new EngineProcess({ configDirPath: '/tmp', resourcePath: '/tmp' });
     const modes: string[] = [];
     spyOn(proc as any, '_spawnProcess').andCallFake((mode: string) => {
       modes.push(mode);

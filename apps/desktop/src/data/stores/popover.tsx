@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import * as Actions from '../actions';
 import { UIProvider } from '../../components/kit/provider';
 import FixedPopover from '../../components/fixed-popover';

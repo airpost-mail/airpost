@@ -1,8 +1,9 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import { ContactStore, Contact } from 'mailspring-exports';
+import ContactStore from '../../src/data/stores/contact';
+import { Contact } from '../../src/data/models/contact';
 
-import { ParticipantsTextField } from 'mailspring-component-kit';
+import ParticipantsTextField from '../../src/components/participants-text-field';
 
 const participant1 = new Contact({
   id: 'local-1',
@@ -200,7 +201,7 @@ xdescribe('ParticipantsTextField', function ParticipantsTextFieldSpecs() {
         const inputs = [
           "Hello world I real. \n asd. garbage-man@example.com—he's cool Also 'recycling-guy@example.com'!",
           'garbage-man@example.com1WHOA I REALLY HATE DATA,recycling-guy@example.com',
-          'nils.com garbage-man@example.com @example.com nope@.com nope! recycling-guy@example.com HOLLA AT recycling-guy@mailspring.',
+          'nils.com garbage-man@example.com @example.com nope@.com nope! recycling-guy@example.com HOLLA AT recycling-guy@example.',
         ];
 
         for (const input of inputs) {

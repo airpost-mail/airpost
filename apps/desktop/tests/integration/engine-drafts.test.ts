@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import {
-  Account,
-  AccountStore,
-  Actions,
-  Contact,
-  DatabaseStore,
-  DraftStore,
-  ExtensionRegistry,
-  Message,
-  SyncbackMetadataTask,
-  TaskQueue,
-  Thread,
-  UndoRedoStore,
-} from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
+import { AccountStore } from '../../src/data/stores/account';
+import * as Actions from '../../src/data/actions';
+import { Contact } from '../../src/data/models/contact';
+import DatabaseStore from '../../src/data/database/store';
+import DraftStore from '../../src/data/drafts/store';
+import * as ExtensionRegistry from '../../src/packages/extension-registry';
+import { Message } from '../../src/data/models/message';
+import { SyncbackMetadataTask } from '../../src/data/tasks/syncback-metadata';
+import TaskQueue from '../../src/data/stores/task-queue';
+import { Thread } from '../../src/data/models/thread';
+import UndoRedoStore from '../../src/data/stores/undo-redo';
 import EngineEvents from '../../src/engine/client/events';
 import { Feature, Method } from '../../src/engine/protocol';
 import { isEngineBuilt } from '../../src/engine/client/drafts';

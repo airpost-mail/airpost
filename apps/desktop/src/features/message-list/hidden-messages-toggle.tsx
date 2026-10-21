@@ -1,5 +1,8 @@
 import React from 'react';
-import { localized, Actions, MessageStore, FocusedPerspectiveStore } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { MessageStore } from '../../data/stores/message';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 
 export class MessageListHiddenMessagesToggle extends React.Component {
   static displayName = 'MessageListHiddenMessagesToggle';

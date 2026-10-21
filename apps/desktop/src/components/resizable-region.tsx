@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Utils } from 'mailspring-exports';
+import * as Utils from '../data/models/utils';
 
 export const ResizableHandle: { [side: string]: IResizeHandle } = {
   Top: {

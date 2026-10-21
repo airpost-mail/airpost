@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import classnames from 'classnames';
-import { localized, isRTL } from 'mailspring-exports';
+import { localized, isRTL } from '../../../intl/localize';
 import { EventOccurrence, isTimed, occurrenceStartUnix, occurrenceEndUnix } from '../data-source';
 import { calcEventColors, formatShortTime } from '../helpers';
 import { HitZone } from '../drag-types';

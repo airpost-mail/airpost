@@ -1,4 +1,7 @@
-import { Actions, Folder, MailboxPerspective, FocusedPerspectiveStore } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Folder } from '../../src/data/models/folder';
+import { MailboxPerspective } from '../../src/data/mailbox-perspective';
+import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
 import ThreadListStore from '../../src/features/thread-list/store';
 
 describe('ThreadListStore', function () {

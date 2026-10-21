@@ -1,7 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import _ from 'underscore';
-import { AccountStore, Thread, Contact, Message } from 'mailspring-exports';
+import { AccountStore } from '../../src/data/stores/account';
+import { Thread } from '../../src/data/models/thread';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
 import ThreadListParticipants, { getTokens } from '../../src/features/thread-list/participants';
 
 describe('ThreadListParticipants', function () {
@@ -10,7 +13,7 @@ describe('ThreadListParticipants', function () {
   });
 
   it('renders unread contacts with .unread-true', function () {
-    const ben = new Contact({ email: 'ben@nylas.com', name: 'ben' });
+    const ben = new Contact({ email: 'ben@example.com', name: 'ben' });
     (ben as any).unread = true;
     const thread = new Thread({});
     (thread as any).__messages = [new Message({ from: [ben], unread: true })];
@@ -23,13 +26,13 @@ describe('ThreadListParticipants', function () {
 
   describe('getTokens', function () {
     beforeEach(function () {
-      this.ben = new Contact({ email: 'ben@nylas.com', name: 'ben' });
-      this.evan = new Contact({ email: 'evan@nylas.com', name: 'evan' });
-      this.evanAgain = new Contact({ email: 'evan@nylas.com', name: 'evan' });
-      this.michael = new Contact({ email: 'michael@nylas.com', name: 'michael' });
-      this.kavya = new Contact({ email: 'kavya@nylas.com', name: 'kavya' });
-      this.phab1 = new Contact({ email: 'no-reply@phab.nylas.com', name: 'Ben' });
-      this.phab2 = new Contact({ email: 'no-reply@phab.nylas.com', name: 'MG' });
+      this.ben = new Contact({ email: 'ben@example.com', name: 'ben' });
+      this.evan = new Contact({ email: 'evan@example.com', name: 'evan' });
+      this.evanAgain = new Contact({ email: 'evan@example.com', name: 'evan' });
+      this.michael = new Contact({ email: 'michael@example.com', name: 'michael' });
+      this.kavya = new Contact({ email: 'kavya@example.com', name: 'kavya' });
+      this.phab1 = new Contact({ email: 'no-reply@phab.example.com', name: 'Ben' });
+      this.phab2 = new Contact({ email: 'no-reply@phab.example.com', name: 'MG' });
     });
 
     describe('when thread.messages is available', () =>
@@ -212,11 +215,11 @@ describe('ThreadListParticipants', function () {
     describe('when getTokens() called and current user is only sender', function () {
       beforeEach(function () {
         this.me = this.account.me();
-        this.ben = new Contact({ email: 'ben@nylas.com', name: 'ben' });
-        this.evan = new Contact({ email: 'evan@nylas.com', name: 'evan' });
-        this.evanCapitalized = new Contact({ email: 'EVAN@nylas.com', name: 'evan' });
-        this.michael = new Contact({ email: 'michael@nylas.com', name: 'michael' });
-        this.kavya = new Contact({ email: 'kavya@nylas.com', name: 'kavya' });
+        this.ben = new Contact({ email: 'ben@example.com', name: 'ben' });
+        this.evan = new Contact({ email: 'evan@example.com', name: 'evan' });
+        this.evanCapitalized = new Contact({ email: 'EVAN@example.com', name: 'evan' });
+        this.michael = new Contact({ email: 'michael@example.com', name: 'michael' });
+        this.kavya = new Contact({ email: 'kavya@example.com', name: 'kavya' });
       });
 
       const tokensFor = function (threadMessages) {

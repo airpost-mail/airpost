@@ -111,12 +111,13 @@ export default class Package {
     return !!this.json.isOptional;
   }
 
+  /** `engines.tern`, or `engines.mailspring`, its v1 plugin API name. */
   engineRange(): string | null {
-    const range = this.json.engines?.mailspring;
+    const range = this.json.engines?.tern ?? this.json.engines?.mailspring;
     return typeof range === 'string' ? range : null;
   }
 
-  /** Whether `engines.mailspring` is a range the plugin API version satisfies. A missing
+  /** Whether `engineRange()` is a range the plugin API version satisfies. A missing
    * `engines` or an invalid range is false, never a throw. */
   isEngineSet() {
     const range = this.engineRange();

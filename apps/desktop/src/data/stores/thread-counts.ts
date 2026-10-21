@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import DatabaseStore from '../database/store';
 import { Thread } from '../models/thread';
 import EngineEvents, {

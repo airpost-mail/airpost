@@ -1,13 +1,11 @@
 import Rx from 'rx-lite';
-import {
-  DatabaseStore,
-  Contact,
-  ContactGroup,
-  ContactBook,
-  MutableQuerySubscription,
-} from 'mailspring-exports';
-import BaseStore from 'mailspring-store';
-import { ListTabular } from 'mailspring-component-kit';
+import DatabaseStore from '../../data/database/store';
+import { Contact } from '../../data/models/contact';
+import { ContactGroup } from '../../data/models/contact-group';
+import { ContactBook } from '../../data/models/contact-book';
+import { MutableQuerySubscription } from '../../data/query/mutable-subscription';
+import BaseStore from '../../data/stores/base';
+import { ListTabular } from '../../components/list/tabular';
 
 class ContactsWindowStore extends BaseStore {
   _perspective: ContactsPerspective = { type: 'unified' };

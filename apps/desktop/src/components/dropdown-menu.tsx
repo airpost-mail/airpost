@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { RetinaImg } from 'mailspring-component-kit';
+import { RetinaImg } from './retina-img';
 import { Menu, MenuProps } from './menu';
 import { Popover, PopoverAnchor, PopoverContent } from './kit/popover';
 

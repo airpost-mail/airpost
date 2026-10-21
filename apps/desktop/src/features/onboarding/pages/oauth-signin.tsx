@@ -1,7 +1,10 @@
 import { shell } from 'electron';
 import React from 'react';
-import { localized, localizedReactFragment, Account, AccountStore } from 'mailspring-exports';
-import { CopyButton, RetinaImg } from 'mailspring-component-kit';
+import { localized, localizedReactFragment } from '../../../intl/localize';
+import { Account } from '../../../data/models/account';
+import { AccountStore } from '../../../data/stores/account';
+import CopyButton from '../../../components/copy-button';
+import { RetinaImg } from '../../../components/retina-img';
 
 import FormErrorMessage from '../form-error-message';
 import AccountProviders from '../account-providers';
@@ -39,10 +42,10 @@ export function reconnectingAccountId(account: Account) {
 }
 
 // The user's default container folder for a new account, as IMAP accounts get it
-// (onboarding-helpers.ts). "Mailspring" is the engine's own default.
+// (onboarding/helpers.ts). "Tern" is the engine's own default.
 export function oauthContainerFolder() {
   const folder = AccountStore.containerFolderDefaultGetter();
-  return folder && folder !== 'Mailspring' ? folder : undefined;
+  return folder && folder !== 'Tern' ? folder : undefined;
 }
 
 export default class OAuthSignInPage extends React.Component<

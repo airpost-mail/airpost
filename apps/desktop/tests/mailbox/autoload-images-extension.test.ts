@@ -1,10 +1,8 @@
-import {
-  Contact,
-  ExtensionRegistry,
-  Message,
-  MessageBodyProcessor,
-  MessageStore,
-} from 'mailspring-exports';
+import { Contact } from '../../src/data/models/contact';
+import * as ExtensionRegistry from '../../src/packages/extension-registry';
+import { Message } from '../../src/data/models/message';
+import MessageBodyProcessor from '../../src/mail/body/processor';
+import { MessageStore } from '../../src/data/stores/message';
 import AutoloadImagesExtension from '../../src/features/message-autoload-images/extension';
 import AutoloadImagesStore from '../../src/features/message-autoload-images/store';
 

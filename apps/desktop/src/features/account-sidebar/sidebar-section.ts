@@ -5,14 +5,12 @@
  * Full docs: https://github.com/decaffeinate/decaffeinate/blob/master/docs/suggestions.md
  */
 import _ from 'underscore';
-import {
-  Account,
-  CategoryStore,
-  Label,
-  ExtensionRegistry,
-  RegExpUtils,
-  localized,
-} from 'mailspring-exports';
+import { Account } from '../../data/models/account';
+import CategoryStore from '../../data/stores/category';
+import { Label } from '../../data/models/label';
+import * as ExtensionRegistry from '../../packages/extension-registry';
+import RegExpUtils from '../../utils/regexp';
+import { localized } from '../../intl/localize';
 
 import SidebarItem, { createCategory } from './sidebar-item';
 import * as SidebarActions from './sidebar-actions';

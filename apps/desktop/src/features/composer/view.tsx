@@ -1,30 +1,25 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import {
-  localized,
-  Utils,
-  Actions,
-  DraftStore,
-  DraftEditingSession,
-  MessageWithEditorState,
-  DragDropTypes,
-  EmlUtils,
-  File,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Utils from '../../data/models/utils';
+import * as Actions from '../../data/actions';
+import DraftStore from '../../data/drafts/store';
+import { DraftEditingSession, MessageWithEditorState } from '../../data/drafts/editing-session';
+import * as DragDropTypes from '../../components/drag-drop-types';
+import * as EmlUtils from '../../mail/eml';
+import { File } from '../../data/models/file';
 import { webUtils } from 'electron';
 import path from 'path';
-import {
-  DropZone,
-  RetinaImg,
-  ScrollRegion,
-  TabGroupRegion,
-  KeyCommandsRegion,
-  InjectedComponentSet,
-  ComposerEditor,
-  ComposerEditorPlaintext,
-  ComposerSupport,
-  RovingTabIndexToolbar,
-} from 'mailspring-component-kit';
+import { DropZone } from '../../components/drop-zone';
+import { RetinaImg } from '../../components/retina-img';
+import { ScrollRegion } from '../../components/scroll-region';
+import { TabGroupRegion } from '../../components/tab-group-region';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
+import { InjectedComponentSet } from '../../components/injected/component-set';
+import { ComposerEditor } from '../../components/composer-editor/composer-editor';
+import { ComposerEditorPlaintext } from '../../components/composer-editor/plaintext-editor';
+import * as ComposerSupport from '../../components/composer-editor/support';
+import { RovingTabIndexToolbar } from '../../components/roving-tab-index-toolbar';
 import { ComposerHeader } from './header';
 import { SendActionButton } from './send-action-button';
 import { ActionBarPlugins } from './action-bar-plugins';

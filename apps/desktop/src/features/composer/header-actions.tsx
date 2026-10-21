@@ -1,6 +1,7 @@
 import React from 'react';
-import { localized, Actions } from 'mailspring-exports';
-import { RovingTabIndexToolbar } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { RovingTabIndexToolbar } from '../../components/roving-tab-index-toolbar';
 import { Button } from '../../components/kit/button';
 import { IconButton } from '../../components/kit/icon-button';
 import Fields from './fields';

@@ -1,4 +1,4 @@
-import { SearchableComponentStore } from 'mailspring-exports';
+import SearchableComponentStore from '../../src/data/stores/searchable-component';
 
 // Message frames are cross-origin, so they report their matches to the store as boxes.
 describe('SearchableComponentStore with a remote region', function () {

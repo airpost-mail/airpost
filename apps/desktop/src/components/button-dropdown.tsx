@@ -1,7 +1,7 @@
 import React, { CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
 import { RetinaImg } from './retina-img';
-import { localized } from 'mailspring-exports';
+import { localized } from '../intl/localize';
 import classnames from 'classnames';
 import { Popover, PopoverAnchor, PopoverContent } from './kit/popover';
 

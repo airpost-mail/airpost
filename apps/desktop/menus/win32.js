@@ -196,7 +196,7 @@ module.exports = {
           command: 'window:toggle-component-regions',
         },
         { type: 'separator' },
-        { label: localized('Open Mailsync Logs'), command: 'window:open-mailsync-logs' },
+        { label: localized('Open Engine Logs'), command: 'window:open-engine-logs' },
         { label: localized('View License'), command: 'application:view-license' },
       ],
     },

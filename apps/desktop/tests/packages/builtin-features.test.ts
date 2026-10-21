@@ -182,7 +182,7 @@ describe('Built-in features', function () {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'package.json'),
-      JSON.stringify({ name: 'composer', engines: { mailspring: '*' } })
+      JSON.stringify({ name: 'composer', engines: { tern: '*' } })
     );
     const before = Object.keys(manager().available);
     const pm = manager({ safeMode: false });
@@ -196,7 +196,7 @@ describe('Built-in features', function () {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'package.json'),
-      JSON.stringify({ name: 'third-party', engines: { mailspring: '*' } })
+      JSON.stringify({ name: 'third-party', engines: { tern: '*' } })
     );
     const pm = manager({ safeMode: false });
     spyOn(AppEnv.packages, 'getAvailablePackages').andReturn(pm.getAvailablePackages());

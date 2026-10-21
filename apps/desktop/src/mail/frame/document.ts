@@ -5,7 +5,7 @@
 import { applyDocumentColorScheme, darkenDocument, removeDarkening } from '@tern/email-dark';
 import { Autolink } from '../body/autolinker';
 import RealDOMParser from '../../components/searchable/real-dom-parser';
-import { DOMUtils } from './exports';
+import DOMUtils from '../../utils/dom';
 import { adjustImages } from './adjust-images';
 import { prepareEmailColors } from './email-color-detection';
 import { BodyOperation, FrameRect, RenderMessage, SearchMatchRect } from './protocol';

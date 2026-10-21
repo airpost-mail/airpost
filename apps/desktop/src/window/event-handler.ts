@@ -99,12 +99,12 @@ export default class WindowEventHandler {
       });
     }
 
-    AppEnv.commands.add(document.body, 'window:open-mailsync-logs', () => {
-      AppEnv.mailsyncBridge.openLogs();
+    AppEnv.commands.add(document.body, 'window:open-engine-logs', () => {
+      AppEnv.engineBridge.openLogs();
     });
 
     AppEnv.commands.add(document.body, 'window:sync-mail-now', () => {
-      AppEnv.mailsyncBridge.sendSyncMailNow();
+      AppEnv.engineBridge.sendSyncMailNow();
     });
 
     AppEnv.commands.add(document.body, 'window:toggle-component-regions', () => {
@@ -356,9 +356,9 @@ export default class WindowEventHandler {
       resolved = `http://${resolved}`;
     }
 
-    if (['mailto:', 'tern:', 'mailspring:'].includes(protocol)) {
+    if (['mailto:', 'tern:'].includes(protocol)) {
       // We sometimes get mailto URIs that are not escaped properly, or have been only partially escaped.
-      // (T1927) Be sure to escape them once, and completely, before we try to open them. This logic
+      // Be sure to escape them once, and completely, before we try to open them. This logic
       // *might* apply to http/https as well but it's unclear.
       const sanitized = encodeURI(decodeURI(resolved));
       require('@electron/remote').getGlobal('application').openUrl(sanitized);

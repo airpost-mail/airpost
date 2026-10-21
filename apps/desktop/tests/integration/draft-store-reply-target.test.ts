@@ -1,14 +1,12 @@
-import {
-  Thread,
-  Contact,
-  Message,
-  Account,
-  DraftStore,
-  AccountStore,
-  DatabaseStore,
-  MessageStore,
-  SignatureStore,
-} from 'mailspring-exports';
+import { Thread } from '../../src/data/models/thread';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { Account } from '../../src/data/models/account';
+import DraftStore from '../../src/data/drafts/store';
+import { AccountStore } from '../../src/data/stores/account';
+import DatabaseStore from '../../src/data/database/store';
+import { MessageStore } from '../../src/data/stores/message';
+import { SignatureStore } from '../../src/data/stores/signature';
 
 import DraftFactory from '../../src/data/drafts/factory';
 import SignatureComposerExtension from '../../src/features/composer-signature/composer-extension';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
-import { Account } from 'mailspring-exports';
+import { Account } from '../../data/models/account';
 import OnboardingStore from './store';
 import PageTopBar from './pages/top-bar';
 

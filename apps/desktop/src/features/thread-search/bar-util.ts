@@ -1,11 +1,9 @@
-import {
-  localized,
-  CategoryStore,
-  DatabaseStore,
-  SearchQueryParser,
-  Thread,
-  ContactStore,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import CategoryStore from '../../data/stores/category';
+import DatabaseStore from '../../data/database/store';
+import { SearchQueryParser } from '../../mail/search/parser';
+import { Thread } from '../../data/models/thread';
+import ContactStore from '../../data/stores/contact';
 
 // start of string or preceding whitespace
 // a known token

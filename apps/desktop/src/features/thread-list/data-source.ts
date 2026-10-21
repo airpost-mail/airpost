@@ -1,12 +1,10 @@
-import {
-  Rx,
-  ObservableListDataSource,
-  DatabaseStore,
-  Thread,
-  Message,
-  QueryResultSet,
-  QuerySubscription,
-} from 'mailspring-exports';
+import Rx from 'rx-lite';
+import { ObservableListDataSource } from '../../components/list/observable-data-source';
+import DatabaseStore from '../../data/database/store';
+import { Thread } from '../../data/models/thread';
+import { Message } from '../../data/models/message';
+import { QueryResultSet } from '../../data/query/result-set';
+import { QuerySubscription } from '../../data/query/subscription';
 
 const _observableForThreadMessages = (id: string, initialModels: Message[]) => {
   const subscription = new QuerySubscription<Message>(

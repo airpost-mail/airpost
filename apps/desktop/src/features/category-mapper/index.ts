@@ -1,4 +1,5 @@
-import { localized, PreferencesUIStore } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { PreferencesUIStore } from '../../data/stores/preferences-ui';
 
 export function activate() {
   this.preferencesTab = new PreferencesUIStore.TabItem({

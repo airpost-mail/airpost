@@ -9,7 +9,7 @@
   "window:toggle-full-screen": "command+ctrl+f",
   "window:reload": "mod+alt+l",
   "window:toggle-dev-tools": "meta+alt+i",
-  "window:open-mailsync-logs": "meta+shift+k",
+  "window:open-engine-logs": "meta+shift+k",
 
   "multiselect-list:select-all": "command+a"
 }

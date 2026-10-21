@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Tern contributors
 
-import {
-  Contact,
-  Message,
-  Thread,
-  Folder,
-  DatabaseStore,
-  NativeNotifications,
-} from 'mailspring-exports';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { Thread } from '../../src/data/models/thread';
+import { Folder } from '../../src/data/models/folder';
+import DatabaseStore from '../../src/data/database/store';
+import NativeNotifications from '../../src/window/platform/native-notifications';
 
 import { Notifier } from '../../src/features/unread-notifications';
 import { EngineEvents } from '../../src/engine/client/events';

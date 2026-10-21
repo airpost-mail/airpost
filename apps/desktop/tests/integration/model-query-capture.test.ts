@@ -493,12 +493,12 @@ const SITES: Site[] = [
   // Categories and tasks.
   {
     name: 'folders',
-    site: 'src/packages/api/mailspring-observables.ts categories',
+    site: 'src/data/query/observables.ts categories',
     build: () => DatabaseStore.findAll<Folder>(Folder),
   },
   {
     name: 'labels-for-account',
-    site: 'src/packages/api/mailspring-observables.ts forAccount',
+    site: 'src/data/query/observables.ts forAccount',
     build: () => DatabaseStore.findAll<Label>(Label).where({ accountId: A2 }),
   },
   {

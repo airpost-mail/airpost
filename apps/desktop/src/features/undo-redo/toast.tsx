@@ -1,13 +1,11 @@
 import React from 'react';
-import {
-  localized,
-  UndoRedoStore,
-  SyncbackMetadataTask,
-  DatabaseStore,
-  Message,
-  Actions,
-} from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import UndoRedoStore from '../../data/stores/undo-redo';
+import { SyncbackMetadataTask } from '../../data/tasks/syncback-metadata';
+import DatabaseStore from '../../data/database/store';
+import { Message } from '../../data/models/message';
+import * as Actions from '../../data/actions';
+import { RetinaImg } from '../../components/retina-img';
 import { Button } from '../../components/kit/button';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { PLUGIN_ID } from '../../../plugins/send-later/lib/constants';

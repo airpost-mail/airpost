@@ -1,7 +1,8 @@
 import React from 'react';
 import moment, { Moment } from 'moment-timezone';
-import { InjectedComponentSet } from 'mailspring-component-kit';
-import { CalendarDateUtils, localized } from 'mailspring-exports';
+import { InjectedComponentSet } from '../../../components/injected/component-set';
+import * as CalendarDateUtils from '../../../data/calendar/calendar-date';
+import { localized } from '../../../intl/localize';
 import { CalendarViewProps } from '../main-calendar';
 import { CalendarEventContainer } from '../event/container';
 import { CalendarView } from '../constants';

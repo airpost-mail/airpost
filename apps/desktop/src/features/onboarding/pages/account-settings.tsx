@@ -1,5 +1,8 @@
 import React from 'react';
-import { localized, Account, AccountStore, RegExpUtils } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import { Account } from '../../../data/models/account';
+import { AccountStore } from '../../../data/stores/account';
+import RegExpUtils from '../../../utils/regexp';
 
 import * as OnboardingActions from '../actions';
 import CreatePageForForm from './create-page-for-form';

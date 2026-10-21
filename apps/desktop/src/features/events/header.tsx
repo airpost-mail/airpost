@@ -1,27 +1,25 @@
-import { RetinaImg } from 'mailspring-component-kit';
+import { RetinaImg } from '../../components/retina-img';
 
 import React from 'react';
 import fs from 'fs';
 import { ipcRenderer } from 'electron';
-import {
-  Rx,
-  Actions,
-  AttachmentStore,
-  Account,
-  AccountStore,
-  Calendar,
-  CalendarConflict,
-  File,
-  localized,
-  DateUtils,
-  CalendarUtils,
-  ICSParticipantStatus,
-  Message,
-  Event,
-  DatabaseChangeRecord,
-  DatabaseStore,
-  RegExpUtils,
-} from 'mailspring-exports';
+import Rx from 'rx-lite';
+import * as Actions from '../../data/actions';
+import AttachmentStore from '../../data/stores/attachment';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
+import { Calendar } from '../../data/models/calendar';
+import { EventConflictJSON as CalendarConflict } from '../../engine/protocol';
+import { File } from '../../data/models/file';
+import { localized } from '../../intl/localize';
+import DateUtils from '../../utils/date';
+import { ICSParticipantStatus } from '../../data/calendar/ics';
+import * as CalendarUtils from '../../data/calendar/ics';
+import { Message } from '../../data/models/message';
+import { Event } from '../../data/models/event';
+import { DatabaseChangeRecord } from '../../data/database/change-record';
+import DatabaseStore from '../../data/database/store';
+import RegExpUtils from '../../utils/regexp';
 import ICAL from 'ical.js';
 import {
   resolveRSVPTarget,
@@ -217,7 +215,7 @@ export class EventHeader extends React.Component<EventHeaderProps, EventHeaderSt
 
     let data: string;
     try {
-      // Mailsync sometimes saves an attachment under a sanitized name only the store can find.
+      // The engine sometimes saves an attachment under a sanitized name only the store can find.
       const filePath = await AttachmentStore.resolvePathForFile(file);
       data = await fs.promises.readFile(filePath, 'utf8');
     } catch (e) {

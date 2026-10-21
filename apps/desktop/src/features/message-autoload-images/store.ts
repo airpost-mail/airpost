@@ -1,7 +1,10 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from '../../data/stores/base';
 import fs from 'fs';
 import path from 'path';
-import { Utils, Message, MessageBodyProcessor, CategoryStore } from 'mailspring-exports';
+import * as Utils from '../../data/models/utils';
+import { Message } from '../../data/models/message';
+import MessageBodyProcessor from '../../mail/body/processor';
+import CategoryStore from '../../data/stores/category';
 import * as AutoloadImagesActions from './actions';
 
 class AutoloadImagesStore extends BaseStore {

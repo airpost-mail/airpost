@@ -1,5 +1,5 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
 import { IconButton } from '../../components/kit/icon-button';
 import EmailFrameStylesStore from './email-frame-styles-store';
 import {

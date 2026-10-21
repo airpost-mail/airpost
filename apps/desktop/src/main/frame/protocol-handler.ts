@@ -51,7 +51,6 @@ export function messageFrameResponse(url: string, method: string, script: () => 
 export function messageFrameScript(resourcePath: string) {
   const dir = path.join(resourcePath, 'src', 'mail', 'frame');
   return bundleScript(require.resolve(path.join(dir, 'entry')), {
-    'mailspring-exports': require.resolve(path.join(dir, 'exports')),
     // RegExpUtils.emojiRegex only; the frame never calls it.
     'emoji-data': null,
   });

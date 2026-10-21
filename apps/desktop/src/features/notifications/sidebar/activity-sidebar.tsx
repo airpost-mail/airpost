@@ -1,14 +1,12 @@
 import React from 'react';
-import {
-  Actions,
-  localized,
-  Utils,
-  FolderSyncProgressStore,
-  TaskQueue,
-  SendDraftTask,
-  GetManyRFC2822Task,
-  Task,
-} from 'mailspring-exports';
+import * as Actions from '../../../data/actions';
+import { localized } from '../../../intl/localize';
+import * as Utils from '../../../data/models/utils';
+import FolderSyncProgressStore from '../../../data/stores/folder-sync-progress';
+import TaskQueue from '../../../data/stores/task-queue';
+import { SendDraftTask } from '../../../data/tasks/send-draft';
+import { GetManyRFC2822Task } from '../../../data/tasks/get-many-rfc2822';
+import { Task } from '../../../data/tasks/task';
 
 import { SyncActivity } from './sync-activity';
 import { SyncbackActivity } from './syncback-activity';

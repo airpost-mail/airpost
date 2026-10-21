@@ -1,13 +1,13 @@
 import React, { Component } from 'react';
-import { ListensToFluxStore, RetinaImg, KeyCommandsRegion } from 'mailspring-component-kit';
-import {
-  localized,
-  Actions,
-  FocusedPerspectiveStore,
-  WorkspaceStore,
-  MailboxPerspective,
-  AccountStore,
-} from 'mailspring-exports';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import { RetinaImg } from '../../components/retina-img';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import WorkspaceStore from '../../data/stores/workspace';
+import { MailboxPerspective } from '../../data/mailbox-perspective';
+import { AccountStore } from '../../data/stores/account';
 import SearchStore from './store';
 import TokenizingContenteditable from './tokenizing-contenteditable';
 import { IconButton } from '../../components/kit/icon-button';

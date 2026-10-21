@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { CalendarDateUtils, isRTL } from 'mailspring-exports';
+import * as CalendarDateUtils from '../../../data/calendar/calendar-date';
+import { isRTL } from '../../../intl/localize';
 
 import { EventOccurrence } from '../data-source';
 import { CalendarContainerType } from '../drag-types';

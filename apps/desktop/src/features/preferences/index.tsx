@@ -1,10 +1,8 @@
 /* eslint global-require: 0 */
-import {
-  localized,
-  PreferencesUIStore,
-  WorkspaceStore,
-  ComponentRegistry,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { PreferencesUIStore } from '../../data/stores/preferences-ui';
+import WorkspaceStore from '../../data/stores/workspace';
+import ComponentRegistry from '../../packages/component-registry';
 
 import PreferencesRoot from './root';
 import { migrateCoreMcpConfig } from './tabs/mcp/policy';

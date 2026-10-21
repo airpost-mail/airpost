@@ -4,16 +4,14 @@
 // renders it with its props.
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
-import {
-  Rx,
-  Thread,
-  Message,
-  ComponentRegistry,
-  ExtensionRegistry,
-  FocusedContentStore,
-  FocusedPerspectiveStore,
-  WorkspaceStore,
-} from 'mailspring-exports';
+import Rx from 'rx-lite';
+import { Thread } from '../../src/data/models/thread';
+import { Message } from '../../src/data/models/message';
+import ComponentRegistry from '../../src/packages/component-registry';
+import * as ExtensionRegistry from '../../src/packages/extension-registry';
+import FocusedContentStore from '../../src/data/stores/focused-content';
+import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
+import WorkspaceStore from '../../src/data/stores/workspace';
 import ThreadListStore from '../../src/features/thread-list/store';
 import ThreadListToolbar from '../../src/features/thread-list/toolbar';
 import MessageListToolbar from '../../src/features/thread-list/message-list-toolbar';

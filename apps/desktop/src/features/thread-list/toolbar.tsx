@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
-import { Thread } from 'mailspring-exports';
-import { MultiselectToolbar } from 'mailspring-component-kit';
+import { Thread } from '../../data/models/thread';
+import MultiselectToolbar from '../../components/multiselect/toolbar';
 import InjectsToolbarButtons, { ToolbarRole } from './injects-toolbar-buttons';
 
 interface ThreadListToolbarProps {

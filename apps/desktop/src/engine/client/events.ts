@@ -3,8 +3,8 @@
 
 /*
 The serve engine as a window's stores and packages see it: the features its hello announced,
-socket requests to it, and the notifications MailsyncBridge doesn't turn into database changes.
-MailsyncBridge feeds it from the window's EngineConnection; until the first hello (and in spec
+socket requests to it, and the notifications EngineBridge doesn't turn into database changes.
+EngineBridge feeds it from the window's EngineConnection; until the first hello (and in spec
 mode) `features` is null and every `has()` is false.
 
 Events: 'connected' (features) after each hello, 'gone' when the connection drops,

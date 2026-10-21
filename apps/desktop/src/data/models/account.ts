@@ -2,7 +2,7 @@
 import * as Attributes from '../attributes';
 import { ModelWithMetadata } from './model-with-metadata';
 import { AttributeValues } from './model';
-import { MailsyncProcessExit } from 'mailspring-exports';
+import { EngineProcessExit } from '../../engine/process';
 
 let CategoryStore = null;
 let Contact = null;
@@ -118,7 +118,7 @@ export class Account extends ModelWithMetadata {
   public aliases: string[];
   public defaultAlias: string;
   public syncState: string;
-  public syncError: MailsyncProcessExit | null;
+  public syncError: EngineProcessExit | null;
   public color: string;
 
   constructor(args: AttributeValues<typeof Account.attributes>) {

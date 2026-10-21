@@ -1,5 +1,5 @@
-import { Actions } from 'mailspring-exports';
-import BaseStore from 'mailspring-store';
+import * as Actions from '../actions';
+import BaseStore from './base';
 import _ from 'underscore';
 
 export interface IDefaultSignatures {
@@ -36,8 +36,7 @@ class _SignatureStore extends BaseStore {
     this.signatures = AppEnv.config.get(`signatures`);
     this.defaultSignatures = AppEnv.config.get(`defaultSignatures`) || {};
 
-    // A clean install starts with no signatures. (Mailspring created a "Sent from Mailspring"
-    // one and applied it to every account; profiles imported from it keep theirs.)
+    // A clean install starts with no signatures; profiles imported from Mailspring keep theirs.
     if (!this.signatures) {
       this.signatures = {};
     }

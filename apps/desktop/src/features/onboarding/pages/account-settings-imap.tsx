@@ -1,6 +1,7 @@
 import { ipcRenderer } from 'electron';
 import React from 'react';
-import { localized, Account } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import { Account } from '../../../data/models/account';
 import CreatePageForForm from './create-page-for-form';
 import FormField from '../form-field';
 import { Checkbox } from '../../../components/kit/checkbox';

@@ -7,7 +7,7 @@
   "description": "The N1 Client Theme",
   "license": "GPL-3.0-only",
   "engines": {
-    "mailspring": "*"
+    "tern": "*"
   },
   "private": true
 }

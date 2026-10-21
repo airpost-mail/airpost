@@ -1,7 +1,8 @@
 // Moves and resizes from the calendar grid go to the engine (events.update with queue: false),
 // which builds the ICS; the window queues the writes itself so they can be undone. The ICS edits
 // are crates/tern-pim's tests.
-import { Actions, SyncbackEventTask } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
 import { Event as EventModel } from '../../src/data/models/event';
 import {
   modifySimpleEvent,

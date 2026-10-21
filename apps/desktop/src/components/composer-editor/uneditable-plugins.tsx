@@ -1,7 +1,9 @@
 import React from 'react';
 import { Editor } from 'slate';
-import { RetinaImg } from 'mailspring-component-kit';
-import { localized, SanitizeTransformer, SignatureStore } from 'mailspring-exports';
+import { RetinaImg } from '../retina-img';
+import { localized } from '../../intl/localize';
+import SanitizeTransformer from '../../mail/body/sanitize-transformer';
+import { SignatureStore } from '../../data/stores/signature';
 import { ComposerEditorPlugin } from './types';
 
 export const UNEDITABLE_TYPE = 'uneditable';
@@ -39,7 +41,7 @@ const RemoteCSSImageRegexp = /(?:url|image-set)\((?!\s*['"]?\s*(?:data|cid):)[^)
 const MayHaveRemoteImages = /\b(?:src|srcset|background|poster)\s*=|url\(|image-set\(/i;
 
 function isRemoteImageURL(url: string) {
-  return !/^\s*(?:cid|data|mailspring|tern-file|file):/i.test(url) && url.trim() !== '';
+  return !/^\s*(?:cid|data|tern-asset|mailspring|tern-file|file):/i.test(url) && url.trim() !== '';
 }
 
 const displayCache = new Map<string, string>();

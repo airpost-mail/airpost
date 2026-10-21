@@ -1,4 +1,4 @@
-import { Utils } from 'mailspring-exports';
+import * as Utils from '../../src/data/models/utils';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';

@@ -8,7 +8,9 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { Contact, AccountStore, localized } from 'mailspring-exports';
+import { Contact } from '../../data/models/contact';
+import { AccountStore } from '../../data/stores/account';
+import { localized } from '../../intl/localize';
 import { exportContacts, importContacts } from '../../engine/client/pim';
 
 function showInfo(title: string, message: string) {

@@ -5,7 +5,7 @@
 One window's socket connection to the `serve` engine the main process supervises
 (engine/supervisor/supervisor.ts). It follows the supervisor's EngineStatus: it connects when the
 status names a ready engine, says hello, subscribes to the deltas and emits them as 'deltas'
-(delta params as JSON text, the shape MailsyncBridge reads), and connects again to the next
+(delta params as JSON text, the shape EngineBridge reads), and connects again to the next
 engine after a respawn.
 
 Only the main window subscribes to every account, which makes it the one connection that takes
@@ -21,7 +21,7 @@ account.add answered, dropped while a reset holds the account, refused when the 
 run it, and kept while the socket is down so the reconnect sends them. Credentials never pass
 here.
 
-MailsyncBridge feeds the window's EngineEvents from it: the hello's features and request() while
+EngineBridge feeds the window's EngineEvents from it: the hello's features and request() while
 connected, and each mail.new.
 */
 import { EventEmitter } from 'events';
@@ -132,7 +132,7 @@ export class EngineConnection extends EventEmitter {
     this._flushPending();
   }
 
-  // Sends one of MailsyncBridge's stdin-shaped commands for the account. False when the engine
+  // Sends one of EngineBridge's stdin-shaped commands for the account. False when the engine
   // doesn't run it, so the bridge can say the account can't sync.
   send(accountId: string, json: Command) {
     const route = this.status && this.status.accounts[accountId];

@@ -1,21 +1,19 @@
 import _ from 'underscore';
 
-import {
-  File,
-  Actions,
-  Thread,
-  Contact,
-  Message,
-  DraftStore,
-  AccountStore,
-  DatabaseStore,
-  AttachmentStore,
-  MailboxPerspective,
-  SanitizeTransformer,
-  FocusedContentStore,
-  InlineStyleTransformer,
-  FocusedPerspectiveStore,
-} from 'mailspring-exports';
+import { File } from '../../src/data/models/file';
+import * as Actions from '../../src/data/actions';
+import { Thread } from '../../src/data/models/thread';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import DraftStore from '../../src/data/drafts/store';
+import { AccountStore } from '../../src/data/stores/account';
+import DatabaseStore from '../../src/data/database/store';
+import AttachmentStore from '../../src/data/stores/attachment';
+import { MailboxPerspective } from '../../src/data/mailbox-perspective';
+import SanitizeTransformer from '../../src/mail/body/sanitize-transformer';
+import FocusedContentStore from '../../src/data/stores/focused-content';
+import InlineStyleTransformer from '../../src/mail/body/inline-style-transformer';
+import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
 
 import os from 'os';
 import DraftFactory, { generateHeaderMessageId } from '../../src/data/drafts/factory';

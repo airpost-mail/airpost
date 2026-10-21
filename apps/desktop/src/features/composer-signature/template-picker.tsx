@@ -1,5 +1,5 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
 import { RadioGroup, RadioGroupItem } from '../../components/kit/radio-group';
 import Templates from './templates';
 

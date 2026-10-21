@@ -1,4 +1,5 @@
-import { SearchQueryAST, SearchQueryParser } from 'mailspring-exports';
+import * as SearchQueryAST from '../../src/mail/search/ast';
+import { SearchQueryParser } from '../../src/mail/search/parser';
 
 const {
   SearchQueryToken,

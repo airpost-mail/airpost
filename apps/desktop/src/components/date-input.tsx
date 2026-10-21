@@ -1,6 +1,7 @@
 import classnames from 'classnames';
 import React, { Component } from 'react';
-import { localized, DateUtils } from 'mailspring-exports';
+import { localized } from '../intl/localize';
+import DateUtils from '../utils/date';
 import { TextField } from './kit/text-field';
 
 type DateInputProps = {
@@ -73,7 +74,7 @@ class DateInput extends Component<DateInputProps, DateInputState> {
     const { className } = this.props;
     const { inputDate, inputValue } = this.state;
     const classes = classnames({
-      'nylas-date-input': true,
+      'tern-date-input': true,
       [className]: className != null,
     });
     const formatted = (

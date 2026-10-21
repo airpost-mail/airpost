@@ -1,15 +1,13 @@
 import moment from 'moment';
 import { formatShortTime as shortTime } from '../../intl/date-format';
-import {
-  Utils,
-  Calendar,
-  Actions,
-  DateUtils,
-  SyncbackEventTask,
-  TaskQueue,
-  localized,
-  CalendarDateUtils,
-} from 'mailspring-exports';
+import * as Utils from '../../data/models/utils';
+import { Calendar } from '../../data/models/calendar';
+import * as Actions from '../../data/actions';
+import DateUtils from '../../utils/date';
+import { SyncbackEventTask } from '../../data/tasks/syncback-event';
+import TaskQueue from '../../data/stores/task-queue';
+import { localized } from '../../intl/localize';
+import * as CalendarDateUtils from '../../data/calendar/calendar-date';
 import { ShowAsOption, defaultShowAs } from './event/show-as-selector';
 import { MIN_EVENT_DURATION_SECONDS } from './constants';
 import { EventOccurrence, coveredDates, isTimed, occurrenceId } from './data-source';

@@ -141,8 +141,8 @@ SUPPORTED_EXTENSIONS.forEach(extension => {
   });
 });
 
-exports.setHomeDirectory = nylasHome => {
-  let cacheDir = path.join(nylasHome, 'compile-cache');
+exports.setHomeDirectory = homeDir => {
+  let cacheDir = path.join(homeDir, 'compile-cache');
   if (
     process.env.USER === 'root' &&
     process.env.SUDO_USER &&

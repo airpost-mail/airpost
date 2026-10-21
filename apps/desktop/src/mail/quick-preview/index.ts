@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import path from 'path';
-import { File } from 'mailspring-exports';
+import { File } from '../../data/models/file';
 import { ipcRenderer } from 'electron';
 import { developerToolsAvailable } from '../../platform/developer-tools';
 import { quickPreviewContentSecurityPolicy } from '../content-security-policy';

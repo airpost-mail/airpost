@@ -1,25 +1,22 @@
 import React from 'react';
 import classNames from 'classnames';
 
-import {
-  localized,
-  localizedReactFragment,
-  Actions,
-  Account,
-  AccountStore,
-  MailRulesStore,
-  MailRulesTemplates,
-} from 'mailspring-exports';
+import { localized, localizedReactFragment } from '../../../intl/localize';
+import * as Actions from '../../../data/actions';
+import { Account } from '../../../data/models/account';
+import { AccountStore } from '../../../data/stores/account';
+import MailRulesStore from '../../../data/stores/mail-rules';
+import * as MailRulesTemplates from '../../../data/mail-rules-templates';
 
+import ScenarioEditor from '../../../components/scenario-editor/scenario-editor';
 import {
-  ScenarioEditor,
   SettingsPage,
   SettingsSection,
   SettingsRow,
   SettingsSwitch,
   SettingsField,
   StatusPill,
-} from 'mailspring-component-kit';
+} from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 import { TextField } from '../../../components/kit/text-field';
 import { SettingsSelect } from '../../../components/settings-select';

@@ -1,7 +1,9 @@
 import React from 'react';
 
-import { Account, localized, localizedReactFragment, RegExpUtils } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { Account } from '../../../data/models/account';
+import { localized, localizedReactFragment } from '../../../intl/localize';
+import RegExpUtils from '../../../utils/regexp';
+import { RetinaImg } from '../../../components/retina-img';
 
 import OAuthSignInPage, { reconnectingAccountId } from './oauth-signin';
 import FormErrorMessage from '../form-error-message';

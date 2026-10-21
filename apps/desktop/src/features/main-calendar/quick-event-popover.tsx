@@ -1,5 +1,9 @@
 import React from 'react';
-import { Actions, Calendar, DatabaseStore, DateUtils, localized } from 'mailspring-exports';
+import * as Actions from '../../data/actions';
+import { Calendar } from '../../data/models/calendar';
+import DatabaseStore from '../../data/database/store';
+import DateUtils from '../../utils/date';
+import { localized } from '../../intl/localize';
 import { Moment } from 'moment';
 import { TextField } from '../../components/kit/text-field';
 import { getEditableCalendars, showNoEditableCalendarsError, createCalendarEvent } from './helpers';
@@ -82,7 +86,7 @@ export class QuickEventPopover extends React.Component<
     }
 
     return (
-      <div className="quick-event-popover nylas-date-input">
+      <div className="quick-event-popover tern-date-input">
         <TextField
           tabIndex={0}
           aria-label={localized('New Event')}

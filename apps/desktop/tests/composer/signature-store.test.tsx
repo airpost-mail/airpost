@@ -1,5 +1,5 @@
 /* eslint quote-props: 0 */
-import { SignatureStore } from 'mailspring-exports';
+import { SignatureStore } from '../../src/data/stores/signature';
 
 let SIGNATURES = {
   '1': {
@@ -15,9 +15,9 @@ let SIGNATURES = {
 };
 
 const DEFAULTS = {
-  'one@nylas.com': '2',
-  'two@nylas.com': '2',
-  'three@nylas.com': null,
+  'one@example.com': '2',
+  'two@example.com': '2',
+  'three@example.com': null,
 };
 
 describe('SignatureStore', function signatureStore() {
@@ -34,9 +34,9 @@ describe('SignatureStore', function signatureStore() {
 
   describe('signatureForAccountId', () => {
     it('should return the default signature for that account', () => {
-      const titleForAccount1 = SignatureStore.signatureForEmail('one@nylas.com').title;
+      const titleForAccount1 = SignatureStore.signatureForEmail('one@example.com').title;
       expect(titleForAccount1).toEqual(SIGNATURES['2'].title);
-      const account2Def = SignatureStore.signatureForEmail('three@nylas.com');
+      const account2Def = SignatureStore.signatureForEmail('three@example.com');
       expect(account2Def).toEqual(undefined);
     });
   });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { localized, Utils } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import * as Utils from '../../../data/models/utils';
 
 export class SyncbackActivity extends React.Component<{ tasks: any[] }> {
   shouldComponentUpdate(nextProps: { tasks: any[] }, nextState: Record<string, never>) {

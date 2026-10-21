@@ -1,6 +1,8 @@
 import React from 'react';
-import { localized, FocusedContactsStore, Contact } from 'mailspring-exports';
-import { InjectedComponentSet } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import FocusedContactsStore from '../../data/stores/focused-contacts';
+import { Contact } from '../../data/models/contact';
+import { InjectedComponentSet } from '../../components/injected/component-set';
 
 class FocusedContactStorePropsContainer extends React.Component<
   { children: React.ReactElement<any> },

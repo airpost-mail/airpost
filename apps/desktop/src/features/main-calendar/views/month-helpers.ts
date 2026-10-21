@@ -1,5 +1,6 @@
 import { Moment } from 'moment-timezone';
-import { CalendarDate, CalendarDateUtils } from 'mailspring-exports';
+import { CalendarDate } from '../../../data/calendar/calendar-date';
+import * as CalendarDateUtils from '../../../data/calendar/calendar-date';
 import { EventOccurrence, occurrenceStartUnix } from '../data-source';
 
 export interface MonthViewBar {

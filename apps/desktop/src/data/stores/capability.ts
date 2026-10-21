@@ -12,7 +12,7 @@
 // capabilities it decides from config alone.
 
 import { useEffect, useState } from 'react';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import { localized } from '../../intl/localize';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
 import { CapabilityReason, EngineCapability, Feature } from '../../engine/protocol';

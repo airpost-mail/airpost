@@ -2,7 +2,9 @@
 // and the undoable task it queues. The ICS the engine writes for these edits (a detailed RRULE
 // or RDATEs kept, EXDATEs rezoned, one SEQUENCE bump, ORGANIZER on the first guest, TRANSP per
 // VEVENT) is crates/tern-pim's desktop corpus, recorded from this spec.
-import { Actions, DatabaseStore, SyncbackEventTask } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import DatabaseStore from '../../src/data/database/store';
+import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
 import { Event as EventModel } from '../../src/data/models/event';
 import { CalendarEventPopover } from '../../src/features/main-calendar/event/popover';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';

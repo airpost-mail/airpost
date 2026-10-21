@@ -1,4 +1,6 @@
-import { SystemStartService, WorkspaceStore, ComponentRegistry } from 'mailspring-exports';
+import SystemStartService from '../../window/platform/system-start-service';
+import WorkspaceStore from '../../data/stores/workspace';
+import ComponentRegistry from '../../packages/component-registry';
 import OnboardingRoot from './root';
 
 export function activate() {

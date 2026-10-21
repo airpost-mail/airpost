@@ -1,12 +1,10 @@
 import _ from 'underscore';
-import {
-  Actions,
-  Thread,
-  DatabaseStore,
-  SearchQueryParser,
-  ComponentRegistry,
-  MutableQuerySubscription,
-} from 'mailspring-exports';
+import * as Actions from '../../data/actions';
+import { Thread } from '../../data/models/thread';
+import DatabaseStore from '../../data/database/store';
+import { SearchQueryParser } from '../../mail/search/parser';
+import ComponentRegistry from '../../packages/component-registry';
+import { MutableQuerySubscription } from '../../data/query/mutable-subscription';
 
 class SearchQuerySubscription extends MutableQuerySubscription<Thread> {
   _searchQuery: string;

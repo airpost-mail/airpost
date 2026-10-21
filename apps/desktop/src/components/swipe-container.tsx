@@ -2,7 +2,7 @@ import _ from 'underscore';
 import { exec } from 'child_process';
 import React, { CSSProperties } from 'react';
 import ReactDOM from 'react-dom';
-import { Utils } from 'mailspring-exports';
+import * as Utils from '../data/models/utils';
 
 // The spring formula from dynamics.js (MIT, Michael Villar):
 // https://github.com/michaelvillar/dynamics.js/blob/master/src/dynamics.coffee#L1179

@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Actions, localized } from 'mailspring-exports';
-import { BindGlobalCommands } from 'mailspring-component-kit';
+import * as Actions from '../../data/actions';
+import { localized } from '../../intl/localize';
+import BindGlobalCommands from '../../components/bind-global-commands';
 import { IconButton } from '../../components/kit/icon-button';
 import { QuickEventPopover } from './quick-event-popover';
 

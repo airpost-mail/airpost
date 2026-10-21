@@ -69,7 +69,6 @@ async function run() {
     process.exit(1);
   }
 
-  // The mailsync submodule is gone from this monorepo, so there is no upstream build to fetch.
   // The Rust engine is built by apps/engine/packaging/build-release.sh --install-desktop.
   if (!fs.existsSync(path.join(desktopDir, 'tern-engine'))) {
     console.log(

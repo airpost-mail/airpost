@@ -1,10 +1,10 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import { Contact } from '../models/contact';
 import RegExpUtils from '../../utils/regexp';
 import DatabaseStore from '../database/store';
 import { AccountStore } from './account';
 import ComponentRegistry from '../../packages/component-registry';
-import { ContactGroup } from 'mailspring-exports';
+import { ContactGroup } from '../models/contact-group';
 
 /**
 Public: ContactStore provides convenience methods for searching contacts and

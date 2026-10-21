@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { apiVersion } from 'mailspring-exports';
+import { PLUGIN_API_VERSION as apiVersion } from '../../src/packages/api-version';
 import PackageManager from '../../src/packages/manager';
 import Package from '../../src/packages/package';
 import { PLUGIN_API_VERSION } from '../../src/packages/api-version';
@@ -38,8 +38,10 @@ describe('PackageManager engines check', function () {
 
   it('skips a package without engines and still activates the ones after it', () => {
     writePackage('a-no-engines', { syncInit: true });
-    writePackage('b-any', { syncInit: true, engines: { mailspring: '*' } });
-    writePackage('c-caret', { syncInit: true, engines: { mailspring: '^1.0.0' } });
+    writePackage('b-any', { syncInit: true, engines: { tern: '*' } });
+    writePackage('c-caret', { syncInit: true, engines: { tern: '^1.0.0' } });
+    // The v1 plugin API name.
+    writePackage('d-v1-name', { syncInit: true, engines: { mailspring: '^1.0.0' } });
 
     const pm = manager();
     expect(() => pm.activatePackages('default')).not.toThrow();
@@ -47,26 +49,27 @@ describe('PackageManager engines check', function () {
     expect(pm.isPackageActive('a-no-engines')).toBe(false);
     expect(pm.isPackageActive('b-any')).toBe(true);
     expect(pm.isPackageActive('c-caret')).toBe(true);
+    expect(pm.isPackageActive('d-v1-name')).toBe(true);
   });
 
   it('skips a package whose range the plugin API version does not satisfy', () => {
-    writePackage('future', { syncInit: true, engines: { mailspring: '>=2.0.0' } });
-    writePackage('garbage', { syncInit: true, engines: { mailspring: 'not a range' } });
-    writePackage('engines-without-mailspring', { syncInit: true, engines: { node: '>=18' } });
-    writePackage('current', { syncInit: true, engines: { mailspring: `>=${PLUGIN_API_VERSION}` } });
+    writePackage('future', { syncInit: true, engines: { tern: '>=2.0.0' } });
+    writePackage('garbage', { syncInit: true, engines: { tern: 'not a range' } });
+    writePackage('engines-without-tern', { syncInit: true, engines: { node: '>=18' } });
+    writePackage('current', { syncInit: true, engines: { tern: `>=${PLUGIN_API_VERSION}` } });
 
     const pm = manager();
     pm.activatePackages('default');
 
     expect(pm.isPackageActive('future')).toBe(false);
     expect(pm.isPackageActive('garbage')).toBe(false);
-    expect(pm.isPackageActive('engines-without-mailspring')).toBe(false);
+    expect(pm.isPackageActive('engines-without-tern')).toBe(false);
     expect(pm.isPackageActive('current')).toBe(true);
     const messages = (console.error as jasmine.Spy).calls.map((c) => String(c.args[0]));
     expect(messages.some((m) => m.includes('future') && m.includes('>=2.0.0'))).toBe(true);
   });
 
-  it('reads engines.mailspring without throwing when engines is missing', () => {
+  it('reads the engines range without throwing when engines is missing', () => {
     writePackage('bare', {});
     const pkg = new Package(
       path.join(resourcePath, 'tests', 'support', 'fixtures', 'packages', 'bare')
@@ -77,7 +80,7 @@ describe('PackageManager engines check', function () {
 
   it('exports the plugin API version', () => {
     expect(apiVersion).toBe(PLUGIN_API_VERSION);
-    expect(apiVersion).toBe('1.34.0');
+    expect(apiVersion).toBe('1.35.0');
   });
 
   it('reads tern.engineMethods, keeping only strings', () => {

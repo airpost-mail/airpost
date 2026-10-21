@@ -1,6 +1,6 @@
 import React from 'react';
-import { ListensToFluxStore } from 'mailspring-component-kit';
-import { localized } from 'mailspring-exports';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import { localized } from '../../intl/localize';
 import { Button } from '../../components/kit/button';
 
 import { Store, ContactsPerspective } from './store';

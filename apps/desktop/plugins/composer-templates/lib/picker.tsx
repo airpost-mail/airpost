@@ -147,7 +147,7 @@ class TemplatePicker extends React.Component<{
             aria-label={label}
           >
             <RetinaImg
-              url="mailspring://composer-templates/assets/icon-composer-templates@2x.png"
+              url="tern-asset://composer-templates/assets/icon-composer-templates@2x.png"
               mode={RetinaImg.Mode.ContentIsMask}
               aria-hidden="true"
             />

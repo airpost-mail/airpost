@@ -119,7 +119,7 @@ describe('EventRSVPTask', () => {
   let queueTask: jasmine.Spy;
 
   beforeEach(() => {
-    spyOn(AppEnv.mailsyncBridge, 'sendSyncCalendarNow');
+    spyOn(AppEnv.engineBridge, 'sendSyncCalendarNow');
     queueTask = spyOn(Actions, 'queueTask');
   });
 
@@ -128,7 +128,7 @@ describe('EventRSVPTask', () => {
 
     await task.onSuccess();
 
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
   });
 
   it('records the response on the invitation message before syncing', async () => {
@@ -145,7 +145,7 @@ describe('EventRSVPTask', () => {
     const queued = queueTask.mostRecentCall.args[0];
     expect(queued instanceof SyncbackMetadataTask).toBe(true);
     expect(queued.value.status).toBe('ACCEPTED');
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
   });
 
   it('still syncs when the invitation message is no longer available', async () => {
@@ -159,7 +159,7 @@ describe('EventRSVPTask', () => {
     await task.onSuccess();
 
     expect(queueTask).not.toHaveBeenCalled();
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
   });
 });
 
@@ -190,7 +190,7 @@ describe('EventRSVPTask.forProposingNewTime', function () {
   });
 
   it('does not record an answer on the invitation, since a proposal is not one', async function () {
-    spyOn(AppEnv.mailsyncBridge, 'sendSyncCalendarNow');
+    spyOn(AppEnv.engineBridge, 'sendSyncCalendarNow');
     const queueTask = spyOn(Actions, 'queueTask');
     const find = spyOn(DatabaseStore, 'find');
     const task = propose();
@@ -200,6 +200,6 @@ describe('EventRSVPTask.forProposingNewTime', function () {
 
     expect(find).not.toHaveBeenCalled();
     expect(queueTask).not.toHaveBeenCalled();
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith(ACCOUNT_ID);
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith(ACCOUNT_ID);
   });
 });

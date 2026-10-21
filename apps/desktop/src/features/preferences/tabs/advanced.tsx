@@ -1,7 +1,8 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
-import { Actions, localized } from 'mailspring-exports';
-import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
+import * as Actions from '../../../data/actions';
+import { localized } from '../../../intl/localize';
+import { SettingsPage, SettingsSection, SettingsRow } from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 
 export default function PreferencesAdvanced() {

@@ -40,7 +40,7 @@ import {
   engineBinaryPath,
   engineBuildId,
   EngineServeProcess,
-  MailsyncProcessExit,
+  EngineProcessExit,
   ResetOptions,
 } from '../process';
 import {
@@ -463,7 +463,7 @@ export class EngineSupervisor {
   }
 }
 
-function serializeExit(exit: MailsyncProcessExit) {
+function serializeExit(exit: EngineProcessExit) {
   const error = exit.error as Error & { syncError?: unknown };
   return {
     code: exit.code === undefined ? null : exit.code,

@@ -2,13 +2,11 @@ import _ from 'underscore';
 import React from 'react';
 import classNames from 'classnames';
 import { RetinaImg } from './retina-img';
-import {
-  localized,
-  MailboxPerspective,
-  FolderSyncProgressStore,
-  FocusedPerspectiveStore,
-} from 'mailspring-exports';
-import { SyncingListState } from 'mailspring-component-kit';
+import { localized } from '../intl/localize';
+import { MailboxPerspective } from '../data/mailbox-perspective';
+import FolderSyncProgressStore from '../data/stores/folder-sync-progress';
+import FocusedPerspectiveStore from '../data/stores/focused-perspective';
+import SyncingListState from './syncing-list-state';
 import { EngineUnavailableState } from './engine-unavailable-state';
 
 type EmptyPerspectiveStateProps = {

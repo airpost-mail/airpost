@@ -1,8 +1,11 @@
 import React from 'react';
 import moment, { Moment } from 'moment-timezone';
 import { formatTime } from '../../../intl/date-format';
-import { ScrollRegion, InjectedComponentSet } from 'mailspring-component-kit';
-import { localized, Actions, CalendarDateUtils } from 'mailspring-exports';
+import { ScrollRegion } from '../../../components/scroll-region';
+import { InjectedComponentSet } from '../../../components/injected/component-set';
+import { localized } from '../../../intl/localize';
+import * as Actions from '../../../data/actions';
+import * as CalendarDateUtils from '../../../data/calendar/calendar-date';
 import { CalendarViewProps } from '../main-calendar';
 import { CalendarView } from '../constants';
 import { Button } from '../../../components/kit/button';

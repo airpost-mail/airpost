@@ -1,4 +1,4 @@
-import { File } from 'mailspring-exports';
+import { File } from '../../data/models/file';
 
 export function bestICSAttachment(files: File[]) {
   return (

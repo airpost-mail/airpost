@@ -1,16 +1,16 @@
 import React, { Component } from 'react';
 import moment from 'moment-timezone';
 import { formatTime } from '../../intl/date-format';
-import {
-  Rx,
-  Event,
-  DatabaseStore,
-  localized,
-  Calendar,
-  Actions,
-  CalendarDateUtils,
-} from 'mailspring-exports';
-import { RetinaImg, KeyCommandsRegion, BindGlobalCommands } from 'mailspring-component-kit';
+import Rx from 'rx-lite';
+import { Event } from '../../data/models/event';
+import DatabaseStore from '../../data/database/store';
+import { localized } from '../../intl/localize';
+import { Calendar } from '../../data/models/calendar';
+import * as Actions from '../../data/actions';
+import * as CalendarDateUtils from '../../data/calendar/calendar-date';
+import { RetinaImg } from '../../components/retina-img';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
+import BindGlobalCommands from '../../components/bind-global-commands';
 import { IconButton } from '../../components/kit/icon-button';
 import { TextField } from '../../components/kit/text-field';
 import { EventOccurrence, occurrencesForEvents, occurrenceStartUnix } from './data-source';

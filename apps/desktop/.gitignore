@@ -23,7 +23,6 @@ certs
 # Python
 *.pyc
 
-/mailsync
 /tern-engine
 /tern-engine.THIRD-PARTY-NOTICES.txt
 /tern-mcp
@@ -31,7 +30,6 @@ certs
 /tern.exe
 /tern-mcp.exe
 /tern-mcp.THIRD-PARTY-NOTICES.txt
-/mailsync.dSYM.zip
 /snap/snapcraft.yml
 /snap/.snapcraft/
 
@@ -39,6 +37,4 @@ certs
 **.bin
 **.tar.gz
 **.dll
-/mailsync.exe
-/mailsync.dSYM
 .idea

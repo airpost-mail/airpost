@@ -1,14 +1,14 @@
 import React from 'react';
-import {
-  Thread,
-  Message,
-  localized,
-  Utils,
-  Actions,
-  AttachmentStore,
-  MessageStore,
-} from 'mailspring-exports';
-import { RetinaImg, InjectedComponentSet, InjectedComponent } from 'mailspring-component-kit';
+import { Thread } from '../../data/models/thread';
+import { Message } from '../../data/models/message';
+import { localized } from '../../intl/localize';
+import * as Utils from '../../data/models/utils';
+import * as Actions from '../../data/actions';
+import AttachmentStore from '../../data/stores/attachment';
+import { MessageStore } from '../../data/stores/message';
+import { RetinaImg } from '../../components/retina-img';
+import { InjectedComponentSet } from '../../components/injected/component-set';
+import InjectedComponent from '../../components/injected/component';
 
 import MessageParticipants from './message-participants';
 import MessageItemBody from './message-item-body';

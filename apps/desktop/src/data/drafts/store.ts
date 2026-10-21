@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import BaseStore from 'mailspring-store';
+import BaseStore from '../stores/base';
 import { DraftEditingSession } from './editing-session';
 import DraftFactory, { ReplyType, ReplyBehavior } from './factory';
 import DatabaseStore from '../database/store';
@@ -164,7 +164,7 @@ class DraftStore extends BaseStore {
 
       // Stop and wait before closing, but never wait for more than 700ms.
       // We may not be able to save the draft once the main window has closed
-      // and the mailsync bridge is unavailable, don't want to hang forever.
+      // and the engine bridge is unavailable, don't want to hang forever.
       setTimeout(() => {
         if (done) done();
       }, 700);

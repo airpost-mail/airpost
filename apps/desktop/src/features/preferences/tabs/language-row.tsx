@@ -1,7 +1,7 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
-import { localized, getAvailableLanguages } from 'mailspring-exports';
-import { SettingsRow } from 'mailspring-component-kit';
+import { localized, getAvailableLanguages } from '../../../intl/localize';
+import { SettingsRow } from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 import {
   Select,

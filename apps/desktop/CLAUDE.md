@@ -41,12 +41,12 @@ npm run build
 
 ## Architecture Overview
 
-Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript and LESS are compiled at runtime; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. Plugin API names keep their Mailspring spelling (`mailspring-exports`, `engines.mailspring`, `window.$m`, `AppEnv`) because third-party plugins depend on them.
+Tern's desktop app is an Electron email client written in TypeScript with React 17, forked from Mailspring. TypeScript and LESS are compiled at runtime; there is no bundler. Built-in features are app code in `src/features/` that loads through the same package manager as plugins, and optional features are bundled plugins. The v1 plugin API keeps its Mailspring names (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`, `window.$m`, `AppEnv.mailsyncBridge`, `mailspring://`, `engines.mailspring`) because third-party plugins depend on them; app code uses relative imports and the Tern names (`AppEnv.engineBridge`, `tern-asset://`, `engines.tern`), and the old names are aliases (`docs/desktop/plugin-api-v2.md` section 11).
 
 ### Key Directories
 
 - **`src/`** - Core application source code, one directory per domain
-  - `main/` - Main process code, grouped into `windows/`, `frame/` (the message frame scheme), `protocols/` (the `mailspring:` and `tern-file:` schemes), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
+  - `main/` - Main process code, grouped into `windows/`, `frame/` (the message frame scheme), `protocols/` (the `tern-asset:` package asset scheme, with `mailspring:` as its alias, and `tern-file:`), `ipc/`, `platform/` (menu, tray, taskbar, OS hooks), `profile/` (profile marker, reset, Mailspring import, KeyManager) and `autoupdate/`; `main.js`, `application.ts` and `permission-policy.ts` sit at its root
   - `intl/` - Localization (`intl/localize.ts`: `localized`, the language list, RTL) and date/time formats in the app's locale and clock (`intl/date-format.ts`); both processes load it
   - `platform/` - The Electron/OS runtime both processes load: the TypeScript compile caches, the error logger, the devtools gate, the `shell` patch, default mail client registration and Linux desktop facts (XDG paths, the .desktop file name, Wayland)
   - `config/` - The config store, keys, schema and IPC channels; `migrator.ts` and `persistence-manager.ts` are main-process only
@@ -55,7 +55,7 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
   - `data/` - The local data layer: actions, models, attributes, queries (`data/query/`), stores, the database (`data/database/`), drafts (`data/drafts/`), tasks, calendar ICS parsing and all-day dates (`data/calendar/`), mailbox perspectives, mail rule templates
   - `mail/` - Message content: body processing (`mail/body/`), the sandboxed message frame and its protocol (`mail/frame/`), search queries (`mail/search/`), attachment previews (`mail/quick-preview/`), the content security policies, the `tern-file:` scheme, attachment safety checks, IMAP folder-name encoding, .eml and .mbox
   - `components/` - Reusable React UI components, including the UI kit (`components/kit/`), the sheets, lists, injected components, the higher-order components (`components/decorators/`) and the thread drag image and drag types
-  - `packages/` - The plugin system: package discovery and loading, themes and styles, the component/extension/service/sound registries, the extension base classes and the plugin API version; `packages/api/` holds only the plugin API barrels (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`), which are on the module path as bare names
+  - `packages/` - The plugin system: package discovery and loading, themes and styles, the component/extension/service/sound registries, the extension base classes and the plugin API version; `packages/api/` holds only the plugin API modules (`mailspring-exports`, `mailspring-component-kit`, `mailspring-store`, `mailspring-observables`), which are on the module path as bare names for plugins. `src/` and `tests/` import the defining modules by relative path instead (`BaseStore` is `data/stores/base.ts`, the Rx helpers `data/query/observables.ts`)
   - `utils/` - Generic helpers: DOM, date, regexp, backoff schedulers, the shared store listener, file: URL checks and atomic file writes
   - `features/` - The built-in features that always load (composer, message-list, thread-list, preferences, main-calendar, etc.), one directory each, listed in `features/index.ts`
 
@@ -63,7 +63,7 @@ Tern's desktop app is an Electron email client written in TypeScript with React 
 - **`themes/`** - The `ui-*` themes
 - **`vendor/`** - Quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify) loaded by `src/mail/quick-preview/renderer.html`
 
-Plugins and themes import core code as `../../../src/...`. `src/packages/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `mailspring:` protocol handler, ThemeManager and the test loader.
+Plugins and themes import core code as `../../../src/...`. `src/packages/bundled-packages.ts` lists the plugin and theme roots and `src/features` for the package manager, the `tern-asset:` protocol handler, ThemeManager and the test loader.
 
 > **IMPORTANT:** Application source code lives in `src/` (including `src/features/`) and `plugins/`. When searching for usages of a module, symbol, or pattern, always search all of them. Searching only `src/` will miss a large portion of the codebase and lead to incomplete changes.
 
@@ -77,7 +77,7 @@ There is one `package.json` and one `node_modules`. Runtime code goes in `depend
 
 ### Core Modules
 
-**Global exports for plugins:**
+**Global exports for plugins** (app code imports the defining modules directly):
 - `mailspring-exports` - Core APIs: Actions, Stores, Models, Tasks, Utils, database access
 - `mailspring-component-kit` - Reusable UI components
 
@@ -118,7 +118,7 @@ One engine process (`tern-engine --mode serve`) runs every account, started by t
 └──────────────┘                             └──────────────────┘
 ```
 
-Windows reach the stdin-only calls over IPC (`engine/channels.ts`). The `MailsyncBridge` in the main window listens to `Actions.queueTask` and sends tasks on its connection; every window applies the deltas it reads.
+Windows reach the stdin-only calls over IPC (`engine/channels.ts`). The `EngineBridge` in the main window listens to `Actions.queueTask` and sends tasks on its connection; every window applies the deltas it reads.
 
 ### Task System (`data/tasks/`)
 
@@ -126,7 +126,7 @@ Tasks represent operations the user wants to perform (send email, star thread, m
 
 **Task Lifecycle:**
 1. UI calls `Actions.queueTask(new SomeTask({...}))`
-2. `MailsyncBridge._onQueueTask()` validates and sends `task.queue` on the main window's socket connection
+2. `EngineBridge._onQueueTask()` validates and sends `task.queue` on the main window's socket connection
 3. Sync engine executes the task (local changes + remote API calls)
 4. Sync engine persists task status updates and emits deltas
 5. Task completion triggers `onSuccess()` or `onError()` callbacks
@@ -219,7 +219,7 @@ Adapts QuerySubscription for virtualized list components (MultiselectList), supp
 ### Data Flow Summary
 
 ```
-User Action → Actions.queueTask() → MailsyncBridge → socket (task.queue) → Sync Engine
+User Action → Actions.queueTask() → EngineBridge → socket (task.queue) → Sync Engine
                                                                           │
                                                                           ▼
 UI Updates ← QuerySubscription ← DatabaseStore.trigger() ← socket delta notifications
@@ -235,8 +235,8 @@ smaller functions over commentary; a comment that restates the code should be de
   consciousness, or the path you took to the answer.
 - Never describe history: where code used to live, what it was folded out of, what the
   previous implementation did, or what a diff changed. Git records that.
-- Cite external evidence when it exists — a Sentry issue ID (`MAILSPRING-CLIENT-AC`), an
-  upstream commit or PR in mailcore2/libetpan/Electron, a spec section, a provider quirk.
+- Cite external evidence when it exists — a Sentry issue ID, an
+  upstream commit or PR in Mailspring/mailcore2/libetpan/Electron, a spec section, a provider quirk.
   These justify code that otherwise looks arbitrary and are the most valuable comments in
   the codebase.
 - Paragraph-length comments should be rare, and almost always attach to a function, class,

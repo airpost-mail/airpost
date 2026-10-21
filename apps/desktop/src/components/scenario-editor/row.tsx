@@ -1,6 +1,6 @@
 import React from 'react';
 import Rx, { Disposable } from 'rx-lite';
-import { Flexbox } from 'mailspring-component-kit';
+import { Flexbox } from '../flexbox';
 import { localized } from '../../intl/localize';
 import { Button } from '../kit/button';
 import { TextField } from '../kit/text-field';

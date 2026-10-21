@@ -1,27 +1,27 @@
-import { imapUtf7 } from 'mailspring-exports';
+import { imapUtf7 } from '../../mail/imap-utf7';
 
 import fs from 'fs';
 import _str from 'underscore.string';
 import React from 'react';
-import { OutlineViewItem, LabelColorizer, LabelColorPopover } from 'mailspring-component-kit';
-import {
-  MailboxPerspective,
-  Label,
-  LabelColorStore,
-  FocusedPerspectiveStore,
-  SyncbackCategoryTask,
-  DestroyCategoryTask,
-  GetManyRFC2822Task,
-  CategoryStore,
-  Actions,
-  RegExpUtils,
-  DragDropTypes,
-  localized,
-  TaskQueue,
-  DatabaseStore,
-  Thread,
-  TaskFactory,
-} from 'mailspring-exports';
+import OutlineViewItem from '../../components/outline-view-item';
+import { LabelColorizer } from '../../components/mail-label';
+import LabelColorPopover from '../../components/label-color-popover';
+import { MailboxPerspective } from '../../data/mailbox-perspective';
+import { Label } from '../../data/models/label';
+import LabelColorStore from '../../data/stores/label-color';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
+import { DestroyCategoryTask } from '../../data/tasks/destroy-category';
+import { GetManyRFC2822Task } from '../../data/tasks/get-many-rfc2822';
+import CategoryStore from '../../data/stores/category';
+import * as Actions from '../../data/actions';
+import RegExpUtils from '../../utils/regexp';
+import * as DragDropTypes from '../../components/drag-drop-types';
+import { localized } from '../../intl/localize';
+import TaskQueue from '../../data/stores/task-queue';
+import DatabaseStore from '../../data/database/store';
+import { Thread } from '../../data/models/thread';
+import { TaskFactory } from '../../data/tasks/factory';
 
 import * as SidebarActions from './sidebar-actions';
 import { ISidebarItem } from './types';
@@ -209,7 +209,7 @@ function detectFolderSeparator(accountId: string): string {
   // Check category paths for known prefixes — most reliable signal
   for (const cat of CategoryStore.categories(accountId)) {
     const catPath = cat.path;
-    for (const prefix of ['INBOX', '[Gmail]', '[Mailspring]', 'Mailspring']) {
+    for (const prefix of ['INBOX', '[Gmail]', 'Tern', '[Mailspring]', 'Mailspring']) {
       if (catPath.startsWith(prefix) && catPath.length > prefix.length) {
         const ch = catPath[prefix.length];
         if (ch === '.' || ch === '/' || ch === '\\') return ch;

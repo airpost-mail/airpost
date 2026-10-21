@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { localized, Actions } from 'mailspring-exports';
+import { localized } from '../intl/localize';
+import * as Actions from '../data/actions';
 import LabelColorStore, { LABEL_COLOR_SCHEMES } from '../data/stores/label-color';
 import { LabelColorizer } from './mail-label';
 

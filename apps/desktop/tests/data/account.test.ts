@@ -1,4 +1,6 @@
-import { Account, Contact, CategoryStore } from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
+import { Contact } from '../../src/data/models/contact';
+import CategoryStore from '../../src/data/stores/category';
 
 describe('Account', function () {
   describe('constructor defaults', function () {

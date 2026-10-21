@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from '../../data/stores/base';
 import {
   Palette,
   RGBA,

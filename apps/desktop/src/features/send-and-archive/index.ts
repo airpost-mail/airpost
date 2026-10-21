@@ -1,4 +1,4 @@
-import { ExtensionRegistry } from 'mailspring-exports';
+import * as ExtensionRegistry from '../../packages/extension-registry';
 import * as SendAndArchiveExtension from './extension';
 
 export function activate() {

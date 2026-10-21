@@ -242,8 +242,7 @@ const parseCommandLine = argv => {
     if (path.resolve(arg) === resourcePath) {
       continue;
     }
-    // mailspring: is still accepted from argv: jump lists and links made before the rename.
-    if (arg.startsWith('mailto:') || arg.startsWith('tern:') || arg.startsWith('mailspring:')) {
+    if (arg.startsWith('mailto:') || arg.startsWith('tern:')) {
       urlsToOpen.push(arg);
     } else if (arg[0] !== '-' && arg[0] !== '?' && /[/|\\]/.test(arg)) {
       pathsToOpen.push(arg);
@@ -343,14 +342,15 @@ const start = () => {
 
 
   protocol.registerSchemesAsPrivileged([
-    {
-      scheme: 'mailspring',
+    // Package assets (main/protocols/asset.ts); mailspring: is the v1 plugin API name.
+    ...['tern-asset', 'mailspring'].map((scheme) => ({
+      scheme,
       privileges: {
         secure: true,
         supportFetchAPI: true,
         corsEnabled: true,
-      }
-    },
+      },
+    })),
     {
       // Downloaded attachments shown in message bodies (src/mail/files-scheme.ts).
       scheme: 'tern-file',

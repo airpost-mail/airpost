@@ -1,14 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import {
-  Flexbox,
-  ScrollRegion,
-  KeyCommandsRegion,
-  ListensToFluxStore,
-  ConfigPropContainer,
-  SheetTitleBar,
-} from 'mailspring-component-kit';
-import { PreferencesUIStore } from 'mailspring-exports';
+import { Flexbox } from '../../components/flexbox';
+import { ScrollRegion } from '../../components/scroll-region';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import { ConfigPropContainer } from '../../components/config-prop-container';
+import { SheetTitleBar } from '../../components/sheets/toolbar';
+import { PreferencesUIStore } from '../../data/stores/preferences-ui';
 import PreferencesSidebar from './sidebar';
 
 const stopPropagation = (e: CustomEvent) => {

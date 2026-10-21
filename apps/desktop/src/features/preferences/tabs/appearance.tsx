@@ -3,19 +3,20 @@ import fs from 'fs';
 import path from 'path';
 import React from 'react';
 import classnames from 'classnames';
+import { LabelColorizer } from '../../../components/mail-label';
 import {
-  LabelColorizer,
   SettingsPage,
   SettingsSection,
   SettingsRow,
   SegmentedControl,
   ConfigSwitchRow,
   ConfigSelectRow,
-} from 'mailspring-component-kit';
+} from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 import { RadioGroup, RadioGroupItem } from '../../../components/kit/radio-group';
 import { SettingsSelect } from '../../../components/settings-select';
-import { Actions, localized } from 'mailspring-exports';
+import * as Actions from '../../../data/actions';
+import { localized } from '../../../intl/localize';
 import { isWaylandSession } from '../../../platform/linux-desktop';
 import { LABEL_COLOR_SCHEMES, LABEL_COLOR_SCHEME_NAMES } from '../../../data/stores/label-color';
 import LessCompileCache from '../../../packages/compile-cache-less';

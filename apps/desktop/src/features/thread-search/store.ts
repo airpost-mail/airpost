@@ -1,5 +1,7 @@
-import BaseStore from 'mailspring-store';
-import { Actions, AccountStore, FocusedPerspectiveStore } from 'mailspring-exports';
+import BaseStore from '../../data/stores/base';
+import * as Actions from '../../data/actions';
+import { AccountStore } from '../../data/stores/account';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 
 import SearchMailboxPerspective from './mailbox-perspective';
 

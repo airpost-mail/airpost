@@ -1,6 +1,8 @@
 import React from 'react';
-import { localized, Message, DraftEditingSession } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { localized } from '../intl/localize';
+import { Message } from '../data/models/message';
+import { DraftEditingSession } from '../data/drafts/editing-session';
+import { RetinaImg } from './retina-img';
 import classnames from 'classnames';
 import _ from 'underscore';
 

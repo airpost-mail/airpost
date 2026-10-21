@@ -11,11 +11,7 @@
 
   "license": "GPL-3.0-only",
   "engines": {
-    "mailspring": "*"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/nylas/nylas-mail"
+    "tern": "*"
   },
   "windowTypes": {
     "default": true,

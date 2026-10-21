@@ -1,7 +1,8 @@
 import React from 'react';
 import classnames from 'classnames';
-import { localized, Account } from 'mailspring-exports';
-import { SettingsCard, StatusPill } from 'mailspring-component-kit';
+import { localized } from '../../../../intl/localize';
+import { Account } from '../../../../data/models/account';
+import { SettingsCard, StatusPill } from '../../../../components/settings';
 
 interface PreferencesAccountListProps {
   accounts: Account[];

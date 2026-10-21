@@ -1,4 +1,4 @@
-import { Category } from 'mailspring-exports';
+import { Category } from '../../data/models/category';
 
 export type CategoryData = {
   id?: string;

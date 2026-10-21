@@ -1,4 +1,7 @@
-import { Actions, Message, DatabaseStore, FocusedContentStore } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Message } from '../../src/data/models/message';
+import DatabaseStore from '../../src/data/database/store';
+import FocusedContentStore from '../../src/data/stores/focused-content';
 import DraftListStore from '../../src/features/draft-list/store';
 
 describe('DraftListStore', function () {

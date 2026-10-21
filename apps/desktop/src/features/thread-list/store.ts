@@ -1,16 +1,14 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from '../../data/stores/base';
 
-import {
-  Rx,
-  Actions,
-  Thread,
-  QueryResultSet,
-  WorkspaceStore,
-  FocusedContentStore,
-  FocusedPerspectiveStore,
-  MailboxPerspective,
-} from 'mailspring-exports';
-import { ListTabular, ListDataSource } from 'mailspring-component-kit';
+import Rx from 'rx-lite';
+import * as Actions from '../../data/actions';
+import { Thread } from '../../data/models/thread';
+import { QueryResultSet } from '../../data/query/result-set';
+import WorkspaceStore from '../../data/stores/workspace';
+import FocusedContentStore from '../../data/stores/focused-content';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import { MailboxPerspective } from '../../data/mailbox-perspective';
+import { ListTabular, ListDataSource } from '../../components/list/tabular';
 import ThreadListDataSource from './data-source';
 
 class ThreadListStore extends BaseStore {

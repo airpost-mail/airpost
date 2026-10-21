@@ -1,5 +1,5 @@
 import React from 'react';
-import { Utils } from 'mailspring-exports';
+import * as Utils from '../../../data/models/utils';
 import { CalendarEvent } from '../event/event';
 import { EventOccurrence, isEventSelected } from '../data-source';
 import { OverlapByEventId } from './week-helpers';

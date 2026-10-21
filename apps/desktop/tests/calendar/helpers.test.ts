@@ -1,5 +1,7 @@
 import moment from 'moment';
-import { Actions, SyncbackEventTask, TaskQueue } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
+import TaskQueue from '../../src/data/stores/task-queue';
 import { fakePimEngine, refusal } from '../support/fake-pim-engine';
 import { formatShortTime as shortTime } from '../../src/intl/date-format';
 // Import directly from the source file; the plugin isn't registered in mailspring-exports.

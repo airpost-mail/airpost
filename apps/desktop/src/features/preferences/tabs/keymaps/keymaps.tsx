@@ -2,10 +2,10 @@ import React from 'react';
 import path from 'path';
 import fs from 'fs';
 
-import { SettingsPage, SettingsSection, SettingsRow } from 'mailspring-component-kit';
+import { SettingsPage, SettingsSection, SettingsRow } from '../../../../components/settings';
 import { Button } from '../../../../components/kit/button';
 import { SettingsSelect } from '../../../../components/settings-select';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../../intl/localize';
 
 import displayedKeybindings from './displayed-keybindings';
 import CommandItem from './command-item';

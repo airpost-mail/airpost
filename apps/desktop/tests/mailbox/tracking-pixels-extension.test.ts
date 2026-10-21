@@ -6,7 +6,7 @@ import {
   removeTrackingPixelsFromDraft,
   srcsetURLs,
 } from '../../src/features/remove-tracking-pixels';
-import { Message } from 'mailspring-exports';
+import { Message } from '../../src/data/models/message';
 
 const readFixture = (name) => {
   return fs

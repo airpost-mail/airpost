@@ -1,5 +1,8 @@
 import React from 'react';
-import { localized, Actions, FocusedContactsStore, Contact } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import FocusedContactsStore from '../../data/stores/focused-contacts';
+import { Contact } from '../../data/models/contact';
 import {
   Select,
   SelectContent,

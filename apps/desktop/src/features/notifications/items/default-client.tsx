@@ -1,6 +1,7 @@
 import React from 'react';
-import { localized, DefaultClientHelper } from 'mailspring-exports';
-import { Notification } from 'mailspring-component-kit';
+import { localized } from '../../../intl/localize';
+import { DefaultClientHelper } from '../../../platform/default-client-helper';
+import Notification from '../../../components/notification';
 import { IDisposable } from 'rx-core';
 
 const SETTINGS_KEY = 'mailto.prompted-about-default';

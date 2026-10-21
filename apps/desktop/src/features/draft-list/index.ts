@@ -1,4 +1,6 @@
-import { WorkspaceStore, ComponentRegistry, Actions } from 'mailspring-exports';
+import WorkspaceStore from '../../data/stores/workspace';
+import ComponentRegistry from '../../packages/component-registry';
+import * as Actions from '../../data/actions';
 import DraftList from './draft-list';
 import DraftListToolbar from './toolbar';
 import DraftListSendStatus from './send-status';

@@ -1,28 +1,28 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
-import { Message } from 'mailspring-exports';
+import { Message } from '../../src/data/models/message';
 import MessageParticipants from '../../src/features/message-list/message-participants';
 
 const user_1 = {
   name: 'User One',
-  email: 'user1@nylas.com',
+  email: 'user1@example.com',
 };
 const user_2 = {
   name: 'User Two',
-  email: 'user2@nylas.com',
+  email: 'user2@example.com',
 };
 const user_3 = {
   name: 'User Three',
-  email: 'user3@nylas.com',
+  email: 'user3@example.com',
 };
 const user_4 = {
   name: 'User Four',
-  email: 'user4@nylas.com',
+  email: 'user4@example.com',
 };
 const user_5 = {
   name: 'User Five',
-  email: 'user5@nylas.com',
+  email: 'user5@example.com',
 };
 
 const test_message = new Message({}).fromJSON({
@@ -103,7 +103,7 @@ describe('MessageParticipants', function () {
     it('uses full names', function () {
       const to = ReactTestUtils.findRenderedDOMComponentWithClass(this.participants, 'to-contact');
       expect((ReactDOM.findDOMNode(to) as HTMLElement).innerText.trim()).toEqual(
-        'User Two <user2@nylas.com>'
+        'User Two <user2@example.com>'
       );
     });
   });

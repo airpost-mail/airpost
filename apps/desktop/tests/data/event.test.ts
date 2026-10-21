@@ -1,4 +1,5 @@
-import { Event, Contact } from 'mailspring-exports';
+import { Event } from '../../src/data/models/event';
+import { Contact } from '../../src/data/models/contact';
 
 describe('Event', function () {
   describe('isRecurrenceException()', function () {

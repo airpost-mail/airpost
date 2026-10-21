@@ -1,13 +1,12 @@
 import React from 'react';
 import classNames from 'classnames';
-import { RetinaImg, SheetTitleBar } from 'mailspring-component-kit';
-import {
-  Account,
-  AccountStore,
-  Actions,
-  PreferencesUIStoreTab,
-  localized,
-} from 'mailspring-exports';
+import { RetinaImg } from '../../components/retina-img';
+import { SheetTitleBar } from '../../components/sheets/toolbar';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
+import * as Actions from '../../data/actions';
+import { PreferencesUIStoreTab } from '../../data/stores/preferences-ui';
+import { localized } from '../../intl/localize';
 import { PreferencesIcon } from './icon';
 import { TextField } from '../../components/kit/text-field';
 

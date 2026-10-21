@@ -1,8 +1,9 @@
 import { shell } from 'electron';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { RetinaImg } from 'mailspring-component-kit';
-import { localized, Account } from 'mailspring-exports';
+import { RetinaImg } from '../../../components/retina-img';
+import { localized } from '../../../intl/localize';
+import { Account } from '../../../data/models/account';
 
 import * as OnboardingActions from '../actions';
 import { finalizeAndValidateAccount } from '../helpers';

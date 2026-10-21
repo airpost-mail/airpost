@@ -197,7 +197,7 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
       ...extraProps
     } = this.props;
     const classes = classnames({
-      'nylas-attachment-item': true,
+      'tern-attachment-item': true,
       'file-attachment-item': true,
       'has-preview': filePreviewPath,
       [className]: className,
@@ -334,7 +334,7 @@ export class ImageAttachmentItem extends Component<ImageAttachmentItemProps> {
 
     return (
       <div
-        className={`nylas-attachment-item image-attachment-item ${className || ''}`}
+        className={`tern-attachment-item image-attachment-item ${className || ''}`}
         {...pickHTMLProps(extraProps)}
       >
         <div>

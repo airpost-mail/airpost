@@ -1,4 +1,5 @@
-import { localized, React } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import React from 'react';
 import * as OnboardingActions from '../actions';
 import { Button } from '../../../components/kit/button';
 
@@ -16,7 +17,7 @@ export default class WelcomePage extends React.Component {
           <div>
             <img
               className="logo"
-              src="mailspring://onboarding/assets/tern-bird-on-dark-256.png"
+              src="tern-asset://onboarding/assets/tern-bird-on-dark-256.png"
               alt=""
               style={{ width: 128, height: 128, marginTop: 110 }}
             />

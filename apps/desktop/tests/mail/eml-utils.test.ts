@@ -1,13 +1,11 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import {
-  Actions,
-  DatabaseStore,
-  Message,
-  TaskQueue,
-  GetMessageRFC2822Task,
-} from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import DatabaseStore from '../../src/data/database/store';
+import { Message } from '../../src/data/models/message';
+import TaskQueue from '../../src/data/stores/task-queue';
+import { GetMessageRFC2822Task } from '../../src/data/tasks/get-message-rfc2822';
 import {
   defaultEmlFilename,
   discardStagedEml,
@@ -322,16 +320,13 @@ describe('stageMessagesAsEml', function () {
 
 describe('discardStagedEml', function () {
   it('removes the file and the staging directory around it', () => {
-    // tern-eml- is the current prefix, mailspring-eml- the one older builds staged under.
-    for (const name of ['tern-eml-spec-discard', 'mailspring-eml-spec-discard']) {
-      const dir = path.join(os.tmpdir(), name);
-      const filePath = path.join(dir, 'Hello.eml');
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(filePath, 'raw');
+    const dir = path.join(os.tmpdir(), 'tern-eml-spec-discard');
+    const filePath = path.join(dir, 'Hello.eml');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, 'raw');
 
-      discardStagedEml(filePath);
-      expect(fs.existsSync(dir)).toBe(false);
-    }
+    discardStagedEml(filePath);
+    expect(fs.existsSync(dir)).toBe(false);
   });
 
   it('refuses to touch a directory it did not create', () => {

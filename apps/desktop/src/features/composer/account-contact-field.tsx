@@ -1,16 +1,15 @@
 import React, { CSSProperties } from 'react';
 import classnames from 'classnames';
-import {
-  localized,
-  AccountStore,
-  ContactStore,
-  Account,
-  Contact,
-  DraftEditingSession,
-  Message,
-  MessageWithEditorState,
-} from 'mailspring-exports';
-import { Menu, ButtonDropdown, InjectedComponentSet } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import { AccountStore } from '../../data/stores/account';
+import ContactStore from '../../data/stores/contact';
+import { Account } from '../../data/models/account';
+import { Contact } from '../../data/models/contact';
+import { DraftEditingSession, MessageWithEditorState } from '../../data/drafts/editing-session';
+import { Message } from '../../data/models/message';
+import { Menu } from '../../components/menu';
+import { ButtonDropdown } from '../../components/button-dropdown';
+import { InjectedComponentSet } from '../../components/injected/component-set';
 import SignatureComposerDropdown from '../composer-signature/composer-dropdown';
 
 interface AccountContactFieldProps {

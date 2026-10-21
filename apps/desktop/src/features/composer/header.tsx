@@ -1,12 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { localized, Actions, AccountStore, Message, DraftEditingSession } from 'mailspring-exports';
-import {
-  KeyCommandsRegion,
-  ParticipantsTextField,
-  ListensToFluxStore,
-  TabGroupContext,
-} from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { AccountStore } from '../../data/stores/account';
+import { Message } from '../../data/models/message';
+import { DraftEditingSession } from '../../data/drafts/editing-session';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
+import ParticipantsTextField from '../../components/participants-text-field';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import { TabGroupContext } from '../../components/tab-group-region';
 import AccountContactField from './account-contact-field';
 import ComposerHeaderActions from './header-actions';
 import Fields from './fields';

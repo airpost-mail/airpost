@@ -1,20 +1,18 @@
 import moment, { Moment } from 'moment';
 import React from 'react';
-import {
-  Rx,
-  DatabaseStore,
-  AccountStore,
-  Calendar,
-  Account,
-  Actions,
-  localized,
-  CalendarDateUtils,
-  DestroyEventTask,
-  Event,
-  DatabaseChangeRecord,
-} from 'mailspring-exports';
+import Rx from 'rx-lite';
+import DatabaseStore from '../../data/database/store';
+import { AccountStore } from '../../data/stores/account';
+import { Calendar } from '../../data/models/calendar';
+import { Account } from '../../data/models/account';
+import * as Actions from '../../data/actions';
+import { localized } from '../../intl/localize';
+import * as CalendarDateUtils from '../../data/calendar/calendar-date';
+import { DestroyEventTask } from '../../data/tasks/destroy-event';
+import { Event } from '../../data/models/event';
+import { DatabaseChangeRecord } from '../../data/database/change-record';
 import { editEvent } from '../../engine/client/pim';
-import { KeyCommandsRegion } from 'mailspring-component-kit';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
 import { CalendarMenuCommands } from './commands';
 import { DayView } from './views/day';
 import { WeekView } from './views/week';
@@ -199,7 +197,7 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
       })
     );
     this._unlistenDatabase = DatabaseStore.listen(this._onDatabaseChange);
-    AppEnv.mailsyncBridge.sendSyncCalendarNow();
+    AppEnv.engineBridge.sendSyncCalendarNow();
     this._themeDisposable = AppEnv.themes.onDidChangeActiveThemes(() => {
       invalidateThemeTextColorCache();
       this.setState((s) => ({ themeVersion: s.themeVersion + 1 }));
@@ -1152,7 +1150,7 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
   };
 
   _onRefreshCalendars = () => {
-    AppEnv.mailsyncBridge.sendSyncCalendarNow();
+    AppEnv.engineBridge.sendSyncCalendarNow();
   };
 
   _shouldShowEmptyState() {

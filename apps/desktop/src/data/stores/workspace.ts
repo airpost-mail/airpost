@@ -6,7 +6,7 @@
 import _ from 'underscore';
 import { webFrame } from 'electron';
 import * as Actions from '../actions';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import { Disposable } from 'event-kit';
 
 let Sheet = {} as SheetSet;

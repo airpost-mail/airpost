@@ -1,12 +1,10 @@
 import * as React from 'react';
-import {
-  Message,
-  File,
-  MessageViewExtension,
-  ExtensionRegistry,
-  ComponentRegistry,
-  DatabaseStore,
-} from 'mailspring-exports';
+import { Message } from '../../data/models/message';
+import { File } from '../../data/models/file';
+import { MessageViewExtension } from '../../packages/message-view-extension';
+import * as ExtensionRegistry from '../../packages/extension-registry';
+import ComponentRegistry from '../../packages/component-registry';
+import DatabaseStore from '../../data/database/store';
 import { EventHeader } from './header';
 import { bestICSAttachment } from './ics-attachment';
 import { InvitationCalendarRefresh } from './invitation-calendar-refresh';
@@ -40,7 +38,7 @@ export function activate() {
   // Every window sees each delta, so only the main window refreshes, once per invitation.
   if (AppEnv.isMainWindow()) {
     const refresher = new InvitationCalendarRefresh((accountId) =>
-      AppEnv.mailsyncBridge.sendSyncCalendarNow(accountId)
+      AppEnv.engineBridge.sendSyncCalendarNow(accountId)
     );
     stopRefreshingOnInvitations = DatabaseStore.listen(refresher.onDatabaseChanged);
   }

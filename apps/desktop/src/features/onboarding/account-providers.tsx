@@ -1,4 +1,5 @@
-import { localized, localizedReactFragment, React } from 'mailspring-exports';
+import { localized, localizedReactFragment } from '../../intl/localize';
+import React from 'react';
 
 const AccountProviders = [
   {

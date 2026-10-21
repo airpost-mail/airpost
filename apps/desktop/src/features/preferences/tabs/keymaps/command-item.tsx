@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import classnames from 'classnames';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../../intl/localize';
 import fs from 'fs';
 
 import { keyAndModifiersForEvent } from './mousetrap-keybinding-helpers';

@@ -1,7 +1,9 @@
 import _ from 'underscore';
 import classnames from 'classnames';
 import React from 'react';
-import { localized, Actions, Contact } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { Contact } from '../../data/models/contact';
 
 const { Menu, MenuItem, clipboard } = require('@electron/remote');
 const MAX_COLLAPSED = 5;

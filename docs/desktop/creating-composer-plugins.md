@@ -97,7 +97,7 @@ plugins/my-composer-plugin/
   "private": true,
   "isOptional": true,
   "engines": {
-    "mailspring": "*"
+    "tern": "*"
   },
   "windowTypes": {
     "default": true,
@@ -221,7 +221,7 @@ export default class MyComposerButton extends React.Component<{
         title={localized('My Plugin')}
       >
         <RetinaImg
-          url="mailspring://my-composer-plugin/assets/icon@2x.png"
+          url="tern-asset://my-composer-plugin/assets/icon@2x.png"
           mode={RetinaImg.Mode.ContentIsMask}
         />
       </button>
@@ -412,7 +412,7 @@ Register custom send actions that appear in the send button dropdown:
 static sendActions() {
   return [{
     title: 'Send Later',
-    iconUrl: 'mailspring://send-later/assets/icon-send-later@2x.png',
+    iconUrl: 'tern-asset://send-later/assets/icon-send-later@2x.png',
     isAvailableForDraft: ({ draft }) => true,
     performSendAction: ({ draft }) => {
       // Custom send logic
@@ -899,7 +899,7 @@ export class TranslateComposerButton extends React.Component<{
     if (this.props.draft.plaintext) return <span />;
     return (
       <button tabIndex={-1} className="btn btn-toolbar" onClick={this._onClick}>
-        <RetinaImg url="mailspring://translation/assets/icon@2x.png"
+        <RetinaImg url="tern-asset://translation/assets/icon@2x.png"
                    mode={RetinaImg.Mode.ContentIsMask} />
       </button>
     );

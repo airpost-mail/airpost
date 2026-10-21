@@ -1,4 +1,5 @@
-import { ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
+import ComponentRegistry from '../../packages/component-registry';
+import WorkspaceStore from '../../data/stores/workspace';
 
 import ThreadList from './thread-list';
 import ThreadListToolbar from './toolbar';

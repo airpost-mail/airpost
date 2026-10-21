@@ -39,7 +39,7 @@ import { registerAttachmentSafetyIPC } from './ipc/attachment-safety';
 import ConfigPersistenceManager, { registerConfigIPC } from '../config/persistence-manager';
 import { EngineSettingsMirror, ENGINE_SETTINGS_WAIT_MS } from '../engine/supervisor/settings';
 import moveToApplications from './platform/move-to-applications';
-import { MailsyncProcess } from '../engine/process';
+import { EngineProcess } from '../engine/process';
 import Config from '../config/config';
 import { registerQuickpreviewIPCHandlers } from './ipc/quick-preview';
 import { guardAuxiliaryWindowNavigation } from './windows/auxiliary-guard';
@@ -154,7 +154,7 @@ export default class Application extends EventEmitter {
           });
       if (!this._attachTo) {
         await waitForEarlierEngine(configDirPath);
-        const engine = new MailsyncProcess(options);
+        const engine = new EngineProcess(options);
         await engine.migrate();
       }
     } catch (err) {
@@ -165,7 +165,7 @@ export default class Application extends EventEmitter {
           `Tern could not find its sync engine. If you're building Tern from source, build it with \`cargo build --release -p tern-engine\` and copy target/release/tern-engine to apps/desktop/tern-engine.`
         );
       } else if (err.toString().includes('spawn')) {
-        message = localized(`Tern could not spawn the mailsync process. %@`, err.toString());
+        message = localized(`Tern could not spawn the engine process. %@`, err.toString());
       } else {
         message = localized(
           `We encountered a problem with your local email database. %@\n\nCheck that no other copies of Tern are running and click Rebuild to reset your local cache.`,
@@ -260,8 +260,8 @@ export default class Application extends EventEmitter {
       this.openUrl(pendingUrl);
     }
 
-    // The OS-level scheme is tern:. mailspring: stays the renderer's internal resource scheme
-    // and is left to Mailspring.app, which may be installed alongside.
+    // The OS-level scheme is tern:. mailspring: is a package asset scheme inside the app
+    // (main/protocols/asset.ts) and is left to Mailspring.app, which may be installed alongside.
     if (process.platform === 'linux') {
       const helper = new DefaultClientHelper();
       helper.registerForURLScheme('tern');
@@ -694,7 +694,7 @@ export default class Application extends EventEmitter {
       this.windowManager.get(WindowManager.MAIN_WINDOW)?.sendMessage('show-calendar', focusEvent);
     });
 
-    // Only the main window's MailsyncBridge has sync clients, so other windows route a
+    // Only the main window's EngineBridge has sync clients, so other windows route a
     // refresh through here.
     this.on('application:sync-calendar', (accountId?: string) => {
       this.sendCalendarSync(accountId);
@@ -1287,7 +1287,7 @@ export default class Application extends EventEmitter {
     }
 
     // url.parse throws on malformed input, and the URL comes from whatever app
-    // launched us (MAILSPRING-CLIENT-M2).
+    // launched us.
     let parts: url.UrlWithParsedQuery;
     try {
       parts = url.parse(urlToOpen, true);
@@ -1304,8 +1304,7 @@ export default class Application extends EventEmitter {
 
     if (parts.protocol === 'mailto:') {
       main.sendMessage('mailto', urlToOpen);
-    } else if (parts.protocol === 'tern:' || parts.protocol === 'mailspring:') {
-      // mailspring: is still accepted for links and jump lists made before the rename.
+    } else if (parts.protocol === 'tern:') {
       // Handle notification action URLs from Windows toast notifications
       // These URLs are triggered when users click buttons on Windows toast notifications
       // since Windows toast XML with activationType="background" doesn't work reliably with Electron

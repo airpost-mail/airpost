@@ -1,4 +1,6 @@
-import { Message, SendActionsStore, ExtensionRegistry } from 'mailspring-exports';
+import { Message } from '../../src/data/models/message';
+import { SendActionsStore } from '../../src/data/stores/send-actions';
+import * as ExtensionRegistry from '../../src/packages/extension-registry';
 
 const SendAction1 = {
   title: 'Send Action 1',

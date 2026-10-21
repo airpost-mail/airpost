@@ -1,6 +1,10 @@
 import classNames from 'classnames';
 import React from 'react';
-import { Utils, DraftStore, ComponentRegistry, Thread, Message } from 'mailspring-exports';
+import * as Utils from '../../data/models/utils';
+import DraftStore from '../../data/drafts/store';
+import ComponentRegistry from '../../packages/component-registry';
+import { Thread } from '../../data/models/thread';
+import { Message } from '../../data/models/message';
 
 import MessageItem from './message-item';
 

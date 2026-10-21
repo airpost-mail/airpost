@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 
 export type LabelColorSchemeName = 'automatic' | 'bright' | 'pastel' | 'muted' | 'earth';
 

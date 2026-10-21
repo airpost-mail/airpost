@@ -2,8 +2,6 @@
 
 A package for Tern that translates draft text into other languages using the Yandex Translation API.
 
-<img src="https://raw.githubusercontent.com/nylas/nylas-mail/master/internal_packages/translation/examples-screencap-translate.png"/>
-
 #### Enable this plugin
 
 1. Download and run Tern

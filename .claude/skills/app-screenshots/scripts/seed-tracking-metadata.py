@@ -16,7 +16,7 @@ rows = db.execute("""
   order by date desc limit 40""").fetchall()
 
 now = int(time.time())
-LINKS = ['https://getmailspring.com/pro', 'https://calendly.com/bengotow/30min', 'https://foundry376.com/pricing', 'https://github.com/Foundry376/Mailspring']
+LINKS = ['https://example.com/pro', 'https://calendly.com/bengotow/30min', 'https://foundry376.com/pricing', 'https://github.com/Foundry376/Mailspring']
 touched = 0
 for mid, aid, date, data in rows:
     d = json.loads(data)
@@ -34,7 +34,7 @@ for mid, aid, date, data in rows:
     for i, url in enumerate(random.sample(LINKS, random.choice([1, 2]))):
         clicks = [{'recipient': r, 'timestamp': when()} for r in recipients for _ in range(random.choice([0, 0, 1, 2]))]
         clicks.sort(key=lambda e: e['timestamp'])
-        links.append({'url': url, 'redirect_url': f'https://link.getmailspring.com/link/{d.get("hMsgId","x")}/{i}?redirect={url}',
+        links.append({'url': url, 'redirect_url': f'https://tern.example/t/l/ns/{d.get("hMsgId","x")}/{i}?u={url}',
                       'click_count': len(clicks), 'click_data': clicks})
     meta = [m for m in d.get('metadata', []) if m.get('pluginId') not in ('open-tracking', 'link-tracking')]
     meta.append({'__cls': 'PluginMetadata', 'pluginId': 'open-tracking', 'v': 2,

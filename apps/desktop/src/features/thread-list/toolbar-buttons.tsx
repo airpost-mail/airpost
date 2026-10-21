@@ -1,16 +1,15 @@
 import React from 'react';
 import classNames from 'classnames';
-import { BindGlobalCommands, RovingTabIndexToolbar } from 'mailspring-component-kit';
-import {
-  localized,
-  Actions,
-  Thread,
-  TaskFactory,
-  ChangeLabelsTask,
-  CategoryStore,
-  FocusedContentStore,
-  FocusedPerspectiveStore,
-} from 'mailspring-exports';
+import BindGlobalCommands from '../../components/bind-global-commands';
+import { RovingTabIndexToolbar } from '../../components/roving-tab-index-toolbar';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { Thread } from '../../data/models/thread';
+import { TaskFactory } from '../../data/tasks/factory';
+import { ChangeLabelsTask } from '../../data/tasks/change-labels';
+import CategoryStore from '../../data/stores/category';
+import FocusedContentStore from '../../data/stores/focused-content';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 
 import { IconButton } from '../../components/kit/icon-button';
 import { ownKeys } from '../../components/kit/keys';

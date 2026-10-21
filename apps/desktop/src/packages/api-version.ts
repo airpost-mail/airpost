@@ -1,7 +1,7 @@
 /**
  * The version of the plugin API, matched as a semver range against a plugin's
- * `engines.mailspring`. It moves with the API, not the app: a minor bump for additions, a
- * major one only when a deprecated export is removed.
+ * `engines.tern` (or `engines.mailspring`). It moves with the API, not the app: a minor bump
+ * for additions, a major one only when a deprecated export is removed.
  *
  * 1.27.0: `Engine` (src/engine/client/api.ts) and `tern.engineMethods`;
  * MessageViewExtension.renderedMessageBodyIntoDocument gets `body` (MessageBody) instead of the
@@ -31,5 +31,10 @@
  * 1.34.0: `TestUtils`, `RegExpUtils.signatureRegex` and `RegExpUtils.commandRegex`; the old
  * names `MailspringTestUtils`, `mailspringSignatureRegex` and `mailspringCommandRegex` are
  * deprecated aliases, removed in 2.0.0.
+ *
+ * 1.35.0: Tern names for what plugins see under Mailspring's: the `tern-asset://` asset scheme,
+ * `engines.tern`, `AppEnv.engineBridge`, `EngineProcess` and `EngineProcessExit`. The old names
+ * (`mailspring://`, `engines.mailspring`, `AppEnv.mailsyncBridge`, `MailsyncProcess`) stay as
+ * aliases.
  */
-export const PLUGIN_API_VERSION = '1.34.0';
+export const PLUGIN_API_VERSION = '1.35.0';

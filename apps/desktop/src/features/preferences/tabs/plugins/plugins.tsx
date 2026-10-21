@@ -1,5 +1,5 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../../intl/localize';
 import {
   SettingsPage,
   SettingsSection,
@@ -9,7 +9,7 @@ import {
   ProviderCard,
   ProviderLogo,
   PrivacyNote,
-} from 'mailspring-component-kit';
+} from '../../../../components/settings';
 import { Button } from '../../../../components/kit/button';
 
 import { pluginInstallRecord } from '../../../../packages/install-record';

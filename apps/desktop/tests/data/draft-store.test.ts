@@ -1,17 +1,15 @@
-import {
-  Thread,
-  Actions,
-  Contact,
-  Message,
-  Account,
-  DraftStore,
-  DatabaseStore,
-  SoundRegistry,
-  DestroyDraftTask,
-  ComposerExtension,
-  ExtensionRegistry,
-  FocusedContentStore,
-} from 'mailspring-exports';
+import { Thread } from '../../src/data/models/thread';
+import * as Actions from '../../src/data/actions';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { Account } from '../../src/data/models/account';
+import DraftStore from '../../src/data/drafts/store';
+import DatabaseStore from '../../src/data/database/store';
+import SoundRegistry from '../../src/packages/sound-registry';
+import { DestroyDraftTask } from '../../src/data/tasks/destroy-draft';
+import { ComposerExtension } from '../../src/packages/composer-extension';
+import * as ExtensionRegistry from '../../src/packages/extension-registry';
+import FocusedContentStore from '../../src/data/stores/focused-content';
 
 import DraftFactory from '../../src/data/drafts/factory';
 

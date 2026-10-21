@@ -1,11 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import {
-  Actions,
-  ComponentRegistry,
-  FocusedPerspectiveStore,
-  WorkspaceStore,
-} from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import ComponentRegistry from '../../src/packages/component-registry';
+import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
+import WorkspaceStore from '../../src/data/stores/workspace';
 
 import SheetContainer from '../../src/components/sheets/container';
 import Sheet from '../../src/components/sheets/sheet';

@@ -7,7 +7,7 @@ import * as Utils from '../models/utils';
 import { Model } from '../models/model';
 import type { QueryResult } from '../../engine/protocol';
 
-type DB = typeof import('mailspring-exports').DatabaseStore;
+type DB = typeof import('../database/store').default;
 
 /**
  * A query as the engine's `query` method takes it. The

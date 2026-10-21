@@ -1,14 +1,12 @@
-import {
-  AccountStore,
-  Actions,
-  CalendarUtils,
-  DatabaseStore,
-  Event,
-  ICSParticipantStatus,
-  localized,
-} from 'mailspring-exports';
+import { AccountStore } from '../../../data/stores/account';
+import * as Actions from '../../../data/actions';
+import { ICSParticipantStatus } from '../../../data/calendar/ics';
+import * as CalendarUtils from '../../../data/calendar/ics';
+import DatabaseStore from '../../../data/database/store';
+import { Event } from '../../../data/models/event';
+import { localized } from '../../../intl/localize';
 import React from 'react';
-import { ProposeTimePopover } from 'mailspring-component-kit';
+import { ProposeTimePopover } from '../../../components/propose-time-popover';
 import { EventOccurrence, occurrenceStartUnix, occurrenceEndUnix } from '../data-source';
 import { parseEventIdFromOccurrence } from '../drag-utils';
 import { showRecurringEventDialog } from './recurring-dialog';

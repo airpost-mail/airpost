@@ -1,4 +1,5 @@
-import { Message, SignatureStore } from 'mailspring-exports';
+import { Message } from '../../src/data/models/message';
+import { SignatureStore } from '../../src/data/stores/signature';
 import SignatureComposerExtension from '../../src/features/composer-signature/composer-extension';
 
 const TEST_ID = 1;

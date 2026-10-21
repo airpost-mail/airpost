@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import BaseStore from 'mailspring-store';
+import BaseStore from '../data/stores/base';
 
 export class Registry extends BaseStore {
   name: string;

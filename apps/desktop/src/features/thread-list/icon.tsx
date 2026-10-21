@@ -1,5 +1,8 @@
 import React from 'react';
-import { localized, Actions, TaskFactory, ExtensionRegistry } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { TaskFactory } from '../../data/tasks/factory';
+import * as ExtensionRegistry from '../../packages/extension-registry';
 import { Button } from '../../components/kit/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/kit/tooltip';
 import { ownKeys } from '../../components/kit/keys';

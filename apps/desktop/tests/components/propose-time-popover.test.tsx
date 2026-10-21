@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactTestUtils from 'react-dom/test-utils';
 import moment from 'moment';
-import { Actions } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
 import { ProposeTimePopover } from '../../src/components/propose-time-popover';
 import { DatePicker } from '../../src/components/date-picker';
 import TimePicker from '../../src/components/time-picker';

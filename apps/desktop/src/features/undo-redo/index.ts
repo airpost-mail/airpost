@@ -1,4 +1,5 @@
-import { ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
+import ComponentRegistry from '../../packages/component-registry';
+import WorkspaceStore from '../../data/stores/workspace';
 import UndoRedoToast from './toast';
 
 export function activate() {

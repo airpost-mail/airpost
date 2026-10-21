@@ -1,6 +1,7 @@
-import { localized, React } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import React from 'react';
 import { ipcRenderer, shell } from 'electron';
-import { Notification } from 'mailspring-component-kit';
+import Notification from '../../../components/notification';
 import { Disposable } from 'event-kit';
 
 interface UpdateNotificationState {
@@ -60,10 +61,7 @@ export default class UpdateNotification extends React.Component<
     return (
       <Notification
         priority="4"
-        title={localized(
-          `An update to Tern is available %@`,
-          version ? `(${version.replace('Mailspring', '').trim()})` : ''
-        )}
+        title={localized(`An update to Tern is available %@`, version ? `(${version.trim()})` : '')}
         subtitle={localized('View changelog')}
         subtitleAction={this._onViewChangelog}
         icon="volstead-upgrade.png"

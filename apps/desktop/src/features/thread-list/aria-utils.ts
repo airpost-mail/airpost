@@ -1,4 +1,7 @@
-import { Thread, FocusedPerspectiveStore, DateUtils, localized } from 'mailspring-exports';
+import { Thread } from '../../data/models/thread';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import DateUtils from '../../utils/date';
+import { localized } from '../../intl/localize';
 
 export function threadAriaLabel(thread: Thread): string {
   const parts: string[] = [];

@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import BaseStore from 'mailspring-store';
+import BaseStore from '../data/stores/base';
 import { sharedListener } from '../utils/shared-listener';
 import { SheetToolbarDeclaration } from '../data/stores/workspace';
 

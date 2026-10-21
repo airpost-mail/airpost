@@ -1,11 +1,9 @@
 import React from 'react';
-import {
-  localized,
-  AccountStore,
-  TaskFactory,
-  MailboxPerspective,
-  Actions,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { AccountStore } from '../../data/stores/account';
+import { TaskFactory } from '../../data/tasks/factory';
+import { MailboxPerspective } from '../../data/mailbox-perspective';
+import * as Actions from '../../data/actions';
 import SearchQuerySubscription from './query-subscription';
 import { Button } from '../../components/kit/button';
 

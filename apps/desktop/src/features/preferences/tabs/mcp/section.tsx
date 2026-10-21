@@ -1,7 +1,11 @@
 import path from 'path';
 import React from 'react';
 import classNames from 'classnames';
-import { localized, AccountStore, CategoryStore, Account, Actions } from 'mailspring-exports';
+import { localized } from '../../../../intl/localize';
+import { AccountStore } from '../../../../data/stores/account';
+import CategoryStore from '../../../../data/stores/category';
+import { Account } from '../../../../data/models/account';
+import * as Actions from '../../../../data/actions';
 import {
   SettingsSection,
   SettingsRow,
@@ -10,7 +14,7 @@ import {
   StatusPill,
   ProviderCard,
   ProviderLogo,
-} from 'mailspring-component-kit';
+} from '../../../../components/settings';
 import { Button } from '../../../../components/kit/button';
 import { Checkbox } from '../../../../components/kit/checkbox';
 import { TextField } from '../../../../components/kit/text-field';

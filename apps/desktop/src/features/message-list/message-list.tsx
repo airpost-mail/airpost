@@ -1,33 +1,28 @@
 import classNames from 'classnames';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import {
-  localized,
-  Utils,
-  Actions,
-  MessageStore,
-  Message,
-  Thread,
-  TaskQueue,
-  GetMessageRFC2822Task,
-  SyncbackDraftTask,
-  DraftFactory,
-  AccountStore,
-  EmlUtils,
-  SearchableComponentStore,
-  SearchableComponentMaker,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Utils from '../../data/models/utils';
+import * as Actions from '../../data/actions';
+import { MessageStore } from '../../data/stores/message';
+import { Message } from '../../data/models/message';
+import { Thread } from '../../data/models/thread';
+import TaskQueue from '../../data/stores/task-queue';
+import { GetMessageRFC2822Task } from '../../data/tasks/get-message-rfc2822';
+import { SyncbackDraftTask } from '../../data/tasks/syncback-draft';
+import DraftFactory from '../../data/drafts/factory';
+import { AccountStore } from '../../data/stores/account';
+import * as EmlUtils from '../../mail/eml';
+import SearchableComponentStore from '../../data/stores/searchable-component';
+import { SearchableComponentMaker } from '../../components/searchable/component-maker';
 
-import {
-  Spinner,
-  RetinaImg,
-  MailLabelSet,
-  ScrollRegion,
-  ScrollPosition,
-  MailImportantIcon,
-  KeyCommandsRegion,
-  InjectedComponentSet,
-} from 'mailspring-component-kit';
+import { Spinner } from '../../components/spinner';
+import { RetinaImg } from '../../components/retina-img';
+import MailLabelSet from '../../components/mail-label-set';
+import { ScrollRegion, ScrollPosition } from '../../components/scroll-region';
+import MailImportantIcon from '../../components/mail-important-icon';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
+import { InjectedComponentSet } from '../../components/injected/component-set';
 
 import FindInThread from './find-in-thread';
 import MessageItemContainer from './message-item-container';

@@ -1,5 +1,5 @@
 // Usage: node --experimental-websocket shoot.mjs <setup-js> <selector> <out.png> [pad] [maxHeight]
-// Runs setup JS in the main Mailspring window, then captures the element matching selector to out.png
+// Runs setup JS in the main Tern window, then captures the element matching selector to out.png
 // (device pixels, so 2x on retina). pad adds CSS px around the element; maxHeight clips tall elements.
 import fs from 'fs';
 

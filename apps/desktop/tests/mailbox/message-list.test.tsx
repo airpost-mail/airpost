@@ -2,7 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 
-import { Thread, Contact, Message, MessageStore, TestUtils } from 'mailspring-exports';
+import { Thread } from '../../src/data/models/thread';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { MessageStore } from '../../src/data/stores/message';
+import TestUtils from '../support/test-utils';
 
 import MessageParticipants from '../../src/features/message-list/message-participants';
 import MessageItemContainer from '../../src/features/message-list/message-item-container';
@@ -18,22 +22,22 @@ const user_1 = new Contact({
 const user_2 = new Contact({
   accountId: TEST_ACCOUNT_ID,
   name: 'User Two',
-  email: 'user2@nylas.com',
+  email: 'user2@example.com',
 });
 const user_3 = new Contact({
   accountId: TEST_ACCOUNT_ID,
   name: 'User Three',
-  email: 'user3@nylas.com',
+  email: 'user3@example.com',
 });
 const user_4 = new Contact({
   accountId: TEST_ACCOUNT_ID,
   name: 'User Four',
-  email: 'user4@nylas.com',
+  email: 'user4@example.com',
 });
 const user_5 = new Contact({
   accountId: TEST_ACCOUNT_ID,
   name: 'User Five',
-  email: 'user5@nylas.com',
+  email: 'user5@example.com',
 });
 
 const m1 = new Message({

@@ -7,7 +7,7 @@ import Sqlite3 from 'better-sqlite3';
 
 import { ExponentialBackoffScheduler } from '../../utils/backoff-schedulers';
 import { Model } from '../models/model';
-import BaseStore from '../../packages/api/mailspring-store';
+import BaseStore from '../stores/base';
 import * as Utils from '../models/utils';
 import Query, { ModelQueryJSON } from '../query/query';
 import EngineReads from './engine-reads';

@@ -1,5 +1,7 @@
 import React, { Component } from 'react';
-import { localized, Actions, DateUtils } from 'mailspring-exports';
+import { localized } from '../intl/localize';
+import * as Actions from '../data/actions';
+import DateUtils from '../utils/date';
 import DateInput from './date-input';
 import { Menu } from './menu';
 import { Moment } from 'moment';

@@ -45,7 +45,7 @@ export interface ResetOptions {
   keepMetadata?: boolean;
 }
 
-export interface MailsyncProcessExit {
+export interface EngineProcessExit {
   code: number;
   error?: Error;
   signal: string;
@@ -109,7 +109,7 @@ export const LocalizedErrorStrings = {
 // condition - a malformed-response parser regression. These should keep
 // reaching error reporting instead of being treated as expected,
 // user-actionable failures.
-const AMBIGUOUS_MAILSYNC_ERRORS = new Set(['ErrorParse']);
+const AMBIGUOUS_ENGINE_ERRORS = new Set(['ErrorParse']);
 
 /*
 Extracts the engine's JSON result from what it wrote to stdout.
@@ -177,11 +177,11 @@ fields onboarding reads: `rawLog`, `errorAdvice`, `errorService`, `isNetworkErro
 `isUserError`. `stripSecrets` redacts the transcript.
 */
 export function errorFromEngineResult(response: any, stripSecrets: (text: string) => string) {
-  const isRecognizedMailsyncError = Object.prototype.hasOwnProperty.call(
+  const isRecognizedEngineError = Object.prototype.hasOwnProperty.call(
     LocalizedErrorStrings,
     response.error
   );
-  let msg = isRecognizedMailsyncError ? LocalizedErrorStrings[response.error] : response.error;
+  let msg = isRecognizedEngineError ? LocalizedErrorStrings[response.error] : response.error;
   if (response.error_service) {
     msg = `${msg} (${response.error_service.toUpperCase()})`;
   }
@@ -203,7 +203,7 @@ export function errorFromEngineResult(response: any, stripSecrets: (text: string
   // oauth-signin-page's error handler) check this flag to avoid flooding error tracking
   // with expected, user-actionable failures.
   (error as any).isUserError =
-    isRecognizedMailsyncError && !AMBIGUOUS_MAILSYNC_ERRORS.has(response.error);
+    isRecognizedEngineError && !AMBIGUOUS_ENGINE_ERRORS.has(response.error);
   return error;
 }
 
@@ -245,7 +245,7 @@ function ensurePrivateDir(dir: string) {
 The engine binary: the one-shot `migrate` and `import-legacy` the main process runs before
 anything else, and (EngineServeProcess) the `serve` engine every account runs in.
 */
-export class MailsyncProcess extends EventEmitter {
+export class EngineProcess extends EventEmitter {
   _proc: ChildProcess = null;
   _win = null;
 
@@ -406,7 +406,7 @@ export class MailsyncProcess extends EventEmitter {
         try {
           const response = lastJSONResponse(Buffer.concat(outChunks).toString('utf-8'));
           if (!response) {
-            // If the Mailsync executable itself failed to run, the logs are not JSON
+            // If the engine executable itself failed to run, the logs are not JSON
             // and may contain system errors (shared library issues, etc). Include this
             // in the logs so users can fix on their own or report detailed bugs.
             const rawLog = this._stripSecrets(buffer.toString());
@@ -698,9 +698,9 @@ goes over the socket, connected once the first stdin response shows the engine h
 Emits 'ready' once the engine has bound its socket, 'hello' (HelloResult) once the socket is
 greeted, 'deltas' (delta params as JSON text, the shape the bridge reads), 'account-state'
 (AccountStateParams), 'mail-new' (MailNewParams), 'settings-changed' (SettingsValues), and
-'close' (MailsyncProcessExit) once, when the engine exits or its socket fails.
+'close' (EngineProcessExit) once, when the engine exits or its socket fails.
 */
-export class EngineServeProcess extends MailsyncProcess {
+export class EngineServeProcess extends EngineProcess {
   _parentRequests = new Map<
     number,
     { method: string; resolve: (result: any) => void; reject: (error: Error) => void }
@@ -739,7 +739,7 @@ export class EngineServeProcess extends MailsyncProcess {
     let errBuffer = '';
     let socketCloseTimer = null;
 
-    const finish = (exit: MailsyncProcessExit) => {
+    const finish = (exit: EngineProcessExit) => {
       if (this._closed) return;
       this._closed = true;
       clearTimeout(socketCloseTimer);
@@ -882,7 +882,7 @@ export class EngineServeProcess extends MailsyncProcess {
     this._attached = true;
     this._socketPath = socketPath;
     this._socketQueue = [];
-    const finish = (exit: MailsyncProcessExit) => {
+    const finish = (exit: EngineProcessExit) => {
       if (this._closed) return;
       this._closed = true;
       this._closeSocket();

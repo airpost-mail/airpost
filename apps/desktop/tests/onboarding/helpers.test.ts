@@ -1,4 +1,5 @@
-import { Account, AccountStore } from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
+import { AccountStore } from '../../src/data/stores/account';
 import EngineEvents from '../../src/engine/client/events';
 import { ErrorCode, Feature } from '../../src/engine/protocol';
 import {

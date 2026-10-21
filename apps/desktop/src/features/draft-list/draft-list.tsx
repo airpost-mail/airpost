@@ -1,17 +1,13 @@
 import React from 'react';
-import {
-  Actions,
-  DOMUtils,
-  Message,
-  WorkspaceStore,
-  FocusedContentStore,
-} from 'mailspring-exports';
-import {
-  FluxContainer,
-  FocusContainer,
-  EmptyListState,
-  MultiselectList,
-} from 'mailspring-component-kit';
+import * as Actions from '../../data/actions';
+import DOMUtils from '../../utils/dom';
+import { Message } from '../../data/models/message';
+import WorkspaceStore from '../../data/stores/workspace';
+import FocusedContentStore from '../../data/stores/focused-content';
+import FluxContainer from '../../components/flux-container';
+import FocusContainer from '../../components/focus-container';
+import EmptyListState from '../../components/empty-list-state';
+import { MultiselectList } from '../../components/multiselect/list';
 import DraftListStore from './store';
 import * as DraftListColumns from './columns';
 

@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import { pathToFileURL } from 'url';
 
-import { localized } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
 import { escapeHTML } from 'underscore.string';
 import { developerToolsAvailable } from '../../platform/developer-tools';
 import {

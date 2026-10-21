@@ -1,21 +1,22 @@
 import React, { Component } from 'react';
-import { Menu, RetinaImg, LabelColorizer, BoldedSearchResult } from 'mailspring-component-kit';
-import {
-  Utils,
-  localized,
-  Actions,
-  TaskQueue,
-  Thread,
-  Account,
-  Category,
-  CategoryStore,
-  Folder,
-  SyncbackCategoryTask,
-  ChangeFolderTask,
-  ChangeLabelsTask,
-  FocusedPerspectiveStore,
-} from 'mailspring-exports';
-import { Categories } from 'mailspring-observables';
+import { Menu } from '../../components/menu';
+import { RetinaImg } from '../../components/retina-img';
+import { LabelColorizer } from '../../components/mail-label';
+import BoldedSearchResult from '../../components/bolded-search-result';
+import * as Utils from '../../data/models/utils';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import TaskQueue from '../../data/stores/task-queue';
+import { Thread } from '../../data/models/thread';
+import { Account } from '../../data/models/account';
+import { Category } from '../../data/models/category';
+import CategoryStore from '../../data/stores/category';
+import { Folder } from '../../data/models/folder';
+import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
+import { ChangeFolderTask } from '../../data/tasks/change-folder';
+import { ChangeLabelsTask } from '../../data/tasks/change-labels';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import { Categories } from '../../data/query/observables';
 import { TextField } from '../../components/kit/text-field';
 import { CategoryData } from './types';
 

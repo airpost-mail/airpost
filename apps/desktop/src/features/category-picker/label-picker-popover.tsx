@@ -1,18 +1,19 @@
 import React, { Component, CSSProperties } from 'react';
-import { Menu, RetinaImg, LabelColorizer, BoldedSearchResult } from 'mailspring-component-kit';
-import {
-  Utils,
-  localized,
-  Actions,
-  TaskQueue,
-  Label,
-  Account,
-  Category,
-  SyncbackCategoryTask,
-  ChangeLabelsTask,
-  Thread,
-} from 'mailspring-exports';
-import { Categories } from 'mailspring-observables';
+import { Menu } from '../../components/menu';
+import { RetinaImg } from '../../components/retina-img';
+import { LabelColorizer } from '../../components/mail-label';
+import BoldedSearchResult from '../../components/bolded-search-result';
+import * as Utils from '../../data/models/utils';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import TaskQueue from '../../data/stores/task-queue';
+import { Label } from '../../data/models/label';
+import { Account } from '../../data/models/account';
+import { Category } from '../../data/models/category';
+import { SyncbackCategoryTask } from '../../data/tasks/syncback-category';
+import { ChangeLabelsTask } from '../../data/tasks/change-labels';
+import { Thread } from '../../data/models/thread';
+import { Categories } from '../../data/query/observables';
 import { TextField } from '../../components/kit/text-field';
 import { CategoryData } from './types';
 

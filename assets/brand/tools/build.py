@@ -34,8 +34,7 @@ M_SILHOUETTE = os.path.join(MASTERS, 'tern-silhouette-1024.png')
 CANVAS = 1024
 # Apple's macOS icon grid: an 824 px tile centred on the 1024 canvas.
 MACOS_TILE = 824
-# Windows and Linux icons get a small margin, close to the old Mailspring set
-# (about 5 % per side).
+# Windows and Linux icons get a small margin (about 5 % per side).
 DESKTOP_TILE = 928
 
 # Alpha cleanup for the AI-exported birds. Alpha <= LO is fringe noise; the

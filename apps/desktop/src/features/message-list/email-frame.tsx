@@ -1,12 +1,10 @@
 import React from 'react';
-import {
-  Utils,
-  localized,
-  QuotedHTMLTransformer,
-  MessageStore,
-  Message,
-  SearchableComponentStore,
-} from 'mailspring-exports';
+import * as Utils from '../../data/models/utils';
+import { localized } from '../../intl/localize';
+import QuotedHTMLTransformer from '../../mail/body/quoted-html-transformer';
+import { MessageStore } from '../../data/stores/message';
+import { Message } from '../../data/models/message';
+import SearchableComponentStore from '../../data/stores/searchable-component';
 import { confirmFormSubmission, showFrameContextMenu } from '../../components/evented-iframe';
 import { MessageBody, MessageFrameBridge } from '../../mail/frame/bridge';
 import {

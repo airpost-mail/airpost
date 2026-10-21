@@ -1,8 +1,10 @@
 import React from 'react';
-import { localized, DefaultClientHelper, SystemStartService } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import { DefaultClientHelper } from '../../../platform/default-client-helper';
+import SystemStartService from '../../../window/platform/system-start-service';
 import { shell } from 'electron';
 
-import { SettingsRow, SettingsSwitch } from 'mailspring-component-kit';
+import { SettingsRow, SettingsSwitch } from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 
 interface DefaultMailClientItemState {

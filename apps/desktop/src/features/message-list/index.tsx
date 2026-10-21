@@ -1,11 +1,9 @@
-import {
-  MailboxPerspective,
-  ComponentRegistry,
-  WorkspaceStore,
-  DatabaseStore,
-  Actions,
-  Thread,
-} from 'mailspring-exports';
+import { MailboxPerspective } from '../../data/mailbox-perspective';
+import ComponentRegistry from '../../packages/component-registry';
+import WorkspaceStore from '../../data/stores/workspace';
+import DatabaseStore from '../../data/database/store';
+import * as Actions from '../../data/actions';
+import { Thread } from '../../data/models/thread';
 
 import { MessageListHiddenMessagesToggle } from './hidden-messages-toggle';
 import MessageList from './message-list';

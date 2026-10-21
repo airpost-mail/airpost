@@ -1,4 +1,7 @@
-import { Actions, Message, WorkspaceStore, FocusedContentStore } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Message } from '../../src/data/models/message';
+import WorkspaceStore from '../../src/data/stores/workspace';
+import FocusedContentStore from '../../src/data/stores/focused-content';
 import DraftList from '../../src/features/draft-list/draft-list';
 import DraftListStore from '../../src/features/draft-list/store';
 

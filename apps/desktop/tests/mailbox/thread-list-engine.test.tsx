@@ -4,7 +4,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { ipcRenderer } from 'electron';
-import { Folder, Message, Thread, MailboxPerspective } from 'mailspring-exports';
+import { Folder } from '../../src/data/models/folder';
+import { Message } from '../../src/data/models/message';
+import { Thread } from '../../src/data/models/thread';
+import { MailboxPerspective } from '../../src/data/mailbox-perspective';
 import ThreadListDataSource from '../../src/features/thread-list/data-source';
 import EngineEvents from '../../src/engine/client/events';
 import EngineReads, { READ_WAIT_MS } from '../../src/data/database/engine-reads';

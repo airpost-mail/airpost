@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import * as Utils from '../models/utils';
 import * as Actions from '../actions';
 import { localized } from '../../intl/localize';

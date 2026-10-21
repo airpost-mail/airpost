@@ -1,6 +1,9 @@
 import React from 'react';
-import { localized, Utils, Message } from 'mailspring-exports';
-import { InjectedComponentSet, ListTabular } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Utils from '../../data/models/utils';
+import { Message } from '../../data/models/message';
+import { InjectedComponentSet } from '../../components/injected/component-set';
+import { ListTabular } from '../../components/list/tabular';
 
 function snippet(html: string) {
   if (!(html && typeof html === 'string')) {

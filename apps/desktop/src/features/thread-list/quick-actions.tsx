@@ -1,11 +1,9 @@
 import React from 'react';
-import {
-  localized,
-  Actions,
-  Thread,
-  TaskFactory,
-  FocusedPerspectiveStore,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { Thread } from '../../data/models/thread';
+import { TaskFactory } from '../../data/tasks/factory';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
 import { Button } from '../../components/kit/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/kit/tooltip';
 import { ownKeys } from '../../components/kit/keys';

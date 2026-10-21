@@ -5,7 +5,7 @@
   "description": "Stars and marks unread a thread when its tern-sample-service reminder comes due, also while Tern is closed.",
   "license": "GPL-3.0-only",
   "engines": {
-    "mailspring": "^1.27.0"
+    "tern": "^1.27.0"
   },
   "tern": {
     "service": {

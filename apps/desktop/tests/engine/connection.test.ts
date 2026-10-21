@@ -3,11 +3,13 @@
 
 import { EventEmitter } from 'events';
 import fs from 'fs';
-import { Actions, Message, SendDraftTask } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Message } from '../../src/data/models/message';
+import { SendDraftTask } from '../../src/data/tasks/send-draft';
 import SoundRegistry from '../../src/packages/sound-registry';
 import OnlineStatusStore from '../../src/data/stores/online-status';
 import { EngineConnection } from '../../src/engine/client/connection';
-import MailsyncBridge, { applyDeltas } from '../../src/engine/client/bridge';
+import EngineBridge, { applyDeltas } from '../../src/engine/client/bridge';
 import { EngineStatus } from '../../src/engine/channels';
 import { FakeEngine, tick, until } from '../support/fake-serve-engine';
 
@@ -267,11 +269,11 @@ describe('task handlers with two windows open', function () {
     spyOn(AppEnv, 'isMainWindow').andReturn(false);
     spyOn(AppEnv, 'onReadyToUnload');
     const connection = new EventEmitter();
-    spyOn(MailsyncBridge.prototype, '_createConnection').andCallFake(function () {
+    spyOn(EngineBridge.prototype, '_createConnection').andCallFake(function () {
       connection.on('deltas', this._onIncomingMessages);
       return connection;
     });
-    const composer = new MailsyncBridge();
+    const composer = new EngineBridge();
     expect(composer._mainWindow).toBe(false);
     expect(composer._connection).toBe(connection);
 

@@ -1,7 +1,8 @@
 import classNames from 'classnames';
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
-import { Utils, localized } from 'mailspring-exports';
+import * as Utils from '../data/models/utils';
+import { localized } from '../intl/localize';
 
 import { ScrollRegion } from './scroll-region';
 import { KeyCommandsRegion } from './key-commands-region';
@@ -500,7 +501,7 @@ class EditableList extends Component<EditableListProps, EditableListState> {
       <KeyCommandsRegion
         tabIndex={0}
         localHandlers={this._listKeymapHandlers()}
-        className={`nylas-editable-list ${this.props.className}`}
+        className={`tern-editable-list ${this.props.className}`}
       >
         <ScrollRegion
           className="items-wrapper"

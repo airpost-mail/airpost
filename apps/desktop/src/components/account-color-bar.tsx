@@ -1,4 +1,4 @@
-import { AccountStore } from 'mailspring-exports';
+import { AccountStore } from '../data/stores/account';
 import React from 'react';
 import { sharedListener } from '../utils/shared-listener';
 

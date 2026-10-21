@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
 import ReactDOMServer from 'react-dom/server';
 import Templates from './templates';
 

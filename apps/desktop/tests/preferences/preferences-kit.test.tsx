@@ -4,14 +4,12 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
 import { render, fireEvent, cleanup, act } from '@testing-library/react';
-import {
-  Account,
-  AccountStore,
-  Actions,
-  ComponentRegistry,
-  PreferencesUIStore,
-  WorkspaceStore,
-} from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
+import { AccountStore } from '../../src/data/stores/account';
+import * as Actions from '../../src/data/actions';
+import ComponentRegistry from '../../src/packages/component-registry';
+import { PreferencesUIStore } from '../../src/data/stores/preferences-ui';
+import WorkspaceStore from '../../src/data/stores/workspace';
 import Sheet from '../../src/components/sheets/sheet';
 import { getPortalContainer } from '../../src/components/kit/portal';
 import { SettingsSelect } from '../../src/components/settings-select';

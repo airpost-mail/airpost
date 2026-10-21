@@ -41,7 +41,7 @@ Paths are relative to `apps/desktop/`.
 | `src/packages/resources.ts` | Keymap, menu and stylesheet loading shared by both |
 | `src/features/index.ts` | The built-in feature list: name, window types, `syncInit`, lazy `require` |
 | `src/window/app-env.ts` | AppEnv singleton that initializes PackageManager |
-| `src/packages/api-version.ts` | The plugin API version matched against `engines.mailspring` |
+| `src/packages/api-version.ts` | The plugin API version matched against `engines.tern` (or `engines.mailspring`) |
 | `src/packages/component-registry.ts` | UI component registration |
 | `src/packages/extension-registry.ts` | Extension registration |
 | `src/packages/composer-extension.ts` | ComposerExtension base class |
@@ -51,12 +51,12 @@ Paths are relative to `apps/desktop/`.
 
 ## Development Guidelines
 
-1. **Plugin Validation**: All plugins must have `engines.mailspring` in package.json
+1. **Plugin Validation**: All plugins must have `engines.tern` in package.json (the loader also reads `engines.mailspring`, which third-party plugins use)
 2. **Lifecycle Compliance**: Plugins must export `activate()` and `deactivate()` functions
 3. **Clean Deactivation**: Always unregister components/extensions in `deactivate()`
 4. **Window Types**: Consider which window types a plugin should load in
 5. **Optional Plugins**: Use `isOptional: true` for user-disableable plugins
-6. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `tests/packages/builtin-features.test.ts`). Its directory name is the `mailspring://` asset host and its place in the activation order, which features share with the bundled plugins
+6. **Built-in Features**: A feature in `src/features/<dir>/` has no package.json; add it to `src/features/index.ts` (and to the order in `tests/packages/builtin-features.test.ts`). Its directory name is the `tern-asset://` asset host and its place in the activation order, which features share with the bundled plugins
 
 ## Testing Plugin Changes
 

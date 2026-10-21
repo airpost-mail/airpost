@@ -1,16 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
-import {
-  Thread,
-  Actions,
-  CategoryStore,
-  TaskFactory,
-  MailboxPerspective,
-  FocusedPerspectiveStore,
-  FocusedContentStore,
-  Folder,
-} from 'mailspring-exports';
+import { Thread } from '../../src/data/models/thread';
+import * as Actions from '../../src/data/actions';
+import CategoryStore from '../../src/data/stores/category';
+import { TaskFactory } from '../../src/data/tasks/factory';
+import { MailboxPerspective } from '../../src/data/mailbox-perspective';
+import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
+import FocusedContentStore from '../../src/data/stores/focused-content';
+import { Folder } from '../../src/data/models/folder';
 import {
   ArchiveButton,
   ToggleStarredButton,

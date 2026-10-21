@@ -1,6 +1,8 @@
 import React from 'react';
-import { localized, DraftStore, ComponentRegistry } from 'mailspring-exports';
-import { ScrollRegion } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import DraftStore from '../../data/drafts/store';
+import ComponentRegistry from '../../packages/component-registry';
+import { ScrollRegion } from '../../components/scroll-region';
 import DraftListStore from './store';
 import DraftSelectedItemsStack from './selected-items-stack';
 

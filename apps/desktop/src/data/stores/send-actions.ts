@@ -1,5 +1,5 @@
 import _str from 'underscore.string';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import * as Actions from '../actions';
 import { Message } from '../models/message';
 import { SendDraftTask } from '../tasks/send-draft';

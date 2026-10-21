@@ -1,15 +1,13 @@
-import {
-  Thread,
-  Actions,
-  AccountStore,
-  Message,
-  SoundRegistry,
-  NativeNotifications,
-  DatabaseStore,
-  localized,
-  DatabaseChangeRecord,
-  TaskFactory,
-} from 'mailspring-exports';
+import { Thread } from '../../data/models/thread';
+import * as Actions from '../../data/actions';
+import { AccountStore } from '../../data/stores/account';
+import { Message } from '../../data/models/message';
+import SoundRegistry from '../../packages/sound-registry';
+import NativeNotifications from '../../window/platform/native-notifications';
+import DatabaseStore from '../../data/database/store';
+import { localized } from '../../intl/localize';
+import { DatabaseChangeRecord } from '../../data/database/change-record';
+import { TaskFactory } from '../../data/tasks/factory';
 import EngineEvents, { EngineEvents as EngineEventsType } from '../../engine/client/events';
 import { Feature, MailNewParams } from '../../engine/protocol';
 

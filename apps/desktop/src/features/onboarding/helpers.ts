@@ -1,4 +1,5 @@
-import { Account, AccountStore } from 'mailspring-exports';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
 import * as EngineAccounts from '../../engine/client/accounts';
 
 // The servers for a new account come from the engine (`account.discover`: the provider
@@ -17,11 +18,11 @@ export async function expandAccountWithCommonSettings(account: Account) {
 }
 
 // Proton accounts pin container_folder to "Folders" through the provider table; the others
-// get the user's default.
+// get the user's default. "Tern" is the engine's own default and is left unset.
 function applyContainerFolderDefault(populated: Account) {
   const containerFolderDefault = AccountStore.containerFolderDefaultGetter();
   if (
-    containerFolderDefault !== 'Mailspring' &&
+    containerFolderDefault !== 'Tern' &&
     (populated.settings.container_folder === '' ||
       populated.settings.container_folder === undefined)
   ) {

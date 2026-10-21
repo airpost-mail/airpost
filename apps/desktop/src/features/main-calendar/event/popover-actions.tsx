@@ -1,5 +1,5 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
 import { Button } from '../../../components/kit/button';
 
 interface EventPopoverActionsProps {

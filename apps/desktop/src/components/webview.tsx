@@ -3,7 +3,7 @@ import { shell } from 'electron';
 import ReactDOM from 'react-dom';
 import classnames from 'classnames';
 import networkErrors from 'chromium-net-errors';
-import { localized } from 'mailspring-exports';
+import { localized } from '../intl/localize';
 
 import { RetinaImg } from './retina-img';
 import { Disposable } from 'event-kit';

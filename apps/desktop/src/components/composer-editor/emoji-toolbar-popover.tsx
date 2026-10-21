@@ -1,6 +1,7 @@
 import React from 'react';
-import { RetinaImg, ScrollRegion } from 'mailspring-component-kit';
-import { localized } from 'mailspring-exports';
+import { RetinaImg } from '../retina-img';
+import { ScrollRegion } from '../scroll-region';
+import { localized } from '../../intl/localize';
 
 import categorizedEmojiList from './categorized-emoji';
 import { getEmojiImagePath, searchEmojiNames } from './emoji-plugins';

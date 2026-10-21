@@ -21,9 +21,9 @@ bump `apps/desktop/package.json`, its lockfile or the Linux metainfo
 
 3. Write the block. Each bullet says what a plugin author can now use or must change: new
    exports and manifest fields, deprecations (and the version that removes them), and
-   anything that breaks plugins within their `engines.mailspring` range. Name the export in
-   backticks; point to `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` when it documents the
-   change.
+   anything that breaks plugins within their `engines.tern` (or `engines.mailspring`) range.
+   Name the export in backticks; point to `docs/desktop/PLUGIN_SYSTEM_ARCHITECTURE.md` when
+   it documents the change.
 
 ```markdown
 Plugin API 1.X.0:

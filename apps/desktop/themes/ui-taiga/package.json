@@ -7,7 +7,7 @@
   "description": "A clean, Mailbox-inspired theme for Tern.",
   "license": "MIT",
   "engines": {
-    "mailspring": "*"
+    "tern": "*"
   },
   "private": true
 }

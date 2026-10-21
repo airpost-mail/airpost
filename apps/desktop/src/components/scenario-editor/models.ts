@@ -1,5 +1,6 @@
 import _ from 'underscore';
-import { localized, Message } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { Message } from '../../data/models/message';
 import { Observable } from 'rx-core';
 
 export class Comparator {

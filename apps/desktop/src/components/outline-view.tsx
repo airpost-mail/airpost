@@ -1,4 +1,5 @@
-import { Utils, localized } from 'mailspring-exports';
+import * as Utils from '../data/models/utils';
+import { localized } from '../intl/localize';
 import React, { Component, CSSProperties } from 'react';
 import { DropZone } from './drop-zone';
 import { RetinaImg } from './retina-img';
@@ -178,7 +179,7 @@ export class OutlineView extends Component<OutlineViewProps, OutlineViewState> {
         }}
       >
         <RetinaImg
-          url="mailspring://account-sidebar/assets/icon-sidebar-addcategory@2x.png"
+          url="tern-asset://account-sidebar/assets/icon-sidebar-addcategory@2x.png"
           style={{ height: 15, width: 14 }}
           mode={RetinaImg.Mode.ContentIsMask}
           alt=""
@@ -367,7 +368,7 @@ export class OutlineView extends Component<OutlineViewProps, OutlineViewState> {
     const allowCreate = this.props.onItemCreated != null && !collapsed;
 
     return (
-      <div className="outline-view nylas-outline-view">
+      <div className="outline-view tern-outline-view">
         {this._renderHeading(allowCreate, collapsed, collapsible)}
         {this._renderOutline(allowCreate, collapsed)}
       </div>

@@ -79,8 +79,8 @@ To create your own plugin, see:
 ### Plugin Installation
 
 Plugins should be copied or symlinked to:
-- **macOS**: `~/Library/Application Support/Mailspring/packages/`
-- **Linux**: `~/.config/Mailspring/packages/`
-- **Windows**: `%APPDATA%/Mailspring/packages/`
+- **macOS**: `~/Library/Application Support/Tern/packages/`
+- **Linux**: `~/.config/Tern/packages/`
+- **Windows**: `%APPDATA%/Tern/packages/`
 
-You can find this directory by going to **Developer > Show Mailsync Logs** in Mailspring.
+You can find this directory by going to **Developer > Open Engine Logs** in Tern.

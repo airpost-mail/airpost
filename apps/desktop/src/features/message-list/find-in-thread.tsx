@@ -1,7 +1,10 @@
 import React from 'react';
 import classnames from 'classnames';
-import { localized, Actions, MessageStore, SearchableComponentStore } from 'mailspring-exports';
-import { KeyCommandsRegion } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { MessageStore } from '../../data/stores/message';
+import SearchableComponentStore from '../../data/stores/searchable-component';
+import { KeyCommandsRegion } from '../../components/key-commands-region';
 import { IconButton } from '../../components/kit/icon-button';
 import { TextField } from '../../components/kit/text-field';
 

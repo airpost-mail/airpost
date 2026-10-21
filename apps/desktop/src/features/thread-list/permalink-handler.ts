@@ -1,7 +1,11 @@
 import url from 'url';
 import querystring from 'querystring';
 import { ipcRenderer } from 'electron';
-import { localized, DatabaseStore, Thread, Matcher, Actions } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import DatabaseStore from '../../data/database/store';
+import { Thread } from '../../data/models/thread';
+import { Matcher } from '../../data/attributes/matcher';
+import * as Actions from '../../data/actions';
 
 const DATE_EPSILON = 60; // Seconds
 

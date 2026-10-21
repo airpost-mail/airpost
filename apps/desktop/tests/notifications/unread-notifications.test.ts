@@ -1,14 +1,12 @@
-import {
-  Contact,
-  Message,
-  Thread,
-  Folder,
-  CategoryStore,
-  DatabaseStore,
-  AccountStore,
-  SoundRegistry,
-  NativeNotifications,
-} from 'mailspring-exports';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { Thread } from '../../src/data/models/thread';
+import { Folder } from '../../src/data/models/folder';
+import CategoryStore from '../../src/data/stores/category';
+import DatabaseStore from '../../src/data/database/store';
+import { AccountStore } from '../../src/data/stores/account';
+import SoundRegistry from '../../src/packages/sound-registry';
+import NativeNotifications from '../../src/window/platform/native-notifications';
 
 import { Notifier } from '../../src/features/unread-notifications';
 

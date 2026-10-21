@@ -1,4 +1,5 @@
-import { ComposerExtension, SignatureStore } from 'mailspring-exports';
+import { ComposerExtension } from '../../packages/composer-extension';
+import { SignatureStore } from '../../data/stores/signature';
 import { applySignature } from './utils';
 
 export default class SignatureComposerExtension extends ComposerExtension {

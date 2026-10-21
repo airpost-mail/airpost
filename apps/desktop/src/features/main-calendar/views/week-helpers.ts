@@ -1,6 +1,6 @@
 import { EventOccurrence, TimedOccurrence, isTimed } from '../data-source';
 import moment, { Moment } from 'moment';
-import { CalendarDateUtils } from 'mailspring-exports';
+import * as CalendarDateUtils from '../../../data/calendar/calendar-date';
 
 export interface OverlapByEventId {
   [id: string]: { concurrentEvents: number; order: null | number };

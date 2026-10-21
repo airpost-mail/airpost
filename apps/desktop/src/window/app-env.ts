@@ -39,7 +39,7 @@ export default class AppEnvConstructor {
   menu: import('./menu-manager').default;
   windowEventHandler: import('./event-handler').default;
   actionBridge: import('../data/action-bridge').default;
-  mailsyncBridge: import('../engine/client/bridge').default;
+  engineBridge: import('../engine/client/bridge').default;
   errorLogger: any;
   savedState: any;
   isReloading: boolean;
@@ -116,24 +116,18 @@ export default class AppEnvConstructor {
 
     this.windowEventHandler = new WindowEventHandler();
 
-    // We extend observables with our own methods. This happens on
-    // require of mailspring-observables
-    require('mailspring-observables');
+    // Adds the Rx.Observable.from* helpers.
+    require('../data/query/observables');
 
-    // mailspring-exports is designed to provide a lazy-loaded set of globally
-    // accessible objects to all packages. Upon require, mailspring-exports will
-    // fill the StoreRegistry, and DatabaseObjectRegistries
-    // with various constructors.
-    //
-    // We initialize all of the stores loaded into the StoreRegistry once
-    // the window starts loading.
-    require('mailspring-exports');
+    // The plugin API barrel (`mailspring-exports`). Requiring it registers the models and
+    // tasks with the DatabaseObjectRegistry and loads the stores nothing else requires.
+    require('../packages/api/mailspring-exports');
 
     const ActionBridge = require('../data/action-bridge').default;
     this.actionBridge = new ActionBridge(ipcRenderer);
 
-    const MailsyncBridge = require('../engine/client/bridge').default;
-    this.mailsyncBridge = new MailsyncBridge();
+    const EngineBridge = require('../engine/client/bridge').default;
+    this.engineBridge = new EngineBridge();
 
     process.title = `Tern ${this.getWindowType()}`;
     this.onWindowPropsReceived(() => {
@@ -316,6 +310,11 @@ export default class AppEnvConstructor {
     return this.packages
       .getActivePackages()
       .filter((pkg) => stackPathComponents.includes(path.basename(pkg.directory)));
+  }
+
+  // The v1 plugin API name of engineBridge.
+  get mailsyncBridge() {
+    return this.engineBridge;
   }
 
   /*
@@ -825,7 +824,7 @@ export default class AppEnvConstructor {
 
   initializeReactRoot() {
     // Put state back into sheet-container? Restore app state here
-    const item = document.createElement('mailspring-workspace');
+    const item = document.createElement('tern-workspace');
     item.setAttribute('id', 'sheet-container');
     item.setAttribute('class', 'sheet-container');
     item.setAttribute('tabIndex', '-1');
@@ -920,8 +919,8 @@ export default class AppEnvConstructor {
       detail: message,
     });
     if (result === 1) {
-      const { Actions } = require('mailspring-exports');
-      const { CodeSnippet } = require('mailspring-component-kit');
+      const Actions = require('../data/actions');
+      const CodeSnippet = require('../components/code-snippet').default;
       Actions.openModal({
         component: CodeSnippet({ intro: message, code: detail, className: 'error-details' }),
         width: 500,
@@ -979,7 +978,6 @@ export default class AppEnvConstructor {
   //
   // Note: If you return false to cancel the window close, you /must/ perform
   // work and then call finishUnload. We do not support cancelling quit!
-  // https://phab.mailspring.com/D1932#inline-11722
   //
   // Also see logic in main/AppWindow::handleEvents where we listen
   // to the browserWindow.on 'close' event to catch "unclosable" windows.

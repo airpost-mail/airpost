@@ -3,7 +3,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
-import { localized, isRTL, Actions, ComponentRegistry, WorkspaceStore } from 'mailspring-exports';
+import { localized, isRTL } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import ComponentRegistry from '../../packages/component-registry';
+import WorkspaceStore from '../../data/stores/workspace';
 import { SheetDeclaration } from '../../data/stores/workspace';
 import { Flexbox } from '../flexbox';
 import { RetinaImg } from '../retina-img';

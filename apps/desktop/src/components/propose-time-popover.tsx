@@ -1,7 +1,9 @@
 import React from 'react';
 import moment, { Moment } from 'moment';
-import { Actions, localized } from 'mailspring-exports';
-import { DatePicker, TimePicker } from 'mailspring-component-kit';
+import * as Actions from '../data/actions';
+import { localized } from '../intl/localize';
+import { DatePicker } from './date-picker';
+import TimePicker from './time-picker';
 import { formatTime } from '../intl/date-format';
 import { Button } from './kit/button';
 import { Textarea } from './kit/textarea';

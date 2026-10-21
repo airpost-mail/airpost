@@ -1,14 +1,13 @@
 import React from 'react';
-import { ListensToFluxStore, RetinaImg } from 'mailspring-component-kit';
-import {
-  localized,
-  Actions,
-  Folder,
-  TaskQueue,
-  ExpungeAllInFolderTask,
-  FocusedPerspectiveStore,
-  ThreadCountsStore,
-} from 'mailspring-exports';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import { RetinaImg } from '../../components/retina-img';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { Folder } from '../../data/models/folder';
+import TaskQueue from '../../data/stores/task-queue';
+import { ExpungeAllInFolderTask } from '../../data/tasks/expunge-all-in-folder';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import ThreadCountsStore from '../../data/stores/thread-counts';
 import { Button } from '../../components/kit/button';
 
 interface ThreadListEmptyFolderBarProps {

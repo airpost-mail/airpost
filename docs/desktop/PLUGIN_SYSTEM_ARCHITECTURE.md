@@ -47,7 +47,7 @@ Built-in features are not packages: they are app code in `src/features/<dir>/`, 
 `BuiltinFeature` (`src/packages/builtin-feature.ts`) and merges them by directory name with
 the bundled plugins and themes, so they share one activation order and stay in
 `AppEnv.packages` under their names. A user package with a feature's name still replaces it.
-The directory name is also the `mailspring://<dir>/` host for the feature's assets. Features
+The directory name is also the `tern-asset://<dir>/` host for the feature's assets. Features
 are not loaded in spec mode and are never listed in Preferences > Plugins.
 
 ### Platform-Specific Config Directories
@@ -93,7 +93,7 @@ my-plugin/
   "license": "GPL-3.0",
 
   "engines": {
-    "mailspring": "*"
+    "tern": "*"
   },
 
   "windowTypes": {
@@ -126,7 +126,7 @@ my-plugin/
 | `name` | Yes | Package identifier (kebab-case) |
 | `version` | Yes | Semantic version |
 | `main` | Yes* | Entry point path (required for non-theme plugins) |
-| `engines.mailspring` | Yes | Semver range of plugin API versions the plugin works with, matched against `apiVersion` (`PLUGIN_API_VERSION` in `src/packages/api-version.ts`, 1.27.0). `*` matches any |
+| `engines.tern` | Yes | Semver range of plugin API versions the plugin works with (`engines.mailspring`, the v1 name, is read too), matched against `apiVersion` (`PLUGIN_API_VERSION` in `src/packages/api-version.ts`, 1.27.0). `*` matches any |
 | `displayName` | No | Human-readable name for UI |
 | `description` | No | Plugin description |
 | `windowTypes` | No | Which window types load this plugin |
@@ -211,7 +211,7 @@ export function activateConfig() {
 
 1. **Discovery**: `PackageManager.discoverPackages()` scans configured directories
 2. **Filtering**: Packages filtered by `windowTypes` for current window
-3. **Validation**: Checks that `engines.mailspring` is a range `PLUGIN_API_VERSION` satisfies
+3. **Validation**: Checks that `engines.tern` is a range `PLUGIN_API_VERSION` satisfies
 4. **Sync Loading**: Plugins with `syncInit: true` activate immediately
 5. **Delayed Loading**: Other plugins activate after 2.5 second delay
 6. **Resource Loading**: Keymaps, stylesheets, menus auto-loaded
@@ -235,7 +235,7 @@ activatePackage(pkg)
     ├── Skip if already active
     ├── Skip if theme (handled separately)
     ├── Skip if optional and disabled in config
-    ├── Verify PLUGIN_API_VERSION satisfies engines.mailspring
+    ├── Verify PLUGIN_API_VERSION satisfies engines.tern
     │   (missing or unsatisfied: logged and skipped; later packages still load)
     │
     ├── Mark as active
@@ -329,7 +329,7 @@ class MyComposerExtension extends ComposerExtension {
   static sendActions() {
     return [{
       title: 'Send Later',
-      iconUrl: 'mailspring://my-plugin/assets/clock.png',
+      iconUrl: 'tern-asset://my-plugin/assets/clock.png',
       isEnabled: ({ draft }) => true,
       performSendAction: ({ draft }) => { /* ... */ }
     }];
@@ -497,7 +497,7 @@ AppEnv.packages.createPackageManually();
 ### Validation Requirements
 
 - Must have `package.json` file
-- Must have `engines.mailspring` field
+- Must have `engines.tern` field
 - Main entry point must exist (for non-themes)
 
 ---
@@ -511,7 +511,7 @@ Themes are plugins with special handling:
   "name": "my-theme",
   "theme": "ui",
   "displayName": "My Theme",
-  "engines": { "mailspring": "*" }
+  "engines": { "tern": "*" }
 }
 ```
 
@@ -557,7 +557,7 @@ not a sandbox.
 | No enable/disable UI | Plugins require config file editing (themes have UI) |
 | No update mechanism | Manual updates only |
 | No sandboxing | Plugins have full API access |
-| Limited version checking | `engines.mailspring: "*"` is common; the range is checked against the plugin API version, which only moves with the API |
+| Limited version checking | `engines.tern: "*"` is common; the range is checked against the plugin API version, which only moves with the API |
 
 ### Disabled Plugins Configuration
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { localized, DateUtils } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
+import DateUtils from '../../../utils/date';
 import { EventPropertyRow } from './property-row';
 import { PropertySelect } from './property-select';
 import moment from 'moment-timezone';

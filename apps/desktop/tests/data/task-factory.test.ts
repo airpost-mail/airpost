@@ -1,12 +1,10 @@
-import {
-  TaskFactory,
-  CategoryStore,
-  Folder,
-  Label,
-  Thread,
-  ChangeFolderTask,
-  ChangeLabelsTask,
-} from 'mailspring-exports';
+import { TaskFactory } from '../../src/data/tasks/factory';
+import CategoryStore from '../../src/data/stores/category';
+import { Folder } from '../../src/data/models/folder';
+import { Label } from '../../src/data/models/label';
+import { Thread } from '../../src/data/models/thread';
+import { ChangeFolderTask } from '../../src/data/tasks/change-folder';
+import { ChangeLabelsTask } from '../../src/data/tasks/change-labels';
 
 describe('TaskFactory', function taskFactory() {
   beforeEach(() => {

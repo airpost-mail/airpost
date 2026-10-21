@@ -1,6 +1,5 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
-import { Button } from '../../components/kit/button';
+import { localized } from '../../intl/localize';
 import {
   Select,
   SelectContent,
@@ -17,7 +16,6 @@ const NONE = '__none__';
 // given as a URL.
 export default class SignaturePhotoPicker extends React.Component<{
   data: any;
-  resolvedURL: string;
   onChange: (e: { target: { value: string; id?: string } }) => void;
 }> {
   _onSourceChange = (value: string) => {
@@ -25,7 +23,7 @@ export default class SignaturePhotoPicker extends React.Component<{
   };
 
   render() {
-    const { data, resolvedURL } = this.props;
+    const { data } = this.props;
 
     let source = data.photoURL || '';
     // 'company' is a removed domain-logo option that saved signature data can still hold.
@@ -34,9 +32,6 @@ export default class SignaturePhotoPicker extends React.Component<{
     } else if (!['gravatar', ''].includes(source)) {
       source = 'custom';
     }
-
-    // A picture uploaded to Mailspring's servers gets a Remove button instead of an editable URL.
-    const isMailspringURL = resolvedURL && resolvedURL.includes('getmailspring.com');
 
     return (
       <div className="field photo-picker">
@@ -54,28 +49,20 @@ export default class SignaturePhotoPicker extends React.Component<{
                 <SelectItem value="custom">{localized('Custom Image…')}</SelectItem>
               </SelectContent>
             </Select>
-            {source === 'custom' &&
-              (isMailspringURL ? (
-                <Button
-                  variant="outline"
-                  onClick={() => this.props.onChange({ target: { value: '', id: 'photoURL' } })}
-                >
-                  {localized('Remove')}
-                </Button>
-              ) : (
-                <>
-                  <label htmlFor="photoURL" className="sr-only">
-                    {localized('Photo URL')}
-                  </label>
-                  <input
-                    type="url"
-                    id="photoURL"
-                    placeholder="http://"
-                    value={data.photoURL === 'custom' ? '' : data.photoURL}
-                    onChange={this.props.onChange}
-                  />
-                </>
-              ))}
+            {source === 'custom' && (
+              <>
+                <label htmlFor="photoURL" className="sr-only">
+                  {localized('Photo URL')}
+                </label>
+                <input
+                  type="url"
+                  id="photoURL"
+                  placeholder="http://"
+                  value={data.photoURL === 'custom' ? '' : data.photoURL}
+                  onChange={this.props.onChange}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>

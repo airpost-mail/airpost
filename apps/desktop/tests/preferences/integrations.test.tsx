@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import TestRenderer, { act } from 'react-test-renderer';
-import { KeyManager, Integrations } from 'mailspring-exports';
+import KeyManager from '../../src/window/key-manager';
+import { Integrations } from '../../src/engine/client/integrations';
 
 import { IntegrationSection, privacyNote } from '../../src/features/preferences/tabs/integrations';
 import { SettingsSelect } from '../../src/components/settings-select';

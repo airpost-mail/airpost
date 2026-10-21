@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Modal } from 'mailspring-component-kit';
-import BaseStore from 'mailspring-store';
+import Modal from '../../components/modal';
+import BaseStore from './base';
 import { UIProvider } from '../../components/kit/provider';
 
 import * as Actions from '../actions';

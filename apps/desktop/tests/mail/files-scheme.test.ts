@@ -61,7 +61,7 @@ describe('tern-file: scheme', function () {
       'tern-file:///ab/cd/abcd1234',
       'tern-file:///ab/cd/abcd1234/missing.png',
       `file://${outside}`,
-      'mailspring://ab/cd/abcd1234/image%201.png',
+      'tern-asset://ab/cd/abcd1234/image%201.png',
     ]) {
       expect([url, resolveFilesSchemeURL(filesDir, url)]).toEqual([url, null]);
     }

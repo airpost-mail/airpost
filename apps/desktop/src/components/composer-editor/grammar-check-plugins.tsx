@@ -1,6 +1,6 @@
 import React from 'react';
 import { Editor, Decoration, Mark, Point, Text } from 'slate';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
 import { ComposerEditorPlugin, ComposerEditorPluginTopLevelComponentProps } from './types';
 import { Button } from '../kit/button';
 

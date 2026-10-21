@@ -1,7 +1,8 @@
 import React from 'react';
 import { shell } from 'electron';
-import { localized } from 'mailspring-exports';
-import { RetinaImg, SettingsPage, SettingsSection, SettingsNote } from 'mailspring-component-kit';
+import { localized } from '../../../intl/localize';
+import { RetinaImg } from '../../../components/retina-img';
+import { SettingsPage, SettingsSection, SettingsNote } from '../../../components/settings';
 import { Button } from '../../../components/kit/button';
 import { TextField } from '../../../components/kit/text-field';
 

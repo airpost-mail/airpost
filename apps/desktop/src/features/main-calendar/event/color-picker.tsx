@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
 import { Button } from '../../../components/kit/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../components/kit/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../components/kit/tooltip';

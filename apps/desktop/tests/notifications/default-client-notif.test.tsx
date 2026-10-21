@@ -5,7 +5,7 @@ import React from 'react';
 let stubIsRegistered = null;
 let stubRegister: (...args: any[]) => void = () => {};
 const patched = proxyquire('../../src/features/notifications/items/default-client', {
-  'mailspring-exports': {
+  '../../../platform/default-client-helper': {
     DefaultClientHelper: class {
       constructor() {
         // The methods are assigned in the constructor (rather than declared as

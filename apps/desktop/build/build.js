@@ -273,10 +273,6 @@ function buildPackagerOptions() {
       topLevelAllowlist,
       // Package tests only run in dev.
       /^\/(plugins|themes)\/[^/]+\/(specs|tests)(\/|$)/,
-      // The C++ engine (legacy/mailsync-cpp) is never packaged, even if a local build left one
-      // in the desktop dir: its dependencies (OpenSSL 1.1 on Windows, StanfordCPPLib) are not
-      // GPL-compatible or have no licence. Only tern-engine ships.
-      /^\/mailsync(\.exe|\.bin|\.dSYM.*)?$/,
       // better-sqlite3's test fixture; postinstall deletes it, this catches a stale tree.
       /test_extension\.node$/,
       // general dirs we never want

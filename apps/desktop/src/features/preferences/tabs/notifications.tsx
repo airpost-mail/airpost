@@ -1,5 +1,5 @@
 import React from 'react';
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
 import {
   SettingsPage,
   SettingsSection,
@@ -7,7 +7,7 @@ import {
   ConfigSelectRow,
   SettingsRow,
   NeedsServerPill,
-} from 'mailspring-component-kit';
+} from '../../../components/settings';
 
 export default function PreferencesNotifications() {
   const enabled = !!AppEnv.config.get('core.notifications.enabled');

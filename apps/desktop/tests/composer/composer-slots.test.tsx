@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
-import { ComponentRegistry, Contact, Message, MessageWithEditorState } from 'mailspring-exports';
-import { ComposerSupport } from 'mailspring-component-kit';
+import ComponentRegistry from '../../src/packages/component-registry';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { MessageWithEditorState } from '../../src/data/drafts/editing-session';
+import * as ComposerSupport from '../../src/components/composer-editor/support';
 import ComposerView from '../../src/features/composer/view';
 
 // The composer's plugin slots, each rendered with a fake registered component. The

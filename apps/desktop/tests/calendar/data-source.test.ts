@@ -3,7 +3,7 @@
 // asks for, and the helpers that read the answer.
 import { Event as EventModel } from '../../src/data/models/event';
 import { Calendar } from '../../src/data/models/calendar';
-import { DatabaseStore } from 'mailspring-exports';
+import DatabaseStore from '../../src/data/database/store';
 import {
   CalendarDataSource,
   occurrencesForEvents,

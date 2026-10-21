@@ -3,14 +3,12 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import ReactTestUtils from 'react-dom/test-utils';
 
-import {
-  Contact,
-  Message,
-  File,
-  Thread,
-  AttachmentStore,
-  MessageBodyProcessor,
-} from 'mailspring-exports';
+import { Contact } from '../../src/data/models/contact';
+import { Message } from '../../src/data/models/message';
+import { File } from '../../src/data/models/file';
+import { Thread } from '../../src/data/models/thread';
+import AttachmentStore from '../../src/data/stores/attachment';
+import MessageBodyProcessor from '../../src/mail/body/processor';
 
 class MessageItemBody extends React.Component {
   render() {
@@ -18,7 +16,7 @@ class MessageItemBody extends React.Component {
   }
 }
 
-import { InjectedComponent } from 'mailspring-component-kit';
+import InjectedComponent from '../../src/components/injected/component';
 
 const file = new File({
   id: 'file_1_id',
@@ -78,19 +76,19 @@ const download_inline = { fileId: 'file_inline_downloading_id' };
 
 const user_1 = new Contact({
   name: 'User One',
-  email: 'user1@nylas.com',
+  email: 'user1@example.com',
 });
 const user_2 = new Contact({
   name: 'User Two',
-  email: 'user2@nylas.com',
+  email: 'user2@example.com',
 });
 const user_3 = new Contact({
   name: 'User Three',
-  email: 'user3@nylas.com',
+  email: 'user3@example.com',
 });
 const user_4 = new Contact({
   name: 'User Four',
-  email: 'user4@nylas.com',
+  email: 'user4@example.com',
 });
 
 const MessageItem = proxyquire('../../src/features/message-list/message-item', {

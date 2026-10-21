@@ -19,7 +19,7 @@ import { Label } from './models/label';
 import { Folder } from './models/folder';
 import { Task } from './tasks/task';
 import * as Actions from './actions';
-import { QuerySubscription } from 'mailspring-exports';
+import { QuerySubscription } from './query/subscription';
 
 let WorkspaceStore = null;
 let ChangeStarredTask = null;

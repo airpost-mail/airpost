@@ -1,4 +1,6 @@
-import { localized, WorkspaceStore, Actions } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import WorkspaceStore from '../../data/stores/workspace';
+import * as Actions from '../../data/actions';
 import React from 'react';
 import { IconButton } from '../../components/kit/icon-button';
 

@@ -1,11 +1,8 @@
 import React from 'react';
-import {
-  localizedReactFragment,
-  localized,
-  ComponentRegistry,
-  WorkspaceStore,
-} from 'mailspring-exports';
-import { HasTutorialTip } from 'mailspring-component-kit';
+import { localizedReactFragment, localized } from '../../intl/localize';
+import ComponentRegistry from '../../packages/component-registry';
+import WorkspaceStore from '../../data/stores/workspace';
+import HasTutorialTip from '../../components/decorators/has-tutorial-tip';
 
 import ThreadSearchBar from './bar';
 

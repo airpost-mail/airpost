@@ -44,7 +44,7 @@ export class GrammarCheckToggle extends React.Component<{
     const icon = (
       <span className="grammar-check-icon-wrap">
         <RetinaImg
-          url="mailspring://composer-grammar-check/assets/icon-composer-grammar@2x.png"
+          url="tern-asset://composer-grammar-check/assets/icon-composer-grammar@2x.png"
           mode={RetinaImg.Mode.ContentIsMask}
           aria-hidden="true"
         />

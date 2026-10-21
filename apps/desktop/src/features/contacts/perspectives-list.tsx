@@ -1,25 +1,20 @@
 import React from 'react';
-import {
-  Account,
-  AccountStore,
-  ContactGroup,
-  ContactBook,
-  Rx,
-  Actions,
-  DestroyContactGroupTask,
-  SyncbackContactGroupTask,
-  ChangeContactGroupMembershipTask,
-  localized,
-} from 'mailspring-exports';
+import { Account } from '../../data/models/account';
+import { AccountStore } from '../../data/stores/account';
+import { ContactGroup } from '../../data/models/contact-group';
+import { ContactBook } from '../../data/models/contact-book';
+import Rx from 'rx-lite';
+import * as Actions from '../../data/actions';
+import { DestroyContactGroupTask } from '../../data/tasks/destroy-contactgroup';
+import { SyncbackContactGroupTask } from '../../data/tasks/syncback-contactgroup';
+import { ChangeContactGroupMembershipTask } from '../../data/tasks/change-contactgroup-membership';
+import { localized } from '../../intl/localize';
 import { ContactsPerspective, Store, ContactsPerspectiveForGroup } from './store';
-import {
-  ScrollRegion,
-  OutlineView,
-  OutlineViewItem,
-  ListensToFluxStore,
-  ListensToObservable,
-  IOutlineViewItem,
-} from 'mailspring-component-kit';
+import { ScrollRegion } from '../../components/scroll-region';
+import { OutlineView, IOutlineViewItem } from '../../components/outline-view';
+import OutlineViewItem from '../../components/outline-view-item';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import ListensToObservable from '../../components/decorators/listens-to-observable';
 import { isEqual } from 'underscore';
 import { showGPeopleReadonlyNotice } from './google-support';
 
@@ -171,7 +166,7 @@ const ContactsPerspectivesWithData: React.FunctionComponent<ContactsPerspectives
   onSelect,
 }) => (
   <ScrollRegion style={{ flex: 1 }} className="contacts-perspective-list">
-    <section className="outline-view nylas-outline-view" style={{ paddingTop: 15 }}>
+    <section className="outline-view tern-outline-view" style={{ paddingTop: 15 }}>
       <OutlineViewItem
         item={{
           id: 'bla',

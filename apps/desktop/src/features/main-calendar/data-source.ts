@@ -1,11 +1,9 @@
 import Rx from 'rx-lite';
-import {
-  Event,
-  DatabaseStore,
-  CalendarDateUtils,
-  CalendarDate,
-  Calendar,
-} from 'mailspring-exports';
+import { Event } from '../../data/models/event';
+import DatabaseStore from '../../data/database/store';
+import { CalendarDate } from '../../data/calendar/calendar-date';
+import * as CalendarDateUtils from '../../data/calendar/calendar-date';
+import { Calendar } from '../../data/models/calendar';
 import EngineEvents from '../../engine/client/events';
 import { expandEvents } from '../../engine/client/pim';
 

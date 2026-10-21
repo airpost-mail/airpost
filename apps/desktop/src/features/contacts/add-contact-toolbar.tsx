@@ -1,8 +1,11 @@
 import React from 'react';
 import { Store, ContactsPerspective } from './store';
-import { localized, Actions, AccountStore } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import { AccountStore } from '../../data/stores/account';
 import * as Icons from './svg-icons';
-import { ListensToFluxStore, BindGlobalCommands } from 'mailspring-component-kit';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import BindGlobalCommands from '../../components/bind-global-commands';
 import { showGPeopleReadonlyNotice } from './google-support';
 import { Button } from '../../components/kit/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/kit/tooltip';

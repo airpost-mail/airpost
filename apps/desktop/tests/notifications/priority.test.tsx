@@ -1,6 +1,7 @@
 import { render, cleanup, act } from '@testing-library/react';
-import { ComponentRegistry, React } from 'mailspring-exports';
-import { Notification } from 'mailspring-component-kit';
+import ComponentRegistry from '../../src/packages/component-registry';
+import React from 'react';
+import Notification from '../../src/components/notification';
 
 import NotifWrapper from '../../src/features/notifications/wrapper';
 

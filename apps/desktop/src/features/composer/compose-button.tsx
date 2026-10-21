@@ -1,5 +1,6 @@
 import React from 'react';
-import { localized, Actions } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
 import { IconButton } from '../../components/kit/icon-button';
 
 export default class ComposeButton extends React.Component {

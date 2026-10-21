@@ -1,14 +1,12 @@
 /* eslint react/sort-comp: 0 */
 import _ from 'underscore';
 import React from 'react';
-import {
-  Message,
-  localized,
-  DraftStore,
-  WorkspaceStore,
-  ComponentRegistry,
-  InflatesDraftClientId,
-} from 'mailspring-exports';
+import { Message } from '../../data/models/message';
+import { localized } from '../../intl/localize';
+import DraftStore from '../../data/drafts/store';
+import WorkspaceStore from '../../data/stores/workspace';
+import ComponentRegistry from '../../packages/component-registry';
+import InflatesDraftClientId from '../../components/decorators/inflates-draft-client-id';
 import ComposeButton from './compose-button';
 import ComposerView from './view';
 

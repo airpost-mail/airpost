@@ -1,20 +1,19 @@
 import React from 'react';
+import { localized } from '../../intl/localize';
+import { AccountStore, IAliasSet } from '../../data/stores/account';
 import {
-  localized,
-  AccountStore,
   SignatureStore,
-  Actions,
-  FocusedPerspectiveStore,
-  Utils,
   ISignatureSet,
   ISignature,
   IDefaultSignatures,
-  IAliasSet,
-  InlineStyleTransformer,
-  SanitizeTransformer,
-} from 'mailspring-exports';
+} from '../../data/stores/signature';
+import * as Actions from '../../data/actions';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import * as Utils from '../../data/models/utils';
+import InlineStyleTransformer from '../../mail/body/inline-style-transformer';
+import SanitizeTransformer from '../../mail/body/sanitize-transformer';
 import classNames from 'classnames';
-import { SettingsPage, SettingsCard, SettingsField } from 'mailspring-component-kit';
+import { SettingsPage, SettingsCard, SettingsField } from '../../components/settings';
 import { Button } from '../../components/kit/button';
 
 import { ResolveSignatureData, RenderSignatureData, DataShape } from './constants';
@@ -196,11 +195,7 @@ class SignatureEditor extends React.Component<SignatureEditorProps> {
                   />
                 </div>
               ))}
-              <SignaturePhotoPicker
-                data={data}
-                resolvedURL={resolvedData.photoURL}
-                onChange={this._onDataFieldChange}
-              />
+              <SignaturePhotoPicker data={data} onChange={this._onDataFieldChange} />
             </div>
           </>
         )}

@@ -1,4 +1,4 @@
-import { Actions } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
 import moment from 'moment';
 import { Event as EventModel } from '../../src/data/models/event';
 import { CalendarEventPopover } from '../../src/features/main-calendar/event/popover';

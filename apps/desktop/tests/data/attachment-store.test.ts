@@ -1,4 +1,6 @@
-import { AttachmentStore, DraftStore, File } from 'mailspring-exports';
+import AttachmentStore from '../../src/data/stores/attachment';
+import DraftStore from '../../src/data/drafts/store';
+import { File } from '../../src/data/models/file';
 
 describe('AttachmentStore', function () {
   describe('_onAddAttachment', () => {

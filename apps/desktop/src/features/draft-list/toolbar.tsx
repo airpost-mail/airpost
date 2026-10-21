@@ -1,13 +1,11 @@
 import React, { Component } from 'react';
-import {
-  ListensToObservable,
-  MultiselectToolbar,
-  InjectedComponentSet,
-} from 'mailspring-component-kit';
+import ListensToObservable from '../../components/decorators/listens-to-observable';
+import MultiselectToolbar from '../../components/multiselect/toolbar';
+import { InjectedComponentSet } from '../../components/injected/component-set';
 
 import DraftListStore from './store';
 import { DraftDeleteButton } from './toolbar-buttons';
-import { Message } from 'mailspring-exports';
+import { Message } from '../../data/models/message';
 
 function getObservable() {
   return DraftListStore.selectionObservable();

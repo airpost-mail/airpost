@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import * as Actions from '../actions';
 import { Task } from '../tasks/task';
 import TaskQueue from './task-queue';

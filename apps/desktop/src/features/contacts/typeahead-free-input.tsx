@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu } from 'mailspring-component-kit';
+import { Menu } from '../../components/menu';
 import { TextField, TextFieldProps } from '../../components/kit/text-field';
 
 type TypeaheadFreeInputProps = TextFieldProps & {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Utils, localized } from 'mailspring-exports';
+import * as Utils from '../../../data/models/utils';
+import { localized } from '../../../intl/localize';
 import { IconButton } from '../../../components/kit/icon-button';
 import { SegmentedControl } from '../../../components/kit/segmented-control';
 import { CalendarView } from '../constants';

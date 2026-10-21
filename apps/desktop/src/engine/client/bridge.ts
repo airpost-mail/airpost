@@ -18,7 +18,7 @@ import { LogsTailParams, LogsTailResult, Method, THREAD_COUNTS_CLASS } from '../
 import { AccountEvent, EngineStatus, SupervisorChannel } from '../channels';
 import * as Actions from '../../data/actions';
 import * as Utils from '../../data/models/utils';
-import { Model } from 'mailspring-exports';
+import { Model } from '../../data/models/model';
 
 const VERBOSE_UNTIL_KEY = 'core.sync.verboseUntil';
 
@@ -155,7 +155,7 @@ The windows' side of the sync engine. The main process supervises the `serve` en
 (engine/supervisor/supervisor.ts) and every window reads deltas on its own socket connection; the
 main window also sends its accounts' commands on it and applies the supervisor's account events.
 */
-export default class MailsyncBridge {
+export default class EngineBridge {
   _connection: EngineConnection = null;
   _mainWindow = false;
   _appliedEvents = new Set<number>();
@@ -206,7 +206,7 @@ export default class MailsyncBridge {
       message =
         `Verbose logging will be enabled for the next thirty minutes. This records ` +
         `all network traffic to your mail providers and will be quite slow. Wait for your ` +
-        `problem to occur, and then submit mailsync-***.log files located in the ` +
+        `problem to occur, and then submit the engine-*.log files located in the ` +
         `directory: \n\n${configDirPath}.`;
     }
     AppEnv.showErrorDialog({

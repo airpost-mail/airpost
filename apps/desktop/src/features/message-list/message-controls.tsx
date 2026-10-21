@@ -2,17 +2,17 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import {
-  localized,
-  Actions,
-  TaskQueue,
-  GetMessageRFC2822Task,
-  EmlUtils,
-  Thread,
-  Message,
-  ComponentRegistry,
-} from 'mailspring-exports';
-import { RetinaImg, ButtonDropdown, Menu } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import TaskQueue from '../../data/stores/task-queue';
+import { GetMessageRFC2822Task } from '../../data/tasks/get-message-rfc2822';
+import * as EmlUtils from '../../mail/eml';
+import { Thread } from '../../data/models/thread';
+import { Message } from '../../data/models/message';
+import ComponentRegistry from '../../packages/component-registry';
+import { RetinaImg } from '../../components/retina-img';
+import { ButtonDropdown } from '../../components/button-dropdown';
+import { Menu } from '../../components/menu';
 import { IconButton } from '../../components/kit/icon-button';
 import { escapeHTML } from 'underscore.string';
 import { developerToolsAvailable } from '../../platform/developer-tools';

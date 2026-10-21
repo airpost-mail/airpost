@@ -1,4 +1,5 @@
-import { Message, MessageViewExtension } from 'mailspring-exports';
+import { Message } from '../../data/models/message';
+import { MessageViewExtension } from '../../packages/message-view-extension';
 import AutoloadImagesStore from './store';
 
 export default class AutoloadImagesExtension extends MessageViewExtension {

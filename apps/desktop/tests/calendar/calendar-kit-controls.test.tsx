@@ -2,7 +2,9 @@
 // The calendar's controls on the UI kit.
 import React from 'react';
 import { render, fireEvent, cleanup, act } from '@testing-library/react';
-import { Actions, Calendar, DatabaseStore } from 'mailspring-exports';
+import * as Actions from '../../src/data/actions';
+import { Calendar } from '../../src/data/models/calendar';
+import DatabaseStore from '../../src/data/database/store';
 import FixedPopover from '../../src/components/fixed-popover';
 import { getPortalContainer } from '../../src/components/kit/portal';
 import { HeaderControls } from '../../src/features/main-calendar/views/header-controls';

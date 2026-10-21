@@ -18,7 +18,7 @@ export function bundledPackageRoots(resourcePath: string) {
   return BUNDLED_PACKAGE_DIRS.map((dir) => path.join(resourcePath, dir));
 }
 
-// Where `mailspring://<dir>/…` assets and the core LESS reload look: the features, then the
+// Where `tern-asset://<dir>/…` assets and the core LESS reload look: the features, then the
 // bundled package roots.
 export function bundledAssetRoots(resourcePath: string) {
   return [featuresRoot(resourcePath), ...bundledPackageRoots(resourcePath)];

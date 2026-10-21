@@ -1,14 +1,12 @@
 import React from 'react';
 import { ipcRenderer } from 'electron';
-import {
-  Actions,
-  WorkspaceStore,
-  ComponentRegistry,
-  DatabaseStore,
-  Event,
-  localized,
-} from 'mailspring-exports';
-import { NavRailItem } from 'mailspring-component-kit';
+import * as Actions from '../../data/actions';
+import WorkspaceStore from '../../data/stores/workspace';
+import ComponentRegistry from '../../packages/component-registry';
+import DatabaseStore from '../../data/database/store';
+import { Event } from '../../data/models/event';
+import { localized } from '../../intl/localize';
+import { NavRailItem } from '../../components/nav-rail';
 import { QuickEventButton } from './quick-event-button';
 import { MainCalendar } from './main-calendar';
 import { CalendarSidebar } from './sidebar';

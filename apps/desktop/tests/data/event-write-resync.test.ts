@@ -3,7 +3,7 @@ import { DestroyEventTask } from '../../src/data/tasks/destroy-event';
 
 describe('re-reading the calendar after an event write', () => {
   beforeEach(() => {
-    spyOn(AppEnv.mailsyncBridge, 'sendSyncCalendarNow');
+    spyOn(AppEnv.engineBridge, 'sendSyncCalendarNow');
   });
 
   it('polls the account a saved event belongs to once the server has it', async () => {
@@ -11,7 +11,7 @@ describe('re-reading the calendar after an event write', () => {
 
     await task.onSuccess();
 
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-1');
   });
 
   it('polls the account a deleted event belonged to once the server has the deletion', async () => {
@@ -19,6 +19,6 @@ describe('re-reading the calendar after an event write', () => {
 
     await task.onSuccess();
 
-    expect(AppEnv.mailsyncBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-2');
+    expect(AppEnv.engineBridge.sendSyncCalendarNow).toHaveBeenCalledWith('account-2');
   });
 });

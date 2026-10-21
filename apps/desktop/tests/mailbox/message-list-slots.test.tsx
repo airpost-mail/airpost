@@ -3,18 +3,16 @@
 // them. Each spec registers a fake component and checks the slot renders it with its props.
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
-import {
-  Thread,
-  Message,
-  Contact,
-  File,
-  ComponentRegistry,
-  ExtensionRegistry,
-  FocusedContactsStore,
-  MessageStore,
-  DraftStore,
-  WorkspaceStore,
-} from 'mailspring-exports';
+import { Thread } from '../../src/data/models/thread';
+import { Message } from '../../src/data/models/message';
+import { Contact } from '../../src/data/models/contact';
+import { File } from '../../src/data/models/file';
+import ComponentRegistry from '../../src/packages/component-registry';
+import * as ExtensionRegistry from '../../src/packages/extension-registry';
+import FocusedContactsStore from '../../src/data/stores/focused-contacts';
+import { MessageStore } from '../../src/data/stores/message';
+import DraftStore from '../../src/data/drafts/store';
+import WorkspaceStore from '../../src/data/stores/workspace';
 import MessageItemBody from '../../src/features/message-list/message-item-body';
 import MessageItemContainer from '../../src/features/message-list/message-item-container';
 import MessageControls from '../../src/features/message-list/message-controls';

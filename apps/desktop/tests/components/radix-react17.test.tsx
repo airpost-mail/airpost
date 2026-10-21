@@ -38,6 +38,9 @@ describe('Radix primitives on React 17', function () {
   });
 
   it('Slot merges props and refs into its child', () => {
+    // The click would reach the window's link handler, whose "Failed to Open Link" dialog for
+    // http://#x blocks the run.
+    spyOn(AppEnv.windowEventHandler, 'openLink');
     const ref = React.createRef<HTMLAnchorElement>();
     const onClick = jasmine.createSpy('onClick');
     const { container } = render(

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Account } from 'mailspring-exports';
+import { Account } from '../../../data/models/account';
 
 import OAuthSignInPage, { reconnectingAccountId } from './oauth-signin';
 import * as OnboardingActions from '../actions';

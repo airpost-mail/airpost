@@ -1,4 +1,4 @@
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import { SendDraftTask } from '../tasks/send-draft';
 import { SyncbackDraftTask } from '../tasks/syncback-draft';
 import TaskQueue from './task-queue';

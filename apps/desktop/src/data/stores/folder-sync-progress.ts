@@ -1,5 +1,5 @@
 import _ from 'underscore';
-import BaseStore from 'mailspring-store';
+import BaseStore from './base';
 import { AccountStore } from './account';
 import CategoryStore from './category';
 import { Folder } from '../models/folder';
@@ -59,7 +59,7 @@ class FolderSyncProgressStore extends BaseStore {
       const state = {};
 
       /*
-      `localStatus` is populated by C++ mailsync. We translate it to a simpler
+      `localStatus` is populated by the engine. We translate it to a simpler
       representation that the JS side can rely on as the underlying
       implementation changes.
       */

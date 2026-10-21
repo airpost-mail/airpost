@@ -1,7 +1,13 @@
 import React from 'react';
 import _ from 'underscore';
-import { Utils, Contact, ContactStore, RegExpUtils, localized } from 'mailspring-exports';
-import { TokenizingTextField, Menu, InjectedComponentSet } from 'mailspring-component-kit';
+import * as Utils from '../../../data/models/utils';
+import { Contact } from '../../../data/models/contact';
+import ContactStore from '../../../data/stores/contact';
+import RegExpUtils from '../../../utils/regexp';
+import { localized } from '../../../intl/localize';
+import { TokenizingTextField } from '../../../components/tokenizing-text-field';
+import { Menu } from '../../../components/menu';
+import { InjectedComponentSet } from '../../../components/injected/component-set';
 import { EventAttendee } from '../data-source';
 
 const TokenRenderer = (props: { token: EventAttendee }) => {

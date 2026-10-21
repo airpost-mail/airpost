@@ -1,4 +1,6 @@
-import { localized, PreferencesUIStore, ExtensionRegistry } from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { PreferencesUIStore } from '../../data/stores/preferences-ui';
+import * as ExtensionRegistry from '../../packages/extension-registry';
 
 import SignatureComposerExtension from './composer-extension';
 

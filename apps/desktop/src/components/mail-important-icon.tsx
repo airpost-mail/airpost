@@ -1,17 +1,15 @@
 import React from 'react';
 import _ from 'underscore';
 import classNames from 'classnames';
-import {
-  localized,
-  Actions,
-  ChangeLabelsTask,
-  CategoryStore,
-  FocusedPerspectiveStore,
-  AccountStore,
-  Thread,
-  Category,
-  Label,
-} from 'mailspring-exports';
+import { localized } from '../intl/localize';
+import * as Actions from '../data/actions';
+import { ChangeLabelsTask } from '../data/tasks/change-labels';
+import CategoryStore from '../data/stores/category';
+import FocusedPerspectiveStore from '../data/stores/focused-perspective';
+import { AccountStore } from '../data/stores/account';
+import { Thread } from '../data/models/thread';
+import { Category } from '../data/models/category';
+import { Label } from '../data/models/label';
 import { Disposable } from 'rx-core';
 
 const ShowImportantKey = 'core.workspace.showImportant';

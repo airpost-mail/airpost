@@ -1,19 +1,20 @@
 import moment, { Moment } from 'moment';
 import { formatShortTime, momentZone } from '../../../intl/date-format';
 import React from 'react';
-import {
-  Actions,
-  Calendar,
-  Account,
-  DatabaseStore,
-  DateUtils,
-  Event,
-  localized,
-  Autolink,
-  CalendarDateUtils,
-  Utils,
-} from 'mailspring-exports';
-import { DatePicker, ScrollRegion, TabGroupRegion, TimePicker } from 'mailspring-component-kit';
+import * as Actions from '../../../data/actions';
+import { Calendar } from '../../../data/models/calendar';
+import { Account } from '../../../data/models/account';
+import DatabaseStore from '../../../data/database/store';
+import DateUtils from '../../../utils/date';
+import { Event } from '../../../data/models/event';
+import { localized } from '../../../intl/localize';
+import { Autolink } from '../../../mail/body/autolinker';
+import * as CalendarDateUtils from '../../../data/calendar/calendar-date';
+import * as Utils from '../../../data/models/utils';
+import { DatePicker } from '../../../components/date-picker';
+import { ScrollRegion } from '../../../components/scroll-region';
+import { TabGroupRegion } from '../../../components/tab-group-region';
+import TimePicker from '../../../components/time-picker';
 import { Button } from '../../../components/kit/button';
 import { IconButton } from '../../../components/kit/icon-button';
 import { TextField } from '../../../components/kit/text-field';

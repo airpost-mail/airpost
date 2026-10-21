@@ -1,20 +1,16 @@
 import React from 'react';
-import {
-  FocusContainer,
-  ListensToFluxStore,
-  ListDataSource,
-  BindGlobalCommands,
-} from 'mailspring-component-kit';
+import FocusContainer from '../../components/focus-container';
+import ListensToFluxStore from '../../components/decorators/listens-to-flux-store';
+import { ListDataSource } from '../../components/list/tabular';
+import BindGlobalCommands from '../../components/bind-global-commands';
 import { Button } from '../../components/kit/button';
 import { IconButton } from '../../components/kit/icon-button';
 import { Store, ContactsPerspective } from './store';
-import {
-  localized,
-  DestroyContactTask,
-  Actions,
-  Contact,
-  ChangeContactGroupMembershipTask,
-} from 'mailspring-exports';
+import { localized } from '../../intl/localize';
+import { DestroyContactTask } from '../../data/tasks/destroy-contact';
+import * as Actions from '../../data/actions';
+import { Contact } from '../../data/models/contact';
+import { ChangeContactGroupMembershipTask } from '../../data/tasks/change-contactgroup-membership';
 import { showGPeopleReadonlyNotice } from './google-support';
 import { exportContactsToFile } from './files';
 

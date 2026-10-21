@@ -2,8 +2,11 @@ import React from 'react';
 import path from 'path';
 import fs from 'fs';
 import classnames from 'classnames';
-import { RetinaImg, ConfigPropContainer } from 'mailspring-component-kit';
-import { localized, AccountStore, Account } from 'mailspring-exports';
+import { RetinaImg } from '../../../components/retina-img';
+import { ConfigPropContainer } from '../../../components/config-prop-container';
+import { localized } from '../../../intl/localize';
+import { AccountStore } from '../../../data/stores/account';
+import { Account } from '../../../data/models/account';
 import { Button } from '../../../components/kit/button';
 import { RadioGroup, RadioGroupItem } from '../../../components/kit/radio-group';
 import {

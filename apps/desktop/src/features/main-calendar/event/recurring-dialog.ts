@@ -1,4 +1,4 @@
-import { localized } from 'mailspring-exports';
+import { localized } from '../../../intl/localize';
 
 export type RecurringEventChoice = 'this-occurrence' | 'all-occurrences' | 'cancel';
 

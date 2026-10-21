@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
-import { SignatureStore } from 'mailspring-exports';
+import { SignatureStore } from '../../src/data/stores/signature';
 import { convertFromHTML, convertToHTML } from '../../src/components/composer-editor/conversion';
 import UneditablePlugins, {
   UNEDITABLE_TYPE,

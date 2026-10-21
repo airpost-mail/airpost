@@ -68,7 +68,7 @@ class SnoozePopover extends Component<{
   renderItem = (itemLabel: string) => {
     const date = SnoozeDatesFactory[itemLabel]();
     const iconName = SnoozeIconNames[itemLabel];
-    const iconPath = `mailspring://thread-snooze/assets/ic-snoozepopover-${iconName}@2x.png`;
+    const iconPath = `tern-asset://thread-snooze/assets/ic-snoozepopover-${iconName}@2x.png`;
     return (
       <Button
         key={itemLabel}

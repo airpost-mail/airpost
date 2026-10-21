@@ -1,6 +1,10 @@
 import React from 'react';
-import { localized, Actions, AttachmentStore, Message } from 'mailspring-exports';
-import { AttachmentItem, Spinner } from 'mailspring-component-kit';
+import { localized } from '../../intl/localize';
+import * as Actions from '../../data/actions';
+import AttachmentStore from '../../data/stores/attachment';
+import { Message } from '../../data/models/message';
+import { AttachmentItem } from '../../components/attachment-items';
+import { Spinner } from '../../components/spinner';
 
 export const AttachmentsArea: React.FunctionComponent<{
   draft: Message;

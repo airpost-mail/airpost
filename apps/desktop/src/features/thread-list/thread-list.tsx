@@ -2,31 +2,27 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import classnames from 'classnames';
 
-import {
-  MultiselectList,
-  FocusContainer,
-  EmptyListState,
-  FluxContainer,
-  SyncingListState,
-} from 'mailspring-component-kit';
+import { MultiselectList } from '../../components/multiselect/list';
+import FocusContainer from '../../components/focus-container';
+import EmptyListState from '../../components/empty-list-state';
+import FluxContainer from '../../components/flux-container';
+import SyncingListState from '../../components/syncing-list-state';
 
-import {
-  Actions,
-  Utils,
-  CanvasUtils,
-  DragDropTypes,
-  ChangeStarredTask,
-  ChangeFolderTask,
-  ChangeLabelsTask,
-  DOMUtils,
-  ExtensionRegistry,
-  FocusedContentStore,
-  FocusedPerspectiveStore,
-  FolderSyncProgressStore,
-  Thread,
-  TaskFactory,
-  localized,
-} from 'mailspring-exports';
+import * as Actions from '../../data/actions';
+import * as Utils from '../../data/models/utils';
+import * as CanvasUtils from '../../components/drag-canvas';
+import * as DragDropTypes from '../../components/drag-drop-types';
+import { ChangeStarredTask } from '../../data/tasks/change-starred';
+import { ChangeFolderTask } from '../../data/tasks/change-folder';
+import { ChangeLabelsTask } from '../../data/tasks/change-labels';
+import DOMUtils from '../../utils/dom';
+import * as ExtensionRegistry from '../../packages/extension-registry';
+import FocusedContentStore from '../../data/stores/focused-content';
+import FocusedPerspectiveStore from '../../data/stores/focused-perspective';
+import FolderSyncProgressStore from '../../data/stores/folder-sync-progress';
+import { Thread } from '../../data/models/thread';
+import { TaskFactory } from '../../data/tasks/factory';
+import { localized } from '../../intl/localize';
 
 import * as ThreadListColumns from './columns';
 import ThreadListScrollTooltip from './scroll-tooltip';

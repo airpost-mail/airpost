@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
-import { localized, Account } from 'mailspring-exports';
-import { RetinaImg } from 'mailspring-component-kit';
+import { localized } from '../../../intl/localize';
+import { Account } from '../../../data/models/account';
+import { RetinaImg } from '../../../components/retina-img';
 import AccountProviders from '../account-providers';
 
 class AccountOnboardingSuccess extends Component<{ account: Account }> {

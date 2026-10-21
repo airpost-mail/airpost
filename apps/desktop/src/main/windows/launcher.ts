@@ -170,7 +170,6 @@ export default class WindowLauncher {
   // Note: This method calls `browserWindow.destroy()` which closes
   // windows without waiting for them to load or firing window lifecycle
   // events.  This is necessary for the app to quit promptly on Linux.
-  // https://phab.mailspring.com/T1282
   cleanupBeforeAppQuit() {
     if (this.hotWindow != null) {
       this.hotWindow.browserWindow.destroy();

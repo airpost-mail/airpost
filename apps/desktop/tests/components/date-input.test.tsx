@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 
-import { DateUtils } from 'mailspring-exports';
+import DateUtils from '../../src/utils/date';
 import DateInput from '../../src/components/date-input';
 
 describe('DateInput', function dateInput() {

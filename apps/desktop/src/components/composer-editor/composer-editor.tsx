@@ -5,7 +5,8 @@ import { Editor, Value, Operation, Range, Block, Text, Point } from 'slate';
 import { Editor as SlateEditorComponent, EditorProps, Plugin } from 'slate-react';
 import Plain from 'slate-plain-serializer';
 import { webUtils } from 'electron';
-import { InlineStyleTransformer, SanitizeTransformer } from 'mailspring-exports';
+import InlineStyleTransformer from '../../mail/body/inline-style-transformer';
+import SanitizeTransformer from '../../mail/body/sanitize-transformer';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -50,8 +51,7 @@ function getDocumentBrokenReason(value: Value): string | null {
 // on, and Slate's point normalization then intentionally leaves that unset point alone
 // rather than guessing a replacement. If we don't repair it here, the very next
 // keystroke crashes deep inside Slate's `deleteExpandedAtRange` (`Point.moveTo` calling
-// `.equals` on a null path) with "Cannot read properties of null (reading 'equals')"
-// (MAILSPRING-CLIENT-1E).
+// `.equals` on a null path) with "Cannot read properties of null (reading 'equals')".
 //
 // NOTE: a fully-unset-but-focused selection isn't unique to this bug — slate-react's
 // own `AfterPlugin.onFocus` intentionally calls `editor.deselect().focus()` on every
@@ -467,8 +467,8 @@ export function shouldAttachPastedFile(clipboardData: DataTransfer) {
 }
 
 export function handleFilePasted(event: ClipboardEvent, onFileReceived: (path: string) => void) {
-  // See https://github.com/Foundry376/Mailspring/pull/2104 - if you right-click + Copy Image in Chrome,
-  // the image file is item 1, not item 0. Every file item is attached so that copying several
+  // After a right-click + Copy Image in Chrome, the image file is item 1, not item 0
+  // (Foundry376/Mailspring#2104). Every file item is attached so that copying several
   // files in Finder / Explorer / a Linux file manager pastes all of them.
   const fileItems = Array.from(event.clipboardData.items).filter((item) => item.kind === 'file');
 

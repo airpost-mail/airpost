@@ -1,8 +1,14 @@
 import React from 'react';
 import { Moment } from 'moment';
 import { Disposable } from 'rx-core';
-import { Rx, DatabaseStore, AccountStore, Calendar, Account, DOMUtils } from 'mailspring-exports';
-import { ScrollRegion, MiniMonthView } from 'mailspring-component-kit';
+import Rx from 'rx-lite';
+import DatabaseStore from '../../data/database/store';
+import { AccountStore } from '../../data/stores/account';
+import { Calendar } from '../../data/models/calendar';
+import { Account } from '../../data/models/account';
+import DOMUtils from '../../utils/dom';
+import { ScrollRegion } from '../../components/scroll-region';
+import { MiniMonthView } from '../../components/mini-month-view';
 import { CalendarSourceList } from './source-list';
 import { setCalendarColors } from './helpers';
 import FocusedMomentStore from './focused-moment-store';

@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import React from 'react';
 import { render, fireEvent, cleanup, act } from '@testing-library/react';
-import {
-  Account,
-  AccountStore,
-  CategoryStore,
-  ComponentRegistry,
-  ExtensionRegistry,
-  Folder,
-  FocusedPerspectiveStore,
-  MailboxPerspective,
-  WorkspaceStore,
-} from 'mailspring-exports';
+import { Account } from '../../src/data/models/account';
+import { AccountStore } from '../../src/data/stores/account';
+import CategoryStore from '../../src/data/stores/category';
+import ComponentRegistry from '../../src/packages/component-registry';
+import * as ExtensionRegistry from '../../src/packages/extension-registry';
+import { Folder } from '../../src/data/models/folder';
+import FocusedPerspectiveStore from '../../src/data/stores/focused-perspective';
+import { MailboxPerspective } from '../../src/data/mailbox-perspective';
+import WorkspaceStore from '../../src/data/stores/workspace';
 import Sheet from '../../src/components/sheets/sheet';
 import AccountSwitcher from '../../src/features/account-sidebar/account-switcher';
 import AccountSidebar from '../../src/features/account-sidebar/account-sidebar';
