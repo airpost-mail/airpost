@@ -107,6 +107,12 @@ pub enum Command {
         #[command(subcommand)]
         command: ContactCommand,
     },
+    /// Write drafts as the desktop's composer starts them (From, signature, quoted text,
+    /// reply recipients), list them and send them. Needs the serve engine.
+    Draft {
+        #[command(subcommand)]
+        command: DraftCommand,
+    },
     /// Move threads to Snoozed until a time, as the desktop's snooze menu does.
     Snooze {
         #[arg(required = true, num_args = 1.., value_name = "THREAD_ID")]
@@ -628,6 +634,96 @@ pub enum ContactCommand {
     },
 }
 
+/// What a draft command writes into the draft.
+#[derive(Debug, Args)]
+pub struct DraftContentArgs {
+    /// Recipients, replacing the ones a reply or forward starts with: addresses or
+    /// `Name <address>`, comma-separated or repeated.
+    #[arg(long, value_name = "ADDRESSES")]
+    pub to: Vec<String>,
+    /// Cc recipients, as --to.
+    #[arg(long, value_name = "ADDRESSES")]
+    pub cc: Vec<String>,
+    /// Bcc recipients, as --to.
+    #[arg(long, value_name = "ADDRESSES")]
+    pub bcc: Vec<String>,
+    /// The subject, replacing the "Re:" or "Fwd:" one.
+    #[arg(long)]
+    pub subject: Option<String>,
+    /// The text, written above the signature and the quoted text. Plain text unless --html.
+    #[arg(long, allow_hyphen_values = true, conflicts_with = "body_file")]
+    pub body: Option<String>,
+    /// Read the text from a file, or from stdin with -.
+    #[arg(long, value_name = "FILE|-")]
+    pub body_file: Option<PathBuf>,
+    /// The text is HTML, and the draft an HTML one.
+    #[arg(long, conflicts_with = "plain")]
+    pub html: bool,
+    /// A plain-text draft. Without --html or --plain the draft follows the composer's
+    /// setting (core.composing.html).
+    #[arg(long)]
+    pub plain: bool,
+}
+
+/// The reply commands' arguments.
+#[derive(Debug, Args)]
+pub struct DraftReplyArgs {
+    /// The message to answer, or a thread id for its newest message that isn't a draft.
+    #[arg(value_name = "MESSAGE_ID|THREAD_ID")]
+    pub id: String,
+    /// Edit the draft already answering the message, if there is one (the default), so
+    /// running the command again revises the reply instead of starting another.
+    #[arg(long, overrides_with = "no_prefer_existing")]
+    pub prefer_existing: bool,
+    /// Always start a new draft.
+    #[arg(long, overrides_with = "prefer_existing")]
+    pub no_prefer_existing: bool,
+    #[command(flatten)]
+    pub content: DraftContentArgs,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DraftCommand {
+    /// A new message, from --account (default: the default sending account).
+    New {
+        #[command(flatten)]
+        content: DraftContentArgs,
+    },
+    /// A reply to the sender.
+    Reply(DraftReplyArgs),
+    /// A reply to the sender and every other recipient.
+    ReplyAll(DraftReplyArgs),
+    /// A forward of a message, with its attachments.
+    Forward {
+        /// The message, or a thread id for its newest message that isn't a draft.
+        #[arg(value_name = "MESSAGE_ID|THREAD_ID")]
+        id: String,
+        #[command(flatten)]
+        content: DraftContentArgs,
+    },
+    /// Send a draft now. It can't be called back.
+    Send {
+        /// The draft's id (`tern draft list` shows it) or its Message-ID.
+        #[arg(value_name = "DRAFT_ID|MESSAGE_ID")]
+        id: String,
+        /// Archive the thread once it is sent.
+        #[arg(long)]
+        archive: bool,
+        /// Wait until the mail has gone; exit 1 if the send fails.
+        #[arg(long)]
+        wait: bool,
+        /// With --wait, give up after this many seconds.
+        #[arg(long, value_name = "SECS", requires = "wait")]
+        timeout: Option<u64>,
+    },
+    /// The unsent drafts, newest first.
+    List {
+        /// How many drafts per account (default 50).
+        #[arg(long, short = 'n')]
+        limit: Option<usize>,
+    },
+}
+
 #[derive(Debug, Subcommand)]
 pub enum TaskCommand {
     /// The stored tasks: pending ones first, oldest queued first, then finished ones, newest
@@ -780,6 +876,55 @@ mod tests {
         assert!(parse(&["ai", "triage", "--since", "3d", "t1"]).is_err());
         assert!(parse(&["ai", "summarize"]).is_err());
         assert!(parse(&["ai", "usage", "--days", "7"]).is_ok());
+    }
+
+    #[test]
+    fn draft_shapes() {
+        let cli = parse(&[
+            "draft", "reply", "m1", "--body", "-- Ann", "--to", "a@x.test", "--to", "b@x.test",
+        ])
+        .unwrap();
+        let Command::Draft {
+            command: DraftCommand::Reply(r),
+        } = cli.command
+        else {
+            panic!("draft reply")
+        };
+        assert_eq!((r.id.as_str(), r.no_prefer_existing), ("m1", false));
+        assert_eq!(r.content.body.as_deref(), Some("-- Ann"));
+        assert_eq!(r.content.to, ["a@x.test", "b@x.test"]);
+        let cli = parse(&[
+            "draft",
+            "reply-all",
+            "t1",
+            "--prefer-existing",
+            "--no-prefer-existing",
+        ])
+        .unwrap();
+        let Command::Draft {
+            command: DraftCommand::ReplyAll(r),
+        } = cli.command
+        else {
+            panic!("draft reply-all")
+        };
+        assert!(r.no_prefer_existing && !r.prefer_existing);
+        assert!(parse(&["draft", "new", "--subject", "Hi", "--body-file", "-"]).is_ok());
+        assert!(parse(&["draft", "new", "--body", "x", "--body-file", "f"]).is_err());
+        assert!(parse(&["draft", "new", "--html", "--plain"]).is_err());
+        assert!(parse(&["draft", "forward", "m1", "--to", "a@x.test", "--plain"]).is_ok());
+        assert!(parse(&["draft", "forward"]).is_err());
+        assert!(parse(&[
+            "draft",
+            "send",
+            "d1",
+            "--archive",
+            "--wait",
+            "--timeout",
+            "30"
+        ])
+        .is_ok());
+        assert!(parse(&["draft", "send", "d1", "--timeout", "30"]).is_err());
+        assert!(parse(&["draft", "list", "-n", "5"]).is_ok());
     }
 
     #[test]

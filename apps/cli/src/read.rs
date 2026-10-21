@@ -436,13 +436,13 @@ pub fn contacts(
     Ok(())
 }
 
-enum Shown {
+pub(crate) enum Shown {
     Message(Value),
     Thread(Value),
 }
 
 /// Looks `id` up as a message, then as a thread, in each account until one has it.
-fn find_shown(
+pub(crate) fn find_shown(
     engines: &mut [Engine],
     targets: &[Target],
     id: &str,
@@ -519,7 +519,11 @@ fn with_kind(mut r: Value, kind: &str) -> Value {
 }
 
 /// Asks the engine for the body, then polls `messages.get` until it is stored.
-fn wait_for_body(engines: &mut [Engine], t: &Target, id: &str) -> Result<Option<String>> {
+pub(crate) fn wait_for_body(
+    engines: &mut [Engine],
+    t: &Target,
+    id: &str,
+) -> Result<Option<String>> {
     call::<Value>(
         engines,
         t,
