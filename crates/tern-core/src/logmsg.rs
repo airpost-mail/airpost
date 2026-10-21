@@ -333,8 +333,8 @@ pub fn ai_triage_resumed() -> &'static str {
 
 // -- Server-synced drafts (docs/drafts-sync-design.md) ------------------------------------
 
-/// A draft row moved to the id its Message-ID gives it. draft-remote-edit-adopt and
-/// import-legacy-drafts-pushed match `Draft \S+ is now \S+`.
+/// A draft row moved to the id its Message-ID gives it. import-legacy-drafts-pushed
+/// matches `Draft \S+ is now \S+`.
 pub fn draft_rekeyed(old_id: &str, new_id: &str) -> String {
     format!("- Draft {old_id} is now {new_id}")
 }

@@ -293,6 +293,7 @@ impl TaskProcessor<'_> {
         if !self.account.save_drafts_to_server() {
             return Ok(None);
         }
+        self.queue_existing_local_drafts()?;
         let ids = self.store.dirty_draft_ids(self.account.id())?;
         if ids.is_empty() {
             return Ok(None);
@@ -337,6 +338,50 @@ impl TaskProcessor<'_> {
         }
         // A second at least: a draft due now waits for the next iteration, not a busy loop.
         Ok(next.map(|at| Duration::from_secs((at - now).max(1) as u64)))
+    }
+
+    /// Drafts saved before the account synced drafts, or imported from the C++ engine, are
+    /// pushed like a fresh save once (docs/drafts-sync-design.md 3.5), a few per iteration:
+    /// those with a body or recipients, not pristine. The others are marked seen and wait
+    /// for their next save.
+    fn queue_existing_local_drafts(&self) -> Result<()> {
+        let ids = self
+            .store
+            .local_drafts_without_sync_state(self.account.id())?;
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let queued = self.store.transaction("queueLocalDrafts", |s| {
+            let mut queued = 0;
+            for id in &ids {
+                let Some(mut draft) = s.find::<Message>(&Query::new().equal("id", id))? else {
+                    continue;
+                };
+                let body: String = s
+                    .conn()
+                    .prepare_cached("SELECT value FROM MessageBody WHERE id = ?")?
+                    .query_row([id], |r| r.get(0))
+                    .unwrap_or_default();
+                let has_recipients = [draft.to(), draft.cc(), draft.bcc()]
+                    .iter()
+                    .any(|l| !elements(l).is_empty());
+                let pristine = draft.data.get("pristine").and_then(Value::as_bool) == Some(true);
+                let push = !pristine && (!body.trim().is_empty() || has_recipients);
+                let sync = DraftSync {
+                    rev: u64::from(push),
+                    ..Default::default()
+                };
+                queued += usize::from(push);
+                draft.set_draft_sync(Some(&sync));
+                s.save(&mut draft)?;
+            }
+            s.unsafe_erase_transaction_deltas();
+            Ok(queued)
+        })?;
+        if queued > 0 {
+            info!("{}", logmsg::draft_sync_enabled(queued));
+        }
+        Ok(())
     }
 
     /// The ids and Message-IDs of drafts a queued send or destroy names.

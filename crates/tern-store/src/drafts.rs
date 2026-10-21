@@ -169,6 +169,23 @@ impl Store {
         Ok(ids)
     }
 
+    /// The account's drafts that exist only here (no server copy) and have no `_dsync`:
+    /// saved before "Save drafts to server" was on, or imported from the C++ engine.
+    pub fn local_drafts_without_sync_state(&self, account_id: &str) -> Result<Vec<String>> {
+        let mut stmt = self.conn().prepare_cached(
+            "SELECT id FROM Message WHERE accountId = ? AND draft = 1 \
+             AND json_extract(data, '$._dsync') IS NULL \
+             AND NOT EXISTS (SELECT 1 FROM MessageFolder mf WHERE mf.messageId = Message.id AND mf.remoteUID > 0)",
+        )?;
+        let ids = stmt
+            .query_map([account_id], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(ids
+            .into_iter()
+            .filter(|id| !tern_core::ids::is_deletion_placeholder_id(id))
+            .collect())
+    }
+
     /// The data of the account's tasks of these classes still to run (`local` or `remote`).
     pub fn pending_task_data(&self, account_id: &str, classes: &[&str]) -> Result<Vec<Value>> {
         let mut stmt = self.conn().prepare_cached(

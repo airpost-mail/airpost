@@ -3493,3 +3493,36 @@ impl Env {
         )
     }
 }
+
+#[test]
+fn drafts_saved_before_drafts_synced_are_pushed_once_turned_on() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    e.mail_folders();
+    let written = e.save_draft("d1@example.com", json!({}));
+    let empty = e.save_draft(
+        "d2@example.com",
+        json!({"body": "", "to": [], "bcc": [], "rthMsgId": ""}),
+    );
+    let pristine = e.save_draft("d3@example.com", json!({"pristine": true}));
+    assert!(e.message(&written).unwrap().draft_sync().is_none());
+
+    e.sync_drafts_to_server();
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [1]);
+    assert_eq!(e.copies(&written), [("Drafts".to_owned(), 1, None)]);
+    for id in [&empty, &pristine] {
+        let sync = e.draft_sync(id);
+        assert_eq!((sync.rev, sync.pushed_rev), (0, 0), "{id}");
+        assert_eq!(e.copies(id), [("Drafts".to_owned(), 0, None)]);
+    }
+    e.push_drafts();
+    assert_eq!(e.imap.appended.len(), 1);
+
+    // The next save of a draft that stayed local pushes it.
+    e.at(T0 + 10);
+    e.save_draft("d2@example.com", json!({"id": empty, "body": "<p>Now</p>"}));
+    e.at(T0 + 30);
+    e.push_drafts();
+    assert_eq!(e.imap.uids("Drafts"), [1, 2]);
+    e.assert_invariants();
+}

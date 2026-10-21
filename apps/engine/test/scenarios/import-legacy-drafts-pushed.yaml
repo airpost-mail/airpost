@@ -1,0 +1,59 @@
+name: import-legacy-drafts-pushed
+description: >
+  Drafts the C++ engine kept only locally (UID-0 Drafts placements) are imported, and with
+  "Save drafts to server" on they are pushed once, like a fresh save: the draft with a body
+  and its attachment, and the reply that joined the thread it answers (still a reply on the
+  server). A draft with neither body nor recipients stays local until it is next saved.
+  Each pushed draft is stored under the id its Message-ID gives it, so its server copy
+  maps back onto it.
+source: "docs/drafts-sync-design.md 3.5 (existing local drafts, includes import-legacy drafts)"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {special_use: "\\Drafts"}
+import_legacy: true
+legacy_db:
+  folders: {INBOX: inbox, Drafts: drafts}
+  messages:
+    m1: {mailbox: INBOX, uid: 1, thread: t1}
+    d1:
+      folder: Drafts
+      draft: {hMsgId: "local-draft-1@example.test", subject: "Unsent plans", body: "<p>draft body</p>",
+              to: [{name: "Bob Builder", email: "bob@example.net"}]}
+      files: [{filename: notes.txt, content: "attached to the draft"}]
+    d2:
+      folder: Drafts
+      draft: {hMsgId: "local-reply-1@example.test", subject: "Re: plans", body: "<p>reply</p>", reply_to: m1}
+    d3:
+      folder: Drafts
+      draft: {hMsgId: "local-empty-1@example.test", subject: "", body: ""}
+steps:
+  - wait: {log: "Saving 2 local drafts to the server", timeout: 60}
+  - wait: {log: "Saved draft local-draft-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {log: "Saved draft local-reply-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  mode_output: {import-legacy: '"error":null'}
+  server_has:
+    Drafts:
+      - {message_id: "local-draft-1@example.test", flags: ["\\Draft", "\\Seen"],
+         contains: ["Unsent plans", "draft body", 'filename="notes.txt"']}
+      - {message_id: "local-reply-1@example.test", contains: ["In-Reply-To: <harness-"]}
+  server_counts: {Drafts: 2, INBOX: 3}
+  counts: {Drafts: 2, INBOX: 3, total: 6}
+  models:
+    Message:
+      where: {draft: true}
+      count: 3
+  log_count: {"Saving \\d+ local drafts to the server": 1}
+  log_present: ["Draft \\S+ is now \\S+"]   # the C++ ids are not the ids their Message-IDs give
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true
