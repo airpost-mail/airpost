@@ -1,5 +1,8 @@
 import React from 'react';
+import { pathToFileURL } from 'url';
 import { localized } from '../../../intl/localize';
+import { macSystemSoundNames, macSystemSoundPath } from '../../../platform/system-sounds';
+import { playSoundURL } from '../../../packages/sound-registry';
 import {
   SettingsPage,
   SettingsSection,
@@ -9,8 +12,19 @@ import {
   NeedsServerPill,
 } from '../../../components/settings';
 
+// The sounds in /System/Library/Sounds, macOS only; elsewhere new mail plays the OS sound theme's
+// or the bundled sound.
+const MacSounds = macSystemSoundNames();
+
+function previewMacSound(name: unknown) {
+  const file = macSystemSoundPath(name);
+  if (!file) return;
+  playSoundURL(pathToFileURL(file).href);
+}
+
 export default function PreferencesNotifications() {
   const enabled = !!AppEnv.config.get('core.notifications.enabled');
+  const sounds = !!AppEnv.config.get('core.notifications.sounds');
   return (
     <SettingsPage
       title={localized('Notifications')}
@@ -26,6 +40,15 @@ export default function PreferencesNotifications() {
           label={localized('Play a sound')}
           disabled={!enabled}
         />
+        {MacSounds.length > 0 && (
+          <ConfigSelectRow
+            keyPath="core.notifications.sound"
+            label={localized('Sound')}
+            options={MacSounds.map((name) => [name, name])}
+            disabled={!enabled || !sounds}
+            onChange={previewMacSound}
+          />
+        )}
       </SettingsSection>
 
       <SettingsSection title={localized('App icon')}>

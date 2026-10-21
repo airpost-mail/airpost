@@ -395,6 +395,13 @@ export default {
             default: true,
             title: localized('Play sound when receiving new mail'),
           },
+          // A name in /System/Library/Sounds (platform/system-sounds.ts).
+          sound: {
+            type: 'string',
+            default: 'Glass',
+            title: localized('Sound'),
+            platforms: ['darwin'],
+          },
           unsnoozeToTop: {
             type: 'boolean',
             default: true,

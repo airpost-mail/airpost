@@ -189,6 +189,7 @@ export function ConfigSelectRow(props: {
   description?: React.ReactNode;
   options?: Option[];
   disabled?: boolean;
+  onChange?: (value: Option[0] | string) => void;
 }) {
   const options = props.options || schemaOptions(props.keyPath);
   const value = AppEnv.config.get(props.keyPath) ?? options[0]?.[0];
@@ -199,7 +200,9 @@ export function ConfigSelectRow(props: {
         disabled={props.disabled}
         onValueChange={(key) => {
           const picked = options.find(([v]) => optionKey(v) === key);
-          AppEnv.config.set(props.keyPath, picked ? picked[0] : key);
+          const next = picked ? picked[0] : key;
+          AppEnv.config.set(props.keyPath, next);
+          props.onChange?.(next);
         }}
       >
         <SelectTrigger aria-label={typeof props.label === 'string' ? props.label : undefined}>

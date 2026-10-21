@@ -31,7 +31,8 @@ export const AppContentSecurityPolicy =
     // frames are src-less about:blank ones, which frame-src doesn't govern.
     `frame-src ${MessageFrameOrigin}`,
     "object-src 'none'",
-    'media-src tern-asset: mailspring:',
+    // blob: carries the OS's own sounds (packages/sound-registry.ts).
+    'media-src tern-asset: mailspring: blob:',
     "manifest-src 'none'",
   ].join('; ') + ';';
 

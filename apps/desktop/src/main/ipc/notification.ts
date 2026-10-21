@@ -2,6 +2,7 @@ import { Notification, IpcMain, IpcMainInvokeEvent, nativeImage } from 'electron
 import path from 'path';
 import { UrlWithParsedQuery } from 'url';
 import { ICON_PATHS } from '../../platform/linux-desktop';
+import { DefaultMacNewMailSound, macSystemSoundPath } from '../../platform/system-sounds';
 
 interface NotificationOptions {
   id: string;
@@ -21,11 +22,19 @@ interface NotificationOptions {
   toastXml?: string;
 }
 
-// Copied into Contents/Resources by build.js, where UNNotificationSound looks it up by name.
-// Must be an MP3: NotificationCenter ignores .caf files in an app bundle (IMA4 and PCM alike)
-// and plays the default tone instead. https://developer.apple.com/forums/thread/716650
-// (FB11642483), reproduced on macOS 27.
+// The fallback when the picked system sound is missing. Copied into Contents/Resources by
+// build.js, where UNNotificationSound looks it up by name. Must be an MP3: NotificationCenter
+// ignores .caf files in an app bundle (IMA4 and PCM alike) and plays the default tone instead.
+// https://developer.apple.com/forums/thread/716650 (FB11642483), reproduced on macOS 27.
 const MAC_NEW_MAIL_SOUND = 'new-mail.mp3';
+
+// The user's pick in Preferences > Notifications, by file name in /System/Library/Sounds,
+// one of the Library/Sounds directories UNNotificationSound searches.
+function macNewMailSound() {
+  const picked = global.application?.config?.get('core.notifications.sound');
+  const file = macSystemSoundPath(picked) || macSystemSoundPath(DefaultMacNewMailSound);
+  return file ? path.basename(file) : MAC_NEW_MAIL_SOUND;
+}
 
 const handledWindowsToastXMLProtocolActionsForIds: string[] = [];
 
@@ -127,7 +136,7 @@ const displayNotification = (
     }
     if (options.playSound) {
       notifOptions.silent = false;
-      notifOptions.sound = MAC_NEW_MAIL_SOUND;
+      notifOptions.sound = macNewMailSound();
     }
   }
 
