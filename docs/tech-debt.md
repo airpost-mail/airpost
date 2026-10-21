@@ -936,6 +936,10 @@ composer HTML (sanitised by hand because of this, `composer-editor.tsx:287-289`,
   (`src/shared/config-channels.ts`, `sendSync`); `.eslintrc` bans `@electron/remote` imports and
   requires outside an allowlist of the 56 files that still use it. Dialogs, `openUrl`,
   `isQuitting`, window count, menu and updater remain.
+- Status (2026-10-21, `next`): no code in `src/`, `plugins/` or `static/` uses remote; windows
+  reach main through `src/platform/app-api.ts` (handlers in `src/main/ipc/app-api.ts`), and lint
+  bans it there with no exemptions. `remote.initialize()`/`enable()` stay for v1 plugins that load
+  it until plugin API 2.0; contextIsolation and sandbox are still open.
 
 ### TD36. Store graph held together by the barrel and require order (before stage 6)
 

@@ -98,54 +98,6 @@
   },
   "overrides": [
     {
-      "files": [
-        "plugins/composer-templates/lib/preferences-templates.tsx",
-        "plugins/composer-templates/lib/store.ts",
-        "plugins/translation/lib/message-header.tsx",
-        "src/components/attachment-items.tsx",
-        "src/components/composer-editor/grammar-check-plugins.tsx",
-        "src/components/evented-iframe.tsx",
-        "src/components/outline-view-item.tsx",
-        "src/components/participants-text-field.tsx",
-        "src/components/sheets/toolbar.tsx",
-        "src/components/tokenizing-text-field.tsx",
-        "src/features/account-sidebar/account-switcher.tsx",
-        "src/features/account-sidebar/sidebar-item.ts",
-        "src/features/composer-signature/preferences-signatures.tsx",
-        "src/features/composer/view.tsx",
-        "src/features/contacts/files.ts",
-        "src/features/contacts/list.tsx",
-        "src/features/contacts/list-context-menu.ts",
-        "src/features/contacts/google-support.ts",
-        "src/features/contacts/index.tsx",
-        "src/features/list-unsubscribe/service.ts",
-        "src/features/main-calendar/event/context-menu.ts",
-        "src/features/main-calendar/event/rsvp.ts",
-        "src/features/main-calendar/main-calendar.tsx",
-        "src/features/main-calendar/event/attendees-input.tsx",
-        "src/features/main-calendar/event/recurring-dialog.ts",
-        "src/features/message-list/message-controls.tsx",
-        "src/features/message-list/message-item-body.tsx",
-        "src/features/message-list/message-list.tsx",
-        "src/features/message-list/message-participants.tsx",
-        "src/features/notifications/items/default-client.tsx",
-        "src/features/notifications/items/update.tsx",
-        "src/features/onboarding/pages/create-page-for-form.tsx",
-        "src/features/preferences/tabs/mcp/tern-mcp.ts",
-        "src/features/preferences/tabs/accounts/details.tsx",
-        "src/features/preferences/tabs/appearance.tsx",
-        "src/features/preferences/tabs/general.tsx",
-        "src/features/preferences/tabs/keymaps/keymaps.tsx",
-        "src/features/print/window.ts",
-        "src/features/system-tray/icon-store.ts",
-        "src/features/thread-list/context-menu.ts"
-      ],
-      "rules": {
-        "no-restricted-imports": "off",
-        "no-restricted-syntax": "off"
-      }
-    },
-    {
       "files": ["src/**", "plugins/**", "themes/**", "tests/**"],
       "rules": {
         "import/no-extraneous-dependencies": [
