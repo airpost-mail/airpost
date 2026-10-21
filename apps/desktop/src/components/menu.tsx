@@ -337,11 +337,8 @@ export class Menu extends React.Component<MenuProps, MenuState> {
     const adjustment = item
       ? DOMUtils.scrollAdjustmentToMakeNodeVisibleInContainer(item, container)
       : undefined;
-    if (adjustment === undefined) {
-      // No selected item. This used to be `scrollTop += undefined`, i.e. NaN, which the DOM
-      // turns into 0; kept as is.
-      container.scrollTop = 0;
-    } else if (adjustment !== 0) {
+    // With no selected item the scroll position is left alone.
+    if (adjustment) {
       container.scrollTop += adjustment;
     }
 

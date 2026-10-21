@@ -118,6 +118,28 @@ describe('Menu on the UI kit', function () {
     expect(onExpand.mostRecentCall.args).toEqual([ITEMS[2]]);
   });
 
+  it('keeps the scroll position on update when nothing is selected', () => {
+    const items: Item[] = Array.from({ length: 30 }, (_, i) => ({
+      id: `i${i}`,
+      name: `Item ${i}`,
+    }));
+    const props = {
+      items,
+      itemKey: (item: Item) => item.id,
+      itemContent: (item: Item) => item.name,
+      defaultSelectedIndex: -1,
+      onSelect: () => {},
+    };
+    const { container, rerender } = render(<Menu {...props} />);
+    const content = container.querySelector<HTMLElement>('.content-container');
+    content.style.height = '40px';
+    content.style.overflow = 'auto';
+    content.scrollTop = 100;
+    expect(content.scrollTop).toBe(100);
+    rerender(<Menu {...props} className="again" />);
+    expect(content.scrollTop).toBe(100);
+  });
+
   it('picks on mouse down', () => {
     const onSelect = jasmine.createSpy('onSelect');
     const container = renderMenu({ onSelect });
