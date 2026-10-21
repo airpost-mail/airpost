@@ -4,8 +4,7 @@ import React from 'react';
 import { localized } from '../../intl/localize';
 import * as Actions from '../../data/actions';
 import { Contact } from '../../data/models/contact';
-import { clipboard } from 'electron';
-import { Menus } from '../../platform/app-api';
+import { Clipboard, Menus } from '../../platform/app-api';
 
 const MAX_COLLAPSED = 5;
 
@@ -77,7 +76,7 @@ export default class MessageParticipants extends React.Component<MessageParticip
         ? { role: 'copy' }
         : {
             label: `${localized(`Copy`)} "${contact.email}"`,
-            click: () => clipboard.writeText(contact.email),
+            click: () => Clipboard.writeText(contact.email),
           },
       {
         label: `${localized(`Email`)} ${contact.name ?? contact.email}`,

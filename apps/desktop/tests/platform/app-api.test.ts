@@ -3,6 +3,7 @@
 
 import {
   AppApiTransport,
+  Clipboard,
   CurrentWindow,
   Dialogs,
   FileListCache,
@@ -85,6 +86,11 @@ describe('the app-api client', function () {
     expect(FileListCache.imageData).toBe('{"x":1}');
     FileListCache.imageData = '{}';
     expect(sent).toEqual([['app-api:file-list-cache:set-image-data', '{}']]);
+  });
+
+  it('writes clipboard text through main', () => {
+    Clipboard.writeText('alice@tern.test');
+    expect(sent).toEqual([['app-api:clipboard:write-text', 'alice@tern.test']]);
   });
 
   describe('menus', () => {

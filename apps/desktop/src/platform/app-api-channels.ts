@@ -191,6 +191,8 @@ export interface AppApiSend {
   'app-api:spellchecker:add-word': [word: string];
   'app-api:spellchecker:remove-word': [word: string];
   'app-api:file-list-cache:set-image-data': [imageData: string];
+  /** The clipboard is main-only in Electron 44; windows write text through this. */
+  'app-api:clipboard:write-text': [text: string];
 }
 
 export interface AppApiSync {

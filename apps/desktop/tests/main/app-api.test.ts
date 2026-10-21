@@ -132,6 +132,7 @@ describe('the app-api main handlers', function () {
         getDisplayMatching: (rect: Electron.Rectangle) => ({ id: rect.x }) as any,
       },
       nativeTheme: { shouldUseDarkColors: true },
+      clipboard: { writeText: jasmine.createSpy('writeText').andReturn(Promise.resolve()) },
       buildMenu: (template) => ({
         popup: (options: any) => popups.push({ template, options }),
       }),
@@ -251,6 +252,13 @@ describe('the app-api main handlers', function () {
   it('shares the file list cache between windows', () => {
     ipc.send(trusted, 'app-api:file-list-cache:set-image-data', '{"a":1}');
     expect(ipc.sendSync(trusted, 'app-api:sync:file-list-cache-image-data')).toBe('{"a":1}');
+  });
+
+  it("writes text to main's clipboard", () => {
+    ipc.send(trusted, 'app-api:clipboard:write-text', 'alice@tern.test');
+    ipc.send(untrusted, 'app-api:clipboard:write-text', 'nope');
+    expect(host.clipboard.writeText).toHaveBeenCalledWith('alice@tern.test');
+    expect((host.clipboard.writeText as jasmine.Spy).calls.length).toBe(1);
   });
 
   it("drives the sender's session spellchecker", async () => {

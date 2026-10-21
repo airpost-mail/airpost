@@ -15,8 +15,7 @@ import { ButtonDropdown } from '../../components/button-dropdown';
 import { Menu } from '../../components/menu';
 import { IconButton } from '../../components/kit/icon-button';
 import { escapeHTML } from 'underscore.string';
-import { clipboard } from 'electron';
-import { App, ContextMenuItem, Menus, openStaticPage } from '../../platform/app-api';
+import { App, Clipboard, ContextMenuItem, Menus, openStaticPage } from '../../platform/app-api';
 import {
   contentSecurityPolicyMetaTag,
   messageContentSecurityPolicy,
@@ -235,7 +234,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
       Thread ID: ${thread.id}
       Thread Metadata: ${JSON.stringify(thread.pluginMetadata, null, '  ')}
     `;
-    clipboard.writeText(data);
+    Clipboard.writeText(data);
   };
 
   render() {

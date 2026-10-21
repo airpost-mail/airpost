@@ -12,8 +12,7 @@ import DraftFactory from '../../data/drafts/factory';
 import { AccountStore } from '../../data/stores/account';
 import TaskQueue from '../../data/stores/task-queue';
 import * as EmlUtils from '../../mail/eml';
-import { clipboard } from 'electron';
-import { Menus } from '../../platform/app-api';
+import { Clipboard, Menus } from '../../platform/app-api';
 
 type TemplateItem =
   | {
@@ -320,7 +319,7 @@ export default class ThreadListContextMenu {
         const id = this.threadIds[0];
         const thread = await DatabaseStore.findBy<Thread>(Thread, { id }).limit(1);
         if (!thread) return;
-        clipboard.writeText(thread.getMailboxPermalink());
+        Clipboard.writeText(thread.getMailboxPermalink());
       },
     };
   }

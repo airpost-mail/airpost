@@ -165,6 +165,13 @@ export const FileListCache = {
   },
 };
 
+/** The system clipboard, which only main can reach in Electron 44. */
+export const Clipboard = {
+  writeText(text: string) {
+    AppApiTransport.send('app-api:clipboard:write-text', text);
+  },
+};
+
 function command(cmd: WindowCommand) {
   AppApiTransport.send('app-api:window:command', cmd);
 }

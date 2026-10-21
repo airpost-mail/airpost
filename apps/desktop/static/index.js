@@ -35,7 +35,8 @@ function showSetupErrorInWindow(stack) {
   button.textContent = 'Copy to Clipboard';
   button.style.cssText = 'margin:0 0 16px;padding:4px 12px;font:13px system-ui,sans-serif;';
   button.onclick = function () {
-    require('electron').clipboard.writeText(stack);
+    // The clipboard is main-only; the channel is main's app-api:clipboard:write-text.
+    require('electron').ipcRenderer.send('app-api:clipboard:write-text', stack);
     button.textContent = 'Copied';
   };
 

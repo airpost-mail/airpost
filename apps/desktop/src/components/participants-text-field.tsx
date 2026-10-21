@@ -1,5 +1,5 @@
 import React from 'react';
-import { clipboard, ipcRenderer } from 'electron';
+import { ipcRenderer } from 'electron';
 import { localized } from '../intl/localize';
 import * as Utils from '../data/models/utils';
 import { Contact } from '../data/models/contact';
@@ -12,7 +12,7 @@ import DatabaseStore from '../data/database/store';
 import { TokenizingTextField } from './tokenizing-text-field';
 import { Menu } from './menu';
 import { InjectedComponentSet } from './injected/component-set';
-import { Menus } from '../platform/app-api';
+import { Clipboard, Menus } from '../platform/app-api';
 
 const TokenRenderer = (props: { token: object }) => {
   const contact = props.token as Contact;
@@ -184,7 +184,7 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
     Menus.popup([
       {
         label: `${localized(`Copy`)} ${participant.email}`,
-        click: () => clipboard.writeText(participant.email),
+        click: () => Clipboard.writeText(participant.email),
       },
       { type: 'separator' },
       {

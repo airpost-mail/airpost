@@ -9,8 +9,7 @@ import { TokenizingTextField } from '../../../components/tokenizing-text-field';
 import { Menu } from '../../../components/menu';
 import { InjectedComponentSet } from '../../../components/injected/component-set';
 import { EventAttendee } from '../data-source';
-import { clipboard } from 'electron';
-import { ContextMenuItem, Menus } from '../../../platform/app-api';
+import { Clipboard, ContextMenuItem, Menus } from '../../../platform/app-api';
 
 const TokenRenderer = (props: { token: EventAttendee }) => {
   const { email, name } = props.token;
@@ -127,7 +126,7 @@ export class EventAttendeesInput extends React.Component<EventAttendeesInputProp
     const items: ContextMenuItem[] = [
       {
         label: `${localized(`Copy`)} ${participant.email}`,
-        click: () => clipboard.writeText(participant.email),
+        click: () => Clipboard.writeText(participant.email),
       },
       { type: 'separator' },
       {

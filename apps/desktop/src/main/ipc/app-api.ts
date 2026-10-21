@@ -54,6 +54,7 @@ export interface AppApiHost {
   > & { readonly isPackaged: boolean };
   screen: Pick<Electron.Screen, 'getPrimaryDisplay' | 'getDisplayMatching'>;
   nativeTheme: Pick<Electron.NativeTheme, 'shouldUseDarkColors'>;
+  clipboard: Pick<Electron.Clipboard, 'writeText'>;
   buildMenu(template: Electron.MenuItemConstructorOptions[]): MenuLike;
   isTrustedSender(contents: Electron.WebContents): boolean;
   windowFor(contents: Electron.WebContents): Electron.BrowserWindow | null;
@@ -393,6 +394,11 @@ export function registerAppApiIPC(ipcMain: Electron.IpcMain, host: AppApiHost) {
   send('app-api:file-list-cache:set-image-data', (_event, imageData) => {
     host.fileListCache.imageData = String(imageData);
   });
+  send('app-api:clipboard:write-text', (_event, text) => {
+    host.clipboard.writeText(String(text)).catch((err: Error) => {
+      console.error('Writing to the clipboard failed:', err);
+    });
+  });
   sync('app-api:sync:facts', () => ({
     isPackaged: host.app.isPackaged,
     locale: host.app.getLocale(),
@@ -463,6 +469,7 @@ export function createAppApiHost(
     app: electron.app,
     screen: electron.screen,
     nativeTheme: electron.nativeTheme,
+    clipboard: electron.clipboard,
     buildMenu: (template) => Menu.buildFromTemplate(template),
     isTrustedSender,
     windowFor: (contents) => BrowserWindow.fromWebContents(contents),

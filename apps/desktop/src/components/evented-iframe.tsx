@@ -14,12 +14,12 @@ import url from 'url';
 import _ from 'underscore';
 import path from 'path';
 import fs from 'fs';
-import { clipboard, ipcRenderer, shell } from 'electron';
+import { ipcRenderer, shell } from 'electron';
 import { FilesScheme, resolveFilesSchemeURL } from '../mail/files-scheme';
 import { markFileFromInternet } from '../mail/attachment-safety';
 import { ExternalFetch } from '../window/external-fetch';
 import { FormSubmissionTarget, formSubmissionTarget } from '../mail/frame/form-submission';
-import { ContextMenuItem, Dialogs, Menus } from '../platform/app-api';
+import { Clipboard, ContextMenuItem, Dialogs, Menus } from '../platform/app-api';
 
 // The bytes behind an image src in a message, for Save Image.
 async function imageBytes(src: string): Promise<Buffer> {
@@ -450,7 +450,7 @@ export function showFrameContextMenu(contents: {
       menu.push({
         label: localized('Copy Email Address'),
         click() {
-          clipboard.writeText(href.split('mailto:').pop() ?? '');
+          Clipboard.writeText(href.split('mailto:').pop() ?? '');
         },
       });
     } else {
@@ -463,7 +463,7 @@ export function showFrameContextMenu(contents: {
       menu.push({
         label: localized('Copy Link Address'),
         click() {
-          clipboard.writeText(href);
+          Clipboard.writeText(href);
         },
       });
     }
@@ -517,7 +517,7 @@ export function showFrameContextMenu(contents: {
     menu.push({
       label: localized('Copy'),
       click() {
-        clipboard.writeText(text);
+        Clipboard.writeText(text);
       },
     });
     menu.push({
