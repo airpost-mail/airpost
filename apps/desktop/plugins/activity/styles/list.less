@@ -31,12 +31,13 @@
       padding: 0 4px;
       position: absolute;
       right: -7px;
-      top: 5px;
+      top: -5px;
       line-height: 11px;
     }
   }
-  .activity-toolbar-icon {
-    margin-top: 20px;
+  // .content-mask outranks the kit's `[data-slot='button'] img.content-mask`, which would paint
+  // the icon in the button's text colour.
+  .activity-toolbar-icon.content-mask {
     background: var(--sidebar-toolbar-muted-foreground);
     &.unread {
       background: @component-active-color;

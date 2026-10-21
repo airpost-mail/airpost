@@ -37,12 +37,12 @@
   /* ---- Sidebar (folder list, calendar list, Preferences) ---- */
   --sidebar-background: #15171d;
   --sidebar-inset-background: var(--sidebar-background);
-  /* The sidebar's lightness plus 58 (text) and 48 (headings, counts) at a third of its saturation:
-     #a9abb1 and #8e9199 for the default palette, 7.8:1 and 5.7:1 (6.5:1 and 4.7:1 on hover).
-     The brightest sidebar text (selection, toolbar, fields) is plus 80, #e4e4e6, not white. */
-  --sidebar-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 58, 100));
-  --darkside-bright-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 80, 100));
-  --sidebar-muted-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 48, 100));
+  /* The sidebar's lightness plus 54 (text) and 45 (headings, counts) at a third of its saturation:
+     #9ea0a7 and #868991 for the default palette, 6.9:1 and 5.1:1 (5.7:1 and 4.3:1 on hover).
+     The brightest sidebar text (selection, toolbar, fields) is plus 76, #d9dadd, not white. */
+  --sidebar-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 54, 100));
+  --darkside-bright-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 76, 100));
+  --sidebar-muted-foreground: hsl(from var(--sidebar-background) h calc(s * 0.3) min(l + 45, 100));
   --sidebar-hover: rgba(255, 255, 255, 0.07);
   /* Selection by text colour only, as before. */
   --sidebar-selected: var(--sidebar-background);

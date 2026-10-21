@@ -5,12 +5,15 @@
 @outline-text: var(--sidebar-foreground);
 @outline-text-muted: var(--sidebar-muted-foreground);
 @count-color: ~"rgb(from @{outline-text} r g b / max(alpha - 0.4, 0))";
+// Icons and disclosure arrows sit a step behind the folder names.
+@outline-icon: ~"rgb(from @{outline-text} r g b / calc(alpha * 0.7))";
+@outline-arrow: ~"rgb(from @{outline-text-muted} r g b / calc(alpha * 0.6))";
 
 .outline-view {
   order: 1;
 
   section {
-    margin-bottom: @padding-base-vertical;
+    margin-bottom: @padding-large-vertical * 1.5;
   }
 
   .item-children {
@@ -24,11 +27,12 @@
     cursor: default;
     color: @outline-text-muted;
     font-weight: @font-weight-semi-bold;
-    font-size: @font-size-small * 0.9;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
     padding-left: @padding-small-horizontal;
     padding-top: @padding-small-horizontal;
     padding-right: @padding-xs-horizontal;
-    letter-spacing: -0.2px;
 
     span:first-child {
       text-overflow: ellipsis;
@@ -64,6 +68,17 @@
     }
   }
 
+  // Smaller than the default 7x8 arrow; the padding keeps its centre where it was.
+  .disclosure-triangle {
+    padding-top: 11px;
+    padding-left: 8px;
+    div {
+      border-top-width: 3px;
+      border-bottom-width: 3px;
+      border-left: 5px solid @outline-arrow;
+    }
+  }
+
   .item-container {
     display: flex;
     &.dropping {
@@ -82,19 +97,20 @@
     flex: 1;
     display: flex;
     align-items: center;
-    font-size: @font-size-base;
+    // Same as the Preferences sidebar.
+    font-size: 13px;
     font-weight: 400;
     padding-right: @spacing-standard;
     line-height: @line-height-large;
     clear: both;
-    height: 27px;
+    height: 29px;
 
     // The overflow needs to be `hidden` in order for the name to flex
     // fit within the contained space.
     overflow: hidden;
 
     img.content-mask {
-      background-color: @outline-text;
+      background-color: @outline-icon;
       vertical-align: text-bottom;
     }
 
