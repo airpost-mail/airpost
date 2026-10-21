@@ -142,7 +142,7 @@ adoption ~300; tombstones ~200; attachment prefetch ~200; client ~50; scenarios 
 
 ## 6. Implementation (2026-10-21)
 
-Engine only; the desktop passes account settings through unchanged, so it needed no change.
+The engine reads `save_drafts_to_server` from the account settings. The desktop has a per-account switch in Preferences > Accounts (an `account.update` restarts the account, so it applies live), and an open composer takes a remote revision only in fields the user hasn't edited since the last save; a re-key keeps the session.
 Where it differs from the design above:
 
 - Setting: `save_drafts_to_server` in the account's `settings`, default on
