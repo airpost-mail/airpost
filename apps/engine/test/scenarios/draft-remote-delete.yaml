@@ -1,0 +1,71 @@
+name: draft-remote-delete
+description: >
+  A pushed draft is deleted in webmail. With nothing unpushed here the draft goes with its
+  last copy (the orphan sweep). The composer that still had it open saves again: the draft
+  is created again under the same id and pushed, so the user's text is not lost.
+source: "docs/drafts-sync-design.md 3.3 (remote delete: clean -> orphan sweep removes the row; dirty -> next save recreates it under the same id and pushes again)"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Version 1</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - wait: {task: save1, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID 1", timeout: 60}
+  - wait: {quiescent: true}
+  - server.expunge: {mailbox: Drafts, uids: [1]}
+  - sync: pass
+  - sync: pass
+  - wait: {models: {Message: {where: {headerMessageId: "push-1@example.test"}, count: 0}}, timeout: 30}
+  - assert:
+      counts: {Drafts: 0, total: 3}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Version 2, still open here</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID 2", timeout: 60}
+  - wait: {quiescent: true}
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "push-1@example.test", contains: ["still open here"]}
+  server_uids: {Drafts: [2]}
+  counts: {Drafts: 1, total: 4}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

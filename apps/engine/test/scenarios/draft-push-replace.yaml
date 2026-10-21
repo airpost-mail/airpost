@@ -1,0 +1,58 @@
+name: draft-push-replace
+description: >
+  A pushed draft is edited and saved again. The new revision is APPENDed and recorded
+  first, then the copy it replaces is deleted (moved to Trash and expunged there), so the
+  server never holds none and ends with exactly one copy, the new text. Locally the draft
+  keeps its row and moves to the new UID.
+source: "docs/drafts-sync-design.md 3.2 steps 3-4; Thunderbird nsMsgCompose RemoveCurrentDraftMessage (APPEND, then delete the previous copy)"
+servers:
+  - {fake: dovecot}
+  - {dovecot: qresync}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 2
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+  Trash: {messages: 1}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>First version</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - wait: {task: save1, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {stored: "push-1@example.test", body: "<p>Second version</p>"}
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID \\d+", count: 2, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "push-1@example.test", flags: ["\\Draft", "\\Seen"],
+         contains: ["Second version"], excludes: ["First version"]}
+  server_counts: {Drafts: 1, Trash: 1, INBOX: 3}
+  counts: {Drafts: 1, Trash: 1, total: 5}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

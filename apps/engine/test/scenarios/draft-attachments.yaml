@@ -1,0 +1,59 @@
+name: draft-attachments
+description: >
+  A pushed draft carries its attachments: the file the client wrote to its files folder is
+  in the server copy, base64 under its filename. A draft whose MIME is larger than the
+  server's APPENDLIMIT (3000 bytes here) is not APPENDed; it stays a local draft, with the
+  reason logged, and the copy already on the server is kept.
+source: "docs/drafts-sync-design.md 3.2 step 2 and risk 3; RFC 7889 (APPENDLIMIT)"
+servers:
+  - {fake: dovecot-appendlimit}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "attach-1@example.test"
+        subject: "The notes"
+        body: "<p>Notes attached</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: [{id: "draftfile0000001", filename: notes.txt, contentType: text/plain, contentId: null, content: "attached to the draft"}]
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - wait: {task: save1, timeout: 60}
+  - wait: {log: "Saved draft attach-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        stored: "attach-1@example.test"
+        files:
+          - {id: "draftfile0000001", filename: notes.txt, contentType: text/plain, contentId: null}
+          - {id: "draftfile0000002", filename: appendix.txt, contentType: text/plain, contentId: null, content: "The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. The long appendix. "}
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - wait: {log: "attach-1@example.test is \\d+ bytes, over the server's APPENDLIMIT", timeout: 60}
+  - wait: {seconds: 3}
+  - wait: {quiescent: true}
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "attach-1@example.test", contains: ['filename="notes.txt"', "YXR0YWNoZWQgdG8gdGhlIGRyYWZ0"], excludes: ["appendix.txt"]}
+  server_counts: {Drafts: 1}
+  counts: {Drafts: 1, total: 4}
+  log_count: {"Saved draft attach-1@example.test": 1}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  running: true

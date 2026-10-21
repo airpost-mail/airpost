@@ -25,7 +25,7 @@ use tern_net::HttpClient;
 use tern_store::{Folder, Message, Model, Query, Store};
 use tracing::{error, info, warn};
 
-use crate::mail_processor::{attributes_of, id_for_message, CopyLabels, MailProcessor};
+use crate::mail_processor::{attributes_of, id_for_copy, CopyLabels, MailProcessor};
 use crate::WorkerContext;
 
 /// A mailcore `Range`: `location` through `location + length` inclusive, `length`
@@ -181,7 +181,8 @@ impl SyncWorker {
         self.session.profile().mailbox_model == tern_providers::MailboxModelKind::GmailLabels
     }
 
-    /// Inserts or updates the message a fetch returned. A panic while processing it (a
+    /// Inserts or updates the message a fetch returned. A copy of a draft sent or deleted
+    /// here is skipped and queued for the foreground to delete. A panic while processing it (a
     /// parser bug on hostile input) quarantines its UID in this folder (TD45): it is skipped
     /// from then on instead of stopping the account at every pass. `None` for a skipped UID.
     pub fn ingest(
@@ -191,6 +192,16 @@ impl SyncWorker {
         sync_data_timestamp: i64,
     ) -> Result<Option<Message>> {
         let uid = remote_msg.uid;
+        if let Some(copy) = crate::drafts::tombstoned_copy(
+            &self.store,
+            &self.ctx.account,
+            folder,
+            remote_msg,
+            self.copy_labels(),
+        )? {
+            self.ctx.foreground.queue_tombstoned_copy(copy);
+            return Ok(None);
+        }
         let key = quarantine_key(folder);
         let quarantined = self.store.get_key_value(&key)?.unwrap_or_default();
         if parse_uids(&quarantined).contains(&uid) {
@@ -390,7 +401,8 @@ impl SyncWorker {
             // its flags match (a mis-paired COPYUID). Ingesting the UID gives it to the
             // message it holds; the ingest of the displaced message's own UID relinks it.
             if same && heavy_initial_request {
-                let remote_id = id_for_message(folder.account_id(), &remote_path, remote_msg);
+                let remote_id =
+                    id_for_copy(&self.ctx.account, folder, remote_msg, self.copy_labels());
                 let recorded = existing
                     .as_ref()
                     .map(|l| l.message_id.as_str())

@@ -1,0 +1,60 @@
+name: draft-destroy-refused
+description: >
+  The user deletes a pushed draft, and the server refuses to delete its copy (the STORE
+  \Deleted is answered NO once), so the copy outlives the draft and its placeholder. The
+  next deep scan finds it: the draft's Message-ID is tombstoned, so the copy is deleted
+  instead of coming back as a draft.
+source: "docs/drafts-sync-design.md 3.3 (tombstones) and risk 5; sent-copy-cleanup-store-refused (a copy a refused STORE keeps is only seen again by a deep scan on a CONDSTORE server)"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+  Trash: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Never mind</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID 1", timeout: 60}
+  - wait: {quiescent: true}
+  - server.reject: {at: {hook: before_command, session: foreground, command: "^UID STORE .*Deleted"}, text: "Temporary failure"}
+  - client.task: {__cls: DestroyDraftTask, messages: {header_message_ids: ["push-1@example.test"]}}
+    as: destroy
+  - wait: {task: destroy, timeout: 60}
+  - wait: {quiescent: true}
+  - assert:
+      server_uids: {Drafts: [1]}
+      counts: {Drafts: 0, total: 3}
+  - force_scans: {}
+  - sync: pass
+  - wait: {log: "Deleting Drafts UID 1, a copy of sent or deleted draft push-1@example.test", timeout: 60}
+  - wait: {quiescent: true}
+expect:
+  server_counts: {Drafts: 0, Trash: 0, INBOX: 3}
+  counts: {Drafts: 0, total: 3}
+  models:
+    Message:
+      where: {headerMessageId: "push-1@example.test"}
+      count: 0
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  running: true

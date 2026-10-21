@@ -1,0 +1,60 @@
+name: draft-push-gmail
+description: >
+  On Gmail, Drafts is a label view of All Mail. A pushed draft is APPENDed to
+  [Gmail]/Drafts and recorded where the sync worker sees it, its All Mail copy (Gmail's
+  APPENDUID names the Drafts view's UID, not All Mail's), with the \Draft label. Saving it
+  again replaces that copy: one All Mail message for the draft, nothing left in Trash, the
+  database agreeing with the server's labels. Modelled on the fake's Gmail store from
+  Google's IMAP extension docs; no recorded Gmail transcript (docs/drafts-sync-design.md
+  risk 1).
+source: "docs/drafts-sync-design.md 2 (Gmail IMAP: APPENDUID refers to the Drafts view) and 3.2; https://developers.google.com/gmail/imap/imap-extensions"
+servers:
+  - {fake: gmail}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 2
+mailboxes:
+  INBOX: {messages: 4}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "gmail-draft-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>First version</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - wait: {task: save1, timeout: 60}
+  - wait: {log: "Saved draft gmail-draft-1@example.test to \\[Gmail\\]/All Mail UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - assert:
+      server_counts: {"[Gmail]/All Mail": 5}
+      db_matches_server: {labels: true}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {stored: "gmail-draft-1@example.test", body: "<p>Second version</p>"}
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - wait: {log: "Saved draft gmail-draft-1@example.test to \\[Gmail\\]/All Mail UID \\d+", count: 2, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    "[Gmail]/All Mail":
+      - {message_id: "gmail-draft-1@example.test", includes: ["\\Draft"], contains: ["Second version"], excludes: ["First version"]}
+  server_counts: {"[Gmail]/All Mail": 5, "[Gmail]/Trash": 0}
+  counts: {"[Gmail]/All Mail": 5, total: 5}
+  db_matches_server: {labels: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

@@ -1,0 +1,55 @@
+name: draft-destroy-after-push
+description: >
+  The user deletes a draft that was pushed. DestroyDraftTask deletes its server copy (to
+  Trash and expunged there), the row and its placeholder go, and later passes don't bring
+  it back from the server: a copy another device saves late is deleted rather than synced,
+  the destroyed draft's Message-ID being tombstoned.
+source: "docs/drafts-sync-design.md 3.3 (tombstones) and risk 4; TaskProcessor::performRemoteDestroyDraft"
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+  Trash: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Never mind</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID \\d+", timeout: 60}
+  - client.task: {__cls: DestroyDraftTask, messages: {header_message_ids: ["push-1@example.test"]}}
+    as: destroy
+  - wait: {task: destroy, timeout: 60}
+  - server.append:
+      mailbox: Drafts
+      flags: ["\\Draft", "\\Seen"]
+      messages: {message_id: "<push-1@example.test>", subject: "Plans for Friday", sender: ["Harness Test", "test@example.test"], body: "Saved late on the phone."}
+  - sync: pass
+  - wait: {log: "Deleting Drafts UID \\d+, a copy of sent or deleted draft push-1@example.test", timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_counts: {Drafts: 0, Trash: 0, INBOX: 3}
+  counts: {Drafts: 0, total: 3}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

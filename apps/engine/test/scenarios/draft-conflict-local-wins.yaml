@@ -1,0 +1,68 @@
+name: draft-conflict-local-wins
+description: >
+  A pushed draft is edited here again, and before that edit reaches the server another
+  device saves its own revision. The local edit wins: the other revision is moved to Trash,
+  not expunged, so it can still be recovered there, and the local revision is pushed and
+  replaces the old copy. Drafts ends with the one local revision.
+source: "docs/drafts-sync-design.md 3.3 (newer remote, local unpushed: local wins, the foreign copy to Trash without expunge, log draft-conflict)"
+slow: true   # ~30s: the quiet window must outlast a sync pass
+servers:
+  - {fake: dovecot}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 10
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+  Trash: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Version 1</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save1
+  - wait: {task: save1, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID 1", timeout: 60}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {stored: "push-1@example.test", body: "<p>Local version 2</p>"}
+    as: save2
+  - wait: {task: save2, timeout: 60}
+  - server.append:
+      mailbox: Drafts
+      flags: ["\\Draft", "\\Seen"]
+      messages:
+        message_id: "<push-1@example.test>"
+        subject: "Plans for Friday"
+        sender: ["Harness Test", "test@example.test"]
+        body: "Phone version 2."
+  - sync: pass
+  - wait: {log: "draft-conflict: push-1@example.test", timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID \\d+", count: 2, timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "push-1@example.test", contains: ["Local version 2"]}
+    Trash:
+      - {message_id: "push-1@example.test", contains: ["Phone version 2"]}
+  server_counts: {Drafts: 1, Trash: 1}
+  counts: {Drafts: 1, Trash: 1, total: 5}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "changed on the server", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

@@ -1,0 +1,59 @@
+name: draft-send-before-scan
+description: >
+  A draft is sent the moment its push lands, before any scan of Drafts has seen the new
+  copy. The push recorded the copy's UID itself, so the send knows to delete it: no copy
+  of a sent draft is left in Drafts to come back as a draft. A copy another device saves
+  late is deleted rather than synced: the sent draft's Message-ID is tombstoned.
+source: "docs/drafts-sync-design.md 1 ('After send ... it would miss a just-APPENDed copy') and risk 4"
+servers:
+  - {fake: dovecot, smtp: true}
+  - {fake: dovecot-without-uidplus, smtp: true}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 3}
+  Drafts: {messages: 0}
+steps:
+  - wait: quiescent
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft:
+        hMsgId: "push-1@example.test"
+        subject: "Plans for Friday"
+        body: "<p>Final version</p>"
+        plaintext: false
+        from: [{name: "Harness Test", email: "test@example.test"}]
+        to: [{name: "Bob Builder", email: "bob@example.net"}]
+        cc: []
+        bcc: []
+        replyTo: []
+        files: []
+        rthMsgId: ""
+        fwdMsgId: ""
+    as: save
+  - wait: {task: save, timeout: 60}
+  - wait: {log: "Saved draft push-1@example.test to Drafts UID \\d+", timeout: 60}
+  - client.task:
+      __cls: SendDraftTask
+      draft: {stored: "push-1@example.test"}
+      perRecipientBodies: null
+    as: send
+  - wait: {task: send, timeout: 60}
+  - server.append:
+      mailbox: Drafts
+      flags: ["\\Draft", "\\Seen"]
+      messages: {message_id: "<push-1@example.test>", subject: "Plans for Friday", sender: ["Harness Test", "test@example.test"], body: "Saved late on the phone."}
+  - sync: pass
+  - wait: {log: "Deleting Drafts UID \\d+, a copy of sent or deleted draft push-1@example.test", timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  smtp: {count: 1}
+  server_counts: {Drafts: 0, Sent: 1, INBOX: 3}
+  counts: {Drafts: 0, Sent: 1, total: 4}
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

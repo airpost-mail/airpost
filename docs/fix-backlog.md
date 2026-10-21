@@ -10,7 +10,7 @@ Paths: C++ relative to upstream Mailspring-Sync, desktop relative to `apps/deskt
 | F1 | Duplicate Sent messages | engine + client | ~1–2 days | pause after P6 |
 | F2 | Gmail Important markers | engine | ~2–3 days | pause after P6 |
 | F3 | No reading pane for drafts | client | ~1.5–2 days | pause after P6 |
-| F4 | Drafts are local only | engine + client | ~2–3 weeks | after parity (D5), behind a gate |
+| F4 | Drafts are local only | engine + client | ~2–3 weeks | engine done 2026-10-21, `save_drafts_to_server` |
 
 ## F1. Duplicate Sent messages
 
@@ -116,3 +116,9 @@ Design summary (full design: `docs/drafts-sync-design.md`):
 - ~13 harness scenarios. First step: record a real Gmail transcript to confirm how `\Draft` is
   reported in All Mail (docs show `\Drafts`).
 - ~2.5–3.5k lines, 2–3 weeks. Lands after parity.
+
+Engine done 2026-10-21 (`docs/drafts-sync-design.md` section 6). The setting is
+`save_drafts_to_server`, default on. The harness and A/B runs turn it off. Open items:
+- Risk 1: no real Gmail transcript yet; Gmail is modelled in the fake from Google's docs.
+- Client: the composer should take an adopted revision only in fields the user has not
+  edited (`draft-editing-session.ts`), and a Preferences toggle for the setting.

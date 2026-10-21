@@ -84,6 +84,40 @@ pub fn orphan_sweep_max_wait() -> i64 {
         .unwrap_or(ORPHAN_SWEEP_MAX_WAIT)
 }
 
+/// Server-synced drafts (docs/drafts-sync-design.md 3.2): a saved draft is pushed once it
+/// has been left alone this long (seconds), so a burst of saves while the user types
+/// uploads once...
+pub const DRAFT_PUSH_QUIET: i64 = 20;
+/// ...or this long when its attachments add up to more than [`DRAFT_PUSH_LARGE_BYTES`].
+pub const DRAFT_PUSH_QUIET_LARGE: i64 = 120;
+pub const DRAFT_PUSH_LARGE_BYTES: u64 = 1 << 20;
+/// Overrides both quiet windows (seconds, 0 allowed) so the harness can reach them.
+pub const DRAFT_PUSH_QUIET_ENV: &str = "TERN_DRAFT_PUSH_QUIET";
+/// How long a sent or deleted draft's Message-ID keeps its copies from syncing back
+/// (seconds): long enough for every device to have caught up.
+pub const DRAFT_TOMBSTONE_LIFETIME: i64 = 30 * 24 * 60 * 60;
+/// Most drafts pushed per foreground iteration; the rest wait for the next one.
+pub const DRAFT_PUSHES_PER_PASS: usize = 5;
+
+/// [`DRAFT_PUSH_QUIET`] or [`DRAFT_PUSH_QUIET_LARGE`], or the value of
+/// `$TERN_DRAFT_PUSH_QUIET`.
+pub fn draft_push_quiet(large: bool) -> i64 {
+    std::env::var(DRAFT_PUSH_QUIET_ENV)
+        .ok()
+        .and_then(|v| v.trim().parse::<i64>().ok())
+        .filter(|v| *v >= 0)
+        .unwrap_or(if large {
+            DRAFT_PUSH_QUIET_LARGE
+        } else {
+            DRAFT_PUSH_QUIET
+        })
+}
+
+/// The wait after `fails` failed pushes of a draft: 30 s, doubling, at most an hour.
+pub fn draft_push_backoff(fails: u32) -> i64 {
+    (30i64 << fails.saturating_sub(1).min(7)).min(60 * 60)
+}
+
 /// Most full headers requested at once; larger ranges are scanned attributes-only first.
 pub const MAX_FULL_HEADERS_REQUEST_SIZE: u32 = 1024;
 /// Chunk size of the first initial-sync request of a folder.
@@ -146,7 +180,7 @@ pub const RECENT_HEADER_SEARCH_DEPTH: u32 = 16;
 /// Tern's own migrations start above it.
 pub const BASE_SCHEMA_VERSION: i32 = 12;
 /// The schema version this build migrates to: the last entry of `tern_store::schema::MIGRATIONS`.
-pub const SCHEMA_VERSION: i32 = 13;
+pub const SCHEMA_VERSION: i32 = 14;
 /// `_State` key marking a database this engine created.
 pub const STATE_ENGINE_KEY: &str = "engine";
 pub const STATE_ENGINE_RUST: &str = "rust";

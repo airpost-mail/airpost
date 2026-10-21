@@ -113,6 +113,29 @@ class Server(ABC):
     def mailboxes(self) -> list:
         return list(self.truth().keys())
 
+    def raw_messages(self, mailbox: str) -> dict:
+        """{uid: bytes}: the full messages in a mailbox (scenario name)."""
+        conn = (imaplib.IMAP4_SSL if getattr(self, "ssl", False) else imaplib.IMAP4)(self.host, self.port)
+        try:
+            conn.login(self.username, self.password)
+            name = self.server_path(mailbox)
+            typ, data = conn.select('"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"', readonly=True)
+            if typ != "OK" or int(data[0] or 0) == 0:
+                return {}
+            typ, data = conn.uid("FETCH", "1:*", "(UID BODY.PEEK[])")
+            out = {}
+            for part in data:
+                if isinstance(part, tuple):
+                    uid_m = _FETCH_UID.search(part[0])
+                    if uid_m:
+                        out[int(uid_m.group(1))] = part[1]
+            return out
+        finally:
+            try:
+                conn.logout()
+            except Exception:
+                pass
+
     def uids(self, mailbox: str) -> list:
         return sorted(self.truth().get(mailbox, {}))
 

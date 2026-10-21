@@ -1,0 +1,62 @@
+name: draft-push-reply-from-server
+description: >
+  A reply drafted in webmail syncs down as a draft in the thread it answers. The user
+  opens it here and edits it: the edit updates that same draft (one row, same thread)
+  rather than starting a second one, and the revision pushed back replaces the webmail
+  copy, still a reply (In-Reply-To and References name the original).
+source: "docs/drafts-sync-design.md 1 ('Editing one loses data') and 3.1"
+servers:
+  - {fake: dovecot}
+  - {dovecot: qresync}
+account: {extra_settings: {save_drafts_to_server: true}}
+env:
+  TERN_DRAFT_PUSH_QUIET: 1
+mailboxes:
+  INBOX: {messages: 2}
+  Drafts: {messages: 0}
+setup:
+  - server.append:
+      mailbox: INBOX
+      messages:
+        message_id: "<orig-1@sender.example.net>"
+        subject: "Quarterly numbers"
+        sender: ["Bob Sender", "bob@sender.example.net"]
+  - server.append:
+      mailbox: Drafts
+      flags: ["\\Draft", "\\Seen"]
+      messages:
+        message_id: "<webmail-reply-1@example.test>"
+        subject: "Re: Quarterly numbers"
+        sender: ["Harness Test", "test@example.test"]
+        to: "Bob Sender <bob@sender.example.net>"
+        in_reply_to: "<orig-1@sender.example.net>"
+        references: ["<orig-1@sender.example.net>"]
+        body: "Started in webmail."
+steps:
+  - wait: quiescent
+  - assert:
+      counts: {Drafts: 1, total: 4}
+      same_thread: [["orig-1@sender.example.net", "webmail-reply-1@example.test"]]
+  - client.need_bodies: {messages: {header_message_ids: ["webmail-reply-1@example.test"]}}
+  - wait: {quiescent: true}
+  - client.task:
+      __cls: SyncbackDraftTask
+      draft: {stored: "webmail-reply-1@example.test", body: "<p>Started in webmail. Finished here.</p>"}
+    as: edit
+  - wait: {task: edit, timeout: 60}
+  - wait: {log: "Saved draft webmail-reply-1@example.test to Drafts UID \\d+", timeout: 60}
+  - wait: {quiescent: true}
+  - sync: pass
+expect:
+  server_has:
+    Drafts:
+      - {message_id: "webmail-reply-1@example.test", flags: ["\\Draft", "\\Seen"],
+         contains: ["Finished here", "In-Reply-To: <orig-1@sender.example.net>", "References: <orig-1@sender.example.net>"]}
+  server_counts: {Drafts: 1, INBOX: 3}
+  counts: {Drafts: 1, total: 4}
+  same_thread: [["orig-1@sender.example.net", "webmail-reply-1@example.test"]]
+  db_matches_server: {flags: true}
+  invariants: {}
+  log_absent: ["\\[critical\\]", "Could not save draft", "UNIQUE constraint"]
+  stable: {passes: 2}
+  running: true

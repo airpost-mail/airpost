@@ -13,6 +13,7 @@
 
 pub mod counts;
 pub mod delta;
+pub mod drafts;
 pub mod invariants;
 pub mod legacy_import;
 pub mod metadata_stash;

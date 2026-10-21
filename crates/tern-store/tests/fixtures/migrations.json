@@ -1,11 +1,23 @@
 {
- "version": 13,
+ "version": 14,
  "added": [
   {
    "type": "index",
    "name": "ThreadReferenceLookup",
    "tbl_name": "ThreadReference",
    "sql": "CREATE INDEX ThreadReferenceLookup ON ThreadReference (accountId, headerMessageId)"
+  },
+  {
+   "type": "index",
+   "name": "sqlite_autoindex_DraftTombstone_1",
+   "tbl_name": "DraftTombstone",
+   "sql": null
+  },
+  {
+   "type": "table",
+   "name": "DraftTombstone",
+   "tbl_name": "DraftTombstone",
+   "sql": "CREATE TABLE DraftTombstone (accountId VARCHAR(8) NOT NULL, headerMessageId VARCHAR(255) NOT NULL, since INTEGER NOT NULL, PRIMARY KEY (accountId, headerMessageId))"
   }
  ]
 }

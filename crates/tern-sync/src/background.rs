@@ -28,7 +28,7 @@ use tracing::{error, info, warn};
 
 use crate::folder_identity::{self, Validity};
 use crate::foreground::run_foreground;
-use crate::mail_processor::{id_for_message, UnplacedMessages};
+use crate::mail_processor::{id_for_copy, UnplacedMessages};
 use crate::mailbox_model;
 use crate::worker::{ls_i64, ls_u32, set_ls, Range, SyncWorker};
 use crate::WorkerContext;
@@ -880,6 +880,12 @@ impl Background {
             .processor()
             .sweep_expired_orphans(bound.sweep_before, pass_started_at)?;
 
+        // Another device's revision of a draft is taken, or overruled, by the foreground,
+        // which owns the draft pushes (docs/drafts-sync-design.md 3.3).
+        if crate::drafts::has_unreconciled_copies(&self.w.store, &self.w.ctx.account)? {
+            self.w.ctx.foreground.interrupt();
+        }
+
         info!("{}", logmsg::sync_loop_complete());
         self.iterations_since_launch += 1;
         Ok(sync_again_immediately)
@@ -1440,7 +1446,7 @@ impl Background {
                 continue;
             };
             // Ids of dateless messages include the path, which was the old one when stored.
-            if &id_for_message(account_id, folder.path(), m) != stored {
+            if &id_for_copy(&self.w.ctx.account, folder, m, self.w.copy_labels()) != stored {
                 return Ok(Some(false));
             }
             matched = true;

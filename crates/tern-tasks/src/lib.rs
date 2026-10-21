@@ -28,6 +28,7 @@ use tern_sync::{RemoteTaskRunner, TaskRunnerFactory, WorkerContext};
 use tracing::{error, info};
 
 mod contacts;
+mod draft_sync;
 mod drafts;
 mod events;
 mod export;
@@ -481,6 +482,16 @@ impl RemoteTaskRunner for TaskProcessor<'_> {
 
     fn perform_remote(&mut self, task: &mut Task, session: &mut dyn ImapSession) -> Result<()> {
         self.perform_remote_task(task, session)
+    }
+
+    fn sync_drafts(
+        &mut self,
+        session: &mut dyn ImapSession,
+        tombstoned: &[tern_sync::drafts::TombstonedCopy],
+    ) -> Result<Option<std::time::Duration>> {
+        self.delete_tombstoned_copies(session, tombstoned)?;
+        self.reconcile_draft_copies(session)?;
+        self.push_dirty_drafts(session)
     }
 
     /// A sent message appended to Sent because the server's own copy had not appeared yet

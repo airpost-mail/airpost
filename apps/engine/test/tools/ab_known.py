@@ -24,6 +24,8 @@ CPP_NO_IMPORT = ("`--mode import-legacy` exists only in the Rust engine; "
 FRESH_DB = ("The Rust `migrate` moves a C++ database aside and starts a fresh V12 database "
             "on purpose; C++ keeps and upgrades it.")
 SNIPPET = ("Snippet/body/search-text drift from replacing libtidy+libxml2 with html5ever.")
+DRAFT_SYNC = ("\"Save drafts to server\" (save_drafts_to_server) exists only in the Rust engine "
+              "(docs/drafts-sync-design.md 3.7); these cases turn it on.")
 
 # Whole-case rules: (scenario regex, server regex, category, reason). They apply when the C++
 # outcome is not PASS, and cover every difference in the case.
@@ -31,6 +33,8 @@ CASE_RULES = [
     (r"^(dav-|google-people-)", None, "deliberate", CPP_NO_OVERRIDES),
     (r"^import-legacy-", None, "deliberate", CPP_NO_IMPORT),
     (r"^fresh-db-replaces-legacy$", None, "deliberate", FRESH_DB),
+    (r"^draft-(push-|remote-|conflict-|send-after-push|send-before-scan|destroy-|attachments)",
+     None, "deliberate", DRAFT_SYNC),
 ]
 
 RULES = [
