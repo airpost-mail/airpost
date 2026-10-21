@@ -17,14 +17,14 @@ Items are grouped by when to do them, and ranked by impact over size inside each
 | TD3 | Remote images on by default, trackers stripped only from own mail, Gravatar always loads | privacy | high | ~1 day | now |
 | TD4 | Onboarding and engine fall back to cleartext IMAP/SMTP | security | high | ~1 day | now, before stage 12 |
 | TD5 | "Reset Accounts and Settings" runs under a live engine and re-imports Mailspring | ux | high | ~80 TS | now |
-| TD6 | No schema migration path for Rust-written databases | engine | high | ~150 Rust | now, before stage 7 |
-| TD7 | ThreadReference lookup on every message insert is a table scan | engine | high | ~40 Rust | now, after TD6 |
+| TD6 | No schema migration path for Rust-written databases (done) | engine | high | ~150 Rust | now, before stage 7 |
+| TD7 | ThreadReference lookup on every message insert is a table scan (done) | engine | high | ~40 Rust | now, after TD6 |
 | TD8 | Query planner has no statistics (no ANALYZE / optimize) | engine | medium | ~60 Rust | now or stage 7 |
 | TD9 | `npm ci` runs `npm install` and `npm dedupe` in `app/` | build | medium | 0.5–1 day | now, before stage 2 |
 | TD10 | Forms in mail can navigate the reading pane | security | medium | ~40 TS | now |
 | TD11 | App CSP duplicated and weak; signature preview unsanitised | security | medium | ~40 TS | now |
-| TD12 | Mail, raw source and logs in fixed `/tmp` names; engine files at default umask | security | medium | ~80 TS, ~40 Rust | now; engine half before stage 11 |
-| TD13 | Outdated vendored parsers run on attachments | security | medium | ~1 day | now |
+| TD12 | Mail, raw source and logs in fixed `/tmp` names; engine files at default umask (engine half done) | security | medium | ~80 TS, ~40 Rust | now; engine half before stage 11 |
+| TD13 | Outdated vendored parsers run on attachments (desktop only) | security | medium | ~1 day | now |
 | TD14 | CI: no dependency updates, no npm licence gate, mutable action tags with signing secrets (done but the PR builds and weekly specs) | build | medium | 1–2 days | now |
 | TD15 | Huge emails parsed in full twice per render despite the clip | perf | medium | ~100 TS | now |
 | TD16 | Localisation: placeholder off-by-one, drifting keys, no plurals | i18n | medium | <30 lines + CI | now, before stage 4 |
@@ -296,6 +296,15 @@ profile, accounts and database are copied in again (`main.js:404`).
 
 ### TD6. No schema migration path for Rust-written databases
 
+Done (pre-launch engine pass, 62210758e). `create_v12` writes `user_version` 12 and `migrate`
+then applies `tern_store::schema::MIGRATIONS` (V13 onwards), each in an IMMEDIATE transaction
+that re-reads `user_version`, so two engines on one profile don't apply a step twice. An
+existing database being upgraded prints `Running Migration`, so the client shows its progress
+window. A version above `SCHEMA_VERSION` is refused. `v12_schema.json` stays the C++ base,
+`tests/fixtures/migrations.json` lists what the migrations add, and `tests/schema.rs` upgrades a
+V12 profile written through the store and checks that its rows survive.
+`schema_check.py check` expects V12 plus the migrations.
+
 Verified. `crates/tern-store/src/migrate.rs:57-77` either creates V12 on an empty database or
 errors on a Rust database below version 12, and silently accepts a version above
 `SCHEMA_VERSION` (`:78-79`), so an older build would run against a schema it doesn't know.
@@ -313,6 +322,12 @@ code does it and no stage schedules it.
 - Size: ~150 Rust plus tests.
 
 ### TD7. ThreadReference lookup on every message insert is a table scan
+
+Done (pre-launch engine pass, 62210758e). Migration V13 creates `ThreadReferenceLookup ON
+ThreadReference (accountId, headerMessageId)` and deletes references whose thread is gone;
+`Thread::after_remove` deletes a thread's references. The lookup's plan is now `SEARCH
+ThreadReference USING INDEX ThreadReferenceLookup` (asserted in `tests/schema.rs`). A/B
+snapshots against the C++ engine differ on `ThreadReference` after a thread is removed.
 
 Verified (EXPLAIN on the V12 schema). Non-Gmail accounts find a new message's thread with
 `WHERE ThreadReference.accountId = ? AND headerMessageId IN (…)`
@@ -437,6 +452,12 @@ which covers those files, so the engine half matters when the engine creates its
 - Size: ~80 TS now; ~40 Rust before stage 11.
 
 ### TD13. Outdated vendored parsers run on attachments
+
+Desktop only (checked in the pre-launch engine pass). The engine has no copied-in third-party
+parsers: MIME, ICS and vCard parsing use crates.io crates (`mail-parser`, `html5ever`,
+`calcard`) that `cargo deny check` (CI, `engine.yml`) checks against RustSec advisories, and the
+iCalendarLib port in `tern-dav/src/ical.rs` is our own code. Engine-side parser hardening is
+TD45.
 
 Verified. Quick preview uses copied-in `vendor/xlsx-0.18.5`, `prism-1.15.0` (2018),
 `pdfjs-4.3.136` and a second copy of DOMPurify (`src/quickpreview/index.ts:63-99`, thumbnails in a

@@ -12,7 +12,8 @@ script is the reference for that DDL:
 
 PATH is `MailSync/constants.h` in a checkout of upstream Mailspring-Sync
 (https://github.com/Foundry376/Mailspring-Sync). `check` without it compares against the
-fixture `dump` wrote.
+fixture `dump` wrote. Either way `check` adds what Tern's migrations create on top of V12
+(`crates/tern-store/tests/fixtures/migrations.json`) and expects their `user_version`.
 
 Comparison is on sqlite_master (type, name, tbl_name, sql), which is what SQLite itself
 keeps: ALTER TABLE ADD COLUMN rewrites the stored CREATE TABLE text, so the replayed text
@@ -28,6 +29,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 V12_FIXTURE = REPO / "crates" / "tern-store" / "tests" / "fixtures" / "v12_schema.json"
+MIGRATIONS_FIXTURE = REPO / "crates" / "tern-store" / "tests" / "fixtures" / "migrations.json"
 FRESH_STEPS = [
     "V1_SETUP_QUERIES", "V3_SETUP_QUERIES", "V4_SETUP_QUERIES", "V6_SETUP_QUERIES",
     "V7_SETUP_QUERIES", "V8_SETUP_QUERIES", "V9_SETUP_QUERIES",
@@ -111,14 +113,16 @@ def main() -> int:
 
     if not args.db:
         ap.error("check needs the database path")
+    migrations = json.loads(MIGRATIONS_FIXTURE.read_text())
+    expected = expected + migrations["added"]
     # Not read-only: a WAL database without its -shm file cannot be opened read-only.
     conn = sqlite3.connect(args.db)
     actual = schema_of(conn)
     version = conn.execute("PRAGMA user_version").fetchone()[0]
     conn.close()
     ok = True
-    if version != 12:
-        print(f"user_version is {version}, expected 12"); ok = False
+    if version != migrations["version"]:
+        print(f"user_version is {version}, expected {migrations['version']}"); ok = False
     exp = {(e["type"], e["name"]): e for e in expected}
     act = {(a["type"], a["name"]): a for a in actual}
     for key in sorted(exp.keys() | act.keys()):
@@ -129,7 +133,7 @@ def main() -> int:
         elif exp[key] != act[key]:
             print(f"differs {key[0]} {key[1]}:\n  expected {exp[key]['sql']}\n  actual   {act[key]['sql']}")
             ok = False
-    print("schema matches the C++ V12 replay" if ok else "schema differs")
+    print("schema matches the C++ V12 replay plus Tern's migrations" if ok else "schema differs")
     return 0 if ok else 1
 
 

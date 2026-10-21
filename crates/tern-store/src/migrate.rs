@@ -7,20 +7,23 @@
 //!
 //! The Rust engine does not upgrade C++ databases. A database the C++ engine wrote (Mailspring's
 //! `edgehill.db`, which the desktop's Import from Mailspring copies to `tern.db`) is moved
-//! aside to `tern.legacy.db` (for `import-legacy`) and a fresh V12 database is created;
+//! aside to `tern.legacy.db` (for `import-legacy`) and a fresh database is created;
 //! mail, contacts and events resync from the server.
 //!
 //! Tern profiles made before the database was called `tern.db` hold it as `edgehill.db`
 //! (and a moved-aside one as `edgehill.legacy.db`); `migrate` renames those first.
+//!
+//! A Tern database is upgraded in place: `user_version` is 12 for the V12 schema and goes up
+//! by one with each of [`schema::MIGRATIONS`]. A database from a newer build is refused.
 
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, OpenFlags, OptionalExtension};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior};
 use tern_core::constants::{
-    DATABASE_FILE, FILES_DIR, LEGACY_DATABASE_FILE, SCHEMA_VERSION, STATE_ENGINE_KEY,
-    STATE_ENGINE_RUST, VACUUM_TIME_KEY,
+    BASE_SCHEMA_VERSION, DATABASE_FILE, FILES_DIR, LEGACY_DATABASE_FILE, SCHEMA_VERSION,
+    STATE_ENGINE_KEY, STATE_ENGINE_RUST, VACUUM_TIME_KEY,
 };
 use tern_core::{Clock, Error, Result};
 
@@ -37,8 +40,10 @@ const OLD_DATABASE_NAMES: [(&str, &str); 2] = [
 pub struct MigrateOutcome {
     /// A database from another engine was moved to `tern.legacy.db`.
     pub moved_legacy: bool,
-    /// A new V12 database was created.
+    /// A new database was created.
     pub created: bool,
+    /// An existing Tern database was brought up to [`SCHEMA_VERSION`].
+    pub upgraded: bool,
 }
 
 /// Runs `--mode migrate` (and `serve` before it accepts connections). Progress lines go to
@@ -90,15 +95,46 @@ pub fn migrate(
         }
         // Bodies and attachments of the old database are re-downloaded under new ids.
         clear_dir_contents(&config_dir.join(FILES_DIR))?;
-    } else if version < SCHEMA_VERSION {
+    } else if version < BASE_SCHEMA_VERSION {
         return Err(Error::other(format!(
             "tern.db is marked as written by this engine but has schema version {version}"
         )));
+    } else if version > SCHEMA_VERSION {
+        // An older build would write rows without what the newer schema expects of them.
+        return Err(Error::other(format!(
+            "tern.db has schema version {version}, newer than this build's {SCHEMA_VERSION}; update Tern to open it"
+        )));
+    } else if version < SCHEMA_VERSION {
+        write_progress(out, "\nRunning Migration")?;
+        outcome.upgraded = true;
     }
-    // Note: a version above SCHEMA_VERSION comes from a newer build; leave it alone, as the
-    // C++ engine did.
+    apply_migrations(&conn)?;
 
     Ok(outcome)
+}
+
+/// Applies the [`schema::MIGRATIONS`] above the database's version, each in an IMMEDIATE
+/// transaction that re-reads `user_version`, so a second process migrating the same database
+/// waits for the first and skips what it applied.
+fn apply_migrations(conn: &Connection) -> Result<()> {
+    for migration in schema::MIGRATIONS {
+        let tx = Transaction::new_unchecked(conn, TransactionBehavior::Immediate)?;
+        let version: i32 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        if version >= migration.version {
+            continue;
+        }
+        if version != migration.version - 1 {
+            return Err(Error::other(format!(
+                "tern.db has schema version {version}, expected {}",
+                migration.version - 1
+            )));
+        }
+        tx.execute_batch(migration.sql)?;
+        tx.pragma_update(None, "user_version", migration.version)?;
+        tx.commit()?;
+        tracing::info!("- Migrated tern.db to schema version {}", migration.version);
+    }
+    Ok(())
 }
 
 /// `--mode reset`: deletes everything belonging to one account and resets its metadata

@@ -38,7 +38,7 @@ steps:
         present: [tern.db, tern.legacy.db]
         empty: [files]
       sql:
-        - {db: main, query: "PRAGMA user_version", equals: 12}
+        - {db: main, query: "PRAGMA user_version", equals: 13}
         - {db: main, query: "SELECT value FROM _State WHERE id = 'engine'", equals: rust}
         # Every row the C++ engine committed survives the move, including those that were
         # only in its WAL (moved alongside, or checkpointed first).

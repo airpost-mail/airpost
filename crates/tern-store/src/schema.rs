@@ -14,13 +14,16 @@
 //!
 //! Regenerate or check with `apps/engine/tools/schema_check.py` (given upstream
 //! Mailspring-Sync's `MailSync/constants.h`); `tests/schema.rs` compares a migrated database
-//! against `tests/fixtures/v12_schema.json`.
+//! against `tests/fixtures/v12_schema.json` plus what [`MIGRATIONS`] add
+//! (`tests/fixtures/migrations.json`).
 
 use std::path::Path;
 use std::time::Duration;
 
 use rusqlite::{Connection, OpenFlags};
-use tern_core::constants::{DATABASE_FILE, SQLITE_BUSY_TIMEOUT_MS};
+use tern_core::constants::{
+    BASE_SCHEMA_VERSION, DATABASE_FILE, SCHEMA_VERSION, SQLITE_BUSY_TIMEOUT_MS,
+};
 use tern_core::Result;
 
 /// Statements in the order the C++ engine created the objects. FTS5 shadow tables and
@@ -82,6 +85,29 @@ pub const V12_SCHEMA: &[&str] = &[
     "CREATE INDEX MessageOrphanSinceIndex ON MessageOrphan (accountId, since)",
     "CREATE INDEX MessageListDateIndex ON Message (accountId, date DESC)",
 ];
+
+/// One schema change on top of [`V12_SCHEMA`]. `sql` runs in the transaction that sets
+/// `user_version` to `version`.
+#[derive(Clone, Copy, Debug)]
+pub struct Migration {
+    pub version: i32,
+    pub sql: &'static str,
+}
+
+/// Tern's schema changes after V12, in order, one version apart, ending at
+/// [`SCHEMA_VERSION`]. A database runs each entry once, so an entry that has shipped is
+/// never edited or removed; a change is a new entry, and `tests/fixtures/migrations.json`
+/// lists what the entries add to `sqlite_master`. Additive changes are preferred: the desktop
+/// reads the database directly and must keep working on the version it was built against.
+pub const MIGRATIONS: &[Migration] = &[Migration {
+    version: 13,
+    // TD7: `Store::find_thread_by_references` looks up by account and Message-ID, which the
+    // primary key (threadId first) can't serve. References of removed threads match nothing.
+    sql: "CREATE INDEX ThreadReferenceLookup ON ThreadReference (accountId, headerMessageId); \
+          DELETE FROM ThreadReference WHERE threadId NOT IN (SELECT id FROM Thread);",
+}];
+
+const _: () = assert!(MIGRATIONS[MIGRATIONS.len() - 1].version == SCHEMA_VERSION);
 
 /// `ACCOUNT_RESET_QUERIES` from upstream `constants.h`, each bound to the account id
 /// (`reset` mode).
@@ -165,13 +191,14 @@ pub fn set_temp_directory(conn: &Connection, config_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Creates the V12 schema on an empty database and sets `user_version`.
+/// Creates the V12 schema on an empty database and sets `user_version` to 12; `migrate` then
+/// applies [`MIGRATIONS`].
 pub fn create_v12(conn: &Connection) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
     for sql in V12_SCHEMA {
         tx.execute_batch(sql)?;
     }
-    tx.pragma_update(None, "user_version", tern_core::constants::SCHEMA_VERSION)?;
+    tx.pragma_update(None, "user_version", BASE_SCHEMA_VERSION)?;
     tx.commit()?;
     Ok(())
 }
