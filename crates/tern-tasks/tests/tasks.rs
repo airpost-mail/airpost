@@ -1829,6 +1829,36 @@ fn a_send_stopped_after_smtp_drops_the_draft_on_relaunch() {
     e.assert_invariants();
 }
 
+#[test]
+fn a_send_stopped_during_smtp_drops_the_draft_once_sent_shows_the_message() {
+    let mut e = env(&["MOVE", "UIDPLUS"]);
+    let (sent, drafts, _) = e.mail_folders();
+    let draft = e.deliver(&drafts, 7, MessageFlags::DRAFT);
+    let hmid = "stopped-in-smtp@example.test";
+    let mut task = e.queue(
+        "SendDraftTask",
+        json!({"draft": draft_json(hmid, json!({"id": draft})), "perRecipientBodies": null}),
+    );
+    // Stopped after the server took the message, before `_smtpDone` was saved; the
+    // provider filed its copy.
+    task.data["_performRemoteRan"] = json!(true);
+    e.store.save(&mut task).unwrap();
+    let mut copy = remote(9, MessageFlags::SEEN);
+    copy.header.as_mut().unwrap().message_id = Some(hmid.to_owned());
+    e.imap.add(sent.path(), copy);
+
+    e.remote(&mut task);
+    assert_eq!(task.status(), "complete", "{}", task.data);
+    assert!(e.message(&draft).is_none());
+    assert!(
+        e.imap.uids("Drafts").is_empty(),
+        "its server copy is gone too"
+    );
+    assert_eq!(e.imap.uids("Sent").len(), 1, "the Sent copy stays");
+    assert!(e.imap.outbox.submissions().is_empty());
+    e.assert_invariants();
+}
+
 // -- RSVP ---------------------------------------------------------------------------------
 
 fn reply_ics(method: &str, attendees: &[&str], extra: &str) -> String {

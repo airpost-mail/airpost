@@ -202,9 +202,10 @@ impl TaskProcessor<'_> {
         session: &mut dyn ImapSession,
     ) -> Result<()> {
         if has(&task.data, "_performRemoteRan") {
-            if has(&task.data, SMTP_DONE_KEY) {
-                // The engine was stopped (the client quit) between SMTP and removing the
-                // draft, usually while it waited for the Sent copy.
+            // The engine was stopped (the client quit) after this send started. Past SMTP,
+            // usually while it waited for the Sent copy, the draft goes. Stopped during SMTP
+            // or before `_smtpDone` was saved, a Sent copy is what tells that it went out.
+            if has(&task.data, SMTP_DONE_KEY) || self.sent_copy_on_server(task, session)? {
                 self.finish_interrupted_send(task, session)?;
             }
             return Ok(());
@@ -585,11 +586,9 @@ impl TaskProcessor<'_> {
     /// server copies and its row go. The Sent copy is not placed again (a copy the
     /// provider filed is synced as usual).
     fn finish_interrupted_send(&self, task: &Task, session: &mut dyn ImapSession) -> Result<()> {
-        let draft_json = at(&task.data, "draft");
-        let Some(id) = draft_json.get("id").and_then(Value::as_str) else {
-            return Ok(());
-        };
-        let Some(draft) = self.store.find::<Message>(&Query::new().equal("id", id))? else {
+        let mut draft_json = at(&task.data, "draft").clone();
+        // A synced draft may have been re-keyed since the task named it.
+        let Some(draft) = self.find_client_draft(self.store, &mut draft_json)? else {
             return Ok(());
         };
         info!(
@@ -599,6 +598,21 @@ impl TaskProcessor<'_> {
         self.tombstone_draft(draft.header_message_id())?;
         remove_message_copies_resilient(session, self.store, self.account.id(), &draft)?;
         self.remove_sent_draft(&draft)
+    }
+
+    /// Whether the Sent folder (on Gmail the Sent label) shows a copy of the task's draft
+    /// among its newest messages.
+    fn sent_copy_on_server(&self, task: &Task, session: &mut dyn ImapSession) -> Result<bool> {
+        let hmid = json_str(at(&task.data, "draft"), "hMsgId");
+        if hmid.is_empty() {
+            return Ok(false);
+        }
+        let sent = match self.sent_folder_or_label() {
+            Ok(sent) => sent,
+            Err(Error::Sync(_)) => return Ok(false),
+            Err(e) => return Err(e),
+        };
+        Ok(!find_recent(session, sent.path(), hmid).is_empty())
     }
 
     /// Removes the draft that was sent, as stored (its snapshot is what the thread counts

@@ -41,8 +41,18 @@ The user runs Mailspring 1.26.0, which already has the upstream Sent-copy rewrit
 Engine half done 2026-10-15 (items 1-3; scenarios `sent-copy-bcc`, `sent-copy-send-interrupted`,
 `sent-copy-late-after-window`). Item 3 has no new table: the cleanup starts from the
 account's date index over the 7-day window and filters on `_asc`, which avoids a schema
-migration; revisit if it shows up in a profile. Follow-ups:
-- Client half of item 2: delay quit while a SendDraftTask is in flight.
+migration; revisit if it shows up in a profile.
+
+Item 2 done 2026-10-21. A relaunched send whose task already ran removes the draft row and
+its server copies when `_smtpDone` is set, or when Sent shows a copy with its Message-ID
+(stopped during SMTP, or before `_smtpDone` was saved); otherwise the draft stays for the
+user (`crates/tern-tasks/src/send.rs`, scenario `sent-copy-send-interrupted`, unit test
+`a_send_stopped_during_smtp_drops_the_draft_once_sent_shows_the_message`). The client half is not needed for the draft row: the desktop no longer kills the engine on
+quit but sends `engine.shutdown` and holds `will-quit` until it returns
+(`src/main/application.ts`), and the relaunch cleans up. `engine.shutdown` waits at most
+`ACCOUNT_STOP_TIMEOUT_MS` (5 s) for an account's threads, so a send in its Sent poll can
+still be cut; if the gap below matters, the fix is the engine waiting for an in-flight
+SendDraftTask on shutdown, not the desktop delaying quit. Follow-ups:
 - Item 5, the client safety net.
 - A send stopped after SMTP but before the APPEND, on a provider that files no Sent copy
   (iCloud, Fastmail), still ends with no Sent copy; the relaunch only removes the draft,
