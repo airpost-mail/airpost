@@ -17,7 +17,7 @@ describe('"tern-asset" protocol URL', () => {
   // Built-in features live in src/features/<dir>; the host is still the directory name.
   it('serves files of a built-in feature', () => {
     const icon = statusOf('tern-asset://account-sidebar/assets/icon-sidebar-addcategory@2x.png');
-    const font = statusOf('tern-asset://custom-fonts/fonts/Inter-Regular.woff2');
+    const font = statusOf('tern-asset://custom-fonts/fonts/AlbertSans-latin.woff2');
     runs(() => {
       expect(icon()).toBe(200);
       expect(font()).toBe(200);

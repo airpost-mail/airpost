@@ -117,7 +117,7 @@ Every surface token defaults to a base or state token, except where Light uses i
 |---|---|---|
 | `--radius` | Base radius; the sm/lg steps scale from it | `3px` |
 | `--radius-sm` / `--radius-md` / `--radius-lg` | | `calc(--radius × 2/3)` = 2px / `var(--radius)` / `calc(--radius × 5/3)` = 5px |
-| `--font-sans` | UI font | `'Inter', 'Helvetica', sans-serif`; `system-ui` on Windows |
+| `--font-sans` | UI font | `'Albert Sans', 'Helvetica', sans-serif`; `system-ui` on Windows |
 | `--font-serif` / `--font-mono` | | Georgia stack / DejaVu Sans Mono stack |
 | `--font-heading` | | `var(--font-sans)` |
 | `--font-size` | Base UI text size | `14px` |
