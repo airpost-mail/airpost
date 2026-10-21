@@ -22,7 +22,7 @@ Exit codes: 0 ok, 1 the command failed, 2 usage error, 3 no engine running.
 
 | Command | What it does | `--json` shape |
 | --- | --- | --- |
-| `tern status` | running engines and their accounts' state | `{engines: [...]}` |
+| `tern status` | running engines and their accounts' state, then the engine, gateway and mcp-http units | `{engines: [...], services: [{name, installed, running, pid, url, port, unit, bin, ...}]}` |
 | `tern accounts` | the accounts | `{accounts: [{accountId, email, state, error, pid, socket}]}` |
 | `tern folders`, `tern labels` | folders or labels with unread and total counts | |
 | `tern threads [--role inbox] [--folder F] [--label L] [-n N] [--all] [--before CURSOR]` | threads, newest first (default 50) | `{threads, next, more}` |
@@ -33,7 +33,7 @@ Exit codes: 0 ok, 1 the command failed, 2 usage error, 3 no engine running.
 | `tern contact get <id>` | a contact's details | |
 | `tern calendar list [--from WHEN] [--to WHEN] [--calendar ID]` | events, now to a week ahead by default | `{occurrences}` |
 | `tern task list [--status ...] [--class SendDraftTask]` | queued and finished tasks | |
-| `tern logs [ACCOUNT] [-n N]` | an account's engine log (works without an engine) | |
+| `tern logs [ACCOUNT\|engine\|gateway\|mcp-http] [-n N]` | an account's engine log, or a service's (works without an engine) | |
 
 The JSON is the engine's own model, not the MCP shapes: a thread's account is `aid`, its
 last-received time `lmrt` (Unix seconds), a message's Message-ID `hMsgId`.

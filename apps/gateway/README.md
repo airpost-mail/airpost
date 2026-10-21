@@ -14,7 +14,9 @@ isn't running".
 The desktop ships tern-gateway and the built web client (`apps/desktop/tern-web`, from
 `npm run build:desktop` in `apps/web`). "Web access from this computer" in Preferences >
 General installs it as a user unit with `tern gateway install --web-root <that dir>`, and
-"Pair a browser" runs `tern gateway pair`. By hand:
+"Pair a browser" runs `tern gateway pair`. The unit starts on demand: launchd (`Sockets`) or
+a systemd `.socket` unit listens on the bind address and starts the gateway on the first
+connection, handing it the socket (`tern-activation`). By hand:
 
     cargo build --release -p tern-gateway
     (cd apps/web && VITE_TERN_ENGINE=gateway npm run build)
