@@ -11,7 +11,7 @@ Install the Node version in the repo's `.node-version` and the Rust toolchain in
 
 ```bash
 make setup     # npm ci here and in apps/web, debug builds of the Rust binaries
-make desktop   # links the debug engine, tern and tern-mcp into this dir, starts on .dev/profile
+make desktop   # links the debug engine, tern, tern-mcp and tern-gateway here, starts on .dev/profile
 ```
 
 Or from this directory, with an engine installed as `tern-engine`
@@ -37,7 +37,7 @@ npm run build        # package for the host platform into dist/
 
 ## Layout
 
-- `src/` holds the core, one directory per domain: main process in `main/`, code both processes load in `shared/`, config in `config/`, window startup in `window/`, the windows' engine client in `engine/`, stores, models and tasks in `data/`, message content in `mail/`, shared UI in `components/`, package loading and the plugin API barrels (`packages/api/`) in `packages/`.
+- `src/` holds the core, one directory per domain: main process in `main/`, code both processes load in `intl/` and `platform/`, config in `config/`, window startup in `window/`, the windows' engine client in `engine/`, stores, models and tasks in `data/`, message content in `mail/`, shared UI in `components/`, package loading and the plugin API barrels (`packages/api/`) in `packages/`.
 - `src/features/` holds the built-in features (always loaded, app code); `plugins/` (bundled, can be turned off) and `themes/` (`ui-*`) hold the bundled packages.
 - `vendor/` holds the quick-preview libraries (pdf.js, Prism, SheetJS, DOMPurify).
 - `tests/` holds the tests (`tests/<area>/*.test.ts`, helpers and fixtures in `tests/support/`).
