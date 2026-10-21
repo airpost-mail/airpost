@@ -4,8 +4,14 @@ import { ModelWithMetadata } from './model-with-metadata';
 import { AttributeValues } from './model';
 import { EngineProcessExit } from '../../engine/process';
 
-let CategoryStore = null;
-let Contact = null;
+import { lazyRequire } from '../lazy-require';
+
+const CategoryStore = lazyRequire(
+  (): typeof import('../stores/category').default => require('../stores/category').default
+);
+const ContactClass = lazyRequire(
+  (): typeof import('./contact').Contact => require('./contact').Contact
+);
 
 export interface AccountAutoaddress {
   value: string;
@@ -89,11 +95,11 @@ export class Account extends ModelWithMetadata {
     }),
   };
 
-  public name: string;
-  public provider: string;
-  public emailAddress: string;
-  public authedAt: Date;
-  public settings: {
+  declare name: string;
+  declare provider: string;
+  declare emailAddress: string;
+  declare authedAt: Date;
+  declare settings: {
     imap_host: string;
     imap_port: number;
     imap_username: string;
@@ -113,13 +119,13 @@ export class Account extends ModelWithMetadata {
     refresh_token: string;
     container_folder: string;
   };
-  public label: string;
-  public autoaddress: AccountAutoaddress;
-  public aliases: string[];
-  public defaultAlias: string;
-  public syncState: string;
-  public syncError: EngineProcessExit | null;
-  public color: string;
+  declare label: string;
+  declare autoaddress: AccountAutoaddress;
+  declare aliases: string[];
+  declare defaultAlias: string | null;
+  declare syncState: string;
+  declare syncError: EngineProcessExit | null;
+  declare color: string;
 
   constructor(args: AttributeValues<typeof Account.attributes>) {
     super(args);
@@ -151,7 +157,7 @@ export class Account extends ModelWithMetadata {
 
   // Returns a {Contact} model that represents the current user.
   me() {
-    Contact = Contact || require('./contact').Contact;
+    const Contact = ContactClass();
 
     return new Contact({
       // used to give them random strings, let's try for something consistent
@@ -163,7 +169,7 @@ export class Account extends ModelWithMetadata {
   }
 
   meUsingAlias(alias: string) {
-    Contact = Contact || require('./contact').Contact;
+    const Contact = ContactClass();
 
     if (!alias) {
       return this.me();
@@ -221,22 +227,19 @@ export class Account extends ModelWithMetadata {
   }
 
   canArchiveThreads() {
-    CategoryStore = CategoryStore || require('../stores/category').default;
-    return CategoryStore.getArchiveCategory(this);
+    return CategoryStore().getArchiveCategory(this);
   }
 
   canTrashThreads() {
-    CategoryStore = CategoryStore || require('../stores/category').default;
-    return CategoryStore.getTrashCategory(this);
+    return CategoryStore().getTrashCategory(this);
   }
 
   preferredRemovalDestination() {
-    CategoryStore = CategoryStore || require('../stores/category').default;
     const preferDelete = AppEnv.config.get('core.reading.backspaceDelete');
-    if (preferDelete || !CategoryStore.getArchiveCategory(this)) {
-      return CategoryStore.getTrashCategory(this);
+    if (preferDelete || !CategoryStore().getArchiveCategory(this)) {
+      return CategoryStore().getTrashCategory(this);
     }
-    return CategoryStore.getArchiveCategory(this);
+    return CategoryStore().getArchiveCategory(this);
   }
 
   hasSyncStateError() {

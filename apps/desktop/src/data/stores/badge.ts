@@ -6,8 +6,9 @@ import ThreadCountsStore from './thread-counts';
 import CategoryStore from './category';
 
 class BadgeStore extends BaseStore {
-  private _unread: number;
-  private _total: number;
+  // The constructor's _updateCounts sets both: unset, they differ from any count it reads.
+  private _unread!: number;
+  private _total!: number;
 
   constructor() {
     super();
@@ -46,8 +47,9 @@ class BadgeStore extends BaseStore {
       ? AccountStore.accountIds()
       : FocusedPerspectiveStore.current().accountIds;
     for (const cat of CategoryStore.getCategoriesWithRoles(accountIds, 'inbox')) {
-      unread += ThreadCountsStore.unreadCountForCategoryId(cat.id);
-      total += ThreadCountsStore.totalCountForCategoryId(cat.id);
+      // An unknown count adds nothing (null reads as 0).
+      unread += ThreadCountsStore.unreadCountForCategoryId(cat.id) ?? 0;
+      total += ThreadCountsStore.totalCountForCategoryId(cat.id) ?? 0;
     }
 
     if (this._unread === unread && this._total === total) {

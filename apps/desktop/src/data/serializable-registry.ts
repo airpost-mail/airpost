@@ -15,15 +15,22 @@
  *
  * Note that there is one registry per window.
  */
-export default class SerializableRegistry {
-  _constructorFactories = {};
+type ConstructorFactory = () => new (...args: unknown[]) => unknown;
+
+/** What `deserialize` builds: an object that inflates itself from JSON. */
+export interface Deserializable {
+  fromJSON(json: unknown): unknown;
+}
+
+export default class SerializableRegistry<T extends Deserializable = Deserializable> {
+  _constructorFactories: { [name: string]: ConstructorFactory } = {};
 
   get(name: string) {
     return this._constructorFactories[name].call(null);
   }
 
   getAllConstructors() {
-    const constructors = [];
+    const constructors: ReturnType<ConstructorFactory>[] = [];
     for (const name of Object.keys(this._constructorFactories)) {
       constructors.push(this.get(name));
     }
@@ -34,7 +41,8 @@ export default class SerializableRegistry {
     return !!this._constructorFactories[name];
   }
 
-  deserialize(name: string, dataJSON: string | object) {
+  // U lets a caller name the registered subclass it expects back.
+  deserialize<U extends T = T>(name: string, dataJSON: string | object): U {
     let data = dataJSON;
     if (typeof data === 'string') {
       data = JSON.parse(data);
@@ -47,13 +55,14 @@ export default class SerializableRegistry {
 Your constructor factory must return a class constructor.`);
     }
 
-    const object = new constructor();
+    // Whoever registers `name` registers a class whose instances are T.
+    const object = new constructor() as U;
     object.fromJSON(data);
 
     return object;
   }
 
-  register(name: string, constructorFactory: () => new (...args: unknown[]) => unknown) {
+  register(name: string, constructorFactory: ConstructorFactory) {
     this._constructorFactories[name] = constructorFactory;
   }
 

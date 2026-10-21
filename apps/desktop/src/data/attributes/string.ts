@@ -16,12 +16,12 @@ export class AttributeString extends Attribute {
     return val === null ? undefined : val;
   }
 
-  fromJSON(val) {
+  fromJSON(val: unknown) {
     return val === null || val === undefined || val === false ? null : `${val}`;
   }
 
   // Public: Returns a {Matcher} for objects starting with the provided value.
-  startsWith(val) {
+  startsWith(val: string) {
     return new Matcher(this, 'startsWith', val);
   }
 
@@ -29,27 +29,27 @@ export class AttributeString extends Attribute {
     return `${this.tableColumn} TEXT`;
   }
 
-  like(val) {
+  like(val: string) {
     this._assertPresentAndQueryable('like', val);
     return new Matcher(this, 'like', val);
   }
 
-  lessThan(val) {
+  lessThan(val: string) {
     this._assertPresentAndQueryable('lessThanOrEqualTo', val);
     return new Matcher(this, '<', val);
   }
 
-  lessThanOrEqualTo(val) {
+  lessThanOrEqualTo(val: string) {
     this._assertPresentAndQueryable('lessThanOrEqualTo', val);
     return new Matcher(this, '<=', val);
   }
 
-  greaterThan(val) {
+  greaterThan(val: string) {
     this._assertPresentAndQueryable('greaterThanOrEqualTo', val);
     return new Matcher(this, '>', val);
   }
 
-  greaterThanOrEqualTo(val) {
+  greaterThanOrEqualTo(val: string) {
     this._assertPresentAndQueryable('greaterThanOrEqualTo', val);
     return new Matcher(this, '>=', val);
   }

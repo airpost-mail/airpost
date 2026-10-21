@@ -18,51 +18,59 @@ import { DestroyDraftTask } from '../tasks/destroy-draft';
 import { Composer as ComposerExtensionRegistry } from '../../packages/extension-registry';
 import QuotedHTMLTransformer from '../../mail/body/quoted-html-transformer';
 import { SyncbackDraftTask } from '../tasks/syncback-draft';
+import { attributeValue, setAttributeValue } from '../models/attribute-access';
+import { lazyRequire } from '../lazy-require';
 
-export type MessageWithEditorState = Message & { bodyEditorState: any };
+// The session loads drafts with their body, and the hotwired getter keeps it a string.
+export type MessageWithEditorState = Message & { body: string; bodyEditorState: any };
 
 /*
 Note: This is a bit of a hack, but pulling in composer-editor/support is what triggers slate,
 slate-react, etc. to be loaded in windows where the components are not actually in use.
 By lazily resolving this import, we can save ~400ms of window start-up time.
 */
-let Conversion = null;
-function resolveConversion() {
-  if (Conversion) return;
-  Conversion = require('../../components/composer-editor/support').Conversion;
-}
+const Conversion = lazyRequire(
+  (): typeof import('../../components/composer-editor/support').Conversion =>
+    require('../../components/composer-editor/support').Conversion
+);
 
 function convertFromHTML(html: string) {
-  resolveConversion();
-  return Conversion.convertFromHTML(html);
+  return Conversion().convertFromHTML(html);
 }
 function convertToHTML(value: Value) {
-  resolveConversion();
-  return Conversion.convertToHTML(value);
+  return Conversion().convertToHTML(value);
 }
 function convertToShapeWithoutContent(value: Value) {
-  resolveConversion();
-  return Conversion.convertToShapeWithoutContent(value);
+  return Conversion().convertToShapeWithoutContent(value);
 }
 
 const MetadataChangePrefix = 'metadata.';
-let DraftStore = null;
+const DraftStore = lazyRequire((): typeof import('./store').default => require('./store').default);
+
+// What DraftStore triggers with: a database change, or a draft's send state changing.
+type DraftDatabaseChange = DatabaseChangeRecord<Message> & { headerMessageId?: string };
+type DraftStoreChange = DraftDatabaseChange | { headerMessageId: string };
+
+function isPersistChange(change: DraftStoreChange): change is DraftDatabaseChange {
+  return 'type' in change && change.type === 'persist';
+}
 
 function hotwireDraftBodyState(draft: any, session: DraftEditingSession): MessageWithEditorState {
   // Populate the bodyEditorState and override the draft properties
   // so that they're kept in sync with minimal recomputation.
-  let _bodyHTMLValue = draft.body;
-  let _bodyEditorValue = null;
+  let _bodyHTMLValue: string | null = draft.body;
+  let _bodyEditorValue: Value | null = null;
 
   draft.__bodyPropDescriptor = {
     configurable: true,
     get: function () {
       if (_bodyHTMLValue === null) {
-        _bodyHTMLValue = convertToHTML(_bodyEditorValue);
+        // One of the two values is always set.
+        _bodyHTMLValue = convertToHTML(_bodyEditorValue!);
       }
       return _bodyHTMLValue;
     },
-    set: function (inHTML) {
+    set: function (inHTML: string) {
       if (_bodyHTMLValue === inHTML) return;
 
       _bodyHTMLValue = inHTML;
@@ -138,11 +146,12 @@ function hotwireDraftBodyState(draft: any, session: DraftEditingSession): Messag
     configurable: true,
     get: function () {
       if (_bodyEditorValue === null) {
-        _bodyEditorValue = convertFromHTML(_bodyHTMLValue);
+        // One of the two values is always set.
+        _bodyEditorValue = convertFromHTML(_bodyHTMLValue!);
       }
       return _bodyEditorValue;
     },
-    set: function (inValue) {
+    set: function (inValue: Value) {
       if (_bodyEditorValue === inValue) return;
       _bodyHTMLValue = null;
       _bodyEditorValue = inValue;
@@ -169,9 +178,12 @@ function hotwireDraftBodyState(draft: any, session: DraftEditingSession): Messag
  */
 function fastCloneDraft(draft: MessageWithEditorState) {
   const next = new Message({});
+  // Copies every own property, attributes and the hot-wired descriptors alike.
+  const source = draft as unknown as Record<string, unknown>;
+  const target = next as unknown as Record<string, unknown>;
   for (const key of Object.getOwnPropertyNames(draft)) {
     if (key === 'body' || key === 'bodyEditorState') continue;
-    next[key] = draft[key];
+    target[key] = source[key];
   }
   Object.defineProperty(next, 'body', (next as any).__bodyPropDescriptor);
   Object.defineProperty(next, 'bodyEditorState', (next as any).__bodyEditorValuePropDescriptor);
@@ -194,8 +206,8 @@ Section: Drafts
 export class DraftEditingSession extends BaseStore {
   static DraftChangeSet = DraftChangeSet;
 
-  _draft: MessageWithEditorState = null;
-  _draftPromise: Promise<Message> = null;
+  _draft: MessageWithEditorState | null = null;
+  _draftPromise: Promise<Message | undefined>;
   _destroyed = false;
   _mountedEditor: Editor | null = null;
 
@@ -205,13 +217,12 @@ export class DraftEditingSession extends BaseStore {
     onCommit: () => this.changeSetCommit(), // for specs
   });
 
-  constructor(headerMessageId: string, draft: Message = null) {
+  constructor(headerMessageId: string, draft: Message | null = null) {
     super();
 
     this.headerMessageId = headerMessageId;
 
-    DraftStore = DraftStore || require('./store').default;
-    this.listenTo(DraftStore, this._onDraftChanged);
+    this.listenTo(DraftStore(), this._onDraftChanged);
 
     this._mountedEditor = null;
 
@@ -274,20 +285,30 @@ export class DraftEditingSession extends BaseStore {
     );
   }
 
+  // The draft, for the methods that run only once the session has prepared it.
+  _loadedDraft() {
+    if (!this._draft) {
+      throw new Error('DraftEditingSession: the draft is not loaded');
+    }
+    return this._draft;
+  }
+
   validateDraftForSending() {
-    const miscWarnings = [];
-    const miscErrors = [];
-    const hasAttachment = this._draft.files && this._draft.files.length > 0;
+    const draft = this._loadedDraft();
+    const miscWarnings: string[] = [];
+    const miscErrors: string[] = [];
+    const hasAttachment = draft.files && draft.files.length > 0;
 
     if (!this.hasSendableFromAddress()) {
       miscErrors.push(DraftEditingSession.unsendableFromAddressMessage());
     }
 
-    if (this._draft.subject.length === 0) {
+    if (draft.subject.length === 0) {
       miscWarnings.push(localized('The subject field is blank.'));
     }
 
-    let cleaned = QuotedHTMLTransformer.removeQuotedHTML(this._draft.body.trim());
+    // The session's draft is always loaded with its body.
+    let cleaned = QuotedHTMLTransformer.removeQuotedHTML(draft.body!.trim());
     const sigIndex = cleaned.search(RegExpUtils.signatureRegex());
     cleaned = sigIndex > -1 ? cleaned.substr(0, sigIndex) : cleaned;
 
@@ -305,16 +326,17 @@ export class DraftEditingSession extends BaseStore {
       if (!extension.warningsForSending) {
         continue;
       }
-      miscWarnings.push(...extension.warningsForSending({ draft: this._draft }));
+      miscWarnings.push(...extension.warningsForSending({ draft }));
     }
 
     return { miscErrors, miscWarnings };
   }
 
   validateDraftRecipients() {
-    const recipientWarnings = [];
-    const recipientErrors = [];
-    const allRecipients = [...this._draft.to, ...this._draft.cc, ...this._draft.bcc];
+    const draft = this._loadedDraft();
+    const recipientWarnings: string[] = [];
+    const recipientErrors: string[] = [];
+    const allRecipients = [...draft.to, ...draft.cc, ...draft.bcc];
 
     const allNames = [...Utils.commonlyCapitalizedSalutations];
     let unnamedRecipientPresent = false;
@@ -355,7 +377,8 @@ export class DraftEditingSession extends BaseStore {
       return { recipientErrors: recipientErrors, recipientWarnings: recipientWarnings };
     }
 
-    let cleaned = QuotedHTMLTransformer.removeQuotedHTML(this._draft.body.trim());
+    // The session's draft is always loaded with its body.
+    let cleaned = QuotedHTMLTransformer.removeQuotedHTML(draft.body!.trim());
     const sigIndex = cleaned.search(RegExpUtils.signatureRegex());
     cleaned = sigIndex > -1 ? cleaned.substr(0, sigIndex) : cleaned;
 
@@ -389,16 +412,18 @@ export class DraftEditingSession extends BaseStore {
   }
 
   addRecipientsToWarningBlacklist() {
-    const allRecipients = [...this._draft.to, ...this._draft.cc, ...this._draft.bcc];
+    const draft = this._loadedDraft();
+    const allRecipients = [...draft.to, ...draft.cc, ...draft.bcc];
     const allRecipientEmails = allRecipients.map((contact) => contact.email);
-    let blacklist = JSON.parse(localStorage.getItem('recipientWarningBlacklist'));
+    // JSON.parse(null) parses "null", as a missing key always has.
+    let blacklist = JSON.parse(localStorage.getItem('recipientWarningBlacklist') ?? 'null');
     if (blacklist === null) blacklist = [];
     blacklist.push(...allRecipientEmails);
     localStorage.setItem('recipientWarningBlacklist', JSON.stringify(blacklist));
   }
 
   checkRecipientInWarningBlacklist(email: string) {
-    const blacklist = JSON.parse(localStorage.getItem('recipientWarningBlacklist'));
+    const blacklist = JSON.parse(localStorage.getItem('recipientWarningBlacklist') ?? 'null');
     if (blacklist && blacklist.includes(email)) return true;
     return false;
   }
@@ -408,7 +433,7 @@ export class DraftEditingSession extends BaseStore {
   // address.
   //
   async ensureCorrectAccount() {
-    const draft = this.draft();
+    const draft = this._loadedDraft();
     const from = draft.from[0];
     if (!from) {
       throw new Error('DraftEditingSession::ensureCorrectAccount - draft has no from address.');
@@ -466,8 +491,8 @@ export class DraftEditingSession extends BaseStore {
     return this;
   }
 
-  _onDraftChanged = (change) => {
-    if (change === undefined || change.type !== 'persist') {
+  _onDraftChanged = (change?: DraftStoreChange) => {
+    if (change === undefined || !isPersistChange(change)) {
       return;
     }
     if (!this._draft) {
@@ -484,8 +509,9 @@ export class DraftEditingSession extends BaseStore {
       return;
     }
 
+    const draft = this._draft;
     const nextDraft = change.objects
-      .filter((obj) => obj.headerMessageId === this._draft.headerMessageId)
+      .filter((obj) => obj.headerMessageId === draft.headerMessageId)
       .pop();
 
     if (!nextDraft) {
@@ -500,15 +526,16 @@ export class DraftEditingSession extends BaseStore {
     let changed = false;
     for (const [key] of Object.entries(Message.attributes)) {
       if (key === 'headerMessageId') continue;
-      if (nextDraft[key] === undefined || nextDraft[key] === null) continue;
+      const value = attributeValue(nextDraft, key);
+      if (value === undefined || value === null) continue;
       if (lockedFields.includes(key)) continue;
-      if (this._draft[key] === nextDraft[key]) continue;
+      if (attributeValue(this._draft, key) === value) continue;
 
       if (changed === false) {
         this._draft = fastCloneDraft(this._draft);
         changed = true;
       }
-      this._draft[key] = nextDraft[key];
+      setAttributeValue(this._draft, key, value);
     }
 
     if (changed) {
@@ -533,16 +560,15 @@ export class DraftEditingSession extends BaseStore {
       throw new Error('DraftChangeSet was modified before the draft was prepared.');
     }
 
-    this._draft = fastCloneDraft(this._draft);
+    const draft = fastCloneDraft(this._draft);
+    this._draft = draft;
 
     for (const [key, val] of Object.entries(changes)) {
       if (key.startsWith(MetadataChangePrefix)) {
-        this._draft.directlyAttachMetadata(
-          key.split(MetadataChangePrefix).pop(),
-          val as Record<string, any>
-        );
+        const parts = key.split(MetadataChangePrefix);
+        draft.directlyAttachMetadata(parts[parts.length - 1], val as Record<string, any>);
       } else {
-        this._draft[key] = val;
+        setAttributeValue(draft, key, val);
       }
     }
     this.trigger();

@@ -48,15 +48,15 @@ export class Calendar extends Model {
     }),
   };
 
-  public name: string;
-  public description: string;
-  public readOnly: boolean;
+  declare name: string;
+  declare description: string;
+  declare readOnly: boolean;
   /** The server's DAV:owner verdict (RFC 3744 section 5.1); '' when it gave none. */
-  public ownership: 'mine' | 'other' | '';
+  declare ownership: 'mine' | 'other' | '';
   /** The collection's href on the server; Google puts the calendar's own address in it. */
-  public path: string;
-  public color: string;
-  public order: number;
+  declare path: string;
+  declare color: string;
+  declare order: number;
 
   constructor(data: AttributeValues<typeof Calendar.attributes>) {
     super(data);

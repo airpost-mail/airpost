@@ -1,6 +1,7 @@
 import { Task } from './task';
 import * as Attributes from '../attributes';
 import { Model, AttributeValues } from '../models/model';
+import { attributeValue } from '../models/attribute-access';
 
 export class SyncbackMetadataTask extends Task {
   static forSaving({
@@ -24,7 +25,7 @@ export class SyncbackMetadataTask extends Task {
       modelId: model.id,
       pluginId: pluginId,
       modelClassName: model.constructor.name.toLowerCase(),
-      modelHeaderMessageId: model['headerMessageId'] || null,
+      modelHeaderMessageId: attributeValue(model, 'headerMessageId') || null,
       accountId: model.accountId,
       value,
       undoValue,
@@ -65,12 +66,12 @@ export class SyncbackMetadataTask extends Task {
     }),
   };
 
-  pluginId: string;
-  modelId: string;
-  modelClassName: string;
+  declare pluginId: string;
+  declare modelId: string;
+  declare modelClassName: string;
   modelHeaderMessageId?: string;
-  value: { [key: string]: any };
-  undoValue: { [key: string]: any };
+  declare value: { [key: string]: any };
+  declare undoValue: { [key: string]: any };
 
   constructor(data: AttributeValues<typeof SyncbackMetadataTask.attributes> = {}) {
     super(data);

@@ -8,10 +8,13 @@ import { Category } from './category';
 import * as Attributes from '../attributes';
 import { ModelWithMetadata } from './model-with-metadata';
 import { AttributeValues } from './model';
+import { lazyRequire } from '../lazy-require';
 import { localized } from '../../intl/localize';
 import { attributionTemplate, formatQuoteDate } from '../../intl/date-format';
 
-let CategoryStore = null;
+const CategoryStore = lazyRequire(
+  (): typeof import('../stores/category').default => require('../stores/category').default
+);
 
 /** Per-placement flag bits in the `folders` map (see `Message.folders`). */
 export const PlacementFlags = {
@@ -205,35 +208,35 @@ export class Message extends ModelWithMetadata {
     }),
   };
 
-  public subject: string;
-  public to: Contact[];
-  public cc: Contact[];
-  public bcc: Contact[];
-  public from: Contact[];
-  public replyTo: Contact[];
-  public files: File[];
-  public events: Event[];
-  public date: Date;
-  public headerMessageId: string;
-  public threadId: string;
-  public snippet: string;
-  public starred: boolean;
-  public unread: boolean;
-  public pristine: boolean;
-  public draft: boolean;
-  public replyToHeaderMessageId: string;
-  public forwardedHeaderMessageId: string;
+  declare subject: string;
+  declare to: Contact[];
+  declare cc: Contact[];
+  declare bcc: Contact[];
+  declare from: Contact[];
+  declare replyTo: Contact[];
+  declare files: File[];
+  declare events: Event[];
+  declare date: Date;
+  declare headerMessageId: string;
+  declare threadId: string;
+  declare snippet: string;
+  declare starred: boolean;
+  declare unread: boolean;
+  declare pristine: boolean;
+  declare draft: boolean;
+  declare replyToHeaderMessageId: string;
+  declare forwardedHeaderMessageId: string;
   /**
    * folderId -> PlacementFlags bits, one entry per live copy. Left undefined (and omitted
    * from `toJSON()`) on drafts the client creates, so the engine's own placement record
    * is not overwritten by a client that has never been told about it.
    */
   public folders?: { [folderId: string]: number };
-  public listUnsubscribe: string;
-  public listUnsubscribePost: string;
+  declare listUnsubscribe: string;
+  declare listUnsubscribePost: string;
 
   /** indicates that "body" is plain text, not HTML */
-  public plaintext: boolean;
+  declare plaintext: boolean;
   public body?: string;
 
   static naturalSortOrder() {
@@ -264,10 +267,9 @@ export class Message extends ModelWithMetadata {
     if (!this.accountId) {
       return [];
     }
-    CategoryStore = CategoryStore || require('../stores/category').default;
     return this.folderIds()
-      .map((id) => CategoryStore.byId(this.accountId, id))
-      .filter(Boolean);
+      .map((id) => CategoryStore().byId(this.accountId, id))
+      .filter((c): c is Category => !!c);
   }
 
   // Public: True if every copy of this message is in spam or trash. A message with no
@@ -313,7 +315,7 @@ export class Message extends ModelWithMetadata {
   // Public: Returns a set of uniqued message participants by combining the
   // `to`, `cc`, `bcc` && (optionally) `from` fields.
   participants({ includeFrom = true, includeBcc = false } = {}) {
-    const seen = {};
+    const seen: { [key: string]: boolean } = {};
     const all: Contact[] = [];
     let contacts = [...this.to, ...this.cc];
     if (includeFrom) {
@@ -345,8 +347,8 @@ export class Message extends ModelWithMetadata {
     const excludeMeAndFroms = (cc: Contact[]) =>
       cc.filter((p) => !(p.isMe() || excludedFroms.includes(Utils.toEquivalentEmailForm(p.email))));
 
-    let to: Contact[] = null;
-    let cc: Contact[] = null;
+    let to: Contact[];
+    let cc: Contact[];
 
     if (this.replyTo.length && !this.replyTo[0].isMe()) {
       // If a replyTo is specified and that replyTo would not result in you

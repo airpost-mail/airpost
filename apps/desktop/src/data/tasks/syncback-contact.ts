@@ -13,7 +13,7 @@ export class SyncbackContactTask extends Task {
     }),
   };
 
-  contact: Contact;
+  declare contact: Contact;
 
   static forCreating({ contact, accountId }: { contact: Contact; accountId: string }) {
     return new SyncbackContactTask({

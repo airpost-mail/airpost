@@ -3,7 +3,6 @@ import { QuerySubscription } from './subscription';
 import { DatabaseChangeRecord } from '../database/change-record';
 import ModelQuery from './query';
 import { Model } from '../models/model';
-let DatabaseStore = null;
 
 /*
 Public: The QuerySubscriptionPool maintains a list of all of the query
@@ -11,8 +10,8 @@ subscriptions in the app. In the future, this class will monitor performance,
 merge equivalent subscriptions, etc.
 */
 class QuerySubscriptionPool {
-  _subscriptions = {};
-  _cleanupChecks = [];
+  _subscriptions: { [key: string]: QuerySubscription<Model> } = {};
+  _cleanupChecks: string[] = [];
 
   constructor() {
     this._setup();
@@ -20,7 +19,7 @@ class QuerySubscriptionPool {
 
   add(query: ModelQuery<any>, callback: ((result: any) => void) & { _registrationPoint?: string }) {
     if (AppEnv.inDevMode()) {
-      callback._registrationPoint = this._formatRegistrationPoint(new Error().stack);
+      callback._registrationPoint = this._formatRegistrationPoint(new Error().stack || '');
     }
 
     const key = this._keyForQuery(query);
@@ -60,7 +59,7 @@ class QuerySubscriptionPool {
       const subscription = this._subscriptions[key];
       console.log(key);
       console.group();
-      for (const callback of subscription._callbacks) {
+      for (const callback of subscription._callbacks as { _registrationPoint?: string }[]) {
         console.log(`${callback._registrationPoint}`);
       }
       console.groupEnd();
@@ -113,7 +112,8 @@ class QuerySubscriptionPool {
   }
 
   _setup() {
-    DatabaseStore = DatabaseStore || require('../database/store').default;
+    const DatabaseStore: typeof import('../database/store').default =
+      require('../database/store').default;
     DatabaseStore.listen(this._onChange);
     require('../database/engine-reads').default.on('resync', this._rerunAll);
   }

@@ -19,19 +19,30 @@ function isRemoteRegion(region: HTMLElement | RemoteSearchRegion): region is Rem
   return !!region && !(region instanceof Node) && 'element' in region;
 }
 
+/** A match's box; `top` is relative to the scroll ancestor once the matches are measured. */
+interface SearchMatch {
+  // Null for a match in a remote region.
+  node: Element | null;
+  regionId: string | null;
+  renderIndex: number;
+  top: number;
+  left: number;
+  height: number;
+}
+
 class SearchableComponentStore extends BaseStore {
-  currentMatch = null;
-  matches = [];
-  globalIndex = null; // null means nothing is selected
-  scrollAncestor = null;
+  currentMatch: SearchMatch | null = null;
+  matches: SearchMatch[] = [];
+  globalIndex: number | null = null; // null means nothing is selected
+  scrollAncestor: Element | null = null;
 
   // null and empty string are different. Null means that search isn't
   // even activated. Empty string means we're active but just not
   // searching anything.
-  searchTerm = null;
+  searchTerm: string | null = null;
   searchRegions: { [key: string]: HTMLElement | RemoteSearchRegion } = {};
 
-  _lastThread?: Thread;
+  _lastThread?: Thread | null;
 
   constructor() {
     super();
@@ -66,16 +77,17 @@ class SearchableComponentStore extends BaseStore {
   }
 
   scrollbarTicks() {
-    let ticks = [];
-    if (this.matches.length > 0 && this.scrollAncestor && this.scrollAncestor.scrollHeight > -1) {
+    let ticks: (number | { percent: number; className: string })[] = [];
+    const scrollAncestor = this.scrollAncestor;
+    if (this.matches.length > 0 && scrollAncestor && scrollAncestor.scrollHeight > -1) {
       ticks = this.matches.map((match) => {
         if (match === this.currentMatch) {
           return {
-            percent: match.top / this.scrollAncestor.scrollHeight,
+            percent: match.top / scrollAncestor.scrollHeight,
             className: 'match',
           };
         }
-        return match.top / this.scrollAncestor.scrollHeight;
+        return match.top / scrollAncestor.scrollHeight;
       });
     }
     return ticks;
@@ -98,7 +110,7 @@ class SearchableComponentStore extends BaseStore {
     // searchNodes need to all be under the root document. matches
     // may contain nodes inside of iframes which are not attached ot the
     // root document.
-    const searchNodes = [];
+    const searchNodes: Node[] = [];
 
     if (this.searchTerm && this.searchTerm.length >= CHAR_THRESHOLD) {
       Object.entries(this.searchRegions).forEach(([regionId, region]) => {
@@ -123,7 +135,7 @@ class SearchableComponentStore extends BaseStore {
           return;
         }
         const node = region;
-        let refNode;
+        let refNode: HTMLElement | Document;
         let topOffset = 0;
         let leftOffset = 0;
         if (node.nodeName === 'IFRAME') {
@@ -131,14 +143,17 @@ class SearchableComponentStore extends BaseStore {
           const iframeRect = node.getBoundingClientRect();
           topOffset = iframeRect.top;
           leftOffset = iframeRect.left;
-          refNode = (node as HTMLIFrameElement).contentDocument.body;
+          // A cross-origin frame registers as a RemoteSearchRegion, so this one's document
+          // is readable.
+          const frameDocument = (node as HTMLIFrameElement).contentDocument!;
+          refNode = frameDocument.body;
           if (!refNode) {
-            refNode = (node as HTMLIFrameElement).contentDocument;
+            refNode = frameDocument;
           }
         } else {
           refNode = node;
         }
-        const matches = refNode.querySelectorAll('search-match, .search-match');
+        const matches = refNode.querySelectorAll<HTMLElement>('search-match, .search-match');
         for (let i = 0; i < matches.length; i++) {
           if (!DOMUtils.nodeIsLikelyVisible(matches[i])) {
             continue;
@@ -150,7 +165,7 @@ class SearchableComponentStore extends BaseStore {
           this.matches.push({
             node: matches[i],
             regionId: matches[i].getAttribute('data-region-id'),
-            renderIndex: +matches[i].getAttribute('data-render-index'),
+            renderIndex: Number(matches[i].getAttribute('data-render-index')),
             top: rect.top + topOffset,
             left: rect.left + leftOffset,
             height: rect.height,
@@ -171,16 +186,18 @@ class SearchableComponentStore extends BaseStore {
         this.currentMatch = this.matches[this.globalIndex];
       }
 
-      const parentFilter = (node: Element) => {
-        return !!node.classList && node.classList.contains('scroll-region-content');
+      const parentFilter = (node: Node) => {
+        const { classList } = node as Partial<Element>;
+        return !!classList && classList.contains('scroll-region-content');
       };
-      this.scrollAncestor = DOMUtils.commonAncestor(searchNodes, parentFilter);
-      this.scrollAncestor =
-        this.scrollAncestor && this.scrollAncestor.closest('.scroll-region-content');
+      // The search nodes and the parents the filter keeps are all elements.
+      const ancestor = DOMUtils.commonAncestor(searchNodes, parentFilter) as Element | null;
+      const scrollAncestor = ancestor && ancestor.closest('.scroll-region-content');
+      this.scrollAncestor = scrollAncestor;
 
-      if (this.scrollAncestor) {
-        const scrollRect = this.scrollAncestor.getBoundingClientRect();
-        const scrollTop = scrollRect.top - this.scrollAncestor.scrollTop;
+      if (scrollAncestor) {
+        const scrollRect = scrollAncestor.getBoundingClientRect();
+        const scrollTop = scrollRect.top - scrollAncestor.scrollTop;
         // We save the position relative to the top of the scrollAncestor
         // instead of the current getBoudingClientRect (which is dependent
         // on the current scroll position)
@@ -209,17 +226,19 @@ class SearchableComponentStore extends BaseStore {
     if (this.matches.length === 0) {
       return;
     }
+    let globalIndex: number;
     if (this.globalIndex === null) {
-      this.globalIndex = 0;
+      globalIndex = 0;
     } else {
-      this.globalIndex += amount;
-      if (this.globalIndex < 0) {
-        this.globalIndex += this.matches.length;
+      globalIndex = this.globalIndex + amount;
+      if (globalIndex < 0) {
+        globalIndex += this.matches.length;
       } else {
-        this.globalIndex = this.globalIndex % this.matches.length;
+        globalIndex = globalIndex % this.matches.length;
       }
     }
-    this.currentMatch = this.matches[this.globalIndex];
+    this.globalIndex = globalIndex;
+    this.currentMatch = this.matches[globalIndex];
     this._scrollIntoView();
     this.trigger();
   }

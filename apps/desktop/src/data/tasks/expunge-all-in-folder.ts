@@ -14,7 +14,7 @@ export class ExpungeAllInFolderTask extends Task {
     }),
   };
 
-  folder: Folder;
+  declare folder: Folder;
 
   constructor(data: AttributeValues<typeof ExpungeAllInFolderTask.attributes> = {}) {
     super(data);

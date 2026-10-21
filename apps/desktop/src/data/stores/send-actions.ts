@@ -41,7 +41,7 @@ function verifySendAction(sendAction: ISendAction, extension: { name?: string } 
 
 class _SendActionsStore extends BaseStore {
   _sendActions: ISendAction[] = [];
-  _unsubscribers = [];
+  _unsubscribers: (() => void)[] = [];
 
   constructor() {
     super();

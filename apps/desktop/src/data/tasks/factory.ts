@@ -11,7 +11,7 @@ import { Task } from './task';
 export const TaskFactory = {
   tasksForThreadsByAccountId(
     threads: Thread[],
-    callback: (accountThreads: Thread[], accountId: string) => Task | Task[]
+    callback: (accountThreads: Thread[], accountId: string) => Task | Task[] | null
   ) {
     const byAccount: { [accountId: string]: { accountThreads: Thread[]; accountId: string } } = {};
     threads.forEach((thread) => {
@@ -28,10 +28,10 @@ export const TaskFactory = {
     const tasks: Task[] = [];
     Object.values(byAccount).forEach(({ accountThreads, accountId }) => {
       const taskOrTasks = callback(accountThreads, accountId);
-      if (taskOrTasks && taskOrTasks instanceof Array) {
+      if (Array.isArray(taskOrTasks)) {
         tasks.push(...taskOrTasks);
       } else if (taskOrTasks) {
-        tasks.push(taskOrTasks as Task);
+        tasks.push(taskOrTasks);
       }
     });
     return tasks;

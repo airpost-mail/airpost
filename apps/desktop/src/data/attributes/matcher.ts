@@ -3,6 +3,7 @@ import { QueryExpression } from '../../mail/search/ast';
 import { Attribute } from './attribute';
 import { AttributeCollection } from './collection';
 import { Model } from '../models/model';
+import { attributeValue, ComparableValue } from '../models/attribute-access';
 
 // https://www.sqlite.org/faq.html#q14
 // That's right. Two single quotes in a row…
@@ -69,12 +70,14 @@ export class Matcher {
 
   static muid = 0;
 
-  attr: Attribute;
-  comparator: string;
+  // Only the leaf matchers made by Attribute have an attribute and a comparator; the
+  // composite and search matchers leave them empty.
+  attr?: Attribute | null;
+  comparator?: string | null;
   val: any;
   muid: number;
 
-  constructor(attr?: Attribute, comparator?: string, val?: any) {
+  constructor(attr?: Attribute | null, comparator?: string | null, val?: any) {
     this.attr = attr;
     this.comparator = comparator;
     this.val = val;
@@ -83,7 +86,7 @@ export class Matcher {
     Matcher.muid = (Matcher.muid + 1) % 50;
   }
 
-  attribute() {
+  attribute(): Attribute | null | undefined {
     return this.attr;
   }
 
@@ -91,8 +94,22 @@ export class Matcher {
     return this.val;
   }
 
+  // The attribute and comparator of a leaf matcher. The composite and search matchers
+  // override every method that reads them.
+  protected leaf(): { attr: Attribute; comparator: string } {
+    if (!this.attr || !this.comparator) {
+      throw new Error(`Matcher (${this.comparator}) has no attribute`);
+    }
+    return { attr: this.attr, comparator: this.comparator };
+  }
+
+  protected leafAttr(): Attribute {
+    return this.leaf().attr;
+  }
+
   evaluate(model: Model) {
-    let modelValue = model[this.attr.modelKey];
+    const attr = this.leafAttr();
+    let modelValue: unknown = attributeValue(model, attr.modelKey);
     if (modelValue instanceof Function) {
       modelValue = modelValue();
     }
@@ -109,7 +126,9 @@ export class Matcher {
       }
     }
 
-    const asId = (v) => (v && v.id ? v.id : v);
+    const asId = (v: unknown) => (v && typeof v === 'object' && 'id' in v && v.id ? v.id : v);
+    // The comparator says what the attribute holds: an ordered value, a list or a string.
+    const ordered = modelValue as ComparableValue;
 
     switch (this.comparator) {
       case '=':
@@ -118,35 +137,35 @@ export class Matcher {
       case '!=':
         return modelValue != matcherValue; // eslint-disable-line
       case '<':
-        return modelValue < matcherValue;
+        return ordered < matcherValue;
       case '>':
-        return modelValue > matcherValue;
+        return ordered > matcherValue;
       case '<=':
-        return modelValue <= matcherValue;
+        return ordered <= matcherValue;
       case '>=':
-        return modelValue >= matcherValue;
+        return ordered >= matcherValue;
       case 'in':
         return matcherValue.includes(modelValue);
       case 'not in':
         return !matcherValue.includes(modelValue);
       case 'contains': {
         const search = asId(matcherValue);
-        for (const item of modelValue) {
+        for (const item of modelValue as unknown[]) {
           if (asId(item) === search) return true;
         }
         return false;
       }
       case 'containsAny': {
-        const idSet = new Set(modelValue.map(asId));
-        return matcherValue.some((submatcherValue) => idSet.has(asId(submatcherValue)));
+        const idSet = new Set((modelValue as unknown[]).map(asId));
+        return matcherValue.some((submatcherValue: unknown) => idSet.has(asId(submatcherValue)));
       }
       case 'startsWith':
-        return modelValue.startsWith(matcherValue);
+        return (modelValue as string).startsWith(matcherValue);
       case 'like':
-        return modelValue.search(new RegExp(`.*${matcherValue}.*`, 'gi')) >= 0;
+        return (modelValue as string).search(new RegExp(`.*${matcherValue}.*`, 'gi')) >= 0;
       default:
         throw new Error(
-          `Matcher.evaulate() not sure how to evaluate ${this.attr.modelKey} with comparator ${this.comparator}`
+          `Matcher.evaulate() not sure how to evaluate ${attr.modelKey} with comparator ${this.comparator}`
         );
     }
   }
@@ -157,8 +176,8 @@ export class Matcher {
   toJSON(): MatcherJSON {
     const value = (v: unknown) => (v instanceof Date ? v.getTime() / 1000 : v);
     return {
-      attr: this.attr.modelKey,
-      op: this.comparator,
+      attr: this.leaf().attr.modelKey,
+      op: this.leaf().comparator,
       value: this.val instanceof Array ? this.val.map(value) : value(this.val),
     };
   }
@@ -167,11 +186,11 @@ export class Matcher {
     return `M${this.muid}`;
   }
 
-  joinSQL(klass): string | false {
+  joinSQL(klass: typeof Model): string | false {
     switch (this.comparator) {
       case 'contains':
       case 'containsAny': {
-        const joinTable = (this.attr as AttributeCollection).tableNameForJoinAgainst(klass);
+        const joinTable = (this.leafAttr() as AttributeCollection).tableNameForJoinAgainst(klass);
         const joinTableRef = this.joinTableRef();
         return `INNER JOIN \`${joinTable}\` AS \`${joinTableRef}\` ON \`${joinTableRef}\`.\`id\` = \`${klass.name}\`.\`id\``;
       }
@@ -180,9 +199,10 @@ export class Matcher {
     }
   }
 
-  whereSQL(klass: typeof Model) {
+  whereSQL(klass: typeof Model): string {
+    const attr = this.leafAttr();
     const val = this.comparator === 'like' ? `%${this.val}%` : this.val;
-    let escaped = null;
+    let escaped: string | number | null = null;
 
     if (typeof val === 'string') {
       escaped = `'${val.replace(/'/g, singleQuoteEscapeSequence)}'`;
@@ -193,10 +213,10 @@ export class Matcher {
     } else if (val instanceof Date) {
       escaped = val.getTime() / 1000;
     } else if (val instanceof Array) {
-      const escapedVals = [];
+      const escapedVals: string[] = [];
       for (const v of val) {
         if (typeof v !== 'string') {
-          throw new Error(`${this.attr.tableColumn} value ${v} must be a string.`);
+          throw new Error(`${attr.tableColumn} value ${v} must be a string.`);
         }
         escapedVals.push(`'${v.replace(/'/g, singleQuoteEscapeSequence)}'`);
       }
@@ -208,29 +228,29 @@ export class Matcher {
     switch (this.comparator) {
       case '=': {
         if (escaped === null) {
-          return `\`${klass.name}\`.\`${this.attr.tableColumn}\` IS NULL`;
+          return `\`${klass.name}\`.\`${attr.tableColumn}\` IS NULL`;
         }
-        return `\`${klass.name}\`.\`${this.attr.tableColumn}\` = ${escaped}`;
+        return `\`${klass.name}\`.\`${attr.tableColumn}\` = ${escaped}`;
       }
       case '!=': {
         if (escaped === null) {
-          return `\`${klass.name}\`.\`${this.attr.tableColumn}\` IS NOT NULL`;
+          return `\`${klass.name}\`.\`${attr.tableColumn}\` IS NOT NULL`;
         }
-        return `\`${klass.name}\`.\`${this.attr.tableColumn}\` != ${escaped}`;
+        return `\`${klass.name}\`.\`${attr.tableColumn}\` != ${escaped}`;
       }
       case 'startsWith': {
         const escapedVal =
           typeof val === 'string'
             ? val.replace(/'/g, singleQuoteEscapeSequence).replace(/[\\%_]/g, (c) => `\\${c}`)
             : val;
-        return `\`${klass.name}\`.\`${this.attr.tableColumn}\` LIKE '${escapedVal}%' ESCAPE '\\'`;
+        return `\`${klass.name}\`.\`${attr.tableColumn}\` LIKE '${escapedVal}%' ESCAPE '\\'`;
       }
       case 'contains':
         return `\`${this.joinTableRef()}\`.\`value\` = ${escaped}`;
       case 'containsAny':
         return `\`${this.joinTableRef()}\`.\`value\` IN ${escaped}`;
       default:
-        return `\`${klass.name}\`.\`${this.attr.tableColumn}\` ${this.comparator} ${escaped}`;
+        return `\`${klass.name}\`.\`${attr.tableColumn}\` ${this.comparator} ${escaped}`;
     }
   }
 }
@@ -261,7 +281,7 @@ export class OrCompositeMatcher extends Matcher {
   }
 
   joinSQL(klass: typeof Model) {
-    const joins = [];
+    const joins: string[] = [];
     for (const matcher of this.children) {
       const join = matcher.joinSQL(klass);
       if (join) {
@@ -302,7 +322,7 @@ export class AndCompositeMatcher extends Matcher {
   }
 
   joinSQL(klass: typeof Model) {
-    const joins = [];
+    const joins: string[] = [];
     for (const matcher of this.children) {
       const join = matcher.joinSQL(klass);
       if (join) {

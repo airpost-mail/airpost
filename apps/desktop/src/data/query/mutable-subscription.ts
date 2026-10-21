@@ -24,7 +24,7 @@ export class MutableQuerySubscription<T extends Model> extends QuerySubscription
     this.update();
   }
 
-  replaceRange = ({ start, end }) => {
+  replaceRange = ({ start, end }: { start: number; end: number }) => {
     if (!this._query) {
       return;
     }

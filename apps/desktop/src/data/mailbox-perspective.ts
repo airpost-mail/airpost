@@ -18,15 +18,48 @@ import { Category } from './models/category';
 import { Label } from './models/label';
 import { Folder } from './models/folder';
 import { Task } from './tasks/task';
+import type { Account } from './models/account';
 import * as Actions from './actions';
 import { QuerySubscription } from './query/subscription';
+import { lazyRequire } from './lazy-require';
 
-let WorkspaceStore = null;
-let ChangeStarredTask = null;
-let ChangeLabelsTask = null;
-let ChangeFolderTask = null;
-let ChangeUnreadTask = null;
-let FocusedPerspectiveStore = null;
+// Loaded on first use: these import this module.
+const WorkspaceStore = (): typeof import('./stores/workspace').default =>
+  require('./stores/workspace').default;
+const ChangeStarredTask = lazyRequire(
+  (): typeof import('./tasks/change-starred').ChangeStarredTask =>
+    require('./tasks/change-starred').ChangeStarredTask
+);
+const ChangeLabelsTask = lazyRequire(
+  (): typeof import('./tasks/change-labels').ChangeLabelsTask =>
+    require('./tasks/change-labels').ChangeLabelsTask
+);
+const ChangeFolderTask = lazyRequire(
+  (): typeof import('./tasks/change-folder').ChangeFolderTask =>
+    require('./tasks/change-folder').ChangeFolderTask
+);
+const ChangeUnreadTask = lazyRequire(
+  (): typeof import('./tasks/change-unread').ChangeUnreadTask =>
+    require('./tasks/change-unread').ChangeUnreadTask
+);
+const FocusedPerspectiveStore = lazyRequire(
+  (): typeof import('./stores/focused-perspective').default =>
+    require('./stores/focused-perspective').default
+);
+
+// A shared role of null (mixed or no categories) is never one of `roles`.
+function roleIsOneOf(role: string | null, roles: string[]) {
+  return role !== null && roles.includes(role);
+}
+
+// The categories a serialized perspective carries.
+function parseCategories(serializedCategories: string | undefined) {
+  if (serializedCategories === undefined) {
+    throw new Error('the perspective has no serializedCategories');
+  }
+  const json: unknown[] = JSON.parse(serializedCategories);
+  return json.map(Utils.convertToModel) as (Category | null)[];
+}
 
 // This is a class cluster. Subclasses are not for external use!
 // https://developer.apple.com/library/ios/documentation/General/Conceptual/CocoaEncyclopedia/ClassClusters/ClassClusters.html
@@ -41,16 +74,19 @@ export class MailboxPerspective {
     return new DraftsMailboxPerspective(accountsOrIds);
   }
 
-  static forCategory(category: Category) {
+  static forCategory(category: Category | null | undefined) {
     return category ? new CategoryMailboxPerspective([category]) : this.forNothing();
   }
 
-  static forCategories(categories: Category[]) {
-    const valid = categories.filter(Boolean);
+  static forCategories(categories: (Category | null | undefined)[]) {
+    const valid = categories.filter((c): c is Category => !!c);
     return valid.length > 0 ? new CategoryMailboxPerspective(valid) : this.forNothing();
   }
 
-  static forStandardCategories(accountsOrIds: string[], ...names: string[]) {
+  static forStandardCategories(
+    accountsOrIds: Account | string | (Account | string)[],
+    ...names: string[]
+  ) {
     const categories = CategoryStore.getCategoriesWithRoles(accountsOrIds, ...names);
     return this.forCategories(categories);
   }
@@ -63,19 +99,18 @@ export class MailboxPerspective {
     return categories.length > 0 ? new UnreadMailboxPerspective(categories) : this.forNothing();
   }
 
-  static forInbox(accountsOrIds: string[]) {
+  static forInbox(accountsOrIds: Account | string | (Account | string)[]) {
     return this.forStandardCategories(accountsOrIds, 'inbox');
   }
 
   static fromJSON(json: { type: string; serializedCategories?: string; accountIds: string[] }) {
     try {
       if (json.type === CategoryMailboxPerspective.name) {
-        const categories = JSON.parse(json.serializedCategories).map(Utils.convertToModel);
-        return this.forCategories(categories);
+        return this.forCategories(parseCategories(json.serializedCategories));
       }
       if (json.type === UnreadMailboxPerspective.name) {
-        const categories = JSON.parse(json.serializedCategories).map(Utils.convertToModel);
-        return this.forUnread(categories);
+        // A null here throws in the constructor, so the restore fails as before.
+        return this.forUnread(parseCategories(json.serializedCategories) as Category[]);
       }
       if (json.type === StarredMailboxPerspective.name) {
         return this.forStarred(json.accountIds);
@@ -93,9 +128,10 @@ export class MailboxPerspective {
   // Instance Methods
 
   accountIds: string[];
-  name: string;
-  iconName: string;
-  _categoriesSharedRole?: string;
+  // Every perspective but the empty one has a name and an icon.
+  name?: string;
+  iconName?: string;
+  _categoriesSharedRole?: string | null;
 
   constructor(accountIds: string[]) {
     this.accountIds = accountIds;
@@ -140,19 +176,17 @@ export class MailboxPerspective {
     return false;
   }
 
-  emptyMessage() {
+  emptyMessage(): React.ReactNode {
     return localized('No Messages');
   }
 
-  categories() {
+  categories(): Category[] {
     return [];
   }
 
   sheet() {
-    if (!WorkspaceStore || !WorkspaceStore.Sheet) {
-      WorkspaceStore = require('./stores/workspace').default;
-    }
-    return WorkspaceStore.Sheet && WorkspaceStore.Sheet.Threads;
+    const { Sheet } = WorkspaceStore();
+    return Sheet && Sheet.Threads;
   }
 
   // overwritten in CategoryMailboxPerspective
@@ -160,7 +194,7 @@ export class MailboxPerspective {
     return false;
   }
 
-  categoriesSharedRole(): string {
+  categoriesSharedRole(): string | null {
     this._categoriesSharedRole =
       this._categoriesSharedRole || Category.categoriesSharedRole(this.categories());
     return this._categoriesSharedRole;
@@ -179,7 +213,8 @@ export class MailboxPerspective {
     return this.categories().length === 1 ? this.categories()[0] : null;
   }
 
-  threads(): QuerySubscription<Thread> {
+  // Null for a perspective that shows no thread list (drafts).
+  threads(): QuerySubscription<Thread> | null {
     throw new Error('threads: Not implemented in base class.');
   }
 
@@ -202,7 +237,7 @@ export class MailboxPerspective {
   //
   // perspective.canReceiveThreadsFromAccountIds([a2, a3]) -> false -> I cant move those threads to Starred
   // perspective.canReceiveThreadsFromAccountIds([a2]) -> true -> I can move that thread to Starred
-  canReceiveThreadsFromAccountIds(accountIds): boolean {
+  canReceiveThreadsFromAccountIds(accountIds: string[] | null | undefined): boolean {
     if (!accountIds || accountIds.length === 0) {
       return false;
     }
@@ -221,7 +256,7 @@ export class MailboxPerspective {
     });
   }
 
-  actionsForReceivingThreads(threads: Thread[], accountId: string): Task | Task[] {
+  actionsForReceivingThreads(threads: Thread[], accountId: string): Task | Task[] | null {
     // eslint-disable-line
     throw new Error('actionsForReceivingThreads: Not implemented in base class.');
   }
@@ -247,7 +282,7 @@ export class MailboxPerspective {
     );
   }
 
-  tasksForRemovingItems(threads: Thread[], source?: string) {
+  tasksForRemovingItems(threads: Thread[], source?: string): Task[] {
     if (!(threads instanceof Array)) {
       throw new Error('tasksForRemovingItems: you must pass an array of threads or thread ids');
     }
@@ -277,10 +312,8 @@ class DraftsMailboxPerspective extends MailboxPerspective {
   }
 
   sheet() {
-    if (!WorkspaceStore || !WorkspaceStore.Sheet) {
-      WorkspaceStore = require('./stores/workspace').default;
-    }
-    return WorkspaceStore.Sheet && WorkspaceStore.Sheet.Drafts;
+    const { Sheet } = WorkspaceStore();
+    return Sheet && Sheet.Drafts;
   }
 }
 
@@ -311,8 +344,8 @@ class StarredMailboxPerspective extends MailboxPerspective {
   }
 
   actionsForReceivingThreads(threads: Thread[], accountId: string) {
-    ChangeStarredTask = ChangeStarredTask || require('./tasks/change-starred').ChangeStarredTask;
-    return new ChangeStarredTask({
+    const ChangeStarred = ChangeStarredTask();
+    return new ChangeStarred({
       accountId,
       threads,
       starred: true,
@@ -390,7 +423,7 @@ class CategoryMailboxPerspective extends MailboxPerspective {
     );
   }
 
-  threads(): QuerySubscription<Thread> {
+  threads(): MutableQuerySubscription<Thread> {
     const query = DatabaseStore.findAll<Thread>(Thread)
       .where([Thread.attributes.categories.containsAny(this.categories().map((c) => c.id))])
       .limit(0);
@@ -399,7 +432,7 @@ class CategoryMailboxPerspective extends MailboxPerspective {
       query.order(Thread.attributes.lastMessageSentTimestamp.descending());
     }
 
-    if (!['spam', 'trash'].includes(this.categoriesSharedRole())) {
+    if (!roleIsOneOf(this.categoriesSharedRole(), ['spam', 'trash'])) {
       query.where({ inAllMail: true });
     }
 
@@ -420,7 +453,8 @@ class CategoryMailboxPerspective extends MailboxPerspective {
   unreadCount() {
     let sum = 0;
     for (const cat of this._categories) {
-      sum += ThreadCountsStore.unreadCountForCategoryId(cat.id);
+      // An unknown count adds nothing (null reads as 0).
+      sum += ThreadCountsStore.unreadCountForCategoryId(cat.id) ?? 0;
     }
     return sum;
   }
@@ -451,21 +485,20 @@ class CategoryMailboxPerspective extends MailboxPerspective {
     );
   }
 
-  actionsForReceivingThreads(threads: Thread[], accountId: string) {
-    FocusedPerspectiveStore =
-      FocusedPerspectiveStore || require('./stores/focused-perspective').default;
-    ChangeLabelsTask = ChangeLabelsTask || require('./tasks/change-labels').ChangeLabelsTask;
-    ChangeFolderTask = ChangeFolderTask || require('./tasks/change-folder').ChangeFolderTask;
+  actionsForReceivingThreads(threads: Thread[], accountId: string): Task[] {
+    const ChangeLabels = ChangeLabelsTask();
+    const ChangeFolder = ChangeFolderTask();
 
-    const current = FocusedPerspectiveStore.current();
+    const current = FocusedPerspectiveStore().current();
 
     // This assumes that the we don't have more than one category per
     // accountId attached to this perspective
-    if (Category.LockedRoles.includes(current.categoriesSharedRole())) {
+    if (roleIsOneOf(current.categoriesSharedRole(), Category.LockedRoles)) {
       return [];
     }
 
-    const myCat = this.categories().find((c) => c.accountId === accountId);
+    // Threads are only dropped here from this perspective's accounts.
+    const myCat = this.categories().find((c) => c.accountId === accountId)!;
     const currentCat = current.categories().find((c) => c.accountId === accountId);
 
     // Don't drag and drop on ourselves
@@ -482,7 +515,7 @@ class CategoryMailboxPerspective extends MailboxPerspective {
       // dragging from a label into All Mail? Make this an "archive" by removing the
       // label. Otherwise (Since labels are subsets of All Mail) it'd have no effect.
       return [
-        new ChangeLabelsTask({
+        new ChangeLabels({
           threads,
           source: 'Dragged into list',
           labelsToAdd: [],
@@ -493,7 +526,7 @@ class CategoryMailboxPerspective extends MailboxPerspective {
     if (myCat instanceof Folder) {
       // dragging to a folder like spam, trash or any IMAP folder? Just change the folder.
       return [
-        new ChangeFolderTask({
+        new ChangeFolder({
           threads,
           source: 'Dragged into list',
           folder: myCat,
@@ -506,13 +539,13 @@ class CategoryMailboxPerspective extends MailboxPerspective {
       // dragging from trash or spam into a label? We need to both apply the label and
       // move to the "All Mail" folder.
       return [
-        new ChangeFolderTask({
+        new ChangeFolder({
           threads,
           source: 'Dragged into list',
           folder: CategoryStore.getCategoryByRole(accountId, 'all'),
           sourceFolderIds,
         }),
-        new ChangeLabelsTask({
+        new ChangeLabels({
           threads,
           source: 'Dragged into list',
           labelsToAdd: [myCat],
@@ -522,7 +555,7 @@ class CategoryMailboxPerspective extends MailboxPerspective {
     }
     // label to label
     return [
-      new ChangeLabelsTask({
+      new ChangeLabels({
         threads,
         source: 'Dragged into list',
         labelsToAdd: [myCat],
@@ -545,9 +578,9 @@ class CategoryMailboxPerspective extends MailboxPerspective {
   // - if finished category === "archive" remove the label
   // - if finished category === "trash" move to trash folder, keep labels intact
   //
-  tasksForRemovingItems(threads: Thread[], source = 'Removed from list') {
-    ChangeLabelsTask = ChangeLabelsTask || require('./tasks/change-labels').ChangeLabelsTask;
-    ChangeFolderTask = ChangeFolderTask || require('./tasks/change-folder').ChangeFolderTask;
+  tasksForRemovingItems(threads: Thread[], source = 'Removed from list'): Task[] {
+    const ChangeLabels = ChangeLabelsTask();
+    const ChangeFolder = ChangeFolderTask();
 
     // If you are viewing the archive, "remove" goes to the trash, since obeying
     // your rpreference would mean possibly doing nothing (if you default to archive.)
@@ -556,25 +589,26 @@ class CategoryMailboxPerspective extends MailboxPerspective {
     }
 
     // If you are viewing spam or trash, "remove" does nothing
-    if (['spam', 'trash'].includes(this.categoriesSharedRole())) {
+    if (roleIsOneOf(this.categoriesSharedRole(), ['spam', 'trash'])) {
       return [];
     }
 
     return TaskFactory.tasksForThreadsByAccountId(threads, (accountThreads, accountId) => {
+      // The account can be gone while its threads are still listed.
       const acct = AccountStore.accountForId(accountId);
-      const preferred = acct.preferredRemovalDestination();
+      const preferred = acct && acct.preferredRemovalDestination();
       if (!preferred) return null;
       const cat = this.categories().find((c) => c.accountId === accountId);
       if (cat instanceof Label && preferred.role !== 'trash') {
         const inboxCat = CategoryStore.getInboxCategory(accountId);
-        return new ChangeLabelsTask({
+        return new ChangeLabels({
           threads: accountThreads,
           labelsToAdd: [],
           labelsToRemove: [cat, inboxCat],
           source: source,
         });
       }
-      return new ChangeFolderTask({
+      return new ChangeFolder({
         threads: accountThreads,
         folder: preferred,
         source: source,
@@ -589,7 +623,7 @@ class UnreadMailboxPerspective extends CategoryMailboxPerspective {
   name = localized('Unread');
   iconName = 'unread.png';
 
-  threads(): QuerySubscription<Thread> {
+  threads(): MutableQuerySubscription<Thread> {
     return new UnreadQuerySubscription(this.categories().map((c) => c.id));
   }
 
@@ -598,10 +632,10 @@ class UnreadMailboxPerspective extends CategoryMailboxPerspective {
   }
 
   actionsForReceivingThreads(threads: Thread[], accountId: string) {
-    ChangeUnreadTask = ChangeUnreadTask || require('./tasks/change-unread').ChangeUnreadTask;
+    const ChangeUnread = ChangeUnreadTask();
     const tasks = super.actionsForReceivingThreads(threads, accountId);
     tasks.push(
-      new ChangeUnreadTask({
+      new ChangeUnread({
         threads: threads,
         unread: true,
         source: 'Dragged Into List',
@@ -611,12 +645,10 @@ class UnreadMailboxPerspective extends CategoryMailboxPerspective {
   }
 
   tasksForRemovingItems(threads: Thread[], source?: string) {
-    ChangeUnreadTask = ChangeUnreadTask || require('./tasks/change-unread').ChangeUnreadTask;
+    const ChangeUnread = ChangeUnreadTask();
 
     const tasks = super.tasksForRemovingItems(threads, source);
-    tasks.push(
-      new ChangeUnreadTask({ threads, unread: false, source: source || 'Removed From List' })
-    );
+    tasks.push(new ChangeUnread({ threads, unread: false, source: source || 'Removed From List' }));
     return tasks;
   }
 }

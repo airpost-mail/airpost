@@ -4,6 +4,7 @@ import BaseStore from './base';
 import WorkspaceStore from './workspace';
 import FocusedPerspectiveStore from './focused-perspective';
 import * as Actions from '../actions';
+import type { MailboxPerspective } from '../mailbox-perspective';
 
 const MAIN_TAB_ITEM_ID = 'General';
 
@@ -38,7 +39,7 @@ export class PreferencesUIStoreTab {
 
 class _PreferencesUIStore extends BaseStore {
   _tabs: PreferencesUIStoreTab[] = [];
-  _selection = {
+  _selection: { tabId: string | null; accountId: string | null } = {
     tabId: null,
     accountId: null,
   };
@@ -46,10 +47,13 @@ class _PreferencesUIStore extends BaseStore {
   constructor() {
     super();
 
-    const perspective = FocusedPerspectiveStore.current();
+    // No built-in perspective has an `account`; a plugin's may.
+    const perspective = FocusedPerspectiveStore.current() as MailboxPerspective & {
+      account?: { id: string };
+    };
     this._selection = {
       tabId: null,
-      accountId: perspective['account'] ? perspective['account'].id : null,
+      accountId: perspective.account ? perspective.account.id : null,
     };
 
     this.setupListeners();

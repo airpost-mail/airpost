@@ -7,7 +7,7 @@ import FixedPopover from '../../components/fixed-popover';
 
 const CONTAINER_ID = 'tern-popover-container';
 
-function createContainer(id) {
+function createContainer(id: string) {
   const element = document.createElement(id);
   document.body.insertBefore(element, document.body.children[0]);
   return element;
@@ -31,7 +31,11 @@ class PopoverStore extends BaseStore {
     this.listenTo(Actions.closePopover, this.closePopover);
   }
 
-  renderPopover = (child, props, callback) => {
+  renderPopover = (
+    child: React.ReactNode,
+    props: React.ComponentProps<typeof FixedPopover>,
+    callback: () => void
+  ) => {
     const popover = (
       <UIProvider>
         <FixedPopover {...props}>{child}</FixedPopover>
@@ -46,8 +50,14 @@ class PopoverStore extends BaseStore {
   };
 
   openPopover = (
-    element,
-    { originRect, direction, fallbackDirection, closeOnAppBlur, callback = () => {} }
+    element: React.ReactNode,
+    {
+      originRect,
+      direction,
+      fallbackDirection,
+      closeOnAppBlur,
+      callback = () => {},
+    }: Omit<React.ComponentProps<typeof FixedPopover>, 'children'> & { callback?: () => void }
   ) => {
     const props = {
       direction,

@@ -14,26 +14,28 @@ Section: Drafts
 const SaveAfterIdleMSec = 10000;
 const SaveAfterIdleSlushMSec = 2000;
 
+type DraftChangeSetCallbacks = {
+  onAddChanges: (changes: Record<string, unknown>) => void;
+  onCommit: () => Promise<void>;
+};
+
 export class DraftChangeSet extends EventEmitter {
-  callbacks = {
-    onAddChanges: null,
-    onCommit: null,
-  };
-  _timer = null;
-  _timerTime = null;
-  _timerStarted = null;
+  // Set by the constructor.
+  callbacks!: DraftChangeSetCallbacks;
+  _timer: ReturnType<typeof setTimeout> | null = null;
+  _timerTime: number | null = null;
+  _timerStarted: number | null = null;
+  // Keyed by every changed field, plus body/bodyEditorState/pluginMetadata.
   _lastModifiedTimes: {
+    [key: string]: number | undefined;
     body?: number;
     bodyEditorState?: number;
     pluginMetadata?: number;
   } = {};
   _lastCommitTime = 0;
-  _commitPromise: Promise<any> = null;
+  _commitPromise: Promise<any> | null = null;
 
-  constructor(callbacks: {
-    onAddChanges: (changes: Record<string, unknown>) => void;
-    onCommit: () => Promise<void>;
-  }) {
+  constructor(callbacks: DraftChangeSetCallbacks) {
     super();
     this.callbacks = callbacks;
   }
@@ -72,7 +74,7 @@ export class DraftChangeSet extends EventEmitter {
 
   dirtyFields() {
     return Object.keys(this._lastModifiedTimes).filter(
-      (key) => this._lastModifiedTimes[key] > this._lastCommitTime
+      (key) => (this._lastModifiedTimes[key] ?? 0) > this._lastCommitTime
     );
   }
 
@@ -82,7 +84,8 @@ export class DraftChangeSet extends EventEmitter {
     // If there's already a timer going and we started it recently,
     // it means it'll fire a bit early but that's ok. It's actually
     // pretty expensive to re-create a timer on every keystroke.
-    if (this._timer && now - this._timerStarted < SaveAfterIdleSlushMSec) {
+    // _timerStarted is set whenever _timer is.
+    if (this._timer && now - this._timerStarted! < SaveAfterIdleSlushMSec) {
       return;
     }
     this.clearDelayedCommit();

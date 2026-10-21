@@ -34,7 +34,7 @@ interface FolderProgress {
 class FolderSyncProgressStore extends BaseStore {
   _triggerDebounced: () => void;
   _statesByAccount: { [accountId: string]: { [folderPath: string]: FolderProgress } } = {};
-  _stateSummary = {
+  _stateSummary: { phrase: string | null; progress: number } = {
     phrase: null,
     progress: 100,
   };
@@ -56,7 +56,7 @@ class FolderSyncProgressStore extends BaseStore {
 
     for (const accountId of AccountStore.accountIds()) {
       const folders = CategoryStore.categories(accountId).filter((cat) => cat instanceof Folder);
-      const state = {};
+      const state: { [folderPath: string]: FolderProgress } = {};
 
       /*
       `localStatus` is populated by the engine. We translate it to a simpler
@@ -74,8 +74,13 @@ class FolderSyncProgressStore extends BaseStore {
 
         state[folder.path] = {
           busy: busy,
-          scanProgress: syncedMinUID > 0 ? 1.0 - (syncedMinUID - 1) / uidnext : 0,
-          bodyProgress: bodiesWanted > 0 ? bodiesPresent / bodiesWanted : 1,
+          scanProgress:
+            syncedMinUID !== undefined && syncedMinUID > 0 ? 1.0 - (syncedMinUID - 1) / uidnext : 0,
+          // A missing bodiesPresent gives NaN, as it always did.
+          bodyProgress:
+            bodiesWanted !== undefined && bodiesWanted > 0
+              ? Number(bodiesPresent) / bodiesWanted
+              : 1,
         };
 
         // assume index will take 40% of time, body sync will take 60%.

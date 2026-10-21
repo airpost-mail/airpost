@@ -14,8 +14,8 @@ import { cancelSend, draftPipelineAvailable, undoSendTarget } from '../../engine
 const LOCAL_PHASE_WAIT_MS = 10000;
 const TASK_ARRIVAL_WAIT_MS = 2000;
 
-interface UndoBlock {
-  tasks?: Task[];
+export interface UndoBlock {
+  tasks: Task[];
   description: string;
   do: () => void;
   undo: () => void;
@@ -109,7 +109,7 @@ class UndoRedoStore extends BaseStore {
 
   // A move whose local phase selected no copy (the engine reports `undoPlacements: {}`)
   // changed nothing, so its entry and toast would offer an undo that does nothing.
-  _dropBlockIfNothingToUndo(block: UndoBlock): void {
+  _dropBlockIfNothingToUndo(block: UndoBlock & { tasks: Task[] }): void {
     Promise.all(block.tasks.map((t) => TaskQueue.waitForPerformLocal(t))).then((latest) => {
       try {
         if (latest.some((t) => t.createUndoTasks().length > 0)) {

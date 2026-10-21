@@ -14,7 +14,7 @@ export class DestroyEventTask extends Task {
     }),
   };
 
-  events: Event[];
+  declare events: Event[];
 
   static forRemoving({ events }: { events: Event[] }) {
     return new DestroyEventTask({

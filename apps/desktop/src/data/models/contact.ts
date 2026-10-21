@@ -109,8 +109,8 @@ export interface ContactInfoGoogle {
 }
 
 // Exported for the engine's copy (crates/tern-compose/src/desktop_data.json).
-export const namePrefixes = {};
-export const nameSuffixes = {};
+export const namePrefixes: { [prefix: string]: boolean } = {};
+export const nameSuffixes: { [suffix: string]: boolean } = {};
 
 [
   '2dlt',
@@ -427,7 +427,7 @@ export class Contact extends Model {
   static fromString(string: string, { accountId }: { accountId?: string } = {}) {
     const emailRegex = RegExpUtils.emailRegex();
     const matches: RegExpExecArray[] = [];
-    let match: RegExpExecArray = null;
+    let match: RegExpExecArray | null = null;
     while ((match = emailRegex.exec(string)) !== null) {
       matches.push(match);
     }
@@ -454,12 +454,12 @@ export class Contact extends Model {
     });
   }
 
-  public name: string;
-  public email: string;
-  public refs: number;
-  public source: string;
-  public hidden: boolean;
-  public contactGroups: string[];
+  declare name: string;
+  declare email: string;
+  declare refs: number;
+  declare source: string;
+  declare hidden: boolean;
+  declare contactGroups: string[];
   public info?: ContactInfoGoogle | ContactInfoVCF;
 
   constructor(data: AttributeValues<typeof Contact.attributes>) {
@@ -600,7 +600,8 @@ export class Contact extends Model {
     if (Utils.emailHasCommonDomain(email)) {
       return '';
     }
-    const domain = email.toLowerCase().trim().split('@').pop();
+    const emailParts = email.toLowerCase().trim().split('@');
+    const domain = emailParts[emailParts.length - 1];
     const domainParts = domain.split('.');
     if (domainParts.length >= 2) {
       return _str.titleize(_str.humanize(domainParts[domainParts.length - 2]));
@@ -618,7 +619,7 @@ export class Contact extends Model {
       // If the phrase has an '@', use everything before the @ sign
       // Unless there that would result in an empty string.
       if (name.indexOf('@') > 0) {
-        name = name.split('@').shift();
+        name = name.split('@')[0];
       }
     }
 
@@ -632,7 +633,7 @@ export class Contact extends Model {
 
     // Take care of phrases like "Mike Kaylor via LinkedIn" that should be displayed
     // as the contents before the separator word. Do not break "Olivia"
-    name = name.split(/(\svia\s)/i).shift();
+    name = name.split(/(\svia\s)/i)[0];
 
     // Take care of whitespace
     name = name.trim();

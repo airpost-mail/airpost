@@ -21,9 +21,11 @@ const AGENT_PATH = path.join(path.dirname(__filename), 'agent.js');
 const BASE_RETRY_LOCK_DELAY = 50;
 const MAX_RETRY_LOCK_DELAY = 500;
 
-type AgentResponse = { results: any[]; agentTime: number };
+type SQLRow = { [key: string]: any };
+type AgentResponse = { results: SQLRow[] | null; agentTime: number };
 type SQLString = string;
-type SQLValue = boolean | string | number;
+// undefined and booleans are mapped to SQLite values in _query.
+type SQLValue = boolean | string | number | null | undefined;
 
 function trimTo(str: string, size?: number) {
   const g = window || global || {};
@@ -36,7 +38,7 @@ function trimTo(str: string, size?: number) {
 }
 
 function handleUnrecoverableDatabaseError(
-  err = new Error(`Manually called handleUnrecoverableDatabaseError`)
+  err: unknown = new Error(`Manually called handleUnrecoverableDatabaseError`)
 ) {
   AppEnv.errorLogger.reportError(err);
   const app = require('@electron/remote').getGlobal('application');
@@ -45,7 +47,7 @@ function handleUnrecoverableDatabaseError(
   }
   const ipc = require('electron').ipcRenderer;
   ipc.send('command', 'application:reset-database', {
-    errorMessage: err.toString(),
+    errorMessage: String(err),
   });
 }
 
@@ -131,10 +133,10 @@ Section: Database
 */
 class DatabaseStore extends BaseStore {
   _open = false;
-  _waiting = [];
+  _waiting: (() => void)[] = [];
   _preparedStatementCache = new LRUCache<string, Sqlite3.Statement<any[]>>({ max: 500 });
   _databasePath = databasePath(AppEnv.getConfigDirPath(), AppEnv.inSpecMode());
-  _db?: Sqlite3.Database;
+  _db?: Sqlite3.Database | null;
 
   constructor() {
     super();
@@ -153,7 +155,7 @@ class DatabaseStore extends BaseStore {
       w();
     }
     this._waiting = [];
-    this._emitter.emit('ready');
+    this.setupEmitter().emit('ready');
   }
 
   _prettyConsoleLog(qa: string) {
@@ -166,7 +168,7 @@ class DatabaseStore extends BaseStore {
     q = `color:${primaryColor} |||%c ${q}`;
     q = q.replace(/`(\w+)`/g, `||| color:${purpleColor} |||%c$&||| color:${primaryColor} |||%c`);
 
-    const colorRules = {
+    const colorRules: { [style: string]: string[] } = {
       'color:green': [
         'SELECT',
         'INSERT INTO',
@@ -196,8 +198,8 @@ class DatabaseStore extends BaseStore {
     }
 
     const parts = q.split('|||');
-    const colors = [];
-    const msg = [];
+    const colors: string[] = [];
+    const msg: string[] = [];
     for (let i = 0; i < parts.length; i++) {
       if (i % 2 === 0) {
         colors.push(parts[i]);
@@ -216,9 +218,11 @@ class DatabaseStore extends BaseStore {
   // held in a queue and run / resolved when the database is ready.
   _query(query: SQLString, values: SQLValue[] = [], background = false) {
     // eslint-disable-next-line no-async-promise-executor
-    return new Promise<{ [key: string]: any }[]>(async (resolve, reject) => {
+    return new Promise<SQLRow[] | null>(async (resolve, reject) => {
       if (!this._open) {
-        this._waiting.push(() => this._query(query, values).then(resolve, reject));
+        this._waiting.push(() => {
+          this._query(query, values).then(resolve, reject);
+        });
         return;
       }
 
@@ -264,6 +268,14 @@ class DatabaseStore extends BaseStore {
     });
   }
 
+  // _db is null when openDatabase failed; the query then fails like any other.
+  _requireDb() {
+    if (!this._db) {
+      throw new Error('DatabaseStore: the database is not open');
+    }
+    return this._db;
+  }
+
   async _executeLocally(query: SQLString, values: SQLValue[]) {
     const fn = query.startsWith('SELECT') ? 'all' : 'run';
     const scheduler = new ExponentialBackoffScheduler({
@@ -278,7 +290,7 @@ class DatabaseStore extends BaseStore {
     // Because other processes may be writing to the database and modifying the
     // schema (running ANALYZE, etc.), we may `prepare` a statement and then be
     // unable to execute it. Handle this case silently unless it's persistent.
-    let results: any[] = null;
+    let results: SQLRow[] | null = null;
 
     while (!results) {
       try {
@@ -293,12 +305,12 @@ class DatabaseStore extends BaseStore {
 
         let stmt = this._preparedStatementCache.get(query);
         if (!stmt) {
-          stmt = this._db.prepare(query);
+          stmt = this._requireDb().prepare(query);
           this._preparedStatementCache.set(query, stmt);
         }
 
         const start = Date.now();
-        results = stmt[fn](values) as any[];
+        results = stmt[fn](values) as SQLRow[];
         const msec = Date.now() - start;
         if (debugVerbose.enabled) {
           const q = `(${msec}ms) ${query}`;
@@ -308,7 +320,7 @@ class DatabaseStore extends BaseStore {
         if (msec > 100) {
           const msgPrefix = msec > 100 ? 'DatabaseStore: query took more than 100ms - ' : '';
           if (query.startsWith(`SELECT `) && DEBUG_QUERY_PLANS) {
-            const plan = this._db
+            const plan = this._requireDb()
               .prepare<any, { detail: string }>(`EXPLAIN QUERY PLAN ${query}`)
               .all(values);
             const planString = `${plan.map((row) => row.detail).join('\n')} for ${query}`;
@@ -322,7 +334,7 @@ class DatabaseStore extends BaseStore {
           }
         }
       } catch (err) {
-        const errString = err.toString();
+        const errString = String(err);
         if (/database disk image is malformed/gi.test(errString)) {
           handleUnrecoverableDatabaseError(err);
           return results;
@@ -330,7 +342,7 @@ class DatabaseStore extends BaseStore {
 
         if (scheduler.numTries() > 5 || !retryableRegexp.test(errString)) {
           throw new Error(
-            `DatabaseStore: Query ${query}, ${JSON.stringify(values)} failed ${err.toString()}`
+            `DatabaseStore: Query ${query}, ${JSON.stringify(values)} failed ${String(err)}`
           );
         }
 
@@ -344,9 +356,9 @@ class DatabaseStore extends BaseStore {
     return results;
   }
 
-  _agent?: ChildProcess;
+  _agent?: ChildProcess | null;
   _agentSpawnFailed = false;
-  _agentOpenQueries: { [id: string]: (args: AgentResponse) => void };
+  _agentOpenQueries: { [id: string]: (args: AgentResponse) => void } = {};
 
   _executeInBackground(query: SQLString, values: SQLValue[]) {
     if (!this._agent && !this._agentSpawnFailed) {
@@ -386,7 +398,7 @@ class DatabaseStore extends BaseStore {
         // Set _agentSpawnFailed so we skip the fork on every subsequent query
         // rather than re-attempting and spamming the console.
         console.error(
-          `Query Agent: failed to spawn (${err.toString()}), falling back to local execution`
+          `Query Agent: failed to spawn (${String(err)}), falling back to local execution`
         );
         this._agent = null;
         this._agentSpawnFailed = true;
@@ -448,7 +460,7 @@ class DatabaseStore extends BaseStore {
   //
   // Returns a {Query}
   //
-  findBy<T extends Model>(klass, predicates: any[] | any = []): Query<T> {
+  findBy<T extends Model>(klass: typeof Model, predicates: any[] | any = []): Query<T> {
     if (!klass) {
       throw new Error(`DatabaseStore::findBy - You must provide a class`);
     }
@@ -464,7 +476,7 @@ class DatabaseStore extends BaseStore {
   //
   // Returns a {Query}
   //
-  findAll<T extends Model>(klass, predicates: any[] | any = []) {
+  findAll<T extends Model>(klass: typeof Model, predicates: any[] | any = []) {
     if (!klass) {
       throw new Error(`DatabaseStore::findAll - You must provide a class`);
     }
@@ -480,7 +492,7 @@ class DatabaseStore extends BaseStore {
   //
   // Returns a {Query}
   //
-  count<T extends Model>(klass, predicates = []) {
+  count<T extends Model>(klass: typeof Model, predicates: any[] | any = []) {
     if (!klass) {
       throw new Error(`DatabaseStore::count - You must provide a class`);
     }
@@ -500,12 +512,12 @@ class DatabaseStore extends BaseStore {
   // - \`class\` The {Model} class desired.
   // - 'arr' An {Array} with a mix of string model IDs and/or models.
   //
-  modelify<T extends Model>(klass, arr: Array<T | string>): Promise<T[]> {
+  modelify<T extends Model>(klass: typeof Model, arr: Array<T | string>): Promise<T[]> {
     if (!(arr instanceof Array) || arr.length === 0) {
       return Promise.resolve([]) as any;
     }
 
-    const ids = [];
+    const ids: string[] = [];
     for (const item of arr) {
       if (item instanceof klass) {
         // nothing

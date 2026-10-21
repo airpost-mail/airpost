@@ -5,9 +5,13 @@ import { QueryRange } from './range';
 import { QueryExpression } from '../../mail/search/ast';
 import * as Utils from '../models/utils';
 import { Model } from '../models/model';
+import { setAttributeValue } from '../models/attribute-access';
 import type { QueryResult } from '../../engine/protocol';
 
 type DB = typeof import('../database/store').default;
+
+/** The model a query's rows inflate to: T itself, or T's element for a list query. */
+type ModelOf<T> = T extends (infer M)[] ? M : T;
 
 /**
  * A query as the engine's `query` method takes it. The
@@ -80,7 +84,7 @@ export default class ModelQuery<T extends Model | Model[]> {
   // - `database` (optional) An optional reference to a {DatabaseStore} the
   //   query will be executed on.
   //
-  constructor(klass, database: DB) {
+  constructor(klass: typeof Model & { SubclassesUseModelTable?: typeof Model }, database: DB) {
     this._klass = klass.SubclassesUseModelTable || klass;
     this._database = database || require('../database/store').default;
   }
@@ -241,9 +245,9 @@ export default class ModelQuery<T extends Model | Model[]> {
   //
   // This method is chainable.
   //
-  limit(limit: number) {
+  limit(limit: number | null) {
     this._assertNotFinalized();
-    if (this._returnOne && limit > 1) {
+    if (this._returnOne && limit !== null && limit > 1) {
       throw new Error('Cannot use limit > 1 with one()');
     }
     this._range = this._range.clone();
@@ -257,7 +261,7 @@ export default class ModelQuery<T extends Model | Model[]> {
   //
   // This method is chainable.
   //
-  offset(offset: number) {
+  offset(offset: number | null) {
     this._assertNotFinalized();
     this._range = this._range.clone();
     this._range.offset = offset;
@@ -269,7 +273,7 @@ export default class ModelQuery<T extends Model | Model[]> {
   // A convenience method for setting both limit and offset given a desired page size.
   //
   page(start: number, end: number, pageSize = 50, pagePadding = 100) {
-    const roundToPage = (n) => Math.max(0, Math.floor(n / pageSize) * pageSize);
+    const roundToPage = (n: number) => Math.max(0, Math.floor(n / pageSize) * pageSize);
     this.offset(roundToPage(start - pagePadding));
     this.limit(roundToPage(end - start + pagePadding * 2));
     return this;
@@ -313,7 +317,16 @@ export default class ModelQuery<T extends Model | Model[]> {
     return this._database.run<T>(this);
   }
 
-  inflateResult(result: { [key: string]: any }[]) {
+  // Each row's model is an instance of the queried class, so of ModelOf<T>.
+  private _inflateModel(json: unknown) {
+    const object = Utils.convertToModel(json);
+    if (!object) {
+      throw new Error('the row has no model');
+    }
+    return object as ModelOf<T> & Model;
+  }
+
+  inflateResult(result: { [key: string]: any }[] | null) {
     if (!result) {
       return null;
     }
@@ -327,26 +340,26 @@ export default class ModelQuery<T extends Model | Model[]> {
 
     try {
       return result.map((row) => {
-        const object: T = Utils.convertToModel(JSON.parse(row.data));
+        const object = this._inflateModel(JSON.parse(row.data));
         for (const attrName of Object.keys(this._klass.attributes)) {
           const attr = this._klass.attributes[attrName];
           if (!attr.needsColumn() || !attr.loadFromColumn) {
             continue;
           }
-          object[attr.modelKey] = attr.fromColumn(row[attr.tableColumn]);
+          setAttributeValue(object, attr.modelKey, attr.fromColumn(row[attr.tableColumn]));
         }
         for (const attr of this._includeJoinedData) {
           let value = row[attr.tableColumn];
           if (value === AttributeJoinedData.NullPlaceholder) {
             value = null;
           }
-          object[attr.modelKey] = attr.deserialize(object, value);
+          setAttributeValue(object, attr.modelKey, attr.deserialize(object, value));
         }
         return object;
       });
     } catch (error) {
       throw new Error(
-        `Query could not parse the database result. Query: ${this.sql()}, Error: ${error.toString()}`
+        `Query could not parse the database result. Query: ${this.sql()}, Error: ${String(error)}`
       );
     }
   }
@@ -362,10 +375,14 @@ export default class ModelQuery<T extends Model | Model[]> {
     }
     try {
       return (result.rows || []).map((json) => {
-        const object: T = Utils.convertToModel(json);
+        const object = this._inflateModel(json);
         for (const attr of this._includeJoinedData) {
           const value = json[attr.modelKey];
-          object[attr.modelKey] = attr.deserialize(object, value === undefined ? null : value);
+          setAttributeValue(
+            object,
+            attr.modelKey,
+            attr.deserialize(object, value === undefined ? null : value)
+          );
         }
         return object;
       });
@@ -373,7 +390,7 @@ export default class ModelQuery<T extends Model | Model[]> {
       throw new Error(
         `Query could not parse the engine's result. Query: ${JSON.stringify(
           this.toJSON()
-        )}, Error: ${error.toString()}`
+        )}, Error: ${String(error)}`
       );
     }
   }
@@ -435,7 +452,7 @@ export default class ModelQuery<T extends Model | Model[]> {
   sql() {
     this.finalize();
 
-    let result = null;
+    let result: string;
 
     if (this._count) {
       result = `COUNT(*) as count`;
@@ -500,8 +517,9 @@ export default class ModelQuery<T extends Model | Model[]> {
     const allMatchersOnJoinTable = allMatchers.every(
       (m) =>
         m === matcher ||
-        joinAttribute.joinQueryableBy.includes(m.attr.modelKey) ||
-        m.attr.modelKey === 'id'
+        // Search matchers have no attribute.
+        (!!m.attr && joinAttribute.joinQueryableBy.includes(m.attr.modelKey)) ||
+        m.attr?.modelKey === 'id'
     );
     const allOrdersOnJoinTable = this._orders.every((o) =>
       joinAttribute.joinQueryableBy.includes(o.attr.modelKey)
@@ -533,7 +551,7 @@ export default class ModelQuery<T extends Model | Model[]> {
   }
 
   _whereClause() {
-    const joins = [];
+    const joins: string[] = [];
     this._matchers.forEach((c) => {
       const join = c.joinSQL(this._klass);
       if (join) {
@@ -548,7 +566,7 @@ export default class ModelQuery<T extends Model | Model[]> {
       }
     });
 
-    const wheres = [];
+    const wheres: string[] = [];
     this._matchers.forEach((c) => {
       const where = c.whereSQL(this._klass);
       if (where) {
@@ -610,14 +628,14 @@ export default class ModelQuery<T extends Model | Model[]> {
   }
 
   matchersFlattened() {
-    const all = [];
-    const traverse = (matchers) => {
+    const all: Matcher[] = [];
+    const traverse = (matchers: Matcher[]) => {
       if (!(matchers instanceof Array)) {
         return;
       }
       for (const m of matchers) {
-        if (m.children) {
-          traverse(m.children);
+        if ('children' in m && m.children) {
+          traverse(m.children as Matcher[]);
         } else {
           all.push(m);
         }
@@ -628,7 +646,8 @@ export default class ModelQuery<T extends Model | Model[]> {
   }
 
   matcherValueForModelKey(key: string) {
-    const matcher = this._matchers.find((m) => m.attr.modelKey === key);
+    // Composite and search matchers have no attribute.
+    const matcher = this._matchers.find((m) => m.attr?.modelKey === key);
     return matcher ? matcher.val : null;
   }
 

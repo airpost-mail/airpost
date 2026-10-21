@@ -45,11 +45,11 @@ export class File extends Model {
     }),
   };
 
-  public filename: string;
-  public size: number;
-  public contentType: string;
-  public messageId: string;
-  public contentId: string;
+  declare filename: string;
+  declare size: number;
+  declare contentType: string;
+  declare messageId: string;
+  declare contentId: string;
 
   constructor(data: AttributeValues<typeof File.attributes>) {
     super(data);
@@ -62,7 +62,7 @@ export class File extends Model {
     // BG: This logic has been moved to the sync side - all files should always have names
     // as of the 1.1 release. This is just here still because people's local dbs could
     // still contain unnammed files.
-    const defaultNames = {
+    const defaultNames: { [contentType: string]: string } = {
       'text/calendar': 'Event.ics',
       'image/png': 'Unnamed Image.png',
       'image/jpg': 'Unnamed Image.jpg',

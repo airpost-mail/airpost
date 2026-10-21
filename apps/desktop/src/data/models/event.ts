@@ -3,7 +3,7 @@ import * as Attributes from '../attributes';
 import { Contact } from './contact';
 
 // the Chrono node module is huge
-let chrono = null;
+let chrono: typeof import('chrono-node') | null = null;
 
 export class Event extends Model {
   // Note: This class doesn't have many table-level attributes. We store the ICS
@@ -72,15 +72,16 @@ export class Event extends Model {
     return Event.sortOrderAttribute().descending();
   };
 
-  calendarId: string;
-  ics: string;
-  icsuid: string;
-  recurrenceId: string;
-  status: string;
-  recurrenceEnd: number;
-  recurrenceStart: number;
-  title: string;
-  participants: any[];
+  declare calendarId: string;
+  declare ics: string;
+  declare icsuid: string;
+  declare recurrenceId: string;
+  declare status: string;
+  declare recurrenceEnd: number;
+  declare recurrenceStart: number;
+  // Not attributes: nothing sets them, so they are only present if a caller assigns them.
+  title?: string;
+  participants?: { email: string; [key: string]: unknown }[];
 
   constructor(data: AttributeValues<typeof Event.attributes>) {
     super(data);
@@ -110,10 +111,10 @@ export class Event extends Model {
   }
 
   displayTitle() {
-    const displayTitle = this.title.replace(/.*Invitation: /, '');
+    const displayTitle = (this.title || '').replace(/.*Invitation: /, '');
     const [displayTitleWithoutDate, date] = displayTitle.split(' @ ');
     if (!chrono) {
-      chrono = require('chrono-node'); //eslint-disable-line
+      chrono = require('chrono-node') as typeof import('chrono-node'); //eslint-disable-line
     }
     if (date && chrono.parseDate(date)) {
       return displayTitleWithoutDate;
@@ -122,7 +123,7 @@ export class Event extends Model {
   }
 
   participantForMe = () => {
-    for (const p of this.participants) {
+    for (const p of this.participants || []) {
       if (new Contact({ email: p.email }).isMe()) {
         return p;
       }

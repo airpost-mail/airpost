@@ -2,10 +2,9 @@ import { Task } from './task';
 import DatabaseObjectRegistry from '../database-object-registry';
 
 export class DestroyModelTask extends Task {
-  modelId: string;
-  endpoint: string;
-  modelName: string;
-  accountId: string;
+  modelId?: string;
+  endpoint?: string;
+  modelName?: string;
 
   constructor({
     modelId,
@@ -13,11 +12,10 @@ export class DestroyModelTask extends Task {
     endpoint,
     accountId,
   }: { modelId?: string; modelName?: string; endpoint?: string; accountId?: string } = {}) {
-    super({});
+    super({ accountId });
     this.modelId = modelId;
     this.endpoint = endpoint;
     this.modelName = modelName;
-    this.accountId = accountId;
   }
 
   shouldDequeueOtherTask(other: Task) {
@@ -31,6 +29,9 @@ export class DestroyModelTask extends Task {
   }
 
   getModelConstructor() {
+    if (!this.modelName) {
+      throw new Error('DestroyModelTask: no modelName');
+    }
     return DatabaseObjectRegistry.get(this.modelName);
   }
 }

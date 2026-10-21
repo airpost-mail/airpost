@@ -10,8 +10,9 @@ export interface Listenable {
 }
 
 export default class BaseStore implements Listenable {
-  _emitter: EventEmitter;
-  subscriptions: Array<{ stop: () => void; listenable: Listenable }>;
+  // Both are made on first use.
+  _emitter?: EventEmitter;
+  subscriptions?: Array<{ stop: () => void; listenable: Listenable }>;
 
   hasListener(listenable: Listenable) {
     for (const sub of this.subscriptions || []) {
@@ -40,7 +41,7 @@ export default class BaseStore implements Listenable {
   }
 
   listenTo(listenable: Listenable, callback: ListenableCallback) {
-    this.subscriptions = this.subscriptions || [];
+    const subscriptions = (this.subscriptions = this.subscriptions || []);
 
     const err = this.validateListening(listenable);
     if (err) {
@@ -54,16 +55,16 @@ export default class BaseStore implements Listenable {
 
     const subscription = {
       stop: () => {
-        const index = this.subscriptions.indexOf(subscription);
+        const index = subscriptions.indexOf(subscription);
         if (index === -1) {
           throw new Error('Tried to remove listen already gone from subscriptions list!');
         }
-        this.subscriptions.splice(index, 1);
+        subscriptions.splice(index, 1);
         desub();
       },
       listenable,
     };
-    this.subscriptions.push(subscription);
+    subscriptions.push(subscription);
 
     return subscription;
   }
@@ -93,13 +94,12 @@ export default class BaseStore implements Listenable {
     }
   }
 
-  setupEmitter() {
+  // Returns the emitter, making it on first use.
+  setupEmitter(): EventEmitter {
     if (this._emitter) {
-      return;
+      return this._emitter;
     }
-    if (this._emitter == null) {
-      this._emitter = new EventEmitter();
-    }
+    this._emitter = new EventEmitter();
     return this._emitter.setMaxListeners(250);
   }
 
@@ -108,27 +108,26 @@ export default class BaseStore implements Listenable {
       throw new Error('@listen called with undefined callback');
     }
 
-    this.setupEmitter();
+    const emitter = this.setupEmitter();
 
     let aborted = false;
 
-    const eventHandler = (...args) => {
+    const eventHandler = (...args: unknown[]) => {
       if (aborted) {
         return;
       }
       return callback.apply(bindContext, args);
     };
 
-    this._emitter.addListener('trigger', eventHandler);
+    emitter.addListener('trigger', eventHandler);
 
     return () => {
       aborted = true;
-      return this._emitter.removeListener('trigger', eventHandler);
+      return emitter.removeListener('trigger', eventHandler);
     };
   }
 
-  trigger(...args) {
-    this.setupEmitter();
-    return this._emitter.emit('trigger', ...args);
+  trigger(...args: unknown[]) {
+    return this.setupEmitter().emit('trigger', ...args);
   }
 }

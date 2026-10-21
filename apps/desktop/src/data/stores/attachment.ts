@@ -19,7 +19,7 @@ import {
 Promise.promisifyAll(_fs);
 const fs = _fs as any;
 
-const fileAccessibleAtPath = async (filePath) => {
+const fileAccessibleAtPath = async (filePath: string) => {
   try {
     await fs.accessAsync(filePath, fs.F_OK);
     return true;
@@ -31,9 +31,9 @@ const fileAccessibleAtPath = async (filePath) => {
 export type AttachmentDownloadData = null;
 
 class AttachmentStore extends BaseStore {
-  _filePreviewPaths = {};
+  _filePreviewPaths: { [fileId: string]: string } = {};
   _filesDirectory: string = path.join(AppEnv.getConfigDirPath(), 'files');
-  _lastDownloadDirectory: string;
+  _lastDownloadDirectory?: string;
   _pendingAddsByDraft: { [headerMessageId: string]: Promise<void> } = {};
 
   constructor() {
@@ -58,7 +58,9 @@ class AttachmentStore extends BaseStore {
   // for files that don't have a name and avoid returning <downloads/dir/"">
   // which causes operations to happen on the directory (badness!)
   //
-  pathForFile(file: File) {
+  pathForFile(file: File): string;
+  pathForFile(file: File | null | undefined): string | null;
+  pathForFile(file: File | null | undefined) {
     if (!file) {
       return null;
     }
@@ -72,6 +74,15 @@ class AttachmentStore extends BaseStore {
     );
     if (!filePath.startsWith(this._filesDirectory + path.sep)) {
       return null;
+    }
+    return filePath;
+  }
+
+  // pathForFile for the store's own reads and writes, which can't go on without a path.
+  _requirePathForFile(file: File) {
+    const filePath = this.pathForFile(file);
+    if (!filePath) {
+      throw new Error(`${file && file.id} has no path inside the files directory`);
     }
     return filePath;
   }
@@ -115,7 +126,7 @@ class AttachmentStore extends BaseStore {
   }
 
   async _prepareAndResolveFilePath(file: File) {
-    let filePath = this.pathForFile(file);
+    let filePath = this._requirePathForFile(file);
 
     if (await fileAccessibleAtPath(filePath)) {
       this._ensurePreviewOfFile(file);
@@ -124,7 +135,7 @@ class AttachmentStore extends BaseStore {
       // this allows us to handle obscure edge cases where the sync engine
       // the file with an altered name.
       const dir = path.dirname(filePath);
-      const items = fs.readdirSync(dir).filter((i) => i !== '.DS_Store');
+      const items = fs.readdirSync(dir).filter((i: string) => i !== '.DS_Store');
       if (items.length === 1) {
         filePath = path.join(dir, items[0]);
       }
@@ -141,7 +152,7 @@ class AttachmentStore extends BaseStore {
       return;
     }
 
-    const filePath = this.pathForFile(file);
+    const filePath = this._requirePathForFile(file);
     const previewPath = `${filePath}.png`;
 
     if (await fileAccessibleAtPath(previewPath)) {
@@ -190,12 +201,12 @@ class AttachmentStore extends BaseStore {
 
   // Copies an attachment out of files/ and marks the copy as downloaded (renderer writes
   // aren't covered by the main bundle's LSFileQuarantineEnabled).
-  _writeToExternalPath = (filePath, savePath) => {
+  _writeToExternalPath = (filePath: string, savePath: string) => {
     return new Promise<void>((resolve, reject) => {
       const stream = fs.createReadStream(filePath);
       const out = fs.createWriteStream(savePath);
-      stream.on('error', (err) => reject(err));
-      out.on('error', (err) => reject(err));
+      stream.on('error', (err: Error) => reject(err));
+      out.on('error', (err: Error) => reject(err));
       out.on('finish', () => resolve());
       stream.pipe(out);
     }).then(() => markFileFromInternet(savePath).then(() => {}));
@@ -263,7 +274,7 @@ class AttachmentStore extends BaseStore {
           AppEnv.savedState.lastDownloadDirectory = dirPath;
 
           const seenPaths = new Set();
-          const lastSavePaths = [];
+          const lastSavePaths: string[] = [];
           const savePromises = files.map((file) => {
             let externalPath = path.join(dirPath, file.safeDisplayName());
             while (seenPaths.has(externalPath) || fs.existsSync(externalPath)) {
@@ -311,11 +322,13 @@ class AttachmentStore extends BaseStore {
   }
 
   _defaultSaveDir() {
+    // Without the variable, Downloads is looked for under the working directory and the
+    // temp dir is used, rather than path.join throwing.
     let home = '';
     if (process.platform === 'win32') {
-      home = process.env.USERPROFILE;
+      home = process.env.USERPROFILE || '';
     } else {
-      home = process.env.HOME;
+      home = process.env.HOME || '';
     }
 
     let downloadDir = path.join(home, 'Downloads');
@@ -353,14 +366,15 @@ class AttachmentStore extends BaseStore {
     });
   }
 
-  _catchFSErrors(error) {
-    let message = null;
-    if (['EPERM', 'EROFS', 'EPIPE', 'EBUSY', 'EMFILE', 'EACCES', 'UNKNOWN'].includes(error.code)) {
+  _catchFSErrors(error: NodeJS.ErrnoException) {
+    let message: string | null = null;
+    const code = error.code || '';
+    if (['EPERM', 'EROFS', 'EPIPE', 'EBUSY', 'EMFILE', 'EACCES', 'UNKNOWN'].includes(code)) {
       message = localized(
         'Tern could not save an attachment. Check that permissions are set correctly and try restarting Tern if the issue persists.'
       );
     }
-    if (['ENOSPC'].includes(error.code)) {
+    if (['ENOSPC'].includes(code)) {
       message = localized(
         'Tern could not save an attachment because you have run out of disk space.'
       );
@@ -414,26 +428,30 @@ class AttachmentStore extends BaseStore {
     // Delete the file, it's preview if present and it's containing folder. We don't
     // delete other arbitrary files in case for some reason other files are saved here.
     try {
-      const filePath = this.pathForFile(file);
+      const filePath = this._requirePathForFile(file);
       await fs.unlinkAsync(filePath);
       if (await fileAccessibleAtPath(`${filePath}.png`)) {
         await fs.unlinkAsync(`${filePath}.png`);
       }
       await fs.rmdirAsync(path.dirname(filePath));
     } catch (err) {
-      throw new Error(`Error deleting file file ${file.filename}:\n\n${err.message}`);
+      throw new Error(`Error deleting file file ${file.filename}:\n\n${(err as Error).message}`);
     }
   }
 
   async _applySessionChanges(headerMessageId: string, changeFunction: (files: File[]) => File[]) {
     const session = await DraftStore.sessionForClientId(headerMessageId);
-    const files = changeFunction(session.draft().files);
+    const draft = session.draft();
+    if (!draft) {
+      throw new Error(`AttachmentStore: draft ${headerMessageId} is not loaded`);
+    }
+    const files = changeFunction(draft.files);
     session.changes.add({ files });
   }
 
   // Handlers
 
-  _onSelectAttachment = ({ headerMessageId }) => {
+  _onSelectAttachment = ({ headerMessageId }: { headerMessageId: string }) => {
     this._assertIdPresent(headerMessageId);
 
     // When the dialog closes, it triggers `Actions.addAttachment`
@@ -515,8 +533,9 @@ class AttachmentStore extends BaseStore {
         contentId: inline ? Utils.generateContentId() : null,
       });
 
-      await _fs.promises.mkdir(path.dirname(this.pathForFile(file)), { recursive: true });
-      await this._copyToInternalPath(filePath, this.pathForFile(file));
+      const internalPath = this._requirePathForFile(file);
+      await _fs.promises.mkdir(path.dirname(internalPath), { recursive: true });
+      await this._copyToInternalPath(filePath, internalPath);
 
       await this._applySessionChanges(headerMessageId, (files) => {
         if (files.reduce((c, f) => c + f.size, 0) >= 25 * 1000000) {
@@ -526,7 +545,7 @@ class AttachmentStore extends BaseStore {
       });
       onCreated(file);
     } catch (err) {
-      AppEnv.showErrorDialog(err.message);
+      AppEnv.showErrorDialog((err as Error).message);
     }
   }
 
@@ -542,7 +561,7 @@ class AttachmentStore extends BaseStore {
     try {
       await this._deleteFile(fileToRemove);
     } catch (err) {
-      AppEnv.showErrorDialog(err.message);
+      AppEnv.showErrorDialog((err as Error).message);
     }
   };
 }

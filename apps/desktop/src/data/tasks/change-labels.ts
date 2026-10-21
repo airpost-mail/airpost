@@ -28,8 +28,8 @@ export class ChangeLabelsTask extends ChangeMailTask {
     }),
   };
 
-  labelsToAdd: Label[];
-  labelsToRemove: Label[];
+  declare labelsToAdd: Label[];
+  declare labelsToRemove: Label[];
 
   constructor(
     data: AttributeValues<typeof ChangeLabelsTask.attributes> & {

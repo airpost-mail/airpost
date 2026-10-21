@@ -4,5 +4,5 @@
 // Only add one if you really can't use native `new Error("my msg")`
 
 export class APIError extends Error {
-  statusCode: number = null;
+  statusCode: number | null = null;
 }

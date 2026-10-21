@@ -34,7 +34,7 @@ export class Attribute {
     if (loadFromColumn && !queryable) {
       throw new Error('loadFromColumn requires queryable');
     }
-    this.loadFromColumn = loadFromColumn;
+    this.loadFromColumn = !!loadFromColumn;
   }
 
   _assertPresentAndQueryable(fnName: string, val: unknown) {

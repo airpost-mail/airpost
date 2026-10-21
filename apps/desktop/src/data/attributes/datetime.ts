@@ -12,7 +12,7 @@ model's `Date`, and `Date < number` coerces the Date to milliseconds.
 Section: Database
 */
 export class AttributeDateTime extends Attribute {
-  toJSON(val) {
+  toJSON(val: unknown) {
     if (!val) {
       return null;
     }
@@ -24,11 +24,11 @@ export class AttributeDateTime extends Attribute {
     return val.getTime() / 1000.0;
   }
 
-  fromJSON(val) {
+  fromJSON(val: unknown) {
     if (val == null || val instanceof Date) {
       return val;
     }
-    return new Date(val * 1000);
+    return new Date(Number(val) * 1000);
   }
 
   columnSQL() {

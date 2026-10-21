@@ -8,7 +8,20 @@ type ICALComponent = InstanceType<ICAL['Component']>;
 type ICALProperty = InstanceType<ICAL['Property']>;
 type ICALEvent = InstanceType<ICAL['Event']>;
 
-let ICAL: ICAL = null;
+let ICALModule: ICAL | null = null;
+
+// ical.js is large, so it loads on first use.
+function loadICAL(): ICAL {
+  if (!ICALModule) {
+    ICALModule = require('ical.js') as ICAL;
+  }
+  return ICALModule;
+}
+
+// jCal (RFC 7265): a component is [name, properties, subcomponents], a property is
+// [name, parameters, value type, ...values].
+type JCalProperty = [string, { [param: string]: unknown }, string, ...unknown[]];
+type JCalComponent = [string, JCalProperty[], JCalComponent[]];
 
 export type ICSParticipantStatus =
   | 'NEEDS-ACTION'
@@ -26,7 +39,7 @@ export interface ICSParticipant {
   component: ICALProperty;
 }
 
-function fixJCalDatesWithoutTimes(jCal) {
+function fixJCalDatesWithoutTimes(jCal: JCalComponent) {
   jCal[1].forEach((property) => {
     if (
       property[0] === 'dtstart' ||
@@ -34,9 +47,15 @@ function fixJCalDatesWithoutTimes(jCal) {
       property[0] === 'exdate' ||
       property[0] === 'rdate'
     ) {
-      if (!property[1].value && property[2] === 'date-time' && /T::$/.test(property[3])) {
+      const value = property[3];
+      if (
+        !property[1].value &&
+        property[2] === 'date-time' &&
+        typeof value === 'string' &&
+        /T::$/.test(value)
+      ) {
         property[2] = 'date';
-        property[3] = property[3].replace(/T::$/, '');
+        property[3] = value.replace(/T::$/, '');
       }
     }
   });
@@ -44,10 +63,8 @@ function fixJCalDatesWithoutTimes(jCal) {
 }
 
 export function parseICSString(ics: string) {
-  if (!ICAL) {
-    ICAL = require('ical.js');
-  }
-  const jcalData = ICAL.parse(ics);
+  const ICAL = loadICAL();
+  const jcalData: JCalComponent = ICAL.parse(ics);
 
   // workaround https://github.com/mozilla-comm/ical.js/issues/186
   fixJCalDatesWithoutTimes(jcalData);
@@ -56,7 +73,9 @@ export function parseICSString(ics: string) {
   // Before ICAL.Event: relating the exceptions reads each RECURRENCE-ID, and a value read once
   // keeps the zone it was read with.
   registerTimezones(root);
-  const event = new ICAL.Event(root.name === 'vevent' ? root : root.getFirstSubcomponent('vevent'));
+  const event = new ICAL.Event(
+    root.name === 'vevent' ? root : root.getFirstSubcomponent('vevent') || undefined
+  );
   return { root, event };
 }
 
@@ -67,6 +86,7 @@ export function parseICSString(ics: string) {
  * a file has no VTIMEZONE for (RFC 7809) by its IANA or Windows name.
  */
 function registerTimezones(vcalendar: ICALComponent): void {
+  const ICAL = loadICAL();
   for (const vtz of vcalendar.getAllSubcomponents('vtimezone')) {
     // The registry is process-wide and ical.js seeds these three names with UTC itself, so a file
     // redefining one would move every time read through that name for the rest of the session.
@@ -131,10 +151,11 @@ export function cleanParticipants(icsEvent: ICALEvent): ICSParticipant[] {
 export function selfParticipant(
   icsEvent: ICALEvent,
   accountId: string
-): ICSParticipant | undefined {
-  const me = cleanParticipants(icsEvent).find((a) => {
+): (ICSParticipant & { email: string }) | undefined {
+  const me = cleanParticipants(icsEvent).find((a): a is ICSParticipant & { email: string } => {
+    if (!a.email) return false;
     const acct = AccountStore.accountForEmail(a.email);
-    return acct && acct.id === accountId;
+    return !!acct && acct.id === accountId;
   });
   return me;
 }

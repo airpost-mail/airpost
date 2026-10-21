@@ -70,8 +70,8 @@ export class SyncbackEventTask extends Task {
     }),
   };
 
-  event: Event;
-  calendarId: string;
+  declare event: Event;
+  declare calendarId: string;
   undoData?: EventSnapshot;
   newData?: EventSnapshot;
   taskDescription?: string;
@@ -252,6 +252,8 @@ export class SyncbackEventTask extends Task {
   async _answerAgainOnCurrentCopy(): Promise<boolean> {
     const current = await this._nextCopyOfEvent();
     if (!current) return false;
+    // onError only calls this for an RSVP write.
+    if (!this.rsvp) return false;
     const { status, occurrenceIcs } = this.rsvp;
     try {
       const result = await answerEvent({

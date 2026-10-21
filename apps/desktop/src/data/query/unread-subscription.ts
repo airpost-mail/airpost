@@ -55,7 +55,7 @@ export default class UnreadQuerySubscription extends MutableQuerySubscription<Th
     }
     this._recentlyReadIds = ids;
     // Swapped without a refetch: the thread's own delta is matched against the new query.
-    const { limit, offset } = this._query.range();
+    const { limit, offset } = this._requireQuery().range();
     this._query = buildQuery(this._categoryIds, ids).limit(limit).offset(offset);
   };
 

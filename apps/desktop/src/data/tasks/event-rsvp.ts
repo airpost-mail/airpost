@@ -14,13 +14,13 @@ import * as Actions from '../actions';
  * COUNTER proposing another time. The sync engine reads an absent `method` as REPLY.
  */
 export class EventRSVPTask extends Task {
-  ics: string;
-  icsRSVPStatus: ICSParticipantStatus;
-  subject: string;
-  messageId: string;
-  organizerEmail: string;
-  method: 'REPLY' | 'COUNTER';
-  comment: string;
+  declare ics: string;
+  declare icsRSVPStatus: ICSParticipantStatus;
+  declare subject: string;
+  declare messageId: string;
+  organizerEmail?: string;
+  declare method: 'REPLY' | 'COUNTER';
+  declare comment: string;
 
   static attributes = {
     ...Task.attributes,

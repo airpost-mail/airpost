@@ -32,7 +32,7 @@ export class ThreadCountsStore extends BaseStore {
   // a later commit before the reply, and the reply's promise settles after the deltas read in
   // the same chunk), but each carries a category's full counts, so replaying them all ends on
   // the newest value for every category they touch.
-  _loading: { deltas: ThreadCountsDelta[] } = null;
+  _loading: { deltas: ThreadCountsDelta[] } | null = null;
 
   constructor(engine: EngineEventsType = EngineEvents) {
     super();
@@ -58,9 +58,11 @@ export class ThreadCountsStore extends BaseStore {
   }
 
   _onCountsChanged = () => {
-    DatabaseStore._query('SELECT * FROM `ThreadCounts`').then((results: ThreadCountRow[]) => {
+    DatabaseStore._query('SELECT * FROM `ThreadCounts`').then((rows) => {
       if (this._fromEngine) return;
-      const nextCounts = {};
+      // The ThreadCounts table's columns.
+      const results = rows as ThreadCountRow[];
+      const nextCounts: Counts = {};
       for (const { categoryId, unread, total } of results) {
         nextCounts[categoryId] = { unread, total };
       }
@@ -76,7 +78,7 @@ export class ThreadCountsStore extends BaseStore {
       return;
     }
     this._fromEngine = true;
-    const loading = { deltas: [] };
+    const loading: { deltas: ThreadCountsDelta[] } = { deltas: [] };
     this._loading = loading;
     this._engine.request<CountsGetResult>(Method.CountsGet, {}).then(
       (result) => {

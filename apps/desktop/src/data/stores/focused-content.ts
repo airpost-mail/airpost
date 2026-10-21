@@ -50,16 +50,17 @@ _onFocusChanged: =>
 Section: Stores
 */
 class FocusedContentStore extends BaseStore {
+  // _resetInstanceVars sets these in the constructor.
   _focused: {
     [view: string]: Model | null;
-  };
+  } = {};
   _focusedUsingClick: {
-    [view: string]: boolean;
-  };
+    [view: string]: boolean | undefined;
+  } = {};
   _keyboardCursor: {
     [view: string]: Model | null;
-  };
-  _keyboardCursorEnabled: boolean;
+  } = {};
+  _keyboardCursorEnabled = false;
 
   constructor() {
     super();
@@ -87,7 +88,7 @@ class FocusedContentStore extends BaseStore {
   _onAccountsChange = () => {
     // Ensure internal consistency by removing any focused items that belong
     // to accounts which no longer exist.
-    const changed = [];
+    const changed: string[] = [];
 
     for (const dict of [this._focused, this._keyboardCursor]) {
       for (const [collection, item] of Object.entries(dict)) {
@@ -99,7 +100,7 @@ class FocusedContentStore extends BaseStore {
     }
 
     if (changed.length > 0) {
-      this.trigger({ impactsCollection: (c) => changed.includes(c) });
+      this.trigger({ impactsCollection: (c: string) => changed.includes(c) });
     }
   };
 
@@ -119,7 +120,7 @@ class FocusedContentStore extends BaseStore {
     }
 
     this._keyboardCursor[collection] = item;
-    this.triggerAfterAnimationFrame({ impactsCollection: (c) => c === collection });
+    this.triggerAfterAnimationFrame({ impactsCollection: (c: string) => c === collection });
   };
 
   _onFocus = ({
@@ -128,7 +129,7 @@ class FocusedContentStore extends BaseStore {
     usingClick,
   }: {
     collection: string;
-    item: Model;
+    item: Model | null;
     usingClick?: boolean;
   }) => {
     if (item && !(item instanceof Model)) {
@@ -153,7 +154,7 @@ class FocusedContentStore extends BaseStore {
     if (item) {
       this._keyboardCursor[collection] = item;
     }
-    this.triggerAfterAnimationFrame({ impactsCollection: (c) => c === collection });
+    this.triggerAfterAnimationFrame({ impactsCollection: (c: string) => c === collection });
   };
 
   _onWorkspaceChange = () => {
@@ -184,7 +185,7 @@ class FocusedContentStore extends BaseStore {
       return;
     }
 
-    const touched = [];
+    const touched: string[] = [];
 
     for (const data of [this._focused, this._keyboardCursor]) {
       for (const [key, val] of Object.entries(data)) {
@@ -201,7 +202,7 @@ class FocusedContentStore extends BaseStore {
     }
 
     if (touched.length > 0) {
-      this.trigger({ impactsCollection: (c) => c in touched });
+      this.trigger({ impactsCollection: (c: string) => c in touched });
     }
   };
 

@@ -3,17 +3,19 @@ import BaseStore from './base';
 import _ from 'underscore';
 
 export interface IDefaultSignatures {
-  [accountId: string]: string;
+  // null once the account's default is toggled off.
+  [accountId: string]: string | null;
 }
+
+// A signature template's fields (templateName, name, title, email, photoURL, ...). The Raw
+// HTML choice leaves templateName undefined.
+export type SignatureData = { [field: string]: string | undefined };
 
 export interface ISignature {
   id: string;
   title: string;
   body: string;
-  data: {
-    title: string;
-    templateName: string;
-  };
+  data: SignatureData;
 }
 
 export interface ISignatureSet {
@@ -21,11 +23,12 @@ export interface ISignatureSet {
 }
 
 class _SignatureStore extends BaseStore {
-  signatures: ISignatureSet;
-  defaultSignatures: IDefaultSignatures;
-  selectedSignatureId: string;
+  // activate() sets these from the constructor.
+  signatures!: ISignatureSet;
+  defaultSignatures!: IDefaultSignatures;
+  selectedSignatureId!: string | null;
 
-  unsubscribers: Array<() => void>;
+  unsubscribers?: Array<() => void>;
 
   constructor() {
     super();
@@ -75,16 +78,18 @@ class _SignatureStore extends BaseStore {
     return this.signatures;
   }
 
-  selectedSignature() {
-    return this.signatures[this.selectedSignatureId];
+  selectedSignature(): ISignature | undefined {
+    const id = this.selectedSignatureId;
+    return id === null ? undefined : this.signatures[id];
   }
 
   getDefaults() {
     return this.defaultSignatures;
   }
 
-  signatureForEmail = (email: string) => {
-    return this.signatures[this.defaultSignatures[email]];
+  signatureForEmail = (email: string): ISignature | undefined => {
+    const id = this.defaultSignatures[email];
+    return id === null || id === undefined ? undefined : this.signatures[id];
   };
 
   _saveSignatures() {
@@ -95,7 +100,7 @@ class _SignatureStore extends BaseStore {
     AppEnv.config.set(`defaultSignatures`, this.defaultSignatures);
   }
 
-  _onSelectSignature = (id: string) => {
+  _onSelectSignature = (id: string | null) => {
     this.selectedSignatureId = id;
     this.trigger();
   };

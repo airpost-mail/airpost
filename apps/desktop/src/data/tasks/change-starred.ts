@@ -16,7 +16,7 @@ export class ChangeStarredTask extends ChangeMailTask {
     }),
   };
 
-  starred: boolean;
+  declare starred: boolean;
 
   constructor(
     data: AttributeValues<typeof ChangeStarredTask.attributes> & {

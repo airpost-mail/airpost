@@ -11,7 +11,7 @@ export class ContactGroup extends Model {
     }),
   };
 
-  public name: string;
+  declare name: string;
 
   static sortOrderAttribute = () => {
     return ContactGroup.attributes.name;

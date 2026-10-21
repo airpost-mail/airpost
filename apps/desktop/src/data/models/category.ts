@@ -7,8 +7,8 @@ import { localized } from '../../intl/localize';
 // We look for a few standard categories and display them in the Mailboxes
 // portion of the left sidebar. Note that these may not all be present on
 // a particular account.
-const ToObject = (arr) => {
-  return arr.reduce((o, v) => {
+const ToObject = (arr: string[]) => {
+  return arr.reduce<{ [role: string]: string }>((o, v) => {
     o[v] = v;
     return o;
   }, {});
@@ -44,7 +44,7 @@ Why not just call localized(cat.role)? We want to hardcode each
 of the localized(xxx) calls so that a static analysis can
 identify all strings that are passed to localize().
 */
-const LocalizedStringForRole = {
+const LocalizedStringForRole: { [role: string]: string } = {
   sent: localized('Sent Mail'),
   inbox: localized('Inbox'),
   important: localized('Important'),
@@ -138,9 +138,9 @@ export class Category extends Model {
     return role;
   }
 
-  public role: string;
-  public path: string;
-  public localStatus: {
+  declare role: string;
+  declare path: string;
+  declare localStatus: {
     syncedMinUID: number;
     bodiesPresent: number;
     bodiesWanted: number;
@@ -152,7 +152,8 @@ export class Category extends Model {
     super(data);
   }
 
-  displayType() {
+  // 'folder' or 'label', from the subclass.
+  displayType(): string {
     throw new Error('Base class');
   }
 
@@ -169,7 +170,7 @@ export class Category extends Model {
     return hue;
   }
 
-  isStandardCategory(forceShowImportant = undefined) {
+  isStandardCategory(forceShowImportant?: boolean) {
     let showImportant = forceShowImportant;
     if (showImportant === undefined) {
       showImportant = AppEnv.config.get('core.workspace.showImportant');

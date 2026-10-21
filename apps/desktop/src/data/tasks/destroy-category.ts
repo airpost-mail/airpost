@@ -13,7 +13,7 @@ export class DestroyCategoryTask extends Task {
     }),
   };
 
-  path: string;
+  declare path: string;
 
   constructor(data: AttributeValues<typeof DestroyCategoryTask.attributes> = {}) {
     super(data);

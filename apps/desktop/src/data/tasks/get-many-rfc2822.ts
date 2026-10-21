@@ -46,13 +46,13 @@ export class GetManyRFC2822Task extends Task {
     }),
   };
 
-  folderId: string;
-  folderPath: string;
-  outputDir: string;
-  format: 'eml' | 'mbox';
-  mboxPath: string;
-  progress: ExportResult;
-  result: ExportResult;
+  declare folderId: string;
+  declare folderPath: string;
+  declare outputDir: string;
+  declare format: 'eml' | 'mbox';
+  declare mboxPath: string;
+  declare progress: ExportResult;
+  declare result: ExportResult;
 
   constructor(data: AttributeValues<typeof GetManyRFC2822Task.attributes> = {}) {
     super(data);
@@ -61,7 +61,7 @@ export class GetManyRFC2822Task extends Task {
   label() {
     if (this.result && this.result.total) {
       const { exported, total, failed } = this.result;
-      if (failed > 0) {
+      if (failed && failed > 0) {
         return `Exporting ${exported || 0} / ${total} (${failed} failed)`;
       }
       return `Exporting ${exported || 0} / ${total}`;

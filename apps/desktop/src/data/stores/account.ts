@@ -44,11 +44,12 @@ one last added, which may be older. Accounts deleted here stay out (accountsToRe
 Section: Stores
 */
 export class _AccountStore extends BaseStore {
-  private _version: number;
+  // _loadAccounts sets these in the constructor; the initial values are what it starts from.
+  private _version = 0;
   private _engine: typeof EngineEvents;
-  private _accounts: Account[];
-  private _containerFolderDefault: string;
-  private _caches: { [key: string]: any };
+  private _accounts: Account[] = [];
+  private _containerFolderDefault = '';
+  private _caches: { [key: string]: any } = {};
   // Deleted in this window, for an account.list answered before the engine removed them.
   private _removedIds = new Set<string>();
 
@@ -145,7 +146,10 @@ export class _AccountStore extends BaseStore {
 
   // Adds the engine's accounts this list lacks and, with `update`, applies the engine's fields
   // to the ones it has. Saves (and so tells the supervisor) only when something changed.
-  _takeEngineAccounts = (jsons: Array<Record<string, any>>, { update }: { update: boolean }) => {
+  _takeEngineAccounts = (
+    jsons: Array<Record<string, any> | undefined>,
+    { update }: { update: boolean }
+  ) => {
     const removed = new Set<string>(AppEnv.config.get(CONFIG_ACCOUNTS_TO_REMOVE_KEY) || []);
     let changed = false;
     for (const json of jsons) {
@@ -186,9 +190,9 @@ export class _AccountStore extends BaseStore {
   };
 
   _enforceAccountsValidity = () => {
-    const seenIds = {};
-    const seenEmails = {};
-    let message = null;
+    const seenIds: { [id: string]: boolean } = {};
+    const seenEmails: { [email: string]: boolean } = {};
+    let message: string | null = null;
 
     this._accounts = this._accounts.filter((account) => {
       if (!account.emailAddress) {
@@ -343,8 +347,12 @@ export class _AccountStore extends BaseStore {
       await EngineAccounts.removeAccount(account.id);
       return true;
     } catch (err) {
-      if (err && err.code === ErrorCode.UnknownAccount) return false;
-      console.warn(`The engine could not remove account ${account.id}: ${err && err.message}`);
+      // An engine error carries its code.
+      const failure = err as { code?: unknown; message?: string } | null | undefined;
+      if (failure && failure.code === ErrorCode.UnknownAccount) return false;
+      console.warn(
+        `The engine could not remove account ${account.id}: ${failure && failure.message}`
+      );
       return false;
     }
   }
@@ -465,7 +473,7 @@ export class _AccountStore extends BaseStore {
       for (const acc of this._accounts) {
         aliases.push(acc.me());
         for (const alias of acc.aliases) {
-          const aliasContact = acc.meUsingAlias(alias);
+          const aliasContact: IAliasSet[number] = acc.meUsingAlias(alias);
           aliasContact.isAlias = true;
           aliases.push(aliasContact);
         }

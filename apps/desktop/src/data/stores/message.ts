@@ -27,15 +27,15 @@ class _MessageStore extends BaseStore {
   FolderNamesHiddenByDefault = FolderNamesHiddenByDefault;
 
   _showingHiddenItems = false;
-  _items?: Message[];
-  _thread?: Thread;
-  _itemsExpanded: { [messageId: string]: 'explicit' | 'default' };
-  _itemsLoading: boolean;
-  _lastMarkedAsReadThreadId?: string;
-  _onFocusChangedTimer?: NodeJS.Timeout;
+  _items: Message[] = [];
+  _thread: Thread | null = null;
+  _itemsExpanded: { [messageId: string]: 'explicit' | 'default' } = {};
+  _itemsLoading = false;
+  _lastMarkedAsReadThreadId?: string | null;
+  _onFocusChangedTimer?: NodeJS.Timeout | null;
   // Message changes for the thread that arrive while its messages are being read, applied on
   // top of the result; null when no read is out.
-  _changesWhileLoading: MessageChange[] = null;
+  _changesWhileLoading: MessageChange[] | null = null;
   // Ids whose bodies are being read, so overlapping loads don't ask for them again.
   _bodiesLoading = new Set<string>();
 
@@ -51,7 +51,7 @@ class _MessageStore extends BaseStore {
     if (this._showingHiddenItems) return this._items;
 
     const viewing = FocusedPerspectiveStore.current().categoriesSharedRole();
-    const viewingHiddenCategory = FolderNamesHiddenByDefault.includes(viewing);
+    const viewingHiddenCategory = viewing !== null && FolderNamesHiddenByDefault.includes(viewing);
 
     // A message can have copies in several folders. It is hidden only when every copy is
     // in spam or trash; when viewing spam or trash, any copy there is enough to show it.
@@ -146,12 +146,13 @@ class _MessageStore extends BaseStore {
   // Message deltas patch the loaded messages, keeping the bodies they don't carry: the engine
   // sends a message's body only with the save that set it.
   _onDataChanged(change: DatabaseChangeRecord<any>) {
-    if (!this._thread) return;
+    const thread = this._thread;
+    if (!thread) return;
 
     if (change.objectClass === Message.name) {
       const loaded = new Set(this._items.map((m) => m.id));
       const objects = (change.objects as Message[]).filter(
-        (m) => m.threadId === this._thread.id || loaded.has(m.id)
+        (m) => m.threadId === thread.id || loaded.has(m.id)
       );
       if (objects.length === 0) return;
       if (this._changesWhileLoading) {
@@ -166,7 +167,7 @@ class _MessageStore extends BaseStore {
     }
 
     if (change.objectClass === Thread.name) {
-      const updatedThread = change.objects.find((t) => t.id === this._thread.id);
+      const updatedThread = change.objects.find((t) => t.id === thread.id);
       if (updatedThread) {
         this._thread = updatedThread;
         this.trigger();
@@ -188,8 +189,10 @@ class _MessageStore extends BaseStore {
 
   _patchedItems(items: Message[], { type, objects }: MessageChange) {
     const byId = new Map(items.map((m) => [m.id, m]));
+    // Called while a thread is open.
+    const threadId = this.threadId();
     for (const message of objects) {
-      if (type === 'unpersist' || message.threadId !== this._thread.id) {
+      if (type === 'unpersist' || message.threadId !== threadId) {
         byId.delete(message.id);
         continue;
       }
@@ -239,13 +242,13 @@ class _MessageStore extends BaseStore {
   }
 
   _onApplyFocusChange() {
-    const focused = FocusedContentStore.focused('thread') as Thread;
+    const focused = FocusedContentStore.focused('thread');
     if (focused === null) {
       this._lastMarkedAsReadThreadId = null;
     }
 
     // if we already match the desired state, no need to trigger
-    if (this.threadId() === (focused || {}).id) return;
+    if (this.threadId() === (focused ? focused.id : undefined)) return;
 
     this._thread = focused;
     this._items = [];
@@ -282,10 +285,11 @@ class _MessageStore extends BaseStore {
       if (markAsReadDelay < 0) return;
 
       setTimeout(() => {
-        if (markAsReadId !== this.threadId() || !this._thread.unread) return;
+        const thread = this._thread;
+        if (markAsReadId !== this.threadId() || !thread || !thread.unread) return;
         Actions.queueTask(
           TaskFactory.taskForInvertingUnread({
-            threads: [this._thread],
+            threads: [thread],
             source: 'Thread Selected',
             canBeUndone: false,
           })
@@ -471,8 +475,9 @@ class _MessageStore extends BaseStore {
     // Re-sort items in the list so that drafts appear after the message that
     // they are in reply to, when possible. First, identify all the drafts
     // with a replyToHeaderMessageId and remove them
-    let index, item;
-    const itemsInReplyTo = [];
+    let index: number;
+    let item: Message | null;
+    const itemsInReplyTo: Message[] = [];
     for (index = items.length - 1; index >= 0; index--) {
       item = items[index];
       if (item.draft && item.replyToHeaderMessageId) {
@@ -486,7 +491,7 @@ class _MessageStore extends BaseStore {
     for (item of itemsInReplyTo) {
       for (index = 0; index < items.length; index++) {
         const other = items[index];
-        if (item.replyToHeaderMessageId === other.headerMessageId) {
+        if (item && item.replyToHeaderMessageId === other.headerMessageId) {
           items.splice(index + 1, 0, item);
           item = null;
           break;

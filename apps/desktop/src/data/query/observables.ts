@@ -8,15 +8,19 @@ import { Model } from '../models/model';
 import ModelQuery from './query';
 import BaseStore from '../stores/base';
 import { Category } from '../models/category';
+import type { Account } from '../models/account';
 import { QueryResultSet } from './result-set';
 
 interface ICategoryOperators {
   sort(): Observable<Category[]> & ICategoryOperators;
-  categoryFilter(filter: (Category) => boolean): Observable<Category[]> & ICategoryOperators;
+  categoryFilter(
+    filter: (category: Category) => boolean
+  ): Observable<Category[]> & ICategoryOperators;
 }
 
-const CategoryOperators = {
-  sort() {
+// Mixed into the category observables below, so `this` is one of them.
+const CategoryOperators: ICategoryOperators = {
+  sort(this: Observable<Category[]>) {
     const obs = this.map((categories) => {
       return categories.sort((catA, catB) => {
         let nameA = catA.displayName;
@@ -36,7 +40,7 @@ const CategoryOperators = {
     return Object.assign(obs, CategoryOperators);
   },
 
-  categoryFilter(filter: (Category) => boolean) {
+  categoryFilter(this: Observable<Category[]>, filter: (category: Category) => boolean) {
     const obs = this.map((categories) => categories.filter(filter));
     return Object.assign(obs, CategoryOperators);
   },
@@ -46,44 +50,49 @@ const CategoryObservables = {
   forAllAccounts() {
     const folders = Rx.Observable.fromQuery<Folder[]>(DatabaseStore.findAll<Folder>(Folder));
     const labels = Rx.Observable.fromQuery<Label[]>(DatabaseStore.findAll<Label>(Label));
-    const joined = Rx.Observable.combineLatest<Category[], Category[], Category[]>(
+    const joined = Rx.Observable.combineLatest<Folder[], Label[], Category[]>(
       folders,
       labels,
-      (f, l) => [].concat(f, l)
+      (f, l) => ([] as Category[]).concat(f, l)
     );
     Object.assign(joined, CategoryOperators);
     return joined as Observable<Category[]> & ICategoryOperators;
   },
 
-  forAccount(account) {
-    const scoped = account ? (q) => q.where({ accountId: account.id }) : (q) => q;
+  forAccount(account?: Account | null) {
+    const scoped = <T extends Model[]>(q: ModelQuery<T>) =>
+      account ? q.where({ accountId: account.id }) : q;
 
     const folders = Rx.Observable.fromQuery(scoped(DatabaseStore.findAll<Folder>(Folder)));
     const labels = Rx.Observable.fromQuery(scoped(DatabaseStore.findAll<Label>(Label)));
-    const joined = Rx.Observable.combineLatest(folders, labels, (f, l) => [].concat(f, l));
+    const joined = Rx.Observable.combineLatest<Folder[], Label[], Category[]>(
+      folders,
+      labels,
+      (f, l) => ([] as Category[]).concat(f, l)
+    );
     Object.assign(joined, CategoryOperators);
     return joined as Observable<Category[]> & ICategoryOperators;
   },
 
-  standard(account): Observable<Category[]> & ICategoryOperators {
-    const observable = Rx.Observable.fromConfig('core.workspace.showImportant').flatMapLatest(
-      (showImportant) => {
-        return CategoryObservables.forAccount(account)
-          .sort()
-          .categoryFilter((cat) => cat.isStandardCategory(showImportant));
-      }
-    );
+  standard(account?: Account | null): Observable<Category[]> & ICategoryOperators {
+    const observable = Rx.Observable.fromConfig<boolean>(
+      'core.workspace.showImportant'
+    ).flatMapLatest((showImportant) => {
+      return CategoryObservables.forAccount(account)
+        .sort()
+        .categoryFilter((cat) => cat.isStandardCategory(showImportant));
+    });
     Object.assign(observable, CategoryOperators);
     return observable as Observable<Category[]> & ICategoryOperators;
   },
 
-  user(account) {
+  user(account?: Account | null) {
     return CategoryObservables.forAccount(account)
       .sort()
       .categoryFilter((cat) => cat.isUserCategory());
   },
 
-  hidden(account) {
+  hidden(account?: Account | null) {
     return CategoryObservables.forAccount(account)
       .sort()
       .categoryFilter((cat) => cat.isHiddenCategory());
@@ -108,7 +117,7 @@ Rx.Observable.fromStore = (store) => {
 // Returns an observable that provides array of selected items on subscription
 Rx.Observable.fromListSelection = (originStore) => {
   return Rx.Observable.create((observer) => {
-    let dataSourceDisposable = null;
+    let dataSourceDisposable: Disposable | null = null;
     const storeObservable = Rx.Observable.fromStore(originStore);
 
     const disposable = storeObservable.subscribe(() => {
@@ -144,9 +153,9 @@ Rx.Observable.fromConfig = (configKey: string) => {
   });
 };
 
-Rx.Observable.fromAction = (action: any) => {
-  return Rx.Observable.create((observer) => {
-    const unsubscribe = action.listen((arg) => observer.onNext(arg));
+Rx.Observable.fromAction = <T>(action: any) => {
+  return Rx.Observable.create<T>((observer) => {
+    const unsubscribe = action.listen((arg: T) => observer.onNext(arg));
     return Rx.Disposable.create(unsubscribe);
   });
 };

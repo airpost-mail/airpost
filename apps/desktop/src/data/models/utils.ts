@@ -8,11 +8,10 @@ import _ from 'underscore';
 import fs from 'fs';
 import path from 'path';
 
-let ResourcePath = null;
 import DatabaseObjectRegistry from '../database-object-registry';
 import { escapeRegExp } from '../../utils/regexp';
 
-export function waitFor(latch, options: { timeout?: number } = {}) {
+export function waitFor(latch: () => unknown, options: { timeout?: number } = {}) {
   const timeout = options.timeout || 400;
   const expire = Date.now() + timeout;
   return new Promise<void>(function (resolve, reject) {
@@ -39,18 +38,23 @@ export function showIconForAttachments(files: any[]) {
   return files.find((f) => !f.contentId || f.size > 12 * 1024);
 }
 
-export function extractTextFromHtml(html, param: { maxLength?: number } = {}) {
+export function extractTextFromHtml(
+  html: string | null | undefined,
+  param: { maxLength?: number } = {}
+) {
   const { maxLength } = param;
   if ((html != null ? html : '').trim().length === 0) {
     return '';
   }
-  if (maxLength && html.length > maxLength) {
-    html = html.slice(0, maxLength);
+  let source = html || '';
+  if (maxLength && source.length > maxLength) {
+    source = source.slice(0, maxLength);
   }
-  const body = new DOMParser().parseFromString(html, 'text/html').body;
+  const body = new DOMParser().parseFromString(source, 'text/html').body;
   body.querySelectorAll('style').forEach((el) => el.remove());
   body.querySelectorAll('script').forEach((el) => el.remove());
-  return body.textContent.trim();
+  // An element's textContent is never null.
+  return (body.textContent || '').trim();
 }
 
 export function modelTypesReviver(k: string, v: any) {
@@ -93,8 +97,8 @@ export function isHash(object: any) {
 
 export { escapeRegExp };
 
-export function range(left, right, inclusive = true) {
-  const range = [];
+export function range(left: number, right: number, inclusive = true) {
+  const range: number[] = [];
   const ascending = left < right;
   const end = !inclusive ? right : ascending ? right + 1 : right - 1;
   for (let i = left; ascending ? i < end : i > end; ascending ? i++ : i--) {
@@ -122,8 +126,13 @@ export function wordSearchRegExp(str = '') {
 // Takes an optional customizer. The customizer is passed the key and the
 // new cloned value for that key. The customizer is expected to either
 // modify the value and return it or simply be the identity function.
-export function deepClone<T>(object: T, customizer?, _circularRefs: Map<any, any> = new Map()): T {
-  let newObject;
+export function deepClone<T>(
+  object: T,
+  // Plugin API: the value was untyped before, and customizers read it as whatever they cloned.
+  customizer?: (key: string, value: any) => unknown,
+  _circularRefs: Map<any, any> = new Map()
+): T {
+  let newObject: object;
   if (!_.isObject(object)) {
     return object;
   }
@@ -148,21 +157,24 @@ export function deepClone<T>(object: T, customizer?, _circularRefs: Map<any, any
   }
   _circularRefs.set(object, newObject);
 
+  // Copying walks the properties by name, whatever the object's type.
+  const source = object as Record<string, unknown>;
+  const target = newObject as Record<string, unknown>;
   // It's important to use getOwnPropertyNames instead of Object.keys to
   // get the non-enumerable items as well.
   for (const key of Object.getOwnPropertyNames(object)) {
-    const newVal = deepClone(object[key], customizer, _circularRefs);
+    const newVal = deepClone(source[key], customizer, _circularRefs);
     if (_.isFunction(customizer)) {
-      newObject[key] = customizer(key, newVal);
+      target[key] = customizer(key, newVal);
     } else {
-      newObject[key] = newVal;
+      target[key] = newVal;
     }
   }
-  return newObject;
+  return newObject as T;
 }
 
 export function toSet(arr: any[] = []) {
-  const set = {};
+  const set: { [item: string]: boolean } = {};
   for (const item of arr) {
     set[item] = true;
   }
@@ -196,7 +208,7 @@ export function shouldDisplayAsImage(
 // AngularJS is Copyright (c) 2010-2020 Google LLC, MIT licence: https://github.com/angular/angular.js/blob/master/LICENSE
 export function encodeHTMLEntities(value: string) {
   const SURROGATE_PAIR_REGEXP = /[\uD800-\uDBFF][\uDC00-\uDFFF]/g;
-  const pairFix = function (value) {
+  const pairFix = function (value: string) {
     const hi = value.charCodeAt(0);
     const low = value.charCodeAt(1);
     return `&#${(hi - 0xd800) * 0x400 + (low - 0xdc00) + 0x10000};`;
@@ -204,7 +216,7 @@ export function encodeHTMLEntities(value: string) {
 
   // Match everything outside of normal chars and " (quote character)
   const NON_ALPHANUMERIC_REGEXP = /([^#-~| |!])/g;
-  const alphaFix = (value) => `&#${value.charCodeAt(0)};`;
+  const alphaFix = (value: string) => `&#${value.charCodeAt(0)};`;
 
   return value
     .replace(/&/g, '&amp;')
@@ -237,28 +249,31 @@ export function isTempId(id: string) {
   return id.slice(0, 6) === 'local-';
 }
 
-let _imageData = null;
-let _imageCache = {};
+let ResourcePath: string | null = null;
+let _imageData: string | null = null;
+// resourcePath -> image basename -> path of the image
+let _imageCache: { [resourcePath: string]: { [basename: string]: string } } = {};
 
+// Returns the image names under the current resource path.
 function ensureImageCacheReady() {
-  if (ResourcePath == null) {
-    ResourcePath = AppEnv.getLoadSettings().resourcePath;
-  }
+  const resourcePath: string = ResourcePath ?? AppEnv.getLoadSettings().resourcePath;
+  ResourcePath = resourcePath;
 
   if (!_imageData) {
-    _imageData = AppEnv.fileListCache().imageData || '{}';
-    _imageCache = JSON.parse(_imageData) || {};
+    const imageData: string = AppEnv.fileListCache().imageData || '{}';
+    _imageData = imageData;
+    _imageCache = JSON.parse(imageData) || {};
   }
 
-  if (!_imageCache || !_imageCache[ResourcePath]) {
+  if (!_imageCache || !_imageCache[resourcePath]) {
     if (_imageCache == null) {
       _imageCache = {};
     }
-    if (_imageCache[ResourcePath] == null) {
-      _imageCache[ResourcePath] = {};
+    if (_imageCache[resourcePath] == null) {
+      _imageCache[resourcePath] = {};
     }
 
-    const imagesPath = path.join(ResourcePath, 'static', 'images');
+    const imagesPath = path.join(resourcePath, 'static', 'images');
     const files = (fs.readdirSync(imagesPath, { recursive: true }) as string[]).map((f) =>
       path.join(imagesPath, f)
     );
@@ -272,54 +287,55 @@ function ensureImageCacheReady() {
       // but invalid in URLs. When possible, switch back to paths relative to
       // the static dir to avoid chars in the path that could cause images not
       // to load. Not: does not use path.join because we remove trailing slash.
-      file = file.replace(`${ResourcePath}/static/`, '');
+      file = file.replace(`${resourcePath}/static/`, '');
 
       const basename = path.basename(file);
-      _imageCache[ResourcePath][basename] = file;
+      _imageCache[resourcePath][basename] = file;
     }
     AppEnv.fileListCache().imageData = JSON.stringify(_imageCache);
   }
+  return _imageCache[resourcePath];
 }
 
 export function imageNamed(fullname: string) {
   const [name, ext] = fullname.split('.');
 
-  ensureImageCacheReady();
+  const images = ensureImageCacheReady();
 
   const plat = process.platform != null ? process.platform : '';
   const ratio = window.devicePixelRatio != null ? window.devicePixelRatio : 1;
 
   let attempt = `${name}-${plat}@${ratio}x.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   attempt = `${name}@${ratio}x.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   attempt = `${name}-${plat}.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   attempt = `${name}.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   attempt = `${name}-${plat}@2x.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   attempt = `${name}@2x.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   attempt = `${name}-${plat}@1x.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   attempt = `${name}@1x.${ext}`;
-  if (_imageCache[ResourcePath][attempt]) {
-    return _imageCache[ResourcePath][attempt];
+  if (images[attempt]) {
+    return images[attempt];
   }
   return null;
 }
@@ -335,19 +351,21 @@ export function subjectWithPrefix(subject: string, prefix: string) {
 }
 
 // True of all arguments have the same domains
-export function emailsHaveSameDomain(...args: string[]) {
+export function emailsHaveSameDomain(...args: (string | undefined)[]) {
   if (args.length < 2) {
     return false;
   }
   const domains = args.map((email = '') => {
-    return email.toLowerCase().trim().split('@').at(-1);
+    const parts = email.toLowerCase().trim().split('@');
+    return parts[parts.length - 1];
   });
   const toMatch = domains[0];
   return _.every(domains, (domain) => domain.length > 0 && toMatch === domain);
 }
 
 export function emailHasCommonDomain(email = '') {
-  const domain = email.toLowerCase().trim().split('@').at(-1);
+  const parts = email.toLowerCase().trim().split('@');
+  const domain = parts[parts.length - 1];
   return commonDomains[domain] != null ? commonDomains[domain] : false;
 }
 
@@ -360,7 +378,10 @@ export function toEquivalentEmailForm(email: string) {
   return `${user}@${domain}`.trim().toLowerCase();
 }
 
-export function emailIsEquivalent(email1: string, email2: string) {
+export function emailIsEquivalent(
+  email1: string | null | undefined,
+  email2: string | null | undefined
+) {
   if (email1 == null) {
     email1 = '';
   }
@@ -384,7 +405,11 @@ export function rectVisibleInRect(
   return !(r2.left > r1.right || r2.right < r1.left || r2.top > r1.bottom || r2.bottom < r1.top);
 }
 
-export function isEqualReact(a, b, options: { ignoreKeys?: []; functionsAreEqual?: boolean } = {}) {
+export function isEqualReact(
+  a: unknown,
+  b: unknown,
+  options: { ignoreKeys?: string[]; functionsAreEqual?: boolean } = {}
+) {
   return isEqual(a, b, {
     functionsAreEqual: true,
     ignoreKeys: (options.ignoreKeys != null ? options.ignoreKeys : []).concat(['id']),
@@ -397,8 +422,8 @@ export function isEqualReact(a, b, options: { ignoreKeys?: []; functionsAreEqual
 //   - keysToIgnore: an array of object keys to ignore checks on
 //   - logWhenFalse: logs when isEqual returns false
 export function isEqual(
-  a,
-  b,
+  a: unknown,
+  b: unknown,
   options: { functionsAreEqual?: boolean; logWhenFalse?: boolean; ignoreKeys?: string[] } = {}
 ) {
   const value = _isEqual(a, b, [], [], options);
@@ -411,30 +436,40 @@ export function isEqual(
   return value;
 }
 
+// Unwraps an underscore-wrapped object (`_(obj)`).
+function unwrapped(value: unknown) {
+  if (
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    '_wrapped' in value &&
+    value._wrapped != null
+  ) {
+    return value._wrapped;
+  }
+  return value;
+}
+
 export function _isEqual(
-  a,
-  b,
-  aStack,
-  bStack,
+  a: unknown,
+  b: unknown,
+  aStack: unknown[] | null | undefined,
+  bStack: unknown[] | null | undefined,
   options: { functionsAreEqual?: boolean; ignoreKeys?: string[] } = {}
 ) {
   // Identical objects are equal. `0 is -0`, but they aren't identical.
   // See the [Harmony `egal`
   // proposal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
   if (a === b) {
-    return a !== 0 || 1 / a === 1 / b;
+    // Same as `a !== 0 || 1 / a === 1 / b`: tells 0 from -0.
+    return Object.is(a, b);
   }
   // A strict comparison is necessary because `null == undefined`.
   if (a === null || b === null) {
     return a === b;
   }
   // Unwrap any wrapped objects.
-  if ((a != null ? a._wrapped : undefined) != null) {
-    a = a._wrapped;
-  }
-  if ((b != null ? b._wrapped : undefined) != null) {
-    b = b._wrapped;
-  }
+  a = unwrapped(a);
+  b = unwrapped(b);
 
   if (options.functionsAreEqual) {
     if (_.isFunction(a) && _.isFunction(b)) {
@@ -460,14 +495,14 @@ export function _isEqual(
       // `NaN`s are equivalent, but non-reflexive.
       // Object(NaN) is equivalent to NaN
       // eslint-disable-next-line
-      if (+a !== +a) {
-        return +b !== +b; // eslint-disable-line
+      if (Number(a) !== Number(a)) {
+        return Number(b) !== Number(b); // eslint-disable-line
       }
       // An `egal` comparison is performed for other numeric values.
-      if (+a === 0) {
-        return 1 / +a === 1 / b;
+      if (Number(a) === 0) {
+        return 1 / Number(a) === 1 / Number(b);
       } else {
-        return +a === +b;
+        return Number(a) === Number(b);
       }
     case '[object Date]':
     case '[object Boolean]':
@@ -475,13 +510,13 @@ export function _isEqual(
       // compared by their millisecond representations. Note that invalid
       // dates with millisecond representations of `NaN` are not
       // equivalent.
-      return +a === +b;
+      return Number(a) === Number(b);
     default:
   }
 
   const areArrays = className === '[object Array]';
   if (!areArrays) {
-    if (typeof a !== 'object' || typeof b !== 'object') {
+    if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
       return false;
     }
 
@@ -508,45 +543,50 @@ export function _isEqual(
 
   // Initializing stack of traversed objects.
   // It's done here since we only need them for objects and arrays comparison.
-  aStack = aStack != null ? aStack : [];
-  bStack = bStack != null ? bStack : [];
-  let { length } = aStack;
+  const aSeen = aStack != null ? aStack : [];
+  const bSeen = bStack != null ? bStack : [];
+  let { length } = aSeen;
   while (length--) {
     // Linear search. Performance is inversely proportional to the number of
     // unique nested structures.
-    if (aStack[length] === a) {
-      return bStack[length] === b;
+    if (aSeen[length] === a) {
+      return bSeen[length] === b;
     }
   }
 
   // Add the first object to the stack of traversed objects.
-  aStack.push(a);
-  bStack.push(b);
+  aSeen.push(a);
+  bSeen.push(b);
+
+  // Both are arrays or non-null objects by now (the class names match, and a
+  // non-array is rejected above unless both are objects).
+  const objA = a as Record<string | number, unknown>;
+  const objB = b as Record<string | number, unknown>;
 
   // Recursively compare objects and arrays.
   if (areArrays) {
     // Compare array lengths to determine if a deep comparison is necessary.
-    ({ length } = a);
-    if (length !== b.length) {
+    length = (a as unknown[]).length;
+    if (length !== (b as unknown[]).length) {
       return false;
     }
     // Deep compare the contents, ignoring non-numeric properties.
     while (length--) {
-      if (!_isEqual(a[length], b[length], aStack, bStack, options)) {
+      if (!_isEqual(objA[length], objB[length], aSeen, bSeen, options)) {
         return false;
       }
     }
   } else {
     // Deep compare objects.
-    let key = undefined;
-    const keys = Object.keys(a);
+    let key: string;
+    const keys = Object.keys(objA);
     ({ length } = keys);
     // Ensure that both objects contain the same number of properties
     // before comparing deep equality.
-    if (Object.keys(b).length !== length) {
+    if (Object.keys(objB).length !== length) {
       return false;
     }
-    const keysToIgnore = {};
+    const keysToIgnore: { [key: string]: boolean } = {};
     if (options.ignoreKeys && _.isArray(options.ignoreKeys)) {
       for (key of options.ignoreKeys) {
         keysToIgnore[key] = true;
@@ -558,20 +598,20 @@ export function _isEqual(
       if (key in keysToIgnore) {
         continue;
       }
-      if (!(_.has(b, key) && _isEqual(a[key], b[key], aStack, bStack, options))) {
+      if (!(_.has(objB, key) && _isEqual(objA[key], objB[key], aSeen, bSeen, options))) {
         return false;
       }
     }
   }
   // Remove the first object from the stack of traversed objects.
-  aStack.pop();
-  bStack.pop();
+  aSeen.pop();
+  bSeen.pop();
   return true;
 }
 
 // https://github.com/mailcheck/mailcheck/wiki/list-of-popular-domains
 // As a hash for instant lookup.
-export const commonDomains = {
+export const commonDomains: { [domain: string]: boolean } = {
   'aol.com': true,
   'att.net': true,
   'comcast.net': true,
@@ -809,7 +849,7 @@ export function likelyNonHumanEmail(email: string) {
   }
 
   // simple catch for things like hex sequences in prefixes
-  const digitCount = email.split('@').shift().split(/[0-9]/g).length - 1;
+  const digitCount = email.split('@')[0].split(/[0-9]/g).length - 1;
   if (digitCount >= 6) {
     return true;
   }

@@ -14,12 +14,12 @@ import { SearchQueryParser } from '../../mail/search/parser';
 
 // A store that handles the focuses collections of and individual contacts
 class FocusedContactsStore extends BaseStore {
-  _unsubFocusedContact?: Rx.Disposable;
+  _unsubFocusedContact?: Rx.Disposable | null;
   _contactScores: { [key: string]: { score: number; contact: Contact } } = {};
-  _currentContacts = [];
-  _currentFocusedContact?: Contact;
-  _currentThread?: Thread;
-  _currentParticipantThreads = [];
+  _currentContacts: Contact[] = [];
+  _currentFocusedContact?: Contact | null;
+  _currentThread?: Thread | null;
+  _currentParticipantThreads: Thread[] = [];
   _triggerLater: () => void;
 
   constructor() {
@@ -91,8 +91,12 @@ class FocusedContactsStore extends BaseStore {
     }
 
     if (contact && contact.email) {
+      const thread = this._currentThread;
+      if (!thread) {
+        throw new Error('FocusedContactsStore: a contact is focused with no thread shown');
+      }
       const query = DatabaseStore.findBy<Contact>(Contact, {
-        accountId: this._currentThread.accountId,
+        accountId: thread.accountId,
         email: contact.email,
       });
       this._unsubFocusedContact = Rx.Observable.fromQuery(query).subscribe((match) => {
@@ -113,11 +117,16 @@ class FocusedContactsStore extends BaseStore {
   _scoreAllParticipants() {
     // Cache account info once for penalty calculations
     const accountId = this._currentThread && this._currentThread.accountId;
-    const account = AccountStore.accountForId(accountId);
+    const account = accountId ? AccountStore.accountForId(accountId) : null;
     const myEmail = account ? account.emailAddress : undefined;
     const myEmailIsCommonDomain = Utils.emailHasCommonDomain(myEmail);
 
-    const score = (message: Message, msgNum: number, field: string, multiplier: number) => {
+    const score = (
+      message: Message,
+      msgNum: number,
+      field: 'to' | 'cc' | 'from',
+      multiplier: number
+    ) => {
       (message[field] || []).forEach((contact, j) => {
         const bonus = message[field].length - j;
         this._assignScore(

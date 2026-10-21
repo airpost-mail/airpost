@@ -8,7 +8,7 @@ import * as Actions from '../actions';
 
 const CONTAINER_ID = 'tern-modal-container';
 
-function createContainer(id) {
+function createContainer(id: string) {
   const element = document.createElement(id);
   document.body.insertBefore(element, document.body.children[0]);
   return element;
@@ -36,7 +36,11 @@ class ModalStore extends BaseStore {
     return this.isOpen;
   };
 
-  renderModal = (child, props, callback) => {
+  renderModal = (
+    child: React.ReactNode,
+    props: React.ComponentProps<typeof Modal>,
+    callback: () => void
+  ) => {
     const modal = (
       <UIProvider>
         <Modal {...props}>{child}</Modal>
@@ -50,7 +54,10 @@ class ModalStore extends BaseStore {
     });
   };
 
-  openModal = ({ component, height, width }, callback = () => {}) => {
+  openModal = (
+    { component, height, width }: { component: React.ReactNode; height?: number; width?: number },
+    callback = () => {}
+  ) => {
     const props = {
       height: height,
       width: width,

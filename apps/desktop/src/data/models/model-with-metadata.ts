@@ -1,5 +1,6 @@
 import { Model, AttributeValues } from './model';
 import * as Attributes from '../attributes';
+import { SortOrder } from '../attributes/sort-order';
 
 /**
  Cloud-persisted data that is associated with a single synced object
@@ -19,9 +20,9 @@ export class PluginMetadata extends Model {
     }),
   } as unknown as (typeof Model)['attributes'];
 
-  public pluginId: string;
-  public version: number;
-  public value: any;
+  declare pluginId: string;
+  declare version: number;
+  declare value: any;
 
   constructor(fields: AttributeValues<typeof PluginMetadata.attributes>) {
     super(fields);
@@ -67,11 +68,11 @@ export class ModelWithMetadata extends Model {
     }),
   };
 
-  static naturalSortOrder() {
+  static naturalSortOrder(): SortOrder | null {
     return null;
   }
 
-  public pluginMetadata: PluginMetadata[];
+  declare pluginMetadata: PluginMetadata[];
 
   constructor(fields: AttributeValues<typeof Model.attributes>) {
     super(fields);
@@ -106,7 +107,7 @@ export class ModelWithMetadata extends Model {
    */
   directlyAttachMetadata(pluginId: string, metadataValue: Record<string, any>) {
     // ensure that this function treats metadata objects as immutable
-    this.pluginMetadata = [].concat(this.pluginMetadata.map((p) => p.clone()));
+    this.pluginMetadata = this.pluginMetadata.map((p) => p.clone());
 
     let metadata = this.metadataObjectForPluginId(pluginId);
     if (!metadata) {

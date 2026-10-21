@@ -21,11 +21,11 @@ const asAccountId = (a: Account | string) => {
 };
 
 class CategoryStore extends BaseStore {
-  _categoryCache = {};
+  _categoryCache: { [accountId: string]: { [categoryId: string]: Folder | Label } } = {};
   _standardCategories: { [accountId: string]: Array<Folder | Label> } = {};
   _userCategories: { [accountId: string]: Array<Folder | Label> } = {};
   _hiddenCategories: { [accountId: string]: Array<Folder | Label> } = {};
-  _categoryResult;
+  _categoryResult?: (Folder | Label)[];
 
   constructor() {
     super();
@@ -53,7 +53,7 @@ class CategoryStore extends BaseStore {
       const cached = this._categoryCache[asAccountId(accountOrId)];
       return cached ? Object.values(cached) : [];
     }
-    let all = [];
+    let all: (Folder | Label)[] = [];
     for (const accountCategories of Object.values(this._categoryCache)) {
       all = all.concat(Object.values(accountCategories));
     }
@@ -102,14 +102,16 @@ class CategoryStore extends BaseStore {
     ...names: string[]
   ) {
     if (Array.isArray(accountsOrIds)) {
-      let res = [];
+      let res: (Folder | Label)[] = [];
       for (const accOrId of accountsOrIds) {
         const cats = names.map((name) => this.getCategoryByRole(accOrId, name));
-        res = res.concat(cats.filter(Boolean));
+        res = res.concat(cats.filter((c): c is Folder | Label => !!c));
       }
       return res;
     }
-    return names.map((name) => this.getCategoryByRole(accountsOrIds, name)).filter(Boolean);
+    return names
+      .map((name) => this.getCategoryByRole(accountsOrIds, name))
+      .filter((c): c is Folder | Label => !!c);
   }
 
   // Public: Returns the Folder or Label object that should be used for "Archive"
@@ -174,7 +176,7 @@ class CategoryStore extends BaseStore {
     }
 
     const filteredByAccount = (fn: (cat: Folder | Label) => boolean) => {
-      const result = {};
+      const result: { [accountId: string]: Array<Folder | Label> } = {};
       for (const cat of categories) {
         if (!fn(cat)) {
           continue;

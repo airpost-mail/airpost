@@ -1,12 +1,14 @@
 import { Categories } from './query/observables';
 import { Template } from '../components/scenario-editor/models';
 import { localized } from '../intl/localize';
+import type { Account } from './models/account';
+import type { Contact } from './models/contact';
 
 export const ConditionTemplates = [
   new Template('from', Template.Type.String, {
     name: localized('From'),
     valueForMessage: (message) =>
-      [].concat(
+      ([] as string[]).concat(
         message.from.map((c) => c.email),
         message.from.map((c) => c.name)
       ),
@@ -15,7 +17,7 @@ export const ConditionTemplates = [
   new Template('to', Template.Type.String, {
     name: localized('To'),
     valueForMessage: (message) =>
-      [].concat(
+      ([] as string[]).concat(
         message.to.map((c) => c.email),
         message.to.map((c) => c.name)
       ),
@@ -24,7 +26,7 @@ export const ConditionTemplates = [
   new Template('cc', Template.Type.String, {
     name: localized('Cc'),
     valueForMessage: (message) =>
-      [].concat(
+      ([] as string[]).concat(
         message.cc.map((c) => c.email),
         message.cc.map((c) => c.name)
       ),
@@ -33,7 +35,7 @@ export const ConditionTemplates = [
   new Template('bcc', Template.Type.String, {
     name: localized('Bcc'),
     valueForMessage: (message) =>
-      [].concat(
+      ([] as string[]).concat(
         message.bcc.map((c) => c.email),
         message.bcc.map((c) => c.name)
       ),
@@ -42,8 +44,8 @@ export const ConditionTemplates = [
   new Template('anyRecipient', Template.Type.String, {
     name: localized('Recipient'),
     valueForMessage: (message) => {
-      const recipients = [].concat(message.to, message.cc, message.bcc);
-      return [].concat(
+      const recipients = ([] as Contact[]).concat(message.to, message.cc, message.bcc);
+      return ([] as string[]).concat(
         recipients.map((c) => c.email),
         recipients.map((c) => c.name)
       );
@@ -53,7 +55,7 @@ export const ConditionTemplates = [
   new Template('replyTo', Template.Type.String, {
     name: localized('Reply to'),
     valueForMessage: (message) =>
-      [].concat(
+      ([] as string[]).concat(
         message.replyTo.map((c) => c.email),
         message.replyTo.map((c) => c.name)
       ),
@@ -118,11 +120,11 @@ export const ConditionMode = {
   All: 'all',
 };
 
-export function ConditionTemplatesForAccount(account): Template[] {
+export function ConditionTemplatesForAccount(account: Account | null | undefined): Template[] {
   return account ? ConditionTemplates : [];
 }
 
-export function ActionTemplatesForAccount(account): Template[] {
+export function ActionTemplatesForAccount(account: Account | null | undefined): Template[] {
   if (!account) {
     return [];
   }

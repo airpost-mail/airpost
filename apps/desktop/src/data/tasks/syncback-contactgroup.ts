@@ -16,8 +16,8 @@ export class SyncbackContactGroupTask extends Task {
     }),
   };
 
-  group: ContactGroup;
-  previousName: string;
+  declare group: ContactGroup;
+  declare previousName: string;
 
   static forCreating(accountId: string, name: string) {
     return new SyncbackContactGroupTask({

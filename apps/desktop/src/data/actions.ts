@@ -58,10 +58,12 @@ Section: General
 */
 
 type ActionFn = (...args: any[]) => void;
-interface Action extends ActionFn, Listenable {
+export interface Action extends ActionFn, Listenable {
   actionName: string;
   scope: 'window' | 'global' | 'main';
   sync: boolean;
+  /** Set by ActionBridge while it fires an action another window sent, so it isn't sent back. */
+  firing?: boolean;
   listen: (callback: (...args: any[]) => any, thisObj?: any) => () => void;
 }
 

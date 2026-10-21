@@ -3,6 +3,7 @@ import { AttributeJoinedData } from '../attributes/joined-data';
 import { Model } from '../models/model';
 import ModelQuery from './query';
 import { QueryRange } from './range';
+import { attributeValue, setAttributeValue } from '../models/attribute-access';
 
 // TODO: Make mutator methods QueryResultSet.join(), QueryResultSet.clip...
 export class MutableQueryResultSet<T extends Model> extends QueryResultSet<T> {
@@ -22,15 +23,17 @@ export class MutableQueryResultSet<T extends Model> extends QueryResultSet<T> {
     if (range.isInfinite()) {
       return;
     }
-    if (range.offset > this._offset) {
-      this._ids = this._ids.slice(range.offset - this._offset);
+    // A null offset or limit reads as 0 here, as the untyped arithmetic always did.
+    const rangeOffset = range.offset ?? 0;
+    if (rangeOffset > (this._offset ?? 0)) {
+      this._ids = this._ids.slice(rangeOffset - (this._offset ?? 0));
       this._offset = range.offset;
     }
 
-    const rangeEnd = range.offset + range.limit;
-    const selfEnd = this._offset + this._ids.length;
+    const rangeEnd = rangeOffset + (range.limit ?? 0);
+    const selfEnd = (this._offset ?? 0) + this._ids.length;
     if (rangeEnd < selfEnd) {
-      this._ids.length = Math.max(0, rangeEnd - this._offset);
+      this._ids.length = Math.max(0, rangeEnd - (this._offset ?? 0));
     }
 
     const models = this.models();
@@ -53,33 +56,36 @@ export class MutableQueryResultSet<T extends Model> extends QueryResultSet<T> {
       this._idToIndexHash = null;
       this._offset = range.offset;
     } else {
-      const currentEnd = this._offset + this._ids.length;
-      const rangeIdsEnd = range.offset + rangeIds.length;
+      const offset = this._offset;
+      // Not infinite, so the range has an offset; a null one reads as 0, as it always did.
+      const rangeOffset = range.offset ?? 0;
+      const currentEnd = offset + this._ids.length;
+      const rangeIdsEnd = rangeOffset + rangeIds.length;
 
-      if (rangeIdsEnd < this._offset) {
+      if (rangeIdsEnd < offset) {
         throw new Error(
-          `addIdsInRange: You can only add adjacent values (${rangeIdsEnd} < ${this._offset})`
+          `addIdsInRange: You can only add adjacent values (${rangeIdsEnd} < ${offset})`
         );
       }
-      if (range.offset > currentEnd) {
+      if (rangeOffset > currentEnd) {
         throw new Error(
           `addIdsInRange: You can only add adjacent values (${range.offset} > ${currentEnd})`
         );
       }
 
-      let existingBefore = [];
-      if (range.offset > this._offset) {
-        existingBefore = this._ids.slice(0, range.offset - this._offset);
+      let existingBefore: string[] = [];
+      if (rangeOffset > offset) {
+        existingBefore = this._ids.slice(0, rangeOffset - offset);
       }
 
-      let existingAfter = [];
+      let existingAfter: string[] = [];
       if (rangeIds.length === range.limit && currentEnd > rangeIdsEnd) {
-        existingAfter = this._ids.slice(rangeIdsEnd - this._offset);
+        existingAfter = this._ids.slice(rangeIdsEnd - offset);
       }
 
-      this._ids = [].concat(existingBefore, rangeIds, existingAfter);
+      this._ids = [...existingBefore, ...rangeIds, ...existingAfter];
       this._idToIndexHash = null;
-      this._offset = Math.min(this._offset, range.offset);
+      this._offset = Math.min(offset, rangeOffset);
     }
   }
 
@@ -93,11 +99,14 @@ export class MutableQueryResultSet<T extends Model> extends QueryResultSet<T> {
     // Make sure we never drop joined data by pulling it over.
     const existing = this._modelsHash[item.id];
     if (existing) {
-      const attrs = (existing.constructor as any).attributes;
+      const attrs = existing.ctor.attributes;
       for (const key of Object.keys(attrs)) {
         const attr = attrs[key];
-        if (attr instanceof AttributeJoinedData && item[attr.modelKey] === undefined) {
-          item[attr.modelKey] = existing[attr.modelKey];
+        if (
+          attr instanceof AttributeJoinedData &&
+          attributeValue(item, attr.modelKey) === undefined
+        ) {
+          setAttributeValue(item, attr.modelKey, attributeValue(existing, attr.modelKey));
         }
       }
     }
@@ -106,14 +115,15 @@ export class MutableQueryResultSet<T extends Model> extends QueryResultSet<T> {
   }
 
   removeModelAtOffset(item: T, offset: number) {
-    const idx = offset - this._offset;
+    const idx = offset - (this._offset ?? 0);
     delete this._modelsHash[item.id];
     this._ids.splice(idx, 1);
     this._idToIndexHash = null;
   }
 
   setQuery(query: ModelQuery<T> | ModelQuery<T[]>) {
-    this._query = query.clone();
-    this._query.finalize();
+    const clone = query.clone();
+    clone.finalize();
+    this._query = clone;
   }
 }

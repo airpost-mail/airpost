@@ -137,19 +137,19 @@ export class Thread extends ModelWithMetadata {
     return Thread.sortOrderAttribute().descending();
   };
 
-  public snippet: string;
-  public subject: string;
-  public unread: boolean;
-  public starred: boolean;
-  public version: number;
-  public folders: Folder[];
-  public labels: Label[];
-  public participants: Contact[];
-  public attachmentCount: number;
-  public firstMessageTimestamp: Date;
-  public lastMessageReceivedTimestamp: Date;
-  public lastMessageSentTimestamp: Date;
-  public inAllMail: boolean;
+  declare snippet: string;
+  declare subject: string;
+  declare unread: boolean;
+  declare starred: boolean;
+  declare version: number;
+  declare folders: Folder[];
+  declare labels: Label[];
+  declare participants: Contact[];
+  declare attachmentCount: number;
+  declare firstMessageTimestamp: Date;
+  declare lastMessageReceivedTimestamp: Date;
+  declare lastMessageSentTimestamp: Date;
+  declare inAllMail: boolean;
 
   async messages({ includeHidden }: { includeHidden?: boolean } = {}) {
     const messages = await DatabaseStore.findAll<Message>(Message)
@@ -162,7 +162,7 @@ export class Thread extends ModelWithMetadata {
   }
 
   get categories() {
-    return [].concat(this.folders || [], this.labels || []);
+    return ([] as Category[]).concat(this.folders || [], this.labels || []);
   }
 
   set categories(c: Category[]) {
@@ -191,10 +191,10 @@ export class Thread extends ModelWithMetadata {
     if (!this.categories) {
       return [];
     }
-    let out = [];
-    const isImportant = (l) => l.role === 'important';
-    const isStandardCategory = (l) => l.isStandardCategory();
-    const isUnhiddenStandardLabel = (l) =>
+    let out: Category[] = [];
+    const isImportant = (l: Category) => l.role === 'important';
+    const isStandardCategory = (l: Category) => l.isStandardCategory();
+    const isUnhiddenStandardLabel = (l: Category) =>
       !isImportant(l) && isStandardCategory(l) && !l.isHiddenCategory();
 
     const importantLabel = this.categories.find(isImportant);

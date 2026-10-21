@@ -5,8 +5,11 @@ import { localized } from '../../intl/localize';
 import { Message } from '../models/message';
 import { Thread } from '../models/thread';
 import { AttributeValues } from '../models/model';
+import { lazyRequire } from '../lazy-require';
 
-let CategoryStore = null;
+const CategoryStore = lazyRequire(
+  (): typeof import('../stores/category').default => require('../stores/category').default
+);
 
 /**
  * The folder each copy of a message was shown in before a move, and that copy's flag bits
@@ -62,8 +65,8 @@ export class ChangeFolderTask extends ChangeMailTask {
     }),
   };
 
-  folder: Folder;
-  sourceFolderIds: string[];
+  declare folder: Folder;
+  declare sourceFolderIds: string[];
   undoPlacements?: SourceFoldersByMessageId;
   restorePlacements?: SourceFoldersByMessageId;
 
@@ -260,8 +263,7 @@ export class ChangeFolderTask extends ChangeMailTask {
     if (!this.accountId) {
       return null;
     }
-    CategoryStore = CategoryStore || require('../stores/category').default;
-    const category = CategoryStore.byId(this.accountId, folderId);
+    const category = CategoryStore().byId(this.accountId, folderId);
     return category instanceof Folder ? category : null;
   }
 }

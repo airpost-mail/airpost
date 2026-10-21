@@ -14,7 +14,7 @@ export class DestroyContactTask extends Task {
     }),
   };
 
-  contacts: Contact[];
+  declare contacts: Contact[];
 
   static forRemoving({ contacts }: { contacts: Contact[] }) {
     return new DestroyContactTask({

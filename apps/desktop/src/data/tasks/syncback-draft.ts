@@ -17,8 +17,8 @@ export class SyncbackDraftTask extends Task {
     }),
   };
 
-  draft: Message;
-  headerMessageId: string;
+  declare draft: Message;
+  declare headerMessageId: string;
 
   constructor({ draft, ...rest }: AttributeValues<typeof SyncbackDraftTask.attributes> = {}) {
     super(rest);

@@ -107,8 +107,7 @@ export class LabelColorStoreClass extends BaseStore {
 
   // Every rendered chip listens (`MailLabel`), more than the default cap of 250.
   setupEmitter() {
-    super.setupEmitter();
-    return this._emitter.setMaxListeners(0);
+    return super.setupEmitter().setMaxListeners(0);
   }
 
   scheme(): LabelColorSchemeName {

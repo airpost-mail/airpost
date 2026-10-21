@@ -5,22 +5,24 @@ import ModelQuery from './query';
 import { Model } from '../models/model';
 import { DatabaseChangeRecord } from '../database/change-record';
 import { QueryResultSet } from './result-set';
+import { attributeValue, ComparableValue } from '../models/attribute-access';
 
 type QuerySubscriptionResult<T extends Model> = QueryResultSet<T> | number | T | T[];
 type QuerySubscriptionCallback<T extends Model> = (result: QuerySubscriptionResult<T>) => void;
 
 export class QuerySubscription<T extends Model> {
-  _set: MutableQueryResultSet<T> = null;
+  _set: MutableQueryResultSet<T> | null = null;
   _callbacks: QuerySubscriptionCallback<T>[] = [];
   _lastResult: QuerySubscriptionResult<T> | undefined = undefined; // null is a valid result!
   _updateInFlight = false;
-  _queuedChangeRecords = [];
+  _queuedChangeRecords: DatabaseChangeRecord<Model>[] = [];
   _queryVersion = 1;
-  _query: ModelQuery<T> | ModelQuery<T[]>;
+  // Null for a MutableQuerySubscription made before its first replaceQuery (thread search).
+  _query: ModelQuery<T> | ModelQuery<T[]> | null;
   _options: any;
 
   constructor(
-    query: ModelQuery<T> | ModelQuery<T[]>,
+    query: ModelQuery<T> | ModelQuery<T[]> | null,
     options: {
       initialModels?: T[];
       emitResultSet?: boolean;
@@ -38,7 +40,7 @@ export class QuerySubscription<T extends Model> {
       this._query.finalize();
 
       if (this._options.initialModels) {
-        this._set = new MutableQueryResultSet();
+        this._set = new MutableQueryResultSet<T>();
         this._set.addModelsInRange(
           this._options.initialModels,
           new QueryRange({
@@ -123,7 +125,8 @@ export class QuerySubscription<T extends Model> {
     if (this._queuedChangeRecords.length === 0) {
       return;
     }
-    if (!this._set) {
+    const set = this._set;
+    if (!set) {
       this.update();
       return;
     }
@@ -133,28 +136,28 @@ export class QuerySubscription<T extends Model> {
 
     this._queuedChangeRecords.forEach((record) => {
       if (record.type === 'unpersist') {
-        for (const item of record.objects) {
-          const offset = this._set.offsetOfId(item.id);
+        for (const item of record.objects as T[]) {
+          const offset = set.offsetOfId(item.id);
           if (offset !== -1) {
-            this._set.removeModelAtOffset(item, offset);
+            set.removeModelAtOffset(item, offset);
             unknownImpacts += 1;
           }
         }
       } else if (record.type === 'persist') {
-        for (const item of record.objects) {
-          const offset = this._set.offsetOfId(item.id);
+        for (const item of record.objects as T[]) {
+          const offset = set.offsetOfId(item.id);
           const itemIsInSet = offset !== -1;
-          const itemShouldBeInSet = item.matches(this._query.matchers());
+          const itemShouldBeInSet = item.matches(this._requireQuery().matchers());
 
           if (itemIsInSet && !itemShouldBeInSet) {
-            this._set.removeModelAtOffset(item, offset);
+            set.removeModelAtOffset(item, offset);
             unknownImpacts += 1;
           } else if (itemShouldBeInSet && !itemIsInSet) {
-            this._set.updateModel(item);
+            set.updateModel(item);
             unknownImpacts += 1;
           } else if (itemIsInSet) {
-            const oldItem = this._set.modelWithId(item.id);
-            this._set.updateModel(item);
+            const oldItem = set.modelWithId(item.id);
+            set.updateModel(item);
 
             if (this._itemSortOrderHasChanged(oldItem, item)) {
               unknownImpacts += 1;
@@ -167,7 +170,7 @@ export class QuerySubscription<T extends Model> {
         // item previously matched the set and doesn't anymore, impacting the items
         // in the query range. We need to refetch IDs to be sure our set === correct.
         if (
-          this._query.range().offset > 0 &&
+          (this._requireQuery().range().offset ?? 0) > 0 &&
           unknownImpacts + knownImpacts < record.objects.length
         ) {
           unknownImpacts += 1;
@@ -187,9 +190,9 @@ export class QuerySubscription<T extends Model> {
   _itemSortOrderHasChanged(old: T, updated: T) {
     if (!old || !updated) return true;
 
-    for (const descriptor of this._query.orderSortDescriptors()) {
-      const oldSortValue = old[descriptor.attr.modelKey];
-      const updatedSortValue = updated[descriptor.attr.modelKey];
+    for (const descriptor of this._requireQuery().orderSortDescriptors()) {
+      const oldSortValue = attributeValue(old, descriptor.attr.modelKey) as ComparableValue;
+      const updatedSortValue = attributeValue(updated, descriptor.attr.modelKey) as ComparableValue;
 
       // http://stackoverflow.com/questions/4587060/determining-date-equality-in-javascript
       if (!(oldSortValue >= updatedSortValue && oldSortValue <= updatedSortValue)) {
@@ -202,7 +205,7 @@ export class QuerySubscription<T extends Model> {
   update({ mustRefetchEntireRange }: { mustRefetchEntireRange?: boolean } = {}) {
     this._updateInFlight = true;
 
-    const desiredRange = this._query.range();
+    const desiredRange = this._requireQuery().range();
     const currentRange = this._set ? this._set.range() : null;
     const hasNonInfiniteRange =
       currentRange && !currentRange.isInfinite() && !desiredRange.isInfinite();
@@ -225,7 +228,7 @@ export class QuerySubscription<T extends Model> {
     }
   }
 
-  _getMissingRange = (desiredRange: QueryRange, currentRange: QueryRange) => {
+  _getMissingRange = (desiredRange: QueryRange, currentRange: QueryRange | null) => {
     if (currentRange && !currentRange.isInfinite() && !desiredRange.isInfinite()) {
       const ranges = QueryRange.rangesBySubtracting(desiredRange, currentRange);
       return ranges.length === 1 ? ranges[0] : desiredRange;
@@ -234,16 +237,17 @@ export class QuerySubscription<T extends Model> {
   };
 
   _getQueryForRange = (range: QueryRange, fetchEntireModels: boolean) => {
-    let rangeQuery = null;
+    const query = this._requireQuery();
+    let rangeQuery: ModelQuery<T> | ModelQuery<T[]> | null = null;
     if (!range.isInfinite()) {
-      rangeQuery = rangeQuery || this._query.clone();
+      rangeQuery = rangeQuery || query.clone();
       rangeQuery.offset(range.offset).limit(range.limit);
     }
     if (!fetchEntireModels) {
-      rangeQuery = rangeQuery || this._query.clone();
+      rangeQuery = rangeQuery || query.clone();
       rangeQuery.idsOnly();
     }
-    rangeQuery = rangeQuery || this._query;
+    rangeQuery = rangeQuery || query;
     return rangeQuery;
   };
 
@@ -263,7 +267,9 @@ export class QuerySubscription<T extends Model> {
     const readFailed = (err: Error) => {
       if (this._queryVersion !== version) return;
       this._updateInFlight = false;
-      console.warn(`QuerySubscription: could not read ${this._query.objectClass()}: ${err}`);
+      console.warn(
+        `QuerySubscription: could not read ${this._requireQuery().objectClass()}: ${err}`
+      );
     };
 
     DatabaseStore.run<T[] | string[]>(rangeQuery, { format: false }).then(async (results) => {
@@ -284,51 +290,70 @@ export class QuerySubscription<T extends Model> {
       if (this._set && !this._set.range().isContiguousWith(contiguityRange)) {
         this._set = null;
       }
-      this._set = this._set || new MutableQueryResultSet();
+      const set = this._set || new MutableQueryResultSet<T>();
+      this._set = set;
 
       if (fetchEntireModels) {
-        this._set.addModelsInRange(results as T[], range);
+        set.addModelsInRange(results as T[], range);
       } else {
-        this._set.addIdsInRange(results as string[], range);
+        set.addIdsInRange(results as string[], range);
       }
 
-      this._set.clipToRange(this._query.range());
+      set.clipToRange(this._requireQuery().range());
 
       // todo: this is returning fewer objects because they're being deleted immediately after being saved
       let models: T[];
       try {
         models = await this._fetchMissingModels();
       } catch (err) {
-        readFailed(err);
+        readFailed(err as Error);
         return;
       }
       if (this._queryVersion !== version) {
         return;
       }
       for (const m of models) {
-        this._set.updateModel(m);
+        set.updateModel(m);
       }
       this._createResultAndTrigger();
     }, readFailed);
   }
 
+  // The query, which reads and change records only reach once the subscription has one.
+  _requireQuery() {
+    if (!this._query) {
+      throw new Error('QuerySubscription: there is no query yet');
+    }
+    return this._query;
+  }
+
+  // The result set, which the callers below only reach once a read or the initial models made it.
+  _requireSet() {
+    if (!this._set) {
+      throw new Error('QuerySubscription: there is no result set yet');
+    }
+    return this._set;
+  }
+
   async _fetchMissingModels() {
-    const missingIds = this._set.ids().filter((id) => !this._set.modelWithId(id));
+    const set = this._requireSet();
+    const missingIds = set.ids().filter((id) => !set.modelWithId(id));
     if (missingIds.length === 0) {
       return [];
     }
-    return DatabaseStore.findAll<T>(this._query._klass, { id: missingIds });
+    return DatabaseStore.findAll<T>(this._requireQuery()._klass, { id: missingIds });
   }
 
   _createResultAndTrigger() {
-    const allCompleteModels = this._set.isComplete();
+    const set = this._requireSet();
+    const allCompleteModels = set.isComplete();
 
-    const d = {};
-    const a = this._set.ids();
+    const d: { [id: string]: number } = {};
+    const a = set.ids();
     for (const ai of a) d[ai] = 1;
     const allUniqueIds = Object.keys(d).length === a.length;
 
-    let error = null;
+    let error: Error | null = null;
     if (!allCompleteModels) {
       error = new Error('QuerySubscription: Applied all changes and result set is missing models.');
     }
@@ -345,15 +370,17 @@ export class QuerySubscription<T extends Model> {
       // return;
     }
 
+    const query = this._requireQuery();
     if (this._options.emitResultSet) {
-      this._set.setQuery(this._query);
-      this._lastResult = this._set.immutableClone();
+      set.setQuery(query);
+      this._lastResult = set.immutableClone();
     } else {
-      const models = this._set.models();
-      this._lastResult = this._query.formatResult(models) as QuerySubscriptionResult<T>;
+      const models = set.models();
+      this._lastResult = query.formatResult(models) as QuerySubscriptionResult<T>;
     }
 
-    this._callbacks.forEach((callback) => callback(this._lastResult));
+    const result = this._lastResult;
+    this._callbacks.forEach((callback) => callback(result));
 
     // process any additional change records that have arrived
     if (this._updateInFlight) {

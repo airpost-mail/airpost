@@ -10,7 +10,7 @@ import BaseStore from './base';
 import { Disposable } from 'event-kit';
 
 let Sheet = {} as SheetSet;
-let Location = {};
+let Location: SheetLocations = {};
 
 // Total TypeScript hack - expose sheet constants that we know will exist
 // and that the app commonly relies on eg: WorkspaceStore.Sheet.Bla, even
@@ -31,7 +31,7 @@ interface SheetSet {
 export interface SheetLocations {
   [locationKey: string]: {
     id: string;
-    Toolbar: SheetToolbarDeclaration;
+    Toolbar: { id: string };
   };
 }
 
@@ -45,9 +45,10 @@ export interface SheetDeclaration {
   columns: { [mode: string]: { id: string; Toolbar: { id: string } }[] };
   supportedModes: string[];
 
-  icon: string;
-  name: string;
-  root: boolean;
+  // Set for the sheets defined with them (defineSheet's options).
+  icon?: string;
+  name?: string;
+  root?: boolean;
   sidebarComponent: any;
   /** While this sheet is on top the shared toolbar is hidden and the sheet draws its own top
    * strip with SheetTitleBar, which carries the window controls, back button and menu button. */
@@ -72,8 +73,9 @@ class WorkspaceStore extends BaseStore {
   Sheet: SheetSet = (Sheet = {} as SheetSet);
 
   private _preferredLayoutMode: string;
-  private _hiddenLocations: { [locationId: string]: SheetLocations[''] };
-  private _sheetStack: SheetDeclaration[];
+  // _resetInstanceVars sets these from the constructor.
+  private _hiddenLocations!: { [locationId: string]: SheetLocations[''] };
+  private _sheetStack!: SheetDeclaration[];
   private _shortcuts?: Disposable;
 
   constructor() {
@@ -175,7 +177,7 @@ class WorkspaceStore extends BaseStore {
     this.trigger(this);
   };
 
-  _onSetFocus = ({ collection, item }) => {
+  _onSetFocus = ({ collection, item }: { collection: string; item: unknown }) => {
     if (collection === 'thread') {
       if (this.layoutMode() === 'list') {
         if (item && this.topSheet() !== Sheet.Thread) {
@@ -233,23 +235,19 @@ class WorkspaceStore extends BaseStore {
     if (this._shortcuts) {
       this._shortcuts.dispose();
     }
-    this._shortcuts = AppEnv.commands.add(
-      document.body,
-      Object.assign(
-        {
-          'core:pop-sheet': () => this.popSheet(),
-        },
-        this._preferredLayoutMode === 'list'
-          ? { 'navigation:list-mode-on': () => this._onSelectLayoutMode('list') }
-          : { 'navigation:list-mode-off': () => this._onSelectLayoutMode('list') },
-        this._preferredLayoutMode === 'split'
-          ? { 'navigation:split-mode-on': () => this._onSelectLayoutMode('split') }
-          : { 'navigation:split-mode-off': () => this._onSelectLayoutMode('split') },
-        this._preferredLayoutMode === 'splitVertical'
-          ? { 'navigation:splitVertical-mode-on': () => this._onSelectLayoutMode('splitVertical') }
-          : { 'navigation:splitVertical-mode-off': () => this._onSelectLayoutMode('splitVertical') }
-      )
-    );
+    const commands: { [command: string]: () => void } = {
+      'core:pop-sheet': () => this.popSheet(),
+      ...(this._preferredLayoutMode === 'list'
+        ? { 'navigation:list-mode-on': () => this._onSelectLayoutMode('list') }
+        : { 'navigation:list-mode-off': () => this._onSelectLayoutMode('list') }),
+      ...(this._preferredLayoutMode === 'split'
+        ? { 'navigation:split-mode-on': () => this._onSelectLayoutMode('split') }
+        : { 'navigation:split-mode-off': () => this._onSelectLayoutMode('split') }),
+      ...(this._preferredLayoutMode === 'splitVertical'
+        ? { 'navigation:splitVertical-mode-on': () => this._onSelectLayoutMode('splitVertical') }
+        : { 'navigation:splitVertical-mode-off': () => this._onSelectLayoutMode('splitVertical') }),
+    };
+    this._shortcuts = AppEnv.commands.add(document.body, commands);
   }
 
   /*
@@ -319,7 +317,7 @@ class WorkspaceStore extends BaseStore {
   //
   defineSheet(
     id: string,
-    options: Partial<SheetDeclaration> = {},
+    options: Partial<SheetDeclaration> & { silent?: boolean } = {},
     columns: { [mode: string]: string[] } = {}
   ) {
     Sheet[id] = {
@@ -353,7 +351,7 @@ class WorkspaceStore extends BaseStore {
       }
     }
 
-    if (options.root && !this.rootSheet() && !(options as any).silent) {
+    if (options.root && !this.rootSheet() && !options.silent) {
       this._onSelectRootSheet(Sheet[id]);
     }
 

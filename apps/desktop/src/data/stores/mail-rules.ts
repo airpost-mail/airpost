@@ -221,7 +221,9 @@ class MailRulesStore extends BaseStore {
       } else {
         this._reprocessing[aid] = { ...state, jobId, total };
       }
-    } catch (err) {
+    } catch (caught) {
+      // An engine error carries its code.
+      const err = caught as { code?: unknown; message: string };
       delete this._reprocessing[aid];
       AppEnv.showErrorDialog(
         err && err.code === ErrorCode.NotFound

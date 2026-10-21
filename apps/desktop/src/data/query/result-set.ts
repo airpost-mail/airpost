@@ -20,10 +20,12 @@ array, and "offset" refers to it's position in the query result set. For example
 an item might be at index 20 in the _ids array, but at offset 120 in the result.
 */
 export class QueryResultSet<T extends Model> {
-  _offset: number;
-  _query: ModelQuery<T> | ModelQuery<T[]>;
-  _idToIndexHash?: { [id: string]: number };
-  _modelsHash?: { [id: string]: T };
+  // Null until the set holds a range.
+  _offset: number | null;
+  _query: ModelQuery<T> | ModelQuery<T[]> | null;
+  // Null when it needs rebuilding (see offsetOfId).
+  _idToIndexHash: { [id: string]: number } | null;
+  _modelsHash: { [id: string]: T };
   _ids: string[] = [];
 
   static setByApplyingModels<T extends Model>(set: QueryResultSet<T>, models: { [id: string]: T }) {
@@ -42,17 +44,18 @@ export class QueryResultSet<T extends Model> {
     this._idToIndexHash = other._idToIndexHash !== undefined ? other._idToIndexHash : null;
     // Clone, since the others may be frozen
     this._modelsHash = Object.assign({}, other._modelsHash || {});
-    this._ids = [].concat(other._ids || []);
+    this._ids = [...(other._ids || [])];
   }
 
-  clone() {
-    return new (this.constructor as any)({
+  clone(): this {
+    const Klass = this.constructor as typeof QueryResultSet;
+    return new Klass<T>({
       _ids: [...this._ids],
       _modelsHash: { ...this._modelsHash },
       _idToIndexHash: { ...this._idToIndexHash },
       _query: this._query,
       _offset: this._offset,
-    });
+    }) as this;
   }
 
   isComplete() {
@@ -80,7 +83,7 @@ export class QueryResultSet<T extends Model> {
   }
 
   idAtOffset(offset: number) {
-    return this._ids[offset - this._offset];
+    return this._ids[offset - (this._offset ?? 0)];
   }
 
   models() {
@@ -97,7 +100,7 @@ export class QueryResultSet<T extends Model> {
         'QueryResultSet.modelAtOffset() takes a numeric index. Maybe you meant modelWithId()?'
       );
     }
-    return this._modelsHash[this._ids[offset - this._offset]];
+    return this._modelsHash[this._ids[offset - (this._offset ?? 0)]];
   }
 
   modelWithId(id: string): T {
@@ -105,20 +108,20 @@ export class QueryResultSet<T extends Model> {
   }
 
   buildIdToIndexHash() {
-    this._idToIndexHash = {};
+    const hash: { [id: string]: number } = {};
     this._ids.forEach((id, idx) => {
-      this._idToIndexHash[id] = idx;
+      hash[id] = idx;
     });
+    this._idToIndexHash = hash;
+    return hash;
   }
 
   offsetOfId(id: string) {
-    if (this._idToIndexHash === null) {
-      this.buildIdToIndexHash();
-    }
+    const hash = this._idToIndexHash === null ? this.buildIdToIndexHash() : this._idToIndexHash;
 
-    if (this._idToIndexHash[id] === undefined) {
+    if (hash[id] === undefined) {
       return -1;
     }
-    return this._idToIndexHash[id] + this._offset;
+    return hash[id] + (this._offset ?? 0);
   }
 }

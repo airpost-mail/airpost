@@ -6,7 +6,7 @@ Public: An object that can be cast to `itemClass`
 Section: Database
 */
 export class AttributeObject extends Attribute {
-  private itemClass: typeof Model;
+  private itemClass?: typeof Model;
 
   constructor({
     modelKey,
@@ -18,11 +18,13 @@ export class AttributeObject extends Attribute {
     this.itemClass = itemClass;
   }
 
-  toJSON(val) {
-    return val && val.toJSON ? val.toJSON() : val;
+  toJSON(val: unknown) {
+    return val && typeof val === 'object' && 'toJSON' in val && typeof val.toJSON === 'function'
+      ? val.toJSON()
+      : val;
   }
 
-  fromJSON(val) {
+  fromJSON(val: unknown) {
     const Klass = this.itemClass;
     if (!val || (Klass && val instanceof Klass)) {
       return val;
@@ -30,7 +32,7 @@ export class AttributeObject extends Attribute {
     if (Klass) {
       return new Klass(val);
     }
-    if (val.__cls) {
+    if (typeof val === 'object' && '__cls' in val && val.__cls) {
       return Utils.convertToModel(val);
     }
     return val;

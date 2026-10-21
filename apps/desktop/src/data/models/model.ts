@@ -1,6 +1,8 @@
 import * as Attributes from '../attributes';
 import { Attribute } from '../attributes/attribute';
 import { Matcher } from '../attributes/matcher';
+import { SortOrder } from '../attributes/sort-order';
+import { attributeValue, setAttributeValue } from './attribute-access';
 
 /**
 Public: A base class for API objects that provides abstract support for
@@ -57,11 +59,13 @@ export class Model {
     }),
   };
 
-  static naturalSortOrder = () => null;
+  static naturalSortOrder = (): SortOrder | null => null;
 
-  public id: string;
-  public accountId: string;
-  public version: number;
+  // Attribute fields are declared, not initialised: the constructor or fromJSON fills the
+  // ones present in the data, and an absent one stays absent so toJSON leaves it out.
+  declare id: string;
+  declare accountId: string;
+  declare version: number;
 
   constructor(data: AttributeValues<typeof Model.attributes>) {
     if (data) {
@@ -70,7 +74,7 @@ export class Model {
       } else {
         for (const key of Object.keys(this.ctor.attributes)) {
           if (data[key] !== undefined) {
-            this[key] = data[key];
+            setAttributeValue(this, key, data[key]);
           }
         }
       }
@@ -78,7 +82,7 @@ export class Model {
   }
 
   clone(): this {
-    return new (this.ctor as any)(this.toJSON()) as any;
+    return new this.ctor(this.toJSON()) as this;
   }
 
   // Public: Inflates the model object from JSON, using the defined attributes to
@@ -92,7 +96,7 @@ export class Model {
       const attr = this.ctor.attributes[key];
       const attrValue = json[attr.jsonKey || key];
       if (attrValue !== undefined) {
-        this[key] = attr.fromJSON(attrValue);
+        setAttributeValue(this, key, attr.fromJSON(attrValue));
       }
     }
     return this;
@@ -107,7 +111,7 @@ export class Model {
     const json: any = {};
     for (const key of Object.keys(this.ctor.attributes)) {
       const attr = this.ctor.attributes[key];
-      const attrValue = this[key];
+      const attrValue = attributeValue(this, key);
       if (attrValue === undefined) {
         continue;
       }

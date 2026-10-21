@@ -36,7 +36,7 @@ Section: Database
 export class AttributeJoinedData extends Attribute {
   static NullPlaceholder = NullPlaceholder;
 
-  modelTable: string;
+  modelTable?: string;
 
   constructor({
     modelKey,

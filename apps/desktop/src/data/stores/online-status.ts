@@ -11,7 +11,7 @@ const MTC_LATE_THRESHOLD = 1000 * 60;
 class OnlineStatusStore extends BaseStore {
   _interval = null;
   _offlineProcesses: { [accountId: string]: boolean } = {};
-  _timeoutTargetTime = null;
+  _timeoutTargetTime: number | null = null;
 
   constructor() {
     super();
@@ -20,12 +20,14 @@ class OnlineStatusStore extends BaseStore {
     // we asked for. If it's "late", we probably went to sleep and are waking.
     // We can restart the sync workers immediately since they're likely back online.
     if (AppEnv.isMainWindow()) {
-      this._timeoutTargetTime = Date.now() + MTC_CHECK_INTERVAL;
+      let targetTime = Date.now() + MTC_CHECK_INTERVAL;
+      this._timeoutTargetTime = targetTime;
       setInterval(() => {
-        if (Date.now() > this._timeoutTargetTime + MTC_LATE_THRESHOLD) {
+        if (Date.now() > targetTime + MTC_LATE_THRESHOLD) {
           this.onMayBeOnline();
         }
-        this._timeoutTargetTime = Date.now() + MTC_CHECK_INTERVAL;
+        targetTime = Date.now() + MTC_CHECK_INTERVAL;
+        this._timeoutTargetTime = targetTime;
       }, MTC_CHECK_INTERVAL);
 
       // Without these the engine notices a returned network only when its 120s retry

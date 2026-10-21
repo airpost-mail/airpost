@@ -12,7 +12,7 @@ import { AttributeValues } from '../models/model';
 import { Contact } from '../models/contact';
 import { ZERO_WIDTH_SPACE } from '../../components/composer-editor/plaintext';
 
-function applyExtensionTransforms(draft: Message, recipient: Contact) {
+function applyExtensionTransforms(draft: Message, recipient: Contact | null): string {
   // Note / todo: This code assumes that:
   // - any changes made to the draft (eg: metadata) should be saved.
   // - any changes made to a HTML body will be made to draftBodyRootNode NOT to the draft.body
@@ -27,13 +27,15 @@ function applyExtensionTransforms(draft: Message, recipient: Contact) {
     for (const ext of extensions) {
       ext.applyTransformsForSending({ draft, recipient });
     }
-    const after = draft.body;
+    // A draft is sent with its body loaded, and extensions rewrite it rather than drop it.
+    const after = draft.body!;
     draft.body = before;
     return after;
   } else {
     // An inert document, so images in the body aren't fetched while it is transformed
     const draftBodyRootNode = document.implementation.createHTMLDocument('').createElement('root');
-    draftBodyRootNode.innerHTML = draft.body;
+    // A draft is sent with its body loaded.
+    draftBodyRootNode.innerHTML = draft.body!;
 
     for (const ext of extensions) {
       ext.applyTransformsForSending({ draft, draftBodyRootNode, recipient });
@@ -61,12 +63,12 @@ export class SendDraftTask extends Task {
     if (task.draft.plaintext) {
       // Our editor uses zero-width spaces to differentiate between soft and hard newlines
       // when you're editing, and we don't want to send these characters.
-      task.draft.body = task.draft.body.replace(new RegExp(ZERO_WIDTH_SPACE, 'g'), '');
+      task.draft.body = task.draft.body!.replace(new RegExp(ZERO_WIDTH_SPACE, 'g'), '');
     }
 
     if (separateBodies) {
       task.perRecipientBodies = {
-        self: task.draft.body,
+        self: task.draft.body!,
       };
       task.draft.participants({ includeFrom: false, includeBcc: true }).forEach((recipient) => {
         task.perRecipientBodies[recipient.email] = applyExtensionTransforms(task.draft, recipient);
@@ -104,9 +106,9 @@ export class SendDraftTask extends Task {
     }),
   };
 
-  draft: Message;
-  perRecipientBodies: { [email: string]: string };
-  silent: boolean;
+  declare draft: Message;
+  declare perRecipientBodies: { [email: string]: string };
+  silent?: boolean;
   offlineSince?: number;
   // These are defined as accessors via Object.defineProperty after class declaration
   declare headerMessageId: string;
@@ -166,8 +168,9 @@ export class SendDraftTask extends Task {
       console.warn(`A background send failed: ${key} ${debuginfo}`);
       return;
     }
-    let errorMessage = null;
-    let errorDetail = null;
+    let errorMessage: string | null = null;
+    let errorDetail: string | null = null;
+    const errorStrings: { [key: string]: string | undefined } = LocalizedErrorStrings;
 
     if (key === 'no-sent-folder') {
       errorMessage = localized(
@@ -191,12 +194,12 @@ export class SendDraftTask extends Task {
       errorDetail = localized(
         `We encountered an SMTP Gateway error that prevented this message from being delivered to all recipients. The message was only sent successfully to these recipients:\n%@\n\nError: %@`,
         emails,
-        LocalizedErrorStrings[smtpError]
+        errorStrings[smtpError]
       );
     } else if (key === 'send-failed') {
       errorMessage = localized(
         `Sorry, Tern was unable to deliver this message: %@`,
-        LocalizedErrorStrings[debuginfo] || debuginfo
+        errorStrings[debuginfo] || debuginfo
       );
     } else {
       errorMessage = localized('We were unable to deliver this message.');

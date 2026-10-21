@@ -7,12 +7,13 @@ Public: The value of this attribute is always a number, or null.
 Section: Database
 */
 export class AttributeNumber extends Attribute {
-  toJSON(val) {
+  toJSON(val: unknown) {
     return val;
   }
 
-  fromJSON(val) {
-    return isNaN(val) ? null : Number(val);
+  fromJSON(val: unknown) {
+    // isNaN coerces the same way Number() does.
+    return isNaN(Number(val)) ? null : Number(val);
   }
 
   columnSQL() {
@@ -20,25 +21,25 @@ export class AttributeNumber extends Attribute {
   }
 
   // Public: Returns a {Matcher} for objects greater than the provided value.
-  greaterThan(val) {
+  greaterThan(val: number) {
     this._assertPresentAndQueryable('greaterThan', val);
     return new Matcher(this, '>', val);
   }
 
   // Public: Returns a {Matcher} for objects less than the provided value.
-  lessThan(val) {
+  lessThan(val: number) {
     this._assertPresentAndQueryable('lessThan', val);
     return new Matcher(this, '<', val);
   }
 
   // Public: Returns a {Matcher} for objects greater than the provided value.
-  greaterThanOrEqualTo(val) {
+  greaterThanOrEqualTo(val: number) {
     this._assertPresentAndQueryable('greaterThanOrEqualTo', val);
     return new Matcher(this, '>=', val);
   }
 
   // Public: Returns a {Matcher} for objects less than the provided value.
-  lessThanOrEqualTo(val) {
+  lessThanOrEqualTo(val: number) {
     this._assertPresentAndQueryable('lessThanOrEqualTo', val);
     return new Matcher(this, '<=', val);
   }

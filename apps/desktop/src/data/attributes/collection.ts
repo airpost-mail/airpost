@@ -31,9 +31,9 @@ The value of this attribute is always an array of other model objects.
 Section: Database
 */
 export class AttributeCollection extends Attribute {
-  itemClass: typeof Model;
-  joinOnField: string;
-  joinTableName: string;
+  itemClass?: typeof Model;
+  joinOnField?: string;
+  joinTableName?: string;
   joinQueryableBy: string[];
 
   constructor({
@@ -92,8 +92,16 @@ export class AttributeCollection extends Attribute {
 
   // Private: The Matcher interface uses this method to determine how to
   // constuct a SQL join:
-  tableNameForJoinAgainst(primaryKlass) {
-    return this.joinTableName || `${primaryKlass.name}${this.itemClass.name}`;
+  tableNameForJoinAgainst(primaryKlass: typeof Model) {
+    if (this.joinTableName) {
+      return this.joinTableName;
+    }
+    if (!this.itemClass) {
+      throw new Error(
+        `AttributeCollection: ${this.modelKey} needs an itemClass or a joinTableName`
+      );
+    }
+    return `${primaryKlass.name}${this.itemClass.name}`;
   }
 
   // Public: Returns a {Matcher} for objects containing the provided value.

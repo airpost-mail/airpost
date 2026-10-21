@@ -1,3 +1,5 @@
+// An infinite range has a null offset and limit. Where the old arithmetic read a null as 0
+// (JS coerces it that way), the code below says `?? 0`.
 export class QueryRange {
   static infinite() {
     return new QueryRange({ limit: null, offset: null });
@@ -12,7 +14,7 @@ export class QueryRange {
     }
 
     return new QueryRange({
-      start: Math.min(a.start, b.start),
+      start: Math.min(a.start ?? 0, b.start ?? 0),
       end: Math.max(a.end, b.end),
     });
   }
@@ -26,12 +28,14 @@ export class QueryRange {
       throw new Error('You cannot subtract infinite ranges.');
     }
 
-    const uncovered = [];
-    if (b.start > a.start) {
-      uncovered.push(new QueryRange({ start: a.start, end: Math.min(a.end, b.start) }));
+    const uncovered: QueryRange[] = [];
+    const aStart = a.start ?? 0;
+    const bStart = b.start ?? 0;
+    if (bStart > aStart) {
+      uncovered.push(new QueryRange({ start: a.start, end: Math.min(a.end, bStart) }));
     }
     if (b.end < a.end) {
-      uncovered.push(new QueryRange({ start: Math.max(a.start, b.end), end: a.end }));
+      uncovered.push(new QueryRange({ start: Math.max(aStart, b.end), end: a.end }));
     }
     return uncovered;
   }
@@ -41,34 +45,41 @@ export class QueryRange {
   }
 
   get end() {
-    return this.offset + this.limit;
+    return (this.offset ?? 0) + (this.limit ?? 0);
   }
 
-  offset: number;
-  limit: number;
+  offset: number | null;
+  limit: number | null;
 
   constructor({
     limit,
     offset,
     start,
     end,
-  }: { limit?: number; offset?: number; start?: number; end?: number } = {}) {
-    this.limit = limit;
-    this.offset = offset;
+  }: {
+    limit?: number | null;
+    offset?: number | null;
+    start?: number | null;
+    end?: number;
+  } = {}) {
+    let rangeLimit = limit;
+    let rangeOffset = offset;
 
     if (start !== undefined && offset === undefined) {
-      this.offset = start;
+      rangeOffset = start;
     }
     if (end !== undefined && limit === undefined) {
-      this.limit = end - this.offset;
+      rangeLimit = end - (rangeOffset ?? 0);
     }
 
-    if (this.limit === undefined) {
+    if (rangeLimit === undefined) {
       throw new Error('You must specify a limit');
     }
-    if (this.offset === undefined) {
+    if (rangeOffset === undefined) {
       throw new Error('You must specify an offset');
     }
+    this.limit = rangeLimit;
+    this.offset = rangeOffset;
   }
 
   clone() {
@@ -90,9 +101,9 @@ export class QueryRange {
     if (this.isInfinite() || b.isInfinite()) {
       return true;
     }
-    return (
-      (this.start <= b.start && b.start <= this.end) || (this.start <= b.end && b.end <= this.end)
-    );
+    const start = this.start ?? 0;
+    const bStart = b.start ?? 0;
+    return (start <= bStart && bStart <= this.end) || (start <= b.end && b.end <= this.end);
   }
 
   toString() {

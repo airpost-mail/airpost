@@ -14,7 +14,7 @@ export class DestroyContactGroupTask extends Task {
     }),
   };
 
-  group: ContactGroup;
+  declare group: ContactGroup;
 
   static forRemoving(group: ContactGroup) {
     return new DestroyContactGroupTask({

@@ -34,11 +34,11 @@ export class ChangeMailTask extends Task {
     }),
   };
 
-  threadIds: string[];
-  messageIds: string[];
-  isUndo: boolean;
-  canBeUndone: boolean;
-  taskDescription: string;
+  declare threadIds: string[];
+  declare messageIds: string[];
+  declare isUndo: boolean;
+  declare canBeUndone: boolean;
+  declare taskDescription: string;
 
   constructor({
     threads = [],

@@ -97,7 +97,7 @@ class DraftStore extends BaseStore {
   @param {String} headerMessageId - The headerMessageId of the draft.
   @returns {Promise} - Resolves to an {DraftEditingSession} for the draft once it has been prepared
   */
-  async sessionForClientId(headerMessageId: string) {
+  async sessionForClientId(headerMessageId: string | null | undefined) {
     if (!headerMessageId) {
       throw new Error('DraftStore::sessionForClientId requires a headerMessageId');
     }
@@ -126,7 +126,7 @@ class DraftStore extends BaseStore {
   }
 
   _onBeforeUnload = (readyToUnload: () => void) => {
-    const promises = [];
+    const promises: Promise<void>[] = [];
 
     // Normally we'd just append all promises, even the ones already
     // fulfilled (nothing to save), but in this case we only want to
@@ -154,7 +154,7 @@ class DraftStore extends BaseStore {
     });
 
     if (promises.length > 0) {
-      let done = () => {
+      let done: (() => void) | null = () => {
         done = null;
         this._draftSessions = {};
         // We have to wait for accumulateAndTrigger() in the DatabaseStore to
@@ -262,7 +262,7 @@ class DraftStore extends BaseStore {
     messageId,
     to,
   }: IThreadMessageModelOrId & { to?: Contact[] }) => {
-    const { headerMessageId, draft } = await this._composeForward(
+    const forwarded = await this._composeForward(
       {
         thread: thread,
         threadId: threadId,
@@ -271,7 +271,9 @@ class DraftStore extends BaseStore {
       },
       to
     );
-    Actions.sendDraft(headerMessageId);
+    // No forward when the thread or message isn't found; destructuring that used to throw.
+    if (!forwarded) return;
+    Actions.sendDraft(forwarded.headerMessageId);
   };
 
   _composeForward = async (
@@ -338,7 +340,10 @@ class DraftStore extends BaseStore {
       // Reply to the newest received/sent message, never to an unsent draft on the thread.
       // No limit: hidden messages (reminders) must not push the real one out of the window, so
       // the scan skips bodies and the chosen message's body is loaded on its own.
-      queries.message = DatabaseStore.findAll<Message>(Message, { threadId: threadId || thread.id })
+      // The checks above leave threadId or thread set.
+      queries.message = DatabaseStore.findAll<Message>(Message, {
+        threadId: threadId || thread!.id,
+      })
         .where(Message.attributes.draft.equal(false))
         .order(Message.attributes.date.descending())
         .then((messages) => {
@@ -406,7 +411,8 @@ class DraftStore extends BaseStore {
     if (!session.draft()) return;
 
     await session.changes.commit();
-    const draftJSON = session.draft().toJSON();
+    // A loaded session's draft is replaced by newer copies but never unset.
+    const draftJSON = session.draft()!.toJSON();
 
     // Since we pass a windowKey, if the popout composer draft already
     // exists we'll simply show that one instead of spawning a whole new
@@ -426,7 +432,7 @@ class DraftStore extends BaseStore {
     try {
       await this._finalizeAndPersistNewMessage(draft, { popout: true });
     } catch (err) {
-      AppEnv.showErrorDialog(err.toString());
+      AppEnv.showErrorDialog(String(err));
     }
   };
 
@@ -548,8 +554,11 @@ class DraftStore extends BaseStore {
         });
       }
       if (session.hasSendableFromAddress()) {
-        AppEnv.showErrorDialog(localized('Sorry, this message could not be sent. %@', err.message));
-        AppEnv.reportError(err, { headerMessageId });
+        const error = err as Error;
+        AppEnv.showErrorDialog(
+          localized('Sorry, this message could not be sent. %@', error.message)
+        );
+        AppEnv.reportError(error, { headerMessageId });
       } else {
         AppEnv.showErrorDialog(DraftEditingSession.unsendableFromAddressMessage());
       }
@@ -560,7 +569,7 @@ class DraftStore extends BaseStore {
     diagnostics.draftIdAfterEnsure = session.draft()?.id;
     diagnostics.draftAccountIdAfterEnsure = session.draft()?.accountId;
 
-    let draft: Message = session.draft();
+    let draft: Message | null = session.draft();
     if (!draft) {
       this._draftsSending[headerMessageId] = false;
       this.trigger({ headerMessageId });
@@ -571,8 +580,10 @@ class DraftStore extends BaseStore {
     }
 
     // remove inline attachments that are no longer in the body
+    const loaded = draft;
     const files = draft.files.filter((f) => {
-      return !(f.contentId && !draft.body.includes(`cid:${f.contentId}`));
+      // The session's draft is always loaded with its body.
+      return !(f.contentId && !loaded.body!.includes(`cid:${f.contentId}`));
     });
     if (files.length !== draft.files.length) {
       session.changes.add({ files });
@@ -670,7 +681,8 @@ class DraftStore extends BaseStore {
     } catch (err) {
       this._draftsSending[headerMessageId] = false;
       this.trigger({ headerMessageId });
-      const why = (err.data && err.data.message) || err.message;
+      const failure = err as { data?: { message?: string }; message?: string };
+      const why = (failure.data && failure.data.message) || failure.message;
       AppEnv.showErrorDialog(localized('Sorry, this message could not be sent. %@', why));
       return;
     }
@@ -704,12 +716,22 @@ class DraftStore extends BaseStore {
     AppEnv.reportError(err, { headerMessageId, ...diagnostics });
   };
 
-  _onSendDraftSuccess = ({ headerMessageId }) => {
+  _onSendDraftSuccess = ({ headerMessageId }: { headerMessageId: string }) => {
     delete this._draftsSending[headerMessageId];
     this.trigger({ headerMessageId });
   };
 
-  _onSendDraftFailed = ({ headerMessageId, threadId, errorMessage, errorDetail }) => {
+  _onSendDraftFailed = ({
+    headerMessageId,
+    threadId,
+    errorMessage,
+    errorDetail,
+  }: {
+    headerMessageId: string;
+    threadId?: string;
+    errorMessage: string;
+    errorDetail?: string;
+  }) => {
     this._draftsSending[headerMessageId] = false;
     this.trigger({ headerMessageId });
 

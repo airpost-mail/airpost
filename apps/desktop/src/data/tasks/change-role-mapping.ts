@@ -15,8 +15,8 @@ export class ChangeRoleMappingTask extends Task {
     }),
   };
 
-  path: string;
-  role: string;
+  declare path: string;
+  declare role: string;
 
   constructor(data: AttributeValues<typeof ChangeRoleMappingTask.attributes> = {}) {
     super(data);

@@ -6,6 +6,9 @@ import WorkspaceStore from './workspace';
 import { MailboxPerspective } from '../mailbox-perspective';
 import CategoryStore from './category';
 import * as Actions from '../actions';
+import type { Account } from '../models/account';
+import type { Folder } from '../models/folder';
+import type { Label } from '../models/label';
 
 class FocusedPerspectiveStore extends BaseStore {
   _current: MailboxPerspective = MailboxPerspective.forNothing();
@@ -45,7 +48,7 @@ class FocusedPerspectiveStore extends BaseStore {
   }
 
   sidebarAccountIds() {
-    let ids = AppEnv.savedState.sidebarAccountIds;
+    let ids: string[] = AppEnv.savedState.sidebarAccountIds;
     if (!ids || !ids.length || !ids.every((id) => AccountStore.accountForId(id))) {
       ids = AppEnv.savedState.sidebarAccountIds = AccountStore.accountIds();
     }
@@ -189,7 +192,7 @@ class FocusedPerspectiveStore extends BaseStore {
    * provided
    */
   _onFocusDefault = (
-    accountsOrIds,
+    accountsOrIds: Account | string | (Account | string)[] | null | undefined,
     { sidebarAccountIds }: { sidebarAccountIds?: string[] } = {}
   ) => {
     if (!accountsOrIds) {
@@ -206,7 +209,9 @@ class FocusedPerspectiveStore extends BaseStore {
     this._onFocusPerspective(perspective);
   };
 
-  _defaultPerspective(accountsOrIds = AccountStore.accountIds()) {
+  _defaultPerspective(
+    accountsOrIds: Account | string | (Account | string)[] = AccountStore.accountIds()
+  ) {
     const perspective = MailboxPerspective.forInbox(accountsOrIds);
 
     // If no account ids were selected, or the categories for these accounts have
@@ -218,7 +223,7 @@ class FocusedPerspectiveStore extends BaseStore {
     return perspective;
   }
 
-  _setPerspective(perspective, sidebarAccountIds?: string[]) {
+  _setPerspective(perspective: MailboxPerspective, sidebarAccountIds?: string[]) {
     let shouldTrigger = false;
 
     if (!perspective.isEqual(this._current)) {
@@ -256,7 +261,7 @@ class FocusedPerspectiveStore extends BaseStore {
   _setUnreadPerspective() {
     const inboxes = this._current.accountIds
       .map((id) => CategoryStore.getCategoryByRole(id, 'inbox'))
-      .filter(Boolean);
+      .filter((c): c is Folder | Label => !!c);
     if (inboxes.length === 0) {
       return;
     }

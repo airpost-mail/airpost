@@ -24,15 +24,16 @@ import {
 } from '../../components/composer-editor/plaintext';
 import { buildDraft, draftPipelineAvailable } from '../../engine/client/drafts';
 import { DraftCreateParams } from '../../engine/protocol';
+import { lazyRequire } from '../lazy-require';
 
-let DraftStore: typeof import('./store').default = null;
+const DraftStore = lazyRequire((): typeof import('./store').default => require('./store').default);
 
 // Message-IDs are `<UUID>@<domain of the sending address>`, so they don't name the client.
 // Internationalised domains go out in their ASCII (punycode) form. Falls back to the machine's
 // hostname when the address has no usable domain.
 export function generateHeaderMessageId(fromEmail?: string) {
   const at = (fromEmail || '').lastIndexOf('@');
-  let domain = at === -1 ? '' : fromEmail.slice(at + 1).trim();
+  let domain = at === -1 ? '' : (fromEmail || '').slice(at + 1).trim();
   // domainToASCII returns '' for anything that is not a valid domain.
   domain = domain && /[^ -~]/.test(domain) ? domainToASCII(domain) : domain;
   if (!/^[A-Za-z0-9.-]+$/.test(domain)) {
@@ -51,14 +52,14 @@ class DraftFactory {
   }
 
   async prepareBodyForQuoting(message: Message) {
+    // A message whose body isn't loaded quotes as empty, not as the text "undefined".
+    const body = message.body ?? '';
     if (!this.useHTML()) {
-      const content = message.plaintext
-        ? message.body
-        : convertToPlainText(convertFromHTML(message.body)).trim();
+      const content = message.plaintext ? body : convertToPlainText(convertFromHTML(body)).trim();
       return deepenPlaintextQuote(content);
     }
 
-    const content = message.plaintext ? convertPlaintextToHTML(message.body) : message.body;
+    const content = message.plaintext ? convertPlaintextToHTML(body) : body;
 
     // TODO: Fix inline images
     const cidRE = MessageUtils.cidRegexString;
@@ -89,7 +90,7 @@ class DraftFactory {
       return await buildDraft({ ...params, html: this.useHTML(), fields: json });
     } catch (err) {
       // Refused or disconnected: the JavaScript builder still makes the draft.
-      console.warn(`draft.create failed, building the draft here: ${err.message}`);
+      console.warn(`draft.create failed, building the draft here: ${(err as Error).message}`);
       return null;
     }
   }
@@ -99,7 +100,7 @@ class DraftFactory {
   async createNewDraft(fields: { accountId?: string; [key: string]: any } = {}) {
     const account = fields.accountId ? null : this._accountForNewDraft();
     const engine = await this._engineDraft(
-      { kind: 'new', accountId: fields.accountId || (account && account.id) },
+      { kind: 'new', accountId: fields.accountId || account?.id },
       fields
     );
     return engine || this.createDraft(fields);
@@ -110,6 +111,9 @@ class DraftFactory {
     const account =
       (fields.accountId && AccountStore.accountForId(fields.accountId)) ||
       this._accountForNewDraft();
+    if (!account) {
+      throw new Error('createDraft: there is no account to send from');
+    }
     const rich = this.useHTML();
     const defaults = {
       body: rich ? '<br/>' : '',
@@ -117,15 +121,15 @@ class DraftFactory {
       version: 0,
       unread: false,
       starred: false,
-      headerMessageId: null as string,
+      headerMessageId: null as string | null,
       from: [account.defaultMe()],
       date: new Date(),
       draft: true,
       pristine: true,
       plaintext: !rich,
       accountId: account.id,
-      cc: [],
-      bcc: [],
+      cc: [] as Contact[],
+      bcc: [] as Contact[],
     };
 
     const merged = Object.assign(defaults, fields);
@@ -189,8 +193,9 @@ class DraftFactory {
 
     const querySplit = /[&|?](subject|body|cc|to|from|bcc)+\s*=/gi;
 
-    let openKey = null;
-    let openValueStart = null;
+    let openKey: string | null = null;
+    // Set together with openKey, before it is read.
+    let openValueStart = 0;
     let matched = true;
 
     while (matched) {
@@ -215,7 +220,7 @@ class DraftFactory {
         openValueStart = querySplit.lastIndex;
       }
     }
-    const contacts = {};
+    const contacts: { [attr: string]: Promise<Contact[]> } = {};
     for (const attr of ['to', 'cc', 'bcc']) {
       if (query[attr]) {
         contacts[attr] = ContactStore.parseContactsInString(query[attr]);
@@ -268,7 +273,7 @@ class DraftFactory {
     if (engine) return engine;
 
     const prevBody = await this.prepareBodyForQuoting(message);
-    let participants = { to: [], cc: [] };
+    let participants: { to: Contact[]; cc: Contact[] } = { to: [], cc: [] };
     if (type === 'reply') {
       participants = message.participantsForReply();
     } else if (type === 'reply-all') {
@@ -315,7 +320,7 @@ class DraftFactory {
       return this.useHTML() ? DOMUtils.escapeHTMLCharacters(text) : text;
     };
 
-    const fields = [];
+    const fields: string[] = [];
     if (message.from.length > 0)
       fields.push(`${localized('From')}: ${formatContact(message.from)}`);
     const subject = this.useHTML()
@@ -377,8 +382,11 @@ class DraftFactory {
     return draft;
   }
 
-  async createDraftForResurfacing(thread: Thread, threadMessageId: string, body: string) {
+  async createDraftForResurfacing(thread: Thread, threadMessageId: string | null, body: string) {
     const account = AccountStore.accountForId(thread.accountId);
+    if (!account) {
+      throw new Error(`createDraftForResurfacing: no account ${thread.accountId}`);
+    }
     let replyToHeaderMessageId = threadMessageId;
 
     if (!replyToHeaderMessageId) {
@@ -420,7 +428,7 @@ class DraftFactory {
       return null;
     }
     if (behavior === 'prefer-existing') {
-      const draft = candidateDrafts.pop();
+      const draft = candidateDrafts[candidateDrafts.length - 1];
       // MessageStore holds bodies for expanded messages only, and the read above skips them;
       // the draft is persisted again with its body, so load it first.
       if (draft.body !== undefined) return draft;
@@ -430,10 +438,9 @@ class DraftFactory {
       return withBody || null;
     }
     if (behavior === 'prefer-existing-if-pristine') {
-      DraftStore = DraftStore || require('./store').default;
       const sessions = await Promise.all(
         candidateDrafts.map((candidateDraft) =>
-          DraftStore.sessionForClientId(candidateDraft.headerMessageId)
+          DraftStore().sessionForClientId(candidateDraft.headerMessageId)
         )
       );
       return sessions.map((s) => s.draft()).find((d) => d && d.pristine);
@@ -448,13 +455,13 @@ class DraftFactory {
     const updated: { to: Contact[]; cc: Contact[] } = { to: [...draft.to], cc: [...draft.cc] };
     const replySet = message.participantsForReply();
     const replyAllSet = message.participantsForReplyAll();
-    let targetSet = null;
+    let targetSet: { to: Contact[]; cc: Contact[] };
 
     if (type === 'reply') {
       targetSet = replySet;
 
       // Remove participants present in the reply-all set and not the reply set
-      for (const key of ['to', 'cc']) {
+      for (const key of ['to', 'cc'] as const) {
         updated[key] = updated[key].filter((contact) => {
           const inReplySet = replySet[key]?.find((x) => x.email === contact.email);
           const inReplyAllSet = replyAllSet[key]?.find((x) => x.email === contact.email);
@@ -467,7 +474,7 @@ class DraftFactory {
       targetSet = replyAllSet;
     }
 
-    for (const key of ['to', 'cc']) {
+    for (const key of ['to', 'cc'] as const) {
       for (const contact of targetSet[key]) {
         if (!updated[key]?.find((x) => x.email === contact.email)) {
           updated[key].push(contact);
@@ -482,6 +489,9 @@ class DraftFactory {
 
   _fromContactForReply(message: Message) {
     const account = AccountStore.accountForId(message.accountId);
+    if (!account) {
+      throw new Error(`_fromContactForReply: no account ${message.accountId}`);
+    }
     const defaultMe = account.defaultMe();
 
     let result = defaultMe;

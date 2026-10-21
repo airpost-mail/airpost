@@ -1,6 +1,6 @@
 /* eslint no-unused-vars: 0*/
 import _ from 'underscore';
-import { Model } from '../models/model';
+import { Model, AttributeValues } from '../models/model';
 import * as Attributes from '../attributes';
 import { generateTempId } from '../models/utils';
 
@@ -30,12 +30,12 @@ export class Task extends Model {
     }),
   };
 
-  status: string;
-  source: string;
-  error: string;
+  declare status: string;
+  declare source: string;
+  declare error: string;
 
   /** Set in subclasses to enable undo support. Defaults to falsy (undefined). */
-  canBeUndone: boolean;
+  canBeUndone?: boolean;
 
   /**
    * True when the engine writes data the undo needs onto the task during its local phase
@@ -51,7 +51,7 @@ export class Task extends Model {
   // `super`.
   //
   // On construction, all Tasks instances are given a unique `id`.
-  constructor(data: { version?: string; status?: string; source?: string; error?: string } = {}) {
+  constructor(data: AttributeValues<typeof Task.attributes> = {}) {
     super(data);
     this.status = this.status || Status.Local;
     this.id = this.id || generateTempId();

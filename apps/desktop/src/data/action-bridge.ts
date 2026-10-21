@@ -1,6 +1,11 @@
 import * as Actions from './actions';
 import * as Utils from './models/utils';
 
+// The action exported under `name`, which arrives from another window over IPC.
+function actionNamed(name: string) {
+  return (Actions as unknown as { [name: string]: Actions.Action | undefined })[name];
+}
+
 const Role = {
   MAIN: 'default',
   SECONDARY: 'secondary',
@@ -27,7 +32,7 @@ class ActionBridge {
 
   globalActions = [];
   ipc: any;
-  ipcLastSendTime = null;
+  ipcLastSendTime: number | null = null;
   initiatorId = AppEnv.getWindowType();
   role = AppEnv.isMainWindow() ? Role.MAIN : Role.SECONDARY;
 
@@ -81,9 +86,10 @@ class ActionBridge {
 
       const args = JSON.parse(json, Utils.modelTypesReviver);
 
-      if (Actions[name]) {
-        Actions[name].firing = true;
-        Actions[name](...args);
+      const action = actionNamed(name);
+      if (action) {
+        action.firing = true;
+        action(...args);
       } else {
         throw new Error(`${this.initiatorId} received unknown action-bridge event: ${name}`);
       }
@@ -91,8 +97,9 @@ class ActionBridge {
   };
 
   onRebroadcast = (target: string, name: string, args: unknown[]) => {
-    if (Actions[name] && Actions[name].firing) {
-      Actions[name].firing = false;
+    const action = actionNamed(name);
+    if (action && action.firing) {
+      action.firing = false;
       return;
     }
 

@@ -134,7 +134,7 @@ export class CapabilityStoreClass extends BaseStore {
   private _keyRead: Promise<void> = Promise.resolve();
   private _keyReadGeneration = 0;
   private _disposables: Array<() => void> = [];
-  keySource: KeySource = null;
+  keySource: KeySource | null = null;
   /** The window's engine connection; swappable for specs. */
   engineEvents: EngineEventsType = EngineEvents;
 
@@ -211,11 +211,13 @@ export class CapabilityStoreClass extends BaseStore {
     if (reported && !reported.available) {
       return unavailable(engineReason(reported, provider));
     }
-    if (!settings.enabled) {
+    // readSettings only enables settings that have a provider.
+    const settingsProvider = settings.provider;
+    if (!settings.enabled || !settingsProvider) {
       return unavailable(localized('Set up a provider in Preferences > Integrations'));
     }
-    const missing = missingSetting(settings, !!this._hasKey[settings.provider]);
-    const name = PROVIDERS[settings.provider].name;
+    const missing = missingSetting(settings, !!this._hasKey[settingsProvider]);
+    const name = PROVIDERS[settingsProvider].name;
     // The key goes with each request unless the engine says it holds the keys itself.
     const keysFromUs = !reported || reported.credentials === 'request';
     if (missing === 'url') {
@@ -254,7 +256,8 @@ export class CapabilityStoreClass extends BaseStore {
     if (missing === 'disabled' || missing === 'provider' || missing === 'model') {
       return unavailable(localized('Set up a model in Preferences > AI'));
     }
-    if (missing === 'key' && keysFromUs) {
+    // A missing key means there is a provider (missingSetting reports 'provider' first).
+    if (missing === 'key' && keysFromUs && provider) {
       return unavailable(
         localized('Add your %@ API key in Preferences > AI', AI.providerName(provider))
       );
@@ -278,7 +281,7 @@ export class CapabilityStoreClass extends BaseStore {
   }
 
   all(): { [feature: string]: Capability } {
-    const result = {};
+    const result: { [feature: string]: Capability } = {};
     for (const feature of ALL_FEATURES) result[feature] = this.get(feature);
     return result;
   }
@@ -297,7 +300,7 @@ export class CapabilityStoreClass extends BaseStore {
     const ai = AI.readSettings();
     const aiProviders = AI.AI_FEATURES.filter((f) => ai.features[f].enabled)
       .map((f) => AI.providerFor(ai, f))
-      .filter(Boolean)
+      .filter((p): p is NonNullable<typeof p> => !!p)
       .map((p) => p.id);
 
     this._keyRead = (async () => {

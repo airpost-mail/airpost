@@ -22,9 +22,9 @@ export class ChangeContactGroupMembershipTask extends Task {
     }),
   };
 
-  contacts: Contact[];
-  group: ContactGroup;
-  direction: 'add' | 'remove';
+  declare contacts: Contact[];
+  declare group: ContactGroup;
+  declare direction: 'add' | 'remove';
 
   static forMoving({
     contacts,

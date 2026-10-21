@@ -5,6 +5,8 @@ import * as Attributes from '../../src/data/attributes';
 import DatabaseObjectRegistry from '../../src/data/database-object-registry';
 
 class GoodTest extends Model {
+  declare foo: string;
+
   static attributes = {
     ...Model.attributes,
 
@@ -31,7 +33,7 @@ describe('DatabaseObjectRegistry', function DatabaseObjectRegistrySpecs() {
 
   it('deserializes the objects for a constructor', () => {
     DatabaseObjectRegistry.register('GoodTest', () => GoodTest);
-    const obj = DatabaseObjectRegistry.deserialize('GoodTest', { foo: 'bar' });
+    const obj = DatabaseObjectRegistry.deserialize<GoodTest>('GoodTest', { foo: 'bar' });
     expect(obj instanceof GoodTest).toBe(true);
     expect(obj.foo).toBe('bar');
   });

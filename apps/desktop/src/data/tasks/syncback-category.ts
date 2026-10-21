@@ -19,9 +19,9 @@ export class SyncbackCategoryTask extends Task {
     }),
   };
 
-  path: string;
-  existingPath: string;
-  created: any;
+  declare path: string;
+  declare existingPath: string;
+  declare created: any;
 
   static forCreating({ name, accountId }: { name: string; accountId: string }) {
     return new SyncbackCategoryTask({
