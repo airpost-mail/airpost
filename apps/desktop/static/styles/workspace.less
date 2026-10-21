@@ -485,10 +485,6 @@ body.is-blurred {
   }
 
   &.is-blurred {
-    .sheet-toolbar-container {
-      background-image: none;
-      background: var(--toolbar-background);
-    }
     .toolbar-window-controls button {
       background-color: color-mix(in srgb, @text-color 15%, transparent);
       box-shadow: inset 0 0 0 0.5px fade(@black, 8%);
@@ -597,6 +593,11 @@ body.is-blurred {
 
 // Kept at the specificity of the generic `body.is-blurred` rule above (which it
 // must outrank), so it deliberately does not use the zero-specificity :where().
+body:where(.platform-darwin).is-blurred .sheet-toolbar-container {
+  // The flat toolbar, not the generic rule's gradient, which is drawn from a light literal.
+  background-image: none;
+  background: var(--toolbar-background);
+}
 body:where(.platform-darwin).is-blurred :is(.sheet-toolbar-container, .sheet-title-bar) {
   .btn.btn-toolbar {
     background: @toolbar-btn-fill-blurred-darwin;
