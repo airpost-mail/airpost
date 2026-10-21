@@ -4,13 +4,11 @@ import { pathToFileURL } from 'url';
 
 import { localized } from '../../intl/localize';
 import { escapeHTML } from 'underscore.string';
-import { developerToolsAvailable } from '../../platform/developer-tools';
+import { App, PrintWindows } from '../../platform/app-api';
 import {
   contentSecurityPolicyMetaTag,
   printContentSecurityPolicy,
 } from '../../mail/content-security-policy';
-
-const { app, BrowserWindow, dialog } = require('@electron/remote');
 
 interface PrintWindowOptions {
   subject: string;
@@ -23,137 +21,82 @@ interface PrintWindowOptions {
   remoteImages: boolean;
 }
 
-export default class PrintWindow {
-  browserWin: Electron.BrowserWindow;
-  tmpFile: string;
+/**
+ * Writes print.html and print.messages.js to the temp directory and opens them in the print
+ * preview window main builds (main/windows/print-window.ts). print.js shows the print prompt
+ * once the page has loaded; we can also call print directly from this process, but inside
+ * print.js we can make sure to call window.print() after we've cleaned up the dom for printing.
+ */
+export default async function openPrintWindow({
+  subject,
+  account,
+  participants,
+  styleTags,
+  htmlContent,
+  printMessages,
+  remoteImages,
+}: PrintWindowOptions) {
+  const tmp = await App.getPath('temp');
+  const tmpMessagesPath = path.join(tmp, 'print.messages.js');
 
-  constructor({
-    subject,
-    account,
-    participants,
-    styleTags,
-    htmlContent,
-    printMessages,
-    remoteImages,
-  }: PrintWindowOptions) {
-    // This script will create the print prompt when loaded. We can also call
-    // print directly from this process, but inside print.js we can make sure to
-    // call window.print() after we've cleaned up the dom for printing
-    const tmp = app.getPath('temp');
-    const tmpMessagesPath = path.join(tmp, 'print.messages.js');
+  const scriptPath = path.join(__dirname, 'static', 'print.js');
+  const stylesPath = path.join(__dirname, 'static', 'styles.css');
+  const participantsHtml = participants
+    .map((part) => {
+      return `<li class="participant"><span>
+        ${escapeHTML(part.name || '')} &lt;${escapeHTML(part.email)}&gt;
+      </span></li>`;
+    })
+    .join('');
 
-    const preloadPath = path.join(__dirname, 'static', 'preload.js');
-    const scriptPath = path.join(__dirname, 'static', 'print.js');
-    const stylesPath = path.join(__dirname, 'static', 'styles.css');
-    const participantsHtml = participants
-      .map((part) => {
-        return `<li class="participant"><span>
-          ${escapeHTML(part.name || '')} &lt;${escapeHTML(part.email)}&gt;
-        </span></li>`;
-      })
-      .join('');
-
-    const content = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          ${contentSecurityPolicyMetaTag(printContentSecurityPolicy({ remoteImages }))}
-          <meta charset="utf-8">
-          ${styleTags}
-          <link rel="stylesheet" type="text/css" href="${pathToFileURL(stylesPath).href}">
-        </head>
-        <body>
-          <div id="print-header">
-            <div id="print-note" style="display: none;">
-              One or more messages in this thread were collapsed and will not be printed.
-              To print these messages, expand them in the main window.
+  const content = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        ${contentSecurityPolicyMetaTag(printContentSecurityPolicy({ remoteImages }))}
+        <meta charset="utf-8">
+        ${styleTags}
+        <link rel="stylesheet" type="text/css" href="${pathToFileURL(stylesPath).href}">
+      </head>
+      <body>
+        <div id="print-header">
+          <div id="print-note" style="display: none;">
+            One or more messages in this thread were collapsed and will not be printed.
+            To print these messages, expand them in the main window.
+          </div>
+          <div style="padding: 10px 14px;">
+            <div id="close-button">
+              ${escapeHTML(localized('Close'))}
             </div>
-            <div style="padding: 10px 14px;">
-              <div id="close-button">
-                ${escapeHTML(localized('Close'))}
-              </div>
-              <div id="print-button">
-                ${escapeHTML(localized('Print'))}
-              </div>
-              <div id="print-pdf-button">
-                ${escapeHTML(localized('Save as PDF'))}
-              </div>
-              <div class="logo-wrapper">
-                <span class="account">${escapeHTML(account.name)} &lt;${escapeHTML(
-                  account.email
-                )}&gt;</span>
-              </div>
+            <div id="print-button">
+              ${escapeHTML(localized('Print'))}
+            </div>
+            <div id="print-pdf-button">
+              ${escapeHTML(localized('Save as PDF'))}
+            </div>
+            <div class="logo-wrapper">
+              <span class="account">${escapeHTML(account.name)} &lt;${escapeHTML(
+                account.email
+              )}&gt;</span>
             </div>
           </div>
-          <div id="print-header-spacing"></div>
-          <h1 class="print-subject">${escapeHTML(subject)}</h1>
-          <div class="print-participants">
-            <ul>
-              ${participantsHtml}
-            </ul>
-          </div>
-          ${htmlContent}
-          <script type="text/javascript" src="${pathToFileURL(tmpMessagesPath).href}"></script>
-          <script type="text/javascript" src="${pathToFileURL(scriptPath).href}"></script>
-        </body>
-      </html>
-    `;
+        </div>
+        <div id="print-header-spacing"></div>
+        <h1 class="print-subject">${escapeHTML(subject)}</h1>
+        <div class="print-participants">
+          <ul>
+            ${participantsHtml}
+          </ul>
+        </div>
+        ${htmlContent}
+        <script type="text/javascript" src="${pathToFileURL(tmpMessagesPath).href}"></script>
+        <script type="text/javascript" src="${pathToFileURL(scriptPath).href}"></script>
+      </body>
+    </html>
+  `;
 
-    this.tmpFile = path.join(tmp, 'print.html');
-    this.browserWin = new BrowserWindow({
-      width: 800,
-      height: 600,
-      title: `${localized('Print')} - ${subject}`,
-      webPreferences: {
-        preload: preloadPath,
-        nodeIntegration: false,
-        contextIsolation: true,
-        devTools: developerToolsAvailable(),
-      },
-    });
-
-    this.browserWin.webContents.ipc.on('print-to-pdf', async () => {
-      const { filePath } = await dialog.showSaveDialog({
-        defaultPath: `${subject}.pdf`,
-      });
-
-      if (!filePath) {
-        return;
-      }
-
-      try {
-        const data = await this.browserWin.webContents.printToPDF({
-          // Electron 21 replaced the old top-level `marginsType` enum with explicit
-          // per-side inches (PrintToPDFMargins). `marginType: 'none'` was neither: an
-          // unrecognised key, silently ignored, so these PDFs have been printing with the
-          // default 1cm margins rather than none.
-          margins: { top: 0, bottom: 0, left: 0, right: 0 },
-          pageSize: 'Letter',
-          printBackground: true,
-          landscape: false,
-        });
-        fs.writeFileSync(filePath, data);
-      } catch (err) {
-        AppEnv.showErrorDialog({
-          title: localized('Save as PDF Failed'),
-          message: localized(
-            'Tern could not generate the PDF. Please try again. If the problem persists, try printing to a PDF printer instead.\n\nError: %@',
-            err instanceof Error ? err.message : String(err)
-          ),
-        });
-      }
-    });
-
-    this.browserWin.removeMenu();
-    fs.writeFileSync(tmpMessagesPath, `window.printMessages = ${printMessages}`);
-    fs.writeFileSync(this.tmpFile, content);
-  }
-
-  /**
-   * Load our temp html file. Once the file is loaded it will run print.js, and
-   * that script will pop out the print dialog.
-   */
-  load() {
-    this.browserWin.loadURL(pathToFileURL(this.tmpFile).href);
-  }
+  fs.writeFileSync(tmpMessagesPath, `window.printMessages = ${printMessages}`);
+  // Main loads this file by its name in the temp directory.
+  fs.writeFileSync(path.join(tmp, 'print.html'), content);
+  await PrintWindows.open({ subject });
 }

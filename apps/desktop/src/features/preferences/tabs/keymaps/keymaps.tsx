@@ -1,11 +1,13 @@
 import React from 'react';
 import path from 'path';
 import fs from 'fs';
+import { shell } from 'electron';
 
 import { SettingsPage, SettingsSection, SettingsRow } from '../../../../components/settings';
 import { Button } from '../../../../components/kit/button';
 import { SettingsSelect } from '../../../../components/settings-select';
 import { localized } from '../../../../intl/localize';
+import { Dialogs } from '../../../../platform/app-api';
 
 import displayedKeybindings from './displayed-keybindings';
 import CommandItem from './command-item';
@@ -67,16 +69,19 @@ export default class PreferencesKeymaps extends React.Component<
     if (!fs.existsSync(keymapsFile)) {
       fs.writeFileSync(keymapsFile, '{}');
     }
-    require('@electron/remote').shell.showItemInFolder(keymapsFile);
+    shell.showItemInFolder(keymapsFile);
   }
 
-  _onDeleteUserKeymap() {
-    const chosen = require('@electron/remote').dialog.showMessageBoxSync({
-      type: 'info',
-      message: localized('Restore the shortcut set?'),
-      detail: localized('Every shortcut you changed goes back to what the set uses.'),
-      buttons: [localized('Cancel'), localized('Restore')],
-    });
+  async _onDeleteUserKeymap() {
+    const chosen = await Dialogs.ask(
+      {
+        type: 'info',
+        message: localized('Restore the shortcut set?'),
+        detail: localized('Every shortcut you changed goes back to what the set uses.'),
+        buttons: [localized('Cancel'), localized('Restore')],
+      },
+      'none'
+    );
 
     if (chosen === 1) {
       const keymapsFile = AppEnv.keymaps.getUserKeymapPath();

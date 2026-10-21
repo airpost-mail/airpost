@@ -21,6 +21,7 @@ import { SidebarPluginContainer } from '../../src/features/message-list/sidebar-
 import { SidebarParticipantPicker } from '../../src/features/message-list/sidebar-participant-picker';
 import { MessageListHiddenMessagesToggle } from '../../src/features/message-list/hidden-messages-toggle';
 import * as MessageListFeature from '../../src/features/message-list';
+import { Menus } from '../../src/platform/app-api';
 
 const proxyquire = require('proxyquire').noPreserveCache();
 
@@ -220,15 +221,11 @@ describe('Message list slots', function () {
       }),
     };
     register(ActionItem, { role: 'MessageActionMenuItem' });
-    const popup = jasmine.createSpy('popup');
-    const buildFromTemplate = spyOn(
-      require('@electron/remote').Menu,
-      'buildFromTemplate'
-    ).andReturn({ popup });
+    const popup = spyOn(Menus, 'popup').andReturn(Promise.resolve());
     const { container } = render(<MessageControls thread={thread} message={makeMessage()} />);
     (container.querySelector('.message-actions-ellipsis') as HTMLElement).click();
     expect(popup.callCount).toBe(1);
-    const template = buildFromTemplate.calls[0].args[0];
+    const template = popup.calls[0].args[0];
     const item = template[template.length - 1];
     expect(template[template.length - 2].type).toBe('separator');
     expect(item.label).toBe('Act on msg-1');

@@ -3,6 +3,7 @@ import { Contact } from '../../data/models/contact';
 import { Store } from './store';
 import { exportContactsToFile } from './files';
 import { showGPeopleReadonlyNotice } from './google-support';
+import { Menus } from '../../platform/app-api';
 
 type TemplateItem = { label: string; click: () => void } | { type: 'separator' };
 
@@ -54,6 +55,6 @@ export class ContactListContextMenu {
   }
 
   displayMenu() {
-    require('@electron/remote').Menu.buildFromTemplate(this.template()).popup({});
+    Menus.popup(this.template());
   }
 }

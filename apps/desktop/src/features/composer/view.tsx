@@ -28,6 +28,7 @@ import { QuotedTextControl } from './quoted-text-control';
 import Fields from './fields';
 import { FilesScheme, resolveFilesSchemeURL } from '../../mail/files-scheme';
 import { IconButton } from '../../components/kit/icon-button';
+import { Dialogs } from '../../platform/app-api';
 
 const { hasBlockquote, hasNonTrailingBlockquote, hideQuotedTextByDefault } =
   ComposerSupport.BaseBlockPlugins;
@@ -433,6 +434,8 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
     });
   };
 
+  // Synchronous: action bar plugins get this as the `isValidDraft` prop and test it as a
+  // boolean, so the warning dialogs block until answered.
   _isValidDraft = (
     options: { forceRecipientWarnings?: boolean; forceMiscWarnings?: boolean } = {}
   ): boolean => {
@@ -444,43 +447,51 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
       return false;
     }
 
-    const dialog = require('@electron/remote').dialog;
     const { session } = this.props;
     const { recipientErrors, recipientWarnings } = session.validateDraftRecipients();
     const { miscErrors, miscWarnings } = session.validateDraftForSending();
 
     // Display errors
     if (recipientErrors.length > 0) {
-      dialog.showMessageBox({
-        type: 'warning',
-        buttons: [localized('Edit Message'), localized('Cancel')],
-        message: localized('Cannot send message'),
-        detail: recipientErrors[0],
-      });
+      Dialogs.showMessageBox(
+        {
+          type: 'warning',
+          buttons: [localized('Edit Message'), localized('Cancel')],
+          message: localized('Cannot send message'),
+          detail: recipientErrors[0],
+        },
+        'none'
+      );
       return false;
     }
     if (miscErrors.length > 0) {
-      dialog.showMessageBox({
-        type: 'warning',
-        buttons: [localized('Edit Message'), localized('Cancel')],
-        message: localized('Cannot send message'),
-        detail: miscErrors[0],
-      });
+      Dialogs.showMessageBox(
+        {
+          type: 'warning',
+          buttons: [localized('Edit Message'), localized('Cancel')],
+          message: localized('Cannot send message'),
+          detail: miscErrors[0],
+        },
+        'none'
+      );
       return false;
     }
 
     // Display warnings
     if (recipientWarnings.length > 0 && !options.forceRecipientWarnings) {
-      const response = dialog.showMessageBoxSync({
-        type: 'warning',
-        buttons: [
-          localized('Send Anyway'),
-          localized('Send & Ignore Warnings For This Email'),
-          localized('Cancel'),
-        ],
-        message: localized('Are you sure?'),
-        detail: recipientWarnings.join('. '),
-      });
+      const response = Dialogs.askSync(
+        {
+          type: 'warning',
+          buttons: [
+            localized('Send Anyway'),
+            localized('Send & Ignore Warnings For This Email'),
+            localized('Cancel'),
+          ],
+          message: localized('Are you sure?'),
+          detail: recipientWarnings.join('. '),
+        },
+        'none'
+      );
       if (response === 0) {
         // response is button array index
         return this._isValidDraft({
@@ -498,12 +509,15 @@ export default class ComposerView extends React.Component<ComposerViewProps, Com
       return false;
     }
     if (miscWarnings.length > 0 && !options.forceMiscWarnings) {
-      const response = dialog.showMessageBoxSync({
-        type: 'warning',
-        buttons: [localized('Send Anyway'), localized('Cancel')],
-        message: localized('Are you sure?'),
-        detail: miscWarnings.join('. '),
-      });
+      const response = Dialogs.askSync(
+        {
+          type: 'warning',
+          buttons: [localized('Send Anyway'), localized('Cancel')],
+          message: localized('Are you sure?'),
+          detail: miscWarnings.join('. '),
+        },
+        'none'
+      );
       if (response === 0) {
         // response is button array index
         return this._isValidDraft({

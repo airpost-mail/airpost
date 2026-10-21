@@ -10,6 +10,7 @@ import { Menu } from './menu';
 
 import { IconButton } from './kit/icon-button';
 import { KeyCommandsRegion } from './key-commands-region';
+import { ContextMenuItem, Menus } from '../platform/app-api';
 
 type SizeToFitInputProps = {
   value: string;
@@ -771,24 +772,21 @@ export class TokenizingTextField<T extends Tokenizable> extends React.Component<
   };
 
   _showDefaultTokenMenu = (token: T) => {
-    const menu = require('@electron/remote').Menu();
-    menu.append(
-      require('@electron/remote').MenuItem({
+    const menu: ContextMenuItem[] = [
+      {
         click: () => this._removeTokens([token]),
         label: localized('Remove'),
-      })
-    );
+      },
+    ];
 
     const { onEditMotion } = this.props;
     if (onEditMotion) {
-      menu.append(
-        require('@electron/remote').MenuItem({
-          label: localized('Edit'),
-          click: () => onEditMotion(token),
-        })
-      );
+      menu.push({
+        label: localized('Edit'),
+        click: () => onEditMotion(token),
+      });
     }
-    menu.popup({});
+    Menus.popup(menu);
   };
 
   // Copy and Paste

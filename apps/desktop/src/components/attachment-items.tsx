@@ -10,6 +10,7 @@ import { Flexbox } from './flexbox';
 import { Spinner } from './spinner';
 import { localized } from '../intl/localize';
 import { markFileFromInternet } from '../mail/attachment-safety';
+import { ContextMenuItem, Menus } from '../platform/app-api';
 
 const defaultProps = {
   draggable: true,
@@ -23,7 +24,7 @@ function buildContextMenu(fns: {
   onRemoveAttachment?: () => void;
   onSaveAttachment?: () => void;
 }) {
-  const template: Electron.MenuItemConstructorOptions[] = [];
+  const template: ContextMenuItem[] = [];
   const { onOpenAttachment, onRemoveAttachment, onPreviewAttachment, onSaveAttachment } = fns;
   if (onOpenAttachment) {
     template.push({
@@ -49,7 +50,7 @@ function buildContextMenu(fns: {
       label: localized('Save Into...'),
     });
   }
-  require('@electron/remote').Menu.buildFromTemplate(template).popup({});
+  Menus.popup(template);
 }
 
 const ProgressBar: React.FunctionComponent<{

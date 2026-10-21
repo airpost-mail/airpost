@@ -20,6 +20,7 @@ import * as Actions from '../../data/actions';
 import RegExpUtils from '../../utils/regexp';
 import * as DragDropTypes from '../../components/drag-drop-types';
 import { localized } from '../../intl/localize';
+import { Dialogs } from '../../platform/app-api';
 import TaskQueue from '../../data/stores/task-queue';
 import DatabaseStore from '../../data/database/store';
 import { Thread } from '../../data/models/thread';
@@ -56,7 +57,11 @@ const toggleItemCollapsed = function (item: ISidebarItem) {
   SidebarActions.setKeyCollapsed(item.id, !isItemCollapsed(item.id));
 };
 
-const onDeleteItem = function (item: ISidebarItem) {
+// Categories whose delete confirmation is open. The window takes input meanwhile, so a second
+// Delete on the same folder is ignored rather than queueing a second task.
+const confirmingDelete = new Set<string>();
+
+const onDeleteItem = async function (item: ISidebarItem) {
   if (item.deleted === true) {
     return;
   }
@@ -64,16 +69,28 @@ const onDeleteItem = function (item: ISidebarItem) {
   if (!category) {
     return;
   }
+  if (confirmingDelete.has(category.id)) {
+    return;
+  }
 
-  const response = require('@electron/remote').dialog.showMessageBoxSync({
-    type: 'info',
-    message: localized('Are you sure?'),
-    detail: localized(
-      'Deleting folders and labels cannot be undone and it may take a few minutes for changes to sync to Tern.'
-    ),
-    buttons: [localized('Delete'), localized('Cancel')],
-    defaultId: 0,
-  });
+  confirmingDelete.add(category.id);
+  let response: number;
+  try {
+    response = await Dialogs.ask(
+      {
+        type: 'info',
+        message: localized('Are you sure?'),
+        detail: localized(
+          'Deleting folders and labels cannot be undone and it may take a few minutes for changes to sync to Tern.'
+        ),
+        buttons: [localized('Delete'), localized('Cancel')],
+        defaultId: 0,
+      },
+      'none'
+    );
+  } finally {
+    confirmingDelete.delete(category.id);
+  }
 
   if (response !== 0) {
     return;

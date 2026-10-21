@@ -9,6 +9,7 @@ import { DisclosureTriangle } from './disclosure-triangle';
 import { DropZone } from './drop-zone';
 import { RetinaImg } from './retina-img';
 import { IOutlineViewItem } from './outline-view';
+import { ContextMenuItem, Menus } from '../platform/app-api';
 
 /*
  * Enum for counter styles
@@ -284,7 +285,6 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
   _buildContextMenu = () => {
     const item = this.props.item;
     const contextMenuLabel = item.contextMenuLabel || item.name || '';
-    const { Menu, MenuItem } = require('@electron/remote');
     const isLabel = contextMenuLabel.toLowerCase() === 'label';
 
     // Groups: act on contents, organize the folder itself (destructive last), export.
@@ -326,24 +326,24 @@ class OutlineViewItem extends Component<OutlineViewItemProps, OutlineViewItemSta
       ],
     ];
 
-    const menu = new Menu();
+    const menu: ContextMenuItem[] = [];
     for (const group of groups) {
       const entries = group.filter((entry): entry is MenuEntry => Boolean(entry));
       if (entries.length === 0) continue;
-      if (menu.items.length > 0) menu.append(new MenuItem({ type: 'separator' }));
-      entries.forEach((entry) => menu.append(new MenuItem(entry)));
+      if (menu.length > 0) menu.push({ type: 'separator' });
+      menu.push(...entries);
     }
     return menu;
   };
 
   _onShowContextMenu = (event: MouseEvent) => {
     event.stopPropagation();
-    this._buildContextMenu().popup({});
+    Menus.popup(this._buildContextMenu());
   };
 
   _onMenuButtonClick = (event: React.MouseEvent) => {
     event.stopPropagation();
-    this._buildContextMenu().popup({});
+    Menus.popup(this._buildContextMenu());
   };
 
   // Renderers

@@ -9,6 +9,8 @@ import { TokenizingTextField } from '../../../components/tokenizing-text-field';
 import { Menu } from '../../../components/menu';
 import { InjectedComponentSet } from '../../../components/injected/component-set';
 import { EventAttendee } from '../data-source';
+import { clipboard } from 'electron';
+import { ContextMenuItem, Menus } from '../../../platform/app-api';
 
 const TokenRenderer = (props: { token: EventAttendee }) => {
   const { email, name } = props.token;
@@ -122,30 +124,18 @@ export class EventAttendeesInput extends React.Component<EventAttendeesInputProp
   };
 
   _onShowContextMenu = (participant: EventAttendee): void => {
-    // Warning: Menu is already initialized as Menu.cjsx!
-    const MenuClass = require('@electron/remote').Menu;
-    const MenuItem = require('@electron/remote').MenuItem;
-    const clipboard = require('@electron/remote').clipboard;
-
-    const menu = new MenuClass();
-    menu.append(
-      new MenuItem({
+    const items: ContextMenuItem[] = [
+      {
         label: `${localized(`Copy`)} ${participant.email}`,
         click: () => clipboard.writeText(participant.email),
-      })
-    );
-    menu.append(
-      new MenuItem({
-        type: 'separator',
-      })
-    );
-    menu.append(
-      new MenuItem({
+      },
+      { type: 'separator' },
+      {
         label: 'Remove',
         click: () => this._remove([participant]),
-      })
-    );
-    menu.popup();
+      },
+    ];
+    Menus.popup(items);
   };
 
   _onInputTrySubmit = (

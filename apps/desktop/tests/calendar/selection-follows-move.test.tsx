@@ -1,3 +1,4 @@
+import { Dialogs } from '../../src/platform/app-api';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import DatabaseStore from '../../src/data/database/store';
@@ -348,7 +349,7 @@ describe('the selection after an event is moved', function () {
   it('ignores Delete until the move has synced back', async function () {
     const calendar = calendarWith([occurrenceAt(START)]);
     await calendar._applyKeyboardEventChange(occurrenceAt(START), QUARTER, false);
-    const dialog = spyOn(require('@electron/remote').dialog, 'showMessageBoxSync');
+    const dialog = spyOn(Dialogs, 'ask');
 
     await calendar._onDeleteSelectedEvents();
 

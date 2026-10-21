@@ -4,7 +4,12 @@ import ReactTestUtils from 'react-dom/test-utils';
 import fs from 'fs';
 import path from 'path';
 import { ipcRenderer } from 'electron';
-const { EventedIFrame, copyImageToClipboard } = require('../../src/components/evented-iframe');
+import { Dialogs } from '../../src/platform/app-api';
+const {
+  EventedIFrame,
+  confirmFormSubmission,
+  copyImageToClipboard,
+} = require('../../src/components/evented-iframe');
 
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNikAQAACIAHF/uBd8AAAAASUVORK5CYII=';
@@ -115,7 +120,7 @@ describe('EventedIFrame form submission', function () {
     oldOpenLink = AppEnv.windowEventHandler.openLink;
     openLinkSpy = jasmine.createSpy('openLink');
     AppEnv.windowEventHandler.openLink = openLinkSpy;
-    confirmSpy = spyOn(frame, '_confirmFormSubmission').andReturn(true);
+    confirmSpy = spyOn(frame, '_confirmFormSubmission').andReturn(Promise.resolve(true));
   });
 
   afterEach(function () {
@@ -133,6 +138,7 @@ describe('EventedIFrame form submission', function () {
         <button id="go" type="submit">Send</button>
       </form>`);
     (doc.getElementById('f') as HTMLFormElement).requestSubmit(doc.getElementById('go'));
+    await Promise.resolve();
 
     expect(confirmSpy).toHaveBeenCalled();
     expect(confirmSpy.calls[0].args[0]).toEqual({
@@ -148,13 +154,14 @@ describe('EventedIFrame form submission', function () {
     expect(current.getElementById('f')).not.toBe(null);
   });
 
-  it('opens a POST form without its fields, honouring formaction on the button', () => {
+  it('opens a POST form without its fields, honouring formaction on the button', async () => {
     writeForm(`
       <form id="f" action="https://login.example.com/form" method="post">
         <input name="password" value="hunter2">
         <button id="go" formaction="https://phish.example.net/collect">Sign in</button>
       </form>`);
     (doc.getElementById('f') as HTMLFormElement).requestSubmit(doc.getElementById('go'));
+    await Promise.resolve();
 
     expect(confirmSpy.calls[0].args[0]).toEqual({
       url: 'https://phish.example.net/collect',
@@ -163,10 +170,11 @@ describe('EventedIFrame form submission', function () {
     expect(openLinkSpy).toHaveBeenCalledWith({ href: 'https://phish.example.net/collect' });
   });
 
-  it('opens nothing when the user declines', () => {
-    confirmSpy.andReturn(false);
+  it('opens nothing when the user declines', async () => {
+    confirmSpy.andReturn(Promise.resolve(false));
     writeForm(`<form id="f" action="https://example.com/x"><input name="q" value="1"></form>`);
     (doc.getElementById('f') as HTMLFormElement).requestSubmit();
+    await Promise.resolve();
     expect(confirmSpy).toHaveBeenCalled();
     expect(openLinkSpy).not.toHaveBeenCalled();
   });
@@ -181,6 +189,33 @@ describe('EventedIFrame form submission', function () {
     }
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(openLinkSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('confirmFormSubmission', function () {
+  it('asks as a sheet of the window and opens only on Open in Browser', async () => {
+    spyOn(Dialogs, 'ask').andReturn(Promise.resolve(0));
+    expect(await confirmFormSubmission({ url: 'https://example.com/a', method: 'get' })).toBe(true);
+    const [options, parent] = (Dialogs.ask as jasmine.Spy).calls[0].args;
+    expect(parent).toBe('window');
+    expect(options.defaultId).toBe(1);
+    expect(options.cancelId).toBe(1);
+    (Dialogs.ask as jasmine.Spy).andReturn(Promise.resolve(1));
+    expect(await confirmFormSubmission({ url: 'https://example.com/a', method: 'post' })).toBe(
+      false
+    );
+  });
+
+  it('declines a second form while the first dialog is open', async () => {
+    let answer: (button: number) => void = () => {};
+    spyOn(Dialogs, 'ask').andCallFake(() => new Promise<number>((resolve) => (answer = resolve)));
+    const first = confirmFormSubmission({ url: 'https://example.com/a', method: 'get' });
+    expect(await confirmFormSubmission({ url: 'https://example.com/b', method: 'get' })).toBe(
+      false
+    );
+    expect((Dialogs.ask as jasmine.Spy).callCount).toBe(1);
+    answer(0);
+    expect(await first).toBe(true);
   });
 });
 

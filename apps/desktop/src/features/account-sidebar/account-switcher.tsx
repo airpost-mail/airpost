@@ -5,6 +5,7 @@ import * as Actions from '../../data/actions';
 import { ipcRenderer } from 'electron';
 import { IconButton } from '../../components/kit/icon-button';
 import * as AccountCommands from './account-commands';
+import { ContextMenuItem, Menus } from '../../platform/app-api';
 
 export default class AccountSwitcher extends React.Component<{
   accounts: Account[];
@@ -13,13 +14,19 @@ export default class AccountSwitcher extends React.Component<{
   static displayName = 'AccountSwitcher';
 
   _makeMenuTemplate = () => {
-    let template: Electron.MenuItemConstructorOptions[] = AccountCommands.menuTemplate(
+    let template: ContextMenuItem[] = AccountCommands.menuTemplate(
       this.props.accounts,
       this.props.sidebarAccountIds,
       {
         clickHandlers: true,
       }
-    );
+    ).map(({ label, type, checked, click, accelerator }) => ({
+      label,
+      type,
+      checked,
+      click,
+      accelerator,
+    }));
     template = template.concat([
       { type: 'separator' },
       { label: `${localized('Add Account')}...`, click: this._onAddAccount },
@@ -40,8 +47,7 @@ export default class AccountSwitcher extends React.Component<{
   };
 
   _onShowMenu = () => {
-    const menu = require('@electron/remote').Menu.buildFromTemplate(this._makeMenuTemplate());
-    menu.popup({});
+    Menus.popup(this._makeMenuTemplate());
   };
 
   // The native menu opens on mouse down, like a menu bar item; Enter and Space open it from the

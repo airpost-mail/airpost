@@ -2,7 +2,7 @@ import { AccountStore } from '../../data/stores/account';
 import * as Actions from '../../data/actions';
 import { Thread } from '../../data/models/thread';
 import { messageFrameBridgeFor, messageFrameContent } from '../../mail/frame/bridge';
-import PrintWindow from './window';
+import openPrintWindow from './window';
 
 class Printer {
   public unsub = Actions.printThread.listen(this._printThread);
@@ -29,7 +29,7 @@ class Printer {
       .filter((content): content is NonNullable<typeof content> => !!content)
       .map((content) => content.html);
 
-    const win = new PrintWindow({
+    await openPrintWindow({
       subject: thread.subject,
       account: {
         name: account.name,
@@ -41,7 +41,6 @@ class Printer {
       printMessages: JSON.stringify(messagesHtml),
       remoteImages,
     });
-    win.load();
   }
 
   deactivate() {

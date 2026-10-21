@@ -2,6 +2,7 @@ import React from 'react';
 import { localized } from '../../../intl/localize';
 import { DefaultClientHelper } from '../../../platform/default-client-helper';
 import Notification from '../../../components/notification';
+import { Dialogs } from '../../../platform/app-api';
 import { IDisposable } from 'rx-core';
 
 const SETTINGS_KEY = 'mailto.prompted-about-default';
@@ -53,14 +54,17 @@ export default class DefaultClientNotification extends React.Component<
     this.helper.registerForURLScheme('mailto', (err) => {
       if (err) {
         if (err.message && err.message.includes('xdg-mime') && err.message.includes('not found')) {
-          require('@electron/remote').dialog.showMessageBox({
-            type: 'error',
-            buttons: [localized('OK')],
-            message: localized('Could not set as default mail client'),
-            detail: localized(
-              'Tern could not find the xdg-mime utility. Please install the xdg-utils package using your system package manager (e.g. apt install xdg-utils) and try again from Preferences > General.'
-            ),
-          });
+          Dialogs.showMessageBox(
+            {
+              type: 'error',
+              buttons: [localized('OK')],
+              message: localized('Could not set as default mail client'),
+              detail: localized(
+                'Tern could not find the xdg-mime utility. Please install the xdg-utils package using your system package manager (e.g. apt install xdg-utils) and try again from Preferences > General.'
+              ),
+            },
+            'none'
+          );
         } else {
           AppEnv.reportError(err);
         }

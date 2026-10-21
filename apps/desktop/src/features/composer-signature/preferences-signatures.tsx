@@ -22,6 +22,7 @@ import SignatureAccountDefaultPicker from './account-default-picker';
 import SignatureTemplatePicker from './template-picker';
 import SignaturePhotoPicker from './photo-picker';
 import Templates from './templates';
+import { Dialogs } from '../../platform/app-api';
 
 interface SignatureEditorProps {
   signature: ISignature;
@@ -87,9 +88,11 @@ class SignatureEditor extends React.Component<SignatureEditorProps> {
     Actions.upsertSignature({ ...sig, body }, sig.id);
   };
 
-  _onDataFieldChange = (event: { target: { id: string; value: string | undefined } }) => {
+  _revertConfirmOpen = false;
+
+  _onDataFieldChange = async (event: { target: { id: string; value: string | undefined } }) => {
     const { id, value } = event.target;
-    const sig = this.props.signature;
+    let sig = this.props.signature;
 
     // If you have raw selected and are switching back to a template,
     // display a warning UNLESS the html is an unmodified template HTML
@@ -98,17 +101,33 @@ class SignatureEditor extends React.Component<SignatureEditorProps> {
         (t) => sig.body === RenderSignatureData({ ...sig.data, templateName: t.name })
       );
       if (!htmlMatchesATemplate) {
-        const idx = require('@electron/remote').dialog.showMessageBoxSync({
-          type: 'warning',
-          buttons: [localized('Cancel'), localized('Continue')],
-          message: localized('Revert custom HTML?'),
-          detail: localized(
-            "Switching back to a signature template will overwrite the custom HTML you've entered."
-          ),
-        });
-        if (idx === 0) {
+        // The page stays usable while the dialog is open: one dialog at a time, the answer is
+        // dropped if another signature was selected meanwhile, and applies to the signature's
+        // current version.
+        if (this._revertConfirmOpen) {
           return;
         }
+        this._revertConfirmOpen = true;
+        let idx: number;
+        try {
+          idx = await Dialogs.ask(
+            {
+              type: 'warning',
+              buttons: [localized('Cancel'), localized('Continue')],
+              message: localized('Revert custom HTML?'),
+              detail: localized(
+                "Switching back to a signature template will overwrite the custom HTML you've entered."
+              ),
+            },
+            'none'
+          );
+        } finally {
+          this._revertConfirmOpen = false;
+        }
+        if (idx === 0 || this.props.signature.id !== sig.id) {
+          return;
+        }
+        sig = this.props.signature;
       }
     }
 

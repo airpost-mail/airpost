@@ -1,6 +1,7 @@
 // Moves and resizes from the calendar grid go to the engine (events.update with queue: false),
 // which builds the ICS; the window queues the writes itself so they can be undone. The ICS edits
 // are crates/tern-pim's tests.
+import { Dialogs } from '../../src/platform/app-api';
 import * as Actions from '../../src/data/actions';
 import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
 import { Event as EventModel } from '../../src/data/models/event';
@@ -57,7 +58,7 @@ describe('recurring event actions', function () {
     });
     queued = [];
     spyOn(Actions, 'queueTask').andCallFake((t) => queued.push(t));
-    dialog = spyOn(require('@electron/remote').dialog, 'showMessageBoxSync').andReturn(0);
+    dialog = spyOn(Dialogs, 'ask').andReturn(Promise.resolve(0));
   });
 
   const update = () => engine.callsTo('events.update')[0];
@@ -110,7 +111,7 @@ describe('recurring event actions', function () {
 
   describe('modifyEventWithRecurringSupport', function () {
     it('asks about a series and edits the one occurrence when told to', async function () {
-      dialog.andReturn(0);
+      dialog.andReturn(Promise.resolve(0));
       const result = await modifyEventWithRecurringSupport(
         options({ isRecurring: true }),
         'move',
@@ -122,7 +123,7 @@ describe('recurring event actions', function () {
     });
 
     it('edits every occurrence when told to', async function () {
-      dialog.andReturn(1);
+      dialog.andReturn(Promise.resolve(1));
       await modifyEventWithRecurringSupport(
         options({ isRecurring: true }),
         'move',
@@ -133,7 +134,7 @@ describe('recurring event actions', function () {
     });
 
     it('does nothing when the question is dismissed', async function () {
-      dialog.andReturn(2);
+      dialog.andReturn(Promise.resolve(2));
       const result = await modifyEventWithRecurringSupport(
         options({ isRecurring: true }),
         'move',

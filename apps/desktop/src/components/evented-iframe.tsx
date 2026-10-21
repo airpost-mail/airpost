@@ -14,11 +14,12 @@ import url from 'url';
 import _ from 'underscore';
 import path from 'path';
 import fs from 'fs';
-import { ipcRenderer } from 'electron';
+import { clipboard, ipcRenderer, shell } from 'electron';
 import { FilesScheme, resolveFilesSchemeURL } from '../mail/files-scheme';
 import { markFileFromInternet } from '../mail/attachment-safety';
 import { ExternalFetch } from '../window/external-fetch';
 import { FormSubmissionTarget, formSubmissionTarget } from '../mail/frame/form-submission';
+import { ContextMenuItem, Dialogs, Menus } from '../platform/app-api';
 
 // The bytes behind an image src in a message, for Save Image.
 async function imageBytes(src: string): Promise<Buffer> {
@@ -70,27 +71,43 @@ export async function copyImageToClipboard(src: string) {
   ipcRenderer.send('write-image-to-clipboard', canvas.toDataURL('image/png'));
 }
 
+let formConfirmOpen = false;
+
 /**
  * Asks before a form from a message opens in the browser. Tern never submits forms inside
- * messages; a POST form's page opens without its fields.
+ * messages; a POST form's page opens without its fields. Resolves false without asking while
+ * another form's dialog is open.
  */
-export function confirmFormSubmission({ url, method }: FormSubmissionTarget) {
-  const { dialog } = require('@electron/remote');
-  const response = dialog.showMessageBoxSync(AppEnv.getCurrentWindow(), {
-    type: 'question',
-    buttons: [localized('Open in Browser'), localized('Cancel')],
-    defaultId: 1,
-    cancelId: 1,
-    message: localized('Open this form in your browser?'),
-    detail:
-      method === 'post'
-        ? localized(
-            "Tern doesn't submit forms inside messages. Your browser will open %@ without the form's contents.",
-            url
-          )
-        : localized("Tern doesn't submit forms inside messages. Your browser will open %@.", url),
-  });
-  return response === 0;
+export async function confirmFormSubmission({ url, method }: FormSubmissionTarget) {
+  if (formConfirmOpen) {
+    return false;
+  }
+  formConfirmOpen = true;
+  try {
+    const response = await Dialogs.ask(
+      {
+        type: 'question',
+        buttons: [localized('Open in Browser'), localized('Cancel')],
+        defaultId: 1,
+        cancelId: 1,
+        message: localized('Open this form in your browser?'),
+        detail:
+          method === 'post'
+            ? localized(
+                "Tern doesn't submit forms inside messages. Your browser will open %@ without the form's contents.",
+                url
+              )
+            : localized(
+                "Tern doesn't submit forms inside messages. Your browser will open %@.",
+                url
+              ),
+      },
+      'window'
+    );
+    return response === 0;
+  } finally {
+    formConfirmOpen = false;
+  }
 }
 
 type EventedIFrameProps = {
@@ -313,11 +330,11 @@ export class EventedIFrame extends React.Component<EventedIFrameAllProps> {
   // the browser through the same path as links; a POST form's page opens without its fields.
   // The message CSP's form-action 'none' and AppWindow's will-frame-navigate guard
   // stop the submission too if this listener isn't attached yet.
-  _onIFrameSubmit = (e: SubmitEvent) => {
+  _onIFrameSubmit = async (e: SubmitEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const submission = formSubmissionTarget(e.target as HTMLFormElement, e.submitter);
-    if (!submission || !this._confirmFormSubmission(submission)) {
+    if (!submission || !(await this._confirmFormSubmission(submission))) {
       return;
     }
     AppEnv.windowEventHandler.openLink({ href: submission.url });
@@ -419,86 +436,72 @@ export function showFrameContextMenu(contents: {
   text: string;
 }) {
   const { href, src } = contents;
-  const { shell } = require('electron');
-  const { Menu, MenuItem, clipboard } = require('@electron/remote');
-  const menu = new Menu();
+  const menu: ContextMenuItem[] = [];
 
   // Menu actions for links
   if (href) {
     if (href.startsWith('mailto')) {
-      menu.append(
-        new MenuItem({
-          label: localized('Compose New Message'),
-          click() {
-            AppEnv.windowEventHandler.openLink({ href });
-          },
-        })
-      );
-      menu.append(
-        new MenuItem({
-          label: localized('Copy Email Address'),
-          click() {
-            clipboard.writeText(href.split('mailto:').pop());
-          },
-        })
-      );
+      menu.push({
+        label: localized('Compose New Message'),
+        click() {
+          AppEnv.windowEventHandler.openLink({ href });
+        },
+      });
+      menu.push({
+        label: localized('Copy Email Address'),
+        click() {
+          clipboard.writeText(href.split('mailto:').pop() ?? '');
+        },
+      });
     } else {
-      menu.append(
-        new MenuItem({
-          label: localized('Open Link'),
-          click() {
-            AppEnv.windowEventHandler.openLink({ href });
-          },
-        })
-      );
-      menu.append(
-        new MenuItem({
-          label: localized('Copy Link Address'),
-          click() {
-            clipboard.writeText(href);
-          },
-        })
-      );
+      menu.push({
+        label: localized('Open Link'),
+        click() {
+          AppEnv.windowEventHandler.openLink({ href });
+        },
+      });
+      menu.push({
+        label: localized('Copy Link Address'),
+        click() {
+          clipboard.writeText(href);
+        },
+      });
     }
-    menu.append(new MenuItem({ type: 'separator' }));
+    menu.push({ type: 'separator' });
   }
 
   // Menu actions for images
   if (src) {
     const srcFilename = path.basename(src);
-    menu.append(
-      new MenuItem({
-        label: localized('Save Image') + '...',
-        click() {
-          AppEnv.showSaveDialog({ defaultPath: srcFilename }, function (path: string | undefined) {
-            if (!path) {
-              return;
-            }
-            imageBytes(src)
-              .then((buffer) => {
-                fs.writeFile(path, buffer, async (err) => {
-                  if (err) {
-                    console.error(`Save Image failed: ${err}`);
-                    return;
-                  }
-                  await markFileFromInternet(path);
-                  require('@electron/remote').shell.showItemInFolder(path);
-                });
-              })
-              .catch((err) => console.error(`Save Image failed: ${err}`));
-          });
-        },
-      })
-    );
-    menu.append(
-      new MenuItem({
-        label: localized('Copy Image'),
-        click() {
-          copyImageToClipboard(src).catch((err) => console.error(`Copy Image failed: ${err}`));
-        },
-      })
-    );
-    menu.append(new MenuItem({ type: 'separator' }));
+    menu.push({
+      label: localized('Save Image') + '...',
+      click() {
+        AppEnv.showSaveDialog({ defaultPath: srcFilename }, function (path: string | undefined) {
+          if (!path) {
+            return;
+          }
+          imageBytes(src)
+            .then((buffer) => {
+              fs.writeFile(path, buffer, async (err) => {
+                if (err) {
+                  console.error(`Save Image failed: ${err}`);
+                  return;
+                }
+                await markFileFromInternet(path);
+                shell.showItemInFolder(path);
+              });
+            })
+            .catch((err) => console.error(`Save Image failed: ${err}`));
+        });
+      },
+    });
+    menu.push({
+      label: localized('Copy Image'),
+      click() {
+        copyImageToClipboard(src).catch((err) => console.error(`Copy Image failed: ${err}`));
+      },
+    });
+    menu.push({ type: 'separator' });
   }
 
   // Menu actions for text
@@ -511,38 +514,32 @@ export function showFrameContextMenu(contents: {
     } else {
       textPreview = text;
     }
-    menu.append(
-      new MenuItem({
-        label: localized('Copy'),
-        click() {
-          clipboard.writeText(text);
-        },
-      })
-    );
-    menu.append(
-      new MenuItem({
-        label: localized(`Search Google for '%@'`, textPreview),
-        click() {
-          shell.openExternal(`https://www.google.com/search?q=${encodeURIComponent(text)}`);
-        },
-      })
-    );
+    menu.push({
+      label: localized('Copy'),
+      click() {
+        clipboard.writeText(text);
+      },
+    });
+    menu.push({
+      label: localized(`Search Google for '%@'`, textPreview),
+      click() {
+        shell.openExternal(`https://www.google.com/search?q=${encodeURIComponent(text)}`);
+      },
+    });
     if (process.platform === 'darwin') {
-      menu.append(
-        new MenuItem({
-          label: localized(`Look Up “%@”`, textPreview),
-          click() {
-            AppEnv.getCurrentWindow().showDefinitionForSelection();
-          },
-        })
-      );
+      menu.push({
+        label: localized(`Look Up “%@”`, textPreview),
+        click() {
+          AppEnv.getCurrentWindow().showDefinitionForSelection();
+        },
+      });
     }
   }
 
   if (process.platform === 'darwin') {
-    menu.append(new MenuItem({ type: 'separator' }));
+    menu.push({ type: 'separator' });
   }
   // Services menu appears here automatically
 
-  menu.popup({});
+  Menus.popup(menu);
 }

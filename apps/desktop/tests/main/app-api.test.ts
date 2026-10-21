@@ -104,6 +104,7 @@ describe('the app-api main handlers', function () {
         showMessageBox: jasmine
           .createSpy('showMessageBox')
           .andReturn(Promise.resolve({ response: 1, checkboxChecked: false })),
+        showMessageBoxSync: jasmine.createSpy('showMessageBoxSync').andReturn(2),
         showOpenDialog: jasmine
           .createSpy('showOpenDialog')
           .andReturn(Promise.resolve({ canceled: false, filePaths: ['/a'] })),
@@ -188,6 +189,19 @@ describe('the app-api main handlers', function () {
       senderWindow,
       { title: 'Open' },
     ]);
+  });
+
+  it('shows a blocking message box for a sync sender', () => {
+    const options = { message: 'Sure?', buttons: ['Send', 'Cancel'] };
+    expect(ipc.sendSync(trusted, 'app-api:sync:dialog:show-message-box', options, 'window')).toBe(
+      2
+    );
+    ipc.sendSync(trusted, 'app-api:sync:dialog:show-message-box', options, 'none');
+    const calls = (host.dialog.showMessageBoxSync as jasmine.Spy).calls.map((c) => c.args);
+    expect(calls).toEqual([[senderWindow, options], [options]]);
+    expect(ipc.sendSync(untrusted, 'app-api:sync:dialog:show-message-box', options, 'none')).toBe(
+      null
+    );
   });
 
   it("runs window commands on the sender's window", () => {

@@ -13,6 +13,7 @@ import { Event } from '../../data/models/event';
 import { DatabaseChangeRecord } from '../../data/database/change-record';
 import { editEvent } from '../../engine/client/pim';
 import { KeyCommandsRegion } from '../../components/key-commands-region';
+import { ContextMenuItem, Dialogs, Menus } from '../../platform/app-api';
 import { CalendarMenuCommands } from './commands';
 import { DayView } from './views/day';
 import { WeekView } from './views/week';
@@ -168,6 +169,8 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
   _suppressNextCalendarClick = false;
   /** Selected occurrences moved here but not yet synced back, by the id they will be drawn under. */
   _pendingMoves = new Map<string, { start: number; staleIcs: string }>();
+  /** The delete confirmation is open; the window takes input meanwhile, so a second Delete is ignored. */
+  _confirmingDelete = false;
 
   constructor(props: MainCalendarProps) {
     super(props);
@@ -443,8 +446,8 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
     this._showGridMenu([{ label: localized('New Event'), click: () => this._createEventAt(args) }]);
   };
 
-  _showGridMenu(template: Electron.MenuItemConstructorOptions[]) {
-    require('@electron/remote').Menu.buildFromTemplate(template).popup({});
+  _showGridMenu(template: ContextMenuItem[]) {
+    Menus.popup(template);
   }
 
   /**
@@ -574,6 +577,9 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
     if (selected.some((o) => this._pendingMoves.has(o.id))) {
       return;
     }
+    if (this._confirmingDelete) {
+      return;
+    }
 
     // Partition before prompting so the dialog can disclose a partial delete
     const deletable = selected.filter((o) => !this._isCalendarReadOnly(o.calendarId));
@@ -584,20 +590,29 @@ export class MainCalendar extends React.Component<MainCalendarProps, MainCalenda
     const skipped = selected.length - deletable.length;
 
     // Show initial confirmation dialog
-    const response = require('@electron/remote').dialog.showMessageBoxSync({
-      type: 'warning',
-      buttons: [localized('Delete'), localized('Cancel')],
-      message: localized('Delete or decline these events?'),
-      detail: skipped
-        ? localized(
-            "%1$@ of the %2$@ selected events will be deleted. The rest are on read-only calendars and can't be changed.",
-            deletable.length,
-            selected.length
-          )
-        : localized(
-            `Are you sure you want to delete or decline invitations for the selected event(s)?`
-          ),
-    });
+    this._confirmingDelete = true;
+    let response: number;
+    try {
+      response = await Dialogs.ask(
+        {
+          type: 'warning',
+          buttons: [localized('Delete'), localized('Cancel')],
+          message: localized('Delete or decline these events?'),
+          detail: skipped
+            ? localized(
+                "%1$@ of the %2$@ selected events will be deleted. The rest are on read-only calendars and can't be changed.",
+                deletable.length,
+                selected.length
+              )
+            : localized(
+                `Are you sure you want to delete or decline invitations for the selected event(s)?`
+              ),
+        },
+        'none'
+      );
+    } finally {
+      this._confirmingDelete = false;
+    }
 
     if (response !== 0) {
       return; // User cancelled

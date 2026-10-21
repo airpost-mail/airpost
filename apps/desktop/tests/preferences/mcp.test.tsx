@@ -275,23 +275,23 @@ describe('Preferences > Agents', function () {
     expect(fs.existsSync(path.join(dir, 'mcp.json'))).toBe(false);
   });
 
-  it('only checks for the stale bridge entry from an installed copy', () => {
-    const inApps = () => true;
-    const elsewhere = () => false;
+  it('only checks for the stale bridge entry from an installed copy', async () => {
+    const inApps = () => Promise.resolve(true);
+    const elsewhere = () => Promise.resolve(false);
     expect(
-      isStableInstall({ devMode: false, platform: 'darwin', inApplicationsFolder: inApps })
+      await isStableInstall({ devMode: false, platform: 'darwin', inApplicationsFolder: inApps })
     ).toBe(true);
     expect(
-      isStableInstall({ devMode: false, platform: 'darwin', inApplicationsFolder: elsewhere })
+      await isStableInstall({ devMode: false, platform: 'darwin', inApplicationsFolder: elsewhere })
     ).toBe(false);
     expect(
-      isStableInstall({ devMode: true, platform: 'darwin', inApplicationsFolder: inApps })
+      await isStableInstall({ devMode: true, platform: 'darwin', inApplicationsFolder: inApps })
     ).toBe(false);
     expect(
-      isStableInstall({ devMode: false, platform: 'linux', inApplicationsFolder: elsewhere })
+      await isStableInstall({ devMode: false, platform: 'linux', inApplicationsFolder: elsewhere })
     ).toBe(true);
     expect(
-      isStableInstall({ devMode: true, platform: 'win32', inApplicationsFolder: elsewhere })
+      await isStableInstall({ devMode: true, platform: 'win32', inApplicationsFolder: elsewhere })
     ).toBe(false);
   });
 

@@ -1,5 +1,6 @@
 // The calendar's answers and counter-proposals go to the engine (events.rsvp), which builds the
 // PARTSTAT edit, the REPLY and the COUNTER (crates/tern-pim plan.rs and its tests).
+import { Dialogs } from '../../src/platform/app-api';
 import { AccountStore } from '../../src/data/stores/account';
 import * as Actions from '../../src/data/actions';
 import DatabaseStore from '../../src/data/database/store';
@@ -91,7 +92,7 @@ describe('answering and countering from the calendar', function () {
     spyOn(AccountStore, 'accountForId').andReturn({ id: 'acct-1', emailAddress: ME });
     spyOn(AppEnv, 'showErrorDialog');
     // The recurring-event question; 0 = this occurrence, 1 = all occurrences, 2 = cancel.
-    dialog = spyOn(require('@electron/remote').dialog, 'showMessageBoxSync').andReturn(1);
+    dialog = spyOn(Dialogs, 'ask').andReturn(Promise.resolve(1));
   });
 
   describe('proposeNewTimeForCalendarEvent', function () {
@@ -178,13 +179,13 @@ describe('answering and countering from the calendar', function () {
     });
 
     it('answers only the clicked occurrence when asked to', async function () {
-      dialog.andReturn(0);
+      dialog.andReturn(Promise.resolve(0));
       await respondToCalendarEvent(occurrence(), 'ACCEPTED');
       expect(engine.callsTo('events.rsvp')[0].occurrenceStart).toBe(START);
     });
 
     it('does nothing when the question is dismissed', async function () {
-      dialog.andReturn(2);
+      dialog.andReturn(Promise.resolve(2));
       await respondToCalendarEvent(occurrence(), 'ACCEPTED');
       expect(engine.calls.length).toBe(0);
     });
@@ -208,21 +209,19 @@ describe('answering and countering from the calendar', function () {
 });
 
 describe('offerCounterInsteadOfMove', function () {
-  const remote = require('@electron/remote');
-
-  it('offers the counter-proposal and opens it when taken up', function () {
-    const dialog = spyOn(remote.dialog, 'showMessageBoxSync').andReturn(0);
+  it('offers the counter-proposal and opens it when taken up', async function () {
+    const dialog = spyOn(Dialogs, 'ask').andReturn(Promise.resolve(0));
     const openPopover = spyOn(Actions, 'openPopover');
-    offerCounterInsteadOfMove(occurrence());
+    await offerCounterInsteadOfMove(occurrence());
     expect(dialog.mostRecentCall.args[0].buttons[0]).toBe('Propose a new time');
     expect(dialog.mostRecentCall.args[0].message).toContain('Design Review');
     expect(openPopover.mostRecentCall.args[0].props.start).toBe(START);
   });
 
-  it('does nothing more when cancelled', function () {
-    spyOn(remote.dialog, 'showMessageBoxSync').andReturn(1);
+  it('does nothing more when cancelled', async function () {
+    spyOn(Dialogs, 'ask').andReturn(Promise.resolve(1));
     const openPopover = spyOn(Actions, 'openPopover');
-    offerCounterInsteadOfMove(occurrence());
+    await offerCounterInsteadOfMove(occurrence());
     expect(openPopover).not.toHaveBeenCalled();
   });
 });

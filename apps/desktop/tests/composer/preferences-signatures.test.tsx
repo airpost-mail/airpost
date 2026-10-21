@@ -5,6 +5,8 @@ import ReactDOM from 'react-dom';
 import { SignatureStore } from '../../src/data/stores/signature';
 import * as Actions from '../../src/data/actions';
 import PreferencesSignatures from '../../src/features/composer-signature/preferences-signatures';
+import Templates from '../../src/features/composer-signature/templates';
+import { Dialogs } from '../../src/platform/app-api';
 
 const SIGNATURES = {
   '1': {
@@ -128,6 +130,49 @@ describe('PreferencesSignatures', function preferencesSignatures() {
       expect(preview.innerHTML).not.toContain('<script');
       expect(preview.innerHTML).not.toContain('javascript:');
       expect((window as any).__sigXSS).toBe(false);
+    });
+  });
+
+  describe('switching custom HTML back to a template', () => {
+    let CUSTOM: { id: string; title: string; body: string; data: object };
+    let editor: any;
+    let answer: (button: number) => void;
+
+    beforeEach(() => {
+      CUSTOM = { id: '5', title: 'custom', body: '<b>my own html</b>', data: {} };
+      spyOn(SignatureStore, 'getSignatures').andReturn({ '5': CUSTOM });
+      spyOn(SignatureStore, 'selectedSignature').andReturn(CUSTOM);
+      spyOn(SignatureStore, 'getDefaults').andReturn({});
+      spyOn(Actions, 'upsertSignature');
+      spyOn(Dialogs, 'ask').andCallFake(() => new Promise<number>((resolve) => (answer = resolve)));
+      const component = makeComponent() as any;
+      [editor] = ReactTestUtils.findAllInRenderedTree(
+        component,
+        (c: any) => !!(c && c._onDataFieldChange)
+      );
+    });
+
+    const pickTemplate = () =>
+      editor._onDataFieldChange({ target: { id: 'templateName', value: Templates[0].name } });
+
+    it('asks once, app-modal, and applies the template on Continue', async () => {
+      const first = pickTemplate();
+      const second = pickTemplate();
+      expect((Dialogs.ask as jasmine.Spy).callCount).toBe(1);
+      expect((Dialogs.ask as jasmine.Spy).calls[0].args[1]).toBe('none');
+      answer(1);
+      await first;
+      await second;
+      const [sig, id] = (Actions.upsertSignature as unknown as jasmine.Spy).mostRecentCall.args;
+      expect(id).toBe('5');
+      expect(sig.data.templateName).toBe(Templates[0].name);
+    });
+
+    it('keeps the custom HTML on Cancel', async () => {
+      const pending = pickTemplate();
+      answer(0);
+      await pending;
+      expect(Actions.upsertSignature).not.toHaveBeenCalled();
     });
   });
 });

@@ -3,6 +3,7 @@ import { Editor, Decoration, Document, Mark, Point, Text } from 'slate';
 import { localized } from '../../intl/localize';
 import { ComposerEditorPlugin, ComposerEditorPluginTopLevelComponentProps } from './types';
 import { Button } from '../kit/button';
+import { ContextMenuItem, Menus } from '../../platform/app-api';
 
 export const GRAMMAR_ERROR_MARK = 'grammar-error';
 
@@ -347,37 +348,30 @@ function getMarkData(mark: any) {
 
 // --- Right-click context menu for a grammar error span ---
 function showGrammarContextMenu(mark: any, editor: Editor) {
-  const { Menu, MenuItem } = require('@electron/remote');
   const { message, shortMessage, ruleId, replacements } = getMarkData(mark);
 
-  const menu = new Menu();
+  const menu: ContextMenuItem[] = [];
 
-  menu.append(
-    new MenuItem({ label: shortMessage || message || localized('Grammar issue'), enabled: false })
-  );
+  menu.push({ label: shortMessage || message || localized('Grammar issue'), enabled: false });
 
   if (replacements.length > 0) {
-    menu.append(new MenuItem({ type: 'separator' }));
+    menu.push({ type: 'separator' });
     replacements.slice(0, 5).forEach((r: string) => {
-      menu.append(
-        new MenuItem({
-          label: r,
-          click: () => applyReplacement(editor, r),
-        })
-      );
+      menu.push({
+        label: r,
+        click: () => applyReplacement(editor, r),
+      });
     });
   }
 
-  menu.append(new MenuItem({ type: 'separator' }));
-  menu.append(
-    new MenuItem({
-      label: localized('Ignore rule'),
-      enabled: !!(grammarCheckStore && ruleId),
-      click: () => grammarCheckStore && grammarCheckStore.dismissRule(ruleId),
-    })
-  );
+  menu.push({ type: 'separator' });
+  menu.push({
+    label: localized('Ignore rule'),
+    enabled: !!(grammarCheckStore && ruleId),
+    click: () => grammarCheckStore && grammarCheckStore.dismissRule(ruleId),
+  });
 
-  menu.popup({ window: require('@electron/remote').getCurrentWindow() });
+  Menus.popup(menu);
 }
 
 // --- renderMark ---

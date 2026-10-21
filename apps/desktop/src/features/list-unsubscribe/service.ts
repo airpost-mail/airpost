@@ -6,6 +6,7 @@ import {
   MessagesUnsubscribeParams,
   MessagesUnsubscribeResult,
 } from '../../engine/protocol';
+import { App } from '../../platform/app-api';
 
 const { shell } = require('electron');
 
@@ -151,7 +152,7 @@ export function performMailtoUnsubscribe(mailtoUri: string): void {
   // Use the application's openUrl handler which routes to DraftStore._onHandleMailtoLink
   // This creates a draft and opens it in the composer for user review
   const sanitizedUri = encodeURI(decodeURI(mailtoUri));
-  require('@electron/remote').getGlobal('application').openUrl(sanitizedUri);
+  App.openUrl(sanitizedUri);
 }
 
 /**

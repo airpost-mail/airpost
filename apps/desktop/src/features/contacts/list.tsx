@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { webUtils } from 'electron';
 import { Contact } from '../../data/models/contact';
 import { localized } from '../../intl/localize';
+import { Dialogs } from '../../platform/app-api';
 import * as CanvasUtils from '../../components/drag-canvas';
 import { AccountStore } from '../../data/stores/account';
 import FocusContainer from '../../components/focus-container';
@@ -152,14 +153,17 @@ class ContactListWithData extends React.Component<ContactListProps, ContactListS
 
     const { perspective } = this.props;
     if (!('accountId' in perspective)) {
-      require('@electron/remote').dialog.showMessageBox({
-        type: 'info',
-        title: localized('Select an Account'),
-        message: localized(
-          'Please select a specific account from the sidebar before importing contacts.'
-        ),
-        buttons: [localized('OK')],
-      });
+      Dialogs.showMessageBox(
+        {
+          type: 'info',
+          title: localized('Select an Account'),
+          message: localized(
+            'Please select a specific account from the sidebar before importing contacts.'
+          ),
+          buttons: [localized('OK')],
+        },
+        'none'
+      );
       return;
     }
 

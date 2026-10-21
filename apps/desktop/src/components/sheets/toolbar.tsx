@@ -19,6 +19,7 @@ import { Button } from '../kit/button';
 import { IconButton } from '../kit/icon-button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../kit/tooltip';
 import { lazyRequire } from '../../data/lazy-require';
+import { CurrentWindow, Menus } from '../../platform/app-api';
 
 // Only required when a Toolbar is actually needed: loading the store has database side effects.
 const getFocusedPerspectiveStore = lazyRequire(
@@ -199,8 +200,7 @@ class ToolbarMenuControl extends React.Component {
   static displayName = 'ToolbarMenuControl';
 
   _onOpenMenu = () => {
-    const { applicationMenu } = require('@electron/remote').getGlobal('application');
-    applicationMenu.menu.popup({});
+    Menus.popupApplicationMenu();
   };
 
   render() {
@@ -455,7 +455,7 @@ export default class Toolbar extends React.Component<ToolbarProps, ToolbarState>
     // toolbar: its title bar has the toolbar's height, so the last offset still fits.
     if (el.clientHeight > 0 && el.clientHeight !== lastReportedToolbarHeight) {
       lastReportedToolbarHeight = el.clientHeight;
-      require('@electron/remote').getCurrentWindow().setSheetOffset(el.clientHeight);
+      CurrentWindow.setSheetOffset(el.clientHeight);
     }
   }
 

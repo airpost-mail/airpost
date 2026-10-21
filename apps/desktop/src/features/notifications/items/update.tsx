@@ -3,6 +3,7 @@ import React from 'react';
 import { ipcRenderer, shell } from 'electron';
 import Notification from '../../../components/notification';
 import { Disposable } from 'event-kit';
+import { App } from '../../../platform/app-api';
 
 interface UpdateNotificationState {
   updateAvailable: boolean;
@@ -17,30 +18,36 @@ export default class UpdateNotification extends React.Component<
   static displayName = 'UpdateNotification';
 
   disposable?: Disposable;
+  mounted = false;
 
-  constructor(props: Record<string, unknown>) {
-    super(props);
-    this.state = this.getStateFromStores();
-  }
+  // Nothing shows until main answers with the updater's state, just after mount.
+  state: UpdateNotificationState = { updateAvailable: false, updateIsManual: false, version: '' };
 
   componentDidMount() {
+    this.mounted = true;
+    this.refresh();
     this.disposable = AppEnv.onUpdateAvailable(() => {
-      this.setState(this.getStateFromStores());
+      this.refresh();
     });
   }
 
   componentWillUnmount() {
+    this.mounted = false;
     if (this.disposable) this.disposable.dispose();
   }
 
-  getStateFromStores() {
-    const updater = require('@electron/remote').getGlobal('application').autoUpdateManager;
-    const updateAvailable = updater.getState() === 'update-available';
-    const info = updateAvailable ? updater.getReleaseDetails() : {};
+  async refresh() {
+    const next = await this.getStateFromStores();
+    if (this.mounted) this.setState(next);
+  }
+
+  async getStateFromStores(): Promise<UpdateNotificationState> {
+    const updater = await App.updaterState();
+    const updateAvailable = updater.state === 'update-available';
     return {
       updateAvailable,
-      updateIsManual: info.releaseNotes === 'manual-download',
-      version: info.releaseVersion,
+      updateIsManual: updateAvailable && updater.releaseNotes === 'manual-download',
+      version: (updateAvailable && updater.releaseVersion) || '',
     };
   }
 

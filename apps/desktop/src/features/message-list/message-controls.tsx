@@ -15,7 +15,8 @@ import { ButtonDropdown } from '../../components/button-dropdown';
 import { Menu } from '../../components/menu';
 import { IconButton } from '../../components/kit/icon-button';
 import { escapeHTML } from 'underscore.string';
-import { developerToolsAvailable } from '../../platform/developer-tools';
+import { clipboard } from 'electron';
+import { App, ContextMenuItem, Menus, openStaticPage } from '../../platform/app-api';
 import {
   contentSecurityPolicyMetaTag,
   messageContentSecurityPolicy,
@@ -125,7 +126,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
   };
 
   _actionsMenuTemplate() {
-    const template: Electron.MenuItemConstructorOptions[] = [
+    const template: ContextMenuItem[] = [
       { label: localized('Log Data'), click: this._onLogData },
       { label: localized('Show Original'), click: this._onShowOriginal },
     ];
@@ -153,8 +154,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
   }
 
   _onShowActionsMenu = () => {
-    const { Menu: SystemMenu } = require('@electron/remote');
-    SystemMenu.buildFromTemplate(this._actionsMenuTemplate()).popup({});
+    Menus.popup(this._actionsMenuTemplate());
   };
 
   // Offered only when the theme and setting darken emails.
@@ -171,10 +171,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
 
   _onShowOriginal = async () => {
     const { message } = this.props;
-    const filepath = require('path').join(
-      require('@electron/remote').app.getPath('temp'),
-      message.id
-    );
+    const filepath = require('path').join(await App.getPath('temp'), message.id);
     const task = new GetMessageRFC2822Task({
       messageId: message.id,
       accountId: message.accountId,
@@ -214,19 +211,11 @@ export default class MessageControls extends React.Component<MessageControlsProp
       return;
     }
 
-    const { BrowserWindow } = require('@electron/remote');
-    const win = new BrowserWindow({
+    openStaticPage({
+      filePath: htmlPath,
+      title: `${message.subject} - RFC822`,
       width: 800,
       height: 600,
-      title: `${message.subject} - RFC822`,
-      webPreferences: {
-        javascript: false,
-        nodeIntegration: false,
-        devTools: developerToolsAvailable(),
-      },
-    });
-    win.loadURL(`file://${htmlPath}`).catch((err: Error) => {
-      console.error('Show Original window failed to load:', err);
     });
   };
 
@@ -246,7 +235,7 @@ export default class MessageControls extends React.Component<MessageControlsProp
       Thread ID: ${thread.id}
       Thread Metadata: ${JSON.stringify(thread.pluginMetadata, null, '  ')}
     `;
-    require('@electron/remote').clipboard.writeText(data);
+    clipboard.writeText(data);
   };
 
   render() {

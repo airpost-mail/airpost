@@ -257,8 +257,10 @@ export default class EmailFrame extends React.Component<EmailFrameProps> {
           url: String(msg.url || ''),
           method: msg.method === 'post' ? ('post' as const) : ('get' as const),
         };
-        if (/^https?:\/\//i.test(submission.url) && confirmFormSubmission(submission)) {
-          AppEnv.windowEventHandler.openLink({ href: submission.url });
+        if (/^https?:\/\//i.test(submission.url)) {
+          confirmFormSubmission(submission).then((confirmed) => {
+            if (confirmed) AppEnv.windowEventHandler.openLink({ href: submission.url });
+          });
         }
         break;
       }

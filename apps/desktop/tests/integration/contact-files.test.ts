@@ -9,6 +9,7 @@ import path from 'path';
 import { AccountStore } from '../../src/data/stores/account';
 import { exportContacts, saveContact } from '../../src/engine/client/pim';
 import { importContactsFromPaths, writeContactsToTempVCF } from '../../src/features/contacts/files';
+import { Dialogs } from '../../src/platform/app-api';
 import { fakePimEngine, flush } from '../support/fake-pim-engine';
 
 const CARD = 'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ada\r\nEND:VCARD\r\n';
@@ -27,7 +28,9 @@ describe('contacts on the engine', function () {
     engine.answers['contacts.update'] = () => ({});
     engine.answers['contacts.create'] = () => ({});
     spyOn(AccountStore, 'accountForId').andReturn({ id: 'a1' });
-    info = spyOn(require('@electron/remote').dialog, 'showMessageBox');
+    info = spyOn(Dialogs, 'showMessageBox').andReturn(
+      Promise.resolve({ response: 0, checkboxChecked: false })
+    );
     file = path.join(os.tmpdir(), `contact-files-spec-${process.pid}.vcf`);
   });
 

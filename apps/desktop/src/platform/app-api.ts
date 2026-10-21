@@ -14,6 +14,7 @@ import type {
   MenuItemTemplate,
   MenuPosition,
   MessageBoxOptions,
+  PrintWindowOptions,
   QuickPreviewCapture,
   QuickPreviewDisplay,
   StaticPageOptions,
@@ -59,6 +60,19 @@ export const Dialogs = {
   async ask(options: MessageBoxOptions, parent: DialogParent): Promise<number> {
     const { response } = await Dialogs.showMessageBox(options, parent);
     return response;
+  },
+
+  /**
+   * The blocking form of `ask`, for synchronous public APIs only. Returns `cancelId` (or -1)
+   * if main can't show the dialog.
+   */
+  askSync(options: MessageBoxOptions, parent: DialogParent): number {
+    const response = AppApiTransport.sendSync(
+      'app-api:sync:dialog:show-message-box',
+      options,
+      parent
+    );
+    return typeof response === 'number' ? response : (options.cancelId ?? -1);
   },
 
   showOpenDialog(options: Electron.OpenDialogOptions, parent: DialogParent) {
@@ -265,6 +279,13 @@ export const QuickPreviewWindows = {
   },
   capture(options: QuickPreviewCapture) {
     return AppApiTransport.invoke('app-api:quickpreview:capture', options);
+  },
+};
+
+export const PrintWindows = {
+  /** Opens the print preview of print.html in the temp directory; write that file first. */
+  open(options: PrintWindowOptions) {
+    return AppApiTransport.invoke('app-api:print:open', options);
   },
 };
 

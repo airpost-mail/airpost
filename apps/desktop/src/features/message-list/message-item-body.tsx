@@ -16,8 +16,7 @@ import {
   contentSecurityPolicyMetaTag,
   messageContentSecurityPolicy,
 } from '../../mail/content-security-policy';
-import { BrowserWindow } from '@electron/remote';
-import { developerToolsAvailable } from '../../platform/developer-tools';
+import { App, openStaticPage } from '../../platform/app-api';
 
 const TransparentPixel =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNikAQAACIAHF/uBd8AAAAASUVORK5CYII=';
@@ -122,10 +121,7 @@ export default class MessageItemBody extends React.Component<
 
   _onShowClipped = async () => {
     const { message } = this.props;
-    const filepath = require('path').join(
-      require('@electron/remote').app.getPath('temp'),
-      `${message.id}.html`
-    );
+    const filepath = require('path').join(await App.getPath('temp'), `${message.id}.html`);
     // The full body gets the same sanitizing and formatting as the reading pane; only the
     // length clip is skipped.
     const { body, remoteImages } = await MessageBodyProcessor.processUnclipped(message);
@@ -135,17 +131,7 @@ export default class MessageItemBody extends React.Component<
     const csp = contentSecurityPolicyMetaTag(messageContentSecurityPolicy({ remoteImages }));
     // The charset tag keeps non-ASCII text from rendering garbled
     fs.writeFileSync(filepath, `${csp}\n<meta charset="UTF-8">\n${html}`);
-    const win = new BrowserWindow({
-      title: `${message.subject}`,
-      width: 800,
-      height: 600,
-      webPreferences: {
-        javascript: false,
-        nodeIntegration: false,
-        devTools: developerToolsAvailable(),
-      },
-    });
-    win.loadURL(`file://${filepath}`);
+    openStaticPage({ filePath: filepath, title: `${message.subject}`, width: 800, height: 600 });
   };
 
   _mergeBodyWithFiles(body: string) {

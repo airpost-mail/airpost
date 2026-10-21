@@ -5,6 +5,7 @@ import * as CalendarUtils from '../../../data/calendar/ics';
 import DatabaseStore from '../../../data/database/store';
 import { Event } from '../../../data/models/event';
 import { localized } from '../../../intl/localize';
+import { Dialogs } from '../../../platform/app-api';
 import React from 'react';
 import { ProposeTimePopover } from '../../../components/propose-time-popover';
 import { EventOccurrence, occurrenceStartUnix, occurrenceEndUnix } from '../data-source';
@@ -176,20 +177,33 @@ export function openProposeNewTimePopover(occurrence: EventOccurrence): void {
   );
 }
 
+let offeringCounter = false;
+
 /**
  * What a guest gets for trying to move a meeting: only the organizer reschedules one (RFC 5546
  * section 2.1.4), so the dialog offers the counter-proposal that stands in for the move.
  */
-export function offerCounterInsteadOfMove(occurrence: EventOccurrence): void {
-  const response = require('@electron/remote').dialog.showMessageBoxSync({
-    type: 'info',
-    buttons: [localized('Propose a new time'), localized('Cancel')],
-    defaultId: 0,
-    cancelId: 1,
-    title: localized("This meeting can't be rescheduled"),
-    message: localized('Only the organizer can move "%@".', occurrence.title),
-    detail: localized('You can propose a new time to the organizer instead.'),
-  });
+export async function offerCounterInsteadOfMove(occurrence: EventOccurrence): Promise<void> {
+  // The window takes input while the dialog is open; a repeated arrow key or drag doesn't stack another.
+  if (offeringCounter) return;
+  offeringCounter = true;
+  let response: number;
+  try {
+    response = await Dialogs.ask(
+      {
+        type: 'info',
+        buttons: [localized('Propose a new time'), localized('Cancel')],
+        defaultId: 0,
+        cancelId: 1,
+        title: localized("This meeting can't be rescheduled"),
+        message: localized('Only the organizer can move "%@".', occurrence.title),
+        detail: localized('You can propose a new time to the organizer instead.'),
+      },
+      'none'
+    );
+  } finally {
+    offeringCounter = false;
+  }
   if (response === 0) {
     openProposeNewTimePopover(occurrence);
   }

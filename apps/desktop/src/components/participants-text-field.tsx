@@ -1,5 +1,5 @@
 import React from 'react';
-import { ipcRenderer } from 'electron';
+import { clipboard, ipcRenderer } from 'electron';
 import { localized } from '../intl/localize';
 import * as Utils from '../data/models/utils';
 import { Contact } from '../data/models/contact';
@@ -12,6 +12,7 @@ import DatabaseStore from '../data/database/store';
 import { TokenizingTextField } from './tokenizing-text-field';
 import { Menu } from './menu';
 import { InjectedComponentSet } from './injected/component-set';
+import { Menus } from '../platform/app-api';
 
 const TokenRenderer = (props: { token: object }) => {
   const contact = props.token as Contact;
@@ -180,30 +181,17 @@ export default class ParticipantsTextField extends React.Component<ParticipantsT
   };
 
   _onShowContextMenu = (participant: Contact) => {
-    // Warning: Menu is already initialized as Menu.ts!
-    const MenuClass = require('@electron/remote').Menu;
-    const MenuItem = require('@electron/remote').MenuItem;
-    const clipboard = require('@electron/remote').clipboard;
-
-    const menu = new MenuClass();
-    menu.append(
-      new MenuItem({
+    Menus.popup([
+      {
         label: `${localized(`Copy`)} ${participant.email}`,
         click: () => clipboard.writeText(participant.email),
-      })
-    );
-    menu.append(
-      new MenuItem({
-        type: 'separator',
-      })
-    );
-    menu.append(
-      new MenuItem({
+      },
+      { type: 'separator' },
+      {
         label: localized('Remove'),
         click: () => this._remove([participant]),
-      })
-    );
-    menu.popup({});
+      },
+    ]);
   };
 
   _onInputTrySubmit = (

@@ -1,5 +1,6 @@
 import { ICSParticipantStatus } from '../../../data/calendar/ics';
 import { localized } from '../../../intl/localize';
+import { Menus } from '../../../platform/app-api';
 import { EventOccurrence } from '../data-source';
 import { canRespondToEvent, myParticipationStatus, respondToCalendarEvent } from './rsvp';
 
@@ -93,6 +94,6 @@ export class CalendarEventContextMenu {
   }
 
   displayMenu() {
-    require('@electron/remote').Menu.buildFromTemplate(this.template()).popup({});
+    Menus.popup(this.template());
   }
 }

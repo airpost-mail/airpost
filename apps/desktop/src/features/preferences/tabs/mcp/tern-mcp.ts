@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
+import { App } from '../../../../platform/app-api';
 
 // The bundled tern-mcp binary (apps/mcp), shipped next to tern-engine in app.asar.unpacked.
 // Installing into an MCP client, the status and the stale-entry check all run tern-mcp, so
@@ -94,17 +95,17 @@ export async function ternMcpStatus(configDir: string): Promise<TernMcpStatus> {
  * into the client's config, so a dev build, a mounted DMG or a translocated copy in
  * ~/Downloads would leave an entry that breaks once the app is moved.
  */
-export function isStableInstall({
+export async function isStableInstall({
   devMode,
   platform,
   inApplicationsFolder,
 }: {
   devMode: boolean;
   platform: string;
-  inApplicationsFolder: () => boolean;
+  inApplicationsFolder: () => Promise<boolean>;
 }) {
   if (devMode) return false;
-  return platform !== 'darwin' || inApplicationsFolder();
+  return platform !== 'darwin' || (await inApplicationsFolder());
 }
 
 /**
@@ -117,10 +118,10 @@ export async function replaceStaleBridgeEntryOnce(configDir: string) {
   if (AppEnv.inSpecMode() || !AppEnv.isMainWindow()) return;
   if (AppEnv.config.get(STALE_ENTRY_CHECKED)) return;
   // Not yet installed for good: leave the flag unset so a later launch does the check.
-  const stable = isStableInstall({
+  const stable = await isStableInstall({
     devMode: AppEnv.inDevMode(),
     platform: process.platform,
-    inApplicationsFolder: () => require('@electron/remote').app.isInApplicationsFolder(),
+    inApplicationsFolder: () => App.isInApplicationsFolder(),
   });
   if (!stable) return;
   if (!ternMcpBinary()) return;

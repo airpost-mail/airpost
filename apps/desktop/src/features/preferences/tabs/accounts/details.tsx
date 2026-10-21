@@ -10,7 +10,7 @@ import { SettingsSelect } from '../../../../components/settings-select';
 import { localized } from '../../../../intl/localize';
 import RegExpUtils from '../../../../utils/regexp';
 import { Account, AccountAutoaddress } from '../../../../data/models/account';
-import { developerToolsAvailable } from '../../../../platform/developer-tools';
+import { Dialogs, App, openStaticPage } from '../../../../platform/app-api';
 
 /** One address the account sends from, shown as text until the user edits it. */
 class AliasRow extends Component<
@@ -216,25 +216,38 @@ class PreferencesAccountDetails extends Component<
     this._saveChanges();
   };
 
-  _onRemoveAccount = () => {
+  /** The remove confirmation is open; the window takes input meanwhile, so a second click is ignored. */
+  _confirmingRemove = false;
+
+  _onRemoveAccount = async () => {
+    if (this._confirmingRemove) return;
     const { account } = this.props;
-    const chosen = require('@electron/remote').dialog.showMessageBoxSync({
-      type: 'warning',
-      message: localized('Remove %@?', account.emailAddress),
-      detail: localized(
-        "Its mail is deleted from this computer. Your mail stays on your provider's server."
-      ),
-      buttons: [localized('Cancel'), localized('Remove')],
-      defaultId: 0,
-      cancelId: 0,
-    });
+    this._confirmingRemove = true;
+    let chosen: number;
+    try {
+      chosen = await Dialogs.ask(
+        {
+          type: 'warning',
+          message: localized('Remove %@?', account.emailAddress),
+          detail: localized(
+            "Its mail is deleted from this computer. Your mail stays on your provider's server."
+          ),
+          buttons: [localized('Cancel'), localized('Remove')],
+          defaultId: 0,
+          cancelId: 0,
+        },
+        'none'
+      );
+    } finally {
+      this._confirmingRemove = false;
+    }
     if (chosen === 1) this.props.onRemoveAccount?.(account);
   };
 
   _onShowErrorDetails = async () => {
     const { id, syncState, settings, provider } = this.props.account;
     const filepath = require('path').join(
-      require('@electron/remote').app.getPath('temp'),
+      await App.getPath('temp'),
       `error-details-${id}-${Date.now()}.html`
     );
 
@@ -259,18 +272,12 @@ class PreferencesAccountDetails extends Component<
       AppEnv.showErrorDialog({ title: 'Error', message: `Could not retrieve sync logs. ${err}` });
       return;
     }
-    const { BrowserWindow } = require('@electron/remote');
-    const win = new BrowserWindow({
+    openStaticPage({
+      filePath: filepath,
+      title: `Account ${id} - Recent Logs`,
       width: 800,
       height: 600,
-      title: `Account ${id} - Recent Logs`,
-      webPreferences: {
-        javascript: false,
-        nodeIntegration: false,
-        devTools: developerToolsAvailable(),
-      },
     });
-    win.loadURL(`file://${filepath}`);
   };
 
   // Renderers

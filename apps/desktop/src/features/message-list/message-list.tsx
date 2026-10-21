@@ -28,6 +28,7 @@ import FindInThread from './find-in-thread';
 import MessageItemContainer from './message-item-container';
 import { MessageListScrollTooltip } from './scroll-tooltip';
 import { SubjectLineIcons } from './subject-line-icons';
+import { Menus } from '../../platform/app-api';
 
 type MinifiedBundle = { type: 'minifiedBundle'; messages: Message[] };
 type MessageOrBundle = Message | MinifiedBundle;
@@ -49,7 +50,6 @@ interface MessageListState {
   focusedMessageIndex: number;
 }
 
-const { Menu, MenuItem } = require('@electron/remote');
 const PREF_REPLY_TYPE = 'core.sending.defaultReplyType';
 const PREF_RESTRICT_WIDTH = 'core.reading.restrictMaxWidth';
 const PREF_DESCENDING_ORDER = 'core.reading.descendingOrderMessageList';
@@ -535,9 +535,7 @@ class MessageList extends React.Component<Record<string, unknown>, MessageListSt
 
     function _onSubjectContextMenu() {
       if (window.getSelection()?.type == 'Range') {
-        const menu = new Menu();
-        menu.append(new MenuItem({ role: 'copy' }));
-        menu.popup({});
+        Menus.popup([{ role: 'copy' }]);
       }
     }
   }

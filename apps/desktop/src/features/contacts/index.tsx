@@ -3,6 +3,7 @@ import ComponentRegistry from '../../packages/component-registry';
 import * as Actions from '../../data/actions';
 import { AccountStore } from '../../data/stores/account';
 import { localized } from '../../intl/localize';
+import { Dialogs } from '../../platform/app-api';
 import { ContactPerspectivesList } from './perspectives-list';
 import { ContactDetailToolbar } from './detail-toolbar';
 import { AddContactToolbar } from './add-contact-toolbar';
@@ -88,12 +89,15 @@ export function activate() {
       if (accountId) {
         importContactsFromFile(accountId);
       } else {
-        require('@electron/remote').dialog.showMessageBox({
-          type: 'info',
-          title: localized('No Account'),
-          message: localized('Add an account to import contacts into.'),
-          buttons: [localized('OK')],
-        });
+        Dialogs.showMessageBox(
+          {
+            type: 'info',
+            title: localized('No Account'),
+            message: localized('Add an account to import contacts into.'),
+            buttons: [localized('OK')],
+          },
+          'none'
+        );
       }
     },
     'contacts:export-vcf-all': () => {

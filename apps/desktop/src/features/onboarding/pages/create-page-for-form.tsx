@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { RetinaImg } from '../../../components/retina-img';
 import { localized } from '../../../intl/localize';
+import { Dialogs } from '../../../platform/app-api';
 import { Account } from '../../../data/models/account';
 
 import * as OnboardingActions from '../actions';
@@ -146,7 +147,13 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
       OnboardingActions.moveToPreviousPage();
     };
 
-    onConnect = (updatedAccount?: Account) => {
+    /** The Gmail-over-IMAP warning is open; the window takes input meanwhile, so another Enter is ignored. */
+    _warningOpen = false;
+
+    onConnect = async (updatedAccount?: Account) => {
+      if (this._warningOpen) {
+        return;
+      }
       const account = updatedAccount || this.state.account;
       // render() already threw for an account whose provider isn't in AccountProviders.
       const providerConfig = AccountProviders.find(
@@ -162,14 +169,23 @@ const CreatePageForForm = (FormComponent: React.ComponentType<any> & Record<stri
         account.settings.imap_host.includes('imap.gmail.com')
       ) {
         didWarnAboutGmailIMAP = true;
-        const buttonIndex = require('@electron/remote').dialog.showMessageBoxSync({
-          type: 'warning',
-          buttons: [localized('Go Back'), localized('Continue')],
-          message: localized('Are you sure?'),
-          detail: localized(
-            `This looks like a Gmail account! While it's possible to setup an App Password and connect to Gmail via IMAP, Tern also supports Google OAuth. Go back and select "Gmail & Google Apps" from the provider screen.`
-          ),
-        });
+        this._warningOpen = true;
+        let buttonIndex: number;
+        try {
+          buttonIndex = await Dialogs.ask(
+            {
+              type: 'warning',
+              buttons: [localized('Go Back'), localized('Continue')],
+              message: localized('Are you sure?'),
+              detail: localized(
+                `This looks like a Gmail account! While it's possible to setup an App Password and connect to Gmail via IMAP, Tern also supports Google OAuth. Go back and select "Gmail & Google Apps" from the provider screen.`
+              ),
+            },
+            'none'
+          );
+        } finally {
+          this._warningOpen = false;
+        }
         if (buttonIndex === 0) {
           OnboardingActions.moveToPage('account-choose');
           return;

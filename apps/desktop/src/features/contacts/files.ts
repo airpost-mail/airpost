@@ -12,14 +12,10 @@ import { Contact } from '../../data/models/contact';
 import { AccountStore } from '../../data/stores/account';
 import { localized } from '../../intl/localize';
 import { exportContacts, importContacts } from '../../engine/client/pim';
+import { Dialogs } from '../../platform/app-api';
 
 function showInfo(title: string, message: string) {
-  require('@electron/remote').dialog.showMessageBox({
-    type: 'info',
-    title,
-    message,
-    buttons: [localized('OK')],
-  });
+  Dialogs.showMessageBox({ type: 'info', title, message, buttons: [localized('OK')] }, 'none');
 }
 
 /** Show a native save dialog and write the given contacts to a .vcf file. */

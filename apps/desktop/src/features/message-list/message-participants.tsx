@@ -4,8 +4,9 @@ import React from 'react';
 import { localized } from '../../intl/localize';
 import * as Actions from '../../data/actions';
 import { Contact } from '../../data/models/contact';
+import { clipboard } from 'electron';
+import { Menus } from '../../platform/app-api';
 
-const { Menu, MenuItem, clipboard } = require('@electron/remote');
 const MAX_COLLAPSED = 5;
 
 interface MessageParticipantsProps {
@@ -71,22 +72,18 @@ export default class MessageParticipants extends React.Component<MessageParticip
   };
 
   _onContactContextMenu = (contact: Contact) => {
-    const menu = new Menu();
-    menu.append(
+    Menus.popup([
       window.getSelection()?.type == 'Range'
-        ? new MenuItem({ role: 'copy' })
-        : new MenuItem({
+        ? { role: 'copy' }
+        : {
             label: `${localized(`Copy`)} "${contact.email}"`,
             click: () => clipboard.writeText(contact.email),
-          })
-    );
-    menu.append(
-      new MenuItem({
+          },
+      {
         label: `${localized(`Email`)} ${contact.name ?? contact.email}`,
         click: () => Actions.composeNewDraftToRecipient(contact),
-      })
-    );
-    menu.popup({});
+      },
+    ]);
   };
 
   _renderFullContacts(contacts: Contact[] = []) {

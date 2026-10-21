@@ -39,6 +39,20 @@ describe('the app-api client', function () {
     expect(invoked).toEqual([['app-api:dialog:show-message-box', options, 'none']]);
   });
 
+  it('asks synchronously, answering cancelId when main gives no answer', () => {
+    const options = { message: 'Sure?', buttons: ['Send', 'Cancel'], cancelId: 1 };
+    syncResult = 0;
+    expect(Dialogs.askSync(options, 'window')).toBe(0);
+    expect(AppApiTransport.sendSync).toHaveBeenCalledWith(
+      'app-api:sync:dialog:show-message-box',
+      options,
+      'window'
+    );
+    syncResult = null;
+    expect(Dialogs.askSync(options, 'window')).toBe(1);
+    expect(Dialogs.askSync({ message: 'Sure?' }, 'none')).toBe(-1);
+  });
+
   it('reads the window from one snapshot and sends commands', () => {
     syncResult = {
       bounds: { x: 5, y: 6, width: 700, height: 500 },

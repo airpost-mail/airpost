@@ -14,16 +14,13 @@ import Sheet from '../../src/components/sheets/sheet';
 import AccountSwitcher from '../../src/features/account-sidebar/account-switcher';
 import AccountSidebar from '../../src/features/account-sidebar/account-sidebar';
 import SidebarStore from '../../src/features/account-sidebar/sidebar-store';
+import { Menus } from '../../src/platform/app-api';
 
 describe('AccountSwitcher on the UI kit', function () {
   let popup: jasmine.Spy;
-  let buildFromTemplate: jasmine.Spy;
 
   beforeEach(() => {
-    popup = jasmine.createSpy('popup');
-    buildFromTemplate = spyOn(require('@electron/remote').Menu, 'buildFromTemplate').andReturn({
-      popup,
-    });
+    popup = spyOn(Menus, 'popup').andReturn(Promise.resolve());
   });
 
   afterEach(() => cleanup());
@@ -49,9 +46,8 @@ describe('AccountSwitcher on the UI kit', function () {
   it('opens the native menu on mouse down', () => {
     const { container } = renderSwitcher();
     fireEvent.mouseDown(container.querySelector('.account-switcher'));
-    expect(buildFromTemplate.callCount).toBe(1);
     expect(popup.callCount).toBe(1);
-    const labels = buildFromTemplate.calls[0].args[0].map((i) => i.label);
+    const labels = popup.calls[0].args[0].map((i) => i.label);
     expect(labels).toContain('Add Account...');
     expect(labels).toContain('Manage Accounts...');
   });

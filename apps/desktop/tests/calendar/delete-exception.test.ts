@@ -4,7 +4,7 @@ import * as Actions from '../../src/data/actions';
 import DatabaseStore from '../../src/data/database/store';
 import { DestroyEventTask } from '../../src/data/tasks/destroy-event';
 import { SyncbackEventTask } from '../../src/data/tasks/syncback-event';
-import { dialog } from '@electron/remote';
+import { Dialogs } from '../../src/platform/app-api';
 import { Event as EventModel } from '../../src/data/models/event';
 import { MainCalendar } from '../../src/features/main-calendar/main-calendar';
 import { TimedOccurrence } from '../../src/features/main-calendar/data-source';
@@ -168,7 +168,7 @@ describe('deleting one plain occurrence from the calendar', function () {
     stubEngine();
     spyOn(DatabaseStore, 'find').andReturn(Promise.resolve(master()));
     // The recurring-event dialog's first button is "this occurrence".
-    choice = spyOn(dialog, 'showMessageBoxSync').andReturn(0);
+    choice = spyOn(Dialogs, 'ask').andReturn(Promise.resolve(0));
   });
 
   it('removes that slot alone when told to', async function () {
@@ -184,7 +184,7 @@ describe('deleting one plain occurrence from the calendar', function () {
   });
 
   it('destroys the series when told to delete every occurrence', async function () {
-    choice.andReturn(1);
+    choice.andReturn(Promise.resolve(1));
     const calendar: any = new MainCalendar({} as any);
 
     await calendar._deleteEvent(plain);

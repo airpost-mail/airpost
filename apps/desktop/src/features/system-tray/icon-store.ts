@@ -1,11 +1,11 @@
 import path from 'path';
 import { ipcRenderer } from 'electron';
 import BadgeStore from '../../data/stores/badge';
+import { App } from '../../platform/app-api';
 
 // Must be absolute real system path
 // https://github.com/atom/electron/issues/1299
 const { platform } = process;
-const { nativeTheme } = require('@electron/remote');
 
 /*
 Current / Intended Behavior:
@@ -41,11 +41,12 @@ class SystemTrayIconStore {
       window.removeEventListener('browser-window-focus', this._onWindowFocus);
       window.removeEventListener('browser-window-hide', this._onWindowBackgrounded);
       window.removeEventListener('browser-window-blur', this._onWindowBackgrounded);
-      nativeTheme.removeListener('updated', this._onNativeThemeUpdated);
+      ipcRenderer.removeListener('system-dark-mode-changed', this._onNativeThemeUpdated);
     });
 
-    // If the theme changes from bright to dark mode or vice versa, we need to update the tray icon
-    nativeTheme.on('updated', this._onNativeThemeUpdated);
+    // If the theme changes from bright to dark mode or vice versa, we need to update the tray icon.
+    // Main sends this when nativeTheme's shouldUseDarkColors changes.
+    ipcRenderer.on('system-dark-mode-changed', this._onNativeThemeUpdated);
   }
 
   deactivate() {
@@ -70,13 +71,7 @@ class SystemTrayIconStore {
   // Returns '-dark' when we need a light icon (for dark backgrounds).
   _dark = () => {
     if (process.platform === 'win32') {
-      // nativeTheme is accessed via @electron/remote; guard against the remote
-      // object being GC'd during window teardown.
-      try {
-        return nativeTheme.shouldUseDarkColors ? '-dark' : '';
-      } catch {
-        return '';
-      }
+      return App.shouldUseDarkColors() ? '-dark' : '';
     }
     if (process.platform === 'linux') {
       const traySystemTheme = AppEnv.config.get('core.workspace.traySystemTheme') || 'automatic';
@@ -93,11 +88,7 @@ class SystemTrayIconStore {
       if (desktop.includes('GNOME') || desktop.includes('UNITY')) {
         return '-dark';
       }
-      try {
-        return nativeTheme.shouldUseDarkColors ? '-dark' : '';
-      } catch {
-        return '';
-      }
+      return App.shouldUseDarkColors() ? '-dark' : '';
     }
     return '';
   };

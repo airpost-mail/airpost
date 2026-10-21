@@ -16,6 +16,7 @@ import MessageControls from '../../src/features/message-list/message-controls';
 import { SidebarParticipantPicker } from '../../src/features/message-list/sidebar-participant-picker';
 import { getPortalContainer } from '../../src/components/kit/portal';
 import { wait } from '../support/kit-helpers';
+import { Menus } from '../../src/platform/app-api';
 
 const proxyquire = require('proxyquire').noPreserveCache();
 
@@ -178,11 +179,7 @@ describe('Message list on the UI kit', function () {
 
   describe('MessageControls', () => {
     it('opens the native actions menu from an icon button', () => {
-      const popup = jasmine.createSpy('popup');
-      const buildFromTemplate = spyOn(
-        require('@electron/remote').Menu,
-        'buildFromTemplate'
-      ).andReturn({ popup });
+      const popup = spyOn(Menus, 'popup').andReturn(Promise.resolve());
       const { container } = render(<MessageControls thread={thread} message={makeMessage()} />);
       const ellipsis = container.querySelector('.message-actions-ellipsis') as HTMLButtonElement;
       expect(ellipsis.getAttribute('data-slot')).toBe('icon-button');
@@ -190,7 +187,7 @@ describe('Message list on the UI kit', function () {
       expect(ellipsis.tabIndex).toBe(-1);
       fireEvent.click(ellipsis);
       expect(popup.callCount).toBe(1);
-      const labels = buildFromTemplate.calls[0].args[0].map((i) => i.label);
+      const labels = popup.calls[0].args[0].map((i) => i.label);
       expect(labels).toContain('Show Original');
       expect(labels).toContain('Download as .eml');
     });

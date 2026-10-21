@@ -98,6 +98,11 @@ export interface StaticPageOptions {
   height?: number;
 }
 
+export interface PrintWindowOptions {
+  /** The window title and the PDF's default file name. */
+  subject: string;
+}
+
 export interface QuickPreviewDisplay {
   filePath: string;
   /** None for a type no strategy renders: the window opens empty. */
@@ -164,6 +169,8 @@ export interface AppApiInvoke {
     string | null
   >;
   'app-api:menu:popup-application-menu': Channel<[], void>;
+  /** The print preview of the temp dir's print.html, which the window wrote first. */
+  'app-api:print:open': Channel<[options: PrintWindowOptions], void>;
   'app-api:spellchecker:get-available-languages': Channel<[], string[]>;
   'app-api:spellchecker:set-languages': Channel<[languages: string[]], void>;
   'app-api:quickpreview:display': Channel<[options: QuickPreviewDisplay], void>;
@@ -197,6 +204,14 @@ export interface AppApiSync {
   'app-api:sync:should-use-dark-colors': Channel<[], boolean>;
   /** Read in beforeunload callbacks, which answer synchronously. */
   'app-api:sync:open-window-count': Channel<[], number>;
+  /**
+   * showMessageBoxSync, for synchronous public APIs only (the composer's `isValidDraft`, which
+   * plugins call and test as a boolean). The window waits until the dialog closes.
+   */
+  'app-api:sync:dialog:show-message-box': Channel<
+    [options: MessageBoxOptions, parent: DialogParent],
+    number
+  >;
 }
 
 /** Main to the window. */

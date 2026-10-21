@@ -18,6 +18,7 @@ import { SettingsSelect } from '../../../components/settings-select';
 import * as Actions from '../../../data/actions';
 import { localized } from '../../../intl/localize';
 import { isWaylandSession } from '../../../platform/linux-desktop';
+import { App } from '../../../platform/app-api';
 import { LABEL_COLOR_SCHEMES, LABEL_COLOR_SCHEME_NAMES } from '../../../data/stores/label-color';
 import LessCompileCache from '../../../packages/compile-cache-less';
 import {
@@ -377,8 +378,8 @@ function WindowControlsRows() {
         <Button
           variant="outline"
           onClick={() => {
-            require('@electron/remote').app.relaunch();
-            require('@electron/remote').app.quit();
+            App.relaunch();
+            App.quit();
           }}
         >
           {localized('Relaunch')}
